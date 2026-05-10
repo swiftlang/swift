@@ -10,12 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "llvm/ADT/SmallVector.h"
-#include "llvm/Support/ErrorHandling.h"
-#include "swift/AST/Comment.h"
-#include "swift/Markup/LineList.h"
 #include "swift/Markup/Markup.h"
 #include "cmark-gfm.h"
+#include "swift/AST/Comment.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Markup/LineList.h"
+#include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/ErrorHandling.h"
+#include <optional>
 
 using namespace swift;
 using namespace markup;
@@ -137,7 +139,7 @@ ParseResult<Strong> parseStrong(MarkupContext &MC, ParseState State) {
 }
 
 ParseResult<Header> parseHeader(MarkupContext &MC, ParseState State) {
-  assert(cmark_node_get_type(State.Node) == CMARK_NODE_HEADER
+  assert(cmark_node_get_type(State.Node) == CMARK_NODE_HEADING
       && State.Event == CMARK_EVENT_ENTER);
   auto Level = cmark_node_get_header_level(State.Node);
   SmallVector<MarkupASTNode *, 2> Children;
@@ -149,19 +151,19 @@ ParseResult<Header> parseHeader(MarkupContext &MC, ParseState State) {
 }
 
 ParseResult<HRule> parseHRule(MarkupContext &MC, ParseState State) {
-  assert(cmark_node_get_type(State.Node) == CMARK_NODE_HRULE
+  assert(cmark_node_get_type(State.Node) == CMARK_NODE_THEMATIC_BREAK
       && State.Event == CMARK_EVENT_ENTER);
   return { HRule::create(MC), State.next() };
 }
 
 ParseResult<HTML> parseHTML(MarkupContext &MC, ParseState State) {
-  assert(cmark_node_get_type(State.Node) == CMARK_NODE_HTML
+  assert(cmark_node_get_type(State.Node) == CMARK_NODE_HTML_BLOCK
       && State.Event == CMARK_EVENT_ENTER);
   return {HTML::create(MC, getLiteralContent(MC, State.Node)), State.next()};
 }
 
 ParseResult<InlineHTML> parseInlineHTML(MarkupContext &MC, ParseState State) {
-  assert(cmark_node_get_type(State.Node) == CMARK_NODE_INLINE_HTML
+  assert(cmark_node_get_type(State.Node) == CMARK_NODE_HTML_INLINE
       && State.Event == CMARK_EVENT_ENTER);
   return {InlineHTML::create(MC, getLiteralContent(MC, State.Node)),
           State.next()};
@@ -174,7 +176,8 @@ ParseResult<Image> parseImage(MarkupContext &MC, ParseState State) {
   
   auto NodeTitle = cmark_node_get_title(State.Node);
   std::string TitleString = NodeTitle ? NodeTitle : "";
-  auto Title = TitleString.empty() ? None : Optional<StringRef>(TitleString);
+  auto Title = TitleString.empty() ? std::nullopt
+                                   : std::optional<StringRef>(TitleString);
 
   SmallVector<MarkupASTNode *, 2> Children;
   auto ResultState = parseChildren(MC, State, Children);
@@ -216,6 +219,15 @@ ParseResult<Link> parseLink(MarkupContext &MC, ParseState State) {
   return { Link::create(MC, Destination, Children), ResultState.next() };
 }
 
+ParseResult<InlineAttributes> parseAttribute(MarkupContext &MC, ParseState State) {
+  assert(cmark_node_get_type(State.Node) == CMARK_NODE_ATTRIBUTE && State.Event == CMARK_EVENT_ENTER);
+  std::string Attributes(cmark_node_get_attributes(State.Node));
+  SmallVector<MarkupASTNode *, 2> Children;
+  auto ResultState = parseChildren(MC, State, Children);
+  assert(State.Node == ResultState.Node && ResultState.Event == CMARK_EVENT_EXIT);
+  return { InlineAttributes::create(MC, Attributes, Children), ResultState.next() };
+}
+
 ParseResult<List> parseList(MarkupContext &MC, ParseState State) {
   assert(cmark_node_get_type(State.Node) == CMARK_NODE_LIST
       && State.Event == CMARK_EVENT_ENTER);
@@ -245,6 +257,13 @@ ParseResult<MarkupASTNode> parseElement(MarkupContext &MC, ParseState State) {
   case CMARK_NODE_DOCUMENT: {
     llvm_unreachable("Markup documents cannot be nested");
   }
+  case CMARK_NODE_FOOTNOTE_REFERENCE:
+  case CMARK_NODE_FOOTNOTE_DEFINITION: {
+    llvm_unreachable("Footnotes are not currently parsed by swiftMarkup");
+  }
+  case CMARK_NODE_ATTRIBUTE: {
+    return parseAttribute(MC, State);
+  }
   case CMARK_NODE_BLOCK_QUOTE: {
     return parseBlockQuote(MC, State);
   }
@@ -257,20 +276,17 @@ ParseResult<MarkupASTNode> parseElement(MarkupContext &MC, ParseState State) {
   case CMARK_NODE_EMPH: {
     return parseEmphasis(MC, State);
   }
-  case CMARK_NODE_HEADER: {
+  case CMARK_NODE_HEADING: {
     return parseHeader(MC, State);
   }
-  case CMARK_NODE_HRULE: {
-    return parseHRule(MC, State);
-  }
-  case CMARK_NODE_HTML: {
+  case CMARK_NODE_HTML_BLOCK: {
     return parseHTML(MC, State);
+  }
+  case CMARK_NODE_HTML_INLINE: {
+    return parseInlineHTML(MC, State);
   }
   case CMARK_NODE_IMAGE: {
     return parseImage(MC, State);
-  }
-  case CMARK_NODE_INLINE_HTML: {
-    return parseInlineHTML(MC, State);
   }
   case CMARK_NODE_ITEM: {
     return parseItem(MC, State);
@@ -295,6 +311,9 @@ ParseResult<MarkupASTNode> parseElement(MarkupContext &MC, ParseState State) {
   }
   case CMARK_NODE_TEXT: {
     return parseText(MC, State);
+  }
+  case CMARK_NODE_THEMATIC_BREAK: {
+    return parseHRule(MC, State);
   }
   default: {
     llvm_unreachable("Can't parse a Markup node of type 'None'");

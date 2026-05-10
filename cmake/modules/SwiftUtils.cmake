@@ -107,6 +107,29 @@ function(get_bootstrapping_swift_lib_dir bs_lib_dir bootstrapping)
     elseif("${bootstrapping}" STREQUAL "")
       get_bootstrapping_path(bs_lib_dir ${lib_dir} "1")
     endif()
+  elseif(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+    if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
+      # Compiler's INSTALL_RPATH is set to libs in the build directory
+      # For building stdlib, use stdlib in the builder's resource directory
+      # because the runtime may not be built yet.
+      # FIXME: This assumes the ABI hasn't changed since the builder.
+      get_filename_component(swift_bin_dir ${CMAKE_Swift_COMPILER} DIRECTORY)
+      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
+
+      # Detect and handle swiftly-managed hosts.
+      if(swift_bin_dir MATCHES ".*/swiftly/bin")
+        execute_process(COMMAND swiftly use --print-location
+          OUTPUT_VARIABLE swiftly_dir
+          ERROR_VARIABLE err)
+        if(err)
+          message(SEND_ERROR "Failed to find swiftly Swift compiler")
+        endif()
+        string(STRIP "${swiftly_dir}" swiftly_dir)
+        set(swift_dir "${swiftly_dir}/usr")
+      endif()
+
+      set(bs_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    endif()
   endif()
   set(bs_lib_dir ${bs_lib_dir} PARENT_SCOPE)
 endfunction()
@@ -161,14 +184,15 @@ function(swift_create_post_build_symlink target)
     ""
     ${ARGN})
 
-  if("${CMAKE_SYSTEM_NAME}" STREQUAL "Windows")
-    if(CS_IS_DIRECTORY)
-      set(cmake_symlink_option "copy_directory")
-    else()
-      set(cmake_symlink_option "copy_if_different")
-    endif()
+  if(CS_IS_DIRECTORY)
+    set(cmake_symlink_option "${SWIFT_COPY_OR_SYMLINK_DIR}")
   else()
-      set(cmake_symlink_option "create_symlink")
+    set(cmake_symlink_option "${SWIFT_COPY_OR_SYMLINK}")
+  endif()
+
+  set(comment_arg)
+  if(CS_COMMENT)
+    set(comment_arg COMMENT "${CS_COMMENT}")
   endif()
 
   add_custom_command(TARGET "${target}" POST_BUILD
@@ -177,34 +201,34 @@ function(swift_create_post_build_symlink target)
       "${CS_SOURCE}"
       "${CS_DESTINATION}"
     WORKING_DIRECTORY "${CS_WORKING_DIRECTORY}"
-    COMMENT "${CS_COMMENT}")
+    ${comment_arg})
 endfunction()
 
 # Once swift-frontend is built, if the standalone (early) swift-driver has been built,
 # we create a `swift-driver` symlink adjacent to the `swift` and `swiftc` executables
 # to ensure that `swiftc` forwards to the standalone driver when invoked.
 function(swift_create_early_driver_copies target)
-  # Early swift-driver is built adjacent to the compiler (swift build dir)
-  set(driver_bin_dir "${CMAKE_BINARY_DIR}/../earlyswiftdriver-${SWIFT_HOST_VARIANT}-${SWIFT_HOST_VARIANT_ARCH}/release/bin")
-  set(swift_bin_dir "${SWIFT_RUNTIME_OUTPUT_INTDIR}")
-  # If early swift-driver wasn't built, nothing to do here.
-  if(NOT EXISTS "${driver_bin_dir}/swift-driver" OR NOT EXISTS "${driver_bin_dir}/swift-help")
-      message(STATUS "Skipping creating early SwiftDriver symlinks - no early SwiftDriver build found.")
-      return()
+  set(SWIFT_EARLY_SWIFT_DRIVER_BUILD "" CACHE PATH "Path to early swift-driver build")
+
+  if(NOT SWIFT_EARLY_SWIFT_DRIVER_BUILD)
+    return()
   endif()
 
-  message(STATUS "Copying over early SwiftDriver executable.")
-  message(STATUS "From: ${driver_bin_dir}/swift-driver")
-  message(STATUS "To: ${swift_bin_dir}/swift-driver")
-  # Use configure_file instead of file(COPY...) to establish a dependency.
-  # Further Changes to `swift-driver` will cause it to be copied over.
-  configure_file(${driver_bin_dir}/swift-driver ${swift_bin_dir}/swift-driver COPYONLY)
+  if(EXISTS ${SWIFT_EARLY_SWIFT_DRIVER_BUILD}/swift-driver${CMAKE_EXECUTABLE_SUFFIX})
+    message(STATUS "Creating early SwiftDriver symlinks")
 
-  message(STATUS "From: ${driver_bin_dir}/swift-help")
-  message(STATUS "To: ${swift_bin_dir}/swift-help")
-  # Use configure_file instead of file(COPY...) to establish a dependency.
-  # Further Changes to `swift-driver` will cause it to be copied over.  
-  configure_file(${driver_bin_dir}/swift-help ${swift_bin_dir}/swift-help COPYONLY)
+    # Use `configure_file` instead of `file(COPY ...)` to establish a
+    # dependency.  Further changes to `swift-driver` will cause it to be copied
+    # over.
+    configure_file(${SWIFT_EARLY_SWIFT_DRIVER_BUILD}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}
+                   ${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-driver${CMAKE_EXECUTABLE_SUFFIX}
+                   COPYONLY)
+    configure_file(${SWIFT_EARLY_SWIFT_DRIVER_BUILD}/swift-help${CMAKE_EXECUTABLE_SUFFIX}
+                   ${SWIFT_RUNTIME_OUTPUT_INTDIR}/swift-help${CMAKE_EXECUTABLE_SUFFIX}
+                   COPYONLY)
+  else()
+    message(STATUS "Not creating early SwiftDriver symlinks (swift-driver not found)")
+  endif()
 endfunction()
 
 function(dump_swift_vars)
@@ -228,4 +252,37 @@ function(is_sdk_requested name result_var_name)
       set("${result_var_name}" "FALSE" PARENT_SCOPE)
     endif()
   endif()
+endfunction()
+
+# Append Swift compilation-caching flags (driven by the SWIFT_CACHING_BUILD_*
+# cache variables) to the named list variable. Callers are responsible for
+# deciding whether caching applies to their target (e.g. checking
+# SWIFT_CACHING_BUILD and the relevant host/runtime guards).
+function(swift_append_caching_compile_flags result_var)
+  list(APPEND ${result_var}
+    "-explicit-module-build"
+    "-cache-compile-job"
+    "-cas-path" "${SWIFT_CACHING_BUILD_CAS_PATH}")
+  if(SWIFT_CACHING_BUILD_PLUGIN_PATH)
+    list(APPEND ${result_var}
+      "-cas-plugin-path" "${SWIFT_CACHING_BUILD_PLUGIN_PATH}")
+  endif()
+  if(SWIFT_CACHING_BUILD_PLUGIN_OPTIONS)
+    string(REPLACE ":" ";" _plugin_opts "${SWIFT_CACHING_BUILD_PLUGIN_OPTIONS}")
+    foreach(_opt IN LISTS _plugin_opts)
+      list(APPEND ${result_var} "-cas-plugin-option" "${_opt}")
+    endforeach()
+  endif()
+  if(SWIFT_CACHING_BUILD_PREFIX_MAP)
+    list(APPEND ${result_var}
+      "-scanner-prefix-map-sdk" "/^sdk"
+      "-scanner-prefix-map-toolchain" "/^toolchain"
+      "-scanner-prefix-map" "${SWIFT_CACHING_BUILD_SOURCE_ROOT}=/^src")
+  endif()
+  if(SWIFT_CACHING_BUILD_ENABLE_MCCAS)
+    list(APPEND ${result_var}
+      "-Xfrontend" "-cas-backend"
+      "-Xllvm" "-cas-friendly-debug-info")
+  endif()
+  set(${result_var} "${${result_var}}" PARENT_SCOPE)
 endfunction()

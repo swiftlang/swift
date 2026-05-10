@@ -17,8 +17,9 @@
 #ifndef SWIFT_SIL_SILVALUE_H
 #define SWIFT_SIL_SILVALUE_H
 
-#include "swift/Basic/Range.h"
 #include "swift/Basic/ArrayRefView.h"
+#include "swift/Basic/Debug.h"
+#include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILArgumentConvention.h"
@@ -26,10 +27,10 @@
 #include "swift/SIL/SILType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 namespace swift {
 
@@ -37,6 +38,7 @@ class DominanceInfo;
 class PostOrderFunctionInfo;
 class ReversePostOrderInfo;
 class Operand;
+class InstructionIndices;
 class SILInstruction;
 class SILArgument;
 class SILLocation;
@@ -270,11 +272,27 @@ struct ValueOwnershipKind {
 
   explicit operator bool() const { return value != OwnershipKind::Any; }
 
+#ifndef __cpp_impl_three_way_comparison
+  // C++20 (more precisely P1185) introduced more overload candidates for
+  // comparison operator calls. With that in place the following definitions are
+  // redundant and actually cause compilation errors because of ambiguity.
+  // P1630 explains the rationale behind introducing this backward
+  // incompatibility.
+  //
+  // References:
+  // https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1185r2.html
+  // https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2019/p1630r1.html
+
   bool operator==(ValueOwnershipKind other) const {
     return value == other.value;
   }
+  bool operator!=(ValueOwnershipKind other) const {
+    return !(value == other.value);
+  }
 
   bool operator==(innerty other) const { return value == other; }
+  bool operator!=(innerty other) const { return !(value == other); }
+#endif
 
   /// We merge by moving down the lattice.
   ValueOwnershipKind merge(ValueOwnershipKind rhs) const {
@@ -320,7 +338,7 @@ struct ValueOwnershipKind {
     return bool(merge(other));
   }
 
-  /// Returns isCompatibleWith(other.getOwnershipKind()).
+  /// Returns isCompatibleWith(other->getOwnershipKind()).
   ///
   /// Definition is inline after SILValue is defined to work around circular
   /// dependencies.
@@ -334,6 +352,30 @@ struct ValueOwnershipKind {
                           return acc;
                         return acc.merge(x);
                       });
+  }
+
+  // An initialized value whose nominal type has a deinit() must be 'owned'. For
+  // example, an owned struct/enum-with-deinit may be initialized by
+  // "forwarding" a trivial value. A struct/enum-with-deinit must be prevented
+  // from forwarding a guaranteed value.
+  //
+  // Simply consider all non-Copyable types to be 'owned'. This could instead be
+  // limited to isValueTypeWithDeinit(). However, forcing non-Copyable types to
+  // be owned is consistent with the fact that their type is non-Trivial and
+  // simplifies reasoning about non-Copyable ownership.
+  ValueOwnershipKind forwardToInit(SILType nominalType) {
+    if (nominalType.isMoveOnly()) {
+      switch (value) {
+      case OwnershipKind::Any:
+      case OwnershipKind::None:
+      case OwnershipKind::Owned:
+        return OwnershipKind::Owned;
+      case OwnershipKind::Guaranteed:
+      case OwnershipKind::Unowned:
+        return *this;
+      }
+    }
+    return *this;
   }
 
   StringRef asString() const;
@@ -461,8 +503,14 @@ public:
   /// entire use list.
   inline bool hasTwoUses() const;
 
-  /// Helper struct for DowncastUserFilterRange
+  /// Helper struct for DowncastUserFilterRange and UserRange
   struct UseToUser;
+
+  using UserRange =
+      llvm::iterator_range<llvm::mapped_iterator<swift::ValueBaseUseIterator,
+                                                 swift::ValueBase::UseToUser,
+                                                 swift::SILInstruction *>>;
+  inline UserRange getUsers() const;
 
   template <typename Subclass>
   using DowncastUserFilterRange =
@@ -488,6 +536,13 @@ public:
     return const_cast<ValueBase*>(this)->getDefiningInstruction();
   }
   SILInstruction *getDefiningInstruction();
+
+  /// Return the instruction that defines this value, terminator instruction
+  /// that produces this result, or null if it is not defined by an instruction.
+  const SILInstruction *getDefiningInstructionOrTerminator() const {
+    return const_cast<ValueBase*>(this)->getDefiningInstructionOrTerminator();
+  }
+  SILInstruction *getDefiningInstructionOrTerminator();
 
   /// Return the SIL instruction that can be used to describe the first time
   /// this value is available.
@@ -544,7 +599,7 @@ public:
 
   /// Return the instruction that defines this value and the appropriate
   /// result index, or None if it is not defined by an instruction.
-  Optional<DefiningInstructionResult> getDefiningInstructionResult();
+  std::optional<DefiningInstructionResult> getDefiningInstructionResult();
 
   /// Returns the ValueOwnershipKind that describes this SILValue's ownership
   /// semantics if the SILValue has ownership semantics. Returns is a value
@@ -558,18 +613,31 @@ public:
 
   bool isLexical() const;
 
+  bool isGuaranteedForwarding() const;
+
+  bool isBeginApplyToken() const;
+
+  bool isBorrowAccessorResult() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.
   ///
   /// NOTE: Please do not use this directly! It is only meant to be used by the
   /// optimizer pass: SILMoveOnlyWrappedTypeEliminator.
-  bool unsafelyEliminateMoveOnlyWrapper() {
-    if (!Type.isMoveOnlyWrapped())
+  bool unsafelyEliminateMoveOnlyWrapper(const SILFunction *fn) {
+    if (!Type.hasAnyMoveOnlyWrapping(fn))
       return false;
-    Type = Type.removingMoveOnlyWrapper();
+    Type = Type.removingAnyMoveOnlyWrapping(fn);
     return true;
   }
+
+  /// Returns true if this value should be traced for optimization debugging
+  /// (it has a debug_value [trace] user).
+  bool hasDebugTrace() const;
+
+  /// Does this SILValue begin a VarDecl scope? Only true in OSSA.
+  bool isFromVarDecl();
 
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
@@ -658,31 +726,18 @@ public:
     return Value->getDefiningInstruction();
   }
 
-  /// Returns the ValueOwnershipKind that describes this SILValue's ownership
-  /// semantics if the SILValue has ownership semantics. Returns is a value
-  /// without any Ownership Semantics.
-  ///
-  /// An example of a SILValue without ownership semantics is a
-  /// struct_element_addr.
-  ///
-  /// NOTE: This is implemented in ValueOwnership.cpp not SILValue.cpp.
-  ///
-  /// FIXME: remove this redundant API from SILValue.
-  ValueOwnershipKind getOwnershipKind() const {
-    return Value->getOwnershipKind();
-  }
-
   /// Verify that this SILValue and its uses respects ownership invariants.
-  void verifyOwnership(DeadEndBlocks *DEBlocks) const;
+  ///
+  /// \p DEBlocks is nullptr when OSSA lifetimes are complete.
+  void verifyOwnership(DeadEndBlocks *DEBlocks, InstructionIndices *instIndices) const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const LLVM_ATTRIBUTE_USED,
-                            "Only for use in the debugger");
+  SWIFT_DEBUG_DUMP;
 };
 
 inline SILNodePointer::SILNodePointer(SILValue value) : node(value) { }
 
 inline bool ValueOwnershipKind::isCompatibleWith(SILValue other) const {
-  return isCompatibleWith(other.getOwnershipKind());
+  return isCompatibleWith(other->getOwnershipKind());
 }
 
 /// Constraints on the ownership of an operand value.
@@ -820,10 +875,17 @@ struct OperandOwnership {
     /// value are in scope.
     /// (ref_element_addr, open_existential_box)
     InteriorPointer,
+
+    // TODO: Remove AnyInteriorPointer after fixing
+    // OperandOwnership::getOwnershipConstraint() to allow InteriorPointer
+    // operands to take any operand ownership.  This will prevent useless borrow
+    // scopes from being generated, so it will require some SIL migration. But
+    // all OSSA utilities need to correctly handle interior uses anyway.
+    AnyInteriorPointer,
     /// Forwarded Borrow. Propagates the guaranteed value within the base's
     /// borrow scope.
     /// (tuple_extract, struct_extract, cast, switch)
-    ForwardingBorrow,
+    GuaranteedForwarding,
     /// End Borrow. End the borrow scope opened directly by the operand.
     /// The operand must be a begin_borrow, begin_apply, or function argument.
     /// (end_borrow, end_apply)
@@ -877,10 +939,11 @@ llvm::raw_ostream &operator<<(llvm::raw_ostream &os,
 ///
 /// Forwarding instructions that produce Owned or Guaranteed values always
 /// forward an operand of the same ownership kind. Each case has a distinct
-/// OperandOwnership (ForwardingConsume and ForwardingBorrow), which enforces a
-/// specific constraint on the operand's ownership. Forwarding instructions that
-/// produce an Unowned value, however, may forward an operand of any
-/// ownership. Therefore, ForwardingUnowned is mapped to OwnershipKind::Any.
+/// OperandOwnership (ForwardingConsume and GuaranteedForwarding), which
+/// enforces a specific constraint on the operand's ownership. Forwarding
+/// instructions that produce an Unowned value, however, may forward an operand
+/// of any ownership. Therefore, ForwardingUnowned is mapped to
+/// OwnershipKind::Any.
 ///
 /// This design yields the following advantages:
 ///
@@ -913,8 +976,11 @@ inline OwnershipConstraint OperandOwnership::getOwnershipConstraint() {
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
     return {OwnershipKind::Owned, UseLifetimeConstraint::LifetimeEnding};
+  case OperandOwnership::AnyInteriorPointer:
+    return {OwnershipKind::Any, UseLifetimeConstraint::NonLifetimeEnding};
+  // TODO: InteriorPointer should be handled like AnyInteriorPointer.
   case OperandOwnership::InteriorPointer:
-  case OperandOwnership::ForwardingBorrow:
+  case OperandOwnership::GuaranteedForwarding:
     return {OwnershipKind::Guaranteed,
             UseLifetimeConstraint::NonLifetimeEnding};
   case OperandOwnership::EndBorrow:
@@ -942,7 +1008,8 @@ inline bool canAcceptUnownedValue(OperandOwnership operandOwnership) {
   case OperandOwnership::DestroyingConsume:
   case OperandOwnership::ForwardingConsume:
   case OperandOwnership::InteriorPointer:
-  case OperandOwnership::ForwardingBorrow:
+  case OperandOwnership::AnyInteriorPointer:
+  case OperandOwnership::GuaranteedForwarding:
   case OperandOwnership::EndBorrow:
   case OperandOwnership::Reborrow:
     return false;
@@ -981,7 +1048,7 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
   case OwnershipKind::None:
     return OperandOwnership::TrivialUse;
   case OwnershipKind::Guaranteed:
-    return OperandOwnership::ForwardingBorrow;
+    return OperandOwnership::GuaranteedForwarding;
   case OwnershipKind::Owned:
     return OperandOwnership::ForwardingConsume;
   }
@@ -990,6 +1057,15 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
 /// A formal SIL reference to a value, suitable for use as a stored
 /// operand.
 class Operand {
+public:
+  enum { numCustomBits = 8 };
+
+  constexpr static const uint64_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max() >> numCustomBits;
+
+private:
+  template <class, class> friend class SILBitfield;
+
   /// The value used as this operand.
   SILValue TheValue;
 
@@ -1003,13 +1079,21 @@ class Operand {
   Operand **Back = nullptr;
 
   /// The owner of this operand.
+  /// If null, the Owner was deleted (but not freed, yet).
   /// FIXME: this could be space-compressed.
   SILInstruction *Owner;
 
+  uint64_t customBits : numCustomBits;
+
+  // For details see SILNode::lastInitializedBitfieldID
+  uint64_t lastInitializedBitfieldID : (64 - numCustomBits);
+
 public:
-  Operand(SILInstruction *owner) : Owner(owner) {}
+  Operand(SILInstruction *owner)
+      : Owner(owner), customBits(0), lastInitializedBitfieldID(0) {}
   Operand(SILInstruction *owner, SILValue theValue)
-      : TheValue(theValue), Owner(owner) {
+      : TheValue(theValue), Owner(owner),
+        customBits(0), lastInitializedBitfieldID(0) {
     insertIntoCurrent();
   }
 
@@ -1030,7 +1114,12 @@ public:
     removeFromCurrent();
     TheValue = newValue;
     insertIntoCurrent();
+    updateReborrowFlags();
+    verify();
   }
+
+  void updateReborrowFlags();
+  void verify() const;
 
   /// Swap the given operand with the current one.
   void swap(Operand &Op) {
@@ -1043,9 +1132,12 @@ public:
   void drop() {
     removeFromCurrent();
     TheValue = SILValue();
-    NextUse = nullptr;
     Back = nullptr;
     Owner = nullptr;
+    // Note: we are _not_ clearing the `NextUse` pointer to be able to delete
+    // users while iterating over the use list.
+    // In such a case, the iterator can detect that the Owner is null and skip
+    // to the next (non-deleted) use by following the non-null `NextUse` pointer.
   }
 
   ~Operand() {
@@ -1106,18 +1198,26 @@ public:
   SILBasicBlock *getParentBlock() const;
   SILFunction *getParentFunction() const;
 
-  LLVM_ATTRIBUTE_DEPRECATED(
-      void dump() const LLVM_ATTRIBUTE_USED,
-      "Dump the operand's state. Only for use in the debugger!");
+  unsigned getCustomBits() const { return customBits; }
+  void setCustomBits(unsigned bits) {customBits = bits; }
+
+  // Called when transferring basic blocks from one function to another.
+  void resetBitfields() {
+    lastInitializedBitfieldID = 0;
+  }
+
+  SILFunction *getFunction() const;
+
   void print(llvm::raw_ostream &os) const;
+  SWIFT_DEBUG_DUMP;
 
 private:
   void removeFromCurrent() {
     if (!Back)
-      return;
-    *Back = NextUse;
-    if (NextUse)
-      NextUse->Back = Back;
+       return;
+     *Back = NextUse;
+     if (NextUse)
+       NextUse->Back = Back;
   }
 
   void insertIntoCurrent() {
@@ -1138,6 +1238,11 @@ private:
   friend class TrailingOperandsList;
 };
 
+inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const Operand &op) {
+  op.print(OS);
+  return OS;
+}
+
 /// A class which adapts an array of Operands into an array of Values.
 ///
 /// The intent is that this should basically act exactly like
@@ -1148,11 +1253,16 @@ inline SILValue getSILValueType(const Operand &op) {
 using OperandValueArrayRef = ArrayRefView<Operand, SILValue, getSILValueType>;
 
 /// An iterator over all uses of a ValueBase.
-class ValueBaseUseIterator : public std::iterator<std::forward_iterator_tag,
-                                                  Operand*, ptrdiff_t> {
+class ValueBaseUseIterator {
 protected:
   Operand *Cur;
 public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = Operand*;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
   ValueBaseUseIterator() = default;
   explicit ValueBaseUseIterator(Operand *cur) : Cur(cur) {}
   Operand *operator->() const { return Cur; }
@@ -1164,7 +1274,7 @@ public:
 
   ValueBaseUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
-    Cur = Cur->NextUse;
+    Cur = Cur->getNextUse();
     return *this;
   }
 
@@ -1199,7 +1309,7 @@ public:
   ConsumingUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
     assert(Cur->isLifetimeEnding());
-    while ((Cur = Cur->NextUse)) {
+    while ((Cur = Cur->getNextUse())) {
       if (Cur->isLifetimeEnding())
         break;
     }
@@ -1217,7 +1327,7 @@ inline ValueBase::consuming_use_iterator
 ValueBase::consuming_use_begin() const {
   auto cur = FirstUse;
   while (cur && !cur->isLifetimeEnding()) {
-    cur = cur->NextUse;
+    cur = cur->getNextUse();
   }
   return ValueBase::consuming_use_iterator(cur);
 }
@@ -1232,7 +1342,7 @@ public:
   NonConsumingUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
     assert(!Cur->isLifetimeEnding());
-    while ((Cur = Cur->NextUse)) {
+    while ((Cur = Cur->getNextUse())) {
       if (!Cur->isLifetimeEnding())
         break;
     }
@@ -1250,7 +1360,7 @@ inline ValueBase::non_consuming_use_iterator
 ValueBase::non_consuming_use_begin() const {
   auto cur = FirstUse;
   while (cur && cur->isLifetimeEnding()) {
-    cur = cur->NextUse;
+    cur = cur->getNextUse();
   }
   return ValueBase::non_consuming_use_iterator(cur);
 }
@@ -1265,7 +1375,7 @@ public:
   explicit TypeDependentUseIterator(Operand *cur) : ValueBaseUseIterator(cur) {}
   TypeDependentUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
-    while ((Cur = Cur->NextUse)) {
+    while ((Cur = Cur->getNextUse())) {
       if (Cur->isTypeDependent())
         break;
     }
@@ -1283,7 +1393,7 @@ inline ValueBase::typedependent_use_iterator
 ValueBase::typedependent_use_begin() const {
   auto cur = FirstUse;
   while (cur && !cur->isTypeDependent()) {
-    cur = cur->NextUse;
+    cur = cur->getNextUse();
   }
   return ValueBase::typedependent_use_iterator(cur);
 }
@@ -1300,7 +1410,7 @@ public:
   NonTypeDependentUseIterator &operator++() {
     assert(Cur && "incrementing past end()!");
     assert(!Cur->isTypeDependent());
-    while ((Cur = Cur->NextUse)) {
+    while ((Cur = Cur->getNextUse())) {
       if (!Cur->isTypeDependent())
         break;
     }
@@ -1318,7 +1428,7 @@ inline ValueBase::non_typedependent_use_iterator
 ValueBase::non_typedependent_use_begin() const {
   auto cur = FirstUse;
   while (cur && cur->isTypeDependent()) {
-    cur = cur->NextUse;
+    cur = cur->getNextUse();
   }
   return ValueBase::non_typedependent_use_iterator(cur);
 }
@@ -1425,6 +1535,10 @@ struct ValueBase::UseToUser {
   SILInstruction *operator()(Operand &use) { return use.getUser(); }
 };
 
+inline ValueBase::UserRange ValueBase::getUsers() const {
+  return llvm::map_range(getUses(), ValueBase::UseToUser());
+}
+
 template <typename T>
 inline ValueBase::DowncastUserFilterRange<T> ValueBase::getUsersOfType() const {
   auto begin = llvm::map_iterator(use_begin(), UseToUser());
@@ -1507,15 +1621,19 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, SILValue V) {
 
 /// Used internally in e.g. the SIL parser and deserializer to handle forward-
 /// referenced values.
+///
 /// A PlaceholderValue must not appear in valid SIL.
 class PlaceholderValue : public ValueBase {
+  SILFunction *parentFunction;
   static int numPlaceholderValuesAlive;
 
 public:
-  PlaceholderValue(SILType type);
+  PlaceholderValue(SILFunction *parentFunction, SILType type);
   ~PlaceholderValue();
 
   static int getNumPlaceholderValuesAlive() { return numPlaceholderValuesAlive; }
+
+  SILFunction *getParent() const { return parentFunction; }
 
   static bool classof(const SILArgument *) = delete;
   static bool classof(const SILInstruction *) = delete;
@@ -1570,6 +1688,15 @@ namespace llvm {
     enum { NumLowBitsAvailable = swift::SILValue::NumLowBitsAvailable };
   };
 
+  /// A SILValue can be checked if a value is present, so we can use it with
+  /// dyn_cast_or_null.
+  template <>
+  struct ValueIsPresent<swift::SILValue> {
+    using SILValue = swift::SILValue;
+    using UnwrappedType = SILValue;
+    static inline bool isPresent(const SILValue &t) { return bool(t); }
+    static inline decltype(auto) unwrapValue(SILValue &t) { return t; }
+  };
 } // end namespace llvm
 
 #endif

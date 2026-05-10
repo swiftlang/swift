@@ -1,5 +1,5 @@
 // XFAIL: CPU=powerpc64le
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -I %S/Inputs %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated -I %S/Inputs %s
 
 import cfuncs
 
@@ -24,8 +24,9 @@ func test_cfunc2(_ i: Int) {
 func test_cfunc3_a() {
   let b = cfunc3( { (a : Double, b : Double) -> Double in a + b } )
   _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') must be unwrapped to a value of type 'double_bin_op_block' (aka '(Double, Double) -> Double')}}
-  // expected-note@-1{{coalesce}}
-  // expected-note@-2{{force-unwrap}}
+  // expected-note@-1{{use optional chaining to call this value of function type when optional is non-'nil'}}
+  // expected-note@-2{{coalesce}}
+  // expected-note@-3{{force-unwrap}}
   _ = b!(1.5, 2.5) as Double
   _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') to type 'Double' in coercion}}
 }
@@ -33,8 +34,9 @@ func test_cfunc3_a() {
 func test_cfunc3_b() {
   let b = cfunc3( { a, b in a + b } )
   _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') must be unwrapped to a value of type 'double_bin_op_block' (aka '(Double, Double) -> Double')}}
-  // expected-note@-1{{coalesce}}
-  // expected-note@-2{{force-unwrap}}
+  // expected-note@-1{{use optional chaining to call this value of function type when optional is non-'nil'}}
+  // expected-note@-2{{coalesce}}
+  // expected-note@-3{{force-unwrap}}
   _ = b!(1.5, 2.5) as Double
   _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') to type 'Double' in coercion}}
 }
@@ -42,8 +44,9 @@ func test_cfunc3_b() {
 func test_cfunc3_c() {
   let b = cfunc3({ $0 + $1 })
   _ = b(1.5, 2.5) as Double // expected-error{{value of optional type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') must be unwrapped to a value of type 'double_bin_op_block' (aka '(Double, Double) -> Double')}}
-  // expected-note@-1{{coalesce}}
-  // expected-note@-2{{force-unwrap}}
+  // expected-note@-1{{use optional chaining to call this value of function type when optional is non-'nil'}}
+  // expected-note@-2{{coalesce}}
+  // expected-note@-3{{force-unwrap}}
   _ = b!(1.5, 2.5) as Double
   _ = b as Double// expected-error{{cannot convert value of type 'double_bin_op_block?' (aka 'Optional<(Double, Double) -> Double>') to type 'Double' in coercion}}
 }
@@ -64,9 +67,12 @@ func test_pow() {
   pow(1.5, 2.5)
 }
 
-#if !((os(Android) || os(Linux)) && arch(arm64))
-// long doubles in AAPCS64 are 128 bits, which is not supported by
-// Swift, so don't test this. SR-9072.
+// https://github.com/apple/swift/issues/51573
+// long doubles in AAPCS64 and 64-bit Android are 128 bits, which is not
+// supported by Swift, so don't test this.
+#if !((os(Android) && _pointerBitWidth(_64)) ||
+  (os(Linux) && arch(arm64)) ||
+  (os(FreeBSD) && arch(arm64)))
 func test_powl() {
   powl(1.5, 2.5)
 }
@@ -183,8 +189,8 @@ func test_nested_pointers() {
   nested_pointer_audited(nil)
   nested_pointer_audited2(nil) // expected-error {{'nil' is not compatible with expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
 
-  nested_pointer(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>?'}}
-  nested_pointer_audited(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>>?'}}
+  nested_pointer(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
+  nested_pointer_audited(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>>'}}
   nested_pointer_audited2(0) // expected-error {{expected argument type 'UnsafePointer<UnsafePointer<Int32>?>'}}
 }
 

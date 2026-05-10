@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -swift-version 5 -disable-availability-checking -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 -target %target-swift-5.1-abi-triple -Xllvm -sil-full-demangle -parse-as-library -disable-objc-attr-requires-foundation-module -enable-objc-interop %s | %FileCheck %s
 
 // REQUIRES: concurrency
 
@@ -18,7 +18,7 @@ public struct DidSetWillSetTests {
 
     // CHECK: bb0(%0 : $Int, %1 : $@thin DidSetWillSetTests.Type):
     // CHECK:        [[SELF:%.*]] = mark_uninitialized [rootself]
-    // CHECK:        [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[SELF]]
+    // CHECK:        [[SELF_LIFETIME:%.*]] = begin_borrow [var_decl] [[SELF]]
     // CHECK:        [[PB_SELF:%.*]] = project_box [[SELF_LIFETIME]]
     // CHECK:        [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB_SELF]]
     // CHECK:        [[P1:%.*]] = struct_element_addr [[WRITE]] : $*DidSetWillSetTests, #DidSetWillSetTests.a
@@ -318,8 +318,8 @@ func local_observing_property(_ arg: Int) {
   // Alloc and initialize the property to the argument value.
   // CHECK: bb0([[ARG:%[0-9]+]] : $Int)
   // CHECK: [[BOX:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[BOX]]
-  // CHECK: [[PB:%.*]] = project_box [[LIFETIME]]
+  // CHECK: [[L:%.*]] = begin_borrow [var_decl] [[BOX]]
+  // CHECK: [[PB:%.*]] = project_box [[L]]
   // CHECK: store [[ARG]] to [trivial] [[PB]]
 }
 
@@ -327,7 +327,7 @@ func local_observing_property(_ arg: Int) {
 // Ensure that setting the variable from within its own didSet doesn't recursively call didSet.
 
 // CHECK-LABEL: sil private [ossa] @$s9observers24local_observing_property{{[_0-9a-zA-Z]*}}SiF13localproperty{{[_0-9a-zA-Z]*}}SivW
-// CHECK: bb0(%0 : @guaranteed ${ var Int })
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var Int })
 // CHECK: [[POINTER:%.*]] = project_box %0 : ${ var Int }, 0
 // CHECK: // function_ref observers.zero.unsafeMutableAddressor : Swift.Int
 // CHECK-NEXT: [[ZEROFN:%.*]] = function_ref @$s9observers4zero{{[_0-9a-zA-Z]*}}vau
@@ -391,14 +391,14 @@ func propertyWithDidSetTakingOldValue() {
 }
 
 // CHECK-LABEL: sil private [ossa] @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_Sivs
-// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @guaranteed ${ var Int }):
+// CHECK: bb0([[ARG1:%.*]] : $Int, [[ARG2:%.*]] : @closureCapture @guaranteed ${ var Int }):
 // CHECK-NEXT:  debug_value [[ARG1]] : $Int, let, name "value", argno 1
 // CHECK-NEXT:  [[ARG2_PB:%.*]] = project_box [[ARG2]]
 // CHECK-NEXT:  debug_value [[ARG2_PB]] : $*Int, var, name "p", argno 2, expr op_deref
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  [[ARG2_PB_VAL:%.*]] = load [trivial] [[READ]] : $*Int
 // CHECK-NEXT:  end_access [[READ]]
-// CHECK-NEXT:  debug_value [[ARG2_PB_VAL]] : $Int
+// CHECK-NEXT:  [[MV_ARG2_PB_VAL:%.*]] = move_value [var_decl] [[ARG2_PB_VAL]] : $Int
 // CHECK-NEXT:  [[WRITE:%.*]] = begin_access [modify] [unknown] [[ARG2_PB]]
 // CHECK-NEXT:  assign [[ARG1]] to [[WRITE]] : $*Int
 // CHECK-NEXT:  end_access [[WRITE]]
@@ -406,7 +406,8 @@ func propertyWithDidSetTakingOldValue() {
 // CHECK-NEXT:  mark_function_escape [[ARG2_PB]]
 // CHECK-NEXT:  // function_ref
 // CHECK-NEXT:  [[FUNC:%.*]] = function_ref @$s9observers32propertyWithDidSetTakingOldValueyyF1pL_SivW : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
-// CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[ARG2_PB_VAL]], [[ARG2]]) : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
+// CHECK-NEXT:  %{{.*}} = apply [[FUNC]]([[MV_ARG2_PB_VAL]], [[ARG2]]) : $@convention(thin) (Int, @guaranteed { var Int }) -> ()
+// CHECK-NEXT:  extend_lifetime [[MV_ARG2_PB_VAL]] : $Int
 // CHECK-NEXT:  %{{.*}} = tuple ()
 // CHECK-NEXT:  return %{{.*}} : $()
 // CHECK-NEXT:} // end sil function '$s9observers32propertyWithDidSetTakingOldValue{{[_0-9a-zA-Z]*}}'

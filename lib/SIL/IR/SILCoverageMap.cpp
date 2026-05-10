@@ -18,18 +18,21 @@
 #include "llvm/ADT/STLExtras.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
 using llvm::coverage::CounterExpression;
+using llvm::coverage::CounterMappingRegion;
 
 SILCoverageMap *
-SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
+SILCoverageMap::create(SILModule &M, SourceFile *ParentSourceFile,
+                       StringRef Filename, StringRef Name,
                        StringRef PGOFuncName, uint64_t Hash,
                        ArrayRef<MappedRegion> MappedRegions,
                        ArrayRef<CounterExpression> Expressions) {
   auto *Buf = M.allocate<SILCoverageMap>(1);
-  SILCoverageMap *CM = ::new (Buf) SILCoverageMap(Hash);
+  SILCoverageMap *CM = ::new (Buf) SILCoverageMap(ParentSourceFile, Hash);
 
   // Store a copy of the names so that we own the lifetime.
   CM->Filename = M.allocateCopy(Filename);
@@ -50,9 +53,23 @@ SILCoverageMap::create(SILModule &M, StringRef Filename, StringRef Name,
   return CM;
 }
 
-SILCoverageMap::SILCoverageMap(uint64_t Hash) : Hash(Hash) {}
+SILCoverageMap::SILCoverageMap(SourceFile *ParentSourceFile, uint64_t Hash)
+  : ParentSourceFile(ParentSourceFile), Hash(Hash) {}
 
 SILCoverageMap::~SILCoverageMap() {}
+
+CounterMappingRegion
+SILCoverageMap::MappedRegion::getLLVMRegion(unsigned int FileID) const {
+  switch (RegionKind) {
+  case MappedRegion::Kind::Code:
+    return CounterMappingRegion::makeRegion(Counter, FileID, StartLine,
+                                            StartCol, EndLine, EndCol);
+  case MappedRegion::Kind::Skipped:
+    return CounterMappingRegion::makeSkipped(FileID, StartLine, StartCol,
+                                             EndLine, EndCol);
+  }
+  llvm_unreachable("Unhandled case in switch!");
+}
 
 namespace {
 struct Printer {
@@ -84,7 +101,8 @@ struct Printer {
 };
 } // end anonymous namespace
 
-void SILCoverageMap::printCounter(llvm::raw_ostream &OS,
-                                  llvm::coverage::Counter C) const {
-  OS << Printer(C, getExpressions());
+void SILCoverageMap::printCounter(
+    llvm::raw_ostream &OS, llvm::coverage::Counter C,
+    ArrayRef<llvm::coverage::CounterExpression> Expressions) {
+  OS << Printer(C, Expressions);
 }

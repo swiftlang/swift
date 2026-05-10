@@ -18,6 +18,7 @@
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILSuccessor.h"
@@ -105,7 +106,7 @@ bool ARCSequenceDataflowEvaluator::processBBTopDown(ARCBBState &BBState) {
     // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : BBState.getTopDownStates()) {
       // If the other state's value is blotted, skip it.
-      if (!OtherState.hasValue())
+      if (!OtherState.has_value())
         continue;
 
       // If we visited an increment or decrement successfully (and thus Op is
@@ -180,7 +181,7 @@ bool ARCSequenceDataflowEvaluator::processTopDown() {
   // For each BB in our reverse post order...
   for (auto *BB : POA->get(&F)->getReversePostOrder()) {
     // We should always have a value here.
-    auto BBDataHandle = getTopDownBBState(BB).getValue();
+    auto BBDataHandle = getTopDownBBState(BB).value();
 
     // This will always succeed since we have an entry for each BB in our RPOT.
     //
@@ -266,7 +267,7 @@ bool ARCSequenceDataflowEvaluator::processBBBottomUp(
     // tracking...
     for (auto &OtherState : BBState.getBottomupStates()) {
       // If the other state's value is blotted, skip it.
-      if (!OtherState.hasValue())
+      if (!OtherState.has_value())
         continue;
 
       // If this is the state associated with the instruction that we are
@@ -390,9 +391,9 @@ bool ARCSequenceDataflowEvaluator::run(bool FreezeOwnedReleases) {
 void ARCSequenceDataflowEvaluator::dumpDataflowResults() {
   llvm::dbgs() << "IncToDecStateMap:\n";
   for (auto it : IncToDecStateMap) {
-    if (!it.hasValue())
+    if (!it.has_value())
       continue;
-    auto instAndState = it.getValue();
+    auto instAndState = it.value();
     llvm::dbgs() << "Increment: ";
     instAndState.first->dump();
     instAndState.second.dump();
@@ -400,9 +401,9 @@ void ARCSequenceDataflowEvaluator::dumpDataflowResults() {
 
   llvm::dbgs() << "DecToIncStateMap:\n";
   for (auto it : DecToIncStateMap) {
-    if (!it.hasValue())
+    if (!it.has_value())
       continue;
-    auto instAndState = it.getValue();
+    auto instAndState = it.value();
     llvm::dbgs() << "Decrement: ";
     instAndState.first->dump();
     instAndState.second.dump();
@@ -415,12 +416,12 @@ ARCSequenceDataflowEvaluator::~ARCSequenceDataflowEvaluator() = default;
 
 void ARCSequenceDataflowEvaluator::clear() { BBStateInfo->clear(); }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCSequenceDataflowEvaluator::getBottomUpBBState(SILBasicBlock *BB) {
   return BBStateInfo->getBottomUpBBHandle(BB);
 }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCSequenceDataflowEvaluator::getTopDownBBState(SILBasicBlock *BB) {
   return BBStateInfo->getTopDownBBHandle(BB);
 }

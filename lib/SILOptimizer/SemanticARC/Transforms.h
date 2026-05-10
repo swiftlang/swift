@@ -33,7 +33,7 @@ struct Context;
 ///
 /// \returns true if we converted atleast one phi from owned -> guaranteed and
 /// eliminated ARC traffic as a result.
-bool tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) LLVM_LIBRARY_VISIBILITY;
+LLVM_LIBRARY_VISIBILITY bool tryConvertOwnedPhisToGuaranteedPhis(Context &ctx);
 
 } // namespace semanticarc
 } // namespace swift

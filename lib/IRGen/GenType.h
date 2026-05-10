@@ -112,6 +112,7 @@ private:
   const LoadableTypeInfo *JobTI = nullptr;
   const LoadableTypeInfo *ExecutorTI = nullptr;
   const LoadableTypeInfo *WitnessTablePtrTI = nullptr;
+  const LoadableTypeInfo *ImplicitActorTI = nullptr;
   const TypeInfo *TypeMetadataPtrTI = nullptr;
   const TypeInfo *SwiftContextPtrTI = nullptr;
   const TypeInfo *TaskContinuationFunctionPtrTI = nullptr;
@@ -119,8 +120,12 @@ private:
   const LoadableTypeInfo *EmptyTI = nullptr;
   const LoadableTypeInfo *IntegerLiteralTI = nullptr;
 
-  const TypeInfo *AccessibleResilientStructTI = nullptr;
-  const TypeInfo *InaccessibleResilientStructTI = nullptr;
+  const TypeInfo *ResilientStructTI[2][2] = {
+    {nullptr, nullptr},
+    {nullptr, nullptr},
+  };
+
+  const TypeInfo *DynamicTupleTI[2] = {nullptr, nullptr};
   
   llvm::DenseMap<std::pair<unsigned, unsigned>, const LoadableTypeInfo *>
     OpaqueStorageTypes;
@@ -142,6 +147,7 @@ private:
                                           Size size, Alignment align);
   const FixedTypeInfo *createImmovable(llvm::Type *T,
                                        Size size, Alignment align);
+  const TypeInfo *createOpaqueImmovable(llvm::Type *T, Alignment minAlign);
 
   void addForwardDecl(TypeBase *key);
 
@@ -168,14 +174,19 @@ private:
   const TypeInfo *convertProtocolCompositionType(ProtocolCompositionType *T);
   const TypeInfo *convertParameterizedProtocolType(ParameterizedProtocolType *T);
   const TypeInfo *convertExistentialType(ExistentialType *T);
+  const TypeInfo *convertPackType(SILPackType *T);
   const LoadableTypeInfo *convertBuiltinNativeObject();
   const LoadableTypeInfo *convertBuiltinUnknownObject();
   const LoadableTypeInfo *convertBuiltinBridgeObject();
-  const TypeInfo *convertResilientStruct(IsABIAccessible_t abiAccessible);
+  const TypeInfo *convertResilientStruct(IsCopyable_t copyable,
+                                         IsABIAccessible_t abiAccessible);
+  const TypeInfo *convertDynamicTupleType(IsCopyable_t copyable);
 #define REF_STORAGE(Name, ...) \
   const TypeInfo *convert##Name##StorageType(Name##StorageType *T);
 #include "swift/AST/ReferenceStorage.def"
-  
+  const TypeInfo *convertBuiltinFixedArrayType(BuiltinFixedArrayType *T);
+  const TypeInfo *convertBuiltinBorrowType(BuiltinBorrowType *T);
+
 public:
   TypeConverter(IRGenModule &IGM);
   ~TypeConverter();
@@ -187,10 +198,12 @@ public:
   const TypeInfo *getTypeEntry(CanType type);
   const TypeInfo &getCompleteTypeInfo(CanType type);
 
-  const TypeLayoutEntry &getTypeLayoutEntry(SILType T);
+  const TypeLayoutEntry
+  &getTypeLayoutEntry(SILType T, bool useStructLayouts);
   const LoadableTypeInfo &getNativeObjectTypeInfo();
   const LoadableTypeInfo &getUnknownObjectTypeInfo();
   const LoadableTypeInfo &getBridgeObjectTypeInfo();
+  const LoadableTypeInfo &getImplicitActorTypeInfo();
   const LoadableTypeInfo &getRawPointerTypeInfo();
   const LoadableTypeInfo &getRawUnsafeContinuationTypeInfo();
   const LoadableTypeInfo &getJobTypeInfo();
@@ -202,7 +215,9 @@ public:
   const LoadableTypeInfo &getWitnessTablePtrTypeInfo();
   const LoadableTypeInfo &getEmptyTypeInfo();
   const LoadableTypeInfo &getIntegerLiteralTypeInfo();
-  const TypeInfo &getResilientStructTypeInfo(IsABIAccessible_t abiAccessible);
+  const TypeInfo &getResilientStructTypeInfo(IsCopyable_t copyable,
+                                             IsABIAccessible_t abiAccessible);
+  const TypeInfo &getDynamicTupleTypeInfo(IsCopyable_t isCopyable);
   const ProtocolInfo &getProtocolInfo(ProtocolDecl *P, ProtocolInfoKind kind);
   const LoadableTypeInfo &getOpaqueStorageTypeInfo(Size storageSize,
                                                    Alignment storageAlign);
@@ -236,7 +251,8 @@ private:
   /// error.
   bool readLegacyTypeInfo(llvm::vfs::FileSystem &fs, StringRef path);
 
-  Optional<YAMLTypeInfoNode> getLegacyTypeInfo(NominalTypeDecl *decl) const;
+  std::optional<YAMLTypeInfoNode>
+  getLegacyTypeInfo(NominalTypeDecl *decl) const;
 
   // Debugging aids.
 #ifndef NDEBUG
@@ -319,7 +335,7 @@ SILType getSingletonAggregateFieldType(IRGenModule &IGM,
 /// An IRGenFunction interface for generating type layout verifiers.
 class IRGenTypeVerifierFunction : public IRGenFunction {
 private:
-  llvm::Constant *VerifierFn;
+  FunctionPointer VerifierFn;
 
   struct VerifierArgumentBuffers {
     Address runtimeBuf, staticBuf;
@@ -368,14 +384,38 @@ TypeLayoutEntry *buildTypeLayoutEntryForFields(IRGenModule &IGM, SILType T,
     return IGM.typeLayoutCache.getEmptyEntry();
   }
 
-  if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
-    return fields[0];
-  }
+  // if (fields.size() == 1 && minFieldAlignment >= minimumAlignment) {
+  //   return fields[0];
+  // }
   if (minimumAlignment < minFieldAlignment)
     minimumAlignment = minFieldAlignment;
   return IGM.typeLayoutCache.getOrCreateAlignedGroupEntry(
       fields, minimumAlignment, true);
 }
+
+/// Emit a call to the deinit for T to destroy the value at the given address,
+/// if a deinit is available.
+///
+/// Returns true if the deinit call was emitted, or false if there is no deinit.
+/// No code emission occurs if the function returns false.
+bool tryEmitDestroyUsingDeinit(IRGenFunction &IGF,
+                               Address address,
+                               SILType T);
+                               
+/// Emit a call to the deinit for T to destroy the value in the given explosion,
+/// if a deinit is available.
+///
+/// Returns true if the deinit call was emitted, or false if there is no deinit.
+/// No code emission occurs if the function returns false.
+bool tryEmitConsumeUsingDeinit(IRGenFunction &IGF,
+                               Explosion &explosion,
+                               SILType T);
+
+/// Most fixed size types currently are always ABI accessible (value operations
+/// can be done without metadata). One notable exception is non-copyable types
+/// with a deinit. Their type metadata is required to call destroy if the deinit
+/// function is not available to the current SIL module.
+IsABIAccessible_t isTypeABIAccessibleIfFixedSize(IRGenModule &IGM, CanType ty);
 
 } // end namespace irgen
 } // end namespace swift

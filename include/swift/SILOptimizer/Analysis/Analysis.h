@@ -15,6 +15,8 @@
 
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/Notifications.h"
+#include "swift/SIL/SILModule.h"
+#include "swift/SIL/SILContext.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/Casting.h"
 
@@ -27,7 +29,7 @@ class SILPassManager;
 /// A list of the known analysis.
 struct SILAnalysisKind {
   enum InnerTy {
-#define ANALYSIS(NAME) NAME,
+#define SIL_ANALYSIS(NAME) NAME,
 #include "Analysis.def"
   } value;
 
@@ -49,20 +51,25 @@ public:
 
     /// The pass created, deleted or rearranged some instructions in a
     /// function.
-    Instructions = 0x1,
+    Instructions = SILContext::NotificationKind::Instructions,
 
     /// The pass modified some calls (apply instructions).
     ///
     /// The intention of this invalidation kind is to allow analysis that
     /// rely on a specific call graph structure to recompute themselves.
-    Calls = 0x2,
+    Calls = SILContext::NotificationKind::Calls,
 
     /// A pass has invalidated some branches in the program.
     ///
     /// The intention of this invalidation kind is to tell analyses like the
     /// Dominance Analysis and the PostOrder Analysis that the underlying CFG
     /// has been modified.
-    Branches = 0x4,
+    Branches = SILContext::NotificationKind::Branches,
+
+    /// The function effects.
+    ///
+    /// The computed effects of the function are invalidated.
+    Effects = SILContext::NotificationKind::Effects,
 
     /// Convenience states:
     FunctionBody = Calls | Branches | Instructions,
@@ -71,7 +78,7 @@ public:
 
     BranchesAndInstructions = Branches | Instructions,
 
-    Everything = Calls | Branches | Instructions,
+    Everything = FunctionBody | Effects,
   };
 
 private:
@@ -226,19 +233,19 @@ public:
     // Check that the analysis can handle this function.
     verifyFunction(f);
 
-    auto &it = storage.FindAndConstruct(f);
-    if (!it.second)
-      it.second = newFunctionAnalysis(f);
-    return it.second.get();
+    auto &value = storage[f];
+    if (!value)
+      value = newFunctionAnalysis(f);
+    return value.get();
   }
 
   virtual void forcePrecompute(SILFunction *f) override {
     // Check that the analysis can handle this function.
     verifyFunction(f);
 
-    auto &it = storage.FindAndConstruct(f);
-    if (!it.second)
-      it.second = newFunctionAnalysis(f);
+    auto &value = storage[f];
+    if (!value)
+      value = newFunctionAnalysis(f);
   }
 
   /// Invalidate all information in this analysis.
@@ -329,7 +336,7 @@ public:
   FunctionInfoTy *operator->() { return *this; }
 };
 
-#define ANALYSIS(NAME) SILAnalysis *create##NAME##Analysis(SILModule *);
+#define SIL_ANALYSIS(NAME) SILAnalysis *create##NAME##Analysis(SILModule *);
 #include "Analysis.def"
 
 } // end namespace swift

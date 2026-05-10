@@ -8,7 +8,9 @@ inline void *operator new(size_t, void *p) { return p; }
 #include <new>
 #endif
 
-struct __attribute__((swift_attr("import_as_ref"))) CxxLinkedList {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) CxxLinkedList {
   int value = 3;
 
   CxxLinkedList * _Nullable next() {
@@ -28,7 +30,9 @@ CxxLinkedList * _Nonnull makeLinkedList() {
   return buff;
 }
 
-struct __attribute__((swift_attr("import_as_ref"))) CxxSequence {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) MyCxxSequence {
   CxxLinkedList * _Nullable list = nullptr;
 
   CxxLinkedList * _Nullable next() {
@@ -41,14 +45,14 @@ struct __attribute__((swift_attr("import_as_ref"))) CxxSequence {
   }
 };
 
-CxxSequence * _Nonnull makeSequence() {
+MyCxxSequence * _Nonnull makeSequence() {
   CxxLinkedList *buff = (CxxLinkedList *)malloc(sizeof(CxxLinkedList) * 4);
   buff[0].value = 0;
   buff[1].value = 1;
   buff[2].value = 2;
   buff[3].value = 3;
 
-  CxxSequence *seq = (CxxSequence *)malloc(sizeof(CxxSequence));
+  MyCxxSequence *seq = (MyCxxSequence *)malloc(sizeof(MyCxxSequence));
   seq->list = buff;
   return seq;
 }

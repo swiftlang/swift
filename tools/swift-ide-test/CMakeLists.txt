@@ -12,16 +12,13 @@ target_link_libraries(swift-ide-test
                         swiftDriver
                         swiftFrontend
                         swiftIDE
+                        swiftIDETool
                         swiftCompilerModules)
 
 # If libxml2 is available, make it available for swift-ide-test.
-if(LLVM_ENABLE_LIBXML2)
-  include_directories(SYSTEM ${LIBXML2_INCLUDE_DIR})
-  target_link_libraries(swift-ide-test PRIVATE ${LIBXML2_LIBRARIES})
+if(SWIFT_HAVE_LIBXML2)
+  target_link_libraries(swift-ide-test PRIVATE LibXml2::LibXml2)
   target_compile_definitions(swift-ide-test PRIVATE SWIFT_HAVE_LIBXML=1)
-  if("${CMAKE_HOST_SYSTEM_NAME}" STREQUAL "OpenBSD" AND NOT CMAKE_CROSSCOMPILING)
-    include_directories(SYSTEM "/usr/local/include")
-  endif()
 endif()
 
 # Create a symlink for swift-api-dump.py in the bin directory

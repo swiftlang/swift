@@ -7,3 +7,8 @@ module CxxSubscripts {
   header "Subscripts.h"
   requires cplusplus
 }
+
+module CxxStdlibPerformance {
+  header "CxxStdlibPerformance.h"
+  requires cplusplus
+}

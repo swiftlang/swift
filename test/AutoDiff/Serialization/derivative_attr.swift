@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
-// RUN: llvm-bcanalyzer %t/derivative_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/derivative_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -enable-sil-verify-all %t/derivative_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
@@ -35,6 +35,26 @@ func derivativeTop2<T: Differentiable, U: Differentiable>(
   _ x: T, _ i: Int, _ y: U
 ) -> (value: U, differential: (T.TangentVector, U.TangentVector) -> U.TangentVector) {
   (y, { (dx, dy) in dy })
+}
+
+// Test top-level inout functions.
+
+func topInout1(_ x: inout S) {}
+
+// CHECK: @derivative(of: topInout1, wrt: x)
+@derivative(of: topInout1)
+func derivativeTopInout1(_ x: inout S) -> (value: Void, pullback: (inout S) -> Void) {
+  fatalError()
+}
+
+func topInout2(_ x: inout S) -> S {
+  x
+}
+
+// CHECK: @derivative(of: topInout2, wrt: x)
+@derivative(of: topInout2)
+func derivativeTopInout2(_ x: inout S) -> (value: S, pullback: (S, inout S) -> Void) {
+  fatalError()
 }
 
 // Test instance methods.
@@ -121,7 +141,7 @@ extension S {
     self
   }
 
-  // CHECK: @derivative(of: subscript, wrt: self)
+  // CHECK: @derivative(of: subscript(_:), wrt: self)
   @derivative(of: subscript(_:), wrt: self)
   func derivativeSubscript<T: Differentiable>(x: T) -> (value: S, differential: (S) -> S) {
     (self, { $0 })

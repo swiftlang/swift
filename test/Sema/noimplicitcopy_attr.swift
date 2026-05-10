@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -parse-stdlib -disable-availability-checking -verify-syntax-tree
+// RUN: %target-typecheck-verify-swift -enable-experimental-move-only -parse-stdlib -disable-availability-checking
 
 import Swift
 
@@ -20,8 +20,7 @@ func varDecls(_ x: Klass, _ x2: Klass) -> () {
 
 func getKlass() -> Builtin.NativeObject {
     let k = Klass()
-    let b = Builtin.unsafeCastToNativeObject(k)
-    return Builtin.move(b)
+    return Builtin.unsafeCastToNativeObject(k)
 }
 
 @_noImplicitCopy var g: Builtin.NativeObject = getKlass() // expected-error {{'@_noImplicitCopy' attribute can only be applied to local lets}}
@@ -138,4 +137,17 @@ func useGeneric<T>(_ x: T) {
     @_noImplicitCopy let y = x
     let z = y
     print(z)
+}
+
+struct MoveOnly: ~Copyable {
+    var k = Klass()
+}
+
+func useMoveOnly(@_noImplicitCopy _ x: __shared MoveOnly) -> MoveOnly { // expected-error {{'@_noImplicitCopy' has no effect when applied to a noncopyable type}}
+    return x
+}
+
+func useMoveOnly2(_ x: __shared MoveOnly) {
+    @_noImplicitCopy let y = x // expected-error {{'@_noImplicitCopy' has no effect when applied to a noncopyable type}}
+    let _ = y
 }

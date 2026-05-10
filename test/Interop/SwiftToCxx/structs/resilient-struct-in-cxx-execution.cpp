@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/resilient-struct-in-cxx.swift -enable-library-evolution -typecheck -module-name Structs -clang-header-expose-public-decls -emit-clang-header-path %t/structs.h
+// RUN: %target-swift-frontend %S/resilient-struct-in-cxx.swift -enable-library-evolution -module-name Structs -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/structs.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-structs-execution.o
 
@@ -15,8 +15,6 @@
 // RUN: %target-run %t/swift-structs-execution-new | %FileCheck --check-prefixes=CHECK,CHANGE %s
 
 // REQUIRES: executable_test
-
-// UNSUPPORTED: CPU=arm64e
 
 #include <assert.h>
 #include "structs.h"
@@ -42,6 +40,11 @@ int main() {
 // CHECK: find - small dump
 // CURRENT-NEXT: x = 66
 // CHANGE-NEXT: x&y = 0&65
+  copySmallStruct.mutate();
+  copySmallStruct.dump();
+// CHECK: find - small dump
+// CURRENT-NEXT: x = 132
+// CHANGE-NEXT: x&y = 0&4294967230
 
   printSmallAndLarge(smallStruct, largeStruct);
 // CHECK: find - small dump

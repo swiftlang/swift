@@ -1,13 +1,13 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 //
 // These are tests for diagnostics produced by constant propagation pass.
 // Due to the change in the implementation of Integer initializers some of the
 // tests here that must fail don't currently. Such tests have comments
 // describing the desirable behavior. They are false negatives now but have
 // to be addressed in the future.
-// References: <rdar://problem/29937936>,
-// <https://bugs.swift.org/browse/SR-5964>
+// References:
+// rdar://problem/29937936
+// https://github.com/apple/swift/issues/48523
 
 import StdlibUnittest
 
@@ -328,6 +328,14 @@ func testAssumeNonNegative() {
   _ = _assumeNonNegative(input) // expected-error {{assumed non-negative value '-3' is negative}}
 }
 
+func testUnsignedSwitchOverflow(val: UInt) {
+  switch val { // expected-error {{negative integer '-24' overflows when stored into unsigned type 'UInt'}}
+    case 12: break
+    case -24: break
+    default: break
+  }
+}
+
 protocol Num { func Double() -> Self }
 
 extension Int8 : Num {
@@ -347,6 +355,12 @@ func add<T : SignedInteger>(_ left: T, _ right: T) -> T {
   return left + right
 }
 
+@Sendable
+@_transparent
+func sendableAdd<T : SignedInteger>(_ left: T, _ right: T) -> T {
+  return left + right
+}
+
 @_transparent
 func applyBinary<T : SignedInteger>(_ fn: (T, T) -> (T), _ left: T, _ right: T) -> T {
   return fn(left, right)
@@ -354,6 +368,10 @@ func applyBinary<T : SignedInteger>(_ fn: (T, T) -> (T), _ left: T, _ right: T) 
 
 func testTransparentApply() -> Int8 {
   return applyBinary(add, Int8.max, Int8.max) // expected-error {{arithmetic operation '127 + 127' (on signed 8-bit integer type) results in an overflow}}
+}
+
+func testTransparentApplySendable() -> Int8 {
+  return applyBinary(sendableAdd, Int8.max, Int8.max) // expected-error {{arithmetic operation '127 + 127' (on signed 8-bit integer type) results in an overflow}}
 }
 
 func testBuiltinGlobalStringTablePointerNoError() -> UnsafePointer<CChar> {

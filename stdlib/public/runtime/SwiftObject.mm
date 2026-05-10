@@ -22,10 +22,15 @@
 #include <objc/runtime.h>
 #include <objc/message.h>
 #include <objc/objc.h>
+#if __has_include(<objc/objc-internal.h>)
+#include <objc/objc-internal.h>
+#endif
 #endif
 #include "llvm/ADT/StringRef.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Runtime/Bincompat.h"
 #include "swift/Runtime/Casting.h"
+#include "swift/Runtime/CustomRRABI.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Heap.h"
@@ -34,12 +39,15 @@
 #include "swift/Runtime/ObjCBridge.h"
 #include "swift/Runtime/Portability.h"
 #include "swift/Strings.h"
-#include "../SwiftShims/RuntimeShims.h"
-#include "../SwiftShims/AssertionReporting.h"
+#include "swift/Threading/Mutex.h"
+#include "swift/shims/RuntimeShims.h"
+#include "swift/shims/AssertionReporting.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "Private.h"
+#include "SwiftEquatableSupport.h"
 #include "SwiftObject.h"
+#include "SwiftValue.h"
 #include "WeakReference.h"
 #if SWIFT_OBJC_INTEROP
 #include <dlfcn.h>
@@ -48,6 +56,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unordered_map>
+#include <unordered_set>
 #if SWIFT_OBJC_INTEROP
 # import <CoreFoundation/CFBase.h> // for CFTypeID
 # import <Foundation/Foundation.h>
@@ -370,11 +379,105 @@ STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS
 }
 
 - (NSUInteger)hash {
+  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+    // Legacy behavior: Don't proxy to Swift Hashable
+    return (NSUInteger)self;
+  }
+
+  auto selfMetadata = _swift_getClassOfAllocated(self);
+
+  // If it's Hashable, use that
+  auto hashableConformance =
+    reinterpret_cast<const hashable_support::HashableWitnessTable *>(
+      swift_conformsToProtocolCommon(
+	selfMetadata, &hashable_support::HashableProtocolDescriptor));
+  if (hashableConformance != NULL) {
+    return _swift_stdlib_Hashable_hashValue_indirect(
+      &self, selfMetadata, hashableConformance);
+  }
+
+  // If a type is Equatable (but not Hashable), we
+  // have to return something here that is compatible
+  // with the `isEqual:` below.
+  auto equatableConformance =
+    reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
+      swift_conformsToProtocolCommon(
+	selfMetadata, &equatable_support::EquatableProtocolDescriptor));
+  if (equatableConformance != nullptr) {
+    // Warn once per class about this
+    auto selfClass = [self class];
+    static Lazy<std::unordered_set<Class>> warned;
+    static LazyMutex warnedLock;
+    LazyMutex::ScopedLock guard(warnedLock);
+    auto result = warned.get().insert(selfClass);
+    auto inserted = std::get<1>(result);
+    if (inserted) {
+      const char *clsName = class_getName([self class]);
+      warning(0,
+	      "Obj-C `-hash` method was invoked on a Swift object of type `%s` "
+	      "that is Equatable but not Hashable; "
+	      "this can lead to severe performance problems.\n",
+	      clsName);
+    }
+    // Constant value (yuck!) is the only choice here
+    return (NSUInteger)1;
+  }
+
+  // Legacy default for types that are neither Hashable nor Equatable.
   return (NSUInteger)self;
 }
 
-- (BOOL)isEqual:(id)object {
-  return self == object;
+- (BOOL)isEqual:(id)other {
+  if (self == other) {
+    return YES;
+  }
+  if (other == nil) {
+    return NO;
+  }
+  if (runtime::bincompat::useLegacySwiftObjCHashing()) {
+    // Legacy behavior: Don't proxy to Swift Hashable or Equatable
+    return NO; // We know the ids are different
+  }
+  if (isObjCTaggedPointer(other)) {
+    // Swift class types cannot be tagged, and a Swift Equatable conformance
+    // cannot validly be called for an object of a different type, so this can
+    // only be incorrect if someone has an Equatable that's invalid in an
+    // extremely specific way (unsafeBitCasting `other` to an unrelated type)
+    return NO;
+  }
+
+  // Get Swift type for self and other
+  auto selfMetadata = _swift_getClassOfAllocated(self);
+
+  // We use Equatable conformance, which will also work for types that implement
+  // Hashable.  If the type implements Equatable but not Hashable, there is a
+  // risk that `-hash` and `-isEqual:` might be incompatible.  See notes above
+  // for `-hash`
+  auto equatableConformance =
+    swift_conformsToProtocolCommon(
+      selfMetadata, &equatable_support::EquatableProtocolDescriptor);
+  if (equatableConformance == NULL) {
+    return NO;
+  }
+
+  // Is the other object a subclass of the parent that
+  // actually defined this conformance?
+  auto conformingParent =
+    findConformingSuperclass(selfMetadata, equatableConformance->getDescription());
+  auto otherMetadata = _swift_getClassOfAllocated(other);
+  if (_swift_class_isSubclass(otherMetadata, conformingParent)) {
+    // We now have an equatable conformance of a common parent
+    // of both object types:
+    return _swift_stdlib_Equatable_isEqual_indirect(
+      &self,
+      &other,
+      conformingParent,
+      reinterpret_cast<const equatable_support::EquatableWitnessTable *>(
+	equatableConformance)
+    );
+  }
+
+  return NO;
 }
 
 - (id)performSelector:(SEL)aSelector {
@@ -543,7 +646,7 @@ void *swift::swift_nonatomic_unknownObjectRetain(void *object) {
 void swift::swift_nonatomic_unknownObjectRelease(void *object) {
   if (isObjCTaggedPointerOrNull(object)) return;
   if (objectUsesNativeSwiftReferenceCounting(object))
-    return swift_release(static_cast<HeapObject *>(object));
+    return swift_nonatomic_release(static_cast<HeapObject *>(object));
   return objc_release(static_cast<id>(object));
 }
 
@@ -574,26 +677,44 @@ static void* toPlainObject_unTagged_bridgeObject(void *object) {
   return (void*)(uintptr_t(object) & ~unTaggedNonNativeBridgeObjectBits);
 }
 
+#if SWIFT_OBJC_INTEROP
+#if __arm64__
+// Marking this as noinline allows swift_bridgeObjectRetain to avoid emitting
+// a stack frame for the swift_retain path on ARM64. It makes for worse codegen
+// on x86-64, though, so limit it to ARM64.
+SWIFT_NOINLINE
+#endif
+static void *objcRetainAndReturn(void *object) {
+  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
+  objc_retain(static_cast<id>(objectRef));
+  return object;
+}
+#endif
+
 void *swift::swift_bridgeObjectRetain(void *object) {
 #if SWIFT_OBJC_INTEROP
   if (isObjCTaggedPointer(object) || isBridgeObjectTaggedPointer(object))
     return object;
-#endif
 
-  auto const objectRef = toPlainObject_unTagged_bridgeObject(object);
-
-#if SWIFT_OBJC_INTEROP
   if (!isNonNative_unTagged_bridgeObject(object)) {
-    swift_retain(static_cast<HeapObject *>(objectRef));
-    return object;
+    return swift_retain(static_cast<HeapObject *>(object));
   }
-  objc_retain(static_cast<id>(objectRef));
-  return object;
+
+  // Put the call to objc_retain in a separate function, tail-called here. This
+  // allows the fast path of swift_bridgeObjectRetain to avoid creating a stack
+  // frame on ARM64. We can't directly tail-call objc_retain, because
+  // swift_bridgeObjectRetain returns the pointer with objectPointerIsObjCBit
+  // set, so we have to make a non-tail call and then return the value with the
+  // bit set.
+  SWIFT_MUSTTAIL return objcRetainAndReturn(object);
 #else
-  swift_retain(static_cast<HeapObject *>(objectRef));
-  return object;
+  // swift_retain will mask off any extra bits in object, and return the
+  // original value, so we can tail call it here.
+  return swift_retain(static_cast<HeapObject *>(object));
 #endif
 }
+
+CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_bridgeObjectRetain)
 
 SWIFT_RUNTIME_EXPORT
 void *swift::swift_nonatomic_bridgeObjectRetain(void *object) {
@@ -634,6 +755,8 @@ void swift::swift_bridgeObjectRelease(void *object) {
   swift_release(static_cast<HeapObject *>(objectRef));
 #endif
 }
+
+CUSTOM_RR_ENTRYPOINTS_DEFINE_ENTRYPOINTS(swift_bridgeObjectRelease)
 
 void swift::swift_nonatomic_bridgeObjectRelease(void *object) {
 #if SWIFT_OBJC_INTEROP
@@ -1243,6 +1366,12 @@ SWIFT_RUNTIME_EXPORT
 id swift_dynamicCastObjCProtocolConditional(id object,
                                             size_t numProtocols,
                                             Protocol * const *protocols) {
+  if (!runtime::bincompat::useLegacySwiftValueUnboxingInCasting()) {
+    if (getAsSwiftValue(object) != nil) {
+      // SwiftValue wrapper never holds a class object
+      return nil;
+    }
+  }
   for (size_t i = 0; i < numProtocols; ++i) {
     if (![object conformsToProtocol:protocols[i]]) {
       return nil;
@@ -1252,12 +1381,33 @@ id swift_dynamicCastObjCProtocolConditional(id object,
   return object;
 }
 
+#if OBJC_SUPPORTSLAZYREALIZATION_DEFINED
+static bool checkObjCSupportsLazyRealization() {
+  if (!SWIFT_RUNTIME_WEAK_CHECK(_objc_supportsLazyRealization))
+    return false;
+  return SWIFT_RUNTIME_WEAK_USE(_objc_supportsLazyRealization());
+}
+#endif
+
+// Check whether the current ObjC runtime supports lazy realization. If it does,
+// then we can avoid forcing realization of classes before we use them.
+static bool objcSupportsLazyRealization() {
+#if OBJC_SUPPORTSLAZYREALIZATION_DEFINED
+  return SWIFT_LAZY_CONSTANT(checkObjCSupportsLazyRealization());
+#else
+  return false;
+#endif
+}
+
 void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
   static const objc_image_info ImageInfo = {0, 0};
 
-  // Ensure the superclass is realized.
   Class c = class_const_cast(_c);
-  [class_getSuperclass(c) class];
+
+  if (!objcSupportsLazyRealization()) {
+    // Ensure the superclass is realized.
+    [class_getSuperclass(c) class];
+  }
 
   // Register the class.
   Class registered = objc_readClassPair(c, &ImageInfo);
@@ -1267,13 +1417,16 @@ void swift::swift_instantiateObjCClass(const ClassMetadata *_c) {
 }
 
 Class swift::swift_getInitializedObjCClass(Class c) {
-  // Used when we have class metadata and we want to ensure a class has been
-  // initialized by the Objective-C runtime. We need to do this because the
-  // class "c" might be valid metadata, but it hasn't been initialized yet.
-  // Send a message that's likely not to be overridden to minimize potential
-  // side effects. Ignore the return value in case it is overridden to
-  // return something different. See SR-10463 for an example.
-  [c self];
+  if (!objcSupportsLazyRealization()) {
+    // Used when we have class metadata and we want to ensure a class has been
+    // initialized by the Objective-C runtime. We need to do this because the
+    // class "c" might be valid metadata, but it hasn't been initialized yet.
+    // Send a message that's likely not to be overridden to minimize potential
+    // side effects. Ignore the return value in case it is overridden to
+    // return something different. See
+    // https://github.com/apple/swift/issues/52863 for an example.
+    [c self];
+  }
   return c;
 }
 
@@ -1351,11 +1504,11 @@ bool swift::swift_isUniquelyReferencedNonObjC_nonNull(const void* object) {
 }
 
 #if SWIFT_OBJC_INTEROP
-// It would be nice to weak link instead of doing this, but we can't do that
-// until the new API is in the versions of libobjc that we're linking against.
 static bool isUniquelyReferenced(id object) {
 #if OBJC_ISUNIQUELYREFERENCED_DEFINED
-  return objc_isUniquelyReferenced(object);
+  if (!SWIFT_RUNTIME_WEAK_CHECK(objc_isUniquelyReferenced))
+    return false;
+  return SWIFT_RUNTIME_WEAK_USE(objc_isUniquelyReferenced(object));
 #else
   auto objcIsUniquelyRefd = SWIFT_LAZY_CONSTANT(reinterpret_cast<bool (*)(id)>(
       dlsym(RTLD_NEXT, "objc_isUniquelyReferenced")));
@@ -1475,6 +1628,13 @@ bool swift::swift_isEscapingClosureAtFileLocation(const HeapObject *object,
           .errorType = "escaping-closure-violation",
           .currentStackDescription = "Closure has escaped",
           .framesToSkip = 1,
+          .memoryAddress = nullptr,
+          .numExtraThreads = 0,
+          .threads = nullptr,
+          .numFixIts = 0,
+          .fixIts = nullptr,
+          .numNotes = 0,
+          .notes = nullptr,
       };
       _swift_reportToDebugger(RuntimeErrorFlagFatal, log, &details);
     }
@@ -1576,7 +1736,13 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   RuntimeErrorDetails details = {
     .version = RuntimeErrorDetails::currentVersion,
     .errorType = "implicit-objc-entrypoint",
+    .currentStackDescription = nullptr,
     .framesToSkip = 1,
+    .memoryAddress = nullptr,
+    .numExtraThreads = 0,
+    .threads = nullptr,
+    .numFixIts = 0,
+    .fixIts = nullptr,
     .numNotes = 1,
     .notes = &note
   };
@@ -1609,7 +1775,7 @@ const HashableWitnessTable *
 swift::hashable_support::getNSStringHashableConformance() {
   return SWIFT_LAZY_CONSTANT(
     reinterpret_cast<const HashableWitnessTable *>(
-      swift_conformsToProtocol(
+      swift_conformsToProtocolCommon(
         getNSStringMetadata(),
         &HashableProtocolDescriptor
       )
@@ -1633,7 +1799,7 @@ const ClassMetadata *swift::getRootSuperclass() {
 }
 
 #define OVERRIDE_OBJC COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 #define OVERRIDE_FOREIGN COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

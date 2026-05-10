@@ -13,27 +13,47 @@
 #ifndef SWIFT_AST_SOURCEFILE_H
 #define SWIFT_AST_SOURCEFILE_H
 
+#include "swift/AST/ASTDumper.h"
+#include "swift/AST/ASTNode.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
 namespace swift {
-
+class ASTScope;
+class AvailabilityScope;
+class GeneratedSourceInfo;
 class PersistentParserState;
+struct SourceFileExtras;
+class Token;
+enum class DefaultIsolation : uint8_t;
 
 /// Kind of import affecting how a decl can be reexported.
+///
+/// This is sorted in order of priority in case the same module is imported
+/// differently. e.g. a normal import (None) offers more visibility than
+/// an @_spiOnly import, which offers more visibility than an
+/// @_implementationOnly import. The logic of \c getRestrictedImportKind relies
+/// on the order of this enum.
+///
 /// This is a subset of \c DisallowedOriginKind.
 ///
 /// \sa getRestrictedImportKind
 enum class RestrictedImportKind {
+  MissingImport,
   ImplementationOnly,
-  Implicit,
+  SPIOnly,
   None // No restriction, i.e. the module is imported publicly.
 };
+
+/// Import that limits the access level of imported entities.
+using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
 
 /// A file containing Swift source code.
 ///
@@ -68,18 +88,24 @@ public:
     /// and the associated language option.
     DisablePoundIfEvaluation = 1 << 1,
 
-    /// Whether to build a syntax tree.
-    BuildSyntaxTree = 1 << 2,
-
     /// Whether to save the file's parsed tokens.
-    CollectParsedTokens = 1 << 3,
+    CollectParsedTokens = 1 << 2,
 
     /// Whether to compute the interface hash of the file.
-    EnableInterfaceHash = 1 << 4,
+    EnableInterfaceHash = 1 << 3,
 
     /// Whether to suppress warnings when parsing. This is set for secondary
     /// files, as they get parsed multiple times.
-    SuppressWarnings = 1 << 5,
+    SuppressWarnings = 1 << 4,
+
+    /// Ensure that the SwiftSyntax tree round trips correctly.
+    RoundTrip = 1 << 5,
+
+    /// Validate the new SwiftSyntax parser diagnostics.
+    ValidateNewParserDiagnostics = 1 << 6,
+
+    /// Consider every #if ... #endif region active.
+    PoundIfAllActive = 1 << 7,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 
@@ -93,21 +119,37 @@ private:
   /// This is the list of modules that are imported by this module.
   ///
   /// This is \c None until it is filled in by the import resolution phase.
-  Optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
+  std::optional<ArrayRef<AttributedImport<ImportedModule>>> Imports;
+
+  /// The underlying clang module, if imported in this file.
+  ModuleDecl *ImportedUnderlyingModule = nullptr;
 
   /// Which imports have made use of @preconcurrency.
   llvm::SmallDenseSet<AttributedImport<ImportedModule>>
       PreconcurrencyImportsUsed;
+
+  /// The highest access level of declarations referencing each import.
+  llvm::DenseMap<const ModuleDecl *, AccessLevel> ImportsUseAccessLevel;
+
+  /// Imports that should be printed in the module interface even though they
+  /// were not written in the source file.
+  llvm::SmallDenseSet<ImportedModule> ImplicitImportsForModuleInterface;
+
+  /// Associates a list of source locations to the member declarations that must
+  /// be diagnosed as being out of scope due to a missing import.
+  using DelayedMissingImportForMemberDiags = llvm::SmallDenseMap<
+      const ValueDecl *, std::vector<std::pair<SourceLoc, DiagnosticBehavior>>>;
+  DelayedMissingImportForMemberDiags MissingImportForMemberDiagnostics;
 
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
   /// same module.
   mutable Identifier PrivateDiscriminator;
 
-  /// The root TypeRefinementContext for this SourceFile.
+  /// The root AvailabilityScope for this SourceFile.
   ///
   /// This is set during type checking.
-  TypeRefinementContext *TRC = nullptr;
+  AvailabilityScope *RootAvailabilityScope = nullptr;
 
   /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
   /// that calls main on the type marked @main.
@@ -120,12 +162,10 @@ private:
   /// this source file.
   ///
   /// We only collect interface hash for primary input files.
-  llvm::Optional<StableHasher> InterfaceHasher;
+  std::optional<Fingerprint> InterfaceHash;
 
   /// The ID for the memory buffer containing this file's source.
-  ///
-  /// May be -1, to indicate no association with a buffer.
-  int BufferID;
+  unsigned BufferID;
 
   /// The parsing options for the file.
   ParsingOptions ParsingOpts;
@@ -136,18 +176,33 @@ private:
   /// The scope map that describes this source file.
   NullablePtr<ASTScope> Scope = nullptr;
 
+   /// The set of parsed decls with opaque return types that have not yet
+   /// been validated.
+   llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
+  
   /// The set of validated opaque return type decls in the source file.
   llvm::SmallVector<OpaqueTypeDecl *, 4> OpaqueReturnTypes;
   llvm::StringMap<OpaqueTypeDecl *> ValidatedOpaqueReturnTypes;
-  /// The set of parsed decls with opaque return types that have not yet
-  /// been validated.
-  llvm::SetVector<ValueDecl *> UnvalidatedDeclsWithOpaqueReturnTypes;
+  /// The set of opaque type decls that have not yet been validated.
+  ///
+  /// \note This is populated as opaque type decls are created. Validation
+  /// requires mangling the naming decl, which would lead to circularity
+  /// if it were done from OpaqueResultTypeRequest.
+  llvm::SetVector<OpaqueTypeDecl *> UnvalidatedOpaqueReturnTypes;
 
-  /// The list of top-level declarations in the source file. This is \c None if
+  /// The list of functions defined in this file whose bodies have yet to be
+  /// typechecked. They must be held in this list instead of eagerly validated
+  /// because their bodies may force us to perform semantic checks of arbitrary
+  /// complexity, and we currently cannot handle those checks in isolation. E.g.
+  /// we cannot, in general, perform witness matching on singular requirements
+  /// unless the entire conformance has been evaluated.
+  std::vector<AbstractFunctionDecl *> DelayedFunctions;
+
+  /// The list of top-level items in the source file. This is \c None if
   /// they have not yet been parsed.
   /// FIXME: Once addTopLevelDecl/prependTopLevelDecl
   /// have been removed, this can become an optional ArrayRef.
-  Optional<std::vector<Decl *>> Decls;
+  std::optional<std::vector<ASTNode>> Items;
 
   /// The list of hoisted declarations. See Decl::isHoisted().
   /// This is only used by lldb.
@@ -174,16 +229,38 @@ private:
   ParserStatePtr DelayedParserState =
       ParserStatePtr(/*ptr*/ nullptr, /*deleter*/ nullptr);
 
+  struct IfConfigClauseRangesData {
+    /// All the \c #if source ranges in this file.
+    std::vector<IfConfigClauseRangeInfo> Ranges;
+
+    /// Whether the elemnts in \c Ranges are sorted in source order within
+    /// this file. We flip this to \c false any time a new range gets recorded,
+    /// and lazily do the sorting when doing a query.
+    bool IsSorted = false;
+  };
+
+  /// Stores all the \c #if source range info in this file.
+  mutable IfConfigClauseRangesData IfConfigClauseRanges;
+
+  friend class HasImportsMatchingFlagRequest;
+
+  /// Indicates which import options have valid caches. Storage for
+  /// \c HasImportsMatchingFlagRequest.
+  ImportOptions validCachedImportOptions;
+
+  /// The cached computation of which import flags are present in the file.
+  /// Storage for \c HasImportsMatchingFlagRequest.
+  ImportOptions cachedImportOptions;
+
+  /// Extra information for the source file, allocated as needed.
+  SourceFileExtras *extras = nullptr;
+
   friend ASTContext;
 
 public:
   /// Appends the given declaration to the end of the top-level decls list. Do
   /// not add any additional uses of this function.
-  void addTopLevelDecl(Decl *d) {
-    // Force decl parsing if we haven't already.
-    (void)getTopLevelDecls();
-    Decls->push_back(d);
-  }
+  void addTopLevelDecl(Decl *d);
 
   /// Prepends a declaration to the top-level decls list.
   ///
@@ -191,28 +268,29 @@ public:
   /// always a mistake, and additional uses should not be added.
   ///
   /// See rdar://58355191
-  void prependTopLevelDecl(Decl *d) {
-    // Force decl parsing if we haven't already.
-    (void)getTopLevelDecls();
-    Decls->insert(Decls->begin(), d);
-  }
+  void prependTopLevelDecl(Decl *d);
 
   /// Add a hoisted declaration. See Decl::isHoisted().
   void addHoistedDecl(Decl *d);
 
+  /// Retrieves an immutable view of the list of top-level items in this file.
+  ArrayRef<ASTNode> getTopLevelItems() const;
+
   /// Retrieves an immutable view of the list of top-level decls in this file.
+  ///
+  /// NOTE: Please use getTopLevelItems() instead.
   ArrayRef<Decl *> getTopLevelDecls() const;
 
   /// Retrieves an immutable view of the list of hoisted decls in this file.
   /// See Decl::isHoisted().
   ArrayRef<Decl *> getHoistedDecls() const;
 
-  /// Retrieves an immutable view of the top-level decls if they have already
+  /// Retrieves an immutable view of the top-level items if they have already
   /// been parsed, or \c None if they haven't. Should only be used for dumping.
-  Optional<ArrayRef<Decl *>> getCachedTopLevelDecls() const {
-    if (!Decls)
-      return None;
-    return llvm::makeArrayRef(*Decls);
+  std::optional<ArrayRef<ASTNode>> getCachedTopLevelItems() const {
+    if (!Items)
+      return std::nullopt;
+    return llvm::ArrayRef(*Items);
   }
 
   /// Retrieve the parsing options for the file.
@@ -222,20 +300,15 @@ public:
   /// code for it. Note this method returns \c false in WMO.
   bool isPrimary() const { return IsPrimary; }
 
-  /// A cache of syntax nodes that can be reused when creating the syntax tree
-  /// for this file.
-  swift::SyntaxParsingCache *SyntaxParsingCache = nullptr;
+  /// Retrieve the \c ExportedSourceFile instance produced by ASTGen, which
+  /// includes the SourceFileSyntax node corresponding to this source file.
+  void *getExportedSourceFile() const;
 
-  /// The list of local type declarations in the source file.
-  llvm::SetVector<TypeDecl *> LocalTypeDecls;
+  /// Defer type checking of `AFD` to the end of `Sema`
+  void addDelayedFunction(AbstractFunctionDecl *AFD);
 
-  /// The list of functions defined in this file whose bodies have yet to be
-  /// typechecked. They must be held in this list instead of eagerly validated
-  /// because their bodies may force us to perform semantic checks of arbitrary
-  /// complexity, and we currently cannot handle those checks in isolation. E.g.
-  /// we cannot, in general, perform witness matching on singular requirements
-  /// unless the entire conformance has been evaluated.
-  std::vector<AbstractFunctionDecl *> DelayedFunctions;
+  /// Typecheck the bodies of all lazily checked functions
+  void typeCheckDelayedFunctions();
 
   /// A mapping from Objective-C selectors to the methods that have
   /// those selectors.
@@ -268,6 +341,10 @@ public:
 
   /// List of Objective-C member conflicts we have found during type checking.
   llvm::SetVector<ObjCMethodConflict> ObjCMethodConflicts;
+
+  /// Categories (extensions with explicit @objc names) declared in this
+  /// source file. They need to be checked for conflicts after type checking.
+  llvm::TinyPtrVector<ExtensionDecl *> ObjCCategories;
 
   /// List of attributes added by access notes, used to emit remarks for valid
   /// ones.
@@ -303,13 +380,18 @@ public:
   /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
-  SourceFile(ModuleDecl &M, SourceFileKind K, Optional<unsigned> bufferID,
+  /// Retrieve "extra" information associated with this source file, which is
+  /// lazily and separately constructed. Use this for scratch information
+  /// that isn't needed for all source files.
+  SourceFileExtras &getExtras() const;
+
+  SourceFile(ModuleDecl &M, SourceFileKind K, unsigned bufferID,
              ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
 
   bool hasImports() const {
-    return Imports.hasValue();
+    return Imports.has_value();
   }
 
   /// Retrieve an immutable view of the source file's imports.
@@ -321,6 +403,18 @@ public:
   /// resolution.
   void setImports(ArrayRef<AttributedImport<ImportedModule>> imports);
 
+  /// Set the imported underlying clang module for this source file. This gets
+  /// called by import resolution.
+  void setImportedUnderlyingModule(ModuleDecl *module) {
+    assert(!ImportedUnderlyingModule && "underlying module already set");
+    ImportedUnderlyingModule = module;
+  }
+
+  /// Finds the import declaration that effectively imports a given module in
+  /// this source file.
+  std::optional<AttributedImport<ImportedModule>>
+  findImport(const ModuleDecl *mod) const;
+
   /// Whether the given import has used @preconcurrency.
   bool hasImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import) const;
@@ -328,6 +422,17 @@ public:
   /// Note that the given import has used @preconcurrency/
   void setImportUsedPreconcurrency(
       AttributedImport<ImportedModule> import);
+
+  /// Return the highest access level of the declarations referencing
+  /// this import in signature or inlinable code.
+  AccessLevel
+  getMaxAccessLevelUsingImport(const ModuleDecl *import) const;
+
+  /// Register the requirement that \p mod be imported with an access level
+  /// that is at least as permissive as \p accessLevel in order to satisfy
+  /// access or exportability checking constraints.
+  void registerRequiredAccessLevelForModule(ModuleDecl *mod,
+                                            AccessLevel accessLevel);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.
@@ -342,12 +447,22 @@ public:
   hasTestableOrPrivateImport(AccessLevel accessLevel, const ValueDecl *ofDecl,
                              ImportQueryKind kind = TestableAndPrivate) const;
 
-  /// Does this source file have any implementation-only imports?
+  /// Does this source file have any imports with \c flag?
   /// If not, we can fast-path module checks.
-  bool hasImplementationOnlyImports() const;
+  bool hasImportsWithFlag(ImportFlags flag) const;
+
+  /// Enumerates each of the direct imports of \p module in the file.
+  using AttributedImportCallback =
+      llvm::function_ref<void(AttributedImport<ImportedModule> &)>;
+  void forEachImportOfModule(const ModuleDecl *module,
+                             AttributedImportCallback callback);
 
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
+
+  /// Return the import of \p targetModule from this file with the most
+  /// permissive access level.
+  ImportAccessLevel getImportAccessLevel(const ModuleDecl *targetModule) const;
 
   /// Find all SPI names imported from \p importedModule by this file,
   /// collecting the identifiers in \p spiGroups.
@@ -355,6 +470,11 @@ public:
   lookupImportedSPIGroups(
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
+
+  /// Returns true if any import of \p importedModule has the `@preconcurrency`
+  /// attribute.
+  virtual bool isModuleImportedPreconcurrency(
+      const ModuleDecl *importedModule) const override;
 
   // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
@@ -386,10 +506,54 @@ public:
 
   SWIFT_DEBUG_DUMPER(dumpSeparatelyImportedOverlays());
 
+  /// Record an import that should be printed in the module interface even
+  /// though it was not written in the source file. These imports are needed in
+  /// Swift 5 mode to preserve the integrity of swiftinterface files when code
+  /// publicly use declarations from modules that were \c `@_implementationOnly`
+  /// imported in other source files.
+  void addImplicitImportForModuleInterface(ImportedModule module) {
+    ImplicitImportsForModuleInterface.insert(module);
+  }
+
+  /// Gather implicit imports that should printed in swiftinterfaces for
+  /// compatibility with code in some Swift 5 modules.
+  void getImplicitImportsForModuleInterface(
+      SmallVectorImpl<ImportedModule> &imports) const override;
+
+  /// Add a source location for which a delayed missing import for member
+  /// diagnostic should be emited.
+  void addDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl,
+                                                  SourceLoc loc,
+                                                  DiagnosticBehavior limit) {
+    MissingImportForMemberDiagnostics[decl].push_back({loc, limit});
+  }
+
+  DelayedMissingImportForMemberDiags
+  takeDelayedMissingImportForMemberDiagnostics() {
+    DelayedMissingImportForMemberDiags diags;
+    std::swap(diags, MissingImportForMemberDiagnostics);
+    return diags;
+  }
+
+  /// Record the source range info for a parsed \c #if clause.
+  void recordIfConfigClauseRangeInfo(const IfConfigClauseRangeInfo &range);
+
+  /// Retrieve the source range info for any \c #if clauses in the file.
+  ArrayRef<IfConfigClauseRangeInfo> getIfConfigClauseRanges() const;
+
+  /// Retrieve the source range infos for any \c #if clauses contained within a
+  /// given source range of this file.
+  ArrayRef<IfConfigClauseRangeInfo>
+  getIfConfigClausesWithin(SourceRange outer) const;
+
+  /// Record visible declarations for use in code completion and refactoring.
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
+
+  /// Retrieve visible declarations for use in code completion and refactoring.
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
+                           OptionSet<ModuleLookupFlags> Flags,
                            SmallVectorImpl<ValueDecl*> &result) const override;
 
   virtual void lookupVisibleDecls(ImportPath::Access accessPath,
@@ -435,27 +599,75 @@ public:
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
 
+  virtual void getExternalMacros(
+      SmallVectorImpl<ExternalMacroPlugin> &macros) const override;
+
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
-  Identifier getDiscriminatorForPrivateValue(const ValueDecl *D) const override;
-  Identifier getPrivateDiscriminator() const { return PrivateDiscriminator; }
-  Optional<ExternalSourceLocs::RawLocs>
+  Identifier getDiscriminatorForPrivateDecl(const Decl *D) const override;
+  Identifier getPrivateDiscriminator(bool createIfMissing = false) const;
+  std::optional<ExternalSourceLocs::RawLocs>
   getExternalRawLocsForDecl(const Decl *D) const override;
 
   virtual bool walk(ASTWalker &walker) override;
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
-  Optional<unsigned> getBufferID() const {
-    if (BufferID == -1)
-      return None;
+  unsigned getBufferID() const {
     return BufferID;
   }
+
+  const GeneratedSourceInfo *getGeneratedSourceFileInfo() const;
+
+  /// For source files created to hold the source code created by expanding
+  /// a macro, this is the AST node that describes the macro expansion.
+  ///
+  /// The source location of this AST node is the place in the source that
+  /// triggered the creation of the macro expansion whose resulting source
+  /// code is in this source file. This will only produce a non-null value when
+  /// the \c SourceFileKind is \c MacroExpansion.
+  ASTNode getMacroExpansion() const;
+
+  /// For source files created to hold the source code for a macro
+  /// expansion, this is the original source range replaced by the macro
+  /// expansion.
+  SourceRange getMacroInsertionRange() const;
+
+  /// For source files created to hold the source code created by expanding
+  /// an attached macro, this is the custom attribute that describes the macro
+  /// expansion.
+  ///
+  /// The source location of this attribute is the place in the source that
+  /// triggered the creation of the macro expansion whose resulting source
+  /// code is in this source file. This will only produce a non-null value when
+  /// the \c SourceFileKind is \c MacroExpansion , and the macro is an attached
+  /// macro.
+  CustomAttr *getAttachedMacroAttribute() const;
+
+  /// For source files created to hold the source code created by expanding
+  /// an attached macro, this is the macro role that the expansion fulfills.
+  ///
+  /// \Returns the fulfilled macro role, or \c None if this source file is not
+  /// for a macro expansion.
+  std::optional<MacroRole> getFulfilledMacroRole() const;
+
+  /// When this source file is enclosed within another source file, for example
+  /// because it describes a macro expansion, return the source file it was
+  /// enclosed in.
+  SourceFile *getEnclosingSourceFile() const;
+
+  /// If this file has an enclosing source file (because it is the result of
+  /// expanding a macro or default argument), returns the node in the enclosing
+  /// file that this file's contents were expanded from.
+  ASTNode getNodeInEnclosingSourceFile() const;
 
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
+
+  /// Retrieve the source text buffer.
+  StringRef getBuffer() const;
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
@@ -472,7 +684,7 @@ public:
     // FIXME: Ideally the parser state should be an output of
     // ParseSourceFileRequest, but the evaluator doesn't currently support
     // move-only outputs for cached requests.
-    (void)getTopLevelDecls();
+    (void)getTopLevelItems();
 
     auto *state = DelayedParserState.get();
     assert(state && "Didn't set any delayed parser state!");
@@ -485,8 +697,18 @@ public:
     DelayedParserState = std::move(state);
   }
 
+  /// Retrieve default action isolation to be used for this source file.
+  /// It's determine based on on top-level `using <<isolation>>` declaration
+  /// found in the file.
+  std::optional<DefaultIsolation> getDefaultIsolation() const;
+
   SWIFT_DEBUG_DUMP;
-  void dump(raw_ostream &os, bool parseIfNeeded = false) const;
+  void
+  dump(raw_ostream &os,
+       ASTDumpMemberLoading memberLoading = ASTDumpMemberLoading::None) const;
+
+  /// Dumps this source file's AST in JSON format to the given output stream.
+  void dumpJSON(raw_ostream &os, ASTDumpMemberLoading memberLoading) const;
 
   /// Pretty-print the contents of this source file.
   ///
@@ -511,6 +733,8 @@ public:
     case SourceFileKind::Library:
     case SourceFileKind::Interface:
     case SourceFileKind::SIL:
+    case SourceFileKind::MacroExpansion:
+    case SourceFileKind::DefaultArgument:
       return false;
     }
     llvm_unreachable("bad SourceFileKind");
@@ -540,33 +764,39 @@ public:
     return isScriptMode() || hasMainDecl();
   }
 
-  /// Get the root refinement context for the file. The root context may be
-  /// null if the context hierarchy has not been built yet. Use
-  /// TypeChecker::getOrBuildTypeRefinementContext() to get a built
-  /// root of the hierarchy.
-  TypeRefinementContext *getTypeRefinementContext() const;
+  ModuleDecl *getUnderlyingModuleIfOverlay() const override {
+    return ImportedUnderlyingModule;
+  }
 
-  /// Set the root refinement context for the file.
-  void setTypeRefinementContext(TypeRefinementContext *TRC);
+  const clang::Module *getUnderlyingClangModule() const override {
+    if (!ImportedUnderlyingModule)
+      return nullptr;
+
+    return ImportedUnderlyingModule->findUnderlyingClangModule();
+  }
+
+  /// Get the root availability scope for the file. The root scope may be
+  /// null if the scope tree has not been built yet. Use
+  /// `AvailabilityScope::getOrBuildForSourceFile()` to get a built
+  /// root of the tree.
+  AvailabilityScope *getAvailabilityScope() const;
+
+  /// Set the root availability scope for the file.
+  void setAvailabilityScope(AvailabilityScope *scope);
 
   /// Whether this file can compute an interface hash.
   bool hasInterfaceHash() const {
     return ParsingOpts.contains(ParsingFlags::EnableInterfaceHash);
   }
 
-  /// Retrieve a fingerprint value that summarizes the declarations in this
-  /// source file.
+  /// Retrieve a fingerprint value that summarizes the top-level declarations in
+  /// this source file.
   ///
   /// Note that the interface hash merely summarizes the top-level declarations
   /// in this file. Type body fingerprints are currently implemented such that
   /// they divert tokens away from the hasher used for fingerprints. That is,
   /// changes to the bodies of types and extensions will not result in a change
-  /// to the interface hash.
-  ///
-  /// In order for the interface hash to be enabled, this source file must be a
-  /// primary and the compiler must be set in incremental mode. If this is not
-  /// the case, this function will try to signal with an assert. It is useful
-  /// to guard requests for the interface hash with \c hasInterfaceHash().
+  /// to the source file interface hash.
   Fingerprint getInterfaceHash() const;
 
   void dumpInterfaceHash(llvm::raw_ostream &out) {
@@ -584,13 +814,9 @@ public:
   /// them to be accessed from \c getAllTokens.
   bool shouldCollectTokens() const;
 
-  bool shouldBuildSyntaxTree() const;
-
   /// Whether the bodies of types and functions within this file can be lazily
   /// parsed.
   bool hasDelayedBodyParsing() const;
-
-  syntax::SourceFileSyntax getSyntaxRoot() const;
 
   OpaqueTypeDecl *lookupOpaqueResultType(StringRef MangledName) override;
 
@@ -601,19 +827,38 @@ public:
     UnvalidatedDeclsWithOpaqueReturnTypes.insert(vd);
   }
 
+  void addOpaqueResultTypeDecl(OpaqueTypeDecl *decl) {
+    UnvalidatedOpaqueReturnTypes.insert(decl);
+  }
+
   ArrayRef<OpaqueTypeDecl *> getOpaqueReturnTypeDecls();
 
   /// Returns true if the source file contains concurrency in the top-level
   bool isAsyncTopLevelSourceFile() const;
 
+  ArrayRef<TypeDecl *> getLocalTypeDecls() const;
+
+  /// Uniquely identifies a source file without exposing its full file path.
+  ///
+  /// A valid file ID should always be of the format "modulename/filename.swift"
+  struct FileIDStr {
+    StringRef moduleName;
+    StringRef fileName;
+
+    /// Parse a string as a SourceFile::FileIDStr.
+    ///
+    /// Returns \c nullopt if \param fileID could not be parsed.
+    static std::optional<FileIDStr> parse(StringRef fileID);
+
+    /// Whether this SourceFile::FileID matches that of the given \param file.
+    bool matches(const SourceFile *file) const;
+  };
+
 private:
 
   /// If not \c None, the underlying vector contains the parsed tokens of this
   /// source file.
-  Optional<ArrayRef<Token>> AllCollectedTokens;
-
-  /// The root of the syntax tree representing the source file.
-  std::unique_ptr<syntax::SourceFileSyntax> SyntaxRoot;
+  std::optional<ArrayRef<Token>> AllCollectedTokens;
 };
 
 inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
@@ -622,8 +867,8 @@ inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
 }
 
 inline SourceFile &ModuleDecl::getMainSourceFile() const {
-  assert(!Files.empty() && "No files added yet");
-  return *cast<SourceFile>(Files.front());
+  assert(!getFiles().empty() && "No files in module");
+  return *cast<SourceFile>(getFiles().front());
 }
 
 inline FileUnit *ModuleDecl::EntryPointInfoTy::getEntryPointFile() const {

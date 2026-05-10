@@ -1,11 +1,14 @@
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -DNEGATIVES -verify %s
+// RUN: %target-swift-frontend -parse-as-library -emit-sil -DNEGATIVES -verify %s -strict-concurrency=targeted
+// RUN: %target-swift-frontend -parse-as-library -emit-sil -DNEGATIVES -verify %s -strict-concurrency=complete
+
 // RUN: %target-swift-frontend -parse-as-library -emit-sil -enable-actor-data-race-checks -o - %s | %FileCheck %s
 
 // REQUIRES: concurrency
 
 func doSomething() {}
 
-// expected-note @+1 4 {{calls to global function 'requiresMainActor()' from outside of its actor context are implicitly asynchronous}}
+// expected-note @+1 6 {{calls to global function 'requiresMainActor()' from outside of its actor context are implicitly asynchronous}}
 @MainActor func requiresMainActor() {}
 
 @MainActor func testNonDefer_positive() {
@@ -32,6 +35,16 @@ func testNonDefer_negative() {
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    function_ref
 // CHECK-NEXT:    apply
+
+@MainActor func testGlobalActor_nested_positive() {
+  defer {
+    defer {
+      requiresMainActor()
+    }
+    doSomething()
+  }
+  doSomething()
+}
 
 #if NEGATIVES
 // expected-note @+1 {{add '@MainActor' to make global function 'testGlobalActor_negative()' part of global actor 'MainActor'}}
@@ -66,7 +79,7 @@ func testGlobalActorAsync_negative() async {
 
 @available(SwiftStdlib 5.1, *)
 actor Actor {
-  // expected-note @+1 3 {{mutation of this property is only permitted within the actor}}
+  // expected-note @+1 6 {{mutation of this property is only permitted within the actor}}
   var actorProperty = 0
 
   func testActor_positive() {
@@ -76,20 +89,44 @@ actor Actor {
     doSomething()
   }
 
+  func testActor_task_positive() {
+    Task {
+      defer { actorProperty += 1 }
+      doSomething()
+    }
+  }
+
 #if NEGATIVES
   nonisolated func testActor_negative() {
     defer {
-      // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a non-isolated context}}
+      // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a nonisolated context}}
       actorProperty += 1
     }
     doSomething()
   }
+
+  nonisolated func testActor_task_negative() {
+    Task {
+      // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a nonisolated context}}
+      defer { actorProperty += 1 }
+      doSomething()
+    }
+  }
+
   @MainActor func testActor_negative_globalActor() {
     defer {
       // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from the main actor}}
       actorProperty += 1
     }
     doSomething()
+  }
+
+  func testActor_task_negative_globalActor() {
+    Task { @MainActor in
+      // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from the main actor}}
+      defer { actorProperty += 1 }
+      doSomething()
+    }
   }
 #endif
 
@@ -99,6 +136,13 @@ actor Actor {
     }
     doSomething()
   }
+  
+  func testGlobalActor_task_positive() {
+    Task { @MainActor in
+      defer { requiresMainActor() }
+      doSomething()
+    }
+  }
 
 #if NEGATIVES
   func testGlobalActor_negative() {
@@ -107,6 +151,14 @@ actor Actor {
       requiresMainActor()
     }
     doSomething()
+  }
+
+  func testGlobalActor_task_negative() {
+    Task {
+      // expected-error @+1 {{call to main actor-isolated global function 'requiresMainActor()' in a synchronous nonisolated context}}
+      defer { requiresMainActor() }
+      doSomething()
+    }
   }
 #endif
 }
@@ -124,9 +176,54 @@ func testIsolatedActor_positive(actor: isolated Actor) {
 @available(SwiftStdlib 5.1, *)
 func testIsolatedActor_negative(actor: Actor) {
   defer {
-    // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a non-isolated context}}
+    // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a nonisolated context}}
     actor.actorProperty += 1
   }
   doSomething()
+}
+#endif
+
+@available(SwiftStdlib 5.1, *)
+func testGlobalActor_inTask_positive() {
+  Task { @MainActor in
+    defer { requiresMainActor() }
+    doSomething()
+  }
+}
+
+#if NEGATIVES
+@available(SwiftStdlib 5.1, *)
+func testGlobalActor_inTask_negative() {
+  Task {
+    // expected-error @+1 {{call to main actor-isolated global function 'requiresMainActor()' in a synchronous nonisolated context}}
+    defer { requiresMainActor() }
+    doSomething()
+  }
+}
+#endif
+
+@available(SwiftStdlib 5.1, *)
+func takeClosureWithIsolatedParam(body: (isolated Actor) -> Void) {}
+
+@available(SwiftStdlib 5.1, *)
+func takeClosureWithNotIsolatedParam(body: (Actor) -> Void) {}
+
+@available(SwiftStdlib 5.1, *)
+func testIsolatedActor_closure_positive() {
+  takeClosureWithIsolatedParam { actor in
+    actor.actorProperty += 1
+    defer { actor.actorProperty += 1 }
+    doSomething()
+  }
+}
+
+#if NEGATIVES
+@available(SwiftStdlib 5.1, *)
+func testIsolatedActor_closure_negative() {
+  takeClosureWithNotIsolatedParam { actor in
+    // expected-error @+1 {{actor-isolated property 'actorProperty' can not be mutated from a nonisolated context}}
+    defer { actor.actorProperty += 1 }
+    doSomething()
+  }
 }
 #endif

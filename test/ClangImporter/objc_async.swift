@@ -1,10 +1,12 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -strict-concurrency=targeted -parse-as-library
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules %s -verify -verify-ignore-unrelated -verify-additional-file %swift_src_root/test/Inputs/clang-importer-sdk/usr/include/ObjCConcurrency.h -strict-concurrency=targeted -parse-as-library -enable-experimental-feature SendableCompletionHandlers
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
+// REQUIRES: swift_feature_SendableCompletionHandlers
+
 import Foundation
 import ObjCConcurrency
-// expected-remark@-1{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
+// expected-warning@-1{{add '@preconcurrency' to suppress 'Sendable'-related warnings from module 'ObjCConcurrency'}}
 
 @available(SwiftStdlib 5.5, *)
 @MainActor func onlyOnMainActor() { }
@@ -114,7 +116,7 @@ func testSendable(fn: () -> Void) {
 func testSendableInAsync() async {
   var x = 17
   doSomethingConcurrentlyButUnsafe {
-    x = 42 // expected-error{{mutation of captured var 'x' in concurrently-executing code}}
+    x = 42 // expected-warning{{mutation of captured var 'x' in concurrently-executing code}}
   }
   print(x)
 }
@@ -135,22 +137,22 @@ func testSendableAttrs(
 
   doSomethingConcurrently {
     print(sendableClass)               // no-error
-    print(nonSendableClass)            // expected-warning{{capture of 'nonSendableClass' with non-sendable type 'NonSendableClass' in a `@Sendable` closure}}
+    print(nonSendableClass)            // expected-warning{{capture of 'nonSendableClass' with non-Sendable type 'NonSendableClass' in a '@Sendable' closure}}
 
     print(sendableEnum)                // no-error
-    print(nonSendableEnum)             // expected-warning{{capture of 'nonSendableEnum' with non-sendable type 'NonSendableEnum' in a `@Sendable` closure}}
+    print(nonSendableEnum)             // expected-warning{{capture of 'nonSendableEnum' with non-Sendable type 'NonSendableEnum' in a '@Sendable' closure}}
 
     print(sendableOptions)             // no-error
-    print(nonSendableOptions)          // expected-warning{{capture of 'nonSendableOptions' with non-sendable type 'NonSendableOptions' in a `@Sendable` closure}}
+    print(nonSendableOptions)          // expected-warning{{capture of 'nonSendableOptions' with non-Sendable type 'NonSendableOptions' in a '@Sendable' closure}}
 
     print(sendableError)               // no-error
     print(nonSendableError)            // no-error--we don't respect `@_nonSendable` on `ns_error_domain` types because all errors are Sendable
 
     print(sendableStringEnum)          // no-error
-    print(nonSendableStringEnum)       // expected-warning{{capture of 'nonSendableStringEnum' with non-sendable type 'NonSendableStringEnum' in a `@Sendable` closure}}
+    print(nonSendableStringEnum)       // expected-warning{{capture of 'nonSendableStringEnum' with non-Sendable type 'NonSendableStringEnum' in a '@Sendable' closure}}
 
     print(sendableStringStruct)        // no-error
-    print(nonSendableStringStruct)     // expected-warning{{capture of 'nonSendableStringStruct' with non-sendable type 'NonSendableStringStruct' in a `@Sendable` closure}}
+    print(nonSendableStringStruct)     // expected-warning{{capture of 'nonSendableStringStruct' with non-Sendable type 'NonSendableStringStruct' in a '@Sendable' closure}}
   }
 }
 
@@ -163,14 +165,14 @@ actor MySubclassCheckingSwiftAttributes : ProtocolWithSwiftAttributes {
   func syncMethod() { } // expected-note 2{{calls to instance method 'syncMethod()' from outside of its actor context are implicitly asynchronous}}
 
   nonisolated func independentMethod() {
-    syncMethod() // expected-error{{ctor-isolated instance method 'syncMethod()' can not be referenced from a non-isolated context}}
+    syncMethod() // expected-error{{call to actor-isolated instance method 'syncMethod()' in a synchronous nonisolated context}}
   }
 
   nonisolated func nonisolatedMethod() {
   }
 
   @MainActor func mainActorMethod() {
-    syncMethod() // expected-error{{actor-isolated instance method 'syncMethod()' can not be referenced from the main actor}}
+    syncMethod() // expected-error{{call to actor-isolated instance method 'syncMethod()' in a synchronous main actor-isolated context}}
   }
 
   @MainActor func uiActorMethod() { }
@@ -208,7 +210,7 @@ class MyButton : NXButton {
   }
 
   @SomeGlobalActor func testOther() {
-    onButtonPress() // expected-error{{call to main actor-isolated instance method 'onButtonPress()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
+    onButtonPress() // expected-warning{{call to main actor-isolated instance method 'onButtonPress()' in a synchronous global actor 'SomeGlobalActor'-isolated context}}
   }
 
   func test() {
@@ -258,9 +260,10 @@ func testMirrored(instance: ClassWithAsync) async {
 @available(SwiftStdlib 5.5, *)
 @SomeGlobalActor func sgActorFn() {}
 
-// Check inferred isolation for overridden decls from ObjC.
-// Note that even if the override is not present, it
-// can have an affect. -- rdar://87217618 / SR-15694
+// rdar://87217618
+// https://github.com/apple/swift/issues/57973
+// Check inferred isolation for overridden decls from ObjC. Note that even if
+// the override is not present, it can have an affect.
 @MainActor
 @available(SwiftStdlib 5.5, *)
 class FooFrame: PictureFrame {
@@ -308,6 +311,7 @@ class BazFrame: NotIsolatedPictureFrame {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 class BazFrameIso: PictureFrame { // expected-error {{global actor 'SomeGlobalActor'-isolated class 'BazFrameIso' has different actor isolation from main actor-isolated superclass 'PictureFrame'}}
 }
@@ -349,8 +353,6 @@ func testSender(
   sender.sendSendableSubclasses(nonSendableObject)
   // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
   sender.sendSendableSubclasses(sendableSubclassOfNonSendableObject)
-  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable}}
-  // FIXME(rdar://89992569): Should allow for the possibility that NonSendableClass will have a Sendable subclass
 
   sender.sendProto(sendableProtos)
   sender.sendProto(nonSendableProtos)
@@ -362,11 +364,9 @@ func testSender(
 
   sender.sendAnyArray([sendableObject])
   sender.sendAnyArray([nonSendableObject])
-  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable; this is an error in Swift 6}}
+  // expected-warning@-1 {{conformance of 'NonSendableClass' to 'Sendable' is unavailable; this is an error in the Swift 6 language mode}}
 
-  sender.sendGeneric(sendableGeneric)
-  // expected-warning@-1{{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
-  // FIXME: Shouldn't warn
+  sender.sendGeneric(sendableGeneric) // no warning
 
   sender.sendGeneric(nonSendableGeneric)
   // expected-warning@-1 {{type 'GenericObject<SendableClass>' does not conform to the 'Sendable' protocol}}
@@ -381,3 +381,32 @@ public struct SomeWrapper<T: AuditedNonSendable> {
 }
 
 extension SomeWrapper: Sendable where T: Sendable {}
+
+
+// rdar://96830159
+@available(SwiftStdlib 5.5, *)
+@MainActor class SendableCompletionHandler {
+  var isolatedThing: [String] = []
+  // expected-note@-1 {{property declared here}}
+
+  func makeCall(slowServer: SlowServer) {
+    slowServer.doSomethingSlow("churn butter") { (_ : Int) in
+      let _ = self.isolatedThing
+      // expected-warning@-1 {{main actor-isolated property 'isolatedThing' can not be referenced from a Sendable closure}}
+    }
+  }
+}
+
+// rdar://97646309 -- lookup and direct call of an optional global-actor constrained method would crash in SILGen
+@available(SwiftStdlib 5.5, *)
+extension CoffeeDelegate  {
+    @MainActor func test() async -> (NSObject?, NSObject, NSObject) {
+        return await self.icedMochaServiceGenerateMocha!(NSObject())
+    }
+}
+
+@MainActor
+func testGetSendableClasses() async {
+  let x = ImportObjCAsyncGetter()
+  _ = await x.sendableClasses
+}

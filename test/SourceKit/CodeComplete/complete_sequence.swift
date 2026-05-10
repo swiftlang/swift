@@ -15,7 +15,7 @@ func bar(arg: Bar) {
   _ = arg.
 }
 
-// NOTE: Tests for 'key.codecomplete.reuseastcontex' option.
+// NOTE: Tests for 'key.codecomplete.reuseastcontext' option.
 
 // Disabled.
 // RUN: %sourcekitd-test \

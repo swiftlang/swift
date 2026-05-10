@@ -1,15 +1,20 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5 -strict-concurrency=targeted
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5 -strict-concurrency=complete
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
 
 import SwiftUI
 
-class Visibility: ObservableObject { // expected-note 2{{class 'Visibility' does not conform to the 'Sendable' protocol}}
+@MainActor
+class Visibility: ObservableObject {
+    nonisolated init() {}
+
     @Published var yes = false // some nonsense
 }
 
-struct CoffeeTrackerView: View { // expected-note{{consider making struct 'CoffeeTrackerView' conform to the 'Sendable' protocol}}
+struct CoffeeTrackerView: View {
+    nonisolated init() {}
+
     @ObservedObject var showDrinkList: Visibility = Visibility()
 
     var storage: Visibility = Visibility()
@@ -34,20 +39,14 @@ func fromMainActor() async {
 
 
 func fromConcurrencyAware() async {
-  // expected-note@+3 {{calls to initializer 'init()' from outside of its actor context are implicitly asynchronous}}
-  // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}
-  // expected-warning@+1 {{non-sendable type 'CoffeeTrackerView' returned by call to main actor-isolated function cannot cross actor boundary}}
-  let view = CoffeeTrackerView()
+  let view = CoffeeTrackerView() // synthesized 'init' is 'nonisolated'
 
-  // expected-note@+3 {{property access is 'async'}}
-  // expected-warning@+2 {{non-sendable type 'some View' in implicitly asynchronous access to main actor-isolated property 'body' cannot cross actor boundary}}
-  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-warning@+2 {{non-Sendable type 'some View' of property 'body' cannot exit main actor-isolated context}}
+  // expected-warning@+1 {{main actor-isolated property 'body' cannot be accessed from outside of the actor}} {{7-7=await }}
   _ = view.body
 
-  // expected-note@+3 {{property access is 'async'}}
-  // expected-warning@+2 {{non-sendable type 'Visibility' in implicitly asynchronous access to main actor-isolated property 'showDrinkList' cannot cross actor boundary}}
-  // expected-error@+1 {{expression is 'async' but is not marked with 'await'}}
+  // expected-warning@+1 {{main actor-isolated property 'showDrinkList' cannot be accessed from outside of the actor}} {{7-7=await }}
   _ = view.showDrinkList
 
-  _ = await view.storage // expected-warning {{non-sendable type 'Visibility' in implicitly asynchronous access to main actor-isolated property 'storage' cannot cross actor boundary}}
+  _ = view.storage
 }

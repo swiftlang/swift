@@ -1,0 +1,32 @@
+
+private struct PrivateS: Codable {
+  let value: Int
+}
+
+
+public struct PublicS: Codable {
+  let value: Int
+
+  private enum CodingKeys: CodingKey {
+    case value
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container: KeyedDecodingContainer<PublicS.CodingKeys> = try decoder.container(keyedBy: PublicS.CodingKeys.self)
+
+    self.value = try container.decode(Int.self, forKey: PublicS.CodingKeys.value)
+
+  }
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.container(keyedBy: PublicS.CodingKeys.self)
+
+    try container.encode(self.value, forKey: PublicS.CodingKeys.value)
+  }
+}
+
+
+open class OpenC: Codable {
+  let value: Int
+}
+

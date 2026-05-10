@@ -1,4 +1,4 @@
-// RUN: %swift -typecheck -verify -parse-stdlib -target i386-apple-tvos9.0 %s
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target i386-apple-tvos9.0 %s
 
 @available(tvOS, introduced: 1.0, deprecated: 2.0, obsoleted: 9.0,
               message: "you don't want to do that anyway")
@@ -59,7 +59,7 @@ if #available(iOS 9.3, *) {
 }
 
 if #available(iOS 9.3, tvOS 9.1, *) {
-  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available in tvOS 9.2 or newer}} {{29-32=9.2}}
+  functionIntroducedOntvOS9_2() // expected-error {{'functionIntroducedOntvOS9_2()' is only available in tvOS 9.2 or newer}} {{-1:29-32=9.2}}
 }
 
 if #available(iOS 9.1, tvOS 9.2, *) {

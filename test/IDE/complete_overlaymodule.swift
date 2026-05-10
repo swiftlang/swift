@@ -6,32 +6,27 @@ import OverlayTest
 
 func testGlobalType() {
     let _: #^TYPE_GLOBAL^#
-// TYPE_GLOBAL: Begin completions
 // TYPE_GLOBAL-NOT: OverlayTest[#Module#]
 // TYPE_GLOBAL-DAG: Decl[Module]/None:                  OverlayTest[#Module#];
 // TYPE_GLOBAL-NOT: OverlayTest[#Module#]
-// TYPE_GLOBAL-DAG: Decl[Struct]/OtherModule[OverlayTest.Overlayed]: Overlayed[#Overlayed#];
-// TYPE_GLOBAL: End completions
+// TYPE_GLOBAL-DAG: Decl[Struct]/OtherModule[OverlayTest.Overlaid]: Overlaid[#Overlaid#];
 }
 func testGlobalExpr() {
     let _ = #^EXPR_GLOBAL^#
-// EPXR_GLOBAL: Begin completions
 // EXPR_GLOBAL-NOT: OverlayTest[#Module#]
 // EXPR_GLOBAL-DAG: Decl[Module]/None:                  OverlayTest[#Module#];
 // EXPR_GLOBAL-NOT: OverlayTest[#Module#]
-// EXPR_GLOBAL-DAG: Decl[Struct]/OtherModule[OverlayTest.Overlayed]: Overlayed[#Overlayed#];
-// EXPR_GLOBAL-DAG: Decl[FreeFunction]/OtherModule[OverlayTest]: createOverlayedInOverlay()[#Overlayed#];
-// EXPR_GLOBAL-DAG: Decl[FreeFunction]/OtherModule[OverlayTest.Overlayed]: createOverlayed()[#Overlayed#];
-// EPXR_GLOBAL: End completions
+// EXPR_GLOBAL-DAG: Decl[Struct]/OtherModule[OverlayTest.Overlaid]: Overlaid[#Overlaid#];
+// EXPR_GLOBAL-DAG: Decl[FreeFunction]/OtherModule[OverlayTest]: createOverlaidInOverlay()[#Overlaid#];
+// EXPR_GLOBAL-DAG: Decl[FreeFunction]/OtherModule[OverlayTest.Overlaid]: createOverlaid()[#Overlaid#];
 }
-func testGlobalExpr(value: Overlayed) {
+func testGlobalExpr(value: Overlaid) {
     value.#^EXPR_MEMBER^#
 // EXPR_MEMBER: Begin completions, 6 items
-// EXPR_MEMBER-DAG: Keyword[self]/CurrNominal:          self[#Overlayed#]; name=self
+// EXPR_MEMBER-DAG: Keyword[self]/CurrNominal:          self[#Overlaid#]; name=self
 // EXPR_MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      x[#Double#]; name=x
 // EXPR_MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      y[#Double#]; name=y
 // EXPR_MEMBER-DAG: Decl[InstanceVar]/CurrNominal:      z[#Double#]; name=z
 // EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   inOverlayFunc()[#Void#]; name=inOverlayFunc()
 // EXPR_MEMBER-DAG: Decl[InstanceMethod]/CurrNominal:   inOriginalFunc()[#Double#]; name=inOriginalFunc()
-// EXPR_MEMBER: End completions
 }

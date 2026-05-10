@@ -7,6 +7,7 @@ import Swift
 
 
 let OptionalTests = TestSuite("Optional")
+defer { runAllTests() }
 
 protocol TestProtocol1 {}
 
@@ -305,12 +306,14 @@ OptionalTests.test("Casting Optional") {
   expectTrue(anyToAny(x, Optional<Optional<C>>.self)!! === x)
   expectTrue(anyToAnyOrNil(ni, Int.self) == nil)
 
-  // Test for SR-459: Weakened optionals don't zero.
+  // https://github.com/apple/swift/issues/43076
+  // Weakened optionals don't zero
   var t = LifetimeTracked(0)
   _ = anyToAny(Optional(t), CustomDebugStringConvertible.self)
   expectTrue(anyToAnyIs(Optional(t), CustomDebugStringConvertible.self))
 
-  // Test for SR-912: Runtime exception casting an Any nil to an Optional.
+  // https://github.com/apple/swift/issues/43524
+  // Runtime exception casting an 'Any' nil to an 'Optional'
   let oi: Int? = nil
   expectTrue(anyToAny(oi as Any, Optional<Int>.self) == nil)
   expectTrue(anyToAnyIs(oi as Any, Optional<Int>.self))
@@ -424,4 +427,29 @@ OptionalTests.test("unsafelyUnwrapped nil")
 }
 #endif
 
-runAllTests()
+OptionalTests.test("_span() from Optional.none")
+.require(.stdlib_6_2).code {
+  var o = Optional<[Int]>.none
+  let span = o._span()
+  // o = [1, 2, 3] // Does not compile, exclusivity violation
+  expectEqual(span.count, 0)
+
+  // make it fail at test time if exclusivity was violated
+  expectNil(o, "fail due to exclusivity violation")
+}
+
+OptionalTests.test("_span() from Optional.some")
+.require(.stdlib_6_2).code {
+  let a: [Int] = [1, 2, 3]
+  var o: Optional = a
+  let span = o._span()
+  // o = nil // Does not compile, exclusivity violation
+  expectEqual(span.count, 1)
+  expectEqual(span[0], o, "accessed mysterious memory location")
+
+  expectNotNil(o, "fail due to exclusivity violation")
+
+  let b = [4, 5, 6]
+  // o = b // Does not compile, exclusivity violation
+  expectNotEqual(span[0], b, "accessed mysterious memory location")
+}

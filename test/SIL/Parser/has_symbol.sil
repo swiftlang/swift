@@ -1,0 +1,30 @@
+// RUN: %empty-directory(%t)
+// RUN: echo "public func simpleFunc() {}" > %t/has_symbol_helper.swift
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/has_symbol_helper.swiftmodule -parse-as-library -enable-library-evolution %t/has_symbol_helper.swift
+// RUN: %target-swift-frontend -emit-sil -verify %s -I %t/
+
+// UNSUPPORTED: OS=windows-msvc
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+@_weakLinked import has_symbol_helper
+
+sil hidden [ossa] @$s4test0A15GlobalFunctionsyyF : $@convention(thin) () -> () {
+bb0:
+  %0 = has_symbol #simpleFunc
+  cond_br %0, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %1 = tuple ()
+  return %1 : $()
+}

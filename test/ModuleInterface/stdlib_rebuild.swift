@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t.mcps)
 
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs/stdlib_rebuild -resource-dir %S/Inputs/stdlib_rebuild -module-cache-path %t.mcps/rebuild-remarks-off) -typecheck %s 2>&1 | %FileCheck -check-prefixes SLOW-DIAG,ALL %s
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs/stdlib_rebuild -resource-dir %S/Inputs/stdlib_rebuild -module-cache-path %t.mcps/rebuild-remarks-off) -typecheck %s 2>&1 | %FileCheck -check-prefixes ALL %s
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs/stdlib_rebuild -resource-dir %S/Inputs/stdlib_rebuild -module-cache-path %t.mcps/rebuild-remarks-off) -typecheck %s 2>&1 | %FileCheck -check-prefixes ALL --allow-empty %s
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs/stdlib_rebuild -resource-dir %S/Inputs/stdlib_rebuild -module-cache-path %t.mcps/rebuild-remarks-off) -D OTHER_IMPORT -typecheck %s 2>&1 | %FileCheck -check-prefixes ALL --allow-empty %s
 
@@ -16,8 +16,6 @@ import OtherModule
 #endif
 
 func fn(_: Int) {}
-
-// SLOW-DIAG: remark: did not find a prebuilt standard library for target '{{.*}}' compatible with this Swift compiler; building it may take a few minutes, but it should only happen once for this combination of compiler and target
 
 // NORMAL-DIAG-DAG: remark: rebuilding module 'Swift' from interface '{{.*}}'
 // NORMAL-DIAG-DAG: remark: rebuilding module '_Concurrency' from interface '{{.*}}'

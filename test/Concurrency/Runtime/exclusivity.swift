@@ -1,11 +1,14 @@
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library)
+// RUN: %target-run-simple-swift(-target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: freestanding
 
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
 // UNSUPPORTED: back_deploy_concurrency
 
 // This test makes sure that:
@@ -30,6 +33,8 @@ var global3: Int = 7
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Android)
+import Android
 #elseif canImport(CRT)
 import CRT
 #endif
@@ -362,7 +367,7 @@ struct Runner {
                 debugLog("==> Enter callee2")
                 debugLog("==> Exit callee2")
             }
-            
+
             // We add an inline never here to make sure that we do not eliminate
             // the dynamic access after inlining.
             @MainActor
@@ -371,7 +376,7 @@ struct Runner {
                 debugLog("==> Enter callee1")
                 let handle = Task { @MainActor in
                     debugLog("==> Enter callee1 Closure")
-                    
+
                     // These accesses end before we await in the task.
                     do {
                         callee2(&global1, &global2, &global3)
@@ -386,7 +391,7 @@ struct Runner {
                 await handle.value
                 debugLog("==> Exit callee1")
             }
-            
+
             debugLog("==> Enter 'testCase1'")
             await callee1()
             debugLog("==> Exit 'testCase1'")
@@ -478,8 +483,8 @@ struct Runner {
         // CHECK-NEXT: SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): (0x0, 0x0)
         // CHECK-NEXT: Access. Pointer: [[ACCESS]]. PC:
         // CHECK: Exiting Thread Local Context. After Swizzle. Task: [[TASK]]
-        // CHECK_NEXT: SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): ([[LLNODE]], [[LLNODE]])
-        // CHECK_NEXT: No Accesses.
+        // CHECK-NEXT: SwiftTaskThreadLocalContext: (FirstAccess,LastAccess): ([[LLNODE]], [[LLNODE]])
+        // CHECK-NEXT: No Accesses.
         //
         // CHECK-NOT: Removing access:
         // CHECK: ==> End Inner Task Handle

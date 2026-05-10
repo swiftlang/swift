@@ -20,7 +20,7 @@ class BasicBlockBitfield;
 // Fake SILFunction and SILBasicBlock.
 
 struct SILFunction {
-  BasicBlockBitfield *newestAliveBitfield = nullptr;
+  BasicBlockBitfield *newestAliveBlockBitfield = nullptr;
   uint64_t currentBitfieldID = 1;
 };
 
@@ -29,9 +29,16 @@ struct SILBasicBlock {
   uint32_t customBits = 0;
   uint64_t lastInitializedBitfieldID = 0;
 
+  enum { numCustomBits = 32 };
+  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() };
+
   SILBasicBlock(SILFunction *function): function(function) {}
 
-  SILFunction *getParent() const { return function; }
+  SILFunction *getFunction() const { return function; }
+  
+  unsigned getCustomBits() const { return customBits; }
+  void setCustomBits(unsigned value) { customBits = value; }
+  
 };
 
 }

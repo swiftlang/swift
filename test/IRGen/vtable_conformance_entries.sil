@@ -1,0 +1,81 @@
+// RUN: %target-swift-frontend -module-name=test -emit-irgen %s | %FileCheck %s
+
+// Windows doesn't use fixed class metadata layout
+// UNSUPPORTED: OS=windows-msvc
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+
+public protocol P : C {
+}
+
+public protocol Q : C {
+}
+
+// CHECK-LABEL: @"$s4test1CCMf" = internal global <{{.*}}> <{ ptr null, ptr @"$s4test1CCAA1PAAWP", ptr null, ptr @"$s4test1CCfD{{.*}}",
+public class C : P {
+}
+
+// CHECK-LABEL: @"$s4test1DCMf" = internal global <{{.*}}> <{ ptr @"$s4test1DCAA1QAAWP", ptr @"$s4test1CCAA1PAAWP", ptr null, ptr @"$s4test1DCfD{{.*}}",
+public class D : C, Q {
+}
+
+// CHECK-LABEL: @"$s4test1CCN" ={{.*}} alias %swift.type, getelementptr inbounds (<{{.*}}>, ptr @"$s4test1CCMf", i32 0, i32 5)
+// CHECK-LABEL: @"$s4test1DCN" ={{.*}} alias %swift.type, getelementptr inbounds (<{{.*}}>, ptr @"$s4test1DCMf", i32 0, i32 5)
+
+sil @$s4test1CCfD : $@convention(method) (@owned C) -> ()
+sil @$s4test1DCfD : $@convention(method) (@owned D) -> ()
+
+sil_vtable C {
+  conformance C: P module nix
+  no_conformance Q
+  #C.deinit!deallocator: @$s4test1CCfD
+}
+
+sil_vtable D {
+  conformance D: inherit (C: P module nix)
+  conformance D: Q module nix
+  #D.deinit!deallocator: @$s4test1DCfD
+}
+
+// CHECK-LABEL: define {{.*}} @unconditional_cast(ptr %0)
+// CHECK:         %1 = load ptr, ptr %0
+// CHECK:         [[G:%.*]] = getelementptr ptr, ptr %{{[0-9]+}}, i32 -5
+// CHECK:         [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK:         [[C:%.*]] = icmp ne ptr [[L]], null
+// CHECK:         [[S:%.*]] = select i1 [[C]], ptr %0, ptr null
+// CHECK:         [[I1:%.*]] = insertvalue { ptr, ptr } undef, ptr [[S]], 0
+// CHECK:         [[I2:%.*]] = insertvalue { ptr, ptr } [[I1]], ptr [[L]], 1
+// CHECK:         ret { ptr, ptr } [[I2]]
+sil @unconditional_cast : $@convention(thin) (@owned C) -> @owned any Q {
+bb0(%0 : $C):
+  %1 = unconditional_checked_cast [prohibit_isolated_conformances] %0 to any Q
+  return %1
+}
+
+// CHECK-LABEL: define {{.*}} @conditional_cast(ptr %0)
+// CHECK:         %1 = load ptr, ptr %0
+// CHECK:         [[G:%.*]] = getelementptr ptr, ptr %{{[0-9]+}}, i32 -5
+// CHECK:         [[L:%.*]] = load ptr, ptr [[G]]
+// CHECK:         [[C:%.*]] = icmp ne ptr [[L]], null
+// CHECK:         [[S:%.*]] = select i1 [[C]], ptr %0, ptr null
+// CHECK:         [[I:%.*]] = icmp ne ptr [[S]], null
+// CHECK:         br i1 [[I]],
+sil @conditional_cast : $@convention(thin) (@owned C) -> @owned Optional<any Q> {
+bb0(%0 : $C):
+  checked_cast_br [prohibit_isolated_conformances] C in %0 to any Q, bb1, bb2
+
+bb1(%3 : $any Q):
+  %4 = enum $Optional<any Q>, #Optional.some!enumelt, %3
+  br bb3(%4)
+
+bb2:
+  %7 = enum $Optional<any Q>, #Optional.none!enumelt
+  br bb3(%7)
+
+bb3(%9 : $Optional<any Q>):
+  return %9
+}

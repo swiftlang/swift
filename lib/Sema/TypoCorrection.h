@@ -17,12 +17,12 @@
 #ifndef SWIFT_SEMA_TYPOCORRECTION_H
 #define SWIFT_SEMA_TYPOCORRECTION_H
 
-#include "swift/Basic/LLVM.h"
-#include "swift/AST/Identifier.h"
 #include "swift/AST/DeclNameLoc.h"
-#include "llvm/ADT/Optional.h"
-#include "llvm/ADT/SmallVector.h"
+#include "swift/AST/Identifier.h"
+#include "swift/Basic/LLVM.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallVector.h"
+#include <optional>
 
 namespace swift {
 
@@ -68,7 +68,7 @@ public:
   /// the notes subsequently emitted by noteAllCandidates will only make
   /// sense in the context of a diagnostic that suggests that the correction
   /// has happened.
-  Optional<SyntacticTypoCorrection> claimUniqueCorrection();
+  std::optional<SyntacticTypoCorrection> claimUniqueCorrection();
 
   /// Emit a note for every candidate in the set.
   void noteAllCandidates() const;

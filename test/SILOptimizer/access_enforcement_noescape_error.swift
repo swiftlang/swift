@@ -1,11 +1,10 @@
 // RUN: %target-swift-frontend -module-name access_enforcement_noescape -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
-// RUN: %target-swift-frontend -module-name access_enforcement_noescape -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -verify -parse-as-library %s
 // REQUIRES: asserts
 
 // This is the subset of tests from access_enforcement_noescape.swift
 // that cause compile-time errors. All the tests are organized in one
 // place so it's easy to see that coverage of all the combinations of
-// access paterns is exhaustive. But the ones that cause compile time
+// access patterns is exhaustive. But the ones that cause compile time
 // errors are commented out in the original file and compiled here
 // instead with the '-verify' option.
 

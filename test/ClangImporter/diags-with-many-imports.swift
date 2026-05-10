@@ -108,4 +108,4 @@ import Module100
 obsoleted()
 // CHECK: [[@LINE-1]]:1: error:
 // CHECK: explicitly marked unavailable here
-// CHECK-NEXT: func obsoleted()
+// CHECK: void obsoleted() __attribute__((unavailable));

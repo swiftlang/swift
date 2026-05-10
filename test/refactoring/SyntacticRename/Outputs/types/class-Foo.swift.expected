@@ -1,18 +1,18 @@
-class /*/*class-Foo:unknown*/MoreFoo in comment*/ /*class-Foo:def*/MoreFoo {}
+class /*/*class-Foo:unknown*/<base>Foo</base> in comment*/ /*class-Foo:def*/<base>Foo</base> {}
 protocol /*protocol-Proto:def*/Proto {
 	associatedtype /*associated-Item:def*/Item
 }
-class /*class-Bar:def*/Bar : /*class-Foo*/MoreFoo, /*protocol-Proto*/Proto {
+class /*class-Bar:def*/Bar : /*class-Foo*/<base>Foo</base>, /*protocol-Proto*/Proto {
 	typealias /*associated-Item:def*/Item = Int
 }
 
 let x: /*class-Bar*/Bar = /*class-Bar*/Bar()
 
-func foo(a: /*class-Foo*/MoreFoo, b: /*class-Bar*/Bar, c: inout /*class-Bar*/Bar) -> /*class-Foo*/MoreFoo {
+func foo(a: /*class-Foo*/<base>Foo</base>, b: /*class-Bar*/Bar, c: inout /*class-Bar*/Bar) -> /*class-Foo*/<base>Foo</base> {
 	return /*class-Bar*/Bar()
 }
 
-typealias /*alias-FuncType:def*/FuncType = (/*class-Foo*/MoreFoo, /*class-Bar*/Bar) -> /*class-Bar*/Bar
+typealias /*alias-FuncType:def*/FuncType = (/*class-Foo*/<base>Foo</base>, /*class-Bar*/Bar) -> /*class-Bar*/Bar
 var example: /*alias-FuncType*/FuncType = {a, b in x}
 
 func bar<X:/*protocol-Proto*/Proto, Y>(a: X, b: Y) {}

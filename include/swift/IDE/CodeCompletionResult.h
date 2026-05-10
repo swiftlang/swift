@@ -16,6 +16,7 @@
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletionResultType.h"
 #include "swift/IDE/CodeCompletionString.h"
+#include "swift/IDE/CommentConversion.h"
 
 namespace swift {
 namespace ide {
@@ -117,6 +118,7 @@ enum class CodeCompletionDeclKind : uint8_t {
   LocalVar,
   GlobalVar,
   PrecedenceGroup,
+  Macro,
 };
 
 enum class CodeCompletionLiteralKind : uint8_t {
@@ -183,24 +185,28 @@ enum class CodeCompletionKeywordKind : uint8_t {
   None,
 #define KEYWORD(X) kw_##X,
 #define POUND_KEYWORD(X) pound_##X,
-#include "swift/Syntax/TokenKinds.def"
+#include "swift/AST/TokenKinds.def"
 };
 
 enum class CompletionKind : uint8_t {
   None,
   Import,
+  Using,
   UnresolvedMember,
   DotExpr,
   StmtOrExpr,
   PostfixExprBeginning,
   PostfixExpr,
-  PostfixExprParen,
   KeyPathExprObjC,
   KeyPathExprSwift,
+  TypePossibleFunctionParamBeginning,
   TypeDeclResultBeginning,
+  TypeBeginning,
+  TypeSimpleOrComposition,
   TypeSimpleBeginning,
-  TypeIdentifierWithDot,
-  TypeIdentifierWithoutDot,
+  TypeSimpleWithDot,
+  TypeSimpleWithoutDot,
+  TypeSimpleInverted,
   CaseStmtKeyword,
   CaseStmtBeginning,
   NominalMemberBeginning,
@@ -210,10 +216,13 @@ enum class CompletionKind : uint8_t {
   EffectsSpecifier,
   PoundAvailablePlatform,
   CallArg,
-  LabeledTrailingClosure,
   ReturnStmtExpr,
+  ThenStmtExpr,
   YieldStmtExpr,
   ForEachSequence,
+
+  /// The \c in keyword in a for-each loop.
+  ForEachInKw,
   AfterPoundExpr,
   AfterPoundDirective,
   PlatformConditon,
@@ -223,6 +232,7 @@ enum class CompletionKind : uint8_t {
   StmtLabel,
   ForEachPatternBeginning,
   TypeAttrBeginning,
+  TypeAttrInheritanceBeginning,
   OptionalBinding,
 };
 
@@ -248,16 +258,15 @@ enum class CodeCompletionDiagnosticSeverity : uint8_t {
 /// E.g. \c InvalidAsyncContext depends on whether the usage context is async or
 /// not.
 enum class NotRecommendedReason : uint8_t {
-  None = 0,                    // both contextual and context-free
-  RedundantImport,             // contextual
-  RedundantImportIndirect,     // contextual
-  Deprecated,                  // context-free
-  SoftDeprecated,              // context-free
-  InvalidAsyncContext,         // contextual
-  CrossActorReference,         // contextual
-  VariableUsedInOwnDefinition, // contextual
+  None = 0,                              // both contextual and context-free
+  RedundantImport,                       // contextual
+  RedundantImportIndirect,               // contextual
+  Deprecated,                            // context-free
+  SoftDeprecated,                        // context-free
+  VariableUsedInOwnDefinition,           // contextual
+  NonAsyncAlternativeUsedInAsyncContext, // contextual
 
-  MAX_VALUE = VariableUsedInOwnDefinition
+  MAX_VALUE = NonAsyncAlternativeUsedInAsyncContext
 };
 
 /// TODO: We consider deprecation warnings as context free although they don't
@@ -291,10 +300,11 @@ enum class ContextualNotRecommendedReason : uint8_t {
   None = 0,
   RedundantImport,
   RedundantImportIndirect,
-  InvalidAsyncContext,
-  CrossActorReference,
   VariableUsedInOwnDefinition,
-  MAX_VALUE = VariableUsedInOwnDefinition
+  /// A method that is sync and has an async alternative is used in an async
+  /// context.
+  NonAsyncAlternativeUsedInAsyncContext,
+  MAX_VALUE = NonAsyncAlternativeUsedInAsyncContext
 };
 
 enum class CodeCompletionResultKind : uint8_t {
@@ -306,6 +316,41 @@ enum class CodeCompletionResultKind : uint8_t {
 
   MAX_VALUE = BuiltinOperator
 };
+
+enum class CodeCompletionMacroRole : uint8_t {
+  Expression = 1 << 0,
+  Declaration = 1 << 1,
+  CodeItem = 1 << 2,
+  AttachedVar = 1 << 3,
+  AttachedContext = 1 << 4,
+  AttachedDecl = 1 << 5,
+  AttachedFunction = 1 << 6,
+};
+using CodeCompletionMacroRoles = OptionSet<CodeCompletionMacroRole>;
+
+enum class CodeCompletionFilterFlag : uint16_t {
+  Expr = 1 << 0,
+  Type = 1 << 1,
+  PrecedenceGroup = 1 << 2,
+  Module = 1 << 3,
+  ExpressionMacro = 1 << 4,
+  DeclarationMacro = 1 << 5,
+  CodeItemMacro = 1 << 6,
+  AttachedVarMacro = 1 << 7,
+  AttachedContextMacro = 1 << 8,
+  AttachedDeclMacro = 1 << 9,
+  AttachedFunctionMacro = 1 << 10,
+};
+using CodeCompletionFilter = OptionSet<CodeCompletionFilterFlag>;
+
+CodeCompletionMacroRoles getCompletionMacroRoles(const Decl *D);
+
+CodeCompletionMacroRoles
+getCompletionMacroRoles(OptionSet<CustomAttributeKind> kinds);
+
+CodeCompletionMacroRoles getCompletionMacroRoles(CodeCompletionFilter filter);
+
+CodeCompletionFilter getCompletionFilter(CodeCompletionMacroRoles roles);
 
 /// The parts of a \c CodeCompletionResult that are not dependent on the context
 /// it appears in and can thus be cached.
@@ -325,11 +370,19 @@ class ContextFreeCodeCompletionResult {
   CodeCompletionOperatorKind KnownOperatorKind : 6;
   static_assert(int(CodeCompletionOperatorKind::MAX_VALUE) < 1 << 6, "");
 
+  CodeCompletionMacroRoles MacroRoles;
+
   bool IsSystem : 1;
+  /// Whether the result has been annotated as having an async alternative that
+  /// should be preferred in async contexts.
+  bool HasAsyncAlternative : 1;
   CodeCompletionString *CompletionString;
   NullTerminatedStringRef ModuleName;
   NullTerminatedStringRef BriefDocComment;
   ArrayRef<NullTerminatedStringRef> AssociatedUSRs;
+  /// The Swift USR for a declaration (including for Clang declarations) used
+  /// for looking up the \c Decl instance for cached results.
+  NullTerminatedStringRef SwiftUSR;
   CodeCompletionResultType ResultType;
 
   ContextFreeNotRecommendedReason NotRecommended : 3;
@@ -341,33 +394,42 @@ class ContextFreeCodeCompletionResult {
   NullTerminatedStringRef DiagnosticMessage;
   NullTerminatedStringRef FilterName;
 
+  /// If the result represents a \c ValueDecl the name by which this decl should
+  /// be referred to in diagnostics.
+  NullTerminatedStringRef NameForDiagnostics;
+
 public:
-  /// Memberwise initializer. \p AssociatedKInd is opaque and will be
+  /// Memberwise initializer. \p AssociatedKind is opaque and will be
   /// interpreted based on \p Kind. If \p KnownOperatorKind is \c None and the
   /// completion item is an operator, it will be determined based on the
-  /// compleiton string.
+  /// completion string.
   ///
-  /// \note The caller must ensure that the \p CompleitonString and all the
+  /// \note The caller must ensure that the \p CompletionString and all the
   /// \c Ref types outlive this result, typically by storing them in the same
   /// \c CodeCompletionResultSink as the result itself.
   ContextFreeCodeCompletionResult(
       CodeCompletionResultKind Kind, uint8_t AssociatedKind,
-      CodeCompletionOperatorKind KnownOperatorKind, bool IsSystem,
-      CodeCompletionString *CompletionString,
+      CodeCompletionOperatorKind KnownOperatorKind,
+      CodeCompletionMacroRoles MacroRoles, bool IsSystem,
+      bool HasAsyncAlternative, CodeCompletionString *CompletionString,
       NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-      CodeCompletionResultType ResultType,
+      NullTerminatedStringRef SwiftUSR, CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       NullTerminatedStringRef DiagnosticMessage,
-      NullTerminatedStringRef FilterName)
-      : Kind(Kind), KnownOperatorKind(KnownOperatorKind), IsSystem(IsSystem),
+      NullTerminatedStringRef FilterName,
+      NullTerminatedStringRef NameForDiagnostics)
+      : Kind(Kind), KnownOperatorKind(KnownOperatorKind),
+        MacroRoles(MacroRoles), IsSystem(IsSystem),
+        HasAsyncAlternative(HasAsyncAlternative),
         CompletionString(CompletionString), ModuleName(ModuleName),
         BriefDocComment(BriefDocComment), AssociatedUSRs(AssociatedUSRs),
-        ResultType(ResultType), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
-        DiagnosticMessage(DiagnosticMessage), FilterName(FilterName) {
+        SwiftUSR(SwiftUSR), ResultType(ResultType),
+        NotRecommended(NotRecommended), DiagnosticSeverity(DiagnosticSeverity),
+        DiagnosticMessage(DiagnosticMessage), FilterName(FilterName),
+        NameForDiagnostics(NameForDiagnostics) {
     this->AssociatedKind.Opaque = AssociatedKind;
     assert((NotRecommended == ContextFreeNotRecommendedReason::None) ==
                (DiagnosticSeverity == CodeCompletionDiagnosticSeverity::None) &&
@@ -393,7 +455,7 @@ public:
   static ContextFreeCodeCompletionResult *createPatternOrBuiltInOperatorResult(
       CodeCompletionResultSink &Sink, CodeCompletionResultKind Kind,
       CodeCompletionString *CompletionString,
-      CodeCompletionOperatorKind KnownOperatorKind,
+      CodeCompletionOperatorKind KnownOperatorKin,
       NullTerminatedStringRef BriefDocComment,
       CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
@@ -430,10 +492,11 @@ public:
   /// \c CodeCompletionResultSink as the result itself.
   static ContextFreeCodeCompletionResult *createDeclResult(
       CodeCompletionResultSink &Sink, CodeCompletionString *CompletionString,
-      const Decl *AssociatedDecl, NullTerminatedStringRef ModuleName,
+      const Decl *AssociatedDecl, bool HasAsyncAlternative,
+      NullTerminatedStringRef ModuleName,
       NullTerminatedStringRef BriefDocComment,
       ArrayRef<NullTerminatedStringRef> AssociatedUSRs,
-      CodeCompletionResultType ResultType,
+      NullTerminatedStringRef SwiftUSR, CodeCompletionResultType ResultType,
       ContextFreeNotRecommendedReason NotRecommended,
       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
       NullTerminatedStringRef DiagnosticMessage);
@@ -464,7 +527,11 @@ public:
     return KnownOperatorKind;
   }
 
+  CodeCompletionMacroRoles getMacroRoles() const { return MacroRoles; }
+
   bool isSystem() const { return IsSystem; };
+
+  bool hasAsyncAlternative() const { return HasAsyncAlternative; };
 
   CodeCompletionString *getCompletionString() const { return CompletionString; }
 
@@ -476,11 +543,21 @@ public:
     return AssociatedUSRs;
   }
 
+  NullTerminatedStringRef getSwiftUSR() const { return SwiftUSR; }
+
   const CodeCompletionResultType &getResultType() const { return ResultType; }
 
   ContextFreeNotRecommendedReason getNotRecommendedReason() const {
     return NotRecommended;
   }
+
+  ContextualNotRecommendedReason calculateContextualNotRecommendedReason(
+      ContextualNotRecommendedReason explicitReason,
+      bool canCurrDeclContextHandleAsync) const;
+
+  CodeCompletionResultTypeRelation calculateContextualTypeRelation(
+      const DeclContext *dc, const ExpectedTypeContext *typeContext,
+      const USRBasedTypeContext *usrTypeContext) const;
 
   CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
     return DiagnosticSeverity;
@@ -490,6 +567,10 @@ public:
   }
 
   NullTerminatedStringRef getFilterName() const { return FilterName; }
+
+  NullTerminatedStringRef getNameForDiagnostics() const {
+    return NameForDiagnostics;
+  }
 
   bool isOperator() const {
     if (getKind() == CodeCompletionResultKind::Declaration) {
@@ -518,6 +599,10 @@ public:
 /// the completion's usage context.
 class CodeCompletionResult {
   const ContextFreeCodeCompletionResult &ContextFree;
+  /// Contains the associated declaration if fetched; if not, stores the
+  /// ASTContext to use for finding the associated declaration through the Swift
+  /// USR.
+  mutable llvm::PointerUnion<const Decl *, ASTContext *> DeclOrCtx;
   SemanticContextKind SemanticContext : 3;
   static_assert(int(SemanticContextKind::MAX_VALUE) < 1 << 3, "");
 
@@ -527,11 +612,6 @@ class CodeCompletionResult {
   /// \c None, then the context free diagnostic will be shown to the user.
   ContextualNotRecommendedReason NotRecommended : 4;
   static_assert(int(ContextualNotRecommendedReason::MAX_VALUE) < 1 << 4, "");
-
-  CodeCompletionDiagnosticSeverity DiagnosticSeverity : 3;
-  static_assert(int(CodeCompletionDiagnosticSeverity::MAX_VALUE) < 1 << 3, "");
-
-  NullTerminatedStringRef DiagnosticMessage;
 
   /// The number of bytes to the left of the code completion point that
   /// should be erased first if this completion string is inserted in the
@@ -545,42 +625,21 @@ private:
   CodeCompletionResultTypeRelation TypeDistance : 3;
   static_assert(int(CodeCompletionResultTypeRelation::MAX_VALUE) < 1 << 3, "");
 
+public:
   /// Memberwise initializer
   /// The \c ContextFree result must outlive this result. Typically, this is
   /// done by allocating the two in the same sink or adopting the context free
   /// sink in the sink that allocates this result.
   CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
+                       llvm::PointerUnion<const Decl *, ASTContext *> DeclOrCtx,
                        SemanticContextKind SemanticContext,
                        CodeCompletionFlair Flair, uint8_t NumBytesToErase,
                        CodeCompletionResultTypeRelation TypeDistance,
-                       ContextualNotRecommendedReason NotRecommended,
-                       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                       NullTerminatedStringRef DiagnosticMessage)
-      : ContextFree(ContextFree), SemanticContext(SemanticContext),
-        Flair(Flair.toRaw()), NotRecommended(NotRecommended),
-        DiagnosticSeverity(DiagnosticSeverity),
-        DiagnosticMessage(DiagnosticMessage), NumBytesToErase(NumBytesToErase),
+                       ContextualNotRecommendedReason NotRecommended)
+      : ContextFree(ContextFree), DeclOrCtx(DeclOrCtx),
+        SemanticContext(SemanticContext), Flair(Flair.toRaw()),
+        NotRecommended(NotRecommended), NumBytesToErase(NumBytesToErase),
         TypeDistance(TypeDistance) {}
-
-public:
-  /// Enrich a \c ContextFreeCodeCompletionResult with the following contextual
-  /// information.
-  /// This computes the type relation between the completion item and its
-  /// expected type context.
-  /// See \c CodeCompletionResultType::calculateTypeRelation for documentation
-  /// on \p USRTypeContext.
-  /// The \c ContextFree result must outlive this result. Typically, this is
-  /// done by allocating the two in the same sink or adopting the context free
-  /// sink in the sink that allocates this result.
-  CodeCompletionResult(const ContextFreeCodeCompletionResult &ContextFree,
-                       SemanticContextKind SemanticContext,
-                       CodeCompletionFlair Flair, uint8_t NumBytesToErase,
-                       const ExpectedTypeContext *TypeContext,
-                       const DeclContext *DC,
-                       const USRBasedTypeContext *USRTypeContext,
-                       ContextualNotRecommendedReason NotRecommended,
-                       CodeCompletionDiagnosticSeverity DiagnosticSeverity,
-                       NullTerminatedStringRef DiagnosticMessage);
 
   const ContextFreeCodeCompletionResult &getContextFreeResult() const {
     return ContextFree;
@@ -661,14 +720,15 @@ public:
       return NotRecommendedReason::RedundantImport;
     case ContextualNotRecommendedReason::RedundantImportIndirect:
       return NotRecommendedReason::RedundantImportIndirect;
-    case ContextualNotRecommendedReason::InvalidAsyncContext:
-      return NotRecommendedReason::InvalidAsyncContext;
-    case ContextualNotRecommendedReason::CrossActorReference:
-      return NotRecommendedReason::CrossActorReference;
+    case ContextualNotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext:
+      return NotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext;
     case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
       return NotRecommendedReason::VariableUsedInOwnDefinition;
     }
   }
+
+  /// Finds the associated declaration on-demand and caches it.
+  const Decl *getAssociatedDecl() const;
 
   SemanticContextKind getSemanticContext() const { return SemanticContext; }
 
@@ -695,41 +755,47 @@ public:
     return getContextFreeResult().getBriefDocComment();
   }
 
+  /// Prints the full documentation comment as XML to the provided \p OS stream.
+  ///
+  /// \returns true if the result has a documentation comment.
+  bool printFullDocCommentAsXML(raw_ostream &OS) const {
+    if (auto *D = getAssociatedDecl())
+      return ide::getDocumentationCommentAsXML(D, OS);
+
+    return false;
+  }
+
+  /// Prints the raw documentation comment to the provided \p OS stream.
+  ///
+  /// \returns true if the result has a documentation comment.
+  bool printRawDocComment(raw_ostream &OS) const {
+    if (auto *D = getAssociatedDecl())
+      return ide::getRawDocumentationComment(D, OS);
+
+    return false;
+  }
+
   ArrayRef<NullTerminatedStringRef> getAssociatedUSRs() const {
     return getContextFreeResult().getAssociatedUSRs();
   }
 
-  /// Get the contextual diagnostic severity. This disregards context-free
-  /// diagnostics.
-  CodeCompletionDiagnosticSeverity getContextualDiagnosticSeverity() const {
-    return DiagnosticSeverity;
-  }
+  /// Get the contextual diagnostic severity and message. This disregards
+  /// context-free diagnostics.
+  std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>
+  getContextualDiagnosticSeverityAndMessage(SmallVectorImpl<char> &Scratch,
+                                            const ASTContext &Ctx) const;
 
-  /// Get the contextual diagnostic message. This disregards context-free
-  /// diagnostics.
-  NullTerminatedStringRef getContextualDiagnosticMessage() const {
-    return DiagnosticMessage;
-  }
-
-  /// Return the contextual diagnostic severity if there was a contextual
-  /// diagnostic. If there is no contextual diagnostic, return the context-free
-  /// diagnostic severity.
-  CodeCompletionDiagnosticSeverity getDiagnosticSeverity() const {
+  /// Return the contextual diagnostic severity and message if there was a
+  /// contextual diagnostic. If there is no contextual diagnostic, return the
+  /// context-free diagnostic severity and message.
+  std::pair<CodeCompletionDiagnosticSeverity, NullTerminatedStringRef>
+  getDiagnosticSeverityAndMessage(SmallVectorImpl<char> &Scratch,
+                                  const ASTContext &Ctx) const {
     if (NotRecommended != ContextualNotRecommendedReason::None) {
-      return DiagnosticSeverity;
+      return getContextualDiagnosticSeverityAndMessage(Scratch, Ctx);
     } else {
-      return getContextFreeResult().getDiagnosticSeverity();
-    }
-  }
-
-  /// Return the contextual diagnostic message if there was a contextual
-  /// diagnostic. If there is no contextual diagnostic, return the context-free
-  /// diagnostic message.
-  NullTerminatedStringRef getDiagnosticMessage() const {
-    if (NotRecommended != ContextualNotRecommendedReason::None) {
-      return DiagnosticMessage;
-    } else {
-      return getContextFreeResult().getDiagnosticMessage();
+      return std::make_pair(getContextFreeResult().getDiagnosticSeverity(),
+                            getContextFreeResult().getDiagnosticMessage());
     }
   }
 

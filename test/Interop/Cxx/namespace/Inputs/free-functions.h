@@ -60,4 +60,13 @@ inline const char *sameNameInSibling() {
 }
 } // namespace FunctionsNS4
 
+namespace FunctionsNS1 {
+namespace FunctionsNS2 {
+namespace FunctionsNS3 {
+struct Y {};
+inline bool operator==(Y, Y) { return true; }
+} // namespace FunctionsNS3
+} // namespace FunctionsNS2
+} // namespace FunctionsNS1
+
 #endif // TEST_INTEROP_CXX_NAMESPACE_INPUTS_FREE_FUNCTION_H

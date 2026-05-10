@@ -29,6 +29,7 @@ namespace llvm {
   class AttributeList;
   class Function;
   class FunctionType;
+  class CallBase;
 }
 namespace swift {
 namespace irgen {
@@ -41,18 +42,17 @@ namespace irgen {
                                   llvm::GlobalValue *global,
                                   const LinkEntity &entity);
 
-  llvm::Function *createFunction(IRGenModule &IGM,
-                                 LinkInfo &linkInfo,
-                                 const Signature &signature,
-                                 llvm::Function *insertBefore = nullptr,
-                                 OptimizationMode FuncOptMode =
-                                   OptimizationMode::NotSet);
+  llvm::Function *createFunction(
+      IRGenModule &IGM, LinkInfo &linkInfo, const Signature &signature,
+      llvm::Function *insertBefore = nullptr,
+      OptimizationMode FuncOptMode = OptimizationMode::NotSet,
+      StackProtectorMode stackProtect = StackProtectorMode::NoStackProtector);
 
   llvm::GlobalVariable *
   createVariable(IRGenModule &IGM, LinkInfo &linkInfo, llvm::Type *objectType,
                  Alignment alignment, DebugTypeInfo DebugType = DebugTypeInfo(),
-                 Optional<SILLocation> DebugLoc = None,
-                 StringRef DebugName = StringRef(), bool heapAllocated = false);
+                 std::optional<SILLocation> DebugLoc = std::nullopt,
+                 StringRef DebugName = StringRef());
 
   llvm::GlobalVariable *
   createLinkerDirectiveVariable(IRGenModule &IGM, StringRef Name);
@@ -70,6 +70,14 @@ namespace irgen {
   emitCXXConstructorThunkIfNeeded(IRGenModule &IGM, Signature signature,
                                   const clang::CXXConstructorDecl *ctor,
                                   StringRef name, llvm::Constant *ctorAddress);
+
+  llvm::CallBase *emitCXXConstructorCall(IRGenFunction &IGF,
+                                         const clang::CXXConstructorDecl *ctor,
+                                         llvm::FunctionType *ctorFnType,
+                                         llvm::Constant *ctorAddress,
+                                         llvm::ArrayRef<llvm::Value *> args);
+
+  bool hasValidSignatureForEmbedded(SILFunction *f);
 }
 }
 

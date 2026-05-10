@@ -8,7 +8,7 @@
 
 
 """
-Cache related utitlity functions and decorators.
+Cache related utility functions and decorators.
 """
 
 import functools

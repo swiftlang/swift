@@ -27,8 +27,8 @@
 #endif // SWIFT_OBJC_INTEROP
 
 // Bring in the definition of HeapObject 
-#include "../../../stdlib/public/SwiftShims/HeapObject.h"
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
+#include "swift/shims/HeapObject.h"
+#include "swift/shims/Visibility.h"
 
 namespace swift {
   
@@ -61,7 +61,7 @@ struct OpaqueValue;
 ///
 /// POSSIBILITIES: The argument order is fair game.  It may be useful
 /// to have a variant which guarantees zero-initialized memory.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 HeapObject *swift_allocObject(HeapMetadata const *metadata,
                               size_t requiredSize,
                               size_t requiredAlignmentMask);
@@ -117,7 +117,7 @@ BoxPair swift_makeBoxUnique(OpaqueValue *buffer, Metadata const *type,
                                     size_t alignMask);
 
 /// Returns the address of a heap object representing all empty box types.
-SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 HeapObject* swift_allocEmptyBox();
 
 /// Atomically increments the retain count of an object.
@@ -137,6 +137,7 @@ HeapObject* swift_allocEmptyBox();
 /// It may also prove worthwhile to have this use a custom CC
 /// which preserves a larger set of registers.
 SWIFT_RUNTIME_EXPORT
+SWIFT_REFCOUNT_CC
 HeapObject *swift_retain(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT
@@ -173,6 +174,7 @@ bool swift_isDeallocating(HeapObject *object);
 ///      - maybe a variant that can assume a non-null object
 /// It's unlikely that a custom CC would be beneficial here.
 SWIFT_RUNTIME_EXPORT
+SWIFT_REFCOUNT_CC
 void swift_release(HeapObject *object);
 
 SWIFT_RUNTIME_EXPORT
@@ -384,6 +386,57 @@ public:
   }
 
   HeapObject *operator *() const { return object; }
+};
+
+/// RAII object that wraps a Swift object and optionally performs a single
+/// retain on that object. Multiple requests to retain the object only perform a
+/// single retain, and if that retain has been done then it's automatically
+/// released when leaving the scope. This helps implement a defensive retain
+/// pattern where you may need to retain an object in some circumstances. This
+/// helper makes it easy to retain the object only once even when loops are
+/// involved, and do a release to balance the retain on all paths out of the
+/// scope.
+class SwiftDefensiveRetainRAII {
+  HeapObject *object;
+  bool didRetain;
+
+public:
+  // Noncopyable.
+  SwiftDefensiveRetainRAII(const SwiftDefensiveRetainRAII &) = delete;
+  SwiftDefensiveRetainRAII &operator=(const SwiftDefensiveRetainRAII &) = delete;
+
+  /// Create a new helper with the given object. The object is not retained
+  /// initially.
+  SwiftDefensiveRetainRAII(HeapObject *object)
+      : object(object), didRetain(false) {}
+
+  ~SwiftDefensiveRetainRAII() {
+    if (didRetain)
+      swift_release(object);
+  }
+
+  /// Perform a defensive retain of the object. If a defensive retain has
+  /// already been performed, this is a no-op.
+  void defensiveRetain() {
+    if (!didRetain) {
+      swift_retain(object);
+      didRetain = true;
+    }
+  }
+
+  /// Take the retain from the helper. This is an optimization for code paths
+  /// that want to retain the object long-term, and avoids doing a redundant
+  /// retain/release pair. If a defensive retain has not been done, then this
+  /// will retain the object, so the caller always gets a +1 on the object.
+  void takeRetain() {
+    if (!didRetain)
+      swift_retain(object);
+    didRetain = false;
+  }
+
+  /// Returns true if the object was defensively retained (and takeRetain not
+  /// called). Intended for use in asserts.
+  bool isRetained() { return didRetain; }
 };
 
 /*****************************************************************************/
@@ -1108,8 +1161,7 @@ swift_getMangledTypeName(const Metadata *type);
 #define STANDARD_OBJC_METHOD_IMPLS_FOR_SWIFT_OBJECTS \
 - (id)retain { \
   auto SELF = reinterpret_cast<HeapObject *>(self); \
-  swift_retain(SELF); \
-  return self; \
+  return reinterpret_cast<id>(swift_retain(SELF)); \
 } \
 - (oneway void)release { \
   auto SELF = reinterpret_cast<HeapObject *>(self); \

@@ -660,7 +660,7 @@ CollectionTypeTests.test("firstIndex(of:)/ContinueSearch") {
 // Collection indices types
 //===----------------------------------------------------------------------===//
 
-// SR-2121
+// https://github.com/apple/swift/issues/44729
 extension Collection {
   func testIndicesElementType() {
     for index in self.indices {

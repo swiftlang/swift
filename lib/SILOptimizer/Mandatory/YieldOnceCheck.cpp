@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/Dominance.h"
@@ -152,21 +153,21 @@ class YieldOnceCheck : public SILFunctionTransform {
   /// an error that is detected.
   /// \return the state at the exit of the basic block if it can be computed
   /// and None otherwise.
-  static Optional<BBState>
+  static std::optional<BBState>
   transferStateThroughBasicBlock(SILBasicBlock *bb, BBState inState,
-                                 Optional<YieldError> &error) {
-    error = None;
+                                 std::optional<YieldError> &error) {
+    error = std::nullopt;
     auto *term = bb->getTerminator();
 
     if (auto *returnInst = dyn_cast<ReturnInst>(term)) {
       if (inState.yieldState == BBState::BeforeYield) {
         error = YieldError::getReturnBeforeYieldError(returnInst, inState);
-        return None;
+        return std::nullopt;
       }
 
       if (inState.yieldState == BBState::Conflict) {
         error = YieldError::getReturnOnConflict(returnInst, inState);
-        return None;
+        return std::nullopt;
       }
       return inState;
     }
@@ -174,7 +175,7 @@ class YieldOnceCheck : public SILFunctionTransform {
     if (auto *yieldInst = dyn_cast<YieldInst>(term)) {
       if (inState.yieldState != BBState::BeforeYield) {
         error = YieldError::getMultipleYieldError(yieldInst, inState);
-        return None;
+        return std::nullopt;
       }
 
       // If the current state is BeforeYield and if the basic block ends in a
@@ -265,7 +266,7 @@ class YieldOnceCheck : public SILFunctionTransform {
     // returning, are not diagnosed until the analysis completes, in order to
     // distinguish them from ReturnOnConflict errors, which happen when some
     // paths yield and some don't.
-    Optional<YieldError> returnBeforeYieldError = None;
+    std::optional<YieldError> returnBeforeYieldError = std::nullopt;
 
     // The algorithm uses a worklist to propagate the state through basic
     // blocks until a fix point. Since the state lattice has height one, each
@@ -280,16 +281,16 @@ class YieldOnceCheck : public SILFunctionTransform {
       const BBState &state = bbToStateMap[bb];
       assert(state.isVisited());
 
-      Optional<YieldError> errorResult = None;
+      std::optional<YieldError> errorResult = std::nullopt;
       auto resultState = transferStateThroughBasicBlock(bb, state, errorResult);
 
-      if (!resultState.hasValue()) {
-        auto error = errorResult.getValue();
+      if (!resultState.has_value()) {
+        auto error = errorResult.value();
 
         // ReturnBeforeYield errors will not be reported until the analysis
         // completes. So record it and continue.
         if (error.errorKind == YieldError::ReturnBeforeYield) {
-          if (!returnBeforeYieldError.hasValue()) {
+          if (!returnBeforeYieldError.has_value()) {
             returnBeforeYieldError = error;
           }
           continue;
@@ -299,7 +300,7 @@ class YieldOnceCheck : public SILFunctionTransform {
         return;
       }
 
-      auto nextState = resultState.getValue();
+      auto nextState = resultState.value();
 
       for (auto *succBB : bb->getSuccessorBlocks()) {
         BBState &succState = bbToStateMap[succBB];
@@ -329,8 +330,8 @@ class YieldOnceCheck : public SILFunctionTransform {
       }
     }
 
-    if (returnBeforeYieldError.hasValue()) {
-      emitDiagnostics(returnBeforeYieldError.getValue(), fun, bbToStateMap);
+    if (returnBeforeYieldError.has_value()) {
+      emitDiagnostics(returnBeforeYieldError.value(), fun, bbToStateMap);
     }
   }
 
@@ -492,11 +493,11 @@ class YieldOnceCheck : public SILFunctionTransform {
           return;
         }
         // Find the case that doesn't yield.
-        Optional<unsigned> caseNumberOpt =
+        std::optional<unsigned> caseNumberOpt =
             switchValue->getUniqueCaseForDestination(noYieldTarget);
-        assert(caseNumberOpt.hasValue());
+        assert(caseNumberOpt.has_value());
 
-        auto caseNumber = caseNumberOpt.getValue();
+        auto caseNumber = caseNumberOpt.value() + 1;
         diagnose(
             astCtx, enumCaseLoc, diag::switch_value_case_doesnt_yield,
             (Twine(caseNumber) + llvm::getOrdinalSuffix(caseNumber)).str());

@@ -42,17 +42,24 @@ CodeCompletionDiagnosticSeverity getSeverity(DiagnosticKind DiagKind) {
 }
 
 class CodeCompletionDiagnostics {
-  ASTContext &Ctx;
+  const ASTContext &Ctx;
   DiagnosticEngine &Engine;
 
 public:
-  CodeCompletionDiagnostics(ASTContext &Ctx) : Ctx(Ctx), Engine(Ctx.Diags) {}
+  CodeCompletionDiagnostics(const ASTContext &Ctx)
+      : Ctx(Ctx), Engine(Ctx.Diags) {}
 
   template <typename... ArgTypes>
   bool
   getDiagnostics(CodeCompletionDiagnosticSeverity &severity,
                  llvm::raw_ostream &Out, Diag<ArgTypes...> ID,
                  typename swift::detail::PassArgument<ArgTypes>::type... VArgs);
+
+  bool getDiagnosticForDeprecated(const ValueDecl *D,
+                                  SemanticAvailableAttr Attr,
+                                  bool isSoftDeprecated,
+                                  CodeCompletionDiagnosticSeverity &severity,
+                                  llvm::raw_ostream &Out);
 
   bool getDiagnosticForDeprecated(const ValueDecl *D,
                                   CodeCompletionDiagnosticSeverity &severity,
@@ -66,7 +73,7 @@ bool CodeCompletionDiagnostics::getDiagnostics(
     typename swift::detail::PassArgument<ArgTypes>::type... VArgs) {
   DiagID id = ID.ID;
   std::vector<DiagnosticArgument> DiagArgs{std::move(VArgs)...};
-  auto format = Engine.diagnosticStringFor(id, /*printDiagnosticNames=*/false);
+  auto format = Engine.getFormatStringForDiagnostic(id);
   DiagnosticEngine::formatDiagnosticText(Out, format, DiagArgs);
   severity = getSeverity(Engine.declaredDiagnosticKindFor(id));
 
@@ -74,72 +81,71 @@ bool CodeCompletionDiagnostics::getDiagnostics(
 }
 
 bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
-    const ValueDecl *D, CodeCompletionDiagnosticSeverity &severity,
-    llvm::raw_ostream &Out) {
-  bool isSoftDeprecated = false;
-  const AvailableAttr *Attr = D->getAttrs().getDeprecated(Ctx);
-  if (!Attr) {
-    Attr = D->getAttrs().getSoftDeprecated(Ctx);
-    isSoftDeprecated = true;
-  }
-  if (!Attr)
-    return true;
-
-  DeclName Name;
-  unsigned RawAccessorKind;
-  std::tie(RawAccessorKind, Name) = getAccessorKindAndNameForDiagnostics(D);
-  // FIXME: 'RawAccessorKind' is always 2 (NOT_ACCESSOR_INDEX).
-  // Code completion doesn't offer accessors. It only emits 'VarDecl's.
+    const ValueDecl *D, SemanticAvailableAttr Attr, bool isSoftDeprecated,
+    CodeCompletionDiagnosticSeverity &severity, llvm::raw_ostream &Out) {
+  // FIXME: Code completion doesn't offer accessors. It only emits 'VarDecl's.
   // So getter/setter specific availability doesn't work in code completion.
 
-  StringRef Platform = Attr->prettyPlatformString();
-  llvm::VersionTuple DeprecatedVersion;
-  if (Attr->Deprecated)
-    DeprecatedVersion = Attr->Deprecated.getValue();
-
+  auto Domain = Attr.getDomain();
+  auto DeprecatedRange = Attr.getDeprecatedRange(Ctx).value();
+  auto Message = Attr.getMessage();
+  auto NewName = Attr.getRename();
   if (!isSoftDeprecated) {
-    if (Attr->Message.empty() && Attr->Rename.empty()) {
-      getDiagnostics(severity, Out, diag::availability_deprecated,
-                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                     Attr->Deprecated.hasValue(), DeprecatedVersion,
+    if (Message.empty() && NewName.empty()) {
+      getDiagnostics(severity, Out, diag::availability_deprecated, D,
+                     Attr.isPlatformSpecific(), Domain,
+                     DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                      /*message*/ StringRef());
-    } else if (!Attr->Message.empty()) {
-      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      getDiagnostics(severity, Out, diag::availability_deprecated,
-                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                     Attr->Deprecated.hasValue(), DeprecatedVersion,
+    } else if (!Message.empty()) {
+      EncodedDiagnosticMessage EncodedMessage(Message);
+      getDiagnostics(severity, Out, diag::availability_deprecated, D,
+                     Attr.isPlatformSpecific(), Domain,
+                     DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
                      EncodedMessage.Message);
     } else {
-      getDiagnostics(severity, Out, diag::availability_deprecated_rename,
-                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                     Attr->Deprecated.hasValue(), DeprecatedVersion, false,
-                     /*ReplaceKind*/ 0, Attr->Rename);
+      getDiagnostics(severity, Out, diag::availability_deprecated_rename, D,
+                     Attr.isPlatformSpecific(), Domain,
+                     DeprecatedRange.hasMinimumVersion(), DeprecatedRange,
+                     false,
+                     /*ReplaceKind*/ 0, NewName);
     }
   } else {
     // '100000' is used as a version number in API that will be deprecated in an
     // upcoming release. This number is to match the 'API_TO_BE_DEPRECATED'
     // macro defined in Darwin platforms.
-    static llvm::VersionTuple DISTANT_FUTURE_VESION(100000);
-    bool isDistantFuture = DeprecatedVersion >= DISTANT_FUTURE_VESION;
+    bool isDistantFuture = DeprecatedRange.isContainedIn(
+        AvailabilityRange(llvm::VersionTuple(100000)));
 
-    if (Attr->Message.empty() && Attr->Rename.empty()) {
-      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated,
-                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                     !isDistantFuture, DeprecatedVersion,
+    if (Message.empty() && NewName.empty()) {
+      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
+                     Attr.isPlatformSpecific(), Domain, !isDistantFuture,
+                     DeprecatedRange,
                      /*message*/ StringRef());
-    } else if (!Attr->Message.empty()) {
-      EncodedDiagnosticMessage EncodedMessage(Attr->Message);
-      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated,
-                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                     !isDistantFuture, DeprecatedVersion,
-                     EncodedMessage.Message);
+    } else if (!Message.empty()) {
+      EncodedDiagnosticMessage EncodedMessage(Message);
+      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated, D,
+                     Attr.isPlatformSpecific(), Domain, !isDistantFuture,
+                     DeprecatedRange, EncodedMessage.Message);
     } else {
-      getDiagnostics(severity, Out, diag::ide_availability_softdeprecated_rename,
-                     RawAccessorKind, Name, Attr->hasPlatform(), Platform,
-                     !isDistantFuture, DeprecatedVersion, Attr->Rename);
+      getDiagnostics(severity, Out,
+                     diag::ide_availability_softdeprecated_rename, D,
+                     Attr.isPlatformSpecific(), Domain, !isDistantFuture,
+                     DeprecatedRange, NewName);
     }
   }
-  return false;;
+  return false;
+}
+
+bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
+    const ValueDecl *D, CodeCompletionDiagnosticSeverity &severity,
+    llvm::raw_ostream &Out) {
+  if (auto attr = D->getDeprecatedAttr())
+    return getDiagnosticForDeprecated(D, *attr, false, severity, Out);
+
+  if (auto attr = D->getSoftDeprecatedAttr())
+    return getDiagnosticForDeprecated(D, *attr, true, severity, Out);
+
+  return true;
 }
 
 } // namespace
@@ -159,27 +165,24 @@ bool swift::ide::getContextFreeCompletionDiagnostics(
 }
 
 bool swift::ide::getContextualCompletionDiagnostics(
-    ContextualNotRecommendedReason Reason, const ValueDecl *D,
-    CodeCompletionDiagnosticSeverity &Severity, llvm::raw_ostream &Out) {
-  CodeCompletionDiagnostics Diag(D->getASTContext());
+    ContextualNotRecommendedReason Reason, StringRef NameForDiagnostics,
+    CodeCompletionDiagnosticSeverity &Severity, llvm::raw_ostream &Out,
+    const ASTContext &Ctx) {
+  CodeCompletionDiagnostics Diag(Ctx);
   switch (Reason) {
-  case ContextualNotRecommendedReason::InvalidAsyncContext:
-    // FIXME: Could we use 'diag::async_in_nonasync_function'?
-    return Diag.getDiagnostics(
-        Severity, Out, diag::ide_async_in_nonasync_context, D->getName());
-  case ContextualNotRecommendedReason::CrossActorReference:
-    return Diag.getDiagnostics(
-        Severity, Out, diag::ide_cross_actor_reference_swift5, D->getName());
   case ContextualNotRecommendedReason::RedundantImport:
     return Diag.getDiagnostics(Severity, Out, diag::ide_redundant_import,
-                               D->getName());
+                               NameForDiagnostics);
   case ContextualNotRecommendedReason::RedundantImportIndirect:
     return Diag.getDiagnostics(
-        Severity, Out, diag::ide_redundant_import_indirect, D->getName());
+        Severity, Out, diag::ide_redundant_import_indirect, NameForDiagnostics);
   case ContextualNotRecommendedReason::VariableUsedInOwnDefinition:
+    return Diag.getDiagnostics(Severity, Out,
+                               diag::ide_recursive_accessor_reference,
+                               NameForDiagnostics, /*"getter"*/ 0);
+  case ContextualNotRecommendedReason::NonAsyncAlternativeUsedInAsyncContext:
     return Diag.getDiagnostics(
-        Severity, Out, diag::recursive_accessor_reference,
-        D->getName().getBaseIdentifier(), /*"getter"*/ 0);
+        Severity, Out, diag::ide_has_async_alternative, NameForDiagnostics);
   case ContextualNotRecommendedReason::None:
     llvm_unreachable("invalid not recommended reason");
   }

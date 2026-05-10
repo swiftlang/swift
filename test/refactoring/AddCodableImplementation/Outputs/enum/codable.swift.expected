@@ -3,19 +3,21 @@ enum Payload: Codable {
   case plain(String)
   case pair(key: String, value: String)
 
-  enum CodingKeys: CodingKey {
+  private enum CodingKeys: CodingKey {
     case plain
     case pair
   }
-  enum PlainCodingKeys: CodingKey {
+
+  private enum PlainCodingKeys: CodingKey {
     case _0
   }
-  enum PairCodingKeys: CodingKey {
+
+  private enum PairCodingKeys: CodingKey {
     case key
     case value
   }
 
-  init(from decoder: Decoder) throws {
+  init(from decoder: any Decoder) throws {
     let container = try decoder.container(keyedBy: Payload.CodingKeys.self)
 
     var allKeys = ArraySlice(container.allKeys)
@@ -25,29 +27,25 @@ enum Payload: Codable {
     }
     switch onlyKey {
     case .plain:
-
       let nestedContainer = try container.nestedContainer(keyedBy: Payload.PlainCodingKeys.self, forKey: Payload.CodingKeys.plain)
 
       self = Payload.plain(try nestedContainer.decode(String.self, forKey: Payload.PlainCodingKeys._0))
-      case .pair:
-
+    case .pair:
       let nestedContainer = try container.nestedContainer(keyedBy: Payload.PairCodingKeys.self, forKey: Payload.CodingKeys.pair)
 
       self = Payload.pair(key: try nestedContainer.decode(String.self, forKey: Payload.PairCodingKeys.key), value: try nestedContainer.decode(String.self, forKey: Payload.PairCodingKeys.value))
     }
   }
 
-  func encode(to encoder: Encoder) throws {
+  func encode(to encoder: any Encoder) throws {
     var container = encoder.container(keyedBy: Payload.CodingKeys.self)
 
     switch self {
     case .plain(let a0):
-
       var nestedContainer = container.nestedContainer(keyedBy: Payload.PlainCodingKeys.self, forKey: Payload.CodingKeys.plain)
 
       try nestedContainer.encode(a0, forKey: Payload.PlainCodingKeys._0)
-      case .pair(let key, let value):
-
+    case .pair(let key, let value):
       var nestedContainer = container.nestedContainer(keyedBy: Payload.PairCodingKeys.self, forKey: Payload.CodingKeys.pair)
 
       try nestedContainer.encode(key, forKey: Payload.PairCodingKeys.key)

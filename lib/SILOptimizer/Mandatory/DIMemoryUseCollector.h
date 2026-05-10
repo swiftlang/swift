@@ -54,6 +54,8 @@ struct DIElementUseInfo;
 class DIMemoryObjectInfo {
   /// The uninitialized memory that we are analyzing.
   MarkUninitializedInst *MemoryInst;
+  // The uninitialized value representing that memory
+  SingleValueInstruction *uninitializedValue;
 
   /// This is the base type of the memory allocation.
   SILType MemorySILType;
@@ -100,19 +102,7 @@ public:
   /// alloc_stack, this always just returns the actual mark_uninitialized
   /// instruction. For alloc_box though it returns the project_box associated
   /// with the memory info.
-  SingleValueInstruction *getUninitializedValue() const {
-    if (IsBox) {
-      SILValue inst = MemoryInst;
-      if (auto *bbi = MemoryInst->getSingleUserOfType<BeginBorrowInst>()) {
-        inst = bbi;
-      }
-      // TODO: consider just storing the ProjectBoxInst in this case.
-      SingleValueInstruction *svi = inst->getSingleUserOfType<ProjectBoxInst>();
-      assert(svi);
-      return svi;
-    }
-    return MemoryInst;
-  }
+  SingleValueInstruction *getUninitializedValue() const;
 
   /// Return the number of elements, without the extra "super.init" tracker in
   /// initializers of derived classes.
@@ -128,7 +118,13 @@ public:
   unsigned getNumElements() const { return NumElements; }
 
   /// Return true if this is 'self' in any kind of initializer.
-  bool isAnyInitSelf() const { return !MemoryInst->isVar(); }
+  bool isAnyInitSelf() const {
+    return !MemoryInst->isVar() && !MemoryInst->isOut();
+  }
+
+  /// Return uninitialized value of 'self' if current memory object
+  /// is located in an initializer (of any kind).
+  SingleValueInstruction *findUninitializedSelfValue() const;
 
   /// True if the memory object is the 'self' argument of a struct initializer.
   bool isStructInitSelf() const {
@@ -158,7 +154,7 @@ public:
     if (MemoryInst->isDelegatingSelf())
       return false;
 
-    if (!MemoryInst->isVar()) {
+    if (!MemoryInst->isVar() && !MemoryInst->isOut()) {
       if (auto decl = getASTType()->getAnyNominal()) {
         if (isa<ClassDecl>(decl)) {
           return true;
@@ -208,6 +204,7 @@ public:
   bool isNonDelegatingInit() const {
     switch (MemoryInst->getMarkUninitializedKind()) {
     case MarkUninitializedInst::Var:
+    case MarkUninitializedInst::Out:
       return false;
     case MarkUninitializedInst::RootSelf:
     case MarkUninitializedInst::CrossModuleRootSelf:
@@ -229,6 +226,8 @@ public:
   bool isDelegatingSelfAllocated() const {
     return MemoryInst->isDelegatingSelfAllocated();
   }
+
+  bool isOut() const { return MemoryInst->isOut(); }
 
   enum class EndScopeKind { Borrow, Access };
 
@@ -267,9 +266,10 @@ enum DIUseKind {
   /// value.
   Assign,
 
-  /// The instruction is an assignment of a wrapped value with an already initialized
-  /// backing property wrapper.
-  AssignWrappedValue,
+  /// The instruction is a setter call for a computed property after all of
+  /// self is initialized. This is used for property wrappers and for init
+  /// accessors.
+  Set,
 
   /// The instruction is a store to a member of a larger struct value.
   PartialStore,
@@ -300,7 +300,12 @@ enum DIUseKind {
   LoadForTypeOfSelf,
 
   /// This instruction is a value_metatype on the address of 'self'.
-  TypeOfSelf
+  TypeOfSelf,
+
+  /// This instruction is the builtin for flow-sensitive current isolation
+  /// within an actor initializer. It will be replaced with either a copy of
+  /// its argument (injected into an (any Actor)?) or nil.
+  FlowSensitiveSelfIsolation,
 };
 
 /// This struct represents a single classified access to the memory object
@@ -316,9 +321,12 @@ struct DIMemoryUse {
   /// track of which tuple elements are affected.
   unsigned FirstElement, NumElements;
 
-  DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE)
-      : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE) {
-  }
+  NullablePtr<VarDecl> Field;
+
+  DIMemoryUse(SILInstruction *Inst, DIUseKind Kind, unsigned FE, unsigned NE,
+              NullablePtr<VarDecl> Field = 0)
+      : Inst(Inst), Kind(Kind), FirstElement(FE), NumElements(NE),
+        Field(Field) {}
 
   DIMemoryUse() : Inst(nullptr) {}
 

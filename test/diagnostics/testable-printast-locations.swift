@@ -9,5 +9,5 @@
 ambiguous()
 
 // CHECK: testable-printast-locations.swift:[[@LINE-2]]:1: error: ambiguous use of 'ambiguous()'
-// CHECK: ModuleA.ambiguous (internal):1:15: note: found this candidate
-// CHECK: ModuleB.ambiguous (internal):1:15: note: found this candidate
+// CHECK: ModuleA.ambiguous:1:15: note: found this candidate in module 'ModuleA'
+// CHECK: ModuleB.ambiguous:1:15: note: found this candidate in module 'ModuleB'

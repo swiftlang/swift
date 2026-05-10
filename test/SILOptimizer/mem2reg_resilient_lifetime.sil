@@ -1,5 +1,5 @@
 
-// RUN: %target-sil-opt -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg -enable-library-evolution | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -enable-lexical-lifetimes %s -mem2reg -enable-library-evolution | %FileCheck %s
 
 import Builtin
 import Swift
@@ -11,11 +11,9 @@ public struct ResilientStruct {
 // CHECK-LABEL: sil [ossa] @mem2reg_debug_value :
 // CHECK:       {{bb[^,]+}}([[REGISTER_0:%[^,]+]] : $*ResilientStruct):
 // CHECK-NEXT:    [[REGISTER_1:%[^,]+]] = load [copy] [[REGISTER_0]]
-// CHECK-NEXT:    [[REGISTER_2:%[^,]+]] = begin_borrow [lexical] [[REGISTER_1]]
-// CHECK-NEXT:    [[REGISTER_3:%[^,]+]] = copy_value [[REGISTER_2]]
-// CHECK-NEXT:    debug_value [[REGISTER_3]]
-// CHECK-NEXT:    end_borrow [[REGISTER_2]]
-// CHECK-NEXT:    destroy_value [[REGISTER_1]]
+// CHECK-NEXT:    debug_value [[REGISTER_1]] : $ResilientStruct, var, name "before"
+// CHECK-NEXT:    [[REGISTER_3:%[^,]+]] = move_value [lexical] [[REGISTER_1]]
+// CHECK-NEXT:    debug_value [[REGISTER_3]] : $ResilientStruct, let, name "after"
 // CHECK-NEXT:    destroy_value [[REGISTER_3]]
 // CHECK-LABEL: } // end sil function 'mem2reg_debug_value'
 sil [ossa] @mem2reg_debug_value : $@convention(thin) (@in_guaranteed ResilientStruct) -> () {
@@ -23,8 +21,9 @@ bb0(%0 : $*ResilientStruct):
   %1 = alloc_stack [lexical] $ResilientStruct
   %2 = load [copy] %0 : $*ResilientStruct
   store %2 to [init] %1 : $*ResilientStruct
-  debug_value %1 : $*ResilientStruct, expr op_deref
+  debug_value %1 : $*ResilientStruct, var, name "before", expr op_deref
   %3 = load [take] %1 : $*ResilientStruct
+  debug_value %3 : $ResilientStruct, let, name "after"
   destroy_value %3 : $ResilientStruct
   dealloc_stack %1 : $*ResilientStruct
   %4 = tuple ()

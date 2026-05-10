@@ -42,7 +42,7 @@ bb0(%out_addr : $*T, %in_addr : $*T, %self : $I):
   %printGeneric_result = apply %printGeneric<I>(%self_addr) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   dealloc_stack %self_addr : $*I
   %value = struct_extract %self : $I, #I.int
-  copy_addr %in_addr to [initialization] %out_addr : $*T
+  copy_addr %in_addr to [init] %out_addr : $*T
   return %value : $Int64
 }
 
@@ -102,8 +102,7 @@ bb0(%0 :$@async @callee_guaranteed () -> ()):
 }
 
 // main
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+sil @main : $@convention(c) () -> Int32 {
   %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
   %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
   %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error

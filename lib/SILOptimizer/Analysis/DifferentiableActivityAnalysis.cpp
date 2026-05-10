@@ -15,6 +15,8 @@
 #include "swift/SILOptimizer/Analysis/DifferentiableActivityAnalysis.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
 
+#include "swift/Basic/Assertions.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/Projection.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
@@ -36,8 +38,8 @@ static bool isWithoutDerivative(SILValue v) {
 
 std::unique_ptr<DifferentiableActivityCollection>
 DifferentiableActivityAnalysis::newFunctionAnalysis(SILFunction *f) {
-  assert(dominanceAnalysis && "Expect a valid dominance anaysis");
-  assert(postDominanceAnalysis && "Expect a valid post-dominance anaysis");
+  assert(dominanceAnalysis && "Expect a valid dominance analysis");
+  assert(postDominanceAnalysis && "Expect a valid post-dominance analysis");
   return std::make_unique<DifferentiableActivityCollection>(
       *f, dominanceAnalysis->get(f), postDominanceAnalysis->get(f));
 }
@@ -81,6 +83,8 @@ void DifferentiableActivityInfo::analyze(DominanceInfo *di,
       s << val << '\n';
   });
   // Outputs are indirect result buffers and return values, count `m`.
+  // For the purposes of differentiation, we consider yields to be results as
+  // well
   collectAllFormalResultsInTypeOrder(function, outputValues);
   LLVM_DEBUG({
     auto &s = getADDebugStream();
@@ -138,8 +142,8 @@ void DifferentiableActivityInfo::propagateVaried(
     if (isVaried(operand->get(), i)) {
       for (auto indRes : applySite.getIndirectSILResults())
         propagateVariedInwardsThroughProjections(indRes, i);
-      for (auto inoutArg : applySite.getInoutArguments())
-        propagateVariedInwardsThroughProjections(inoutArg, i);
+      for (auto semresArg : applySite.getAutoDiffSemanticResultArguments())
+        propagateVariedInwardsThroughProjections(semresArg, i);
       // Propagate variedness to apply site direct results.
       forEachApplyDirectResult(applySite, [&](SILValue directResult) {
         setVariedAndPropagateToUsers(directResult, i);
@@ -154,10 +158,15 @@ void DifferentiableActivityInfo::propagateVaried(
       propagateVariedInwardsThroughProjections(si->getDest(), i);              \
   }
   PROPAGATE_VARIED_THROUGH_STORE(Store)
-  PROPAGATE_VARIED_THROUGH_STORE(StoreBorrow)
   PROPAGATE_VARIED_THROUGH_STORE(CopyAddr)
   PROPAGATE_VARIED_THROUGH_STORE(UnconditionalCheckedCastAddr)
 #undef PROPAGATE_VARIED_THROUGH_STORE
+  else if (auto *sbi = dyn_cast<StoreBorrowInst>(inst)) {
+    if (isVaried(sbi->getSrc(), i)) {
+      setVariedAndPropagateToUsers(sbi, i);
+      propagateVariedInwardsThroughProjections(sbi, i);
+    }
+  }
   // Handle `tuple_element_addr`.
   else if (auto *teai = dyn_cast<TupleElementAddrInst>(inst)) {
     if (isVaried(teai->getOperand(), i)) {
@@ -226,13 +235,13 @@ void DifferentiableActivityInfo::propagateVaried(
 
 /// Returns the accessor kind of the given SIL function, if it is a lowered
 /// accessor. Otherwise, return `None`.
-static Optional<AccessorKind> getAccessorKind(SILFunction *fn) {
+static std::optional<AccessorKind> getAccessorKind(SILFunction *fn) {
   auto *dc = fn->getDeclContext();
   if (!dc)
-    return None;
+    return std::nullopt;
   auto *accessor = dyn_cast_or_null<AccessorDecl>(dc->getAsDecl());
   if (!accessor)
-    return None;
+    return std::nullopt;
   return accessor->getAccessorKind();
 }
 
@@ -265,10 +274,10 @@ void DifferentiableActivityInfo::propagateVariedInwardsThroughProjections(
     // the `inout` argument is a safe over-approximation but not always true.
     if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
       if (auto *calleeFn = bai->getCalleeFunction()) {
-        if (getAccessorKind(calleeFn) == AccessorKind::Modify) {
+        auto kind = getAccessorKind(calleeFn);
+        if (kind && isYieldingMutableAccessor(*kind))
           for (auto inoutArg : bai->getInoutArguments())
             propagateVariedInwardsThroughProjections(inoutArg, i);
-        }
       }
     }
     return;
@@ -298,15 +307,28 @@ void DifferentiableActivityInfo::setUsefulAndPropagateToOperands(
     return;
   }
   setUseful(value, dependentVariableIndex);
+
   // If the given value is a basic block argument, propagate usefulness to
   // incoming values.
   if (auto *bbArg = dyn_cast<SILPhiArgument>(value)) {
     SmallVector<SILValue, 4> incomingValues;
-    bbArg->getSingleTerminatorOperands(incomingValues);
-    for (auto incomingValue : incomingValues)
-      setUsefulAndPropagateToOperands(incomingValue, dependentVariableIndex);
-    return;
+    if (bbArg->getSingleTerminatorOperands(incomingValues)) {
+      for (auto incomingValue : incomingValues)
+        setUsefulAndPropagateToOperands(incomingValue, dependentVariableIndex);
+      return;
+    }
+
+    if (bbArg->isTerminatorResult()) {
+      if (TryApplyInst *tai = dyn_cast<TryApplyInst>(bbArg->getTerminatorForResult())) {
+        propagateUseful(tai, dependentVariableIndex);
+        return;
+      }
+      llvm::report_fatal_error("unknown terminator with result");
+    }
+
+    llvm::report_fatal_error("do not know how to handle this incoming bb argument");
   }
+  
   auto *inst = value->getDefiningInstruction();
   if (!inst)
     return;
@@ -330,10 +352,12 @@ void DifferentiableActivityInfo::propagateUseful(
     // Note: the assumption that yielded addresses are always a projection into
     // the `inout` argument is a safe over-approximation but not always true.
     if (auto *bai = dyn_cast<BeginApplyInst>(inst)) {
-      if (auto *calleeFn = bai->getCalleeFunction())
-        if (getAccessorKind(calleeFn) == AccessorKind::Modify)
+      if (auto *calleeFn = bai->getCalleeFunction()) {
+        auto kind = getAccessorKind(calleeFn);
+        if (kind && isYieldingMutableAccessor(*kind))
           for (auto yield : bai->getYieldedValues())
             setUsefulAndPropagateToOperands(yield, i);
+      }
     }
     // Propagate usefulness through apply site arguments.
     for (auto arg : applySite.getArgumentsWithoutIndirectResults())
@@ -393,7 +417,7 @@ void DifferentiableActivityInfo::propagateUsefulThroughAddress(
       SKIP_NODERIVATIVE(RefElementAddr)
 #undef SKIP_NODERIVATIVE
       if (Projection::isAddressProjection(res) || isa<BeginAccessInst>(res) ||
-          isa<BeginBorrowInst>(res))
+          isa<BeginBorrowInst>(res) || isa<InitEnumDataAddrInst>(res))
         propagateUsefulThroughAddress(res, dependentVariableIndex);
     }
   }
@@ -412,64 +436,75 @@ void DifferentiableActivityInfo::setUsefulThroughArrayInitialization(
     auto *dti = dyn_cast<DestructureTupleInst>(use->getUser());
     if (!dti)
       continue;
-    // The second tuple field of the return value is the `RawPointer`.
-    for (auto use : dti->getResult(1)->getUses()) {
-      // The `RawPointer` passes through a `pointer_to_address`. That
-      // instruction's first use is a `store` whose source is useful; its
-      // subsequent uses are `index_addr`s whose only use is a useful `store`.
-      auto *ptai = dyn_cast<PointerToAddressInst>(use->getUser());
-      assert(ptai && "Expected `pointer_to_address` user for uninitialized "
-                     "array intrinsic");
-      setUseful(ptai, dependentVariableIndex);
-      // Propagate usefulness through array element addresses:
-      // `pointer_to_address` and `index_addr` instructions.
-      //
-      // - Set all array element addresses as useful.
-      // - Find instructions with array element addresses as "result":
-      //   - `store` and `copy_addr` with array element address as destination.
-      //   - `apply` with array element address as an indirect result.
-      // - For each instruction, propagate usefulness through "arguments":
-      //   - `store` and `copy_addr`: propagate to source.
-      //   - `apply`: propagate to arguments.
-      //
-      // NOTE: `propagateUseful(use->getUser(), ...)` is intentionally not used
-      // because it marks more values than necessary as useful, including:
-      // - The `RawPointer` result of the intrinsic.
-      // - `integer_literal` operands to `index_addr` for indexing the
-      //   `RawPointer`.
-      // It is also blocked by TF-1032: control flow differentiation crash for
-      // active values with no tangent space.
-      for (auto use : ptai->getUses()) {
-        auto *user = use->getUser();
-        if (auto *si = dyn_cast<StoreInst>(user)) {
-          setUseful(si->getDest(), dependentVariableIndex);
-          setUsefulAndPropagateToOperands(si->getSrc(), dependentVariableIndex);
-        } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
-          setUseful(cai->getDest(), dependentVariableIndex);
-          setUsefulAndPropagateToOperands(cai->getSrc(),
-                                          dependentVariableIndex);
-        } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
-          if (FullApplySite(ai).isIndirectResultOperand(*use))
-            for (auto arg : ai->getArgumentsWithoutIndirectResults())
-              setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
-        } else if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
-          setUseful(iai, dependentVariableIndex);
-          for (auto use : iai->getUses()) {
-            auto *user = use->getUser();
-            if (auto si = dyn_cast<StoreInst>(user)) {
-              setUseful(si->getDest(), dependentVariableIndex);
-              setUsefulAndPropagateToOperands(si->getSrc(),
-                                              dependentVariableIndex);
-            } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
-              setUseful(cai->getDest(), dependentVariableIndex);
-              setUsefulAndPropagateToOperands(cai->getSrc(),
-                                              dependentVariableIndex);
-            } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
-              if (FullApplySite(ai).isIndirectResultOperand(*use))
-                for (auto arg : ai->getArgumentsWithoutIndirectResults())
-                  setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
+
+    ValueWorklist worklist(dti->getResult(0));
+
+    while (SILValue v = worklist.pop()) {
+      for (auto use : v->getUses()) {
+        switch (use->getUser()->getKind()) {
+          case SILInstructionKind::UncheckedRefCastInst:
+          case SILInstructionKind::StructExtractInst:
+          case SILInstructionKind::BeginBorrowInst:
+            worklist.pushIfNotVisited(cast<SingleValueInstruction>(use->getUser()));
+            break;
+          case SILInstructionKind::RefTailAddrInst: {
+            auto *rta = cast<RefTailAddrInst>(use->getUser());
+            setUseful(rta, dependentVariableIndex);
+            // Propagate usefulness through array element addresses:
+            // `pointer_to_address` and `index_addr` instructions.
+            //
+            // - Set all array element addresses as useful.
+            // - Find instructions with array element addresses as "result":
+            //   - `store` and `copy_addr` with array element address as destination.
+            //   - `apply` with array element address as an indirect result.
+            // - For each instruction, propagate usefulness through "arguments":
+            //   - `store` and `copy_addr`: propagate to source.
+            //   - `apply`: propagate to arguments.
+            //
+            // NOTE: `propagateUseful(use->getUser(), ...)` is intentionally not used
+            // because it marks more values than necessary as useful, including:
+            // - The `RawPointer` result of the intrinsic.
+            // - `integer_literal` operands to `index_addr` for indexing the
+            //   `RawPointer`.
+            // It is also blocked by TF-1032: control flow differentiation crash for
+            // active values with no tangent space.
+            for (auto use : rta->getUses()) {
+              auto *user = use->getUser();
+              if (auto *si = dyn_cast<StoreInst>(user)) {
+                setUseful(si->getDest(), dependentVariableIndex);
+                setUsefulAndPropagateToOperands(si->getSrc(), dependentVariableIndex);
+              } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+                setUseful(cai->getDest(), dependentVariableIndex);
+                setUsefulAndPropagateToOperands(cai->getSrc(),
+                                                dependentVariableIndex);
+              } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
+                if (FullApplySite(ai).isIndirectResultOperand(*use))
+                  for (auto arg : ai->getArgumentsWithoutIndirectResults())
+                    setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
+              } else if (auto *iai = dyn_cast<IndexAddrInst>(user)) {
+                setUseful(iai, dependentVariableIndex);
+                for (auto use : iai->getUses()) {
+                  auto *user = use->getUser();
+                  if (auto si = dyn_cast<StoreInst>(user)) {
+                    setUseful(si->getDest(), dependentVariableIndex);
+                    setUsefulAndPropagateToOperands(si->getSrc(),
+                                                    dependentVariableIndex);
+                  } else if (auto *cai = dyn_cast<CopyAddrInst>(user)) {
+                    setUseful(cai->getDest(), dependentVariableIndex);
+                    setUsefulAndPropagateToOperands(cai->getSrc(),
+                                                    dependentVariableIndex);
+                  } else if (auto *ai = dyn_cast<ApplyInst>(user)) {
+                    if (FullApplySite(ai).isIndirectResultOperand(*use))
+                      for (auto arg : ai->getArgumentsWithoutIndirectResults())
+                        setUsefulAndPropagateToOperands(arg, dependentVariableIndex);
+                  }
+                }
+              }
             }
+            break;
           }
+          default:
+            break;
         }
       }
     }

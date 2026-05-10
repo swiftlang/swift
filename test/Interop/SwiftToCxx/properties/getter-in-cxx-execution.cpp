@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/getter-in-cxx.swift -typecheck -module-name Properties -clang-header-expose-public-decls -emit-clang-header-path %t/properties.h
+// RUN: %target-swift-frontend %S/getter-in-cxx.swift -module-name Properties -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/properties.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-props-execution.o
 // RUN: %target-interop-build-swift %S/getter-in-cxx.swift -o %t/swift-props-execution -Xlinker %t/swift-props-execution.o -module-name Properties -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -9,8 +9,6 @@
 // RUN: %target-run %t/swift-props-execution | %FileCheck %s
 
 // REQUIRES: executable_test
-
-// UNSUPPORTED: CPU=arm64e
 
 #include <assert.h>
 #include "properties.h"
@@ -55,5 +53,18 @@ int main() {
 // CHECK-NEXT: create RefCountedClass 1
 // CHECK-NEXT: destroy RefCountedClass 1
 // CHECK-NEXT: destroy RefCountedClass 0
+
+  auto propsInClass = createPropsInClass(-1234);
+  assert(propsInClass.getStoredInt() == -1234);
+  assert(propsInClass.getComputedInt() == -1235);
+  auto smallStructFromClass = propsInClass.getSmallStruct();
+  assert(smallStructFromClass.getX() == 1234);
+
+  {
+    auto x = LargeStruct::getStaticX();
+    assert(x == -402);
+    auto smallStruct = LargeStruct::getStaticSmallStruct();
+    assert(smallStruct.getX() == 789);
+  }
   return 0;
 }

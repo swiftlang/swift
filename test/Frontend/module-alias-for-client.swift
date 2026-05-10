@@ -22,7 +22,7 @@
 /// Check Lib.swiftmodule is created and AppleLogging.swiftmodule is loaded
 // RUN: test -f %t/Lib.swiftmodule
 // RUN: %FileCheck %s -input-file %t/result-Lib.output -check-prefix CHECK-Lib
-// CHECK-Lib: remark: loaded module at {{.*}}AppleLogging.swiftmodule
+// CHECK-Lib: remark: loaded module {{.*}}AppleLogging.swiftmodule
 
 /// 3a. Client1
 /// Create module Client1 that imports Lib and XLogging, WITHOUT module aliasing for XLogging
@@ -31,8 +31,8 @@
 /// Check Client1.swiftmodule is created and Lib.swiftmodule and XLogging.swiftmodule are loaded
 // RUN: test -f %t/Client1.swiftmodule
 // RUN: %FileCheck %s -input-file %t/result-Client1.output -check-prefix CHECK-1
-// CHECK-1: remark: loaded module at {{.*}}XLogging.swiftmodule
-// CHECK-1: remark: loaded module at {{.*}}Lib.swiftmodule
+// CHECK-1: remark: loaded module {{.*}}XLogging.swiftmodule
+// CHECK-1: remark: loaded module {{.*}}Lib.swiftmodule
 
 /// 3b. Client2
 /// Create a module Client2 that imports Lib and XLogging, WITH module aliasing for XLogging
@@ -42,10 +42,10 @@
 /// loaded but XLogging.swiftmodule is not loaded.
 // RUN: test -f %t/Client2.swiftmodule
 // RUN: %FileCheck %s -input-file %t/result-Client2.output -check-prefix CHECK-2A
-// CHECK-2A: remark: loaded module at {{.*}}AppleLogging.swiftmodule
-// CHECK-2A: remark: loaded module at {{.*}}Lib.swiftmodule
+// CHECK-2A: remark: loaded module {{.*}}AppleLogging.swiftmodule
+// CHECK-2A: remark: loaded module {{.*}}Lib.swiftmodule
 // RUN: not %FileCheck %s -input-file %t/result-Client2.output -check-prefix CHECK-2B
-// CHECK-2B: remark: loaded module at {{.*}}XLogging.swiftmodule
+// CHECK-2B: remark: loaded module {{.*}}XLogging.swiftmodule
 
 
 // BEGIN FileLogging.swift

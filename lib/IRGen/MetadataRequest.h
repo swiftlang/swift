@@ -25,6 +25,7 @@ class Constant;
 class Function;
 class GlobalVariable;
 class PHINode;
+class Type;
 class Value;
 }
 
@@ -470,6 +471,9 @@ enum class MetadataAccessStrategy {
   /// There is a unique public accessor function for the given type metadata.
   PublicUniqueAccessor,
 
+  /// There is a unique package accessor function for the given type metadata.
+  PackageUniqueAccessor,
+
   /// There is a unique hidden accessor function for the given type metadata.
   HiddenUniqueAccessor,
 
@@ -490,6 +494,7 @@ enum class MetadataAccessStrategy {
 static inline bool isAccessorLazilyGenerated(MetadataAccessStrategy strategy) {
   switch (strategy) {
   case MetadataAccessStrategy::PublicUniqueAccessor:
+  case MetadataAccessStrategy::PackageUniqueAccessor:
   case MetadataAccessStrategy::HiddenUniqueAccessor:
   case MetadataAccessStrategy::PrivateAccessor:
     return false;
@@ -535,14 +540,14 @@ enum SpecializedMetadataCanonicality : bool {
 /// known, but access to the metadata must go through the canonical specialized
 /// accessor so that initialization of the metadata can occur.
 bool isSpecializedNominalTypeMetadataStaticallyAddressable(
-    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
+    IRGenModule &IGM, CanType type,
     SpecializedMetadataCanonicality canonicality,
     SpecializedMetadataUsageIsOnlyFromAccessor onlyFromAccessor);
 
 /// Is the address of a specialization of the generic metadata which does not
 /// require runtime initialization statically known?
 bool isCompleteSpecializedNominalTypeMetadataStaticallyAddressable(
-    IRGenModule &IGM, NominalTypeDecl &nominal, CanType type,
+    IRGenModule &IGM, CanType type,
     SpecializedMetadataCanonicality canonicality);
 
 /// Is the address of canonical metadata which may need to be initialized (e.g.
@@ -624,11 +629,9 @@ using CacheEmitter =
   llvm::function_ref<MetadataResponse(IRGenFunction &IGF, Explosion &params)>;
 
 /// Emit the body of a lazy cache access function.
-void emitCacheAccessFunction(IRGenModule &IGM,
-                             llvm::Function *accessor,
-                             llvm::Constant *cache,
-                             CacheStrategy cacheStrategy,
-                             CacheEmitter getValue,
+void emitCacheAccessFunction(IRGenModule &IGM, llvm::Function *accessor,
+                             llvm::Constant *cache, llvm::Type *cacheTy,
+                             CacheStrategy cacheStrategy, CacheEmitter getValue,
                              bool isReadNone = true);
 MetadataResponse
 emitGenericTypeMetadataAccessFunction(IRGenFunction &IGF, Explosion &params,
@@ -709,6 +712,8 @@ MetadataResponse emitCheckTypeMetadataState(IRGenFunction &IGF,
 /// Return the abstract operational cost of a checkTypeMetadataState operation.
 OperationCost getCheckTypeMetadataStateCost(DynamicMetadataRequest request,
                                             MetadataResponse response);
+
+ParameterFlags getABIParameterFlags(ParameterTypeFlags flags);
 
 } // end namespace irgen
 } // end namespace swift

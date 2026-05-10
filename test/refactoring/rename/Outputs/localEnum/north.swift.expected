@@ -1,9 +1,9 @@
 func boop() {
   enum LocalEnum {
-    case east
+    case <base>north</base>
     case south
   }
 
-  print(LocalEnum.east)
+  print(LocalEnum.<base>north</base>)
 }
 

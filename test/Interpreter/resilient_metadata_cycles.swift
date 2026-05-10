@@ -20,7 +20,8 @@ import resilient_class
 
 var ResilientMetadataCycleTests = TestSuite("Resilient metadata cycle tests")
 
-// SR-7876
+// https://github.com/apple/swift/issues/50411
+
 enum test0_Node {
   case link(size: Size, children: [test0_Node])
 
@@ -29,7 +30,7 @@ enum test0_Node {
   }
 }
 
-ResilientMetadataCycleTests.test("SR-7876") {
+ResilientMetadataCycleTests.test("https://github.com/apple/swift/issues/50411") {
   _ = test0_Node.test()
 }
 

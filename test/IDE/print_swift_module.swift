@@ -29,7 +29,7 @@ public func returnsAlias() -> Alias<Int> {
 
 @resultBuilder
 public struct BridgeBuilder {
-    static func buildBlock(_: Any...) {}
+    public static func buildBlock(_: Any...) {}
 }
 
 public struct City {

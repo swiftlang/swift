@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 /// TODO: unique and reuse the () parameter list in ASTContext, it is common to
@@ -44,8 +45,11 @@ ParameterList::create(const ASTContext &C, SourceLoc LParenLoc,
 /// Change the DeclContext of any contained parameters to the specified
 /// DeclContext.
 void ParameterList::setDeclContextOfParamDecls(DeclContext *DC) {
-  for (auto P : *this)
+  for (ParamDecl *P : *this) {
     P->setDeclContext(DC);
+    if (auto initContext = P->getCachedDefaultArgumentInitContext())
+      (*initContext)->changeFunction(DC);
+  }
 }
 
 /// Make a duplicate copy of this parameter list.  This allocates copies of
@@ -60,32 +64,36 @@ ParameterList *ParameterList::clone(const ASTContext &C,
   SmallVector<ParamDecl*, 8> params(begin(), end());
 
   // Remap the ParamDecls inside of the ParameterList.
+  unsigned i = 0;
   for (auto &decl : params) {
     auto defaultArgKind = decl->getDefaultArgumentKind();
 
-    decl = ParamDecl::cloneWithoutType(C, decl);
-    if (options & Implicit)
-      decl->setImplicit();
-
-    // If the argument isn't named, give the parameter a name so that
-    // silgen will produce a value for it.
-    if (decl->getName().empty() && (options & NamedArguments))
-      decl->setName(C.getIdentifier("argument"));
-    
     // If we're inheriting a default argument, mark it as such.
     // FIXME: Figure out how to clone default arguments as well.
     if (options & Inherited) {
       switch (defaultArgKind) {
       case DefaultArgumentKind::Normal:
       case DefaultArgumentKind::StoredProperty:
-        decl->setDefaultArgumentKind(DefaultArgumentKind::Inherited);
+        defaultArgKind = DefaultArgumentKind::Inherited;
         break;
 
       default:
         break;
       }
     } else {
-      decl->setDefaultArgumentKind(DefaultArgumentKind::None);
+      defaultArgKind = DefaultArgumentKind::None;
+    }
+
+    decl = ParamDecl::cloneWithoutType(C, decl, defaultArgKind);
+    if (options & Implicit)
+      decl->setImplicit();
+
+    // If the argument isn't named, give the parameter a name so that
+    // silgen will produce a value for it.
+    if (decl->getName().empty() && (options & NamedArguments)) {
+      llvm::SmallString<16> s;
+      { llvm::raw_svector_ostream(s) << "__argument" << ++i; }
+      decl->setName(C.getIdentifier(s));
     }
   }
   

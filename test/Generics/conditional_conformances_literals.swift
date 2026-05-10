@@ -1,6 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
-// rdar://problem/38461036 , https://bugs.swift.org/browse/SR-7192 and highlights the real problem in https://bugs.swift.org/browse/SR-6941
+// rdar://problem/38461036
+// https://github.com/apple/swift/issues/49740 and highlights the real problem
+// in https://github.com/apple/swift/issues/49489
 
 protocol SameType {}
 protocol Conforms {}
@@ -43,7 +45,7 @@ func arraySameType() {
 
     let _: SameType = arrayWorks as SameType
     let _: SameType = arrayFails as SameType
-    // expected-error@-1 {{protocol 'SameType' requires the types 'Fails' and 'Works' be equivalent}}
+    // expected-error@-1 {{generic struct 'Array' requires the types 'Fails' and 'Works' be equivalent}}
 }
 
 func dictionarySameType() {
@@ -68,7 +70,7 @@ func dictionarySameType() {
 
     let _: SameType = dictWorks as SameType
     let _: SameType = dictFails as SameType
-    // expected-error@-1 {{protocol 'SameType' requires the types 'Fails' and 'Works' be equivalent}}
+    // expected-error@-1 {{generic struct 'Dictionary' requires the types 'Fails' and 'Works' be equivalent}}
 }
 
 func arrayConforms() {
@@ -89,11 +91,11 @@ func arrayConforms() {
 
     let _: Conforms = [works] as Conforms
     let _: Conforms = [fails] as Conforms
-    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{generic struct 'Array' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = arrayWorks as Conforms
     let _: Conforms = arrayFails as Conforms
-    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{generic struct 'Array' requires that 'Fails' conform to 'Conforms'}}
 }
 
 func dictionaryConforms() {
@@ -114,11 +116,11 @@ func dictionaryConforms() {
 
     let _: Conforms = [0 : works] as Conforms
     let _: Conforms = [0 : fails] as Conforms
-    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{generic struct 'Dictionary' requires that 'Fails' conform to 'Conforms'}}
 
     let _: Conforms = dictWorks as Conforms
     let _: Conforms = dictFails as Conforms
-    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{generic struct 'Dictionary' requires that 'Fails' conform to 'Conforms'}}
 }
 
 func combined() {
@@ -131,6 +133,6 @@ func combined() {
     // expected-error@-1 {{type 'any Conforms' cannot conform to 'Conforms'}} expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
 
     let _: Conforms = [[0: [1 : [fails]] as Conforms]]
-    // expected-error@-1 {{protocol 'Conforms' requires that 'Fails' conform to 'Conforms'}}
+    // expected-error@-1 {{generic struct 'Dictionary' requires that 'Fails' conform to 'Conforms'}}
     // expected-error@-2 {{type 'any Conforms' cannot conform to 'Conforms'}} expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
 }

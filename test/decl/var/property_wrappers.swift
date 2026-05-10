@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -swift-version 5 -package-name myPkg
 
 // ---------------------------------------------------------------------------
 // Property wrapper type definitions
@@ -58,13 +58,13 @@ struct WrapperAcceptingAutoclosure<T> {
 
 @propertyWrapper
 struct MissingValue<T> { }
-// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{educational-notes=property-wrapper-requirements}}{{25-25=var wrappedValue: <#Value#>}}
+// expected-error@-1{{property wrapper type 'MissingValue' does not contain a non-static property named 'wrappedValue'}} {{documentation-file=property-wrapper-requirements}}{{25-25=\nvar wrappedValue: <#Value#>}}
 
 @propertyWrapper
 struct StaticValue {
   static var wrappedValue: Int = 17
 }
-// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}{{21-21=var wrappedValue: <#Value#>}}
+// expected-error@-3{{property wrapper type 'StaticValue' does not contain a non-static property named 'wrappedValue'}}{{21-21=\nvar wrappedValue: <#Value#>}}
 
 
 // expected-error@+1{{'@propertyWrapper' attribute cannot be applied to this declaration}}
@@ -76,7 +76,7 @@ protocol CannotBeAWrapper {
 
 @propertyWrapper
 struct NonVisibleValueWrapper<Value> {
-  private var wrappedValue: Value // expected-error{{private property 'wrappedValue' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}} {{educational-notes=property-wrapper-requirements}}
+  private var wrappedValue: Value // expected-error{{private property 'wrappedValue' cannot have more restrictive access than its enclosing property wrapper type 'NonVisibleValueWrapper' (which is internal)}} {{documentation-file=property-wrapper-requirements}}
 }
 
 @propertyWrapper
@@ -92,7 +92,7 @@ struct NonVisibleInitWrapper<Value> {
 struct InitialValueTypeMismatch<Value> {
   var wrappedValue: Value // expected-note{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an @autoclosure thereof}} {{educational-notes=property-wrapper-requirements}}
+  init(wrappedValue initialValue: Value?) { // expected-error{{'init(wrappedValue:)' parameter type ('Value?') must be the same as its 'wrappedValue' property type ('Value') or an '@autoclosure' thereof}} {{documentation-file=property-wrapper-requirements}}
     self.wrappedValue = initialValue!
   }
 }
@@ -101,10 +101,10 @@ struct InitialValueTypeMismatch<Value> {
 struct MultipleInitialValues<Value> {
   var wrappedValue: Value? = nil // expected-note 2{{'wrappedValue' declared here}}
 
-  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
+  init(wrappedValue initialValue: Int) { // expected-error{{'init(wrappedValue:)' parameter type ('Int') must be the same as its 'wrappedValue' property type ('Value?') or an '@autoclosure' thereof}}
   }
 
-  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an @autoclosure thereof}}
+  init(wrappedValue initialValue: Double) { // expected-error{{'init(wrappedValue:)' parameter type ('Double') must be the same as its 'wrappedValue' property type ('Value?') or an '@autoclosure' thereof}}
   }
 }
 
@@ -112,7 +112,7 @@ struct MultipleInitialValues<Value> {
 struct InitialValueFailable<Value> {
   var wrappedValue: Value
 
-  init?(wrappedValue initialValue: Value) { // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}} {{educational-notes=property-wrapper-requirements}}
+  init?(wrappedValue initialValue: Value) { // expected-error{{property wrapper initializer 'init(wrappedValue:)' cannot be failable}} {{documentation-file=property-wrapper-requirements}}
     return nil
   }
 }
@@ -253,6 +253,9 @@ struct MultipleWrappers {
 
   @WrapperWithInitialValue // expected-error 2{{property wrapper can only apply to a single variable}}
   var (y, z) = (1, 2)
+
+  @Clamping(min: 0, max: 255) // expected-error 2{{property wrapper can only apply to a single variable}}
+  var a = 0, b = 0
 }
 
 // ---------------------------------------------------------------------------
@@ -620,6 +623,21 @@ public struct HasUsableFromInlineWrapper<T> {
   // expected-error@-1{{property wrapper type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
 }
 
+public struct HasUsableFromInlinePackageWrapper<T> {
+  @propertyWrapper
+  package struct PackageWrapper<U> { // expected-note{{type declared here}}
+    package var wrappedValue: U
+    package init(wrappedValue initialValue: U) {
+      self.wrappedValue = initialValue
+    }
+  }
+
+  @PackageWrapper
+  @usableFromInline
+  package var y: [T] = []
+  // expected-error@-1{{property wrapper type referenced from a '@usableFromInline' property must be '@usableFromInline' or public}}
+}
+
 @propertyWrapper
 class Box<Value> {
   private(set) var wrappedValue: Value
@@ -900,7 +918,8 @@ class TestInvalidRedeclaration1 {
   // expected-error@-3 {{invalid redeclaration of synthesized property '_i'}}
 }
 
-// SR-12839
+// https://github.com/apple/swift/issues/55285
+
 struct TestInvalidRedeclaration2 {
   var _foo1 = 123 // expected-error {{invalid redeclaration of synthesized property '_foo1'}}
   @WrapperWithInitialValue var foo1 = 123 // expected-note {{'_foo1' synthesized for property wrapper backing storage}}
@@ -942,7 +961,7 @@ struct Observable<Value> {
   }
 
   @available(*, unavailable, message: "must be in a class")
-  var wrappedValue: Value { // expected-note{{'wrappedValue' has been explicitly marked unavailable here}}
+  var wrappedValue: Value { // expected-note 2{{'wrappedValue' has been explicitly marked unavailable here}}
     get { fatalError("called wrappedValue getter") }
     set { fatalError("called wrappedValue setter") }
   }
@@ -963,6 +982,13 @@ struct Observable<Value> {
 
 struct MyObservedValueType {
   @Observable // expected-error{{'wrappedValue' is unavailable: must be in a class}}
+  var observedProperty = 17
+}
+
+func takesObservable(@Observable _ observable: Int) {} // expected-error{{'wrappedValue' is unavailable: must be in a class}}
+
+class MyObservedClass {
+  @Observable
   var observedProperty = 17
 }
 
@@ -1001,28 +1027,36 @@ struct UsesWrapperRequiringP {
   // expected-error@-3{{type annotation missing in pattern}}
 }
 
-// SR-10899 / rdar://problem/51588022
-@propertyWrapper
-struct SR_10899_Wrapper {
-  var wrappedValue: String { "hi" }
+// rdar://problem/51588022
+// https://github.com/apple/swift/issues/53289
+do {
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: String { "hi" }
+  }
+
+  struct S {
+    @Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match 'wrappedValue' type 'String'}}
+  }
 }
 
-struct SR_10899_Usage {
-  @SR_10899_Wrapper var thing: Bool // expected-error{{property type 'Bool' does not match 'wrappedValue' type 'String'}}
+// https://github.com/apple/swift/issues/57080
+do {
+  @propertyWrapper
+  struct StringWrappedValue {
+    var wrappedValue: String
+  }
+
+  struct S {
+    // expected-error@+1 {{property type '() -> String' does not match 'wrappedValue' type 'String'}}
+    @StringWrappedValue var value: () -> String
+  }
 }
 
-// https://bugs.swift.org/browse/SR-14730
-@propertyWrapper
-struct StringWrappedValue {
-  var wrappedValue: String
-}
+// rdar://problem/52593304
+// https://github.com/apple/swift/issues/53453
+// Assertion with DeclContext mismatches
 
-struct SR_14730 {
-  // expected-error@+1 {{property type '() -> String' does not match 'wrappedValue' type 'String'}}
-  @StringWrappedValue var value: () -> String
-}
-
-// SR-11061 / rdar://problem/52593304 assertion with DeclContext mismatches
 class SomeValue {
 	@SomeA(closure: { $0 }) var some: Int = 100
 }
@@ -1113,12 +1147,12 @@ struct TestComposition {
   @Wrapper<String> @Wrapper var value: Int // expected-error{{composed wrapper type 'Wrapper<Int>' does not match type of 'Wrapper<String>.wrappedValue', which is 'String'}}
 
 	func triggerErrors(d: Double) { // expected-note 6 {{mark method 'mutating' to make 'self' mutable}} {{2-2=mutating }}
-		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}} {{8-8=Int(}} {{9-9=)}}
+		p1 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{8-8=Int(}} {{9-9=)}}
     // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
-		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String?'}}
+		p2 = d // expected-error{{cannot assign value of type 'Double' to type 'String'}}
     // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
     // TODO(diagnostics): Looks like source range for 'd' here is reported as starting at 10, but it should be 8
-    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int?'}} {{10-10=Int(}} {{11-11=)}}
+    p3 = d // expected-error{{cannot assign value of type 'Double' to type 'Int'}} {{10-10=Int(}} {{11-11=)}}
     // expected-error@-1 {{cannot assign to property: 'self' is immutable}}
 
 		_p1 = d // expected-error{{cannot assign value of type 'Double' to type 'WrapperA<WrapperB<WrapperC<Int>>>'}}
@@ -1306,37 +1340,47 @@ struct MissingPropertyWrapperUnwrap {
     self.x[q: "ultimate question", 42] // expected-error {{referencing subscript 'subscript(q:_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
     self.x[q: "ultimate question", 42] = true // expected-error {{referencing subscript 'subscript(q:_:)' requires wrapper 'Foo<Int>'}} {{10-10=_}}
 
-    // SR-11476
+    // https://github.com/apple/swift/issues/53876
     _ = \Self.[takesFoo: self.x] // expected-error {{cannot convert value 'x' of type 'Int' to expected type 'Foo<Int>', use wrapper instead}}{{31-31=_}}
     _ = \Foo<W>.[x: self._x] // expected-error {{cannot convert value '_x' of type 'Foo<Int>' to expected type 'Int', use wrapped value instead}} {{26-27=}}
   }
 }
 
+_ = {
+  struct S {
+    @WrapperWithInitialValue var x = 0
+    init() {}
+  }
+  func a<T>(_: WrapperWithInitialValue<T>) {}
+  a(S().x) // expected-error {{cannot convert value 'x' of type 'Int' to expected type 'WrapperWithInitialValue<Int>', use wrapper instead}} {{9-9=_}}
+}
+
 struct InvalidPropertyDelegateUse {
   // TODO(diagnostics): We need to a tailored diagnostic for extraneous arguments in property delegate initialization
-  @Foo var x: Int = 42 // expected-error@:21 {{argument passed to call that takes no arguments}}
+  @Foo var x: Int = 42 // expected-error@:21 {{extra argument 'wrappedValue' in call}}
 
   func test() {
     self.x.foo() // expected-error {{value of type 'Int' has no member 'foo'}}
   }
 }
 
-// SR-11060
+// https://github.com/apple/swift/issues/53452
+do {
+  class C {
+    @Wrapper var property: Int = 1234 // expected-error {{missing argument for parameter 'string' in property wrapper initializer; add 'wrappedValue' and 'string' arguments in '@Wrapper(...)'}}
+  }
 
-class SR_11060_Class {
-  @SR_11060_Wrapper var property: Int = 1234 // expected-error {{missing argument for parameter 'string' in property wrapper initializer; add 'wrappedValue' and 'string' arguments in '@SR_11060_Wrapper(...)'}}
-}
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: Int
 
-@propertyWrapper
-struct SR_11060_Wrapper {
-  var wrappedValue: Int
-  
-  init(wrappedValue: Int, string: String) { // expected-note {{'init(wrappedValue:string:)' declared here}}
-    self.wrappedValue = wrappedValue
+    init(wrappedValue: Int, string: String) { // expected-note {{'init(wrappedValue:string:)' declared here}}
+      self.wrappedValue = wrappedValue
+    }
   }
 }
 
-// SR-11138
+// https://github.com/apple/swift/issues/53534
 // Check that all possible compositions of nonmutating/mutating accessors
 // on wrappers produce wrapped properties with the correct settability and
 // mutatiness in all compositions.
@@ -1737,69 +1781,70 @@ func test_missing_method_with_lvalue_base() {
   }
 }
 
-// SR-11288
-// Look into the protocols that the type conforms to
+// https://github.com/apple/swift/issues/53689
+// Look into the protocols that the type conforms to.
 
 // typealias as propertyWrapper //
 
 @propertyWrapper
-struct SR_11288_S0 {
+struct W_53689 {
   var wrappedValue: Int
 }
 
-protocol SR_11288_P1 {
-  typealias SR_11288_Wrapper1 = SR_11288_S0
+protocol P1_53689 {
+  typealias Wrapper1_53689 = W_53689
 }
 
-struct SR_11288_S1: SR_11288_P1 {
-  @SR_11288_Wrapper1 var answer = 42 // Okay
+struct S1_53689: P1_53689 {
+  @Wrapper1_53689 var answer = 42 // Okay
 }
 
 // associatedtype as propertyWrapper //
 
-protocol SR_11288_P2 {
-  associatedtype SR_11288_Wrapper2 = SR_11288_S0
+protocol P2_53689 {
+  associatedtype Wrapper2_53689 = W_53689
 }
 
-struct SR_11288_S2: SR_11288_P2 {
-  @SR_11288_Wrapper2 var answer = 42 // expected-error {{unknown attribute 'SR_11288_Wrapper2'}}
+struct S2_53689: P2_53689 {
+  @Wrapper2_53689 var answer = 42 // expected-error {{unknown attribute 'Wrapper2_53689'}}
 }
 
-protocol SR_11288_P3 {
-  associatedtype SR_11288_Wrapper3
+protocol P3_53689 {
+  associatedtype Wrapper3_53689
 }
 
-struct SR_11288_S3: SR_11288_P3 {
-  typealias SR_11288_Wrapper3 = SR_11288_S0
-  @SR_11288_Wrapper3 var answer = 42 // Okay
+struct S3_53689: P3_53689 {
+  typealias Wrapper3_53689 = W_53689
+  @Wrapper3_53689 var answer = 42 // Okay
 }
 
 // typealias as propertyWrapper in a constrained protocol extension //
 
-protocol SR_11288_P4 {}
-extension SR_11288_P4 where Self: AnyObject { // expected-note {{requirement specified as 'Self' : 'AnyObject' [with Self = SR_11288_S4]}}
-  typealias SR_11288_Wrapper4 = SR_11288_S0
+protocol P4_53689 {}
+extension P4_53689 where Self: AnyObject { // expected-note {{requirement specified as 'Self' : 'AnyObject' [with Self = S4_53689]}}
+  typealias Wrapper4_53689 = W_53689
 }
 
-struct SR_11288_S4: SR_11288_P4 {
-  @SR_11288_Wrapper4 var answer = 42 // expected-error {{'Self.SR_11288_Wrapper4' (aka 'SR_11288_S0') requires that 'SR_11288_S4' be a class type}}
+struct S4_53689: P4_53689 {
+  @Wrapper4_53689 var answer = 42 // expected-error {{'Self.Wrapper4_53689' (aka 'W_53689') requires that 'S4_53689' be a class type}}
 }
 
-class SR_11288_C0: SR_11288_P4 {
-  @SR_11288_Wrapper4 var answer = 42 // Okay
+class C4_53689: P4_53689 {
+  @Wrapper4_53689 var answer = 42 // Okay
 }
 
 // typealias as propertyWrapper in a generic type //
 
-protocol SR_11288_P5 {
-  typealias SR_11288_Wrapper5 = SR_11288_S0
+protocol P5_53689 {
+  typealias Wrapper5_53689 = W_53689
 }
 
-struct SR_11288_S5<T>: SR_11288_P5 {
-  @SR_11288_Wrapper5 var answer = 42 // Okay
+struct S5_53689<T>: P5_53689 {
+  @Wrapper5_53689 var answer = 42 // Okay
 }
 
-// SR-11393
+// https://github.com/apple/swift/issues/53794
+
 protocol Copyable: AnyObject {
     func copy() -> Self
 }
@@ -1862,37 +1907,37 @@ struct UseNonMutatingProjectedValueSet {
   }
 }
 
-// SR-11478
-
+// https://github.com/apple/swift/issues/53878
+do {
 @propertyWrapper
-struct SR_11478_W<Value> {
-  var wrappedValue: Value
-}
+  struct Wrapper<Value> {
+    var wrappedValue: Value
+  }
 
-class SR_11478_C1 {
-  @SR_11478_W static var bool1: Bool = true // Ok
-  @SR_11478_W class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
-  @SR_11478_W class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
-}
+  class C1 {
+    @Wrapper static var bool1: Bool = true // Ok
+    @Wrapper class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+    @Wrapper class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+  }
 
-final class SR_11478_C2 {
-  @SR_11478_W static var bool1: Bool = true // Ok
-  @SR_11478_W class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
-  @SR_11478_W class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
-}
-
-// SR-11381
-
-@propertyWrapper
-struct SR_11381_W<T> {
-  init(wrappedValue: T) {}
-  var wrappedValue: T {
-    fatalError()
+  final class C2 {
+    @Wrapper static var bool1: Bool = true // Ok
+    @Wrapper class var bool2: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
+    @Wrapper class final var bool3: Bool = true // expected-error {{class stored properties not supported in classes; did you mean 'static'?}}
   }
 }
 
-struct SR_11381_S {
-  @SR_11381_W var foo: Int = nil // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+// https://github.com/apple/swift/issues/53782
+do {
+@propertyWrapper
+  struct Wrapper<T> {
+    init(wrappedValue: T) {}
+    var wrappedValue: T { get {} }
+  }
+
+  struct S {
+    @Wrapper var foo: Int = nil // expected-error {{'nil' is not compatible with expected argument type 'Int'}}
+  }
 }
 
 // rdar://problem/53349209 - regression in property wrapper inference
@@ -1921,12 +1966,12 @@ struct TestConcrete1 {
   }
 }
 
-// SR-11477
+// https://github.com/apple/swift/issues/53877
 
 // Two initializers that can default initialize the wrapper //
 
 @propertyWrapper
-struct SR_11477_W1 { // Okay
+struct W1_53877 { // Okay
   let name: String
 
   init() {
@@ -1945,7 +1990,7 @@ struct SR_11477_W1 { // Okay
 // Two initializers with default arguments that can default initialize the wrapper //
 
 @propertyWrapper
-struct SR_11477_W2 { // Okay
+struct W2_53877 { // Okay
   let name: String
 
   init(anotherName: String = "DefaultParamInit1") {
@@ -1964,7 +2009,7 @@ struct SR_11477_W2 { // Okay
 // Single initializer that can default initialize the wrapper //
 
 @propertyWrapper
-struct SR_11477_W3 { // Okay
+struct W3_53877 { // Okay
   let name: String
 
   init() {
@@ -2025,7 +2070,7 @@ struct Rdar57411331 {
   var other: Int
 }
 
-// SR-11994
+// https://github.com/apple/swift/issues/54428
 @propertyWrapper
 open class OpenPropertyWrapperWithPublicInit {
   public init(wrappedValue: String) { // Okay
@@ -2035,20 +2080,21 @@ open class OpenPropertyWrapperWithPublicInit {
   open var wrappedValue: String = "Hello, world"
 }
 
-// SR-11654
+// https://github.com/apple/swift/issues/54065
+do {
+  struct S {}
 
-struct SR_11654_S {}
+  class C {
+    @Foo var property: S?
+  }
 
-class SR_11654_C {
-  @Foo var property: SR_11654_S?
+  func f<T>(_ argument: T?) -> T? {
+    return argument
+  }
+
+  let c = C()
+  _ = f(c.property) // Okay
 }
-
-func sr_11654_generic_func<T>(_ argument: T?) -> T? {
-  return argument
-}
-
-let sr_11654_c = SR_11654_C()
-_ = sr_11654_generic_func(sr_11654_c.property) // Okay
 
 // rdar://problem/59471019 - property wrapper initializer requires empty parens
 // for default init

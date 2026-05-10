@@ -19,7 +19,6 @@
 
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Bitstream/BitstreamReader.h"
@@ -27,11 +26,10 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/OnDiskHashTable.h"
 #include "llvm/Support/StringSaver.h"
-#include "llvm/Support/YAMLParser.h"
-#include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -42,22 +40,20 @@ enum class DiagID : uint32_t;
 
 namespace diag {
 
-using namespace llvm::support;
-
 enum LocalizationProducerState : uint8_t {
   NotInitialized,
   Initialized,
   FailedInitialization
 };
 
-class DefToYAMLConverter {
+class DefToStringsConverter {
   llvm::ArrayRef<const char *> IDs;
   llvm::ArrayRef<const char *> Messages;
 
 public:
-  DefToYAMLConverter(llvm::ArrayRef<const char *> ids,
-                     llvm::ArrayRef<const char *> messages)
-      : IDs(ids), Messages(messages) {
+  DefToStringsConverter(llvm::ArrayRef<const char *> ids,
+                        llvm::ArrayRef<const char *> messages)
+    : IDs(ids), Messages(messages) {
     assert(IDs.size() == Messages.size());
   }
 
@@ -73,20 +69,21 @@ public:
   using hash_value_type = uint32_t;
   using offset_type = uint32_t;
 
-  hash_value_type ComputeHash(key_type_ref key) { return llvm::hash_code(key); }
+  hash_value_type ComputeHash(key_type_ref key) { return key; }
 
   std::pair<offset_type, offset_type> EmitKeyDataLength(llvm::raw_ostream &out,
                                                         key_type_ref key,
                                                         data_type_ref data) {
     offset_type dataLength = static_cast<offset_type>(data.size());
-    endian::write<offset_type>(out, dataLength, little);
+    llvm::support::endian::write<offset_type>(out, dataLength,
+                                              llvm::endianness::little);
     // No need to write the key length; it's constant.
     return {sizeof(key_type), dataLength};
   }
 
   void EmitKey(llvm::raw_ostream &out, key_type_ref key, unsigned len) {
     assert(len == sizeof(key_type));
-    endian::write<key_type>(out, key, little);
+    llvm::support::endian::write<key_type>(out, key, llvm::endianness::little);
   }
 
   void EmitData(llvm::raw_ostream &out, key_type_ref key, data_type_ref data,
@@ -115,19 +112,20 @@ public:
     return lhs == rhs;
   }
 
-  hash_value_type ComputeHash(internal_key_type key) {
-    return llvm::hash_code(key);
-  }
+  hash_value_type ComputeHash(internal_key_type key) { return key; }
 
   static std::pair<offset_type, offset_type>
   ReadKeyDataLength(const unsigned char *&data) {
     offset_type dataLength =
-        endian::readNext<offset_type, little, unaligned>(data);
+        llvm::support::endian::readNext<offset_type, llvm::endianness::little,
+                                        llvm::support::unaligned>(data);
     return {sizeof(uint32_t), dataLength};
   }
 
   internal_key_type ReadKey(const unsigned char *data, offset_type length) {
-    return endian::readNext<internal_key_type, little, unaligned>(data);
+    return llvm::support::endian::readNext<
+        internal_key_type, llvm::endianness::little, llvm::support::unaligned>(
+        data);
   }
 
   data_type ReadData(internal_key_type Key, const unsigned char *data,
@@ -161,32 +159,20 @@ public:
 };
 
 class LocalizationProducer {
-  /// This allocator will retain localized diagnostic strings containing the
-  /// diagnostic's message and identifier as `message [id]` for the duration of
-  /// compiler invocation. This will be used when the frontend flag
-  /// `-debug-diagnostic-names` is used.
-  llvm::BumpPtrAllocator localizationAllocator;
-  llvm::StringSaver localizationSaver;
-  bool printDiagnosticNames;
   LocalizationProducerState state = NotInitialized;
 
 public:
-  LocalizationProducer(bool printDiagnosticNames = false)
-      : localizationSaver(localizationAllocator),
-        printDiagnosticNames(printDiagnosticNames) {}
-
   /// If the  message isn't available/localized in current context
   /// return the fallback default message.
   virtual llvm::StringRef getMessageOr(swift::DiagID id,
                                        llvm::StringRef defaultMessage);
 
   /// \returns a `SerializedLocalizationProducer` pointer if the serialized
-  /// diagnostics file available, otherwise returns a `YAMLLocalizationProducer`
-  /// if the `YAML` file is available. If both files aren't available returns a
-  /// `nullptr`.
+  /// diagnostics file available, otherwise returns a
+  /// `StringsLocalizationProducer` if the `.strings` file is available. If both
+  /// files aren't available returns a `nullptr`.
   static std::unique_ptr<LocalizationProducer>
-  producerFor(llvm::StringRef locale, llvm::StringRef path,
-              bool printDiagnosticNames);
+  producerFor(llvm::StringRef locale, llvm::StringRef path);
 
   virtual ~LocalizationProducer() {}
 
@@ -204,15 +190,14 @@ protected:
   virtual llvm::StringRef getMessage(swift::DiagID id) const = 0;
 };
 
-class YAMLLocalizationProducer final : public LocalizationProducer {
-  std::vector<std::string> diagnostics;
+class StringsLocalizationProducer final : public LocalizationProducer {
   std::string filePath;
 
+  std::vector<std::string> diagnostics;
+
 public:
-  /// The diagnostics IDs that are no longer available in `.def`
-  std::vector<std::string> unknownIDs;
-  explicit YAMLLocalizationProducer(llvm::StringRef filePath,
-                                    bool printDiagnosticNames = false);
+  explicit StringsLocalizationProducer(llvm::StringRef filePath)
+      : LocalizationProducer(), filePath(filePath) {}
 
   /// Iterate over all of the available (non-empty) translations
   /// maintained by this producer, callback gets each translation
@@ -223,6 +208,10 @@ public:
 protected:
   bool initializeImpl() override;
   llvm::StringRef getMessage(swift::DiagID id) const override;
+
+private:
+  static void readStringsFile(llvm::MemoryBuffer *in,
+                              std::vector<std::string> &diagnostics);
 };
 
 class SerializedLocalizationProducer final : public LocalizationProducer {
@@ -234,38 +223,11 @@ class SerializedLocalizationProducer final : public LocalizationProducer {
 
 public:
   explicit SerializedLocalizationProducer(
-      std::unique_ptr<llvm::MemoryBuffer> buffer,
-      bool printDiagnosticNames = false);
+      std::unique_ptr<llvm::MemoryBuffer> buffer);
 
 protected:
   bool initializeImpl() override;
   llvm::StringRef getMessage(swift::DiagID id) const override;
-};
-
-class LocalizationInput : public llvm::yaml::Input {
-  using Input::Input;
-
-  /// Read diagnostics in the YAML file iteratively
-  template <typename T, typename Context>
-  friend typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value,
-                                 void>::type
-  readYAML(llvm::yaml::IO &io, T &Seq, T &unknownIDs, bool, Context &Ctx);
-
-  template <typename T>
-  friend typename std::enable_if<llvm::yaml::has_SequenceTraits<T>::value,
-                                 LocalizationInput &>::type
-  operator>>(LocalizationInput &yin, T &diagnostics);
-
-public:
-  /// A vector that keeps track of the diagnostics IDs that are available in
-  /// YAML and not available in `.def` files.
-  std::vector<std::string> unknownIDs;
-  
-  /// A diagnostic ID might be present in YAML and not in `.def` file, if that's
-  /// the case the `id` won't have a `DiagID` value.
-  /// If the `id` is available in `.def` file this method will return the `id`'s
-  /// value, otherwise this method won't return a value.
-  static llvm::Optional<uint32_t> readID(llvm::yaml::IO &io);
 };
 
 } // namespace diag

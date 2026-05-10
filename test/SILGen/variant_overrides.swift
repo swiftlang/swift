@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s17variant_overrides1AC3foo5blockyyACc_tF :
 // CHECK-SAME:    $@convention(method) (@guaranteed @callee_guaranteed (@guaranteed A) -> (), @guaranteed A) -> ()
@@ -7,7 +7,7 @@ class A {
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s17variant_overrides1BC3foo5blockyyACyxGc_tF :
-// CHECK-SAME:     $@convention(method) <T> (@guaranteed @callee_guaranteed @substituted <τ_0_0, τ_0_1 where τ_0_0 == τ_0_1> (@guaranteed B<τ_0_0>) -> () for <T, T>, @guaranteed B<T>) -> ()
+// CHECK-SAME:     $@convention(method) <T> (@guaranteed @callee_guaranteed @substituted <τ_0_0> (@guaranteed B<τ_0_0>) -> () for <T>, @guaranteed B<T>) -> ()
 class B<T> : A {
   override func foo(block: @escaping (B<T>) -> Void) {}
 }

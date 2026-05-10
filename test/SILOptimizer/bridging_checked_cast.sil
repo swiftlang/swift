@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -inline %s | %FileCheck %s
 // REQUIRES: objc_interop
 
 import Swift

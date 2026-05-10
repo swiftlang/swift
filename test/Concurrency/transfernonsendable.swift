@@ -1,0 +1,2419 @@
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix ni- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix ni-ns- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
+
+// REQUIRES: concurrency
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+/// Classes are always non-Sendable, so this is non-Sendable
+class NonSendableKlass { // expected-note {{}}
+  var field: NonSendableKlass? = nil
+  var boolean: Bool = false
+  var value: Int = 0
+
+  init() {}
+  init(_ x: NonSendableKlass) {
+  }
+
+  func asyncCall() async {}
+  func asyncCallWithIsolatedParameter(isolation: isolated (any Actor)? = #isolation) async {
+  }
+
+  func getSendableGenericStructAsync() async -> SendableGenericStruct { fatalError() }
+}
+
+nonisolated final class NonIsolatedFinalKlass {
+  var ns = NonSendableKlass()
+}
+
+class SendableKlass : @unchecked Sendable {}
+
+actor MyActor {
+  var klass = NonSendableKlass()
+
+  final var finalKlass = NonSendableKlass()
+
+  func useKlass(_ x: NonSendableKlass) {}
+
+  func useSendableFunction(_: @Sendable () -> Void) {}
+  func useNonSendableFunction(_: () -> Void) {}
+  func doSomething() {}
+  @MainActor func useKlassMainActor(_ x: NonSendableKlass) {}
+}
+
+final actor FinalActor {
+  var klass = NonSendableKlass()
+  func useKlass(_ x: NonSendableKlass) {}
+}
+
+@MainActor
+class MainActorIsolatedKlass {
+  var klass = NonSendableKlass()
+  let klassLet = NonSendableKlass()
+}
+
+@MainActor
+final class FinalMainActorIsolatedKlass {
+  var klass = NonSendableKlass()
+}
+
+func useInOut<T>(_ x: inout T) {}
+func useValue<T>(_ x: T) {}
+func useValueAsync<T>(_ x: T) async {}
+func useValueNoncopyable<T : ~Copyable>(_ x: borrowing T) {}
+@concurrent func useValueAsyncConcurrent<T>(_ x: T) async {}
+
+@MainActor func transferToMain<T>(_ t: T) async {}
+
+var booleanFlag: Bool { false }
+
+struct SingleFieldKlassBox {
+  var k = NonSendableKlass()
+}
+
+struct TwoFieldKlassBox {
+  var k1 = NonSendableKlass()
+  var k2 = NonSendableKlass()
+}
+
+class TwoFieldKlassClassBox {
+  var k1 = NonSendableKlass()
+  var k2 = NonSendableKlass()
+  var recursive: TwoFieldKlassClassBox? = nil
+}
+
+struct SendableGenericStruct : Sendable {
+  var x = SendableKlass()
+}
+
+struct NoncopyableStructNonsendable : ~Copyable {
+  var x = NonSendableKlass()
+}
+
+enum MyEnum<T> {
+    case none
+    indirect case some(NonSendableKlass)
+    case more(T)
+}
+
+func nonescapingAsyncClosure(_ x: () async -> ()) {}
+
+////////////////////////////
+// MARK: Actor Self Tests //
+////////////////////////////
+
+extension MyActor {
+  func warningIfCallingGetter() async {
+    await self.klass.asyncCall()
+    // expected-ni-warning @-1 {{sending 'self.klass' risks causing data races}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and 'self'-isolated uses}}
+  }
+
+  func warningIfCallingAsyncOnFinalField() async {
+    // Since we are calling finalKlass directly, we emit a warning here.
+    await self.finalKlass.asyncCall()
+    // expected-ni-warning @-1 {{sending 'self.finalKlass' risks causing data races}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'self.finalKlass' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and 'self'-isolated uses}}
+  }
+
+  // We do not warn on this since we warn in the caller of our getter instead.
+  var klassGetter: NonSendableKlass {
+    self.finalKlass
+  }
+}
+
+extension FinalActor {
+  func warningIfCallingAsyncOnFinalField() async {
+    // Since our whole class is final, we emit the error directly here.
+    await self.klass.asyncCall()
+    // expected-ni-warning @-1 {{sending 'self.klass' risks causing data races}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'self.klass' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and 'self'-isolated uses}}
+  }
+}
+
+/////////////////////////////
+// MARK: Closure Formation //
+/////////////////////////////
+
+// This test makes sure that we can properly pattern match project_box.
+func formClosureWithoutCrashing() {
+ var c = NonSendableKlass() // expected-warning {{variable 'c' was never mutated; consider changing to 'let' constant}}
+  let _ = { print(c) }
+}
+
+// In this test, closure is not promoted into its box form. As a result, we
+// treat assignments into contents as a merge operation rather than an assign.
+func closureInOut(_ a: MyActor) async {
+  var contents = NonSendableKlass()
+  let ns0 = NonSendableKlass()
+  let ns1 = NonSendableKlass()
+
+  contents = ns0
+  contents = ns1
+
+  var closure = {}
+  closure = { useInOut(&contents) }
+
+  await a.useKlass(ns0)
+
+  // expected-warning @-2 {{sending 'ns0' risks causing data races}}
+  // expected-note @-3 {{sending 'ns0' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
+
+  if await booleanFlag {
+    await a.useKlass(ns1) // expected-note {{access can happen concurrently}}
+  } else {
+    closure() // expected-note {{access can happen concurrently}}
+  }
+}
+
+func closureInOutDifferentActor(_ a: MyActor, _ a2: MyActor) async {
+  var contents = NonSendableKlass()
+  let ns0 = NonSendableKlass()
+  let ns1 = NonSendableKlass()
+
+  contents = ns0
+  contents = ns1
+
+  var closure = {}
+  closure = { useInOut(&contents) }
+
+  await a.useKlass(ns0)
+
+  // expected-warning @-2 {{sending 'ns0' risks causing data races}}
+  // expected-note @-3 {{sending 'ns0' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
+
+  // We only emit a warning on the first use we see, so make sure we do both
+  // the use and the closure.
+  if await booleanFlag {
+    await a2.useKlass(ns1) // expected-note {{access can happen concurrently}}
+
+  } else {
+    closure() // expected-note {{access can happen concurrently}}
+  }
+}
+
+
+func closureInOut2(_ a: MyActor) async {
+  var contents = NonSendableKlass()
+  let ns0 = NonSendableKlass()
+  let ns1 = NonSendableKlass()
+
+  contents = ns0
+  contents = ns1
+
+  var closure = {}
+
+  await a.useKlass(ns0) // expected-warning {{sending 'ns0' risks causing data races}}
+  // expected-note @-1 {{sending 'ns0' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
+
+
+  closure = { useInOut(&contents) } // expected-note {{access can happen concurrently}}
+
+  await a.useKlass(ns1) // expected-warning {{sending 'ns1' risks causing data races}}
+  // expected-note @-1 {{sending 'ns1' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
+
+
+  closure() // expected-note {{access can happen concurrently}}
+}
+
+func closureNonInOut(_ a: MyActor) async {
+  var contents = NonSendableKlass()
+  let ns0 = NonSendableKlass()
+  let ns1 = NonSendableKlass()
+
+  contents = ns0
+  contents = ns1
+
+  var closure = {}
+
+  await a.useKlass(ns0)
+
+
+  closure = { useValue(contents) }
+
+  await a.useKlass(ns1) // expected-warning {{sending 'ns1' risks causing data races}}
+  // expected-note @-1 {{sending 'ns1' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
+
+
+  closure() // expected-note {{access can happen concurrently}}
+}
+
+// TODO: Rework the nonisolated closure so we only treat nonisolated closures
+// that capture self as being nonisolated. When we capture from outside of a
+// method, we cannot access the inside of the actor without using an await, so
+// this is safe.
+func transferNonIsolatedNonAsyncClosureTwice() async {
+  let a = MyActor()
+
+  // This is nonisolated and non-async... we can transfer it safely.
+  var actorCaptureClosure = { print(a) }
+  await transferToMain(actorCaptureClosure)
+
+
+  actorCaptureClosure = { print(a) }
+  await transferToMain(actorCaptureClosure)
+
+}
+
+extension MyActor {
+  // Simple just capture self and access field.
+  func simpleClosureCaptureSelfAndTransfer() async {
+    let closure: () -> () = {
+      print(self.klass)
+    }
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  func simpleClosureCaptureSelfAndTransferThroughTuple() async {
+    let closure: () -> () = {
+      print(self.klass)
+    }
+    let x = (1, closure)
+    await transferToMain(x)
+
+    // expected-warning @-2 {{sending value of non-Sendable type '(Int, () -> ())' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated value of non-Sendable type '(Int, () -> ())' to main actor-isolated global function 'transferToMain' risks causing races in between 'self'-isolated and main actor-isolated uses}}
+  }
+
+  func simpleClosureCaptureSelfAndTransferThroughTupleBackwards() async {
+    let closure: () -> () = {
+      print(self.klass)
+    }
+
+    let x = (closure, 1)
+    await transferToMain(x) // expected-warning {{sending value of non-Sendable type '(() -> (), Int)' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '(() -> (), Int)' to main actor-isolated global function 'transferToMain' risks causing races in between 'self'-isolated and main actor-isolated uses}}
+  }
+
+  func simpleClosureCaptureSelfAndTransferThroughOptional() async {
+    let closure: () -> () = {
+      print(self.klass)
+    }
+    let x: Any? = (1, closure)
+    await transferToMain(x)
+    // expected-warning @-1 {{sending 'x' risks causing data races}}
+    // expected-note @-2 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  func simpleClosureCaptureSelfAndTransferThroughOptionalBackwards() async {
+    let closure: () -> () = {
+      print(self.klass)
+    }
+    // In contrast to the tuple backwards case, we do error here since the value
+    // we are forming is an Any?  so we actually form the tuple as an object and
+    // store it all as once.
+    let x: Any? = (closure, 1)
+    await transferToMain(x)
+    // expected-warning @-1 {{sending 'x' risks causing data races}}
+    // expected-note @-2 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  func simpleClosureCaptureSelfWithReinit() async {
+    var closure: () -> () = {
+      print(self.klass)
+    }
+
+    // Error here.
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+    closure = {}
+
+    // But not here.
+    await transferToMain(closure)
+
+
+  }
+
+  func simpleClosureCaptureSelfWithReinit2() async {
+    var closure: () -> () = {}
+
+    // No error here.
+    await transferToMain(closure)
+
+
+
+    closure = {
+      print(self.klass)
+    }
+
+    // Error here.
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  func simpleClosureCaptureSelfWithReinit3() async {
+    var closure: () -> () = {}
+
+    // We get a transfer after use error.
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local actor-isolated uses}}
+
+    if await booleanFlag {
+      closure = {
+        print(self.klass)
+      }
+    }
+
+    await transferToMain(closure)
+
+    // expected-note @-2 {{access can happen concurrently}}
+    // expected-warning @-3 {{sending 'closure' risks causing data races}}
+    // expected-note @-4 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  // In this case, we reinit along both paths, but only one has an actor derived
+  // thing.
+  func simpleClosureCaptureSelfWithReinit4() async {
+    var closure: () -> () = {}
+
+    await transferToMain(closure)
+
+
+
+    if await booleanFlag {
+      closure = {
+        print(self.klass)
+      }
+    } else {
+      closure = {}
+    }
+
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  func simpleClosureCaptureSelfThroughTuple() async {
+    let x = (self, self.klass)
+    let closure: () -> () = {
+      print(x.1)
+    }
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  func simpleClosureCaptureSelfThroughTuple2() async {
+    let x = (2, self.klass)
+    let closure: () -> () = {
+      print(x.1)
+    }
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  func simpleClosureCaptureSelfThroughOptional() async {
+    let x: Any? = (2, self.klass)
+    let closure: () -> () = {
+      print(x as Any)
+    }
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+}
+
+func testSimpleLetClosureCaptureActor() async {
+  let a = MyActor()
+  let closure = { print(a) }
+  await transferToMain(closure)
+
+}
+
+func testSimpleVarClosureCaptureActor() async {
+  let a = MyActor()
+  var closure = {}
+  closure = { print(a) }
+  await transferToMain(closure)
+
+}
+
+
+extension MyActor {
+  // Make sure that we properly propagate actor derived from klass into field's
+  // value.
+  func simplePropagateNonSendableThroughMultipleProperty() async {
+    let f = self.klass.field!
+    let closure: () -> () = {
+      print(f)
+    }
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+
+  // Make sure that we properly propagate actor derived from klass into field's
+  // value.
+  func simplePropagateNonSendableThroughMultipleProperty2() async {
+    let f = self.klass.field!
+    let closure: () -> () = {
+      print(f.field!)
+    }
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+  }
+}
+
+extension MyActor {
+  func testVarReassignStopActorDerived() async {
+    var closure: () -> () = {
+      print(self)
+    }
+
+    // This should error.
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'self'-isolated 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+    // This doesnt since we re-assign
+    closure = {}
+    await transferToMain(closure)
+
+
+
+    // This re-assignment shouldn't error.
+    closure = {}
+    // But this transfer should.
+    await transferToMain(closure)
+
+    // expected-warning @-2 {{sending 'closure' risks causing data races}}
+    // expected-note @-3 {{sending 'closure' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local actor-isolated uses}}
+
+    // But this will error since we race.
+    closure() // expected-note {{access can happen concurrently}}
+  }
+}
+
+func testNoncopyableNonsendableStructWithNonescapingMainActorAsync() {
+  let x = NoncopyableStructNonsendable()
+  let _ = {
+    nonescapingAsyncClosure { @MainActor in
+      useValueNoncopyable(x) // expected-warning {{sending 'x' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    }
+  }
+}
+
+///////////////////////////////////
+// MARK: Sendable Function Tests //
+///////////////////////////////////
+
+// Make sure that we do not error on function values that are Sendable... even
+// if the function is converted to a non-Sendable form by a function conversion.
+func testConversionsAndSendable(a: MyActor, f: @Sendable () -> Void, f2: () -> Void) async {
+  // No function conversion.
+  await a.useSendableFunction(f)
+
+  // Function conversion.
+  await a.useNonSendableFunction(f)
+
+  // Show that we error if we are not sendable.
+  await a.useNonSendableFunction(f2)
+
+  // expected-warning @-2 {{sending 'f2' risks causing data races}}
+  // expected-note @-3 {{sending task-isolated 'f2' to actor-isolated instance method 'useNonSendableFunction' risks causing data races between actor-isolated and task-isolated uses}}
+}
+
+func testSendableClosureCapturesNonSendable(a: MyActor) {
+  let klass = NonSendableKlass()
+  let _ = { @Sendable in
+    _ = klass // expected-warning {{capture of 'klass' with non-Sendable type 'NonSendableKlass' in a '@Sendable' closure}}
+  }
+}
+
+func testSendableClosureCapturesNonSendable2(a: FinalMainActorIsolatedKlass) {
+  let klass = NonSendableKlass()
+  let _ = { @Sendable @MainActor in
+    a.klass = klass
+  }
+}
+
+/////////////////////////////////////////////////////
+// MARK: Multiple Field Var Assignment Merge Tests //
+/////////////////////////////////////////////////////
+
+func singleFieldVarMergeTest() async {
+  var box = SingleFieldKlassBox()
+  box = SingleFieldKlassBox()
+
+  // This transfers the entire region.
+  await transferToMain(box.k)
+
+
+  // But since box has only a single element, this doesn't race.
+  box.k = NonSendableKlass()
+  useValue(box.k)
+  useValue(box)
+
+  // We transfer the box back to main.
+  await transferToMain(box)
+
+
+  // And reassign over the entire box, so again we can use it again.
+  box = SingleFieldKlassBox()
+
+  useValue(box)
+  useValue(box.k)
+
+  await transferToMain(box) // expected-warning {{sending 'box' risks causing data races}}
+  // expected-note @-1 {{sending 'box' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+
+
+  // But if we use box.k here, we emit an error since we didn't reinitialize at
+  // all.
+  useValue(box.k) // expected-note {{access can happen concurrently}}
+}
+
+func multipleFieldVarMergeTest1() async {
+  var box = TwoFieldKlassBox()
+  box = TwoFieldKlassBox()
+
+  // This transfers the entire region.
+  await transferToMain(box.k1) // expected-warning {{sending 'box.k1' risks causing data races}}
+  // expected-note @-1 {{sending 'box.k1' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+
+
+  // So even if we reassign over k1, since we did a merge, this should error.
+  box.k1 = NonSendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(box)
+}
+
+func multipleFieldVarMergeTest2() async {
+  var box = TwoFieldKlassBox()
+  box = TwoFieldKlassBox()
+
+  // This transfers the entire region.
+  await transferToMain(box.k1)
+
+
+  // But if we assign over box completely, we can use it again.
+  box = TwoFieldKlassBox()
+
+  useValue(box.k1)
+  useValue(box.k2)
+  useValue(box)
+
+  await transferToMain(box.k2)
+
+
+  // But if we assign over box completely, we can use it again.
+  box = TwoFieldKlassBox()
+
+  useValue(box.k1)
+  useValue(box.k2)
+  useValue(box)
+}
+
+func multipleFieldTupleMergeTest1() async {
+  var box = (NonSendableKlass(), NonSendableKlass())
+  box = (NonSendableKlass(), NonSendableKlass())
+
+  // This transfers the entire region.
+  await transferToMain(box.0) // expected-warning {{sending 'box.0' risks causing data races}}
+  // expected-note @-1 {{sending 'box.0' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+
+  // So even if we reassign over k1, since we did a merge, this should error.
+  box.0 = NonSendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(box)
+}
+
+// TODO: Tuples today do not work since I need to change how we assign into
+// tuple addresses to use a single instruction. Today SILGen always uses
+// multiple values. I am going to fix this in a subsequent commit.
+func multipleFieldTupleMergeTest2() async {
+  var box = (NonSendableKlass(), NonSendableKlass())
+
+  // This transfers the entire region.
+  await transferToMain(box.0)
+
+
+  let box2 = (NonSendableKlass(), NonSendableKlass())
+  // But if we assign over box completely, we can use it again.
+  box = box2
+
+  useValue(box.0)
+  useValue(box.1)
+  useValue(box)
+
+  await transferToMain(box.1)
+
+
+  // But if we assign over box completely, we can use it again.
+  box = (NonSendableKlass(), NonSendableKlass())
+
+  useValue(box.0)
+  useValue(box.1)
+  useValue(box)
+}
+
+///////////////////////////
+// MARK: ClassFieldTests //
+///////////////////////////
+
+class ClassFieldTests {
+  let letSendableTrivial = 0
+  let letSendableNonTrivial = SendableKlass()
+  let letNonSendableNonTrivial = NonSendableKlass()
+  var varSendableTrivial = 0
+  var varSendableNonTrivial = SendableKlass()
+  var varNonSendableNonTrivial = NonSendableKlass()
+}
+
+func letSendableTrivialClassFieldTest() async {
+  let test = ClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.letSendableTrivial
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func letSendableNonTrivialClassFieldTest() async {
+  let test = ClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+
+  _ = test.letSendableNonTrivial
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func letNonSendableNonTrivialClassFieldTest() async {
+  let test = ClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.letNonSendableNonTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varSendableTrivialClassFieldTest() async {
+  let test = ClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varSendableTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varSendableNonTrivialClassFieldTest() async {
+  let test = ClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varSendableNonTrivial  // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varNonSendableNonTrivialClassFieldTest() async {
+  let test = ClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varNonSendableNonTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+////////////////////////////////
+// MARK: FinalClassFieldTests //
+////////////////////////////////
+
+final class FinalClassFieldTests {
+  let letSendableTrivial = 0
+  let letSendableNonTrivial = SendableKlass()
+  let letNonSendableNonTrivial = NonSendableKlass()
+  var varSendableTrivial = 0
+  var varSendableNonTrivial = SendableKlass()
+  var varNonSendableNonTrivial = NonSendableKlass()
+}
+
+func letSendableTrivialFinalClassFieldTest() async {
+  let test = FinalClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.letSendableTrivial
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func letSendableNonTrivialFinalClassFieldTest() async {
+  let test = FinalClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.letSendableNonTrivial
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func letNonSendableNonTrivialFinalClassFieldTest() async {
+  let test = FinalClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.letNonSendableNonTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varSendableTrivialFinalClassFieldTest() async {
+  let test = FinalClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varSendableTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varSendableNonTrivialFinalClassFieldTest() async {
+  let test = FinalClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varSendableNonTrivial  // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varNonSendableNonTrivialFinalClassFieldTest() async {
+  let test = FinalClassFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varNonSendableNonTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+////////////////////////////
+// MARK: StructFieldTests //
+////////////////////////////
+
+struct StructFieldTests {
+  let letSendableTrivial = 0
+  let letSendableNonTrivial = SendableKlass()
+  let letNonSendableNonTrivial = NonSendableKlass()
+  var varSendableTrivial = 0
+  var varSendableNonTrivial = SendableKlass()
+  var varNonSendableNonTrivial = NonSendableKlass()
+}
+
+func letSendableTrivialLetStructFieldTest() async {
+  let test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.letSendableTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func letSendableNonTrivialLetStructFieldTest() async {
+  let test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.letSendableNonTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func letNonSendableNonTrivialLetStructFieldTest() async {
+  let test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.letNonSendableNonTrivial // expected-note {{access can happen concurrently}}
+  _ = z
+  useValue(test)
+}
+
+func letSendableTrivialVarStructFieldTest() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.letSendableTrivial
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func letSendableNonTrivialVarStructFieldTest() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.letSendableNonTrivial
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func letNonSendableNonTrivialVarStructFieldTest() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.letNonSendableNonTrivial // expected-note {{access can happen concurrently}}
+  _ = z
+  useValue(test)
+}
+
+// Lets can access sendable let/var even if captured in a closure.
+func letNonSendableNonTrivialLetStructFieldClosureTest() async {
+  let test = StructFieldTests()
+  let cls = {
+    print(test)
+  }
+  _ = cls
+  var cls2 = {}
+  cls2 = {
+    print(test)
+  }
+  _ = cls2
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.letSendableNonTrivial // expected-note {{access can happen concurrently}}
+  _ = z
+  let z2 = test.varSendableNonTrivial
+  _ = z2
+  useValue(test)
+}
+
+func varSendableTrivialLetStructFieldTest() async {
+  let test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varSendableTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varSendableNonTrivialLetStructFieldTest() async {
+  let test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varSendableNonTrivial // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldTest() async {
+  let test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.varNonSendableNonTrivial // expected-note {{access can happen concurrently}}
+  _ = z
+  useValue(test)
+}
+
+func varSendableTrivialVarStructFieldTest() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varSendableTrivial
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func varSendableNonTrivialVarStructFieldTest() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.varSendableNonTrivial
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func varNonSendableNonTrivialVarStructFieldTest() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.varNonSendableNonTrivial // expected-note {{access can happen concurrently}}
+  _ = z
+  useValue(test)
+}
+
+// vars cannot access sendable let/var if captured in a closure.
+func varNonSendableNonTrivialLetStructFieldClosureTest1() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  let cls = {
+    test = StructFieldTests()
+  }
+  _ = cls
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.letSendableNonTrivial // expected-note {{access can happen concurrently}}
+  _ = z
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureTest2() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  let cls = {
+    test = StructFieldTests()
+  }
+  _ = cls
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.varSendableNonTrivial // expected-note {{access can happen concurrently}}
+  _ = z
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureTest3() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  let cls = {
+    test = StructFieldTests()
+  }
+  _ = cls
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  test.varSendableNonTrivial = SendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+// vars cannot access sendable let/var if captured in a closure.
+func varNonSendableNonTrivialLetStructFieldClosureTest4() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+  cls = {
+    test = StructFieldTests()
+  }
+  _ = cls
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.letSendableNonTrivial // expected-note {{access can happen concurrently}}
+  _ = z
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureTest5() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+  cls = {
+    test = StructFieldTests()
+  }
+  _ = cls
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.varSendableNonTrivial // expected-note {{access can happen concurrently}}
+  _ = z
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureTest6() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+  cls = {
+    test = StructFieldTests()
+  }
+  _ = cls
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  test.varSendableNonTrivial = SendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureTest7() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+  cls = {
+    test.varSendableNonTrivial = SendableKlass()
+  }
+  _ = cls
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  test.varSendableNonTrivial = SendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureTest8() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+  cls = {
+    useInOut(&test)
+  }
+  _ = cls
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  test.varSendableNonTrivial = SendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureTest9() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+  cls = {
+    useInOut(&test.varSendableNonTrivial)
+  }
+  _ = cls
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  test.varSendableNonTrivial = SendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive1() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+
+  if await booleanFlag {
+    cls = {
+      useInOut(&test.varSendableNonTrivial)
+    }
+    _ = cls
+  } else {
+    await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+    // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+
+    test.varSendableNonTrivial = SendableKlass()
+  }
+
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive2() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+
+  if await booleanFlag {
+    cls = {
+      useInOut(&test.varSendableNonTrivial)
+    }
+    _ = cls
+
+    await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+    // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  }
+
+  test.varSendableNonTrivial = SendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(test)
+}
+
+// We do not error when accessing the sendable field in this example since the
+// transfer is not reachable from the closure. Instead we emit an error on test.
+func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive3() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+
+  if await booleanFlag {
+    cls = {
+      useInOut(&test.varSendableNonTrivial)
+    }
+    _ = cls
+  } else {
+    await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+    // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  }
+
+  test.varSendableNonTrivial = SendableKlass()
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive4() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+
+  for _ in 0..<1024 {
+    // TODO: The error here is b/c of the loop carry. We should probably store
+    // the operand instead of just the require inst, so we can better separate a
+    // loop carry use and an error due to multiple params. Then we could emit
+    // the error on test below. This is still correct though, just not as
+    // good... that is QoI though.
+    await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+    // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+    // expected-note @-2 {{access can happen concurrently}}
+
+    // This is treated as a use since test is in box form and is mutable. So we
+    // treat assignment as a merge.
+    test = StructFieldTests()
+    cls = {
+      useInOut(&test.varSendableNonTrivial)
+    }
+    _ = cls
+  }
+
+  test.varSendableNonTrivial = SendableKlass()
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive5() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+
+  // The reason why we error here is that even though we reassign at the end of
+  // the for loop and currently understand that test has a new value different
+  // from the value assigned to test at the beginning of the for loop, when we
+  // merge back through the for loop, we have to merge the regions due to the
+  // union operation we perform. So the conservatism of the dataflow creates
+  // this. This is a case where we are going to need to be able to have the
+  // compiler explain the regions well.
+  for _ in 0..<1024 {
+    await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+    // expected-note @-2 {{access can happen concurrently}}
+
+    test = StructFieldTests()
+  }
+
+  test.varSendableNonTrivial = SendableKlass()
+  useValue(test)
+}
+
+func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive6() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+
+  // In this test case, the first transfer errors on the
+  // test.varSendableNonTrivial b/c of the cls. Since we don't have cls on the
+  // else path, it emits on useValue(test).
+  if await booleanFlag {
+    cls = {
+      useInOut(&test.varSendableNonTrivial)
+    }
+    _ = cls
+    await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  } else {
+    await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  }
+
+  test.varSendableNonTrivial = SendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(test)  // expected-note {{access can happen concurrently}}
+}
+
+// In this case since we are tracking the transfer from the else statement, we
+// track the closure.
+func varNonSendableNonTrivialLetStructFieldClosureFlowSensitive7() async {
+  var test = StructFieldTests()
+  test = StructFieldTests()
+  var cls = {}
+
+  if await booleanFlag {
+    await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  } else {
+    cls = {
+      useInOut(&test.varSendableNonTrivial)
+    }
+    _ = cls
+    await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  }
+
+  test.varSendableNonTrivial = SendableKlass() // expected-note {{access can happen concurrently}}
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+////////////////////////////
+// MARK: TupleFieldTests //
+////////////////////////////
+
+func varSendableTrivialLetTupleFieldTest() async {
+  let test = (0, SendableKlass(), NonSendableKlass())
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.0
+  useValue(z)
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func varSendableNonTrivialLetTupleFieldTest() async {
+  let test = (0, SendableKlass(), NonSendableKlass())
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.1
+  useValue(z)
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func varNonSendableNonTrivialLetTupleFieldTest() async {
+  let test = (0, SendableKlass(), NonSendableKlass())
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.2 // expected-note {{access can happen concurrently}}
+  useValue(z)
+  useValue(test)
+}
+
+func varSendableTrivialVarTupleFieldTest() async {
+  var test = (0, SendableKlass(), NonSendableKlass())
+  test = (0, SendableKlass(), NonSendableKlass())
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.0
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func varSendableTrivialVarTupleFieldTest2() async {
+  var test = (0, SendableKlass(), NonSendableKlass())
+  test = (0, SendableKlass(), NonSendableKlass())
+  await transferToMain(test.2) // expected-warning {{sending 'test.2' risks causing data races}}
+  // expected-note @-1 {{sending 'test.2' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.0
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func varSendableNonTrivialVarTupleFieldTest() async {
+  var test = (0, SendableKlass(), NonSendableKlass())
+  test = (0, SendableKlass(), NonSendableKlass())
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  _ = test.1
+  useValue(test) // expected-note {{access can happen concurrently}}
+}
+
+func varNonSendableNonTrivialVarTupleFieldTest() async {
+  var test = (0, SendableKlass(), NonSendableKlass())
+  test = (0, SendableKlass(), NonSendableKlass())
+  await transferToMain(test) // expected-warning {{sending 'test' risks causing data races}}
+  // expected-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  let z = test.2 // expected-note {{access can happen concurrently}}
+  useValue(z)
+  useValue(test)
+}
+
+//////////////////////////////
+// MARK: Control Flow Tests //
+//////////////////////////////
+
+func controlFlowTest1() async {
+  let x = NonSendableKlass()
+
+  if await booleanFlag {
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  } else {
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+
+  }
+
+  useValue(x) // expected-note 2{{access can happen concurrently}}
+}
+
+// This test seems like something that we should not error upon. What is
+// happening here is that when we get to the bottom of the for loop, we realize
+// that x's old value and x/x's new value are in different regions. But when we
+// merge back into the loop header, we note that the loop entry block has x/x's
+// old value in the same region so when we merge, we get that x/x's old
+// value/x's new value are all in the same region. We emit the error on useValue
+// as well afterwards since if we exit from the loop header, we have that large
+// merge region leave the for loop.
+func controlFlowTest2() async {
+  var x = NonSendableKlass()
+
+  for _ in 0..<1024 {
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+    // expected-note @-2 {{access can happen concurrently}}
+
+
+    x = NonSendableKlass()
+  }
+
+  useValue(x)
+}
+
+////////////////////////
+// MARK: Actor Setter //
+////////////////////////
+
+actor ActorWithSetter {
+  var field = NonSendableKlass()
+  var twoFieldBox = TwoFieldKlassBox()
+  var twoFieldBoxInTuple = (NonSendableKlass(), TwoFieldKlassBox())
+  var recursive: ActorWithSetter? = nil
+  var classBox = TwoFieldKlassClassBox()
+
+  func test1() async {
+    let x = NonSendableKlass()
+    self.field = x
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+  }
+
+  func test2() async {
+    let x = NonSendableKlass()
+    self.twoFieldBox.k1 = x
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+  }
+
+  func test3() async {
+    let x = NonSendableKlass()
+    self.twoFieldBoxInTuple.1.k1 = x
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+  }
+
+  func classBox() async {
+    let x = NonSendableKlass()
+    self.classBox.k1 = x
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+  }
+}
+
+final actor FinalActorWithSetter {
+  var field = NonSendableKlass()
+  var twoFieldBox = TwoFieldKlassBox()
+  var twoFieldBoxInTuple = (NonSendableKlass(), TwoFieldKlassBox())
+  var recursive: ActorWithSetter? = nil
+  var classBox = TwoFieldKlassClassBox()
+
+  func test1() async {
+    let x = NonSendableKlass()
+    self.field = x
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+  }
+
+  func test2() async {
+    let x = NonSendableKlass()
+    self.twoFieldBox.k1 = x
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+  }
+
+  func test3() async {
+    let x = NonSendableKlass()
+    self.twoFieldBoxInTuple.1.k1 = x
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+  }
+
+  func classBox() async {
+    let x = NonSendableKlass()
+    self.classBox.k1 = x
+    await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+  }
+}
+
+func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
+  let _ = { @MainActor in
+    let _ = x // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+
+
+  }
+}
+
+// Make sure we handle the merge of the actor-isolated and disconnected state
+// appropriately.
+//
+// TODO: Since we are accessing the var field, we miss an
+// error. rdar://126170563.
+@MainActor func actorMergeInLoopVar() async {
+  let a = MainActorIsolatedKlass()
+  var c = NonSendableKlass()
+  for _ in 0..<1024 {
+    // This works with nonisolated(nonsending) since the first time through the
+    // loop we are disconnected... meaning that we are ok. The second time
+    // through the loop, we are now main actor isolated, but again b/c we
+    // inherit isolation, we are ok.
+    await useValueAsync(c) // expected-ni-warning {{sending 'c' risks causing data races}}
+    // expected-ni-note @-1 {{sending main actor-isolated 'c' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
+
+    c = a.klass
+  }
+}
+
+@MainActor func actorMergeInLoopLet() async {
+  let a = MainActorIsolatedKlass()
+  var c = NonSendableKlass()
+  for _ in 0..<1024 {
+    await useValueAsync(c) // expected-ni-warning {{sending 'c' risks causing data races}}
+    // expected-ni-note @-1 {{sending main actor-isolated 'c' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and main actor-isolated uses}}
+
+    c = a.klassLet
+  }
+}
+
+func testGetActorName() async {
+  let a = MyActor()
+  let x = NonSendableKlass()
+  await a.useKlass(x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{sending 'x' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
+
+  useValue(x) // expected-note {{access can happen concurrently}}
+}
+
+extension MyActor {
+  func testCallBangIsolatedMethod(other: MyActor) async {
+    await klass.asyncCallWithIsolatedParameter(isolation: other) // expected-warning {{sending 'self.klass' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'self.klass' to actor-isolated instance method 'asyncCallWithIsolatedParameter(isolation:)' risks causing data races between actor-isolated and 'self'-isolated uses}}
+
+  }
+}
+
+extension FinalActor {
+  func testCallBangIsolatedMethod(other: MyActor) async {
+    await klass.asyncCallWithIsolatedParameter(isolation: other) // expected-warning {{sending 'self.klass' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'self.klass' to actor-isolated instance method 'asyncCallWithIsolatedParameter(isolation:)' risks causing data races between actor-isolated and 'self'-isolated uses}}
+
+  }
+}
+
+extension NonSendableKlass {
+  func directAsyncCallWithIsolatedParameter(isolation: isolated (any Actor)? = #isolation) async {
+  }
+}
+
+extension MyActor {
+  func testCallBangIsolatedDirectMethod(other: MyActor) async {
+    await klass.directAsyncCallWithIsolatedParameter(isolation: other) // expected-warning {{sending 'self.klass' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'self.klass' to actor-isolated instance method 'directAsyncCallWithIsolatedParameter(isolation:)' risks causing data races between actor-isolated and 'self'-isolated uses}}
+
+  }
+}
+
+extension FinalActor {
+  func testCallBangIsolatedDirectMethod(other: MyActor) async {
+    await klass.directAsyncCallWithIsolatedParameter(isolation: other) // expected-warning {{sending 'self.klass' risks causing data races}}
+    // expected-note @-1 {{sending 'self'-isolated 'self.klass' to actor-isolated instance method 'directAsyncCallWithIsolatedParameter(isolation:)' risks causing data races between actor-isolated and 'self'-isolated uses}}
+
+  }
+}
+
+actor DictionaryActorTest {
+  var data: [Int: Int] = [:]
+
+  // We used to crash on this due to isolation merging.
+  func doSomething(_ key: Int) {
+    assert(self.data[key] == 0)
+  }
+}
+
+extension MyActor {
+  // Make sure that we properly infer information from isolated parameters that
+  // aren't self.
+  func isolationInferenceFromNonSelfIsolatedParameters() {
+    useValue {
+      self.doSomething()
+    }
+  }
+
+  func isolationInferenceFromNonSelfIsolatedParameters2() {
+    useValue {
+      self.doSomething()
+      let x = NonSendableKlass()
+      self.useKlass(x)
+      await transferToMain(x)
+      // expected-warning @-1 {{sending 'x' risks causing data races}}
+      // expected-note @-2 {{sending 'self'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
+
+    }
+  }
+}
+
+func initAccessorTests() {
+  @available(SwiftStdlib 5.1, *)
+  actor NonisolatedAccessors {
+    nonisolated var a: Int = 0 {
+      init {
+      }
+
+      get { 0 }
+      set {}
+    }
+
+    init(value: Int) {
+      let escapingSelf: (NonisolatedAccessors) -> Void = { _ in }
+
+      // a is initialized here via default value
+
+      escapingSelf(self)
+
+      self.a = value // Ok (nonisolated)
+      print(a) // Ok (nonisolated)
+    }
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  actor NonSendableInit {
+    var first: NonSendableKlass
+    var second: NonSendableKlass? = nil {
+      @storageRestrictions(initializes: first)
+      init(initialValue)  {
+        first = initialValue!
+      }
+
+      get { fatalError() }
+      set { fatalError() }
+    }
+
+    @MainActor
+    var third: NonSendableKlass
+    @MainActor
+    var fourth: NonSendableKlass? = nil {
+      @storageRestrictions(initializes: third)
+      init(initialValue)  {
+        third = initialValue!
+      }
+
+      get { fatalError() }
+      set { fatalError() }
+    }
+  }
+}
+
+func differentInstanceTest(_ a: MyActor, _ b: MyActor) async {
+  let x = NonSendableKlass()
+  await a.useKlass(x)
+  // expected-warning @-1 {{sending 'x' risks causing data races}}
+  // expected-note @-2 {{sending 'x' to actor-isolated instance method 'useKlass' risks causing data races between actor-isolated and local nonisolated uses}}
+
+  await b.useKlass(x) // expected-note {{access can happen concurrently}}
+
+}
+
+protocol AssociatedTypeTestProtocol {
+  associatedtype A: Actor
+}
+
+func associatedTypeTestBasic<T: AssociatedTypeTestProtocol>(_: T, _: isolated T.A) {
+}
+
+func associatedTypeTestBasic2<T: AssociatedTypeTestProtocol>(_: T, iso: isolated T.A, x: NonSendableKlass) async {
+  await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{sending 'iso'-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and 'iso'-isolated uses}}
+
+}
+
+func sendableGlobalActorIsolated() {
+  let x = NonSendableKlass()
+  let _ = { @Sendable @MainActor in
+    print(x) // expected-warning {{sending 'x' risks causing data races}}
+    // expected-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+
+  }
+  print(x) // expected-note {{access can happen concurrently}}
+}
+
+// We do not get an error here since we are transferring x both times to a
+// MainActor-isolated thing function. We used to emit an error when using region
+// isolation since we would trip on the store_borrow we used to materialize the
+// value.
+func testIndirectParameterSameIsolationNoError() async {
+  let x = NonSendableKlass()
+  await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
+  await transferToMain(x) // expected-note {{access can happen concurrently}}
+}
+
+extension MyActor {
+  func testNonSendableCaptures(sc: NonSendableKlass) {
+    Task {
+      _ = self
+      _ = sc
+
+      Task { [sc,self] in
+        _ = self
+        _ = sc
+
+        Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+          _ = sc // expected-note {{closure captures 'self'-isolated 'sc'}}
+        }
+
+        Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+          _ = sc // expected-note {{closure captures 'self'-isolated 'sc'}}
+        }
+      }
+    }
+  }
+}
+
+public struct TimeoutError: Error, CustomStringConvertible {
+  public var description: String { "Timed out" }
+}
+
+// We used to not merge the isolation below correctly causing us to emit a crash
+// due to undefined behavior. Make sure we do not crash or emit an unhandled
+// pattern error.
+public func doNotCrashOrEmitUnhandledPatternErrors<T: Sendable>(
+  _ duration: Duration,
+  _ body: @escaping @Sendable () async throws -> T
+) async throws -> T {
+  try await withThrowingTaskGroup(of: T.self) { taskGroup in
+    taskGroup.addTask {
+      try await Task.sleep(for: duration)
+      throw TimeoutError()
+    }
+    taskGroup.addTask {
+      return try await body()
+    }
+    for try await value in taskGroup {
+      taskGroup.cancelAll()
+      return value
+    }
+    throw CancellationError()
+  }
+}
+
+/// The following makes sure that when we have a function like test2 with an
+/// assigned isolation that returns a Sendable value... we treat the value as
+/// actually Sendable. This occurs in this example via the result of the default
+/// parameter function for string.
+///
+/// We shouldn't emit any diagnostic here.
+actor FunctionWithSendableResultAndIsolationActor {
+    func foo() -> String {
+        return string()
+    }
+    func string(someCondition: Bool = false) -> String {
+        return ""
+    }
+}
+
+// This was a test case that we used to emit an "pattern the compiler doesn't
+// understand" error. We now accept it, so lets make sure we keep doing so!
+@MainActor
+func previouslyBrokenTestCase(ns: NonSendableKlass) async -> SendableGenericStruct? {
+  return await { () -> SendableGenericStruct? in
+    return await ns.getSendableGenericStructAsync() // expected-ni-warning {{sending 'ns' risks causing data races}}
+    // expected-ni-note @-1 {{sending main actor-isolated 'ns' to @concurrent instance method 'getSendableGenericStructAsync()' risks causing data races between @concurrent and main actor-isolated uses}}
+  }()
+}
+
+@MainActor
+func testThatGlobalActorTakesPrecedenceOverActorIsolationOnMethods() async {
+  let a = MyActor()
+  let ns = NonSendableKlass()
+
+  // 'ns' should be MainActor isolated since useKlassMainActor is @MainActor
+  // isolated. Previously we would let MyActor take precedence here...
+  a.useKlassMainActor(ns)
+
+  // Meaning we would get an error here.
+  Task { @MainActor in print(ns) }
+}
+
+// Shouldn't get any errors from x.
+//
+// We used to look through the access to x.boolean and think that the closure
+// was capturing x instead of y.
+func testBooleanCapture(_ x: inout NonSendableKlass) {
+  let y = x.boolean
+  Task.detached { @MainActor [z = y] in
+    print(z)
+  }
+}
+
+public class Context {
+  let value: Int
+
+  init(value: Int) {
+    self.value = value
+  }
+}
+
+extension MyActor {
+  public func withContext<T>(_ block: sending (NonSendableKlass) throws -> T) async throws -> sending T {
+    return try block(klass) // expected-warning {{returning 'self'-isolated 'self.klass' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning 'self'-isolated 'self.klass' risks causing data races since the caller assumes that 'self.klass' can be safely sent to other isolation domains}}
+  }
+}
+
+func nonSendableAllocBoxConsumingParameter(x: consuming SendableKlass) async throws {
+  try await withThrowingTaskGroup(of: Void.self) { group in
+    group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      useValue(x) // expected-note {{closure captures reference to mutable parameter 'x' which remains modifiable by code in the current task}}
+    }
+
+    try await group.waitForAll()
+  }
+}
+
+func nonSendableAllocBoxConsumingVar() async throws {
+  var x = SendableKlass()
+  x = SendableKlass()
+
+  try await withThrowingTaskGroup(of: Void.self) { group in
+    group.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      useValue(x) // expected-note {{closure captures reference to mutable var 'x' which remains modifiable by code in the current task}}
+    }
+
+    try await group.waitForAll()
+  }
+}
+
+func offByOneWithImplicitPartialApply() {
+  class A {
+      var description = ""
+  }
+
+  class B {
+      let a = A()
+
+      func b() {
+          let asdf = ""
+          Task { @MainActor in
+            a.description = asdf // expected-warning {{sending 'self' risks causing data races}}
+            // expected-note @-1 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+          }
+      }
+  }
+}
+
+// We should not error in either of the cases below due to sending.
+func testIndirectAndDirectSendingResultsWithGlobalActor() async {
+  @MainActor
+  struct S {
+    let ns = NonSendableKlass()
+
+    func getNonSendableKlassIndirect<T>() -> sending T {
+      fatalError()
+    }
+    func getNonSendableKlassDirect() -> sending NonSendableKlass {
+      fatalError()
+    }
+  }
+
+  let s = await S()
+  let ns: NonSendableKlass = await s.getNonSendableKlassDirect()
+
+  Task.detached {
+    _ = ns
+  }
+
+  let ns2: NonSendableKlass = await s.getNonSendableKlassIndirect()
+  Task.detached {
+    _ = ns2
+  }
+}
+
+// We used to not check if bodies were not empty when emitting the error for
+// using result in the throwing task group. Make sure we do not crash.
+func testFunctionIsNotEmpty(input: SendableKlass) async throws {
+  var result: [SendableKlass] = []
+  try await withThrowingTaskGroup(of: Void.self) { taskGroup in // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+    taskGroup.addTask { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+      result.append(input) // expected-note {{closure captures reference to mutable var 'result' which remains modifiable by code in the current task}}
+    }
+  }
+}
+
+func unsafeNonIsolatedAppliesToAssignToOutParam(ns: NonSendableKlass) -> sending NonSendableKlass {
+  func withUnsafeValue<T>(_ block: (NonSendableKlass) throws -> sending T) rethrows -> sending T {
+    fatalError()
+  }
+
+  return withUnsafeValue {
+    nonisolated(unsafe) let obj = $0
+    return obj
+  }
+}
+
+extension NonIsolatedFinalKlass {
+  // We used to crash while computing the isolation of the ref_element_addr
+  // here. Make sure we do not crash.
+  func testGetIsolationInfoOfField() async {
+    await transferToMain(ns) // expected-warning {{sending 'self.ns' risks causing data races}}
+    // expected-note @-1 {{sending task-isolated 'self.ns' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  }
+}
+
+func mutableLocalCaptureDataRace() async {
+  var x = 0
+  x = 0
+  _ = x
+
+  Task.detached { x = 1 }
+  // expected-warning @-1 {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current task}}
+
+  x = 2 // expected-note {{access can happen concurrently}}
+}
+
+func mutableLocalCaptureDataRace2() async {
+  var x = 0
+  x = 0
+
+  Task.detached { x = 1 } // expected-warning {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current task}}
+
+  print(x) // expected-note {{access can happen concurrently}}
+}
+
+func localCaptureDataRace3() async {
+  let x = 0
+
+  Task.detached { print(x) }
+
+  print(x)
+}
+
+nonisolated func localCaptureDataRace4() {
+  var x = 0
+  _ = x
+
+  Task.detached { @MainActor in x = 1 } // expected-warning {{sending 'x' risks causing data races}}
+  // expected-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+
+  x = 2 // expected-note {{access can happen concurrently}}
+}
+
+// We shouldn't error here since every time around, we are using the same
+// isolation.
+func testIsolatedParamInference() {
+  class S : @unchecked Sendable {}
+
+  final class B {
+    var s = S()
+    var b: Bool = false
+
+    func foo(isolation: isolated Actor = #isolation) async {
+      while !b {
+        await withTaskGroup(of: Int.self) { group in
+          _ = isolation
+          self.s = S()
+        }
+      }
+    }
+  }
+}
+
+// We shouldn't error here since test2 is isolated to B since we are capturing
+// self and funcParam is also exposed to B's isolated since it is a parameter to
+// one of B's methods.
+func sendIsolatedValueToItsOwnIsolationDomain() {
+  class A {
+    func useValue() {}
+  }
+
+  func helper(_ x: @escaping () -> A) {}
+
+  actor B {
+    let field = A()
+
+    private func test(funcParam: A?) async {
+      helper {
+        if let funcParam {
+          return funcParam
+        } else {
+          return self.field
+        }
+      }
+
+      funcParam?.useValue()
+    }
+  }
+}
+
+// We used to crash on this since we were not looking finding underlying objects
+// hard enough.
+func indirectEnumTestCase<T>(_ e: MyEnum<T>) async -> Bool {
+    switch e {
+    case .some(let x):
+      _ = x
+      return true
+    default:
+        return false
+    }
+}
+
+/// Make sure that we properly infer the location of the capture of self in func
+/// d().
+func inferLocationOfCapturedTaskIsolatedSelfCorrectly() {
+  class A {
+    var block:  @MainActor () -> Void = {}
+  }
+  class B {
+    let a = A()
+
+    func d() {
+      a.block = c
+      // expected-warning @-1 {{sending 'self' risks causing data races}}
+      // expected-note @-2 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    }
+
+    @MainActor
+    func c() {}
+  }
+}
+
+nonisolated(nonsending) func testCallNonisolatedNonsending(_ x: NonSendableKlass) async {
+  await useValueAsync(x) // expected-ni-warning {{sending 'x' risks causing data races}}
+  // expected-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent global function 'useValueAsync' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
+  await useValueAsyncConcurrent(x) // expected-warning {{sending 'x' risks causing data races}}
+  // expected-ni-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
+  // expected-ni-ns-note @-2 {{sending task-isolated 'x' to @concurrent global function 'useValueAsyncConcurrent' risks causing data races between @concurrent and task-isolated uses}}
+}
+
+func avoidThinkingClosureParameterIsSending() {
+  @MainActor
+  final class Foo {
+    let value = NonSendableKlass()
+
+    func perform() {
+        Task { [value] in
+          await value.asyncCall() // expected-ni-warning {{sending 'value' risks causing data races}}
+          // expected-ni-note @-1 {{sending main actor-isolated 'value' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and main actor-isolated uses}}
+        }
+
+        Task {
+          await value.asyncCall() // expected-ni-warning {{sending 'self.value' risks causing data races}}
+          // expected-ni-note @-1 {{sending main actor-isolated 'self.value' to @concurrent instance method 'asyncCall()' risks causing data races between @concurrent and main actor-isolated uses}}
+        }
+    }
+  }
+}
+
+enum RequireSrcWhenStoringEvenWhenSendable {
+  func test<T: Sendable>(t: T) {
+    var result: T = t
+    Task {
+      result = t // expected-warning {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'result' which is accessed later by code in the current task}}
+    }
+    useValue(result) // expected-note {{access can happen concurrently}}
+  }
+
+  func test2() {
+    var result: Any = 0
+    Task {
+      result = 0 // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'result' which is accessed later by code in the current task}}
+    }
+    useValue(result) // expected-note {{access can happen concurrently}}
+  }
+
+  protocol Initializable {
+    init()
+  }
+
+  func test3<T: Initializable & SendableMetatype>(type: T.Type) {
+    var result = type.init()
+    Task {
+      result = type.init() // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'result' which is accessed later by code in the current task}}
+    }
+    useValue(result) // expected-note {{access can happen concurrently}}
+  }
+}
+
+///////////////////////////
+// MARK: Indirect Assign //
+///////////////////////////
+
+extension Optional where Wrapped: ~Copyable {
+  mutating func takeSending() -> sending Self {
+    let result = self
+    self = nil
+    return result // expected-warning {{returning task-isolated 'result' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning task-isolated 'result' risks causing data races since the caller assumes that 'result' can be safely sent to other isolation domains}}
+  }
+}
+
+struct IndirectAssignTests {
+  struct Box {
+    typealias FuncType = () async -> Void
+
+    var value: FuncType?
+
+    mutating func takeFuncType() -> sending FuncType {
+      if let v = value {
+        self.value = nil
+        return v // expected-warning {{sending 'v' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'v' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  protocol TakingProtocol {
+    associatedtype Value
+    mutating func take() -> sending Value
+  }
+
+  struct Box2 : TakingProtocol {
+    var value: NonSendableKlass?
+
+    typealias Value = NonSendableKlass
+    mutating func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct GenericBox<T> {
+    var value: T?
+
+    mutating func take() -> sending T {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{returning task-isolated 'value' as a 'sending' result risks causing data races}}
+        // expected-note @-1 {{returning task-isolated 'value' risks causing data races since the caller assumes that 'value' can be safely sent to other isolation domains}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct Box2GuardLet {
+    var value: NonSendableKlass?
+
+    mutating func take() -> sending NonSendableKlass {
+      guard let value else {
+        preconditionFailure("Consumed twice")
+      }
+      self.value = nil
+      return value // expected-warning {{sending 'value' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    }
+  }
+
+  struct TupleBox {
+    var value: (NonSendableKlass, NonSendableKlass)?
+
+    mutating func take() -> sending (NonSendableKlass, NonSendableKlass) {
+      if let value {
+        self.value = nil
+        // TODO: Need a better error message.
+        return value // expected-warning {{task or actor-isolated value cannot be sent}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+
+    mutating func takeFirst() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value.0 // expected-warning {{sending 'value.0' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value.0' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct NoncopyableBox: ~Copyable {
+    var value: NonSendableKlass?
+
+    mutating func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  // Based on: Box2.take()
+  actor ActorBox {
+    var value: NonSendableKlass?
+
+    func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{'self'-isolated 'value' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  class ClassBox {
+    var value: NonSendableKlass?
+
+    func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  @MainActor
+  struct MainActorBox {
+    var value: NonSendableKlass?
+
+    mutating func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{main actor-isolated 'value' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct Box2Async {
+    var value: NonSendableKlass?
+
+    mutating func take() async -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct NestedOptionalBox {
+    var value: NonSendableKlass??
+
+    mutating func take() -> sending NonSendableKlass {
+      if let value, let innerValue = value {
+        self.value = nil
+        return innerValue // expected-warning {{sending 'innerValue' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'innerValue' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  enum BoxEnum {
+    case empty
+    case full(NonSendableKlass)
+
+    mutating func take() -> sending NonSendableKlass {
+      switch self {
+      case .empty:
+        preconditionFailure("Consumed twice")
+      case .full(let value):
+        self = .empty
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      }
+    }
+  }
+
+  struct ConsumingBox: ~Copyable {
+    var value: NonSendableKlass?
+
+    consuming func take() -> sending NonSendableKlass {
+      if let value {
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  final actor FinalActorBox {
+    var value: NonSendableKlass?
+
+    func take() -> sending NonSendableKlass {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{'self'-isolated 'value' cannot be a 'sending' result. 'self'-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct ArrayBox {
+    var values: [NonSendableKlass] = []
+
+    mutating func takeFirst() -> sending NonSendableKlass {
+      guard !values.isEmpty else {
+        preconditionFailure("Empty")
+      }
+      let value = values.removeFirst()
+      values = []
+      return value // expected-warning {{sending 'value' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    }
+  }
+
+  struct DictionaryBox {
+    var values: [String: NonSendableKlass] = [:]
+
+    mutating func take(key: String) -> sending NonSendableKlass {
+      guard let value = values.removeValue(forKey: key) else {
+        preconditionFailure("Key not found")
+      }
+      values = [:]
+      return value // expected-warning {{sending 'value' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    }
+  }
+
+  struct MultipleReturnBox {
+    var value1: NonSendableKlass?
+    var value2: NonSendableKlass?
+
+    mutating func takeEither() -> sending NonSendableKlass {
+      if let value1 {
+        self.value1 = nil
+        return value1
+      } else if let value2 {
+        self.value2 = nil
+        return value2
+      } else {
+        preconditionFailure("Both consumed")
+      }
+      // TODO: The warning should be on the user itself.
+    } // expected-warning {{sending 'value2' risks causing data races}}
+    // expected-note @-1 {{task-isolated 'value2' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+  }
+
+  struct LazyBox {
+    var _value: NonSendableKlass?
+    var initialized = false
+
+    mutating func getOrCreate() -> sending NonSendableKlass {
+      if !initialized {
+        _value = NonSendableKlass()
+        initialized = true
+      }
+      let result = _value!
+      _value = nil
+      initialized = false
+      return result // expected-warning {{sending 'result' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'result' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    }
+  }
+
+  struct InoutBox {
+    var value: NonSendableKlass?
+  }
+
+  static func takeFromInout(_ box: inout IndirectAssignTests.InoutBox) -> sending NonSendableKlass {
+    if let value = box.value {
+      box.value = nil
+      return value // expected-warning {{sending 'value' risks causing data races}}
+      // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+    } else {
+      preconditionFailure("Consumed twice")
+    }
+  }
+
+  struct ExistentialBox {
+    var value: (any Sendable)?
+
+    // This should work since the value is Sendable
+    mutating func take() -> sending (any Sendable) {
+      if let value {
+        self.value = nil
+        return value
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+
+  struct NonSendableExistentialBox {
+    var value: (any AnyObject)?
+
+    mutating func take() -> sending (any AnyObject) {
+      if let value {
+        self.value = nil
+        return value // expected-warning {{sending 'value' risks causing data races}}
+        // expected-note @-1 {{task-isolated 'value' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+      } else {
+        preconditionFailure("Consumed twice")
+      }
+    }
+  }
+}
+
+// rdar://169803154 - @MainActor async closure with for-try-await must not produce
+// spurious non-Sendable / unknown-pattern errors.  The constraint solver must honor
+// an explicit global actor on an async closure the same way it does for a sync one.
+@MainActor
+class rdar169803154_Klass {
+  init() {
+    _ = Task.detached { @MainActor in
+      _ = self
+      for try await x in rdar169803154_Seq.seq { _ = x }
+    }
+  }
+}
+
+enum rdar169803154_Seq {
+  static var seq: some AsyncSequence<Float, Error> {
+    AsyncThrowingStream(Float.self) { $0.finish() }
+  }
+}

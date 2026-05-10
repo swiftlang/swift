@@ -18,7 +18,7 @@ bb0(%0 : $*T):
   // function_ref specialize_recursive_generics.recursive_generics <A>(A) -> ()
   %2 = function_ref @_TF29specialize_recursive_generics18recursive_genericsU__FQ_T_ : $@convention(thin) <τ_0_0> (@in τ_0_0) -> () // user: %5
   %3 = alloc_stack $T                             // users: %4, %5, %6
-  copy_addr %0 to [initialization] %3 : $*T     // id: %4
+  copy_addr %0 to [init] %3 : $*T     // id: %4
   %5 = apply %2<T>(%3) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %3 : $*T         // id: %6
   destroy_addr %0 : $*T                           // id: %7
@@ -44,9 +44,9 @@ bb0(%0 : $*T, %1 : $*U):
   // function_ref specialize_recursive_generics.recursive_generics_with_different_substitutions <A, B>(A, B) -> ()
   %4 = function_ref @_TF29specialize_recursive_generics47recursive_generics_with_different_substitutionsU___FTQ_Q0__T_ : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> () // user: %9
   %5 = alloc_stack $U                             // users: %6, %9, %11
-  copy_addr %1 to [initialization] %5 : $*U     // id: %6
+  copy_addr %1 to [init] %5 : $*U     // id: %6
   %7 = alloc_stack $T                             // users: %8, %9, %10
-  copy_addr %0 to [initialization] %7 : $*T     // id: %8
+  copy_addr %0 to [init] %7 : $*T     // id: %8
   %9 = apply %4<U, T>(%5, %7) : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
   dealloc_stack %7 : $*T         // id: %10
   dealloc_stack %5 : $*U         // id: %11
@@ -98,7 +98,7 @@ public protocol P {}
 sil hidden [noinline] @helper : $@convention(thin) <T> (@in T, @in P) -> @owned Optional<C> {
 bb0(%0 : $*T, %1 : $*P):
   %4 = alloc_stack $P
-  copy_addr %1 to [initialization] %4 : $*P
+  copy_addr %1 to [init] %4 : $*P
   %6 = alloc_stack $C
   checked_cast_addr_br take_always P in %4 : $*P to C in %6 : $*C, bb1, bb2
 bb1:
@@ -129,7 +129,7 @@ bb0(%0 : $C, %1 : $*Self):
   store %6 to %7 : $*Int32
   %9 = alloc_stack $P
   %10 = init_existential_addr %9 : $*P, $Self
-  copy_addr %1 to [initialization] %10 : $*Self
+  copy_addr %1 to [init] %10 : $*Self
   // CHECK: apply [[HELPER]]
   // CHECK-NOT: apply [[HELPER]]
   %12 = apply %4<Int32>(%7, %9) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in P) -> @owned Optional<C>

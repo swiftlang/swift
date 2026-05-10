@@ -1,20 +1,16 @@
 
-if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  set(SWIFTAST_LLVM_LINK_COMPONENTS)
-else()
-  set(SWIFTAST_LLVM_LINK_COMPONENTS
-    bitreader bitwriter coroutines coverage irreader debuginfoDWARF
-    profiledata instrumentation object objcarcopts mc mcparser
-    bitreader bitwriter lto ipo option core support remarks ${LLVM_TARGETS_TO_BUILD}
-  )
-endif()
+set(SWIFTAST_LLVM_LINK_COMPONENTS
+  bitreader bitwriter coroutines coverage irreader debuginfoDWARF
+  profiledata instrumentation object objcarcopts mc mcparser
+  bitreader bitwriter lto ipo option core support remarks ${LLVM_TARGETS_TO_BUILD}
+)
 
 add_swift_host_library(swiftAST STATIC
   AbstractSourceFileDepGraphFactory.cpp
   AccessNotes.cpp
   AccessRequests.cpp
+  ActorIsolation.cpp
   ArgumentList.cpp
-  ASTBridging.cpp
   ASTContext.cpp
   ASTDemangler.cpp
   ASTDumper.cpp
@@ -31,18 +27,31 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
+  AvailabilityConstraint.cpp
+  AvailabilityContext.cpp
+  AvailabilityDomain.cpp
+  AvailabilityQuery.cpp
+  AvailabilityScope.cpp
+  AvailabilityScopeBuilder.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
   CaptureInfo.cpp
   ClangSwiftTypeCorrespondence.cpp
   ClangTypeConverter.cpp
+  Concurrency.cpp
   ConcreteDeclRef.cpp
+  ConformanceLookup.cpp
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DeclContextDumper.cpp
+  DeclNameExtractor.cpp
   DeclNameLoc.cpp
+  DiagnosticArgument.cpp
+  DiagnosticBridge.cpp
   DiagnosticConsumer.cpp
   DiagnosticEngine.cpp
+  DiagnosticGroups.cpp
   DiagnosticList.cpp
   DistributedDecl.cpp
   DocComment.cpp
@@ -51,9 +60,12 @@ add_swift_host_library(swiftAST STATIC
   ExistentialGeneralization.cpp
   Expr.cpp
   ExtInfo.cpp
+  FeatureSet.cpp
   FineGrainedDependencies.cpp
   FineGrainedDependencyFormat.cpp
+  FreestandingMacroExpansion.cpp
   FrontendSourceFileDepGraphFactory.cpp
+  FunctionRefInfo.cpp
   GenericEnvironment.cpp
   GenericParamList.cpp
   GenericSignature.cpp
@@ -62,6 +74,8 @@ add_swift_host_library(swiftAST STATIC
   IndexSubset.cpp
   InlinableText.cpp
   LayoutConstraint.cpp
+  LifetimeDependence.cpp
+  LocalArchetypeRequirementCollector.cpp
   Module.cpp
   ModuleDependencies.cpp
   ModuleLoader.cpp
@@ -69,13 +83,21 @@ add_swift_host_library(swiftAST STATIC
   NameLookup.cpp
   NameLookupRequests.cpp
   OperatorNameLookup.cpp
+  PackConformance.cpp
+  PackExpansionMatcher.cpp
+  ParameterPack.cpp
   Parameter.cpp
   Pattern.cpp
-  PlatformKind.cpp
+  PlatformKindUtils.cpp
+  PluginLoader.cpp
+  PluginRegistry.cpp
   PrettyStackTrace.cpp
   ProtocolConformance.cpp
+  ProtocolConformanceRef.cpp
   RawComment.cpp
+  Requirement.cpp
   RequirementEnvironment.cpp
+  RequirementMachine/ApplyInverses.cpp
   RequirementMachine/ConcreteContraction.cpp
   RequirementMachine/ConcreteTypeWitness.cpp
   RequirementMachine/Diagnostics.cpp
@@ -105,14 +127,15 @@ add_swift_host_library(swiftAST STATIC
   SearchPathOptions.cpp
   SILLayout.cpp
   Stmt.cpp
+  StorageImpl.cpp
   SubstitutionMap.cpp
   SwiftNameTranslation.cpp
   Type.cpp
   TypeCheckRequests.cpp
   TypeDeclFinder.cpp
   TypeJoinMeet.cpp
-  TypeRefinementContext.cpp
   TypeRepr.cpp
+  TypeSubstitution.cpp
   TypeWalker.cpp
   UnqualifiedLookup.cpp
   USRGeneration.cpp
@@ -121,58 +144,43 @@ add_swift_host_library(swiftAST STATIC
   ${SWIFTAST_LLVM_LINK_COMPONENTS}
   )
 
+add_subdirectory(Bridging)
+
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)
-  if(CMAKE_CXX_COMPILER_ID STREQUAL MSVC OR CMAKE_CXX_SIMULATE_ID STREQUAL MSVC)
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC" OR CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
     target_compile_options(swiftAST PRIVATE /O2 /Ob2)
   else()
     target_compile_options(swiftAST PRIVATE -O3)
   endif()
 endif()
-if(NOT SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  target_link_libraries(swiftAST INTERFACE
-    clangCodeGen
-    clangIndex
-    clangFormat
-    clangToolingCore
-    clangFrontendTool
-    clangFrontend
-    clangDriver
-    clangSerialization
-    clangParse
-    clangSema
-    clangAnalysis
-    clangEdit
-    clangRewriteFrontend
-    clangRewrite
-    clangAST
-    clangLex
-    clangAPINotes
-    clangBasic)
-endif()
+target_link_libraries(swiftAST INTERFACE
+  clangCodeGen
+  clangIndex
+  clangFormat
+  clangToolingCore
+  clangFrontendTool
+  clangDependencyScanning
+  clangFrontend
+  clangDriver
+  clangSerialization
+  clangParse
+  clangSema
+  clangAnalysis
+  clangEdit
+  clangRewriteFrontend
+  clangRewrite
+  clangAST
+  clangLex
+  clangAPINotes
+  clangBasic)
 
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
-  PRIVATE swiftSyntax)
-if(SWIFT_BUILD_ONLY_SYNTAXPARSERLIB)
-  # Remove dependencies from clangBasic to avoid bringing along some llvm
-  # libraries that we don't need to be building.
-  set_property(TARGET clangBasic PROPERTY LINK_LIBRARIES "")
-  set_property(TARGET clangBasic PROPERTY LINK_DEPENDS "")
-  set_property(TARGET clangBasic PROPERTY INTERFACE_LINK_LIBRARIES "")
-  set_property(TARGET clangBasic PROPERTY INTERFACE_LINK_DEPENDS "")
-  target_link_libraries(swiftAST
-    PRIVATE clangBasic)
-  target_compile_definitions(swiftAST PRIVATE
-    SWIFT_BUILD_ONLY_SYNTAXPARSERLIB=1)
-else()
-  target_link_libraries(swiftAST PRIVATE
-    swiftMarkup)
-endif()
+  PRIVATE swiftMarkup)
 
-# intrinsics_gen is the LLVM tablegen target that generates the include files
-# where intrinsics and attributes are declared. swiftAST depends on these
-# headers.
-# For more information see the comment at the top of lib/CMakeLists.txt.
-add_dependencies(swiftAST intrinsics_gen clang-tablegen-targets)
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftAST
+    PRIVATE swiftASTGen swiftBasicSwift)
+endif()
 
 set_swift_llvm_is_available(swiftAST)

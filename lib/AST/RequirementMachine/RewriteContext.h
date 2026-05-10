@@ -45,12 +45,14 @@ class RewriteContext final {
   /// Folding set for uniquing symbols.
   llvm::FoldingSet<Symbol::Storage> Symbols;
 
+  /// The singleton storage for shape symbols.
+  Symbol::Storage *TheShapeSymbol;
+
+  /// The singleton storage for pack element symbols.
+  Symbol::Storage *ThePackElementSymbol;
+
   /// Folding set for uniquing terms.
   llvm::FoldingSet<Term::Storage> Terms;
-
-  /// Cache for transitive closure of inherited protocols.
-  llvm::DenseMap<const ProtocolDecl *,
-                 llvm::TinyPtrVector<const ProtocolDecl *>> AllInherited;
 
   /// Requirement machines built from generic signatures.
   llvm::DenseMap<GenericSignature, RequirementMachine *> Machines;
@@ -160,9 +162,6 @@ public:
   ///
   //////////////////////////////////////////////////////////////////////////////
 
-  const llvm::TinyPtrVector<const ProtocolDecl *> &
-  getInheritedProtocols(const ProtocolDecl *proto);
-
   int compareProtocols(const ProtocolDecl *lhs,
                        const ProtocolDecl *rhs);
 
@@ -174,8 +173,6 @@ public:
   //////////////////////////////////////////////////////////////////////////////
 
   static unsigned getGenericParamIndex(Type type);
-
-  Term getTermForType(CanType paramType, const ProtocolDecl *proto);
 
   MutableTerm getMutableTermForType(CanType paramType,
                                     const ProtocolDecl *proto);

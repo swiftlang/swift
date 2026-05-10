@@ -25,6 +25,7 @@ TEST_MODES = [
     'optimize_none',
     'optimize',
     'optimize_unchecked',
+    'optimize_none_with_opaque_values',
     'only_executable',
     'only_non_executable',
 ]
@@ -35,7 +36,6 @@ TEST_SUBSETS = [
     'only_validation',
     'only_long',
     'only_stress',
-    'only_early_swiftdriver'
 ]
 
 SWIFT_SOURCE_DIR = os.path.join(SWIFT_SOURCE_ROOT, 'swift')
@@ -128,6 +128,8 @@ def main():
     parser.add_argument("--build-jobs",
                         type=int,
                         help="The number of parallel build jobs to use")
+    parser.add_argument("--color", choices=["true", "false"], default="true",
+                        help="Whether to enable color output (default: true)")
     parser.add_argument("--target",
                         type=argparse.types.ShellSplitType(),
                         action=argparse.actions.AppendAction,
@@ -158,6 +160,15 @@ def main():
     parser.add_argument("--unified", action="store_true",
                         help="The build directory is an unified LLVM build, "
                              "not a standalone Swift build")
+    parser.add_argument("--update-tests", action="store_true",
+                        help="Invoke lit with --update-tests to auto-repair failing tests "
+                             "(when possible)")
+    parser.add_argument("--lit-args",
+                        type=argparse.types.ShellSplitType(),
+                        action=argparse.actions.AppendAction,
+                        default=[],
+                        help="direct passthrough options for lit, for options not directly "
+                             "supported by run-test")
 
     args = parser.parse_args()
 
@@ -266,6 +277,10 @@ def main():
     for param in args.param:
         test_args += ['--param', param]
 
+    # Enable colors if we're on a tty.
+    if args.color == 'true' and sys.stdout.isatty():
+        test_args += ['--param', 'color_output']
+
     if args.result_dir:
         test_args += ['--param', 'swift_test_results_dir=%s' % args.result_dir,
                       '--xunit-xml-output=%s' % os.path.join(args.result_dir,
@@ -273,6 +288,11 @@ def main():
 
     if args.filter:
         test_args += ['--filter', args.filter]
+
+    if args.update_tests:
+        test_args.append('--update-tests')
+
+    test_args += args.lit_args
 
     test_cmd = [sys.executable, args.lit] + test_args + paths
 

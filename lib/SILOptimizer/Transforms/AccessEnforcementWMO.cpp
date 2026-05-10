@@ -55,6 +55,8 @@
 
 #define DEBUG_TYPE "access-enforcement-wmo"
 
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
@@ -105,7 +107,7 @@ static bool isVisibleExternally(DisjointAccessLocationKey key, SILModule *mod) {
   if (auto *decl = key.dyn_cast<const VarDecl *>())
     return mod->isVisibleExternally(decl);
 
-  auto *global = key.get<const SILGlobalVariable *>();
+  auto *global = cast<const SILGlobalVariable *>(key);
   return isPossiblyUsedExternally(global->getLinkage(), mod->isWholeModule());
 }
 
@@ -113,7 +115,7 @@ static StringRef getName(DisjointAccessLocationKey key) {
   if (auto *decl = key.dyn_cast<const VarDecl *>())
     return decl->getNameStr();
 
-  return key.get<const SILGlobalVariable *>()->getName();
+  return cast<const SILGlobalVariable *>(key)->getName();
 }
 
 namespace {
@@ -143,6 +145,7 @@ namespace {
 // checks).
 class GlobalAccessRemoval {
   SILModule &module;
+  SmallPtrSetVector<SILFunction *, 8> changedFunctions;
 
   using BeginAccessSet = SmallDenseSet<BeginAccessInst *, 8>;
 
@@ -162,6 +165,8 @@ public:
   GlobalAccessRemoval(SILModule &module) : module(module) {}
 
   void perform();
+  
+  void invalidateAnalysis(SILModuleTransform *pass);
 
 protected:
   bool visitInstruction(SILInstruction *I);
@@ -187,6 +192,13 @@ void GlobalAccessRemoval::perform() {
     }
   }
   removeNonreentrantAccess();
+}
+
+void GlobalAccessRemoval::invalidateAnalysis(SILModuleTransform *pass) {
+  for (SILFunction *changedFunction : changedFunctions) {
+    pass->invalidateAnalysis(changedFunction,
+                             SILAnalysis::InvalidationKind::Instructions);
+  }
 }
 
 bool GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
@@ -218,6 +230,7 @@ bool GlobalAccessRemoval::visitInstruction(SILInstruction *I) {
         break;
       case KeyPathPatternComponent::Kind::GettableProperty:
       case KeyPathPatternComponent::Kind::SettableProperty:
+      case KeyPathPatternComponent::Kind::Method:
       case KeyPathPatternComponent::Kind::OptionalChain:
       case KeyPathPatternComponent::Kind::OptionalForce:
       case KeyPathPatternComponent::Kind::OptionalWrap:
@@ -292,6 +305,7 @@ void GlobalAccessRemoval::removeNonreentrantAccess() {
     for (BeginAccessInst *beginAccess : info.beginAccessSet) {
       LLVM_DEBUG(llvm::dbgs() << "  Disabling access marker " << *beginAccess);
       beginAccess->setEnforcement(SILAccessEnforcement::Static);
+      changedFunctions.insert(beginAccess->getFunction());
     }
   }
 }
@@ -301,6 +315,7 @@ struct AccessEnforcementWMO : public SILModuleTransform {
   void run() override {
     GlobalAccessRemoval eliminationPass(*getModule());
     eliminationPass.perform();
+    eliminationPass.invalidateAnalysis(this);
   }
 };
 }

@@ -23,9 +23,10 @@ namespace swift {
 class AsyncLet;
 class AsyncTask;
 class ContinuationAsyncContext;
-class ExecutorRef;
 struct HeapObject;
 class Job;
+class SerialExecutorRef;
+class TaskExecutorRef;
 class TaskGroup;
 class TaskStatusRecord;
 
@@ -36,8 +37,6 @@ namespace trace {
 
 void actor_create(HeapObject *actor);
 
-void actor_destroy(HeapObject *actor);
-
 void actor_deallocate(HeapObject *actor);
 
 void actor_enqueue(HeapObject *actor, Job *job);
@@ -47,8 +46,7 @@ void actor_dequeue(HeapObject *actor, Job *job);
 // State values are:
 // Idle = 0, Scheduled = 1, Running = 2, Zombie_ReadyForDeallocation = 3,
 // invalid/unknown = 255
-void actor_state_changed(HeapObject *actor, Job *firstJob,
-                         bool needsPreprocessing, uint8_t state,
+void actor_state_changed(HeapObject *actor, Job *firstJob, uint8_t state,
                          bool isDistributedRemote, bool isPriorityEscalated,
                          uint8_t maxPriority);
 
@@ -59,12 +57,15 @@ void actor_note_job_queue(HeapObject *actor, Job *first,
 
 void task_create(AsyncTask *task, AsyncTask *parent, TaskGroup *group,
                  AsyncLet *asyncLet, uint8_t jobPriority, bool isChildTask,
-                 bool isFuture, bool isGroupChildTask, bool isAsyncLetTask);
+                 bool isFuture, bool isGroupChildTask, bool isAsyncLetTask,
+                 bool isDiscardingTask, bool hasInitialTaskExecutorPreference,
+                 const char *taskName);
 
 void task_destroy(AsyncTask *task);
 
 void task_status_changed(AsyncTask *task, uint8_t maxPriority, bool isCancelled,
-                         bool isEscalated, bool isRunning, bool isEnqueued);
+                         bool isEscalated, bool isStarting, bool isRunning,
+                         bool isEnqueued, bool wasRunning);
 
 void task_flags_changed(AsyncTask *task, uint8_t jobPriority, bool isChildTask,
                         bool isFuture, bool isGroupChildTask,
@@ -89,7 +90,16 @@ void job_enqueue_global(Job *job);
 
 void job_enqueue_global_with_delay(unsigned long long delay, Job *job);
 
-void job_enqueue_main_executor(Job *job);
+void job_enqueue_executor(Job *job, SerialExecutorRef serialExecutor,
+                          TaskExecutorRef taskExecutor);
+
+enum class TracingExecutorKind : uint8_t {
+  GlobalConcurrent,
+  DefaultActor,
+  MainActor,
+  CustomSerialExecutor,
+  TaskExecutor,
+};
 
 struct job_run_info {
   /// The ID of the task that started running.
@@ -104,15 +114,23 @@ struct job_run_info {
 // call to task_run_end.  Any information we want to log must be
 // extracted from the job when we start to run it because execution
 // will invalidate the job.
-job_run_info job_run_begin(Job *job);
+job_run_info job_run_begin(Job *job, SerialExecutorRef serialExecutor,
+                           TaskExecutorRef taskExecutor);
 
 void job_run_end(job_run_info info);
+
+// Emitted when a task switches executors without suspending (i.e., the
+// surrounding job_run interval continues, but the active executor has
+// changed). Lets trace consumers see executor hops that happen inside a
+// single job_run interval.
+void task_switch_executor(AsyncTask *task, SerialExecutorRef serialExecutor,
+                          TaskExecutorRef taskExecutor);
 
 } // namespace trace
 } // namespace concurrency
 } // namespace swift
 
-#if SWIFT_STDLIB_CONCURRENCY_TRACING
+#if SWIFT_STDLIB_TRACING
 #include "TracingSignpost.h"
 #else
 #include "TracingStubs.h"

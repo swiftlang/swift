@@ -14,12 +14,12 @@
 #define SWIFT_SILOPTIMIZER_PASSMANAGER_ARC_GLOBALARCSEQUENCEDATAFLOW_H
 
 #include "RefCountState.h"
-#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
-#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/NullablePtr.h"
+#include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ProgramTerminationAnalysis.h"
 #include "llvm/ADT/MapVector.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 
@@ -64,7 +64,7 @@ private:
   BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap;
 
   llvm::BumpPtrAllocator Allocator;
-  ImmutablePointerSetFactory<SILInstruction> SetFactory;
+  ImmutablePointerSetFactory<SILInstruction *> SetFactory;
 
   /// Stashed BB information.
   std::unique_ptr<ARCBBStateInfo> BBStateInfo;
@@ -106,8 +106,8 @@ private:
   bool processBBTopDown(ARCBBState &BBState);
   void computePostDominatingConsumedArgMap();
 
-  llvm::Optional<ARCBBStateInfoHandle> getBottomUpBBState(SILBasicBlock *BB);
-  llvm::Optional<ARCBBStateInfoHandle> getTopDownBBState(SILBasicBlock *BB);
+  std::optional<ARCBBStateInfoHandle> getBottomUpBBState(SILBasicBlock *BB);
+  std::optional<ARCBBStateInfoHandle> getTopDownBBState(SILBasicBlock *BB);
 
   void dumpDataflowResults();
 };

@@ -24,6 +24,8 @@
 
 namespace swift {
 
+class SubstitutionMap;
+
 /// This describes a list of parameters.  Each parameter descriptor is tail
 /// allocated onto this list.
 class alignas(ParamDecl *) ParameterList final :
@@ -85,10 +87,10 @@ public:
   ParamDecl *back() const { return getArray().back(); }
 
   MutableArrayRef<ParamDecl*> getArray() {
-    return {getTrailingObjects<ParamDecl*>(), numParameters};
+    return getTrailingObjects(numParameters);
   }
   ArrayRef<ParamDecl*> getArray() const {
-    return {getTrailingObjects<ParamDecl*>(), numParameters};
+    return getTrailingObjects(numParameters);
   }
 
   size_t size() const {
@@ -128,11 +130,13 @@ public:
   /// Make a duplicate copy of this parameter list.  This allocates copies of
   /// the ParamDecls, so they can be reparented into a new DeclContext.
   ParameterList *clone(const ASTContext &C,
-                       OptionSet<CloneFlags> options = None) const;
+                       OptionSet<CloneFlags> options = std::nullopt) const;
 
   /// Return a list of function parameters for this parameter list,
   /// based on the interface types of the parameters in this list.
   void getParams(SmallVectorImpl<AnyFunctionType::Param> &params) const;
+
+  unsigned getOrigParamIndex(SubstitutionMap subMap, unsigned substIndex) const;
 
   /// Return the full source range of this parameter.
   SourceRange getSourceRange() const;

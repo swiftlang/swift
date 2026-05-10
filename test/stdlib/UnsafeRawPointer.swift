@@ -54,6 +54,21 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory") {
   expectEqual(5, Missile.missilesLaunched)
 }
 
+UnsafeMutableRawPointerExtraTestSuite.test("initializeMemorySingleElement")
+.require(.stdlib_5_8)
+.code {
+  Missile.missilesLaunched = 0
+  let p1 = UnsafeMutableRawPointer.allocate(
+    byteCount: MemoryLayout<Missile>.stride, alignment: MemoryLayout<Missile>.alignment
+  )
+  defer { p1.deallocate() }
+  var p2 = p1.initializeMemory(as: Missile.self, to: Missile(1))
+  expectEqual(1, p2.pointee.number)
+  expectEqual(p1, p2)
+  p2.deinitialize()
+  expectEqual(Missile.missilesLaunched, 1)
+}
+
 UnsafeMutableRawPointerExtraTestSuite.test("bindMemory") {
   let sizeInBytes = 3 * MemoryLayout<Int>.stride
   let p1 = UnsafeMutableRawPointer.allocate(
@@ -95,10 +110,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load/store") {
 }
 
 UnsafeMutableRawPointerExtraTestSuite.test("load.unaligned")
-.skip(.custom({
-  if #available(SwiftStdlib 5.7, *) { return false }
-  return true
-}, reason: "Requires Swift 5.7's stdlib"))
+.require(.stdlib_5_7)
 .code {
   guard #available(SwiftStdlib 5.7, *) else { return }
   var data: [UInt8] = [0x0, 0x0, 0x0, 0xff, 0xff, 0xff, 0xff, 0x0]
@@ -114,6 +126,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.unaligned")
   expectEqual(result, 0xffff_0000)
 }
 
+#if !os(WASI)
 UnsafeMutableRawPointerExtraTestSuite.test("load.invalid")
 .skip(.custom({ !_isDebugAssertConfiguration() },
               reason: "This tests a debug precondition.."))
@@ -137,12 +150,10 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.invalid.mutable")
   }
   expectUnreachable()
 }
+#endif
 
 UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
-.skip(.custom({
-  if #available(SwiftStdlib 5.7, *) { return false }
-  return true
-}, reason: "Requires Swift 5.7's stdlib"))
+.require(.stdlib_5_7)
 .code {
   let count = MemoryLayout<UInt>.stride * 2
   let p1 = UnsafeMutableRawPointer.allocate(
@@ -167,13 +178,11 @@ UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
               0)
 }
 
+#if !os(WASI)
 UnsafeMutableRawPointerExtraTestSuite.test("store.invalid")
 .skip(.custom({ !_isDebugAssertConfiguration() },
               reason: "This tests a debug precondition.."))
-.skip(.custom({
-  if #available(SwiftStdlib 5.7, *) { return false }
-  return true
-}, reason: "Requires Swift 5.7's stdlib"))
+.require(.stdlib_5_7)
 .code {
   Missile.missilesLaunched = 0
   let m = Missile(0)
@@ -186,6 +195,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("store.invalid")
   p1.storeBytes(of: m, as: Missile.self)
   expectUnreachable()
 }
+#endif
 
 UnsafeMutableRawPointerExtraTestSuite.test("copyMemory") {
   let sizeInBytes = 4 * MemoryLayout<Int>.stride
@@ -382,6 +392,20 @@ UnsafeMutableRawPointerExtraTestSuite.test("pointer-comparisons") {
   expectTrue(a.assumingMemoryBound(to: Int.self) != b)
   expectTrue(b.assumingMemoryBound(to: UInt.self) > UnsafeMutableRawPointer(a))
   expectTrue(a < b.assumingMemoryBound(to: Double.self))
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("zero-allocation") {
+  let a = UnsafeMutableRawPointer.allocate(byteCount: 0, alignment: 1)
+  let b = UnsafeMutableRawPointer.allocate(byteCount: 0, alignment: 16)
+  let c = UnsafeMutableRawPointer.allocate(byteCount: 0, alignment: 1024)
+  defer {
+    a.deallocate()
+    b.deallocate()
+    c.deallocate()
+  }
+  expectNotEqual(Int(bitPattern: a), 0x0)
+  expectNotEqual(Int(bitPattern: b), 0x0)
+  expectNotEqual(Int(bitPattern: c), 0x0)
 }
 
 runAllTests()

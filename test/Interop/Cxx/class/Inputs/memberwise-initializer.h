@@ -1,6 +1,10 @@
 #ifndef TEST_INTEROP_CXX_CLASS_INPUTS_MEMBERWISE_INITIALIZER_H
 #define TEST_INTEROP_CXX_CLASS_INPUTS_MEMBERWISE_INITIALIZER_H
 
+template <typename T>
+struct TemplatedType {};
+
+
 struct StructPrivateOnly {
 private:
   int varPrivate;
@@ -50,6 +54,37 @@ struct ClassWithUnimportedMemberFunction {
 public:
   int varPublic;
   int ClassWithUnimportedMemberFunction::* unimportedMemberFunction();
+};
+
+struct ClassWithTemplatedFunction {
+public:
+  int varPublic;
+
+  template <int I>
+  void foo();
+};
+
+struct ClassWithTemplatedUsingDecl {
+public:
+  int varPublic;
+
+  template <typename T>
+  using MyUsing = TemplatedType<T>;
+};
+
+struct ClassWithStaticAssert {
+  int x, y;
+  static_assert(true);
+};
+
+struct ClassWithStaticAssert2 {
+  static_assert(true);
+  int x, y;
+};
+
+struct ClassWithConstexprStatic {
+  int x;
+  static constexpr int y = 0;
 };
 
 #endif

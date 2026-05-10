@@ -1,0 +1,32 @@
+// RUN: %target-sil-opt -sil-print-debuginfo -mem2reg -verify %s | %FileCheck %s
+
+// Check that SILMem2Reg on empty tuples.
+
+// See rdar://171023691
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { loc "outer.swift":1:1 parent @testMem2RegInlinedScope : $@convention(thin) () -> () }
+sil_scope 2 { loc "inner.swift":2:2 parent @inlinedCallee : $@convention(thin) () -> () }
+sil_scope 3 { loc "inner.swift":3:3 parent 2 inlined_at 1 }
+
+sil @testMem2RegInlinedScope : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $(), var, name "local", loc "outer.swift":10:9, scope 1
+
+  // CHECK: sil_scope [[OUTER_SCOPE:[0-9]+]] { {{.*}} @testMem2RegInlinedScope
+  // CHECK-LABEL: sil @testMem2RegInlinedScope
+  // CHECK: debug_value {{.*}} scope [[OUTER_SCOPE]]
+  // CHECK: return %0
+
+  // This is a load from a different alloca that is now directly accessing the
+  // alloca above (e.g., because of inlining). This should not be used to
+  // describe "local" as it actually loads from a different local.
+  %1 = load %0 : $*(), loc "inner.swift":3:3, scope 3
+
+  dealloc_stack %0 : $*()
+  return %1
+}

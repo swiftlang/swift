@@ -5,9 +5,9 @@
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -enable-testing -O
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
-// RUN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
+// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd -tbd-install_name test 
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd -tbd-install_name test
+// RUN: %llvm-readtapi --compare %t/typecheck.tbd %t/emit-ir.tbd
 
 public func publicNoArgs() {}
 public func publicSomeArgs(_: Int, x: Int) {}
@@ -20,6 +20,11 @@ internal func internalWithDefault(_: Int = 0) {}
 private func privateNoArgs() {}
 private func privateSomeArgs(_: Int, x: Int) {}
 private func privateWithDefault(_: Int = 0) {}
+
+public dynamic func publicDynamic() {}
+
+@_dynamicReplacement(for: publicDynamic())
+public func replacementForPublicDynamic() {}
 
 @_cdecl("c_publicNoArgs") public func publicNoArgsCDecl() {}
 @_cdecl("c_publicSomeArgs") public func publicSomeArgsCDecl(_: Int, x: Int) {}

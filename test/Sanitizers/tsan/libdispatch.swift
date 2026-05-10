@@ -5,6 +5,9 @@
 // REQUIRES: tsan_runtime
 // UNSUPPORTED: OS=tvos
 
+// rdar://101876380
+// UNSUPPORTED: OS=ios
+
 // FIXME: This should be covered by "tsan_runtime"; older versions of Apple OSs
 // don't support TSan.
 // UNSUPPORTED: remote_run
@@ -49,5 +52,5 @@ for _ in 1...10 {
 
 print("Done!")
 
-// CHECK: ThreadSanitizer: data race
-// CHECK: Done!
+// CHECK-DAG: ThreadSanitizer: data race
+// CHECK-DAG: Done!

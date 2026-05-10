@@ -20,6 +20,8 @@
 //===----------------------------------------------------------------------===//
 import SwiftShims
 
+#if !$Embedded
+
 @frozen
 @usableFromInline
 internal struct _BridgeStorage<NativeClass: AnyObject> {
@@ -61,7 +63,7 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     rawValue = Builtin.reinterpretCast(native)
   }
 
-#if !(arch(i386) || arch(arm) || arch(arm64_32) || arch(wasm32))
+#if _pointerBitWidth(_64)
   @inlinable
   @inline(__always)
   internal init(taggedPayload: UInt) {
@@ -159,3 +161,79 @@ internal struct _BridgeStorage<NativeClass: AnyObject> {
     }
   }
 }
+
+#else
+
+@frozen
+@usableFromInline
+internal struct _BridgeStorage<NativeClass: AnyObject> {
+  @usableFromInline
+  internal typealias Native = NativeClass
+
+  // rawValue is passed inout to _isUnique.  Although its value
+  // is unchanged, it must appear mutable to the optimizer.
+  @usableFromInline
+  internal var rawValue: NativeClass
+
+  @inlinable
+  @inline(__always)
+  internal init(native: Native) {
+    #if !$Embedded
+    _internalInvariant(_usesNativeSwiftReferenceCounting(NativeClass.self))
+    #endif
+    rawValue = native
+  }
+
+  @inlinable
+  @inline(__always)
+  internal mutating func isUniquelyReferencedNative() -> Bool {
+    return _isUnique(&rawValue)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func beginCOWMutationNative() -> Bool {
+    return Bool(Builtin.beginCOWMutation(&rawValue))
+  }
+
+  @inlinable
+  static var flagMask: UInt {
+    @inline(__always) get {
+      return (1 as UInt) << _objectPointerLowSpareBitShift
+    }
+  }
+
+  @inlinable
+  internal var nativeInstance: Native {
+    @inline(__always) get {
+      return rawValue
+    }
+  }
+
+  @inlinable
+  internal var unflaggedNativeInstance: Native {
+    @inline(__always) get {
+      return rawValue
+    }
+  }
+
+  @inlinable
+  @inline(__always)
+  internal mutating func isUniquelyReferencedUnflaggedNative() -> Bool {
+    return _isUnique_native(&rawValue)
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func beginCOWMutationUnflaggedNative() -> Bool {
+    return Bool(Builtin.beginCOWMutation_native(&rawValue))
+  }
+
+  @_alwaysEmitIntoClient
+  @inline(__always)
+  internal mutating func endCOWMutation() {
+    Builtin.endCOWMutation(&rawValue)
+  }
+}
+
+#endif

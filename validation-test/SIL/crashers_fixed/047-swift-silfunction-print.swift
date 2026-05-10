@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -emit-sil %s
 
-// SR-12239: use-after-free in `SILFunction::print`.
+// https://github.com/apple/swift/issues/54666
+// Use-after-free in `SILFunction::print`
 
 func outer<C>(_ x: C) {
   func inner<C>(_ x: C) {}

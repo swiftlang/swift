@@ -20,7 +20,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletionCache.h"
 #include "swift/IDE/CodeCompletionConsumer.h"
-#include "swift/Parse/CodeCompletionCallbacks.h"
+#include "swift/Parse/IDEInspectionCallbacks.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"
 #include <memory>
@@ -63,13 +63,13 @@ private:
   ide::CodeCompletionCache CompletionCache;
   ide::CodeCompletionContext CompletionContext;
   std::unique_ptr<ide::CodeCompletionConsumer> Consumer;
-  std::unique_ptr<CodeCompletionCallbacksFactory> CompletionCallbacksFactory;
+  std::unique_ptr<IDEInspectionCallbacksFactory> IDEInspectionCallbacksFactory;
 
   std::vector<StringRef> CompletionStrings;
   std::vector<CookedResult> CookedResults;
 
   std::string Prefix;
-  mutable Optional<std::string> Root;
+  mutable std::optional<std::string> Root;
   size_t CurrentCompletionIdx;
 
 public:

@@ -12,7 +12,8 @@ BundleTests.test("Bundle.bundleForNilClass") {
   // Foundation implementation does. The patched version from
   // ObjCRuntimeGetImageNameFromClass did not.
   //
-  // SR-9188
+  // https://github.com/apple/swift/issues/51679
+
   typealias BundleForClassFunc =
     @convention(c) (AnyObject, Selector, AnyObject?) -> Bundle
   

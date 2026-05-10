@@ -133,7 +133,7 @@ public struct StaticString: Sendable {
     _precondition(
       hasPointerRepresentation,
       "StaticString should have pointer representation")
-    return UnsafePointer(bitPattern: UInt(_startPtrOrData))!
+    return unsafe UnsafePointer(bitPattern: UInt(_startPtrOrData))!
   }
 
   /// A single Unicode scalar value.
@@ -198,14 +198,19 @@ public struct StaticString: Sendable {
   ///   duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure.
   @_transparent
+  @safe
   public func withUTF8Buffer<R>(
     _ body: (UnsafeBufferPointer<UInt8>) -> R
   ) -> R {
     if hasPointerRepresentation {
-      return body(UnsafeBufferPointer(
+      return unsafe body(UnsafeBufferPointer(
         start: utf8Start, count: utf8CodeUnitCount))
     } else {
-      return unicodeScalar.withUTF8CodeUnits { body($0) }
+      #if $Embedded
+      fatalError("non-pointer representation not supported in embedded Swift")
+      #else
+      return unicodeScalar.withUTF8CodeUnits { unsafe body($0) }
+      #endif
     }
   }
 }
@@ -296,7 +301,7 @@ extension StaticString: CustomStringConvertible {
 
   /// A textual representation of the static string.
   public var description: String {
-    return withUTF8Buffer { String._uncheckedFromUTF8($0) }
+    return withUTF8Buffer { unsafe String._uncheckedFromUTF8($0) }
   }
 }
 

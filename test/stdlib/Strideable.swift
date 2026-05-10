@@ -210,7 +210,8 @@ StrideTestSuite.test("FloatingPointStride/rounding error") {
     // multiply-add operation `(1 as Float).addingProduct(0.9, 6)` gives the
     // result `6.3999996`. This is nonetheless the desired behavior because
     // avoiding error accumulation and intermediate rounding error wherever
-    // possible will produce better results more often than not (see SR-6377).
+    // possible will produce better results more often than not (see
+    // https://github.com/apple/swift/issues/48927).
     //
     // If checking of end bounds has been inadvertently modified such that we're
     // computing the distance from the penultimate element to the end (in this

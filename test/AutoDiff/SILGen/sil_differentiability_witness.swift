@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s | %target-sil-opt | %FileCheck %s
+// RUN: %target-swift-frontend -emit-silgen %s | %target-sil-opt -sil-verify-none | %FileCheck %s
 
 // Test SIL differentiability witness SIL generation.
 
@@ -131,7 +131,7 @@ public struct Foo: Differentiable {
 // Test function that is differentiable wrt subset of its parameters:
 // - wrt x: explicit @differentiable(reverse) attribute, with no custom derivative specified
 // - wrt y: explicit @differentiable(reverse) attribute, with custom derivative specified
-// - wrt x, y: custom deriviative specified, with no explicit @differentiable(reverse) attribute
+// - wrt x, y: custom derivative specified, with no explicit @differentiable(reverse) attribute
 // Has a tuple argument to verify that indices are correctly lowered to SIL.
 
 @differentiable(reverse, wrt: x)

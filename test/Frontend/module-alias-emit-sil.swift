@@ -10,7 +10,7 @@
 // RUN: test -f %t/AppleLogging.swiftmodule
 
 /// Verify generated SIL only contains AppleLogging
-// RUN: %target-swift-frontend -emit-sil %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t > %t/result-sil.output
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t > %t/result-sil.output
 // RUN: %FileCheck %s -input-file %t/result-sil.output
 // RUN: not %FileCheck %s -input-file %t/result-sil.output -check-prefix CHECK-NOT-FOUND
 // CHECK-NOT-FOUND: XLogging
@@ -28,7 +28,7 @@
 // CHECK:   init()
 // CHECK: }
 
-// CHECK: public func start() -> Loggable?
+// CHECK: public func start() -> (any Loggable)?
 
 // CHECK: public func end(_ arg: Logger)
 
@@ -44,18 +44,18 @@
 // CHECK: } // end sil function '$s7FileLib02MyB0V12AppleLogging8LoggableAadEP9verbositySivgTW'
 
 // CHECK: // start()
-// CHECK: sil @$s7FileLib5start12AppleLogging8Loggable_pSgyF : $@convention(thin) () -> @out Optional<Loggable> {
+// CHECK: sil @$s7FileLib5start12AppleLogging8Loggable_pSgyF : $@convention(thin) () -> @out Optional<any Loggable> {
 // CHECK: // %0 "$return_value"                             // user: %2
-// CHECK: bb0(%0 : $*Optional<Loggable>):
+// CHECK: bb0(%0 : $*Optional<any Loggable>):
 // CHECK:   // function_ref setup()
-// CHECK:   %1 = function_ref @$s12AppleLogging5setupAA8Loggable_pSgyF : $@convention(thin) () -> @out Optional<Loggable> // user: %2
-// CHECK:   %2 = apply %1(%0) : $@convention(thin) () -> @out Optional<Loggable>
+// CHECK:   %1 = function_ref @$s12AppleLogging5setupAA8Loggable_pSgyF : $@convention(thin) () -> @out Optional<any Loggable> // user: %2
+// CHECK:   %2 = apply %1(%0) : $@convention(thin) () -> @out Optional<any Loggable>
 // CHECK:   %3 = tuple ()                                   // user: %4
 // CHECK: return %3 : $()                                 // id: %4
 // CHECK: } // end sil function '$s7FileLib5start12AppleLogging8Loggable_pSgyF'
 
 // CHECK: // setup()
-// CHECK: sil @$s12AppleLogging5setupAA8Loggable_pSgyF : $@convention(thin) () -> @out Optional<Loggable>
+// CHECK: sil @$s12AppleLogging5setupAA8Loggable_pSgyF : $@convention(thin) () -> @out Optional<any Loggable>
 
 // CHECK: // end(_:)
 // CHECK: sil @$s7FileLib3endyy12AppleLogging6LoggerVF : $@convention(thin) (Logger) -> () {

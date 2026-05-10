@@ -6,7 +6,7 @@
 
 // CHECK: target triple = "{{.*}}-apple-macosx{{[0-9][0-9]}}.
 // CHECK-SPECIFIC-MAC-10-X: target triple = "{{.*}}-apple-macosx10.51.0"
-// CHECK-DARWIN-OVER-11: target triple = "{{.*}}-apple-macosx46.0.0"
+// CHECK-DARWIN-OVER-11: target triple = "{{.*}}-apple-macosx56.0.0"
 
 public func anchor() {}
 anchor()

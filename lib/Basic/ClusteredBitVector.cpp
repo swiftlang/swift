@@ -30,7 +30,7 @@ void ClusteredBitVector::print(llvm::raw_ostream &out) const {
   if (!Bits) {
     return;
   }
-  auto &v = Bits.getValue();
+  auto &v = Bits.value();
   for (size_t i = 0, e = size(); ; ) {
     out << (v[i++] ? '1' : '0');
     if (i == e) {

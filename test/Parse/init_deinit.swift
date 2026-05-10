@@ -2,6 +2,7 @@
 
 struct FooStructConstructorA {
   init // expected-error {{expected '('}}
+  // expected-error@-1{{initializer requires a body}}
 }
 
 struct FooStructConstructorB {
@@ -10,10 +11,17 @@ struct FooStructConstructorB {
 
 struct FooStructConstructorC {
   init {} // expected-error {{expected '('}}{{7-7=()}}
+  // expected-note@-1{{'init()' previously declared here}}
   init<T> {} // expected-error {{expected '('}} {{10-10=()}}
+  // expected-error@-1{{generic parameter 'T' is not used in function signature}}
   init? { self.init() } // expected-error {{expected '('}} {{8-8=()}}
+  // expected-error@-1{{invalid redeclaration of 'init()'}}
 }
 
+struct FooStructConstructorD {
+  init() -> FooStructConstructorD { }
+  // expected-error@-1{{initializers cannot have a result type}}
+}
 
 struct FooStructDeinitializerA {
   deinit // expected-error {{expected '{' for deinitializer}}
@@ -25,8 +33,8 @@ struct FooStructDeinitializerB {
   deinit // expected-error {{expected '{' for deinitializer}}
 }
 
-struct FooStructDeinitializerC {
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+struct FooStructDeinitializerC { // expected-note {{consider adding '~Copyable' to struct 'FooStructDeinitializerC'}}
+  deinit {} // expected-error {{deinitializer cannot be declared in struct 'FooStructDeinitializerC' that conforms to 'Copyable'}}
 }
 
 class FooClassDeinitializerA {
@@ -45,30 +53,30 @@ init {} // expected-error {{initializers may only be declared within a type}} ex
 init() // expected-error {{initializers may only be declared within a type}}
 init() {} // expected-error {{initializers may only be declared within a type}}
 
-deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 deinit // expected-error {{expected '{' for deinitializer}}
-deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 
 struct BarStruct {
   init() {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // NOTE: this doesn't get diagnosed with the other errors in this file for some reason.
 }
 
 extension BarStruct {
   init(x : Int) {}
 
   // When/if we allow 'var' in extensions, then we should also allow dtors
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 }
 
 enum BarUnion {
   init() {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // NOTE: this doesn't get diagnosed with the other errors in this file for some reason.
 }
 
 extension BarUnion {
   init(x : Int) {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 }
 
 class BarClass {
@@ -78,22 +86,22 @@ class BarClass {
 
 extension BarClass {
   convenience init(x : Int) { self.init() }
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 }
 
 protocol BarProtocol {
   init() {} // expected-error {{protocol initializers must not have bodies}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 }
 
 extension BarProtocol {
   init(x : Int) {}
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 }
 
 func fooFunc() {
   init() {} // expected-error {{initializers may only be declared within a type}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 }
 
 func barFunc() {
@@ -105,29 +113,7 @@ func barFunc() {
 
   var y : () = { () -> () in
     // expected-warning@-1 {{variable 'y' was never used; consider replacing with '_' or removing it}}
-    deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+    deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
     return
   } ()
-}
-
-// SR-852
-class Aaron {
-  init(x: Int) {}
-  convenience init() { init(x: 1) } // expected-error {{missing 'self.' at initializer invocation}} {{24-24=self.}}
-}
-
-class Theodosia: Aaron {
-  init() {
-    init(x: 2) // expected-error {{missing 'super.' at initializer invocation}} {{5-5=super.}}
-  }
-}
-
-struct AaronStruct {
-  init(x: Int) {}
-  init() { init(x: 1) } // expected-error {{missing 'self.' at initializer invocation}} {{12-12=self.}}
-}
-
-enum AaronEnum: Int {
-  case A = 1
-  init(x: Int) { init(rawValue: x)! } // expected-error {{missing 'self.' at initializer invocation}} {{18-18=self.}}
 }

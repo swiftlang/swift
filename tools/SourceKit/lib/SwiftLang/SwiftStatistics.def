@@ -20,7 +20,7 @@ SWIFT_STATISTIC(numASTBuilds, num-ast-builds, "# of ASTs built or rebuilt")
 SWIFT_STATISTIC(numASTsInMem, num-asts-in-memory, "# of ASTs currently in memory")
 SWIFT_STATISTIC(maxASTsInMem, max-asts-in-memory, "maximum # of ASTs ever in memory at once")
 SWIFT_STATISTIC(numASTCacheHits, num-ast-cache-hits, "# of ASTs found in the cache without rebuilding")
-SWIFT_STATISTIC(numASTsUsedWithSnaphots, num-ast-snaphost-uses, "# of ASTs used with snaphots without rebuilding")
+SWIFT_STATISTIC(numASTsUsedWithSnapshots, num-ast-snapshot-uses, "# of ASTs used with snapshots without rebuilding")
 
 SWIFT_STATISTIC(numOpenDocs, num-open-documents, "# of editor documents currently open")
 SWIFT_STATISTIC(maxOpenDocs, max-open-documents, "maximum # of editor documents ever open at once")

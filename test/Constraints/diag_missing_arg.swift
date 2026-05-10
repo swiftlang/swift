@@ -19,11 +19,11 @@ func attributedInOutFunc(x: inout @convention(c) () -> Int32) {} // expected-not
 attributedInOutFunc() // expected-error {{missing argument for parameter 'x' in call}} {{21-21=x: &<#@convention(c) () -> Int32#>}}
 
 func genericFunc1<T>(x: T) {} // expected-note * {{here}}
-genericFunc1() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#_#>}}
+genericFunc1() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#T#>}}
 
 protocol P {}
 func genericFunc2<T : P>(x: T) {} // expected-note * {{here}}
-genericFunc2() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#_#>}}
+genericFunc2() // expected-error {{missing argument for parameter 'x' in call}} {{14-14=x: <#T#>}}
 
 typealias MyInt = Int
 func aliasedFunc(x: MyInt) {} // expected-note * {{here}}
@@ -105,16 +105,16 @@ struct S1 {
 var s1 = S1()
 _ = s1[x: 1, y: {1}]  // Ok.
 _ = s1[x: 1] { 1 } // Ok.
-_ = s1[x: 1] // expected-error {{missing argument for parameter 'y' in call}} {{12-12=, y: <#() -> Int#>}}
-_ = s1[y: { 1 }] // expected-error {{missing argument for parameter 'x' in call}} {{8-8=x: <#Int#>, }}
-_ = s1[] { 1 } // expected-error {{missing argument for parameter 'x' in call}} {{8-8=x: <#Int#>}}
+_ = s1[x: 1] // expected-error {{missing argument for parameter 'y' in subscript}} {{12-12=, y: <#() -> Int#>}}
+_ = s1[y: { 1 }] // expected-error {{missing argument for parameter 'x' in subscript}} {{8-8=x: <#Int#>, }}
+_ = s1[] { 1 } // expected-error {{missing argument for parameter 'x' in subscript}} {{8-8=x: <#Int#>}}
 _ = s1 { 1 } // expected-error {{cannot call value of non-function type 'S1'}} {{none}}
-_ = s1[] // expected-error {{missing arguments for parameters 'x', 'y' in call}} {{8-8=x: <#Int#>, y: <#() -> Int#>}}
+_ = s1[] // expected-error {{missing arguments for parameters 'x', 'y' in subscript}} {{8-8=x: <#Int#>, y: <#() -> Int#>}}
 s1[x: 1, y: {1}] = 1 // Ok.
 s1[x: 1] { 1 } = 1 // Ok.
-s1[x: 1] = 1 // expected-error {{missing argument for parameter 'y' in call}} {{8-8=, y: <#() -> Int#>}}
-s1[y: { 1 }] = 1 // expected-error {{missing argument for parameter 'x' in call}} {{4-4=x: <#Int#>, }}
-s1[] { 1 } = 1 // expected-error {{missing argument for parameter 'x' in call}} {{4-4=x: <#Int#>}}
+s1[x: 1] = 1 // expected-error {{missing argument for parameter 'y' in subscript}} {{8-8=, y: <#() -> Int#>}}
+s1[y: { 1 }] = 1 // expected-error {{missing argument for parameter 'x' in subscript}} {{4-4=x: <#Int#>, }}
+s1[] { 1 } = 1 // expected-error {{missing argument for parameter 'x' in subscript}} {{4-4=x: <#Int#>}}
 
 struct S2 {
   subscript(x: Int, y: () -> Int) -> Int { get { return 1 } set { } } // expected-note * {{here}}
@@ -122,42 +122,42 @@ struct S2 {
 var s2 = S2()
 _ = s2[1, {1}]  // Ok.
 _ = s2[1] { 1 } // Ok.
-_ = s2[1] // expected-error {{missing argument for parameter #2 in call}} {{9-9=, <#() -> Int#>}}
-_ = s2[{ 1 }] // expected-error {{missing argument for parameter #1 in call}} {{8-8=<#Int#>, }}
-_ = s2[] { 1 } // expected-error {{missing argument for parameter #1 in call}} {{8-8=<#Int#>}}
+_ = s2[1] // expected-error {{missing argument for parameter #2 in subscript}} {{9-9=, <#() -> Int#>}}
+_ = s2[{ 1 }] // expected-error {{missing argument for parameter #1 in subscript}} {{8-8=<#Int#>, }}
+_ = s2[] { 1 } // expected-error {{missing argument for parameter #1 in subscript}} {{8-8=<#Int#>}}
 _ = s2 { 1 } // expected-error {{cannot call value of non-function type 'S2'}} {{none}}
-_ = s2[] // expected-error {{missing arguments for parameters #1, #2 in call}} {{8-8=<#Int#>, <#() -> Int#>}}
+_ = s2[] // expected-error {{missing arguments for parameters #1, #2 in subscript}} {{8-8=<#Int#>, <#() -> Int#>}}
 s2[1, {1}] = 1 // Ok.
 s2[1] { 1 } = 1 // Ok.
-s2[1] = 1 // expected-error {{missing argument for parameter #2 in call}} {{5-5=, <#() -> Int#>}}
-s2[{ 1 }] = 1 // expected-error {{missing argument for parameter #1 in call}} {{4-4=<#Int#>, }}
-s2[] { 1 } = 1 // expected-error {{missing argument for parameter #1 in call}} {{4-4=<#Int#>}}
+s2[1] = 1 // expected-error {{missing argument for parameter #2 in subscript}} {{5-5=, <#() -> Int#>}}
+s2[{ 1 }] = 1 // expected-error {{missing argument for parameter #1 in subscript}} {{4-4=<#Int#>, }}
+s2[] { 1 } = 1 // expected-error {{missing argument for parameter #1 in subscript}} {{4-4=<#Int#>}}
 
 struct S3 {
       subscript(x x: Int, y y: Int, z z: (Int) -> Int) -> Int { get { return 1 } set { } } // expected-note * {{here}}
 }
 var s3 = S3()
-_ = s3[y: 1] { 1 } // expected-error {{missing argument for parameter 'x' in call}} {{8-8=x: <#Int#>, }}
+_ = s3[y: 1] { 1 } // expected-error {{missing argument for parameter 'x' in subscript}} {{8-8=x: <#Int#>, }}
 // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{15-15= _ in}}
-_ = s3[x: 1] { 1 } // expected-error {{missing argument for parameter 'y' in call}} {{12-12=, y: <#Int#>}}
+_ = s3[x: 1] { 1 } // expected-error {{missing argument for parameter 'y' in subscript}} {{12-12=, y: <#Int#>}}
 // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{15-15= _ in}}
-_ = s3[x: 1, y: 1] // expected-error {{missing argument for parameter 'z' in call}} {{18-18=, z: <#(Int) -> Int#>}}
-s3[y: 1] { 1 } = 1 // expected-error {{missing argument for parameter 'x' in call}} {{4-4=x: <#Int#>, }}
+_ = s3[x: 1, y: 1] // expected-error {{missing argument for parameter 'z' in subscript}} {{18-18=, z: <#(Int) -> Int#>}}
+s3[y: 1] { 1 } = 1 // expected-error {{missing argument for parameter 'x' in subscript}} {{4-4=x: <#Int#>, }}
 // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{11-11= _ in}}
-s3[x: 1] { 1 } = 1 // expected-error {{missing argument for parameter 'y' in call}} {{8-8=, y: <#Int#>}}
+s3[x: 1] { 1 } = 1 // expected-error {{missing argument for parameter 'y' in subscript}} {{8-8=, y: <#Int#>}}
 // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{11-11= _ in}}
-s3[x: 1, y: 1] = 1 // expected-error {{missing argument for parameter 'z' in call}} {{14-14=, z: <#(Int) -> Int#>}}
+s3[x: 1, y: 1] = 1 // expected-error {{missing argument for parameter 'z' in subscript}} {{14-14=, z: <#(Int) -> Int#>}}
 
 struct S4 {
       subscript(x: Int, y: Int, z: (Int) -> Int) -> Int { get { return 1 } set { } } // expected-note * {{here}}
 }
 var s4 = S4()
-_ = s4[1] { 1 } // expected-error {{missing argument for parameter #2 in call}} {{9-9=, <#Int#>}}
+_ = s4[1] { 1 } // expected-error {{missing argument for parameter #2 in subscript}} {{9-9=, <#Int#>}}
 // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{12-12= _ in}}
-_ = s4[1, 1] // expected-error {{missing argument for parameter #3 in call}} {{12-12=, <#(Int) -> Int#>}}
-s4[1] { 1 } = 1 // expected-error {{missing argument for parameter #2 in call}} {{5-5=, <#Int#>}}
+_ = s4[1, 1] // expected-error {{missing argument for parameter #3 in subscript}} {{12-12=, <#(Int) -> Int#>}}
+s4[1] { 1 } = 1 // expected-error {{missing argument for parameter #2 in subscript}} {{5-5=, <#Int#>}}
 // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{8-8= _ in}}
-s4[1, 1] = 1 // expected-error {{missing argument for parameter #3 in call}} {{8-8=, <#(Int) -> Int#>}}
+s4[1, 1] = 1 // expected-error {{missing argument for parameter #3 in subscript}} {{8-8=, <#(Int) -> Int#>}}
 
 func multiLine(x: Int, y: Int, z: Int) {} // expected-note * {{here}}
 multiLine( // expected-error {{missing arguments for parameters 'x', 'y', 'z' in call}} {{11-11=x: <#Int#>, y: <#Int#>, z: <#Int#>}}
@@ -174,3 +174,22 @@ multiLine(
   x: 1,
   y: 1 // expected-error {{missing argument for parameter 'z' in call}} {{7-7=, z: <#Int#>}}
 )
+
+// https://github.com/swiftlang/swift/issues/87818
+do {
+  struct Test {
+    var callback: ((Int) -> Void)? = nil
+    var multiArgCallback: ((Int, String) -> Void)? = nil
+  }
+
+  func test(t: inout Test, fn: @escaping () -> Void) {
+    t.callback = { }
+    // expected-error@-1 {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{19-19= _ in}}
+    t.multiArgCallback = { _ in }
+    // expected-error@-1 {{closure type '(Int, String) -> Void' expects 2 arguments, but 1 was used in closure body}} {{29-29=,_ }}
+    t.callback = fn
+    // expected-error@-1 {{cannot assign value of type '() -> Void' to type '((Int) -> Void)?'}}
+    t.callback = Optional.some(fn)
+    // expected-error@-1 {{cannot convert value of type '() -> Void' to expected argument type '(Int) -> Void'}}
+  }
+}

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -11,51 +11,50 @@
 //===----------------------------------------------------------------------===//
 
 import ASTBridging
-
 import Basic
 
-public typealias DiagID = BridgedDiagID
-
-extension BridgedDiagnosticArgument {
-  init(stringRef val: BridgedStringRef) {
-    self.init(kind: .stringRef, value: .init(stringRefValue: val))
-  }
-  init(int val: Int) {
-    self.init(kind: .int, value: .init(intValue: val))
-  }
-}
+public typealias DiagID = swift.DiagID
 
 public protocol DiagnosticArgument {
   func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void)
 }
 extension String: DiagnosticArgument {
   public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
-    withBridgedStringRef { fn(BridgedDiagnosticArgument(stringRef: $0)) }
+    _withBridgedStringRef { fn(BridgedDiagnosticArgument($0)) }
+  }
+}
+extension StringRef: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    fn(BridgedDiagnosticArgument(_bridged))
   }
 }
 extension Int: DiagnosticArgument {
   public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
-    fn(BridgedDiagnosticArgument(int: self))
+    fn(BridgedDiagnosticArgument(self))
+  }
+}
+extension Type: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    fn(bridged.asDiagnosticArgument())
   }
 }
 
 public struct DiagnosticFixIt {
-  public let start: SourceLoc
-  public let byteLength: Int
-  public let text: String
+  let start: SourceLoc
+  let byteLength: Int
+  let text: String
 
-  public init(start: SourceLoc, byteLength: Int, replacement text: String) {
+  init(start: SourceLoc, byteLength: Int, replacement text: String) {
     self.start = start
     self.byteLength = byteLength
     self.text = text
   }
 
   func withBridgedDiagnosticFixIt(_ fn: (BridgedDiagnosticFixIt) -> Void) {
-    text.withBridgedStringRef { bridgedTextRef in
+    text._withBridgedStringRef { bridgedTextRef in
       let bridgedDiagnosticFixIt = BridgedDiagnosticFixIt(
-        start: start.bridged,
-        byteLength: byteLength,
-        text: bridgedTextRef)
+        start.bridged, UInt32(byteLength),
+        bridgedTextRef)
       fn(bridgedDiagnosticFixIt)
     }
   }
@@ -67,21 +66,28 @@ public struct DiagnosticEngine {
   public init(bridged: BridgedDiagnosticEngine) {
     self.bridged = bridged
   }
-  public init?(bridged: BridgedOptionalDiagnosticEngine) {
-    guard let object = bridged.object else {
+  init?(bridged: BridgedNullableDiagnosticEngine) {
+    guard let raw = bridged.raw else {
       return nil
     }
-    self.bridged = BridgedDiagnosticEngine(object: object)
+    self.bridged = BridgedDiagnosticEngine(raw: raw)
   }
 
-  public func diagnose(_ position: SourceLoc?,
-                       _ id: DiagID,
+  public func diagnose(_ id: DiagID,
                        _ args: [DiagnosticArgument],
+                       at position: SourceLoc?,
                        highlight: CharSourceRange? = nil,
                        fixIts: [DiagnosticFixIt] = []) {
-
-    let bridgedSourceLoc: swift.SourceLoc = position.bridged
-    let bridgedHighlightRange: swift.CharSourceRange = highlight.bridged
+    let bridgedSourceLoc = position.bridgedLocation
+    let highlightStart: swift.SourceLoc
+    let highlightLength: UInt32
+    if let highlight = highlight {
+      highlightStart = highlight.start.bridged
+      highlightLength = highlight.byteLength
+    } else {
+      highlightStart = .init()
+      highlightLength = 0
+    }
     var bridgedArgs: [BridgedDiagnosticArgument] = []
     var bridgedFixIts: [BridgedDiagnosticFixIt] = []
 
@@ -93,9 +99,10 @@ public struct DiagnosticEngine {
     var closure: () -> Void = {
       bridgedArgs.withBridgedArrayRef { bridgedArgsRef in
         bridgedFixIts.withBridgedArrayRef { bridgedFixItsRef in
-          DiagnosticEngine_diagnose(bridged, bridgedSourceLoc,
-                                    id, bridgedArgsRef,
-                                    bridgedHighlightRange, bridgedFixItsRef)
+          bridged.diagnose(at: bridgedSourceLoc, id, bridgedArgsRef,
+                           highlightAt: highlightStart,
+                           highlightLength: highlightLength,
+                           fixIts: bridgedFixItsRef)
         }
       }
     }
@@ -121,11 +128,59 @@ public struct DiagnosticEngine {
     closure()
   }
 
-  public func diagnose(_ position: SourceLoc?,
-                       _ id: DiagID,
+  // FIXME: Remove this overload once https://github.com/swiftlang/swift/issues/82318 is fixed.
+  public func diagnose(
+    _ id: DiagID,
+    arguments args: [DiagnosticArgument],
+    at position: SourceLoc?,
+    highlight: CharSourceRange? = nil,
+    fixIts: [DiagnosticFixIt] = []
+  ) {
+    diagnose(id, args, at: position, highlight: highlight, fixIts: fixIts)
+  }
+
+  public func diagnose(_ id: DiagID,
                        _ args: DiagnosticArgument...,
+                       at position: SourceLoc?,
                        highlight: CharSourceRange? = nil,
                        fixIts: DiagnosticFixIt...) {
-    diagnose(position, id, args, highlight: highlight, fixIts: fixIts)
+    diagnose(id, args, at: position, highlight: highlight, fixIts: fixIts)
+  }
+
+  public func diagnose<SourceLocation: ProvidingSourceLocation>(_ diagnostic: Diagnostic<SourceLocation>) {
+    let loc = diagnostic.location.getSourceLocation(diagnosticEngine: self)
+    diagnose(diagnostic.id, diagnostic.arguments, at: loc)
+  }
+
+  /// Loads the file at `path` and returns a `SourceLoc` pointing to `line` and `column` in the file.
+  /// Returns nil if the file cannot be loaded.
+  public func getLocationFromExternalSource(path: StringRef, line: Int, column: Int) -> SourceLoc? {
+    return SourceLoc(bridged: bridged.getLocationFromExternalSource(path: path._bridged, line: line, column: column))
+  }
+}
+
+/// Something which can provide a `SourceLoc` for diagnostics.
+public protocol ProvidingSourceLocation {
+  func getSourceLocation(diagnosticEngine: DiagnosticEngine) -> SourceLoc?
+}
+
+extension SourceLoc: ProvidingSourceLocation {
+  public func getSourceLocation(diagnosticEngine: DiagnosticEngine) -> SourceLoc? { self }
+}
+
+/// A utility struct which allows throwing a Diagnostic.
+public struct Diagnostic<SourceLocation: ProvidingSourceLocation> : Error {
+  public let id: DiagID
+  public let arguments: [DiagnosticArgument]
+  public let location: SourceLocation
+
+  public init(_ id: DiagID, _ arguments: DiagnosticArgument..., at location: SourceLocation) {
+    self.init(id, arguments, at: location)
+  }
+
+  public init(_ id: DiagID, _ arguments: [DiagnosticArgument], at location: SourceLocation) {
+    self.id = id
+    self.arguments = arguments
+    self.location = location
   }
 }

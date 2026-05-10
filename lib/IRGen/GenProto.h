@@ -19,8 +19,10 @@
 
 #include "swift/SIL/SILFunction.h"
 
+#include "ComputedWitnessIndex.h"
 #include "Fulfillment.h"
 #include "GenericRequirement.h"
+#include "MetadataSource.h"
 
 namespace llvm {
   class Type;
@@ -28,7 +30,7 @@ namespace llvm {
 
 namespace swift {
   class AssociatedConformance;
-  class AssociatedType;
+  class AssociatedTypeDecl;
   class CanType;
   class FuncDecl;
   enum class MetadataState : size_t;
@@ -48,6 +50,7 @@ namespace irgen {
   class MetadataPath;
   class MetadataResponse;
   class NativeCCEntryPointArgumentEmission;
+  class PolymorphicSignatureExpandedTypeSource;
   class ProtocolInfo;
   class TypeInfo;
 
@@ -71,6 +74,10 @@ namespace irgen {
                                          SILDeclRef member,
                                          ProtocolConformanceRef conformance);
 
+  llvm::Value *emitAssociatedConformanceValue(IRGenFunction &IGF,
+                                              llvm::Value *wtable,
+                                              const AssociatedConformance &conf);
+
   /// Compute the index into a witness table for a resilient protocol given
   /// a reference to a descriptor of one of the requirements in that witness
   /// table.
@@ -84,11 +91,11 @@ namespace irgen {
   ///
   /// \param parentMetadata - the type metadata for T
   /// \param wtable - the witness table witnessing the conformance of T to P
-  /// \param associatedType - the declaration of X; a member of P
+  /// \param assocType - the declaration of X; a member of P
   MetadataResponse emitAssociatedTypeMetadataRef(IRGenFunction &IGF,
                                                  llvm::Value *parentMetadata,
                                                  llvm::Value *wtable,
-                                                 AssociatedType associatedType,
+                                                 AssociatedTypeDecl *assocType,
                                                  DynamicMetadataRequest request);
 
   // Return the offset one should do on a witness table pointer to retrieve the
@@ -97,11 +104,29 @@ namespace irgen {
     return -1 - (int)index;
   }
 
+  llvm::Value *loadParentProtocolWitnessTable(IRGenFunction &IGF,
+                                              llvm::Value *wtable,
+                                              ComputedWitnessIndex index);
+
+  llvm::Value *loadConditionalConformance(IRGenFunction &IGF,
+                                          llvm::Value *wtable,
+                                          WitnessIndex index);
+
+  struct ExpandedSignature {
+    unsigned numShapes;
+    unsigned numTypeMetadataPtrs;
+    unsigned numWitnessTablePtrs;
+    unsigned numValues;
+  };
+
   /// Add the witness parameters necessary for calling a function with
   /// the given generics clause.
-  void expandPolymorphicSignature(IRGenModule &IGM,
-                                  CanSILFunctionType type,
-                                  SmallVectorImpl<llvm::Type*> &types);
+  /// Returns the number of lowered parameters of each kind.
+  ExpandedSignature expandPolymorphicSignature(
+      IRGenModule &IGM, CanSILFunctionType type,
+      SmallVectorImpl<llvm::Type *> &types,
+      SmallVectorImpl<PolymorphicSignatureExpandedTypeSource> *outReqs =
+          nullptr);
 
   /// Return the number of trailing arguments necessary for calling a
   /// witness method.
@@ -178,92 +203,8 @@ namespace irgen {
                                    CanType srcType,
                                    ProtocolConformanceRef conformance);
 
-  class MetadataSource {
-  public:
-    enum class Kind {
-      /// Metadata is derived from a source class pointer.
-      ClassPointer,
-
-      /// Metadata is derived from a type metadata pointer.
-      Metadata,
-
-      /// Metadata is derived from the origin type parameter.
-      GenericLValueMetadata,
-
-      /// Metadata is obtained directly from the from a Self metadata
-      /// parameter passed via the WitnessMethod convention.
-      SelfMetadata,
-
-      /// Metadata is derived from the Self witness table parameter
-      /// passed via the WitnessMethod convention.
-      SelfWitnessTable,
-
-      /// Metadata is obtained directly from the FixedType indicated. Used with
-      /// Objective-C generics, where the actual argument is erased at runtime
-      /// and its existential bound is used instead.
-      ErasedTypeMetadata,
-    };
-
-    static bool requiresSourceIndex(Kind kind) {
-      return (kind == Kind::ClassPointer ||
-              kind == Kind::Metadata ||
-              kind == Kind::GenericLValueMetadata);
-    }
-
-    static bool requiresFixedType(Kind kind) {
-      return (kind == Kind::ErasedTypeMetadata);
-    }
-
-    enum : unsigned { InvalidSourceIndex = ~0U };
-
-  private:
-    /// The kind of source this is.
-    Kind TheKind;
-
-    /// For ClassPointer, Metadata, and GenericLValueMetadata, the source index;
-    /// for ErasedTypeMetadata, the type; for others, Index should be set to
-    /// InvalidSourceIndex.
-    union {
-      unsigned Index;
-      CanType FixedType;
-    };
-
-  public:
-    CanType Type;
-
-    MetadataSource(Kind kind, CanType type)
-      : TheKind(kind), Index(InvalidSourceIndex), Type(type)
-    {
-      assert(!requiresSourceIndex(kind) && !requiresFixedType(kind));
-    }
-
-
-    MetadataSource(Kind kind, CanType type, unsigned index)
-      : TheKind(kind), Index(index), Type(type) {
-      assert(requiresSourceIndex(kind));
-      assert(index != InvalidSourceIndex);
-    }
-
-    MetadataSource(Kind kind, CanType type, CanType fixedType)
-      : TheKind(kind), FixedType(fixedType), Type(type) {
-      assert(requiresFixedType(kind));
-    }
-
-    Kind getKind() const { return TheKind; }
-
-    unsigned getParamIndex() const {
-      assert(requiresSourceIndex(getKind()));
-      return Index;
-    }
-
-    CanType getFixedType() const {
-      assert(requiresFixedType(getKind()));
-      return FixedType;
-    }
-  };
-
   using GenericParamFulfillmentCallback =
-    llvm::function_ref<void(CanType genericParamType,
+    llvm::function_ref<void(GenericRequirement req,
                             const MetadataSource &source,
                             const MetadataPath &path)>;
 

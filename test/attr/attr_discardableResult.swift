@@ -180,20 +180,26 @@ func testOptionalChaining(c1: C1?, s1: S1?) {
   s1!.f2Optional() // expected-warning {{result of call to 'f2Optional()' is unused}}
 }
 
-@discardableResult func SR2948 (_ closure: @escaping ()->()) -> (()->()) {
+// https://github.com/apple/swift/issues/45542
+
+@discardableResult func f_45542(_ closure: @escaping ()->()) -> (()->()) {
   closure()
   return closure
 }
-SR2948({}) // okay
-
-class SR7562_A {
-    @discardableResult required init(input: Int) { }
+do {
+  f_45542({}) // okay
 }
 
-class SR7562_B : SR7562_A {}
+// https://github.com/apple/swift/issues/50104
 
-SR7562_A(input: 10) // okay
-SR7562_B(input: 10) // okay
+class C1_50104 {
+  @discardableResult required init(input: Int) { }
+}
+class C2_50104 : C1_50104 {}
+do {
+  C1_50104(input: 10) // okay
+  C2_50104(input: 10) // okay
+}
 
 protocol FooProtocol {}
 
@@ -223,9 +229,9 @@ class Discard {
   }
 }
 
-// SR-12271
+// https://github.com/apple/swift/issues/54699
 
-struct SR_12271_S {
+struct S_54699 {
   @discardableResult
   func bar1() -> () -> Void {
     return {}
@@ -236,9 +242,9 @@ struct SR_12271_S {
     return {}
   }
 }
-
-SR_12271_S().bar1() // Okay
-SR_12271_S.bar2() // Okay
-
-SR_12271_S().bar1 // expected-error {{function is unused}}
-SR_12271_S.bar2 // expected-error {{function is unused}}
+do {
+  S_54699().bar1() // Okay
+  S_54699.bar2() // Okay
+  S_54699().bar1 // expected-error {{function is unused}}
+  S_54699.bar2 // expected-error {{function is unused}}
+}

@@ -35,12 +35,12 @@ func generic_nondependent_context<T>(_ x: T, y: Int) -> Int {
 func generic_capture<T>(_ x: T) -> Any.Type {
   func foo() -> Any.Type { return T.self }
 
-  // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A8_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick Any.Type
+  // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A8_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick any Any.Type
   // CHECK: [[FOO_CLOSURE:%.*]] = partial_apply [callee_guaranteed] [[FOO]]<T>()
   // CHECK: destroy_value [[FOO_CLOSURE]]
   let _ = foo
 
-  // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A8_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick Any.Type
+  // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A8_capture{{.*}} : $@convention(thin) <τ_0_0> () -> @thick any Any.Type
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]<T>()
 
   // CHECK: return [[FOO_CLOSURE]]
@@ -71,11 +71,11 @@ protocol Concept {
 func generic_nocapture_existential<T>(_ x: T, y: Concept) -> Bool {
   func foo(_ a: Concept) -> Bool { return a.sensical }
 
-  // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A22_nocapture_existential{{.*}} : $@convention(thin) (@in_guaranteed Concept) -> Bool
+  // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A22_nocapture_existential{{.*}} : $@convention(thin) (@in_guaranteed any Concept) -> Bool
   // CHECK: [[FOO_CLOSURE:%.*]] = thin_to_thick_function [[FOO]]
   let _ = foo
 
-  // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A22_nocapture_existential{{.*}} : $@convention(thin) (@in_guaranteed Concept) -> Bool
+  // CHECK: [[FOO:%.*]] = function_ref @$s16generic_closures0A22_nocapture_existential{{.*}} : $@convention(thin) (@in_guaranteed any Concept) -> Bool
   // CHECK: [[FOO_CLOSURE:%.*]] = apply [[FOO]]([[ARG:%.*]])
 
   // CHECK: return [[FOO_CLOSURE]]
@@ -132,8 +132,8 @@ class NestedGeneric<U> {
   // CHECK-LABEL: sil hidden [ossa] @$s16generic_closures13NestedGenericC20nested_reabstraction{{[_0-9a-zA-Z]*}}F
   //   CHECK:       [[REABSTRACT:%.*]] = function_ref @$sIeg_ytIegr_TR
   //   CHECK:       partial_apply [callee_guaranteed] [[REABSTRACT]]
-  func nested_reabstraction<T>(_ x: T) -> Optionable<() -> ()> {
-    return .some({})
+  func nested_reabstraction<T>(_ x: T, fn: @escaping () -> ()) -> Optionable<() -> ()> {
+    return .some(fn)
   }
 }
 

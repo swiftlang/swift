@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// https://bugs.swift.org/browse/SR-1461
+// https://github.com/apple/swift/issues/44070
 
 class X {}
 func foo() {}

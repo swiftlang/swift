@@ -1,0 +1,333 @@
+// RUN: %target-sil-opt -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+
+//   Check that join points normally require the stack to match.
+// CHECK-LABEL: Begin Error in function require_match_1
+// CHECK-LABEL: Begin Error in function require_match_1
+// CHECK:       SIL verification failed: inconsistent stack states entering basic block
+// CHECK-NEXT:  Entering basic block bb3
+// CHECK-NEXT:  Current stack state: []
+// CHECK-NEXT:  Recorded stack state: [
+// CHECK-NEXT:    %0 = alloc_stack $Builtin.Int32
+// CHECK-NEXT:  ]
+// CHECK-LABEL: End Error in function require_match_1
+sil @require_match_1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %0
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %result = tuple ()
+  return %result : $()
+}
+
+//   Same as above, just with the branches switched around.
+// CHECK-LABEL: Begin Error in function require_match_2
+// CHECK-LABEL: Begin Error in function require_match_2
+// CHECK:       SIL verification failed: inconsistent stack states entering basic block
+// CHECK-NEXT:  Entering basic block bb3
+// CHECK-NEXT:  Current stack state: [
+// CHECK-NEXT:    %0 = alloc_stack $Builtin.Int32
+// CHECK-NEXT:  ]
+// CHECK-NEXT:  Recorded stack state: []
+// CHECK-LABEL: End Error in function require_match_2
+sil @require_match_2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  dealloc_stack %0
+  br bb3
+
+bb3:
+  %result = tuple ()
+  return %result : $()
+}
+
+//   Check that such a join point is okay if it's a branch into a dead-end region.
+// CHECK-NOT:   Begin Error in function merge_unreachable_okay_1
+sil @merge_unreachable_okay_1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %0
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  unreachable
+}
+
+//   Same as above, just with the branches switched around.
+// CHECK-NOT:   Begin Error in function merge_unreachable_okay_1
+sil @merge_unreachable_okay_2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  dealloc_stack %0
+  br bb3
+
+bb3:
+  unreachable
+}
+
+//   Check that it's not okay to subsequently dealloc the allocation.
+// CHECK-LABEL: Begin Error in function merge_unreachable_then_dealloc_1
+// CHECK:       SIL verification failed: deallocating allocation that is not the top of the stack
+// CHECK-NEXT:  Current stack state: []
+// CHECK-NEXT:  Stack allocation:
+// CHECK-NEXT:    %0 = alloc_stack $Builtin.Int32
+// CHECK-LABEL: End Error in function merge_unreachable_then_dealloc_1
+sil @merge_unreachable_then_dealloc_1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %0
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  dealloc_stack %0
+  unreachable
+}
+
+//   Same as above, just with the branches switched around.
+// CHECK-LABEL: Begin Error in function merge_unreachable_then_dealloc_2
+// CHECK:       SIL verification failed: deallocating allocation that is not the top of the stack
+// CHECK-NEXT:  Current stack state: []
+// CHECK-NEXT:  Stack allocation:
+// CHECK-NEXT:    %0 = alloc_stack $Builtin.Int32
+// CHECK-LABEL: End Error in function merge_unreachable_then_dealloc_2
+sil @merge_unreachable_then_dealloc_2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  dealloc_stack %0
+  br bb3
+
+bb3:
+  dealloc_stack %0
+  unreachable
+}
+
+//   Parallel branches with inconsistent stack state into a dead-end loop
+// CHECK-NOT:   Begin Error in function parallel_branches_into_dead_1
+sil @parallel_branches_into_dead_1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %0
+  br bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  br bb3
+}
+
+//   Same as above, just with the dealloc switched around to trigger
+//   a different visitation pattern.
+// CHECK-NOT:   Begin Error in function parallel_branches_into_dead_2
+sil @parallel_branches_into_dead_2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  dealloc_stack %0
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  br bb3
+}
+
+//   Add an unreachable block that also branches to the dead-end region to
+//   make sure we don't fail to visit anything.
+// CHECK-NOT:   Begin Error in function parallel_branches_into_dead_with_unreachable_block
+sil @parallel_branches_into_dead_with_unreachable_block : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  dealloc_stack %0
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  br bb3
+
+bb5: // unreachable
+  br bb3
+}
+
+//   Parallel branches with inconsistent stack state into a dead-end loop
+//   that contains a dealloc
+// CHECK-LABEL:   Begin Error in function parallel_branches_into_dead_dealloc_1
+// CHECK-NEXT:    SIL verification failed: deallocating allocation that is not the top of the stack
+sil @parallel_branches_into_dead_dealloc_1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %0
+  br bb3
+
+bb2:
+  br bb4
+
+bb3:
+  dealloc_stack %0
+  br bb4
+
+bb4:
+  br bb3
+}
+
+//   Same as above, just with the dealloc switched around to trigger
+//   a different visitation pattern.
+// CHECK-LABEL:   Begin Error in function parallel_branches_into_dead_dealloc_2
+// CHECK-NEXT:    SIL verification failed: deallocating allocation that is not the top of the stack
+sil @parallel_branches_into_dead_dealloc_2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  dealloc_stack %0
+  br bb3
+
+bb2:
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %0
+  br bb3
+}
+
+//   Yet another visitation pattern.
+// CHECK-LABEL:   Begin Error in function parallel_branches_into_dead_dealloc_3
+// CHECK-NEXT:    SIL verification failed: deallocating allocation that is not the top of the stack
+sil @parallel_branches_into_dead_dealloc_3 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  dealloc_stack %0
+  br bb4
+
+bb3:
+  dealloc_stack %0
+  br bb4
+
+bb4:
+  br bb3
+}
+
+//   Yet another visitation pattern.
+// CHECK-LABEL:   Begin Error in function parallel_branches_into_dead_dealloc_4
+// CHECK-NEXT:    SIL verification failed: deallocating allocation that is not the top of the stack
+sil @parallel_branches_into_dead_dealloc_4 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  dealloc_stack %0
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  dealloc_stack %0
+  br bb3
+}
+
+//   And again, add an unreachable block.
+// CHECK-LABEL:   Begin Error in function parallel_branches_into_dead_dealloc_with_unreachable_block
+// CHECK-NEXT:    SIL verification failed: deallocating allocation that is not the top of the stack
+sil @parallel_branches_into_dead_dealloc_with_unreachable_block : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Builtin.Int32
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3
+
+bb2:
+  dealloc_stack %0
+  br bb4
+
+bb3:
+  dealloc_stack %0
+  br bb4
+
+bb4:
+  br bb3
+
+bb5: // unreachable
+  br bb3
+}

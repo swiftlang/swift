@@ -1,3 +1,5 @@
+[** ‼️ The official C++ interoperability documentation and status page is live at Swift.org and provides an up-to-date guide for mixing Swift and C++ ‼️ **](https://www.swift.org/documentation/cxx-interop/status)
+
 #  C++ Interoperability Status
 
 Swift has some experimental ability to interoperate with C++.
@@ -22,8 +24,7 @@ using V = std::vector<long>;
 ```Swift
 // main.swift
 import CxxTypes
-import std.vector
-import std.algorithm
+import CxxStdlib
 
 // We can extend C++ types in Swift.
 extension V : RandomAccessCollection {
@@ -76,8 +77,8 @@ This status table describes which of the following C++ language features can be 
 | Typedefs / Type aliases                     | Yes    |
 | Global Variables                            | Yes    |
 | Namespaces                                  | Yes    |
-| Inline Namespaces                           | Yes, with some known issues (https://bugs.swift.org/browse/SR-15956) |
-| Exceptions                                  | No  |
+| Inline Namespaces                           | Yes, with some known issues ([#58217](https://github.com/swiftlang/swift/issues/58217)) |
+| Exceptions                                  | No. Uncaught exceptions that propagate into Swift frames are UB.  |
 | Fields                                      | Yes |
 | Member functions                            | Yes. Some value category overloads aren't imported |
 | Virtual Member Functions                    | No |
@@ -120,7 +121,7 @@ This status table describes which of the following C++ standard library features
 ## Known Issues
 
 ### Inline Namespaces
-- https://bugs.swift.org/browse/SR-15956: Swift's typechecker currently doesn't allow calling a function from an inline namespace when it's referenced through the parent namespace. Example of a test that fails: https://github.com/apple/swift/blob/main/test/Interop/Cxx/namespace/inline-namespace-function-call-broken.swift 
+- [#58217](https://github.com/swiftlang/swift/issues/58217): Swift's typechecker currently doesn't allow calling a function from an inline namespace when it's referenced through the parent namespace. Example of a test that fails: https://github.com/swiftlang/swift/blob/main/test/Interop/Cxx/namespace/inline-namespace-function-call-broken.swift
 
 
 ## Swift to C++ Interoperability Status
@@ -137,11 +138,21 @@ This status table describes which of the following Swift language features have 
 
 **Functions**
 
+Swift functions can be called from C++, with some restrictions. See this table for details:
+
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
 | Top-level `@_cdecl` functions  | Yes                                                      |
-| Top-level Swift functions      | Partially, only with primitive and Swift struct types    |
+| Top-level Swift functions      | Yes |
+| Swift Methods                  | Yes (see the **Methods** section below for more details) |
+| Primitive parameter or result types  | Yes           |
+| Swift `struct`/`enum`/`class` parameter or result types  | Yes           |
 | `inout` parameters             | Yes                                                      |
+| C++ `struct`/`class` parameter or result types  | Yes   |
+| Objective-C `@interface` parameter or result types  | Yes   |
+| Swift closure parameter or result types  | No           |
+| Swift protocol type parameter or result types  | No           |
+| SIMD type parameter or result types  | No           |
 | Variadic parameters            | No                                                       |
 | Multiple return values         | No                                                       |
 
@@ -152,19 +163,60 @@ This status table describes which of the following Swift language features have 
 | Fixed layout structs           | Yes                                                      |
 | Resilient / opaque structs     | Yes                                                      |
 | Copy and destroy semantics     | Yes                                                      |
-| Initializers                   | Partially, as static `init` methods. No failable support |
+| Initializers                   | Yes (except for throwing initializers)                   |
+
+**Enums**
+
+| **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
+|------------------------------|----------------------------------------------------------|
+| Fixed layout enums           | Yes                                                      |
+| Resilient / opaque enums     | Yes                                                      |
+| Copy and destroy semantics   | Yes                                                      |
+| Creation                     | Yes                                                      |
+| Enums with associated values | Partially: only support structs and enums                |
+| Enums with raw values        | Yes                                                       |
+| Indirect enums               | No                                                       |
+
+**Class types**
+
+| **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
+|--------------------------------|----------------------------------------------------------|
+| Class reference values         | Yes                                                      |
+| ARC semantics                  | Yes (C++ copy constructor,assignment operator, destructor perform ARC operations)  |
+| Initializers                   | Yes (except for throwing initializers) |
 
 **Methods**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Instance methods               | Yes, for structs only                                    |
+| Instance methods               | Yes on structs and enums. Instance methods on class types are partially supported (virtual calls won't be virtual due to a bug right now) |
 | Static methods                 | No                                                       |
 
 **Properties**
 
 | **Swift Language Feature**     | **Implemented Experimental Support For Using It In C++** |
 |--------------------------------|----------------------------------------------------------|
-| Getter accessors               | Yes, via `get<name>`. For structs only                   |
-| Setter accessors               | No                                                       |
+| Getter accessors               | Yes, via `get<name>`. Boolean properties that start with `is` or `has` are remapped directly to a getter method using their original name                         |
+| Setter accessors               | Yes, via `set<name>`                                     |
 | Mutation accessors             | No                                                       |
+| Static property accessors      | Yes                         |
+
+**Generics**
+
+| **Swift Language Feature**   | **Implemented Experimental Support For Using It In C++** |
+|------------------------------|----------------------------------------------------------|
+| Generic functions            | Partially, only without generic constraints              |
+| Generic methods              | Partially, only without generic constraints              |
+| Generic `struct` types       | Partially, only without generic constraints and less than 4 generic parameters             |
+| Generic `enum` types         | Partially, only without generic constraints and less than 4 generic parameters |
+| Generic `class` types        | No |
+
+### Swift standard library
+
+This status table describes which of the following Swift standard library APIs have some experimental support for using them in C++.
+
+| **Swift Library Type**     | **Can be used from C++** |
+|--------------------------------|----------------------------------------------------------|
+| `String`     | Can be used as a type in C++. APIs in extensions are not exposed to C++. Conversion between `std.string` is not yet supported   |
+| `Array<T>`   | Can be used as a type in C++. Ranged for loops are supported. Limited set of APIs in some extensions are exposed to C++. |
+| `Optional<T>`   | Can be used as a type in C++. Can be constructed. `get` extracts the optional value and it's also implicitly castable to `bool`.  |

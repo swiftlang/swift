@@ -1,7 +1,9 @@
-// RUN: %target-swift-frontend-typecheck -verify -disable-availability-checking %s
-// RUN: %target-swift-frontend-typecheck -enable-testing -verify -disable-availability-checking %s
+// RUN: %target-swift-frontend-typecheck -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature CoroutineAccessors
+// RUN: %target-swift-frontend-typecheck -enable-testing -verify -verify-ignore-unrelated -target %target-swift-5.1-abi-triple %s -package-name myPkg -enable-experimental-feature CoroutineAccessors
 
 // Swift.AdditiveArithmetic:3:17: note: cannot yet register derivative default implementation for protocol requirements
+
+// REQUIRES: swift_feature_CoroutineAccessors
 
 import _Differentiation
 
@@ -427,10 +429,32 @@ extension Class: Differentiable where T: Differentiable {}
 // Test computed properties.
 
 extension Struct {
+  // expected-note @+1 {{cannot register derivative for _modify accessor}}
   var computedProperty: T {
     get { x }
     set { x = newValue }
     _modify { yield &x }
+  }
+  // The `@derivative(of:)` annotations below specify
+  // .`yielding borrow` and .`yielding mutate`
+  // expected-note @+2 {{cannot register derivative for yielding borrow accessor}}
+  // expected-note @+1 {{cannot register derivative for yielding mutate accessor}}
+  var computedProperty2: T {
+    yielding borrow { yield x }
+    yielding mutate { yield &x }
+  }
+  // The `@derivative(of:)` annotations below specify .borrow and .mutate
+  // expected-note @+2 {{cannot register derivative for yielding borrow accessor}}
+  // expected-note @+1 {{cannot register derivative for yielding mutate accessor}}
+  var computedProperty2a: T {
+    yielding borrow { yield x }
+    yielding mutate { yield &x }
+  }
+  // expected-note @+2 {{cannot register derivative for borrow accessor}}
+  // expected-note @+1 {{cannot register derivative for mutate accessor}}
+  var computedProperty3: T {
+    borrow { return x }
+    mutate { return &x }
   }
 }
 extension Struct where T: Differentiable & AdditiveArithmetic {
@@ -451,9 +475,60 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     fatalError()
   }
 
-  // expected-error @+1 {{cannot register derivative for _modify accessor}}
+  // expected-error @+1 {{referenced declaration 'computedProperty' could not be resolved}}
   @derivative(of: computedProperty._modify)
   mutating func vjpPropertyModify(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{referenced declaration 'computedProperty2' could not be resolved}}
+  @derivative(of: computedProperty2.`yielding borrow`)
+  mutating func vjpPropertyYieldingBorrow(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+
+  // expected-error @+1 {{referenced declaration 'computedProperty2' could not be resolved}}
+  @derivative(of: computedProperty2.`yielding mutate`)
+  mutating func vjpPropertyYieldingMutate(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // We can match `.borrow` or `.mutate` to a yielding borrow or mutate
+  // expected-error @+1 {{referenced declaration 'computedProperty2a' could not be resolved}}
+  @derivative(of: computedProperty2a.borrow)
+  mutating func vjpProperty2Borrow(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // We can match `.borrow` or `.mutate` to a yielding borrow or mutate
+  // expected-error @+1 {{referenced declaration 'computedProperty2a' could not be resolved}}
+  @derivative(of: computedProperty2a.mutate)
+  mutating func vjpProperty2Mutate(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{referenced declaration 'computedProperty3' could not be resolved}}
+  @derivative(of: computedProperty3.borrow)
+  mutating func vjpPropertyBorrow(_ newValue: T) -> (
+    value: (), pullback: (inout TangentVector) -> T.TangentVector
+  ) {
+    fatalError()
+  }
+
+  // expected-error @+1 {{referenced declaration 'computedProperty3' could not be resolved}}
+  @derivative(of: computedProperty3.mutate)
+  mutating func vjpPropertyMutate(_ newValue: T) -> (
     value: (), pullback: (inout TangentVector) -> T.TangentVector
   ) {
     fatalError()
@@ -496,7 +571,7 @@ extension Struct {
   }
 
   // expected-note @+1 {{candidate subscript does not have a setter}}
-  subscript<T: Differentiable>(x: T) -> T { x }
+  subscript<U: Differentiable>(x: U) -> U { x }
 }
 extension Struct where T: Differentiable & AdditiveArithmetic {
   @derivative(of: subscript.get)
@@ -504,7 +579,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     return (1, { _ in .zero })
   }
 
-  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-error @+2 {{a derivative already exists for getter for 'subscript()'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript)
   func vjpSubscript() -> (value: Float, pullback: (Float) -> TangentVector) {
@@ -521,7 +596,7 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
     return (1, { _ in .zero })
   }
 
-  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-error @+2 {{a derivative already exists for getter for 'subscript(float:)'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript(float:), wrt: self)
   func vjpSubscriptLabeled(float: Float) -> (value: Float, pullback: (Float) -> TangentVector) {
@@ -534,14 +609,14 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   }
 
   @derivative(of: subscript(_:).get, wrt: self)
-  func vjpSubscriptGenericGetter<T: Differentiable>(x: T) -> (value: T, pullback: (T.TangentVector) -> TangentVector)   {
+  func vjpSubscriptGenericGetter<U: Differentiable>(x: U) -> (value: U, pullback: (U.TangentVector) -> TangentVector)   {
     return (x, { _ in .zero })
   }
 
-  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-error @+2 {{a derivative already exists for getter for 'subscript(_:)'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript(_:), wrt: self)
-  func vjpSubscriptGeneric<T: Differentiable>(x: T) -> (value: T, pullback: (T.TangentVector) -> TangentVector)   {
+  func vjpSubscriptGeneric<U: Differentiable>(x: U) -> (value: U, pullback: (U.TangentVector) -> TangentVector)   {
     return (x, { _ in .zero })
   }
 
@@ -576,27 +651,29 @@ extension Struct where T: Differentiable & AdditiveArithmetic {
   // Error: original subscript has no setter.
   // expected-error @+1 {{referenced declaration 'subscript(_:)' could not be resolved}}
   @derivative(of: subscript(_:).set, wrt: self)
-  mutating func vjpSubscriptGeneric_NoSetter<T: Differentiable>(x: T) -> (
-    value: T, pullback: (T.TangentVector) -> TangentVector
+  mutating func vjpSubscriptGeneric_NoSetter<U: Differentiable>(x: U) -> (
+    value: U, pullback: (U.TangentVector) -> TangentVector
   ) {
     return (x, { _ in .zero })
   }
 }
 
-struct SR15530_Struct<T> {}
-extension SR15530_Struct: Differentiable where T: Differentiable {}
+// https://github.com/apple/swift/issues/57833
 
-extension SR15530_Struct {
-  // expected-note @+1 {{candidate instance method does not have type equal to or less constrained than '<T where T : Differentiable> (inout SR15530_Struct<T>) -> (Int, @differentiable(reverse) (inout T) -> Void) -> Void'}}
-  mutating func sr15530_update<D>(at index: Int, byCalling closure: (inout T, D) -> Void, withArgument: D) {
+struct Struct2<T> {}
+extension Struct2: Differentiable where T: Differentiable {}
+
+extension Struct2 {
+  // expected-note @+1 {{candidate instance method does not have type equal to or less constrained than '<T where T : Differentiable> (inout Struct2<T>) -> (Int, @differentiable(reverse) (inout T) -> Void) -> Void'}}
+  mutating func update<D>(at index: Int, byCalling closure: (inout T, D) -> Void, withArgument: D) {
     fatalError("Stop")
   }
 }
 
-extension SR15530_Struct where T: Differentiable {
-  // expected-error @+1 {{referenced declaration 'sr15530_update' could not be resolved}}
-  @derivative(of: sr15530_update)
-  mutating func vjp_sr15530_update(
+extension Struct2 where T: Differentiable {
+  // expected-error @+1 {{referenced declaration 'update' could not be resolved}}
+  @derivative(of: update)
+  mutating func vjp_update(
     at index: Int,
     byCalling closure: @differentiable(reverse) (inout T) -> Void
   ) -> (value: Void, pullback: (inout Self.TangentVector) -> Void) {
@@ -617,14 +694,15 @@ extension Class where T: Differentiable {
     return (1, { _ in .zero })
   }
 
-  // expected-error @+2 {{a derivative already exists for '_'}}
+  // expected-error @+2 {{a derivative already exists for getter for 'subscript()'}}
   // expected-note @-6 {{other attribute declared here}}
   @derivative(of: subscript)
   func vjpSubscript() -> (value: Float, pullback: (Float) -> TangentVector) {
     return (1, { _ in .zero })
   }
 
-  // FIXME(SR-13096): Enable derivative registration for class property/subscript setters.
+  // FIXME: Enable derivative registration for class property/subscript setters (https://github.com/apple/swift/issues/55542).
+  //
   // This requires changing derivative type calculation rules for functions with
   // class-typed parameters. We need to assume that all functions taking
   // class-typed operands may mutate those operands.
@@ -746,13 +824,19 @@ extension ProtocolRequirementDerivative {
 func multipleSemanticResults(_ x: inout Float) -> Float {
   return x
 }
-// expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
 @derivative(of: multipleSemanticResults)
 func vjpMultipleSemanticResults(x: inout Float) -> (
-  value: Float, pullback: (Float) -> Float
-) {
-  return (multipleSemanticResults(&x), { $0 })
+  value: Float, pullback: (Float, inout Float) -> Void
+) { fatalError() }
+
+func inoutNonDifferentiableResult(_ x: inout Float) -> Int {
+  return 5
 }
+// expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+@derivative(of: inoutNonDifferentiableResult)
+func vjpInoutNonDifferentiableResult(x: inout Float) -> (
+  value: Int, pullback: (inout Float) -> Void
+) { fatalError() }
 
 struct InoutParameters: Differentiable {
   typealias TangentVector = DummyTangentVector
@@ -760,7 +844,8 @@ struct InoutParameters: Differentiable {
 }
 
 extension InoutParameters {
-  // expected-note @+1 4 {{'staticMethod(_:rhs:)' defined here}}
+  // expected-note @+2 {{'staticMethod(_:rhs:)' defined here}}
+  // expected-note @+1 {{'staticMethod(_:rhs:)' defined here}}
   static func staticMethod(_ lhs: inout Self, rhs: Self) {}
 
   // Test wrt `inout` parameter.
@@ -791,33 +876,34 @@ extension InoutParameters {
 
   // Test non-wrt `inout` parameter.
 
+  // expected-error @+1 {{cannot differentiate void function 'staticMethod(_:rhs:)'}}
   @derivative(of: staticMethod, wrt: rhs)
   static func vjpNotWrtInout(_ lhs: inout Self, _ rhs: Self) -> (
     value: Void, pullback: (TangentVector) -> TangentVector
   ) { fatalError() }
 
-  // expected-error @+1 {{function result's 'pullback' type does not match 'staticMethod(_:rhs:)'}}
+  // expected-error @+1 {{cannot differentiate void function 'staticMethod(_:rhs:)'}}
   @derivative(of: staticMethod, wrt: rhs)
   static func vjpNotWrtInoutMismatch(_ lhs: inout Self, _ rhs: Self) -> (
-    // expected-note @+1 {{'pullback' does not have expected type '(InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(DummyTangentVector) -> DummyTangentVector')}}
     value: Void, pullback: (inout TangentVector) -> TangentVector
   ) { fatalError() }
 
+  // expected-error @+1 {{cannot differentiate void function 'staticMethod(_:rhs:)'}}
   @derivative(of: staticMethod, wrt: rhs)
   static func jvpNotWrtInout(_ lhs: inout Self, _ rhs: Self) -> (
     value: Void, differential: (TangentVector) -> TangentVector
   ) { fatalError() }
 
-  // expected-error @+1 {{function result's 'differential' type does not match 'staticMethod(_:rhs:)'}}
+  // expected-error @+1 {{cannot differentiate void function 'staticMethod(_:rhs:)'}}
   @derivative(of: staticMethod, wrt: rhs)
   static func jvpNotWrtInout(_ lhs: inout Self, _ rhs: Self) -> (
-    // expected-note @+1 {{'differential' does not have expected type '(InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(DummyTangentVector) -> DummyTangentVector')}}
     value: Void, differential: (inout TangentVector) -> TangentVector
   ) { fatalError() }
 }
 
 extension InoutParameters {
-  // expected-note @+1 4 {{'mutatingMethod' defined here}}
+  // expected-note @+2 {{'mutatingMethod' defined here}}
+  // expected-note @+1 {{'mutatingMethod' defined here}}  
   mutating func mutatingMethod(_ other: Self) {}
 
   // Test wrt `inout` `self` parameter.
@@ -848,27 +934,27 @@ extension InoutParameters {
 
   // Test non-wrt `inout` `self` parameter.
 
+  // expected-error @+1 {{cannot differentiate void function 'mutatingMethod'}}
   @derivative(of: mutatingMethod, wrt: other)
   mutating func vjpNotWrtInout(_ other: Self) -> (
     value: Void, pullback: (TangentVector) -> TangentVector
   ) { fatalError() }
 
-  // expected-error @+1 {{function result's 'pullback' type does not match 'mutatingMethod'}}
+  // expected-error @+1 {{cannot differentiate void function 'mutatingMethod'}}
   @derivative(of: mutatingMethod, wrt: other)
   mutating func vjpNotWrtInoutMismatch(_ other: Self) -> (
-    // expected-note @+1 {{'pullback' does not have expected type '(InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(DummyTangentVector) -> DummyTangentVector')}}
     value: Void, pullback: (inout TangentVector) -> TangentVector
   ) { fatalError() }
 
+  // expected-error @+1 {{cannot differentiate void function 'mutatingMethod'}}
   @derivative(of: mutatingMethod, wrt: other)
   mutating func jvpNotWrtInout(_ other: Self) -> (
     value: Void, differential: (TangentVector) -> TangentVector
   ) { fatalError() }
 
-  // expected-error @+1 {{function result's 'differential' type does not match 'mutatingMethod'}}
+  // expected-error @+1 {{cannot differentiate void function 'mutatingMethod'}}
   @derivative(of: mutatingMethod, wrt: other)
   mutating func jvpNotWrtInoutMismatch(_ other: Self) -> (
-    // expected-note @+1 {{'differential' does not have expected type '(InoutParameters.TangentVector) -> InoutParameters.TangentVector' (aka '(DummyTangentVector) -> DummyTangentVector')}}
     value: Void, differential: (TangentVector, TangentVector) -> Void
   ) { fatalError() }
 }
@@ -885,17 +971,32 @@ func vjpNoSemanticResults(_ x: Float) -> (value: Void, pullback: Void) {}
 
 extension InoutParameters {
   func multipleSemanticResults(_ x: inout Float) -> Float { x }
-  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-  @derivative(of: multipleSemanticResults)
+  @derivative(of: multipleSemanticResults, wrt: x)
   func vjpMultipleSemanticResults(_ x: inout Float) -> (
-    value: Float, pullback: (inout Float) -> Void
+    value: Float, pullback: (Float, inout Float) -> Void
   ) { fatalError() }
 
   func inoutVoid(_ x: Float, _ void: inout Void) -> Float {}
-  // expected-error @+1 {{cannot differentiate functions with both an 'inout' parameter and a result}}
-  @derivative(of: inoutVoid)
+  @derivative(of: inoutVoid, wrt: (x, void))
   func vjpInoutVoidParameter(_ x: Float, _ void: inout Void) -> (
-    value: Float, pullback: (inout Float) -> Void
+    value: Float, pullback: (Float) -> Float
+  ) { fatalError() }
+}
+
+// Test tuple results.
+
+extension InoutParameters {
+  func tupleResults(_ x: Float) -> (Float, Float) { (x, x) }
+  @derivative(of: tupleResults, wrt: x)
+  func vjpTupleResults(_ x: Float) -> (
+    value: (Float, Float), pullback: (Float, Float) -> Float
+  ) { fatalError() }
+
+  func tupleResultsInt(_ x: Float) -> (Int, Float) { (1, x) }
+  // expected-error @+1 {{can only differentiate functions with results that conform to 'Differentiable', but 'Int' does not conform to 'Differentiable'}}
+  @derivative(of: tupleResultsInt, wrt: x)
+  func vjpTupleResults(_ x: Float) -> (
+    value: (Int, Float), pullback: (Float) -> Float
   ) { fatalError() }
 }
 
@@ -998,6 +1099,12 @@ func _public_original_usablefrominline_derivative(_ x: Float) -> (value: Float, 
   fatalError()
 }
 
+package func package_original_package_derivative(_ x: Float) -> Float { x }
+@derivative(of: package_original_package_derivative)
+package func _package_original_package_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
 func internal_original_internal_derivative(_ x: Float) -> Float { x }
 @derivative(of: internal_original_internal_derivative)
 func _internal_original_internal_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
@@ -1030,10 +1137,50 @@ func _internal_original_inlinable_derivative(_ x: Float) -> (value: Float, pullb
   fatalError()
 }
 
+func internal_original_alwaysemitintoclient_derivative_error(_ x: Float) -> Float { x }
+@_alwaysEmitIntoClient
+@derivative(of: internal_original_alwaysemitintoclient_derivative_error)
+// expected-error @+1 {{either both or none of derivative and original function must have @alwaysEmitIntoClient attribute}}
+func _internal_original_alwaysemitintoclient_derivative_error(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+@_alwaysEmitIntoClient
 func internal_original_alwaysemitintoclient_derivative(_ x: Float) -> Float { x }
 @_alwaysEmitIntoClient
 @derivative(of: internal_original_alwaysemitintoclient_derivative)
 func _internal_original_alwaysemitintoclient_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+
+package func package_original_usablefrominline_derivative(_ x: Float) -> Float { x }
+@usableFromInline
+@derivative(of: package_original_usablefrominline_derivative)
+package func _package_original_usablefrominline_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+package func package_original_inlinable_derivative(_ x: Float) -> Float { x }
+@inlinable
+@derivative(of: package_original_inlinable_derivative)
+package func _package_original_inlinable_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+@_alwaysEmitIntoClient
+package func package_original_alwaysemitintoclient_derivative_error(_ x: Float) -> Float { x }
+@derivative(of: package_original_alwaysemitintoclient_derivative_error)
+// expected-error @+1 {{either both or none of derivative and original function must have @alwaysEmitIntoClient attribute}}
+package func _package_original_alwaysemitintoclient_derivative_error(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+@_alwaysEmitIntoClient
+package func package_original_alwaysemitintoclient_derivative(_ x: Float) -> Float { x }
+@_alwaysEmitIntoClient
+@derivative(of: package_original_alwaysemitintoclient_derivative)
+package func _package_original_alwaysemitintoclient_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
 
@@ -1048,11 +1195,36 @@ public func _usablefrominline_original_public_derivative(_ x: Float) -> (value: 
   fatalError()
 }
 
+@usableFromInline
+package func package_usablefrominline_original_public_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_package__usablefrominline_original_public_derivative' is public, but original function 'package_usablefrominline_original_public_derivative' is package}}
+@derivative(of: package_usablefrominline_original_public_derivative)
+// expected-note @+1 {{mark the derivative function as 'package' to match the original function}} {{1-7=package}}
+public func _package__usablefrominline_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+package func package_original_public_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_package_original_public_derivative' is public, but original function 'package_original_public_derivative' is package}}
+@derivative(of: package_original_public_derivative)
+// expected-note @+1 {{mark the derivative function as 'package' to match the original function}} {{1-7=package}}
+public func _package_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
 func internal_original_public_derivative(_ x: Float) -> Float { x }
 // expected-error @+1 {{derivative function must have same access level as original function; derivative function '_internal_original_public_derivative' is public, but original function 'internal_original_public_derivative' is internal}}
 @derivative(of: internal_original_public_derivative)
 // expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-7=internal}}
 public func _internal_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+func internal_original_package_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_internal_original_package_derivative' is package, but original function 'internal_original_package_derivative' is internal}}
+@derivative(of: internal_original_package_derivative)
+// expected-note @+1 {{mark the derivative function as 'internal' to match the original function}} {{1-8=internal}}
+package func _internal_original_package_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
 
@@ -1070,6 +1242,14 @@ private func private_original_public_derivative(_ x: Float) -> Float { x }
 @derivative(of: private_original_public_derivative)
 // expected-note @+1 {{mark the derivative function as 'private' to match the original function}} {{1-7=private}}
 public func _private_original_public_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  fatalError()
+}
+
+private func private_original_package_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_private_original_package_derivative' is package, but original function 'private_original_package_derivative' is private}}
+@derivative(of: private_original_package_derivative)
+// expected-note @+1 {{mark the derivative function as 'private' to match the original function}}
+package func _private_original_package_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
 
@@ -1102,16 +1282,32 @@ fileprivate func _private_original_fileprivate_derivative(_ x: Float) -> (value:
 public func public_original_private_derivative(_ x: Float) -> Float { x }
 // expected-error @+1 {{derivative function must have same access level as original function; derivative function '_public_original_private_derivative' is fileprivate, but original function 'public_original_private_derivative' is public}}
 @derivative(of: public_original_private_derivative)
-// expected-note @+1 {{mark the derivative function as '@usableFromInline' to match the original function}} {{1-1=@usableFromInline }}
 fileprivate func _public_original_private_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+// expected-note @-1 {{mark the derivative function as '@usableFromInline' to match the original function}} {{-1:1-1=@usableFromInline }}
+  fatalError()
+}
+
+public func public_original_package_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_public_original_package_derivative' is package, but original function 'public_original_package_derivative' is public}}
+@derivative(of: public_original_package_derivative)
+package func _public_original_package_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+  // expected-note @-1 {{mark the derivative function as '@usableFromInline' to match the original function}} {{-1:1-1=@usableFromInline }}
   fatalError()
 }
 
 public func public_original_internal_derivative(_ x: Float) -> Float { x }
 // expected-error @+1 {{derivative function must have same access level as original function; derivative function '_public_original_internal_derivative' is internal, but original function 'public_original_internal_derivative' is public}}
 @derivative(of: public_original_internal_derivative)
-// expected-note @+1 {{mark the derivative function as '@usableFromInline' to match the original function}} {{1-1=@usableFromInline }}
 func _public_original_internal_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
+// expected-note @-1 {{mark the derivative function as '@usableFromInline' to match the original function}} {{-1:1-1=@usableFromInline }}
+  fatalError()
+}
+
+package func package_original_internal_derivative(_ x: Float) -> Float { x }
+// expected-error @+1 {{derivative function must have same access level as original function; derivative function '_package_original_internal_derivative' is internal, but original function 'package_original_internal_derivative' is package}}
+@derivative(of: package_original_internal_derivative)
+// expected-note @+1 {{mark the derivative function as 'package' to match the original function}} {{1-1=package }}
+func _package_original_internal_derivative(_ x: Float) -> (value: Float, pullback: (Float) -> Float) {
   fatalError()
 }
 

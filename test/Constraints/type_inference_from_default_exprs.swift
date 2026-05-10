@@ -1,6 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/InferViaDefaults.swiftmodule -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift
-// RUN: %target-swift-frontend -module-name main -typecheck -verify -I %t %s %S/Inputs/type_inference_via_defaults_other_module.swift
+// RUN: %target-build-swift -parse-as-library -emit-library -emit-module-path %t/InferViaDefaults.swiftmodule -module-name InferViaDefaults %S/Inputs/type_inference_via_defaults_other_module.swift -o %t/%target-library-name(InferViaDefaults)
+// RUN: %target-swift-frontend -typecheck -verify -lInferViaDefaults -module-name main -I %t -L %t %s
+
+import InferViaDefaults
 
 func testInferFromResult<T>(_: T = 42) -> T { fatalError() } // Ok
 
@@ -136,8 +138,8 @@ func main() {
   testMultiple(a: 0.0, b: "a")  // Ok
 
   // From a different module
-  with_defaults() // Ok
-  with_defaults("") // Ok
+  InferViaDefaults.with_defaults() // Ok
+  InferViaDefaults.with_defaults("") // Ok
 
   _ = S()[] // Ok
   _ = S()[B()] // Ok
@@ -166,6 +168,11 @@ func main() {
   takesCircle(.init()) // Ok
   takesRectangle(.init())
   // expected-error@-1 {{cannot convert default value of type 'Rectangle' to expected argument type 'Circle' for parameter #0}}
+  
+  testS72199_2(x: 0)
+  testS72199_3(xs: 0, 0)
+  testS72199_4(x: 0)
+  testS72199_5(x: 0)
 }
 
 func test_magic_defaults() {
@@ -176,7 +183,7 @@ func test_magic_defaults() {
   let _: String = generic_with_magic()
 }
 
-// SR-16069
+// https://github.com/apple/swift/issues/58330
 func test_allow_same_type_between_dependent_types() {
   struct Default : P {
     typealias X = Int
@@ -206,7 +213,7 @@ protocol StorageType {
   var identifier: String { get }
 }
 
-class Storage {
+class Storage { // expected-note {{class 'Storage' is not '@usableFromInline' or public}}
 }
 
 extension Storage {
@@ -231,3 +238,55 @@ class BaseStorage<T> : Storage, StorageType {
 
 final class CustomStorage<T>: BaseStorage<T> { // Ok - no crash typechecking inherited init
 }
+
+// https://github.com/apple/swift/issues/61061
+
+struct S61061<T> where T:Hashable { // expected-note{{'T' declared as parameter to type 'S61061'}}
+  init(x:[[T: T]] = [:]) {} // expected-error{{default argument value of type '[AnyHashable : Any]' cannot be converted to type '[[T : T]]'}}
+  // expected-error@-1{{generic parameter 'T' could not be inferred}}
+}
+
+struct S61061_1<T> where T:Hashable { // expected-note{{'T' declared as parameter to type 'S61061_1'}}
+  init(x:[(T, T)] = [:]) {} // expected-error{{default argument value of type '[AnyHashable : Any]' cannot be converted to type '[(T, T)]'}}
+  // expected-error@-1{{generic parameter 'T' could not be inferred}}
+}
+
+struct S61061_2<T> where T:Hashable {
+  init(x:[(T, T)] = [(1, "")]) {} // expected-error{{conflicting arguments to generic parameter 'T' ('String' vs. 'Int')}}
+}
+
+struct S61061_3<T> where T:Hashable {
+  init(x:[(T, T)] = [(1, 1)]) {} // OK
+}
+
+// https://github.com/apple/swift/issues/62025
+// Syntactic checks are not run on the default argument expressions
+public struct MyStruct {} // expected-note {{initializer 'init()' is not '@usableFromInline' or public}}
+public func issue62025_with_init<T>(_: T = MyStruct()) {}
+// expected-error@-1 {{initializer 'init()' is internal and cannot be referenced from a default argument value}}
+public func issue62025_with_type<T>(_: T = Storage.self) {}
+// expected-error@-1 {{class 'Storage' is internal and cannot be referenced from a default argument value}}
+do {
+  func default_with_dup_keys<T>(_: T = ["a": 1, "a": 2]) {}
+  // expected-warning@-1 {{dictionary literal of type '[String : Int]' has duplicate entries for string literal key 'a'}}
+  // expected-note@-2 2 {{duplicate key declared here}}
+}
+
+func testInferenceFromClosureVarInvalid<T>(x: T = { let x = "" as Int; return x }()) {}
+// expected-error@-1 {{cannot convert value of type 'String' to type 'Int' in coercion}}
+
+// https://github.com/swiftlang/swift/issues/72199
+enum S72199_1 {
+  func testS72199_1<T>(_: T = 42, _: [T]) {}
+  // expected-warning@-1 {{cannot use default expression for inference of 'T' because it is inferrable from parameters #0, #1; this will be an error in a future Swift language mode}}
+}
+
+func testS72199_2<T: P>(x: T.X, y: T = S()) { } // Ok
+func testS72199_3<each T: P>(xs: repeat (each T).X, ys: (repeat each T) = (S(), S())) {} // Ok
+
+typealias S72199_4<T> = Int
+func testS72199_4<T>(x: S72199_4<T>, y: T = "") {} // Ok
+
+func testS72199_5<T: P>(x: T.X, y: (T, T.X) = (S(), 0)) {} // Ok
+func testS72199_6<T: P>(x: T, y: (T, T.X) = (S(), 0)) {}
+// expected-error@-1 {{cannot use default expression for inference of '(T, T.X)' because it is inferrable from parameters #0, #1}}

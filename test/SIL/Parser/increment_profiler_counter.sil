@@ -1,0 +1,9 @@
+// RUN: %target-sil-opt %s | %FileCheck %s
+
+sil [ossa] @foo : $@convention(thin) () -> () {
+bb0:
+  // CHECK: increment_profiler_counter 93, "$foo", num_counters 120, hash 78
+  increment_profiler_counter 93, "$foo", num_counters 120, hash 78
+  %1 = tuple()
+  return %1 : $()
+}

@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/PersistentParserState.h"
 
@@ -26,11 +27,10 @@ PersistentParserState::PersistentParserState() { }
 
 PersistentParserState::~PersistentParserState() { }
 
-void PersistentParserState::setCodeCompletionDelayedDeclState(
-    SourceManager &SM, unsigned BufferID, CodeCompletionDelayedDeclKind Kind,
-    unsigned Flags, DeclContext *ParentContext, SourceRange BodyRange,
-    SourceLoc PreviousLoc) {
-  assert(!CodeCompletionDelayedDeclStat.get() &&
+void PersistentParserState::setIDEInspectionDelayedDeclState(
+    SourceManager &SM, unsigned BufferID, IDEInspectionDelayedDeclKind Kind,
+    DeclContext *ParentContext, SourceRange BodyRange, SourceLoc PreviousLoc) {
+  assert(!IDEInspectionDelayedDeclStat.get() &&
          "only one decl can be delayed for code completion");
   unsigned startOffset = SM.getLocOffsetInBuffer(BodyRange.Start, BufferID);
   unsigned endOffset = SM.getLocOffsetInBuffer(BodyRange.End, BufferID);
@@ -38,13 +38,13 @@ void PersistentParserState::setCodeCompletionDelayedDeclState(
   if (PreviousLoc.isValid())
     prevOffset = SM.getLocOffsetInBuffer(PreviousLoc, BufferID);
 
-  CodeCompletionDelayedDeclStat.reset(new CodeCompletionDelayedDeclState(
-      Kind, Flags, ParentContext, startOffset, endOffset, prevOffset));
+  IDEInspectionDelayedDeclStat.reset(new IDEInspectionDelayedDeclState(
+      Kind, ParentContext, startOffset, endOffset, prevOffset));
 }
 
-void PersistentParserState::restoreCodeCompletionDelayedDeclState(
-    const CodeCompletionDelayedDeclState &other) {
-  CodeCompletionDelayedDeclStat.reset(new CodeCompletionDelayedDeclState(
-      other.Kind, other.Flags, other.ParentContext,
-      other.StartOffset, other.EndOffset, other.PrevOffset));
+void PersistentParserState::restoreIDEInspectionDelayedDeclState(
+    const IDEInspectionDelayedDeclState &other) {
+  IDEInspectionDelayedDeclStat.reset(new IDEInspectionDelayedDeclState(
+      other.Kind, other.ParentContext, other.StartOffset, other.EndOffset,
+      other.PrevOffset));
 }

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/availability.swiftmodule -typecheck -emit-objc-header-path %t/availability.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/availability.swiftmodule -typecheck -verify -emit-objc-header-path %t/availability.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/availability.h
 // RUN: %check-in-clang %t/availability.h
 
@@ -16,7 +16,7 @@
 // CHECK-NEXT: - (void)alwaysDeprecatedTwo SWIFT_DEPRECATED_MSG("it's old");
 // CHECK-NEXT: - (void)alwaysDeprecatedThree SWIFT_DEPRECATED_MSG("", "qux");
 // CHECK-NEXT: - (void)alwaysDeprecatedFour SWIFT_DEPRECATED_MSG("use something else", "quux");
-// CHECK-NEXT: - (void)escapeMessage SWIFT_DEPRECATED_MSG("one\ntwo\tthree\x0Dfour\\ \"five\"");
+// CHECK-NEXT: - (void)escapeMessage SWIFT_DEPRECATED_MSG("one\ntwo\tthree\rfour\\ \"five\"{U+0000}six");
 // CHECK-NEXT: - (void)unicodeMessage SWIFT_DEPRECATED_MSG("über");
 // CHECK-NEXT: - (void)singlePlatShorthand SWIFT_AVAILABILITY(macos,introduced=10.10);
 // CHECK-NEXT: - (void)multiPlatShorthand
@@ -52,16 +52,16 @@
 // CHECK-NEXT: - (void)unavailableMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethod' has been renamed to 'overloadMethodWithFirst:second:'");
 // CHECK-NEXT: - (void)unavailableOnMacOSMethodRenamedToOverloadMethodWithFirst:(NSInteger)first second:(NSInteger)second SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethod' has been renamed to 'overloadMethodWithFirst:second:'");
 
-// CHECK-NEXT: - (void)firstOverloadingMethodWithDiffernceNameWithFirst:(NSInteger)first second:(NSInteger)second;
-// CHECK-NEXT: - (void)secondOverloadingMethodWithDiffernceNameWithFirst:(double)first second:(double)second;
+// CHECK-NEXT: - (void)firstOverloadingMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second;
+// CHECK-NEXT: - (void)secondOverloadingMethodWithDifferenceNameWithFirst:(double)first second:(double)second;
 // CHECK-NEXT: - (void)deprecatedMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "firstOverloadingMethodWithDiffernceNameWithFirst:second:");
+// CHECK-SAME: SWIFT_DEPRECATED_MSG("", "firstOverloadingMethodWithDifferenceNameWithFirst:second:");
 // CHECK-NEXT: - (void)deprecatedOnMacOSMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDiffernceNameWithFirst:second:'");
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'deprecatedOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDifferenceNameWithFirst:second:'");
 // CHECK-NEXT: - (void)unavailableMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDiffernceNameWithFirst:second:'");
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'unavailableMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDifferenceNameWithFirst:second:'");
 // CHECK-NEXT: - (void)unavailableOnMacOSMethodRenamedToOverloadMethodWithDifferenceNameWithFirst:(NSInteger)first second:(NSInteger)second
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDiffernceNameWithFirst:second:'");
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'unavailableOnMacOSMethodRenamedToOverloadMethodWithDifferenceName' has been renamed to 'firstOverloadingMethodWithDifferenceNameWithFirst:second:'");
 
 // CHECK-NEXT: + (void)deprecatedAvailabilityWithValue:(NSInteger)value;
 // CHECK-NEXT: - (void)deprecatedInstanceMethodRenamedToClassMethodWithValue:(NSInteger)value
@@ -139,15 +139,15 @@
 // CHECK-NEXT: @property (nonatomic) NSInteger alwaysUnavailableProperty SWIFT_UNAVAILABLE_MSG("'alwaysUnavailableProperty' has been renamed to 'baz': whatever");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger alwaysDeprecatedProperty SWIFT_DEPRECATED_MSG("use something else", "quux");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForDeprecatedObjCProperty;
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableDeprecatedObjCProperty
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplaceableDeprecatedObjCProperty
 // CHECK-SAME: SWIFT_DEPRECATED_MSG("use something else", "replaceForDeprecatedObjCProperty");
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableDeprecatedOnMacOSObjCProperty
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'replacableDeprecatedOnMacOSObjCProperty' has been renamed to 'replaceForDeprecatedObjCProperty': use something else");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplaceableDeprecatedOnMacOSObjCProperty
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,deprecated=0.0.1,message="'replaceableDeprecatedOnMacOSObjCProperty' has been renamed to 'replaceForDeprecatedObjCProperty': use something else");
 // CHECK-NEXT: @property (nonatomic, readonly) NSInteger replaceForUnavailableObjCProperty;
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableUnavailableObjCProperty
-// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'replacableUnavailableObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplacableUnavailableOnMacOSObjCProperty
-// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'replacableUnavailableOnMacOSObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplaceableUnavailableObjCProperty
+// CHECK-SAME: SWIFT_UNAVAILABLE_MSG("'replaceableUnavailableObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger numberOfReplaceableUnavailableOnMacOSObjCProperty
+// CHECK-SAME: SWIFT_AVAILABILITY(macos,unavailable,message="'replaceableUnavailableOnMacOSObjCProperty' has been renamed to 'replaceForUnavailableObjCProperty': use something else");
 
 // CHECK-NEXT: @property (nonatomic, readonly, strong) Availability * _Null_unspecified singlePlatCombinedPropertyClass
 // CHECK-SAME: SWIFT_AVAILABILITY(macos,introduced=10.7,deprecated=10.9,obsoleted=10.10);
@@ -275,7 +275,7 @@
     @available(*, deprecated, message: "use something else", renamed: "quux")
     @objc func alwaysDeprecatedFour() {}
 
-    @available(*, deprecated, message: "one\ntwo\tthree\rfour\\ \"five\"")
+    @available(*, deprecated, message: "one\ntwo\tthree\rfour\\ \"five\"\0six")
     @objc func escapeMessage() {}
     @available(*, deprecated, message: "über")
     @objc func unicodeMessage() {}
@@ -339,9 +339,9 @@
     @objc func unavailableOnMacOSMethodRenamedToOverloadMethod(first: Int, second: Int) {}
 
 
-    @objc(firstOverloadingMethodWithDiffernceNameWithFirst:second:)
+    @objc(firstOverloadingMethodWithDifferenceNameWithFirst:second:)
     func overloadMethodWithDifferenceObjCName(first: Int, second: Int) {}
-    @objc(secondOverloadingMethodWithDiffernceNameWithFirst:second:)
+    @objc(secondOverloadingMethodWithDifferenceNameWithFirst:second:)
     func overloadMethodWithDifferenceObjCName(first: Double, second: Double) {}
 
     @available(*, deprecated, renamed: "overloadMethodWithDifferenceObjCName(first:second:)")
@@ -487,13 +487,13 @@
         }
     }
     @available(*, deprecated, message: "use something else", renamed: "__replaceForDeprecatedObjCProperty")
-    @objc(numberOfReplacableDeprecatedObjCProperty) var replacableDeprecatedObjCProperty: Int {
+    @objc(numberOfReplaceableDeprecatedObjCProperty) var replaceableDeprecatedObjCProperty: Int {
         get {
             return -1
         }
     }
     @available(macOS, deprecated, message: "use something else", renamed: "__replaceForDeprecatedObjCProperty")
-    @objc(numberOfReplacableDeprecatedOnMacOSObjCProperty) var replacableDeprecatedOnMacOSObjCProperty: Int {
+    @objc(numberOfReplaceableDeprecatedOnMacOSObjCProperty) var replaceableDeprecatedOnMacOSObjCProperty: Int {
         get {
             return -1
         }
@@ -506,13 +506,13 @@
       }
     }
     @available(*, unavailable, message: "use something else", renamed: "__replaceForUnavailableObjCProperty")
-    @objc(numberOfReplacableUnavailableObjCProperty) var replacableUnavailableObjCProperty: Int {
+    @objc(numberOfReplaceableUnavailableObjCProperty) var replaceableUnavailableObjCProperty: Int {
       get {
         return -1
       }
     }
     @available(macOS, unavailable, message: "use something else", renamed: "__replaceForUnavailableObjCProperty")
-    @objc(numberOfReplacableUnavailableOnMacOSObjCProperty) var replacableUnavailableOnMacOSObjCProperty: Int {
+    @objc(numberOfReplaceableUnavailableOnMacOSObjCProperty) var replaceableUnavailableOnMacOSObjCProperty: Int {
       get {
         return -1
       }

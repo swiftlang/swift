@@ -1,7 +1,10 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: freestanding
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime
@@ -28,12 +31,12 @@ func asyncFib(_ n: Int) async -> Int {
   async let second = await asyncFib(n-1)
 
   // Sleep a random amount of time waiting on the result producing a result.
-  await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
+  try! await Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
 
   let result = await first + second
 
   // Sleep a random amount of time before producing a result.
-  await Task.sleep(UInt64.random(in: 0..<100) * 1_000_000)
+  try! await Task.sleep(nanoseconds: UInt64.random(in: 0..<100) * 1_000_000)
 
   return result
 }
@@ -42,7 +45,7 @@ func asyncFib(_ n: Int) async -> Int {
 func runFibonacci(_ n: Int) async {
   let result = await asyncFib(n)
 
-  print()
+  print("")
   print("Async fib = \(result), sequential fib = \(fib(n))")
   assert(result == fib(n))
 }

@@ -42,71 +42,46 @@ namespace swift {
 /// NecessaryBindings - The set of metadata that must be saved in
 /// order to perform some set of operations on a type.
 class NecessaryBindings {
-  enum class Kind {
-    /// Are the bindings to be computed for a partial apply forwarder.
-    /// In the case this is true we need to store/restore the conformance of a
-    /// specialized type with conditional conformance because the conditional
-    /// requirements are not available in the partial apply forwarder.
-    PartialApply,
-    AsyncFunction,
-  };
-  Kind kind;
   llvm::SetVector<GenericRequirement> RequirementsSet;
-  llvm::SmallVector<GenericRequirement, 2> RequirementsVector;
-  llvm::DenseMap<GenericRequirement, ProtocolConformanceRef> Conformances;
-
-  void addRequirement(GenericRequirement requirement) {
-    switch (kind) {
-    case Kind::PartialApply:
-      RequirementsSet.insert(requirement);
-      break;
-    case Kind::AsyncFunction:
-      RequirementsVector.push_back(requirement);
-      break;
-    }
-  }
-
-  void addAbstractConditionalRequirements(
-      SpecializedProtocolConformance *specializedConformance);
+  SubstitutionMap SubMap;
+  bool NoEscape;
 
 public:
-  NecessaryBindings() = default;
+  NecessaryBindings() {}
+  NecessaryBindings(SubstitutionMap subs, bool noEscape)
+    : SubMap(subs), NoEscape(noEscape) {}
   
+  SubstitutionMap getSubstitutionMap() const {
+    return SubMap;
+  }
+
   /// Collect the necessary bindings to invoke a function with the given
   /// signature.
-  static NecessaryBindings
-  forAsyncFunctionInvocation(IRGenModule &IGM, CanSILFunctionType origType,
-                             SubstitutionMap subs);
   static NecessaryBindings forPartialApplyForwarder(IRGenModule &IGM,
                                                     CanSILFunctionType origType,
                                                     SubstitutionMap subs,
-                                                    bool considerParameterSources = true);
+                                                    bool noEscape,
+                                                    bool considerParameterSources);
 
-  /// Add whatever information is necessary to reconstruct type metadata
-  /// for the given type.
-  void addTypeMetadata(CanType type);
+  /// Collect the necessary bindings to be able to destroy a value inside of a
+  /// fixed-layout boxed allocation.
+  static NecessaryBindings forFixedBox(IRGenModule &IGM,
+                                       SILBoxType *box);
+
+  void addRequirement(GenericRequirement requirement) {
+    auto type = requirement.getTypeParameter().subst(SubMap);
+    if (!type->hasArchetype())
+      return;
+
+    RequirementsSet.insert(requirement);
+  }
 
   /// Get the requirement from the bindings at index i.
   const GenericRequirement &operator[](size_t i) const {
-    switch (kind) {
-    case Kind::PartialApply:
-      return RequirementsSet[i];
-    case Kind::AsyncFunction:
-      return RequirementsVector[i];
-    }
-    llvm_unreachable("covered switch");
-  }
-
-  ProtocolConformanceRef
-  getConformance(const GenericRequirement &requirement) const {
-    return Conformances.lookup(requirement);
+    return RequirementsSet[i];
   }
 
   size_t size() const { return getRequirements().size(); }
-
-  /// Add whatever information is necessary to reconstruct a witness table
-  /// reference for the given type.
-  void addProtocolConformance(CanType type, ProtocolConformanceRef conf);
 
   /// Is the work to do trivial?
   bool empty() const { return getRequirements().empty(); }
@@ -116,32 +91,24 @@ public:
   Size getBufferSize(IRGenModule &IGM) const;
 
   /// Save the necessary bindings to the given buffer.
-  void save(IRGenFunction &IGF, Address buffer) const;
-
-  void save(IRGenFunction &IGF, Address buffer, Explosion &source) const;
+  ///
+  /// If `replacementSubs` has a value, then the bindings saved are taken from
+  /// the given substitution map instead of the substitutions
+  void save(IRGenFunction &IGF, Address buffer,
+            std::optional<SubstitutionMap> replacementSubs = std::nullopt)
+            const;
 
   /// Restore the necessary bindings from the given buffer.
   void restore(IRGenFunction &IGF, Address buffer, MetadataState state) const;
 
   const llvm::ArrayRef<GenericRequirement> getRequirements() const {
-    switch (kind) {
-    case Kind::PartialApply:
-      return RequirementsSet.getArrayRef();
-    case Kind::AsyncFunction:
-      return RequirementsVector;
-    }
-    llvm_unreachable("unhandled case");
+    return RequirementsSet.getArrayRef();
   }
 
-  bool forPartialApply() const { return kind == Kind::PartialApply; }
-  bool forAsyncFunction() const { return kind == Kind::AsyncFunction; }
-
 private:
-  static NecessaryBindings computeBindings(IRGenModule &IGM,
-                                           CanSILFunctionType origType,
-                                           SubstitutionMap subs,
-                                           bool forPartialApplyForwarder,
-                                           bool considerParameterSources = true);
+  void computeBindings(IRGenModule &IGM,
+                       CanSILFunctionType origType,
+                       bool considerParameterSources);
 };
 
 } // end namespace irgen

@@ -1,6 +1,6 @@
 
 // First check the SIL.
-// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
 
 // Also do an end-to-end test to check all components, including IRGen.
 // RUN: %empty-directory(%t) 
@@ -15,6 +15,67 @@ struct MyError : Error {
 		_code = xx
 	}
 }
+
+// CHECK-LABEL: sil hidden [noinline] @$s4test7testit1yS2icSbF : $@convention(thin) (Bool) -> @owned @callee_guaranteed (Int) -> Int {
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test16generic_get_funcyxxcx_SbtlFSi_Tg5 :
+// CHECK: [[CL:%[0-9]+]] = apply [[F]](%{{[0-9]+}}, %0) :
+// CHECK: [[CL2:%[0-9]+]] = convert_function [[CL]]
+// CHECK: [[TH:%[0-9]+]] = function_ref @$sS2iIegnr_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed Int) -> @out Int) -> Int
+// CHECK: [[RET:%[0-9]+]] = partial_apply [callee_guaranteed] [[TH]]([[CL2]])
+// CHECK: return [[RET]] : $@callee_guaranteed (Int) -> Int
+@inline(never)
+func testit1(_ b: Bool) -> (Int) -> Int {
+  return generic_get_func(27, b)
+}
+
+@inline(never)
+func testit2() -> (Int, Int, Bool) -> Int {
+  return concrete_get_func()
+}
+
+// No reabstraction thunk is needed because we directly apply the returned closure.
+
+// CHECK-LABEL: sil hidden [noinline] @$s4test7testit3ySiSbF : $@convention(thin) (Bool) -> Int {
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test8generic3yxx_xSbtlFSi_Tg5 : $@convention(thin) (Int, Int, Bool) -> Int
+// CHECK: [[RET:%[0-9]+]] = apply [[F]]({{.*}}) : $@convention(thin) (Int, Int, Bool) -> Int
+// CHECK: return [[RET]] : $Int
+@inline(never)
+func testit3(_ b: Bool) -> Int {
+  return generic3(270, 28, b)
+}
+
+// CHECK-LABEL: sil hidden [noinline] @$s4test16testit1_throwingyS2iKcSbF : $@convention(thin) (Bool) -> @owned @callee_guaranteed (Int) -> (Int, @error any Error) {
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test25generic_get_func_throwingyxxKcSblFSi_Tg5 :
+// CHECK: [[CL:%[0-9]+]] = apply [[F]](%0) :
+// CHECK: [[CONV:%[0-9]+]] = convert_function [[CL]]
+// CHECK: [[TH:%[0-9]+]] = function_ref @$sS2is5Error_pIegnrzo_S2isAA_pIegydzo_TR :
+// CHECK: [[RET:%[0-9]+]] = partial_apply [callee_guaranteed] [[TH]]([[CONV]])
+// CHECK: return [[RET]] : $@callee_guaranteed (Int) -> (Int, @error any Error)
+@inline(never)
+func testit1_throwing(_ b: Bool) -> (Int) throws -> Int {
+  return generic_get_func_throwing(b)
+}
+
+@inline(never)
+func testit2_throwing() -> (Int, Bool) throws -> Int {
+  return concrete_get_func_throwing()
+}
+
+// No reabstraction thunk is needed because we directly apply the returned closure.
+
+// CHECK-LABEL: sil hidden [noinline] @$s4test16testit3_throwingySiSbF : $@convention(thin) (Bool) -> Int {
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test17generic3_throwingyxx_SbtKlFSi_Tg5 : $@convention(thin) (Int, Bool) -> (Int, @error any Error)
+// CHECK: try_apply [[F]](%{{[0-9]+}}, %0) : $@convention(thin) (Int, Bool) -> (Int, @error any Error), normal bb{{[0-9]+}}, error bb{{[0-9]+}}
+// CHECK: }
+@inline(never)
+func testit3_throwing(_ b: Bool) -> Int {
+  do {
+    return try generic3_throwing(271, b)
+  } catch {
+    return error._code
+  }
+}
+
 
 // We need a reabstraction thunk to convert from direct args/result to indirect
 // args/result, which is expected in the returned closure.
@@ -35,19 +96,6 @@ func generic_get_func<T>(_ t1: T, _ b: Bool) -> (T) -> T {
 	return generic
 }
 
-// CHECK-LABEL: sil hidden [noinline] @$s4test7testit1yS2icSbF : $@convention(thin) (Bool) -> @owned @callee_guaranteed (Int) -> Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test16generic_get_funcyxxcx_SbtlFSi_Tg5 :
-// CHECK: [[CL:%[0-9]+]] = apply [[F]](%{{[0-9]+}}, %0) :
-// CHECK: [[CL2:%[0-9]+]] = convert_function [[CL]]
-// CHECK: [[TH:%[0-9]+]] = function_ref @$sS2iIegnr_S2iIegyd_TR : $@convention(thin) (Int, @guaranteed @callee_guaranteed (@in_guaranteed Int) -> @out Int) -> Int
-// CHECK: [[RET:%[0-9]+]] = partial_apply [callee_guaranteed] [[TH]]([[CL2]])
-// CHECK: return [[RET]] : $@callee_guaranteed (Int) -> Int
-@inline(never)
-func testit1(_ b: Bool) -> (Int) -> Int {
-	return generic_get_func(27, b)
-}
-
-
 @inline(never)
 func generic2<T>(_ t1: T, t2: T, b: Bool) -> T {
 	return b ? t1 : t2
@@ -66,25 +114,8 @@ func concrete_get_func() -> (Int, Int, Bool) -> Int {
 }
 
 @inline(never)
-func testit2() -> (Int, Int, Bool) -> Int {
-	return concrete_get_func()
-}
-
-
-@inline(never)
 func generic3<T>(_ t1: T, _ t2: T, _ b: Bool) -> T {
 	return b ? t1 : t2
-}
-
-// No reabstraction thunk is needed because we directly apply the returned closure.
-
-// CHECK-LABEL: sil hidden [noinline] @$s4test7testit3ySiSbF : $@convention(thin) (Bool) -> Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test8generic3yxx_xSbtlFSi_Tg5 : $@convention(thin) (Int, Int, Bool) -> Int
-// CHECK: [[RET:%[0-9]+]] = apply [[F]]({{.*}}) : $@convention(thin) (Int, Int, Bool) -> Int
-// CHECK: return [[RET]] : $Int
-@inline(never)
-func testit3(_ b: Bool) -> Int {
-	return generic3(270, 28, b)
 }
 
 // The same three test cases again, but with throwing functions.
@@ -94,7 +125,7 @@ func testit3(_ b: Bool) -> Int {
 
 // CHECK-LABEL: sil shared [noinline] @$s4test25generic_get_func_throwingyxxKcSblFSi_Tg5 :
 // CHECK: [[F:%[0-9]+]] = function_ref @$s4test25generic_get_func_throwingyxxKcSblF0B0L_yxxKlFSi_TG5 :
-// CHECK: [[PA:%[0-9]+]] = partial_apply [callee_guaranteed] [[F]](%0) : $@convention(thin) (@in_guaranteed Int, Bool) -> (@out Int, @error Error)
+// CHECK: [[PA:%[0-9]+]] = partial_apply [callee_guaranteed] [[F]](%0) : $@convention(thin) (@in_guaranteed Int, Bool) -> (@out Int, @error any Error)
 // CHECK: [[CONV:%[0-9]+]] = convert_function [[PA]]
 // CHECK: return [[CONV]] :
 @inline(never)
@@ -111,19 +142,6 @@ func generic_get_func_throwing<T>(_ b: Bool) -> (T) throws -> T {
 	return generic
 }
 
-// CHECK-LABEL: sil hidden [noinline] @$s4test16testit1_throwingyS2iKcSbF : $@convention(thin) (Bool) -> @owned @callee_guaranteed (Int) -> (Int, @error Error) {
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test25generic_get_func_throwingyxxKcSblFSi_Tg5 :
-// CHECK: [[CL:%[0-9]+]] = apply [[F]](%0) :
-// CHECK: [[CONV:%[0-9]+]] = convert_function [[CL]]
-// CHECK: [[TH:%[0-9]+]] = function_ref @$sS2is5Error_pIegnrzo_S2isAA_pIegydzo_TR :
-// CHECK: [[RET:%[0-9]+]] = partial_apply [callee_guaranteed] [[TH]]([[CONV]])
-// CHECK: return [[RET]] : $@callee_guaranteed (Int) -> (Int, @error Error)
-@inline(never)
-func testit1_throwing(_ b: Bool) -> (Int) throws -> Int {
-	return generic_get_func_throwing(b)
-}
-
-
 @inline(never)
 func generic2_throwing<T>(_ t1: T, b: Bool) throws -> T {
 	if b {
@@ -135,21 +153,14 @@ func generic2_throwing<T>(_ t1: T, b: Bool) throws -> T {
 // No reabstraction thunk is needed because the returned closure expects direct
 // args/result anyway.
 
-// CHECK-LABEL: sil hidden [noinline] @$s4test26concrete_get_func_throwingS2i_SbtKcyF : $@convention(thin) () -> @owned @callee_guaranteed (Int, Bool) -> (Int, @error Error) {
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test17generic2_throwing_1bxx_SbtKlFSi_Tg5 : $@convention(thin) (Int, Bool) -> (Int, @error Error)
-// CHECK: [[RET:%[0-9]+]] = thin_to_thick_function [[F]] : $@convention(thin) (Int, Bool) -> (Int, @error Error) to $@callee_guaranteed (Int, Bool) -> (Int, @error Error)
-// CHECK: return [[RET]] : $@callee_guaranteed (Int, Bool) -> (Int, @error Error)
+// CHECK-LABEL: sil hidden [noinline] @$s4test26concrete_get_func_throwingS2i_SbtKcyF : $@convention(thin) () -> @owned @callee_guaranteed (Int, Bool) -> (Int, @error any Error) {
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test17generic2_throwing_1bxx_SbtKlFSi_Tg5 : $@convention(thin) (Int, Bool) -> (Int, @error any Error)
+// CHECK: [[RET:%[0-9]+]] = thin_to_thick_function [[F]] : $@convention(thin) (Int, Bool) -> (Int, @error any Error) to $@callee_guaranteed (Int, Bool) -> (Int, @error any Error)
+// CHECK: return [[RET]] : $@callee_guaranteed (Int, Bool) -> (Int, @error any Error)
 @inline(never)
 func concrete_get_func_throwing() -> (Int, Bool) throws -> Int {
 	return generic2_throwing
 }
-
-@inline(never)
-func testit2_throwing() -> (Int, Bool) throws -> Int {
-	return concrete_get_func_throwing()
-}
-
-
 
 @inline(never)
 func generic3_throwing<T>(_ t1: T, _ b: Bool) throws -> T {
@@ -159,23 +170,8 @@ func generic3_throwing<T>(_ t1: T, _ b: Bool) throws -> T {
 	return t1
 }
 
-// No reabstraction thunk is needed because we directly apply the returned closure.
-
-// CHECK-LABEL: sil hidden [noinline] @$s4test16testit3_throwingySiSbF : $@convention(thin) (Bool) -> Int {
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test17generic3_throwingyxx_SbtKlFSi_Tg5 : $@convention(thin) (Int, Bool) -> (Int, @error Error)
-// CHECK: try_apply [[F]](%{{[0-9]+}}, %0) : $@convention(thin) (Int, Bool) -> (Int, @error Error), normal bb{{[0-9]+}}, error bb{{[0-9]+}}
-// CHECK: }
-@inline(never)
-func testit3_throwing(_ b: Bool) -> Int {
-	do {
-		return try generic3_throwing(271, b)
-	} catch {
-		return error._code
-	}
-}
-
 // CHECK-LABEL: sil shared [transparent] [thunk] @$s4test16generic_get_funcyxxcx_SbtlF0B0L_yxxlFSi_TG5 : $@convention(thin) (@in_guaranteed Int, Bool, @in_guaranteed Int) -> @out Int {
-// CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool, %3 : $*Int):
+// CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : @closureCapture $Bool, %3 : @closureCapture $*Int):
 // CHECK: [[LD1:%[0-9]+]] = load %1 : $*Int
 // CHECK: [[LD2:%[0-9]+]] = load %3 : $*Int
 // CHECK: [[F:%[0-9]+]] = function_ref @$s4test16generic_get_funcyxxcx_SbtlF0B0L_yxxlFSi_Tg5 : $@convention(thin) (Int, Bool, Int) -> Int
@@ -183,16 +179,16 @@ func testit3_throwing(_ b: Bool) -> Int {
 // CHECK: store [[RET]] to %0 : $*Int
 // CHECK: return %{{[0-9]*}} : $()
 
-// CHECK-LABEL: sil shared [transparent] [thunk] @$s4test25generic_get_func_throwingyxxKcSblF0B0L_yxxKlFSi_TG5 : $@convention(thin) (@in_guaranteed Int, Bool) -> (@out Int, @error Error) {
-// CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : $Bool):
+// CHECK-LABEL: sil shared [transparent] [thunk] @$s4test25generic_get_func_throwingyxxKcSblF0B0L_yxxKlFSi_TG5 : $@convention(thin) (@in_guaranteed Int, Bool) -> (@out Int, @error any Error) {
+// CHECK: bb0(%0 : $*Int, %1 : $*Int, %2 : @closureCapture $Bool):
 // CHECK: [[LD:%[0-9]+]] = load %1 : $*Int
-// CHECK: [[F:%[0-9]+]] = function_ref @$s4test25generic_get_func_throwingyxxKcSblF0B0L_yxxKlFSi_Tg5 : $@convention(thin) (Int, Bool) -> (Int, @error Error)
-// CHECK: try_apply [[F]]([[LD]], %2) : $@convention(thin) (Int, Bool) -> (Int, @error Error), normal bb1, error bb2
+// CHECK: [[F:%[0-9]+]] = function_ref @$s4test25generic_get_func_throwingyxxKcSblF0B0L_yxxKlFSi_Tg5 : $@convention(thin) (Int, Bool) -> (Int, @error any Error)
+// CHECK: try_apply [[F]]([[LD]], %2) : $@convention(thin) (Int, Bool) -> (Int, @error any Error), normal bb1, error bb2
 // CHECK: bb1([[NORMAL:%[0-9]+]] : $Int):
 // CHECK: store [[NORMAL]] to %0 : $*Int
 // CHECK: return %{{[0-9]*}} : $()
-// CHECK: bb2([[ERROR:%[0-9]+]] : $Error):
-// CHECK: throw [[ERROR]] : $Error
+// CHECK: bb2([[ERROR:%[0-9]+]] : $any Error):
+// CHECK: throw [[ERROR]] : $any Error
 
 
 // The main program.

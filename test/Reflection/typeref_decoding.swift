@@ -1,14 +1,18 @@
 // REQUIRES: no_asan
-// RUN: %empty-directory(%t)
-
-// Temporarily disable on arm64e (rdar://89754240)
+//
+// LC_DYLD_CHAINED_FIXUPS decode not currently supported (default on visionOS)
+// UNSUPPORTED: OS=xros
+//
+// rdar://100805115
 // UNSUPPORTED: CPU=arm64e
 
-// RUN: %target-build-swift -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
-// RUN: %target-build-swift -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift %S/Inputs/main.swift -emit-module -emit-executable -module-name TypesToReflect -o %t/TypesToReflect
+// RUN: %empty-directory(%t)
 
-// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s
-// RUN: %target-swift-reflection-dump -binary-filename %t/TypesToReflect | %FileCheck %s
+// RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-build-swift -target %target-swift-5.2-abi-triple -Xfrontend -enable-anonymous-context-mangled-names %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift %S/Inputs/main.swift -emit-module -emit-executable %no-fixup-chains -module-name TypesToReflect -o %t/TypesToReflect
+
+// RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) | %FileCheck %s
+// RUN: %target-swift-reflection-dump %t/TypesToReflect | %FileCheck %s
 
 // CHECK: FIELDS:
 // CHECK: =======

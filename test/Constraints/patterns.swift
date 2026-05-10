@@ -120,7 +120,7 @@ case iPadHair<E>.HairForceOne:
   ()
 case iPadHair.HairForceOne: // expected-error{{generic enum type 'iPadHair' is ambiguous without explicit generic parameters when matching value of type 'any HairType'}}
   ()
-case Watch.Edition: // expected-warning {{cast from 'any HairType' to unrelated type 'Watch' always fails}}
+case Watch.Edition: // expected-error {{pattern of type 'Watch' cannot match 'any HairType'}}
   ()
 case .HairForceOne: // expected-error{{type 'any HairType' has no member 'HairForceOne'}}
   ()
@@ -135,7 +135,8 @@ case let x?: break // expected-warning{{immutable value 'x' was never used; cons
 case nil: break
 }
 
-func SR2066(x: Int?) {
+// https://github.com/apple/swift/issues/44675
+func f_44675(x: Int?) {
     // nil literals should still work when wrapped in parentheses
     switch x {
     case (nil): break
@@ -247,15 +248,15 @@ func ugly(_ a: A<EE>) {
   }
 }
 
-// SR-2057
+// https://github.com/apple/swift/issues/44666
+do {
+  enum E {
+    case foo
+  }
 
-enum SR2057 {
-  case foo
+  let x: E?
+  if case .foo = x { } // Ok
 }
-
-let sr2057: SR2057?
-if case .foo = sr2057 { } // Ok
-
 
 // Invalid 'is' pattern
 class SomeClass {}
@@ -337,7 +338,8 @@ func rdar32241441() {
 }
 
 
-// SR-6100
+// https://github.com/apple/swift/issues/48655
+
 struct One<Two> { // expected-note{{'Two' declared as parameter to type 'One'}}
     public enum E: Error {
         // if you remove associated value, everything works
@@ -345,16 +347,26 @@ struct One<Two> { // expected-note{{'Two' declared as parameter to type 'One'}}
     }
 }
 
+enum HomeworkError: Error {
+case dogAteIt
+case forgot
+}
+
 func testOne() {
   do {
   } catch let error { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
     if case One.E.SomeError = error {} // expected-error{{generic parameter 'Two' could not be inferred}}
   }
+  do {
+  } catch HomeworkError.forgot { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
+  } catch {
+  }
 }
 
-// SR-8347
-// constrain initializer expressions of optional some pattern bindings to be optional
-func test8347() -> String {
+// https://github.com/apple/swift/issues/50875
+// Constrain initializer expressions of optional some pattern bindings to
+// be optional.
+func test_50875() -> String {
   struct C {
     subscript (s: String) -> String? {
       return ""
@@ -404,29 +416,73 @@ func test8347() -> String {
   }
 }
 
-enum SR_7799 {
- case baz
- case bar
+// https://github.com/apple/swift/issues/50338
+do {
+  enum E {
+   case baz
+   case bar
+
+      static var member: Self {
+          .baz
+      }
+
+      static func method() -> Self {
+          .bar
+      }
+
+      static func methodArg(_: Void) -> Self {
+          .baz
+      }
+
+      static var none: Self {
+          .baz
+      }
+  }
+
+  let oe: E? = .bar
+
+  switch oe {
+   case .bar?: break // Ok
+   case .baz: break // Ok
+   case .member: break // Ok
+   case .missingMember: break // expected-error {{type 'E?' has no member 'missingMember'}}
+   case .method(): break // Ok
+   case .methodArg(()): break // Ok
+   case .none: break // expected-warning {{assuming you mean 'Optional<E>.none'; did you mean 'E.none' instead?}} expected-note {{use 'nil' to silence this warning}} expected-note {{use 'none?' instead}}
+   default: break
+  }
+
+  let ooe: E?? = .baz
+
+  switch ooe {
+   case .bar?: break // Ok
+   case .baz: break // Ok
+   case .member: break // Ok
+   case .missingMember: break // expected-error {{type 'E??' has no member 'missingMember'}}
+   case .method(): break // Ok
+   case .methodArg(()): break // Ok
+   default: break
+  }
+
+  if case .baz = ooe {} // Ok
+  if case .bar? = ooe {} // Ok
+  if case .member = ooe {} // Ok
+  if case .missingMember = ooe {} // expected-error {{type 'E??' has no member 'missingMember'}}
+  if case .method() = ooe {} // Ok
+  if case .methodArg(()) = ooe {} // Ok
+
+  enum M {
+    case m
+    static func `none`(_: Void) -> Self { .m }
+  }
+
+  let om: M? = .m
+
+  switch om {
+  case .none: break // Ok
+  default: break
+  }
 }
-
-let sr7799: SR_7799? = .bar
-
-switch sr7799 {
- case .bar?: break // Ok
- case .baz: break // Ok
- default: break
-}
-
-let sr7799_1: SR_7799?? = .baz
-
-switch sr7799_1 {
- case .bar?: break // Ok
- case .baz: break // Ok
- default: break
-}
-
-if case .baz = sr7799_1 {} // Ok
-if case .bar? = sr7799_1 {} // Ok
 
 // rdar://problem/60048356 - `if case` fails when `_` pattern doesn't have a label
 func rdar_60048356() {
@@ -486,6 +542,7 @@ func rdar63510989() {
   }
 
   func test(e: E) {
+    if case .single(_) = e {} // Ok
     if case .single(_ as Value) = e {} // Ok
     if case .single(let v as Value) = e {} // Ok
     // expected-warning@-1 {{immutable value 'v' was never used; consider replacing with '_' or removing it}}
@@ -518,5 +575,311 @@ func rdar64157451() {
 // rdar://80797176 - circular reference incorrectly diagnosed while reaching for a type of a pattern.
 func rdar80797176 () {
   for x: Int in [1, 2] where x.bitWidth == 32 { // Ok
+  }
+}
+
+// https://github.com/apple/swift/issues/60029
+for (key, values) in oldName { // expected-error{{cannot find 'oldName' in scope}}
+  for (idx, value) in values.enumerated() {
+    print(key, idx, value)
+  }
+}
+
+// https://github.com/apple/swift/issues/60503
+func f60503() {
+  let (key, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
+  let (_, _) = settings.enumerate() // expected-error{{cannot find 'settings' in scope}}
+}
+
+// rdar://105089074
+enum EWithIdent<Id> where Id: P {
+case test(Id)
+}
+
+extension [EWithIdent<Int>] { // expected-error {{type 'Int' does not conform to protocol 'P'}}
+  func test() {
+    sorted { lhs, rhs in
+      switch (rhs, rhs) {
+      case let (.test(x), .test(y)): break
+        // expected-error@-1 2 {{type 'Element' has no member 'test'}}
+      case (_, _): break
+      }
+    }
+  }
+}
+
+struct TestIUOMatchOp {
+  static func ~= (lhs: TestIUOMatchOp, rhs: TestIUOMatchOp) -> Bool! { nil }
+  func foo() {
+    if case self = self {}
+  }
+}
+
+struct TestRecursiveVarRef<T> {
+  lazy var e: () -> Int = {e}()
+}
+
+func testMultiStmtClosureExprPattern(_ x: Int) {
+  if case { (); return x }() = x {}
+}
+
+func testExprPatternIsolation() {
+  // We type-check ExprPatterns separately, so these are illegal.
+  if case 0 = nil {} // expected-error {{'nil' requires a contextual type}}
+  let _ = {
+    if case 0 = nil {} // expected-error {{'nil' requires a contextual type}}
+  }
+  for case 0 in nil {} // expected-error {{'nil' requires a contextual type}}
+  for case 0 in [nil] {}
+  // expected-error@-1 {{type 'Any' cannot conform to 'Equatable'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-note@-3 {{requirement from conditional conformance of 'Any?' to 'Equatable'}}
+
+  // Though we will try Double for an integer literal...
+  let d: Double = 0
+  if case d = 0 {}
+  let _ = {
+    if case d = 0 {}
+  }
+  for case d in [0] {}
+
+  // But not Float
+  let f: Float = 0
+  if case f = 0 {} // expected-error {{expression pattern of type 'Float' cannot match values of type 'Int'}}
+  let _ = {
+    if case f = 0 {} // expected-error {{expression pattern of type 'Float' cannot match values of type 'Int'}}
+  }
+  for case f in [0] {}  // expected-error {{expression pattern of type 'Float' cannot match values of type 'Int'}}
+
+  enum MultiPayload<T: Equatable>: Equatable {
+    case e(T, T)
+    static func f(_ x: T, _ y: T) -> Self { .e(x, y) }
+  }
+  enum E: Equatable {
+    case a, b
+    static var c: E { .a }
+    static var d: E { .b }
+  }
+
+  func produceMultiPayload<T>() -> MultiPayload<T> { fatalError() }
+
+  // We type-check ExprPatterns left to right, so only one of these works.
+  if case .e(0.0, 0) = produceMultiPayload() {}
+  if case .e(0, 0.0) = produceMultiPayload() {} // expected-error {{expression pattern of type 'Double' cannot match values of type 'Int'}}
+
+  for case .e(0.0, 0) in [produceMultiPayload()] {}
+  for case .e(0, 0.0) in [produceMultiPayload()] {} // expected-error {{expression pattern of type 'Double' cannot match values of type 'Int'}}
+
+  // Same, because although it's a top-level ExprPattern, we don't resolve
+  // that until during solving.
+  if case .f(0.0, 0) = produceMultiPayload() {}
+  if case .f(0, 0.0) = produceMultiPayload() {} // expected-error {{expression pattern of type 'Double' cannot match values of type 'Int'}}
+
+  if case .e(5, nil) = produceMultiPayload() {} // expected-warning {{type 'Int' is not optional, value can never be nil; this is an error in the Swift 6 language mode}}
+
+  // FIXME: Bad error (https://github.com/apple/swift/issues/64279)
+  if case .e(nil, 0) = produceMultiPayload() {}
+  // expected-error@-1 {{expression pattern of type 'String' cannot match values of type 'Substring'}}
+  // expected-note@-2 {{overloads for '~=' exist with these partially matching parameter lists}}
+
+  if case .e(5, nil) = produceMultiPayload() as MultiPayload<Int?> {}
+  if case .e(nil, 0) = produceMultiPayload() as MultiPayload<Int?> {}
+
+  // Enum patterns are solved together.
+  if case .e(E.a, .b) = produceMultiPayload() {}
+  if case .e(.a, E.b) = produceMultiPayload() {}
+
+  // These also work because they start life as EnumPatterns.
+  if case .e(E.c, .d) = produceMultiPayload() {}
+  if case .e(.c, E.d) = produceMultiPayload() {}
+  for case .e(E.c, .d) in [produceMultiPayload()] {}
+  for case .e(.c, E.d) in [produceMultiPayload()] {}
+
+  // Silly, but allowed.
+  if case 0: Int? = 0 {} // expected-warning {{non-optional expression of type 'Int' used in a check for optionals}}
+
+  var opt: Int?
+  if case opt = 0 {}
+}
+
+enum LotsOfOptional {
+  case yup(Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?, Int?)
+}
+func testLotsOfNil(_ x: LotsOfOptional) {
+  if case .yup(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil) = x {}
+}
+
+// https://github.com/apple/swift/issues/66752
+// FIXME: We ought to improve the diagnostics here
+func issue66752(_ x: Result<String, Error>) {
+  let _ = {
+    if case .failure() = x {}
+    // expected-error@-1 {{type '()' cannot conform to 'Error}}
+    // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+  }
+  let _ = {
+    if case (.failure(), let y) = (x, 0) {}
+    // expected-error@-1 {{type '()' cannot conform to 'Error}}
+    // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+  }
+  if case .failure() = x {}
+  // expected-error@-1 {{type '()' cannot conform to 'Error}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+  
+  if case (.failure(), let y) = (x, 0) {}
+  // expected-error@-1 {{type '()' cannot conform to 'Error}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+  // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+}
+
+// https://github.com/apple/swift/issues/66750
+// FIXME: We ought to improve the diagnostics here
+func issue66750(_ x: Result<String, Error>) {
+  let _ = {
+    switch x {
+    case .success:
+      "a"
+    case .failure():
+      // expected-error@-1 {{type '()' cannot conform to 'Error}}
+      // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+      // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+      "b"
+    }
+  }
+  let _ = {
+    switch (x, 0) {
+    case (.success, let y):
+      "a"
+    case (.failure(), let y):
+      // expected-error@-1 {{type '()' cannot conform to 'Error}}
+      // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+      // expected-note@-3 {{required by generic enum 'Result' where 'Failure' = '()'}}
+      "b"
+    }
+  }
+  switch x {
+  case .success:
+    break
+  case .failure(): // expected-error {{tuple pattern cannot match values of the non-tuple type 'any Error'}}
+    break
+  }
+  switch (x, 0) {
+  case (.success, let y):
+    break
+  case (.failure(), let y):
+    // expected-error@-1 {{tuple pattern cannot match values of the non-tuple type 'any Error'}}
+    break
+  }
+}
+
+// rdar://123466496 - `type of expression is ambiguous without a type annotation` with extra elements
+do {
+  enum E {
+  case test(a: Int, b: String)
+  }
+
+  func test(_: (E) -> Void) {
+  }
+
+  test {
+    switch $0 {
+    case .test(a: 42, b: "", c: 0.0): break
+      // expected-error@-1 {{tuple pattern has the wrong length for tuple type '(Int, String)'}}
+    }
+  }
+}
+
+func testMatchingNonErrorConformingTypeInClosure(_ x: any Error) {
+  enum E {
+    case e
+  }
+  _ = {
+    switch x {
+    case E.e: // expected-error {{pattern of type 'E' does not conform to expected match type 'Error'}}
+      break
+    default:
+      break
+    }
+  }
+}
+
+// rdar://131819800 - crash in `transformWithPosition` while trying to emit diagnostics for `AllowFunctionTypeMismatch` fix
+do {
+  enum E {
+  case test(kind: Int, defaultsToEmpty: Bool = false)
+  }
+
+  func test(e: E) {
+    if case .test(kind: _, // expected-error {{tuple pattern has the wrong length for tuple type '(Int, Bool)'}}
+                  name: let name?,
+                  defaultsToEmpty: _,
+                  deprecateName: let deprecatedName?) = e {
+    }
+  }
+}
+
+// Make sure we diagnose 'Undefined' here.
+func testUndefinedTypeInPattern(_ x: Int) {
+  switch x {
+  case Optional<Undefined>.alsoUndefined: // expected-error {{cannot find type 'Undefined' in scope}}
+    break
+  }
+  _ = {
+    switch x {
+    case Optional<Undefined>.alsoUndefined: // expected-error {{cannot find type 'Undefined' in scope}}
+      break
+    }
+  }
+}
+
+func testUndefinedInClosureVar() {
+  // Make sure we don't produce "unable to infer closure type without a type annotation"
+  _ = {
+    var x: Undefined // expected-error {{cannot find type 'Undefined' in scope}}
+  }
+  _ = {
+    for x: Undefined in [0] {} // expected-error {{cannot find type 'Undefined' in scope}}
+  }
+}
+
+// Codify inconsistent behavior of 'guard let' with non-Optional bindings.
+do {
+  protocol P {}
+
+  class Base {}
+
+  class First: Base, P {}
+  class Second: Base, P {}
+
+  func invalidGuardLetInitializer(b: Bool, c1: First, c2: First?, c3: [First], d: Second) {
+    guard let _: P = b ? c1 : c1 else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+
+    guard let _: P = c2 != nil ? c2! : c1 else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+
+    guard let _: P = c3.first != nil ? c3.first! : c1 else { return }
+    // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'any P'}}
+
+    guard let _: P = b ? c1 : d else { return }  // FIXME: Should also be an error
+
+    guard let _: P = c2 != nil ? c2! : d else { return }  // FIXME: Should also be an error
+
+    guard let _: P = c3.first != nil ? c3.first! : d else { return }  // FIXME: Should also be an error
+  }
+}
+
+func testMissingPatternDiagnosticsInExpressionContext() {
+  enum Kind {
+    case test(_: Int, _: String, _: Int, x: String)
+  }
+
+  func test(k: Kind) {
+    if case .test() = k {} // expected-error {{missing patterns #1, #2, #3, #4 in enum associated value match}} {{19-19=<#Int#>, <#String#>, <#Int#>, <#String#>}}
+    if case let .test(_, answer, _) = k {} // expected-error {{missing pattern #4 in enum associated value match}} {{35-35=, <#String#>}}
+    if case let .test(_, answer) = k {} // expected-error {{missing patterns #3, #4 in enum associated value match}} {{32-32=, <#Int#>, <#String#>}}
   }
 }

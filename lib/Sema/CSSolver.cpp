@@ -18,10 +18,13 @@
 #include "TypeChecker.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/PreparedOverload.h"
 #include "swift/Sema/SolutionResult.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -42,7 +45,6 @@ using namespace constraints;
 #define DEBUG_TYPE "Constraint solver overall"
 #define JOIN2(X,Y) X##Y
 STATISTIC(NumSolutionAttempts, "# of solution attempts");
-STATISTIC(TotalNumTypeVariables, "# of type variables created");
 
 #define CS_STATISTIC(Name, Description) \
   STATISTIC(Overall##Name, Description);
@@ -55,16 +57,6 @@ STATISTIC(TotalNumTypeVariables, "# of type variables created");
 #include "swift/Sema/ConstraintSolverStats.def"
 STATISTIC(LargestSolutionAttemptNumber, "# of the largest solution attempt");
 
-TypeVariableType *ConstraintSystem::createTypeVariable(
-                                     ConstraintLocator *locator,
-                                     unsigned options) {
-  ++TotalNumTypeVariables;
-  auto tv = TypeVariableType::getNew(getASTContext(), assignTypeVariableID(),
-                                     locator, options);
-  addTypeVariable(tv);
-  return tv;
-}
-
 Solution ConstraintSystem::finalize() {
   assert(solverState);
 
@@ -72,9 +64,7 @@ Solution ConstraintSystem::finalize() {
   Solution solution(*this, CurrentScore);
 
   // Update the best score we've seen so far.
-  auto &ctx = getASTContext();
-  assert(ctx.TypeCheckerOpts.DisableConstraintSolverPerformanceHacks ||
-         !solverState->BestScore || CurrentScore <= *solverState->BestScore);
+  assert(!solverState->BestScore || CurrentScore <= *solverState->BestScore);
 
   if (!solverState->BestScore || CurrentScore <= *solverState->BestScore) {
     solverState->BestScore = CurrentScore;
@@ -90,19 +80,24 @@ Solution ConstraintSystem::finalize() {
 
     case FreeTypeVariableBinding::Allow:
       break;
-        
-    case FreeTypeVariableBinding::UnresolvedType:
-      assignFixedType(tv, ctx.TheUnresolvedType);
-      break;
     }
   }
 
   // For each of the type variables, get its fixed type.
   for (auto tv : getTypeVariables()) {
+    // This type variable has no binding. Allowed only
+    // when `FreeTypeVariableBinding::Allow` is set,
+    // which is checked above.
+    if (!getFixedType(tv)) {
+      solution.typeBindings[tv] = Type();
+      continue;
+    }
+
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
   // Copy over the resolved overloads.
+  solution.overloadChoices.reserve(ResolvedOverloads.size());
   solution.overloadChoices.insert(ResolvedOverloads.begin(),
                                   ResolvedOverloads.end());
 
@@ -115,29 +110,52 @@ Solution ConstraintSystem::finalize() {
 
       CanType first = simplifyType(types.first)->getCanonicalType();
       CanType second = simplifyType(types.second)->getCanonicalType();
+
+      // Pick the restriction with the highest value to avoid depending on
+      // iteration order.
+      auto found = solution.ConstraintRestrictions.find({first, second});
+      if (found != solution.ConstraintRestrictions.end() &&
+          (unsigned) restriction <= (unsigned) found->second) {
+        continue;
+      }
+
       solution.ConstraintRestrictions[{first, second}] = restriction;
     }
   }
 
   // For each of the fixes, record it as an operation on the affected
   // expression.
-  unsigned firstFixIndex = 0;
-  if (solverState && solverState->PartialSolutionScope) {
-    firstFixIndex = solverState->PartialSolutionScope->numFixes;
+  unsigned firstFixIndex =
+      (solverState ? solverState->numPartialSolutionFixes : 0);
+  for (const auto &fix :
+       llvm::make_range(Fixes.begin() + firstFixIndex, Fixes.end()))
+    solution.Fixes.push_back(fix);
+
+  for (const auto &fix : FixedRequirements) {
+    solution.FixedRequirements.push_back(fix);
   }
-  solution.Fixes.append(Fixes.begin() + firstFixIndex, Fixes.end());
 
   // Remember all the disjunction choices we made.
   for (auto &choice : DisjunctionChoices) {
     solution.DisjunctionChoices.insert(choice);
   }
 
+  // Remember all the applied disjunctions.
+  for (auto &choice : AppliedDisjunctions) {
+    solution.AppliedDisjunctions.insert(choice);
+  }
+
   // Remember all of the argument/parameter matching choices we made.
+  solution.argumentMatchingChoices.reserve(argumentMatchingChoices.size());
   for (auto &argumentMatch : argumentMatchingChoices) {
     auto inserted = solution.argumentMatchingChoices.insert(argumentMatch);
     assert(inserted.second || inserted.first->second == argumentMatch.second);
     (void)inserted;
   }
+
+  // Remember implied results.
+  for (auto impliedResult : ImpliedResults)
+    solution.ImpliedResults.insert(impliedResult);
 
   // Remember the opened types.
   for (const auto &opened : OpenedTypes) {
@@ -155,7 +173,10 @@ Solution ConstraintSystem::finalize() {
   }
 
   // Remember the opened existential types.
-  for (const auto &openedExistential : OpenedExistentialTypes) {
+  for (auto &openedExistential : OpenedExistentialTypes) {
+    openedExistential.second = simplifyType(openedExistential.second)
+        ->castTo<ExistentialArchetypeType>();
+
     assert(solution.OpenedExistentialTypes.count(openedExistential.first) == 0||
            solution.OpenedExistentialTypes[openedExistential.first]
              == openedExistential.second &&
@@ -163,15 +184,30 @@ Solution ConstraintSystem::finalize() {
     solution.OpenedExistentialTypes.insert(openedExistential);
   }
 
+  for (const auto &expansion : OpenedPackExpansionTypes) {
+    assert(solution.OpenedPackExpansionTypes.count(expansion.first) == 0 ||
+           solution.OpenedPackExpansionTypes[expansion.first] ==
+                   expansion.second &&
+               "Already recorded");
+    solution.OpenedPackExpansionTypes.insert(expansion);
+  }
+
   // Remember the defaulted type variables.
   solution.DefaultedConstraints.insert(DefaultedConstraints.begin(),
                                        DefaultedConstraints.end());
 
+  solution.nodeTypes.reserve(NodeTypes.size());
   for (auto &nodeType : NodeTypes) {
     solution.nodeTypes.insert(nodeType);
   }
+  solution.keyPathComponentTypes.reserve(KeyPathComponentTypes.size());
   for (auto &keyPathComponentType : KeyPathComponentTypes) {
     solution.keyPathComponentTypes.insert(keyPathComponentType);
+  }
+
+  // Remember key paths.
+  for (const auto &keyPaths : KeyPaths) {
+    solution.KeyPaths.insert(keyPaths);
   }
 
   // Remember contextual types.
@@ -179,11 +215,23 @@ Solution ConstraintSystem::finalize() {
     solution.contextualTypes.push_back({entry.first, entry.second.first});
   }
 
-  solution.solutionApplicationTargets = solutionApplicationTargets;
-  solution.caseLabelItems = caseLabelItems;
-  solution.isolatedParams.append(isolatedParams.begin(), isolatedParams.end());
-  solution.preconcurrencyClosures.append(preconcurrencyClosures.begin(),
-                                         preconcurrencyClosures.end());
+  for (auto &target : targets)
+    solution.targets.insert(target);
+
+  for (const auto &item : caseLabelItems)
+    solution.caseLabelItems.insert(item);
+
+  for (const auto &throwSite : potentialThrowSites)
+    solution.potentialThrowSites.push_back(throwSite);
+
+  for (const auto &pattern : exprPatterns)
+    solution.exprPatterns.insert(pattern);
+
+  for (const auto &param : isolatedParams)
+    solution.isolatedParams.insert(param);
+
+  for (auto closure : preconcurrencyClosures)
+    solution.preconcurrencyClosures.insert(closure);
 
   for (const auto &transformed : resultBuilderTransformed) {
     solution.resultBuilderTransformed.insert(transformed);
@@ -193,75 +241,128 @@ Solution ConstraintSystem::finalize() {
     solution.appliedPropertyWrappers.insert(appliedWrapper);
   }
 
-  // Remember implicit value conversions.
-  for (const auto &valueConversion : ImplicitValueConversions) {
-    solution.ImplicitValueConversions.push_back(valueConversion);
-  }
-
   // Remember argument lists.
   for (const auto &argListMapping : ArgumentLists) {
     solution.argumentLists.insert(argListMapping);
   }
 
-  for (const auto &implicitRoot : ImplicitCallAsFunctionRoots) {
-    solution.ImplicitCallAsFunctionRoots.insert(implicitRoot);
+  for (const auto &implicitInfo : ImplicitCallAsFunctions) {
+    solution.ImplicitCallAsFunctions.insert(implicitInfo);
+  }
+
+  for (const auto &env : PackExpansionEnvironments) {
+    solution.PackExpansionEnvironments.insert(env);
+  }
+
+  for (const auto &packEnv : PackElementExpansions)
+    solution.PackElementExpansions.insert(packEnv);
+
+  for (const auto &synthesized : SynthesizedConformances) {
+    solution.SynthesizedConformances.insert(synthesized);
   }
 
   return solution;
 }
 
-void ConstraintSystem::applySolution(const Solution &solution) {
-  // Update the score.
-  CurrentScore += solution.getFixedScore();
+void ConstraintSystem::replaySolution(const Solution &solution,
+                                      bool shouldIncreaseScore) {
+  if (shouldIncreaseScore)
+    replayScore(solution.getFixedScore());
 
-  // Assign fixed types to the type variables solved by this solution.
   for (auto binding : solution.typeBindings) {
     // If we haven't seen this type variable before, record it now.
     addTypeVariable(binding.first);
+  }
+
+  // Assign fixed types to the type variables solved by this solution.
+  for (auto binding : solution.typeBindings) {
+    if (!binding.second)
+      continue;
 
     // If we don't already have a fixed type for this type variable,
     // assign the fixed type from the solution.
-    if (!getFixedType(binding.first) && !binding.second->hasTypeVariable())
-      assignFixedType(binding.first, binding.second, /*updateState=*/false);
+    if (getFixedType(binding.first))
+      continue;
+
+    assignFixedType(binding.first, binding.second, /*updateState=*/false);
   }
 
   // Register overload choices.
   // FIXME: Copy these directly into some kind of partial solution?
-  for (auto overload : solution.overloadChoices)
-    ResolvedOverloads.insert(overload);
+  for (auto overload : solution.overloadChoices) {
+    if (!ResolvedOverloads.count(overload.first))
+      recordResolvedOverload(overload.first, overload.second);
+  }
 
   // Register constraint restrictions.
   // FIXME: Copy these directly into some kind of partial solution?
   for ( auto &restriction : solution.ConstraintRestrictions) {
-    auto *type1 = restriction.first.first.getPointer();
-    auto *type2 = restriction.first.second.getPointer();
+    auto type1 = restriction.first.first;
+    auto type2 = restriction.first.second;
 
-    ConstraintRestrictions.insert({{type1, type2}, restriction.second});
+    addConversionRestriction(type1, type2, restriction.second);
   }
 
   // Register the solution's disjunction choices.
   for (auto &choice : solution.DisjunctionChoices) {
-    DisjunctionChoices.insert(choice);
+    if (DisjunctionChoices.count(choice.first) == 0)
+      recordDisjunctionChoice(choice.first, choice.second);
+  }
+
+  // Register the solution's applied disjunctions.
+  for (auto &choice : solution.AppliedDisjunctions) {
+    if (AppliedDisjunctions.count(choice.first) == 0)
+      recordAppliedDisjunction(choice.first, choice.second);
   }
 
   // Remember all of the argument/parameter matching choices we made.
   for (auto &argumentMatch : solution.argumentMatchingChoices) {
-    argumentMatchingChoices.insert(argumentMatch);
+    if (argumentMatchingChoices.count(argumentMatch.first) == 0)
+      recordMatchCallArgumentResult(argumentMatch.first, argumentMatch.second);
+  }
+
+  // Remember implied results.
+  for (auto impliedResult : solution.ImpliedResults) {
+    if (ImpliedResults.count(impliedResult.first) == 0)
+      recordImpliedResult(impliedResult.first, impliedResult.second);
   }
 
   // Register the solution's opened types.
   for (const auto &opened : solution.OpenedTypes) {
-    OpenedTypes.insert(opened);
+    if (OpenedTypes.count(opened.first) == 0)
+      recordOpenedType(opened.first, opened.second);
   }
 
   // Register the solution's opened existential types.
   for (const auto &openedExistential : solution.OpenedExistentialTypes) {
-    OpenedExistentialTypes.insert(openedExistential);
+    if (OpenedExistentialTypes.count(openedExistential.first) == 0) {
+      recordOpenedExistentialType(openedExistential.first,
+                                  openedExistential.second);
+    }
+  }
+
+  // Register the solution's opened pack expansion types.
+  for (const auto &expansion : solution.OpenedPackExpansionTypes) {
+    if (OpenedPackExpansionTypes.count(expansion.first) == 0)
+      recordOpenedPackExpansionType(expansion.first, expansion.second);
+  }
+
+  // Register the solutions's pack expansion environments.
+  for (const auto &expansion : solution.PackExpansionEnvironments) {
+    if (PackExpansionEnvironments.count(expansion.first) == 0)
+      recordPackExpansionEnvironment(expansion.first, expansion.second);
+  }
+
+  // Register the solutions's pack expansions.
+  for (auto &packEnvironment : solution.PackElementExpansions) {
+    if (PackElementExpansions.count(packEnvironment.first) == 0)
+      recordPackElementExpansion(packEnvironment.first, packEnvironment.second);
   }
 
   // Register the defaulted type variables.
-  DefaultedConstraints.insert(solution.DefaultedConstraints.begin(),
-                              solution.DefaultedConstraints.end());
+  for (auto *locator : solution.DefaultedConstraints) {
+    recordDefaultedConstraint(locator);
+  }
 
   // Add the node types back.
   for (auto &nodeType : solution.nodeTypes) {
@@ -273,18 +374,26 @@ void ConstraintSystem::applySolution(const Solution &solution) {
             nodeType.getSecond());
   }
 
-  // Add the contextual types.
-  for (const auto &contextualType : solution.contextualTypes) {
-    if (!getContextualTypeInfo(contextualType.first)) {
-      setContextualType(contextualType.first, contextualType.second.typeLoc,
-                        contextualType.second.purpose);
+  // Add key paths.
+  for (const auto &keypath : solution.KeyPaths) {
+    if (KeyPaths.count(keypath.first) == 0) {
+      recordKeyPath(keypath.first,
+                    std::get<0>(keypath.second),
+                    std::get<1>(keypath.second),
+                    std::get<2>(keypath.second));
     }
   }
 
+  // Add the contextual types.
+  for (const auto &contextualType : solution.contextualTypes) {
+    if (!getContextualTypeInfo(contextualType.first))
+      setContextualInfo(contextualType.first, contextualType.second);
+  }
+
   // Register the statement condition targets.
-  for (const auto &target : solution.solutionApplicationTargets) {
-    if (!getSolutionApplicationTarget(target.first))
-      setSolutionApplicationTarget(target.first, target.second);
+  for (const auto &target : solution.targets) {
+    if (!getTargetFor(target.first))
+      setTargetFor(target.first, target.second);
   }
 
   // Register the statement condition targets.
@@ -293,51 +402,73 @@ void ConstraintSystem::applySolution(const Solution &solution) {
       setCaseLabelItemInfo(info.first, info.second);
   }
 
+  auto sites = ArrayRef(solution.potentialThrowSites);
+  ASSERT(sites.size() >= potentialThrowSites.size());
+  for (const auto &site : sites.slice(potentialThrowSites.size())) {
+    recordPotentialThrowSite(site.first, site.second);
+  }
+
   for (auto param : solution.isolatedParams) {
-    isolatedParams.insert(param);
+    if (isolatedParams.count(param) == 0)
+      recordIsolatedParam(param);
+  }
+
+  for (auto &pair : solution.exprPatterns) {
+    if (exprPatterns.count(pair.first) == 0)
+      setExprPatternFor(pair.first, pair.second);
   }
 
   for (auto closure : solution.preconcurrencyClosures) {
-    preconcurrencyClosures.insert(closure);
+    if (preconcurrencyClosures.count(closure) == 0)
+      recordPreconcurrencyClosure(closure);
   }
 
   for (const auto &transformed : solution.resultBuilderTransformed) {
-    resultBuilderTransformed.insert(transformed);
+    if (resultBuilderTransformed.count(transformed.first) == 0)
+      recordResultBuilderTransform(transformed.first, transformed.second);
   }
 
   for (const auto &appliedWrapper : solution.appliedPropertyWrappers) {
-    appliedPropertyWrappers.insert(appliedWrapper);
-  }
-
-  for (auto &valueConversion : solution.ImplicitValueConversions) {
-    ImplicitValueConversions.insert(valueConversion);
+    auto found = appliedPropertyWrappers.find(appliedWrapper.first);
+    if (found == appliedPropertyWrappers.end()) {
+      for (auto applied : appliedWrapper.second)
+        applyPropertyWrapper(getAsExpr(appliedWrapper.first), applied);
+    } else {
+      ASSERT(found->second.size() == appliedWrapper.second.size());
+    }
   }
 
   // Register the argument lists.
   for (auto &argListMapping : solution.argumentLists) {
-    ArgumentLists.insert(argListMapping);
+    if (ArgumentLists.count(argListMapping.first) == 0)
+      recordArgumentList(argListMapping.first, argListMapping.second);
   }
 
-  for (auto &implicitRoot : solution.ImplicitCallAsFunctionRoots) {
-    ImplicitCallAsFunctionRoots.insert(implicitRoot);
+  for (auto &implicitInfo : solution.ImplicitCallAsFunctions) {
+    if (ImplicitCallAsFunctions.count(implicitInfo.first) == 0)
+      recordImplicitCallAsFunction(implicitInfo.first,
+                                   implicitInfo.second.Member,
+                                   implicitInfo.second.BaseArgs);
+  }
+
+  for (auto &synthesized : solution.SynthesizedConformances) {
+    if (SynthesizedConformances.count(synthesized.first) == 0)
+      recordSynthesizedConformance(synthesized.first, synthesized.second);
   }
 
   // Register any fixes produced along this path.
-  Fixes.insert(solution.Fixes.begin(), solution.Fixes.end());
-}
+  for (auto *fix : solution.Fixes) {
+    if (Fixes.count(fix) == 0)
+      addFix(fix);
+  }
 
-/// Restore the type variable bindings to what they were before
-/// we attempted to solve this constraint system.
-void ConstraintSystem::restoreTypeVariableBindings(unsigned numBindings) {
-  auto &savedBindings = *getSavedBindings();
-  std::for_each(savedBindings.rbegin(), savedBindings.rbegin() + numBindings,
-                [](SavedTypeVariableBinding &saved) {
-                  saved.restore();
-                });
-  savedBindings.erase(savedBindings.end() - numBindings,
-                      savedBindings.end());
+  // Register fixed requirements.
+  for (auto fix : solution.FixedRequirements) {
+    recordFixedRequirement(std::get<0>(fix),
+                           std::get<1>(fix),
+                           std::get<2>(fix));
+  }
 }
-
 bool ConstraintSystem::simplify() {
   // While we have a constraint in the worklist, process it.
   while (!ActiveConstraints.empty()) {
@@ -345,22 +476,70 @@ bool ConstraintSystem::simplify() {
     auto *constraint = &ActiveConstraints.front();
     deactivateConstraint(constraint);
 
+    auto isSimplifiable =
+        constraint->getKind() != ConstraintKind::Disjunction &&
+        constraint->getKind() != ConstraintKind::Conjunction;
+
+    if (isDebugMode()) {
+      auto &log = llvm::errs();
+      log.indent(solverState->getCurrentIndent());
+      log << "(considering: ";
+      constraint->print(log, &getASTContext().SourceMgr,
+                        solverState->getCurrentIndent());
+      log << "\n";
+
+      // {Dis, Con}junction are returned unsolved in \c simplifyConstraint() and
+      // handled separately by solver steps.
+      if (isSimplifiable) {
+        log.indent(solverState->getCurrentIndent() + 2)
+            << "(simplification result:\n";
+      }
+    }
+
     // Simplify this constraint.
     switch (simplifyConstraint(*constraint)) {
     case SolutionKind::Error:
       retireFailedConstraint(constraint);
+      if (isDebugMode()) {
+        auto &log = llvm::errs();
+        if (isSimplifiable) {
+          log.indent(solverState->getCurrentIndent() + 2) << ")\n";
+        }
+        log.indent(solverState->getCurrentIndent() + 2) << "(outcome: error)\n";
+      }
       break;
 
     case SolutionKind::Solved:
       if (solverState)
         ++solverState->NumSimplifiedConstraints;
       retireConstraint(constraint);
+      if (isDebugMode()) {
+        auto &log = llvm::errs();
+        if (isSimplifiable) {
+          log.indent(solverState->getCurrentIndent() + 2) << ")\n";
+        }
+        log.indent(solverState->getCurrentIndent() + 2)
+            << "(outcome: simplified)\n";
+      }
       break;
 
     case SolutionKind::Unsolved:
       if (solverState)
         ++solverState->NumUnsimplifiedConstraints;
+      if (isDebugMode()) {
+        auto &log = llvm::errs();
+        if (isSimplifiable) {
+          log.indent(solverState->getCurrentIndent() + 2) << ")\n";
+        }
+        log.indent(solverState->getCurrentIndent() + 2)
+            << "(outcome: unsolved)\n";
+      }
       break;
+    }
+
+    if (isDebugMode()) {
+      auto &log = llvm::errs();
+      log.indent(solverState->getCurrentIndent()) << ")\n";
     }
 
     // Check whether a constraint failed. If so, we're done.
@@ -424,7 +603,7 @@ void truncate(llvm::SetVector<V> &vector, unsigned newSize) {
 
 ConstraintSystem::SolverState::SolverState(
     ConstraintSystem &cs, FreeTypeVariableBinding allowFreeTypeVariables)
-    : CS(cs), AllowFreeTypeVariables(allowFreeTypeVariables) {
+    : CS(cs), AllowFreeTypeVariables(allowFreeTypeVariables), Trail(cs) {
   assert(!CS.solverState &&
          "Constraint system should not already have solver state!");
   CS.solverState = this;
@@ -443,7 +622,8 @@ ConstraintSystem::SolverState::SolverState(
   if (tyOpts.DebugConstraintSolverAttempt &&
       tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
     CS.Options |= ConstraintSystemFlags::DebugConstraints;
-    llvm::errs() << "---Constraint system #" << SolutionAttempt << "---\n";
+    llvm::errs().indent(CS.solverState->getCurrentIndent())
+        << "---Constraint system #" << SolutionAttempt << "---\n";
     CS.print(llvm::errs());
   }
 }
@@ -457,13 +637,6 @@ ConstraintSystem::SolverState::~SolverState() {
   // let's just drop the state without attempting to rollback.
   if (CS.inInvalidState())
     return;
-
-  // Make sure that all of the retired constraints have been returned
-  // to constraint system.
-  assert(!hasRetiredConstraints());
-
-  // Make sure that all of the generated constraints have been handled.
-  assert(generatedConstraints.empty());
 
   // Re-activate constraints which were initially marked as "active"
   // to restore original state of the constraint system.
@@ -487,16 +660,27 @@ ConstraintSystem::SolverState::~SolverState() {
     CS.activateConstraint(constraint);
   }
 
+  auto &ctx = CS.getASTContext();
+
   // If global constraint debugging is off and we are finished logging the
   // current solution attempt, switch debugging back off.
-  const auto &tyOpts = CS.getASTContext().TypeCheckerOpts;
-  if (!tyOpts.DebugConstraintSolver &&
-      tyOpts.DebugConstraintSolverAttempt &&
-      tyOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
+  if (!ctx.TypeCheckerOpts.DebugConstraintSolver &&
+      ctx.TypeCheckerOpts.DebugConstraintSolverAttempt &&
+      ctx.TypeCheckerOpts.DebugConstraintSolverAttempt == SolutionAttempt) {
     CS.Options -= ConstraintSystemFlags::DebugConstraints;
   }
 
-  // Write our local statistics back to the overall statistics.
+  // This statistic is special because it's not a counter; we just update
+  // it in one shot at the end.
+  if (ctx.Stats) {
+    auto &counters = ctx.Stats->getFrontendCounters();
+    int64_t bytes = CS.getAllocator().getBytesAllocated();
+    counters.NumSolverBytesAllocated += bytes;
+    counters.MaxSolverBytesAllocated =
+        std::max(counters.MaxSolverBytesAllocated, bytes);
+  }
+
+  // Write our local debug statistics back to the overall debug statistics.
   #define CS_STATISTIC(Name, Description) JOIN2(Overall,Name) += Name;
   #include "swift/Sema/ConstraintSolverStats.def"
 
@@ -504,7 +688,7 @@ ConstraintSystem::SolverState::~SolverState() {
   // Update the "largest" statistics if this system is larger than the
   // previous one.  
   // FIXME: This is not at all thread-safe.
-  if (NumStatesExplored > LargestNumStatesExplored.getValue()) {
+  if (NumSolverScopes > LargestNumSolverScopes.getValue()) {
     LargestSolutionAttemptNumber = SolutionAttempt-1;
     ++LargestSolutionAttemptNumber;
     #define CS_STATISTIC(Name, Description) \
@@ -516,55 +700,33 @@ ConstraintSystem::SolverState::~SolverState() {
 }
 
 ConstraintSystem::SolverScope::SolverScope(ConstraintSystem &cs)
-  : cs(cs), CGScope(cs.CG)
-{
-  numTypeVariables = cs.TypeVariables.size();
-  numSavedBindings = cs.solverState->savedBindings.size();
-  numConstraintRestrictions = cs.ConstraintRestrictions.size();
-  numFixes = cs.Fixes.size();
-  numFixedRequirements = cs.FixedRequirements.size();
-  numDisjunctionChoices = cs.DisjunctionChoices.size();
-  numAppliedDisjunctions = cs.AppliedDisjunctions.size();
-  numArgumentMatchingChoices = cs.argumentMatchingChoices.size();
-  numOpenedTypes = cs.OpenedTypes.size();
-  numOpenedExistentialTypes = cs.OpenedExistentialTypes.size();
-  numDefaultedConstraints = cs.DefaultedConstraints.size();
-  numAddedNodeTypes = cs.addedNodeTypes.size();
-  numAddedKeyPathComponentTypes = cs.addedKeyPathComponentTypes.size();
-  numDisabledConstraints = cs.solverState->getNumDisabledConstraints();
-  numFavoredConstraints = cs.solverState->getNumFavoredConstraints();
-  numResultBuilderTransformed = cs.resultBuilderTransformed.size();
-  numAppliedPropertyWrappers = cs.appliedPropertyWrappers.size();
-  numResolvedOverloads = cs.ResolvedOverloads.size();
-  numInferredClosureTypes = cs.ClosureTypes.size();
-  numContextualTypes = cs.contextualTypes.size();
-  numSolutionApplicationTargets = cs.solutionApplicationTargets.size();
-  numCaseLabelItems = cs.caseLabelItems.size();
-  numIsolatedParams = cs.isolatedParams.size();
-  numPreconcurrencyClosures = cs.preconcurrencyClosures.size();
-  numImplicitValueConversions = cs.ImplicitValueConversions.size();
-  numArgumentLists = cs.ArgumentLists.size();
-  numImplicitCallAsFunctionRoots = cs.ImplicitCallAsFunctionRoots.size();
+  : cs(cs),
+    startTypeVariables(cs.TypeVariables.size()),
+    startTrailSteps(cs.solverState->Trail.size()),
+    scopeNumber(cs.solverState->beginScope()),
+    moved(0) {
+  ASSERT(!cs.failedConstraint && "Unexpected failed constraint!");
+}
 
-  PreviousScore = cs.CurrentScore;
-
-  cs.solverState->registerScope(this);
-  assert(!cs.failedConstraint && "Unexpected failed constraint!");
+ConstraintSystem::SolverScope::SolverScope(SolverScope &&other)
+  : cs(other.cs),
+    startTypeVariables(other.startTypeVariables),
+    startTrailSteps(other.startTrailSteps),
+    scopeNumber(other.scopeNumber),
+    moved(0) {
+  other.moved = 1;
 }
 
 ConstraintSystem::SolverScope::~SolverScope() {
+  if (moved)
+    return;
+
   // Don't attempt to rollback from an incorrect state.
   if (cs.inInvalidState())
     return;
 
-  // Erase the end of various lists.
-  truncate(cs.TypeVariables, numTypeVariables);
-
-  truncate(cs.ResolvedOverloads, numResolvedOverloads);
-
-  // Restore bindings.
-  cs.restoreTypeVariableBindings(cs.solverState->savedBindings.size() -
-                                   numSavedBindings);
+  // Roll back introduced type variables.
+  truncate(cs.TypeVariables, startTypeVariables);
 
   // Move any remaining active constraints into the inactive list.
   if (!cs.ActiveConstraints.empty()) {
@@ -575,102 +737,43 @@ ConstraintSystem::SolverScope::~SolverScope() {
                                   cs.ActiveConstraints);
   }
 
-  // Rollback all of the changes done to constraints by the current scope,
-  // e.g. add retired constraints back to the circulation and remove generated
-  // constraints introduced by the current scope.
-  cs.solverState->rollback(this);
+  uint64_t endTrailSteps = cs.solverState->Trail.size();
 
-  // Remove any constraint restrictions.
-  truncate(cs.ConstraintRestrictions, numConstraintRestrictions);
+  // Roll back changes to the constraint system.
+  cs.solverState->Trail.undo(startTrailSteps);
 
-  // Remove any fixes.
-  truncate(cs.Fixes, numFixes);
-
-  // Remove any disjunction choices.
-  truncate(cs.DisjunctionChoices, numDisjunctionChoices);
-
-  // Remove any applied disjunctions.
-  truncate(cs.AppliedDisjunctions, numAppliedDisjunctions);
-
-  // Remove any argument matching choices;
-  truncate(cs.argumentMatchingChoices, numArgumentMatchingChoices);
-
-  // Remove any opened types.
-  truncate(cs.OpenedTypes, numOpenedTypes);
-
-  // Remove any conformances solver had to fix along
-  // the current path.
-  truncate(cs.FixedRequirements, numFixedRequirements);
-
-  // Remove any opened existential types.
-  truncate(cs.OpenedExistentialTypes, numOpenedExistentialTypes);
-
-  // Remove any defaulted type variables.
-  truncate(cs.DefaultedConstraints, numDefaultedConstraints);
-
-  // Remove any node types we registered.
-  for (unsigned i :
-           reverse(range(numAddedNodeTypes, cs.addedNodeTypes.size()))) {
-    auto node = cs.addedNodeTypes[i].first;
-    if (Type oldType = cs.addedNodeTypes[i].second)
-      cs.NodeTypes[node] = oldType;
-    else
-      cs.NodeTypes.erase(node);
-  }
-  truncate(cs.addedNodeTypes, numAddedNodeTypes);
-
-  // Remove any node types we registered.
-  for (unsigned i : reverse(range(numAddedKeyPathComponentTypes,
-                                  cs.addedKeyPathComponentTypes.size()))) {
-    auto KeyPath = std::get<0>(cs.addedKeyPathComponentTypes[i]);
-    auto KeyPathIndex = std::get<1>(cs.addedKeyPathComponentTypes[i]);
-    if (Type oldType = std::get<2>(cs.addedKeyPathComponentTypes[i])) {
-      cs.KeyPathComponentTypes[{KeyPath, KeyPathIndex}] = oldType;
-    } else {
-      cs.KeyPathComponentTypes.erase({KeyPath, KeyPathIndex});
-    }
-  }
-  truncate(cs.addedKeyPathComponentTypes, numAddedKeyPathComponentTypes);
-
-  /// Remove any builder transformed closures.
-  truncate(cs.resultBuilderTransformed, numResultBuilderTransformed);
-
-  // Remove any applied property wrappers.
-  truncate(cs.appliedPropertyWrappers, numAppliedPropertyWrappers);
-
-  // Remove any inferred closure types (e.g. used in result builder body).
-  truncate(cs.ClosureTypes, numInferredClosureTypes);
-
-  // Remove any contextual types.
-  truncate(cs.contextualTypes, numContextualTypes);
-
-  // Remove any solution application targets.
-  truncate(cs.solutionApplicationTargets, numSolutionApplicationTargets);
-
-  // Remove any case label item infos.
-  truncate(cs.caseLabelItems, numCaseLabelItems);
-
-  // Remove any isolated parameters.
-  truncate(cs.isolatedParams, numIsolatedParams);
-
-  // Remove any preconcurrency closures.
-  truncate(cs.preconcurrencyClosures, numPreconcurrencyClosures);
-
-  // Remove any implicit value conversions.
-  truncate(cs.ImplicitValueConversions, numImplicitValueConversions);
-
-  // Remove any argument lists no longer in scope.
-  truncate(cs.ArgumentLists, numArgumentLists);
-
-  // Remove any implicitly generated root expressions for `.callAsFunction`
-  // which are no longer in scope.
-  truncate(cs.ImplicitCallAsFunctionRoots, numImplicitCallAsFunctionRoots);
-
-  // Reset the previous score.
-  cs.CurrentScore = PreviousScore;
+  // Update statistics.
+  cs.solverState->endScope(scopeNumber,
+                           startTrailSteps,
+                           endTrailSteps);
 
   // Clear out other "failed" state.
   cs.failedConstraint = nullptr;
+}
+
+unsigned ConstraintSystem::SolverState::beginScope() {
+  ++depth;
+  maxDepth = std::max(maxDepth, depth);
+
+  CS.incrementScopeCounter();
+
+  return NumSolverScopes++;
+}
+
+/// Update statistics when a scope ends.
+void ConstraintSystem::SolverState::endScope(unsigned scopeNumber,
+                                             uint64_t startTrailSteps,
+                                             uint64_t endTrailSteps) {
+  ASSERT(depth > 0);
+  --depth;
+
+  unsigned steps = endTrailSteps - startTrailSteps;
+  NumTrailSteps += steps;
+  CS.NumTrailSteps += steps;
+
+  unsigned countSolverScopes = NumSolverScopes - scopeNumber;
+  if (countSolverScopes == 1)
+    CS.incrementLeafScopes();
 }
 
 /// Solve the system of constraints.
@@ -680,7 +783,7 @@ ConstraintSystem::SolverScope::~SolverScope() {
 ///
 /// \returns a solution if a single unambiguous one could be found, or None if
 /// ambiguous or unsolvable.
-Optional<Solution>
+std::optional<Solution>
 ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
                               bool allowFixes) {
 
@@ -692,543 +795,13 @@ ConstraintSystem::solveSingle(FreeTypeVariableBinding allowFreeTypeVariables,
   filterSolutions(solutions);
 
   if (solutions.size() != 1)
-    return Optional<Solution>();
+    return std::optional<Solution>();
 
   return std::move(solutions[0]);
 }
 
-bool ConstraintSystem::Candidate::solve(
-    llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
-  // Don't attempt to solve candidate if there is closure
-  // expression involved, because it's handled specially
-  // by parent constraint system (e.g. parameter lists).
-  bool containsClosure = false;
-  E->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-    if (isa<ClosureExpr>(childExpr)) {
-      containsClosure = true;
-      return nullptr;
-    }
-    return childExpr;
-  });
-
-  if (containsClosure)
-    return false;
-
-  auto cleanupImplicitExprs = [&](Expr *expr) {
-    expr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-      Type type = childExpr->getType();
-      if (childExpr->isImplicit() && type && type->hasTypeVariable())
-        childExpr->setType(Type());
-      return childExpr;
-    });
-  };
-
-  // Allocate new constraint system for sub-expression.
-  ConstraintSystem cs(DC, None);
-
-  // Set up expression type checker timer for the candidate.
-  cs.Timer.emplace(E, cs);
-
-  // Generate constraints for the new system.
-  if (auto generatedExpr = cs.generateConstraints(E, DC)) {
-    E = generatedExpr;
-  } else {
-    // Failure to generate constraint system for sub-expression
-    // means we can't continue solving sub-expressions.
-    cleanupImplicitExprs(E);
-    return true;
-  }
-
-  // If this candidate is too complex given the number
-  // of the domains we have reduced so far, let's bail out early.
-  if (isTooComplexGiven(&cs, shrunkExprs))
-    return false;
-
-  auto &ctx = cs.getASTContext();
-  if (cs.isDebugMode()) {
-    auto &log = llvm::errs();
-    log << "--- Solving candidate for shrinking at ";
-    auto R = E->getSourceRange();
-    if (R.isValid()) {
-      R.print(log, ctx.SourceMgr, /*PrintText=*/ false);
-    } else {
-      log << "<invalid range>";
-    }
-    log << " ---\n";
-
-    E->dump(log);
-    log << '\n';
-    cs.print(log);
-  }
-
-  // If there is contextual type present, add an explicit "conversion"
-  // constraint to the system.
-  if (!CT.isNull()) {
-    auto constraintKind = ConstraintKind::Conversion;
-    if (CTP == CTP_CallArgument)
-      constraintKind = ConstraintKind::ArgumentConversion;
-
-    cs.addConstraint(constraintKind, cs.getType(E), CT,
-                     cs.getConstraintLocator(E), /*isFavored=*/true);
-  }
-
-  // Try to solve the system and record all available solutions.
-  llvm::SmallVector<Solution, 2> solutions;
-  {
-    SolverState state(cs, FreeTypeVariableBinding::Allow);
-
-    // Use solve which doesn't try to filter solution list.
-    // Because we want the whole set of possible domain choices.
-    cs.solveImpl(solutions);
-  }
-
-  if (cs.isDebugMode()) {
-    auto &log = llvm::errs();
-    if (solutions.empty()) {
-      log << "--- No Solutions ---\n";
-    } else {
-      log << "--- Solutions ---\n";
-      for (unsigned i = 0, n = solutions.size(); i != n; ++i) {
-        auto &solution = solutions[i];
-        log << "--- Solution #" << i << " ---\n";
-        solution.dump(log);
-      }
-    }
-  }
-
-  // Record found solutions as suggestions.
-  this->applySolutions(solutions, shrunkExprs);
-
-  // Let's double-check if we have any implicit expressions
-  // with type variables and nullify their types.
-  cleanupImplicitExprs(E);
-
-  // No solutions for the sub-expression means that either main expression
-  // needs salvaging or it's inconsistent (read: doesn't have solutions).
-  return solutions.empty();
-}
-
-void ConstraintSystem::Candidate::applySolutions(
-    llvm::SmallVectorImpl<Solution> &solutions,
-    llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const {
-  // A collection of OSRs with their newly reduced domains,
-  // it's domains are sets because multiple solutions can have the same
-  // choice for one of the type variables, and we want no duplication.
-  llvm::SmallDenseMap<OverloadSetRefExpr *, llvm::SmallSetVector<ValueDecl *, 2>>
-    domains;
-  for (auto &solution : solutions) {
-    auto &score = solution.getFixedScore();
-
-    // Avoid any solutions with implicit value conversions
-    // because they might get reverted later when more context
-    // becomes available.
-    if (score.Data[SK_ImplicitValueConversion] > 0)
-      continue;
-
-    for (auto choice : solution.overloadChoices) {
-      // Some of the choices might not have locators.
-      if (!choice.getFirst())
-        continue;
-
-      auto anchor = choice.getFirst()->getAnchor();
-      auto *OSR = getAsExpr<OverloadSetRefExpr>(anchor);
-      // Anchor is not available or expression is not an overload set.
-      if (!OSR)
-        continue;
-
-      auto overload = choice.getSecond().choice;
-      auto type = overload.getDecl()->getInterfaceType();
-
-      // One of the solutions has polymorphic type associated with one of its
-      // type variables. Such functions can only be properly resolved
-      // via complete expression, so we'll have to forget solutions
-      // we have already recorded. They might not include all viable overload
-      // choices.
-      if (type->is<GenericFunctionType>()) {
-        return;
-      }
-
-      domains[OSR].insert(overload.getDecl());
-    }
-  }
-
-  // Reduce the domains.
-  for (auto &domain : domains) {
-    auto OSR = domain.getFirst();
-    auto &choices = domain.getSecond();
-
-    // If the domain wasn't reduced, skip it.
-    if (OSR->getDecls().size() == choices.size()) continue;
-
-    // Update the expression with the reduced domain.
-    MutableArrayRef<ValueDecl *> decls(
-                                Allocator.Allocate<ValueDecl *>(choices.size()),
-                                choices.size());
-
-    std::uninitialized_copy(choices.begin(), choices.end(), decls.begin());
-    OSR->setDecls(decls);
-
-    // Record successfully shrunk expression.
-    shrunkExprs.insert(OSR);
-  }
-}
-
-void ConstraintSystem::shrink(Expr *expr) {
-  if (getASTContext().TypeCheckerOpts.SolverDisableShrink)
-    return;
-
-  using DomainMap = llvm::SmallDenseMap<Expr *, ArrayRef<ValueDecl *>>;
-
-  // A collection of original domains of all of the expressions,
-  // so they can be restored in case of failure.
-  DomainMap domains;
-
-  struct ExprCollector : public ASTWalker {
-    Expr *PrimaryExpr;
-
-    // The primary constraint system.
-    ConstraintSystem &CS;
-
-    // All of the sub-expressions which are suitable to be solved
-    // separately from the main system e.g. binary expressions, collections,
-    // function calls, coercions etc.
-    llvm::SmallVector<Candidate, 4> Candidates;
-
-    // Counts the number of overload sets present in the tree so far.
-    // Note that the traversal is depth-first.
-    llvm::SmallVector<std::pair<Expr *, unsigned>, 4> ApplyExprs;
-
-    // A collection of original domains of all of the expressions,
-    // so they can be restored in case of failure.
-    DomainMap &Domains;
-
-    ExprCollector(Expr *expr, ConstraintSystem &cs, DomainMap &domains)
-        : PrimaryExpr(expr), CS(cs), Domains(domains) {}
-
-    std::pair<bool, Expr *> walkToExprPre(Expr *expr) override {
-      // A dictionary expression is just a set of tuples; try to solve ones
-      // that have overload sets.
-      if (auto collectionExpr = dyn_cast<CollectionExpr>(expr)) {
-        visitCollectionExpr(collectionExpr,
-                            CS.getContextualType(expr, /*forConstraint=*/false),
-                            CS.getContextualTypePurpose(expr));
-        // Don't try to walk into the dictionary.
-        return {false, expr};
-      }
-
-      // Let's not attempt to type-check closures or expressions
-      // which constrain closures, because they require special handling
-      // when dealing with context and parameters declarations.
-      if (isa<ClosureExpr>(expr)) {
-        return {false, expr};
-      }
-
-      // Similar to 'ClosureExpr', 'TapExpr' has a 'VarDecl' the type of which
-      // is determined by type checking the parent interpolated string literal.
-      if (isa<TapExpr>(expr)) {
-        return {false, expr};
-      }
-
-      if (auto coerceExpr = dyn_cast<CoerceExpr>(expr)) {
-        if (coerceExpr->isLiteralInit())
-          ApplyExprs.push_back({coerceExpr, 1});
-        visitCoerceExpr(coerceExpr);
-        return {false, expr};
-      }
-
-      if (auto OSR = dyn_cast<OverloadSetRefExpr>(expr)) {
-        Domains[OSR] = OSR->getDecls();
-      }
-
-      if (auto applyExpr = dyn_cast<ApplyExpr>(expr)) {
-        auto func = applyExpr->getFn();
-        // Let's record this function application for post-processing
-        // as well as if it contains overload set, see walkToExprPost.
-        ApplyExprs.push_back(
-            {applyExpr, isa<OverloadSetRefExpr>(func) || isa<TypeExpr>(func)});
-      }
-
-      return { true, expr };
-    }
-
-    /// Determine whether this is an arithmetic expression comprised entirely
-    /// of literals.
-    static bool isArithmeticExprOfLiterals(Expr *expr) {
-      expr = expr->getSemanticsProvidingExpr();
-
-      if (auto prefix = dyn_cast<PrefixUnaryExpr>(expr))
-        return isArithmeticExprOfLiterals(prefix->getOperand());
-
-      if (auto postfix = dyn_cast<PostfixUnaryExpr>(expr))
-        return isArithmeticExprOfLiterals(postfix->getOperand());
-
-      if (auto binary = dyn_cast<BinaryExpr>(expr))
-        return isArithmeticExprOfLiterals(binary->getLHS()) &&
-               isArithmeticExprOfLiterals(binary->getRHS());
-
-      return isa<IntegerLiteralExpr>(expr) || isa<FloatLiteralExpr>(expr);
-    }
-
-    Expr *walkToExprPost(Expr *expr) override {
-      auto isSrcOfPrimaryAssignment = [&](Expr *expr) -> bool {
-        if (auto *AE = dyn_cast<AssignExpr>(PrimaryExpr))
-          return expr == AE->getSrc();
-        return false;
-      };
-
-      if (expr == PrimaryExpr || isSrcOfPrimaryAssignment(expr)) {
-        // If this is primary expression and there are no candidates
-        // to be solved, let's not record it, because it's going to be
-        // solved regardless.
-        if (Candidates.empty())
-          return expr;
-
-        auto contextualType = CS.getContextualType(expr,
-                                                   /*forConstraint=*/false);
-        // If there is a contextual type set for this expression.
-        if (!contextualType.isNull()) {
-          Candidates.push_back(Candidate(CS, PrimaryExpr, contextualType,
-                                         CS.getContextualTypePurpose(expr)));
-          return expr;
-        }
-
-        // Or it's a function application or assignment with other candidates
-        // present. Assignment should be easy to solve because we'd get a
-        // contextual type from the destination expression, otherwise shrink
-        // might produce incorrect results without considering aforementioned
-        // destination type.
-        if (isa<ApplyExpr>(expr) || isa<AssignExpr>(expr)) {
-          Candidates.push_back(Candidate(CS, PrimaryExpr));
-          return expr;
-        }
-      }
-
-      if (!isa<ApplyExpr>(expr))
-        return expr;
-
-      unsigned numOverloadSets = 0;
-      // Let's count how many overload sets do we have.
-      while (!ApplyExprs.empty()) {
-        auto &application = ApplyExprs.back();
-        auto applyExpr = application.first;
-
-        // Add overload sets tracked by current expression.
-        numOverloadSets += application.second;
-        ApplyExprs.pop_back();
-
-        // We've found the current expression, so record the number of
-        // overloads.
-        if (expr == applyExpr) {
-          ApplyExprs.push_back({applyExpr, numOverloadSets});
-          break;
-        }
-      }
-
-      // If there are fewer than two overloads in the chain
-      // there is no point of solving this expression,
-      // because we won't be able to reduce its domain.
-      if (numOverloadSets > 1 && !isArithmeticExprOfLiterals(expr))
-        Candidates.push_back(Candidate(CS, expr));
-
-      return expr;
-    }
-
-  private:
-    /// Extract type of the element from given collection type.
-    ///
-    /// \param collection The type of the collection container.
-    ///
-    /// \returns Null type, ErrorType or UnresolvedType on failure,
-    /// properly constructed type otherwise.
-    Type extractElementType(Type collection) {
-      auto &ctx = CS.getASTContext();
-      if (!collection || collection->hasError())
-        return collection;
-
-      auto base = collection.getPointer();
-      auto isInvalidType = [](Type type) -> bool {
-        return type.isNull() || type->hasUnresolvedType() ||
-               type->hasError();
-      };
-
-      // Array type.
-      if (auto array = dyn_cast<ArraySliceType>(base)) {
-        auto elementType = array->getBaseType();
-        // If base type is invalid let's return error type.
-        return elementType;
-      }
-
-      // Map or Set or any other associated collection type.
-      if (auto boundGeneric = dyn_cast<BoundGenericType>(base)) {
-        if (boundGeneric->hasUnresolvedType())
-          return boundGeneric;
-
-        llvm::SmallVector<TupleTypeElt, 2> params;
-        for (auto &type : boundGeneric->getGenericArgs()) {
-          // One of the generic arguments in invalid or unresolved.
-          if (isInvalidType(type))
-            return type;
-
-          params.push_back(type);
-        }
-
-        // If there is just one parameter, let's return it directly.
-        if (params.size() == 1)
-          return params[0].getType();
-
-        return TupleType::get(params, ctx);
-      }
-
-      return Type();
-    }
-
-    bool isSuitableCollection(TypeRepr *collectionTypeRepr) {
-      // Only generic identifier, array or dictionary.
-      switch (collectionTypeRepr->getKind()) {
-      case TypeReprKind::GenericIdent:
-      case TypeReprKind::Array:
-      case TypeReprKind::Dictionary:
-        return true;
-
-      default:
-        return false;
-      }
-    }
-
-    void visitCoerceExpr(CoerceExpr *coerceExpr) {
-      auto subExpr = coerceExpr->getSubExpr();
-      // Coerce expression is valid only if it has sub-expression.
-      if (!subExpr) return;
-
-      unsigned numOverloadSets = 0;
-      subExpr->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-        if (isa<OverloadSetRefExpr>(childExpr)) {
-          ++numOverloadSets;
-          return childExpr;
-        }
-
-        if (auto nestedCoerceExpr = dyn_cast<CoerceExpr>(childExpr)) {
-          visitCoerceExpr(nestedCoerceExpr);
-          // Don't walk inside of nested coercion expression directly,
-          // that is be done by recursive call to visitCoerceExpr.
-          return nullptr;
-        }
-
-        // If sub-expression we are trying to coerce to type is a collection,
-        // let's allow collector discover it with assigned contextual type
-        // of coercion, which allows collections to be solved in parts.
-        if (auto collectionExpr = dyn_cast<CollectionExpr>(childExpr)) {
-          auto *const typeRepr = coerceExpr->getCastTypeRepr();
-
-          if (typeRepr && isSuitableCollection(typeRepr)) {
-            const auto coercionType = TypeResolution::resolveContextualType(
-                typeRepr, CS.DC, None,
-                // FIXME: Should we really be unconditionally complaining
-                // about unbound generics and placeholders here? For
-                // example:
-                // let foo: [Array<Float>] = [[0], [1], [2]] as [Array]
-                // let foo: [Array<Float>] = [[0], [1], [2]] as [Array<_>]
-                /*unboundTyOpener*/ nullptr, /*placeholderHandler*/ nullptr);
-
-            // Looks like coercion type is invalid, let's skip this sub-tree.
-            if (coercionType->hasError())
-              return nullptr;
-
-            // Visit collection expression inline.
-            visitCollectionExpr(collectionExpr, coercionType,
-                                CTP_CoerceOperand);
-          }
-        }
-
-        return childExpr;
-      });
-
-      // It's going to be inefficient to try and solve
-      // coercion in parts, so let's just make it a candidate directly,
-      // if it contains at least a single overload set.
-
-      if (numOverloadSets > 0)
-        Candidates.push_back(Candidate(CS, coerceExpr));
-    }
-
-    void visitCollectionExpr(CollectionExpr *collectionExpr,
-                             Type contextualType = Type(),
-                             ContextualTypePurpose CTP = CTP_Unused) {
-      // If there is a contextual type set for this collection,
-      // let's propagate it to the candidate.
-      if (!contextualType.isNull()) {
-        auto elementType = extractElementType(contextualType);
-        // If we couldn't deduce element type for the collection, let's
-        // not attempt to solve it.
-        if (!elementType ||
-            elementType->hasError() ||
-            elementType->hasUnresolvedType())
-          return;
-
-        contextualType = elementType;
-      }
-
-      for (auto element : collectionExpr->getElements()) {
-        unsigned numOverloads = 0;
-        element->walk(OverloadSetCounter(numOverloads));
-
-        // There are no overload sets in the element; skip it.
-        if (numOverloads == 0)
-          continue;
-
-        // Record each of the collection elements, which passed
-        // number of overload sets rule, as a candidate for solving
-        // with contextual type of the collection.
-        Candidates.push_back(Candidate(CS, element, contextualType, CTP));
-      }
-    }
-  };
-
-  ExprCollector collector(expr, *this, domains);
-
-  // Collect all of the binary/unary and call sub-expressions
-  // so we can start solving them separately.
-  expr->walk(collector);
-
-  llvm::SmallSetVector<OverloadSetRefExpr *, 4> shrunkExprs;
-  for (auto &candidate : collector.Candidates) {
-    // If there are no results, let's forget everything we know about the
-    // system so far. This actually is ok, because some of the expressions
-    // might require manual salvaging.
-    if (candidate.solve(shrunkExprs)) {
-      // Let's restore all of the original OSR domains for this sub-expression,
-      // this means that we can still make forward progress with solving of the
-      // top sub-expressions.
-      candidate.getExpr()->forEachChildExpr([&](Expr *childExpr) -> Expr * {
-        if (auto OSR = dyn_cast<OverloadSetRefExpr>(childExpr)) {
-          auto domain = domains.find(OSR);
-          if (domain == domains.end())
-            return childExpr;
-
-          OSR->setDecls(domain->getSecond());
-          shrunkExprs.remove(OSR);
-        }
-
-        return childExpr;
-      });
-    }
-  }
-
-  // Once "shrinking" is done let's re-allocate final version of
-  // the candidate list to the permanent arena, so it could
-  // survive even after primary constraint system is destroyed.
-  for (auto &OSR : shrunkExprs) {
-    auto choices = OSR->getDecls();
-    auto decls =
-        getASTContext().AllocateUninitialized<ValueDecl *>(choices.size());
-
-    std::uninitialized_copy(choices.begin(), choices.end(), decls.begin());
-    OSR->setDecls(decls);
-  }
-}
-
-static bool debugConstraintSolverForTarget(
-   ASTContext &C, SolutionApplicationTarget target) {
+bool constraints::debugConstraintSolverForTarget(
+    ASTContext &C, SyntacticElementTarget target) {
   if (C.TypeCheckerOpts.DebugConstraintSolver)
     return true;
 
@@ -1261,10 +834,9 @@ static bool debugConstraintSolverForTarget(
   return startBound != endBound;
 }
 
-Optional<std::vector<Solution>> ConstraintSystem::solve(
-    SolutionApplicationTarget &target,
-    FreeTypeVariableBinding allowFreeTypeVariables
-) {
+std::optional<std::vector<Solution>>
+ConstraintSystem::solve(SyntacticElementTarget &target,
+                        FreeTypeVariableBinding allowFreeTypeVariables) {
   llvm::SaveAndRestore<ConstraintSystemOptions> debugForExpr(Options);
   if (debugConstraintSolverForTarget(getASTContext(), target)) {
     Options |= ConstraintSystemFlags::DebugConstraints;
@@ -1274,16 +846,38 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
   auto dumpSolutions = [&](const SolutionResult &result) {
     // Debug-print the set of solutions.
     if (isDebugMode()) {
+      auto &log = llvm::errs();
+      auto indent = solverState ? solverState->getCurrentIndent() : 0;
       if (result.getKind() == SolutionResult::Success) {
-        llvm::errs() << "---Solution---\n";
-        result.getSolution().dump(llvm::errs());
+        log << "\n";
+        log.indent(indent) << "---Solution---\n";
+        result.getSolution().dump(llvm::errs(), indent);
       } else if (result.getKind() == SolutionResult::Ambiguous) {
         auto solutions = result.getAmbiguousSolutions();
         for (unsigned i : indices(solutions)) {
-          llvm::errs() << "--- Solution #" << i << " ---\n";
-          solutions[i].dump(llvm::errs());
+          log << "\n";
+          log.indent(indent) << "--- Solution #" << i << " ---\n";
+          solutions[i].dump(llvm::errs(), indent);
         }
       }
+    }
+  };
+
+  auto reportSolutionsToSolutionCallback = [&](const SolutionResult &result) {
+    if (!getASTContext().SolutionCallback) {
+      return;
+    }
+    switch (result.getKind()) {
+    case SolutionResult::Success:
+      getASTContext().SolutionCallback->sawSolution(result.getSolution());
+      break;
+    case SolutionResult::Ambiguous:
+      for (auto &solution : result.getAmbiguousSolutions()) {
+        getASTContext().SolutionCallback->sawSolution(solution);
+      }
+      break;
+    default:
+      break;
     }
   };
 
@@ -1299,61 +893,41 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
     case SolutionResult::Success: {
       // Return the successful solution.
       dumpSolutions(solution);
+      reportSolutionsToSolutionCallback(solution);
       std::vector<Solution> result;
       result.push_back(std::move(solution).takeSolution());
       return std::move(result);
     }
 
     case SolutionResult::Error:
-      maybeProduceFallbackDiagnostic(target);
-      return None;
+      maybeProduceFallbackDiagnostic(target.getLoc());
+      return std::nullopt;
 
     case SolutionResult::TooComplex: {
-      auto affectedRange = solution.getTooComplexAt();
-
-      // If affected range is unknown, let's use whole
-      // target.
-      if (!affectedRange)
-        affectedRange = target.getSourceRange();
-
-      getASTContext()
-          .Diags.diagnose(affectedRange->Start, diag::expression_too_complex)
-          .highlight(*affectedRange);
-
-      solution.markAsDiagnosed();
-      return None;
+      diagnoseTooComplex(target.getLoc(), solution);
+      return std::nullopt;
     }
 
     case SolutionResult::Ambiguous:
       // If salvaging produced an ambiguous result, it has already been
       // diagnosed.
-      if (stage == 1) {
+      // If we have found an ambiguous solution in the first stage, salvaging
+      // won't produce more solutions, so we can inform the solution callback
+      // about the current ambiguous solutions straight away.
+      if (stage == 1 || Context.SolutionCallback) {
+        reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
-        return None;
-      }
-
-      if (Options.contains(
-            ConstraintSystemFlags::AllowUnresolvedTypeVariables)) {
-        dumpSolutions(solution);
-        auto ambiguousSolutions = std::move(solution).takeAmbiguousSolutions();
-        std::vector<Solution> result(
-            std::make_move_iterator(ambiguousSolutions.begin()),
-            std::make_move_iterator(ambiguousSolutions.end()));
-        return std::move(result);
+        return std::nullopt;
       }
 
       LLVM_FALLTHROUGH;
 
     case SolutionResult::UndiagnosedError:
-      if (shouldSuppressDiagnostics()) {
-        solution.markAsDiagnosed();
-        return None;
-      }
-
       if (stage == 1) {
         diagnoseFailureFor(target);
+        reportSolutionsToSolutionCallback(solution);
         solution.markAsDiagnosed();
-        return None;
+        return std::nullopt;
       }
 
       // Loop again to try to salvage.
@@ -1365,12 +939,25 @@ Optional<std::vector<Solution>> ConstraintSystem::solve(
   llvm_unreachable("Loop always returns");
 }
 
+void ConstraintSystem::diagnoseTooComplex(SourceLoc fallbackLoc,
+                                          SolutionResult &result) {
+  auto affectedRange = result.getTooComplexAt();
+
+  SourceLoc loc = (affectedRange ? affectedRange->Start : fallbackLoc);
+  auto diag = getASTContext().Diags.diagnose(loc, diag::expression_too_complex);
+
+  if (affectedRange)
+    diag.highlight(*affectedRange);
+
+  result.markAsDiagnosed();
+}
+
 SolutionResult
-ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
+ConstraintSystem::solveImpl(SyntacticElementTarget &target,
                             FreeTypeVariableBinding allowFreeTypeVariables) {
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log << "---Constraint solving at ";
+    log << "\n---Constraint solving at ";
     auto R = target.getSourceRange();
     if (R.isValid()) {
       R.print(log, getASTContext().SourceMgr, /*PrintText=*/ false);
@@ -1382,12 +969,11 @@ ConstraintSystem::solveImpl(SolutionApplicationTarget &target,
 
   assert(!solverState && "cannot be used directly");
 
-  // Set up the expression type checker timer.
   if (Expr *expr = target.getAsExpr())
-    Timer.emplace(expr, *this);
+    startExpression(expr);
 
   if (generateConstraints(target, allowFreeTypeVariables))
-    return SolutionResult::forError();;
+    return SolutionResult::forError();
 
   // Try to solve the constraint system using computed suggestions.
   SmallVector<Solution, 4> solutions;
@@ -1418,8 +1004,9 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log << "---Solver statistics---\n";
-    log << "Total number of scopes explored: " << solverState->NumStatesExplored << "\n";
+    log << "\n---Solver statistics---\n";
+    log << "Total number of scopes explored: " << solverState->NumSolverScopes << "\n";
+    log << "Total number of trail steps: " << solverState->NumTrailSteps << "\n";
     log << "Maximum depth reached while exploring solutions: " << solverState->maxDepth << "\n";
     if (Timer) {
       auto timeInMillis =
@@ -1439,10 +1026,6 @@ bool ConstraintSystem::solve(SmallVectorImpl<Solution> &solutions,
 
 void ConstraintSystem::solveImpl(SmallVectorImpl<Solution> &solutions) {
   assert(solverState);
-
-  setPhase(ConstraintSystemPhase::Solving);
-
-  SWIFT_DEFER { setPhase(ConstraintSystemPhase::Finalization); };
 
   // If constraint system failed while trying to
   // genenerate constraints, let's stop right here.
@@ -1550,10 +1133,12 @@ void ConstraintSystem::solveForCodeCompletion(
 
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log << "--- Discovered " << solutions.size() << " solutions ---\n";
+    auto indent = solverState ? solverState->getCurrentIndent() : 0;
+    log.indent(indent) << "--- Discovered " << solutions.size()
+                       << " solutions ---\n";
     for (const auto &solution : solutions) {
-      log << "--- Solution ---\n";
-      solution.dump(log);
+      log.indent(indent) << "--- Solution ---\n";
+      solution.dump(log, indent);
     }
   }
 
@@ -1561,289 +1146,64 @@ void ConstraintSystem::solveForCodeCompletion(
 }
 
 bool ConstraintSystem::solveForCodeCompletion(
-    SolutionApplicationTarget &target, SmallVectorImpl<Solution> &solutions) {
+    SyntacticElementTarget &target, SmallVectorImpl<Solution> &solutions) {
   if (auto *expr = target.getAsExpr()) {
     // Tell the constraint system what the contextual type is.
-    setContextualType(expr, target.getExprContextualTypeLoc(),
-                      target.getExprContextualTypePurpose());
+    setContextualInfo(expr, target.getExprContextualTypeInfo());
 
-    // Set up the expression type checker timer.
-    Timer.emplace(expr, *this);
-
-    shrink(expr);
+    startExpression(expr);
   }
 
   if (isDebugMode()) {
     auto &log = llvm::errs();
-    log << "--- Code Completion ---\n";
+    log.indent(solverState ? solverState->getCurrentIndent() : 0)
+        << "--- Code Completion ---\n";
   }
 
-  if (generateConstraints(target, FreeTypeVariableBinding::Disallow))
+  if (generateConstraints(target))
     return false;
 
   solveForCodeCompletion(solutions);
   return true;
 }
 
-void ConstraintSystem::collectDisjunctions(
-    SmallVectorImpl<Constraint *> &disjunctions) {
-  for (auto &constraint : InactiveConstraints) {
-    if (constraint.getKind() == ConstraintKind::Disjunction)
-      disjunctions.push_back(&constraint);
-  }
-}
-
-ConstraintSystem::SolutionKind
-ConstraintSystem::filterDisjunction(
-    Constraint *disjunction, bool restoreOnFail,
-    llvm::function_ref<bool(Constraint *)> pred) {
-  assert(disjunction->getKind() == ConstraintKind::Disjunction);
-
-  SmallVector<Constraint *, 4> constraintsToRestoreOnFail;
-  unsigned choiceIdx = 0;
-  unsigned numEnabledTerms = 0;
-  ASTContext &ctx = getASTContext();
-  for (unsigned constraintIdx : indices(disjunction->getNestedConstraints())) {
-    auto constraint = disjunction->getNestedConstraints()[constraintIdx];
-
-    // Skip already-disabled constraints. Let's treat disabled
-    // choices which have a fix as "enabled" ones here, so we can
-    // potentially infer some type information from them.
-    if (constraint->isDisabled() && !constraint->getFix())
-      continue;
-
-    if (pred(constraint)) {
-      ++numEnabledTerms;
-      choiceIdx = constraintIdx;
-      continue;
-    }
-
-    if (isDebugMode()) {
-      llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
-        << "(disabled disjunction term ";
-      constraint->print(llvm::errs(), &ctx.SourceMgr);
-      llvm::errs() << ")\n";
-    }
-
-    if (restoreOnFail)
-      constraintsToRestoreOnFail.push_back(constraint);
-
-    if (solverState)
-      solverState->disableConstraint(constraint);
-    else
-      constraint->setDisabled();
-  }
-
-  switch (numEnabledTerms) {
-  case 0:
-    for (auto constraint : constraintsToRestoreOnFail) {
-      constraint->setEnabled();
-    }
-    return SolutionKind::Error;
-
-  case 1: {
-    // Only a single constraint remains. Retire the disjunction and make
-    // the remaining constraint active.
-    auto choice = disjunction->getNestedConstraints()[choiceIdx];
-
-    // This can only happen when subscript syntax is used to lookup
-    // something which doesn't exist in type marked with
-    // `@dynamicMemberLookup`.
-    // Since filtering currently runs as part of the `applicable function`
-    // constraint processing, "keypath dynamic member lookup" choice can't
-    // be attempted in-place because that would also try to operate on that
-    // constraint, so instead let's keep the disjunction, but disable all
-    // unviable choices.
-    if (choice->getOverloadChoice().isKeyPathDynamicMemberLookup()) {
-      // Early simplification of the "keypath dynamic member lookup" choice
-      // is impossible because it requires constraints associated with
-      // subscript index expression to be present.
-      if (Phase == ConstraintSystemPhase::ConstraintGeneration)
-        return SolutionKind::Unsolved;
-
-      for (auto *currentChoice : disjunction->getNestedConstraints()) {
-        if (currentChoice != choice)
-          solverState->disableConstraint(currentChoice);
-      }
-      return SolutionKind::Solved;
-    }
-
-    // Retire the disjunction. It's been solved.
-    retireConstraint(disjunction);
-
-    // Note the choice we made and simplify it. This introduces the
-    // new constraint into the system.
-    if (disjunction->shouldRememberChoice()) {
-      recordDisjunctionChoice(disjunction->getLocator(), choiceIdx);
-    }
-
-    if (isDebugMode()) {
-      llvm::errs().indent(solverState ? solverState->depth * 2 : 0)
-        << "(introducing single enabled disjunction term ";
-      choice->print(llvm::errs(), &ctx.SourceMgr);
-      llvm::errs() << ")\n";
-    }
-
-    simplifyDisjunctionChoice(choice);
-
-    return failedConstraint ? SolutionKind::Unsolved : SolutionKind::Solved;
-  }
-
-  default:
-    return SolutionKind::Unsolved;
-  }
-}
-
-// Attempt to find a disjunction of bind constraints where all options
-// in the disjunction are binding the same type variable.
-//
-// Prefer disjunctions where the bound type variable is also the
-// right-hand side of a conversion constraint, since having a concrete
-// type that we're converting to can make it possible to split the
-// constraint system into multiple ones.
-static Constraint *selectBestBindingDisjunction(
-    ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions) {
-
-  if (disjunctions.empty())
-    return nullptr;
-
-  auto getAsTypeVar = [&cs](Type type) {
-    return cs.simplifyType(type)->getRValueType()->getAs<TypeVariableType>();
-  };
-
-  Constraint *firstBindDisjunction = nullptr;
-  for (auto *disjunction : disjunctions) {
-    auto choices = disjunction->getNestedConstraints();
-    assert(!choices.empty());
-
-    auto *choice = choices.front();
-    if (choice->getKind() != ConstraintKind::Bind)
-      continue;
-
-    // We can judge disjunction based on the single choice
-    // because all of choices (of bind overload set) should
-    // have the same left-hand side.
-    // Only do this for simple type variable bindings, not for
-    // bindings like: ($T1) -> $T2 bind String -> Int
-    auto *typeVar = getAsTypeVar(choice->getFirstType());
-    if (!typeVar)
-      continue;
-
-    if (!firstBindDisjunction)
-      firstBindDisjunction = disjunction;
-
-    auto constraints = cs.getConstraintGraph().gatherConstraints(
-        typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
-        [](Constraint *constraint) {
-          return constraint->getKind() == ConstraintKind::Conversion;
-        });
-
-    for (auto *constraint : constraints) {
-      if (typeVar == getAsTypeVar(constraint->getSecondType()))
-        return disjunction;
-    }
-  }
-
-  // If we had any binding disjunctions, return the first of
-  // those. These ensure that we attempt to bind types earlier than
-  // trying the elements of other disjunctions, which can often mean
-  // we fail faster.
-  return firstBindDisjunction;
-}
-
-Optional<std::pair<Constraint *, unsigned>>
-ConstraintSystem::findConstraintThroughOptionals(
-    TypeVariableType *typeVar, OptionalWrappingDirection optionalDirection,
-    llvm::function_ref<bool(Constraint *, TypeVariableType *)> predicate) {
-  unsigned numOptionals = 0;
-  auto *rep = getRepresentative(typeVar);
-
-  SmallPtrSet<TypeVariableType *, 4> visitedVars;
-  while (visitedVars.insert(rep).second) {
-    // Look for a disjunction that binds this type variable to an overload set.
-    TypeVariableType *optionalObjectTypeVar = nullptr;
-    auto constraints = getConstraintGraph().gatherConstraints(
-        rep, ConstraintGraph::GatheringKind::EquivalenceClass,
-        [&](Constraint *match) {
-          // If we have an "optional object of" constraint, we may need to
-          // look through it to find the constraint we're looking for.
-          if (match->getKind() != ConstraintKind::OptionalObject)
-            return predicate(match, rep);
-
-          switch (optionalDirection) {
-          case OptionalWrappingDirection::Promote: {
-            // We want to go from T to T?, so check if we're on the RHS, and
-            // move over to the LHS if we can.
-            auto rhsTypeVar = match->getSecondType()->getAs<TypeVariableType>();
-            if (rhsTypeVar && getRepresentative(rhsTypeVar) == rep) {
-              optionalObjectTypeVar =
-                  match->getFirstType()->getAs<TypeVariableType>();
-            }
-            break;
-          }
-          case OptionalWrappingDirection::Unwrap: {
-            // We want to go from T? to T, so check if we're on the LHS, and
-            // move over to the RHS if we can.
-            auto lhsTypeVar = match->getFirstType()->getAs<TypeVariableType>();
-            if (lhsTypeVar && getRepresentative(lhsTypeVar) == rep) {
-              optionalObjectTypeVar =
-                  match->getSecondType()->getAs<TypeVariableType>();
-            }
-            break;
-          }
-          }
-          // Don't include the optional constraint in the results.
-          return false;
-        });
-
-    // If we found a result, return it.
-    if (!constraints.empty())
-      return std::make_pair(constraints[0], numOptionals);
-
-    // If we found an "optional object of" constraint, follow it.
-    if (optionalObjectTypeVar && !getFixedType(optionalObjectTypeVar)) {
-      numOptionals += 1;
-      rep = getRepresentative(optionalObjectTypeVar);
-      continue;
-    }
-
-    // Otherwise we're done.
-    return None;
-  }
-  return None;
-}
-
-Constraint *ConstraintSystem::getUnboundBindOverloadDisjunction(
-    TypeVariableType *tyvar, unsigned *numOptionalUnwraps) {
-  assert(!getFixedType(tyvar));
-  auto result = findConstraintThroughOptionals(
-      tyvar, OptionalWrappingDirection::Promote,
-      [&](Constraint *match, TypeVariableType *currentRep) {
-        // Check to see if we have a bind overload disjunction that binds the
-        // type var we need.
-        if (match->getKind() != ConstraintKind::Disjunction ||
-            match->getNestedConstraints().front()->getKind() !=
-                ConstraintKind::BindOverload)
-          return false;
-
-        auto lhsTy = match->getNestedConstraints().front()->getFirstType();
-        auto *lhsTyVar = lhsTy->getAs<TypeVariableType>();
-        return lhsTyVar && currentRep == getRepresentative(lhsTyVar);
-      });
-  if (!result)
-    return nullptr;
-
-  if (numOptionalUnwraps)
-    *numOptionalUnwraps = result->second;
-
-  return result->first;
-}
-
 // Performance hack: if there are two generic overloads, and one is
 // more specialized than the other, prefer the more-specialized one.
-static Constraint *tryOptimizeGenericDisjunction(
-                                          DeclContext *dc,
-                                          ArrayRef<Constraint *> constraints) {
+static Constraint *
+tryOptimizeGenericDisjunction(ConstraintSystem &cs, Constraint *disjunction,
+                              ArrayRef<Constraint *> constraints) {
+  auto *dc = cs.DC;
+
+  // If we're solving for code completion, and have a child completion token,
+  // skip this optimization since the completion token being a placeholder can
+  // allow us to prefer an unhelpful disjunction choice.
+  if (cs.isForCodeCompletion()) {
+    auto anchor = disjunction->getLocator()->getAnchor();
+    if (cs.containsIDEInspectionTarget(cs.includingParentApply(anchor)))
+      return nullptr;
+  }
+
+  // Don't attempt this optimization if call has number literals.
+  // This is intended to narrowly fix situations like:
+  //
+  // func test<T: FloatingPoint>(_: T) { ... }
+  // func test<T: Numeric>(_: T) { ... }
+  //
+  // test(42)
+  //
+  // The call should use `<T: Numeric>` overload even though the
+  // `<T: FloatingPoint>` is a more specialized version because
+  // selecting `<T: Numeric>` doesn't introduce non-default literal
+  // types.
+  if (auto *argFnType = cs.getAppliedDisjunctionArgumentFunction(disjunction)) {
+    if (llvm::any_of(
+            argFnType->getParams(), [](const AnyFunctionType::Param &param) {
+              auto *typeVar = param.getPlainType()->getAs<TypeVariableType>();
+              return typeVar && typeVar->getImpl().isNumberLiteralType();
+            }))
+      return nullptr;
+  }
+
   llvm::SmallVector<Constraint *, 4> choices;
   for (auto *choice : constraints) {
     if (choices.size() > 2)
@@ -1872,10 +1232,16 @@ static Constraint *tryOptimizeGenericDisjunction(
     assert(decl);
 
     auto *AFD = dyn_cast<AbstractFunctionDecl>(decl);
-    if (!AFD || !AFD->isGeneric())
+    if (!AFD || !AFD->hasGenericParamList())
       return false;
 
     if (AFD->getAttrs().hasAttribute<DisfavoredOverloadAttr>())
+      return false;
+
+    // If a function has been converted to typed throws, let's ignore it
+    // when it's generic only over a thrown type now just like we would
+    // regular `throws` version.
+    if (isGenericOnlyOverThrownType(AFD))
       return false;
 
     auto funcType = AFD->getInterfaceType();
@@ -1974,6 +1340,9 @@ static void existingOperatorBindingsForDisjunction(ConstraintSystem &CS,
 void DisjunctionChoiceProducer::partitionGenericOperators(
     SmallVectorImpl<unsigned>::iterator first,
     SmallVectorImpl<unsigned>::iterator last) {
+  if (!CS.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks)
+    return;
+
   auto *argFnType = CS.getAppliedDisjunctionArgumentFunction(Disjunction);
   if (!isOperatorDisjunction(Disjunction) || !argFnType)
     return;
@@ -1988,18 +1357,24 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
   SmallVector<unsigned, 4> simdOverloads;
   SmallVector<unsigned, 4> otherGenericOverloads;
 
-  auto refinesOrConformsTo = [&](NominalTypeDecl *nominal, KnownProtocolKind kind) -> bool {
-    if (!nominal)
-      return false;
+  auto &ctx = CS.getASTContext();
 
-    auto *protocol =
-        TypeChecker::getProtocol(CS.getASTContext(), SourceLoc(), kind);
+  auto *additiveArithmeticProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
+  auto *sequenceProto = ctx.getProtocol(KnownProtocolKind::Sequence);
+  auto *simdProto = ctx.getProtocol(KnownProtocolKind::SIMD);
+
+  auto conformsTo = [&](Type type, ProtocolDecl *protocol) -> bool {
+    return protocol && bool(CS.lookupConformance(type, protocol));
+  };
+
+  auto refinesOrConformsTo = [&](NominalTypeDecl *nominal, ProtocolDecl *protocol) -> bool {
+    if (!nominal || !protocol)
+      return false;
 
     if (auto *refined = dyn_cast<ProtocolDecl>(nominal))
       return refined->inheritsFrom(protocol);
 
-    return (bool)TypeChecker::conformsToProtocol(nominal->getDeclaredType(), protocol,
-                                                 CS.DC->getParentModule());
+    return conformsTo(nominal->getDeclaredInterfaceType(), protocol);
   };
 
   // Gather Numeric and Sequence overloads into separate buckets.
@@ -2012,9 +1387,9 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
       simdOverloads.push_back(index);
     } else if (!decl->getInterfaceType()->is<GenericFunctionType>()) {
       concreteOverloads.push_back(index);
-    } else if (refinesOrConformsTo(nominal, KnownProtocolKind::AdditiveArithmetic)) {
+    } else if (refinesOrConformsTo(nominal, additiveArithmeticProto)) {
       numericOverloads.push_back(index);
-    } else if (refinesOrConformsTo(nominal, KnownProtocolKind::Sequence)) {
+    } else if (refinesOrConformsTo(nominal, sequenceProto)) {
       sequenceOverloads.push_back(index);
     } else {
       otherGenericOverloads.push_back(index);
@@ -2050,27 +1425,21 @@ void DisjunctionChoiceProducer::partitionGenericOperators(
     if (argType->isTypeVariableOrMember())
       continue;
 
-    if (TypeChecker::conformsToKnownProtocol(
-            argType, KnownProtocolKind::AdditiveArithmetic,
-            CS.DC->getParentModule())) {
+    if (conformsTo(argType, additiveArithmeticProto)) {
       first =
           std::copy(numericOverloads.begin(), numericOverloads.end(), first);
       numericOverloads.clear();
       break;
     }
 
-    if (TypeChecker::conformsToKnownProtocol(
-            argType, KnownProtocolKind::Sequence,
-            CS.DC->getParentModule())) {
+    if (conformsTo(argType, sequenceProto)) {
       first =
           std::copy(sequenceOverloads.begin(), sequenceOverloads.end(), first);
       sequenceOverloads.clear();
       break;
     }
 
-    if (TypeChecker::conformsToKnownProtocol(
-            argType, KnownProtocolKind::SIMD,
-            CS.DC->getParentModule())) {
+    if (conformsTo(argType, simdProto)) {
       first = std::copy(simdOverloads.begin(), simdOverloads.end(), first);
       simdOverloads.clear();
       break;
@@ -2088,7 +1457,7 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     SmallVectorImpl<unsigned> &PartitionBeginning) {
   // Apply a special-case rule for favoring one generic function over
   // another.
-  if (auto favored = tryOptimizeGenericDisjunction(CS.DC, Choices)) {
+  if (auto favored = tryOptimizeGenericDisjunction(CS, Disjunction, Choices)) {
     CS.favorConstraint(favored);
   }
 
@@ -2120,13 +1489,17 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   // end of the partitioning.
   SmallVector<unsigned, 4> favored;
   SmallVector<unsigned, 4> everythingElse;
+  // Disfavored choices are part of `everythingElse` but introduced at the end.
+  SmallVector<unsigned, 4> disfavored;
   SmallVector<unsigned, 4> simdOperators;
   SmallVector<unsigned, 4> disabled;
   SmallVector<unsigned, 4> unavailable;
 
   // Add existing operator bindings to the main partition first. This often
   // helps the solver find a solution fast.
-  existingOperatorBindingsForDisjunction(CS, Choices, everythingElse);
+  if (CS.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks)
+    existingOperatorBindingsForDisjunction(CS, Choices, everythingElse);
+
   for (auto index : everythingElse)
     taken.insert(Choices[index]);
 
@@ -2140,6 +1513,23 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     if (constraint->isFavored()) {
       favored.push_back(index);
       return true;
+    }
+
+    // Order VarDecls before other kinds of declarations because they are
+    // effectively favored over functions when the two are in the same
+    // overload set. This disjunction order allows SK_UnappliedFunction
+    // to prune later overload choices that are functions when a solution
+    // has already been found with a property.
+    if (auto *decl = getOverloadChoiceDecl(constraint)) {
+      if (isa<VarDecl>(decl)) {
+        everythingElse.push_back(index);
+        return true;
+      }
+
+      if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>()) {
+        disfavored.push_back(index);
+        return true;
+      }
     }
 
     return false;
@@ -2165,16 +1555,18 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   }
 
   // Partition SIMD operators.
-  if (isOperatorDisjunction(Disjunction) &&
-      !Choices[0]->getOverloadChoice().getName().getBaseIdentifier().isArithmeticOperator()) {
-    forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
-      if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
-        simdOperators.push_back(index);
-        return true;
-      }
+  if (CS.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+    if (isOperatorDisjunction(Disjunction) &&
+        !Choices[0]->getOverloadChoice().getName().getBaseIdentifier().isArithmeticOperator()) {
+      forEachChoice(Choices, [&](unsigned index, Constraint *constraint) -> bool {
+        if (isSIMDOperator(constraint->getOverloadChoice().getDecl())) {
+          simdOperators.push_back(index);
+          return true;
+        }
 
-      return false;
-    });
+        return false;
+      });
+    }
   }
 
   // Gather the remaining options.
@@ -2182,6 +1574,9 @@ void DisjunctionChoiceProducer::partitionDisjunction(
     everythingElse.push_back(index);
     return true;
   });
+
+  // Introduce disfavored choices at the end.
+  everythingElse.append(disfavored);
 
   // Local function to create the next partition based on the options
   // passed in.
@@ -2202,71 +1597,46 @@ void DisjunctionChoiceProducer::partitionDisjunction(
   assert(Ordering.size() == Choices.size());
 }
 
-Constraint *ConstraintSystem::selectDisjunction() {
-  SmallVector<Constraint *, 4> disjunctions;
-
-  collectDisjunctions(disjunctions);
-  if (disjunctions.empty())
-    return nullptr;
-
-  if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
-    return disjunction;
-
-  // Pick the disjunction with the smallest number of favored, then active choices.
-  auto cs = this;
-  auto minDisjunction = std::min_element(disjunctions.begin(), disjunctions.end(),
-      [&](Constraint *first, Constraint *second) -> bool {
-        unsigned firstActive = first->countActiveNestedConstraints();
-        unsigned secondActive = second->countActiveNestedConstraints();
-        unsigned firstFavored = first->countFavoredNestedConstraints();
-        unsigned secondFavored = second->countFavoredNestedConstraints();
-
-        if (!isOperatorDisjunction(first) || !isOperatorDisjunction(second))
-          return firstActive < secondActive;
-
-        if (firstFavored == secondFavored) {
-          // Look for additional choices that are "favored"
-          SmallVector<unsigned, 4> firstExisting;
-          SmallVector<unsigned, 4> secondExisting;
-
-          existingOperatorBindingsForDisjunction(*cs, first->getNestedConstraints(), firstExisting);
-          firstFavored += firstExisting.size();
-          existingOperatorBindingsForDisjunction(*cs, second->getNestedConstraints(), secondExisting);
-          secondFavored += secondExisting.size();
-        }
-
-        // Everything else equal, choose the disjunction with the greatest
-        // number of resolved argument types. The number of resolved argument
-        // types is always zero for disjunctions that don't represent applied
-        // overloads.
-        if (firstFavored == secondFavored) {
-          if (firstActive != secondActive)
-            return firstActive < secondActive;
-
-          return (first->countResolvedArgumentTypes(*this) > second->countResolvedArgumentTypes(*this));
-        }
-
-        firstFavored = firstFavored ? firstFavored : firstActive;
-        secondFavored = secondFavored ? secondFavored : secondActive;
-        return firstFavored < secondFavored;
-      });
-
-  if (minDisjunction != disjunctions.end())
-    return *minDisjunction;
-
-  return nullptr;
-}
-
 Constraint *ConstraintSystem::selectConjunction() {
+  SmallVector<Constraint *, 4> conjunctions;
   for (auto &constraint : InactiveConstraints) {
     if (constraint.isDisabled())
       continue;
 
     if (constraint.getKind() == ConstraintKind::Conjunction)
-      return &constraint;
+      conjunctions.push_back(&constraint);
   }
 
-  return nullptr;
+  if (conjunctions.empty())
+    return nullptr;
+
+  auto &SM = getASTContext().SourceMgr;
+
+  // Conjunctions should be solved in order of their apperance in the source.
+  // This is important because once a conjunction is solved, we don't re-visit
+  // it, so we need to make sure we don't solve it before another conjuntion
+  // that could provide it with necessary type information. Source order
+  // provides an easy to reason about and quick way of establishing this.
+  return *std::min_element(
+      conjunctions.begin(), conjunctions.end(),
+      [&](Constraint *conjunctionA, Constraint *conjunctionB) {
+        auto *locA = conjunctionA->getLocator();
+        auto *locB = conjunctionB->getLocator();
+        if (!(locA && locB))
+          return false;
+
+        auto anchorA = locA->getAnchor();
+        auto anchorB = locB->getAnchor();
+        if (!(anchorA && anchorB))
+          return false;
+
+        auto slocA = anchorA.getStartLoc();
+        auto slocB = anchorB.getStartLoc();
+        if (!(slocA.isValid() && slocB.isValid()))
+          return false;
+
+        return SM.isBeforeInBuffer(slocA, slocB);
+      });
 }
 
 bool DisjunctionChoice::attempt(ConstraintSystem &cs) const {
@@ -2316,6 +1686,9 @@ bool DisjunctionChoice::isUnaryOperator() const {
 void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
   assert(ExplicitConversion);
 
+  if (!cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks)
+    return;
+
   auto LHS = Choice->getFirstType();
   auto typeVar = LHS->getAs<TypeVariableType>();
   if (!typeVar)
@@ -2345,20 +1718,20 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     conversionType = bindings.Bindings[0].BindingType;
   } else {
     for (const auto &literal : bindings.Literals) {
-      if (literal.second.viableAsBinding()) {
-        conversionType = literal.second.getDefaultType();
+      if (literal.viableAsBinding()) {
+        conversionType = literal.getDefaultType();
         break;
       }
     }
   }
 
-  auto constraints = cs.CG.gatherConstraints(
+  auto constraints = cs.CG.gatherNearbyConstraints(
       typeVar,
-      ConstraintGraph::GatheringKind::EquivalenceClass,
       [](Constraint *constraint) -> bool {
         switch (constraint->getKind()) {
         case ConstraintKind::Conversion:
         case ConstraintKind::Defaultable:
+        case ConstraintKind::NonisolatedConformsTo:
         case ConstraintKind::ConformsTo:
         case ConstraintKind::LiteralConformsTo:
         case ConstraintKind::TransitivelyConformsTo:
@@ -2379,6 +1752,17 @@ bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
   {
     llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
     findReferencedVariables(cs, referencedVars);
+
+    if (cs.isDebugMode()) {
+      auto indent = cs.solverState->getCurrentIndent();
+      auto &log = llvm::errs().indent(indent);
+      log << "(Element type variables in scope: ";
+      interleave(
+        referencedVars,
+        [&](TypeVariableType *typeVar) { log << "$T" << typeVar->getID(); },
+        [&] { log << ", "; });
+      log << ")\n";
+    }
 
     for (auto *typeVar : referencedVars)
       cs.addTypeVariable(typeVar);

@@ -48,26 +48,26 @@ public:
                           IsInitialization_t isInit);
 
   /// Emits an `AdditiveArithmetic.zero` of the given type. The type must be a
-  /// loadable type, and must conform to `AddditiveArithmetic` or be a tuple
+  /// loadable type, and must conform to `AdditiveArithmetic` or be a tuple
   /// thereof.
   SILValue emitZero(SILLocation loc, CanType type);
 
   /// Emits an `AdditiveArithmetic.+=` for the given destination buffer and
   /// operand. The type of the buffer and the operand must conform to
-  /// `AddditiveArithmetic` or be a tuple thereof. The operand will not be
+  /// `AdditiveArithmetic` or be a tuple thereof. The operand will not be
   /// consumed.
   void emitInPlaceAdd(SILLocation loc, SILValue destinationBuffer,
                       SILValue operand);
 
   /// Emits an `AdditiveArithmetic.+` for the given operands. The type of the
-  /// operands must conform to `AddditiveArithmetic` or be a tuple thereof. The
+  /// operands must conform to `AdditiveArithmetic` or be a tuple thereof. The
   /// operands will not be consumed.
   void emitAddIntoBuffer(SILLocation loc, SILValue destinationBuffer,
                          SILValue lhsAddress, SILValue rhsAddress);
 
   /// Emits an `AdditiveArithmetic.+` for the given operands. The type of the
   /// operands must be a loadable type, and must conform to
-  /// `AddditiveArithmetic` or be a tuple thereof. The operands will not be
+  /// `AdditiveArithmetic` or be a tuple thereof. The operands will not be
   /// consumed.
   SILValue emitAdd(SILLocation loc, SILValue lhs, SILValue rhs);
 };

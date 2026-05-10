@@ -21,6 +21,12 @@
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
 
+// Temporarily disabled on arm64 (rdar://128522114)
+// UNSUPPORTED: CPU=arm64
+
+// And on older OS (rdar://132941962)
+// UNSUPPORTED: use_os_stdlib
+
 import Foundation
 import ArrayBridgeObjC
 import StdlibUnittest
@@ -422,6 +428,11 @@ tests.test("testThunks") {
   testBridgeableValue(Thunks())
 }
 
+tests.test("testHKTFilter") {
+  let base = ["hello", "world"]
+  let result = testHKTFilter(base) as! NSArray as! [String]
+  expectEqual(result, ["hello"])
+}
 
 tests.test("testRoundTrip") {
   class Test : NSObject {
@@ -485,7 +496,7 @@ tests.test("rdar://problem/27905230") {
 }
 
 tests.test("verbatimBridged/Base/withUnsafeBufferPointer") {
-  // https://bugs.swift.org/browse/SR-14663
+  // https://github.com/apple/swift/issues/57014
   // This tests a bad precondition that was fixed in
   // https://github.com/apple/swift/pull/37960
   guard #available(SwiftStdlib 5.5, *) else { return }
@@ -504,7 +515,7 @@ tests.test("verbatimBridged/Base/withUnsafeBufferPointer") {
 }
 
 tests.test("verbatimBridged/AnyObject/withUnsafeBufferPointer") {
-  // https://bugs.swift.org/browse/SR-14663
+  // https://github.com/apple/swift/issues/57014
   // This tests a bad precondition that was fixed in
   // https://github.com/apple/swift/pull/37960
   guard #available(SwiftStdlib 5.5, *) else { return }

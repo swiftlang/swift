@@ -1,0 +1,14 @@
+---
+Name: StructAsOptionSet
+Typedefs:
+- Name: WGPUBufferUsage
+  SwiftConformsTo: Swift.OptionSet
+  SwiftWrapper: struct
+Globals:
+- Name: WGPUBufferUsage_None
+  SwiftName: WGPUBufferUsage.none
+- Name: WGPUBufferUsage_MapRead
+  SwiftName: WGPUBufferUsage.mapRead
+- Name: WGPUBufferUsage_MapWrite
+  SwiftName: WGPUBufferUsage.mapWrite
+

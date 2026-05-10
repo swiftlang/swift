@@ -35,7 +35,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
 
   bool shouldInterpret() {
     auto *fun = getFunction();
-    return fun->getName().startswith("interpret");
+    return fun->getName().starts_with("interpret");
   }
 
   bool shouldSkipInstruction(SILInstruction *inst) {
@@ -47,7 +47,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
     if (!callee)
       return false;
 
-    return callee->getName().startswith("skip");
+    return callee->getName().starts_with("skip");
   }
 
   void run() override {
@@ -74,12 +74,12 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
                        << "\n";
           break;
         }
-        llvm::errs() << "Returns " << returnVal.getValue() << "\n";
+        llvm::errs() << "Returns " << returnVal.value() << "\n";
         break;
       }
 
-      Optional<SILBasicBlock::iterator> nextInstOpt;
-      Optional<SymbolicValue> errorVal;
+      std::optional<SILBasicBlock::iterator> nextInstOpt;
+      std::optional<SymbolicValue> errorVal;
 
       // If the instruction is marked as skip, skip it and make its effects
       // non-constant. Otherwise, try evaluating the instruction and if the
@@ -95,7 +95,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
 
       // Diagnose errors in the evaluation. Unknown symbolic values produced
       // by skipping instructions are not considered errors.
-      if (errorVal.hasValue() &&
+      if (errorVal.has_value() &&
           !errorVal->isUnknownDueToUnevaluatedInstructions()) {
         errorVal->emitUnknownDiagnosticNotes(inst->getLoc());
         break;
@@ -108,7 +108,7 @@ class ConstantEvaluatorTester : public SILFunctionTransform {
         break;
       }
 
-      currI = nextInstOpt.getValue();
+      currI = nextInstOpt.value();
     }
   }
 };

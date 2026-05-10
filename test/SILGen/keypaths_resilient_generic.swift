@@ -8,21 +8,32 @@ import resilient_class
 
 open class MySubclass<T> : ResilientOutsideParent {
   public final var storedProperty: T? = nil
+
+  open class MyNestedClass : ResilientOutsideParent {
+    public final var storedProperty: T? = nil
+  }
 }
 
 open class ConcreteSubclass : MySubclass<Int> {
   public final var anotherStoredProperty: Int? = nil
 }
 
-// CHECK-LABEL: sil shared [thunk] [ossa] @$s26keypaths_resilient_generic10MySubclassC14storedPropertyxSgvplACyxGTK : $@convention(thin) <T> (@in_guaranteed MySubclass<T>) -> @out Optional<T> {
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s26keypaths_resilient_generic10MySubclassC14storedPropertyxSgvplACyxGTK : $@convention(keypath_accessor_getter) <T> (@in_guaranteed MySubclass<T>) -> @out Optional<T> {
 
-// CHECK-LABEL: sil shared [thunk] [ossa] @$s26keypaths_resilient_generic10MySubclassC14storedPropertyxSgvplACyxGTk : $@convention(thin) <T> (@in_guaranteed Optional<T>, @in_guaranteed MySubclass<T>) -> () {
+// CHECK-LABEL: sil shared [thunk] [ossa] @$s26keypaths_resilient_generic10MySubclassC14storedPropertyxSgvplACyxGTk : $@convention(keypath_accessor_setter) <T> (@in_guaranteed Optional<T>, @in_guaranteed MySubclass<T>) -> () {
 
 // CHECK:      sil_property #MySubclass.storedProperty<τ_0_0> (
 // CHECK-SAME:   settable_property $Optional<τ_0_0>,
 // CHECK-SAME:   id ##MySubclass.storedProperty,
-// CHECK-SAME:   getter @$s26keypaths_resilient_generic10MySubclassC14storedPropertyxSgvplACyxGTK : $@convention(thin) <τ_0_0> (@in_guaranteed MySubclass<τ_0_0>) -> @out Optional<τ_0_0>,
-// CHECK-SAME:   setter @$s26keypaths_resilient_generic10MySubclassC14storedPropertyxSgvplACyxGTk : $@convention(thin) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @in_guaranteed MySubclass<τ_0_0>) -> ()
+// CHECK-SAME:   getter @$s26keypaths_resilient_generic10MySubclassC14storedPropertyxSgvplACyxGTK : $@convention(keypath_accessor_getter) <τ_0_0> (@in_guaranteed MySubclass<τ_0_0>) -> @out Optional<τ_0_0>,
+// CHECK-SAME:   setter @$s26keypaths_resilient_generic10MySubclassC14storedPropertyxSgvplACyxGTk : $@convention(keypath_accessor_setter) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @in_guaranteed MySubclass<τ_0_0>) -> ()
+// CHECK-SAME: )
+
+// CHECK:      sil_property #MySubclass.MyNestedClass.storedProperty<τ_0_0> (
+// CHECK-SAME:   settable_property $Optional<τ_0_0>,
+// CHECK-SAME:   id ##MySubclass.MyNestedClass.storedProperty,
+// CHECK-SAME:   getter @$s26keypaths_resilient_generic10MySubclassC0D11NestedClassC14storedPropertyxSgvplAEyx_GTK : $@convention(keypath_accessor_getter) <τ_0_0> (@in_guaranteed MySubclass<τ_0_0>.MyNestedClass) -> @out Optional<τ_0_0>,
+// CHECK-SAME:   setter @$s26keypaths_resilient_generic10MySubclassC0D11NestedClassC14storedPropertyxSgvplAEyx_GTk : $@convention(keypath_accessor_setter) <τ_0_0> (@in_guaranteed Optional<τ_0_0>, @in_guaranteed MySubclass<τ_0_0>.MyNestedClass) -> ()
 // CHECK-SAME: )
 
 // CHECK:      sil_property #ConcreteSubclass.anotherStoredProperty (

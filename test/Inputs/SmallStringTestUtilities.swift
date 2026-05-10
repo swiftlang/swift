@@ -71,11 +71,12 @@ extension _SmallString {
  
 #if _runtime(_ObjC)
   init?(_cocoaString ns: NSString) {
-#if arch(i386) || arch(arm) || arch(arm64_32)
+#if _pointerBitWidth(_32)
     return nil
 #else
     guard _isObjCTaggedPointer(ns) else { return nil }
-    self.init(taggedCocoa: ns)
+    self = (ns as String)._guts.asSmall //regular tagged NSStrings are guaranteed to bridge to SmallStrings
+    assert(_StringGuts(self).isSmall)
 #endif
   }
 #endif

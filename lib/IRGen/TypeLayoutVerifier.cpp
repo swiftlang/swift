@@ -22,6 +22,7 @@
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "EnumPayload.h"
 #include "IRGenDebugInfo.h"
@@ -36,7 +37,8 @@ using namespace irgen;
 
 IRGenTypeVerifierFunction::IRGenTypeVerifierFunction(IRGenModule &IGM,
                                                      llvm::Function *f)
-: IRGenFunction(IGM, f), VerifierFn(IGM.getVerifyTypeLayoutAttributeFn()) {
+    : IRGenFunction(IGM, f),
+      VerifierFn(IGM.getVerifyTypeLayoutAttributeFunctionPointer()) {
   // Verifier functions are always artificial.
   if (IGM.DebugInfo)
     IGM.DebugInfo->emitArtificialFunction(*this, f);
@@ -87,9 +89,9 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
                                == FixedPacking::OffsetZero),
              "is-inline bit");
       verifyValues(metadata,
-             emitLoadOfIsPOD(*this, layoutType),
-             getBoolConstant(fixedTI->isPOD(ResilienceExpansion::Maximal)),
-             "is-POD bit");
+             emitLoadOfIsTriviallyDestroyable(*this, layoutType),
+             getBoolConstant(fixedTI->isTriviallyDestroyable(ResilienceExpansion::Maximal)),
+             "is-trivially-destructible bit");
       verifyValues(metadata,
              emitLoadOfIsBitwiseTakable(*this, layoutType),
              getBoolConstant(fixedTI->isBitwiseTakable(ResilienceExpansion::Maximal)),
@@ -111,9 +113,9 @@ IRGenTypeVerifierFunction::emit(ArrayRef<CanType> formalTypes) {
         auto fixedXIBuf = createAlloca(fixedTI->getStorageType(),
                                            fixedTI->getFixedAlignment(),
                                            "extra-inhabitant");
-        auto xiOpaque = Builder.CreateBitCast(xiBuf, IGM.OpaquePtrTy);
-        auto fixedXIOpaque = Builder.CreateBitCast(fixedXIBuf,
-                                                       IGM.OpaquePtrTy);
+        auto xiOpaque = Builder.CreateElementBitCast(xiBuf, IGM.OpaqueTy);
+        auto fixedXIOpaque =
+            Builder.CreateElementBitCast(fixedXIBuf, IGM.OpaqueTy);
         auto xiMask = fixedTI->getFixedExtraInhabitantMask(IGM);
         auto xiSchema = EnumPayloadSchema(xiMask.getBitWidth());
 
@@ -317,7 +319,7 @@ void IRGenModule::emitTypeVerifier() {
     Builder.llvm::IRBuilderBase::SetInsertPoint(EntryBB, IP);
     if (DebugInfo)
       DebugInfo->setEntryPointLoc(Builder);
-    Builder.CreateCall(VerifierFunction, {});
+    Builder.CreateCall(fnTy, VerifierFunction, {});
   }
 
   IRGenTypeVerifierFunction VerifierIGF(*this, VerifierFunction);

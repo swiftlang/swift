@@ -10,23 +10,34 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "Dependencies.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/ModuleLoader.h"
+#include "swift/AST/PluginRegistry.h"
+#include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
+#include "swift/Basic/SourceManager.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
+#include "swift/Frontend/ModuleInterfaceSupport.h"
+#include "swift/FrontendTool/Dependencies.h"
+#include "swift/IDE/SourceEntityWalker.h"
 
+#include "clang/AST/DeclObjC.h"
+#include "clang/AST/ObjCMethodReferenceInfo.h"
 #include "clang/Basic/Module.h"
 
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/JSON.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/YAMLTraits.h"
 #include "llvm/Support/FileUtilities.h"
-#include "llvm/Support/LockFileManager.h"
 
 #if !defined(_MSC_VER) && !defined(__MINGW32__)
 #include <unistd.h>
@@ -38,18 +49,28 @@ using namespace swift;
 
 namespace {
 struct SwiftModuleTraceInfo {
-  Identifier Name;
+  std::string Name;
   std::string Path;
   bool IsImportedDirectly;
   bool SupportsLibraryEvolution;
+  bool StrictMemorySafety;
+};
+
+struct SwiftMacroTraceInfo {
+  std::string Name;
+  std::string Path;
 };
 
 struct LoadedModuleTraceFormat {
   static const unsigned CurrentVersion = 2;
   unsigned Version;
-  Identifier Name;
+  std::string Name;
   std::string Arch;
+  std::string LanguageMode;
+  std::vector<StringRef> EnabledLanguageFeatures;
+  bool StrictMemorySafety;
   std::vector<SwiftModuleTraceInfo> SwiftModules;
+  std::vector<SwiftMacroTraceInfo> SwiftMacros;
 };
 } // namespace
 
@@ -57,12 +78,21 @@ namespace swift {
 namespace json {
 template <> struct ObjectTraits<SwiftModuleTraceInfo> {
   static void mapping(Output &out, SwiftModuleTraceInfo &contents) {
-    StringRef name = contents.Name.str();
-    out.mapRequired("name", name);
+    out.mapRequired("name", contents.Name);
     out.mapRequired("path", contents.Path);
     out.mapRequired("isImportedDirectly", contents.IsImportedDirectly);
     out.mapRequired("supportsLibraryEvolution",
                     contents.SupportsLibraryEvolution);
+    out.mapRequired("strictMemorySafety",
+                    contents.StrictMemorySafety);
+  }
+};
+
+template <>
+struct ObjectTraits<SwiftMacroTraceInfo> {
+  static void mapping(Output &out, SwiftMacroTraceInfo &contents) {
+    out.mapRequired("name", contents.Name);
+    out.mapRequired("path", contents.Path);
   }
 };
 
@@ -73,10 +103,16 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
   static void mapping(Output &out, LoadedModuleTraceFormat &contents) {
     out.mapRequired("version", contents.Version);
 
-    StringRef name = contents.Name.str();
-    out.mapRequired("name", name);
+    out.mapRequired("name", contents.Name);
 
     out.mapRequired("arch", contents.Arch);
+
+    out.mapRequired("languageMode", contents.LanguageMode);
+
+    out.mapRequired("enabledLanguageFeatures",
+                    contents.EnabledLanguageFeatures);
+
+    out.mapRequired("strictMemorySafety", contents.StrictMemorySafety);
 
     // The 'swiftmodules' key is kept for backwards compatibility.
     std::vector<std::string> moduleNames;
@@ -85,6 +121,8 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
     out.mapRequired("swiftmodules", moduleNames);
 
     out.mapRequired("swiftmodulesDetailedInfo", contents.SwiftModules);
+
+    out.mapRequired("swiftmacros", contents.SwiftMacros);
   }
 };
 } // namespace json
@@ -109,12 +147,7 @@ static bool contains(const SetLike &setLike, Item item) {
 /// By default, all imports are included.
 static void getImmediateImports(
     ModuleDecl *module, SmallPtrSetImpl<ModuleDecl *> &imports,
-    ModuleDecl::ImportFilter importFilter = {
-        ModuleDecl::ImportFilterKind::Exported,
-        ModuleDecl::ImportFilterKind::Default,
-        ModuleDecl::ImportFilterKind::ImplementationOnly,
-        ModuleDecl::ImportFilterKind::SPIAccessControl,
-        ModuleDecl::ImportFilterKind::ShadowedByCrossImportOverlay}) {
+    ModuleDecl::ImportFilter importFilter = ModuleDecl::getImportFilterAll()) {
   SmallVector<ImportedModule, 8> importList;
   module->getImportedModules(importList, importFilter);
 
@@ -169,8 +202,7 @@ class ABIDependencyEvaluator {
 
   /// Check if a Swift module is an overlay for some Clang module.
   ///
-  /// FIXME: Delete this hack once SR-13363 is fixed and ModuleDecl has the
-  /// right API which we can use directly.
+  /// FIXME: Delete this hack once https://github.com/apple/swift/issues/55804 is fixed and ModuleDecl has the right API which we can use directly.
   bool isOverlayOfClangModule(ModuleDecl *swiftModule);
 
   /// Check for cases where we have a fake cycle through an overlay.
@@ -553,7 +585,7 @@ void ABIDependencyEvaluator::printABIExportMap(llvm::raw_ostream &os) const {
 // FIXME: Use the VFS instead of handling paths directly. We are particularly
 // sloppy about handling relative paths in the dependency tracker.
 static void computeSwiftModuleTraceInfo(
-    const SmallPtrSetImpl<ModuleDecl *> &abiDependencies,
+    ASTContext &ctx, const SmallPtrSetImpl<ModuleDecl *> &abiDependencies,
     const llvm::DenseMap<StringRef, ModuleDecl *> &pathToModuleDecl,
     const DependencyTracker &depTracker, StringRef prebuiltCachePath,
     std::vector<SwiftModuleTraceInfo> &traceInfo) {
@@ -570,6 +602,8 @@ static void computeSwiftModuleTraceInfo(
   SmallVector<std::string, 16> dependencies{deps.begin(), deps.end()};
   auto incrDeps = depTracker.getIncrementalDependencyPaths();
   dependencies.append(incrDeps.begin(), incrDeps.end());
+  // NOTE: macro dependencies are handled differently.
+  // See 'computeSwiftMacroTraceInfo()'.
   for (const auto &depPath : dependencies) {
 
     // Decide if this is a swiftmodule based on the extension of the raw
@@ -606,7 +640,7 @@ static void computeSwiftModuleTraceInfo(
 
       traceInfo.push_back(
           {/*Name=*/
-           depMod->getName(),
+           depMod->getName().str().str(),
            /*Path=*/
            realDepPath.str(),
            // TODO: There is an edge case which is not handled here.
@@ -619,7 +653,7 @@ static void computeSwiftModuleTraceInfo(
            /*IsImportedDirectly=*/
            isImportedDirectly,
            /*SupportsLibraryEvolution=*/
-           depMod->isResilient()});
+           depMod->isResilient(), depMod->strictMemorySafety()});
       buffer.clear();
 
       continue;
@@ -630,13 +664,12 @@ static void computeSwiftModuleTraceInfo(
     // filename available.
     if (isSwiftinterface) {
       // FIXME: Use PrettyStackTrace instead.
-      SmallVector<char, 0> errMsg;
-      llvm::raw_svector_ostream err(errMsg);
-      err << "Unexpected path for swiftinterface file:\n" << depPath << "\n";
-      err << "The module <-> path mapping we have is:\n";
+      llvm::errs() << "WARNING: unexpected path for swiftinterface file:\n"
+                   << depPath << "\n"
+                   << "The module <-> path mapping we have is:\n";
       for (auto &m : pathToModuleDecl)
-        err << m.second->getName() << " <-> " << m.first << '\n';
-      llvm::report_fatal_error(errMsg);
+        llvm::errs() << m.second->getName() << " <-> " << m.first << '\n';
+      continue;
     }
 
     // Skip cached modules in the prebuilt cache. We will add the corresponding
@@ -644,7 +677,7 @@ static void computeSwiftModuleTraceInfo(
     //
     // FIXME: This is incorrect if both paths are not relative w.r.t. to the
     // same root.
-    if (StringRef(depPath).startswith(prebuiltCachePath))
+    if (StringRef(depPath).starts_with(prebuiltCachePath))
       continue;
 
     // If we have a swiftmodule next to an interface, that interface path will
@@ -678,6 +711,108 @@ static void computeSwiftModuleTraceInfo(
             });
 }
 
+static void
+computeSwiftMacroTraceInfo(ASTContext &ctx, const DependencyTracker &depTracker,
+                           std::vector<SwiftMacroTraceInfo> &traceInfo) {
+  for (const auto &macroDep : depTracker.getMacroPluginDependencies()) {
+    traceInfo.push_back({macroDep.moduleName.str().str(), macroDep.path});
+  }
+
+  // Again, almost a re-implementation of reversePathSortedFilenames :(.
+  std::sort(
+      traceInfo.begin(), traceInfo.end(),
+      [](const SwiftMacroTraceInfo &m1, const SwiftMacroTraceInfo &m2) -> bool {
+        return std::lexicographical_compare(m1.Path.rbegin(), m1.Path.rend(),
+                                            m2.Path.rbegin(), m2.Path.rend());
+      });
+}
+
+static void computeEnabledFeatures(const ASTContext &ctx,
+                                   std::vector<StringRef> &enabledFeatures) {
+  struct FeatureAndName {
+    Feature feature;
+    StringRef name;
+  };
+
+  static const FeatureAndName features[] = {
+#define FEATURE_ENTRY(FeatureName) {Feature::FeatureName, #FeatureName},
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)                     \
+  FEATURE_ENTRY(FeatureName)
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)                  \
+  FEATURE_ENTRY(FeatureName)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)          \
+  FEATURE_ENTRY(FeatureName)
+#include "swift/Basic/Features.def"
+  };
+
+  for (auto &featureAndName : features) {
+    if (ctx.LangOpts.hasFeature(featureAndName.feature))
+      enabledFeatures.push_back(featureAndName.name);
+  }
+
+  // FIXME: It would be nice if the features were added in sorted order instead.
+  // However, std::sort is not constexpr until C++20.
+  std::sort(enabledFeatures.begin(), enabledFeatures.end(),
+            [](const StringRef &lhs, const StringRef &rhs) -> bool {
+              return lhs.compare(rhs) < 0;
+            });
+}
+
+static bool
+writeLoadedModuleOutput(const ASTContext &ctxt, StringRef mainModuleName,
+                        bool isStrictMemorySafety,
+                        const std::vector<SwiftModuleTraceInfo> &swiftModules,
+                        const std::vector<SwiftMacroTraceInfo> &swiftMacros,
+                        StringRef loadedModuleTracePath) {
+  std::vector<StringRef> enabledFeatures;
+  computeEnabledFeatures(ctxt, enabledFeatures);
+
+  LoadedModuleTraceFormat trace = {
+      /*version=*/LoadedModuleTraceFormat::CurrentVersion,
+      mainModuleName.str(),
+      /*arch=*/ctxt.LangOpts.Target.getArchName().str(),
+      ctxt.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString(),
+      enabledFeatures,
+      isStrictMemorySafety,
+      swiftModules,
+      swiftMacros};
+
+  // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
+  // so first write to memory and then dump the buffer to the trace file.
+  std::string stringBuffer;
+  {
+    llvm::raw_string_ostream memoryBuffer(stringBuffer);
+    json::Output jsonOutput(memoryBuffer, /*UserInfo=*/{},
+                            /*PrettyPrint=*/false);
+    json::jsonize(jsonOutput, trace, /*Required=*/true);
+  }
+  stringBuffer += "\n";
+
+  // Write output via atomic append.
+  llvm::vfs::OutputConfig config;
+  config.setAppend().setAtomicWrite();
+  auto outputFile =
+      ctxt.getOutputBackend().createFile(loadedModuleTracePath, config);
+
+  if (!outputFile) {
+    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                        loadedModuleTracePath,
+                        toString(outputFile.takeError()));
+    return true;
+  }
+
+  *outputFile << stringBuffer;
+
+  if (auto err = outputFile->keep()) {
+    ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                        loadedModuleTracePath, toString(std::move(err)));
+    return true;
+  }
+
+  return false;
+}
+
 // [NOTE: Bailing-vs-crashing-in-trace-emission] There are certain edge cases
 // in trace emission where an invariant that you think should hold does not hold
 // in practice. For example, sometimes we have seen modules without any
@@ -694,6 +829,10 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
                                           DependencyTracker *depTracker,
                                           const FrontendOptions &opts,
                                           const InputFile &input) {
+  // Scan dependencies emit the trace from module dependency cache.
+  if (opts.RequestedAction == FrontendOptions::ActionType::ScanDependencies)
+    return false;
+
   ASTContext &ctxt = mainModule->getASTContext();
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
@@ -711,8 +850,11 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   llvm::DenseMap<StringRef, ModuleDecl *> pathToModuleDecl;
   for (const auto &module : ctxt.getLoadedModules()) {
     ModuleDecl *loadedDecl = module.second;
-    if (!loadedDecl)
-      llvm::report_fatal_error("Expected loaded modules to be non-null.");
+    if (!loadedDecl) {
+      llvm::errs() << "WARNING: Unable to load module '" << module.first
+                   << ".\n";
+      continue;
+    }
     if (loadedDecl == mainModule)
       continue;
     if (loadedDecl->getModuleFilename().empty()) {
@@ -730,89 +872,191 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   }
 
   std::vector<SwiftModuleTraceInfo> swiftModules;
-  computeSwiftModuleTraceInfo(abiDependencies, pathToModuleDecl, *depTracker,
-                              opts.PrebuiltModuleCachePath, swiftModules);
+  computeSwiftModuleTraceInfo(ctxt, abiDependencies, pathToModuleDecl,
+                              *depTracker, opts.PrebuiltModuleCachePath,
+                              swiftModules);
 
-  LoadedModuleTraceFormat trace = {
-      /*version=*/LoadedModuleTraceFormat::CurrentVersion,
-      /*name=*/mainModule->getName(),
-      /*arch=*/ctxt.LangOpts.Target.getArchName().str(), swiftModules};
+  std::vector<SwiftMacroTraceInfo> swiftMacros;
+  computeSwiftMacroTraceInfo(ctxt, *depTracker, swiftMacros);
 
-  // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
-  // so first write to memory and then dump the buffer to the trace file.
+  return writeLoadedModuleOutput(ctxt, mainModule->getName().str(),
+                                 mainModule->strictMemorySafety(), swiftModules,
+                                 swiftMacros, loadedModuleTracePath);
+}
+
+bool swift::emitLoadedModuleTraceIfNeeded(const ModuleDependencyID &mainModule,
+                                          const ModuleDependenciesCache &cache,
+                                          const ASTContext &ctxt,
+                                          const FrontendOptions &opts) {
+  // Compute the output path.
+  auto loadedModuleTracePath = opts.InputsAndOutputs.firstInputProducingOutput()
+                                   .getLoadedModuleTracePath();
+  if (loadedModuleTracePath.empty())
+    return false;
+
+  // compute the full set of swift module dependencies.
+  auto *info = cache.findKnownDependency(mainModule).getAsSwiftSourceModule();
+  assert(info && "main module is not source module");
+  std::set<ModuleDependencyID> directDeps;
+  for (auto &dep : cache.getAllSwiftDependencies(mainModule)) {
+    if (llvm::find(info->dependencyOnlyImports, dep.ModuleName) ==
+        info->dependencyOnlyImports.end())
+      directDeps.insert(dep);
+  }
+
+  std::set<ModuleDependencyID> allLoadedModules;
+  SmallVector<ModuleDependencyID> workList(directDeps.begin(),
+                                           directDeps.end());
+  while (!workList.empty()) {
+    ModuleDependencyID mod = workList.back();
+    workList.pop_back();
+
+    if (!allLoadedModules.insert(mod).second)
+      continue; // already visited.
+
+    if (mod.Kind == ModuleDependencyKind::Clang)
+      continue; // ignore clang dependencies.
+
+    auto deps = cache.getAllSwiftDependencies(mod);
+    workList.append(deps.begin(), deps.end());
+  }
+
+  auto isDirectImport = [&](const ModuleDependencyID &mod) {
+    return llvm::find(directDeps, mod) != directDeps.end();
+  };
+
+  auto realPath = [&](const std::string &path) {
+    SmallString<128> realPath;
+    if (ctxt.SourceMgr.getFileSystem()->getRealPath(path, realPath))
+      return path;
+    return realPath.str().str();
+  };
+
+  std::vector<SwiftModuleTraceInfo> swiftModules;
+  for (auto &mod : allLoadedModules) {
+    // Record swift module dependencies and ignore other dependencies.
+    auto &info = cache.findKnownDependency(mod);
+    if (auto *binary = info.getAsSwiftBinaryModule())
+      swiftModules.push_back({mod.ModuleName,
+                              realPath(binary->getDefiningModulePath()),
+                              isDirectImport(mod), binary->isResilient,
+                              binary->isStrictMemorySafety});
+    else if (auto *textual = info.getAsSwiftInterfaceModule())
+      swiftModules.push_back(
+          {mod.ModuleName, realPath(textual->swiftInterfaceFile),
+           isDirectImport(mod),
+           /*isResilient=*/true, textual->isStrictMemorySafety});
+  }
+
+  std::vector<SwiftMacroTraceInfo> swiftMacros;
+  for (auto &macro : info->macroDependencies) {
+    swiftMacros.push_back({macro.first, macro.second.LibraryPath.empty()
+                                            ? macro.second.ExecutablePath
+                                            : macro.second.LibraryPath});
+  }
+
+  return writeLoadedModuleOutput(
+      ctxt, mainModule.ModuleName,
+      ctxt.LangOpts.hasFeature(Feature::StrictMemorySafety), swiftModules,
+      swiftMacros, loadedModuleTracePath);
+}
+
+class ObjcMethodReferenceCollector: public SourceEntityWalker {
+  unsigned CurrentFileID;
+  llvm::DenseMap<const clang::ObjCMethodDecl*, unsigned> results;
+  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
+                          ExtensionDecl *ExtTyRef, Type T,
+                          ReferenceMetaData Data) override {
+    if (!Range.isValid())
+      return true;
+    if (auto *clangD = dyn_cast_or_null<clang::ObjCMethodDecl>(D->getClangDecl()))
+      Info.References[CurrentFileID].push_back(clangD);
+    return true;
+  }
+
+  clang::ObjCMethodReferenceInfo Info;
+
+public:
+  ObjcMethodReferenceCollector(ModuleDecl *MD) {
+    Info.ToolName = "swift-compiler-version";
+    Info.ToolVersion =
+      getSwiftInterfaceCompilerVersionForCurrentCompiler(MD->getASTContext());
+    auto &Opts = MD->getASTContext().LangOpts;
+    Info.Target = Opts.Target.str();
+    Info.TargetVariant = Opts.TargetVariant.has_value() ?
+      Opts.TargetVariant->str() : "";
+  }
+  void setFileBeforeVisiting(SourceFile *SF) {
+    assert(SF && "need to visit actual source files");
+    Info.FilePaths.push_back(SF->getFilename().str());
+    CurrentFileID = Info.FilePaths.size();
+  }
+  void serializeAsJson(llvm::raw_ostream &OS) {
+    clang::serializeObjCMethodReferencesAsJson(Info, OS);
+  }
+};
+
+static void createFineModuleTraceFile(CompilerInstance &instance,
+                                      const InputFile &input) {
+  StringRef tracePath = input.getFineModuleTracePath();
+  if (tracePath.empty()) {
+    // we basically rely on the passing down of module trace file path
+    // as an indicator that this job needs to emit an ObjC message trace file.
+    // FIXME: add a separate swift-frontend flag for ObjC message trace path
+    // specifically.
+    return;
+  }
+  ModuleDecl *MD = instance.getMainModule();
+  auto &ctx = MD->getASTContext();
+  // Write output via atomic append.
+  llvm::vfs::OutputConfig config;
+  config.setAppend().setAtomicWrite();
+  auto outputFile = ctx.getOutputBackend().createFile(tracePath, config);
+  if (!outputFile) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output, tracePath,
+                       toString(outputFile.takeError()));
+    return;
+  }
+  ObjcMethodReferenceCollector collector(MD);
+
+  auto blocklisted = ctx.blockListConfig.hasBlockListAction(MD->getNameStr(),
+    BlockListKeyKind::ModuleName, BlockListAction::SkipEmittingFineModuleTrace);
+
+  if (!blocklisted) {
+    instance.forEachFileToTypeCheck([&](SourceFile& SF) {
+      collector.setFileBeforeVisiting(&SF);
+      collector.walk(SF);
+      return false;
+    });
+  }
+
+  // print this json line.
   std::string stringBuffer;
   {
     llvm::raw_string_ostream memoryBuffer(stringBuffer);
-    json::Output jsonOutput(memoryBuffer, /*UserInfo=*/{},
-                            /*PrettyPrint=*/false);
-    json::jsonize(jsonOutput, trace, /*Required=*/true);
+    collector.serializeAsJson(memoryBuffer);
   }
   stringBuffer += "\n";
 
-  // If writing to stdout, just perform a normal write.
-  // If writing to a file, ensure the write is atomic by creating a filesystem lock
-  // on the output file path.
-  std::error_code EC;
-  if (loadedModuleTracePath == "-") {
-    llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::OF_Append);
-    if (out.has_error() || EC) {
-      ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                          loadedModuleTracePath, EC.message());
-      out.clear_error();
-      return true;
-    }
-    out << stringBuffer;
-  } else {
-    while (1) {
-      // Attempt to lock the output file.
-      // Only one process is allowed to append to this file at a time.
-      llvm::LockFileManager Locked(loadedModuleTracePath);
-      switch (Locked) {
-        case llvm::LockFileManager::LFS_Error:{
-          // If we error acquiring a lock, we cannot ensure appends
-          // to the trace file are atomic - cannot ensure output correctness.
-          ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                              loadedModuleTracePath,
-                              "Failed to acquire filesystem lock");
-          Locked.unsafeRemoveLockFile();
-          return true;
-        }
-        case llvm::LockFileManager::LFS_Owned: {
-          // Lock acquired, perform the write and release the lock.
-          llvm::raw_fd_ostream out(loadedModuleTracePath, EC, llvm::sys::fs::OF_Append);
-          if (out.has_error() || EC) {
-            ctxt.Diags.diagnose(SourceLoc(), diag::error_opening_output,
-                                loadedModuleTracePath, EC.message());
-            out.clear_error();
-            return true;
-          }
-          out << stringBuffer;
-          out.close();
-          Locked.unsafeRemoveLockFile();
-          return false;
-        }
-        case llvm::LockFileManager::LFS_Shared: {
-          // Someone else owns the lock on this file, wait.
-          switch (Locked.waitForUnlock(256)) {
-            case llvm::LockFileManager::Res_Success:
-              LLVM_FALLTHROUGH;
-            case llvm::LockFileManager::Res_OwnerDied: {
-              continue; // try again to get the lock.
-            }
-            case llvm::LockFileManager::Res_Timeout: {
-              // We could error on timeout to avoid potentially hanging forever, but
-              // it may be more likely that an interrupted process failed to clear the lock,
-              // causing other waiting processes to time-out. Let's clear the lock and try
-              // again right away. If we do start seeing compiler hangs in this location,
-              // we will need to re-consider.
-              Locked.unsafeRemoveLockFile();
-              continue;
-            }
-          }
-          break;
-        }
-      }
-    }
+  // Write output via atomic append.
+  *outputFile << stringBuffer;
+  if (auto err = outputFile->keep()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                       tracePath, toString(std::move(err)));
+    return;
   }
-  return true;
+}
+
+bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
+                                        const FrontendOptions &opts) {
+  ModuleDecl *mainModule = Instance.getMainModule();
+  ASTContext &ctxt = mainModule->getASTContext();
+  assert(!ctxt.hadError() &&
+         "We should've already exited earlier if there was an error.");
+
+  opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
+    createFineModuleTraceFile(Instance, input);
+    return true;
+  });
+  return false;
 }

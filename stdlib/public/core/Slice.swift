@@ -138,7 +138,7 @@ public struct Slice<Base: Collection> {
 
   @_alwaysEmitIntoClient @inline(__always)
   internal var _bounds: Range<Base.Index> {
-    Range(_uncheckedBounds: (_startIndex, _endIndex))
+    unsafe Range(_uncheckedBounds: (_startIndex, _endIndex))
   }
 }
 
@@ -222,14 +222,15 @@ extension Slice: Collection {
   }
 
   @_alwaysEmitIntoClient @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
     try _base.withContiguousStorageIfAvailable { buffer in
       let start = _base.distance(from: _base.startIndex, to: _startIndex)
       let count = _base.distance(from: _startIndex, to: _endIndex)
-      let slice = UnsafeBufferPointer(rebasing: buffer[start ..< start + count])
-      return try body(slice)
+      let slice = unsafe UnsafeBufferPointer(rebasing: buffer[start ..< start + count])
+      return try unsafe body(slice)
     }
   }
 }
@@ -240,13 +241,13 @@ extension Slice {
       initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     if let (_, copied) = self.withContiguousStorageIfAvailable({
-      $0._copyContents(initializing: buffer)
+      unsafe $0._copyContents(initializing: buffer)
     }) {
       let position = index(startIndex, offsetBy: copied)
       return (Iterator(_elements: self, _position: position), copied)
     }
 
-    return _copySequenceContents(initializing: buffer)
+    return unsafe _copySequenceContents(initializing: buffer)
   }
 }
 
@@ -293,6 +294,7 @@ extension Slice: MutableCollection where Base: MutableCollection {
   }
 
   @_alwaysEmitIntoClient @inlinable
+  @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -307,16 +309,16 @@ extension Slice: MutableCollection where Base: MutableCollection {
     let start = _base.distance(from: _base.startIndex, to: _startIndex)
     let count = _base.distance(from: _startIndex, to: _endIndex)
     return try _base.withContiguousMutableStorageIfAvailable { buffer in
-      var slice = UnsafeMutableBufferPointer(
+      var slice = unsafe UnsafeMutableBufferPointer(
         rebasing: buffer[start ..< start + count])
-      let copy = slice
+      let copy = unsafe slice
       defer {
-        _precondition(
+        unsafe _precondition(
           slice.baseAddress == copy.baseAddress &&
           slice.count == copy.count,
           "Slice.withContiguousMutableStorageIfAvailable: replacing the buffer is not allowed")
       }
-      return try body(&slice)
+      return try unsafe body(&slice)
     }
   }
 }

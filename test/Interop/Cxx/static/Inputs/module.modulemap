@@ -27,3 +27,8 @@ module ConstexprStaticMemberVarErrors {
   header "constexpr-static-member-var-errors.h"
   requires cplusplus
 }
+
+module InvalidStaticMemberVar {
+  header "invalid-static-member-var.h"
+  requires cplusplus
+}

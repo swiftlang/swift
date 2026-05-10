@@ -12,13 +12,13 @@
 
 #define DEBUG_TYPE "sil-projection"
 #include "swift/SIL/Projection.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/IndexTrie.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILUndef.h"
-#include "llvm/ADT/None.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -131,8 +131,10 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
     assert(getIndex() == int(UEDI->getElementNo()));
     break;
   }
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-    auto *UTEDAI = cast<UncheckedTakeEnumDataAddrInst>(I);
+    auto *UTEDAI = cast<UncheckedEnumDataAddrInstBase>(I);
     Value = ValueTy(ProjectionKind::Enum, UTEDAI->getCaseIndex());
     assert(getKind() == ProjectionKind::Enum);
     assert(getIndex() == int(UTEDAI->getCaseIndex()));
@@ -152,6 +154,13 @@ Projection::Projection(SingleValueInstruction *I) : Value() {
       assert(getKind() == ProjectionKind::Index);
       assert(getIndex() == NewIndex);
     }
+    break;
+  }
+  case SILInstructionKind::ProjectBlockStorageInst: {
+    auto *Ty = I->getType().getASTType().getPointer();
+    assert(Ty->isCanonical());
+    Value = ValueTy(ProjectionKind::BlockStorageCast, Ty);
+    assert(getKind() == ProjectionKind::BlockStorageCast);
     break;
   }
   case SILInstructionKind::UpcastInst: {
@@ -199,6 +208,7 @@ SILType Projection::getType(SILType BaseType, SILModule &M,
   case ProjectionKind::Tuple:
     return BaseType.getTupleElementType(getIndex());
   case ProjectionKind::Upcast:
+  case ProjectionKind::BlockStorageCast:
   case ProjectionKind::RefCast:
   case ProjectionKind::BitwiseCast:
   case ProjectionKind::TailElems:
@@ -238,6 +248,8 @@ Projection::createObjectProjection(SILBuilder &B, SILLocation Loc,
     return nullptr;
   case ProjectionKind::Box:
     return nullptr;
+  case ProjectionKind::BlockStorageCast:
+    return nullptr;
   case ProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::RefCast:
@@ -272,17 +284,29 @@ Projection::createAddressProjection(SILBuilder &B, SILLocation Loc,
         SILType::getBuiltinIntegerType(64, B.getModule().getASTContext());
     auto IntLiteralIndex =
         B.createIntegerLiteral(Loc, IntLiteralTy, getIndex());
-    return B.createIndexAddr(Loc, Base, IntLiteralIndex);
+    return B.createIndexAddr(Loc, Base, IntLiteralIndex,
+        // TODO: do we need to be conservative here?
+        /*needsStackProtection=*/ true);
   }
-  case ProjectionKind::Enum:
-    return B.createUncheckedTakeEnumDataAddr(Loc, Base,
-                                             getEnumElementDecl(BaseTy));
+  case ProjectionKind::Enum: {
+    if (UncheckedEnumDataAddrInstBase::isDestructive(
+                                            BaseTy.getEnumOrBoundGenericEnum(),
+                                            &B.getFunction())) {
+      return B.createUncheckedTakeEnumDataAddr(Loc, Base,
+                                               getEnumElementDecl(BaseTy));
+    } else {
+      return B.createUncheckedInPlaceEnumDataAddr(Loc, Base,
+                                               getEnumElementDecl(BaseTy));
+    }
+  }
   case ProjectionKind::Class:
     return B.createRefElementAddr(Loc, Base, getVarDecl(BaseTy));
   case ProjectionKind::TailElems:
     return B.createRefTailAddr(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::Box:
     return B.createProjectBox(Loc, Base, getIndex());
+  case ProjectionKind::BlockStorageCast:
+    return B.createProjectBlockStorage(Loc, Base);
   case ProjectionKind::Upcast:
     return B.createUpcast(Loc, Base, getCastType(BaseTy));
   case ProjectionKind::RefCast:
@@ -361,8 +385,8 @@ void Projection::getFirstLevelProjections(
 //                            Projection Path
 //===----------------------------------------------------------------------===//
 
-Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
-                                                           SILValue End) {
+std::optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
+                                                                SILValue End) {
   ProjectionPath P(Start->getType(), End->getType());
 
   // If Start == End, there is a "trivial" projection path in between the
@@ -374,10 +398,19 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
   // and unions. This is currently only associated with structs.
   if (Start->getType().aggregateHasUnreferenceableStorage() ||
       End->getType().aggregateHasUnreferenceableStorage())
-    return llvm::NoneType::None;
+    return std::nullopt;
 
   auto Iter = End;
   while (Start != Iter) {
+
+    if (auto *mvr = dyn_cast<MultipleValueInstructionResult>(Iter)) {
+      if (auto *bci = dyn_cast<BeginCOWMutationInst>(mvr->getParent())) {
+        Iter = bci->getOperand();
+        continue;
+      }
+      break;
+    }
+
     // end_cow_mutation and begin_access are not projections, but we need to be
     // able to form valid ProjectionPaths across them, otherwise optimization
     // passes like RLE/DSE cannot recognize their locations.
@@ -385,7 +418,7 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
     // TODO: migrate users to getProjectionPath to the AccessPath utility to
     // avoid this hack.
     if (!isa<EndCOWMutationInst>(Iter) && !isa<BeginAccessInst>(Iter) &&
-        !isa<BeginBorrowInst>(Iter)) {
+        !isa<BeginBorrowInst>(Iter) && !isa<MoveValueInst>(Iter)) {
       Projection AP(Iter);
       if (!AP.isValid())
         break;
@@ -403,7 +436,7 @@ Optional<ProjectionPath> ProjectionPath::getProjectionPath(SILValue Start,
   // ProjectionPath never allow paths to be compared as a list of indices.
   // Only the encoded type+index pair will be compared.
   if (P.empty() || Start != Iter)
-    return llvm::NoneType::None;
+    return std::nullopt;
 
   // Reverse to get a path from base to most-derived.
   std::reverse(P.Path.begin(), P.Path.end());
@@ -533,12 +566,12 @@ ProjectionPath::computeSubSeqRelation(const ProjectionPath &RHS) const {
   return SubSeqRelation_t::RHSStrictSubSeqOfLHS;
 }
 
-Optional<ProjectionPath>
+std::optional<ProjectionPath>
 ProjectionPath::removePrefix(const ProjectionPath &Path,
                              const ProjectionPath &Prefix) {
   // We can only subtract paths that have the same base.
   if (Path.BaseType != Prefix.BaseType)
-    return llvm::NoneType::None;
+    return std::nullopt;
 
   // If Prefix is greater than or equal to Path in size, Prefix can not be a
   // prefix of Path. Return None.
@@ -546,10 +579,10 @@ ProjectionPath::removePrefix(const ProjectionPath &Path,
   unsigned PathSize = Path.size();
 
   if (PrefixSize >= PathSize)
-    return llvm::NoneType::None;
+    return std::nullopt;
 
   // First make sure that the prefix matches.
-  Optional<ProjectionPath> P = ProjectionPath(Path.BaseType);
+  std::optional<ProjectionPath> P = ProjectionPath(Path.BaseType);
   for (unsigned i = 0; i < PrefixSize; ++i) {
     if (Path.Path[i] != Prefix.Path[i]) {
       P.reset();
@@ -587,6 +620,10 @@ void Projection::print(raw_ostream &os, SILType baseType) const {
   }
   case ProjectionKind::Box: {
     os << " Box over";
+    break;
+  }
+  case ProjectionKind::BlockStorageCast: {
+    os << "BlockStorageCast";
     break;
   }
   case ProjectionKind::Upcast: {
@@ -861,6 +898,7 @@ SILValue Projection::getOperandForAggregate(SILInstruction *I) const {
     case ProjectionKind::Class:
     case ProjectionKind::TailElems:
     case ProjectionKind::Box:
+    case ProjectionKind::BlockStorageCast:
     case ProjectionKind::Upcast:
     case ProjectionKind::RefCast:
     case ProjectionKind::BitwiseCast:
@@ -880,7 +918,7 @@ ProjectionTreeNode::getChildForProjection(ProjectionTree &Tree,
                                           const Projection &P) {
   for (unsigned Index : ChildProjections) {
     ProjectionTreeNode *N = Tree.getNode(Index);
-    if (N->Proj && N->Proj.getValue() == P) {
+    if (N->Proj && N->Proj.value() == P) {
       return N;
     }
   }
@@ -891,14 +929,14 @@ ProjectionTreeNode *
 ProjectionTreeNode::getParent(ProjectionTree &Tree) {
   if (!Parent)
     return nullptr;
-  return Tree.getNode(Parent.getValue());
+  return Tree.getNode(Parent.value());
 }
 
 const ProjectionTreeNode *
 ProjectionTreeNode::getParent(const ProjectionTree &Tree) const {
   if (!Parent)
     return nullptr;
-  return Tree.getNode(Parent.getValue());
+  return Tree.getNode(Parent.value());
 }
 
 NullablePtr<SingleValueInstruction>
@@ -920,6 +958,7 @@ static bool isSupportedProjection(const Projection &p) {
   case ProjectionKind::Enum:
   case ProjectionKind::Box:
   case ProjectionKind::Upcast:
+  case ProjectionKind::BlockStorageCast:
   case ProjectionKind::RefCast:
   case ProjectionKind::BitwiseCast:
   case ProjectionKind::TailElems:
@@ -1005,9 +1044,9 @@ void ProjectionTreeNode::createNextLevelChildrenForStruct(
     auto *Node = Tree.createChildForStruct(this, NodeTy, VD, ChildIndex++);
     LLVM_DEBUG(llvm::dbgs() << "        Creating child for: " <<NodeTy << "\n");
     LLVM_DEBUG(llvm::dbgs() << "            Projection: " 
-               << Node->getProjection().getValue().getIndex() << "\n");
+               << Node->getProjection().value().getIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
-    assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
+    assert(getChildForProjection(Tree, Node->getProjection().value()) == Node &&
            "Child not matched to its projection in parent!");
     assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
   }
@@ -1023,9 +1062,9 @@ createNextLevelChildrenForTuple(ProjectionTree &Tree, TupleType *TT) {
     auto *Node = Tree.createChildForTuple(this, NodeTy, i);
     LLVM_DEBUG(llvm::dbgs() << "        Creating child for: " << NodeTy <<"\n");
     LLVM_DEBUG(llvm::dbgs() << "            Projection: "
-               << Node->getProjection().getValue().getIndex() << "\n");
+               << Node->getProjection().value().getIndex() << "\n");
     ChildProjections.push_back(Node->getIndex());
-    assert(getChildForProjection(Tree, Node->getProjection().getValue()) == Node &&
+    assert(getChildForProjection(Tree, Node->getProjection().value()) == Node &&
            "Child not matched to its projection in parent!");
     assert(Node->getParent(Tree) == this && "Parent of Child is not Parent?!");
   }
@@ -1124,7 +1163,7 @@ public:
 
   void setValueForChild(ProjectionTreeNode *Child, SILValue V) {
     assert(!Invalidated && "Must not be invalidated to set value for child");
-    Values[Child->Proj.getValue().getIndex()] = V;
+    Values[Child->Proj.value().getIndex()] = V;
   }
 };
 
@@ -1216,7 +1255,7 @@ ProjectionTree::computeExplodedArgumentValueInner(SILBuilder &Builder,
     if (Iter != LeafValues.end())
       return Iter->second;
     // Return undef for dead node.
-    return SILUndef::get(Node->getType(), Builder.getFunction());
+    return SILUndef::get(Builder.getFunction(), Node->getType());
   }
 
   // This is an aggregate node, construct its value from its children

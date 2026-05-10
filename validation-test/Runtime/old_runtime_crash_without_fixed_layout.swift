@@ -6,7 +6,7 @@
 // RUN: %target-build-swift %s -L %t -I %t -lresilient_struct -o %t/main %target-rpath(%t) -target %target-stable-abi-triple
 // RUN: %target-codesign %t/main
 
-// RUN: %target-run %t/main %t/%target-library-name(resilient_struct) %t/libresilient_class%{target-shared-library-suffix}
+// RUN: %target-run %t/main %t/%target-library-name(resilient_struct)
 
 
 // REQUIRES: executable_test

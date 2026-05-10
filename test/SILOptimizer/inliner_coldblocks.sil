@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-remarks=sil-inliner -o %t.sil 2>&1 | %FileCheck -check-prefix=REMARKS_PASSED %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -compute-side-effects -inline -sil-remarks=sil-inliner -o %t.sil 2>&1 | %FileCheck -check-prefix=REMARKS_PASSED %s
 // RUN: %FileCheck %s < %t.sil
 // RUN: %target-sil-opt -enable-sil-verify-all %s -inline -sil-remarks-missed=sil-inliner -o /dev/null 2>&1 | %FileCheck -check-prefix=REMARKS_MISSED %s
 // RUN: %target-sil-opt -enable-sil-verify-all %s -inline -save-optimization-record-path %t.yaml -o /dev/null 2>&1 | %FileCheck -allow-empty -check-prefix=NO_REMARKS %s
@@ -8,6 +8,8 @@
 // REMARKS_PASSED-NOT: remark:
 // REMARKS_MISSED-NOT: remark:
 // NO_REMARKS-NOT: remark:
+
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -63,13 +65,16 @@ bb0:
   %ex = builtin "int_expect_Int1"(undef : $Builtin.Int1, %i1 : $Builtin.Int1) : $Builtin.Int1
   cond_br %ex, bb1, bb2
 
+bb2:
+  br bb3
+
 bb1:
   %f = function_ref @callee : $@convention(thin) () -> ()
   // REMARKS_PASSED: {{.*}}inliner_coldblocks.sil:[[# @LINE + 1]]:8: remark: Pure call. Always profitable to inline "callee"
   %a = apply %f() : $@convention(thin) () -> ()
-  br bb2
+  br bb3
 
-bb2:
+bb3:
   %r = tuple ()
   return %r : $()
 }
@@ -87,9 +92,12 @@ bb0:
 bb1:
   %f = function_ref @callee : $@convention(thin) () -> ()
   %a = apply %f() : $@convention(thin) () -> ()
-  br bb2
+  br bb3
 
 bb2:
+  br bb3
+
+bb3:
   %r = tuple ()
   return %r : $()
 }
@@ -117,9 +125,12 @@ bb3(%c : $Builtin.Int1):
 bb4:
   %f = function_ref @callee : $@convention(thin) () -> ()
   %a = apply %f() : $@convention(thin) () -> ()
-  br bb5
+  br bb6
 
 bb5:
+  br bb6
+
+bb6:
   %r = tuple ()
   return %r : $()
 }
@@ -153,9 +164,12 @@ bb5(%c : $Builtin.Int1):
 bb6:
   %f = function_ref @callee : $@convention(thin) () -> ()
   %a = apply %f() : $@convention(thin) () -> ()
-  br bb7
+  br bb8
 
 bb7:
+  br bb8
+
+bb8:
   %r = tuple ()
   return %r : $()
 }
@@ -207,7 +221,7 @@ bb0:
   // YAML-NEXT:   - Callee:          '"update_global"'
   // YAML-NEXT:     DebugLoc:
   // YAML:          File:            {{.*}}inliner_coldblocks.sil
-  // YAML:            Line:            20
+  // YAML:            Line:            22
   // YAML:            Column:          6
   // YAML-NEXT:   - String:          ' inlined into '
   // YAML-NEXT:   - Caller:          '"regular_large_callee"'

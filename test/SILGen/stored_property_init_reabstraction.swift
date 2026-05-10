@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // rdar://problem/67419937
 
@@ -25,7 +25,7 @@ struct Struct<T> {
 
 // CHECK-LABEL: sil hidden [ossa] @$s34stored_property_init_reabstraction6StructVyACySiGSicSiRszlufC : $@convention(method) (Int, @thin Struct<Int>.Type) -> @owned Struct<Int> {
 // CHECK: [[SELF_BOX:%.*]] = mark_uninitialized [rootself] {{%.*}} : ${ var Struct<Int> }
-// CHECK: [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[SELF_BOX]]
+// CHECK: [[SELF_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[SELF_BOX]]
 // CHECK: [[SELF:%.*]] = project_box [[SELF_LIFETIME]] : ${ var Struct<Int> }, 0
 // CHECK: [[ADDR:%.*]] = struct_element_addr [[SELF]] : $*Struct<Int>, #Struct.fn
 // CHECK: [[INIT:%.*]] = function_ref @$s34stored_property_init_reabstraction6StructV2fnyxcSgvpfi : $@convention(thin) <τ_0_0> () -> @owned Optional<@callee_guaranteed @substituted <τ_0_0> (@in_guaranteed τ_0_0) -> () for <τ_0_0>>

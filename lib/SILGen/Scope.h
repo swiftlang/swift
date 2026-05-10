@@ -18,6 +18,7 @@
 #define SWIFT_SILGEN_SCOPE_H
 
 #include "SILGenFunction.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDebugScope.h"
 #include "Cleanup.h"
 
@@ -154,7 +155,7 @@ class LLVM_LIBRARY_VISIBILITY DebugScope {
   SILGenFunction &SGF;
 
 public:
-  explicit DebugScope(SILGenFunction &SGF, CleanupLocation loc) : SGF(SGF) {
+  explicit DebugScope(SILGenFunction &SGF, SILLocation loc) : SGF(SGF) {
     SGF.enterDebugScope(loc);
   }
 

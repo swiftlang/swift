@@ -3,9 +3,9 @@
 // RUN: echo 'public func b() { }' >%t/b.swift
 // RUN: echo 'public func main() {a(); b()}' >%t/main.swift
 
-// Test printing to stdout
+// Test printing to stdout (using either -dump-ast or -emit-ast)
 // RUN: %target-swift-frontend -dump-ast -primary-file %t/a.swift %t/b.swift %t/main.swift -module-name main -o - 2>%t/a.swift.stderr | %FileCheck -check-prefix A-AST %s
-// RUN: %target-swift-frontend -dump-ast %t/a.swift -primary-file %t/b.swift %t/main.swift -module-name main -o - 2>%t/b.swift.stderr | %FileCheck -check-prefix B-AST %s
+// RUN: %target-swift-frontend -emit-ast %t/a.swift -primary-file %t/b.swift %t/main.swift -module-name main -o - 2>%t/b.swift.stderr | %FileCheck -check-prefix B-AST %s
 // RUN: %target-swift-frontend -dump-ast %t/a.swift %t/b.swift -primary-file %t/main.swift -module-name main -o - 2>%t/main.swift.stderr | %FileCheck -check-prefix MAIN-AST %s
 
 // Test printing to files

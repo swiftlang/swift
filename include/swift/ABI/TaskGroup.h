@@ -44,12 +44,30 @@ public:
   /// Checks the cancellation status of the group.
   bool isCancelled();
 
-  // Add a child task to the group. Always called with the status record lock of
-  // the parent task held
+  /// Only mark the task group as cancelled, without performing the follow-up
+  /// work of cancelling all the child tasks.
+  ///
+  /// Returns true if the group was already cancelled before this call.
+  bool statusCancel();
+
+  // Add a child task to the task group. Always called while holding the
+  // status record lock of the task group's owning task.
   void addChildTask(AsyncTask *task);
+
+  // Remove a child task from the task group. Always called while holding
+  // the status record lock of the task group's owning task.
+  void removeChildTask(AsyncTask *task);
 
   // Provide accessor for task group's status record
   TaskGroupTaskStatusRecord *getTaskRecord();
+
+  /// The group is a `TaskGroup` that accumulates results.
+  bool isAccumulatingResults() {
+    return !isDiscardingResults();
+  }
+
+  /// The group is a `DiscardingTaskGroup` that discards results.
+  bool isDiscardingResults();
 };
 
 } // end namespace swift

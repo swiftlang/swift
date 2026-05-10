@@ -30,10 +30,10 @@ namespace swift {
 ///   : $@convention(method) <τ_0_0 where τ_0_0 : P, τ_0_0 : Q>
 ///     (@guaranteed τ_0_0) -> @owned τ_0_0
 ///
-/// When successfull, ConcreteExistentialInfo can be used to determine the
+/// When successful, ConcreteExistentialInfo can be used to determine the
 /// concrete type of the opened existential.
 struct OpenedArchetypeInfo {
-  OpenedArchetypeType *OpenedArchetype = nullptr;
+  ExistentialArchetypeType *OpenedArchetype = nullptr;
   // The opened value.
   SingleValueInstruction *OpenedArchetypeValue;
   // The existential value.
@@ -74,6 +74,9 @@ struct ConcreteExistentialInfo {
   SILValue ConcreteValue;
   // True if the ConcreteValue is copied from another stack location
   bool isConcreteValueCopied = false;
+  // True if the ConcreteValue should replace all uses of the opened
+  // existential.
+  bool ConcreteValueNeedsFixup = false;
   // When ConcreteType is itself an opened existential, record the type
   // definition. May be nullptr for a valid AppliedConcreteType.
   SingleValueInstruction *ConcreteTypeDef = nullptr;
@@ -85,7 +88,7 @@ struct ConcreteExistentialInfo {
 
   // Search for a recognized pattern in which the given existential value is
   // initialized to a concrete type. Constructs a valid ConcreteExistentialInfo
-  // object if successfull.
+  // object if successful.
   ConcreteExistentialInfo(SILValue existential, SILInstruction *user);
 
   // This constructor initializes a ConcreteExistentialInfo based on already
@@ -93,7 +96,7 @@ struct ConcreteExistentialInfo {
   ConcreteExistentialInfo(SILValue existential, SILInstruction *user,
                           CanType ConcreteType, ProtocolDecl *Protocol);
 
-  /// For scenerios where ConcreteExistentialInfo is created using a known
+  /// For scenarios where ConcreteExistentialInfo is created using a known
   /// ConcreteType and ProtocolDecl, the ConcreteValue can be null.
   bool isValid() const { return ConcreteType && !ExistentialSubs.empty(); }
 
@@ -119,7 +122,7 @@ private:
 struct ConcreteOpenedExistentialInfo {
   OpenedArchetypeInfo OAI;
   // If CEI has a value, it must be valid.
-  Optional<ConcreteExistentialInfo> CEI;
+  std::optional<ConcreteExistentialInfo> CEI;
 
   ConcreteOpenedExistentialInfo(Operand &use);
 

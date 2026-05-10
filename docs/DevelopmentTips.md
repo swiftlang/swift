@@ -16,12 +16,12 @@ Going further, ninja can spawn a web browser for you to navigate dependencies an
 
 Clicking around a little bit, we can find `lib/swift/iphonesimulator/i386/libswiftCore.dylib` as a commonly-depended-upon target. This will perform just what is needed to compile the standard library for i386 and nothing else.
 
-Going further, for various reasons the standard library has lots of warnings. This is actively being addressed, but fixing all of them may require language features, etc. In the mean time, let’s suppress warnings in our build so that we just see the errors. `ninja -nv lib/swift/iphonesimulator/i386/libswiftCore.dylib` will show us the actual commands ninja will issue to build the i386 stdlib. (You’ll notice that an incremental build here is merely 3 commands as opposed to ~150 for `swift-stdlib-iphonesimulator-i386`).
+Going further, for various reasons the standard library has lots of warnings. This is actively being addressed, but fixing all of them may require language features, etc. In the meantime, let’s suppress warnings in our build so that we just see the errors. `ninja -nv lib/swift/iphonesimulator/i386/libswiftCore.dylib` will show us the actual commands ninja will issue to build the i386 stdlib. (You’ll notice that an incremental build here is merely 3 commands as opposed to ~150 for `swift-stdlib-iphonesimulator-i386`).
 
 Copy the invocation that has  ` -o <build-path>/swift-macosx-x86_64/stdlib/public/core/iphonesimulator/i386/Swift.o`, so that we can perform the actual call to swiftc ourselves. Tack on `-suppress-warnings` at the end, and now we have the command to just build `Swift.o` for i386 while only displaying the actual errors.
 
 ### Choosing the bootstrapping mode
-By default, the compiler builds with the `boostrapping-with-hostlibs` (macOS) or `bootstrapping` (Linux) bootstrapping mode. To speed up local development it's recommended to build with the `hosttools` mode: `utils/build-script --bootstrapping=hosttools`.
+By default, the compiler builds with the `bootstrapping-with-hostlibs` (macOS) or `bootstrapping` (Linux) bootstrapping mode. To speed up local development it's recommended to build with the `hosttools` mode: `utils/build-script --bootstrapping=hosttools`.
 
 It requires a recently new swift toolchain to be installed on your build machine. You might need to download and install a nightly Swift toolchain to build the Swift project in `hosttools` mode.
 
@@ -29,9 +29,9 @@ Not that changing the bootstrapping mode needs a reconfiguration.
 
 #### Using a locally built Swift toolchain
 
-If you do not want to install a nightly Swift toolchain, or you need to debug Swift code within SwiftCompilerSources, you can build the Swift toolchain in `boostrapping-with-hostlibs` mode on your local machine once, and then use this toolchain to iterate on your changes with the `hosttools` mode:
+If you do not want to install a nightly Swift toolchain, or you need to debug Swift code within SwiftCompilerSources, you can build the Swift toolchain in `bootstrapping-with-hostlibs` mode on your local machine once, and then use this toolchain to iterate on your changes with the `hosttools` mode:
 
-* Build the toolchain locally in `boostrapping-with-hostlibs` mode: `./utils/build-toolchain com.yourname`.
+* Build the toolchain locally in `bootstrapping-with-hostlibs` mode: `./utils/build-toolchain com.yourname`.
 * Copy the `swift-LOCAL-YYYY-MM-DD.xctoolchain` file from `./swift-nightly-install/Library/Developer/Toolchains` to `/Library/Developer/Toolchains`.
 * Launch Xcode, in the menu bar select _Xcode_ > _Toolchains_ > _Local Swift Development Snapshot YYYY-MM-DD_.
 * Remove the Swift build directory: `./build`.
@@ -45,7 +45,7 @@ DYLD_LIBRARY_PATH=/Library/Developer/Toolchains/swift-LOCAL-YYYY-MM-DD.xctoolcha
 ### Working with two build directories
 For developing and debugging you are probably building a debug configuration of swift. But it's often beneficial to also build a release-assert configuration in parallel (`utils/build-script -R`).
 
-The standard library takes very long to build with a debug compiler. It's much faster to build everything (including the standard library) with a release compiler and only the swift-frontend (with `ninja swift-frontend`) in debug. Then copy the release-built standard library to the debug build:
+The standard library takes very long to build with a debug compiler. It's much faster to build everything (including the standard library) with a release compiler and only the swift-frontend (with `ninja bin/swift-frontend`) in debug. Then copy the release-built standard library to the debug build:
 ```
 src=/path/to/build/Ninja-ReleaseAssert/swift-macosx-x86_64
 dst=/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64
@@ -78,6 +78,37 @@ You can run some compiles to see if it is actually doing something by running `s
 
 One known issue with `sccache` is that you might occasionally get an "error: Connection to server timed out", even though you didn't stop the server. Simply re-running the build command usually works.
 
+### Use clang-cache and Swift compilation caching
+
+If your toolchain includes `clang-cache` (found next to the `clang` binary), you can use the `--enable-caching` flag for faster cached builds of both C/C++ and Swift code:
+
+```
+$ ./swift/utils/build-script MY_ARGS --enable-caching --bootstrapping=hosttools
+```
+
+This is incompatible with `--sccache`. You can set `export SWIFT_USE_CACHING=1` to always enable it.
+
+Additional options:
+
+- `--caching-cas-path PATH` — Custom CAS directory (default: `$BUILD_ROOT/cas`).
+- `--caching-depscan-socket PATH` — Custom depscan daemon socket (default: `/tmp/clang-scand`).
+- `--caching-plugin-path PATH` — Path to a CAS plugin library.
+- `--caching-plugin-option OPT` — Option for the CAS plugin (can be specified multiple times).
+- `--caching-prefix-map` — Enable prefix mapping for reproducible cached builds across machines.
+- `--caching-remote-service-path PATH` — Path to a remote caching service socket. Implies `--caching-prefix-map` and auto-infers the CAS plugin from the toolchain if not provided.
+
+**Incremental builds outside build-script:** When caching is enabled, the build script generates a ninja wrapper at `build/<subdir>/build-utils/ninja` that automatically invokes `cache-build-session`. Using `cmake --build` will pick up this wrapper automatically:
+
+```
+$ cmake --build <build-dir> --target swift-frontend
+```
+
+If you need to invoke ninja directly, use the wrapper instead of the system ninja:
+
+```
+$ <build-dir>/../build-utils/ninja -C <build-dir> bin/swift-frontend
+```
+
 ## Memory usage
 
 When building Swift, peak memory usage happens during the linking phases that produce llvm and swift executables. In case your build fails because a process ran out of RAM, you can use one or more of the following techniques to reduce the peak memory usage.
@@ -97,31 +128,5 @@ By default, `build-script` will spawn as many parallel compile / link jobs as th
 For example, to have `build-script` spawn only one link job at a time, we can invoke it as:
 
 ```
-build-script --llvm-cmake-options==-DLLVM_PARALLEL_LINK_JOBS=1 --swift-cmake-options=-DSWIFT_PARALLEL_LINK_JOBS=1
+build-script --llvm-cmake-options=-DLLVM_PARALLEL_LINK_JOBS=1 --swift-cmake-options=-DSWIFT_PARALLEL_LINK_JOBS=1
 ```
-
-## Using ninja with Xcode
-
-Although it's possible to build the swift compiler entirely with Xcode (`--xcode`), often it's better to build with _ninja_ and use Xcode for editing and debugging.
-This is very convenient because you get the benefits of the ninja build system and all the benefits of the Xcode IDE, like code completion, refactoring, debugging, etc.
-
-To setup this environment a few steps are necessary:
-* Create a new workspace.
-* Create Xcode projects for LLVM and Swift with `utils/build-script --skip-build --xcode --skip-early-swift-driver`. Beside configuring, this needs to build a few LLVM files which are needed to configure the swift project.
-* Add the generated LLVM and Swift projects to your workspace. They can be found in the build directories `build/Xcode-DebugAssert/llvm-macosx-x86_64/LLVM.xcodeproj` and `build/Xcode-DebugAssert/swift-macosx-x86_64/Swift.xcodeproj`.
-* Add the `swift/SwiftCompilerSources` package to the workspace.
-* Create a new empty project `build-targets` (or however you want to name it) in the workspace, using the "External Build System" template.
-* For each compiler tool you want to build (`swift-frontend`, `sil-opt`, etc.), add an "External Build System" target to the `build-targets` project.
-* In the "Info" section of the target configuration, set:
-    * the _Build Tool_ to the full path of the `ninja` command
-    * the _Argument_ to the tool name (e.g. `swift-frontend`)
-    * the _Directory_ to the ninja swift build directory, e.g. `/absolute/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64`. For debugging to work, this has to be a debug build of course.
-* For each target, create a new scheme:
-    * In the _Build_ section add the corresponding build target that you created before.
-    * In the _Run/Info_ section select the built _Executable_ in the build directory (e.g. `/absolute/path/to/build/Ninja-DebugAssert/swift-macosx-x86_64/bin/swift-frontend`).
-    * In the _Run/Arguments_ section you can set the command line arguments with which you want to run the compiler tool.
-    * In the _Run/Options_ section you can set the working directory for debugging.
-
-Now you are all set. You can build and debug like with a native Xcode project.
-
-If the project structure changes, e.g. new source files are added or deleted, you just have to re-create the LLVM and Swift projects with `utils/build-script --skip-build --xcode --skip-early-swift-driver`.

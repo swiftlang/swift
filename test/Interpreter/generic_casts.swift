@@ -6,6 +6,15 @@
 //
 // RUN: %target-run %t/a.out | %FileCheck --check-prefix CHECK %s
 // RUN: %target-run %t/a.out.optimized | %FileCheck --check-prefix CHECK %s
+
+// RUN: %target-build-swift -Onone %s -o %t/a.out
+// RUN: %target-build-swift -O %s -o %t/a.out.optimized
+// RUN: %target-codesign %t/a.out
+// RUN: %target-codesign %t/a.out.optimized
+//
+// RUN: %target-run %t/a.out | %FileCheck --check-prefix CHECK %s
+// RUN: %target-run %t/a.out.optimized | %FileCheck --check-prefix CHECK %s
+
 // REQUIRES: executable_test
 
 // FIXME: rdar://problem/19648117 Needs splitting objc parts out
@@ -308,7 +317,8 @@ print(#line, nongenericAnyIsPAndPCSubType(type: PS.self)) // CHECK: [[@LINE]] fa
 print(#line, genericAnyIs(type: PS.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyIsPAndPCSubType(type: PE.self)) // CHECK: [[@LINE]] false
 print(#line, genericAnyIs(type: PE.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
-//print(#line, nongenericAnyIsPAndPCSubType(type: PC.self)) // CHECK-SR-11565: [[@LINE]] false -- FIXME: reenable this when SR-11565 is fixed
+// FIXME: reenable this when https://github.com/apple/swift/issues/53970 is fixed
+//print(#line, nongenericAnyIsPAndPCSubType(type: PC.self)) // C HECK: [[@LINE]] false
 print(#line, genericAnyIs(type: PC.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyIsPAndPCSubType(type: PCSub.self)) // CHECK: [[@LINE]] true
 print(#line, genericAnyIs(type: PCSub.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
@@ -316,7 +326,8 @@ print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PS.self)) // CHECK: [
 print(#line, genericAnyAsConditional(type: PS.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PE.self)) // CHECK: [[@LINE]] false
 print(#line, genericAnyAsConditional(type: PE.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
-// print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PC.self)) // CHECK-SR-11565: [[@LINE]] false -- FIXME: reenable this when SR-11565 is fixed
+// FIXME: reenable this when https://github.com/apple/swift/issues/53970 is fixed
+// print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PC.self)) // C HECK: [[@LINE]] false
 print(#line, genericAnyAsConditional(type: PC.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false
 print(#line, nongenericAnyAsConditionalPAndPCSubType(type: PCSub.self)) // CHECK: [[@LINE]] true
 print(#line, genericAnyAsConditional(type: PCSub.self, to: (P & PCSub).self, expected: false)) // CHECK: [[@LINE]] false

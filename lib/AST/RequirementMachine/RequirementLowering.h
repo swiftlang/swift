@@ -38,12 +38,25 @@ namespace rewriting {
 // documentation
 // comments.
 
+void desugarRequirements(SmallVector<StructuralRequirement, 2> &result,
+                         SmallVectorImpl<InverseRequirement> &inverses,
+                         SmallVectorImpl<RequirementError> &errors);
+
 void desugarRequirement(Requirement req, SourceLoc loc,
                         SmallVectorImpl<Requirement> &result,
+                        SmallVectorImpl<InverseRequirement> &inverses,
                         SmallVectorImpl<RequirementError> &errors);
 
-void inferRequirements(Type type, SourceLoc loc, ModuleDecl *module,
+void inferRequirements(Type type, ModuleDecl *module, DeclContext *dc,
                        SmallVectorImpl<StructuralRequirement> &result);
+
+void realizeTypeRequirement(DeclContext *dc,
+                            Type subjectType,
+                            Type constraintType,
+                            SourceLoc loc,
+                            SmallVectorImpl<StructuralRequirement> &result,
+                            SmallVectorImpl<RequirementError> &errors,
+                            bool isFromInheritanceClause);
 
 void realizeRequirement(DeclContext *dc,
                         Requirement req, RequirementRepr *reqRepr,
@@ -56,12 +69,22 @@ void realizeInheritedRequirements(TypeDecl *decl, Type type,
                                   SmallVectorImpl<StructuralRequirement> &result,
                                   SmallVectorImpl<RequirementError> &errors);
 
+void applyInverses(ASTContext &ctx,
+                   ArrayRef<Type> gps,
+                   ArrayRef<InverseRequirement> inverseList,
+                   ArrayRef<StructuralRequirement> explicitRequirements,
+                   DefaultRequirementOptions options,
+                   SmallVectorImpl<StructuralRequirement> &result,
+                   SmallVectorImpl<RequirementError> &errors);
+
 // Defined in ConcreteContraction.cpp.
 bool performConcreteContraction(
     ArrayRef<StructuralRequirement> requirements,
     SmallVectorImpl<StructuralRequirement> &result,
     SmallVectorImpl<RequirementError> &errors,
     bool debug);
+
+Type stripBoundDependentMemberTypes(Type t);
 
 } // end namespace rewriting
 

@@ -16,21 +16,23 @@
 
 using namespace swift;
 
-void FullApplySite::insertAfterInvocation(function_ref<void(SILBuilder &)> func) const {
+void ApplySite::insertAfterInvocation(function_ref<void(SILBuilder &)> func) const {
   SILBuilderWithScope::insertAfter(getInstruction(), func);
 }
 
-void FullApplySite::insertAfterFullEvaluation(
+void ApplySite::insertAfterApplication(
     function_ref<void(SILBuilder &)> func) const {
   switch (getKind()) {
-  case FullApplySiteKind::ApplyInst:
-  case FullApplySiteKind::TryApplyInst:
+  case ApplySiteKind::ApplyInst:
+  case ApplySiteKind::TryApplyInst:
+  case ApplySiteKind::PartialApplyInst:
     return insertAfterInvocation(func);
-  case FullApplySiteKind::BeginApplyInst:
+  case ApplySiteKind::BeginApplyInst:
     SmallVector<EndApplyInst *, 2> endApplies;
     SmallVector<AbortApplyInst *, 2> abortApplies;
+    SmallVector<EndBorrowInst *, 2> endBorrows;
     auto *bai = cast<BeginApplyInst>(getInstruction());
-    bai->getCoroutineEndPoints(endApplies, abortApplies);
+    bai->getCoroutineEndPoints(endApplies, abortApplies, &endBorrows);
     for (auto *eai : endApplies) {
       SILBuilderWithScope builder(std::next(eai->getIterator()));
       func(builder);
@@ -39,8 +41,21 @@ void FullApplySite::insertAfterFullEvaluation(
       SILBuilderWithScope builder(std::next(aai->getIterator()));
       func(builder);
     }
+    for (auto *ebi : endBorrows) {
+      SILBuilderWithScope builder(std::next(ebi->getIterator()));
+      func(builder);
+    }
     return;
   }
   llvm_unreachable("covered switch isn't covered");
 }
 
+bool ApplySite::isAddressable(const Operand &operand) const {
+  unsigned calleeArgIndex = getCalleeArgIndex(operand);
+  assert(calleeArgIndex >= getSubstCalleeConv().getSILArgIndexOfFirstParam());
+  unsigned paramIdx =
+    calleeArgIndex - getSubstCalleeConv().getSILArgIndexOfFirstParam();
+
+  CanSILFunctionType calleeType = getSubstCalleeType();
+  return calleeType->isAddressable(paramIdx, getFunction());
+}

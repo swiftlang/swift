@@ -1,7 +1,8 @@
 // RUN: %target-run-simple-swift %t
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=windows-msvc
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
+// UNSUPPORTED: OS=freebsd
 
 import StdlibUnittest
 import SwiftPrivateLibcExtras
@@ -9,6 +10,8 @@ import SwiftPrivateLibcExtras
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
 #else
 #error("Unsupported platform")
 #endif

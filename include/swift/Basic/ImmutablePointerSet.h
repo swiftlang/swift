@@ -48,28 +48,32 @@
 #ifndef SWIFT_BASIC_IMMUTABLEPOINTERSET_H
 #define SWIFT_BASIC_IMMUTABLEPOINTERSET_H
 
-#include "swift/Basic/STLExtras.h"
 #include "swift/Basic/NullablePtr.h"
-#include "llvm/Support/Allocator.h"
+#include "swift/Basic/STLExtras.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/FoldingSet.h"
+#include "llvm/Support/Allocator.h"
 #include <algorithm>
 #include <type_traits>
 
 namespace swift {
 
-template <typename PtrTy> class ImmutablePointerSetFactory;
+template <typename T>
+class ImmutablePointerSetFactory;
 
 /// An immutable set of pointers. It is backed by a tail allocated sorted array
 /// ref.
-template <typename T> class ImmutablePointerSet : public llvm::FoldingSetNode {
-  using PtrTy = typename std::add_pointer<T>::type;
+template <typename T>
+class ImmutablePointerSet : public llvm::FoldingSetNode {
   friend class ImmutablePointerSetFactory<T>;
 
+  using PtrTraits = llvm::PointerLikeTypeTraits<T>;
+
   NullablePtr<ImmutablePointerSetFactory<T>> ParentFactory;
-  ArrayRef<PtrTy> Data;
+  llvm::ArrayRef<T> Data;
 
   ImmutablePointerSet(ImmutablePointerSetFactory<T> *ParentFactory,
-                      ArrayRef<PtrTy> NewData)
+                      llvm::ArrayRef<T> NewData)
       : ParentFactory(ParentFactory), Data(NewData) {}
 
 public:
@@ -99,7 +103,7 @@ public:
     return !(*this == P);
   }
 
-  unsigned count(PtrTy Ptr) const {
+  unsigned count(T Ptr) const {
     // This returns the first element >= Ptr. Since we know that our array is
     // sorted and uniqued, Ptr must be that element.
     auto LowerBound = std::lower_bound(begin(), end(), Ptr);
@@ -112,17 +116,19 @@ public:
     return *LowerBound == Ptr;
   }
 
-  using iterator = typename ArrayRef<PtrTy>::iterator;
+  using iterator = typename llvm::ArrayRef<T>::iterator;
   iterator begin() const { return Data.begin(); }
   iterator end() const { return Data.end(); }
+  llvm::iterator_range<iterator> range() const { return {begin(), end()}; }
+  llvm::ArrayRef<T> data() const { return Data; }
 
   unsigned size() const { return Data.size(); }
   bool empty() const { return Data.empty(); }
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     assert(!Data.empty() && "Should not profile empty ImmutablePointerSet");
-    for (PtrTy P : Data) {
-      ID.AddPointer(P);
+    for (T P : Data) {
+      ID.AddPointer(PtrTraits::getAsVoidPointer(P));
     }
   }
 
@@ -176,10 +182,11 @@ public:
   }
 };
 
-template <typename T> class ImmutablePointerSetFactory {
-  using PtrTy = typename std::add_pointer<T>::type;
-
+template <typename T>
+class ImmutablePointerSetFactory {
   using PtrSet = ImmutablePointerSet<T>;
+  using PtrTraits = typename PtrSet::PtrTraits;
+
   // This is computed out-of-line so that ImmutablePointerSetFactory is
   // treated as a complete type.
   static const unsigned AllocAlignment;
@@ -204,7 +211,7 @@ public:
 
   /// Given a sorted and uniqued list \p Array, return the ImmutablePointerSet
   /// containing Array. Asserts if \p Array is not sorted and uniqued.
-  PtrSet *get(ArrayRef<PtrTy> Array) {
+  PtrSet *get(llvm::ArrayRef<T> Array) {
     if (Array.empty())
       return ImmutablePointerSetFactory::getEmptySet();
 
@@ -214,8 +221,8 @@ public:
     assert(is_sorted_and_uniqued(Array));
 
     llvm::FoldingSetNodeID ID;
-    for (PtrTy Ptr : Array) {
-      ID.AddPointer(Ptr);
+    for (T Ptr : Array) {
+      ID.AddPointer(PtrTraits::getAsVoidPointer(Ptr));
     }
 
     void *InsertPt;
@@ -224,7 +231,7 @@ public:
     }
 
     size_t NumElts = Array.size();
-    size_t MemSize = sizeof(PtrSet) + sizeof(PtrTy) * NumElts;
+    size_t MemSize = sizeof(PtrSet) + sizeof(T) * NumElts;
 
     // Allocate the memory.
     auto *Mem =
@@ -233,7 +240,8 @@ public:
     // Copy in the pointers into the tail allocated memory. We do not need to do
     // any sorting/uniquing ourselves since we assume that our users perform
     // this task for us.
-    MutableArrayRef<PtrTy> DataMem(reinterpret_cast<PtrTy *>(&Mem[1]), NumElts);
+    llvm::MutableArrayRef<T> DataMem(reinterpret_cast<T *>(&Mem[1]),
+                                     NumElts);
     std::copy(Array.begin(), Array.end(), DataMem.begin());
 
     // Allocate the new node and insert it into the Set.
@@ -242,7 +250,84 @@ public:
     return NewNode;
   }
 
-  PtrSet *merge(PtrSet *S1, ArrayRef<PtrTy> S2) {
+  template <typename U, typename... Args>
+  struct IsTrivialTypedPointerAndHasProfile {
+    constexpr static bool hasProfile =
+        std::is_same_v<decltype(std::remove_pointer<U>::type::Profile(
+                           std::declval<Args>()...)),
+                       void>;
+    constexpr static bool value =
+        hasProfile && std::is_trivial_v<U> && std::is_pointer_v<U>;
+  };
+
+  /// Emplace a new value with \p args if we do not yet have one. We allocate
+  /// the object with our bump ptr allocator, so we require that the type be
+  /// trivial.
+  template <typename... Args>
+  typename std::enable_if_t<IsTrivialTypedPointerAndHasProfile<
+                                T, llvm::FoldingSetNodeID &, Args...>::value,
+                            PtrSet> *
+  emplace(Args... args) {
+    llvm::FoldingSetNodeID ID;
+    using NoPointerTy = typename std::remove_pointer<T>::type;
+    NoPointerTy::Profile(ID, std::forward<Args>(args)...);
+
+    void *InsertPt;
+    if (auto *PSet = Set.FindNodeOrInsertPos(ID, InsertPt)) {
+      return PSet;
+    }
+
+    size_t NumElts = 1;
+    size_t MemSize = sizeof(PtrSet) + sizeof(NoPointerTy);
+
+    // Allocate the memory.
+    auto *Mem =
+        reinterpret_cast<PtrSet *>(Allocator.Allocate(MemSize, AllocAlignment));
+
+    // Copy in the pointers into the tail allocated memory. We do not need to do
+    // any sorting/uniquing ourselves since we assume that our users perform
+    // this task for us.
+    llvm::MutableArrayRef<NoPointerTy *> DataMem(
+        reinterpret_cast<NoPointerTy **>(&Mem[1]), NumElts);
+    NoPointerTy *type =
+        new (Allocator) NoPointerTy(std::forward<Args>(args)...);
+    DataMem[0] = type;
+
+    // Allocate the new node and insert it into the Set.
+    auto *NewNode = new (Mem) PtrSet(this, DataMem);
+    Set.InsertNode(NewNode, InsertPt);
+    return NewNode;
+  }
+
+  PtrSet *get(T value) {
+    llvm::FoldingSetNodeID ID;
+    ID.AddPointer(PtrTraits::getAsVoidPointer(value));
+
+    void *InsertPt;
+    if (auto *PSet = Set.FindNodeOrInsertPos(ID, InsertPt)) {
+      return PSet;
+    }
+
+    size_t NumElts = 1;
+    size_t MemSize = sizeof(PtrSet) + sizeof(T) * NumElts;
+
+    // Allocate the memory.
+    auto *Mem =
+        reinterpret_cast<PtrSet *>(Allocator.Allocate(MemSize, AllocAlignment));
+
+    // Copy in the pointers into the tail allocated memory. We do not need to do
+    // any sorting/uniquing ourselves since we assume that our users perform
+    // this task for us.
+    llvm::MutableArrayRef<T> DataMem(reinterpret_cast<T *>(&Mem[1]), NumElts);
+    DataMem[0] = value;
+
+    // Allocate the new node and insert it into the Set.
+    auto *NewNode = new (Mem) PtrSet(this, DataMem);
+    Set.InsertNode(NewNode, InsertPt);
+    return NewNode;
+  }
+
+  PtrSet *merge(PtrSet *S1, llvm::ArrayRef<T> S2) {
     if (S1->empty())
       return get(S2);
 
@@ -264,7 +349,7 @@ public:
     // perform a sorted set merging algorithm to create the ID. We also count
     // the number of unique elements for allocation purposes.
     unsigned NumElts = 0;
-    set_union_for_each(*S1, S2, [&ID, &NumElts](const PtrTy Ptr) -> void {
+    set_union_for_each(*S1, S2, [&ID, &NumElts](const T Ptr) -> void {
       ID.AddPointer(Ptr);
       NumElts++;
     });
@@ -275,7 +360,7 @@ public:
       return PSet;
     }
 
-    unsigned MemSize = sizeof(PtrSet) + sizeof(PtrTy) * NumElts;
+    unsigned MemSize = sizeof(PtrSet) + sizeof(T) * NumElts;
 
     // Allocate the memory.
     auto *Mem =
@@ -284,7 +369,7 @@ public:
     // Copy in the union of the two pointer sets into the tail allocated
     // memory. Since we know that our sorted arrays are uniqued, we can use
     // set_union to get the uniqued sorted array that we want.
-    MutableArrayRef<PtrTy> DataMem(reinterpret_cast<PtrTy *>(&Mem[1]), NumElts);
+    llvm::MutableArrayRef<T> DataMem(reinterpret_cast<T *>(&Mem[1]), NumElts);
     std::set_union(S1->begin(), S1->end(), S2.begin(), S2.end(),
                    DataMem.begin());
 
@@ -313,8 +398,8 @@ public:
     // perform a sorted set merging algorithm to create the ID. We also count
     // the number of unique elements for allocation purposes.
     unsigned NumElts = 0;
-    set_union_for_each(*S1, *S2, [&ID, &NumElts](const PtrTy Ptr) -> void {
-      ID.AddPointer(Ptr);
+    set_union_for_each(*S1, *S2, [&ID, &NumElts](const T Ptr) -> void {
+      ID.AddPointer(PtrTraits::getAsVoidPointer(Ptr));
       NumElts++;
     });
 
@@ -324,7 +409,7 @@ public:
       return PSet;
     }
 
-    unsigned MemSize = sizeof(PtrSet) + sizeof(PtrTy) * NumElts;
+    unsigned MemSize = sizeof(PtrSet) + sizeof(T) * NumElts;
 
     // Allocate the memory.
     auto *Mem =
@@ -333,7 +418,7 @@ public:
     // Copy in the union of the two pointer sets into the tail allocated
     // memory. Since we know that our sorted arrays are uniqued, we can use
     // set_union to get the uniqued sorted array that we want.
-    MutableArrayRef<PtrTy> DataMem(reinterpret_cast<PtrTy *>(&Mem[1]), NumElts);
+    llvm::MutableArrayRef<T> DataMem(reinterpret_cast<T *>(&Mem[1]), NumElts);
     std::set_union(S1->begin(), S1->end(), S2->begin(), S2->end(),
                    DataMem.begin());
 
@@ -352,8 +437,8 @@ template <typename T>
 #if !defined(_MSC_VER) || defined(__clang__)
 constexpr
 #endif
-const unsigned ImmutablePointerSetFactory<T>::AllocAlignment =
-    (alignof(PtrSet) > alignof(PtrTy)) ? alignof(PtrSet) : alignof(PtrTy);
+    const unsigned ImmutablePointerSetFactory<T>::AllocAlignment =
+        (alignof(PtrSet) > alignof(T)) ? alignof(PtrSet) : alignof(T);
 
 } // end swift namespace
 

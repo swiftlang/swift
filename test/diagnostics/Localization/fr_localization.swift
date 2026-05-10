@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: swift-serialize-diagnostics --input-file-path=%S/Inputs/fr.yaml --output-directory=%t/
-// RUN: swift-serialize-diagnostics --input-file-path=%S/Inputs/en.yaml --output-directory=%t/
+// RUN: swift-serialize-diagnostics --input-file-path=%S/Inputs/fr.strings --output-directory=%t/
+// RUN: swift-serialize-diagnostics --input-file-path=%S/Inputs/en.strings --output-directory=%t/
 // RUN: %target-typecheck-verify-swift -localization-path %t -locale fr
 
 _ = "HI!
@@ -8,7 +8,7 @@ _ = "HI!
 
 // FIXME: This used to produce a localized diagnostic.
 
-var self1 = self1 // expected-note 2{{through reference here}}
+var self1 = self1 // expected-note {{through reference here}}
 // expected-error@-1 {{circular reference}}
 
 struct Broken {

@@ -5,6 +5,8 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-function=test_simple 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTION %s
 // RUN: %target-sil-opt -enable-sil-verify-all %s -O -sil-stats-functions -sil-stats-only-functions=test 2>&1 | %FileCheck --check-prefix=CHECK-SIL-STATS-ONLY-FUNCTIONS %s
 
+// REQUIRES: swift_in_compiler
+
 
 // Test different modes of optimizer counters statistics collection.
 
@@ -17,9 +19,8 @@ sil @fatalError : $@convention(thin) () -> Never
 
 // Check that module level statistics are produced.
 //
-// CHECK-SIL-STATS-MODULES: module, inst, HighLevel,Function+EarlyLoopOpt, PerformanceConstantPropagation, {{.*}}, 15, 12
-// CHECK-SIL-STATS-MODULES: module, block, HighLevel,Function+EarlyLoopOpt, SimplifyCFG, {{.*}}, 6, 3
-// CHECK-SIL-STATS-MODULES: module, inst, HighLevel,Function+EarlyLoopOpt, SimplifyCFG, {{.*}}, 12, 6
+// CHECK-SIL-STATS-MODULES: module, block, PrepareOptimizationPasses, Simplification, {{.*}}, 6, 3
+// CHECK-SIL-STATS-MODULES: module, inst, PrepareOptimizationPasses, Simplification, {{.*}}, 15, 6
 
 // Check that module level statistics are produced.
 //

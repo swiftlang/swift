@@ -7,6 +7,12 @@ struct MagicWrapper {
   int getValuePlusArg(int arg) const { return t.getValue() + arg; }
 };
 
+template<class T>
+struct MagicWrapperWithExplicitCtor {
+  T t;
+  MagicWrapperWithExplicitCtor(T t) : t(t) {}
+};
+
 struct IntWrapper {
   int value;
   int getValue() const { return value; }

@@ -35,7 +35,6 @@ class MyClass {
 // CHECK-MyClass-DAG: Decl[Constructor]/CurrNominal:      init()[#MyClass#];
 // CHECK-MyClass-DAG: Decl[InstanceMethod]/CurrNominal:   instanceMethod({#(self): MyClass#})[#() -> Void#];
 // CHECK-MyClass-DAG: Decl[StaticMethod]/CurrNominal:     staticMethod()[#Void#];
-// CHECK-MyClass: End completions
 }
 
 struct MyStruct {
@@ -57,7 +56,6 @@ struct MyStruct {
 // CHECK-MyStruct-DAG: Decl[Constructor]/CurrNominal:      init()[#MyStruct#];
 // CHECK-MyStruct-DAG: Decl[InstanceMethod]/CurrNominal:   instanceMethod({#(self): MyStruct#})[#() -> Void#];
 // CHECK-MyStruct-DAG: Decl[StaticMethod]/CurrNominal:     staticMethod()[#Void#];
-// CHECK-MyStruct: End completions
 }
 
 protocol MyProto { }
@@ -75,10 +73,9 @@ extension MyProto {
     Self.#^SSELF_DOT_IN_STATICMETHOD_MyProto^#
   }
 // CHECK-MyProto: Begin completions, 5 items
-// CHECK-MyProto-DAG: Keyword[self]/CurrNominal:          self[#Self.Type#];
-// CHECK-MyProto-DAG: Keyword/CurrNominal:                Type[#Self.Type#];
+// CHECK-MyProto-DAG: Keyword[self]/CurrNominal:          self[#MyProto.Type#];
+// CHECK-MyProto-DAG: Keyword/CurrNominal:                Type[#MyProto.Type#];
 // CHECK-MyProto-DAG: Decl[Constructor]/CurrNominal:      init()[#MyProto#];
 // CHECK-MyProto-DAG: Decl[InstanceMethod]/CurrNominal:   instanceMethod({#(self): MyProto#})[#() -> Void#];
 // CHECK-MyProto-DAG: Decl[StaticMethod]/CurrNominal:     staticMethod()[#Void#];
-// CHECK-MyProto: End completions
 }

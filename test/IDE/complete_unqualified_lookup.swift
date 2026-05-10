@@ -1,35 +1,5 @@
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INSTANCE_VAR_INIT | %FileCheck %s -check-prefix=STRUCT_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_STATIC_VAR_INIT | %FileCheck %s -check-prefix=STRUCT_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_LAZY_VAR_INIT | %FileCheck %s -check-prefix=STRUCT_INSTANCE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INSTANCE_VAR_BODY | %FileCheck %s -check-prefix=STRUCT_INSTANCE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_STATIC_VAR_BODY | %FileCheck %s -check-prefix=STRUCT_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INITIALIZER_DEFAULTPARAM | %FileCheck %s -check-prefix=STRUCT_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INITIALIZER_BODY | %FileCheck %s -check-prefix=STRUCT_INSTANCE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INSTANCE_FUNC_DEFAULTPARAM  | %FileCheck %s -check-prefix=STRUCT_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INSTANCE_FUNC_BODY | %FileCheck %s -check-prefix=STRUCT_INSTANCE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_STATIC_FUNC_DEFAULTPARAM | %FileCheck %s -check-prefix=STRUCT_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_STATIC_FUNC_BODY | %FileCheck %s -check-prefix=STRUCT_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INSTANCE_SUBSCRIPT_DEFAULTPARAM | %FileCheck %s -check-prefix=STRUCT_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_INSTANCE_SUBSCRIPT_BODY | %FileCheck %s -check-prefix=STRUCT_INSTANCE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_STATIC_SUBSCRIPT_DEFAULTPARAM | %FileCheck %s -check-prefix=STRUCT_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=STRUCT_STATIC_SUBSCRIPT_BODY | %FileCheck %s -check-prefix=STRUCT_STATIC
+// RUN: %batch-code-completion
 
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_STATIC_VAR_INIT | %FileCheck %s -check-prefix=ENUM_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_INSTANCE_VAR_BODY | %FileCheck %s -check-prefix=ENUM_INSTANCE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_STATIC_VAR_BODY | %FileCheck %s -check-prefix=ENUM_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_INITIALIZER_DEFAULTPARAM | %FileCheck %s -check-prefix=ENUM_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_INITIALIZER_BODY | %FileCheck %s -check-prefix=ENUM_INSTANCE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_INSTANCE_FUNC_DEFAULTPARAM  | %FileCheck %s -check-prefix=ENUM_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_INSTANCE_FUNC_BODY | %FileCheck %s -check-prefix=ENUM_INSTANCE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_STATIC_FUNC_DEFAULTPARAM | %FileCheck %s -check-prefix=ENUM_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_STATIC_FUNC_BODY | %FileCheck %s -check-prefix=ENUM_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_INSTANCE_SUBSCRIPT_DEFAULTPARAM | %FileCheck %s -check-prefix=ENUM_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_INSTANCE_SUBSCRIPT_BODY | %FileCheck %s -check-prefix=ENUM_INSTANCE
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_STATIC_SUBSCRIPT_DEFAULTPARAM | %FileCheck %s -check-prefix=ENUM_STATIC
-// RUN: %target-swift-ide-test -code-completion -source-filename %s -code-completion-token=ENUM_STATIC_SUBSCRIPT_BODY | %FileCheck %s -check-prefix=ENUM_STATIC
-
-
-// STRUCT_INSTANCE: Begin completions
 // STRUCT_INSTANCE-NOT: init()
 // STRUCT_INSTANCE-NOT: staticVar
 // STRUCT_INSTANCE-NOT: staticFunc
@@ -38,9 +8,7 @@
 // STRUCT_INSTANCE-NOT: init()
 // STRUCT_INSTANCE-NOT: staticVar
 // STRUCT_INSTANCE-NOT: staticFunc
-// STRUCT_INSTANCE: End completions
 
-// STRUCT_STATIC: Begin completions
 // STRUCT_STATIC-NOT: init()
 // STRUCT_STATIC-NOT: instanceVar 
 // STRUCT_STATIC-DAG: Decl[StaticVar]/CurrNominal: staticVar[#Int#];
@@ -48,7 +16,6 @@
 // STRUCT_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(self): MyStruct#})[#() -> Int#];
 // STRUCT_STATIC-NOT: init()
 // STRUCT_STATIC-NOT: instanceVar 
-// STRUCT_STATIC: End completions
 
 struct MyStruct {
   init() { self = MyEnum.east }
@@ -57,33 +24,32 @@ struct MyStruct {
   var instanceVar: Int { 1 }
   func instanceFunc() -> Int { 1 }
 
-  var testInstanceVarInit: String = (#^STRUCT_INSTANCE_VAR_INIT^#)
-  static var testStaticVarInit: String = (#^STRUCT_STATIC_VAR_INIT^#)
-  lazy var testLazyVarInit: String = (#^STRUCT_LAZY_VAR_INIT^#)
+  var testInstanceVarInit: String = (#^STRUCT_INSTANCE_VAR_INIT?check=STRUCT_STATIC^#)
+  static var testStaticVarInit: String = (#^STRUCT_STATIC_VAR_INIT?check=STRUCT_STATIC^#)
+  lazy var testLazyVarInit: String = (#^STRUCT_LAZY_VAR_INIT?check=STRUCT_INSTANCE^#)
   var testInstanceVar: String {
-    #^STRUCT_INSTANCE_VAR_BODY^#
+    #^STRUCT_INSTANCE_VAR_BODY?check=STRUCT_INSTANCE^#
   }
   static var testStaticVar: String {
-    #^STRUCT_STATIC_VAR_BODY^#
+    #^STRUCT_STATIC_VAR_BODY?check=STRUCT_STATIC^#
   }
-  init(testInit: String = #^STRUCT_INITIALIZER_DEFAULTPARAM^#) {
-    #^STRUCT_INITIALIZER_BODY^#
+  init(testInit: String = #^STRUCT_INITIALIZER_DEFAULTPARAM?check=STRUCT_STATIC^#) {
+    #^STRUCT_INITIALIZER_BODY?check=STRUCT_INSTANCE^#
   }
-  func testInstanceMethod(x: String = #^STRUCT_INSTANCE_FUNC_DEFAULTPARAM^#) {
-    #^STRUCT_INSTANCE_FUNC_BODY^#
+  func testInstanceMethod(x: String = #^STRUCT_INSTANCE_FUNC_DEFAULTPARAM?check=STRUCT_STATIC^#) {
+    #^STRUCT_INSTANCE_FUNC_BODY?check=STRUCT_INSTANCE^#
   }
-  static func testStaticMethod(x: String = #^STRUCT_STATIC_FUNC_DEFAULTPARAM^#) {
-    #^STRUCT_STATIC_FUNC_BODY^#
+  static func testStaticMethod(x: String = #^STRUCT_STATIC_FUNC_DEFAULTPARAM?check=STRUCT_STATIC^#) {
+    #^STRUCT_STATIC_FUNC_BODY?check=STRUCT_STATIC^#
   }
-  subscript(testInstanceSubscript idx: String = #^STRUCT_INSTANCE_SUBSCRIPT_DEFAULTPARAM^#) {
-    #^STRUCT_INSTANCE_SUBSCRIPT_BODY^#
+  subscript(testInstanceSubscript idx: String = #^STRUCT_INSTANCE_SUBSCRIPT_DEFAULTPARAM?check=STRUCT_STATIC^#) {
+    #^STRUCT_INSTANCE_SUBSCRIPT_BODY?check=STRUCT_INSTANCE^#
   }
-  static subscript(testStaticSubscript idx: String = #^STRUCT_STATIC_SUBSCRIPT_DEFAULTPARAM^#) {
-    #^STRUCT_STATIC_SUBSCRIPT_BODY^#
+  static subscript(testStaticSubscript idx: String = #^STRUCT_STATIC_SUBSCRIPT_DEFAULTPARAM?check=STRUCT_STATIC^#) {
+    #^STRUCT_STATIC_SUBSCRIPT_BODY?check=STRUCT_STATIC^#
   }
 }
 
-// ENUM_INSTANCE: Begin completions
 // ENUM_INSTANCE-NOT: east
 // ENUM_INSTANCE-NOT: west
 // ENUM_INSTANCE-NOT: init()
@@ -96,9 +62,7 @@ struct MyStruct {
 // ENUM_INSTANCE-NOT: init()
 // ENUM_INSTANCE-NOT: staticVar
 // ENUM_INSTANCE-NOT: staticFunc
-// ENUM_INSTANCE: End completions
 
-// ENUM_STATIC: Begin completions
 // ENUM_STATIC-NOT: init()
 // ENUM_STATIC-NOT: instanceVar 
 // ENUM_STATIC-DAG: Decl[EnumElement]/CurrNominal: east[#MyEnum#];
@@ -108,7 +72,6 @@ struct MyStruct {
 // ENUM_STATIC-DAG: Decl[InstanceMethod]/CurrNominal: instanceFunc({#(self): MyEnum#})[#() -> Int#];
 // ENUM_STATIC-NOT: init()
 // ENUM_STATIC-NOT: instanceVar 
-// ENUM_STATIC: End completions
 
 enum MyEnum {
   case east, west
@@ -118,26 +81,36 @@ enum MyEnum {
   var instanceVar: Int { 1 }
   func instanceFunc() -> Int { 1 }
 
-  static var testStaticVarInit: String = (#^ENUM_STATIC_VAR_INIT^#)
+  static var testStaticVarInit: String = (#^ENUM_STATIC_VAR_INIT?check=ENUM_STATIC^#)
   var testInstanceVar: String {
-    #^ENUM_INSTANCE_VAR_BODY^#
+    #^ENUM_INSTANCE_VAR_BODY?check=ENUM_INSTANCE^#
   }
   static var testStaticVar: String {
-    #^ENUM_STATIC_VAR_BODY^#
+    #^ENUM_STATIC_VAR_BODY?check=ENUM_STATIC^#
   }
-  func init(testInit: String = #^ENUM_INITIALIZER_DEFAULTPARAM^#) {
-    #^ENUM_INITIALIZER_BODY^#
+  init(testInit: String = #^ENUM_INITIALIZER_DEFAULTPARAM?check=ENUM_STATIC^#) {
+    #^ENUM_INITIALIZER_BODY?check=ENUM_INSTANCE^#
   }
-  func testInstanceMethod(x: String = #^ENUM_INSTANCE_FUNC_DEFAULTPARAM^#) {
-    #^ENUM_INSTANCE_FUNC_BODY^#
+  func testInstanceMethod(x: String = #^ENUM_INSTANCE_FUNC_DEFAULTPARAM?check=ENUM_STATIC^#) {
+    #^ENUM_INSTANCE_FUNC_BODY?check=ENUM_INSTANCE^#
   }
-  static func testStaticMethod(x: String = #^ENUM_STATIC_FUNC_DEFAULTPARAM^#) {
-    #^ENUM_STATIC_FUNC_BODY^#
+  static func testStaticMethod(x: String = #^ENUM_STATIC_FUNC_DEFAULTPARAM?check=ENUM_STATIC^#) {
+    #^ENUM_STATIC_FUNC_BODY?check=ENUM_STATIC^#
   }
-  subscript(testInstanceSubscript idx: String = #^ENUM_INSTANCE_SUBSCRIPT_DEFAULTPARAM^#) {
-    #^ENUM_INSTANCE_SUBSCRIPT_BODY^#
+  subscript(testInstanceSubscript idx: String = #^ENUM_INSTANCE_SUBSCRIPT_DEFAULTPARAM?check=ENUM_STATIC^#) {
+    #^ENUM_INSTANCE_SUBSCRIPT_BODY?check=ENUM_INSTANCE^#
   }
-  static subscript(testStaticSubscript idx: String = #^ENUM_STATIC_SUBSCRIPT_DEFAULTPARAM^#) {
-    #^ENUM_STATIC_SUBSCRIPT_BODY^#
+  static subscript(testStaticSubscript idx: String = #^ENUM_STATIC_SUBSCRIPT_DEFAULTPARAM?check=ENUM_STATIC^#) {
+    #^ENUM_STATIC_SUBSCRIPT_BODY?check=ENUM_STATIC^#
+  }
+}
+
+// rdar://123790296
+func testBindingFromDefer(_ x: Int?) {
+  guard let bar = x else { return }
+  defer {
+    #^BINDING_FROM_DEFER^#
+    // BINDING_FROM_DEFER-DAG: Decl[LocalVar]/Local: x[#Int?#]; name=x
+    // BINDING_FROM_DEFER-DAG: Decl[LocalVar]/Local: bar[#Int#]; name=bar
   }
 }

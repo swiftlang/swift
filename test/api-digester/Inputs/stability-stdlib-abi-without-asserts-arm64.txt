@@ -1,0 +1,92 @@
+// ABI additions for arm64 only.
+
+Accessor __VaListBuilder.storage.Get() has mangled name changing from 'Swift.__VaListBuilder.storage.getter : Swift.ContiguousArray<Swift.Int>' to 'Swift.__VaListBuilder.storage.getter : Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int>>'
+Accessor __VaListBuilder.storage.Get() has return type change from Swift.ContiguousArray<Swift.Int> to Swift.UnsafeMutablePointer<Swift.Int>?
+Accessor __VaListBuilder.storage.Modify() has mangled name changing from 'Swift.__VaListBuilder.storage.modify : Swift.ContiguousArray<Swift.Int>' to 'Swift.__VaListBuilder.storage.modify : Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int>>'
+Accessor __VaListBuilder.storage.Set() has mangled name changing from 'Swift.__VaListBuilder.storage.setter : Swift.ContiguousArray<Swift.Int>' to 'Swift.__VaListBuilder.storage.setter : Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int>>'
+Accessor __VaListBuilder.storage.Set() has parameter 0 type change from Swift.ContiguousArray<Swift.Int> to Swift.UnsafeMutablePointer<Swift.Int>?
+Constructor BinaryFloatingPoint.init(_:) has been removed
+Constructor Double.init(_:) has mangled name changing from 'Swift.Double.init(Swift.Float80) -> Swift.Double' to 'Swift.Double.init(Swift.Float16) -> Swift.Double'
+Constructor Double.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Double.init(_builtinFloatLiteral:) has mangled name changing from 'Swift.Double.init(_builtinFloatLiteral: Builtin.FPIEEE80) -> Swift.Double' to 'Swift.Double.init(_builtinFloatLiteral: Builtin.FPIEEE64) -> Swift.Double'
+Constructor Double.init(_builtinFloatLiteral:) has parameter 0 type change from Builtin.FPIEEE80 to Builtin.FPIEEE64
+Constructor Double.init(exactly:) has mangled name changing from 'Swift.Double.init(exactly: Swift.Float80) -> Swift.Optional<Swift.Double>' to 'Swift.Double.init(exactly: Swift.Float16) -> Swift.Optional<Swift.Double>'
+Constructor Double.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Float.init(_:) has mangled name changing from 'Swift.Float.init(Swift.Float80) -> Swift.Float' to 'Swift.Float.init(Swift.Float16) -> Swift.Float'
+Constructor Float.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Float.init(_builtinFloatLiteral:) has mangled name changing from 'Swift.Float.init(_builtinFloatLiteral: Builtin.FPIEEE80) -> Swift.Float' to 'Swift.Float.init(_builtinFloatLiteral: Builtin.FPIEEE64) -> Swift.Float'
+Constructor Float.init(_builtinFloatLiteral:) has parameter 0 type change from Builtin.FPIEEE80 to Builtin.FPIEEE64
+Constructor Float.init(exactly:) has mangled name changing from 'Swift.Float.init(exactly: Swift.Float80) -> Swift.Optional<Swift.Float>' to 'Swift.Float.init(exactly: Swift.Float16) -> Swift.Optional<Swift.Float>'
+Constructor Float.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int.init(_:) has mangled name changing from 'Swift.Int.init(Swift.Float80) -> Swift.Int' to 'Swift.Int.init(Swift.Float16) -> Swift.Int'
+Constructor Int.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int.init(exactly:) has mangled name changing from 'Swift.Int.init(exactly: Swift.Float80) -> Swift.Optional<Swift.Int>' to 'Swift.Int.init(exactly: Swift.Float16) -> Swift.Optional<Swift.Int>'
+Constructor Int.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int16.init(_:) has mangled name changing from 'Swift.Int16.init(Swift.Float80) -> Swift.Int16' to 'Swift.Int16.init(Swift.Float16) -> Swift.Int16'
+Constructor Int16.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int16.init(exactly:) has mangled name changing from 'Swift.Int16.init(exactly: Swift.Float80) -> Swift.Optional<Swift.Int16>' to 'Swift.Int16.init(exactly: Swift.Float16) -> Swift.Optional<Swift.Int16>'
+Constructor Int16.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int32.init(_:) has mangled name changing from 'Swift.Int32.init(Swift.Float80) -> Swift.Int32' to 'Swift.Int32.init(Swift.Float16) -> Swift.Int32'
+Constructor Int32.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int32.init(exactly:) has mangled name changing from 'Swift.Int32.init(exactly: Swift.Float80) -> Swift.Optional<Swift.Int32>' to 'Swift.Int32.init(exactly: Swift.Float16) -> Swift.Optional<Swift.Int32>'
+Constructor Int32.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int64.init(_:) has mangled name changing from 'Swift.Int64.init(Swift.Float80) -> Swift.Int64' to 'Swift.Int64.init(Swift.Float16) -> Swift.Int64'
+Constructor Int64.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int64.init(exactly:) has mangled name changing from 'Swift.Int64.init(exactly: Swift.Float80) -> Swift.Optional<Swift.Int64>' to 'Swift.Int64.init(exactly: Swift.Float16) -> Swift.Optional<Swift.Int64>'
+Constructor Int64.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int8.init(_:) has mangled name changing from 'Swift.Int8.init(Swift.Float80) -> Swift.Int8' to 'Swift.Int8.init(Swift.Float16) -> Swift.Int8'
+Constructor Int8.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor Int8.init(exactly:) has mangled name changing from 'Swift.Int8.init(exactly: Swift.Float80) -> Swift.Optional<Swift.Int8>' to 'Swift.Int8.init(exactly: Swift.Float16) -> Swift.Optional<Swift.Int8>'
+Constructor Int8.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt.init(_:) has mangled name changing from 'Swift.UInt.init(Swift.Float80) -> Swift.UInt' to 'Swift.UInt.init(Swift.Float16) -> Swift.UInt'
+Constructor UInt.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt.init(exactly:) has mangled name changing from 'Swift.UInt.init(exactly: Swift.Float80) -> Swift.Optional<Swift.UInt>' to 'Swift.UInt.init(exactly: Swift.Float16) -> Swift.Optional<Swift.UInt>'
+Constructor UInt.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt16.init(_:) has mangled name changing from 'Swift.UInt16.init(Swift.Float80) -> Swift.UInt16' to 'Swift.UInt16.init(Swift.Float16) -> Swift.UInt16'
+Constructor UInt16.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt16.init(exactly:) has mangled name changing from 'Swift.UInt16.init(exactly: Swift.Float80) -> Swift.Optional<Swift.UInt16>' to 'Swift.UInt16.init(exactly: Swift.Float16) -> Swift.Optional<Swift.UInt16>'
+Constructor UInt16.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt32.init(_:) has mangled name changing from 'Swift.UInt32.init(Swift.Float80) -> Swift.UInt32' to 'Swift.UInt32.init(Swift.Float16) -> Swift.UInt32'
+Constructor UInt32.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt32.init(exactly:) has mangled name changing from 'Swift.UInt32.init(exactly: Swift.Float80) -> Swift.Optional<Swift.UInt32>' to 'Swift.UInt32.init(exactly: Swift.Float16) -> Swift.Optional<Swift.UInt32>'
+Constructor UInt32.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt64.init(_:) has mangled name changing from 'Swift.UInt64.init(Swift.Float80) -> Swift.UInt64' to 'Swift.UInt64.init(Swift.Float16) -> Swift.UInt64'
+Constructor UInt64.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt64.init(exactly:) has mangled name changing from 'Swift.UInt64.init(exactly: Swift.Float80) -> Swift.Optional<Swift.UInt64>' to 'Swift.UInt64.init(exactly: Swift.Float16) -> Swift.Optional<Swift.UInt64>'
+Constructor UInt64.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt8.init(_:) has mangled name changing from 'Swift.UInt8.init(Swift.Float80) -> Swift.UInt8' to 'Swift.UInt8.init(Swift.Float16) -> Swift.UInt8'
+Constructor UInt8.init(_:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor UInt8.init(exactly:) has mangled name changing from 'Swift.UInt8.init(exactly: Swift.Float80) -> Swift.Optional<Swift.UInt8>' to 'Swift.UInt8.init(exactly: Swift.Float16) -> Swift.Optional<Swift.UInt8>'
+Constructor UInt8.init(exactly:) has parameter 0 type change from Swift.Float80 to Swift.Float16
+Constructor _ExpressibleByBuiltinFloatLiteral.init(_builtinFloatLiteral:) has mangled name changing from 'Swift._ExpressibleByBuiltinFloatLiteral.init(_builtinFloatLiteral: Builtin.FPIEEE80) -> A' to 'Swift._ExpressibleByBuiltinFloatLiteral.init(_builtinFloatLiteral: Builtin.FPIEEE64) -> A'
+Constructor _ExpressibleByBuiltinFloatLiteral.init(_builtinFloatLiteral:) has parameter 0 type change from Builtin.FPIEEE80 to Builtin.FPIEEE64
+Func __VaListBuilder.allocStorage(wordCount:) is a new API without '@available'
+Func __VaListBuilder.appendWords(_:) is a new API without '@available'
+Func __VaListBuilder.deallocStorage(wordCount:storage:) is a new API without '@available'
+Func __VaListBuilder.rawSizeAndAlignment(_:) is a new API without '@available'
+Func _cos(_:) has been removed
+Func _exp(_:) has been removed
+Func _exp2(_:) has been removed
+Func _log(_:) has been removed
+Func _log10(_:) has been removed
+Func _log2(_:) has been removed
+Func _nearbyint(_:) has been removed
+Func _rint(_:) has been removed
+Func _sin(_:) has been removed
+Struct Float80 has been removed
+Struct __VaListBuilder.Header has been removed
+Var __VaListBuilder.allocated is a new API without '@available'
+Var __VaListBuilder.allocated is added to a non-resilient type
+Var __VaListBuilder.count is a new API without '@available'
+Var __VaListBuilder.count is added to a non-resilient type
+Var __VaListBuilder.fpRegistersUsed has been removed
+Var __VaListBuilder.gpRegistersUsed has been removed
+Var __VaListBuilder.header has been removed
+Var __VaListBuilder.requiredAlignmentInBytes is a new API without '@available'
+Var __VaListBuilder.requiredAlignmentInBytes is added to a non-resilient type
+Var __VaListBuilder.storage has declared type change from Swift.ContiguousArray<Swift.Int> to Swift.UnsafeMutablePointer<Swift.Int>?
+Var __VaListBuilder.storage has mangled name changing from 'Swift.__VaListBuilder.storage : Swift.ContiguousArray<Swift.Int>' to 'Swift.__VaListBuilder.storage : Swift.Optional<Swift.UnsafeMutablePointer<Swift.Int>>'
+Var _countFPRegisters has been removed
+Var _countGPRegisters has been removed
+Var _fpRegisterWords has been removed
+Var _registerSaveWords has been removed

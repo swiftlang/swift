@@ -14,8 +14,8 @@ Centralized command line and file system interface for the build script.
 # ----------------------------------------------------------------------------
 
 import os
-import pipes
 import platform
+import shlex
 import shutil
 import subprocess
 import sys
@@ -35,7 +35,7 @@ def _fatal_error(message):
 
 
 def _quote(arg):
-    return pipes.quote(str(arg))
+    return shlex.quote(str(arg))
 
 
 def quote_command(args):
@@ -88,8 +88,8 @@ def call(command, stderr=None, env=None, dry_run=None, echo=True):
         subprocess.check_call(command, env=_env, stderr=stderr)
     except subprocess.CalledProcessError as e:
         _fatal_error(
-            "command terminated with a non-zero exit status " +
-            str(e.returncode) + ", aborting")
+            f"command `{command}` terminated with a non-zero exit status "
+            f"{str(e.returncode)}, aborting")
     except OSError as e:
         _fatal_error(
             "could not execute '" + quote_command(command) +
@@ -138,8 +138,8 @@ def capture(command, stderr=None, env=None, dry_run=None, echo=True,
         if optional:
             return None
         _fatal_error(
-            "command terminated with a non-zero exit status " +
-            str(e.returncode) + ", aborting")
+            f"command `{command}` terminated with a non-zero exit status "
+            f"{str(e.returncode)}, aborting")
     except OSError as e:
         if optional:
             return None
@@ -183,13 +183,14 @@ def rmtree(path, dry_run=None, echo=True):
         shutil.rmtree(path)
 
 
-def copytree(src, dest, dry_run=None, echo=True):
+def copytree(src, dest, dry_run=None, ignore_pattern=None, echo=True):
     dry_run = _coerce_dry_run(dry_run)
     if dry_run or echo:
         _echo_command(dry_run, ['cp', '-r', src, dest])
     if dry_run:
         return
-    shutil.copytree(src, dest)
+    ignore = shutil.ignore_patterns(ignore_pattern) if ignore_pattern else None
+    shutil.copytree(src, dest, ignore=ignore)
 
 
 def symlink(source, dest, dry_run=None, echo=True):
@@ -201,46 +202,10 @@ def symlink(source, dest, dry_run=None, echo=True):
     os.symlink(source, dest)
 
 
-# Initialized later
-lock = None
-
-
-def run(*args, **kwargs):
-    repo_path = os.getcwd()
-    echo_output = kwargs.pop('echo', False)
-    dry_run = kwargs.pop('dry_run', False)
-    env = kwargs.get('env', None)
-    prefix = kwargs.pop('prefix', '')
+def remove(path, dry_run=None, echo=True):
+    dry_run = _coerce_dry_run(dry_run)
+    if dry_run or echo:
+        _echo_command(dry_run, ['rm', path])
     if dry_run:
-        _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
-        return(None, 0, args)
-
-    my_pipe = subprocess.Popen(
-        *args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
-        universal_newlines=True,
-        **kwargs)
-    (output, _) = my_pipe.communicate()
-    ret = my_pipe.wait()
-
-    if lock:
-        lock.acquire()
-    if echo_output:
-        sys.stdout.flush()
-        sys.stderr.flush()
-        _echo_command(dry_run, *args, env=env, prompt="{0}+ ".format(prefix))
-        if output:
-            for line in output.splitlines():
-                print("{0}{1}".format(prefix, line))
-        sys.stdout.flush()
-        sys.stderr.flush()
-    if lock:
-        lock.release()
-
-    if ret != 0:
-        eout = Exception()
-        eout.ret = ret
-        eout.args = args
-        eout.repo_path = repo_path
-        eout.stderr = output
-        raise eout
-    return (output, 0, args)
+        return
+    os.remove(path)

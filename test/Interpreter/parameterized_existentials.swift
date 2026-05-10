@@ -49,5 +49,14 @@ ParameterizedProtocolsTestSuite.test("casting") {
   expectEqual(a.value, b.value)
 }
 
+// rdar://96571508
+struct ErasingHolder<T> {
+  let box: any Holder<T>
+}
+ParameterizedProtocolsTestSuite.test("casting") {
+  let a = ErasingHolder(box: IntHolder(value: 5))
+  expectEqual(a.box.value, 5)
+}
+
 runAllTests()
 

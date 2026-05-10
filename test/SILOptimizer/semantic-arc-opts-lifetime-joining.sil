@@ -1,5 +1,4 @@
-// RUN: %target-sil-opt -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
-// REQUIRES: swift_stdlib_asserts
+// RUN: %target-sil-opt -sil-print-types -module-name Swift -enable-sil-verify-all -semantic-arc-opts -sil-semantic-arc-peepholes-lifetime-joining %s | %FileCheck %s
 
 // NOTE: Some of our tests here depend on borrow elimination /not/ running!
 // Please do not add it to clean up the IR like we did in
@@ -14,6 +13,13 @@ import Builtin
 //////////////////
 
 typealias AnyObject = Builtin.AnyObject
+
+struct Bool {
+  var value : Builtin.Int1
+}
+
+sil @closureCapturesBool : $@convention(thin) (@guaranteed { var Bool }) -> ()
+sil @closureArgumentEscapes : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> ()
 
 enum MyNever {}
 enum FakeOptional<T> {
@@ -107,6 +113,13 @@ struct NativeObjectWrapper {
 
 sil @owned_user_object_pair : $@convention(thin) (@owned NativeObjectPair) -> ()
 
+class X {}
+struct S {}
+
+sil @getX : $@convention(thin) () -> @owned X
+sil @getS : $@convention(thin) (@owned X) -> @out S
+sil @loadWeakX_from : $@convention(thin) (@in_guaranteed S) -> @owned FakeOptional<X>
+
 ///////////
 // Tests //
 ///////////
@@ -173,10 +186,10 @@ bb2:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @donot_join_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
-// CHECK: copy_value
-// CHECK: } // end sil function 'donot_join_liveranges_in_same_block_1'
-sil [ossa] @donot_join_liveranges_in_same_block_1 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-LABEL: sil [ossa] @join_liveranges_in_same_block_5 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'join_liveranges_in_same_block_5'
+sil [ossa] @join_liveranges_in_same_block_5 : $@convention(thin) (@owned Builtin.NativeObject) -> () {
 bb0(%0 : @owned $Builtin.NativeObject):
   %1 = copy_value %0 : $Builtin.NativeObject
   br bb1
@@ -792,10 +805,11 @@ bb3:
   return %9999 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_fail_2 : $@convention(thin) () -> () {
-// CHECK: copy_value
-// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_fail_2'
-sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_fail_2 : $@convention(thin) () -> () {
+// TODO: check why the copy cannot be eliminated here
+// CHECK-LABEL: sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_8 : $@convention(thin) () -> () {
+// xCHECK-NOT: copy_value
+// CHECK: } // end sil function 'join_live_range_with_borrowscopes_multipledestroys_succeed_8'
+sil [ossa] @join_live_range_with_borrowscopes_multipledestroys_succeed_8 : $@convention(thin) () -> () {
 bb0:
   %obj = alloc_ref $Klass
   cond_br undef, bb1, bb2
@@ -883,3 +897,121 @@ bb3(%result : @owned $FakeOptional<Builtin.NativeObject>):
   dealloc_stack %allocStack : $*Builtin.NativeObject
   return %result : $FakeOptional<Builtin.NativeObject>
 }
+
+// Don't do this optimization:
+//   Eliminate borrowed copy with useless lifetime:
+//   %5 = copy_value %0 : ${ var Bool }
+//
+// CHECK: sil hidden [ossa] @testCapturedSingleDestroyCopy : $@convention(thin) () -> Bool {
+// CHECK:   load [trivial] %{{.*}} : $*Bool
+// CHECK:   destroy_value %0 : ${ var Bool }
+sil hidden [ossa] @testCapturedSingleDestroyCopy : $@convention(thin) () -> Bool {
+bb0:
+  // var test = false
+  %0 = alloc_box ${ var Bool }, var, name "test"
+  %1 = project_box %0 : ${ var Bool }, 0
+  %2 = integer_literal $Builtin.Int1, 0
+  %3 = struct $Bool (%2 : $Builtin.Int1)
+  store %3 to [trivial] %1 : $*Bool
+
+  // capture test in an escaping closure
+  %5 = copy_value %0 : ${ var Bool }
+  %6 = function_ref @closureCapturesBool : $@convention(thin) (@guaranteed { var Bool }) -> ()
+  %7 = partial_apply [callee_guaranteed] %6(%5) : $@convention(thin) (@guaranteed { var Bool }) -> ()
+  %8 = function_ref @closureArgumentEscapes : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> ()
+  %9 = apply %8(%7) : $@convention(thin) (@owned @callee_guaranteed () -> ()) -> ()
+
+  // return test
+  %10 = begin_access [read] [dynamic] %1 : $*Bool
+  %11 = load [trivial] %10 : $*Bool
+  end_access %10 : $*Bool
+  destroy_value %0 : ${ var Bool }
+  return %11 : $Bool
+}
+
+// Don't do this optimization:
+//   Eliminate copy of lexical value which ends after lifetime of copy IF there
+//   may be deinit barriers between the final consume and the copy.
+//
+// CHECK-LABEL: sil [ossa] @testDestroyedLexicalValue : {{.*}} {
+// CHECK:         [[GET:%[^,]+]] = function_ref @getX
+// CHECK:         [[X:%[^,]+]] = apply [[GET]]()
+// CHECK:         [[MX:%[^,]+]] = move_value [lexical] [[X]]
+// CHECK:         destroy_value [[MX]] : $X
+// CHECK-LABEL: } // end sil function 'testDestroyedLexicalValue'
+sil [ossa] @testDestroyedLexicalValue : $@convention(thin) () -> @owned FakeOptional<X> {
+bb0:
+  %getX = function_ref @getX : $@convention(thin) () -> @owned X
+  %x = apply %getX() : $@convention(thin) () -> @owned X
+  %mx = move_value [lexical] %x : $X
+  %a = alloc_stack [lexical] $S, let, name "s"
+  %c = copy_value %mx : $X
+  %getS = function_ref @getS : $@convention(thin) (@owned X) -> @out S
+  %s = apply %getS(%a, %c) : $@convention(thin) (@owned X) -> @out S
+  %loadWeakX_from = function_ref @loadWeakX_from : $@convention(thin) (@in_guaranteed S) -> @owned FakeOptional<X>
+  %o = apply %loadWeakX_from(%a) : $@convention(thin) (@in_guaranteed S) -> @owned FakeOptional<X>
+  // ^^^^^ Deinit barrier
+  destroy_addr %a : $*S
+  dealloc_stack %a : $*S
+  destroy_value %mx : $X
+  return %o : $FakeOptional<X>
+}
+
+// CHECK-LABEL: sil [ossa] @testDestroyedLexicalValueNoBarriers : {{.*}} {
+// CHECK-NOT:     destroy_value
+// CHECK-LABEL: } // end sil function 'testDestroyedLexicalValueNoBarriers'
+sil [ossa] @testDestroyedLexicalValueNoBarriers : $@convention(thin) () -> () {
+bb0:
+  %getX = function_ref @getX : $@convention(thin) () -> @owned X
+  %x = apply %getX() : $@convention(thin) () -> @owned X
+  %mx = move_value [lexical] %x : $X
+  %a = alloc_stack [lexical] $S, let, name "s"
+  %c = copy_value %mx : $X
+  %getS = function_ref @getS : $@convention(thin) (@owned X) -> @out S
+  %s = apply %getS(%a, %c) : $@convention(thin) (@owned X) -> @out S
+  destroy_addr %a : $*S
+  dealloc_stack %a : $*S
+  destroy_value %mx : $X
+  %r = tuple ()
+  return %r : $()
+}
+
+sil @consume_and_borrow : $@convention(thin) (@owned Klass, @guaranteed Klass) -> ()
+sil @borrow : $@convention(thin) (@guaranteed Klass) -> ()
+sil @consume : $@convention(thin) (@owned Klass) -> ()
+sil @get_klass : $@convention(thin) () -> @owned Klass
+
+// CHECK-LABEL: sil hidden [ossa] @borrow_and_consume_copyable_test1 :
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'borrow_and_consume_copyable_test1'
+sil hidden [ossa] @borrow_and_consume_copyable_test1 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  %2 = move_value [var_decl] %1
+  %3 = copy_value %2
+  %4 = function_ref @borrow : $@convention(thin) (@guaranteed Klass) -> ()
+  %5 = apply %4(%2) : $@convention(thin) (@guaranteed Klass) -> ()
+  %6 = function_ref @consume : $@convention(thin) (@owned Klass) -> ()
+  %7 = apply %6(%3) : $@convention(thin) (@owned Klass) -> ()
+  destroy_value %2
+  %9 = tuple ()
+  return %9
+}
+
+// CHECK-LABEL: sil hidden [ossa] @borrow_and_consume_copyable_test2 : 
+// CHECK: copy_value
+// CHECK-LABEL: } // end sil function 'borrow_and_consume_copyable_test2'
+sil hidden [ossa] @borrow_and_consume_copyable_test2 : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @get_klass : $@convention(thin) () -> @owned Klass
+  %1 = apply %0() : $@convention(thin) () -> @owned Klass
+  %2 = move_value [var_decl] %1
+  %3 = copy_value %2
+  %4 = function_ref @consume_and_borrow : $@convention(thin) (@owned Klass, @guaranteed Klass) -> ()
+  %5 = apply %4(%3, %2) : $@convention(thin) (@owned Klass, @guaranteed Klass) -> ()
+  destroy_value %2
+  %7 = tuple ()
+  return %7
+}
+

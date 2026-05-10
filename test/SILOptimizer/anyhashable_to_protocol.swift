@@ -11,7 +11,7 @@ class FooProtocolImplementation : NSObject, FooProtocol {
 }
 
 // CHECK-LABEL: sil @{{.*}}testit
-// CHECK: checked_cast_addr_br {{.*}} AnyHashable {{.*}} to FooProtocol 
+// CHECK: checked_cast_addr_br {{.*}} AnyHashable {{.*}} to any FooProtocol 
 public func testit(_ x: AnyHashable) -> Bool {
   return (x as? FooProtocol) != nil
 }

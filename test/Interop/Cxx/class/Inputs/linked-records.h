@@ -36,4 +36,11 @@ struct F {
   M m2;
 };
 
+struct G {
+  class {
+  public:
+    M m;
+  } cc;
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_LINKED_RECORDS_H

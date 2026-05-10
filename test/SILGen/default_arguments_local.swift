@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
 
 // CHECK-LABEL: sil hidden [ossa] @$s23default_arguments_local5outer1x1y1z1wySi_yXlypxtlF : $@convention(thin) <T> (Int, @guaranteed AnyObject, @in_guaranteed Any, @in_guaranteed T) -> ()
 func outer<T>(x: Int, y: AnyObject, z: Any, w: T) {
@@ -58,8 +58,9 @@ class ArtClass<T> {
   }
 }
 
-// Default arguments of local functions inside @inlinable contexts should be serialized.
-// https://bugs.swift.org/browse/SR-12404
+// Default arguments of local functions inside '@inlinable' contexts should
+// be serialized.
+// https://github.com/apple/swift/issues/54842
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s23default_arguments_local5outeryyF : $@convention(thin) () -> () {
 @inlinable public func outer() {

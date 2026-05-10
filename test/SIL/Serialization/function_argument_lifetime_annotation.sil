@@ -1,0 +1,36 @@
+// First parse this and then emit a *.sib. Then read in the *.sib, then recreate
+
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name eager_move
+// RUN: %target-sil-opt %t/tmp.sib -module-name eager_move | %FileCheck %s
+
+sil_stage canonical
+
+class C {}
+
+// CHECK-LABEL: sil [serialized] [ossa] @one_arg_eager_move : {{.*}} {
+// CHECK: bb0(%0 : @_eagerMove @owned $C):
+// CHECK: } // end sil function 'one_arg_eager_move'
+sil [serialized] [ossa] @one_arg_eager_move : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @_eagerMove @owned $C):
+  destroy_value %instance : $C
+  %retval = tuple()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [serialized] [ossa] @one_arg_lexical : {{.*}} {
+// CHECK: bb0(%0 : @_lexical @owned $C):
+// CHECK: } // end sil function 'one_arg_lexical'
+sil [serialized] [ossa] @one_arg_lexical : $@convention(thin) (@owned C) -> () {
+bb0(%instance : @_lexical @owned $C):
+  destroy_value %instance : $C
+  %retval = tuple()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [serialized] [lexical_lifetimes] [ossa] @force_lexical_function : {{.*}} {
+// CHECK-LABEL: } // end sil function 'force_lexical_function'
+sil [serialized] [lexical_lifetimes] [ossa] @force_lexical_function : $@convention(thin) () -> () {
+  %retval = tuple()
+  return %retval : $()
+}

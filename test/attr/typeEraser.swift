@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -verify
+// RUN: %target-swift-frontend -typecheck %s -verify -package-name myPkg
 
 // MARK: - Correct type eraser
 
@@ -29,11 +29,11 @@ protocol Collection {
 @_typeEraser // expected-error {{expected '(' in '_typeEraser' attribute}}
 protocol A1 {}
 
-@_typeEraser() // expected-error {{expected a type name in @_typeEraser()}}
+@_typeEraser() // expected-error {{expected a type name in '@_typeEraser()'}}
 protocol A2 {}
 
 @_typeEraser(AnyP // expected-note {{to match this opening '('}}
-protocol A3 {} // expected-error {{expected ')' after type name for @_typeEraser}}
+protocol A3 {} // expected-error {{expected ')' after type name for '@_typeEraser'}}
 
 @_typeEraser(AnyP) // expected-error {{@_typeEraser may only be used on 'protocol' declarations}}
 func notAProtocol() {}
@@ -50,7 +50,7 @@ protocol InvalidTypeEraser {}
 @_typeEraser(InvalidTypeEraser) // expected-error {{type eraser must be a class, struct, or enum}}
 protocol B3 {}
 
-class Generic<Param>: B5 { // expected-note {{generic type 'Generic' declared here}}
+class Generic<Param>: B5 { // expected-note {{generic class 'Generic' declared here}}
   init<T: B5>(erasing t: T) {}
 }
 @_typeEraser(Generic) // expected-error {{reference to generic type 'Generic' requires arguments in <...>}}
@@ -63,6 +63,18 @@ class MoreRestrictive: B6 { // expected-note {{type eraser declared here}}
 }
 @_typeEraser(MoreRestrictive) // expected-error {{internal type eraser 'MoreRestrictive' cannot have more restrictive access than protocol 'B6' (which is public)}}
 public protocol B6 {}
+
+class MoreRestrictive1: B66 { // expected-note {{type eraser declared here}}
+ init<T: B66>(erasing t: T) {}
+}
+@_typeEraser(MoreRestrictive1) // expected-error {{internal type eraser 'MoreRestrictive1' cannot have more restrictive access than protocol 'B66' (which is package)}}
+package protocol B66 {}
+
+package class PkgMoreRestrictive: PB6 { // expected-note {{type eraser declared here}}
+ init<T: B6>(erasing t: T) {}
+}
+@_typeEraser(PkgMoreRestrictive) // expected-error {{package type eraser 'PkgMoreRestrictive' cannot have more restrictive access than protocol 'PB6' (which is public)}}
+public protocol PB6 {}
 
 typealias FnAlias = () -> Void
 @_typeEraser(FnAlias) // expected-error {{type eraser must be a class, struct, or enum}}
@@ -118,6 +130,20 @@ public class UnviableInits: E1 {
 }
 @_typeEraser(UnviableInits) // expected-error {{type eraser 'UnviableInits' has no viable initializer of the form 'init<T: E1>(erasing: T)'}}
 public protocol E1 {}
+
+public class UnviableInits11: E11 {
+ public init<T: E11>(erasing t: T) where T: Hashable {} // expected-note {{'init(erasing:)' cannot have unsatisfied requirements when 'T' = 'some E11'}}
+ package init<T: E11>(erasing t: T) {} // expected-note {{package 'init(erasing:)' cannot have more restrictive access than protocol 'E11' (which is public)}}
+}
+@_typeEraser(UnviableInits11) // expected-error {{type eraser 'UnviableInits11' has no viable initializer of the form 'init<T: E11>(erasing: T)'}}
+public protocol E11 {}
+
+package class PkgUnviableInits: PE1 {
+  package init<T: PE1>(erasing t: T) where T: Hashable {} // expected-note {{'init(erasing:)' cannot have unsatisfied requirements when 'T' = 'some PE1'}}
+  init<T: PE1>(erasing t: T) {} // expected-note {{internal 'init(erasing:)' cannot have more restrictive access than protocol 'PE1' (which is package)}}
+}
+@_typeEraser(PkgUnviableInits) // expected-error {{type eraser 'PkgUnviableInits' has no viable initializer of the form 'init<T: PE1>(erasing: T)'}}
+package protocol PE1 {}
 
 class FailableInit: E2 {
   init?<T: E2>(erasing t: T) {} // expected-note {{'init(erasing:)' cannot be failable}}

@@ -1,9 +1,12 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -import-objc-header %S/Inputs/tail_allocated_c_array.h -swift-version 5 -g %s -o %t/a.out
+// RUN: %target-build-swift -import-objc-header %S/Inputs/tail_allocated_c_array.h -swift-version 5 -g %s -o %t/a.out %if !legacy_swift_driver && !CPU=wasm32 %{ -explicit-module-build %}
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
 // UNSUPPORTED: freestanding
+
+@_spi(ObservableRerootKeyPath)
+import Swift
 
 import StdlibUnittest
 
@@ -322,6 +325,14 @@ keyPath.test("computed properties") {
     expectTrue(oldTest.canary !== test.canary)
     expectTrue(test.canary === test[keyPath: tc_mutatingProtoExt].canary)
   }
+}
+
+keyPath.test("equality") {
+  expectNotEqual(\Array<String>.isEmpty, \Substring.isEmpty)
+  expectNotEqual(\Array<String>.isEmpty, \Substring.isEmpty)
+  expectNotEqual(\Array<String>.isEmpty, \String.isEmpty)
+  expectNotEqual(\Array<String>.isEmpty, \Substring.last)
+  expectNotEqual(\Array<String>.isEmpty, \Array<Substring>.isEmpty)
 }
 
 class AB {
@@ -986,24 +997,24 @@ keyPath.test("key path literal closures") {
   expectEqual(3, variadicFn("a", "b", "c"))
 }
 
-// SR-6096
+// https://github.com/apple/swift/issues/48651
 
-protocol Protocol6096 {}
-struct Value6096<ValueType> {}
-extension Protocol6096 {
+protocol P_48651 {}
+struct S_48651<ValueType> {}
+extension P_48651 {
     var asString: String? {
         return self as? String
     }
 }
-extension Value6096 where ValueType: Protocol6096 {
+extension S_48651 where ValueType: P_48651 {
     func doSomething() {
         _ = \ValueType.asString?.endIndex
     }
 }
-extension Int: Protocol6096 {}
+extension Int: P_48651 {}
 
 keyPath.test("optional chaining component that needs generic instantiation") {
-  Value6096<Int>().doSomething()
+  S_48651<Int>().doSomething()
 }
 
 // Nested generics.
@@ -1065,5 +1076,221 @@ keyPath.test("ReferenceWritableKeyPath statically typed as WritableKeyPath") {
   expectEqual(outer[keyPath: upcastKeyPath], 46)
 }
 
-runAllTests()
+struct Dog {
+  var name: String
+  var age: Int
+}
 
+class Cat {
+  var name: String
+  var age: Int
+
+  init(name: String, age: Int) {
+    self.name = name
+    self.age = age
+  }
+}
+
+if #available(SwiftStdlib 5.9, *) {
+  keyPath.test("_createOffsetBasedKeyPath") {
+    let dogAgeKp = _createOffsetBasedKeyPath(
+      root: Dog.self,
+      value: Int.self,
+      offset: MemoryLayout<String>.size
+    ) as? KeyPath<Dog, Int>
+
+    expectNotNil(dogAgeKp)
+
+    let sparky = Dog(name: "Sparky", age: 7)
+
+    expectEqual(sparky[keyPath: dogAgeKp!], 7)
+
+    let catNameKp = _createOffsetBasedKeyPath(
+      root: Cat.self,
+      value: String.self,
+      offset: 2 * MemoryLayout<UnsafeRawPointer>.size
+    ) as? KeyPath<Cat, String>
+
+    expectNotNil(catNameKp)
+
+    let chloe = Cat(name: "Chloe", age: 4)
+
+    expectEqual(chloe[keyPath: catNameKp!], "Chloe")
+  }
+}
+
+class RerootedSuper {
+  var x = "hello world"
+}
+
+class RerootedSub0: RerootedSuper {}
+class RerootedSub1: RerootedSub0 {}
+
+if #available(SwiftStdlib 5.9, *) {
+  keyPath.test("_rerootKeyPath") {
+    let x = \RerootedSub1.x
+
+    let superValue = RerootedSuper()
+    let sub0 = RerootedSub0()
+    let sub1 = RerootedSub1()
+
+    let sub0Kp = _rerootKeyPath(x, to: RerootedSub0.self)
+
+    expectTrue(type(of: sub0Kp) == ReferenceWritableKeyPath<RerootedSub0, String>.self)
+
+    let superKp = _rerootKeyPath(x, to: RerootedSuper.self)
+
+    expectTrue(type(of: superKp) == ReferenceWritableKeyPath<RerootedSuper, String>.self)
+
+    let x0 = sub1[keyPath: sub0Kp] as! String
+    expectEqual(x0, "hello world")
+
+    let x1 = sub1[keyPath: superKp] as! String
+    expectEqual(x1, "hello world")
+
+    let x2 = sub0[keyPath: sub0Kp] as! String
+    expectEqual(x2, "hello world")
+
+    let x3 = sub0[keyPath: superKp] as! String
+    expectEqual(x3, "hello world")
+
+    let x4 = superValue[keyPath: superKp] as! String
+    expectEqual(x4, "hello world")
+  }
+}
+
+@_alignment(8)
+struct EightAligned {
+  let x = 0
+}
+
+extension EightAligned: Equatable {}
+extension EightAligned: Hashable {}
+
+@_alignment(16)
+struct SixteenAligned {
+  let x = 0
+}
+
+extension SixteenAligned: Equatable {}
+extension SixteenAligned: Hashable {}
+
+struct OveralignedForEight {
+  subscript(getter getter: EightAligned) -> Int {
+    128
+  }
+
+  subscript(setter setter: EightAligned) -> Int {
+    get {
+      128
+    }
+
+    set {
+      fatalError()
+    }
+  }
+}
+
+struct OveralignedForSixteen {
+  subscript(getter getter: SixteenAligned) -> Int {
+    128
+  }
+
+  subscript(setter setter: SixteenAligned) -> Int {
+    get {
+      128
+    }
+
+    set {
+      fatalError()
+    }
+  }
+}
+
+struct SimpleEight {
+  let oa = OveralignedForEight()
+}
+
+struct SimpleSixteen {
+  let oa = OveralignedForSixteen()
+}
+
+#if _pointerBitWidth(_32)
+if #available(SwiftStdlib 6.3, *) {
+  keyPath.test("eight byte overaligned arguments") {
+    let oa = OveralignedForEight()
+    let kp = \OveralignedForEight.[getter: EightAligned()]
+
+    let value = oa[keyPath: kp]
+    expectEqual(value, 128)
+
+    // Test that appends where the argument is no longer overaligned work
+    let simple = SimpleEight()
+    let kp11 = \SimpleEight.oa
+    let kp12 = \OveralignedForEight.[getter: EightAligned()]
+    let kp1 = kp11.appending(path: kp12)
+
+    let value1 = simple[keyPath: kp1]
+    expectEqual(value1, 128)
+
+    // Test that appends where the argument is still overaligned works
+    let kp21 = \SimpleEight.oa
+    let kp22 = \OveralignedForEight.[setter: EightAligned()]
+    let kp2 = kp21.appending(path: kp22)
+
+    let value2 = simple[keyPath: kp2]
+    expectEqual(value2, 128)
+  }
+}
+#endif
+
+if #available(SwiftStdlib 6.3, *) {
+  keyPath.test("sixteen byte overaligned arguments") {
+    let oa = OveralignedForSixteen()
+    let kp = \OveralignedForSixteen.[getter: SixteenAligned()]
+
+    let value = oa[keyPath: kp]
+    expectEqual(value, 128)
+
+    // Test that appends where the argument is no longer overaligned work
+    let simple = SimpleSixteen()
+    let kp11 = \SimpleSixteen.oa
+    let kp12 = \OveralignedForSixteen.[getter: SixteenAligned()]
+    let kp1 = kp11.appending(path: kp12)
+
+    let value1 = simple[keyPath: kp1]
+    expectEqual(value1, 128)
+
+    // Test that appends where the argument is still overaligned works
+    let kp21 = \SimpleSixteen.oa
+    let kp22 = \OveralignedForSixteen.[setter: SixteenAligned()]
+    let kp2 = kp21.appending(path: kp22)
+
+    let value2 = simple[keyPath: kp2]
+    expectEqual(value2, 128)
+  }
+}
+
+struct Thingy {
+  var thingy: Thingy { self }
+
+  var a = 42
+}
+
+extension Int {
+  var subscripty: Thingy {
+    Thingy(a: 67)
+  }
+}
+
+keyPath.test("appending keypath with multiple components") {
+  var kp: KeyPath = \Thingy.self
+  kp = kp.appending(path: \.thingy)
+  kp = kp.appending(path: \.a.subscripty)
+
+  let t = Thingy()
+  let value = t[keyPath: kp]
+  expectEqual(value.a, 67)
+}
+
+runAllTests()

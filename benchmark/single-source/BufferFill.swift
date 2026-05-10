@@ -55,7 +55,7 @@ public func bufferFillFromSliceTeardown() {
 public func bufferFillFromSliceExecute(n: Int) {
   // Measure performance when filling an UnsafeBuffer from a Slice
   // of a Collection that supports `withContiguousStorageIfAvailable`
-  // See: https://bugs.swift.org/browse/SR-14491
+  // See: https://github.com/apple/swift/issues/56846
 
   for _ in 0..<n {
     let slice = Slice(base: a, bounds: a.indices)
@@ -87,7 +87,7 @@ public func rawBufferCopyBytesTeardown() {
 public func rawBufferCopyBytesExecute(n: Int) {
   // Measure performance when copying bytes into an UnsafeRawBuffer
   // from a Collection that supports `withContiguousStorageIfAvailable`
-  // See: https://bugs.swift.org/browse/SR-14886
+  // See: https://github.com/apple/swift/issues/57233
 
   for _ in 0..<n {
     rb.copyBytes(from: ra)
@@ -112,7 +112,7 @@ public func rawBufferInitializeMemoryTeardown() {
 public func rawBufferInitializeMemoryExecute(n: Int) {
   // Measure performance when initializing an UnsafeRawBuffer
   // from a Collection that supports `withContiguousStorageIfAvailable`
-  // See: https://bugs.swift.org/browse/SR-14982
+  // See: https://github.com/apple/swift/issues/57324
 
   for _ in 0..<n {
     var (iterator, initialized) = rb.initializeMemory(as: Int.self, from: a)
@@ -154,7 +154,7 @@ public func rawBufferCopyContentsTeardown() {
 public func rawBufferCopyContentsExecute(n: Int) {
   // Measure performance of copying bytes from an
   // `UnsafeRawBufferPointer` to an `UnsafeMutableBufferPointer<UInt8>`.
-  // See: https://bugs.swift.org/browse/SR-9604
+  // See: https://github.com/apple/swift/issues/52050
 
   for _ in 0..<n {
     var (iterator, initialized) = b8.initialize(from: r8)

@@ -8,7 +8,7 @@ public struct MyStruct<T> {
   public typealias AliasInt = Int
 
   public func foo(x: AliasInt) -> AliasT { fatalError() }
-// CHECK:  public func foo(x: MyModule.MyStruct<T>.AliasInt) -> MyModule.MyStruct<T>.AliasT
+// CHECK:  public func foo(x: MyModule::MyStruct<T>.MyModule::AliasInt) -> MyModule::MyStruct<T>.MyModule::AliasT
 }
 
 public class MyBase<U> {
@@ -17,7 +17,7 @@ public class MyBase<U> {
 }
 
 public class MyDerived<X>: MyBase<X> {
-// CHECK-LABEL: public class MyDerived<X> : MyModule.MyBase<X> {
+// CHECK-LABEL: public class MyDerived<X> : MyModule::MyBase<X> {
   public func bar(x: AliasU) -> AliasInt { fatalError() }
-// CHECK:  public func bar(x: MyModule.MyDerived<X>.AliasU) -> MyModule.MyDerived<X>.AliasInt
+// CHECK:  public func bar(x: MyModule::MyDerived<X>.MyModule::AliasU) -> MyModule::MyDerived<X>.MyModule::AliasInt
 }

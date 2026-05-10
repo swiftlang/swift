@@ -1,4 +1,4 @@
-//===---- ExistentialSpecializerTransform.h - Existential Specializer -----===//
+//===--- ExistentialTransform.h - Existential Specializer -----------------===//
 //
 // This source file is part of the Swift.org open source project
 //

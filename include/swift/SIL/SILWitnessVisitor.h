@@ -57,6 +57,9 @@ public:
     auto requirements = protocol->getRequirementSignature().getRequirements();
     for (const auto &reqt : requirements) {
       switch (reqt.getKind()) {
+      case RequirementKind::SameShape:
+        llvm_unreachable("Same-shape requirement not supported here");
+
       // These requirements don't show up in the witness table.
       case RequirementKind::Superclass:
       case RequirementKind::SameType:
@@ -97,7 +100,7 @@ public:
       // If this is a new associated type (which does not override an
       // existing associated type), add it.
       if (associatedType->getOverriddenDecls().empty())
-        asDerived().addAssociatedType(AssociatedType(associatedType));
+        asDerived().addAssociatedType(associatedType);
     }
 
     if (asDerived().shouldVisitRequirementSignatureOnly())
@@ -122,16 +125,18 @@ public:
 
   void visitAbstractStorageDecl(AbstractStorageDecl *sd) {
     sd->visitOpaqueAccessors([&](AccessorDecl *accessor) {
-      if (SILDeclRef::requiresNewWitnessTableEntry(accessor)) {
+      if (accessor->requiresNewWitnessTableEntry()) {
         asDerived().addMethod(SILDeclRef(accessor, SILDeclRef::Kind::Func));
         addAutoDiffDerivativeMethodsIfRequired(accessor,
+                                               SILDeclRef::Kind::Func);
+        addDistributedWitnessMethodsIfRequired(accessor,
                                                SILDeclRef::Kind::Func);
       }
     });
   }
 
   void visitConstructorDecl(ConstructorDecl *cd) {
-    if (SILDeclRef::requiresNewWitnessTableEntry(cd)) {
+    if (cd->requiresNewWitnessTableEntry()) {
       asDerived().addMethod(SILDeclRef(cd, SILDeclRef::Kind::Allocator));
       addAutoDiffDerivativeMethodsIfRequired(cd, SILDeclRef::Kind::Allocator);
     }
@@ -143,11 +148,25 @@ public:
 
   void visitFuncDecl(FuncDecl *func) {
     assert(!isa<AccessorDecl>(func));
-    if (SILDeclRef::requiresNewWitnessTableEntry(func)) {
-      asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
-      addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
-      addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
+    if (!func->requiresNewWitnessTableEntry())
+      return;
+
+    // Unreachable functions (with custom availability) should not generate
+    // witness entries
+    // FIXME: cannot use func->isUnreachableAtRuntime() here rdar://170184865
+    for (auto *attr : func->getAttrs().getAttributes<AvailableAttr>()) {
+      if (auto domain = attr->getDomainOrIdentifier().getAsDomain()) {
+        if (domain->isCustom() &&
+            domain->getCustomDomain()->getKind() ==
+                CustomAvailabilityDomain::Kind::Disabled) {
+          return;
+        }
+      }
     }
+
+    asDerived().addMethod(SILDeclRef(func, SILDeclRef::Kind::Func));
+    addAutoDiffDerivativeMethodsIfRequired(func, SILDeclRef::Kind::Func);
+    addDistributedWitnessMethodsIfRequired(func, SILDeclRef::Kind::Func);
   }
 
   void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
@@ -157,22 +176,13 @@ public:
   void visitAssociatedTypeDecl(AssociatedTypeDecl *td) {
     // We already visited these in the first pass.
   }
-    
+
   void visitTypeAliasDecl(TypeAliasDecl *tad) {
     // We don't care about these by themselves for witnesses.
   }
 
   void visitPatternBindingDecl(PatternBindingDecl *pbd) {
     // We only care about the contained VarDecls.
-  }
-
-  void visitIfConfigDecl(IfConfigDecl *icd) {
-    // We only care about the active members, which were already subsumed by the
-    // enclosing type.
-  }
-
-  void visitPoundDiagnosticDecl(PoundDiagnosticDecl *pdd) {
-    // We don't care about diagnostics at this stage.
   }
 
 private:
@@ -197,11 +207,14 @@ private:
 
   void addDistributedWitnessMethodsIfRequired(AbstractFunctionDecl *AFD,
                                               SILDeclRef::Kind kind) {
-    if (!AFD->isDistributed())
+    if (!AFD)
       return;
 
-    // Add another which will be witnessed by the 'distributed thunk'
-    SILDeclRef declRef(AFD, kind);
+    auto thunk = AFD->getDistributedThunk();
+    if (!thunk)
+      return;
+
+    SILDeclRef declRef(thunk, kind);
     asDerived().addMethod(declRef.asDistributed());
   }
 };

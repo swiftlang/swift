@@ -1,7 +1,7 @@
 // First parse this and then emit a *.sib. Then read in the *.sib, then recreate
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt %s -emit-sib -o %t/tmp.sib -module-name async
-// RUN: %target-sil-opt %t/tmp.sib -module-name async | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -emit-sib -o %t/tmp.sib -module-name async
+// RUN: %target-sil-opt -sil-print-types %t/tmp.sib -module-name async | %FileCheck %s
 // REQUIRES: concurrency
 
 import Builtin
@@ -40,7 +40,7 @@ entry:
   // CHECK-NEXT: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
   // CHECK-NEXT: {{^ *$}}
-  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $Error):
+  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $any Error):
 bb2(%e : $Error):
   // CHECK-NEXT: br
   br bb3
@@ -82,8 +82,8 @@ entry:
   // CHECK-NEXT: await_async_continuation [[CONT]] : $Builtin.RawUnsafeContinuation, resume [[RESUME:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
   await_async_continuation %c : $Builtin.RawUnsafeContinuation, resume bb1, error bb2
   // CHECK-NEXT: {{^ *$}}
-  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $Error):
-bb2(%e : $Error):
+  // CHECK-NEXT: [[ERROR]]([[EVALUE:%.*]] : $any Error):
+bb2(%e : $any Error):
   // CHECK-NEXT: dealloc_stack
   dealloc_stack %a : $*Builtin.Int32
   // CHECK-NEXT: br

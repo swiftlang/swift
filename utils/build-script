@@ -14,9 +14,14 @@ The ultimate tool for building Swift.
 """
 
 
+from argparse import Namespace
+import atexit
 import json
 import os
 import platform
+import re
+import signal
+import subprocess
 import sys
 import time
 
@@ -40,24 +45,8 @@ from swift_build_support.swift_build_support.toolchain import host_toolchain
 from swift_build_support.swift_build_support.utils \
     import exit_rejecting_arguments
 from swift_build_support.swift_build_support.utils import fatal_error
+from swift_build_support.swift_build_support.utils import log_analyzer
 
-
-# -----------------------------------------------------------------------------
-# Constants
-
-# These versions are community sourced. At any given time only the Xcode
-# version used by Swift CI is officially supported. See ci.swift.org
-_SUPPORTED_XCODE_BUILDS = [
-    ("13.0 beta 4", "13A5201i"),
-    ("13.0", "13A233"),
-    ("13.1 RC 1", "13A1030d"),
-    ("13.2 beta", "13C5066c"),
-    ("13.2.1", "13C100"),
-    ("13.3", "13E113"),
-    ("13.3.1", "13E500a"),
-    ("13.4", "13F17a"),
-    ("13.4.1", "13F100"),
-]
 
 # -----------------------------------------------------------------------------
 # Helpers
@@ -69,6 +58,18 @@ def print_note(message, stream=sys.stdout):
     """
 
     stream.write('[{}] NOTE: {}\n'.format(sys.argv[0], message))
+    stream.flush()
+
+
+def print_warning(message, stream=sys.stdout):
+    """Writes a warning to the given stream. By default this function outputs
+    to stdout.
+    """
+
+    warning = "[{}] WARNING: {}\n".format(sys.argv[0], message)
+    magenta_warning = "\033[35m" + warning + "\033[0m"
+
+    stream.write(magenta_warning)
     stream.flush()
 
 
@@ -99,7 +100,8 @@ def initialize_runtime_environment():
             'MACOSX_DEPLOYMENT_TARGET',
             'IPHONEOS_DEPLOYMENT_TARGET',
             'TVOS_DEPLOYMENT_TARGET',
-            'WATCHOS_DEPLOYMENT_TARGET']:
+            'WATCHOS_DEPLOYMENT_TARGET',
+            'XROS_DEPLOYMENT_TARGET']:
         os.environ.pop(v, None)
 
     # Provide a default NINJA_STATUS to format ninja output.
@@ -146,19 +148,24 @@ def validate_xcode_compatibility():
         print("note: skipping Xcode version check")
         return
 
-    version = shell.capture(
+    output = shell.capture(
         ['xcodebuild', '-version'], dry_run=False, echo=False).strip()
+    # Capture only version ex: '14.x' from full output
+    match = re.match(r"Xcode (\d+\.\d+(?:\.\d)?)", output)
+    if not match:
+        print(f"warning: unexpected xcodebuild output format: '{output}', "
+              "skipping Xcode compatibility check, please report this issue",
+              file=sys.stderr)
+        return
 
-    valid_build_numbers = tuple(x[1] for x in _SUPPORTED_XCODE_BUILDS)
-    if not version.endswith(valid_build_numbers):
-        valid_versions_string = "\n".join(
-            "{} ({})".format(*x) for x in _SUPPORTED_XCODE_BUILDS)
+    version_match = match.group(1)
+    current_version = tuple(int(v) for v in version_match.replace('.', ' ').split())
+    minimum_version = (13, 0)
+    if current_version < minimum_version:
         raise SystemExit(
-            "error: using unsupported Xcode version:\n\n{}\n\n"
-            "Install one of:\n{}\n\n"
-            "Or set 'SKIP_XCODE_VERSION_CHECK=1' in the environment".format(
-                version, valid_versions_string
-            )
+            f"error: using unsupported Xcode version '{version_match}'. "
+            f"Install Xcode {'.'.join(str(x) for x in minimum_version)} or newer, "
+            "or set 'SKIP_XCODE_VERSION_CHECK=1' in the environment"
         )
 
 
@@ -184,7 +191,7 @@ def tar(source, destination):
 # -----------------------------------------------------------------------------
 # Argument Validation
 
-def validate_arguments(toolchain, args):
+def validate_arguments(toolchain, args: Namespace):
     if toolchain.cc is None or toolchain.cxx is None:
         fatal_error(
             "can't find clang (please install clang-3.5 or a "
@@ -205,6 +212,38 @@ def validate_arguments(toolchain, args):
         if toolchain.sccache is None:
             fatal_error(
                 "can't find sccache (please install sccache)")
+
+    if args.enable_caching:
+        cc_dir = os.path.dirname(toolchain.cc)
+        clang_cache_path = os.path.join(cc_dir, 'clang-cache')
+        if not os.path.isfile(clang_cache_path):
+            fatal_error(
+                "can't find clang-cache at '{}' "
+                "(expected next to clang at '{}')".format(
+                    clang_cache_path, toolchain.cc))
+
+    if args.enable_caching and args.sccache:
+        fatal_error(
+            '--enable-caching can not be used with --sccache')
+
+    if args.enable_caching and args.distcc:
+        fatal_error(
+            '--enable-caching can not be used with --distcc')
+
+    if args.enable_caching and (args.cmake_c_launcher or
+                                args.cmake_cxx_launcher):
+        fatal_error(
+            '--enable-caching can not be used with'
+            ' --cmake-c-launcher or --cmake-cxx-launcher')
+
+    # Xcode project generation is no longer supported.
+    if args.cmake_generator == "Xcode":
+        fatal_error(
+            "build-script no longer supports Xcode project generation, you "
+            "should use utils/generate-xcode instead, see "
+            "https://github.com/swiftlang/swift/blob/main/docs/HowToGuides/"
+            "GettingStarted.md#using-ninja-with-xcode for more info"
+        )
 
     if args.host_target is None or args.stdlib_deployment_targets is None:
         fatal_error("unknown operating system")
@@ -253,12 +292,13 @@ def default_stdlib_deployment_targets(args):
     if host_target is None:
         return None
 
+    targets = [host_target]
+
     # OS X build machines configure all Darwin platforms by default.
     # Put iOS native targets last so that we test them last
     # (it takes a long time).
     if host_target == StdlibDeploymentTarget.OSX.x86_64 or \
             host_target == StdlibDeploymentTarget.OSX.arm64:
-        targets = [host_target]
         if args.build_ios and args.build_ios_simulator:
             targets.extend(StdlibDeploymentTarget.iOSSimulator.targets)
         if args.build_ios and args.build_ios_device:
@@ -272,10 +312,19 @@ def default_stdlib_deployment_targets(args):
                            .AppleWatchSimulator.targets)
         if args.build_watchos and args.build_watchos_device:
             targets.extend(StdlibDeploymentTarget.AppleWatch.targets)
+        if StdlibDeploymentTarget.XROSSimulator and \
+           args.build_xros and args.build_xros_simulator:
+            targets.extend(StdlibDeploymentTarget.XROSSimulator.targets)
+        if StdlibDeploymentTarget.XROS and \
+           args.build_xros and args.build_xros_device:
+            targets.extend(StdlibDeploymentTarget.XROS.targets)
         return targets
-    else:
-        # All other machines only configure their host stdlib by default.
-        return [host_target]
+    elif host_target.platform.name == 'linux':
+        if args.build_linux_static:
+            targets.append(getattr(StdlibDeploymentTarget.Musl,
+                                   host_target.arch))
+
+    return targets
 
 
 def apply_default_arguments(toolchain, args):
@@ -288,6 +337,10 @@ def apply_default_arguments(toolchain, args):
     )
     if ninja_required and toolchain.ninja is None:
         args.build_ninja = True
+
+    # Enable test colors if we're on a tty.
+    if args.color_in_tests and sys.stdout.isatty():
+        args.lit_args += " --param color_output"
 
     # Set the default stdlib-deployment-targets, if none were provided.
     if args.stdlib_deployment_targets is None:
@@ -369,6 +422,12 @@ def apply_default_arguments(toolchain, args):
             if (target.platform.is_darwin and
                 target.arch in supported_archs)
         ]
+    else:
+        # Clear the value explicitly from CMakeCache.txt
+        # to avoid picking up a stale value that can cause
+        # build failures
+        args.extra_cmake_options.append(
+            '-USWIFT_DARWIN_SUPPORTED_ARCHS')
 
     # Filter out any macOS stdlib deployment targets that are not supported
     # by the macOS SDK.
@@ -379,7 +438,7 @@ def apply_default_arguments(toolchain, args):
         for target in targets
         if (not target.platform.is_darwin or
             target.platform.sdk_supports_architecture(
-                target.arch, args.darwin_xcrun_toolchain))
+                target.arch, args.darwin_xcrun_toolchain, args))
     ]
 
     # Include the Darwin module-only architectures in the CMake options.
@@ -387,6 +446,38 @@ def apply_default_arguments(toolchain, args):
         args.extra_cmake_options.append(
             '-DSWIFT_DARWIN_MODULE_ARCHS:STRING={}'.format(
                 args.swift_darwin_module_archs))
+    if (args.infer_cross_compile_hosts_on_darwin and
+            platform.system() == "Darwin"):
+        args.cross_compile_hosts = _infer_cross_compile_hosts_on_darwin(
+            get_running_arch(args.dry_run))
+        print("Inferred the following hosts for cross compilations: "
+              f"{args.cross_compile_hosts}")
+        sys.stdout.flush()
+
+
+def _infer_cross_compile_hosts_on_darwin(arch_we_are_running_on):
+    if arch_we_are_running_on == "x86_64":
+        return ["macosx-arm64"]
+    else:
+        return ["macosx-x86_64"]
+
+
+def get_running_arch(dry_run):
+    # We can override the detected arch to support
+    # BuildSystem/infer-cross-compile-hosts-on-darwin-macosx.test
+    # Given the narrow scenario, we preferred using
+    # an environment variable instead of a build-script
+    # argument to make this less discoverable on purpose
+    if dry_run:
+        injected_arch = os.environ.get(
+            'ARCH_FOR_BUILDSYSTEM_TESTS',
+            platform.machine())
+        print("DRY RUN: assume build-script is being run on a "
+              f"{injected_arch} machine")
+        return injected_arch
+    else:
+        return platform.machine()
+
 
 # -----------------------------------------------------------------------------
 # Main (preset)
@@ -419,6 +510,13 @@ def parse_preset_args():
         action=argparse.actions.StoreTrueAction,
         nargs=argparse.Nargs.OPTIONAL)
     parser.add_argument(
+        "--preset-vars-file",
+        help="load preset vars from the specified file",
+        metavar="PATH",
+        action="append",
+        dest="preset_vars_file_names",
+        default=[])
+    parser.add_argument(
         "--distcc",
         help="use distcc",
         action=argparse.actions.StoreTrueAction,
@@ -430,6 +528,41 @@ def parse_preset_args():
         action=argparse.actions.StoreTrueAction,
         nargs=argparse.Nargs.OPTIONAL,
         default=os.environ.get('SWIFT_USE_SCCACHE') == '1')
+    parser.add_argument(
+        "--enable-caching",
+        help="enable compilation caching using clang-cache and swift "
+             "cache-compile-job (incompatible with --sccache)",
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL,
+        default=os.environ.get('SWIFT_USE_CACHING') == '1')
+    parser.add_argument(
+        "--caching-cas-path",
+        help="the path to the CAS directory for caching builds",
+        metavar="PATH")
+    parser.add_argument(
+        "--caching-depscan-socket",
+        help="the socket path for the clang-cache depscan daemon",
+        metavar="PATH")
+    parser.add_argument(
+        "--caching-plugin-path",
+        help="the path to the CAS plugin for caching builds",
+        metavar="PATH")
+    parser.add_argument(
+        "--caching-plugin-option",
+        action="append",
+        default=[],
+        help="options to pass to the CAS plugin "
+             "(can be specified multiple times)")
+    parser.add_argument(
+        "--caching-prefix-map",
+        help="enable prefix mapping for cached builds",
+        action=argparse.actions.StoreTrueAction,
+        nargs=argparse.Nargs.OPTIONAL,
+        default=False)
+    parser.add_argument(
+        "--caching-remote-service-path",
+        help="the path to the remote caching service socket",
+        metavar="PATH")
     parser.add_argument(
         "--cmake-c-launcher",
         help="the absolute path to set CMAKE_C_COMPILER_LAUNCHER",
@@ -443,6 +576,11 @@ def parse_preset_args():
         help="the number of parallel build jobs to use",
         type=int,
         dest="build_jobs")
+    parser.add_argument(
+        "--lit-jobs",
+        help="the number of workers to use when testing with lit",
+        type=int,
+        dest="lit_jobs")
     parser.add_argument(
         "preset_substitutions_raw",
         help="'name=value' pairs that are substituted in the preset",
@@ -507,6 +645,13 @@ def main_preset():
         fatal_error("missing --preset option")
 
     args.preset_substitutions = {}
+    for file in args.preset_vars_file_names:
+        if os.path.isfile(file):
+            with open(file, 'r') as f:
+                for _, line in enumerate(f):
+                    name, value = line.split("=", 1)
+                    args.preset_substitutions[name] = value.strip()
+
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value
@@ -528,6 +673,17 @@ def main_preset():
         fatal_error(
             '--sccache can not be used with' +
             ' --cmake-c-launcher or --cmake-cxx-launcher')
+    if args.enable_caching and (args.cmake_c_launcher or
+                                args.cmake_cxx_launcher):
+        fatal_error(
+            '--enable-caching can not be used with'
+            ' --cmake-c-launcher or --cmake-cxx-launcher')
+    if args.enable_caching and args.sccache:
+        fatal_error(
+            '--enable-caching can not be used with --sccache')
+    if args.enable_caching and args.distcc:
+        fatal_error(
+            '--enable-caching can not be used with --distcc')
 
     build_script_args = [sys.argv[0]]
     if args.dry_run:
@@ -540,8 +696,27 @@ def main_preset():
         build_script_args += ["--distcc"]
     if args.sccache:
         build_script_args += ["--sccache"]
+    if args.enable_caching:
+        build_script_args += ["--enable-caching"]
+    if args.caching_cas_path:
+        build_script_args += ["--caching-cas-path", args.caching_cas_path]
+    if args.caching_depscan_socket:
+        build_script_args += ["--caching-depscan-socket",
+                              args.caching_depscan_socket]
+    if args.caching_plugin_path:
+        build_script_args += ["--caching-plugin-path",
+                              args.caching_plugin_path]
+    for opt in (args.caching_plugin_option or []):
+        build_script_args += ["--caching-plugin-option", opt]
+    if args.caching_prefix_map:
+        build_script_args += ["--caching-prefix-map"]
+    if args.caching_remote_service_path:
+        build_script_args += ["--caching-remote-service-path",
+                              args.caching_remote_service_path]
     if args.build_jobs:
         build_script_args += ["--jobs", str(args.build_jobs)]
+    if args.lit_jobs:
+        build_script_args += ["--lit-jobs", str(args.lit_jobs)]
     if args.swiftsyntax_install_prefix:
         build_script_args += ["--install-swiftsyntax",
                               "--install-destdir",
@@ -609,6 +784,99 @@ def main_normal():
         toolchain.libtool = args.host_libtool
     if args.cmake is not None:
         toolchain.cmake = args.cmake
+
+    # Preprocess the arguments to apply defaults.
+    apply_default_arguments(toolchain, args)
+
+    cached_ninja_real = None
+    cached_ninja_cache_session = None
+    cached_ninja_wrapper_path = None
+
+    # Set up caching build defaults and environment.
+    if args.enable_caching:
+        # Handle --caching-remote-service-path implications.
+        if args.caching_remote_service_path:
+            # Infer plugin path if not explicitly provided.
+            if not args.caching_plugin_path:
+                plugin_path = None
+                if platform.system() == 'Darwin':
+                    try:
+                        developer_dir = shell.capture(
+                            ['xcode-select', '-p'],
+                            dry_run=False, echo=False).rstrip()
+                        candidate = os.path.join(
+                            developer_dir, 'usr', 'lib',
+                            'libToolchainCASPlugin.dylib')
+                        if os.path.isfile(candidate):
+                            plugin_path = candidate
+                    except Exception:
+                        pass
+                if plugin_path is None:
+                    fatal_error(
+                        "--caching-remote-service-path requires a CAS "
+                        "plugin. Provide --caching-plugin-path or install "
+                        "Xcode.")
+                args.caching_plugin_path = plugin_path
+
+            # Add remote-service-path as a plugin option.
+            if args.caching_plugin_option is None:
+                args.caching_plugin_option = []
+            args.caching_plugin_option.append(
+                'remote-service-path=' + args.caching_remote_service_path)
+
+            # Imply prefix mapping.
+            args.caching_prefix_map = True
+
+        if args.caching_cas_path is None:
+            args.caching_cas_path = os.path.join(
+                SWIFT_BUILD_ROOT, 'cas')
+        os.environ['LLVM_CACHE_CAS_PATH'] = args.caching_cas_path
+        os.environ['LLVM_CACHE_BUILD_SESSION_ID'] = 'buildid'
+        if args.caching_plugin_path:
+            os.environ['LLVM_CACHE_PLUGIN_PATH'] = args.caching_plugin_path
+        if args.caching_plugin_option:
+            os.environ['LLVM_CACHE_PLUGIN_OPTIONS'] = \
+                ':'.join(args.caching_plugin_option)
+        if args.caching_prefix_map:
+            os.environ['LLVM_CACHE_PREFIX_MAPS'] = \
+                SWIFT_SOURCE_ROOT + '=/^src'
+        if args.caching_remote_service_path:
+            os.environ['LLVM_CACHE_REMOTE_SERVICE_SOCKET_PATH'] = \
+                args.caching_remote_service_path
+
+        # Enable MCCAS backend unless using remote service or explicitly
+        # disabled via environment.
+        args.caching_enable_mccas = (
+            not args.caching_remote_service_path and
+            os.environ.get('SWIFT_CACHE_DISABLE_MCCAS') is None)
+
+        # Compute a ninja wrapper that invokes cache-build-session for
+        # incremental builds outside the build-script daemon. The wrapper
+        # file itself is written after the clean step below so that --clean
+        # does not remove it.
+        if toolchain.ninja is not None:
+            cc_dir = os.path.dirname(toolchain.cc)
+            cache_session = os.path.join(cc_dir, 'cache-build-session')
+            if os.path.isfile(cache_session):
+                wrapper_path = os.path.join(
+                    SWIFT_BUILD_ROOT, args.build_subdir,
+                    'build-utils', 'ninja')
+                cached_ninja_real = toolchain.ninja
+                cached_ninja_cache_session = cache_session
+                cached_ninja_wrapper_path = wrapper_path
+                toolchain.ninja = wrapper_path
+
+    cmake = CMake(args=args, toolchain=toolchain)
+    toolchain.cmake = cmake.get_cmake_path(source_root=SWIFT_SOURCE_ROOT,
+                                           build_root=SWIFT_BUILD_ROOT)
+    args.cmake = toolchain.cmake
+
+    # Create the build script invocation.
+    invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
+
+    # Validate the arguments.
+    validate_arguments(toolchain, args)
+
     if args.sccache:
         print("Ensuring the sccache server is running...")
         # Use --show-stats to ensure the server is started, because using
@@ -616,22 +884,55 @@ def main_normal():
         # Capture the output because we don't want to see the stats.
         shell.capture([toolchain.sccache, "--show-stats"])
 
-    cmake = CMake(args=args, toolchain=toolchain)
-    # Check the CMake version is sufficient on Linux and build from source
-    # if not.
-    cmake_path = cmake.check_cmake_version(SWIFT_SOURCE_ROOT, SWIFT_BUILD_ROOT)
-    if cmake_path is not None:
-        toolchain.cmake = cmake_path
-        args.cmake = cmake_path
+    clang_cache_depscan_daemon = None
+    depscan_log_file = None
+    if args.enable_caching:
+        cc_dir = os.path.dirname(toolchain.cc)
+        clang_cache_path = os.path.join(cc_dir, 'clang-cache')
+        depscan_socket = args.caching_depscan_socket
 
-    # Preprocess the arguments to apply defaults.
-    apply_default_arguments(toolchain, args)
+        os.environ['CLANG_CACHE_SCAN_DAEMON_SOCKET_PATH'] = depscan_socket
 
-    # Validate the arguments.
-    validate_arguments(toolchain, args)
+        # Clean stale socket/pid files.
+        for suffix in ['', '.sock', '.pid']:
+            try:
+                os.remove(depscan_socket + suffix)
+            except FileNotFoundError:
+                pass
 
-    # Create the build script invocation.
-    invocation = build_script_invocation.BuildScriptInvocation(toolchain, args)
+        # Start the depscan daemon.
+        print("Starting clang-cache depscan daemon...")
+        depscan_log_path = os.path.join(
+            SWIFT_BUILD_ROOT, args.build_subdir, 'depscan-daemon.log')
+        shell.makedirs(os.path.dirname(depscan_log_path))
+        depscan_log_file = open(depscan_log_path, 'w')
+        clang_cache_depscan_daemon = subprocess.Popen(
+            [clang_cache_path, '-depscan-server', depscan_socket],
+            stdout=depscan_log_file, stderr=depscan_log_file)
+
+        def _cleanup_depscan_daemon():
+            if (clang_cache_depscan_daemon is not None and
+                    clang_cache_depscan_daemon.poll() is None):
+                print("Terminating clang-cache depscan daemon...")
+                clang_cache_depscan_daemon.terminate()
+                try:
+                    clang_cache_depscan_daemon.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    clang_cache_depscan_daemon.kill()
+            if depscan_log_file is not None:
+                depscan_log_file.close()
+
+        atexit.register(_cleanup_depscan_daemon)
+
+        original_sigterm = signal.getsignal(signal.SIGTERM)
+
+        def _sigterm_handler(signum, frame):
+            _cleanup_depscan_daemon()
+            if callable(original_sigterm):
+                original_sigterm(signum, frame)
+            else:
+                sys.exit(128 + signum)
+        signal.signal(signal.SIGTERM, _sigterm_handler)
 
     # Sanitize the runtime environment.
     initialize_runtime_environment()
@@ -652,6 +953,21 @@ def main_normal():
     # Create build directory.
     shell.makedirs(invocation.workspace.build_root)
 
+    # Write the cached-build ninja wrapper now so that --clean above does
+    # not remove it. cmake config steps that follow invoke this wrapper.
+    if cached_ninja_wrapper_path is not None:
+        shell.makedirs(os.path.dirname(cached_ninja_wrapper_path))
+        with open(cached_ninja_wrapper_path, 'w') as f:
+            f.write('#!/bin/sh\n')
+            f.write('# Auto-generated ninja wrapper for cached builds.\n')
+            f.write('if [ -n "$CLANG_CACHE_SCAN_DAEMON_SOCKET_PATH" ]; then\n')
+            f.write('  exec "{}" "$@"\n'.format(cached_ninja_real))
+            f.write('else\n')
+            f.write('  exec "{}" "{}" "$@"\n'.format(
+                cached_ninja_cache_session, cached_ninja_real))
+            f.write('fi\n')
+        os.chmod(cached_ninja_wrapper_path, 0o755)
+
     # Create .build_script_log
     if not args.dry_run:
         build_script_log = os.path.join(invocation.workspace.build_root,
@@ -661,10 +977,6 @@ def main_normal():
     if args.clean_install_destdir:
         sys.stdout.write("Cleaning install destdir!\n")
         shell.rmtree(args.install_destdir)
-
-    # Build ninja if required, which will update the toolchain.
-    if args.build_ninja:
-        invocation.build_ninja()
 
     # Execute the underlying build script implementation.
     invocation.execute()
@@ -716,6 +1028,13 @@ def main():
 
 if __name__ == "__main__":
     try:
-        sys.exit(main())
+        exit_code = main()
+        log_analyzer()
+    except SystemExit:
+        raise
     except KeyboardInterrupt:
         sys.exit(1)
+    except Exception:
+        log_analyzer()
+        raise
+    sys.exit(exit_code)

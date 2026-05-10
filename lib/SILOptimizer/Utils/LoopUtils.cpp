@@ -11,14 +11,18 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-loop-utils"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILModule.h"
+#include "swift/SIL/StackAllocation.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "llvm/Support/Debug.h"
 
@@ -32,7 +36,7 @@ static SILBasicBlock *createInitialPreheader(SILBasicBlock *Header) {
   llvm::SmallVector<SILValue, 8> Args;
   for (auto *HeaderArg : Header->getArguments()) {
     Args.push_back(Preheader->createPhiArgument(HeaderArg->getType(),
-                                                OwnershipKind::Owned));
+                                                HeaderArg->getOwnershipKind()));
   }
 
   // Create the branch to the header.
@@ -62,8 +66,7 @@ static SILBasicBlock *insertPreheader(SILLoop *L, DominanceInfo *DT,
   // Then change all of the original predecessors to target Preheader instead of
   // header.
   for (auto *Pred : Preds) {
-    replaceBranchTarget(Pred->getTerminator(), Header, Preheader,
-                        true /*PreserveArgs*/);
+    Pred->getTerminator()->replaceBranchTarget(Header, Preheader);
   }
 
   // Update dominance info.
@@ -127,8 +130,9 @@ static SILBasicBlock *insertBackedgeBlock(SILLoop *L, DominanceInfo *DT,
   // the backedge block which correspond to any PHI nodes in the header block.
   SmallVector<SILValue, 6> BBArgs;
   for (auto *BBArg : Header->getArguments()) {
-    BBArgs.push_back(BEBlock->createPhiArgument(BBArg->getType(),
-                                                BBArg->getOwnershipKind()));
+    BBArgs.push_back(BEBlock->createPhiArgument(
+        BBArg->getType(), BBArg->getOwnershipKind(), /* decl */ nullptr,
+        BBArg->isReborrow(), BBArg->hasPointerEscape()));
   }
 
   // Arbitrarily pick one of the predecessor's branch locations.
@@ -214,6 +218,141 @@ bool swift::canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI) {
 
   return MadeChange;
 }
+
+bool swift::canDuplicateLoopInstruction(SILLoop *L, SILInstruction *I, DeadEndBlocks *deb) {
+  SinkAddressProjections sinkProj;
+  for (auto res : I->getResults()) {
+    // If a guaranteed value is used in a dead-end exit block and the enclosing value
+    // is _not_ destroyed in this block, we end up missing the enclosing value as
+    // phi-argument after duplicating the loop.
+    // TODO: once we have complete lifetimes we can remove this check
+    if (res->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      for (Operand *use : res->getUses()) {
+        SILBasicBlock *useBlock = use->getUser()->getParent();
+        if (!L->contains(useBlock) && deb->isDeadEnd(useBlock))
+          return false;
+      }
+    }
+
+    if (!res->getType().isAddress()) {
+      continue;
+    }
+    auto canSink = sinkProj.analyzeAddressProjections(I);
+    if (!canSink) {
+      return false;
+    }
+  }
+
+  // The deallocation of a stack allocation must be in the loop, otherwise the
+  // deallocation will be fed by a phi node of two allocations.
+  if (auto allocation = I->getStackAllocation()) {
+    for (auto *UI : allocation->getValue()->getUses()) {
+      if (UI->getUser()->isDeallocatingStack()) {
+        if (!L->contains(UI->getUser()->getParent()))
+          return false;
+      }
+    }
+    return true;
+  }
+  if (auto deallocation = I->getStackDeallocation()) {
+    SILInstruction *alloc = deallocation->getAllocation().getInstruction();
+    return L->contains(alloc);
+  }
+  // In OSSA, partial_apply is not considered stack allocating. Nonetheless,
+  // prevent it from being cloned so OSSA lowering can directly convert it to a
+  // single allocation.
+  if (auto *PA = dyn_cast<PartialApplyInst>(I)) {
+    if (PA->isOnStack()) {
+      assert(PA->getFunction()->hasOwnership());
+      return false;
+    }
+  }
+  // Like partial_apply [onstack], mark_dependence [nonescaping] on values
+  // creates a borrow scope. We currently assume that a set of dominated
+  // scope-ending uses can be found.
+  if (auto *MD = dyn_cast<MarkDependenceInst>(I)) {
+    return !MD->isNonEscaping() || MD->getType().isAddress();
+  }
+  // CodeGen can't build ssa for objc methods.
+  if (auto *Method = dyn_cast<MethodInst>(I)) {
+    if (Method->getMember().isForeign) {
+      for (auto *UI : Method->getUses()) {
+        if (!L->contains(UI->getUser()))
+          return false;
+      }
+    }
+    return true;
+  }
+
+  // We can't have a phi of two openexistential instructions of different UUID.
+  if (isa<OpenExistentialAddrInst>(I) || isa<OpenExistentialRefInst>(I) ||
+      isa<OpenExistentialMetatypeInst>(I) || isa<OpenExistentialValueInst>(I) ||
+      isa<OpenExistentialBoxInst>(I) || isa<OpenExistentialBoxValueInst>(I) ||
+      isa<OpenPackElementInst>(I)) {
+    SingleValueInstruction *OI = cast<SingleValueInstruction>(I);
+    for (auto *UI : OI->getUses())
+      if (!L->contains(UI->getUser()))
+        return false;
+    return true;
+  }
+
+  if (isa<ThrowInst>(I) || isa<ThrowAddrInst>(I))
+    return false;
+
+  // The entire access must be within the loop.
+  if (auto BAI = dyn_cast<BeginAccessInst>(I)) {
+    for (auto *UI : BAI->getUses()) {
+      if (!L->contains(UI->getUser()))
+        return false;
+    }
+    return true;
+  }
+  // The entire coroutine execution must be within the loop.
+  // Note that we don't have to worry about the reverse --- a loop which
+  // contains an end_apply or abort_apply of an external begin_apply ---
+  // because that wouldn't be structurally valid in the first place.
+  if (auto BAI = dyn_cast<BeginApplyInst>(I)) {
+    for (auto *Use : BAI->getEndApplyUses()) {
+      auto *User = Use->getUser();
+      assert(isa<EndApplyInst>(User) || isa<AbortApplyInst>(User) ||
+             isa<EndBorrowInst>(User));
+      if (!L->contains(User))
+        return false;
+    }
+    return true;
+  }
+
+  if (auto *bi = dyn_cast<BuiltinInst>(I)) {
+    if (bi->getBuiltinInfo().ID == BuiltinValueKind::Once)
+      return false;
+  }
+
+  if (isa<DynamicMethodBranchInst>(I))
+    return false;
+
+  // Can't duplicate get/await_async_continuation.
+  if (isa<AwaitAsyncContinuationInst>(I) ||
+      isa<GetAsyncContinuationAddrInst>(I) || isa<GetAsyncContinuationInst>(I))
+    return false;
+
+  // Bail if there are any begin-borrow instructions which have no corresponding
+  // end-borrow uses. This is the case if the control flow ends in a dead-end block.
+  // After duplicating such a block, the re-borrow flags cannot be recomputed
+  // correctly for inserted phi arguments.
+  if (auto *svi  = dyn_cast<SingleValueInstruction>(I)) {
+    if (auto bv = BorrowedValue(lookThroughBorrowedFromDef(svi))) {
+      if (!bv.hasLocalScopeEndingUses())
+        return false;
+    }
+  }
+
+  // Some special cases above that aren't considered isTriviallyDuplicatable
+  // return true early.
+  assert(I->isTriviallyDuplicatable() &&
+    "Code here must match isTriviallyDuplicatable in SILInstruction");
+  return true;
+}
+
 
 //===----------------------------------------------------------------------===//
 //                                Loop Visitor

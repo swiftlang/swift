@@ -1,7 +1,10 @@
-// RUN: %target-run-simple-swift(-parse-as-library  -Xfrontend -disable-availability-checking) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library  -target %target-swift-5.1-abi-triple) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library  -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)  | %FileCheck %s
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: freestanding
 
 // rdar://76038845
 // REQUIRES: concurrency_runtime

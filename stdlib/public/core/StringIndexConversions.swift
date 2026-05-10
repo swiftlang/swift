@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -177,3 +177,184 @@ extension String.Index {
   }
 }
 
+extension String {
+  /// Returns the largest valid index in `self` that does not exceed the given
+  /// position.
+  ///
+  ///     let cafe = "Cafe\u{301}" // "Café"
+  ///     let accent = cafe.unicodeScalars.firstIndex(of: "\u{301")!
+  ///     let char = cafe._index(roundingDown: accent)
+  ///     print(cafe[char]) // "é"
+  ///
+  /// `String` methods such as `index(after:)` and `distance(from:to:)`
+  /// implicitly round their input indices down to the nearest valid index:
+  ///
+  ///     let i = cafe.index(before: char)
+  ///     let j = cafe.index(before: accent)
+  ///     print(cafe[i], cafe[j]) // "f f"
+  ///     print(i == j) // true
+  ///
+  /// This operation lets you perform this rounding yourself. For example, this
+  /// can be used to safely check if `index(before:)` would consider some
+  /// arbitrary index equivalent to the start index before calling it.
+  ///
+  /// - Parameter i: An index that is valid in at least one view of this string.
+  /// - Returns: The largest valid index within this string that doesn't exceed
+  ///     `i`.
+  @available(SwiftStdlib 5.8, *)
+  public // SPI(Foundation) FIXME: This should be API
+  func _index(roundingDown i: Index) -> Index {
+    _guts.validateInclusiveCharacterIndex(i)
+  }
+}
+
+extension Substring {
+  /// Returns the largest valid index in `self` that does not exceed the given
+  /// position.
+  ///
+  /// `Substring` methods such as `index(after:)` and `distance(from:to:)`
+  /// implicitly round their input indices down to the nearest valid index.
+  /// This operation lets you perform this rounding yourself. For example, this
+  /// can be used to safely check if `index(before:)` would consider some
+  /// arbitrary index equivalent to the start index before calling it.
+  ///
+  /// - Parameter i: An index that is valid in at least one view of this
+  ///     substring.
+  /// - Returns: The largest valid index within this substring that doesn't
+  ///     exceed `i`.
+  @available(SwiftStdlib 5.8, *)
+  public // SPI(Foundation) FIXME: This should be API
+  func _index(roundingDown i: Index) -> Index {
+    _wholeGuts.validateInclusiveCharacterIndex(i, in: _bounds)
+  }
+}
+
+extension String.UnicodeScalarView {
+  /// Returns the largest valid index in `self` that does not exceed the given
+  /// position.
+  ///
+  /// Methods such as `index(after:)` and `distance(from:to:)` implicitly round
+  /// their input indices down to the nearest valid index. This operation lets
+  /// you perform this rounding yourself. For example, this can be used to
+  /// safely check if `index(before:)` would consider some arbitrary index
+  /// equivalent to the start index before calling it.
+  ///
+  /// - Parameter i: An index that is valid in at least one view of the string
+  ///    shared by this view.
+  /// - Returns: The largest valid index within this view that doesn't exceed
+  ///     `i`.
+  @_alwaysEmitIntoClient
+  public // SPI(Foundation) FIXME: This should be API
+  func _index(roundingDown i: Index) -> Index {
+    _guts.validateInclusiveScalarIndex(i)
+  }
+}
+
+extension Substring.UnicodeScalarView {
+  /// Returns the largest valid index in `self` that does not exceed the given
+  /// position.
+  ///
+  /// Methods such as `index(after:)` and `distance(from:to:)` implicitly round
+  /// their input indices down to the nearest valid index. This operation lets
+  /// you perform this rounding yourself. For example, this can be used to
+  /// safely check if `index(before:)` would consider some arbitrary index
+  /// equivalent to the start index before calling it.
+  ///
+  /// - Parameter i: An index that is valid in at least one view of the
+  ///    substring shared by this view.
+  /// - Returns: The largest valid index within this view that doesn't exceed
+  ///     `i`.
+  @_alwaysEmitIntoClient
+  public // SPI(Foundation) FIXME: This should be API
+  func _index(roundingDown i: Index) -> Index {
+    _wholeGuts.validateInclusiveScalarIndex(i, in: _bounds)
+  }
+}
+
+extension String.UTF8View {
+  /// Returns the largest valid index in `self` that does not exceed the given
+  /// position.
+  ///
+  /// Methods such as `index(after:)` and `distance(from:to:)` implicitly round
+  /// their input indices down to the nearest valid index. This operation lets
+  /// you perform this rounding yourself. For example, this can be used to
+  /// safely check if `index(before:)` would consider some arbitrary index
+  /// equivalent to the start index before calling it.
+  ///
+  /// - Parameter i: An index that is valid in at least one view of the
+  ///    substring shared by this view.
+  /// - Returns: The largest valid index within this view that doesn't exceed
+  ///     `i`.
+  @_alwaysEmitIntoClient
+  public // SPI(Foundation) FIXME: This should be API
+  func _index(roundingDown i: Index) -> Index {
+    let i = _guts.validateInclusiveSubscalarIndex(i)
+    guard _guts.isForeign else { return i.strippingTranscoding._knownUTF8 }
+    return _utf8AlignForeignIndex(i)
+  }
+}
+
+extension Substring.UTF8View {
+  /// Returns the largest valid index in `self` that does not exceed the given
+  /// position.
+  ///
+  /// Methods such as `index(after:)` and `distance(from:to:)` implicitly round
+  /// their input indices down to the nearest valid index. This operation lets
+  /// you perform this rounding yourself. For example, this can be used to
+  /// safely check if `index(before:)` would consider some arbitrary index
+  /// equivalent to the start index before calling it.
+  ///
+  /// - Parameter i: An index that is valid in at least one view of the
+  ///    substring shared by this view.
+  /// - Returns: The largest valid index within this view that doesn't exceed
+  ///     `i`.
+  @_alwaysEmitIntoClient
+  public // SPI(Foundation) FIXME: This should be API
+  func _index(roundingDown i: Index) -> Index {
+    let i = _wholeGuts.validateInclusiveSubscalarIndex(i, in: _bounds)
+    guard _wholeGuts.isForeign else { return i.strippingTranscoding._knownUTF8 }
+    return _slice._base._utf8AlignForeignIndex(i)
+  }
+}
+
+extension String.UTF16View {
+  /// Returns the valid index in `self` that this view considers equivalent to
+  /// the given index.
+  ///
+  /// Indices in the UTF-8 view that address positions between Unicode scalars
+  /// are rounded down to the nearest scalar boundary; other indices are left as
+  /// is.
+  ///
+  /// - Parameter i: An index that is valid in at least one view of the
+  ///    substring shared by this view.
+  /// - Returns: The valid index in `self` that this view considers equivalent
+  ///    to `i`.
+  @_alwaysEmitIntoClient
+  public // SPI(Foundation) FIXME: This should be API
+  func _index(roundingDown i: Index) -> Index {
+    let i = _guts.validateInclusiveSubscalarIndex(i)
+    if _guts.isForeign { return i.strippingTranscoding._knownUTF16 }
+    return _utf16AlignNativeIndex(i)
+  }
+}
+
+extension Substring.UTF16View {
+  /// Returns the valid index in `self` that this view considers equivalent to
+  /// the given index.
+  ///
+  /// Indices in the UTF-8 view that address positions between Unicode scalars
+  /// are rounded down to the nearest scalar boundary; other indices are left as
+  /// is.
+  ///
+  /// - Parameter i: An index that is valid in at least one view of the
+  ///    substring shared by this view.
+  /// - Returns: The valid index in `self` that this view considers equivalent
+  ///    to `i`.
+  @_alwaysEmitIntoClient
+  public // SPI(Foundation) FIXME: This should be API
+  func _index(roundingDown i: Index) -> Index {
+    let i = _wholeGuts.validateInclusiveSubscalarIndex(i, in: _bounds)
+    if _wholeGuts.isForeign { return i.strippingTranscoding._knownUTF16 }
+    return _slice._base._utf16AlignNativeIndex(i)
+  }
+}

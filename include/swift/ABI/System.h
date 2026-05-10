@@ -17,6 +17,6 @@
 #ifndef SWIFT_ABI_SYSTEM_H
 #define SWIFT_ABI_SYSTEM_H
 
-#include "../../../stdlib/public/SwiftShims/System.h"
+#include "swift/shims/System.h"
 
 #endif // SWIFT_ABI_SYSTEM_H

@@ -93,7 +93,7 @@ struct YieldInDefer {
   }
 }
 
-// SR-15066
+// https://github.com/apple/swift/issues/57393
 struct InvalidYieldParsing {
   var property: String {
     _read {

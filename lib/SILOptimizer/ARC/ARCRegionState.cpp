@@ -14,6 +14,7 @@
 #include "ARCRegionState.h"
 #include "ARCSequenceOptUtils.h"
 #include "RCStateTransitionVisitors.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/Analysis/AliasAnalysis.h"
@@ -55,7 +56,7 @@ void ARCRegionState::initSuccBottomUp(ARCRegionState &SuccRegionState) {
 void ARCRegionState::mergeSuccBottomUp(ARCRegionState &SuccRegionState) {
   // Otherwise for each [(SILValue, BottomUpState)] that we are tracking...
   for (auto &Pair : getBottomupStates()) {
-    if (!Pair.hasValue())
+    if (!Pair.has_value())
       continue;
 
     SILValue RefCountedValue = Pair->first;
@@ -113,7 +114,7 @@ void ARCRegionState::initPredTopDown(ARCRegionState &PredRegionState) {
 void ARCRegionState::mergePredTopDown(ARCRegionState &PredRegionState) {
   // For each [(SILValue, TopDownState)] that we are tracking...
   for (auto &Pair : getTopDownStates()) {
-    if (!Pair.hasValue())
+    if (!Pair.has_value())
       continue;
     SILValue RefCountedValue = Pair->first;
 
@@ -166,7 +167,7 @@ bool ARCRegionState::processBlockBottomUp(
     EpilogueARCFunctionInfo *EAFI, LoopRegionFunctionInfo *LRFI,
     bool FreezeOwnedArgEpilogueReleases,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory) {
   LLVM_DEBUG(llvm::dbgs() << ">>>> Bottom Up!\n");
 
   SILBasicBlock &BB = *R->getBlock();
@@ -219,7 +220,7 @@ bool ARCRegionState::processBlockBottomUp(
     // tracking...
     for (auto &OtherState : getBottomupStates()) {
       // If the other state's value is blotted, skip it.
-      if (!OtherState.hasValue())
+      if (!OtherState.has_value())
         continue;
 
       // If this is the state associated with the instruction that we are
@@ -279,7 +280,7 @@ bool ARCRegionState::processLoopBottomUp(
   // For each state that we are currently tracking, apply our summarized
   // instructions to it.
   for (auto &OtherState : getBottomupStates()) {
-    if (!OtherState.hasValue())
+    if (!OtherState.has_value())
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts()) {
@@ -311,7 +312,7 @@ bool ARCRegionState::processBottomUp(
     llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
     BlotMapVector<SILInstruction *, BottomUpRefCountState> &IncToDecStateMap,
     llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory) {
   const LoopRegion *R = getRegion();
 
   // We only process basic blocks for now. This ensures that we always propagate
@@ -331,7 +332,7 @@ bool ARCRegionState::processBottomUp(
 bool ARCRegionState::processBlockTopDown(
     SILBasicBlock &BB, AliasAnalysis *AA, RCIdentityFunctionInfo *RCIA,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory) {
   LLVM_DEBUG(llvm::dbgs() << ">>>> Top Down!\n");
 
   bool NestingDetected = false;
@@ -383,7 +384,7 @@ bool ARCRegionState::processBlockTopDown(
     // For all other [(SILValue, TopDownState)] we are tracking...
     for (auto &OtherState : getTopDownStates()) {
       // If the other state's value is blotted, skip it.
-      if (!OtherState.hasValue())
+      if (!OtherState.has_value())
         continue;
 
       // If we visited an increment or decrement successfully (and thus Op is
@@ -429,7 +430,7 @@ bool ARCRegionState::processLoopTopDown(
   // For each state that we are currently tracking, apply our summarized
   // instructions to it.
   for (auto &OtherState : getTopDownStates()) {
-    if (!OtherState.hasValue())
+    if (!OtherState.has_value())
       continue;
 
     for (auto *I : State->getSummarizedInterestingInsts()) {
@@ -460,7 +461,7 @@ bool ARCRegionState::processTopDown(
     llvm::DenseSet<SILInstruction *> &UnmatchedRefCountInsts,
     BlotMapVector<SILInstruction *, TopDownRefCountState> &DecToIncStateMap,
     llvm::DenseMap<const LoopRegion *, ARCRegionState *> &RegionStateInfo,
-    ImmutablePointerSetFactory<SILInstruction> &SetFactory) {
+    ImmutablePointerSetFactory<SILInstruction *> &SetFactory) {
   const LoopRegion *R = getRegion();
 
   // We only process basic blocks for now. This ensures that we always propagate

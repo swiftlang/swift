@@ -43,9 +43,9 @@ class Derived : Base {
 
 
 // Check if the objc methods are not generated with the unnamed_addr attribute.
-// CHECK-IR-DAG: define {{.*}} @"$s4test4BaseC20supportsSecureCodingSbvgZTo"({{[^\)]*}}) #{{[0-9]+}} {
-// CHECK-IR-DAG: define {{.*}} @"$s4test4BaseC6encode4withySo7NSCoderC_tFTo"({{[^\)]*}}) #{{[0-9]+}} {
-// CHECK-IR-DAG: define {{.*}} @"$s4test7DerivedC20supportsSecureCodingSbvgZTo"({{[^\)]*}}) #{{[0-9]+}} {
+// CHECK-IR-DAG: define {{.*}} @"$s4test4BaseC20supportsSecureCodingSbvgZTo"({{.*}}) #{{[0-9]+}} {
+// CHECK-IR-DAG: define {{.*}} @"$s4test4BaseC6encode4withySo7NSCoderC_tFTo"({{.*}}) #{{[0-9]+}} {
+// CHECK-IR-DAG: define {{.*}} @"$s4test7DerivedC20supportsSecureCodingSbvgZTo"({{.*}}) #{{[0-9]+}} {
 
 let d = Derived(s: "")
 if #available(macOS 10.13, iOS 11, tvOS 11, watchOS 4, *) {

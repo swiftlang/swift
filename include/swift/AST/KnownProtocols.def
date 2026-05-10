@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -41,9 +41,31 @@
     PROTOCOL_WITH_NAME(Id, Name)
 #endif
 
+/// \def INVERTIBLE_PROTOCOL_WITH_NAME(id, name)
+/// \param Name a string literal with the external name of this protocol
+/// \param Id the internal "enum name" of this protocol.
+#ifndef INVERTIBLE_PROTOCOL_WITH_NAME
+#define INVERTIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    PROTOCOL_WITH_NAME(Id, Name)
+#endif
+
+/// \def REPRESSIBLE_PROTOCOL_WITH_NAME(id, name)
+/// \param id the internal "enum name" of this protocol
+/// \param name a string literal with the external name of this protocol
+#ifndef REPRESSIBLE_PROTOCOL_WITH_NAME
+#define REPRESSIBLE_PROTOCOL_WITH_NAME(Id, Name) \
+    PROTOCOL_WITH_NAME(Id, Name)
+#endif
+
+#define REPRESSIBLE_PROTOCOL(name) REPRESSIBLE_PROTOCOL_WITH_NAME(name, #name)
+#define REPRESSIBLE_PROTOCOL_(name) REPRESSIBLE_PROTOCOL_WITH_NAME(name, "_" #name)
 
 #define PROTOCOL(name) PROTOCOL_WITH_NAME(name, #name)
 #define PROTOCOL_(name) PROTOCOL_WITH_NAME(name, "_" #name)
+
+#ifndef CXX_PROTOCOL
+#define CXX_PROTOCOL(name) PROTOCOL(name)
+#endif
 
 /// \param typeName supplies the name used for type lookup,
 /// \param performLocalLookup specifies whether to first look in the local context.
@@ -59,7 +81,6 @@
     BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
 
 PROTOCOL(Actor)
-PROTOCOL(AnyActor)
 PROTOCOL(Sequence)
 PROTOCOL(Identifiable)
 PROTOCOL(IteratorProtocol)
@@ -74,9 +95,13 @@ PROTOCOL(CaseIterable)
 PROTOCOL(SIMD)
 PROTOCOL(SIMDScalar)
 PROTOCOL(BinaryInteger)
+PROTOCOL(FixedWidthInteger)
 PROTOCOL(RangeReplaceableCollection)
+PROTOCOL(Executor)
 PROTOCOL(SerialExecutor)
+PROTOCOL(TaskExecutor)
 PROTOCOL(GlobalActor)
+PROTOCOL(ExecutorFactory)
 
 PROTOCOL_(BridgedNSError)
 PROTOCOL_(BridgedStoredNSError)
@@ -86,7 +111,8 @@ PROTOCOL(CodingKey)
 PROTOCOL(Encodable)
 PROTOCOL(Decodable)
 
-PROTOCOL(Sendable)
+REPRESSIBLE_PROTOCOL(Sendable)
+PROTOCOL(SendableMetatype)
 PROTOCOL(UnsafeSendable)
 
 PROTOCOL_(ObjectiveCBridgeable)
@@ -99,15 +125,50 @@ PROTOCOL(Differentiable)
 
 // Distributed Actors
 PROTOCOL(DistributedActor)
+PROTOCOL_(DistributedActorStub)
 PROTOCOL(DistributedActorSystem)
 PROTOCOL(DistributedTargetInvocationEncoder)
 PROTOCOL(DistributedTargetInvocationDecoder)
 PROTOCOL(DistributedTargetInvocationResultHandler)
 
+// C++ Standard Library Overlay:
+CXX_PROTOCOL(CxxConvertibleToBool)
+CXX_PROTOCOL(CxxConvertibleToCollection)
+CXX_PROTOCOL(CxxDictionary)
+CXX_PROTOCOL(CxxOptional)
+CXX_PROTOCOL(CxxPair)
+CXX_PROTOCOL(CxxSet)
+CXX_PROTOCOL(CxxRandomAccessCollection)
+CXX_PROTOCOL(CxxMutableRandomAccessCollection)
+CXX_PROTOCOL(CxxSequence)
+CXX_PROTOCOL(CxxBorrowingSequence)
+CXX_PROTOCOL(CxxUniqueSet)
+CXX_PROTOCOL(CxxVector)
+CXX_PROTOCOL(CxxSpan)
+CXX_PROTOCOL(CxxMutableSpan)
+CXX_PROTOCOL(UnsafeCxxInputIterator)
+CXX_PROTOCOL(UnsafeCxxMutableInputIterator)
+CXX_PROTOCOL(UnsafeCxxRandomAccessIterator)
+CXX_PROTOCOL(UnsafeCxxMutableRandomAccessIterator)
+CXX_PROTOCOL(UnsafeCxxContiguousIterator)
+CXX_PROTOCOL(UnsafeCxxMutableContiguousIterator)
+
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)
 
+PROTOCOL(BorrowingSequence)
+PROTOCOL(BorrowingIteratorProtocol)
+
+PROTOCOL(ConvertibleToBytes)
+PROTOCOL(ConvertibleFromBytes)
+
 PROTOCOL(FloatingPoint)
+
+#define INVERTIBLE_PROTOCOL(Name, Bit) \
+    INVERTIBLE_PROTOCOL_WITH_NAME(Name, #Name)
+#include "swift/ABI/InvertibleProtocols.def"
+
+REPRESSIBLE_PROTOCOL(BitwiseCopyable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)
@@ -136,6 +197,11 @@ BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_(ExpressibleByBuiltinUnicodeScalarLitera
 #undef EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
 #undef BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_
 #undef BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME
+#undef REPRESSIBLE_PROTOCOL_WITH_NAME
+#undef REPRESSIBLE_PROTOCOL
+#undef REPRESSIBLE_PROTOCOL_
+#undef INVERTIBLE_PROTOCOL_WITH_NAME
 #undef PROTOCOL
 #undef PROTOCOL_
 #undef PROTOCOL_WITH_NAME
+#undef CXX_PROTOCOL

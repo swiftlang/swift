@@ -26,13 +26,13 @@ We describe how to build both standalone and with build-script below.
 
 ### build-script invoking CMake
 
-By default, Swift benchmarks for OS X are compiled during the Swift build
+By default, Swift benchmarks for macOS are compiled during the Swift build
 process. To build Swift benchmarks for additional platforms, pass the following
 flags:
 
     $ swift/utils/build-script --ios --watchos --tvos
 
-OS X benchmark driver binaries are placed in `bin` alongside `swiftc`.
+macOS benchmark driver binaries are placed in `bin` alongside `swiftc`.
 Additional platform binaries are placed in the `benchmark/bin` build directory.
 
 The required Swift standard library dylibs are placed in `lib`. The
@@ -119,6 +119,11 @@ installed libraries instead, enable
 This will reflect the performance of the Swift standard library
 installed on the device, not the one included in the Swift root.
 
+If a build fails with an error like `cannot find X in scope`, it may be because
+default toolchains don't give access to stdlib SPI. Try using a dev toolchain
+built locally or a dev snapshot from
+[Swift.org](https://www.swift.org/install/).
+
 ### build-script using SwiftPM+LLBuild
 
 To build the benchmarks using build-script/swiftpm, one must build both
@@ -147,6 +152,15 @@ swift-source/swift/benchmark$ .build/release/SwiftBench
 2,AngryPhonebook,1,2044,2044,2044,0,2044
 ...
 ```
+
+### Troubleshooting
+
+* To check what libraries benchmark is linked against, set the
+  `DYLD_PRINT_SEARCHING` environment variable. E.g.
+  `export DYLD_PRINT_SEARCHING=1`.
+* To force linking with a locally built stdlib, use the `DYLD_LIBRARY_PATH`
+  environment variable. E.g. `export
+  DYLD_LIBRARY_PATH=<path_to_build_folder>/Ninja-ReleaseAssert/swift-macosx-x86_64/lib/swift/macosx/x86_64`.
 
 ## Editing in Xcode
 

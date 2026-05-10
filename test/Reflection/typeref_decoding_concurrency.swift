@@ -18,8 +18,8 @@
 // For macOS versions before 12.0, the mangling for concurrency-related
 // types cannot be used to create type metadata.
 
-// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s
-// RUN: %target-swift-reflection-dump -binary-filename %t/TypesToReflect | %FileCheck %s
+// RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) | %FileCheck %s
+// RUN: %target-swift-reflection-dump %t/TypesToReflect | %FileCheck %s
 
 // CHECK: FIELDS:
 // CHECK: =======

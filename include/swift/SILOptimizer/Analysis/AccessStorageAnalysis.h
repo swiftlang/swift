@@ -19,11 +19,6 @@
 // FunctionAccessStorage.unidentifiedAccess. This does not imply that all
 // accesses within the function have Unidentified AccessStorage.
 //
-// Note: This interprocedural analysis can be easily augmented to simultaneously
-// compute FunctionSideEffects, without using a separate analysis, by adding
-// FunctionSideEffects as a member of FunctionAccessStorage. However, passes
-// that use AccessStorageAnalysis do not currently need SideEffectAnalysis.
-//
 //===----------------------------------------------------------------------===//
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_ACCESSED_STORAGE_ANALYSIS_H
@@ -31,9 +26,12 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
-#include "swift/SILOptimizer/Analysis/SideEffectAnalysis.h"
+#include "swift/SILOptimizer/Analysis/BottomUpIPAnalysis.h"
 
 namespace swift {
+
+class BasicCalleeAnalysis;
+class DestructorAnalysis;
 
 /// Information about a formal access within a function pertaining to a
 /// particular AccessStorage location.
@@ -125,7 +123,7 @@ namespace swift {
 using AccessStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
 
 /// Records each unique AccessStorage in a set of StorageAccessInfo
-/// objects. Hashing and equality only sees the AccesedStorage data. The
+/// objects. Hashing and equality only sees the AccessedStorage data. The
 /// additional StorageAccessInfo bits are recorded as results of this analysis.
 ///
 /// Any unidentified accesses are summarized as a single unidentifiedAccess
@@ -135,7 +133,7 @@ using AccessStorageSet = llvm::SmallDenseSet<StorageAccessInfo, 8>;
 /// AccessStorage, which is never allowed for class or global access.
 class AccessStorageResult {
   AccessStorageSet storageAccessSet;
-  Optional<SILAccessKind> unidentifiedAccess;
+  std::optional<SILAccessKind> unidentifiedAccess;
 
 public:
   AccessStorageResult() {}
@@ -149,7 +147,9 @@ public:
     return storageAccessSet.empty() && !unidentifiedAccess;
   }
 
-  bool hasUnidentifiedAccess() const { return unidentifiedAccess != None; }
+  bool hasUnidentifiedAccess() const {
+    return unidentifiedAccess != std::nullopt;
+  }
 
   /// Return true if the analysis has determined all accesses of otherStorage
   /// have the [no_nested_conflict] flag set.
@@ -172,7 +172,7 @@ public:
 
   void clear() {
     storageAccessSet.clear();
-    unidentifiedAccess = None;
+    unidentifiedAccess = std::nullopt;
   }
 
   /// Return true if these effects are fully conservative.
@@ -203,7 +203,7 @@ public:
 
   /// Record any access scopes entered by the given single SIL instruction. 'I'
   /// must not be a FullApply; use mergeFromApply instead.
-  void analyzeInstruction(SILInstruction *I);
+  void analyzeInstruction(SILInstruction *I, DestructorAnalysis *DA);
 
   void print(raw_ostream &os) const;
   void dump() const;
@@ -295,10 +295,7 @@ public:
   /// the callee.
   ///
   /// TODO: Summarize ArraySemanticsCall accesses.
-  bool summarizeCall(FullApplySite fullApply) {
-    assert(accessResult.isEmpty() && "expected uninitialized results.");
-    return false;
-  }
+  bool summarizeCall(FullApplySite fullApply);
 
   /// Merge effects directly from \p RHS.
   bool mergeFrom(const FunctionAccessStorage &RHS) {
@@ -321,8 +318,8 @@ public:
   /// Analyze the side-effects of a single SIL instruction \p I.
   /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
   /// reaches MaxRecursionDepth.
-  void analyzeInstruction(SILInstruction *I) {
-    accessResult.analyzeInstruction(I);
+  void analyzeInstruction(SILInstruction *I, DestructorAnalysis *DA) {
+    accessResult.analyzeInstruction(I, DA);
   }
 
   void print(raw_ostream &os) const { accessResult.print(os); }
@@ -343,16 +340,127 @@ public:
 /// Use the GenericFunctionEffectAnalysis API to get the results of the analysis:
 /// - geEffects(SILFunction*)
 /// - getCallSiteEffects(FunctionEffects &callEffects, FullApplySite fullApply)
-class AccessStorageAnalysis
-    : public GenericFunctionEffectAnalysis<FunctionAccessStorage> {
+class AccessStorageAnalysis : public BottomUpIPAnalysis {
+
+  /// Stores the analysis data, e.g. side-effects, for a function.
+  struct FunctionInfo : public FunctionInfoBase<FunctionInfo> {
+
+    /// The function effects.
+    FunctionAccessStorage functionEffects;
+
+    /// Back-link to the function.
+    SILFunction *F;
+
+    /// Used during recomputation to indicate if the side-effects of a caller
+    /// must be updated.
+    bool needUpdateCallers = false;
+
+    FunctionInfo(SILFunction *F) : F(F) {}
+
+    /// Clears the analysis data on invalidation.
+    void clear() { functionEffects.clear(); }
+  };
+
+  typedef BottomUpFunctionOrder<FunctionInfo> FunctionOrder;
+
+  enum {
+    /// The maximum call-graph recursion depth for recomputing the analysis.
+    /// This is a relatively small number to reduce compile time in case of
+    /// large cycles in the call-graph.
+    /// In case of no cycles, we should not hit this limit at all because the
+    /// pass manager processes functions in bottom-up order.
+    MaxRecursionDepth = 5
+  };
+
+  /// All the function effect information for the whole module.
+  llvm::DenseMap<SILFunction *, FunctionInfo *> functionInfoMap;
+
+  /// The allocator for the map of values in FunctionInfoMap.
+  llvm::SpecificBumpPtrAllocator<FunctionInfo> allocator;
+
+  /// Callee analysis, used for determining the callees at call sites.
+  BasicCalleeAnalysis *BCA;
+
+  /// Destructor analysis, used for determined which releases are harmless wrt
+  /// to their side-effects.
+  DestructorAnalysis *DA;
+
 public:
   AccessStorageAnalysis()
-      : GenericFunctionEffectAnalysis<FunctionAccessStorage>(
-            SILAnalysisKind::AccessStorage) {}
+      : BottomUpIPAnalysis(SILAnalysisKind::AccessStorage) {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::AccessStorage;
   }
+
+  const FunctionAccessStorage &getEffects(SILFunction *F) {
+    FunctionInfo *functionInfo = getFunctionInfo(F);
+    if (!functionInfo->isValid())
+      recompute(functionInfo);
+    return functionInfo->functionEffects;
+  }
+
+  /// Get the merged effects of all callees at the given call site from the
+  /// callee's perspective (don't transform parameter effects).
+  void getCalleeEffects(FunctionAccessStorage &calleeEffects,
+                        FullApplySite fullApply);
+
+  /// Get the merge effects of all callees at the given call site from the
+  /// caller's perspective. Parameter effects are translated into information
+  /// for the caller's arguments, and local effects are dropped.
+  void getCallSiteEffects(FunctionAccessStorage &callEffects,
+                          FullApplySite fullApply) {
+    FunctionAccessStorage calleeEffects;
+    getCalleeEffects(calleeEffects, fullApply);
+    callEffects.mergeFromApply(calleeEffects, fullApply);
+  }
+
+  BasicCalleeAnalysis *getBasicCalleeAnalysis() { return BCA; }
+
+  DestructorAnalysis *getDestructorAnalysis() { return DA; }
+
+  virtual void initialize(SILPassManager *PM) override;
+
+  /// Invalidate all information in this analysis.
+  virtual void invalidate() override;
+
+  /// Invalidate all of the information for a specific function.
+  virtual void invalidate(SILFunction *F, InvalidationKind K) override;
+
+  /// Notify the analysis about a newly created function.
+  virtual void notifyAddedOrModifiedFunction(SILFunction *F) override {}
+
+  /// Notify the analysis about a function which will be deleted from the
+  /// module.
+  virtual void notifyWillDeleteFunction(SILFunction *F) override {
+    invalidate(F, InvalidationKind::Nothing);
+  }
+
+  /// Notify the analysis about changed witness or vtables.
+  virtual void invalidateFunctionTables() override {}
+
+private:
+  /// Gets or creates FunctionAccessStorage for \p F.
+  FunctionInfo *getFunctionInfo(SILFunction *F) {
+    FunctionInfo *&functionInfo = functionInfoMap[F];
+    if (!functionInfo) {
+      functionInfo = new (allocator.Allocate()) FunctionInfo(F);
+    }
+    return functionInfo;
+  }
+
+  /// Analyze the side-effects of a function, including called functions.
+  /// Visited callees are added to \p BottomUpOrder until \p RecursionDepth
+  /// reaches MaxRecursionDepth.
+  void analyzeFunction(FunctionInfo *functionInfo, FunctionOrder &bottomUpOrder,
+                       int recursionDepth);
+
+  void analyzeCall(FunctionInfo *functionInfo, FullApplySite fullApply,
+                   FunctionOrder &bottomUpOrder, int recursionDepth);
+
+  /// Recomputes the side-effect information for the function \p Initial and
+  /// all called functions, up to a recursion depth of MaxRecursionDepth.
+  void recompute(FunctionInfo *initialInfo);
 };
 
 } // end namespace swift

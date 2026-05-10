@@ -26,6 +26,7 @@
 #include "Address.h"
 #include "GenOpaque.h"
 #include "IndirectTypeInfo.h"
+#include "Outlining.h"
 
 namespace swift {
 namespace irgen {
@@ -41,17 +42,19 @@ private:
 protected:
   const Impl &asImpl() const { return static_cast<const Impl &>(*this); }
 
-  WitnessSizedTypeInfo(llvm::Type *type, Alignment align, IsPOD_t pod,
-                       IsBitwiseTakable_t bt, IsABIAccessible_t abi)
-    : super(type, align, pod, bt, IsNotFixedSize, abi,
+  WitnessSizedTypeInfo(llvm::Type *type, Alignment align, IsTriviallyDestroyable_t pod,
+                       IsBitwiseTakable_t bt,
+                       IsCopyable_t cp,
+                       IsABIAccessible_t abi)
+    : super(type, align, pod, bt, cp,
+            IsNotFixedSize, abi,
             SpecialTypeInfoKind::None) {}
 
 private:
   /// Bit-cast the given pointer to the right type and assume it as an
   /// address of this type.
   Address getAsBitCastAddress(IRGenFunction &IGF, llvm::Value *addr) const {
-    addr = IGF.Builder.CreateBitCast(addr,
-                                     this->getStorageType()->getPointerTo());
+    addr = IGF.Builder.CreateBitCast(addr, IGF.IGM.PtrTy);
     return this->getAddressForPointer(addr);
   }
 
@@ -60,9 +63,11 @@ public:
   static bool isFixed() { return false; }
 
   StackAddress allocateStack(IRGenFunction &IGF, SILType T,
-                             const llvm::Twine &name) const override {
+                             const llvm::Twine &name,
+                             StackAllocationIsNested_t isNested =
+                                 StackAllocationIsNested) const override {
     // Allocate memory on the stack.
-    auto alloca = IGF.emitDynamicAlloca(T, name);
+    auto alloca = IGF.emitDynamicStackAllocation(T, isNested, name);
     IGF.Builder.CreateLifetimeStart(alloca.getAddressPointer());
     return alloca.withAddress(
              getAsBitCastAddress(IGF, alloca.getAddressPointer()));
@@ -71,7 +76,7 @@ public:
   void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
                        SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    IGF.emitDeallocateDynamicAlloca(stackAddress);
+    IGF.emitDynamicStackDeallocation(stackAddress);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
@@ -96,12 +101,20 @@ public:
     return emitLoadOfStride(IGF, T);
   }
 
-  llvm::Value *getIsPOD(IRGenFunction &IGF, SILType T) const override {
-    return emitLoadOfIsPOD(IGF, T);
+  llvm::Value *getIsTriviallyDestroyable(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsTriviallyDestroyable(IGF, T);
   }
 
   llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
     return emitLoadOfIsBitwiseTakable(IGF, T);
+  }
+
+  llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsBitwiseBorrowable(IGF, T);
+  }
+
+  llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsAddressableForDependencies(IGF, T);
   }
 
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
@@ -119,6 +132,79 @@ public:
   }
   llvm::Constant *getStaticStride(IRGenModule &IGM) const override {
     return nullptr;
+  }
+};
+
+class BitwiseCopyableTypeInfo
+    : public WitnessSizedTypeInfo<BitwiseCopyableTypeInfo> {
+  using Self = BitwiseCopyableTypeInfo;
+  using Super = WitnessSizedTypeInfo<Self>;
+
+protected:
+  BitwiseCopyableTypeInfo(llvm::Type *type, IsABIAccessible_t abiAccessible)
+      : Super(type, Alignment(1), IsNotTriviallyDestroyable,
+              IsNotBitwiseTakable, IsCopyable, abiAccessible) {}
+
+public:
+  static BitwiseCopyableTypeInfo *create(llvm::Type *type,
+                                         IsABIAccessible_t abiAccessible) {
+    return new Self(type, abiAccessible);
+  }
+
+  void bitwiseCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                   SILType T, bool isOutlined) const {
+    IGF.Builder.CreateMemCpy(destAddr, srcAddr, getSize(IGF, T));
+  }
+
+  void initializeWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined,
+                          bool zeroizeIfSensitive) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void initializeWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                          SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void assignWithCopy(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                      SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void assignWithTake(IRGenFunction &IGF, Address destAddr, Address srcAddr,
+                      SILType T, bool isOutlined) const override {
+    bitwiseCopy(IGF, destAddr, srcAddr, T, isOutlined);
+  }
+
+  void destroy(IRGenFunction &IGF, Address address, SILType T,
+               bool isOutlined) const override {
+    // BitwiseCopyable types are trivial, so destroy is a no-op.
+  }
+
+  llvm::Value *getEnumTagSinglePayload(IRGenFunction &IGF,
+                                       llvm::Value *numEmptyCases,
+                                       Address enumAddr, SILType T,
+                                       bool isOutlined) const override {
+    return emitGetEnumTagSinglePayloadCall(IGF, T, numEmptyCases, enumAddr);
+  }
+
+  void storeEnumTagSinglePayload(IRGenFunction &IGF, llvm::Value *whichCase,
+                                 llvm::Value *numEmptyCases, Address enumAddr,
+                                 SILType T, bool isOutlined) const override {
+    emitStoreEnumTagSinglePayloadCall(IGF, T, whichCase, numEmptyCases,
+                                      enumAddr);
+  }
+
+  void collectMetadataForOutlining(OutliningMetadataCollector &collector,
+                                   SILType T) const override {
+    // We'll need formal type metadata for this archetype.
+    collector.collectTypeMetadata(T);
+  }
+
+  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                                        bool useStructLayouts) const override {
+    return IGM.typeLayoutCache.getOrCreateArchetypeEntry(T.getObjectType());
   }
 };
 }

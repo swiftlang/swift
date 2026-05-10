@@ -3,22 +3,20 @@
 // their bridged type.
 //
 // This is particularly important for `CGFloat`, which has a native Swift decl
-// in the CoreGraphics overlay that shadows the imported Clang decl, so relying
-// solely on whether or not the decl has a Clang node is not sufficient.
+// in the CoreFoundation overlay that shadows the imported Clang decl, so
+// relying solely on whether or not the decl has a Clang node is not sufficient.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck %s -parse-as-library -emit-objc-header-path %t/swift.h
+// RUN: %target-swift-frontend %s -parse-as-library -typecheck -verify -emit-objc-header-path %t/swift.h
 // RUN: %FileCheck %s < %t/swift.h
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -DCGFLOAT_IN_COREFOUNDATION -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreFoundation.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource) -DCGFLOAT_IN_COREFOUNDATION -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -DCGFLOAT_IN_COREFOUNDATION -emit-module -o %t %clang-importer-sdk-path/swift-modules/CoreGraphics.swift
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -o %t %clang-importer-sdk-path/swift-modules/Foundation.swift
 
 // REQUIRES: objc_interop
 
 import CoreGraphics
 import Foundation
-
-// CHECK: @import CoreGraphics;
 
 // CHECK-NOT: @class NSNumber;
 

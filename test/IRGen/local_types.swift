@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module %S/Inputs/local_types_helper.swift -o %t
 // RUN: %target-swift-frontend -enable-objc-interop -emit-ir -parse-as-library %s -I %t | %FileCheck -check-prefix CHECK -check-prefix NEGATIVE %s
+// REQUIRES: objc_codegen
 
 import local_types_helper
 
@@ -62,7 +63,7 @@ public func innerIfConfig() {
   // CHECK-DAG: @"$s11local_types13innerIfConfigyyF17LocalClassEnabledL_CMm" = internal global %objc_class
   class LocalClassEnabled {}
   func inner() {
-    // CHECK-DAG: @"$s11local_types13innerIfConfigyyF0C0L0_yyF17LocalClassEnabledL_CMm" = internal global %objc_class
+    // CHECK-DAG: @"$s11local_types13innerIfConfigyyF0C0L_yyF17LocalClassEnabledL_CMm" = internal global %objc_class
     class LocalClassEnabled {}
   }
   #endif

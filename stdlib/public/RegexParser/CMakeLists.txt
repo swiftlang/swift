@@ -14,13 +14,13 @@ set(swift_matching_engine_link_libraries
   swiftCore)
 
 file(GLOB_RECURSE _MATCHING_ENGINE_SOURCES
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_RegexParser/*.swift")
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_RegexParser/*.swift")
 set(MATCHING_ENGINE_SOURCES)
 foreach(source ${_MATCHING_ENGINE_SOURCES})
   file(TO_CMAKE_PATH "${source}" source)
   list(APPEND MATCHING_ENGINE_SOURCES ${source})
 endforeach()
-message(STATUS "Using Experimental String Processing library for _RegexParser (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
+message(STATUS "Using Experimental String Processing library for _RegexParser (${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}).")
 
 set(SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS_NO_RESILIENCE)
 string(REGEX REPLACE "-enable-library-evolution" ""
@@ -31,6 +31,7 @@ add_swift_target_library(swift_RegexParser ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   "${MATCHING_ENGINE_SOURCES}"
 
   SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
@@ -46,7 +47,9 @@ add_swift_target_library(swift_RegexParser ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
     # Workaround until `_RegexParser` is imported as implementation-only
     # by `_StringProcessing`.
     -Xfrontend -disable-implicit-string-processing-module-import
+    -enable-experimental-feature AllowRuntimeSymbolDeclarations
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   INSTALL_IN_COMPONENT stdlib
+  MACCATALYST_BUILD_FLAVOR "zippered"
 )

@@ -81,7 +81,7 @@ extension TextOutputStream {
   public mutating func _unlock() {}
 
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    write(String._fromASCII(buffer))
+    unsafe write(String._fromASCII(buffer))
   }
 }
 
@@ -284,13 +284,13 @@ internal func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 internal func _fallbackEnumRawValue<T>(_ value: T) -> Int64? {
   switch MemoryLayout.size(ofValue: value) {
   case 8:
-    return unsafeBitCast(value, to:Int64.self)
+    return unsafe unsafeBitCast(value, to:Int64.self)
   case 4:
-    return Int64(unsafeBitCast(value, to:Int32.self))
+    return unsafe Int64(unsafeBitCast(value, to:Int32.self))
   case 2:
-    return Int64(unsafeBitCast(value, to:Int16.self))
+    return unsafe Int64(unsafeBitCast(value, to:Int16.self))
   case 1:
-    return Int64(unsafeBitCast(value, to:Int8.self))
+    return unsafe Int64(unsafeBitCast(value, to:Int8.self))
   default:
     return nil
   }
@@ -354,8 +354,8 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
         }
         target.write(")")
       case .enum:
-        if let cString = _getEnumCaseName(value),
-            let caseName = String(validatingUTF8: cString) {
+        if let cString = unsafe _getEnumCaseName(value),
+            let caseName = unsafe String(validatingCString: cString) {
           // Write the qualified type name in debugPrint.
           if isDebugPrint {
             printTypeName(mirror.subjectType)
@@ -381,6 +381,10 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
             target.write(")")
           }
         }
+      case .foreignReference:
+        printTypeName(mirror.subjectType)
+        // FRT has no children
+        target.write("()")
       default:
         target.write(_typeName(mirror.subjectType))
     }
@@ -389,8 +393,8 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
     printTypeName(metatypeValue)
   } else {
     // Fall back to the type or an opaque summary of the kind
-    if let cString = _opaqueSummary(mirror.subjectType),
-        let opaqueSummary = String(validatingUTF8: cString) {
+    if let cString = unsafe _opaqueSummary(mirror.subjectType),
+        let opaqueSummary = unsafe String(validatingCString: cString) {
       target.write(opaqueSummary)
     } else {
       target.write(_typeName(mirror.subjectType, qualified: true))
@@ -401,6 +405,7 @@ internal func _adHocPrint_unlocked<T, TargetStream: TextOutputStream>(
 
 @usableFromInline
 @_semantics("optimize.sil.specialize.generic.never")
+@_unavailableInEmbedded
 internal func _print_unlocked<T, TargetStream: TextOutputStream>(
   _ value: T, _ target: inout TargetStream
 ) {
@@ -451,6 +456,7 @@ internal func _print_unlocked<T, TargetStream: TextOutputStream>(
 
 @_semantics("optimize.sil.specialize.generic.never")
 @inline(never)
+@_unavailableInEmbedded
 public func _debugPrint_unlocked<T, TargetStream: TextOutputStream>(
     _ value: T, _ target: inout TargetStream
 ) {
@@ -524,15 +530,15 @@ internal func _dumpPrint_unlocked<T, TargetStream: TextOutputStream>(
 
   if let displayStyle = mirror.displayStyle {
     switch displayStyle {
-    case .`class`, .`struct`:
+    case .`class`, .`struct`, .foreignReference:
       // Classes and structs without custom representations are displayed as
       // their fully qualified type name
       target.write(_typeName(mirror.subjectType, qualified: true))
       return
     case .`enum`:
       target.write(_typeName(mirror.subjectType, qualified: true))
-      if let cString = _getEnumCaseName(value),
-          let caseName = String(validatingUTF8: cString) {
+      if let cString = unsafe _getEnumCaseName(value),
+          let caseName = unsafe String(validatingCString: cString) {
         target.write(".")
         target.write(caseName)
       }
@@ -566,7 +572,7 @@ internal struct _Stdout: TextOutputStream {
 
     var string = string
     _ = string.withUTF8 { utf8 in
-      _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
+      unsafe _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
     }
   }
 }
@@ -580,7 +586,7 @@ extension String: TextOutputStream {
   }
 
   public mutating func _writeASCII(_ buffer: UnsafeBufferPointer<UInt8>) {
-    self._guts.append(_StringGuts(buffer, isASCII: true))
+    unsafe self._guts.append(_StringGuts(buffer, isASCII: true))
   }
 }
 

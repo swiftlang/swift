@@ -1,5 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 _ = /(/ // expected-error@:7 {{expected ')'}}
 _ = #/(/# // expected-error@:8 {{expected ')'}}
@@ -38,7 +38,7 @@ do {
   /#
   // expected-error@-2:7 {{unterminated regex literal}}
   // expected-error@-3:10 {{expected escape sequence}}
-  // expected-error@-3:4 {{expected expression}}
+  // expected-error@-3:5 {{expected a macro identifier}}
 }
 
 func foo<T>(_ x: T, _ y: T) {}

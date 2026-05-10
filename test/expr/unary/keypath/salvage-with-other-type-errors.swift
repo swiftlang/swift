@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // Ensure that key path exprs can tolerate being re-type-checked when necessary
 // to diagnose other errors in adjacent exprs.
@@ -6,7 +6,7 @@
 struct P<T: K> { }
 
 struct S {
-    init<B>(_ a: P<B>) { // expected-note {{in call to initializer}}
+    init<B>(_ a: P<B>) { // expected-note {{where 'B' = 'String'}}
         fatalError()
     }
 }
@@ -27,12 +27,11 @@ struct A {
 }
 
 extension A: K {
-  static let j = S(\A.id + "id") // expected-error {{generic parameter 'B' could not be inferred}}
-  // expected-error@-1 {{binary operator '+' cannot be applied to operands of type 'KeyPath<A, String>' and 'String'}}
-  // expected-note@-2 {{overloads for '+' exist with these partially matching parameter lists: (String, String)}}
+  static let j = S(\A.id + "id")
+  // expected-error@-1 {{initializer 'init(_:)' requires that 'String' conform to 'K'}}
 }
 
-// SR-5034
+// https://github.com/apple/swift/issues/47610
 
 struct B {
     let v: String
@@ -44,10 +43,10 @@ struct B {
     }
 }
 func f3() {
-    B(v: "").f1(block: { _ in }).f2(keyPath: \B.v) // expected-error{{unable to infer type of a closure parameter '_' in the current context}}
+    B(v: "").f1(block: { _ in }).f2(keyPath: \B.v) // expected-error{{cannot infer type of closure parameter '_' without a type annotation}}
 }
 
-// SR-5375
+// https://github.com/apple/swift/issues/47949
 
 protocol Bindable: class { }
 

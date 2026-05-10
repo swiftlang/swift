@@ -2,6 +2,7 @@ import SomeModule
 print(someFunc())
 
 // UNIT: Record | system | SomeModule |
+// SKIP-NOT: Record | system | SomeModule |
 
 // RUN: %empty-directory(%t)
 //
@@ -37,6 +38,38 @@ print(someFunc())
 // RUN:     -index-ignore-stdlib \
 // RUN:     -index-store-path %t/idx \
 // RUN:     -sdk %t/SDK \
+// RUN:     -Fsystem %t/SDK/Frameworks \
+// RUN:     -module-cache-path %t/modulecache \
+// RUN:     %s
+//
+// --- Check the index.
+// RUN: c-index-test core -print-unit %t/idx | %FileCheck -check-prefix=UNIT %s
+//
+// --- Built with indexing, SomeModule is outside of the SDK so it's skipped.
+// RUN: %empty-directory(%t/idx)
+// RUN: %empty-directory(%t/modulecache)
+// RUN: %target-swift-frontend \
+// RUN:     -typecheck \
+// RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
+// RUN:     -index-store-path %t/idx \
+// RUN:     -sdk %t/NotTheActualSDK \
+// RUN:     -Fsystem %t/SDK/Frameworks \
+// RUN:     -module-cache-path %t/modulecache \
+// RUN:     %s
+//
+// --- Check the index.
+// RUN: c-index-test core -print-unit %t/idx | %FileCheck -check-prefix=SKIP %s
+
+// --- Built with indexing, without an SDK path SomeModule is indexed.
+// RUN: %empty-directory(%t/idx)
+// RUN: %empty-directory(%t/modulecache)
+// RUN: %target-swift-frontend \
+// RUN:     -typecheck \
+// RUN:     -index-system-modules \
+// RUN:     -index-ignore-stdlib \
+// RUN:     -index-store-path %t/idx \
+// RUN:     -sdk "" \
 // RUN:     -Fsystem %t/SDK/Frameworks \
 // RUN:     -module-cache-path %t/modulecache \
 // RUN:     %s

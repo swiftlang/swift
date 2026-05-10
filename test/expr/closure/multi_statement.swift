@@ -1,4 +1,3 @@
-
 // RUN: %target-typecheck-verify-swift -swift-version 5 -enable-experimental-static-assert
 
 func isInt<T>(_ value: T) -> Bool {
@@ -308,7 +307,7 @@ func test_pattern_matches_only_cases() {
   }
 }
 
-// rdar://91225620 - type of expression is ambiguous without more context in closure
+// rdar://91225620 - type of expression is ambiguous without a type annotation in closure
 func test_wrapped_var_without_initializer() {
   @propertyWrapper
   struct Wrapper {
@@ -339,8 +338,8 @@ func test_unknown_refs_in_tilde_operator() {
 
   let _: (E) -> Void = {
     if case .test(unknown) = $0 {
-      // expected-error@-1 {{type 'E' has no member 'test'}}
-      // expected-error@-2 2 {{cannot find 'unknown' in scope}}
+      // expected-error@-1 2 {{cannot find 'unknown' in scope}}
+      // expected-error@-2 {{type 'E' has no member 'test'}}
     }
   }
 }
@@ -359,7 +358,8 @@ func test_no_crash_with_circular_ref_due_to_error() {
       // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
       // expected-error@-2 {{'let' cannot appear nested inside another 'var' or 'let' pattern}}
       // expected-error@-3 {{cannot call value of non-function type 'Int?'}}
-      print(next)
+      // expected-note@-4 {{'next' declared here}}
+      print(next) // expected-error {{use of local variable 'next' before its declaration}}
       return x
     }
     return 0
@@ -545,5 +545,184 @@ func test_conflicting_pattern_vars() {
         _ = y
       }
     }
+  }
+}
+
+// rdar://91452726 - crash in MissingMemberFailure::diagnoseInLiteralCollectionContext
+struct Test {
+  struct ID {
+  }
+
+  enum E : Hashable, Equatable {
+  case id
+  }
+
+  var arr: [(ID, E)]
+
+  func test() {
+    _ = arr.map { v in
+      switch v {
+      case .id: return true // expected-error {{value of tuple type '(Test.ID, Test.E)' has no member 'id'}}
+      }
+    }
+  }
+}
+
+https://github.com/apple/swift/issues/61017
+do {
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: Int
+
+    init(wrappedValue: Int) {
+      self.wrappedValue = wrappedValue
+    }
+  }
+
+  class Test {
+    let bar: () -> Void = {
+      @Wrapper var wrapped = 1
+      let wrapper: Wrapper = _wrapped // Ok
+    }
+  }
+}
+
+https://github.com/apple/swift/issues/61024
+do {
+  enum Baz: String {
+  case someCase
+  }
+
+  @propertyWrapper
+  struct Wrapper {
+    var wrappedValue: Int
+    let argument: String
+
+    init(wrappedValue: Int, argument: String) { // expected-note 2 {{'init(wrappedValue:argument:)' declared here}}
+      self.wrappedValue = wrappedValue
+      self.argument = argument
+    }
+  }
+
+  class Foo {
+    let ok: () -> Void = {
+      @Wrapper(argument: Baz.someCase.rawValue) var wrapped1 = 1 // Ok
+      @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped2 // Ok
+      @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped3: Int // Ok
+    }
+
+    let bad0: () -> Void = {
+      @Wrapper var wrapped: Int
+      // expected-error@-1 {{missing arguments for parameters 'wrappedValue', 'argument' in call}}
+    }
+
+    let bad1: () -> Void = {
+      @Wrapper var wrapped = 0
+      // expected-error@-1 {{missing argument for parameter 'argument' in property wrapper initializer; add 'wrappedValue' and 'argument' arguments in '@Wrapper(...)'}}
+    }
+
+    let bad2: () -> Void = {
+      @Wrapper(wrappedValue: 42, argument: Baz.someCase.rawValue) var wrapped = 0
+      // expected-error@-1 {{extra argument 'wrappedValue' in call}}
+    }
+  }
+}
+
+// Test to make sure that type-checker doesn't attempt the closure passed to
+// `.filter` before the one from `.init`, otherwise it would mean that generic
+// parameter of `.filter` wouldn't be inferred since it depends on result of
+// `.init` closure.
+func test_that_closures_are_attempted_in_order() {
+  struct Test<T> {
+    init(_: ([Int]) -> T) {}
+    init(_: String) {}
+    init(_: Int, _: String = "") {}
+
+    func filter(_: (T) -> Bool) {}
+  }
+
+  Test {
+    _ = 42
+    return $0.map { Optional(Float($0)) }
+  }
+  .filter {
+    if $0.isEmpty { // Ok
+      return true
+    }
+    return false
+  }
+}
+
+func test_use_of_concrete_params_in_for_condition() {
+  struct S {
+    var cond: Bool
+  }
+
+  func test(_: (S) -> Void) {}
+
+  test { data in
+    for i in 0...10 where !data.cond { // Ok
+      print(i)
+    }
+  }
+}
+
+// https://github.com/apple/swift/issues/63455
+func test_recursive_var_reference_in_multistatement_closure() {
+  struct MyStruct {
+    func someMethod() {}
+  }
+
+  func takeClosure(_ x: () -> Void) {}
+
+  func test(optionalInt: Int?, themes: MyStruct?) {
+    takeClosure {
+      let int = optionalInt {
+        // expected-error@-1 {{cannot call value of non-function type 'Int?'}}
+        // expected-note@-2 {{'int' declared here}}
+        print(int) // expected-error {{use of local variable 'int' before its declaration}}
+      }
+    }
+
+    takeClosure {
+      let theme = themes?.someMethod() {
+        // expected-error@-1 {{extra trailing closure passed in call}}
+        // expected-note@-2 {{'theme' declared here}}
+        _ = theme // expected-error {{use of local variable 'theme' before its declaration}}
+      }
+    }
+
+    takeClosure {
+      let theme = themes?.filter({ $0 }) {
+        // expected-error@-1 {{value of type 'MyStruct' has no member 'filter'}}
+        // expected-note@-2 {{'theme' declared here}}
+        _ = theme // expected-error {{use of local variable 'theme' before its declaration}}
+      }
+    }
+  }
+}
+
+// https://github.com/apple/swift/issues/67363
+func test_result_builder_in_member_chaining() {
+  @resultBuilder
+  struct Builder {
+    static func buildBlock<T>(_: T) -> Int { 42 }
+  }
+
+  struct Test {
+    static func test<T>(fn: () -> T) -> T {
+      fn()
+    }
+
+    func builder(@Builder _: () -> Int) {}
+  }
+
+  Test.test {
+    let test = Test()
+    return test
+  // FIXME: This call should type-check, currently closure is resolved before overload of `builder` is picked.
+  }.builder { // expected-error {{cannot convert value of type '()' to closure result type 'Int'}}
+    let result = ""
+    result
   }
 }

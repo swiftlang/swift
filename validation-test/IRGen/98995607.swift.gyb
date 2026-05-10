@@ -1,0 +1,23 @@
+// RUN: %target-run-simple-swiftgyb(-Xfrontend -disable-availability-checking)
+
+// REQUIRES: executable_test
+
+%for N in range(0, 100):
+
+protocol P${N}<A, B> {
+  associatedtype A
+  associatedtype B
+}
+
+%end
+
+var array : [Any.Type] = [
+%for N in range(0, 100):
+  (any P${N}<Int, Float>).self,
+%end
+%for N in range(0, 100):
+  (any P${N}<Float, String>).self,
+%end
+]
+
+print(array)

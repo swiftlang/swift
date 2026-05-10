@@ -1,29 +1,8 @@
 // RUN: %target-swift-frontend -enforce-exclusivity=checked -swift-version 4 -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -enforce-exclusivity=checked -swift-version 4 -emit-sil -primary-file %s -o /dev/null -verify
 
 import Swift
 
 func takesTwoInouts<T>(_ p1: inout T, _ p2: inout T) { }
-
-func simpleInoutDiagnostic() {
-  var i = 7
-
-  // FIXME: This diagnostic should be removed if static enforcement is
-  // turned on by default.
-  // expected-error@+4{{inout arguments are not allowed to alias each other}}
-  // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
-  // expected-note@+1{{conflicting access is here}}
-  takesTwoInouts(&i, &i)
-}
-
-func inoutOnInoutParameter(p: inout Int) {
-  // expected-error@+4{{inout arguments are not allowed to alias each other}}
-  // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{overlapping accesses to 'p', but modification requires exclusive access; consider copying to a local variable}}
-  // expected-note@+1{{conflicting access is here}}
-  takesTwoInouts(&p, &p)
-}
 
 func swapNoSuppression(_ i: Int, _ j: Int) {
   var a: [Int] = [1, 2, 3]
@@ -39,14 +18,6 @@ struct StructWithMutatingMethodThatTakesSelfInout {
   var f = SomeClass()
   mutating func mutate(_ other: inout StructWithMutatingMethodThatTakesSelfInout) { }
   mutating func mutate(_ other: inout SomeClass) { }
-
-  mutating func callMutatingMethodThatTakesSelfInout() {
-    // expected-error@+4{{inout arguments are not allowed to alias each other}}
-    // expected-note@+3{{previous aliasing argument}}
-    // expected-error@+2{{overlapping accesses to 'self', but modification requires exclusive access; consider copying to a local variable}}
-    // expected-note@+1{{conflicting access is here}}
-    mutate(&self)
-  }
 
   mutating func callMutatingMethodThatTakesSelfStoredPropInout() {
     // expected-error@+2{{overlapping accesses to 'self', but modification requires exclusive access; consider copying to a local variable}}
@@ -81,16 +52,6 @@ class ClassWithFinalStoredProp {
     local1.s1.mutate(&local1.s1.f)
   }
 }
-
-func violationWithGenericType<T>(_ p: T) {
-  var local = p
-  // expected-error@+4{{inout arguments are not allowed to alias each other}}
-  // expected-note@+3{{previous aliasing argument}}
-  // expected-error@+2{{overlapping accesses to 'local', but modification requires exclusive access; consider copying to a local variable}}
-  // expected-note@+1{{conflicting access is here}}
-  takesTwoInouts(&local, &local)
-}
-
 
 // Helper.
 struct StructWithTwoStoredProp {
@@ -264,12 +225,9 @@ func callsClosureLiteralImmediately() {
 
 func callsStoredClosureLiteral() {
   var i = 7;
-  let c = { (p: inout Int) in i}
+  let c = { (p: inout Int) in i} // expected-note {{conflicting access is here}}
 
-  // Closure literals that are stored and later called are treated as escaping
-  // We don't expect a static exclusivity diagnostic here, but the issue
-  // will be caught at run time
-  _ = c(&i) // no-error
+  _ = c(&i) // expected-error {{overlapping accesses to 'i', but modification requires exclusive access; consider copying to a local variable}}
 }
 
 
@@ -616,10 +574,14 @@ func nestedConflict(x: inout Int) {
   // expected-note@-2 2{{conflicting access is here}}
 }
 
-// Avoid diagnosing a conflict on disjoint struct properies when one is a `let`.
+// Avoid diagnosing a conflict on disjoint struct properties when one is a `let`.
 // This requires an address projection before loading the `let` property.
 //
-// <rdar://problem/35561050> [SR-10145][Exclusivity] SILGen loads entire struct when reading captured 'let' stored property
+// rdar://problem/35561050
+// https://github.com/apple/swift/issues/52547
+// [Exclusivity] SILGen loads entire struct when reading captured 'let'
+// stored property
+
 struct DisjointLetMember {
   var dummy: AnyObject // Make this a nontrivial struct because the SIL is more involved.
   mutating func get(makeValue: ()->Int) -> Int {

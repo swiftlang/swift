@@ -1,8 +1,11 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library -swift-version 5 -strict-concurrency=complete -enable-upcoming-feature NonisolatedNonsendingByDefault)
+// REQUIRES: swift_feature_NonisolatedNonsendingByDefault
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// REQUIRES: reflection
 // UNSUPPORTED: back_deployment_runtime
 
 import _Concurrency
@@ -15,6 +18,7 @@ struct TestError: Error {}
     var tests = TestSuite("CheckedContinuation")
 
     if #available(SwiftStdlib 5.1, *) {
+      #if !os(WASI)
       tests.test("trap on double resume non-throwing continuation") {
         expectCrashLater()
 
@@ -41,6 +45,7 @@ struct TestError: Error {}
         }
         await task.get()
       }
+      #endif
 
       tests.test("test withCheckedThrowingContinuation") {
         let task2 = detach {

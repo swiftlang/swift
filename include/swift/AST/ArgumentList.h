@@ -22,6 +22,7 @@
 #include "swift/Basic/Debug.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace swift {
 /// Forward declared trampoline for Expr::getType.
@@ -51,6 +52,9 @@ public:
     return Argument(SourceLoc(), Identifier(), expr);
   }
 
+  /// Make an implicit unlabeled 'inout' argument.
+  static Argument implicitInOut(ASTContext &ctx, Expr *expr);
+
   SourceLoc getStartLoc() const { return getSourceRange().Start; }
   SourceLoc getEndLoc() const { return getSourceRange().End; }
   SourceRange getSourceRange() const;
@@ -64,6 +68,11 @@ public:
 
   /// The argument label written in the call.
   Identifier getLabel() const { return Label; }
+
+  /// Whether the argument has a non-empty label. Note that this returns `false`
+  /// for an explicitly specified empty label e.g `_: {}` for a trailing
+  /// closure.
+  bool hasLabel() const { return !Label.empty(); }
 
   /// Set a new argument label.
   ///
@@ -84,13 +93,13 @@ public:
   bool isInOut() const;
 
   /// Whether the argument is a compile-time constant value.
-  bool isConst() const;
+  bool isCompileTimeLiteral() const;
 
-  bool operator==(const Argument &other) {
+  bool operator==(const Argument &other) const {
     return LabelLoc == other.LabelLoc && Label == other.Label &&
            ArgExpr == other.ArgExpr;
   }
-  bool operator!=(const Argument &other) { return !(*this == other); }
+  bool operator!=(const Argument &other) const { return !(*this == other); }
 };
 
 /// Represents the argument list of a function call or subscript access.
@@ -131,7 +140,7 @@ class alignas(Argument) ArgumentList final
   bool HasLabelLocs : 1;
 
   ArgumentList(SourceLoc lParenLoc, SourceLoc rParenLoc, unsigned numArgs,
-               Optional<unsigned> firstTrailingClosureIndex,
+               std::optional<unsigned> firstTrailingClosureIndex,
                ArgumentList *originalArgs, bool isImplicit, bool hasLabels,
                bool hasLabelLocs)
       : LParenLoc(lParenLoc), RParenLoc(rParenLoc), NumArgs(numArgs),
@@ -146,7 +155,7 @@ class alignas(Argument) ArgumentList final
     assert(!firstTrailingClosureIndex || *firstTrailingClosureIndex < numArgs &&
            "Invalid trailing closure index");
     RawFirstTrailingClosureIndex =
-        firstTrailingClosureIndex.getValueOr(numArgs);
+        firstTrailingClosureIndex.value_or(numArgs);
   }
 
   ArgumentList(const ArgumentList &) = delete;
@@ -212,7 +221,7 @@ public:
   /// \param arena The arena to allocate the ArgumentList in.
   static ArgumentList *
   create(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
-         SourceLoc rParenLoc, Optional<unsigned> firstTrailingClosureIndex,
+         SourceLoc rParenLoc, std::optional<unsigned> firstTrailingClosureIndex,
          bool isImplicit, ArgumentList *originalArgs = nullptr,
          AllocationArena arena = AllocationArena::Permanent);
 
@@ -227,7 +236,7 @@ public:
   static ArgumentList *
   createParsed(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
                SourceLoc rParenLoc,
-               Optional<unsigned> firstTrailingClosureIndex);
+               std::optional<unsigned> firstTrailingClosureIndex);
 
   /// Create a new type-checked ArgumentList from an original set of arguments.
   ///
@@ -246,17 +255,17 @@ public:
   /// \param rParenLoc The location of the closing ')'. Note that for a
   /// subscript argument list, this will be for the closing ']'.
   /// \param arena The arena to allocate the ArgumentList in.
-  static ArgumentList *
-  createImplicit(ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
-                 SourceLoc rParenLoc,
-                 Optional<unsigned> firstTrailingClosureIndex = None,
-                 AllocationArena arena = AllocationArena::Permanent);
+  static ArgumentList *createImplicit(
+      ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
+      SourceLoc rParenLoc,
+      std::optional<unsigned> firstTrailingClosureIndex = std::nullopt,
+      AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a set of \p args.
-  static ArgumentList *
-  createImplicit(ASTContext &ctx, ArrayRef<Argument> args,
-                 Optional<unsigned> firstTrailingClosureIndex = None,
-                 AllocationArena arena = AllocationArena::Permanent);
+  static ArgumentList *createImplicit(
+      ASTContext &ctx, ArrayRef<Argument> args,
+      std::optional<unsigned> firstTrailingClosureIndex = std::nullopt,
+      AllocationArena arena = AllocationArena::Permanent);
 
   /// Create a new implicit ArgumentList with a single labeled argument
   /// expression.
@@ -372,10 +381,10 @@ public:
   ///
   /// Note for a type-checked argument list, this must be queried on
   /// \c getOriginalArgs instead.
-  Optional<unsigned> getFirstTrailingClosureIndex() const {
+  std::optional<unsigned> getFirstTrailingClosureIndex() const {
     assert(!HasOriginalArgs && "Query original args instead");
     if (RawFirstTrailingClosureIndex == NumArgs)
-      return None;
+      return std::nullopt;
     return RawFirstTrailingClosureIndex;
   }
 
@@ -392,7 +401,7 @@ public:
 
   /// Whether any unlabeled or labeled trailing closures are present.
   bool hasAnyTrailingClosures() const {
-    return getOriginalArgs()->getFirstTrailingClosureIndex().hasValue();
+    return getOriginalArgs()->getFirstTrailingClosureIndex().has_value();
   }
 
   /// Whether a given index is for an unlabeled trailing closure, which is the
@@ -435,7 +444,7 @@ public:
   iterator_range<iterator> getNonTrailingArgs() const {
     assert(!HasOriginalArgs && "Query original args instead");
     auto idx = getFirstTrailingClosureIndex();
-    if (!idx.hasValue())
+    if (!idx.has_value())
       return *this;
 
     return {begin(), iterator(this, *idx)};
@@ -448,7 +457,7 @@ public:
   iterator_range<iterator> getTrailingClosures() const {
     assert(!HasOriginalArgs && "Query original args instead");
     auto idx = getFirstTrailingClosureIndex();
-    if (!idx.hasValue())
+    if (!idx.has_value())
       return {end(), end()};
 
     return {iterator(this, *idx), end()};
@@ -459,11 +468,11 @@ public:
   ///
   /// Note for a type-checked argument list, this must be queried on
   /// \c getOriginalArgs instead.
-  Optional<Argument> getFirstTrailingClosure() const {
+  std::optional<Argument> getFirstTrailingClosure() const {
     assert(!HasOriginalArgs && "Query original args instead");
     auto idx = getFirstTrailingClosureIndex();
-    if (!idx.hasValue())
-      return None;
+    if (!idx.has_value())
+      return std::nullopt;
     return get(*idx);
   }
 
@@ -517,20 +526,13 @@ public:
   /// arguments, returns its index. Otherwise returns \c None. By default this
   /// will match against semantic sub-expressions, but that may be disabled by
   /// passing \c false for \c allowSemantic.
-  Optional<unsigned> findArgumentExpr(Expr *expr,
-                                      bool allowSemantic = true) const;
+  std::optional<unsigned> findArgumentExpr(Expr *expr,
+                                           bool allowSemantic = true) const;
 
   /// Creates a TupleExpr or ParenExpr that holds the argument exprs. A
   /// ParenExpr will be returned for a single argument, otherwise a TupleExpr.
   /// Don't use this function unless you actually need an AST transform.
   Expr *packIntoImplicitTupleOrParen(
-      ASTContext &ctx,
-      llvm::function_ref<Type(Expr *)> getType = __Expr_getType) const;
-
-  /// Avoid adding new usages of this. Creates a TupleType or ParenType
-  /// representing the types in the argument list. A ParenType will be returned
-  /// for a single argument, otherwise a TupleType.
-  Type composeTupleOrParenType(
       ASTContext &ctx,
       llvm::function_ref<Type(Expr *)> getType = __Expr_getType) const;
 

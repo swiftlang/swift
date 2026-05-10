@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_objc.swift -disable-objc-attr-requires-foundation-module -enable-objc-interop
-// RUN: llvm-bcanalyzer %t/def_objc.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -module-name objc -emit-silgen -I %t %s -o - | %FileCheck %s -check-prefix=SIL
+// RUN: %llvm-bcanalyzer %t/def_objc.swiftmodule | %FileCheck %s
+// RUN: %target-swift-frontend -module-name objc -Xllvm -sil-print-types -emit-silgen -I %t %s -o - | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: UnknownCode
 
 import def_objc
 
-// SIL: sil hidden [ossa] @$s4objc9testProto3objy04def_A09ObjCProto_p_tF : $@convention(thin) (@guaranteed ObjCProto) -> () {
+// SIL: sil hidden [ossa] @$s4objc9testProto3objy04def_A09ObjCProto_p_tF : $@convention(thin) (@guaranteed any ObjCProto) -> () {
 func testProto(obj obj: ObjCProto) {
-  // SIL: = objc_method {{%.*}} : $@opened({{.*}}) ObjCProto, #ObjCProto.doSomething!foreign
+  // SIL: = objc_method {{%.*}} : $@opened({{.*}}, any ObjCProto) Self, #ObjCProto.doSomething!foreign
   obj.doSomething()
 }
 

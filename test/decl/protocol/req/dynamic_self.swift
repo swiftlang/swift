@@ -18,7 +18,7 @@ protocol P {
 func takesP(_: P) {} // OK
 
 // Error: Missing witnesses.
-class W : P {} // expected-error{{type 'W' does not conform to protocol 'P'}}
+class W : P {} // expected-error{{type 'W' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
 
 // Okay: Self method in class.
 class X : P {
@@ -62,7 +62,7 @@ struct GS<T> : P {
   func f() -> GS { self }
 }
 
-struct SError : P { // expected-error{{type 'SError' does not conform to protocol 'P'}}
+struct SError : P { // expected-error{{type 'SError' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   var p: Int { 0 } // expected-note{{candidate has non-matching type 'Int'}}
   subscript() -> Int { 0 } // expected-note{{candidate has non-matching type '() -> Int'}}
   func f() -> Int { 0 } // expected-note{{candidate has non-matching type '() -> Int'}}
@@ -81,7 +81,7 @@ enum GE<T> : P {
   func f() -> GE { self }
 }
 
-enum EError : P { // expected-error{{type 'EError' does not conform to protocol 'P'}}
+enum EError : P { // expected-error{{type 'EError' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   var p: Int { 0 } // expected-note{{candidate has non-matching type 'Int'}}
   subscript() -> Int { 0 } // expected-note{{candidate has non-matching type '() -> Int'}}
   func f() -> Int { 0 } // expected-note{{candidate has non-matching type '() -> Int'}}

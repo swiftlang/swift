@@ -15,12 +15,12 @@
 
 #include "swift/Basic/Sanitizers.h"
 #include "swift/Basic/OptionSet.h"
-#include "llvm/ADT/Triple.h"
+#include "llvm/TargetParser/Triple.h"
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 // FIXME: This include is just for llvm::SanitizerCoverageOptions. We should
 // split the header upstream so we don't include so much.
-#include "llvm/Transforms/Instrumentation.h"
+#include "llvm/Transforms/Utils/Instrumentation.h"
 
 namespace swift {
 class DiagnosticEngine;
@@ -49,6 +49,11 @@ llvm::SanitizerCoverageOptions parseSanitizerCoverageArgValue(
 
 /// Parse -sanitize-address-use-odr-indicator's value.
 bool parseSanitizerAddressUseODRIndicator(
+    const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
+    DiagnosticEngine &Diags);
+
+/// Parse -sanitize-stable-abi's value
+bool parseSanitizerUseStableABI(
     const llvm::opt::Arg *A, const OptionSet<SanitizerKind> &enabledSanitizers,
     DiagnosticEngine &Diags);
 

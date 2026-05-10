@@ -40,7 +40,7 @@
 #include "swift/Demangling/Demangle.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Basic/Unreachable.h"
-#include "../../../stdlib/public/SwiftShims/HeapObject.h"
+#include "swift/shims/HeapObject.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 
@@ -56,18 +56,33 @@ template <typename Runtime> struct TargetOpaqueMetadata;
 template <typename Runtime> struct TargetValueMetadata;
 template <typename Runtime> struct TargetForeignClassMetadata;
 template <typename Runtime> struct TargetForeignReferenceTypeMetadata;
-template <typename Runtime> struct TargetContextDescriptor;
-template <typename Runtime> class TargetTypeContextDescriptor;
-template <typename Runtime> class TargetClassDescriptor;
-template <typename Runtime> class TargetValueTypeDescriptor;
-template <typename Runtime> class TargetEnumDescriptor;
-template <typename Runtime> class TargetStructDescriptor;
+template <typename Runtime>
+struct swift_ptrauth_struct_context_descriptor(ContextDescriptor)
+    TargetContextDescriptor;
+template <typename Runtime>
+class swift_ptrauth_struct_context_descriptor(TypeContextDescriptor)
+    TargetTypeContextDescriptor;
+template <typename Runtime>
+class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
+    TargetClassDescriptor;
+template <typename Runtime>
+class swift_ptrauth_struct_context_descriptor(ValueTypeDescriptor)
+    TargetValueTypeDescriptor;
+template <typename Runtime>
+class swift_ptrauth_struct_context_descriptor(EnumDescriptor)
+    TargetEnumDescriptor;
+template <typename Runtime>
+class swift_ptrauth_struct_context_descriptor(StructDescriptor)
+    TargetStructDescriptor;
 template <typename Runtime> struct TargetGenericMetadataPattern;
 template <typename Runtime> struct TargetProtocolConformanceDescriptor;
 
 struct HeapObject;
 class WeakReference;
 struct UnownedReference;
+
+using HeapObjectDestroyer =
+  SWIFT_CC(swift) void(SWIFT_CONTEXT HeapObject *);
 
 /// The result of requesting type metadata.  Generally the return value of
 /// a function.
@@ -116,6 +131,15 @@ struct MetadataDependency {
   }
 };
 
+/// Prefix of a metadata header, containing a pointer to the
+/// type layout string.
+template <typename Runtime>
+struct TargetTypeMetadataLayoutPrefix {
+    TargetSignedPointer<Runtime, const uint8_t *
+                                      __ptrauth_swift_type_layout_string>
+        layoutString;
+};
+
 /// The header before a metadata object which appears on all type
 /// metadata.  Note that heap metadata are not necessarily type
 /// metadata, even for objects of a heap type: for example, objects of
@@ -124,11 +148,25 @@ struct MetadataDependency {
 /// This case can be distinguished using the isTypeMetadata() flag
 /// on ClassMetadata.
 template <typename Runtime>
-struct TargetTypeMetadataHeader {
+struct TargetTypeMetadataHeaderBase {
   /// A pointer to the value-witnesses for this type.  This is only
   /// present for type metadata.
-  TargetPointer<Runtime, const ValueWitnessTable> ValueWitnesses;
+  TargetPointer<Runtime, const TargetValueWitnessTable<Runtime>> ValueWitnesses;
 };
+
+template <typename Runtime>
+struct TargetTypeMetadataHeader
+    : TargetTypeMetadataLayoutPrefix<Runtime>,
+      TargetTypeMetadataHeaderBase<Runtime> {
+
+  TargetTypeMetadataHeader() = default;
+  constexpr TargetTypeMetadataHeader(
+    const TargetTypeMetadataLayoutPrefix<Runtime> &layout,
+    const TargetTypeMetadataHeaderBase<Runtime> &header)
+      : TargetTypeMetadataLayoutPrefix<Runtime>(layout),
+        TargetTypeMetadataHeaderBase<Runtime>(header) {}
+};
+
 using TypeMetadataHeader = TargetTypeMetadataHeader<InProcess>;
 
 /// A "full" metadata pointer is simply an adjusted address point on a
@@ -157,6 +195,16 @@ static inline const FullMetadata<T> *asFullMetadata(const T *metadata) {
   return asFullMetadata(const_cast<T*>(metadata));
 }
 
+/// Given a full metadata pointer, produce the regular metadata pointer.
+template <class T>
+static inline T *asMetadata(FullMetadata<T> *metadata) {
+  return (T *) (((typename T::HeaderType*) metadata) + 1);
+}
+template <class T>
+static inline const T *asMetadata(const FullMetadata<T> *metadata) {
+  return asMetadata(const_cast<FullMetadata<T> *>(metadata));
+}
+
 // std::result_of is busted in Xcode 5. This is a simplified reimplementation
 // that isn't SFINAE-safe.
 namespace {
@@ -173,7 +221,7 @@ using TypeContextDescriptor = TargetTypeContextDescriptor<InProcess>;
 template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
 using ExternalTypeContextDescriptor = TargetTypeContextDescriptor<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
-// FIXME: https://bugs.swift.org/browse/SR-1155
+// FIXME: https://github.com/apple/swift/issues/43763
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
 
@@ -259,7 +307,6 @@ public:
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
-    case MetadataKind::ForeignReferenceType:
       return true;
 
     default:
@@ -284,7 +331,14 @@ public:
     return isAnyKindOfClass(getKind());
   }
 
-  const ValueWitnessTable *getValueWitnesses() const {
+  const uint8_t *getLayoutString() const {
+    assert(hasLayoutString());
+    // Classes should not have layout strings
+    assert(!isAnyClass());
+    return asFullMetadata(this)->layoutString;
+  }
+
+  const TargetValueWitnessTable<Runtime> *getValueWitnesses() const {
     return asFullMetadata(this)->ValueWitnesses;
   }
 
@@ -294,6 +348,23 @@ public:
 
   void setValueWitnesses(const ValueWitnessTable *table) {
     asFullMetadata(this)->ValueWitnesses = table;
+  }
+
+  void setLayoutString(const uint8_t *layoutString) {
+    if (isAnyClass()) {
+      asFullMetadata(reinterpret_cast<TargetAnyClassMetadata<Runtime> *>(this))
+          ->layoutString = layoutString;
+    } else {
+      asFullMetadata(this)->layoutString = layoutString;
+    }
+  }
+
+  bool hasLayoutString() const {
+    if (auto *contextDescriptor = getTypeContextDescriptor()) {
+      return contextDescriptor->hasLayoutString();
+    }
+
+    return false;
   }
   
   // Define forwarders for value witnesses. These invoke this metadata's value
@@ -429,8 +500,7 @@ public:
 #endif
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 
 protected:
@@ -446,14 +516,11 @@ protected:
 /// The common structure of opaque metadata.  Adds nothing.
 template <typename Runtime>
 struct TargetOpaqueMetadata {
-  typedef TargetTypeMetadataHeader<Runtime> HeaderType;
+  typedef TargetTypeMetadataHeaderBase<Runtime> HeaderType;
 
   // We have to represent this as a member so we can list-initialize it.
   TargetMetadata<Runtime> base;
 };
-
-using HeapObjectDestroyer =
-  SWIFT_CC(swift) void(SWIFT_CONTEXT HeapObject *);
 
 /// The prefix on a heap metadata.
 template <typename Runtime>
@@ -470,13 +537,16 @@ using HeapMetadataHeaderPrefix =
 /// The header present on all heap metadata.
 template <typename Runtime>
 struct TargetHeapMetadataHeader
-    : TargetHeapMetadataHeaderPrefix<Runtime>,
-      TargetTypeMetadataHeader<Runtime> {
+    : TargetTypeMetadataLayoutPrefix<Runtime>,
+      TargetHeapMetadataHeaderPrefix<Runtime>,
+      TargetTypeMetadataHeaderBase<Runtime> {
   constexpr TargetHeapMetadataHeader(
+      const TargetTypeMetadataLayoutPrefix<Runtime> &typeLayoutPrefix,
       const TargetHeapMetadataHeaderPrefix<Runtime> &heapPrefix,
-      const TargetTypeMetadataHeader<Runtime> &typePrefix)
-    : TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
-      TargetTypeMetadataHeader<Runtime>(typePrefix) {}
+      const TargetTypeMetadataHeaderBase<Runtime> &typePrefix)
+    : TargetTypeMetadataLayoutPrefix<Runtime>(typeLayoutPrefix),
+      TargetHeapMetadataHeaderPrefix<Runtime>(heapPrefix),
+      TargetTypeMetadataHeaderBase<Runtime>(typePrefix) {}
 };
 using HeapMetadataHeader =
   TargetHeapMetadataHeader<InProcess>;
@@ -496,6 +566,14 @@ struct TargetHeapMetadata : TargetMetadata<Runtime> {
     : TargetMetadata<Runtime>(kind) {}
   constexpr TargetHeapMetadata(TargetAnyClassMetadataObjCInterop<Runtime> *isa)
     : TargetMetadata<Runtime>(isa) {}
+
+  HeapObjectDestroyer *getHeapObjectDestroyer() const {
+    return asFullMetadata(this)->destroy;
+  }
+
+  void setHeapObjectDestroyer(HeapObjectDestroyer *destroy) {
+    asFullMetadata(this)->destroy = destroy;
+  }
 };
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
@@ -514,6 +592,7 @@ struct TargetMethodDescriptor {
   union {
     TargetCompactFunctionPointer<Runtime, void> Impl;
     TargetRelativeDirectPointer<Runtime, void> AsyncImpl;
+    TargetRelativeDirectPointer<Runtime, void> CoroImpl;
   };
 
   // TODO: add method types or anything else needed for reflection.
@@ -521,6 +600,8 @@ struct TargetMethodDescriptor {
   void *getImpl() const {
     if (Flags.isAsync()) {
       return AsyncImpl.get();
+    } else if (Flags.isCalleeAllocatedCoroutine()) {
+      return CoroImpl.get();
     } else {
       return Impl.get();
     }
@@ -583,6 +664,54 @@ using TargetRelativeProtocolRequirementPointer =
 using RelativeProtocolRequirementPointer =
   TargetRelativeProtocolRequirementPointer<InProcess>;
 
+/// An entry in the default override table, consisting of one of our methods
+/// `replacement` together with (1) another of our methods `original` which
+/// might have been overridden by a subclass and (2) an implementation of
+/// `replacement` to be used by such a subclass if it does not provide its own
+/// implementation.
+template <typename Runtime>
+struct TargetMethodDefaultOverrideDescriptor {
+  /// The method which replaced the original at call-sites.
+  TargetRelativeMethodDescriptorPointer<Runtime> Replacement;
+
+  /// The method originally called at such call sites.
+  TargetRelativeMethodDescriptorPointer<Runtime> Original;
+
+  union {
+    TargetCompactFunctionPointer<Runtime, void, /*nullable*/ true> Impl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> AsyncImpl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> CoroImpl;
+  };
+
+  bool isData() const {
+    auto *replacement = Replacement.get();
+    assert(replacement && "no replacement");
+    return replacement->Flags.isData();
+  }
+
+  void *getImpl() const {
+    auto *replacement = Replacement.get();
+    assert(replacement && "no replacement");
+    if (replacement->Flags.isAsync()) {
+      return AsyncImpl.get();
+    } else if (replacement->Flags.isCalleeAllocatedCoroutine()) {
+      return CoroImpl.get();
+    } else {
+      return Impl.get();
+    }
+  }
+};
+
+/// Header for a table of default override descriptors.  Such a table is a
+/// variable-sized structure whose length is stored in this header which is
+/// followed by that many TargetMethodDefaultOverrideDescriptors.
+template <typename Runtime>
+struct TargetMethodDefaultOverrideTableHeader {
+  /// The number of TargetMethodDefaultOverrideDescriptor records following this
+  /// header in the class's nominal type descriptor.
+  uint32_t NumEntries;
+};
+
 /// An entry in the method override table, referencing a method from one of our
 /// ancestor classes, together with an implementation.
 template <typename Runtime>
@@ -597,6 +726,7 @@ struct TargetMethodOverrideDescriptor {
   union {
     TargetCompactFunctionPointer<Runtime, void, /*nullable*/ true> Impl;
     TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> AsyncImpl;
+    TargetRelativeDirectPointer<Runtime, void, /*nullable*/ true> CoroImpl;
   };
 
   void *getImpl() const {
@@ -604,6 +734,8 @@ struct TargetMethodOverrideDescriptor {
     assert(baseMethod && "no base method");
     if (baseMethod->Flags.isAsync()) {
       return AsyncImpl.get();
+    } else if (baseMethod->Flags.isCalleeAllocatedCoroutine()) {
+      return CoroImpl.get();
     } else {
       return Impl.get();
     }
@@ -649,9 +781,9 @@ struct TargetClassMetadataBounds : TargetMetadataBounds<Runtime> {
   /// Return the basic bounds of all Swift class metadata.
   /// The immediate members offset will not be meaningful.
   static constexpr TargetClassMetadataBounds<Runtime> forSwiftRootClass() {
-    using Metadata = FullMetadata<TargetClassMetadataType<Runtime>>;
-    return forAddressPointAndSize(sizeof(typename Metadata::HeaderType),
-                                  sizeof(Metadata));
+    using MetadataTy = FullMetadata<TargetClassMetadataType<Runtime>>;
+    return forAddressPointAndSize(sizeof(typename MetadataTy::HeaderType),
+                                  sizeof(MetadataTy));
   }
 
   /// Return the bounds of a Swift class metadata with the given address
@@ -1167,7 +1299,7 @@ using ForeignClassMetadata = TargetForeignClassMetadata<InProcess>;
 /// The structure of metadata objects for foreign reference types.
 /// A foreign reference type is a non-Swift, non-Objective-C foreign type with
 /// reference semantics. Foreign reference types are pointers/reference to
-/// value types marked with the "import_as_ref" attribute.
+/// value types marked with the `swift_attr("import_reference")` attribute.
 ///
 /// Foreign reference types may have *custom* reference counting operations, or
 /// they may be immortal (and therefore trivial).
@@ -1390,21 +1522,91 @@ struct TargetEnumMetadata : public TargetValueMetadata<Runtime> {
 };
 using EnumMetadata = TargetEnumMetadata<InProcess>;
 
+template <typename Runtime>
+struct TargetFunctionGlobalActorMetadata {
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> GlobalActorType;
+};
+using FunctionGlobalActorMetadata = TargetFunctionGlobalActorMetadata<InProcess>;
+
+template <typename Runtime>
+struct TargetFunctionThrownErrorMetadata {
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> ThrownErrorType;
+};
+using FunctionThrownErrorMetadata = TargetFunctionThrownErrorMetadata<InProcess>;
+
 /// The structure of function type metadata.
 template <typename Runtime>
-struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
+struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime>,
+  swift::ABI::TrailingObjects<
+    TargetFunctionTypeMetadata<Runtime>,
+    ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>,
+    ParameterFlags,
+    TargetFunctionMetadataDifferentiabilityKind<typename Runtime::StoredSize>,
+    TargetFunctionGlobalActorMetadata<Runtime>,
+    ExtendedFunctionTypeFlags,
+    TargetFunctionThrownErrorMetadata<Runtime>> {
   using StoredSize = typename Runtime::StoredSize;
   using Parameter = ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>;
 
+private:
+  using TrailingObjects =
+      swift::ABI::TrailingObjects<
+        TargetFunctionTypeMetadata<Runtime>,
+        Parameter,
+        ParameterFlags,
+        TargetFunctionMetadataDifferentiabilityKind<StoredSize>,
+        TargetFunctionGlobalActorMetadata<Runtime>,
+        ExtendedFunctionTypeFlags,
+        TargetFunctionThrownErrorMetadata<Runtime>>;
+  friend TrailingObjects;
+
+  template<typename T>
+  using OverloadToken = typename TrailingObjects::template OverloadToken<T>;
+
+public:
   TargetFunctionTypeFlags<StoredSize> Flags;
 
   /// The type metadata for the result type.
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> ResultType;
 
-  Parameter *getParameters() { return reinterpret_cast<Parameter *>(this + 1); }
+private:
+  size_t numTrailingObjects(OverloadToken<Parameter>) const {
+    return getNumParameters();
+  }
+
+  size_t numTrailingObjects(OverloadToken<ParameterFlags>) const {
+    return hasParameterFlags() ? getNumParameters() : 0;
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<TargetFunctionMetadataDifferentiabilityKind<StoredSize>>
+  ) const {
+    return isDifferentiable() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<TargetFunctionGlobalActorMetadata<Runtime>>
+  ) const {
+    return hasGlobalActor() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<ExtendedFunctionTypeFlags>) const {
+    return hasExtendedFlags() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(
+      OverloadToken<TargetFunctionThrownErrorMetadata<Runtime>>
+  ) const {
+    return hasThrownError() ? 1 : 0;
+  }
+      
+public:
+  Parameter *getParameters() { 
+    return this->template getTrailingObjects<Parameter>();
+  }
 
   const Parameter *getParameters() const {
-    return reinterpret_cast<const Parameter *>(this + 1);
+    return this->template getTrailingObjects<Parameter>();
   }
 
   Parameter getParameter(unsigned index) const {
@@ -1414,8 +1616,7 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
 
   ParameterFlags getParameterFlags(unsigned index) const {
     assert(index < getNumParameters());
-    auto flags = hasParameterFlags() ? getParameterFlags()[index] : 0;
-    return ParameterFlags::fromIntValue(flags);
+    return hasParameterFlags() ? getParameterFlags()[index] : ParameterFlags();
   }
 
   StoredSize getNumParameters() const {
@@ -1431,6 +1632,13 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   bool hasParameterFlags() const { return Flags.hasParameterFlags(); }
   bool isEscaping() const { return Flags.isEscaping(); }
   bool hasGlobalActor() const { return Flags.hasGlobalActor(); }
+  bool hasExtendedFlags() const { return Flags.hasExtendedFlags(); }
+  bool hasThrownError() const {
+    if (!Flags.hasExtendedFlags())
+      return false;
+
+    return getExtendedFlags().isTypedThrows();
+  }
 
   static constexpr StoredSize OffsetToFlags = sizeof(TargetMetadata<Runtime>);
 
@@ -1438,32 +1646,24 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
     return metadata->getKind() == MetadataKind::Function;
   }
 
-  uint32_t *getParameterFlags() {
-    return reinterpret_cast<uint32_t *>(getParameters() + getNumParameters());
+  ParameterFlags *getParameterFlags() {
+    return this->template getTrailingObjects<ParameterFlags>();
   }
 
-  const uint32_t *getParameterFlags() const {
-    return reinterpret_cast<const uint32_t *>(getParameters() +
-                                              getNumParameters());
+  const ParameterFlags *getParameterFlags() const {
+    return this->template getTrailingObjects<ParameterFlags>();
   }
 
   TargetFunctionMetadataDifferentiabilityKind<StoredSize> *
   getDifferentiabilityKindAddress() {
     assert(isDifferentiable());
-    void *previousEndAddr = hasParameterFlags()
-        ? reinterpret_cast<void *>(getParameterFlags() + getNumParameters())
-        : reinterpret_cast<void *>(getParameters() + getNumParameters());
-    return reinterpret_cast<
-        TargetFunctionMetadataDifferentiabilityKind<StoredSize> *>(
-        llvm::alignAddr(previousEndAddr,
-                        llvm::Align(alignof(typename Runtime::StoredPointer))));
+    return this->template getTrailingObjects<TargetFunctionMetadataDifferentiabilityKind<StoredSize>>();
   }
 
   TargetFunctionMetadataDifferentiabilityKind<StoredSize>
   getDifferentiabilityKind() const {
     if (isDifferentiable()) {
-      return *const_cast<TargetFunctionTypeMetadata<Runtime> *>(this)
-          ->getDifferentiabilityKindAddress();
+      return *(this->template getTrailingObjects<TargetFunctionMetadataDifferentiabilityKind<StoredSize>>());
     }
     return TargetFunctionMetadataDifferentiabilityKind<StoredSize>
         ::NonDifferentiable;
@@ -1472,26 +1672,47 @@ struct TargetFunctionTypeMetadata : public TargetMetadata<Runtime> {
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> *
   getGlobalActorAddr() {
     assert(hasGlobalActor());
-    
-    void *endAddr =
-        isDifferentiable()
-          ? reinterpret_cast<void *>(getDifferentiabilityKindAddress() + 1) :
-        hasParameterFlags()
-          ? reinterpret_cast<void *>(getParameterFlags() + getNumParameters()) :
-        reinterpret_cast<void *>(getParameters() + getNumParameters());
-    return reinterpret_cast<
-        ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> *>(
-          llvm::alignAddr(
-              endAddr, llvm::Align(alignof(typename Runtime::StoredPointer))));
+    auto globalActorAddr =
+      this->template getTrailingObjects<TargetFunctionGlobalActorMetadata<Runtime>>();
+    return &globalActorAddr->GlobalActorType;
   }
 
   ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>
   getGlobalActor() const {
     if (!hasGlobalActor())
       return ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>();
+    auto globalActorAddr =
+      this->template getTrailingObjects<TargetFunctionGlobalActorMetadata<Runtime>>();
+    return globalActorAddr->GlobalActorType;
+  }
 
-    return *const_cast<TargetFunctionTypeMetadata<Runtime> *>(this)
-      ->getGlobalActorAddr();
+  ExtendedFunctionTypeFlags *getExtendedFlagsAddr() {
+    assert(hasExtendedFlags());
+    return this->template getTrailingObjects<ExtendedFunctionTypeFlags>();
+  }
+      
+  ExtendedFunctionTypeFlags getExtendedFlags() const {
+    if (!hasExtendedFlags())
+      return ExtendedFunctionTypeFlags();
+
+    return this->template getTrailingObjects<ExtendedFunctionTypeFlags>()[0];
+  }
+
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> *
+  getThrownErrorAddr() {
+    assert(hasThrownError());
+    auto thrownErrorAddr =
+      this->template getTrailingObjects<TargetFunctionThrownErrorMetadata<Runtime>>();
+    return &thrownErrorAddr->ThrownErrorType;
+  }
+
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>
+  getThrownError() const {
+    if (!hasThrownError())
+      return ConstTargetMetadataPointer<Runtime, swift::TargetMetadata>();
+    auto thrownErrorAddr =
+      this->template getTrailingObjects<TargetFunctionThrownErrorMetadata<Runtime>>();
+    return thrownErrorAddr->ThrownErrorType;
   }
 };
 using FunctionTypeMetadata = TargetFunctionTypeMetadata<InProcess>;
@@ -1508,10 +1729,43 @@ struct TargetMetatypeMetadata : public TargetMetadata<Runtime> {
 };
 using MetatypeMetadata = TargetMetatypeMetadata<InProcess>;
 
+/// The structure of `Builtin.FixedArray` type metadata.
+template <typename Runtime>
+struct TargetFixedArrayTypeMetadata : public TargetMetadata<Runtime> {
+  using StoredPointerDifference = typename Runtime::StoredPointerDifference;
+  
+  StoredPointerDifference Count;
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Element;
+  
+  // Returns the number of elements for which storage is reserved.
+  // A type that is instantiated with negative size cannot have values
+  // instantiated, so is laid out with zero size like an uninhabited type.
+  StoredPointerDifference getRealizedCount() const {
+    return Count < 0 ? 0 : Count;
+  }
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::FixedArray;
+  }
+};
+using FixedArrayTypeMetadata = TargetFixedArrayTypeMetadata<InProcess>;
+
+/// The structure of `Builtin.Borrow` type metadata.
+template <typename Runtime>
+struct TargetBorrowTypeMetadata : public TargetMetadata<Runtime> {
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Referent;
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::Borrow;
+  }
+};
+using BorrowTypeMetadata = TargetBorrowTypeMetadata<InProcess>;
+
 /// The structure of tuple type metadata.
 template <typename Runtime>
 struct TargetTupleTypeMetadata : public TargetMetadata<Runtime> {
   using StoredSize = typename Runtime::StoredSize;
+  using HeaderType = TargetTypeMetadataHeaderBase<Runtime>;
   TargetTupleTypeMetadata() = default;
   constexpr TargetTupleTypeMetadata(const TargetMetadata<Runtime> &base,
                                     uint32_t numElements,
@@ -1578,7 +1832,9 @@ TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements() -> StoredSize {
   return offsetof(TargetTupleTypeMetadata<Runtime>, NumElements);
 }
 
-template <typename Runtime> struct TargetProtocolDescriptor;
+template <typename Runtime>
+struct swift_ptrauth_struct_context_descriptor(ProtocolDescriptor)
+    TargetProtocolDescriptor;
 
 /// A protocol requirement descriptor. This describes a single protocol
 /// requirement in a protocol descriptor. The index of the requirement in
@@ -1606,7 +1862,9 @@ struct TargetProtocolRequirement {
 
 using ProtocolRequirement = TargetProtocolRequirement<InProcess>;
 
-template<typename Runtime> struct TargetProtocolDescriptor;
+template <typename Runtime>
+struct swift_ptrauth_struct_context_descriptor(ProtocolDescriptor)
+    TargetProtocolDescriptor;
 using ProtocolDescriptor = TargetProtocolDescriptor<InProcess>;
 
 template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
@@ -1643,6 +1901,35 @@ using AssociatedWitnessTableAccessFunction =
                                  const Metadata *self,
                                  const WitnessTable *selfConformance);
 
+template<typename Runtime>
+using TargetRelativeProtocolConformanceDescriptorPointer =
+  RelativeIndirectablePointer<const TargetProtocolConformanceDescriptor<Runtime>,
+                              /*nullable*/ false>;
+
+/// A relative witness table for a protocol.
+///
+/// With the exception of the initial protocol conformance descriptor,
+/// the layout of a witness table is dependent on the protocol being
+/// represented.
+/// Entries are relative pointers.
+template <typename Runtime>
+class TargetRelativeWitnessTable {
+  /// The protocol conformance descriptor from which this witness table
+  /// was generated.
+  TargetRelativeProtocolConformanceDescriptorPointer<Runtime> Description;
+
+public:
+  const TargetProtocolConformanceDescriptor<Runtime> *getDescription() const {
+    return Description;
+  }
+};
+using RelativeWitnessTable = TargetRelativeWitnessTable<InProcess>;
+
+using AssociatedRelativeWitnessTableAccessFunction =
+  SWIFT_CC(swift) RelativeWitnessTable *(const Metadata *associatedType,
+                                 const Metadata *self,
+                                 const RelativeWitnessTable *selfConformance);
+
 /// The possible physical representations of existential types.
 enum class ExistentialTypeRepresentation {
   /// The type uses an opaque existential representation.
@@ -1668,6 +1955,7 @@ struct TargetExistentialTypeMetadata
       TargetExistentialTypeMetadata<Runtime>,
       ConstTargetMetadataPointer<Runtime, TargetMetadata>,
       TargetProtocolDescriptorRef<Runtime>> {
+  using HeaderType = TargetTypeMetadataHeaderBase<Runtime>;
 
 private:
   using ProtocolDescriptorRef = TargetProtocolDescriptorRef<Runtime>;
@@ -1849,7 +2137,13 @@ struct TargetExtendedExistentialTypeShape
       GenericParamDescriptor,
       // Requirements for requirement signature, followed by requirements
       // for generalization signature
-      TargetGenericRequirementDescriptor<Runtime>> {
+      TargetGenericRequirementDescriptor<Runtime>,
+      // Optional header describing any type packs in the generalization
+      // signature.
+      GenericPackShapeHeader,
+      // For each type pack in the generalization signature, a descriptor
+      // storing the shape class.
+      GenericPackShapeDescriptor> {
 private:
   using RelativeValueWitnessTablePointer =
     TargetRelativeIndirectablePointer<Runtime,
@@ -1862,7 +2156,9 @@ private:
       TargetExistentialTypeExpression<Runtime>,
       RelativeValueWitnessTablePointer,
       GenericParamDescriptor,
-      TargetGenericRequirementDescriptor<Runtime>>;
+      TargetGenericRequirementDescriptor<Runtime>,
+      GenericPackShapeHeader,
+      GenericPackShapeDescriptor>;
   friend TrailingObjects;
 
   template<typename T>
@@ -1885,8 +2181,19 @@ private:
          + (Flags.hasImplicitGenSigParams() ? 0 : getNumGenSigParams());
   }
 
-  size_t numTrailingObjects(OverloadToken<GenericRequirementDescriptor>) const {
+  size_t numTrailingObjects(OverloadToken<TargetGenericRequirementDescriptor<Runtime>>) const {
     return getNumGenSigRequirements() + getNumReqSigRequirements();
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeHeader>) const {
+    return (Flags.hasTypePacks() ? 1 : 0);
+  }
+
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeDescriptor>) const {
+    if (!Flags.hasTypePacks())
+      return 0;
+
+    return getGenSigPackShapeHeader().NumTypePacks;
   }
 
   const TargetGenericContextDescriptorHeader<Runtime> *
@@ -1933,7 +2240,8 @@ public:
   TargetGenericContextDescriptorHeader<Runtime> ReqSigHeader;
 
   RuntimeGenericSignature<Runtime> getRequirementSignature() const {
-    return {ReqSigHeader, getReqSigParams(), getReqSigRequirements()};
+    return {ReqSigHeader, getReqSigParams(), getReqSigRequirements(),
+            {0, 0}, nullptr, {0}, nullptr};
   }
 
   unsigned getNumReqSigParams() const {
@@ -2012,7 +2320,9 @@ public:
 
   RuntimeGenericSignature<Runtime> getGeneralizationSignature() const {
     if (!hasGeneralizationSignature()) return RuntimeGenericSignature<Runtime>();
-    return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements()};
+    return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements(),
+            getGenSigPackShapeHeader(), getGenSigPackShapeDescriptors(),
+            {0}, nullptr};
   }
 
   unsigned getNumGenSigParams() const {
@@ -2041,11 +2351,38 @@ public:
     return getReqSigRequirements() + ReqSigHeader.NumRequirements;
   }
 
+  GenericPackShapeHeader getGenSigPackShapeHeader() const {
+    assert(hasGeneralizationSignature());
+    if (!Flags.hasTypePacks())
+      return {0, 0};
+    return *this->template getTrailingObjects<GenericPackShapeHeader>();
+  }
+
+  const GenericPackShapeDescriptor *getGenSigPackShapeDescriptors() const {
+    assert(hasGeneralizationSignature());
+    if (!Flags.hasTypePacks())
+      return nullptr;
+    return this->template getTrailingObjects<GenericPackShapeDescriptor>();
+  }
+
   /// Return the amount of space used in ExtendedExistentialTypeMetadata
   /// for this shape to store the generalization arguments.
   unsigned getGenSigArgumentLayoutSizeInWords() const {
     if (!hasGeneralizationSignature()) return 0;
     return getGenSigHeader()->getArgumentLayoutSizeInWords();
+  }
+  
+  bool isCopyable() const {
+    for (auto &reqt : getRequirementSignature().getRequirements()) {
+      if (reqt.getKind() != GenericRequirementKind::InvertedProtocols) {
+        continue;
+      }
+      if (reqt.getInvertedProtocols()
+              .contains(InvertibleProtocolKind::Copyable)) {
+        return false;
+      }
+    }
+    return true;
   }
 };
 using ExtendedExistentialTypeShape
@@ -2467,6 +2804,32 @@ struct TargetResilientWitnessesHeader {
 };
 using ResilientWitnessesHeader = TargetResilientWitnessesHeader<InProcess>;
 
+/// Describes a reference to a global actor type and its conformance to the
+/// global actor protocol.
+template<typename Runtime>
+struct TargetGlobalActorReference {
+private:
+  using SignedDescriptorPointer =
+      const TargetProtocolConformanceDescriptor<Runtime>
+          *__ptrauth_swift_protocol_conformance_descriptor;
+
+public:
+  /// The type of the global actor.
+  RelativeDirectPointer<const char, /*nullable*/ false> type;
+
+  /// The conformance of the global actor to the GlobalActor protocol.
+  RelativeIndirectablePointer<
+      const TargetProtocolConformanceDescriptor<Runtime>,
+      /*nullable*/ false,
+      /*offset*/ int32_t,
+      /*indirect type*/ SignedDescriptorPointer>
+      conformance;
+};
+
+/// Describes the context of a protocol conformance that is relevant when
+/// the conformance is used, such as global actor isolation.
+struct ConformanceExecutionContext;
+
 /// The structure of a protocol conformance.
 ///
 /// This contains enough static information to recover the witness table for a
@@ -2477,17 +2840,21 @@ struct TargetProtocolConformanceDescriptor final
              TargetProtocolConformanceDescriptor<Runtime>,
              TargetRelativeContextPointer<Runtime>,
              TargetGenericRequirementDescriptor<Runtime>,
+             GenericPackShapeDescriptor,
              TargetResilientWitnessesHeader<Runtime>,
              TargetResilientWitness<Runtime>,
-             TargetGenericWitnessTable<Runtime>> {
+             TargetGenericWitnessTable<Runtime>,
+             TargetGlobalActorReference<Runtime>> {
 
   using TrailingObjects = swift::ABI::TrailingObjects<
                              TargetProtocolConformanceDescriptor<Runtime>,
                              TargetRelativeContextPointer<Runtime>,
                              TargetGenericRequirementDescriptor<Runtime>,
+                             GenericPackShapeDescriptor,
                              TargetResilientWitnessesHeader<Runtime>,
                              TargetResilientWitness<Runtime>,
-                             TargetGenericWitnessTable<Runtime>>;
+                             TargetGenericWitnessTable<Runtime>,
+                             TargetGlobalActorReference<Runtime>>;
   friend TrailingObjects;
 
   template<typename T>
@@ -2576,10 +2943,17 @@ public:
 
   /// Retrieve the conditional requirements that must also be
   /// satisfied
-  llvm::ArrayRef<GenericRequirementDescriptor>
+  llvm::ArrayRef<TargetGenericRequirementDescriptor<Runtime>>
   getConditionalRequirements() const {
-    return {this->template getTrailingObjects<GenericRequirementDescriptor>(),
+    return {this->template getTrailingObjects<TargetGenericRequirementDescriptor<Runtime>>(),
             Flags.getNumConditionalRequirements()};
+  }
+
+  /// Retrieve the pack shape descriptors for the conditional pack requirements.
+  llvm::ArrayRef<GenericPackShapeDescriptor>
+  getConditionalPackShapeDescriptors() const {
+    return {this->template getTrailingObjects<GenericPackShapeDescriptor>(),
+            Flags.getNumConditionalPackShapeDescriptors()};
   }
 
   /// Get the directly-referenced witness table pattern, which may also
@@ -2595,8 +2969,13 @@ public:
   /// Get the witness table for the specified type, realizing it if
   /// necessary, or return null if the conformance does not apply to the
   /// type.
+  ///
+  /// The context will be populated with any information that needs to be
+  /// checked before this witness table can be used within a given execution
+  /// context.
   const swift::TargetWitnessTable<Runtime> *
-  getWitnessTable(const TargetMetadata<Runtime> *type) const;
+  getWitnessTable(const TargetMetadata<Runtime> *type,
+                  ConformanceExecutionContext &context) const;
 
   /// Retrieve the resilient witnesses.
   llvm::ArrayRef<ResilientWitness> getResilientWitnesses() const {
@@ -2614,6 +2993,32 @@ public:
       return nullptr;
 
     return this->template getTrailingObjects<GenericWitnessTable>();
+  }
+
+  /// Whether this conformance has any conditional requirements that need to
+  /// be evaluated.
+  bool hasGlobalActorIsolation() const {
+    return Flags.hasGlobalActorIsolation();
+  }
+
+  /// Retrieve the global actor type to which this conformance is isolated, if
+  /// any.
+  llvm::StringRef
+  getGlobalActorType() const {
+    if (!Flags.hasGlobalActorIsolation())
+      return llvm::StringRef();
+
+    return Demangle::makeSymbolicMangledNameStringRef(this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->type);
+  }
+
+  /// Retrieve the protocol conformance of the global actor type to the
+  /// GlobalActor protocol.
+  const TargetProtocolConformanceDescriptor<Runtime> *
+  getGlobalActorConformance() const {
+    if (!Flags.hasGlobalActorIsolation())
+      return nullptr;
+
+    return this->template getTrailingObjects<TargetGlobalActorReference<Runtime>>()->conformance;
   }
 
 #if !defined(NDEBUG) && SWIFT_OBJC_INTEROP
@@ -2640,6 +3045,10 @@ private:
     return Flags.getNumConditionalRequirements();
   }
 
+  size_t numTrailingObjects(OverloadToken<GenericPackShapeDescriptor>) const {
+    return Flags.getNumConditionalPackShapeDescriptors();
+  }
+
   size_t numTrailingObjects(OverloadToken<ResilientWitnessesHeader>) const {
     return Flags.hasResilientWitnesses() ? 1 : 0;
   }
@@ -2653,6 +3062,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<GenericWitnessTable>) const {
     return Flags.hasGenericWitnessTable() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<RelativeDirectPointer<const char, /*nullable*/ true>>) const {
+    return Flags.hasGlobalActorIsolation() ? 1 : 0;
   }
 };
 using ProtocolConformanceDescriptor
@@ -2671,12 +3084,14 @@ using ExternalProtocolConformanceDescriptor = TargetProtocolConformanceDescripto
 template<template <typename Runtime> class ObjCInteropKind, unsigned PointerSize>
 using ExternalProtocolConformanceRecord = TargetProtocolConformanceRecord<External<ObjCInteropKind<RuntimeTarget<PointerSize>>>>;
 
-template<typename Runtime>
-struct TargetModuleContextDescriptor;
+template <typename Runtime>
+struct swift_ptrauth_struct_context_descriptor(ModuleContextDescriptor)
+    TargetModuleContextDescriptor;
 
 /// Base class for all context descriptors.
-template<typename Runtime>
-struct TargetContextDescriptor {
+template <typename Runtime>
+struct swift_ptrauth_struct_context_descriptor(ContextDescriptor)
+    TargetContextDescriptor {
   /// Flags describing the context, including its kind and format version.
   ContextDescriptorFlags Flags;
   
@@ -2685,6 +3100,9 @@ struct TargetContextDescriptor {
 
   bool isGeneric() const { return Flags.isGeneric(); }
   bool isUnique() const { return Flags.isUnique(); }
+  bool hasInvertibleProtocols() const {
+    return Flags.hasInvertibleProtocols();
+  }
   ContextDescriptorKind getKind() const { return Flags.getKind(); }
 
   /// Get the generic context information for this context, or null if the
@@ -2693,6 +3111,15 @@ struct TargetContextDescriptor {
 
   /// Get the module context for this context.
   const TargetModuleContextDescriptor<Runtime> *getModuleContext() const;
+
+  /// Retrieve the set of protocols that are inverted by this type's
+  /// primary definition.
+  ///
+  /// This type might still conditionally conform to any of the protocols
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet *
+  getInvertedProtocols() const;
 
   /// Is this context part of a C-imported module?
   bool isCImportedContext() const;
@@ -2710,8 +3137,7 @@ struct TargetContextDescriptor {
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "only for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 
 private:
@@ -2733,10 +3159,11 @@ inline bool isCImportedModuleName(llvm::StringRef name) {
 }
 
 /// Descriptor for a module context.
-template<typename Runtime>
-struct TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
+template <typename Runtime>
+struct swift_ptrauth_struct_context_descriptor(ModuleContextDescriptor)
+    TargetModuleContextDescriptor final : TargetContextDescriptor<Runtime> {
   /// The module name.
-  RelativeDirectPointer<const char, /*nullable*/ false> Name;
+  TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Name;
 
   /// Is this module a special C-imported module?
   bool isCImportedContext() const {
@@ -2774,8 +3201,9 @@ TargetContextDescriptor<Runtime>::getModuleContext() const {
 }
 
 /// Descriptor for an extension context.
-template<typename Runtime>
-struct TargetExtensionContextDescriptor final
+template <typename Runtime>
+struct swift_ptrauth_struct_context_descriptor(ExtensionContextDescriptor)
+    TargetExtensionContextDescriptor final
     : TargetContextDescriptor<Runtime>,
       TrailingGenericContextObjects<TargetExtensionContextDescriptor<Runtime>>
 {
@@ -2792,7 +3220,7 @@ public:
   ///
   /// Note that the Parent of the extension will be the module context the
   /// extension is declared inside.
-  RelativeDirectPointer<const char> ExtendedContext;
+  TargetRelativeDirectPointer<Runtime, const char> ExtendedContext;
 
   using TrailingGenericContextObjects::getGenericContext;
 
@@ -2813,8 +3241,9 @@ struct TargetMangledContextName {
   TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> name;
 };
 
-template<typename Runtime>
-struct TargetAnonymousContextDescriptor final
+template <typename Runtime>
+struct swift_ptrauth_struct_context_descriptor(AnonymousContextDescriptor)
+    TargetAnonymousContextDescriptor final
     : TargetContextDescriptor<Runtime>,
       TrailingGenericContextObjects<TargetAnonymousContextDescriptor<Runtime>,
                                     TargetGenericContextDescriptorHeader,
@@ -2872,7 +3301,7 @@ private:
   using TrailingGenericContextObjects::numTrailingObjects;
 
   size_t numTrailingObjects(OverloadToken<MangledContextName>) const {
-    return this->hasMangledNam() ? 1 : 0;
+    return this->hasMangledName() ? 1 : 0;
   }
 
 public:
@@ -2894,8 +3323,9 @@ using ExternalAnonymousContextDescriptor = TargetAnonymousContextDescriptor<Exte
 /// Only Swift protocols are defined by a protocol descriptor, whereas
 /// Objective-C (including protocols defined in Swift as @objc) use the
 /// Objective-C protocol layout.
-template<typename Runtime>
-struct TargetProtocolDescriptor final
+template <typename Runtime>
+struct swift_ptrauth_struct_context_descriptor(ProtocolDescriptor)
+    TargetProtocolDescriptor final
     : TargetContextDescriptor<Runtime>,
       swift::ABI::TrailingObjects<
         TargetProtocolDescriptor<Runtime>,
@@ -2976,28 +3406,30 @@ public:
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "only for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Protocol;
   }
 };
-  
+
 /// The descriptor for an opaque type.
 template <typename Runtime>
-struct TargetOpaqueTypeDescriptor final
-  : TargetContextDescriptor<Runtime>,
+struct swift_ptrauth_struct_context_descriptor(OpaqueTypeDescriptor)
+    TargetOpaqueTypeDescriptor final
+    : TargetContextDescriptor<Runtime>,
     TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
                                   TargetGenericContextDescriptorHeader,
-                                  RelativeDirectPointer<const char>>
+                                  RelativeDirectPointer<const char>,
+                                  InvertibleProtocolSet>
 {
 private:
   using TrailingGenericContextObjects =
       swift::TrailingGenericContextObjects<TargetOpaqueTypeDescriptor<Runtime>,
                                            TargetGenericContextDescriptorHeader,
-                                           RelativeDirectPointer<const char>>;
+                                           RelativeDirectPointer<const char>,
+                                           InvertibleProtocolSet>;
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
   friend TrailingObjects;
@@ -3033,6 +3465,23 @@ public:
     assert(i < getNumUnderlyingTypeArguments());
     const char *ptr = getUnderlyingTypeArgumentMangledName(i);    
     return Demangle::makeSymbolicMangledNameStringRef(ptr);
+  }
+
+  /// Retrieve the set of protocols that are inverted by this type's
+  /// primary definition.
+  ///
+  /// This type might still conditionally conform to any of the protocols
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet &
+  getInvertedProtocols() const {
+    assert(this->hasInvertibleProtocols());
+    return
+      *this->template getTrailingObjects<InvertibleProtocolSet>();
+  }
+  
+  size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
+    return this->hasInvertibleProtocols() ? 1 : 0;
   }
 
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
@@ -3281,10 +3730,10 @@ struct TargetGenericValueMetadataPattern final :
 
   /// The value-witness table.  Indirectable so that we can re-use tables
   /// from other libraries if that seems wise.
-  TargetRelativeIndirectablePointer<Runtime, const ValueWitnessTable>
+  TargetRelativeIndirectablePointer<Runtime, const TargetValueWitnessTable<Runtime>>
     ValueWitnesses;
 
-  const ValueWitnessTable *getValueWitnessesPattern() const {
+  const TargetValueWitnessTable<Runtime> *getValueWitnessesPattern() const {
     return ValueWitnesses.get();
   }
 
@@ -3555,7 +4004,10 @@ struct TargetCanonicalSpecializedMetadatasListEntry {
 
 template <typename Runtime>
 struct TargetCanonicalSpecializedMetadataAccessorsListEntry {
-  TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false> accessor;
+  TargetCompactFunctionPointer<
+      Runtime, SWIFT_CC(swift) MetadataResponse(MetadataRequest),
+      /*Nullable*/ false>
+      accessor;
 };
 
 template <typename Runtime>
@@ -3564,8 +4016,15 @@ struct TargetCanonicalSpecializedMetadatasCachingOnceToken {
 };
 
 template <typename Runtime>
-class TargetTypeContextDescriptor
-    : public TargetContextDescriptor<Runtime> {
+struct TargetSingletonMetadataPointer {
+  TargetRelativeDirectPointer<Runtime, TargetMetadata<Runtime>,
+                              /*Nullable*/ false>
+      metadata;
+};
+
+template <typename Runtime>
+class swift_ptrauth_struct_context_descriptor(TypeContextDescriptor)
+    TargetTypeContextDescriptor : public TargetContextDescriptor<Runtime> {
 public:
   /// The name of the type.
   TargetRelativeDirectPointer<Runtime, const char, /*nullable*/ false> Name;
@@ -3579,9 +4038,11 @@ public:
                               /*Nullable*/ true> AccessFunctionPtr;
   
   /// A pointer to the field descriptor for the type, if any.
-  TargetRelativeDirectPointer<Runtime, const reflection::FieldDescriptor,
-                              /*nullable*/ true> Fields;
-      
+  TargetRelativeDirectPointer<Runtime,
+                              const reflection::TargetFieldDescriptor<Runtime>,
+                              /*nullable*/ true>
+      Fields;
+
   bool isReflectable() const { return (bool)Fields; }
 
   MetadataAccessFunction getAccessFunction() const {
@@ -3613,7 +4074,19 @@ public:
   }
 
   bool hasCanonicalMetadataPrespecializations() const {
-    return getTypeContextDescriptorFlags().hasCanonicalMetadataPrespecializations();
+    return this->isGeneric() &&
+           getTypeContextDescriptorFlags()
+               .hasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer();
+  }
+
+  bool hasSingletonMetadataPointer() const {
+    return !this->isGeneric() &&
+           getTypeContextDescriptorFlags()
+               .hasCanonicalMetadataPrespecializationsOrSingletonMetadataPointer();
+  }
+
+  bool hasLayoutString() const {
+    return getTypeContextDescriptorFlags().hasLayoutString();
   }
 
   /// Given that this type has foreign metadata initialization, return the
@@ -3783,7 +4256,8 @@ struct TargetObjCResilientClassStubInfo {
 };
 
 template <typename Runtime>
-class TargetClassDescriptor final
+class swift_ptrauth_struct_context_descriptor(ClassDescriptor)
+    TargetClassDescriptor final
     : public TargetTypeContextDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                               TargetTypeGenericContextDescriptorHeader,
@@ -3799,9 +4273,13 @@ class TargetClassDescriptor final
                               TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                               TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                               TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
-                              TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>> {
+                              TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+                              InvertibleProtocolSet,
+                              TargetSingletonMetadataPointer<Runtime>,
+                              TargetMethodDefaultOverrideTableHeader<Runtime>,
+                              TargetMethodDefaultOverrideDescriptor<Runtime>> {
 private:
-  using TrailingGenericContextObjects =
+  using TrailingGenericContextObjects = 
     swift::TrailingGenericContextObjects<TargetClassDescriptor<Runtime>,
                                          TargetTypeGenericContextDescriptorHeader,
                                          TargetResilientSuperclass<Runtime>,
@@ -3815,7 +4293,11 @@ private:
                                          TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                                          TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
                                          TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>,
-                                         TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>>;
+                                         TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+                                         InvertibleProtocolSet,
+                                         TargetSingletonMetadataPointer<Runtime>,
+                                         TargetMethodDefaultOverrideTableHeader<Runtime>,
+                                         TargetMethodDefaultOverrideDescriptor<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -3839,12 +4321,18 @@ public:
     TargetCanonicalSpecializedMetadatasListCount<Runtime>;
   using MetadataListEntry = 
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
-  using MetadataAccessor = 
-    TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false>;
+  using MetadataAccessor = TargetCompactFunctionPointer<
+      Runtime, SWIFT_CC(swift) MetadataResponse(MetadataRequest),
+      /*Nullable*/ false>;
   using MetadataAccessorListEntry =
       TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>;
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
+  using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
+  using DefaultOverrideTableHeader =
+      TargetMethodDefaultOverrideTableHeader<Runtime>;
+  using DefaultOverrideDescriptor =
+      TargetMethodDefaultOverrideDescriptor<Runtime>;
 
   using StoredPointer = typename Runtime::StoredPointer;
   using StoredPointerDifference = typename Runtime::StoredPointerDifference;
@@ -3986,6 +4474,20 @@ private:
     return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
   }
 
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
+    return this->hasSingletonMetadataPointer() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<DefaultOverrideTableHeader>) const {
+    return hasDefaultOverrideTable() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<DefaultOverrideDescriptor>) const {
+    if (!hasDefaultOverrideTable())
+      return 0;
+    return getDefaultOverrideTable()->NumEntries;
+  }
+
 public:
   const TargetRelativeDirectPointer<Runtime, const void, /*nullable*/true> &
   getResilientSuperclass() const {
@@ -4015,6 +4517,10 @@ public:
     }
 
     return FieldOffsetVectorOffset;
+  }
+
+  bool hasDefaultOverrideTable() const {
+    return getTypeContextDescriptorFlags().class_hasDefaultOverrideTable();
   }
 
   bool isActor() const {
@@ -4061,6 +4567,20 @@ public:
       return {};
     return {this->template getTrailingObjects<MethodOverrideDescriptor>(),
             numTrailingObjects(OverloadToken<MethodOverrideDescriptor>{})};
+  }
+
+  const DefaultOverrideTableHeader *getDefaultOverrideTable() const {
+    if (!hasDefaultOverrideTable())
+      return nullptr;
+    return this->template getTrailingObjects<DefaultOverrideTableHeader>();
+  }
+
+  llvm::ArrayRef<DefaultOverrideDescriptor> getDefaultOverrideDescriptors()
+      const {
+    if (!hasDefaultOverrideTable())
+      return {};
+    return {this->template getTrailingObjects<DefaultOverrideDescriptor>(),
+            numTrailingObjects(OverloadToken<DefaultOverrideDescriptor>{})};
   }
 
   /// Return the bounds of this class's metadata.
@@ -4165,6 +4685,31 @@ public:
     return box->token.get();
   }
 
+  TargetMetadata<Runtime> *getSingletonMetadata() const {
+    if (!this->hasSingletonMetadataInitialization())
+      return nullptr;
+
+    auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
+    return box->token.get();
+  }
+
+  /// Retrieve the set of protocols that are inverted by this type's
+  /// primary definition.
+  ///
+  /// This type might still conditionally conform to any of the protocols
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet &
+  getInvertedProtocols() const {
+    assert(this->hasInvertibleProtocols());
+    return
+      *this->template getTrailingObjects<InvertibleProtocolSet>();
+  }
+
+  size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
+    return this->hasInvertibleProtocols() ? 1 : 0;
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Class;
   }
@@ -4173,8 +4718,8 @@ public:
 using ClassDescriptor = TargetClassDescriptor<InProcess>;
 
 template <typename Runtime>
-class TargetValueTypeDescriptor
-    : public TargetTypeContextDescriptor<Runtime> {
+class swift_ptrauth_struct_context_descriptor(ValueTypeDescriptor)
+    TargetValueTypeDescriptor : public TargetTypeContextDescriptor<Runtime>{
 public:
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Struct ||
@@ -4184,7 +4729,8 @@ public:
 using ValueTypeDescriptor = TargetValueTypeDescriptor<InProcess>;
 
 template <typename Runtime>
-class TargetStructDescriptor final
+class swift_ptrauth_struct_context_descriptor(StructDescriptor)
+    TargetStructDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetStructDescriptor<Runtime>,
                             TargetTypeGenericContextDescriptorHeader,
@@ -4193,7 +4739,9 @@ class TargetStructDescriptor final
                             TargetSingletonMetadataInitialization<Runtime>,
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                             TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                            TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>> {
+                            TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+                            InvertibleProtocolSet,
+                            TargetSingletonMetadataPointer<Runtime>> {
 public:
   using ForeignMetadataInitialization =
     TargetForeignMetadataInitialization<Runtime>;
@@ -4207,6 +4755,7 @@ public:
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
+  using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
 
 private:
   using TrailingGenericContextObjects =
@@ -4216,7 +4765,9 @@ private:
                                            SingletonMetadataInitialization,
                                            MetadataListCount,
                                            MetadataListEntry,
-                                           MetadataCachingOnceToken>;
+                                           MetadataCachingOnceToken,
+                                           InvertibleProtocolSet,
+                                           TargetSingletonMetadataPointer<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4248,6 +4799,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
     return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
+    return this->hasSingletonMetadataPointer() ? 1 : 0;
   }
 
 public:
@@ -4303,6 +4858,31 @@ public:
     return box->token.get();
   }
 
+  TargetMetadata<Runtime> *getSingletonMetadata() const {
+    if (!this->hasSingletonMetadataInitialization())
+      return nullptr;
+
+    auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
+    return box->token.get();
+  }
+
+  /// Retrieve the set of protocols that are inverted by this type's
+  /// primary definition.
+  ///
+  /// This type might still conditionally conform to any of the protocols
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet &
+  getInvertedProtocols() const {
+    assert(this->hasInvertibleProtocols());
+    return
+      *this->template getTrailingObjects<InvertibleProtocolSet>();
+  }
+
+  size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
+    return this->hasInvertibleProtocols() ? 1 : 0;
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Struct;
   }
@@ -4311,7 +4891,8 @@ public:
 using StructDescriptor = TargetStructDescriptor<InProcess>;
 
 template <typename Runtime>
-class TargetEnumDescriptor final
+class swift_ptrauth_struct_context_descriptor(EnumDescriptor)
+    TargetEnumDescriptor final
     : public TargetValueTypeDescriptor<Runtime>,
       public TrailingGenericContextObjects<TargetEnumDescriptor<Runtime>,
                             TargetTypeGenericContextDescriptorHeader,
@@ -4320,7 +4901,9 @@ class TargetEnumDescriptor final
                             TargetSingletonMetadataInitialization<Runtime>,
                             TargetCanonicalSpecializedMetadatasListCount<Runtime>,
                             TargetCanonicalSpecializedMetadatasListEntry<Runtime>,
-                            TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>> {
+                            TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>,
+                            InvertibleProtocolSet,
+                            TargetSingletonMetadataPointer<Runtime>> {
 public:
   using SingletonMetadataInitialization =
     TargetSingletonMetadataInitialization<Runtime>;
@@ -4334,6 +4917,7 @@ public:
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
   using MetadataCachingOnceToken =
       TargetCanonicalSpecializedMetadatasCachingOnceToken<Runtime>;
+  using SingletonMetadataPointer = TargetSingletonMetadataPointer<Runtime>;
 
 private:
   using TrailingGenericContextObjects =
@@ -4343,7 +4927,9 @@ private:
                                         SingletonMetadataInitialization,
                                         MetadataListCount,
                                         MetadataListEntry, 
-                                        MetadataCachingOnceToken>;
+                                        MetadataCachingOnceToken,
+                                        InvertibleProtocolSet,
+                                        TargetSingletonMetadataPointer<Runtime>>;
 
   using TrailingObjects =
     typename TrailingGenericContextObjects::TrailingObjects;
@@ -4375,6 +4961,10 @@ private:
 
   size_t numTrailingObjects(OverloadToken<MetadataCachingOnceToken>) const {
     return this->hasCanonicalMetadataPrespecializations() ? 1 : 0;
+  }
+
+  size_t numTrailingObjects(OverloadToken<SingletonMetadataPointer>) const {
+    return this->hasSingletonMetadataPointer() ? 1 : 0;
   }
 
 public:
@@ -4444,13 +5034,37 @@ public:
     return box->token.get();
   }
 
+  TargetMetadata<Runtime> *getSingletonMetadata() const {
+    if (!this->hasSingletonMetadataInitialization())
+      return nullptr;
+
+    auto box = this->template getTrailingObjects<SingletonMetadataPointer>();
+    return box->token.get();
+  }
+
+  /// Retrieve the set of protocols that are inverted by this type's
+  /// primary definition.
+  ///
+  /// This type might still conditionally conform to any of the protocols
+  /// that are inverted here, but that information is recorded in the
+  /// conditional inverted protocols of the corresponding `GenericContext`.
+  const InvertibleProtocolSet &
+  getInvertedProtocols() const {
+    assert(this->hasInvertibleProtocols());
+    return
+      *this->template getTrailingObjects<InvertibleProtocolSet>();
+  }
+               
+  size_t numTrailingObjects(OverloadToken<InvertibleProtocolSet>) const {
+    return this->hasInvertibleProtocols() ? 1 : 0;
+  }
+
   static bool classof(const TargetContextDescriptor<Runtime> *cd) {
     return cd->getKind() == ContextDescriptorKind::Enum;
   }
 
 #ifndef NDEBUG
-  LLVM_ATTRIBUTE_DEPRECATED(void dump() const,
-                            "Only meant for use in the debugger");
+  [[deprecated("Only meant for use in the debugger")]] void dump() const;
 #endif
 };
 
@@ -4485,6 +5099,31 @@ TargetContextDescriptor<Runtime>::getGenericContext() const {
     return llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
         ->getGenericContext();
   default:    
+    // We don't know about this kind of descriptor.
+    return nullptr;
+  }
+}
+
+template<typename Runtime>
+inline const InvertibleProtocolSet *
+TargetContextDescriptor<Runtime>::getInvertedProtocols() const {
+  if (!this->hasInvertibleProtocols())
+    return nullptr;
+
+  switch (getKind()) {
+  case ContextDescriptorKind::Class:
+    return &llvm::cast<TargetClassDescriptor<Runtime>>(this)
+        ->getInvertedProtocols();
+  case ContextDescriptorKind::Enum:
+    return &llvm::cast<TargetEnumDescriptor<Runtime>>(this)
+        ->getInvertedProtocols();
+  case ContextDescriptorKind::Struct:
+    return &llvm::cast<TargetStructDescriptor<Runtime>>(this)
+        ->getInvertedProtocols();
+  case ContextDescriptorKind::OpaqueType:
+    return &llvm::cast<TargetOpaqueTypeDescriptor<Runtime>>(this)
+        ->getInvertedProtocols();
+  default:
     // We don't know about this kind of descriptor.
     return nullptr;
   }
@@ -4628,9 +5267,9 @@ struct DynamicReplacementKey {
   uint16_t getExtraDiscriminator() const {
     return flags & 0x0000FFFF;
   }
-  bool isAsync() const {
-    return ((flags >> 16 ) & 0x1);
-  }
+  bool isAsync() const { return ((flags >> 16) & 0x1); }
+  bool isCalleeAllocatedCoroutine() const { return ((flags >> 16) & 0x2); }
+  bool isData() const { return isAsync() || isCalleeAllocatedCoroutine(); }
 };
 
 /// A record describing a dynamic function replacement.
@@ -4644,6 +5283,7 @@ class DynamicReplacementDescriptor {
   union {
     TargetCompactFunctionPointer<InProcess, void, false> replacementFunction;
     TargetRelativeDirectPointer<InProcess, void, false> replacementAsyncFunction;
+    TargetRelativeDirectPointer<InProcess, void, false> replacementCoroFunction;
   };
   RelativeDirectPointer<DynamicReplacementChainEntry, false> chainEntry;
   uint32_t flags;
@@ -4653,6 +5293,8 @@ class DynamicReplacementDescriptor {
   void *getReplacementFunction() const {
     if (replacedFunctionKey->isAsync()) {
       return replacementAsyncFunction.get();
+    } else if (replacedFunctionKey->isCalleeAllocatedCoroutine()) {
+      return replacementCoroFunction.get();
     } else {
       return replacementFunction.get();
     }
@@ -4716,7 +5358,7 @@ public:
 /// and then called through a fully-abstracted entry point whose arguments
 /// can be constructed in code.
 template <typename Runtime>
-struct TargetAccessibleFunctionRecord final {
+struct TargetAccessibleFunctionRecord {
 public:
   /// The name of the function, which is a unique string assigned to the
   /// function so it can be looked up later.
@@ -4739,6 +5381,76 @@ public:
 };
 
 using AccessibleFunctionRecord = TargetAccessibleFunctionRecord<InProcess>;
+
+enum class PackLifetime : uint8_t {
+  OnStack = 0,
+  OnHeap = 1
+};
+
+/// A pointer to a metadata or witness table pack. If the LSB is set,
+/// the pack is allocated on the heap; otherwise, it is allocated on
+/// the stack.
+template<typename Runtime, template <typename> class Pointee>
+class TargetPackPointer {
+  typename Runtime::StoredSize Ptr;
+
+  using PointerType = typename Runtime::template Pointer<const Pointee<Runtime>>;
+
+public:
+  explicit TargetPackPointer() : Ptr(0) {}
+
+  explicit TargetPackPointer(typename Runtime::StoredSize rawPtr) : Ptr(rawPtr) {}
+
+  explicit TargetPackPointer(const void *rawPtr)
+    : Ptr(reinterpret_cast<typename Runtime::StoredSize>(rawPtr)) {}
+
+  explicit TargetPackPointer(PointerType const *ptr, PackLifetime lifetime)
+    : Ptr(reinterpret_cast<typename Runtime::StoredSize>(ptr) |
+          (lifetime == PackLifetime::OnHeap ? 1 : 0)) {}
+
+  explicit operator bool() const {
+    return Ptr != 0;
+  }
+
+  // Strips off the LSB.
+  const PointerType *getElements() const {
+    return reinterpret_cast<const PointerType *>(Ptr & ~1);
+  }
+
+  // Strips off the LSB.
+  PointerType *getElements() {
+    return reinterpret_cast<PointerType *>(Ptr & ~1);
+  }
+
+  // Leaves the LSB.
+  const PointerType *getPointer() const {
+    return reinterpret_cast<const PointerType *>(Ptr);
+  }
+
+  PackLifetime getLifetime() const {
+    return (bool)(Ptr & 1) ? PackLifetime::OnHeap : PackLifetime::OnStack;
+  }
+
+  // Get the number of elements in the pack, only valid for on-heap packs.
+  size_t getNumElements() const {
+    if (getLifetime() == PackLifetime::OnHeap)
+      return *(reinterpret_cast<const size_t *>(Ptr & ~1) - 1);
+
+    fatalError(0, "Cannot get length of on-stack pack");
+  }
+};
+
+/// A pointer to a metadata pack.
+template<typename Runtime>
+using TargetMetadataPackPointer = TargetPackPointer<Runtime, TargetMetadata>;
+
+using MetadataPackPointer = TargetMetadataPackPointer<InProcess>;
+
+/// A pointer to a witness table pack.
+template<typename Runtime>
+using TargetWitnessTablePackPointer = TargetPackPointer<Runtime, TargetWitnessTable>;
+
+using WitnessTablePackPointer = TargetWitnessTablePackPointer<InProcess>;
 
 } // end namespace swift
 

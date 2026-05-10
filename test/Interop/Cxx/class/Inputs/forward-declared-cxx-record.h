@@ -3,7 +3,8 @@
 
 #include "forward-declared-cxx-record-used.h"
 
-struct __attribute__((swift_attr("import_as_ref"))) ForwardDeclaredInOtherHeader {
+struct __attribute__((swift_attr("import_reference")))
+ForwardDeclaredInOtherHeader {
   ~ForwardDeclaredInOtherHeader() = delete;
 };
 

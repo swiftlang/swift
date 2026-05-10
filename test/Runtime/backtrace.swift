@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -o %t/a.out
-// RUN: %{python} %S/../Inputs/not.py "%target-run %t/a.out" 2>&1 | %{python} %utils/backtrace-check
+// RUN: env SWIFT_BACKTRACE=enable=no %{python} %S/../Inputs/not.py "%target-run %t/a.out" 2>&1 | %{python} %utils/backtrace-check
 
 // NOTE: not.py is used above instead of "not --crash" because %target-run
 // doesn't pass through the crash, and `not` may not be available when running
@@ -10,6 +10,7 @@
 // UNSUPPORTED: OS=watchos
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
+// UNSUPPORTED: OS=linux-android, OS=linux-androideabi
 
 // REQUIRES: swift_stdlib_asserts
 // REQUIRES: executable_test

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2022 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -10,66 +10,52 @@
 //
 //===----------------------------------------------------------------------===//
 
-import ASTBridging
+import BasicBridging
 
+/// Represents a location in source code.
+/// It is basically a pointer into a buffer of the loaded source file (managed by `DiagnosticEngine`).
+/// In contrast to just having a filename+line+column, this allows displaying the context around
+/// the location when printing diagnostics.
 public struct SourceLoc {
-  /// Points into a source file.
-  let locationInFile: UnsafePointer<UInt8>
-
-  public init?(locationInFile: UnsafePointer<UInt8>?) {
-    guard let locationInFile = locationInFile else {
-      return nil
-    }
-    self.locationInFile = locationInFile
-  }
+  public let bridged: swift.SourceLoc
 
   public init?(bridged: swift.SourceLoc) {
     guard bridged.isValid() else {
       return nil
     }
-    self.locationInFile = bridged.getOpaquePointerValue().assumingMemoryBound(to: UInt8.self)
-  }
-
-  public var bridged: swift.SourceLoc {
-    .init(llvm.SMLoc.getFromPointer(locationInFile))
+    self.bridged = bridged
   }
 }
 
-extension SourceLoc {
-  public func advanced(by n: Int) -> SourceLoc {
-    SourceLoc(locationInFile: locationInFile.advanced(by: n))!
-  }
-}
-
-extension Optional where Wrapped == SourceLoc {
-  public var bridged: swift.SourceLoc {
+extension Optional<SourceLoc> {
+  // TODO: This can go back to being 'bridged' once we upgrade to a toolchain
+  // where https://github.com/swiftlang/swift/issues/82609 is fixed.
+  public var bridgedLocation: swift.SourceLoc {
     self?.bridged ?? .init()
   }
 }
 
+public struct SourceRange {
+  public let bridged: swift.SourceRange
+
+  public init(start: SourceLoc?) {
+    self.bridged = swift.SourceRange(start: start.bridgedLocation)
+  }
+}
+
 public struct CharSourceRange {
-  private let start: SourceLoc
-  private let byteLength: UInt32
+  public let start: SourceLoc
+  public let byteLength: UInt32
 
   public init(start: SourceLoc, byteLength: UInt32) {
     self.start = start
     self.byteLength = byteLength
   }
 
-  public init?(bridged: swift.CharSourceRange) {
-    guard let start = SourceLoc(bridged: bridged.getStart()) else {
+  public init?(bridgedStart: swift.SourceLoc, byteLength: UInt32) {
+    guard let start = SourceLoc(bridged: bridgedStart) else {
       return nil
     }
-    self.init(start: start, byteLength: bridged.getByteLength())
-  }
-
-  public var bridged: swift.CharSourceRange {
-    .init(start.bridged, byteLength)
-  }
-}
-
-extension Optional where Wrapped == CharSourceRange {
-  public var bridged: swift.CharSourceRange {
-    self?.bridged ?? .init(.init(), 0)
+    self.init(start: start, byteLength: byteLength)
   }
 }

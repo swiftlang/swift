@@ -20,8 +20,12 @@ from .. import shell
 from .. import targets
 
 
-def is_release_variant(build_variant):
-    return build_variant in ['Release', 'RelWithDebInfo']
+def is_release_variant(build_variant: str) -> bool:
+    return build_variant in ['Release', 'RelWithDebInfo', 'MinSizeRel']
+
+
+def is_debug_info_variant(build_variant):
+    return build_variant in ['Debug', 'RelWithDebInfo']
 
 
 class Product(object):
@@ -77,7 +81,7 @@ class Product(object):
         """is_ignore_install_all_product -> bool
 
         Whether this product is to ignore the install-all directive
-        and insted always respect its own should_install.
+        and instead always respect its own should_install.
         This is useful when we run -install-all but have products
         which should never be installed into the toolchain
         (e.g. earlyswiftdriver)
@@ -191,6 +195,13 @@ class Product(object):
         """
         return is_release_variant(self.args.build_variant)
 
+    def is_debug_info(self):
+        """is_debug_info() -> Bool
+
+        Whether or not this target is built with debug info
+        """
+        return is_debug_info_variant(self.args.build_variant)
+
     def install_toolchain_path(self, host_target):
         """toolchain_path() -> string
 
@@ -201,10 +212,16 @@ class Product(object):
         if self.args.cross_compile_hosts:
             if self.is_darwin_host(host_target):
                 install_destdir = self.host_install_destdir(host_target)
-            else:
+            elif self.args.cross_compile_append_host_target_to_destdir:
                 install_destdir = os.path.join(install_destdir, self.args.host_target)
         return targets.toolchain_path(install_destdir,
                                       self.args.install_prefix)
+
+    def native_clang_tools_path(self, host_target):
+        if self.args.native_clang_tools_path is not None:
+            return os.path.split(self.args.native_clang_tools_path)[0]
+        else:
+            return self.install_toolchain_path(host_target)
 
     def native_toolchain_path(self, host_target):
         if self.args.native_swift_tools_path is not None:
@@ -247,42 +264,71 @@ class Product(object):
     def has_cross_compile_hosts(self):
         return self.args.cross_compile_hosts
 
-    def generate_darwin_toolchain_file(self, platform, arch):
+    def target_for_platform(self, platform, arch, include_version=True):
+        target = None
+        if platform == 'macosx':
+            target = '{}-apple-macosx{}'.format(
+                arch,
+                self.args.darwin_deployment_version_osx if include_version else "")
+        elif platform == 'iphonesimulator':
+            target = '{}-apple-ios{}-simulator'.format(
+                arch,
+                self.args.darwin_deployment_version_ios if include_version else "")
+        elif platform == 'iphoneos':
+            target = '{}-apple-ios{}'.format(
+                arch,
+                self.args.darwin_deployment_version_ios if include_version else "")
+        elif platform == 'appletvsimulator':
+            target = '{}-apple-tvos{}-simulator'.format(
+                arch,
+                self.args.darwin_deployment_version_tvos if include_version else "")
+        elif platform == 'appletvos':
+            target = '{}-apple-tvos{}'.format(
+                arch,
+                self.args.darwin_deployment_version_tvos if include_version else "")
+        elif platform == 'watchsimulator':
+            target = '{}-apple-watchos{}-simulator'.format(
+                arch,
+                self.args.darwin_deployment_version_watchos if include_version else "")
+        elif platform == 'watchos':
+            target = '{}-apple-watchos{}'.format(
+                arch,
+                self.args.darwin_deployment_version_watchos if include_version else "")
+        elif platform in ['xrsimulator', 'xros']:
+            target = '{}-apple-xros{}'.format(
+                arch, self.args.darwin_deployment_version_xros)
+        return target
+
+    def generate_darwin_toolchain_file(self, platform, arch,
+                                       macos_deployment_version=None):
+        """
+        Generates a new CMake tolchain file that specifies Darwin as a target
+        platform.
+
+            Returns: path on the filesystem to the newly generated toolchain file.
+        """
+
         shell.makedirs(self.build_dir)
         toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
 
         cmake_osx_sysroot = xcrun.sdk_path(platform)
 
-        target = None
         if platform == 'macosx':
-            target = '{}-apple-macosx{}'.format(
-                arch, self.args.darwin_deployment_version_osx)
-        elif platform == 'iphonesimulator':
-            target = '{}-apple-ios{}'.format(
-                arch, self.args.darwin_deployment_version_ios)
-        elif platform == 'iphoneos':
-            target = '{}-apple-ios{}'.format(
-                arch, self.args.darwin_deployment_version_ios)
-        elif platform == 'appletvsimulator':
-            target = '{}-apple-tvos{}'.format(
-                arch, self.args.darwin_deployment_version_tvos)
-        elif platform == 'appletvos':
-            target = '{}-apple-tvos{}'.format(
-                arch, self.args.darwin_deployment_version_tvos)
-        elif platform == 'watchsimulator':
-            target = '{}-apple-watchos{}'.format(
-                arch, self.args.darwin_deployment_version_watchos)
-        elif platform == 'watchos':
-            target = '{}-apple-watchos{}'.format(
-                arch, self.args.darwin_deployment_version_watchos)
+            if macos_deployment_version is None:
+                macos_deployment_version = self.args.darwin_deployment_version_osx
+            target = '{}-apple-macosx{}'.format(arch, macos_deployment_version)
         else:
-            raise RuntimeError("Unhandled platform?!")
+            target = self.target_for_platform(platform, arch)
+            if not target:
+                raise RuntimeError('Unhandled platform {}?!'.format(platform))
 
         toolchain_args = {}
 
         toolchain_args['CMAKE_SYSTEM_NAME'] = 'Darwin'
         toolchain_args['CMAKE_OSX_SYSROOT'] = cmake_osx_sysroot
         toolchain_args['CMAKE_OSX_ARCHITECTURES'] = arch
+        toolchain_args['CMAKE_SHARED_LIBRARY_RUNTIME_C_FLAG'] = '\"-Wl,-rpath,\"'
+        toolchain_args['CMAKE_SYSTEM_VERSION'] = self.args.darwin_deployment_version_osx
 
         if self.toolchain.cc.endswith('clang'):
             toolchain_args['CMAKE_C_COMPILER_TARGET'] = target
@@ -290,6 +336,13 @@ class Product(object):
             toolchain_args['CMAKE_CXX_COMPILER_TARGET'] = target
         # Swift always supports cross compiling.
         toolchain_args['CMAKE_Swift_COMPILER_TARGET'] = target
+
+        toolchain_args['CMAKE_LINKER'] = self.toolchain.ld
+        toolchain_args['CMAKE_CC'] = self.toolchain.cc
+        toolchain_args['CMAKE_CXX'] = self.toolchain.cxx
+        toolchain_args['CMAKE_ASM_COMPILER_AR'] = self.toolchain.ar
+        toolchain_args['CMAKE_ASM_COMPILER_RANLIB'] = self.toolchain.ranlib
+        toolchain_args['CMAKE_LINKER'] = self.toolchain.ld
 
         # Sort by the key so that we always produce the same toolchain file
         data = sorted(toolchain_args.items(), key=lambda x: x[0])
@@ -301,7 +354,7 @@ class Product(object):
 
         return toolchain_file
 
-    def get_linux_abi(self, arch):
+    def get_linux_target_components(self, arch):
         # Map tuples of (platform, arch) to ABI
         #
         # E.x.: Hard ABI or Soft ABI for Linux map to gnueabihf
@@ -310,41 +363,79 @@ class Product(object):
             'armv7': ('arm', 'gnueabihf')
         }
 
-        # Default is just arch, gnu
-        sysroot_arch, abi = arch_platform_to_abi.get(arch, (arch, 'gnu'))
-        return sysroot_arch, abi
+        abi = 'gnu'
+        vendor = 'unknown'
+
+        try:
+            output = shell.capture([self.toolchain.cc, "--print-target-triple"])
+
+            # clang can't handle default `*-unknown-linux-*` components on Alpine,
+            # it needs special handling to propagate `vendor` and `abi` intact
+            if 'alpine-linux-musl' in output:
+                vendor = 'alpine'
+                abi = 'musl'
+
+            sysroot_arch, abi = arch_platform_to_abi.get(arch, (arch, abi))
+
+        except BaseException:
+            # Default is just arch, gnu
+            sysroot_arch, abi = arch_platform_to_abi.get(arch, (arch, abi))
+        return sysroot_arch, vendor, abi
 
     def get_linux_sysroot(self, platform, arch):
         if not self.is_cross_compile_target('{}-{}'.format(platform, arch)):
             return None
-        sysroot_arch, abi = self.get_linux_abi(arch)
+        sysroot_arch, _, abi = self.get_linux_target_components(arch)
         # $ARCH-$PLATFORM-$ABI
         # E.x.: aarch64-linux-gnu
         sysroot_dirname = '{}-{}-{}'.format(sysroot_arch, platform, abi)
         return os.path.join(os.sep, 'usr', sysroot_dirname)
 
     def get_linux_target(self, platform, arch):
-        sysroot_arch, abi = self.get_linux_abi(arch)
-        return '{}-unknown-linux-{}'.format(sysroot_arch, abi)
+        sysroot_arch, vendor, abi = self.get_linux_target_components(arch)
+        return '{}-{}-linux-{}'.format(sysroot_arch, vendor, abi)
 
-    def generate_linux_toolchain_file(self, platform, arch):
+    def generate_linux_toolchain_file(self, platform, arch, crosscompiling=True):
+        """
+        Generates a new CMake tolchain file that specifies Linux as a target
+        platform.
+
+            Returns: path on the filesystem to the newly generated toolchain file.
+        """
+
         shell.makedirs(self.build_dir)
         toolchain_file = os.path.join(self.build_dir, 'BuildScriptToolchain.cmake')
 
         toolchain_args = {}
 
-        toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
-        toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
+        if crosscompiling:
+            if platform == "linux":
+                toolchain_args['CMAKE_SYSTEM_NAME'] = 'Linux'
+                toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch
+            elif platform == "android":
+                toolchain_args['CMAKE_SYSTEM_NAME'] = 'Android'
+                toolchain_args['CMAKE_SYSTEM_VERSION'] = self.args.android_api_level
+                toolchain_args['CMAKE_SYSTEM_PROCESSOR'] = arch if not arch == 'armv7' \
+                                                           else 'armv7-a'
+                toolchain_args['CMAKE_ANDROID_NDK'] = self.args.android_ndk
+                toolchain_args['CMAKE_FIND_ROOT_PATH'] = self.args.cross_compile_deps_path
+                # This is a workaround for a CMake 3.30+ bug,
+                # https://gitlab.kitware.com/cmake/cmake/-/issues/26154, and can
+                # be removed once that is fixed.
+                toolchain_args['CMAKE_SHARED_LINKER_FLAGS'] = '\"\"'
 
         # We only set the actual sysroot if we are actually cross
         # compiling. This is important since otherwise cmake seems to change the
         # RUNPATH to be a relative rather than an absolute path, breaking
         # certain cmark tests (and maybe others).
-        maybe_sysroot = self.get_linux_sysroot(platform, arch)
-        if maybe_sysroot is not None:
-            toolchain_args['CMAKE_SYSROOT'] = maybe_sysroot
+        if platform == "linux":
+            maybe_sysroot = self.get_linux_sysroot(platform, arch)
+            if maybe_sysroot is not None:
+                toolchain_args['CMAKE_SYSROOT'] = maybe_sysroot
 
-        target = self.get_linux_target(platform, arch)
+            target = self.get_linux_target(platform, arch)
+        elif platform == "android":
+            target = '%s-unknown-linux-android%s' % (arch, self.args.android_api_level)
         if self.toolchain.cc.endswith('clang'):
             toolchain_args['CMAKE_C_COMPILER_TARGET'] = target
         if self.toolchain.cxx.endswith('clang++'):
@@ -366,8 +457,66 @@ class Product(object):
 
         return toolchain_file
 
-    def common_cross_c_flags(self, platform, arch):
+    def generate_toolchain_file_for_darwin_or_linux(
+            self, host_target, override_macos_deployment_version=None):
+        """
+        Checks `host_target` platform and generates a new CMake tolchain file
+        appropriate for that target platform (either Darwin or Linux). Defines
+        `CMAKE_C_FLAGS` and `CMAKE_CXX_FLAGS` as CMake options. Also defines
+        `CMAKE_TOOLCHAIN_FILE` with the path of the generated toolchain file
+        as a CMake option.
+
+            Returns: path to the newly generated toolchain file on the
+            filesystem.
+        """
+
+        (platform, arch) = host_target.split('-')
+        common_c_flags = ' '.join(self.common_cross_c_flags(platform, arch))
+        self.cmake_options.define('CMAKE_C_FLAGS', common_c_flags)
+        self.cmake_options.define('CMAKE_CXX_FLAGS', common_c_flags)
+
+        toolchain_file = None
+        if self.is_darwin_host(host_target):
+            toolchain_file = self.generate_darwin_toolchain_file(
+                platform, arch,
+                macos_deployment_version=override_macos_deployment_version)
+            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
+        elif platform == "linux" or platform == "android":
+            # Always cross-compile for linux, but not on Android, as a native
+            # compile on Android does not use the NDK and its CMake config.
+            cross_compile = platform == "linux" or \
+                self.is_cross_compile_target(host_target)
+            toolchain_file = self.generate_linux_toolchain_file(platform, arch,
+                                                                cross_compile)
+            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
+
+            if cross_compile and platform == "android":
+                resource_dir = None
+                # build-script-impl products build before the install and use
+                # the Swift stdlib from the compiler build directory instead,
+                # while products built even before that currently do not support
+                # cross-compiling Swift.
+                if not self.is_before_build_script_impl_product() and \
+                   not self.is_build_script_impl_product():
+                    install_path = self.host_install_destdir(host_target) + \
+                        self.args.install_prefix
+                    resource_dir = '%s/lib/swift' % install_path
+                flags = targets.StdlibDeploymentTarget.get_target_for_name(
+                    host_target).platform.swift_flags(self.args, resource_dir)
+                self.cmake_options.define('CMAKE_Swift_FLAGS', flags)
+
+        return toolchain_file
+
+    def get_openbsd_toolchain_file(self):
+        return os.getenv('OPENBSD_USE_TOOLCHAIN_FILE')
+
+    def common_cross_c_flags(self, platform, arch, include_arch=False):
         cross_flags = []
+
+        target = self.target_for_platform(platform, arch, include_version=True)
+        if include_arch and target:
+            cross_flags.append('-arch {}'.format(arch))
+            cross_flags.append('-target {}'.format(target))
 
         if self.is_release():
             cross_flags.append('-fno-stack-protector')

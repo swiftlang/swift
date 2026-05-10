@@ -53,11 +53,7 @@ public:
 
     GenericTypeRequirements requirements(super::IGM, typeDecl);
     for (auto reqt : requirements.getRequirements()) {
-      if (reqt.Protocol) {
-        asImpl().addGenericWitnessTable(reqt, args...);
-      } else {
-        asImpl().addGenericArgument(reqt, args...);
-      }
+      asImpl().addGenericRequirement(reqt, args...);
     }
 
     asImpl().noteEndOfGenericRequirements(args...);

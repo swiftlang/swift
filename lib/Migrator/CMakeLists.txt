@@ -23,18 +23,13 @@ set(outputs)
 foreach(input ${datafiles})
   set(source "${CMAKE_CURRENT_SOURCE_DIR}/${input}")
   set(dest "${output_dir}/${input}")
-  if(CMAKE_SYSTEM_NAME STREQUAL Windows)
-    set(CMAKE_SYMLINK_COMMAND copy)
-  else()
-    set(CMAKE_SYMLINK_COMMAND create_symlink)
-  endif()
 
   add_custom_command(OUTPUT
                        "${output_dir}/${input}"
                      DEPENDS
                        "${CMAKE_CURRENT_SOURCE_DIR}/${input}"
                      COMMAND
-                       "${CMAKE_COMMAND}" "-E" "${CMAKE_SYMLINK_COMMAND}" "${source}" "${dest}")
+                       "${CMAKE_COMMAND}" "-E" "${SWIFT_COPY_OR_SYMLINK}" "${source}" "${dest}")
   list(APPEND outputs "${output_dir}/${input}")
 endforeach()
 list(APPEND outputs "${output_dir}")
@@ -56,8 +51,7 @@ add_swift_host_library(swiftMigrator STATIC
   OptionalTryMigratorPass.cpp
   RewriteBufferEditsReceiver.cpp)
 target_link_libraries(swiftMigrator PRIVATE
-  swiftIDE
-  swiftSyntax)
+  swiftIDE)
 
 add_dependencies(swiftMigrator
   "symlink_migrator_data")

@@ -21,6 +21,7 @@
 
 #include "swift/Basic/SourceManager.h"
 #include "swift/SIL/OptimizationRemark.h"
+#include "llvm/Remarks/Remark.h"
 #include "llvm/Remarks/RemarkStreamer.h"
 
 namespace swift {
@@ -71,6 +72,10 @@ public:
   /// \c llvm::remarks::RemarkStreamer with the given \c LLVMContext.
   void intoLLVMContext(llvm::LLVMContext &Ctx) &;
 
+  std::unique_ptr<llvm::raw_fd_ostream> releaseStream() {
+    return std::move(remarkStream);
+  }
+
 public:
   /// Emit a remark through the streamer.
   template <typename RemarkT>
@@ -88,10 +93,10 @@ template <typename RemarkT> static llvm::remarks::Type toRemarkType() {
   llvm_unreachable("Unknown remark type");
 }
 
-static inline Optional<llvm::remarks::RemarkLocation>
+static inline std::optional<llvm::remarks::RemarkLocation>
 toRemarkLocation(const SourceLoc &loc, const SourceManager &srcMgr) {
   if (!loc.isValid())
-    return None;
+    return std::nullopt;
 
   StringRef file = srcMgr.getDisplayNameForLoc(loc);
   unsigned line, col;
@@ -106,7 +111,7 @@ llvm::remarks::Remark SILRemarkStreamer::toLLVMRemark(
   llvmRemark.RemarkType = toRemarkType<RemarkT>();
   llvmRemark.PassName = optRemark.getPassName();
   llvmRemark.RemarkName = optRemark.getIdentifier();
-  llvmRemark.FunctionName = optRemark.getDemangledFunctionName();
+  llvmRemark.FunctionName = optRemark.getFunction()->getName();
   llvmRemark.Loc =
       toRemarkLocation(optRemark.getLocation(), getASTContext().SourceMgr);
 

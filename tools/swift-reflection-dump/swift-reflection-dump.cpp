@@ -16,9 +16,9 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Reflection/ReflectionContext.h"
-#include "swift/Reflection/TypeRef.h"
-#include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/ReflectionContext.h"
+#include "swift/RemoteInspection/TypeRef.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/StaticMirror/ObjectFileContext.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Object/Archive.h"
@@ -70,7 +70,7 @@ static llvm::cl::opt<ActionType> Action(
     llvm::cl::init(ActionType::DumpReflectionSections));
 
 static llvm::cl::list<std::string>
-    BinaryFilename("binary-filename",
+BinaryFilename(llvm::cl::Positional,
                    llvm::cl::desc("Filenames of the binary files"),
                    llvm::cl::OneOrMore);
 
@@ -78,6 +78,14 @@ static llvm::cl::opt<std::string>
     Architecture("arch",
                  llvm::cl::desc("Architecture to inspect in the binary"),
                  llvm::cl::Required);
+
+static llvm::cl::opt<bool> DisableObjCInterop(
+    "no-objc-interop",
+    llvm::cl::desc("Disable Objective-C interoperability support"
+#if SWIFT_OBJC_INTEROP
+                   " (not supported)"
+#endif
+                   ));
 } // end namespace options
 
 static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
@@ -109,7 +117,12 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
     ObjectFiles.push_back(O);
   }
 
-  auto context = makeReflectionContextForObjectFiles(ObjectFiles);
+#if SWIFT_OBJC_INTEROP
+  bool ObjCInterop = !options::DisableObjCInterop;
+#else
+  bool ObjCInterop = false;
+#endif
+  auto context = makeReflectionContextForObjectFiles(ObjectFiles, ObjCInterop);
   auto &builder = context->Builder;
 
   switch (Action) {
@@ -117,17 +130,21 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
     // Dump everything
     switch (context->PointerSize) {
     case 4:
-      // FIXME: This could/should be configurable.
 #if SWIFT_OBJC_INTEROP
-      builder.dumpAllSections<WithObjCInterop, 4>(stream);
+      if (!options::DisableObjCInterop)
+        builder.dumpAllSections<WithObjCInterop, 4>(stream);
+      else
+        builder.dumpAllSections<NoObjCInterop, 4>(stream);
 #else
       builder.dumpAllSections<NoObjCInterop, 4>(stream);
 #endif
       break;
     case 8:
-      // FIXME: This could/should be configurable.
 #if SWIFT_OBJC_INTEROP
-      builder.dumpAllSections<WithObjCInterop, 8>(stream);
+      if (!options::DisableObjCInterop)
+        builder.dumpAllSections<WithObjCInterop, 8>(stream);
+      else
+        builder.dumpAllSections<NoObjCInterop, 8>(stream);
 #else
       builder.dumpAllSections<NoObjCInterop, 8>(stream);
 #endif
@@ -142,7 +159,7 @@ static int doDumpReflectionSections(ArrayRef<std::string> BinaryFilenames,
       if (Line.empty())
         continue;
 
-      if (StringRef(Line).startswith("//"))
+      if (StringRef(Line).starts_with("//"))
         continue;
 
       Demangle::Demangler Dem;

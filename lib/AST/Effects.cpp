@@ -31,6 +31,7 @@ bool AnyFunctionType::hasEffect(EffectKind kind) const {
   switch (kind) {
   case EffectKind::Throws: return getExtInfo().isThrowing();
   case EffectKind::Async: return getExtInfo().isAsync();
+  case EffectKind::Unsafe: return false;
   }
   llvm_unreachable("Bad effect kind");
 }
@@ -39,6 +40,7 @@ void swift::simple_display(llvm::raw_ostream &out, const EffectKind kind) {
   switch (kind) {
   case EffectKind::Throws: out << "throws"; return;
   case EffectKind::Async: out << "async"; return;
+  case EffectKind::Unsafe: out << "@unsafe"; return;
   }
   llvm_unreachable("Bad effect kind");
 }
@@ -71,6 +73,8 @@ bool ProtocolDecl::hasPolymorphicEffect(EffectKind kind) const {
     return getAttrs().hasAttribute<swift::AtRethrowsAttr>();
   case EffectKind::Async:
     return getAttrs().hasAttribute<swift::AtReasyncAttr>();
+  case EffectKind::Unsafe:
+    return false;
   }
   llvm_unreachable("Bad effect kind");
 }
@@ -81,6 +85,8 @@ bool AbstractFunctionDecl::hasEffect(EffectKind kind) const {
     return hasThrows();
   case EffectKind::Async:
     return hasAsync();
+  case EffectKind::Unsafe:
+    return getExplicitSafety() == ExplicitSafety::Unsafe;
   }
   llvm_unreachable("Bad effect kind");
 }
@@ -91,6 +97,8 @@ bool AbstractFunctionDecl::hasPolymorphicEffect(EffectKind kind) const {
     return getAttrs().hasAttribute<swift::RethrowsAttr>();
   case EffectKind::Async:
     return getAttrs().hasAttribute<swift::ReasyncAttr>();
+  case EffectKind::Unsafe:
+    return false;
   }
   llvm_unreachable("Bad effect kind");
 }
@@ -114,6 +122,9 @@ void swift::simple_display(llvm::raw_ostream &out,
   case PolymorphicEffectKind::ByConformance:
     out << "by conformance";
     break;
+  case PolymorphicEffectKind::AsyncSequenceRethrows:
+    out << "by async sequence implicit @rethrows";
+    break;
   case PolymorphicEffectKind::Always:
     out << "always";
     break;
@@ -124,8 +135,8 @@ void swift::simple_display(llvm::raw_ostream &out,
 }
 
 bool ProtocolConformanceRef::hasEffect(EffectKind kind) const {
-  if (!isConcrete()) { return true; }
-  return evaluateOrDefault(getRequirement()->getASTContext().evaluator,
+  if (!isConcrete()) { return kind != EffectKind::Unsafe; }
+  return evaluateOrDefault(getProtocol()->getASTContext().evaluator,
      ConformanceHasEffectRequest{kind, getConcrete()},
      true);
 }

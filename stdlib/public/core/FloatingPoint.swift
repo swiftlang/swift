@@ -45,7 +45,7 @@
 /// following form for a floating-point value `x` of type `F`, where `**` is
 /// exponentiation:
 ///
-///     x.significand * F.radix ** x.exponent
+///     x.significand * (F.radix ** x.exponent)
 ///
 /// Here's an example of the number -8.5 represented as an instance of the
 /// `Double` type, which defines a radix of 2.
@@ -328,7 +328,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// `infinity` is greater than this value.
   static var greatestFiniteMagnitude: Self { get }
 
-  /// The [mathematical constant π][wiki], approximately equal to 3.14159.
+  /// The mathematical constant pi (π), approximately equal to 3.14159.
   /// 
   /// When measuring an angle in radians, π is equivalent to a half-turn.
   ///
@@ -339,8 +339,6 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   ///     print(Double.pi)
   ///     // Prints "3.14159265358979"
-  ///
-  /// [wiki]: https://en.wikipedia.org/wiki/Pi
   static var pi: Self { get }
 
   // NOTE: Rationale for "ulp" instead of "epsilon":
@@ -434,7 +432,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// type `F`, the magnitude can be calculated as the following, where `**`
   /// is exponentiation:
   ///
-  ///     let magnitude = x.significand * F.radix ** x.exponent
+  ///     x.significand * (F.radix ** x.exponent)
   ///
   /// In the next example, `y` has a value of `21.5`, which is encoded as
   /// `1.34375 * 2 ** 4`. The significand of `y` is therefore 1.34375.
@@ -460,7 +458,7 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// The magnitude of a floating-point value `x` of type `F` can be calculated
   /// by using the following formula, where `**` is exponentiation:
   ///
-  ///     let magnitude = x.significand * F.radix ** x.exponent
+  ///     x.significand * (F.radix ** x.exponent)
   ///
   /// In the next example, `y` has a value of `21.5`, which is encoded as
   /// `1.34375 * 2 ** 4`. The significand of `y` is therefore 1.34375.
@@ -940,8 +938,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   /// For more information about the available rounding rules, see the
   /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `rounded()`
-  /// method instead.
+  /// default "schoolbook rounding" of `.toNearestOrAwayFromZero`, you can use
+  /// the shorter `rounded()` method instead.
   ///
   ///     print(x.rounded())
   ///     // Prints "7.0"
@@ -976,8 +974,8 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///
   /// For more information about the available rounding rules, see the
   /// `FloatingPointRoundingRule` enumeration. To round a value using the
-  /// default "schoolbook rounding", you can use the shorter `round()` method
-  /// instead.
+  /// default "schoolbook rounding" of `.toNearestOrAwayFromZero`, you can use
+  /// the shorter `round()` method instead.
   ///
   ///     var w1 = 6.5
   ///     w1.round()
@@ -1050,6 +1048,9 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   /// - Every value except for NaN and `+infinity` compares less than
   ///   `+infinity`.
   ///
+  /// The following example shows the behavior of the `isLess(than:)` method
+  /// with different kinds of values:
+  ///
   ///     let x = 15.0
   ///     x.isLess(than: 20.0)
   ///     // true
@@ -1079,6 +1080,9 @@ public protocol FloatingPoint: SignedNumeric, Strideable, Hashable
   ///   when called on NaN or when NaN is passed as `other`.
   /// - `-infinity` compares less than or equal to all values except NaN.
   /// - Every value except NaN compares less than or equal to `+infinity`.
+  ///
+  /// The following example shows the behavior of the `isLessThanOrEqualTo(_:)`
+  /// method with different kinds of values:
   ///
   ///     let x = 15.0
   ///     x.isLessThanOrEqualTo(20.0)
@@ -1518,7 +1522,7 @@ public protocol BinaryFloatingPoint: FloatingPoint, ExpressibleByFloatLiteral {
   /// - Parameter value: A floating-point value to be converted.
   init(_ value: Double)
 
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !os(anyAppleOS))) && (arch(i386) || arch(x86_64))
   /// Creates a new instance from the given value, rounded to the closest
   /// possible representation.
   ///
@@ -1929,7 +1933,7 @@ extension BinaryFloatingPoint {
         significandBitPattern:
           UInt64(truncatingIfNeeded: value.significandBitPattern))
       self = Self(value_)
-#if !(os(Windows) || os(Android)) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !os(anyAppleOS))) && (arch(i386) || arch(x86_64))
     case (15, 63):
       let value_ = value as? Float80 ?? Float80(
         sign: value.sign,

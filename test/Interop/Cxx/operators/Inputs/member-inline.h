@@ -7,6 +7,11 @@ struct LoadableIntWrapper {
     return LoadableIntWrapper{.value = value - rhs.value};
   }
 
+  LoadableIntWrapper operator+=(LoadableIntWrapper rhs) {
+    value += rhs.value;
+    return *this;
+  }
+
   int operator()() {
     return value;
   }
@@ -17,13 +22,15 @@ struct LoadableIntWrapper {
     return value + x * y;
   }
 
+  operator int() const { return value; }
+
   LoadableIntWrapper &operator++() {
     value++;
     return *this;
   }
 
   // Friend functions
-  friend bool operator==(const LoadableIntWrapper lhs,
+  friend bool operator==(const LoadableIntWrapper &lhs,
                          const LoadableIntWrapper &rhs) {
     return lhs.value == rhs.value;
   }
@@ -31,16 +38,42 @@ struct LoadableIntWrapper {
   friend LoadableIntWrapper operator-(const LoadableIntWrapper& obj) {
     return LoadableIntWrapper{.value = -obj.value};
   }
+
+  friend LoadableIntWrapper operator-=(LoadableIntWrapper& lhs, const LoadableIntWrapper& rhs) {
+    lhs.value -= rhs.value;
+    return lhs;
+  }
 };
+
+namespace NS {
+struct IntWrapperInNamespace {
+  int value;
+  friend bool operator==(const IntWrapperInNamespace &lhs,
+                         const IntWrapperInNamespace &rhs) {
+    return lhs.value == rhs.value;
+  }
+};
+} // namespace NS
 
 struct LoadableBoolWrapper {
   bool value;
   LoadableBoolWrapper operator!() {
     return LoadableBoolWrapper{.value = !value};
   }
+  operator bool() const { return value; }
 };
 
-struct AddressOnlyIntWrapper {
+template<class T>
+struct TemplatedWithFriendOperator {
+  friend bool operator==(const TemplatedWithFriendOperator &lhs,
+                         const TemplatedWithFriendOperator &rhs) {
+    return true;
+  }
+};
+
+using TemplatedWithFriendOperatorSpec = TemplatedWithFriendOperator<int>;
+
+struct __attribute__((swift_attr("import_owned"))) AddressOnlyIntWrapper {
   int value;
 
   AddressOnlyIntWrapper(int value) : value(value) {}
@@ -85,6 +118,18 @@ struct HasPreIncrementOperatorWithVoidReturnType {
   void operator++() { ++value; }
 };
 
+struct __attribute__((swift_attr("import_reference"),
+                      swift_attr("retain:immortal"),
+                      swift_attr("release:immortal"))) ImmortalCounter {
+  int value = 0;
+
+  ImmortalCounter &operator++() {
+    value++;
+    return *this;
+  }
+};
+static ImmortalCounter myCounter;
+
 struct HasDeletedOperator {
   void operator!=(HasDeletedOperator) const = delete;
 };
@@ -112,7 +157,21 @@ public:
   };
 };
 
-struct ReadOnlyIntArray {
+#if __cplusplus >= 202302L
+struct NullarySubscript {
+  int operator[]() const { return 42; }
+  int &operator[]() { return field; }
+  int field;
+};
+
+struct BinarySubscript {
+  int operator[](int x, int y) const { return x + y; }
+  int &operator[](int, int) { return field; }
+  int field;
+};
+#endif
+
+struct __attribute__((swift_attr("import_owned"))) ReadOnlyIntArray {
 private:
   int values[5] = { 1, 2, 3, 4, 5 };
 
@@ -135,6 +194,32 @@ public:
   int &operator[](int x) {
     return values[x];
   }
+};
+
+struct ReadOnlyRvalueParam {
+private:
+  int values[5] = {1, 2, 3, 4, 5};
+
+public:
+  const int &operator[](int &&x) const { return values[x]; }
+};
+
+struct ReadWriteRvalueParam {
+private:
+  int values[5] = {1, 2, 3, 4, 5};
+
+public:
+  const int &operator[](int &&x) const { return values[x]; }
+  int &operator[](int&& x) { return values[x]; }
+};
+
+struct ReadWriteRvalueGetterParam {
+private:
+  int values[5] = {1, 2, 3, 4, 5};
+  
+public:
+  const int &operator[](int &&x) const { return values[x]; }
+  int &operator[](int x) { return values[x]; }
 };
 
 struct DifferentTypesArray {
@@ -174,7 +259,7 @@ struct TemplatedArray {
 };
 typedef TemplatedArray<double> TemplatedDoubleArray;
 
-struct TemplatedSubscriptArray {
+struct __attribute__((swift_attr("import_unsafe"))) TemplatedSubscriptArray {
   int *ptr;
 
   template<class T>
@@ -195,7 +280,7 @@ private:
   int values[3] = { 1, 2, 3 };
 };
 
-struct NonTrivialIntArrayByVal {
+struct __attribute__((swift_attr("import_owned"))) NonTrivialIntArrayByVal {
   NonTrivialIntArrayByVal(int first) { values[0] = first; }
   NonTrivialIntArrayByVal(const NonTrivialIntArrayByVal &other) {
     for (int i = 0; i < 5; i++)
@@ -237,7 +322,8 @@ struct TemplatedByVal {
   }
 };
 
-struct TemplatedOperatorArrayByVal {
+struct __attribute__((swift_attr("import_unsafe")))
+TemplatedOperatorArrayByVal {
   int *ptr;
   template<class T> T operator[](T i) { return ptr[i]; }
   template <class T>
@@ -246,7 +332,7 @@ struct TemplatedOperatorArrayByVal {
   }
 };
 
-struct NonTrivial {
+struct __attribute__((swift_attr("import_owned"))) NonTrivial {
   char *Str;
   long long a;
   short b;
@@ -278,7 +364,7 @@ private:
   int a = 64;
 };
 
-struct RefToPtr {
+struct __attribute__((swift_attr("import_unsafe"))) RefToPtr {
   RefToPtr() { b = &a; }
   int *&operator[](int x) { return b; }
 private:
@@ -286,7 +372,7 @@ private:
   int *b = nullptr;
 };
 
-struct PtrToPtr {
+struct __attribute__((swift_attr("import_unsafe"))) PtrToPtr {
   PtrToPtr() { b = &a; }
   int **operator[](int x) { return &b; }
 private:
@@ -314,6 +400,16 @@ struct DerivedFromReadWriteIntArray : ReadWriteIntArray {};
 
 struct DerivedFromNonTrivialArrayByVal : NonTrivialArrayByVal {};
 
+struct SubscriptUnnamedParameter {
+  int operator[](int) const { return 123; }
+};
+
+struct SubscriptUnnamedParameterReadWrite {
+  int value = 0;
+  const int &operator[](int) const { return value; }
+  int &operator[](int) { return value; }
+};
+
 struct Iterator {
 private:
   int value = 123;
@@ -333,6 +429,192 @@ private:
   int value = 456;
 public:
   int operator*() const { return value; }
+};
+
+class AllStar {
+private:
+  long L = 111;
+
+public:
+  // The unary variant (i.e., dereference) should be accessible
+  // via the synthesized .pointee member
+  long &operator*() { return L; }
+
+  // The binary variant (i.e., multiply) should be accessible
+  // via the synthesized static func *(lhs, rhs) operator
+  AllStar operator*(const AllStar &rhs) const {
+    AllStar a;
+    a.L = this->L * rhs.L;
+    return a;
+  }
+};
+
+struct AmbiguousOperatorStar {
+private:
+  int value = 567;
+public:
+  int &operator*() { return value; }
+  const int &operator*() const { return value; }
+};
+
+struct AmbiguousOperatorStar2 {
+private:
+  int value = 678;
+public:
+  int &operator*() & { return value; }
+  const int &operator*() const & { return value; }
+  const int &&operator*() const && { return static_cast<const int &&>(value); }
+};
+
+struct DerivedFromConstIterator : public ConstIterator {};
+
+struct DerivedFromConstIteratorPrivately : private ConstIterator {};
+
+class SubscriptSetterConst {
+public:
+  using T = int;
+
+  SubscriptSetterConst() : p(new T[10]) {}
+
+  T& operator[](int i) const {
+    return p[i];
+  }
+private:
+  T *p;
+};
+
+struct DerivedFromConstIteratorPrivatelyWithUsingDecl : private ConstIterator {
+  using ConstIterator::operator*;
+};
+
+struct DerivedFromAmbiguousOperatorStarPrivatelyWithUsingDecl
+    : private AmbiguousOperatorStar {
+  using AmbiguousOperatorStar::operator*;
+};
+
+struct DerivedFromLoadableIntWrapperWithUsingDecl : private LoadableIntWrapper {
+  using LoadableIntWrapper::operator-;
+  using LoadableIntWrapper::operator+=;
+
+  int getValue() const {
+    return value;
+  }
+  void setValue(int v) {
+    this->value = v;
+  }
+};
+
+struct HasOperatorCallWithDefaultArg {
+  int value;
+  int operator()(int x = 0) const { return value + x; }
+};
+
+class HasStaticOperatorCallBase {
+public:
+  static int operator()(int x) { return x + 42; }
+};
+
+class HasStaticOperatorCallBaseNonTrivial: public NonTrivial {
+public:
+  HasStaticOperatorCallBaseNonTrivial() {}
+  HasStaticOperatorCallBaseNonTrivial(const HasStaticOperatorCallBaseNonTrivial &self) : NonTrivial(self) {}
+  HasStaticOperatorCallBaseNonTrivial(HasStaticOperatorCallBaseNonTrivial &&self) : NonTrivial(self) {}
+
+  static int operator()(const NonTrivial &arg) { return arg.f + 42; }
+};
+
+class HasStaticOperatorCallDerived : public HasStaticOperatorCallBase {};
+
+class HasStaticOperatorCallWithConstOperator {
+public:
+  inline int operator()(int x, int y) const { return x + y; }
+  static int operator()(int x) {
+        return x - 1;
+   }
+};
+
+
+// This type is intentionally unimportable,
+// to ensure that the function that uses in a parameter
+// cannot import its parameter list.
+struct UnimportableCxxTypeByDefault {
+private:
+  UnimportableCxxTypeByDefault(const UnimportableCxxTypeByDefault &) = delete;
+  UnimportableCxxTypeByDefault(UnimportableCxxTypeByDefault &&) = delete;
+};
+
+struct HasStaticOperatorCallWithUnimportableCxxType {
+  // This operator won't be imported.
+  static int operator()(const UnimportableCxxTypeByDefault &) noexcept {
+      return 0;
+  }
+};
+
+struct ClassWithOperatorStarAvailable {
+  int value;
+
+public:
+  const int &operator*() const { return value; }
+};
+
+struct DerivedClassWithOperatorStarAvailable : ClassWithOperatorStarAvailable {
+};
+
+struct ClassWithOperatorStarUnavailable {
+  int value;
+
+public:
+  const int &operator*() const
+      __attribute__((availability(swift, unavailable))) {
+    return value;
+  }
+};
+
+struct DerivedClassWithOperatorStarUnavailable
+    : ClassWithOperatorStarUnavailable {};
+
+struct ClassWithSuccessorAvailable {
+  int value;
+
+public:
+  ClassWithSuccessorAvailable &operator++() {
+    value++;
+    return *this;
+  }
+};
+
+struct ClassWithSuccessorUnavailable {
+  int value;
+
+public:
+  ClassWithSuccessorUnavailable &operator++()
+      __attribute__((availability(swift, unavailable))) {
+    value++;
+    return *this;
+  }
+};
+
+struct ClassWithOperatorEqualsParamUnnamed {
+  bool operator==(const ClassWithOperatorEqualsParamUnnamed &) const {
+    return false;
+  }
+};
+
+struct ClassWithTemplatedOperatorStar {
+  template <typename T> T operator*() const { return "bogus"; }
+};
+
+struct ClassWithDefaultTemplatedOperatorStar {
+  template <typename T = int> T operator*() const { return 42; }
+};
+
+struct HasOperatorReturningAuto {
+  auto operator*() const {
+    struct Inner {
+      int x = 123;
+    };
+    return Inner();
+  }
 };
 
 #endif

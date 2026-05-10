@@ -17,7 +17,7 @@ foreach(SDK ${SWIFT_SDKS})
         SHARED NOSWIFTRT
         ARCHITECTURE ${ARCH}
         SDK ${SDK}
-        INSTALL_IN_COMPONENT dev
+        INSTALL_IN_COMPONENT never_install
         BlocksRuntime.c
       )
       set_target_properties(BlocksRuntimeStub${VARIANT_SUFFIX} PROPERTIES

@@ -115,7 +115,7 @@ class TestHelpers(unittest.TestCase):
 
         mock_stream.write.assert_called_with(
             '>>> {}\n'.format(shell.quote(test_command)))
-        assert(mock_stream.flush.called)
+        assert mock_stream.flush.called
 
     @utils.requires_module('unittest.mock')
     def test_echo_command_custom_prefix(self):
@@ -124,7 +124,7 @@ class TestHelpers(unittest.TestCase):
         shell._echo_command('ls', mock_stream, prefix='$ ')
 
         mock_stream.write.assert_called_with('$ ls\n')
-        assert(mock_stream.flush.called)
+        assert mock_stream.flush.called
 
     # -------------------------------------------------------------------------
     # _normalize_args
@@ -279,7 +279,7 @@ class TestSubprocessWrappers(unittest.TestCase):
 
     # NOTE: Testing the Popen class is harder than it might appear. We're not
     # able to mock out the subprocess.Popen superclass as one might initially
-    # expect. Rather that shell.Popen class object already exists and inherts
+    # expect. Rather that shell.Popen class object already exists and inherits
     # from subprocess.Popen, thus mocking it out does not change the behavior.
     # Ultimately this class is merely a wrapper that uses already tested
     # decorators to add functionality so testing here might not provide any

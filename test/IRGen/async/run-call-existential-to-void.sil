@@ -42,10 +42,10 @@ bb0(%int : $Int64, %S_type : $@thin S.Type):
 // CHECK-LL: define hidden swift{{(tail)?}}cc void @existentialToVoid(
 sil hidden @existentialToVoid : $@async @convention(thin) (@in_guaranteed P) -> () {
 bb0(%existential : $*P):
-  %existential_addr = open_existential_addr immutable_access %existential : $*P to $*@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77") P
+  %existential_addr = open_existential_addr immutable_access %existential : $*P to $*@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77", P) Self
   %any = alloc_stack $Any
-  %any_addr = init_existential_addr %any : $*Any, $@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77") P
-  copy_addr %existential_addr to [initialization] %any_addr : $*@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77") P
+  %any_addr = init_existential_addr %any : $*Any, $@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77", P) Self
+  copy_addr %existential_addr to [init] %any_addr : $*@opened("B2796A9C-FEBE-11EA-84BB-D0817AD71B77", P) Self
   %printAny = function_ref @printAny : $@convention(thin) (@in_guaranteed Any) -> ()
   %result = apply %printAny(%any) : $@convention(thin) (@in_guaranteed Any) -> ()
   destroy_addr %any : $*Any
@@ -88,8 +88,7 @@ bb0(%0 :$@async @callee_guaranteed () -> ()):
 }
 
 // main
-sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
-bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+sil @main : $@convention(c) () -> Int32 {
   %test_case_nothrow = function_ref @test_case : $@convention(thin) @async () -> ()
   %thick_test_case = thin_to_thick_function %test_case_nothrow : $@convention(thin) @async () -> () to $@callee_guaranteed @async () -> ()
   %thunk = function_ref @no_throw_to_throw_think : $@convention(thin) @async (@guaranteed @async @callee_guaranteed () -> ()) -> @error Error

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name devirt_value_metatypes -emit-sil -enable-spec-devirt -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_value_metatypes -emit-sil -O %s | %FileCheck %s
 
 open class A {
   @inline(never)
@@ -15,8 +15,7 @@ class B: A {
 
 // CHECK-LABEL: sil {{.*}}@$s22devirt_value_metatypes17testValueMetatypeyyAA1ACF
 // CHECK: value_metatype $@thick A.Type
-// CHECK: checked_cast_br
-// CHECK: checked_cast_br
+// This used to check speculative-devirtualization, which we don't have anymore.
 // CHECK: class_method
 // CHECK: }
 public func testValueMetatype(_ x:A) {
@@ -54,7 +53,7 @@ public final class E : C {
 
 // CHECK-LABEL: sil {{.*}}@$s22devirt_value_metatypes5testEySiAA1ECF
 // CHECK-NOT: value_metatype $@thick E.Type
-// CHECK_NOT: checked_cast_br
+// CHECK-NOT: checked_cast_br
 // CHECK: function_ref
 // CHECK: apply
 // CHECK: return

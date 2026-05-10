@@ -13,8 +13,8 @@ struct GenericTangentVectorMember<T: Differentiable>: Differentiable,
 // CHECK-AST:   internal var x: T.TangentVector
 // CHECK-AST:   internal static func + (lhs: GenericTangentVectorMember<T>, rhs: GenericTangentVectorMember<T>) -> GenericTangentVectorMember<T>
 // CHECK-AST:   internal static func - (lhs: GenericTangentVectorMember<T>, rhs: GenericTangentVectorMember<T>) -> GenericTangentVectorMember<T>
-// CHECK-AST:   @_implements(Equatable, ==(_:_:)) internal static func __derived_struct_equals(_ a: GenericTangentVectorMember<T>, _ b: GenericTangentVectorMember<T>) -> Bool
 // CHECK-AST:   internal typealias TangentVector = GenericTangentVectorMember<T>
+// CHECK-AST:   @_implements(Equatable, ==(_:_:)) internal static func __derived_struct_equals(_ a: GenericTangentVectorMember<T>, _ b: GenericTangentVectorMember<T>) -> Bool
 // CHECK-AST:   internal init(x: T.TangentVector)
 // CHECK-AST:   internal static var zero: GenericTangentVectorMember<T> { get }
 
@@ -158,19 +158,21 @@ extension TangentVectorP where Self == StructWithTangentVectorConstrained.Tangen
 // CHECK-AST-LABEL: internal struct StructWithTangentVectorConstrained : TangentVectorConstrained {
 // CHECK-AST:   internal struct TangentVector : {{(TangentVectorP, Differentiable, AdditiveArithmetic)|(TangentVectorP, AdditiveArithmetic, Differentiable)|(Differentiable, TangentVectorP, AdditiveArithmetic)|(AdditiveArithmetic, TangentVectorP, Differentiable)|(Differentiable, AdditiveArithmetic, TangentVectorP)|(AdditiveArithmetic, Differentiable, TangentVectorP)}} {
 
-public struct SR14241Struct: Differentiable {
+// https://github.com/apple/swift/issues/56601
+
+public struct S1: Differentiable {
   public var simd: [Float]
   public var scalar: Float
 }
 
-// CHECK-AST-LABEL: public struct SR14241Struct : Differentiable {
+// CHECK-AST-LABEL: public struct S1 : Differentiable {
 // CHECK-AST: public var simd: [Float]
 // CHECK-AST: public var scalar: Float
 // CHECK-AST: struct TangentVector : AdditiveArithmetic, Differentiable {
 // CHECK-AST:   var simd: Array<Float>.TangentVector
 // CHECK-AST:   var scalar: Float
 
-// CHECK-SIL-LABEL: public struct SR14241Struct : Differentiable {
+// CHECK-SIL-LABEL: public struct S1 : Differentiable {
 // CHECK-SIL: @differentiable(reverse, wrt: self)
 // CHECK-SIL: @_hasStorage public var simd: [Float] { get set }
 // CHECK-SIL: @differentiable(reverse, wrt: self)

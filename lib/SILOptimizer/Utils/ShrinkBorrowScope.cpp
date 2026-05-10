@@ -10,21 +10,25 @@
 //
 //===----------------------------------------------------------------------===//
 /// Shrink borrow scopes by hoisting end_borrows up to deinit barriers.  After
-/// this is done, CanonicalOSSALifetime is free to hoist the destroys of the
+/// this is done, OSSACanonicalizeOwned is free to hoist the destroys of the
 /// owned value up to the end_borrow.  In this way, the lexical lifetime of
 /// guaranteed values is preserved.
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Builtins.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/Test.h"
+#include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/Reachability.h"
 #include "swift/SILOptimizer/Analysis/VisitBarrierAccessScopes.h"
-#include "swift/SILOptimizer/Utils/CanonicalizeBorrowScope.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/SILOptimizer/Utils/OSSACanonicalizeGuaranteed.h"
 #include "llvm/ADT/STLExtras.h"
 
 #define DEBUG_TYPE "copy-propagation"
@@ -56,18 +60,21 @@ struct Context final {
 
   /// The copy_value instructions that the utility creates or changes.
   ///
-  /// Clients provide this so that they can update worklists in respons.
+  /// Clients provide this so that they can update worklists in response.
   SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts;
 
   InstructionDeleter &deleter;
 
+  BasicCalleeAnalysis *calleeAnalysis;
+
   Context(BeginBorrowInst const &introducer,
           SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts,
-          InstructionDeleter &deleter)
+          InstructionDeleter &deleter, BasicCalleeAnalysis *calleeAnalysis)
       : introducer(introducer), borrowedValue(BorrowedValue(&introducer)),
         borrowee(introducer.getOperand()), defBlock(introducer.getParent()),
         function(*introducer.getFunction()),
-        modifiedCopyValueInsts(modifiedCopyValueInsts), deleter(deleter) {}
+        modifiedCopyValueInsts(modifiedCopyValueInsts), deleter(deleter),
+        calleeAnalysis(calleeAnalysis) {}
   Context(Context const &) = delete;
   Context &operator=(Context const &) = delete;
 };
@@ -163,7 +170,8 @@ public:
   Dataflow(Context const &context, Usage const &uses, DeinitBarriers &barriers)
       : context(context), uses(uses), barriers(barriers),
         result(&context.function),
-        reachability(&context.function, context.defBlock, *this, result) {}
+        reachability(Reachability::untilInitialBlock(
+            &context.function, context.defBlock, *this, result)) {}
   Dataflow(Dataflow const &) = delete;
   Dataflow &operator=(Dataflow const &) = delete;
 
@@ -206,6 +214,10 @@ private:
   void visitBarrierBlock(SILBasicBlock *block) {
     barriers.blocks.push_back(block);
   }
+
+  void visitInitialBlock(SILBasicBlock *block) {
+    barriers.blocks.push_back(block);
+  }
 };
 
 /// Whether the specified value is %lifetime or its iterated copy_value.
@@ -244,7 +256,7 @@ Dataflow::classifyInstruction(SILInstruction *instruction) {
                ? Classification::Barrier
                : Classification::Other;
   }
-  if (isDeinitBarrier(instruction)) {
+  if (isDeinitBarrier(instruction, context.calleeAnalysis)) {
     return Classification::Barrier;
   }
   return Classification::Other;
@@ -284,8 +296,8 @@ Dataflow::Effect Dataflow::effectForPhi(SILBasicBlock *block) {
 }
 
 /// Finds end_access instructions which are barriers to hoisting because the
-/// access scopes they contain barriers to hoisting.  Hoisting end_borrows into
-/// such access scopes could introduce exclusivity violations.
+/// access scopes they end contain barriers to hoisting.  Hoisting end_borrows
+/// into such access scopes could introduce exclusivity violations.
 ///
 /// Implements BarrierAccessScopeFinder::Visitor
 class BarrierAccessScopeFinder final {
@@ -343,6 +355,7 @@ public:
   bool run();
 
 private:
+  EndBorrowInst *findPreexistingEndBorrow(SILInstruction *instruction);
   bool createEndBorrow(SILInstruction *insertionPoint);
 };
 
@@ -379,6 +392,15 @@ bool Rewriter::run() {
     if (auto *terminator = dyn_cast<TermInst>(instruction)) {
       auto successors = terminator->getParentBlock()->getSuccessorBlocks();
       for (auto *successor : successors) {
+        // If a terminator is a barrier, it must not branch to a merge point.
+        // Doing so would require one of the following:
+        // - the terminator was passed a phi--which is handled by barriers.phis
+        // - the terminator had a result--which can't happen thanks to the lack
+        //   of critical edges
+        // - the terminator was a BranchInst which was passed no arguments but
+        //   which was nonetheless identified as a barrier--which is illegal
+        assert(successor->getSinglePredecessorBlock() ==
+               terminator->getParentBlock());
         madeChange |= createEndBorrow(&successor->front());
       }
     } else {
@@ -395,10 +417,11 @@ bool Rewriter::run() {
   // don't have multiple predecessors) whose end was not reachable (because
   // reachability was not able to make it to the top of some other successor).
   //
-  // In other words, a control flow boundary is the target edge from a block B
-  // to its single predecessor P not all of whose successors S in succ(P) had
-  // reachable beginnings.  We witness that fact about P's successors by way of
-  // P not having a reachable end--see BackwardReachability::meetOverSuccessors.
+  // In other words, a control flow boundary is the target block of the edge
+  // to a block B from its single predecessor P not all of whose successors S
+  // in succ(P) had reachable beginnings.  We witness that fact about P's
+  // successors by way of P not having a reachable end--see
+  // IterativeBackwardReachability::meetOverSuccessors.
   //
   // control-flow-boundary(B) := beginning-reachable(B) && !end-reachable(P)
   for (auto *block : barriers.blocks) {
@@ -418,12 +441,31 @@ bool Rewriter::run() {
   return madeChange;
 }
 
-bool Rewriter::createEndBorrow(SILInstruction *insertionPoint) {
-  if (auto *ebi = dyn_cast<EndBorrowInst>(insertionPoint)) {
-    if (llvm::find(uses.ends, insertionPoint) != uses.ends.end()) {
-      reusedEndBorrowInsts.insert(insertionPoint);
-      return false;
+EndBorrowInst *
+Rewriter::findPreexistingEndBorrow(SILInstruction *insertionPoint) {
+  for (auto *instruction = insertionPoint; instruction;
+       instruction = instruction->getNextInstruction()) {
+    if (auto *ebi = dyn_cast<EndBorrowInst>(instruction)) {
+      if (llvm::find(uses.ends, ebi) != uses.ends.end())
+        return ebi;
     }
+    if (auto *cvi = dyn_cast<CopyValueInst>(instruction)) {
+      if (llvm::is_contained(barriers.copies, cvi)) {
+        continue;
+      }
+    }
+    /// Otherwise, this is an "interesting" instruction.  We want to record that
+    /// we were able to hoist the end of the borrow scope over it, so we stop
+    /// looking for the preexisting end_borrow.
+    return nullptr;
+  }
+  return nullptr;
+}
+
+bool Rewriter::createEndBorrow(SILInstruction *insertionPoint) {
+  if (auto *ebi = findPreexistingEndBorrow(insertionPoint)) {
+    reusedEndBorrowInsts.insert(ebi);
+    return false;
   }
   auto builder = SILBuilderWithScope(insertionPoint);
   builder.createEndBorrow(
@@ -449,7 +491,38 @@ bool run(Context &context) {
 
 bool swift::shrinkBorrowScope(
     BeginBorrowInst const &bbi, InstructionDeleter &deleter,
+    BasicCalleeAnalysis *calleeAnalysis,
     SmallVectorImpl<CopyValueInst *> &modifiedCopyValueInsts) {
-  ShrinkBorrowScope::Context context(bbi, modifiedCopyValueInsts, deleter);
+  ShrinkBorrowScope::Context context(bbi, modifiedCopyValueInsts, deleter,
+                                     calleeAnalysis);
   return ShrinkBorrowScope::run(context);
 }
+
+namespace swift::test {
+// Arguments:
+// - BeginBorrowInst - the introducer for the scope to shrink
+// Dumps:
+// - DELETED:  <<instruction deleted>>
+static FunctionTest ShrinkBorrowScopeTest(
+    "shrink_borrow_scope", [](auto &function, auto &arguments, auto &test) {
+      auto instruction = arguments.takeValue();
+      auto *bbi = cast<BeginBorrowInst>(instruction);
+      auto *analysis = test.template getAnalysis<BasicCalleeAnalysis>();
+      SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
+      InstructionDeleter deleter(
+          InstModCallbacks().onDelete([&](auto *instruction) {
+            llvm::outs() << "DELETED:\n";
+            instruction->print(llvm::outs());
+            instruction->eraseFromParent();
+
+          }));
+      auto shrunk =
+          shrinkBorrowScope(*bbi, deleter, analysis, modifiedCopyValueInsts);
+      auto *shrunkString = shrunk ? "shrunk" : "did not shrink";
+      llvm::outs() << "Result: " << shrunkString << "\n";
+      llvm::outs() << "Rewrote the following copies:\n";
+      for (auto *cvi : modifiedCopyValueInsts) {
+        cvi->print(llvm::outs());
+      }
+    });
+} // namespace swift::test

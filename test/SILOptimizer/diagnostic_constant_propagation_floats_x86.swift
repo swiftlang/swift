@@ -1,8 +1,9 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 //
 // REQUIRES: CPU=i386 || CPU=x86_64
-// UNSUPPORTED: OS=windows-msvc
+//
+// Windows and Android do not expose Float80.
+// UNSUPPORTED: OS=windows-msvc, OS=linux-android
 //
 // These are tests for diagnostics produced by constant propagation pass
 // on floating-point operations that are specific to x86 architectures,
@@ -52,7 +53,7 @@ func testFloatConvertOverflow() {
   _blackHole(e2)
   _blackHole(e3)
 
-  // All warnings are disabled during explict conversions, except when the
+  // All warnings are disabled during explicit conversions, except when the
   // input literal overflows the largest available FP type.
   _blackHole(Float(1E309))
   _blackHole(Double(1E309))
@@ -82,7 +83,7 @@ func testFloatConvertUnderflow() {
   let e3: Double = 0x11p-1074 // expected-warning {{'0x11p-1074' underflows and loses precision during conversion to 'Double'}}
   _blackHole(e3)
 
-  // All warnings are disabled during explict conversions
+  // All warnings are disabled during explicit conversions
   _blackHole(Float(1E-400))
   _blackHole(Double(1E-309))
   _blackHole(Double(5E-324))

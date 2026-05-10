@@ -94,9 +94,9 @@ struct HasVarInit {
 // auto_closures should not collide with the equivalent non-auto_closure
 // function type.
 
-// CHECK-LABEL: sil hidden [ossa] @$s8mangling19autoClosureOverload1fySiyXK_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s8mangling19autoClosureOverload1fySiyXK_tF :
 func autoClosureOverload(f: @autoclosure () -> Int) {}
-// CHECK-LABEL: sil hidden [ossa] @$s8mangling19autoClosureOverload1fySiyXE_tF : $@convention(thin) (@noescape @callee_guaranteed () -> Int) -> () {
+// CHECK-LABEL: sil hidden [ossa] @$s8mangling19autoClosureOverload1fySiyXE_tF :
 func autoClosureOverload(f: () -> Int) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s8mangling24autoClosureOverloadCallsyyF : $@convention(thin) () -> () {
@@ -144,25 +144,25 @@ func curry1() {
 
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8mangling3barSiyKF : $@convention(thin) () -> (Int, @error Error)
+// CHECK-LABEL: sil hidden [ossa] @$s8mangling3barSiyKF : $@convention(thin) () -> (Int, @error any Error)
 func bar() throws -> Int { return 0 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8mangling12curry1ThrowsyyKF : $@convention(thin) () -> @error Error
+// CHECK-LABEL: sil hidden [ossa] @$s8mangling12curry1ThrowsyyKF : $@convention(thin) () -> @error any Error
 func curry1Throws() throws {
 
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8mangling12curry2ThrowsyycyKF : $@convention(thin) () -> (@owned @callee_guaranteed () -> (), @error Error)
+// CHECK-LABEL: sil hidden [ossa] @$s8mangling12curry2ThrowsyycyKF : $@convention(thin) () -> (@owned @callee_guaranteed () -> (), @error any Error)
 func curry2Throws() throws -> () -> () {
   return curry1
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8mangling6curry3yyKcyF : $@convention(thin) () -> @owned @callee_guaranteed () -> @error Error
+// CHECK-LABEL: sil hidden [ossa] @$s8mangling6curry3yyKcyF : $@convention(thin) () -> @owned @callee_guaranteed () -> @error any Error
 func curry3() -> () throws -> () {
   return curry1Throws
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s8mangling12curry3ThrowsyyKcyKF : $@convention(thin) () -> (@owned @callee_guaranteed () -> @error Error, @error Error)
+// CHECK-LABEL: sil hidden [ossa] @$s8mangling12curry3ThrowsyyKcyKF : $@convention(thin) () -> (@owned @callee_guaranteed () -> @error any Error, @error any Error)
 func curry3Throws() throws -> () throws -> () {
   return curry1Throws
 }

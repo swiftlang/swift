@@ -15,12 +15,19 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/LayoutConstraint.h"
+#include "swift/SIL/SILValue.h"
+#define DEBUG_TYPE "sil-diagnose-invalid-escaping-captures"
+
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILInstruction.h"
@@ -55,21 +62,9 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
       isa<CopyBlockWithoutEscapingInst>(user))
     return false;
 
-  // Ignore uses that are totally uninteresting. partial_apply [stack] is
-  // terminated by a dealloc_stack instruction.
-  if (isIncidentalUse(user) || onlyAffectsRefCount(user) ||
-      isa<DeallocStackInst>(user))
-    return false;
-
-  // Before checking conversions in general below (getSingleValueCopyOrCast),
-  // check for convert_function to [without_actually_escaping]. Assume such
-  // conversion are not actually escaping without following their uses.
-  if (auto *CFI = dyn_cast<ConvertFunctionInst>(user)) {
-    if (CFI->withoutActuallyEscaping())
-      return false;
-  }
-
   // Look through copies, borrows, and conversions.
+  // getSingleValueCopyOrCast handles all result producing instructions for
+  // which onlyAffectsRefCount returns true.
   if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
     // Only follow the copied operand. Other operands are incidental,
     // as in the second operand of mark_dependence.
@@ -77,6 +72,22 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
       followUses(copy);
 
     return false;
+  }
+
+  // Ignore uses that are totally uninteresting. partial_apply [stack] is
+  // terminated by a dealloc_stack instruction.
+  if (isIncidentalUse(user) || onlyAffectsRefCount(user) ||
+      isa<DeallocStackInst>(user)) {
+    assert(user->getNumResults() == 0);
+    return false;
+  }
+
+  // Before checking conversions in general below (getSingleValueCopyOrCast),
+  // check for convert_function to [without_actually_escaping]. Assume such
+  // conversion are not actually escaping without following their uses.
+  if (auto *CFI = dyn_cast<ConvertFunctionInst>(user)) {
+    if (CFI->withoutActuallyEscaping())
+      return false;
   }
 
   // Look through `differentiable_function`.
@@ -147,7 +158,236 @@ static bool checkNoEscapePartialApplyUse(Operand *oper, FollowUse followUses) {
   return true;
 }
 
+/// Given an \p instruction try to find the argument pack that is allocated
+/// to it as a best effort. If no appropriate value can be found, return
+/// an empty \c SILValue.
+/// 
+/// While any instruction *could* be passed, this pattern matching was only written
+/// with the following patterns in mind, which start with alloc_stack and load.
+/// 
+/// Given an escaping use of a pack:
+/// 
+/// ```swift
+/// func foo<each T>(_ fn: repeat () -> each T) {
+///   escapes {
+///     let _ = (repeat each fn)
+///   }
+/// }
+/// ```
+/// 
+/// We start at
+/// 
+/// ```
+/// %3 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %20, %18, %14
+/// ```
+/// 
+/// And need to navigate
+/// 
+/// ```
+/// // %0 "fn"                                        // users: %13, %1
+/// bb0(%0 : $*Pack{repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>}):
+/// // ...
+///   %3 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %20, %18, %14
+/// // ...
+///   %13 = pack_element_get %11 of %0 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %15
+///   %14 = tuple_pack_element_addr %11 of %3 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %15
+///   copy_addr %13 to [init] %14                     // id: %15
+/// // ...
+/// ```
+/// 
+/// Taking a path like
+/// 
+/// ```
+///     %3 alloc_stack             [get users]
+/// -> %14 tuple_pack_element_addr [get users] (since tuple isn't an arg!)
+/// -> %15 copy_addr               [get src inst]
+/// -> %13 pack_element_get        [get pack arg]
+/// ->  %0 "fn"
+/// ```
+/// 
+/// We can follow use to user, until we hit copy_addr and need to find the
+/// source of the copy. When we hit pack_element_get, the pack operand is the
+/// argument "fn" and we are done. Defer within an escaping function and pack
+/// iteration follows this pattern. The arg check on tuple_pack_element_addr exists
+/// for the next case, the use of a pack inside defer:
+/// 
+/// ```swift
+/// func foo<each T>(_ fn: repeat () -> each T) {
+///   defer {
+///     escapes {
+///       let _ = (repeat each fn)
+///     }
+///   }
+///   _ = 42
+/// }
+/// ```
+/// 
+/// We start at
+/// 
+/// ```
+/// %17 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %34, %32, %28
+/// ```
+/// 
+/// And need to navigate
+/// 
+/// ```
+/// // %0 "fn"                                        // user: %11
+/// bb0(%0 : @closureCapture $*(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>)):
+///   %1 = alloc_pack $Pack{repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>} // users: %38, %27, %15, %12
+/// // ...
+///   %11 = tuple_pack_element_addr %9 of %0 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %12
+///   pack_element_set %11 into %9 of %1              // id: %12
+/// // ...
+///   %17 = alloc_stack $(repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>) // users: %34, %32, %28
+/// // ...
+///   %25 = dynamic_pack_index %22 of $Pack{repeat () -> each T} // users: %28, %27, %26
+///   %26 = open_pack_element %25 of <each T> at <Pack{repeat each T}>, shape $each T // users: %28, %27
+///   %27 = pack_element_get %25 of %1 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %29
+///   %28 = tuple_pack_element_addr %25 of %17 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %29
+///   copy_addr %27 to [init] %28                     // id: %29
+/// // ...
+/// ```
+/// 
+/// Taking a path like
+/// 
+/// ```
+///    %17 alloc_stack             [get users]
+/// -> %28 tuple_pack_element_addr [get users]      (since tuple isn't an arg!)
+/// -> %29 copy_addr               [get src inst]
+/// -> %27 pack_element_get        [get pack users] (since pack isn't an arg!)
+/// ->  %1 alloc_pack              [get users]
+/// -> %12 pack_element_set        [get value users]
+/// -> %11 tuple_pack_element_addr [get tuple arg]
+/// ->  %0 "fn"
+/// ```
+/// 
+/// The same logic applies, until we hit pack_element_get, where defer introduces
+/// additional indirection. We need to find the allocation of the pack it is
+/// accessing, then find it's users to discover the addr instruction, which
+/// will have the argument "fn" as the tuple operand. We need to support this
+/// indirection. You can see that we hit two different pack instructions, and finish
+/// on a tuple_pack_element_addr instruction, not a pack_element_get instruction.
+/// 
+/// One more case (that I'm aware of) exists, where an escaping capture is repeated:
+/// 
+/// ```swift
+/// repeat escapes {
+///   (each fn)()
+/// }
+/// ```
+/// 
+/// ```
+/// %13 = load [copy] %12 : $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %14
+/// ```
+/// 
+/// ```
+/// // %0 "fn"                                        // users: %12, %1
+/// bb0(%0 : $*Pack{repeat @noescape <τ_0_0> () -> @out τ_0_0 for <each T>}):
+/// // ...
+///   %12 = pack_element_get %9 of %0 as $*@noescape <τ_0_0> () -> @out τ_0_0 for <each T> // user: %13
+///   %13 = load [copy] %12                           // user: %14
+/// ```
+/// 
+/// With a nice and simple path:
+/// 
+/// ```
+///    %13 load [get src inst]
+/// -> %12 pack_element_get [get pack arg]
+/// -> %0 "fn"
+/// ```
+/// 
+/// We follow the src of the load, like copy_addr, although load is single operand.
+static const SILValue tryGetPackFromIntermediaryInstruction(SILInstruction *instruction) {
+  InstructionWorklist worklist(instruction);
+  while (SILInstruction *inst = worklist.pop()) {
+    // Follow the users of the stack allocation.
+    if (auto *allocStack = dyn_cast<AllocStackInst>(inst)) {
+      worklist.pushInstructionsIfNotVisited(allocStack->getUsers());
+      continue;
+    }
+
+    // Follow the users of the pack allocation.
+    if (auto *allocPack = dyn_cast<AllocPackInst>(inst)) {
+      worklist.pushInstructionsIfNotVisited(allocPack->getUsers());
+      continue;
+    }
+
+    // Follow the source of copy addr.
+    if (auto *copyAddr = dyn_cast<CopyAddrInst>(inst)) {
+      if (auto *src = copyAddr->getSrc()->getDefiningInstruction())
+        worklist.pushIfNotVisited(src);
+      continue;
+    }
+
+    // Follow the source of load inst.
+    if (auto *load = dyn_cast<LoadInst>(inst)) {
+      if (auto *src = load->getOperand()->getDefiningInstruction())
+        worklist.pushIfNotVisited(src);
+      continue;
+    }
+
+    // Follow the value of a pack set, ideally to a tuple pack element addr
+    // inst.
+    if (auto *packElemSet = dyn_cast<PackElementSetInst>(inst)) {
+      if (auto *valueDef = packElemSet->getValue()->getDefiningInstruction())
+        worklist.pushIfNotVisited(valueDef);
+      continue;
+    }
+
+    // TuplePackElementAddrInst may have a function argument as its tuple
+    // operand's definition. Otherwise, follow the users of the address.
+    if (auto *tuplePackElemAddr = dyn_cast<TuplePackElementAddrInst>(inst)) {
+      if (auto *arg = dyn_cast<SILArgument>(tuplePackElemAddr->getTuple())) {
+        return arg;
+      }
+      worklist.pushInstructionsIfNotVisited(tuplePackElemAddr->getUsers());
+      continue;
+    }
+
+    // PackElementGetInst may have a function argument as its pack operand's
+    // definition. Otherwise, follow to the definition of the pack.
+    if (auto *packElemGet = dyn_cast<PackElementGetInst>(inst)) {
+      if (auto *arg = dyn_cast<SILArgument>(packElemGet->getPack())) {
+        return arg;
+      }
+      if (auto *packDef = packElemGet->getPack()->getDefiningInstruction())
+        worklist.pushIfNotVisited(packDef);
+      continue;
+    }
+  }
+
+  return SILValue();
+}
+
 const ParamDecl *getParamDeclFromOperand(SILValue value) {
+  while (true) {
+    // Look through mark must check.
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(value)) {
+      value = mmci->getOperand();
+      continue;
+    }
+
+    // Look through copies.
+    if (auto *ci = dyn_cast<CopyValueInst>(value)) {
+      value = ci->getOperand();
+      continue;
+    }
+
+    // Try to find the pack that is stored in a temporary stack allocation or
+    // accessed in a load.
+    if (isa<AllocStackInst>(value) || isa<LoadInst>(value)) {
+      value = tryGetPackFromIntermediaryInstruction(
+          value->getDefiningInstruction());
+      if (value) // Only continue if we got a non-empty SILValue.
+        continue;
+      // If we weren't able to find a pack, return early; we won't be able to
+      // find the param declaration.
+      return nullptr;
+    }
+
+    break;
+  }
+
   if (auto *arg = dyn_cast<SILArgument>(value))
     if (auto *decl = dyn_cast_or_null<ParamDecl>(arg->getDecl()))
       return decl;
@@ -164,6 +404,7 @@ bool isUseOfSelfInInitializer(Operand *oper) {
     if (auto *MUI = dyn_cast<MarkUninitializedInst>(value)) {
       switch (MUI->getMarkUninitializedKind()) {
       case MarkUninitializedInst::Kind::Var:
+      case MarkUninitializedInst::Kind::Out:
         return false;
       case MarkUninitializedInst::Kind::RootSelf:
       case MarkUninitializedInst::Kind::CrossModuleRootSelf:
@@ -182,6 +423,8 @@ bool isUseOfSelfInInitializer(Operand *oper) {
 }
 
 static bool checkForEscapingPartialApplyUses(PartialApplyInst *PAI) {
+  LLVM_DEBUG(llvm::dbgs() << "Checking for escaping partial apply uses.\n");
+
   // Avoid exponential path exploration.
   SmallVector<Operand *, 8> uses;
   llvm::SmallDenseSet<Operand *, 8> visited;
@@ -198,10 +441,16 @@ static bool checkForEscapingPartialApplyUses(PartialApplyInst *PAI) {
   bool foundEscapingUse = false;
   while (!uses.empty()) {
     Operand *oper = uses.pop_back_val();
-    foundEscapingUse |= checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
+    LLVM_DEBUG(llvm::dbgs() << "Visiting user: " << *oper->getUser());
+    bool localFoundEscapingUse = checkNoEscapePartialApplyUse(oper, [&](SILValue V) {
       for (Operand *use : V->getUses())
         uselistInsert(use);
     });
+    LLVM_DEBUG(
+        if (localFoundEscapingUse)
+          llvm::dbgs() << "    Escapes!\n";
+    );
+    foundEscapingUse |= localFoundEscapingUse;
   }
 
   // If there aren't any, we're fine.
@@ -260,8 +509,24 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
     Operand *oper = uses.pop_back_val();
     SILInstruction *user = oper->getUser();
 
-    if (isIncidentalUse(user) || onlyAffectsRefCount(user))
+    // Look through copy_value.
+    if (auto *ci = dyn_cast<CopyValueInst>(user)) {
+      for (auto *use : ci->getUses()) {
+        uselistInsert(use);
+      }
       continue;
+    }
+
+    if (isIncidentalUse(user) || onlyAffectsRefCount(user) ||
+        isa<DeallocationInst>(user) || isa<DestroyAddrInst>(user))
+      continue;
+
+    // Look through mark must check inst.
+    if (auto *mmci = dyn_cast<MarkUnresolvedNonCopyableValueInst>(user)) {
+      for (auto *use : mmci->getUses())
+        uselistInsert(use);
+      continue;
+    }
 
     // Look through copies, borrows, and conversions.
     if (SingleValueInstruction *copy = getSingleValueCopyOrCast(user)) {
@@ -283,6 +548,62 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
       }
     }
 
+    // Look through indirect pack references. A function with a pack parameter
+    // will get the address, set the pack, and later get and load the pack. We
+    // want to follow this indirection until the load, so we can diagnose where
+    // the pack is used, like `repeat each x`.
+    //
+    // %12 = tuple_pack_element_addr %10 of %1 // user: %13
+    // pack_element_set %12 into %10 of %2 // id: %13
+    // ^ find the users of that pack
+    // %26 = pack_element_get %24 of %2 // user: %27
+    // %27 = load [copy] %26 // users: %29, %28
+    // ^ diagnose at this instruction
+    if (auto *svi = dyn_cast<SingleValueInstruction>(user)) {
+      if (isa<TuplePackElementAddrInst>(user) ||
+          isa<PackElementGetInst>(user)) {
+        for (auto *use : svi->getUses())
+          uselistInsert(use);
+        continue;
+      }
+    }
+
+    // Follow the uses of the pack that is set, to discover get/load
+    // instructions
+    if (auto *packElemSetInst = dyn_cast<PackElementSetInst>(user)) {
+      for (auto *use : packElemSetInst->getPack()->getUses()) {
+        uselistInsert(use);
+      }
+      continue;
+    }
+
+    // Follow indirection for defer.
+    if (auto *copyAddrInst = dyn_cast<CopyAddrInst>(user)) {
+      // We came from the source, follow it to where its copied to
+      if (oper->getOperandNumber() == CopyAddrInst::Src) {
+        SILValue dest = copyAddrInst->getDest();
+
+        // Walk through address projections to find the base.
+        while (true) {
+          if (auto *tuplePackInst = dyn_cast<TuplePackElementAddrInst>(dest)) {
+            dest = tuplePackInst->getTuple();
+            continue;
+          }
+
+          if (auto *packInst = dyn_cast<PackElementGetInst>(dest)) {
+            dest = packInst->getPack();
+            continue;
+          }
+
+          break;
+        }
+
+        for (auto *use : dest->getUses())
+          uselistInsert(use);
+      }
+      continue;
+    }
+
     // Otherwise, we might have found one of the "real" usages of the capture.
     // Diagnose it here.
     SILValue val = oper->get();
@@ -293,22 +614,6 @@ static void diagnoseCaptureLoc(ASTContext &Context, DeclContext *DC,
   }
 }
 
-static bool isNonEscapingFunctionValue(SILValue value) {
-  auto type = value->getType().getASTType();
-
-  // Look through box types to handle mutable 'var' bindings.
-  if (auto boxType = dyn_cast<SILBoxType>(type)) {
-    for (auto field : boxType->getLayout()->getFields()) {
-      if (field.getLoweredType()->isNoEscape())
-        return true;
-    }
-
-    return false;
-  }
-
-  return type->isNoEscape();
-}
-
 // Diagnose this partial_apply if it captures a non-escaping value and has
 // an escaping use.
 static void checkPartialApply(ASTContext &Context, DeclContext *DC,
@@ -317,6 +622,8 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
   // original closure instead.
   if (isPartialApplyOfReabstractionThunk(PAI))
     return;
+
+  LLVM_DEBUG(llvm::dbgs() << "Checking Partial Apply: " << *PAI);
 
   ApplySite apply(PAI);
 
@@ -334,7 +641,7 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
 
     // Captures of noescape function types or tuples containing noescape
     // function types cannot escape.
-    if (isNonEscapingFunctionValue(value))
+    if (value->getType().containsNoEscapeFunction())
       noEscapeCaptures.push_back(&oper);
   }
 
@@ -365,18 +672,24 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
       }
     }
   }
+
+  bool emittedError = false;
+
   // First, diagnose the inout captures, if any.
   for (auto inoutCapture : inoutCaptures) {
-    Optional<Identifier> paramName = None;
+    std::optional<Identifier> paramName = std::nullopt;
     if (isUseOfSelfInInitializer(inoutCapture)) {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
                functionKind);
     } else {
       auto *param = getParamDeclFromOperand(inoutCapture->get());
-      if (param->isSelfParameter())
+      if (param->isSelfParameter()) {
+        emittedError = true;
         diagnose(Context, PAI->getLoc(), diag::escaping_mutable_self_capture,
                  functionKind);
-      else {
+      } else {
+        emittedError = true;
         paramName = param->getName();
         diagnose(Context, PAI->getLoc(), diag::escaping_inout_capture,
                  functionKind, param->getName());
@@ -385,30 +698,45 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
       }
     }
     if (functionKind != EscapingAutoClosure) {
+      emittedError = true;
       diagnoseCaptureLoc(Context, DC, PAI, inoutCapture);
       continue;
     }
     // For an autoclosure capture, present a way to fix the problem.
-    if (paramName)
+    if (paramName) {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::copy_inout_captured_by_autoclosure,
-               paramName.getValue());
-    else
+               paramName.value());
+    } else {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::copy_self_captured_by_autoclosure);
+    }
   }
 
   // Finally, diagnose captures of values with noescape type.
   for (auto noEscapeCapture : noEscapeCaptures) {
     if (auto *param = getParamDeclFromOperand(noEscapeCapture->get())) {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_noescape_param_capture,
                functionKind, param->getName());
       diagnose(Context, param->getLoc(), diag::noescape_param_defined_here,
                param->getName());
     } else {
+      emittedError = true;
       diagnose(Context, PAI->getLoc(), diag::escaping_noescape_var_capture,
                functionKind);
     }
 
     diagnoseCaptureLoc(Context, DC, PAI, noEscapeCapture);
+  }
+
+  // If we emitted an error, mark the closure function as not being suitable for
+  // noncopyable diagnostics. The user can fix the issue and then recompile.
+  if (emittedError) {
+    if (auto *f = apply.getCalleeFunction()) {
+      auto s = semantics::NO_MOVEONLY_DIAGNOSTICS;
+      f->addSemanticsAttr(s);
+    }
   }
 }
 
@@ -435,7 +763,7 @@ static void checkPartialApply(ASTContext &Context, DeclContext *DC,
 static void checkApply(ASTContext &Context, FullApplySite site) {
   auto isNoEscapeParam = [&](SILValue value) -> const ParamDecl * {
     // If the value is an escaping, do not enforce any restrictions.
-    if (!isNonEscapingFunctionValue(value))
+    if (!value->getType().containsNoEscapeFunction())
       return nullptr;
 
     // If the value is not a function parameter, do not enforce any restrictions.
@@ -464,9 +792,13 @@ static void checkApply(ASTContext &Context, FullApplySite site) {
     auto arg = pair.first;
     bool capture = pair.second;
 
-    if (auto *CI = dyn_cast<ConversionInst>(arg)) {
-      arglistInsert(CI->getConverted(), /*capture=*/false);
+    if (auto CI = ConversionOperation(arg)) {
+      arglistInsert(CI.getConverted(), /*capture=*/false);
       continue;
+    }
+
+    if (auto *Copy = dyn_cast<CopyValueInst>(arg)) {
+      arglistInsert(Copy->getOperand(), capture);
     }
 
     // If one of our call arguments is a noescape parameter, diagnose the
@@ -504,7 +836,7 @@ static void checkEscapingCaptures(SILFunction *F) {
   if (F->empty())
     return;
 
-  auto &Context =F->getASTContext();
+  auto &Context = F->getASTContext();
   auto *DC = F->getDeclContext();
 
   for (auto &BB : *F) {
@@ -527,6 +859,8 @@ private:
     if (F->wasDeserializedCanonical())
       return;
 
+    LLVM_DEBUG(llvm::dbgs() << "*** Diagnosing escaping captures in function: "
+                            << F->getName() << '\n');
     checkEscapingCaptures(F);
   }
 };

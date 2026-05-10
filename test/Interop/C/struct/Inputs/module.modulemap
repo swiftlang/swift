@@ -2,3 +2,31 @@ module StructDeclContext {
   header "struct-decl-context.h"
   export *
 }
+
+module ForeignReference {
+  header "foreign-reference.h"
+}
+
+module ForeignReferenceInvalid {
+  header "foreign-reference-invalid.h"
+}
+
+module StructAsOptionSet {
+  header "struct-as-option-set.h"
+}
+
+module NoncopyableStructs {
+  header "noncopyable-struct.h"
+}
+
+module ReturnForeignReference {
+  header "return-foreign-reference.h"
+}
+
+module OpaquePointerImport {
+  header "opaque-pointer-import.h"
+}
+
+module OpaquePointerImportAPINotes {
+  header "opaque-pointer-import-apinotes.h"
+}

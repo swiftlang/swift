@@ -105,10 +105,10 @@ protocol FooProtocol {
     associatedtype Baz: Equatable
 }
 
-// SR-5717
+// https://github.com/apple/swift/issues/48287
 a.b(c: d?.e?.f, h: i)
 
-// SR-6926
+// https://github.com/apple/swift/issues/49474
 /* 👨‍👩‍👧‍👦👨‍👩‍👧‍👦👨‍👩‍👧‍👦 */
 `init`(x: Int, y: Int) {}
 class C {
@@ -182,5 +182,22 @@ var var_with_didset = 10 {
 class A {
   #if true
   @IBAction @objc func foo(a: Int) {}
+  #endif
+}
+
+func testPostfixIfConfig() {
+  foo
+  #if FLAG1
+    .flag1
+    #if FLAG2
+      .flag2
+    #elseif FLAG3
+      .flag3
+    #else
+      .else1
+    #endif
+    .flag1Tail
+  #else
+    .else2
   #endif
 }

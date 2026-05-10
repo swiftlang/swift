@@ -205,7 +205,7 @@ representation before writing an object to a stream, we provide a
 
     // You'll never want to reimplement this
     func format() -> PrintRepresentation {
-      return this
+      return self
     }
   }
 
@@ -242,7 +242,7 @@ Besides modeling ``TextOutputStream``, ``String`` also conforms to
     }
 
     func format() -> String {
-      return this
+      return self
     }
   }
 
@@ -321,7 +321,7 @@ complicated ``format(...)`` might be written::
   }
 
   extension Int : CustomStringConvertibleInteger {
-    func toInt() -> Int { return this }
+    func toInt() -> Int { return self }
   }
 
 

@@ -157,14 +157,15 @@ takesEmpty(EmptyWitness())
 // Note: the SimpleThrowsClosure protocol is not @rethrows
 protocol SimpleThrowsClosure {
   func doIt(_: () throws -> ()) rethrows
-  // expected-note@-1 {{protocol requires function 'doIt' with type '(() throws -> ()) throws -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'doIt' with type '(() throws -> ()) throws -> ()'}}
 
   func doIt2<T : Empty>(_: T) rethrows
-  // expected-note@-1 {{protocol requires function 'doIt2' with type '<T> (T) throws -> ()'; do you want to add a stub?}}
+  // expected-note@-1 {{protocol requires function 'doIt2' with type '<T> (T) throws -> ()'}}
 }
 
 struct ConformsToSimpleThrowsClosure<T : RethrowingProtocol> : SimpleThrowsClosure {
-// expected-error@-1 {{type 'ConformsToSimpleThrowsClosure<T>' does not conform to protocol 'SimpleThrowsClosure'}}
+  // expected-error@-1 {{type 'ConformsToSimpleThrowsClosure<T>' does not conform to protocol 'SimpleThrowsClosure'}}
+  // expected-note@-2 {{add stubs for conformance}}
   let t: T
 
   // This cannot witness SimpleThrowsClosure.doIt(), because the
@@ -175,7 +176,7 @@ struct ConformsToSimpleThrowsClosure<T : RethrowingProtocol> : SimpleThrowsClosu
     try t.source()
   }
 
-  func doIt2<T : Empty>(_: T) rethrows {}
+  func doIt2<U : Empty>(_: U) rethrows {}
   // expected-note@-1 {{candidate is 'rethrows' via a conformance, but the protocol requirement is not from a '@rethrows' protocol}}
 }
 

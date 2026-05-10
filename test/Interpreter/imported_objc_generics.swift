@@ -143,6 +143,7 @@ ImportedObjCGenerics.test("InheritanceFromNongeneric") {
   expectTrue(Container<NSString>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.superclass() == NSObject.self)
   expectTrue(Container<NSObject>.self == Container<NSString>.self)
+  expectTrue((Container<NSObject>, Int).self == (Container<NSString>, Int).self)
 }
 
 public class InheritInSwift: Container<NSString> {

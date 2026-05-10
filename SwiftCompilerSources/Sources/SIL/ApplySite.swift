@@ -10,62 +10,438 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
-public struct ApplyOperands {
-  public static let calleeOperandIndex: Int = 0
+/// Argument conventions indexed on an apply's operand.
+///
+/// `partial_apply` operands correspond to a suffix of the callee
+/// arguments.
+///
+/// Example:
+/// ```
+/// func callee(a, b, c, d, e) { }
+///
+/// %pa = partial_apply @callee(c, d, e)
+/// // operand indices:         1, 2, 3
+/// // callee indices:          2, 3, 4
+///
+///  %a = apply         %pa    (a, b)
+/// // operand indices:         1, 2
+/// // callee indices:          0, 1
+/// ```
+public struct ApplyOperandConventions : Collection {
+  public static let calleeIndex: Int = 0
   public static let firstArgumentIndex = 1
+
+  /// Callee's argument conventions indexed on the function's arguments.
+  public let calleeArgumentConventions: ArgumentConventions
+
+  public let unappliedArgumentCount: Int
+
+  public var appliedArgumentCount: Int {
+    calleeArgumentConventions.count - unappliedArgumentCount
+  }
+
+  public var startIndex: Int { ApplyOperandConventions.firstArgumentIndex }
+
+  public var endIndex: Int { ApplyOperandConventions.firstArgumentIndex + appliedArgumentCount }
+
+  public func index(after index: Int) -> Int {
+    return index + 1
+  }
+
+  public subscript(_ operandIndex: Int) -> ArgumentConvention {
+    return calleeArgumentConventions[
+      calleeArgumentIndex(ofOperandIndex: operandIndex)!]
+  }
+
+  public subscript(result operandIndex: Int) -> ResultInfo? {
+    return calleeArgumentConventions[result:
+      calleeArgumentIndex(ofOperandIndex: operandIndex)!]
+  }
+
+  public subscript(parameter operandIndex: Int) -> ParameterInfo? {
+    return calleeArgumentConventions[parameter:
+      calleeArgumentIndex(ofOperandIndex: operandIndex)!]
+  }
+
+  public subscript(resultDependsOn operandIndex: Int)
+    -> LifetimeDependenceConvention? {
+    return calleeArgumentConventions[resultDependsOn:
+      calleeArgumentIndex(ofOperandIndex: operandIndex)!]
+  }
+
+  // If the specified parameter is a dependency target, return its dependency sources.
+  public subscript(parameterDependencies operandIndex: Int)
+    -> FunctionConvention.LifetimeDependencies? {
+    return calleeArgumentConventions[parameterDependencies:
+      calleeArgumentIndex(ofOperandIndex: operandIndex)!]
+  }
+
+  public func parameterDependence(targetOperandIndex: Int, sourceOperandIndex: Int) -> LifetimeDependenceConvention? {
+    guard let targetArgIdx = calleeArgumentIndex(ofOperandIndex: targetOperandIndex),
+          let sourceArgIdx = calleeArgumentIndex(ofOperandIndex: sourceOperandIndex) else {
+      return nil
+    }
+    return calleeArgumentConventions.parameterDependence(targetArgumentIndex: targetArgIdx,
+                                                         sourceArgumentIndex: sourceArgIdx)
+  }
+
+  public var firstParameterOperandIndex: Int {
+    return ApplyOperandConventions.firstArgumentIndex +
+      calleeArgumentConventions.firstParameterIndex
+  }
+
+  // TODO: rewrite uses of this API to avoid manipulating integer
+  // indices, and make this private. No client should have multiple
+  // integer indices, some of which are caller indices, and some of
+  // which are callee indices.
+  public func calleeArgumentIndex(ofOperandIndex index: Int) -> Int? {
+    let callerArgIdx = index - startIndex
+    if callerArgIdx < 0 {
+      return nil
+    }
+    let calleeArgIdx = callerArgIdx + unappliedArgumentCount
+    assert(calleeArgIdx < calleeArgumentConventions.count,
+           "invalid operand index")
+    return calleeArgIdx
+  }
+
+  // TODO: this should be private.
+  public func calleeArgumentIndex(of operand: Operand) -> Int? {
+    calleeArgumentIndex(ofOperandIndex: operand.index)
+  }
 }
 
+@_semantics("fast_cast")
 public protocol ApplySite : Instruction {
   var operands: OperandArray { get }
   var numArguments: Int { get }
   var substitutionMap: SubstitutionMap { get }
-  func calleeArgIndex(callerArgIndex: Int) -> Int
-  func callerArgIndex(calleeArgIndex: Int) -> Int?
-  func getArgumentConvention(calleeArgIndex: Int) -> ArgumentConvention
+
+  var unappliedArgumentCount: Int { get }
+}
+
+// lattice: no -> lifetime -> value
+public enum IsFullyAssigned {
+  case no
+  case lifetime
+  case value
+
+  var reassignsLifetime: Bool {
+    switch self {
+    case .no:
+      false
+    case .lifetime, .value:
+      true
+    }
+  }
 }
 
 extension ApplySite {
-  public var callee: Value { operands[ApplyOperands.calleeOperandIndex].value }
+  public var callee: Value { operands[ApplyOperandConventions.calleeIndex].value }
 
-  public var arguments: LazyMapSequence<OperandArray, Value> {
-    let numArgs = ApplySite_getNumArguments(bridged)
-    let offset = ApplyOperands.firstArgumentIndex
-    let argOps = operands[offset..<(numArgs + offset)]
-    return argOps.lazy.map { $0.value }
+  public var hasSubstitutions: Bool {
+    return substitutionMap.hasAnySubstitutableParams
   }
 
-  public var substitutionMap: SubstitutionMap {
-    SubstitutionMap(ApplySite_getSubstitutionMap(bridged))
+  public var isAsync: Bool {
+    return callee.type.isAsyncFunction
   }
 
-  public func argumentIndex(of operand: Operand) -> Int? {
-    let opIdx = operand.index
-    if opIdx >= ApplyOperands.firstArgumentIndex &&
-       opIdx <= ApplyOperands.firstArgumentIndex + numArguments {
-      return opIdx - ApplyOperands.firstArgumentIndex
-    }
-    return nil
-  }
-
-  public func getArgumentConvention(calleeArgIndex: Int) -> ArgumentConvention {
-    return ApplySite_getArgumentConvention(bridged, calleeArgIndex).convention
-  }
-  
   public var referencedFunction: Function? {
     if let fri = callee as? FunctionRefInst {
       return fri.referencedFunction
     }
     return nil
   }
+
+  public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
+    if let callee = referencedFunction {
+      return callee.hasSemanticsAttribute(attr)
+    }
+    return false
+  }
+
+  public var isCalleeNoReturn: Bool {
+    bridged.ApplySite_isCalleeNoReturn()  
+  }
+
+  public var isCalleeTrapNoReturn: Bool {
+    referencedFunction?.isTrapNoReturn ?? false
+  }
+
+  /// Returns the subset of operands which are argument operands.
+  ///
+  /// This does not include the callee function operand.
+  public var argumentOperands: OperandArray {
+    let numArgs = bridged.ApplySite_getNumArguments()
+    let offset = ApplyOperandConventions.firstArgumentIndex
+    return operands[offset..<(numArgs + offset)]
+  }
+
+  /// Returns the subset of operands that are parameters. This does
+  /// not include indirect results. This does include 'self'.
+  public var parameterOperands: OperandArray {
+    let firstParamIdx =
+      operandConventions.calleeArgumentConventions.firstParameterIndex
+    let argOpers = argumentOperands // bridged call
+    return argOpers[firstParamIdx..<argOpers.count]
+  }
+
+  /// Returns the subset of operand values which are arguments.
+  ///
+  /// This does not include the callee function operand.
+  public var arguments: LazyMapSequence<OperandArray, Value> {
+    argumentOperands.values
+  }
+
+  /// Indirect results including the error result.
+  public var indirectResultOperands: OperandArray {
+    let ops = operandConventions
+    return operands[ops.startIndex..<ops.firstParameterOperandIndex]
+  }
+
+  public func isIndirectResult(operand: Operand) -> Bool {
+    let idx = operand.index
+    let ops = operandConventions
+    return idx >= ops.startIndex && idx < ops.firstParameterOperandIndex
+  }
+
+  public var substitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.ApplySite_getSubstitutionMap())
+  }
+
+  public var calleeArgumentConventions: ArgumentConventions {
+    ArgumentConventions(convention: functionConvention)
+  }
+
+  public var operandConventions: ApplyOperandConventions {
+    ApplyOperandConventions(
+      calleeArgumentConventions: calleeArgumentConventions,
+      unappliedArgumentCount: bridged.PartialApply_getCalleeArgIndexOfFirstAppliedArg())
+  }
+
+  /// Returns true if `operand` is the callee function operand and not am argument operand.
+  public func isCallee(operand: Operand) -> Bool {
+    operand.index == ApplyOperandConventions.calleeIndex
+  }
+
+  public func convention(of operand: Operand) -> ArgumentConvention? {
+    let idx = operand.index
+    return idx < operandConventions.startIndex ? nil : operandConventions[idx]
+  }
+
+  public func result(for operand: Operand) -> ResultInfo? {
+    let idx = operand.index
+    return idx < operandConventions.startIndex ? nil
+      : operandConventions[result: idx]
+  }
+
+  public func parameter(for operand: Operand) -> ParameterInfo? {
+    let idx = operand.index
+    return idx < operandConventions.startIndex ? nil
+      : operandConventions[parameter: idx]
+  }
+
+  public func resultDependence(on operand: Operand)
+    -> LifetimeDependenceConvention? {
+    let idx = operand.index
+    return idx < operandConventions.startIndex ? nil
+      : operandConventions[resultDependsOn: idx]
+  }
+
+  public var hasResultDependence: Bool {
+    functionConvention.resultDependencies != nil
+  }
+
+  public func isAddressable(operand: Operand) -> Bool {
+    for targetOperand in argumentOperands {
+      guard !targetOperand.value.isEscapable else {
+        continue
+      }
+      if let dep = parameterDependence(target: targetOperand, source: operand), dep.isAddressable(for: operand.value) {
+        return true
+      }
+    }
+    if let dep = resultDependence(on: operand) {
+      return dep.isAddressable(for: operand.value)
+    }
+    return false
+  }
+
+  public var hasLifetimeDependence: Bool {
+    functionConvention.hasLifetimeDependencies()
+  }
+
+  public func parameterDependencies(target operand: Operand) -> FunctionConvention.LifetimeDependencies? {
+    let idx = operand.index
+    return idx < operandConventions.startIndex ? nil
+      : operandConventions[parameterDependencies: idx]
+  }
+
+  public func parameterDependence(target: Operand, source: Operand) -> LifetimeDependenceConvention? {
+    return operandConventions.parameterDependence(targetOperandIndex: target.index, sourceOperandIndex: source.index)
+  }
+
+  /// Returns .value if this apply fully assigns 'operand' (via @out).
+  ///
+  /// Returns .lifetime if this 'operand' is a non-Escapable inout argument and its lifetime is not propagated by the
+  /// call ('@lifetime(param: copy param)' is not present).
+  public func fullyAssigns(operand: Operand) -> IsFullyAssigned {
+    switch convention(of: operand) {
+    case .indirectOut:
+      return .value
+    case .indirectInout:
+      if let argIdx = calleeArgumentIndex(of: operand),
+         calleeArgumentConventions.parameterDependence(targetArgumentIndex: argIdx, sourceArgumentIndex: argIdx) == nil
+      {
+        return .lifetime
+      }
+      return .no
+    default:
+      return .no
+    }
+  }
+
+  public var yieldConventions: YieldConventions {
+    YieldConventions(convention: functionConvention)
+  }
+
+  public func convention(of yield: MultipleValueInstructionResult)
+    -> ArgumentConvention {
+    assert(yield.definingInstruction == self)
+    return yieldConventions[yield.index]
+  }
+
+  /// Converts an argument index of a callee to the corresponding apply operand.
+  ///
+  /// If the apply does not actually apply that argument, it returns nil.
+  ///
+  /// Example:
+  /// ```
+  ///                 func callee(v, w, x, y, z) { }
+  /// // caller operands in %pa:  -, -, c, d, e     ("-" == nil)
+  /// // caller operands in %a:   a, b, -, -, -
+  ///
+  /// %pa = partial_apply @callee(c, d, e)
+  ///  %a = apply         %pa    (a, b)
+  /// ```
+  ///
+  /// TODO: delete this API and rewrite the users. 
+  public func operand(forCalleeArgumentIndex calleeArgIdx: Int) -> Operand? {
+    let callerArgIdx = calleeArgIdx - operandConventions.unappliedArgumentCount
+    guard callerArgIdx >= 0 && callerArgIdx < numArguments else { return nil }
+    return argumentOperands[callerArgIdx]
+  }
+
+  /// Returns the argument of `operand` in a callee function.
+  ///
+  /// Returns nil if `operand` is not an argument operand. This is the case if
+  /// it's the callee function operand.
+  public func calleeArgument(of operand: Operand, in callee: Function) -> FunctionArgument? {
+    if let argIdx = calleeArgumentIndex(of: operand) {
+      return callee.arguments[argIdx]
+    }
+    return nil
+  }
+
+  /// Returns the argument index of an operand.
+  ///
+  /// Returns nil if `operand` is not an argument operand. This is the case if
+  /// it's the callee function operand.
+  ///
+  /// Warning: the returned integer can be misused as an index into the wrong collection.
+  /// Use `calleeArgument(of:,in:)` if possible.
+  public func calleeArgumentIndex(of operand: Operand) -> Int? {
+    operandConventions.calleeArgumentIndex(of: operand)
+  }
+
+  public var hasGuaranteedResult: Bool {
+    functionConvention.hasGuaranteedResult
+  }
 }
 
+extension ApplySite {
+  public var functionConvention: FunctionConvention {
+    FunctionConvention(for: substitutedCalleeType, in: parentFunction)
+  }
+
+  public var substitutedCalleeType: CanonicalType {
+    CanonicalType(bridged: bridged.ApplySite_getSubstitutedCalleeType())
+  }
+}
+
+@_semantics("fast_cast")
 public protocol FullApplySite : ApplySite {
   var singleDirectResult: Value? { get }
+  var singleDirectErrorResult: Value? { get }
 }
 
 extension FullApplySite {
-  public func calleeArgIndex(callerArgIndex: Int) -> Int { callerArgIndex }
-  public func callerArgIndex(calleeArgIndex: Int) -> Int? { calleeArgIndex }
+  public var unappliedArgumentCount: Int { 0 }
+
+  /// The number of indirect out arguments.
+  ///
+  /// 0 if the callee has a direct or no return value and 1, if it has an indirect return value.
+  ///
+  /// FIXME: This is incorrect in two cases: it does not include the
+  /// indirect error result, and, prior to address lowering, does not
+  /// include pack results.
+  public var numIndirectResultArguments: Int {
+    return bridged.FullApplySite_numIndirectResultArguments()
+  }
+
+  /// The direct result or yields produced by this apply. This does
+  /// not include any potential results returned by a coroutine
+  /// (end_apply results).
+  public var resultOrYields: SingleInlineArray<Value> {
+    var values = SingleInlineArray<Value>()
+    if let beginApply = self as? BeginApplyInst {
+      beginApply.yieldedValues.forEach { values.push($0) }
+    } else {
+      let result = singleDirectResult!
+      if !result.type.isVoid {
+        values.push(result)
+      }
+    }
+    return values
+  }
+}
+
+extension Instruction {
+  /// To be used for fast type casting to `FullApplySite` in time critical code.
+  /// This is a workaround for the slow runtime type casts. After toolchain builders are
+  /// upgraded to a compiler version which includes the fix for this problem
+  /// (https://github.com/swiftlang/swift/pull/88270), we don't need this anymore and
+  /// the regular `as FullApplySite` casts can be used instead.
+  public var isFullApplySite: Bool {
+    switch self {
+    case is ApplyInst, is TryApplyInst, is BeginApplyInst:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+/// For pattern matching in switch statements.
+public struct IsFullApplySite {}
+public let isFullApplySite = IsFullApplySite()
+
+public func ~= (pattern: IsFullApplySite, value: Instruction) -> Bool {
+  return value.isFullApplySite
+}
+
+let addressableTest = Test("addressable_arguments") {
+  function, arguments, context in
+
+  let operand = arguments.takeOperand()
+  guard let apply = operand.instruction as? ApplySite, let argIdx = apply.calleeArgumentIndex(of: operand) else {
+    fatalError("tested operand must be an apply argument")
+  }
+  let isAddressable = apply.isAddressable(operand: operand)
+  print("Arg Index: \(argIdx) of Apply: \(apply)")
+  print("  isAddressable: \(isAddressable)")
 }

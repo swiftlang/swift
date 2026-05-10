@@ -28,7 +28,7 @@ public let benchmarks = [
   BenchmarkInfo(name: "SubstringEqualString", runFunction: run_SubstringEqualString, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringEquatable", runFunction: run_SubstringEquatable, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringFromLongString2", runFunction: run_SubstringFromLongString, tags: [.validation, .api, .String]),
-  BenchmarkInfo(name: "SubstringFromLongStringGeneric", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
+  BenchmarkInfo(name: "SubstringFromLongStringGeneric2", runFunction: run_SubstringFromLongStringGeneric, tags: [.validation, .api, .String]),
   BenchmarkInfo(name: "SubstringTrimmingASCIIWhitespace", runFunction: run_SubstringTrimmingASCIIWhitespace, tags: [.validation, .api, .String]),
 ]
 
@@ -58,7 +58,7 @@ func create<T : RangeReplaceableCollection, U : Collection>(
 public func run_SubstringFromLongStringGeneric(_ n: Int) {
   var s = longWide
   s += "!" // ensure the string has a real buffer
-  for _ in 1...n*500 {
+  for _ in 1...n*5000 {
     create(Substring.self, from: s)
   }
 }

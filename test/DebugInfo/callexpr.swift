@@ -21,6 +21,6 @@ func bar(x: MyType = MyType()) {}
 
 // CHECK2: call {{.*}}MyType{{.*}}, !dbg ![[DEFAULTARG:.*]]
 // CHECK2: call {{.*}}bar{{.*}}, !dbg ![[BARCALL:.*]]
-bar() // CHECK2: ![[DEFAULTARG]] = !DILocation(line: [[@LINE]], column: 4
+bar() // CHECK2: ![[DEFAULTARG]] = !DILocation(line: 0
       // CHECK2: ![[BARCALL]] = !DILocation(line: [[@LINE-1]], column: 1
 

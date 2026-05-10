@@ -1,4 +1,4 @@
-// swift-tools-version:5.0
+// swift-tools-version:5.9
 
 import PackageDescription
 import Foundation
@@ -9,6 +9,8 @@ unsupportedTests.insert("ObjectiveCNoBridgingStubs")
 unsupportedTests.insert("ObjectiveCBridging")
 unsupportedTests.insert("ObjectiveCBridgingStubs")
 #endif
+
+unsupportedTests.insert("SimpleArraySpecialization")
 
 //===---
 // Single Source Libraries
@@ -78,6 +80,7 @@ var multiSourceLibraries: [(parentSubDir: String, name: String)] = multiSourceLi
 
 var products: [Product] = []
 products.append(.library(name: "TestsUtils", type: .static, targets: ["TestsUtils"]))
+//products.append(.library(name: "SimpleArray", type: .static, targets: ["SimpleArray"]))
 products.append(.library(name: "DriverUtils", type: .static, targets: ["DriverUtils"]))
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 products.append(.library(name: "ObjectiveCTests", type: .static, targets: ["ObjectiveCTests"]))
@@ -96,6 +99,13 @@ products += multiSourceLibraries.map {
 
 var targets: [Target] = []
 targets.append(.target(name: "TestsUtils", path: "utils", sources: ["TestsUtils.swift"]))
+// targets.append(.target(
+//   name: "SimpleArray",
+//   path: "utils",
+//   sources: ["SimpleArray.swift"],
+//   swiftSettings: [.unsafeFlags(["-Xfrontend",
+//                                 "-enable-experimental-feature",
+//                                 "LayoutPrespecialization"])]))
 targets.append(.systemLibrary(name: "LibProc", path: "utils/LibProc"))
 targets.append(
   .target(name: "DriverUtils",
@@ -117,10 +127,8 @@ targets.append(
     dependencies: swiftBenchDeps,
     path: "utils",
     sources: ["main.swift"],
-    swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                  "-enable-experimental-cxx-interop",
-                                  "-I",
-                                  "utils/CxxTests"])]))
+    cxxSettings: [.headerSearchPath("../utils/CxxTests")],
+    swiftSettings: [.interoperabilityMode(.Cxx)]))
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 targets.append(
@@ -129,7 +137,7 @@ targets.append(
     publicHeadersPath: "."))
 #endif
 
-var singleSourceDeps: [Target.Dependency] = [.target(name: "TestsUtils")]
+var singleSourceDeps: [Target.Dependency] = [.target(name: "TestsUtils"), /* .target(name: "SimpleArray") */]
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
 singleSourceDeps.append(.target(name: "ObjectiveCTests"))
 #endif
@@ -156,10 +164,10 @@ targets += cxxSingleSourceLibraries.map { name in
     dependencies: singleSourceDeps,
     path: "cxx-source",
     sources: ["\(name).swift"],
-    swiftSettings: [.unsafeFlags(["-Xfrontend",
-                                  "-enable-experimental-cxx-interop",
-                                  "-I",
-                                  "utils/CxxTests"])])
+    cxxSettings: [.headerSearchPath("../utils/CxxTests")],
+    swiftSettings: [.interoperabilityMode(.Cxx),
+                    .unsafeFlags([// FIXME: https://github.com/apple/swift/issues/61453
+                                  "-Xfrontend", "-validate-tbd-against-ir=none"])])
 }
 
 targets += multiSourceLibraries.map { lib in
@@ -168,16 +176,22 @@ targets += multiSourceLibraries.map { lib in
     dependencies: [
       .target(name: "TestsUtils")
     ],
-    path: lib.parentSubDir)
+    path: "\(lib.parentSubDir)/\(lib.name)")
 }
 
 //===---
 // Top Level Definition
 //
 
-let p = Package(
+var p = Package(
   name: "swiftbench",
   products: products,
   targets: targets,
-  swiftLanguageVersions: [.v4]
+  swiftLanguageVersions: [.v4],
+  cxxLanguageStandard: .cxx20
 )
+
+// Let's build for Swift 5.5-aligned runtimes.
+#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+p.platforms = [.macOS(.v12), .iOS(.v15), .watchOS(.v8), .tvOS(.v15)]
+#endif

@@ -19,6 +19,7 @@
 #define SWIFT_IRGEN_CLASSMETADATAVISITOR_H
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILModule.h"
@@ -63,10 +64,57 @@ protected:
     : super(IGM), Target(target),
       VTable(IGM.getSILModule().lookUpVTable(target, /*deserialize*/ false)) {}
 
+  ClassMetadataVisitor(IRGenModule &IGM, ClassDecl *target, SILVTable *vtable)
+    : super(IGM), Target(target), VTable(vtable) {}
+
 public:
+  const SILVTable *getVTable() const { return VTable; }
+
+  bool isPureObjC() const {
+    return Target->getObjCImplementationDecl();
+  }
+
+  // Layout in embedded mode while considering the class type.
+  // This is important for adding the right superclass pointer.
+  // The regular `layout` method can be used for layout tasks for which the
+  // actual superclass pointer is not relevant.
+  void layoutEmbedded(CanType classTy) {
+    asImpl().addValueWitnessTable();
+    asImpl().noteAddressPoint();
+    asImpl().addEmbeddedSuperclass(classTy);
+    asImpl().addDestructorFunction();
+    asImpl().addIVarDestroyer();
+    addEmbeddedClassMembers(Target);
+  }
+
   void layout() {
-    static_assert(MetadataAdjustmentIndex::Class == 2,
+    static_assert(MetadataAdjustmentIndex::Class == 3,
                   "Adjustment index must be synchronized with this layout");
+
+    if (IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+      asImpl().addValueWitnessTable();
+      asImpl().noteAddressPoint();
+      asImpl().addSuperclass();
+      asImpl().addDestructorFunction();
+      asImpl().addIVarDestroyer();
+      addEmbeddedClassMembers(Target);
+      return;
+    }
+
+    if (isPureObjC()) {
+      assert(IGM.ObjCInterop);
+      asImpl().noteAddressPoint();
+      asImpl().addMetadataFlags();
+      asImpl().addSuperclass();
+      asImpl().addClassCacheData();
+      asImpl().addClassDataPointer();
+      return;
+    }
+
+    asImpl().addConformanceTable();
+
+    // Pointer to layout string
+    asImpl().addLayoutStringPointer();
 
     // HeapMetadata header.
     asImpl().addDestructorFunction();
@@ -121,10 +169,6 @@ private:
 
       // Super class metadata is resilient if
       // the superclass is resilient when viewed from the current module.
-      // But not if the current class is defined in an external module and
-      //    not publically accessible (e.g private or internal). This would
-      //    normally not happen except if we compile theClass's module with
-      //    enable-testing.
       } else if (IGM.hasResilientMetadata(superclassDecl,
                                           ResilienceExpansion::Maximal,
                                           rootClass)) {
@@ -172,7 +216,8 @@ private:
     // whether they need them or not.
     asImpl().noteStartOfFieldOffsets(theClass);
     forEachField(IGM, theClass, [&](Field field) {
-      asImpl().addFieldEntries(field);
+      if (isExportableField(field))
+        asImpl().addFieldEntries(field);
     });
     asImpl().noteEndOfFieldOffsets(theClass);
 
@@ -181,6 +226,21 @@ private:
     if (IGM.hasResilientMetadata(theClass, ResilienceExpansion::Maximal,
                                  rootClass))
       return;
+
+    // Add vtable entries.
+    asImpl().addVTableEntries(theClass);
+  }
+
+  /// Add fields associated with the given class and its bases.
+  void addEmbeddedClassMembers(ClassDecl *theClass) {
+    // Visit the superclass first.
+    if (auto *superclassDecl = theClass->getSuperclassDecl()) {
+      addEmbeddedClassMembers(superclassDecl);
+    }
+
+    // Note that we have to emit a global variable storing the metadata
+    // start offset, or access remaining fields relative to one.
+    asImpl().noteStartOfImmediateMembers(theClass);
 
     // Add vtable entries.
     asImpl().addVTableEntries(theClass);
@@ -208,6 +268,9 @@ private:
     case Field::DefaultActorStorage:
       asImpl().addDefaultActorStorageFieldOffset();
       return;
+    case Field::NonDefaultDistributedActorStorage:
+      asImpl().addNonDefaultDistributedActorStorageFieldOffset();
+      return;
     }
   }
 };
@@ -229,6 +292,17 @@ public:
   void addNominalTypeDescriptor() { addPointer(); }
   void addIVarDestroyer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
+
+  void addConformanceTable() {
+    if (!this->VTable)
+      return;
+    
+    for (unsigned i = 0, e = this->VTable->getConformances().size(); i < e; ++i) {
+      addPointer();
+    }
+  }
+
+  void addLayoutStringPointer() { addPointer(); }
   void addDestructorFunction() { addPointer(); }
   void addSuperclass() { addPointer(); }
   void addClassFlags() { addInt32(); }
@@ -245,6 +319,7 @@ public:
   }
   void addMethodOverride(SILDeclRef baseRef, SILDeclRef declRef) {}
   void addDefaultActorStorageFieldOffset() { addPointer(); }
+  void addNonDefaultDistributedActorStorageFieldOffset() { addPointer(); }
   void addFieldOffset(VarDecl *var) { addPointer(); }
   void addFieldOffsetPlaceholders(MissingMemberDecl *mmd) {
     for (unsigned i = 0, e = mmd->getNumberOfFieldOffsetVectorEntries();
@@ -252,11 +327,7 @@ public:
       addPointer();
     }
   }
-  void addGenericArgument(GenericRequirement requirement, ClassDecl *forClass) {
-    addPointer();
-  }
-  void addGenericWitnessTable(GenericRequirement requirement,
-                              ClassDecl *forClass) {
+  void addGenericRequirement(GenericRequirement requirement, ClassDecl *forClass) {
     addPointer();
   }
   void addPlaceholder(MissingMemberDecl *MMD) {

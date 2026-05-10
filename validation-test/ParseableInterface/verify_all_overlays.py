@@ -46,7 +46,9 @@ for filename in os.listdir(sdk_overlay_dir):
         "DifferentiationUnittest",
         "Swift",
         "SwiftLang",
-        "std",  # swiftstd uses `-module-interface-preserve-types-as-written`
+        # swiftCxxStdlib uses `-module-interface-preserve-types-as-written`
+        "CxxStdlib",
+        "CompatibilitySpan",
     ]:
         continue
 
@@ -54,8 +56,6 @@ for filename in os.listdir(sdk_overlay_dir):
     output_path = os.path.join(output_dir, module_name + ".swiftmodule")
     compiler_args = ["-o", output_path, "-module-name", module_name,
                      interface_file]
-    if module_name == "std":
-        compiler_args += ["-enable-experimental-cxx-interop"]
 
     status = subprocess.call(compiler_invocation +
                              compiler_args)

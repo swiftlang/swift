@@ -1,5 +1,10 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
-// SR-8398
+// RUN: %target-swift-emit-silgen %s | %FileCheck %s --check-prefixes=CHECK,CHECK-NO-WEAK-LET
+// RUN: %target-swift-emit-silgen -enable-upcoming-feature ImmutableWeakCaptures %s | %FileCheck %s --check-prefixes=CHECK,CHECK-HAS-WEAK-LET
+
+// REQUIRES: swift_feature_ImmutableWeakCaptures
+
+// https://github.com/apple/swift/issues/50924
+
 func fibonacci(_ n: Int) -> Int {
   var cache: [Int: Int] = [:]
 

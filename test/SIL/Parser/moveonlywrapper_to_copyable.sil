@@ -1,0 +1,46 @@
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all=true %s | %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all=true | %FileCheck %s
+
+sil_stage raw
+
+import Builtin
+
+class Klass {}
+
+sil @use_foo : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @foo : $@convention(thin) (@owned Klass) -> @owned Klass {
+// CHECK: bb0([[ARG:%[0-9]+]] :
+// CHECK: [[MOVE_ONLY:%[0-9]+]] = copyable_to_moveonlywrapper [owned] [[ARG]] : $Klass
+// CHECK: [[BORROWED_MOVE_ONLY:%[0-9]+]] = begin_borrow [[MOVE_ONLY]]
+// CHECK: moveonlywrapper_to_copyable [guaranteed] [[BORROWED_MOVE_ONLY]] : $@moveOnly Klass
+// CHECK: moveonlywrapper_to_copyable [owned] [[MOVE_ONLY]] : $@moveOnly Klass
+// CHECK: } // end sil function 'foo'
+sil [ossa] @foo : $@convention(thin) (@owned Klass) -> @owned Klass {
+bb0(%0 : @owned $Klass):
+  %1 = copyable_to_moveonlywrapper [owned] %0 : $Klass
+  %1a = begin_borrow %1 : $@moveOnly Klass
+  %2a = moveonlywrapper_to_copyable [guaranteed] %1a : $@moveOnly Klass
+  %f = function_ref @use_foo : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%2a) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %1a : $@moveOnly Klass
+  %2 = moveonlywrapper_to_copyable [owned] %1 : $@moveOnly Klass
+  return %2 : $Klass
+}
+
+// CHECK-LABEL: sil [ossa] @foo2 : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: bb0([[ARG:%[0-9]+]] :
+// CHECK: [[MOVE_ONLY:%[0-9]+]] = copyable_to_moveonlywrapper [guaranteed] [[ARG]] : $Klass
+// CHECK: [[BORROWED_MOVE_ONLY:%[0-9]+]] = begin_borrow [[MOVE_ONLY]]
+// CHECK: moveonlywrapper_to_copyable [guaranteed] [[BORROWED_MOVE_ONLY]] : $@moveOnly Klass
+// CHECK: } // end sil function 'foo2'
+sil [ossa] @foo2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = copyable_to_moveonlywrapper [guaranteed] %0 : $Klass
+  %1a = begin_borrow %1 : $@moveOnly Klass
+  %2a = moveonlywrapper_to_copyable [guaranteed] %1a : $@moveOnly Klass
+  %f = function_ref @use_foo : $@convention(thin) (@guaranteed Klass) -> ()
+  apply %f(%2a) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %1a : $@moveOnly Klass
+  %9999 = tuple()
+  return %9999 : $()
+}

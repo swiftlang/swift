@@ -2,7 +2,7 @@
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -experimental-skip-non-inlinable-function-bodies-without-types
 // RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -experimental-skip-non-inlinable-function-bodies
 
-// REQUIRES: swift_in_compiler
+// REQUIRES: swift_swift_parser
 
 // We don't consider this a regex literal when skipping as it has an initial
 // space.

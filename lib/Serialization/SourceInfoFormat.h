@@ -60,7 +60,7 @@ const uint32_t SWIFTSOURCEINFO_HASH_SEED = 5387;
 /// .swiftsourceinfo doesn't have consequences as serious as breaking the format
 /// of .swiftdoc, because .swiftsourceinfo file is for local development use only.
 ///
-/// When changing this block, backwards-compatible changes are prefered.
+/// When changing this block, backwards-compatible changes are preferred.
 /// You may need to update the version when you do so. See docs/StableBitcode.md
 /// for information on how to make backwards-compatible changes using the LLVM
 /// bitcode format.

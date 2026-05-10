@@ -17,3 +17,6 @@ func test() -> UnsafeMutablePointer<CGFloat>? {
     return CGColorGetComponents(color)
 }
 
+// Allow redundant conformances on CoreFoundation
+// types where the conformance is in CoreGraphics.
+extension CGFloat: CustomStringConvertible {}

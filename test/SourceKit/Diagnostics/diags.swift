@@ -13,7 +13,7 @@ func foo(y: String) {
 // We shouldn't build an AST for the syntactic open
 // CHECK: 0 {{.*}} source.statistic.num-ast-builds
 
-// Retrieving diagnostics should workd
+// Retrieving diagnostics should work
 // CHECK: {
 // CHECK:   key.diagnostics: [
 // CHECK:     {
@@ -30,7 +30,7 @@ func foo(y: String) {
 // ... and we should have built an AST for it
 // CHECK: 1 {{.*}} source.statistic.num-ast-builds
 
-// Retrieving diagnostics again should workd
+// Retrieving diagnostics again should work
 // CHECK: {
 // CHECK:   key.diagnostics: [
 // CHECK:     {

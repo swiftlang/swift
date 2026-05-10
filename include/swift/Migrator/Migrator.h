@@ -18,7 +18,7 @@
 #define SWIFT_MIGRATOR_MIGRATOR_H
 
 #include "swift/Migrator/MigrationState.h"
-#include "swift/Syntax/References.h"
+#include "llvm/ADT/IntrusiveRefCntPtr.h"
 
 namespace swift {
 class CompilerInstance;
@@ -39,7 +39,7 @@ struct Migrator {
   CompilerInstance *StartInstance;
   const CompilerInvocation &StartInvocation;
   SourceManager SrcMgr;
-  std::vector<RC<MigrationState>> States;
+  std::vector<llvm::IntrusiveRefCntPtr<MigrationState>> States;
 
   Migrator(CompilerInstance *StartInstance,
            const CompilerInvocation &StartInvocation);

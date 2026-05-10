@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
 sil_stage canonical
 
@@ -37,6 +37,7 @@ bb0:
   %1 = thin_to_thick_function %0 : $@convention(thin) () -> Builtin.Int32 to $@callee_guaranteed () -> Builtin.Int32
   %2 = convert_escape_to_noescape %1 : $@callee_guaranteed () -> Builtin.Int32 to $@noescape @callee_guaranteed () -> Builtin.Int32
   %4 = apply %2() : $@noescape @callee_guaranteed () -> Builtin.Int32
+  destroy_value %2 : $@noescape @callee_guaranteed () -> Builtin.Int32
   return %4 : $Builtin.Int32
 }
 
@@ -76,8 +77,7 @@ bb0(%0 : @guaranteed $Klass):
 // CHECK-LABEL: sil [ossa] @ref_to_raw_pointer_unchecked_ref_cast_composition_ossa_owned : $@convention(thin) (@owned Klass) -> Builtin.RawPointer
 // CHECK: bb0([[ARG:%.*]] : @owned
 // CHECK-NEXT: [[RESULT:%.*]] = ref_to_raw_pointer [[ARG]]
-// CHECK-NEXT: [[CAST:%.*]] = unchecked_ref_cast [[ARG]]
-// CHECK-NEXT: destroy_value [[CAST]]
+// CHECK-NEXT: destroy_value [[ARG]]
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function 'ref_to_raw_pointer_unchecked_ref_cast_composition_ossa_owned'
 sil [ossa] @ref_to_raw_pointer_unchecked_ref_cast_composition_ossa_owned : $@convention(thin) (@owned Klass) -> Builtin.RawPointer {
@@ -97,8 +97,8 @@ bb0(%0 : @owned $Klass):
 sil @collapse_existential_pack_unpack_ref_to_raw_pointer : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
-  %3 = ref_to_raw_pointer %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self
+  %3 = ref_to_raw_pointer %2 : $@opened("2CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self to $Builtin.RawPointer
   %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %5 = integer_literal $Builtin.Word, 5
   store %5 to %4: $*Builtin.Word
@@ -115,8 +115,8 @@ bb0(%0 : $Klass):
 sil [ossa] @collapse_existential_pack_unpack_ref_to_raw_pointer_ossa_guaranteed : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("3CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
-  %3 = ref_to_raw_pointer %2 : $@opened("3CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("3CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self
+  %3 = ref_to_raw_pointer %2 : $@opened("3CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self to $Builtin.RawPointer
   %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %5 = integer_literal $Builtin.Word, 5
   store %5 to [trivial] %4: $*Builtin.Word
@@ -140,12 +140,12 @@ bb0(%0 : @owned $Klass):
   %1 = init_existential_ref %0 : $Klass : $Klass, $AnyObject
   %f = function_ref @use_anyobject : $@convention(thin) (@guaranteed AnyObject) -> ()
   apply %f(%1) : $@convention(thin) (@guaranteed AnyObject) -> ()
-  %2 = open_existential_ref %1 : $AnyObject to $@opened("4CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
-  %3 = ref_to_raw_pointer %2 : $@opened("4CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject to $Builtin.RawPointer
+  %2 = open_existential_ref %1 : $AnyObject to $@opened("4CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self
+  %3 = ref_to_raw_pointer %2 : $@opened("4CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self to $Builtin.RawPointer
   %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Builtin.Word
   %5 = integer_literal $Builtin.Word, 5
   store %5 to [trivial] %4: $*Builtin.Word
-  destroy_value %2 : $@opened("4CAE06CE-5F10-11E4-AF13-C82A1428F987") AnyObject
+  destroy_value %2 : $@opened("4CAE06CE-5F10-11E4-AF13-C82A1428F987", AnyObject) Self
   %6 = tuple ()
   return %6 : $()
 }
@@ -216,10 +216,8 @@ bb0(%0 : @owned $Optional<Klass>):
 //
 // CHECK-LABEL: sil @test_zero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
-// CHECK-NOT: integer_literal
-// CHECK-NOT: builtin "assumeAlignment"
 // CHECK: [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*T
-// CHECK: copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK: copy_addr [[PTR]] to [init] %0 : $*T
 // CHECK-LABEL: } // end sil function 'test_zero_alignment'
 sil @test_zero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
@@ -229,7 +227,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
   %6 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %5 : $Builtin.Word) : $Builtin.RawPointer
   debug_value %6 : $Builtin.RawPointer, let, name "alignedPointer"
   %8 = pointer_to_address %6 : $Builtin.RawPointer to [align=1] $*T
-  copy_addr %8 to [initialization] %0 : $*T
+  copy_addr %8 to [init] %0 : $*T
   %10 = tuple ()
   return %10 : $()
 }
@@ -245,10 +243,8 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
 //
 // CHECK-LABEL: sil @test_nonzero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
-// CHECK-NOT: integer_literal
-// CHECK-NOT: builtin "assumeAlignment"
 // CHECK:     [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to [align=8] $*T
-// CHECK:     copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK:     copy_addr [[PTR]] to [init] %0 : $*T
 // CHECK-LABEL: } // end sil function 'test_nonzero_alignment'
 sil @test_nonzero_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
@@ -258,7 +254,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
   %6 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %5 : $Builtin.Word) : $Builtin.RawPointer
   debug_value %6 : $Builtin.RawPointer, let, name "alignedPointer"
   %8 = pointer_to_address %6 : $Builtin.RawPointer to [align=1] $*T
-  copy_addr %8 to [initialization] %0 : $*T
+  copy_addr %8 to [init] %0 : $*T
   %10 = tuple ()
   return %10 : $()
 }
@@ -278,7 +274,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
 // CHECK-NOT: builtin "alignOf"
 // CHECK-NOT: builtin "assumeAlignment"
 // CHECK:     [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*T
-// CHECK:     copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK:     copy_addr [[PTR]] to [init] %0 : $*T
 // CHECK-LABEL: } // end sil function 'test_dynamic_alignment'
 sil @test_dynamic_alignment : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
@@ -293,7 +289,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
   %11 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %10 : $Builtin.Word) : $Builtin.RawPointer
   debug_value %11 : $Builtin.RawPointer, let, name "alignedPointer"
   %13 = pointer_to_address %11 : $Builtin.RawPointer to [align=1] $*T
-  copy_addr %13 to [initialization] %0 : $*T
+  copy_addr %13 to [init] %0 : $*T
   %15 = tuple ()
   return %15 : $()
 }
@@ -313,7 +309,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
 // CHECK-NOT: builtin "alignOf"
 // CHECK-NOT: builtin "assumeAlignment"
 // CHECK:     [[PTR:%.*]] = pointer_to_address %1 : $Builtin.RawPointer to $*T
-// CHECK:     copy_addr [[PTR]] to [initialization] %0 : $*T
+// CHECK:     copy_addr [[PTR]] to [init] %0 : $*T
 // CHECK-LABEL: } // end sil function 'test_dynamic_alignment32'
 sil @test_dynamic_alignment32 : $@convention(thin) <T> (Builtin.RawPointer, @thick T.Type) -> @out T {
 bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
@@ -328,7 +324,7 @@ bb0(%0 : $*T, %1 : $Builtin.RawPointer, %2 : $@thick T.Type):
   %11 = builtin "assumeAlignment"(%1 : $Builtin.RawPointer, %10 : $Builtin.Word) : $Builtin.RawPointer
   debug_value %11 : $Builtin.RawPointer, let, name "alignedPointer"
   %13 = pointer_to_address %11 : $Builtin.RawPointer to [align=1] $*T
-  copy_addr %13 to [initialization] %0 : $*T
+  copy_addr %13 to [init] %0 : $*T
   %15 = tuple ()
   return %15 : $()
 }

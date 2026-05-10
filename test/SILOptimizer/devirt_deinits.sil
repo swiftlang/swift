@@ -1,0 +1,463 @@
+// RUN: %target-sil-opt -sil-print-types %s -deinit-devirtualizer -module-name=test -enable-experimental-cxx-interop -I %S/Inputs | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+import CXXTypesWithUserProvidedDestructor
+
+@inline(never) func log(_ s: StaticString)
+
+struct S1: ~Copyable {
+  deinit
+}
+
+struct S2: ~Copyable {
+  deinit
+}
+
+struct S3<T>: ~Copyable {
+  @_hasStorage let t: T
+  deinit
+}
+
+enum E1: ~Copyable {
+  case A(Int)
+  case B
+  case C(S1)
+}
+
+enum E2: ~Copyable {
+  case A
+  case B(E1)
+  case C(S2)
+}
+
+struct StrWithoutDeinit: ~Copyable {
+  @_hasStorage var a: S1
+  @_hasStorage var b: S2
+  @_hasStorage let c: Int
+}
+
+struct S4: ~Copyable {
+  @_hasStorage var a: S1
+  @_hasStorage var b: S2
+  deinit
+}
+
+struct S5: ~Copyable {
+  @_hasStorage let a: Int
+  @_hasStorage let b: AnyObject
+}
+
+struct S6: ~Copyable {
+  deinit
+}
+
+// CHECK-LABEL: sil [ossa] @test_simple_struct :
+// CHECK:         [[D:%.*]] = function_ref @s1_deinit
+// CHECK:         apply [[D]](%0) : $@convention(method) (@owned S1) -> ()
+// CHECK:       } // end sil function 'test_simple_struct'
+sil [ossa] @test_simple_struct : $@convention(thin) (@owned S1) -> () {
+bb0(%0 : @owned $S1):
+  destroy_value %0 : $S1
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_devirtualize_deadend_destroys :
+// CHECK:         destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'dont_devirtualize_deadend_destroys'
+sil [ossa] @dont_devirtualize_deadend_destroys : $@convention(thin) (@owned S1) -> () {
+bb0(%0 : @owned $S1):
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @test_two_field_deinits :
+// CHECK:         ([[S1:%.*]], [[S2:%.*]], %{{[0-9]*}}) = destructure_struct %0
+// CHECK:         [[D1:%.*]] = function_ref @s1_deinit
+// CHECK:         apply [[D1]]([[S1]]) : $@convention(method) (@owned S1) -> ()
+// CHECK:         [[D2:%.*]] = function_ref @s2_deinit
+// CHECK:         apply [[D2]]([[S2]]) : $@convention(method) (@owned S2) -> ()
+// CHECK:       } // end sil function 'test_two_field_deinits'
+sil [ossa] @test_two_field_deinits : $@convention(thin) (@owned StrWithoutDeinit) -> () {
+bb0(%0 : @owned $StrWithoutDeinit):
+  destroy_value %0 : $StrWithoutDeinit
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_deinit :
+// CHECK:         ({{%.*}}, [[S2:%.*]]) = destructure_struct %0
+// CHECK-NEXT:    destroy_value [[S2]]
+// CHECK-NEXT:    tuple ()
+// CHECK:       } // end sil function 'test_no_deinit'
+sil [ossa] @test_no_deinit : $@convention(thin) (@owned S5) -> () {
+bb0(%0 : @owned $S5):
+  destroy_value %0 : $S5
+  %r = tuple()
+  return %r : $()
+}
+// CHECK-LABEL: sil [ossa] @test_indirect_deinit_arg :
+// CHECK:         [[D:%.*]] = function_ref @s3_deinit
+// CHECK:         [[S:%.*]] = alloc_stack $S3<Int>
+// CHECK:         store %0 to [init] [[S]]
+// CHECK:         apply [[D]]<Int>([[S]])
+// CHECK:         dealloc_stack [[S]]
+// CHECK:       } // end sil function 'test_indirect_deinit_arg'
+sil [ossa] @test_indirect_deinit_arg : $@convention(thin) (@owned S3<Int>) -> () {
+bb0(%0 : @owned $S3<Int>):
+  destroy_value %0 : $S3<Int>
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_enum :
+// CHECK:         switch_enum %0
+// CHECK:       bb1([[S1:%.*]] : @owned $S1):
+// CHECK:         [[D:%.*]] = function_ref @s1_deinit
+// CHECK:         apply [[D]]([[S1]])
+// CHECK-NEXT:    br bb4
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb4
+// CHECK:       bb3(%7 : $Int):
+// CHECK-NEXT:    br bb4
+// CHECK:       } // end sil function 'test_enum'
+sil [ossa] @test_enum : $@convention(thin) (@owned E1) -> () {
+bb0(%0 : @owned $E1):
+  destroy_value %0 : $E1
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_nested_enum :
+// CHECK:         switch_enum %0
+// CHECK:       bb1([[S2:%.*]] : @owned $S2):
+// CHECK:         [[D2:%.*]] = function_ref @s2_deinit
+// CHECK:         apply [[D2]]([[S2]])
+// CHECK:       bb2([[E1:%.*]] : @owned $E1):
+// CHECK:         switch_enum [[E1]]
+// CHECK:       bb3([[S1:%.*]] : @owned $S1):
+// CHECK:         [[D1:%.*]] = function_ref @s1_deinit
+// CHECK:         apply [[D1]]([[S1]])
+// CHECK:       bb4:
+// CHECK:       } // end sil function 'test_nested_enum'
+sil [ossa] @test_nested_enum : $@convention(thin) (@owned E2) -> () {
+bb0(%0 : @owned $E2):
+  destroy_value %0 : $E2
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_drop_deinit :
+// CHECK:         %1 = drop_deinit %0
+// CHECK:         end_lifetime %1
+// CHECK:       } // end sil function 'test_drop_deinit'
+sil [ossa] @test_drop_deinit : $@convention(thin) (@owned S1) -> () {
+bb0(%0 : @owned $S1):
+  %1 = drop_deinit %0 : $S1
+  destroy_value %1 : $S1
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_two_field_drop_deinit :
+// CHECK:         %1 = drop_deinit %0
+// CHECK:         ([[S1:%.*]], [[S2:%.*]]) = destructure_struct %1
+// CHECK:         [[D1:%.*]] = function_ref @s1_deinit
+// CHECK:         apply [[D1]]([[S1]]) : $@convention(method) (@owned S1) -> ()
+// CHECK:         [[D2:%.*]] = function_ref @s2_deinit
+// CHECK:         apply [[D2]]([[S2]]) : $@convention(method) (@owned S2) -> ()
+// CHECK:       } // end sil function 'test_two_field_drop_deinit'
+sil [ossa] @test_two_field_drop_deinit : $@convention(thin) (@owned S4) -> () {
+bb0(%0 : @owned $S4):
+  %1 = drop_deinit %0 : $S4
+  destroy_value %1 : $S4
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simple_struct_addr :
+// CHECK:         [[D:%.*]] = function_ref @s1_deinit
+// CHECK:         [[L:%.*]] = load [take] %0
+// CHECK:         apply [[D]]([[L]]) : $@convention(method) (@owned S1) -> ()
+// CHECK:       } // end sil function 'test_simple_struct_addr'
+sil [ossa] @test_simple_struct_addr : $@convention(thin) (@in S1) -> () {
+bb0(%0 : $*S1):
+  destroy_addr %0 : $*S1
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_two_field_deinits_addr :
+// CHECK:         [[A1:%.*]] = struct_element_addr %0 : $*StrWithoutDeinit, #StrWithoutDeinit.a
+// CHECK:         [[D1:%.*]] = function_ref @s1_deinit
+// CHECK:         [[L1:%.*]] = load [take] [[A1]]
+// CHECK:         apply [[D1]]([[L1]])
+// CHECK:         [[A2:%.*]] = struct_element_addr %0 : $*StrWithoutDeinit, #StrWithoutDeinit.b
+// CHECK:         [[D2:%.*]] = function_ref @s2_deinit
+// CHECK:         [[L2:%.*]] = load [take] [[A2]]
+// CHECK:         apply [[D2]]([[L2]])
+// CHECK:       } // end sil function 'test_two_field_deinits_addr'
+sil [ossa] @test_two_field_deinits_addr : $@convention(thin) (@in StrWithoutDeinit) -> () {
+bb0(%0 : $*StrWithoutDeinit):
+  destroy_addr %0 : $*StrWithoutDeinit
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_indirect_deinit_arg_addr :
+// CHECK:         [[D:%.*]] = function_ref @s3_deinit
+// CHECK:         apply [[D]]<Int>(%0)
+// CHECK:       } // end sil function 'test_indirect_deinit_arg_addr'
+sil [ossa] @test_indirect_deinit_arg_addr : $@convention(thin) (@in S3<Int>) -> () {
+bb0(%0 : $*S3<Int>):
+  destroy_addr %0 : $*S3<Int>
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_enum_addr :
+// CHECK:         switch_enum_addr %0
+// CHECK:       bb1:
+// CHECK:         [[A:%.*]] = unchecked_take_enum_data_addr %0 : $*E1, #E1.C!enumelt
+// CHECK:         [[D:%.*]] = function_ref @s1_deinit
+// CHECK:         [[L:%.*]] = load [take] [[A]]
+// CHECK:         apply [[D]]([[L]])
+// CHECK-NEXT:    br bb4
+// CHECK:       bb2:
+// CHECK-NEXT:    br bb4
+// CHECK:       bb3:
+// CHECK-NEXT:    br bb4
+// CHECK:       } // end sil function 'test_enum_addr'
+sil [ossa] @test_enum_addr : $@convention(thin) (@in E1) -> () {
+bb0(%0 : $*E1):
+  destroy_addr %0 : $*E1
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_nested_enum_addr :
+// CHECK:         switch_enum_addr %0
+// CHECK:       bb1:
+// CHECK:         [[A2:%.*]] = unchecked_take_enum_data_addr %0 : $*E2, #E2.C!enumelt
+// CHECK:         [[D2:%.*]] = function_ref @s2_deinit
+// CHECK:         [[L2:%.*]] = load [take] [[A2]]
+// CHECK:         apply [[D2]]([[L2]])
+// CHECK:       bb2:
+// CHECK:         [[A3:%.*]] = unchecked_take_enum_data_addr %0 : $*E2, #E2.B!enumelt
+// CHECK:         switch_enum_addr [[A3]]
+// CHECK:       bb3:
+// CHECK:         [[A1:%.*]] = unchecked_take_enum_data_addr [[A3]] : $*E1, #E1.C!enumelt
+// CHECK:         [[D1:%.*]] = function_ref @s1_deinit
+// CHECK:         [[L1:%.*]] = load [take] [[A1]]
+// CHECK:         apply [[D1]]([[L1]])
+// CHECK:       bb4:
+// CHECK:       } // end sil function 'test_nested_enum_addr'
+sil [ossa] @test_nested_enum_addr : $@convention(thin) (@in E2) -> () {
+bb0(%0 : $*E2):
+  destroy_addr %0 : $*E2
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_two_field_drop_deinit_addr :
+// CHECK:         %1 = drop_deinit %0
+// CHECK:         [[A1:%.*]] = struct_element_addr %1 : $*S4, #S4.a
+// CHECK:         [[D1:%.*]] = function_ref @s1_deinit
+// CHECK:         [[L1:%.*]] = load [take] [[A1]]
+// CHECK:         apply [[D1]]([[L1]])
+// CHECK:         [[A2:%.*]] = struct_element_addr %1 : $*S4, #S4.b
+// CHECK:         [[D2:%.*]] = function_ref @s2_deinit
+// CHECK:         [[L2:%.*]] = load [take] [[A2]]
+// CHECK:         apply [[D2]]([[L2]])
+// CHECK:       } // end sil function 'test_two_field_drop_deinit_addr'
+sil [ossa] @test_two_field_drop_deinit_addr : $@convention(thin) (@in S4) -> () {
+bb0(%0 : $*S4):
+  %1 = drop_deinit %0 : $*S4
+  %2 = struct_element_addr %1 : $*S4, #S4.a
+  destroy_addr %2 : $*S1
+  %4 = struct_element_addr %1 : $*S4, #S4.b
+  destroy_addr %4 : $*S2
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nonCopyable_generic :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'nonCopyable_generic'
+sil [ossa] @nonCopyable_generic : $@convention(thin) <T where T : ~Copyable> (@in T) -> () {
+bb0(%0 : $*T):
+  destroy_addr %0 : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @nodevirt_of_cxx_type :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'nodevirt_of_cxx_type'
+sil [ossa] @nodevirt_of_cxx_type : $@convention(thin) (@in NonCopyable) -> () {
+bb0(%0 : $*NonCopyable):
+  destroy_addr %0
+  %5 = tuple ()
+  return %5
+}
+
+// CHECK-LABEL: sil @test_non_ossa :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'test_non_ossa'
+sil @test_non_ossa : $@convention(thin) (@in S1) -> () {
+bb0(%0 : $*S1):
+  destroy_addr %0 : $*S1
+  %r = tuple()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_destroyArray :
+// CHECK:         [[PTA:%.*]] = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*S1
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:         [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK:         [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IV:%.*]] : $Builtin.Word):
+// CHECK:         [[CMP:%.*]] = builtin "cmp_slt_Word"([[IV]] : $Builtin.Word, %1 : $Builtin.Word)
+// CHECK:         cond_br [[CMP]], bb2, bb3
+// CHECK:       bb2:
+// CHECK:         [[ADDR:%.*]] = index_addr [[PTA]] :  $*S1, [[IV]]
+// CHECK:         [[DEINIT:%.*]] = function_ref @s1_deinit :
+// CHECK:         [[ELEMENT:%.*]] = load [take] [[ADDR]]
+// CHECK:         apply [[DEINIT]]([[ELEMENT]])
+// CHECK:         [[ADD:%.*]] = builtin "sadd_with_overflow_Word"([[IV]] : $Builtin.Word, [[ONE]] : $Builtin.Word, [[FALSE]] : $Builtin.Int1)
+// CHECK:         [[INCR:%.*]] = tuple_extract [[ADD]] : $(Builtin.Word, Builtin.Int1), 0
+// CHECK:         br bb1([[INCR]] : $Builtin.Word)
+// CHECK:       bb3:
+// CHECK:       } // end sil function 'test_destroyArray'
+sil [ossa] @test_destroyArray : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin S1.Type                    // user: %10
+  %3 = builtin "destroyArray"<S1>(%2, %0, %1) : $()
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @testDestroyInlineArray :
+// CHECK:         [[DS:%.*]] = destructure_struct %0
+// CHECK:         [[AS:%.*]] = alloc_stack $Builtin.FixedArray<20, S1>
+// CHECK:         store [[DS]] to [init] [[AS]]
+// CHECK:         [[VB:%.*]] = vector_base_addr [[AS]]
+// CHECK:         [[COUNT:%.*]] = integer_literal $Builtin.Word, 20
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:         [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK:         [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IV:%.*]] : $Builtin.Word):
+// CHECK:         [[CMP:%.*]] = builtin "cmp_slt_Word"([[IV]] : $Builtin.Word, [[COUNT]] : $Builtin.Word)
+// CHECK:         cond_br [[CMP]], bb2, bb3
+// CHECK:       bb2:
+// CHECK:         [[ADDR:%.*]] = index_addr [[VB]] :  $*S1, [[IV]]
+// CHECK:         [[DEINIT:%.*]] = function_ref @s1_deinit :
+// CHECK:         [[ELEMENT:%.*]] = load [take] [[ADDR]]
+// CHECK:         apply [[DEINIT]]([[ELEMENT]])
+// CHECK:         [[ADD:%.*]] = builtin "sadd_with_overflow_Word"([[IV]] : $Builtin.Word, [[ONE]] : $Builtin.Word, [[FALSE]] : $Builtin.Int1)
+// CHECK:         [[INCR:%.*]] = tuple_extract [[ADD]] : $(Builtin.Word, Builtin.Int1), 0
+// CHECK:         br bb1([[INCR]] : $Builtin.Word)
+// CHECK:       bb3:
+// CHECK:         dealloc_stack [[AS]]
+// CHECK:       } // end sil function 'testDestroyInlineArray'
+sil [ossa] @testDestroyInlineArray : $@convention(thin) (@owned InlineArray<20, S1>) -> () {
+bb0(%0 : @owned $InlineArray<20, S1>):
+  %1 = destructure_struct %0
+  destroy_value %1
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @testDestroyAddrInlineArray :
+// CHECK:         [[VB:%.*]] = vector_base_addr %1
+// CHECK:         [[COUNT:%.*]] = integer_literal $Builtin.Word, 20
+// CHECK:         [[ZERO:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK:         [[ONE:%.*]] = integer_literal $Builtin.Word, 1
+// CHECK:         [[FALSE:%.*]] = integer_literal $Builtin.Int1, 0
+// CHECK:         br bb1([[ZERO]] : $Builtin.Word)
+// CHECK:       bb1([[IV:%.*]] : $Builtin.Word):
+// CHECK:         [[CMP:%.*]] = builtin "cmp_slt_Word"([[IV]] : $Builtin.Word, [[COUNT]] : $Builtin.Word)
+// CHECK:         cond_br [[CMP]], bb2, bb3
+// CHECK:       bb2:
+// CHECK:         [[ADDR:%.*]] = index_addr [[VB]] :  $*S1, [[IV]]
+// CHECK:         [[DEINIT:%.*]] = function_ref @s1_deinit :
+// CHECK:         [[ELEMENT:%.*]] = load [take] [[ADDR]]
+// CHECK:         apply [[DEINIT]]([[ELEMENT]])
+// CHECK:         [[ADD:%.*]] = builtin "sadd_with_overflow_Word"([[IV]] : $Builtin.Word, [[ONE]] : $Builtin.Word, [[FALSE]] : $Builtin.Int1)
+// CHECK:         [[INCR:%.*]] = tuple_extract [[ADD]] : $(Builtin.Word, Builtin.Int1), 0
+// CHECK:         br bb1([[INCR]] : $Builtin.Word)
+// CHECK:       bb3:
+// CHECK:       } // end sil function 'testDestroyAddrInlineArray'
+sil [ossa] @testDestroyAddrInlineArray : $@convention(thin) (@in InlineArray<20, S1>) -> () {
+bb0(%0 : $*InlineArray<20, S1>):
+  %1 = struct_element_addr %0, #InlineArray._storage
+  destroy_addr %1
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @testNonConstInlineArray :
+// CHECK:         destroy_addr %1
+// CHECK:       } // end sil function 'testNonConstInlineArray'
+sil [ossa] @testNonConstInlineArray : $@convention(thin) <let N: Int> (@in InlineArray<N, S1>) -> () {
+bb0(%0 : $*InlineArray<N, S1>):
+  %1 = struct_element_addr %0, #InlineArray._storage
+  destroy_addr %1
+  %3 = tuple ()
+  return %3
+}
+
+
+// CHECK-LABEL: sil [serialized] [ossa] @dont_create_non_public_function_ref_in_serialized_func :
+// CHECK-NOT:     function_ref
+// CHECK-NOT:     apply
+// CHECK:       } // end sil function 'dont_create_non_public_function_ref_in_serialized_func'
+sil [serialized] [ossa] @dont_create_non_public_function_ref_in_serialized_func : $@convention(thin) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  destroy_value %0
+  %r = tuple()
+  return %r
+}
+
+
+sil @s1_deinit : $@convention(method) (@owned S1) -> ()
+sil @s2_deinit : $@convention(method) (@owned S2) -> ()
+sil @s3_deinit : $@convention(method) <T> (@in S3<T>) -> ()
+sil @s4_deinit : $@convention(method) (@owned S4) -> ()
+
+sil hidden [ossa] @s6_deinit : $@convention(method) (@owned S6) -> () {
+bb0(%0 : @owned $S6):
+  %1 = drop_deinit %0
+  () = destructure_struct %1
+  %r = tuple ()
+  return %r
+}
+
+sil_moveonlydeinit S1 {
+  @s1_deinit
+}
+
+sil_moveonlydeinit S2 {
+  @s2_deinit
+}
+
+sil_moveonlydeinit S3 {
+  @s3_deinit
+}
+
+sil_moveonlydeinit S4 {
+  @s4_deinit
+}
+
+sil_moveonlydeinit S6 {
+  @s6_deinit
+}

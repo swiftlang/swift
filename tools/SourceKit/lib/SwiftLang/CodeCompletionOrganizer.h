@@ -38,7 +38,6 @@ struct Options {
   bool addInnerResults = false;
   bool addInnerOperators = true;
   bool addInitsToTopLevel = false;
-  bool callPatternHeuristics = false;
   bool hideUnderscores = true;
   bool reallyHideAllUnderscores = false;
   bool hideLowPriority = true;
@@ -47,6 +46,7 @@ struct Options {
   bool annotatedDescription = false;
   bool includeObjectLiterals = true;
   bool addCallWithNoDefaultArgs = true;
+  bool verifyUSRToDecl = false;
   unsigned minFuzzyLength = 2;
   unsigned showTopNonLiteralResults = 3;
 

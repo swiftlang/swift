@@ -122,23 +122,23 @@ public:
     if (nhead == sizeof(byteBuffer)) {
       // We have headroom available for all 64 bits. Eagerly compress the
       // now-full buffer into our state.
-      std::copy(bits, bits + sizeof(byteBuffer), byteBuffer);
+      std::copy_n(bits, sizeof(byteBuffer), byteBuffer);
     } else if (N >= available) {
       // There was some excess - append as many bytes as we can hold and
       // compress the buffer into our state.
-      std::copy(bits, bits + nhead, byteBuffer + bufLen);
+      std::copy_n(bits, nhead, byteBuffer + bufLen);
     } else {
       // We have headroom available for these bits.
-      std::copy(bits, bits + N, byteBuffer + bufLen);
+      std::copy_n(bits, N, byteBuffer + bufLen);
       return setBufferLength(bufLen + N);
     }
 
-    constexpr auto endian = llvm::support::endianness::little;
+    constexpr auto endian = llvm::endianness::little;
     compress(llvm::support::endian::read<uint64_t>(byteBuffer, endian));
 
     // Now reseed the buffer with the remaining bytes.
     const uint64_t remainder = N - available;
-    std::copy(bits + available, bits + N, byteBuffer);
+    std::copy_n(bits + available, remainder, byteBuffer);
     return setBufferLength(remainder);
   }
 
@@ -146,7 +146,7 @@ public:
       typename T,
       typename std::enable_if<std::is_integral<T>::value>::type * = nullptr>
   void combine(T bits) {
-    constexpr auto endian = llvm::support::endianness::little;
+    constexpr auto endian = llvm::endianness::little;
     uint8_t buf[sizeof(T)] = {0};
     bits = llvm::support::endian::byte_swap<T>(bits, endian);
     std::memcpy(buf, &bits, sizeof(T));
@@ -173,7 +173,11 @@ public:
     return combine_many(arg.first, arg.second);
   }
 
-  template <typename T> void combine(const std::basic_string<T> &arg) {
+  void combine(const std::basic_string<char> &arg) {
+    return combine_range(arg.begin(), arg.end());
+  }
+
+  void combine(const std::basic_string<wchar_t> &arg) {
     return combine_range(arg.begin(), arg.end());
   }
 

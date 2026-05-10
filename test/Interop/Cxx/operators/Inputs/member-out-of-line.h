@@ -9,7 +9,7 @@ struct LoadableIntWrapper {
   int operator()(int x, int y) const;
 };
 
-struct AddressOnlyIntWrapper {
+struct __attribute__((swift_attr("import_owned"))) AddressOnlyIntWrapper {
   int value;
 
   AddressOnlyIntWrapper(int value) : value(value) {}
@@ -29,7 +29,7 @@ public:
   int &operator[](int x);
 };
 
-struct NonTrivialIntArrayByVal {
+struct __attribute__((swift_attr("import_owned"))) NonTrivialIntArrayByVal {
   NonTrivialIntArrayByVal(int first) { values[0] = first; }
   NonTrivialIntArrayByVal(const NonTrivialIntArrayByVal &other) {
     for (int i = 0; i < 5; i++)
@@ -42,6 +42,11 @@ struct NonTrivialIntArrayByVal {
 
 private:
   int values[5] = { 1, 2, 3, 4, 5 };
+};
+
+struct ClassWithOperatorEqualsParamUnnamed {
+  bool operator==(const ClassWithOperatorEqualsParamUnnamed &) const;
+  bool operator!=(const ClassWithOperatorEqualsParamUnnamed &) const;
 };
 
 #endif

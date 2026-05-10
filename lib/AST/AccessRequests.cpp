@@ -19,8 +19,11 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
-#include "llvm/Support/MathExtras.h"
+#include "llvm/ADT/bit.h"
+
+#include <limits>
 
 using namespace swift;
 
@@ -40,6 +43,11 @@ AccessLevel
 AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   assert(!D->hasAccess());
 
+  // ABI decls share the access level of their API decl.
+  auto abiRole = ABIRoleInfo(D);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getFormalAccess();
+
   // Check if the decl has an explicit access control attribute.
   if (auto *AA = D->getAttrs().getAttribute<AccessControlAttr>())
     return AA->getAccess();
@@ -50,18 +58,33 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     AbstractStorageDecl *storage = accessor->getStorage();
     switch (accessor->getAccessorKind()) {
     case AccessorKind::Get:
+    case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::Read:
+    case AccessorKind::YieldingBorrow:
+    case AccessorKind::Borrow:
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:
     case AccessorKind::Modify:
+    case AccessorKind::YieldingMutate:
+    case AccessorKind::Mutate:
       return storage->getSetterFormalAccess();
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
       // These are only needed to synthesize the setter.
       return AccessLevel::Private;
+    case AccessorKind::Init:
+      // These are only called from within the same module.
+      return AccessLevel::Internal;
     }
+  }
+
+  // Special case for opaque type decls, which inherit the access of their
+  // naming decls.
+  if (auto *opaqueType = dyn_cast<OpaqueTypeDecl>(D)) {
+    if (auto *namingDecl = opaqueType->getNamingDecl())
+      return namingDecl->getFormalAccess();
   }
 
   DeclContext *DC = D->getDeclContext();
@@ -81,20 +104,25 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   // Special case for dtors and enum elements: inherit from container
   if (D->getKind() == DeclKind::Destructor ||
       D->getKind() == DeclKind::EnumElement) {
-    if (D->hasInterfaceType() && D->isInvalid()) {
-      return AccessLevel::Private;
-    } else {
-      auto container = cast<NominalTypeDecl>(D->getDeclContext());
-      return std::max(container->getFormalAccess(), AccessLevel::Internal);
+    auto container = dyn_cast<NominalTypeDecl>(DC);
+    if (D->getKind() == DeclKind::Destructor && !container) {
+      // A destructor in an extension means @_objcImplementation. An
+      // @_objcImplementation class's deinit is only called by the ObjC thunk,
+      // if at all, so it is nonpublic.
+      return AccessLevel::Internal;
     }
+
+    return std::max(container->getFormalAccess(), AccessLevel::Internal);
   }
 
   switch (DC->getContextKind()) {
   case DeclContextKind::TopLevelCodeDecl:
+  case DeclContextKind::SerializedTopLevelCodeDecl:
     // Variables declared in a top-level 'guard' statement can be accessed in
     // later top-level code.
     return AccessLevel::FilePrivate;
   case DeclContextKind::AbstractClosureExpr:
+  case DeclContextKind::SerializedAbstractClosure:
     if (isa<ParamDecl>(D)) {
       // Closure parameters may need to be accessible to the enclosing
       // context, for single-expression closures.
@@ -102,12 +130,13 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     } else {
       return AccessLevel::Private;
     }
-  case DeclContextKind::SerializedLocal:
   case DeclContextKind::Initializer:
   case DeclContextKind::AbstractFunctionDecl:
   case DeclContextKind::SubscriptDecl:
   case DeclContextKind::EnumElementDecl:
     return AccessLevel::Private;
+  case DeclContextKind::Package:
+    return AccessLevel::Package;
   case DeclContextKind::Module:
   case DeclContextKind::FileUnit:
     return AccessLevel::Internal;
@@ -120,16 +149,19 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
   }
   case DeclContextKind::ExtensionDecl:
     return cast<ExtensionDecl>(DC)->getDefaultAccessLevel();
+  case DeclContextKind::MacroDecl:
+    // There are no declarations inside a macro.
+    return AccessLevel::Private;
   }
   llvm_unreachable("unhandled kind");
 }
 
-Optional<AccessLevel> AccessLevelRequest::getCachedResult() const {
+std::optional<AccessLevel> AccessLevelRequest::getCachedResult() const {
   auto valueDecl = std::get<0>(getStorage());
   if (valueDecl->hasAccess())
     return valueDecl->TypeAndAccess.getInt().getValue();
 
-  return None;
+  return std::nullopt;
 }
 
 void AccessLevelRequest::cacheResult(AccessLevel value) const {
@@ -172,6 +204,12 @@ AccessLevel
 SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
                                    AbstractStorageDecl *ASD) const {
   assert(!ASD->Accessors.getInt().hasValue());
+
+  // ABI decls share the access level of their API decl.
+  auto abiRole = ABIRoleInfo(ASD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return abiRole.getCounterpart()->getSetterFormalAccess();
+
   if (auto *SAA = ASD->getAttrs().getAttribute<SetterAccessAttr>())
     return SAA->getAccess();
 
@@ -182,12 +220,12 @@ SetterAccessLevelRequest::evaluate(Evaluator &evaluator,
   return ASD->getFormalAccess();
 }
 
-Optional<AccessLevel> SetterAccessLevelRequest::getCachedResult() const {
+std::optional<AccessLevel> SetterAccessLevelRequest::getCachedResult() const {
   auto abstractStorageDecl = std::get<0>(getStorage());
   if (abstractStorageDecl->Accessors.getInt().hasValue())
     return abstractStorageDecl->Accessors.getInt().getValue();
 
-  return None;
+  return std::nullopt;
 }
 
 void SetterAccessLevelRequest::cacheResult(AccessLevel value) const {
@@ -219,11 +257,11 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
     DirectlyReferencedTypeDecls typeDecls =
       evaluateOrDefault(Ctx.evaluator, TypeDeclsFromWhereClauseRequest{ED}, {});
 
-    Optional<AccessScope> maxScope = AccessScope::getPublic();
+    std::optional<AccessScope> maxScope = AccessScope::getPublic();
 
     // Try to scope the extension's access to the least public type mentioned
     // in its where clause.
-    for (auto *typeDecl : typeDecls) {
+    for (auto *typeDecl : typeDecls.first) {
       if (isa<TypeAliasDecl>(typeDecl) || isa<NominalTypeDecl>(typeDecl)) {
         auto scope = typeDecl->getFormalAccessScope(ED->getDeclContext());
         maxScope = maxScope->intersectWith(scope);
@@ -236,11 +274,13 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
       maxScope = maxScope->intersectWith(scope);
     }
 
-    if (!maxScope.hasValue()) {
+    if (!maxScope.has_value()) {
       // This is an error case and will be diagnosed elsewhere.
       maxAccess = AccessLevel::Public;
     } else if (maxScope->isPublic()) {
       maxAccess = AccessLevel::Public;
+    } else if (maxScope->isPackage()) {
+      maxAccess = AccessLevel::Package;
     } else if (isa<ModuleDecl>(maxScope->getDeclContext())) {
       maxAccess = AccessLevel::Internal;
     } else {
@@ -299,18 +339,25 @@ DefaultAndMaxAccessLevelRequest::evaluate(Evaluator &evaluator,
 // So we decode Max as the last (high) bit that is set, and Default as the first
 // (low). And add one to each, to map them back into AccessLevels.
 
-Optional<std::pair<AccessLevel,AccessLevel>>
+std::optional<std::pair<AccessLevel, AccessLevel>>
 DefaultAndMaxAccessLevelRequest::getCachedResult() const {
   auto extensionDecl = std::get<0>(getStorage());
   if (extensionDecl->hasDefaultAccessLevel()) {
     uint8_t Bits = extensionDecl->getDefaultAndMaxAccessLevelBits();
     assert(Bits != 0x7 && "more than two bits set for Default and Max");
-    AccessLevel Max = static_cast<AccessLevel>(llvm::findLastSet(Bits) + 1);
-    AccessLevel Default = static_cast<AccessLevel>(llvm::findFirstSet(Bits) + 1);
+
+    uint8_t lastSet = Bits == 0 ? std::numeric_limits<uint8_t>::max()
+                                : (llvm::countl_zero(Bits) ^
+                                   (std::numeric_limits<uint8_t>::digits - 1));
+    uint8_t firstSet = Bits == 0 ? std::numeric_limits<uint8_t>::max()
+                                 : llvm::countr_zero(Bits);
+    AccessLevel Max = static_cast<AccessLevel>(lastSet + 1);
+    AccessLevel Default = static_cast<AccessLevel>(firstSet + 1);
+
     assert(Max >= Default);
     return std::make_pair(Default, Max);
   }
-  return None;
+  return std::nullopt;
 }
 
 void
@@ -318,8 +365,8 @@ DefaultAndMaxAccessLevelRequest::cacheResult(
   std::pair<AccessLevel, AccessLevel> value) const {
   auto extensionDecl = std::get<0>(getStorage());
   extensionDecl->setDefaultAndMaxAccessLevelBits(value.first, value.second);
-  assert(getCachedResult().getValue().first == value.first);
-  assert(getCachedResult().getValue().second == value.second);
+  assert(getCachedResult().value().first == value.first);
+  assert(getCachedResult().value().second == value.second);
 }
 
 // Define request evaluation functions for each of the access requests.

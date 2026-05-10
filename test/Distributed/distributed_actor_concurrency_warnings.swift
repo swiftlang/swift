@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-concurrency -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -target %target-swift-5.7-abi-triple
 // REQUIRES: concurrency
 // REQUIRES: distributed
 

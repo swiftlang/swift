@@ -52,3 +52,9 @@ func foo5<T : SubSuperP>(_: T) {}
 // CHECK-NEXT: Generic signature: <T where T : Q, T.[Q]T : SubSuperP>
 func foo6<T : Q>(_: T) where T.T : SubSuperP {}
 
+protocol POther where Self : COther {}
+class COther : POther {}
+
+// CHECK-LABEL: .foo7@
+// CHECK-NEXT: Generic signature: <T where T : POther>
+func foo7<T>(_: T) where T : COther, T : POther {}

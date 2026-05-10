@@ -103,7 +103,8 @@ do {
   inoutFunc(&b[(1,2),(2,3)])
 }
 
-// https://bugs.swift.org/browse/SR-1816
+// https://github.com/apple/swift/issues/44425
+
 public struct Flags: OptionSet {
   public var rawValue: Int
   public init(rawValue: Int) { self.rawValue = rawValue }

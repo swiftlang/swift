@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -I %S/../IDE/Inputs/custom-modules %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -25,10 +25,10 @@ extension Hive {
   // CHECK: bb0([[QUEEN:%.*]] : @owned $Bee, [[META:%.*]] : $@thick Hive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var Hive }, let, name "self"
   // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
+  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MU]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var Hive }, 0
-  // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [lexical] [[QUEEN]]
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+  // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [[QUEEN]]
   // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
   // CHECK:   [[OPT_COPIED_BORROWED_QUEEN:%.*]] = enum $Optional<Bee>, #Optional.some!enumelt, [[COPIED_BORROWED_QUEEN]]
   // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.foreign : (Hive.Type) -> (Bee?) -> Hive?, $@convention(objc_method) (Optional<Bee>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
@@ -47,11 +47,11 @@ extension Hive {
   // CHECK: bb0([[QUEEN:%.*]] : @owned $Bee, [[META:%.*]] : $@thick Hive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var Hive }, let, name "self"
   // CHECK-NEXT:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]]
-  // CHECK-NEXT:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
+  // CHECK-NEXT:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MU]]
   // CHECK-NEXT:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var Hive }, 0
-  // CHECK-NEXT:   [[BORROWED_QUEEN:%.*]] = begin_borrow [lexical] [[QUEEN]]
   // CHECK:   [[FOREIGN_ERROR_STACK:%.*]] = alloc_stack [dynamic_lifetime] $Optional<NSError>
   // CHECK:   [[OBJC_META:%[0-9]+]] = thick_to_objc_metatype [[META]] : $@thick Hive.Type to $@objc_metatype Hive.Type
+  // CHECK:   [[BORROWED_QUEEN:%.*]] = begin_borrow [[QUEEN]]
   // CHECK:   [[COPIED_BORROWED_QUEEN:%.*]] = copy_value [[BORROWED_QUEEN]]
   // CHECK:   [[OPT_COPIED_BORROWED_QUEEN:%.*]] = enum $Optional<Bee>, #Optional.some!enumelt, [[COPIED_BORROWED_QUEEN]]
   // CHECK:   [[FACTORY:%[0-9]+]] = objc_method [[OBJC_META]] : $@objc_metatype Hive.Type, #Hive.init!allocator.foreign : (Hive.Type) -> (Bee?) throws -> Hive, $@convention(objc_method) (Optional<Bee>, Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>, @objc_metatype Hive.Type) -> @autoreleased Optional<Hive>
@@ -68,11 +68,11 @@ extension Hive {
   // CHECK:   return [[HIVE_COPY]]
   // CHECK: bb2:
   // CHECK:   [[OPTIONAL_NSERROR:%.*]] = load [take] [[FOREIGN_ERROR_STACK]] : $*Optional<NSError>
-  // CHECK:   [[CONVERT_NSERROR_TO_ERROR_FUNC:%.*]] = function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned Error
-  // CHECK:   [[ERROR:%.*]] = apply [[CONVERT_NSERROR_TO_ERROR_FUNC]]([[OPTIONAL_NSERROR]]) : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned Error
-  // CHECK:   "willThrow"([[ERROR]] : $Error)
+  // CHECK:   [[CONVERT_NSERROR_TO_ERROR_FUNC:%.*]] = function_ref @$s10Foundation22_convertNSErrorToErrorys0E0_pSo0C0CSgF : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned any Error
+  // CHECK:   [[ERROR:%.*]] = apply [[CONVERT_NSERROR_TO_ERROR_FUNC]]([[OPTIONAL_NSERROR]]) : $@convention(thin) (@guaranteed Optional<NSError>) -> @owned any Error
+  // CHECK:   "willThrow"([[ERROR]] : $any Error)
   // CHECK:   dealloc_stack [[FOREIGN_ERROR_STACK]]
-  // CHECK:   throw [[ERROR]] : $Error
+  // CHECK:   throw [[ERROR]] : $any Error
   // CHECK: } // end sil function '$sSo4HiveC17objc_factory_initE15otherFlakyQueenABSo3BeeC_tKcfC'
   convenience init(otherFlakyQueen other: Bee) throws {
     try self.init(flakyQueen: other)
@@ -83,7 +83,7 @@ extension SomeClass {
   // CHECK-LABEL: sil hidden [ossa] @$sSo12IAMSomeClassC17objc_factory_initE6doubleABSd_tcfC
   // CHECK: bb0([[DOUBLE:%.*]] : $Double,
   // CHECK-NOT: value_metatype
-  // CHECK: [[FNREF:%[0-9]+]] = function_ref @MakeIAMSomeClass
+  // CHECK: [[FNREF:%[0-9]+]] = function_ref @$sSo12IAMSomeClassC5valueABSd_tcfCTo : $@convention(c) (Double) -> @autoreleased SomeClass
   // CHECK: apply [[FNREF]]([[DOUBLE]])
   convenience init(double: Double) {
     self.init(value: double)
@@ -95,7 +95,7 @@ class SubHive : Hive {
   // CHECK: bb0([[METATYPE:%.*]] : $@thick SubHive.Type):
   // CHECK:   [[SELF_BOX:%.*]] = alloc_box ${ var SubHive }, let, name "self"
   // CHECK:   [[MU:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var SubHive }
-  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MU]]
+  // CHECK:   [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MU]]
   // CHECK:   [[PB_BOX:%.*]] = project_box [[LIFETIME]] : ${ var SubHive }, 0
   // CHECK:   [[UP_METATYPE:%.*]] = upcast [[METATYPE]]
   // CHECK:   [[OBJC_METATYPE:%.*]] = thick_to_objc_metatype [[UP_METATYPE]]

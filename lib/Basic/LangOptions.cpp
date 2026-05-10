@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,8 +17,11 @@
 
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
+#include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Range.h"
 #include "swift/Config.h"
 #include "llvm/ADT/Hashing.h"
@@ -26,8 +29,34 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/raw_ostream.h"
 #include <limits.h>
+#include <optional>
 
 using namespace swift;
+
+LangOptions::LangOptions() {
+  // Add all promoted language features
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  enableFeature(Feature::FeatureName);
+#define UPCOMING_FEATURE(FeatureName, SENumber, LanguageMode)
+#define EXPERIMENTAL_FEATURE(FeatureName, AvailableInProd)
+#define OPTIONAL_LANGUAGE_FEATURE(FeatureName, SENumber, Description)
+#include "swift/Basic/Features.def"
+
+  // Special case: remove macro support if the compiler wasn't built with a
+  // host Swift.
+#if !SWIFT_BUILD_SWIFT_SYNTAX
+  disableFeature(Feature::Macros);
+  disableFeature(Feature::FreestandingExpressionMacros);
+  disableFeature(Feature::AttachedMacros);
+  disableFeature(Feature::ExtensionMacros);
+#endif
+
+  // Enable any playground options that are enabled by default.
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  if (DefaultOn) \
+    PlaygroundOptions.insert(PlaygroundOption::OptionName);
+#include "swift/Basic/PlaygroundOptions.def"
+}
 
 struct SupportedConditionalValue {
   StringRef value;
@@ -46,6 +75,9 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "tvOS",
   "watchOS",
   "iOS",
+  "visionOS",
+  "xrOS",
+  "Firmware",
   "Linux",
   "FreeBSD",
   "OpenBSD",
@@ -55,6 +87,8 @@ static const SupportedConditionalValue SupportedConditionalCompilationOSs[] = {
   "Cygwin",
   "Haiku",
   "WASI",
+  "Emscripten",
+  "none",
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationArches[] = {
@@ -68,6 +102,9 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "powerpc64le",
   "s390x",
   "wasm32",
+  "riscv32",
+  "riscv64",
+  "avr"
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationEndianness[] = {
@@ -75,9 +112,16 @@ static const SupportedConditionalValue SupportedConditionalCompilationEndianness
   "big"
 };
 
+static const SupportedConditionalValue SupportedConditionalCompilationPointerBitWidths[] = {
+  "_16",
+  "_32",
+  "_64"
+};
+
 static const SupportedConditionalValue SupportedConditionalCompilationRuntimes[] = {
   "_ObjC",
   "_Native",
+  "_multithreaded",
 };
 
 static const SupportedConditionalValue SupportedConditionalCompilationTargetEnvironments[] = {
@@ -91,13 +135,28 @@ static const SupportedConditionalValue SupportedConditionalCompilationPtrAuthSch
   "_arm64e",
 };
 
+static const SupportedConditionalValue SupportedConditionalCompilationHasAtomicBitWidths[] = {
+  "_8",
+  "_16",
+  "_32",
+  "_64",
+  "_128"
+};
+
+static const SupportedConditionalValue SupportedConditionalCompilationObjectFileFormats[] = {
+  "MachO",
+  "ELF",
+  "COFF",
+  "Wasm",
+};
+
 static const PlatformConditionKind AllPublicPlatformConditionKinds[] = {
 #define PLATFORM_CONDITION(LABEL, IDENTIFIER) PlatformConditionKind::LABEL,
 #define PLATFORM_CONDITION_(LABEL, IDENTIFIER)
 #include "swift/AST/PlatformConditionKinds.def"
 };
 
-ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
+static ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(const PlatformConditionKind &Kind) {
   switch (Kind) {
   case PlatformConditionKind::OS:
     return SupportedConditionalCompilationOSs;
@@ -105,6 +164,8 @@ ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(con
     return SupportedConditionalCompilationArches;
   case PlatformConditionKind::Endianness:
     return SupportedConditionalCompilationEndianness;
+  case PlatformConditionKind::PointerBitWidth:
+    return SupportedConditionalCompilationPointerBitWidths;
   case PlatformConditionKind::Runtime:
     return SupportedConditionalCompilationRuntimes;
   case PlatformConditionKind::CanImport:
@@ -113,12 +174,16 @@ ArrayRef<SupportedConditionalValue> getSupportedConditionalCompilationValues(con
     return SupportedConditionalCompilationTargetEnvironments;
   case PlatformConditionKind::PtrAuth:
     return SupportedConditionalCompilationPtrAuthSchemes;
+  case PlatformConditionKind::HasAtomicBitWidth:
+    return SupportedConditionalCompilationHasAtomicBitWidths;
+  case PlatformConditionKind::ObjectFileFormat:
+    return SupportedConditionalCompilationObjectFileFormats;
   }
   llvm_unreachable("Unhandled PlatformConditionKind in switch");
 }
 
-PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
-                                                     std::vector<StringRef> &suggestedValues) {
+static PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind, const StringRef &V,
+                                                            std::vector<StringRef> &suggestedValues) {
   std::string lower = V.lower();
   for (const PlatformConditionKind& candidateKind : AllPublicPlatformConditionKinds) {
     if (candidateKind != Kind) {
@@ -137,8 +202,8 @@ PlatformConditionKind suggestedPlatformConditionKind(PlatformConditionKind Kind,
   return Kind;
 }
 
-bool isMatching(PlatformConditionKind Kind, const StringRef &V,
-                PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
+static bool isMatching(PlatformConditionKind Kind, const StringRef &V,
+                       PlatformConditionKind &suggestedKind, std::vector<StringRef> &suggestions) {
   // Compare against known values, ignoring case to avoid penalizing
   // characters with incorrect case.
   unsigned minDistance = std::numeric_limits<unsigned>::max();
@@ -172,9 +237,12 @@ checkPlatformConditionSupported(PlatformConditionKind Kind, StringRef Value,
   case PlatformConditionKind::OS:
   case PlatformConditionKind::Arch:
   case PlatformConditionKind::Endianness:
+  case PlatformConditionKind::PointerBitWidth:
   case PlatformConditionKind::Runtime:
   case PlatformConditionKind::TargetEnvironment:
   case PlatformConditionKind::PtrAuth:
+  case PlatformConditionKind::HasAtomicBitWidth:
+  case PlatformConditionKind::ObjectFileFormat:
     return isMatching(Kind, Value, suggestedKind, suggestedValues);
   case PlatformConditionKind::CanImport:
     // All importable names are valid.
@@ -196,9 +264,8 @@ LangOptions::getPlatformConditionValue(PlatformConditionKind Kind) const {
 
 bool LangOptions::
 checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
-  // Check a special case that "macOS" is an alias of "OSX".
-  if (Kind == PlatformConditionKind::OS && Value == "macOS")
-    return checkPlatformCondition(Kind, "OSX");
+  // Note: BridgedLangOptions_enumerateBuildConfigurationEntries has a redundant
+  // copy of these special cases.
 
   // When compiling for iOS we consider "macCatalyst" to be a
   // synonym of "macabi". This enables the use of
@@ -216,6 +283,14 @@ checkPlatformCondition(PlatformConditionKind Kind, StringRef Value) const {
         return true;
   }
 
+  if (Kind == PlatformConditionKind::HasAtomicBitWidth) {
+    for (auto bitWidth : AtomicBitWidths) {
+      if (bitWidth == Value) {
+        return true;
+      }
+    }
+  }
+
   return false;
 }
 
@@ -225,32 +300,204 @@ bool LangOptions::isCustomConditionalCompilationFlagSet(StringRef Name) const {
       != CustomConditionalCompilationFlags.end();
 }
 
-bool LangOptions::hasFeature(Feature feature) const {
-  if (Features.contains(feature))
+bool LangOptions::FeatureState::isEnabled() const {
+  return state == FeatureState::Kind::Enabled;
+}
+
+bool LangOptions::FeatureState::isEnabledForMigration() const {
+  ASSERT(feature.isMigratable() && "You forgot to make the feature migratable!");
+
+  return state == FeatureState::Kind::EnabledForMigration;
+}
+
+LangOptions::FeatureStateStorage::FeatureStateStorage()
+    : states(Feature::getNumFeatures(), FeatureState::Kind::Off) {}
+
+void LangOptions::FeatureStateStorage::setState(Feature feature,
+                                                FeatureState::Kind state) {
+  auto index = size_t(feature);
+
+  states[index] = state;
+}
+
+LangOptions::FeatureState
+LangOptions::FeatureStateStorage::getState(Feature feature) const {
+  auto index = size_t(feature);
+
+  return FeatureState(feature, states[index]);
+}
+
+LangOptions::FeatureState LangOptions::getFeatureState(Feature feature) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
+    return state;
+
+  if (auto languageMode = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(languageMode.value())) {
+      return FeatureState(feature, FeatureState::Kind::Enabled);
+    }
+  }
+
+  return state;
+}
+
+bool LangOptions::hasFeature(Feature feature, bool allowMigration) const {
+  auto state = featureStates.getState(feature);
+  if (state.isEnabled())
     return true;
 
-  if (feature == Feature::BareSlashRegexLiterals &&
-      EnableBareSlashRegexLiterals)
-    return true;
+  if (auto languageMode = feature.getLanguageMode()) {
+    if (isLanguageModeAtLeast(languageMode.value()))
+      return true;
+  }
 
-  if (auto version = getFeatureLanguageVersion(feature))
-    return isSwiftVersionAtLeast(*version);
+  if (allowMigration && state.isEnabledForMigration())
+    return true;
 
   return false;
 }
 
 bool LangOptions::hasFeature(llvm::StringRef featureName) const {
-  if (auto feature = getFutureFeature(featureName))
-    return hasFeature(*feature);
-
-  if (auto feature = getExperimentalFeature(featureName))
+  auto feature = llvm::StringSwitch<std::optional<Feature>>(featureName)
+#define LANGUAGE_FEATURE(FeatureName, SENumber, Description)                   \
+  .Case(#FeatureName, Feature::FeatureName)
+#include "swift/Basic/Features.def"
+                     .Default(std::nullopt);
+  if (feature)
     return hasFeature(*feature);
 
   return false;
 }
 
+bool LangOptions::isMigratingToFeature(Feature feature) const {
+  return featureStates.getState(feature).isEnabledForMigration();
+}
+
+void LangOptions::enableFeature(Feature feature, bool forMigration) {
+  if (forMigration) {
+    ASSERT(feature.isMigratable());
+    featureStates.setState(feature, FeatureState::Kind::EnabledForMigration);
+    return;
+  }
+
+  featureStates.setState(feature, FeatureState::Kind::Enabled);
+}
+
+void LangOptions::disableFeature(Feature feature) {
+  featureStates.setState(feature, FeatureState::Kind::Off);
+}
+
+void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
+  // We really want to use Clang's getMaxAtomicInlineWidth(), but that requires
+  // a Clang::TargetInfo and we're setting up lang opts very early in the
+  // pipeline before any ASTContext or any ClangImporter instance where we can
+  // access the target's info.
+
+  switch (triple.getArch()) {
+  // ARM is only a 32 bit arch and all archs besides the microcontroller profile
+  // ones have double word atomics.
+  case llvm::Triple::ArchType::arm:
+  case llvm::Triple::ArchType::thumb:
+    switch (triple.getSubArch()) {
+    case llvm::Triple::SubArchType::ARMSubArch_v6m:
+    case llvm::Triple::SubArchType::ARMSubArch_v7m:
+      setMaxAtomicBitWidth(32);
+      break;
+
+    default:
+      setMaxAtomicBitWidth(64);
+      break;
+    }
+    break;
+
+  // AArch64 (arm64) supports double word atomics on all archs besides the
+  // microcontroller profiles.
+  case llvm::Triple::ArchType::aarch64:
+    switch (triple.getSubArch()) {
+    case llvm::Triple::SubArchType::ARMSubArch_v8m_baseline:
+    case llvm::Triple::SubArchType::ARMSubArch_v8m_mainline:
+    case llvm::Triple::SubArchType::ARMSubArch_v8_1m_mainline:
+      setMaxAtomicBitWidth(64);
+      break;
+
+    default:
+      setMaxAtomicBitWidth(128);
+      break;
+    }
+    break;
+
+  // arm64_32 has 32 bit pointer words, but it has the same architecture as
+  // arm64 and supports 128 bit atomics.
+  case llvm::Triple::ArchType::aarch64_32:
+    setMaxAtomicBitWidth(128);
+    break;
+
+  // PowerPC does not support double word atomics.
+  case llvm::Triple::ArchType::ppc:
+    setMaxAtomicBitWidth(32);
+    break;
+
+  // All of the 64 bit PowerPC flavors do not support double word atomics.
+  case llvm::Triple::ArchType::ppc64:
+  case llvm::Triple::ArchType::ppc64le:
+    setMaxAtomicBitWidth(64);
+    break;
+
+  // SystemZ (s390x) does not support double word atomics.
+  case llvm::Triple::ArchType::systemz:
+    setMaxAtomicBitWidth(64);
+    break;
+
+  // Wasm32 supports double word atomics.
+  case llvm::Triple::ArchType::wasm32:
+    setMaxAtomicBitWidth(64);
+    break;
+
+  // x86 supports double word atomics.
+  //
+  // Technically, this is incorrect. However, on all x86 platforms where Swift
+  // is deployed this is true.
+  case llvm::Triple::ArchType::x86:
+    setMaxAtomicBitWidth(64);
+    break;
+
+  // x86_64 supports double word atomics.
+  //
+  // Technically, this is incorrect. However, on all x86_64 platforms where Swift
+  // is deployed this is true. If the ClangImporter ever stops unconditionally
+  // adding '-mcx16' to its Clang instance, then be sure to update this below.
+  case llvm::Triple::ArchType::x86_64:
+    setMaxAtomicBitWidth(128);
+    break;
+
+  default:
+    // Some exotic architectures may not support atomics at all. If that's the
+    // case please update the switch with your flavor of arch. Otherwise assume
+    // every arch supports at least word atomics.
+
+    if (triple.isArch32Bit()) {
+      setMaxAtomicBitWidth(32);
+    }
+
+    if (triple.isArch64Bit()) {
+      setMaxAtomicBitWidth(64);
+    }
+  }
+}
+
+static bool isMultiThreadedRuntime(llvm::Triple triple) {
+  if (triple.getOS() == llvm::Triple::WASI) {
+    return triple.getEnvironmentName() == "threads";
+  }
+  if (triple.getOSName() == "none") {
+    return false;
+  }
+  return true;
+}
+
 std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   clearAllPlatformConditionValues();
+  clearAtomicBitWidths();
 
   if (triple.getOS() == llvm::Triple::Darwin &&
       triple.getVendor() == llvm::Triple::Apple) {
@@ -260,11 +507,12 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     llvm::raw_svector_ostream osx(osxBuf);
     osx << llvm::Triple::getOSTypeName(llvm::Triple::MacOSX);
 
-    unsigned major, minor, micro;
-    triple.getMacOSXVersion(major, minor, micro);
-    osx << major << "." << minor;
-    if (micro != 0)
-      osx << "." << micro;
+    llvm::VersionTuple OSVersion;
+    triple.getMacOSXVersion(OSVersion);
+
+    osx << OSVersion.getMajor() << "." << OSVersion.getMinor().value_or(0);
+    if (auto Subminor = OSVersion.getSubminor())
+      osx << "." << *Subminor;
 
     triple.setOSName(osx.str());
   }
@@ -272,20 +520,34 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
 
   bool UnsupportedOS = false;
 
+  auto addAppleOSPlatformConditionValues =
+      [this](ArrayRef<StringRef> platforms) {
+        for (auto platform : platforms) {
+          addPlatformConditionValue(PlatformConditionKind::OS, platform);
+        }
+        addPlatformConditionValue(PlatformConditionKind::OS, "anyAppleOS");
+      };
+
   // Set the "os" platform condition.
   switch (Target.getOS()) {
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
-    addPlatformConditionValue(PlatformConditionKind::OS, "OSX");
+    addAppleOSPlatformConditionValues({"OSX", "macOS"});
     break;
   case llvm::Triple::TvOS:
-    addPlatformConditionValue(PlatformConditionKind::OS, "tvOS");
+    addAppleOSPlatformConditionValues({"tvOS"});
     break;
   case llvm::Triple::WatchOS:
-    addPlatformConditionValue(PlatformConditionKind::OS, "watchOS");
+    addAppleOSPlatformConditionValues({"watchOS"});
     break;
   case llvm::Triple::IOS:
-    addPlatformConditionValue(PlatformConditionKind::OS, "iOS");
+    addAppleOSPlatformConditionValues({"iOS"});
+    break;
+  case llvm::Triple::XROS:
+    addAppleOSPlatformConditionValues({"xrOS", "visionOS"});
+    break;
+  case llvm::Triple::Firmware:
+    addPlatformConditionValue(PlatformConditionKind::OS, "Firmware");
     break;
   case llvm::Triple::Linux:
     if (Target.getEnvironment() == llvm::Triple::Android)
@@ -317,6 +579,15 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::WASI:
     addPlatformConditionValue(PlatformConditionKind::OS, "WASI");
     break;
+  case llvm::Triple::Emscripten:
+    addPlatformConditionValue(PlatformConditionKind::OS, "Emscripten");
+    break;
+  case llvm::Triple::UnknownOS:
+    if (Target.getOSName() == "none") {
+      addPlatformConditionValue(PlatformConditionKind::OS, "none");
+      break;
+    }
+    LLVM_FALLTHROUGH;
   default:
     UnsupportedOS = true;
     break;
@@ -359,30 +630,55 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::wasm32:
     addPlatformConditionValue(PlatformConditionKind::Arch, "wasm32");
     break;
+  case llvm::Triple::ArchType::riscv32:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "riscv32");
+    break;
+  case llvm::Triple::ArchType::riscv64:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "riscv64");
+    break;
+  case llvm::Triple::ArchType::avr:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "avr");
+    break;
   default:
     UnsupportedArch = true;
+
+    if (Target.getOSName() == "none") {
+      if (Target.getArch() != llvm::Triple::ArchType::UnknownArch) {
+        auto ArchName = llvm::Triple::getArchTypeName(Target.getArch());
+        addPlatformConditionValue(PlatformConditionKind::Arch, ArchName);
+        UnsupportedArch = false;
+      }
+    }
   }
 
   if (UnsupportedOS || UnsupportedArch)
     return { UnsupportedOS, UnsupportedArch };
 
   // Set the "_endian" platform condition.
-  switch (Target.getArch()) {
-  default: llvm_unreachable("undefined architecture endianness");
-  case llvm::Triple::ArchType::arm:
-  case llvm::Triple::ArchType::thumb:
-  case llvm::Triple::ArchType::aarch64:
-  case llvm::Triple::ArchType::aarch64_32:
-  case llvm::Triple::ArchType::ppc64le:
-  case llvm::Triple::ArchType::wasm32:
-  case llvm::Triple::ArchType::x86:
-  case llvm::Triple::ArchType::x86_64:
+  if (Target.isLittleEndian()) {
     addPlatformConditionValue(PlatformConditionKind::Endianness, "little");
-    break;
-  case llvm::Triple::ArchType::ppc64:
-  case llvm::Triple::ArchType::systemz:
+  } else {
     addPlatformConditionValue(PlatformConditionKind::Endianness, "big");
-    break;
+  }
+
+  // Set the "_pointerBitWidth" platform condition.
+  if (Target.isArch16Bit()) {
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_16");
+  } else if (Target.isArch32Bit()) {
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_32");
+  } else if (Target.isArch64Bit()) {
+    addPlatformConditionValue(PlatformConditionKind::PointerBitWidth, "_64");
+  }
+
+  // Set the "objectFormat" platform condition.
+  if (Target.isOSBinFormatMachO()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "MachO");
+  } else if (Target.isOSBinFormatELF()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "ELF");
+  } else if (Target.isOSBinFormatCOFF()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "COFF");
+  } else if (Target.isOSBinFormatWasm()) {
+    addPlatformConditionValue(PlatformConditionKind::ObjectFileFormat, "Wasm");
   }
 
   // Set the "runtime" platform condition.
@@ -407,6 +703,14 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     addPlatformConditionValue(PlatformConditionKind::TargetEnvironment,
                               "macabi");
 
+  if (isMultiThreadedRuntime(Target)) {
+    addPlatformConditionValue(PlatformConditionKind::Runtime,
+                              "_multithreaded");
+  }
+
+  // Set the "_hasHasAtomicBitWidth" platform condition.
+  setHasAtomicBitWidth(triple);
+
   // If you add anything to this list, change the default size of
   // PlatformConditionValues to not require an extra allocation
   // in the common case.
@@ -414,52 +718,22 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   return { false, false };
 }
 
-llvm::StringRef swift::getFeatureName(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName: return #FeatureName;
-#include "swift/Basic/Features.def"
+llvm::StringRef swift::getPlaygroundOptionName(PlaygroundOption option) {
+  switch (option) {
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  case PlaygroundOption::OptionName: return #OptionName;
+#include "swift/Basic/PlaygroundOptions.def"
   }
   llvm_unreachable("covered switch");
 }
 
-bool swift::isSuppressibleFeature(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName: return false;
-#define SUPPRESSIBLE_LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option) \
-  case Feature::FeatureName: return true;
-#include "swift/Basic/Features.def"
-  }
-  llvm_unreachable("covered switch");
-}
-
-llvm::Optional<Feature> swift::getFutureFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<Optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define FUTURE_FEATURE(FeatureName, SENumber, Version) \
-                   .Case(#FeatureName, Feature::FeatureName)
-#include "swift/Basic/Features.def"
-                   .Default(None);
-}
-
-llvm::Optional<Feature> swift::getExperimentalFeature(llvm::StringRef name) {
-  return llvm::StringSwitch<Optional<Feature>>(name)
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define EXPERIMENTAL_FEATURE(FeatureName) \
-                   .Case(#FeatureName, Feature::FeatureName)
-#include "swift/Basic/Features.def"
-                   .Default(None);
-}
-
-llvm::Optional<unsigned> swift::getFeatureLanguageVersion(Feature feature) {
-  switch (feature) {
-#define LANGUAGE_FEATURE(FeatureName, SENumber, Description, Option)
-#define FUTURE_FEATURE(FeatureName, SENumber, Version) \
-  case Feature::FeatureName: return Version;
-#include "swift/Basic/Features.def"
-  default: return None;
-  }
+std::optional<PlaygroundOption>
+swift::getPlaygroundOption(llvm::StringRef name) {
+  return llvm::StringSwitch<std::optional<PlaygroundOption>>(name)
+#define PLAYGROUND_OPTION(OptionName, Description, DefaultOn, HighPerfOn) \
+  .Case(#OptionName, PlaygroundOption::OptionName)
+#include "swift/Basic/PlaygroundOptions.def"
+      .Default(std::nullopt);
 }
 
 DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
@@ -477,26 +751,48 @@ DiagnosticBehavior LangOptions::getAccessNoteFailureLimit() const {
   llvm_unreachable("covered switch");
 }
 
+namespace {
+  constexpr std::array<std::string_view, 16> knownSearchPathPrefiexes =
+       {"-I",
+        "-F",
+        "-fmodule-map-file=",
+        "-iquote",
+        "-idirafter",
+        "-iframeworkwithsysroot",
+        "-iframework",
+        "-iprefix",
+        "-iwithprefixbefore",
+        "-iwithprefix",
+        "-isystemafter",
+        "-isystem",
+        "-isysroot",
+        "-ivfsoverlay",
+        "-working-directory=",
+        "-working-directory"};
+
+  constexpr std::array<std::string_view, 16>
+      knownClangDependencyIgnorablePrefiexes = {"-I",
+                                                "-F",
+                                                "-fmodule-map-file=",
+                                                "-ffile-compilation-dir",
+                                                "-iquote",
+                                                "-idirafter",
+                                                "-iframeworkwithsysroot",
+                                                "-iframework",
+                                                "-iprefix",
+                                                "-iwithprefixbefore",
+                                                "-iwithprefix",
+                                                "-isystemafter",
+                                                "-isystem",
+                                                "-isysroot",
+                                                "-working-directory=",
+                                                "-working-directory"};
+}
+
 std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
     std::function<std::string(StringRef)> pathRemapCallback) const {
   auto consumeIncludeOption = [](StringRef &arg, StringRef &prefix) {
-    static StringRef options[] = {"-I",
-                                  "-F",
-                                  "-fmodule-map-file=",
-                                  "-iquote",
-                                  "-idirafter",
-                                  "-iframeworkwithsysroot",
-                                  "-iframework",
-                                  "-iprefix",
-                                  "-iwithprefixbefore",
-                                  "-iwithprefix",
-                                  "-isystemafter",
-                                  "-isystem",
-                                  "-isysroot",
-                                  "-ivfsoverlay",
-                                  "-working-directory=",
-                                  "-working-directory"};
-    for (StringRef &option : options)
+    for (const auto &option : knownSearchPathPrefiexes)
       if (arg.consume_front(option)) {
         prefix = option;
         return true;
@@ -528,4 +824,46 @@ std::vector<std::string> ClangImporterOptions::getRemappedExtraArgs(
     }
   }
   return args;
+}
+
+std::vector<std::string>
+ClangImporterOptions::getReducedExtraArgsForSwiftModuleDependency() const {
+  auto matchIncludeOption = [](StringRef &arg) {
+    for (const auto &option : knownClangDependencyIgnorablePrefiexes)
+      if (arg.consume_front(option))
+        return true;
+    return false;
+  };
+
+  std::vector<std::string> filtered_args;
+  bool skip_next = false;
+  std::vector<std::string> args;
+  for (auto A : ExtraArgs) {
+    StringRef arg(A);
+    if (skip_next) {
+      skip_next = false;
+      continue;
+    } else if (matchIncludeOption(arg)) {
+      if (arg.empty()) {
+        // Option pair
+        skip_next = true;
+      } // else non-pair option e.g. '-I/search/path'
+      continue;
+    } else {
+      filtered_args.push_back(A);
+    }
+  }
+
+  return filtered_args;
+}
+
+std::string ClangImporterOptions::getPCHInputPath() const {
+  if (!BridgingHeaderPCH.empty())
+    return BridgingHeaderPCH;
+
+  if (llvm::sys::path::extension(BridgingHeader)
+          .ends_with(file_types::getExtension(file_types::TY_PCH)))
+    return BridgingHeader;
+
+  return {};
 }

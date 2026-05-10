@@ -13,7 +13,10 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 #define SWIFT_BASIC_DIAGNOSTICOPTIONS_H
 
+#include "swift/Basic/PrintDiagnosticNamesMode.h"
+#include "swift/Basic/WarningGroupBehaviorRule.h"
 #include "llvm/ADT/Hashing.h"
+#include <vector>
 
 namespace swift {
 
@@ -38,6 +41,17 @@ public:
   /// \c VerifyMode is not \c NoVerify.
   bool VerifyIgnoreUnknown = false;
 
+  /// Indicates whether to allow diagnostics for locations outside files parsed
+  /// for 'expected' diagnostics if \c VerifyMode is not \c NoVerify. Does not
+  /// allow diagnostics at <unknown>, that is controlled by VerifyIgnoreUnknown.
+  bool VerifyIgnoreUnrelated = false;
+
+  /// Indicates whether to ignore \c diag::in_macro_expansion. This is useful
+  /// for when they occur in unnamed buffers (such as clang attribute buffers),
+  /// but VerifyIgnoreUnrelated is too blunt of a tool. Note that notes of this
+  /// kind are not printed by \c PrintingDiagnosticConsumer.
+  bool VerifyIgnoreMacroLocationNote = false;
+
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
 
@@ -54,21 +68,34 @@ public:
 
   /// Suppress all warnings
   bool SuppressWarnings = false;
+  
+  /// Suppress all notes
+  bool SuppressNotes = false;
 
-  /// Treat all warnings as errors
-  bool WarningsAsErrors = false;
+  /// Suppress all remarks
+  bool SuppressRemarks = false;
 
-  /// When printing diagnostics, include the diagnostic name (diag::whatever) at
-  /// the end.
-  bool PrintDiagnosticNames = false;
+  /// Check for `@warn` diagnostic group behavior controls
+  bool CheckSyntacticControls = false;
 
-  /// If set to true, include educational notes in printed output if available.
-  /// Educational notes are documentation which supplement diagnostics.
-  bool PrintEducationalNotes = false;
+  /// Rules for escalating warnings to errors
+  llvm::SmallVector<WarningGroupBehaviorRule, 4> WarningGroupControlRules;
+
+  /// Unknown warning group names specified via -Werror or -Wwarning.
+  /// These will be diagnosed when the DiagnosticEngine is configured.
+  llvm::SmallVector<std::string, 1> UnknownWarningGroups;
+
+  /// When printing diagnostics, include either the diagnostic name
+  /// (diag::whatever) at the end or the associated diagnostic group.
+  PrintDiagnosticNamesMode PrintDiagnosticNames =
+      PrintDiagnosticNamesMode::None;
 
   /// Whether to emit diagnostics in the terse LLVM style or in a more
-  /// descriptive style that's specific to Swift (currently experimental).
-  FormattingStyle PrintedFormattingStyle = FormattingStyle::LLVM;
+  /// descriptive style that's specific to Swift.
+  FormattingStyle PrintedFormattingStyle = FormattingStyle::Swift;
+
+  /// Whether to emit macro expansion buffers into separate, temporary files.
+  bool EmitMacroExpansionFiles = true;
 
   std::string DiagnosticDocumentationPath = "";
 
@@ -77,10 +104,24 @@ public:
   /// Path to a directory of diagnostic localization tables.
   std::string LocalizationPath = "";
 
+  /// A list of prefixes that are appended to expected- that the diagnostic
+  /// verifier should check for diagnostics.
+  ///
+  /// For example, if one placed the phrase "NAME", the verifier will check for:
+  /// expected-$NAME{error,note,warning,remark} as well as the normal expected-
+  /// prefixes.
+  std::vector<std::string> AdditionalDiagnosticVerifierPrefixes;
+
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Bridging PCH hash.
   llvm::hash_code getPCHHashComponents() const {
     // Nothing here that contributes anything significant when emitting the PCH.
+    return llvm::hash_value(0);
+  }
+
+  /// Return a hash code of any components from these options that should
+  /// contribute to a Swift Dependency Scanning hash.
+  llvm::hash_code getModuleScanningHashComponents() const {
     return llvm::hash_value(0);
   }
 };

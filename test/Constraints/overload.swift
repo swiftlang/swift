@@ -92,7 +92,7 @@ func f4(_ j: Wibble) { } // expected-error{{cannot find type 'Wibble' in scope}}
 f4(5)
 
 func f1() {
-  var c : Class // expected-error{{cannot find type 'Class' in scope}}
+  var c : Klass // expected-error{{cannot find type 'Klass' in scope}}
   markUsed(c.x) // make sure error does not cascade here
 }
 
@@ -194,8 +194,9 @@ func overloadedMethod<T>() {} // expected-note {{in call to function 'overloaded
 overloadedMethod()
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
 
-// Ensure we select the overload of '??' returning T? rather than T.
-func SR3817(_ d: [String : Any], _ s: String, _ t: String) -> Any {
+/// https://github.com/apple/swift/issues/46402
+/// Ensure we select the overload of `??` returning `T?` rather than `T`.
+func f_46402(_ d: [String : Any], _ s: String, _ t: String) -> Any {
   if let r = d[s] ?? d[t] {
     return r
   } else {
@@ -256,4 +257,167 @@ func rdar79672230() {
 
   var t: MyType = MyType()
   test(&t) // expected-error {{no exact matches in call to local function 'test'}}
+}
+
+// rdar://97396399 - crash in swift::DiagnosticEngine::formatDiagnosticText
+func rdar97396399() {
+  // Has to be overloaded to make sure that contextual type is not recorded during constraint generation
+  func test(_: () -> Void) {}
+  func test(_: (Int) -> Void) {}
+
+  // Multiple different overloads, none of which conform to Sequence
+  func fn(_: Int) -> Int {}
+  // expected-note@-1 {{found candidate with type '(Int) -> Int'}}
+  // expected-note@-2 {{result type 'Int' of 'fn' does not conform to 'Sequence'}}
+  func fn(_: Int) -> Double {}
+  // expected-note@-1 {{found candidate with type '(Int) -> Double'}}
+  // expected-note@-2 {{result type 'Double' of 'fn' does not conform to 'Sequence'}}
+
+  test {
+    for x in fn { // expected-error {{no 'fn' overloads produce result type that conforms to 'Sequence'}}
+      print(x)
+    }
+  }
+
+  test {
+    for x in fn(42) { // expected-error {{no 'fn' overloads produce result type that conforms to 'Sequence'}}
+      print(x)
+    }
+  }
+}
+
+// https://github.com/apple/swift/issues/63834
+func f63834(int: Int, string: String) {} // expected-note 3{{found candidate with type '(Int, String) -> ()'}}
+func f63834(int: Int, string: Bool) {} // expected-note 3{{found candidate with type '(Int, Bool) -> ()'}}
+
+func f63834_1(int: Int, string: Bool) {} // expected-note{{candidate '(Int, Bool) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
+func f63834_1(int: Int, string: String) {} // expected-note{{candidate '(Int, String) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
+
+// FIXME: We can mention candidate type.
+func f63834_2(int: Int, string: Bool) {} // expected-note {{found this candidate}}
+func f63834_2(int: Int, string: String) {} // expected-note {{found this candidate}}
+
+// One function argument mismatch
+let _ = f63834(int:string:) as (Int, Int) -> Void // expected-error{{no exact matches in reference to global function 'f63834'}}
+// Contextual mismatch
+let _ = f63834(int:string:) as Int // expected-error{{no exact matches in reference to global function 'f63834'}}
+let _ = (f63834(int:string:)) as Int // expected-error{{no exact matches in reference to global function 'f63834'}}
+
+// Missing function argument
+let _ = f63834_1(int:string:) as (Int) -> Void // expected-error{{no exact matches in reference to global function 'f63834_1'}}
+// None of the function argument types matches
+let _ = f63834_2(int:string:) as (Double, Double) -> Void // expected-error{{no exact matches in reference to global function 'f63834_2'}}
+let _ = { i, j in } as (Int) -> Void // expected-error{{contextual closure type '(Int) -> Void' expects 1 argument, but 2 were used in closure body}}
+
+struct A63834 {
+  static func fn(int: Int, string: String) {} // expected-note{{candidate '(Int, String) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
+  static func fn(int: Int, string: Bool) {}  // expected-note{{candidate '(Int, Bool) -> ()' has 2 parameters, but context '(Int) -> Void' has 1}}
+
+  static func fn1(int: Int, string: String) {} // expected-note{{found candidate with type '(Int, String) -> ()'}}
+  static func fn1(int: Int, string: Bool) {}  // expected-note{{found candidate with type '(Int, Bool) -> ()'}}
+}
+let _ = A63834.fn1(int:string:) as Int // expected-error {{no exact matches in reference to static method 'fn1'}}
+let _ = A63834.fn(int:string:) as (Int) -> Void // expected-error{{no exact matches in reference to static method 'fn'}}
+
+typealias Magic<T> = T
+func f63834_D(_ x: Int = 0) {}
+func f63834_D(_ x: String) {}
+
+(f63834_D as Magic)() // expected-error{{missing argument for parameter #1 in call}}
+
+func fn63834_3() -> String {} // expected-note {{found candidate with type 'String'}}
+func fn63834_3() -> Double {} // expected-note {{found candidate with type 'Double'}}
+
+fn63834_3() as Int // expected-error {{no exact matches in call to global function 'fn63834_3'}}
+
+// Make sure that Copyable and/or Escapable don't change overloading behavior
+do {
+  struct S {
+    var v: Int
+  }
+
+  func test(data: [S]) {
+    let transformed = data.flatMap { e in
+      if true {
+        return Array<S>()
+      }
+      return Array(arrayLiteral: e)
+    }
+
+    _ = transformed.map {
+      _ = $0.v // Ok
+    }
+  }
+}
+
+// Make sure that the solver properly handles mix of non-default integer and floating-point literals
+do {
+  func test(
+    withInitialValue initialValue: Float,
+    increment: Float,
+    count: Int) -> [Float] {}
+
+  func test(
+    withInitialValue initialValue: Double,
+    increment: Double,
+    count: Int) -> [Double] {}
+
+
+  func testDoubleVsFloat(count: Int) {
+    let returnedResult = test(withInitialValue: 0,
+                              increment: 0.1,
+                              count: count)
+
+    let _: [Double] = returnedResult // Ok
+  }
+}
+
+do {
+  struct S {
+    let x: Int
+    var y: Int
+  }
+
+  func overloaded(_: String) {}
+  // expected-note@-1 3 {{candidate expects value of type 'String' for parameter #1 (got 'Int')}}
+  func overloaded(_: inout Int) {}
+  // expected-note@-1 3 {{candidate expects in-out value for parameter #1 but argument is immutable}}
+
+  func testImmutable(s: S) {
+    overloaded(s.x) // expected-error {{no exact matches in call to local function 'overloaded'}}
+  }
+  
+  func testMutable(s: inout S) {
+    overloaded(s.x) // expected-error {{no exact matches in call to local function 'overloaded'}}
+  }
+
+  func testImmutableBase(s: S) {
+    overloaded(s.y) // expected-error {{no exact matches in call to local function 'overloaded'}}
+  }
+
+  func testMissingAddressOf(s: inout S) {
+    overloaded(s.y) // expected-error {{passing value of type 'Int' to an inout parameter requires explicit '&'}}
+  }
+}
+
+// Reduced from GRDB open source project -- optional injection followed by
+// existential erasure must be considered better than AnyHashable conversion for this
+// to type check.
+do {
+  protocol DatabaseValueConvertible {}
+
+  struct DatabaseValue: DatabaseValueConvertible {}
+
+  class Row {
+    init(_ dictionary: [String: (any DatabaseValueConvertible)?]) { fatalError() }
+    init?(_ dictionary: [AnyHashable: Any]) { fatalError() }
+  }
+
+  func f(key: [String: DatabaseValue]) -> Row {
+    let row = Row(key)
+
+    // We have to pick the non-failable init above, otherwise this will have
+    // the wrong type.
+    return row
+  }
 }

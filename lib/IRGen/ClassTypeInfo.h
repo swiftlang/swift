@@ -20,20 +20,23 @@
 #include "ClassLayout.h"
 #include "HeapTypeInfo.h"
 
+#include "swift/ClangImporter/ClangImporterRequests.h"
+
 namespace swift {
 namespace irgen {
 
 /// Layout information for class types.
 class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
   ClassDecl *TheClass;
+  mutable llvm::StructType *classLayoutType;
 
   // The resilient layout of the class, without making any assumptions
   // that violate resilience boundaries. This is used to allocate
   // and deallocate instances of the class, and to access fields.
-  mutable Optional<ClassLayout> ResilientLayout;
+  mutable std::optional<ClassLayout> ResilientLayout;
 
   // A completely fragile layout, used for metadata emission.
-  mutable Optional<ClassLayout> FragileLayout;
+  mutable std::optional<ClassLayout> FragileLayout;
 
   /// Can we use swift reference-counting, or do we have to use
   /// objc_retain/release?
@@ -45,19 +48,118 @@ class ClassTypeInfo : public HeapTypeInfo<ClassTypeInfo> {
 public:
   ClassTypeInfo(llvm::PointerType *irType, Size size, SpareBitVector spareBits,
                 Alignment align, ClassDecl *theClass,
-                ReferenceCounting refcount)
-      : HeapTypeInfo(irType, size, std::move(spareBits), align),
-        TheClass(theClass), Refcount(refcount) {}
+                ReferenceCounting refcount, llvm::StructType *classLayoutType)
+      : HeapTypeInfo(refcount, irType, size, std::move(spareBits), align),
+        TheClass(theClass), classLayoutType(classLayoutType),
+        Refcount(refcount) {}
 
   ReferenceCounting getReferenceCounting() const { return Refcount; }
 
   ClassDecl *getClass() const { return TheClass; }
+
+  llvm::Type *getClassLayoutType() const { return classLayoutType; }
 
   const ClassLayout &getClassLayout(IRGenModule &IGM, SILType type,
                                     bool forBackwardDeployment) const;
 
   StructLayout *createLayoutWithTailElems(IRGenModule &IGM, SILType classType,
                                           ArrayRef<SILType> tailTypes) const;
+
+  void emitScalarRelease(IRGenFunction &IGF, llvm::Value *value,
+                         Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::Custom) {
+      auto releaseFn =
+          evaluateOrDefault(
+              getClass()->getASTContext().evaluator,
+              CustomRefCountingOperation(
+                  {getClass(), CustomRefCountingOperationKind::release}),
+              {})
+              .operation;
+      IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value);
+      return;
+    }
+
+    HeapTypeInfo::emitScalarRelease(IGF, value, atomicity);
+  }
+
+  bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
+                                           unsigned index) const override {
+    // Custom refcounting functions might not support null pointers.
+    return index == 0 && getReferenceCounting() != ReferenceCounting::Custom;
+  }
+
+  void emitScalarRetain(IRGenFunction &IGF, llvm::Value *value,
+                        Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::Custom) {
+      auto retainFn =
+          evaluateOrDefault(
+              getClass()->getASTContext().evaluator,
+              CustomRefCountingOperation(
+                  {getClass(), CustomRefCountingOperationKind::retain}),
+              {})
+              .operation;
+      IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value);
+      return;
+    }
+
+    HeapTypeInfo::emitScalarRetain(IGF, value, atomicity);
+  }
+
+  void strongCustomRetain(IRGenFunction &IGF, Explosion &e,
+                          bool needsNullCheck) const override {
+    assert(getReferenceCounting() == ReferenceCounting::Custom &&
+           "only supported for custom ref-counting");
+
+    llvm::Value *value = e.claimNext();
+    auto retainFn =
+        evaluateOrDefault(
+            getClass()->getASTContext().evaluator,
+            CustomRefCountingOperation(
+                {getClass(), CustomRefCountingOperationKind::retain}),
+            {})
+            .operation;
+    IGF.emitForeignReferenceTypeLifetimeOperation(retainFn, value,
+                                                  needsNullCheck);
+  }
+
+  // Implement the primary retain/release operations of ReferenceTypeInfo
+  // using basic reference counting.
+  void strongRetain(IRGenFunction &IGF, Explosion &e,
+                    Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::Custom) {
+      strongCustomRetain(IGF, e, /*needsNullCheck*/ false);
+      return;
+    }
+
+    HeapTypeInfo::strongRetain(IGF, e, atomicity);
+  }
+
+  void strongCustomRelease(IRGenFunction &IGF, Explosion &e,
+                           bool needsNullCheck) const override {
+    assert(getReferenceCounting() == ReferenceCounting::Custom &&
+           "only supported for custom ref-counting");
+
+    llvm::Value *value = e.claimNext();
+    auto releaseFn =
+        evaluateOrDefault(
+            getClass()->getASTContext().evaluator,
+            CustomRefCountingOperation(
+                {getClass(), CustomRefCountingOperationKind::release}),
+            {})
+            .operation;
+    IGF.emitForeignReferenceTypeLifetimeOperation(releaseFn, value,
+                                                  needsNullCheck);
+  }
+
+  void strongRelease(IRGenFunction &IGF, Explosion &e,
+                     Atomicity atomicity) const override {
+    if (getReferenceCounting() == ReferenceCounting::Custom) {
+      strongCustomRelease(IGF, e, /*needsNullCheck*/ false);
+      return;
+    }
+
+    HeapTypeInfo::strongRelease(IGF, e, atomicity);
+  }
 };
 
 } // namespace irgen

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -28,12 +28,18 @@
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
+#include "swift/SIL/SILDefaultOverrideTable.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/SILVTableVisitor.h"
-#include "llvm/ADT/None.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
+#include "clang/AST/RecordLayout.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
@@ -96,7 +102,7 @@ namespace {
     // added before the class fields, and the tail elements themselves
     // come after. We don't make a ClassLayout in this case, only a
     // StructLayout.
-    Optional<ArrayRef<SILType>> TailTypes;
+    std::optional<ArrayRef<SILType>> TailTypes;
 
     // Normally, Swift only emits static metadata for a class if it has no
     // generic ancestry and no fields with resilient value types, which
@@ -127,13 +133,12 @@ namespace {
     Size HeaderSize;
 
   public:
-    ClassLayoutBuilder(IRGenModule &IGM, SILType classType,
-                       ReferenceCounting refcounting,
-                       bool completelyFragileLayout,
-                       Optional<ArrayRef<SILType>> tailTypes = None)
-      : StructLayoutBuilder(IGM),
-        TailTypes(tailTypes),
-        CompletelyFragileLayout(completelyFragileLayout) {
+    ClassLayoutBuilder(
+        IRGenModule &IGM, SILType classType, ReferenceCounting refcounting,
+        bool completelyFragileLayout,
+        std::optional<ArrayRef<SILType>> tailTypes = std::nullopt)
+        : StructLayoutBuilder(IGM), TailTypes(tailTypes),
+          CompletelyFragileLayout(completelyFragileLayout) {
       // Start by adding a heap header.
       switch (refcounting) {
       case ReferenceCounting::Native:
@@ -148,6 +153,7 @@ namespace {
         HeaderSize = CurSize;
         break;
       case ReferenceCounting::None:
+      case ReferenceCounting::Custom:
         break;
       case ReferenceCounting::Block:
       case ReferenceCounting::Unknown:
@@ -155,10 +161,13 @@ namespace {
       case ReferenceCounting::Error:
         llvm_unreachable("not a class refcounting kind");
       }
-      
+
       // Next, add the fields for the given class.
       auto theClass = classType.getClassOrBoundGenericClass();
       assert(theClass);
+
+      if (theClass->getObjCImplementationDecl())
+        Options |= ClassMetadataFlags::ClassHasObjCImplementation;
 
       if (theClass->isGenericContext() && !theClass->hasClangNode())
         Options |= ClassMetadataFlags::ClassIsGeneric;
@@ -219,7 +228,8 @@ namespace {
                                bool superclass) {
       if (theClass->hasClangNode() && !theClass->isForeignReferenceType()) {
         Options |= ClassMetadataFlags::ClassHasObjCAncestry;
-        return;
+        if (!theClass->getObjCImplementationDecl())
+          return;
       }
 
       if (theClass->isNativeNSObjectSubclass()) {
@@ -280,6 +290,41 @@ namespace {
                                superclass);
     }
 
+    void maybeAddCxxRecordBases(ClassDecl *cd) {
+      auto cxxRecord = dyn_cast_or_null<clang::CXXRecordDecl>(cd->getClangDecl());
+      if (!cxxRecord)
+        return;
+
+      auto bases = getBasesAndOffsets(cxxRecord);
+      for (auto base : bases) {
+        if (base.offset != CurSize) {
+          assert(base.offset > CurSize);
+          auto paddingSize = base.offset - CurSize;
+          auto &opaqueTI =
+              IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
+          auto element = ElementLayout::getIncomplete(opaqueTI);
+          addField(element, LayoutStrategy::Universal);
+        }
+
+        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(base.size, Alignment(1));
+        auto element = ElementLayout::getIncomplete(opaqueTI);
+        addField(element, LayoutStrategy::Universal);
+      }
+    }
+
+    void addPaddingBeforeClangField(const clang::FieldDecl *fd) {
+      auto offset = Size(fd->getASTContext().toCharUnitsFromBits(
+          fd->getASTContext().getFieldOffset(fd)).getQuantity());
+
+      if (offset != CurSize) {
+        assert(offset > CurSize);
+        auto paddingSize = offset - CurSize;
+        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
+        auto element = ElementLayout::getIncomplete(opaqueTI);
+        addField(element, LayoutStrategy::Universal);
+      }
+    }
+
     void addDirectFieldsFromClass(ClassDecl *rootClass, SILType rootClassType,
                                   ClassDecl *theClass, SILType classType,
                                   bool superclass) {
@@ -289,7 +334,9 @@ namespace {
                                                ->getRecursiveProperties()
                                                .hasUnboundGeneric());
 
-      forEachField(IGM, theClass, [&](Field field) {
+      maybeAddCxxRecordBases(theClass);
+
+      auto fn = [&](Field field) {
         // Ignore missing properties here; we should have flagged these
         // with the classHasIncompleteLayout call above.
         if (!field.isConcrete()) {
@@ -324,7 +371,29 @@ namespace {
           AllStoredProperties.push_back(field);
           AllFieldAccesses.push_back(getFieldAccess(isKnownEmpty));
         }
-      });
+      };
+
+      auto classDecl = dyn_cast<ClassDecl>(theClass);
+      if (classDecl) {
+        if (classDecl->isRootDefaultActor()) {
+          fn(Field::DefaultActorStorage);
+        } else if (classDecl->isNonDefaultExplicitDistributedActor()) {
+          fn(Field::NonDefaultDistributedActorStorage);
+        }
+      }
+
+      for (auto decl :
+           theClass->getStoredPropertiesAndMissingMemberPlaceholders()) {
+        if (decl->getClangDecl())
+          if (auto clangField = cast<clang::FieldDecl>(decl->getClangDecl()))
+            addPaddingBeforeClangField(clangField);
+
+        if (auto var = dyn_cast<VarDecl>(decl)) {
+          fn(var);
+        } else {
+          fn(cast<MissingMemberDecl>(decl));
+        }
+      }
 
       if (!superclass) {
         // If we're calculating the layout of a specialized generic class type,
@@ -414,8 +483,7 @@ ClassLayout ClassTypeInfo::generateLayout(IRGenModule &IGM, SILType classType,
                                           bool completelyFragileLayout) const {
   ClassLayoutBuilder builder(IGM, classType, Refcount, completelyFragileLayout);
 
-  auto *classTy =
-      cast<llvm::StructType>(getStorageType()->getPointerElementType());
+  auto *classTy = classLayoutType;
 
   if (completelyFragileLayout) {
     // Create a name for the new llvm type.
@@ -441,11 +509,9 @@ ClassTypeInfo::createLayoutWithTailElems(IRGenModule &IGM,
                              tailTypes);
 
   // Create a name for the new llvm type.
-  llvm::StructType *classTy =
-    cast<llvm::StructType>(getStorageType()->getPointerElementType());
   SmallString<32> typeName;
   llvm::raw_svector_ostream os(typeName);
-  os << classTy->getName() << "_tailelems" << IGM.TailElemTypeID++;
+  os << classLayoutType->getName() << "_tailelems" << IGM.TailElemTypeID++;
 
   // Create the llvm type.
   llvm::StructType *ResultTy = llvm::StructType::create(IGM.getLLVMContext(),
@@ -480,13 +546,11 @@ ClassTypeInfo::getClassLayout(IRGenModule &IGM, SILType classType,
 /// as a size_t), and cast to a pointer to the given type.
 llvm::Value *IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
                                               llvm::Value *offset,
-                                              llvm::Type *objectType,
                                               const llvm::Twine &name) {
   assert(offset->getType() == IGM.SizeTy || offset->getType() == IGM.Int32Ty);
   auto addr = Builder.CreateBitCast(base, IGM.Int8PtrTy);
-  addr = Builder.CreateInBoundsGEP(
-      addr->getType()->getScalarType()->getPointerElementType(), addr, offset);
-  return Builder.CreateBitCast(addr, objectType->getPointerTo(), name);
+  addr = Builder.CreateInBoundsGEP(IGM.Int8Ty, addr, offset);
+  return Builder.CreateBitCast(addr, IGM.PtrTy, name);
 }
 
 /// Cast the base to i8*, apply the given inbounds offset (in bytes,
@@ -495,7 +559,7 @@ Address IRGenFunction::emitByteOffsetGEP(llvm::Value *base,
                                          llvm::Value *offset,
                                          const TypeInfo &type,
                                          const llvm::Twine &name) {
-  auto addr = emitByteOffsetGEP(base, offset, type.getStorageType(), name);
+  auto addr = emitByteOffsetGEP(base, offset, name);
   return type.getAddressForPointer(addr);
 }
 
@@ -573,8 +637,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,
                                                       SILType fieldType,
-                                                      VarDecl *field,
-                                                      GenericSignature fnSig) {
+                                                      VarDecl *field) {
   // If the field is empty, its address doesn't matter.
   auto &fieldTI = IGF.getTypeInfo(fieldType);
   if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
@@ -591,13 +654,13 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
 
   switch (fieldInfo.first) {
   case FieldAccess::ConstantDirect: {
-    Address baseAddr(base, classLayout.getAlignment());
+    Address baseAddr(base, classLayout.getType(), classLayout.getAlignment());
     auto element = fieldInfo.second;
-    Address memberAddr = element.project(IGF, baseAddr, None);
+    Address memberAddr = element.project(IGF, baseAddr, std::nullopt);
     // We may need to bitcast the address if the field is of a generic type.
-    if (memberAddr.getType()->getElementType() != fieldTI.getStorageType())
-      memberAddr = IGF.Builder.CreateBitCast(memberAddr,
-                                     fieldTI.getStorageType()->getPointerTo());
+    if (memberAddr.getElementType() != fieldTI.getStorageType())
+      memberAddr = IGF.Builder.CreateElementBitCast(memberAddr,
+                                                    fieldTI.getStorageType());
     return OwnedAddress(memberAddr, base);
   }
     
@@ -608,7 +671,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   }
     
   case FieldAccess::ConstantIndirect: {
-    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType, fnSig);
+    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
     auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
     return emitAddressAtOffset(IGF, baseType, base, offset, field);
   }
@@ -634,7 +697,7 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
 
   case FieldAccess::NonConstantDirect: {
     std::string symbol =
-      LinkEntity::forFieldOffset(field).mangleAsString();
+      LinkEntity::forFieldOffset(field).mangleAsString(IGM.Context);
     return MemberAccessStrategy::getDirectGlobal(std::move(symbol),
                                  MemberAccessStrategy::OffsetKind::Bytes_Word);
   }
@@ -650,8 +713,7 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
 
 Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
                                   SILType ClassType,
-                                  SILType TailType,
-                                  GenericSignature fnSig) {
+                                  SILType TailType) {
   const ClassTypeInfo &classTI = IGF.getTypeInfo(ClassType).as<ClassTypeInfo>();
 
   llvm::Value *Offset = nullptr;
@@ -667,8 +729,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
     Align = HeapObjAlign.alignmentAtOffset(ClassSize);
   } else {
     llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
-                                                             ClassType,
-                                                             fnSig);
+                                                             ClassType);
     Offset = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                         ClassType.getClassOrBoundGenericClass(),
                                         metadata).first;
@@ -681,8 +742,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
   llvm::Value *InvertedMask = IGF.Builder.CreateNot(AlignMask);
   Offset = IGF.Builder.CreateAnd(Offset, InvertedMask);
 
-  llvm::Value *Addr = IGF.emitByteOffsetGEP(Base, Offset,
-                                            TailTI.getStorageType(), "tailaddr");
+  Address Addr = IGF.emitByteOffsetGEP(Base, Offset, TailTI, "tailaddr");
 
   if (auto *OffsetConst = dyn_cast<llvm::ConstantInt>(Offset)) {
     // Try to get an accurate alignment (only possible if the Offset is a
@@ -690,7 +750,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
     Size TotalOffset(OffsetConst->getZExtValue());
     Align = HeapObjAlign.alignmentAtOffset(TotalOffset);
   }
-  return Address(Addr, Align);
+  return Address(Addr.getAddress(), Addr.getElementType(), Align);
 }
 
 /// Try to stack promote a class instance with possible tail allocated arrays.
@@ -703,6 +763,8 @@ static llvm::Value *stackPromote(IRGenFunction &IGF,
   if (StackAllocSize < 0)
     return nullptr;
   if (!FieldLayout.isFixedLayout())
+    return nullptr;
+  if (!FieldLayout.isFixedSize())
     return nullptr;
 
   // Calculate the total size needed.
@@ -780,7 +842,8 @@ irgen::appendSizeForTailAllocatedArrays(IRGenFunction &IGF,
 
 /// Emit an allocation of a class.
 llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
-                                        bool objc, int &StackAllocSize,
+                                        bool objc, bool isBare,
+                                        int &StackAllocSize,
                                         TailArraysRef TailArrays) {
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto classType = selfType.getASTType();
@@ -797,20 +860,27 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     return emitObjCAllocObjectCall(IGF, metadata, selfType);
   }
 
-  llvm::Value *metadata =
-    emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata,
-                             MetadataState::Complete);
-
   auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
                                              /*forBackwardDeployment=*/false);
 
-  llvm::Type *destType = classLayout.getType()->getPointerTo();
   llvm::Value *val = nullptr;
   if (llvm::Value *Promoted = stackPromote(IGF, classLayout, StackAllocSize,
                                            TailArrays)) {
-    val = IGF.Builder.CreateBitCast(Promoted, IGF.IGM.RefCountedPtrTy);
-    val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
+    if (isBare) {
+      val = Promoted;
+    } else {
+      llvm::Value *metadata =
+        emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata,
+                                 MetadataState::Complete);
+
+      val = IGF.Builder.CreateBitCast(Promoted, IGF.IGM.RefCountedPtrTy);
+      val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
+    }
   } else {
+    llvm::Value *metadata =
+      emitClassHeapMetadataRef(IGF, classType, MetadataValueType::TypeMetadata,
+                               MetadataState::Complete);
+
     llvm::Value *size, *alignMask;
     if (classLayout.isFixedSize()) {
       size = IGF.IGM.getSize(classLayout.getSize());
@@ -825,10 +895,15 @@ llvm::Value *irgen::emitClassAllocation(IRGenFunction &IGF, SILType selfType,
     // Allocate the object on the heap.
     std::tie(size, alignMask)
       = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
-    val = IGF.emitAllocObjectCall(metadata, size, alignMask, "reference.new");
+
+    auto maybeDescriptor =
+        classLayout.computeTypedMallocTypeDescriptor(IGF.IGM, selfType);
+
+    val = IGF.emitAllocObjectCall(metadata, size, alignMask, maybeDescriptor,
+                                  "reference.new");
     StackAllocSize = -1;
   }
-  return IGF.Builder.CreateBitCast(val, destType);
+  return IGF.Builder.CreateBitCast(val, IGF.IGM.PtrTy);
 }
 
 llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF, 
@@ -847,6 +922,7 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
   auto &classTI = IGF.getTypeInfo(selfType).as<ClassTypeInfo>();
   auto &classLayout = classTI.getClassLayout(IGF.IGM, selfType,
                                           /*forBackwardDeployment=*/false);
+  auto *destType = IGF.IGM.PtrTy;
 
   // If we are allowed to allocate on the stack we are allowed to use
   // `selfType`'s size assumptions.
@@ -857,7 +933,6 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
                                                  IGF.IGM.RefCountedPtrTy);
     val = IGF.emitInitStackObjectCall(metadata, val, "reference.new");
 
-    llvm::Type *destType = classLayout.getType()->getPointerTo();
     return IGF.Builder.CreateBitCast(val, destType);
   }
 
@@ -871,9 +946,8 @@ llvm::Value *irgen::emitClassAllocationDynamic(IRGenFunction &IGF,
     = appendSizeForTailAllocatedArrays(IGF, size, alignMask, TailArrays);
 
   llvm::Value *val = IGF.emitAllocObjectCall(metadata, size, alignMask,
-                                             "reference.new");
+                                             std::nullopt, "reference.new");
   StackAllocSize = -1;
-  llvm::Type *destType = classLayout.getType()->getPointerTo();
   return IGF.Builder.CreateBitCast(val, destType);
 }
 
@@ -883,7 +957,6 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                         SILType selfType,
                                         ClassDecl *selfClass,
                                         llvm::Value *selfValue,
-                                        GenericSignature fnSig,
                                         llvm::Value *&size,
                                         llvm::Value *&alignMask) {
   // Try to determine the size of the object we're deallocating.
@@ -900,7 +973,7 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
 
   // Otherwise, get them from the metadata.
   llvm::Value *metadata =
-    emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType, fnSig);
+    emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType);
   std::tie(size, alignMask)
     = emitClassResilientInstanceSizeAndAlignMask(IGF, selfClass, metadata);
 }
@@ -912,8 +985,7 @@ static llvm::Value *emitCastToHeapObject(IRGenFunction &IGF,
 
 void irgen::emitClassDeallocation(IRGenFunction &IGF,
                                   SILType selfType,
-                                  llvm::Value *selfValue,
-                                  GenericSignature fnSig) {
+                                  llvm::Value *selfValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
 
   // We want to deallocate default actors or potential default
@@ -925,7 +997,7 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
     if (rootActorClass->isDefaultActor(IGF.IGM.getSwiftModule(),
                                        ResilienceExpansion::Maximal)) {
       selfValue = emitCastToHeapObject(IGF, selfValue);
-      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateFn(),
+      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateFunctionPointer(),
                              {selfValue});
       return;
     }
@@ -935,8 +1007,9 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
         rootActorClass->isResilient(IGF.IGM.getSwiftModule(),
                                     ResilienceExpansion::Maximal)) {
       selfValue = emitCastToHeapObject(IGF, selfValue);
-      IGF.Builder.CreateCall(IGF.IGM.getDefaultActorDeallocateResilientFn(),
-                             {selfValue});
+      IGF.Builder.CreateCall(
+          IGF.IGM.getDefaultActorDeallocateResilientFunctionPointer(),
+          {selfValue});
       return;
     }
 
@@ -944,7 +1017,7 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
   }
 
   llvm::Value *size, *alignMask;
-  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue, fnSig,
+  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
 
   selfValue = emitCastToHeapObject(IGF, selfValue);
@@ -954,13 +1027,12 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
 void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                          SILType selfType,
                                          llvm::Value *selfValue,
-                                         llvm::Value *metadataValue,
-                                         GenericSignature fnSig) {
+                                         llvm::Value *metadataValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
   assert(theClass->getForeignClassKind() == ClassDecl::ForeignKind::Normal);
 
   llvm::Value *size, *alignMask;
-  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue, fnSig,
+  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
 
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
@@ -984,12 +1056,23 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
   auto &resilientLayout =
     classTI.getClassLayout(*this, selfType, /*forBackwardDeployment=*/false);
 
+  auto hasEmbeddedWithExistentials = isEmbeddedWithExistentials();
+
   // As a matter of policy, class metadata is never emitted lazily for now.
-  assert(!IRGen.hasLazyMetadata(D));
+  assert(hasEmbeddedWithExistentials || !IRGen.hasLazyMetadata(D));
 
   // Emit the class metadata.
-  emitClassMetadata(*this, D, fragileLayout, resilientLayout);
-  emitFieldDescriptor(D);
+  if (!D->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    emitClassMetadata(*this, D, fragileLayout, resilientLayout);
+    emitFieldDescriptor(D);
+  } else {
+    if (!hasEmbeddedWithExistentials && !D->isGenericContext()) {
+      emitEmbeddedClassMetadata(*this, D);
+    } else {
+      // We create all metadata lazily in embedded with existentials mode.
+      return;
+    }
+  }
 
   IRGen.addClassForEagerInitialization(D);
   IRGen.addBackDeployedObjCActorInitialization(D);
@@ -1015,7 +1098,7 @@ namespace {
     TaggedUnion<ClassUnion, ProtocolDecl *> TheEntity;
     ExtensionDecl *TheExtension;
     const ClassLayout *FieldLayout;
-    
+
     ClassDecl *getClass() const {
       const ClassUnion *classUnion;
       if (!(classUnion = TheEntity.dyn_cast<ClassUnion>())) {
@@ -1033,19 +1116,29 @@ namespace {
       }
       return nullptr;
     }
-    Optional<CanType> getSpecializedGenericType() const {
+    std::optional<CanType> getSpecializedGenericType() const {
       const ClassUnion *classUnion;
       if (!(classUnion = TheEntity.dyn_cast<ClassUnion>())) {
-        return llvm::None;
+        return std::nullopt;
       }
       const ClassPair *classPair;
       if (!(classPair = classUnion->dyn_cast<ClassPair>())) {
-        return llvm::None;
+        return std::nullopt;
       }
       auto &pair = *classPair;
       return pair.second;
     }
 
+    std::optional<StringRef> getCustomCategoryName() const {
+      if (!TheExtension)
+        return std::nullopt;
+      assert(!TheExtension->hasClangNode());
+      auto ident = TheExtension->getObjCCategoryName();
+      if (!ident.empty()) {
+        return ident.str();
+      }
+      return std::nullopt;
+    }
     bool isBuildingClass() const {
       return TheEntity.isa<ClassUnion>() && !TheExtension;
     }
@@ -1110,7 +1203,7 @@ namespace {
     SmallVector<ProtocolDecl*, 4> Protocols;
     SmallVector<VarDecl*, 8> InstanceProperties;
     SmallVector<VarDecl*, 8> ClassProperties;
-    
+
     llvm::Constant *Name = nullptr;
 
     SmallVectorImpl<MethodDescriptor> &getMethodList(ValueDecl *decl) {
@@ -1140,11 +1233,14 @@ namespace {
         const ClassLayout &fieldLayout)
         : IGM(IGM), TheEntity(theUnion), TheExtension(nullptr),
           FieldLayout(&fieldLayout) {
-      visitConformances(getClass());
+      visitConformances(getClass()->getImplementationContext());
 
-      if (getClass()->isRootDefaultActor())
+      if (getClass()->isRootDefaultActor()) {
         Ivars.push_back(Field::DefaultActorStorage);
-      visitMembers(getClass());
+      } else if (getClass()->isNonDefaultExplicitDistributedActor()) {
+        Ivars.push_back(Field::NonDefaultDistributedActorStorage);
+      }
+      visitImplementationMembers(getClass());
 
       if (Lowering::usesObjCAllocator(getClass())) {
         addIVarInitializer();
@@ -1160,7 +1256,8 @@ namespace {
 
       visitConformances(theExtension);
 
-      for (Decl *member : TheExtension->getMembers())
+      for (Decl *member :
+           TheExtension->getImplementationContext()->getAllMembers())
         visit(member);
     }
 
@@ -1204,6 +1301,15 @@ namespace {
     /// Gather protocol records for all of the explicitly-specified Objective-C
     /// protocol conformances.
     void visitConformances(const IterableDeclContext *idc) {
+      auto decl = idc->getDecl();
+      if (decl->getImplementedObjCDecl()) {
+        // We want to use the conformance lists imported from the ObjC header.
+        for (auto interface : decl->getAllImplementedObjCDecls()) {
+          visitConformances(cast<IterableDeclContext>(interface));
+        }
+        return;
+      }
+
       llvm::SmallSetVector<ProtocolDecl *, 2> protocols;
       for (auto conformance : idc->getLocalConformances(
                                 ConformanceLookupKind::OnlyExplicit)) {
@@ -1246,7 +1352,8 @@ namespace {
     void buildMetaclassStub() {
       assert(FieldLayout && "can't build a metaclass from a category");
 
-      Optional<CanType> specializedGenericType = getSpecializedGenericType();
+      std::optional<CanType> specializedGenericType =
+          getSpecializedGenericType();
 
       // The isa is the metaclass pointer for the root class.
       auto rootClass = getRootClassForMetaclass(IGM, getClass());
@@ -1282,6 +1389,12 @@ namespace {
       }
 
       auto dataPtr = emitROData(ForMetaClass, DoesNotHaveUpdateCallback);
+
+      // Record the ro-data globals if this is a pre-specialized class.
+      if (specializedGenericType) {
+        IGM.addGenericROData(dataPtr);
+      }
+
       dataPtr = llvm::ConstantExpr::getPtrToInt(dataPtr, IGM.IntPtrTy);
 
       llvm::Constant *fields[] = {
@@ -1292,7 +1405,7 @@ namespace {
         dataPtr
       };
       auto init = llvm::ConstantStruct::get(IGM.ObjCClassStructTy,
-                                            makeArrayRef(fields));
+                                            llvm::ArrayRef(fields));
       llvm::Constant *uncastMetaclass;
       if (specializedGenericType) {
         uncastMetaclass =
@@ -1309,6 +1422,12 @@ namespace {
   private:
     void buildCategoryName(SmallVectorImpl<char> &s) {
       llvm::raw_svector_ostream os(s);
+
+      if (auto customCategoryName = getCustomCategoryName()) {
+        os << *customCategoryName;
+        return;
+      }
+
       // Find the module the extension is declared in.
       ModuleDecl *TheModule = TheExtension->getParentModule();
 
@@ -1322,7 +1441,10 @@ namespace {
     llvm::Constant *getClassMetadataRef() {
       auto *theClass = getClass();
 
-      if (theClass->hasClangNode())
+      // If this is truly an imported ObjC class, with no @_objcImplementation,
+      // someone else will emit the ObjC metadata symbol and we simply want to
+      // use it.
+      if (theClass->hasClangNode() && !theClass->getObjCImplementationDecl())
         return IGM.getAddrOfObjCClass(theClass, NotForDefinition);
 
       // Note that getClassMetadataStrategy() will return
@@ -1352,7 +1474,8 @@ namespace {
 
       // struct category_t {
       //   char const *name;
-      fields.add(IGM.getAddrOfGlobalString(CategoryName));
+      fields.add(IGM.getAddrOfGlobalString(CategoryName,
+                                           CStringSectionType::ObjCClassName));
       //   const class_t *theClass;
       fields.add(getClassMetadataRef());
       //   const method_list_t *instanceMethods;
@@ -1391,7 +1514,8 @@ namespace {
       //   Class super;
       fields.addNullPointer(IGM.Int8PtrTy);
       //   char const *name;
-      fields.add(IGM.getAddrOfGlobalString(getEntityName(nameBuffer)));
+      fields.add(IGM.getAddrOfGlobalString(getEntityName(nameBuffer),
+                                           CStringSectionType::ObjCClassName));
       //   const protocol_list_t *baseProtocols;
       fields.add(buildProtocolList(weakLinkage));
       //   const method_list_t *requiredInstanceMethods;
@@ -1478,11 +1602,10 @@ namespace {
       //     const uint8_t *IvarLayout;
       //     ClassMetadata *NonMetaClass;
       // };
-      Optional<CanType> specializedGenericType;
+      std::optional<CanType> specializedGenericType;
       if ((specializedGenericType = getSpecializedGenericType()) && forMeta) {
         //     ClassMetadata *NonMetaClass;
-        b.addBitCast(IGM.getAddrOfTypeMetadata(*specializedGenericType),
-                     IGM.Int8PtrTy);
+        b.add(IGM.getAddrOfTypeMetadata(*specializedGenericType));
       } else {
         //     const uint8_t *IvarLayout;
         // GC/ARC layout.  TODO.
@@ -1613,7 +1736,8 @@ namespace {
       }
       
       llvm::SmallString<64> buffer;
-      Name = IGM.getAddrOfGlobalString(getClass()->getObjCRuntimeName(buffer));
+      Name = IGM.getAddrOfGlobalString(getClass()->getObjCRuntimeName(buffer),
+                                       CStringSectionType::ObjCClassName);
       return Name;
     }
 
@@ -1668,11 +1792,15 @@ namespace {
     /// Destructors need to be collected into the instance methods
     /// list 
     void visitDestructorDecl(DestructorDecl *destructor) {
-      auto classDecl = cast<ClassDecl>(destructor->getDeclContext());
+      auto classDecl = cast<ClassDecl>(destructor->getDeclContext()->getImplementedObjCContext());
       if (Lowering::usesObjCAllocator(classDecl) &&
           hasObjCDeallocDefinition(destructor)) {
         InstanceMethods.push_back(destructor);
       }
+    }
+
+    void visitMissingDecl(MissingDecl *missing) {
+      llvm_unreachable("missing decl in IRGen");
     }
 
     void visitMissingMemberDecl(MissingMemberDecl *placeholder) {
@@ -1718,6 +1846,9 @@ namespace {
 
     void buildMethod(ConstantArrayBuilder &descriptors,
                      AbstractFunctionDecl *method) {
+      if (!method->isAvailableDuringLowering())
+        return;
+
       auto accessor = dyn_cast<AccessorDecl>(method);
       if (!accessor)
         return emitObjCMethodDescriptor(IGM, descriptors, method);
@@ -1732,8 +1863,8 @@ namespace {
                                         accessor->getStorage());
 
 #define OBJC_ACCESSOR(ID, KEYWORD)
-#define ACCESSOR(ID) \
-      case AccessorKind::ID:
+#define ACCESSOR(ID, KEYWORD) case AccessorKind::ID:
+      case AccessorKind::DistributedGet:
 #include "swift/AST/AccessorKinds.def"
         llvm_unreachable("shouldn't be trying to build this accessor");
       }
@@ -1923,6 +2054,9 @@ namespace {
         if (field.getKind() == Field::DefaultActorStorage) {
           offsetPtr = nullptr;
           break;
+        } else if (field.getKind() == Field::NonDefaultDistributedActorStorage) {
+          offsetPtr = nullptr;
+          break;
         }
 
         // Otherwise, we should have a normal stored property.
@@ -1942,19 +2076,35 @@ namespace {
       }
 
       StringRef name = field.getName();
+      std::string typeEnc;
+      if (field.getKind() == Field::Var) {
+        auto *varDecl = field.getVarDecl();
+        if (varDecl->isObjC() && varDecl->hasStorage()) {
+          auto varTy = varDecl->getInterfaceType();
+          auto varDC = varDecl->getDeclContext();
+          bool isTriviallyRepresentable = varTy->isTriviallyRepresentableIn(
+              ForeignLanguage::ObjectiveC, varDC);
+
+          if (isTriviallyRepresentable)
+            getObjCEncodingForPropertyType(IGM, varDecl, typeEnc);
+          else
+            // "Unknown type" - used when ObjC classes are bridged to separate
+            // Swift types.
+            typeEnc = "?";
+        }
+      }
       const TypeInfo &storageTI = pair.second.getType();
       auto fields = ivars.beginStruct();
 
       if (offsetPtr)
         fields.add(offsetPtr);
       else
-        fields.addNullPointer(IGM.IntPtrTy->getPointerTo());
+        fields.addNullPointer(IGM.PtrTy);
 
-      // TODO: clang puts this in __TEXT,__objc_methname,cstring_literals
-      fields.add(IGM.getAddrOfGlobalString(name));
-
-      // TODO: clang puts this in __TEXT,__objc_methtype,cstring_literals
-      fields.add(IGM.getAddrOfGlobalString(""));
+      fields.add(
+          IGM.getAddrOfGlobalString(name, CStringSectionType::ObjCMethodName));
+      fields.add(IGM.getAddrOfGlobalString(typeEnc,
+                                           CStringSectionType::ObjCMethodType));
 
       Size size;
       Alignment alignment;
@@ -2048,7 +2198,7 @@ namespace {
       if (prop->getAttrs().hasAttribute<NSManagedAttr>())
         outs << ",D";
       
-      auto isObject = propDC->mapTypeIntoContext(propTy)
+      auto isObject = propDC->mapTypeIntoEnvironment(propTy)
           ->hasRetainablePointerRepresentation();
       auto hasObjectEncoding = typeEnc[0] == '@';
       
@@ -2090,8 +2240,11 @@ namespace {
       buildPropertyAttributes(prop, propertyAttributes);
       
       auto fields = properties.beginStruct();
-      fields.add(IGM.getAddrOfGlobalString(prop->getObjCPropertyName().str()));
-      fields.add(IGM.getAddrOfGlobalString(propertyAttributes));
+      fields.add(
+          IGM.getAddrOfGlobalString(prop->getObjCPropertyName().str(),
+                                    CStringSectionType::ObjCPropertyName));
+      fields.add(IGM.getAddrOfGlobalString(
+          propertyAttributes, CStringSectionType::ObjCPropertyName));
       fields.finishAndAddTo(properties);
     }
 
@@ -2198,7 +2351,7 @@ namespace {
         llvm::raw_svector_ostream os(buffer);
         os << LinkEntity::forTypeMetadata(*prespecialization,
                                           TypeMetadataAddress::FullMetadata)
-                  .mangleAsString();
+                  .mangleAsString(IGM.Context);
         return os.str();
       }
 
@@ -2246,7 +2399,9 @@ namespace {
       case llvm::Triple::Wasm:
         var->setSection(".data");
         break;
+      case llvm::Triple::DXContainer:
       case llvm::Triple::GOFF:
+      case llvm::Triple::SPIRV:
       case llvm::Triple::UnknownObjectFormat:
         llvm_unreachable("Don't know how to emit private global constants for "
                          "the selected object format.");
@@ -2277,6 +2432,134 @@ namespace {
       if (auto setter = subscript->getOpaqueAccessor(AccessorKind::Set))
         methods.push_back(setter);
     }
+    
+    SWIFT_DEBUG_DUMP {
+      dump(llvm::errs());
+      llvm::errs() << "\n";
+    }
+    
+    void dump(llvm::raw_ostream &os) const {
+      os << "(class_data_builder";
+      
+      if (isBuildingClass())
+        os << " for_class";
+      if (isBuildingCategory())
+        os << " for_category";
+      if (isBuildingProtocol())
+        os << " for_protocol";
+      
+      if (auto cd = getClass()) {
+        os << " class=";
+        cd->dumpRef(os);
+      }
+      if (auto pd = getProtocol()) {
+        os << " protocol=";
+        pd->dumpRef(os);
+      }
+      if (auto ty = getSpecializedGenericType()) {
+        os << " specialized=";
+        ty->print(os);
+      }
+      if (TheExtension) {
+        os << " extension=";
+        TheExtension->getExtendedTypeRepr()->print(os);
+        os << "@";
+        TheExtension->getLoc().print(os, IGM.Context.SourceMgr);
+      }
+      if (auto name = getCustomCategoryName()) {
+        os << " custom_category_name=" << *name;
+      }
+      
+      if (HasNonTrivialConstructor)
+        os << " has_non_trivial_constructor";
+      if (HasNonTrivialDestructor)
+        os << " has_non_trivial_destructor";
+      
+      if (!CategoryName.empty())
+        os << " category_name=" << CategoryName;
+      
+      os << "\n  (ivars";
+      for (auto field : Ivars) {
+        os << "\n    (";
+        switch (field.getKind()) {
+          case Field::Kind::Var:
+            os << "var ";
+            field.getVarDecl()->dumpRef(os);
+            break;
+          case Field::Kind::MissingMember:
+            os << "missing_member";
+            break;
+          case Field::Kind::DefaultActorStorage:
+            os << "default_actor_storage";
+            break;
+          case Field::Kind::NonDefaultDistributedActorStorage:
+            os << "non_default_distributed_actor_storage";
+            break;
+        }
+        os << ")";
+      }
+      os << ")";
+      
+      auto printMethodList =
+          [&](StringRef label,
+              const SmallVectorImpl<MethodDescriptor> &methods) {
+        if (methods.empty()) return;
+        
+        os << "\n  (" << label;
+        for (auto method : methods) {
+          os << "\n    (";
+          switch (method.getKind()) {
+            case MethodDescriptor::Kind::Method:
+              os << "method ";
+              method.getMethod()->dumpRef(os);
+              break;
+              
+            case MethodDescriptor::Kind::IVarInitializer:
+              os << "ivar_initializer";
+              method.getImpl()->printAsOperand(os);
+              break;
+              
+            case MethodDescriptor::Kind::IVarDestroyer:
+              os << "ivar_destroyer";
+              method.getImpl()->printAsOperand(os);
+              break;
+          }
+          os << ")";
+        }
+        os << ")";
+      };
+      
+      printMethodList("instance_methods", InstanceMethods);
+      printMethodList("class_methods", ClassMethods);
+      printMethodList("opt_instance_methods", OptInstanceMethods);
+      printMethodList("opt_class_methods", OptClassMethods);
+      
+      os << "\n  (protocols";
+      for (auto pd : Protocols) {
+        os << "\n    (protocol ";
+        pd->dumpRef(os);
+        os << ")";
+      }
+      os << ")";
+      
+      auto printPropertyList = [&](StringRef label,
+                                   const SmallVectorImpl<VarDecl *> &props) {
+        if (props.empty()) return;
+        
+        os << "\n  (" << label;
+        for (auto prop : props) {
+          os << "\n    (property ";
+          prop->dumpRef(os);
+          os << ")";
+        }
+        os << ")";
+      };
+      
+      printPropertyList("instance_properties", InstanceProperties);
+      printPropertyList("class_properties", ClassProperties);
+      
+      os << ")";
+    }
   };
 } // end anonymous namespace
 
@@ -2285,6 +2568,7 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
   llvm::Function *f =
     IGM.getAddrOfObjCMetadataUpdateFunction(D, ForDefinition);
   f->setAttributes(IGM.constructInitialAttributes());
+  IGM.setColocateMetadataSection(f);
 
   IRGenFunction IGF(IGM, f);
   if (IGM.DebugInfo)
@@ -2295,12 +2579,27 @@ static llvm::Function *emitObjCMetadataUpdateFunction(IRGenModule &IGM,
   Explosion params = IGF.collectParameters();
   (void) params.claimAll();
 
-  // Just directly call our metadata accessor. This should actually
-  // return the same metadata; the Objective-C runtime enforces this.
-  auto type = D->getDeclaredType()->getCanonicalType();
-  auto *metadata = IGF.emitTypeMetadataRef(type,
-                                           MetadataState::Complete)
-    .getMetadata();
+  llvm::Value *metadata;
+  if (D->getObjCImplementationDecl()) {
+    // This is an @objc @implementation class, so it has no metadata completion
+    // function. We must do the completion function's work here, taking care to
+    // fetch the address of the ObjC class without going through either runtime.
+    metadata = IGM.getAddrOfObjCClass(D, NotForDefinition);
+    auto loweredTy = IGM.getLoweredType(D->getDeclaredTypeInContext());
+
+    IGF.emitInitializeFieldOffsetVector(loweredTy, metadata,
+                                        /*isVWTMutable=*/false,
+                                        /*collector=*/nullptr);
+  } else {
+    // Just call our metadata accessor, which will cause the Swift runtime to
+    // call the metadata completion function if there is one. This should
+    // actually return the same metadata; the Objective-C runtime enforces this.
+    auto type = D->getDeclaredType()->getCanonicalType();
+    metadata = IGF.emitTypeMetadataRef(type,
+                                       MetadataState::Complete)
+      .getMetadata();
+  }
+
   IGF.Builder.CreateRet(
     IGF.Builder.CreateBitCast(metadata,
                               IGM.ObjCClassPtrTy));
@@ -2347,13 +2646,12 @@ llvm::Constant *IRGenModule::emitObjCResilientClassStub(
   auto *objcStub = llvm::ConstantExpr::getBitCast(fullObjCStub, Int8PtrTy);
   objcStub = llvm::ConstantExpr::getInBoundsGetElementPtr(
       Int8Ty, objcStub, getSize(getPointerSize()));
-  objcStub = llvm::ConstantExpr::getPointerCast(objcStub,
-      ObjCResilientClassStubTy->getPointerTo());
+  objcStub = llvm::ConstantExpr::getPointerCast(objcStub, PtrTy);
 
   if (isPublic) {
     entity = LinkEntity::forObjCResilientClassStub(
         D, TypeMetadataAddress::AddressPoint);
-    defineAlias(entity, objcStub);
+    defineAlias(entity, objcStub, ObjCResilientClassStubTy);
   }
 
   return objcStub;
@@ -2399,7 +2697,14 @@ static llvm::Constant *doEmitClassPrivateData(
   }
 
   // Then build the class RO-data.
-  return builder.emitROData(ForClass, hasUpdater);
+  auto res = builder.emitROData(ForClass, hasUpdater);
+
+  // Record the ro-data globals if this is a pre-specialized class.
+  if (classUnion.isa<std::pair<ClassDecl*, CanType>>()) {
+    IGM.addGenericROData(res);
+  }
+
+  return res;
 }
 
 llvm::Constant *irgen::emitSpecializedGenericClassPrivateData(
@@ -2481,6 +2786,24 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
                                             ProtocolDecl *proto) {
   assert(proto->isObjC() && "not an objc protocol");
   PrettyStackTraceDecl stackTraceRAII("emitting ObjC metadata for", proto);
+
+  // The linker on older deployment targets does not gracefully handle the
+  // situation when both an objective c object and a swift object define the
+  // protocol under the same symbol name.
+  auto deploymentAvailability =
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
+  bool canUseClangEmission = deploymentAvailability.isContainedIn(
+    IGM.Context.getSwift58Availability());
+
+  if (llvm::Triple(IGM.Module.getTargetTriple()).isOSDarwin() &&
+      canUseClangEmission) {
+    // Use the clang to generate the protocol metadata if there is a clang node.
+    if (auto clangDecl = proto->getClangDecl()) {
+      if (auto objcMethodDecl = dyn_cast<clang::ObjCProtocolDecl>(clangDecl)) {
+        return IGM.emitClangProtocolObject(objcMethodDecl);
+      }
+    }
+  }
   ClassDataBuilder builder(IGM, proto);
   return builder.emitProtocol();
 }
@@ -2488,7 +2811,6 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
 const TypeInfo *
 TypeConverter::convertClassType(CanType type, ClassDecl *D) {
   llvm::StructType *ST = IGM.createNominalType(type);
-  llvm::PointerType *irType = ST->getPointerTo();
   ReferenceCounting refcount = type->getReferenceCounting();
   
   SpareBitVector spareBits;
@@ -2500,11 +2822,10 @@ TypeConverter::convertClassType(CanType type, ClassDecl *D) {
     spareBits.appendClearBits(IGM.getPointerSize().getValueInBits());
   else
     spareBits = IGM.getHeapObjectSpareBits();
-  
-  return new ClassTypeInfo(irType, IGM.getPointerSize(),
-                           std::move(spareBits),
-                           IGM.getPointerAlignment(),
-                           D, refcount);
+
+  return new ClassTypeInfo(IGM.PtrTy, IGM.getPointerSize(),
+                           std::move(spareBits), IGM.getPointerAlignment(), D,
+                           refcount, ST);
 }
 
 /// Lazily declare a fake-looking class to represent an ObjC runtime base class.
@@ -2521,8 +2842,9 @@ ClassDecl *IRGenModule::getObjCRuntimeBaseClass(Identifier name,
                                            Context.TheBuiltinModule,
                                            /*isActor*/false);
   SwiftRootClass->setIsObjC(Context.LangOpts.EnableObjCInterop);
-  SwiftRootClass->getAttrs().add(ObjCAttr::createNullary(Context, objcName,
-    /*isNameImplicit=*/true));
+  SwiftRootClass->addAttribute(
+      ObjCAttr::createNullary(Context, objcName,
+                              /*isNameImplicit=*/true));
   SwiftRootClass->setImplicit();
   SwiftRootClass->setAccess(AccessLevel::Open);
   
@@ -2619,6 +2941,9 @@ CanType irgen::getSuperclassForMetadata(IRGenModule &IGM, CanType type,
 
 ClassMetadataStrategy
 IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
+  if (Context.LangOpts.hasFeature(Feature::Embedded))
+    return ClassMetadataStrategy::Fixed;
+
   SILType selfType = getSelfType(theClass);
   auto &selfTI = getTypeInfo(selfType).as<ClassTypeInfo>();
 
@@ -2655,7 +2980,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
     auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
+        AvailabilityRange::forDeploymentTarget(Context);
     if (deploymentAvailability.isContainedIn(
           Context.getObjCMetadataUpdateCallbackAvailability()))
       return ClassMetadataStrategy::Update;
@@ -2716,13 +3041,14 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                                   llvm::Value *metadata) {
   auto &layout = IGF.IGM.getClassMetadataLayout(theClass);
 
-  Address metadataAsBytes(IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy),
-                          IGF.IGM.getPointerAlignment());
+  Address metadataAsBytes(
+      IGF.Builder.CreateBitCast(metadata, IGF.IGM.Int8PtrTy), IGF.IGM.Int8Ty,
+      IGF.IGM.getPointerAlignment());
 
   Address slot = IGF.Builder.CreateConstByteArrayGEP(
       metadataAsBytes,
       layout.getInstanceSizeOffset());
-  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int32Ty->getPointerTo());
+  slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int32Ty);
   llvm::Value *size = IGF.Builder.CreateLoad(slot);
   if (IGF.IGM.SizeTy != IGF.IGM.Int32Ty)
     size = IGF.Builder.CreateZExt(size, IGF.IGM.SizeTy);
@@ -2730,7 +3056,7 @@ irgen::emitClassResilientInstanceSizeAndAlignMask(IRGenFunction &IGF,
   slot = IGF.Builder.CreateConstByteArrayGEP(
       metadataAsBytes,
       layout.getInstanceAlignMaskOffset());
-  slot = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int16Ty->getPointerTo());
+  slot = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int16Ty);
   llvm::Value *alignMask = IGF.Builder.CreateLoad(slot);
   alignMask = IGF.Builder.CreateZExt(alignMask, IGF.IGM.SizeTy);
 
@@ -2741,7 +3067,7 @@ llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
   assert(!method.getOverridden() && "must always be base method");
 
   auto entity = LinkEntity::forMethodDescriptor(method);
-  auto mangled = entity.mangleAsString();
+  auto mangled = entity.mangleAsString(IGM.Context);
   auto typeId = llvm::MDString::get(*IGM.LLVMContext, mangled);
   return typeId;
 }
@@ -2751,9 +3077,7 @@ static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
   if (IGF.IGM.getOptions().VirtualFunctionElimination) {
     // For LLVM IR VFE, emit a @llvm.type.checked.load with the type of the
     // method.
-    llvm::Function *checkedLoadIntrinsic = llvm::Intrinsic::getDeclaration(
-        &IGF.IGM.Module, llvm::Intrinsic::type_checked_load);
-    auto slotAsPointer = IGF.Builder.CreateBitCast(slot, IGF.IGM.Int8PtrTy);
+    auto slotAsPointer = IGF.Builder.CreateElementBitCast(slot, IGF.IGM.Int8Ty);
     auto typeId = typeIdForMethod(IGF.IGM, method);
 
     // Arguments for @llvm.type.checked.load: 1) target address, 2) offset -
@@ -2766,11 +3090,10 @@ static llvm::Value *emitVTableSlotLoad(IRGenFunction &IGF, Address slot,
 
     // TODO/FIXME: Using @llvm.type.checked.load loses the "invariant" marker
     // which could mean redundant loads don't get removed.
-    llvm::Value *checkedLoad =
-        IGF.Builder.CreateCall(checkedLoadIntrinsic, args);
+    llvm::Value *checkedLoad = IGF.Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::type_checked_load, args);
     auto fnPtr = IGF.Builder.CreateExtractValue(checkedLoad, 0);
-    return IGF.Builder.CreateBitCast(fnPtr,
-                                     signature.getType()->getPointerTo());
+    return IGF.Builder.CreateBitCast(fnPtr, IGF.IGM.PtrTy);
   }
 
   // Not doing LLVM IR VFE, can just be a direct load.
@@ -2792,29 +3115,39 @@ FunctionPointer irgen::emitVirtualMethodValue(IRGenFunction &IGF,
   case ClassMetadataLayout::MethodInfo::Kind::Offset: {
     auto offset = methodInfo.getOffset();
 
-    auto slot = IGF.emitAddressAtOffset(metadata, offset,
-                                        signature.getType()->getPointerTo(),
+    auto slot = IGF.emitAddressAtOffset(metadata, offset, IGF.IGM.PtrTy,
                                         IGF.IGM.getPointerAlignment());
     auto fnPtr = emitVTableSlotLoad(IGF, slot, method, signature);
     auto &schema = methodType->isAsync()
                        ? IGF.getOptions().PointerAuth.AsyncSwiftClassMethods
+                   : methodType->isCalleeAllocatedCoroutine()
+                       ? IGF.getOptions().PointerAuth.CoroSwiftClassMethods
                        : IGF.getOptions().PointerAuth.SwiftClassMethods;
     auto authInfo =
       PointerAuthInfo::emit(IGF, schema, slot.getAddress(), method);
-    return FunctionPointer(methodType, fnPtr, authInfo, signature);
+    return FunctionPointer::createSigned(methodType, fnPtr, authInfo,
+                                         signature, true);
   }
   case ClassMetadataLayout::MethodInfo::Kind::DirectImpl: {
     auto fnPtr = llvm::ConstantExpr::getBitCast(methodInfo.getDirectImpl(),
-                                           signature.getType()->getPointerTo());
+                                                IGF.IGM.PtrTy);
     llvm::Constant *secondaryValue = nullptr;
+    auto *accessor = dyn_cast<AccessorDecl>(method.getDecl());
     if (cast<AbstractFunctionDecl>(method.getDecl())->hasAsync()) {
       auto *silFn = IGF.IGM.getSILFunctionForAsyncFunctionPointer(
           methodInfo.getDirectImpl());
       secondaryValue = cast<llvm::Constant>(
           IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
+    } else if (accessor &&
+               requiresFeatureCoroutineAccessors(accessor->getAccessorKind())) {
+      assert(methodType->isCalleeAllocatedCoroutine());
+      auto *silFn = IGF.IGM.getSILFunctionForCoroFunctionPointer(
+          methodInfo.getDirectImpl());
+      secondaryValue = cast<llvm::Constant>(
+          IGF.IGM.getAddrOfSILFunction(silFn, NotForDefinition));
     }
     return FunctionPointer::forDirect(methodType, fnPtr, secondaryValue,
-                                      signature);
+                                      signature, true);
   }
   }
   llvm_unreachable("covered switch");
@@ -2826,7 +3159,6 @@ irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                               SILType baseType,
                               SILDeclRef method,
                               CanSILFunctionType methodType,
-                              GenericSignature fnSig,
                               bool useSuperVTable) {
   // Find the metadata.
   llvm::Value *metadata;
@@ -2845,10 +3177,19 @@ irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       metadata = base;
     } else {
       // Otherwise, load the class metadata from the 'self' value's isa pointer.
-      metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType, fnSig,
+      metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
                                                   /*suppress cast*/ true);
     }
   }
 
   return emitVirtualMethodValue(IGF, metadata, method, methodType);
+}
+
+void IRGenerator::ensureRelativeSymbolCollocation(SILDefaultOverrideTable &ot) {
+  if (!CurrentIGM)
+    return;
+
+  for (auto &entry : ot.getEntries()) {
+    forceLocalEmitOfLazyFunction(entry.impl);
+  }
 }

@@ -1,7 +1,8 @@
-// RUN: %target-swift-frontend -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize
-// RUN: %target-swift-frontend -enable-type-layout -force-struct-type-layouts -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=FORCE-OPT --check-prefix=FORCE-OPT-%target-ptrsize
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
+// RUN: %target-swift-frontend -disable-availability-checking -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -disable-availability-checking -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize --check-prefix=OPT-%target-ptrauth
+// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
+
+// REQUIRES: PTRSIZE=64
 
 public struct B<T> {
   var x: T
@@ -43,11 +44,11 @@ public enum ForwardEnum<T> {
   case None
 }
 
-// NOTL-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwCP"(
+// NOTL-LABEL: define{{.*}} ptr @"$s30typelayout_based_value_witness1AVwCP"(
 // NOTL:   @"$s30typelayout_based_value_witness1BVMa"(
 // NOTL: }
 
-// CHECK-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwCP"(
+// CHECK-LABEL: define{{.*}} ptr @"$s30typelayout_based_value_witness1AVwCP"(
 // CHECK-NOT:   @"$s30typelayout_based_value_witness1BVMa"(
 // CHECK: }
 
@@ -55,19 +56,19 @@ public enum ForwardEnum<T> {
 // CHECK-NOT: @"$s30typelayout_based_value_witness1BVMa"
 // CHECK: }
 
-// CHECK-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwcp"(
+// CHECK-LABEL: define{{.*}} ptr @"$s30typelayout_based_value_witness1AVwcp"(
 // CHECK-NOT: @"$s30typelayout_based_value_witness1BVMa"
 // CHECK: }
 
-// CHECK-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwca"(
+// CHECK-LABEL: define{{.*}} ptr @"$s30typelayout_based_value_witness1AVwca"(
 // CHECK-NOT: @"$s30typelayout_based_value_witness1BVMa"
 // CHECK: }
 
-// CHECK-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwtk"(
+// CHECK-LABEL: define{{.*}} ptr @"$s30typelayout_based_value_witness1AVwtk"(
 // CHECK-NOT: @"$s30typelayout_based_value_witness1BVMa"
 // CHECK: }
 
-// CHECK-LABEL: define{{.*}} %swift.opaque* @"$s30typelayout_based_value_witness1AVwta"(
+// CHECK-LABEL: define{{.*}} ptr @"$s30typelayout_based_value_witness1AVwta"(
 // CHECK-NOT: @"$s30typelayout_based_value_witness1BVMa"
 // CHECK: }
 
@@ -80,78 +81,56 @@ public enum ForwardEnum<T> {
 // CHECK: }
 
 
-// OPT: define{{.*}} void @"$s30typelayout_based_value_witness1AVwxx"(%swift.opaque* noalias %object, %swift.type* nocapture readonly %"A<T>")
-// OPT:   [[T_PARAM:%.*]] = getelementptr inbounds %swift.type, %swift.type* %"A<T>", {{(i64|i32)}} 2
-// OPT:   [[T2:%.*]] = bitcast %swift.type* [[T_PARAM]] to %swift.type**
-// OPT:   [[T:%.*]] = load %swift.type*, %swift.type** [[T2]]
-// OPT:   [[VWT_ADDR:%.*]] = getelementptr inbounds %swift.type, %swift.type* [[T]], {{(i64|i32)}} -1
-// OPT:   [[VWT2:%.*]] = bitcast %swift.type* [[VWT_ADDR]] to i8***
-// OPT:   [[VWT:%.*]] = load i8**, i8*** [[VWT2]]
-// OPT:   [[DESTROY_VW:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], {{(i64|i32)}} 1
-// OPT:   [[DESTROY2:%.*]] = bitcast i8** [[DESTROY_VW]] to void (%swift.opaque*, %swift.type*)**
-// OPT:   [[DESTROY:%.*]] = load void (%swift.opaque*, %swift.type*)*, void (%swift.opaque*, %swift.type*)** [[DESTROY2]]
-// OPT:   tail call void [[DESTROY]](%swift.opaque* noalias %object, %swift.type* [[T]])
-// OPT:   [[SIZE_VW:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], {{(i64|i32)}} 8
-// OPT:   [[SIZE2:%.*]] = bitcast i8** [[SIZE_VW]] to {{(i64|i32)}}*
-// OPT:   [[SIZE_T:%.*]] = load {{(i64|i32)}}, {{(i64|i32)}}* [[SIZE2]]
-// OPT:   [[OBJECT:%.*]] = ptrtoint %swift.opaque* %object to {{(i64|i32)}}
-// OPT:   [[FLAGS_VW:%.*]] = getelementptr inbounds i8*, i8** [[VWT]], {{(i64|i32)}} 10
-// OPT:   [[FLAGS2:%.*]] = bitcast i8** [[FLAGS_VW]] to i32*
-// OPT:   [[FLAGS3:%.*]] = load i32, i32* [[FLAGS2]]
+// OPT: define{{.*}} void @"$s30typelayout_based_value_witness1AVwxx"(ptr noalias %object, ptr readonly captures(none) %"A<T>")
+// OPT:   [[T_PARAM:%.*]] = getelementptr inbounds{{.*}} i8, ptr %"A<T>", i64 16
+// OPT:   [[T:%.*]] = load ptr, ptr [[T_PARAM]]
+// OPT:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8, ptr [[T]], {{(i64|i32)}} -8
+
+// OPT-noptrauth:   [[VWT:%.*]] = load ptr, ptr [[VWT_ADDR]]
+
+// OPT-ptrauth: [[ADDR_INT:%.*]] = ptrtoint ptr [[VWT_ADDR]] to i64
+// OPT-ptrauth: [[DISCRIMINANT:%.*]] = tail call i64 @llvm.ptrauth.blend(i64 [[ADDR_INT]], i64 11839)
+// OPT-ptrauth: [[SIGNED_VWT:%.*]] = ptrtoint ptr %T.valueWitnesses
+// OPT-ptrauth: [[VWT_INT:%.*]] = tail call i64 @llvm.ptrauth.auth(i64 [[SIGNED_VWT]], i32 2, i64 [[DISCRIMINANT]])
+// OPT-ptrauth: [[VWT:%.*]] = inttoptr i64 [[VWT_INT]] to ptr
+
+// OPT:   [[DESTROY_VW:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[VWT]], {{(i64|i32)}} 8
+// OPT:   [[DESTROY:%.*]] = load ptr, ptr [[DESTROY_VW]]
+
+// OPT-ptrauth: [[DESTROY_ADDR:%.*]] = ptrtoint ptr [[DESTROY_VW]] to i64
+// OPT-ptrauth: [[DISCRIMINANT:%.*]] = tail call i64 @llvm.ptrauth.blend(i64 [[DESTROY_ADDR]], i64 1272)
+
+// OPT:   tail call void [[DESTROY]](ptr noalias %object, ptr [[T]])
+// OPT:   [[SIZE_VW:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[VWT]], {{(i64|i32)}} 64
+// OPT:   [[SIZE_T:%.*]] = load {{(i64|i32)}}, ptr [[SIZE_VW]]
+// OPT:   [[OBJECT:%.*]] = ptrtoint ptr %object to {{(i64|i32)}}
+// OPT:   [[FLAGS_VW:%.*]] = getelementptr inbounds{{.*}} i8, ptr [[VWT]], {{(i64|i32)}} 80
+// OPT:   [[FLAGS3:%.*]] = load i32, ptr [[FLAGS_VW]]
 // OPT:   [[FLAGS:%.*]] = and i32 [[FLAGS3]], 255
-// OPT-64:   %flags.alignmentMask = zext i32 [[FLAGS]] to i64
+// OPT-64:   %flags.alignmentMask = zext nneg i32 [[FLAGS]] to i64
 // OPT-64:   [[TMP:%.*]] = add {{(i64|i32)}} [[SIZE_T]], %flags.alignmentMask
 // OPT-32:   [[TMP:%.*]] = add {{(i64|i32)}} %flags.alignmentMask, [[SIZE_T]]
 // OPT:   [[TMP2:%.*]] = add {{(i64|i32)}} [[TMP]], [[OBJECT]]
 // OPT:   [[INVERTED:%.*]] = xor {{(i64|i32)}} %flags.alignmentMask, -1
 // OPT:   [[ADDR2:%.*]] = and {{(i64|i32)}} [[TMP2:%.*]], [[INVERTED:%.*]]
-// OPT:   [[ADDR_T2:%.*]] = inttoptr {{(i64|i32)}} [[ADDR2]] to %swift.opaque*
-// OPT:   tail call void [[DESTROY]](%swift.opaque* noalias [[ADDR_T2]], %swift.type* [[T]])
+// OPT:   [[ADDR_T2:%.*]] = inttoptr {{(i64|i32)}} [[ADDR2]] to ptr
+// OPT:   tail call void [[DESTROY]](ptr noalias [[ADDR_T2]], ptr [[T]])
 // OPT:   [[TMP3:%.*]] = and {{(i64|i32)}} [[TMP]], [[INVERTED:%.*]]
 // OPT:   [[TMP4:%.*]] = add {{(i64|i32)}} [[TMP2:%.*]], [[TMP3]]
 // OPT:   [[ADDR3:%.*]] = and {{(i64|i32)}} [[TMP4]], [[INVERTED:%.*]]
-// OPT:   [[ADDR_T3:%.*]] = inttoptr {{(i64|i32)}} [[ADDR3]] to %swift.opaque*
-// OPT:   tail call void [[DESTROY]](%swift.opaque* noalias [[ADDR_T3]], %swift.type* [[T]])
+// OPT:   [[ADDR_T3:%.*]] = inttoptr {{(i64|i32)}} [[ADDR3]] to ptr
+// OPT:   tail call void [[DESTROY]](ptr noalias [[ADDR_T3]], ptr [[T]])
 // OPT:   [[TMP5:%.*]] = add {{(i64|i32)}} [[TMP]], [[ADDR3]]
 // OPT:   [[ADDR4:%.*]] = and {{(i64|i32)}} [[TMP5]], [[INVERTED:%.*]]
-// OPT:   [[ADDR_T4:%.*]] = inttoptr {{(i64|i32)}} [[ADDR4]] to %swift.opaque*
-// OPT:   tail call void [[DESTROY]](%swift.opaque* noalias [[ADDR_T4]], %swift.type* [[T]])
+// OPT:   [[ADDR_T4:%.*]] = inttoptr {{(i64|i32)}} [[ADDR4]] to ptr
+// OPT:   tail call void [[DESTROY]](ptr noalias [[ADDR_T4]], ptr [[T]])
 // OPT:   ret void
 // CHECK: }
 
-// FORCE-OPT: define{{.*}} void @"$s30typelayout_based_value_witness5FixedVwxx"(%swift.opaque* noalias nocapture readonly %object, %swift.type* nocapture readnone %"Fixed<T>")
-// For fixed types, we should expect a direct gep to the address instead of a
-// manual alignment computation only if we force creating aligned groups for structs
-// FORCE-OPT:  [[T_PARAM:%.*]] = bitcast %swift.opaque* %object to i8*
-// FORCE-OPT:  [[OFFSET:%.*]] = getelementptr inbounds i8, i8* [[T_PARAM]], {{(i64|i32)}} {{4|8}}
-// FORCE-OPT:  [[CASTED:%.*]] = bitcast i8* [[OFFSET]] to %T30typelayout_based_value_witness1CC**
-// FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]]
-// FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
-// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]])
-// FORCE-OPT:  ret void
-// FORCE-OPT:}
-
-// FORCE-OPT: define{{.*}} void @"$s30typelayout_based_value_witness12NullableEnumOwxx"(%swift.opaque* noalias nocapture readonly %object, %swift.type* nocapture readnone %"NullableEnum<T>")
-// For enums with a pointer type and a single empty case, the empty case should
-// get encoded as the 0 value, so it should not generate a branch
-// FORCE-OPT: %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** %{{.*}}
-// FORCE-OPT: [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
-// FORCE-OPT: tail call void @swift_release(%swift.refcounted* [[FIELD]])
-// FORCE-OPT: ret void
-// FORCE-OPT:}
-
-// FORCE-OPT: define{{.*}} void @"$s30typelayout_based_value_witness11ForwardEnumOwxx"(%swift.opaque* noalias nocapture readonly %object, %swift.type* nocapture readnone %"ForwardEnum<T>")
-// Since fixed is able to hold the one extra tag required in it's pointer field,
-// it's safe to release it without checking the case. We should not see a branch here
-// FORCE-OPT:  [[T_PARAM:%.*]] = bitcast %swift.opaque* %object to i8*
-// FORCE-OPT:  [[OFFSET:%.*]] = getelementptr inbounds i8, i8* [[T_PARAM]], {{(i64|i32)}} {{(8|16)}}
-// FORCE-OPT:  [[CASTED:%.*]] = bitcast i8* [[OFFSET]] to %T30typelayout_based_value_witness1CC**
-// FORCE-OPT:  %toDestroy = load %T30typelayout_based_value_witness1CC*, %T30typelayout_based_value_witness1CC** [[CASTED]]
-// FORCE-OPT:  [[FIELD:%.*]] = getelementptr %T30typelayout_based_value_witness1CC, %T30typelayout_based_value_witness1CC* %toDestroy, {{(i64|i32)}} 0, i32 0
-// FORCE-OPT:  tail call void @swift_release(%swift.refcounted* [[FIELD]])
-// FORCE-OPT:  ret void
-// FORCE-OPT:}
-
+// OPT: define internal void @"$s30typelayout_based_value_witness2E3Owui"(ptr noalias writeonly captures(none) %value, i32 %tag, ptr readonly captures(none) %"E3<T>")
+// OPT:  [[IS_EMPTY:%.*]] = icmp eq i32 {{%.*}}, 0
+// OPT:  br i1 [[IS_EMPTY]], label %empty-payload, label %non-empty-payload
+// OPT: }
 
 // Let's not crash on the following example.
 public protocol P {}
@@ -170,4 +149,57 @@ public struct S<T: P> {
 public enum E2<T: P> {
     case first(Ref<T>)
     case second(String)
+}
+
+public enum E3<T> {
+  case empty
+  case first(T)
+  case second(T)
+}
+
+// Value types storing large InlineArray can have excessively large value witnesses #88579
+
+// CHECK:      define {{.*}} void @"$s30typelayout_based_value_witness2S1Vwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK:        [[CASEVAL:%[0-9]+]] = trunc i32 [[CASEID:%[0-9]+]] to i8
+// CHECK-NEXT:   store i8 [[CASEVAL]], ptr %value, align 1
+// CHECK-NOT:    memset
+// CHECK:      }
+struct S1 {
+  var a: InlineArray<1, Int8>
+}
+
+// CHECK:     define {{.*}} void @"$s30typelayout_based_value_witness4S16BVwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK-NOT:   memset
+// CHECK:     }
+struct S16B {
+  var a: InlineArray<16, Int8>
+}
+
+// CHECK:     define {{.*}} void @"$s30typelayout_based_value_witness4S17BVwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK:       memset
+// CHECK:     }
+struct S17B {
+  var a: InlineArray<17, Int8>
+}
+
+
+// CHECK:      define {{.*}} void @"$s30typelayout_based_value_witness3S10Vwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK:        [[CASEVAL:%[0-9]+]] = zext i32 [[CASEID:%[0-9]+]] to i64
+// CHECK-NEXT:   store i64 [[CASEVAL]], ptr %value, align 8
+// CHECK-NEXT:   [[PAYLOAD_BASE:%[0-9]+]] = getelementptr inbounds i8, ptr %value, i32 8
+// CHECK-NEXT:   call void @llvm.memset.p0.i64(ptr align 8 [[PAYLOAD_BASE]], i8 0, i64 72, i1 false)
+// CHECK:      }
+struct S10 {
+    var a: InlineArray<10, Int>
+}
+
+// CHECK:      define {{.*}} void @"$s30typelayout_based_value_witness4S100Vwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK:        entry:
+// CHECK:        [[CASEVAL:%[0-9]+]] = zext i32 [[CASEID:%[0-9]+]] to i64
+// CHECK-NEXT:   store i64 [[CASEVAL]], ptr %value, align 8
+// CHECK-NEXT:   [[PAYLOAD_BASE:%[0-9]+]] = getelementptr inbounds i8, ptr %value, i32 8
+// CHECK-NEXT:   call void @llvm.memset.p0.i64(ptr align 8 [[PAYLOAD_BASE]], i8 0, i64 792, i1 false)
+// CHECK:      }
+struct S100 {
+    var a: InlineArray<100, Int>
 }

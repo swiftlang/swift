@@ -24,6 +24,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/raw_ostream.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/AST/Comment.h"
 #include "clang/AST/Decl.h"
 #include "clang/Index/CommentToXML.h"
 
@@ -70,6 +71,18 @@ struct CommentToXMLConverter {
 
   void printDocument(const Document *D) {
     llvm_unreachable("Can't print a swift::markup::Document as XML directly");
+  }
+
+  void printInlineAttributes(const InlineAttributes *A) {
+    OS << "<InlineAttributes attributes=\"";
+    appendWithXMLEscaping(OS, A->getAttributes());
+    OS << "\">";
+
+    for (const auto *N : A->getChildren()) {
+      printASTNode(N);
+    }
+
+    OS << "</InlineAttributes>";
   }
 
   void printBlockQuote(const BlockQuote *BQ) {
@@ -219,7 +232,7 @@ struct CommentToXMLConverter {
 
     if (PF->isClosureParameter()) {
       OS << "<ClosureParameter>";
-      visitCommentParts(PF->getParts().getValue());
+      visitCommentParts(PF->getParts().value());
       OS << "</ClosureParameter>";
     } else {
       OS << "<Discussion>";
@@ -264,9 +277,9 @@ struct CommentToXMLConverter {
 } // unnamed namespace
 
 void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts &Parts) {
-  if (Parts.Brief.hasValue()) {
+  if (Parts.Brief.has_value()) {
     OS << "<Abstract>";
-    printASTNode(Parts.Brief.getValue());
+    printASTNode(Parts.Brief.value());
     OS << "</Abstract>";
   }
 
@@ -278,14 +291,14 @@ void CommentToXMLConverter::visitCommentParts(const swift::markup::CommentParts 
     OS << "</Parameters>";
   }
 
-  if (Parts.ReturnsField.hasValue())
-    printResultDiscussion(Parts.ReturnsField.getValue());
+  if (Parts.ReturnsField.has_value())
+    printResultDiscussion(Parts.ReturnsField.value());
 
-  if (Parts.ThrowsField.hasValue())
-    printThrowsDiscussion(Parts.ThrowsField.getValue());
+  if (Parts.ThrowsField.has_value())
+    printThrowsDiscussion(Parts.ThrowsField.value());
 
   if (!Parts.Tags.empty()) {
-    printTagFields(llvm::makeArrayRef(Parts.Tags.begin(), Parts.Tags.end()));
+    printTagFields(llvm::ArrayRef(Parts.Tags.begin(), Parts.Tags.end()));
   }
 
   if (!Parts.BodyNodes.empty()) {
@@ -368,7 +381,7 @@ visitDocComment(const DocComment *DC, TypeOrExtensionDecl SynthesizedTarget) {
     PO.VarInitializers = false;
     PO.ShouldQualifyNestedDeclarations =
         PrintOptions::QualifyNestedDeclarations::TypesOnly;
-    PO.SkipUnderscoredStdlibProtocols = false;
+    PO.SkipUnderscoredSystemProtocols = false;
     if (SynthesizedTarget)
       PO.initForSynthesizedExtension(SynthesizedTarget);
 
@@ -456,6 +469,32 @@ std::string ide::extractPlainTextFromComment(const StringRef Text) {
   return getLineListFromComment(SourceMgr, MC, Text).str();
 }
 
+static DocComment *getCascadingDocComment(swift::markup::MarkupContext &MC,
+                                          const Decl *D) {
+  auto *docD = D->getDocCommentProvidingDecl();
+  if (!docD)
+    return nullptr;
+
+  auto *doc = getSingleDocComment(MC, docD);
+  assert(doc && "getDocCommentProvidingDecl() returned decl with no comment");
+
+  // If the doc-comment is inherited from other decl, add a note about it.
+  if (docD != D) {
+    doc->setDecl(D);
+    if (auto baseD = docD->getDeclContext()->getSelfNominalTypeDecl()) {
+      doc->addInheritanceNote(MC, baseD);
+
+      // If the doc is inherited from protocol requirement, associate the
+      // requirement with the doc-comment.
+      // FIXME: This is to keep the old behavior.
+      if (isa<ProtocolDecl>(baseD))
+        doc->setDecl(docD);
+    }
+  }
+
+  return doc;
+}
+
 bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS,
                                        TypeOrExtensionDecl SynthesizedTarget) {
   auto MaybeClangNode = D->getClangNode();
@@ -484,6 +523,38 @@ bool ide::getDocumentationCommentAsXML(const Decl *D, raw_ostream &OS,
   return true;
 }
 
+bool ide::getRawDocumentationComment(const Decl *D, raw_ostream &OS) {
+  ClangNode MaybeClangNode = D->getClangNode();
+  if (MaybeClangNode) {
+    const clang::Decl *CD = MaybeClangNode.getAsDecl();
+    if (!CD) {
+      return false;
+    }
+    const clang::ASTContext &ClangContext = CD->getASTContext();
+    const clang::comments::FullComment *FC =
+      ClangContext.getCommentForDecl(CD, /*PP=*/nullptr);
+    if (!FC) {
+      return false;
+    }
+    const clang::RawComment *rawComment = ClangContext.getRawCommentForAnyRedecl(FC->getDecl());
+    if (!rawComment) {
+      return false;
+    }
+    OS << rawComment->getFormattedText(ClangContext.getSourceManager(),
+                                       ClangContext.getDiagnostics());
+    return true;
+  }
+
+  const Decl *docD = D->getDocCommentProvidingDecl();
+  if (!docD) {
+    return false;
+  }
+  RawComment rawComment = docD->getRawComment();
+  OS << swift::markup::MarkupContext().getLineList(rawComment).str();
+  OS.flush();
+  return true;
+}
+
 bool ide::getLocalizationKey(const Decl *D, raw_ostream &OS) {
   swift::markup::MarkupContext MC;
   auto DC = getCascadingDocComment(MC, D);
@@ -491,7 +562,7 @@ bool ide::getLocalizationKey(const Decl *D, raw_ostream &OS) {
     return false;
 
   if (const auto LKF = DC->getLocalizationKeyField()) {
-    printInlinesUnder(LKF.getValue(), OS);
+    printInlinesUnder(LKF.value(), OS);
     return true;
   }
 
@@ -560,9 +631,9 @@ class DoxygenConverter : public MarkupASTVisitor<DoxygenConverter> {
   }
 
   void printNestedParamField(const ParamField *PF) {
-    auto Parts = PF->getParts().getValue();
-    if (Parts.Brief.hasValue()) {
-      visit(Parts.Brief.getValue());
+    auto Parts = PF->getParts().value();
+    if (Parts.Brief.has_value()) {
+      visit(Parts.Brief.value());
     }
 
     if (!Parts.ParamFields.empty()) {
@@ -588,24 +659,24 @@ class DoxygenConverter : public MarkupASTVisitor<DoxygenConverter> {
       printNewline();
     }
 
-    if (Parts.ReturnsField.hasValue()) {
+    if (Parts.ReturnsField.has_value()) {
       printNewline();
       print("\\a ");
       print(PF->getName());
       print(" returns: ");
 
-      for (auto Child : Parts.ReturnsField.getValue()->getChildren()) {
+      for (auto Child : Parts.ReturnsField.value()->getChildren()) {
         visit(Child);
       }
     }
 
-    if (Parts.ThrowsField.hasValue()) {
+    if (Parts.ThrowsField.has_value()) {
       printNewline();
       print("\\a ");
       print(PF->getName());
       print(" error: ");
 
-      for (auto Child : Parts.ThrowsField.getValue()->getChildren()) {
+      for (auto Child : Parts.ThrowsField.value()->getChildren()) {
         visit(Child);
       }
     }
@@ -635,6 +706,12 @@ public:
 
   void visitDocument(const Document *D) {
     for (const auto *Child : D->getChildren())
+      visit(Child);
+  }
+
+  void visitInlineAttributes(const InlineAttributes *A) {
+    // attributed strings don't have an analogue in Doxygen, so just print out the text
+    for (const auto *Child : A->getChildren())
       visit(Child);
   }
 
@@ -823,8 +900,8 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
   DoxygenConverter Converter(OS);
 
   auto Brief = DC->getBrief();
-  if (Brief.hasValue()) {
-    Converter.visit(Brief.getValue());
+  if (Brief.has_value()) {
+    Converter.visit(Brief.value());
   }
 
   for (const auto *N : DC->getBodyNodes()) {
@@ -840,15 +917,15 @@ void ide::getDocumentationCommentAsDoxygen(const DocComment *DC,
   }
 
   auto TF = DC->getThrowsField();
-  if (TF.hasValue()) {
+  if (TF.has_value()) {
     Converter.printNewline();
-    Converter.visit(TF.getValue());
+    Converter.visit(TF.value());
   }
 
   auto RF = DC->getReturnsField();
-  if (RF.hasValue()) {
+  if (RF.has_value()) {
     Converter.printNewline();
-    Converter.visit(RF.getValue());
+    Converter.visit(RF.value());
   }
 }
 

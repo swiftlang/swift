@@ -7,8 +7,8 @@
 // BEGIN MyModule.swift
 
 public protocol HasAssocWithConstraint {
-  associatedtype AssocWithContraint: HasAssocWithConstraint
-  var value: AssocWithContraint { get }
+  associatedtype AssocWithConstraint: HasAssocWithConstraint
+  var value: AssocWithConstraint { get }
 }
 
 // BEGIN Test.swift
@@ -16,7 +16,5 @@ import MyModule
 
 struct MyValue: HasAssocWithConstraint {
   var #^OPAQUE_RESULT^#
-// OPAQUE_RESULT: Begin completions
 // OPAQUE_RESULT-DAG: Decl[InstanceVar]/Super: value: some HasAssocWithConstraint;
-// OPAQUE_RESULT: End completions
 }

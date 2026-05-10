@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name witnesses -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name witnesses -Xllvm -sil-full-demangle %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 
 infix operator <~>
 
@@ -44,16 +44,16 @@ protocol Existentiable {
 func protocol_method(x: Existentiable) -> Loadable {
   return x.foo()
 }
-// CHECK-LABEL: sil hidden [ossa] @$s9witnesses15protocol_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed Existentiable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Existentiable]], #Existentiable.foo :
+// CHECK-LABEL: sil hidden [ossa] @$s9witnesses15protocol_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed any Existentiable) -> Loadable {
+// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened\(.*, any Existentiable\) Self]], #Existentiable.foo :
 // CHECK:         apply [[METHOD]]<[[OPENED]]>({{%.*}})
 // CHECK:       }
 
 func protocol_generic_method(x: Existentiable) -> Loadable {
   return x.generic()
 }
-// CHECK-LABEL: sil hidden [ossa] @$s9witnesses23protocol_generic_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed Existentiable) -> Loadable {
-// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened(.*) Existentiable]], #Existentiable.generic :
+// CHECK-LABEL: sil hidden [ossa] @$s9witnesses23protocol_generic_method1xAA8LoadableVAA13Existentiable_p_tF : $@convention(thin) (@in_guaranteed any Existentiable) -> Loadable {
+// CHECK:         [[METHOD:%.*]] = witness_method $[[OPENED:@opened\(.*, any Existentiable\) Self]], #Existentiable.generic :
 // CHECK:         apply [[METHOD]]<[[OPENED]], Loadable>({{%.*}}, {{%.*}})
 // CHECK:       }
 
@@ -61,8 +61,8 @@ func protocol_generic_method(x: Existentiable) -> Loadable {
   func foo()
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s9witnesses20protocol_objc_method1xyAA8ObjCAble_p_tF : $@convention(thin) (@guaranteed ObjCAble) -> ()
-// CHECK:         objc_method {{%.*}} : $@opened({{.*}}) ObjCAble, #ObjCAble.foo!foreign
+// CHECK-LABEL: sil hidden [ossa] @$s9witnesses20protocol_objc_method1xyAA8ObjCAble_p_tF : $@convention(thin) (@guaranteed any ObjCAble) -> ()
+// CHECK:         objc_method {{%.*}} : $@opened({{.*}}, any ObjCAble) Self, #ObjCAble.foo!foreign
 func protocol_objc_method(x: ObjCAble) {
   x.foo()
 }
@@ -122,10 +122,10 @@ struct ConformingStruct : X {
   mutating
   func addrOnly(x: AddrOnly) -> AddrOnly { return x }
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses16ConformingStructVAA1XA2aDP8addrOnly{{[_0-9a-zA-Z]*}}FTW :
-  // CHECK:       bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformingStruct):
+  // CHECK:       bb0(%0 : $*any AddrOnly, %1 : $*any AddrOnly, %2 : $*ConformingStruct):
   // CHECK-NEXT:    // function_ref
-  // CHECK-NEXT:    %3 = function_ref @$s9witnesses16ConformingStructV8addrOnly{{[_0-9a-zA-Z]*}}F : $@convention(method) (@in_guaranteed AddrOnly, @inout ConformingStruct) -> @out AddrOnly
-  // CHECK-NEXT:    %4 = apply %3(%0, %1, %2) : $@convention(method) (@in_guaranteed AddrOnly, @inout ConformingStruct) -> @out AddrOnly
+  // CHECK-NEXT:    %3 = function_ref @$s9witnesses16ConformingStructV8addrOnly{{[_0-9a-zA-Z]*}}F : $@convention(method) (@in_guaranteed any AddrOnly, @inout ConformingStruct) -> @out any AddrOnly
+  // CHECK-NEXT:    %4 = apply %3(%0, %1, %2) : $@convention(method) (@in_guaranteed any AddrOnly, @inout ConformingStruct) -> @out any AddrOnly
   // CHECK-NEXT:    %5 = tuple ()
   // CHECK-NEXT:    return %5 : $()
   // CHECK-NEXT:  }
@@ -226,10 +226,10 @@ struct ConformsWithMoreGeneric : X, Y {
   mutating
   func addrOnly<G>(x: G) -> G { return x }
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses23ConformsWithMoreGenericVAA1XA2aDP8addrOnly{{[_0-9a-zA-Z]*}}FTW :
-  // CHECK:       bb0(%0 : $*AddrOnly, %1 : $*AddrOnly, %2 : $*ConformsWithMoreGeneric):
+  // CHECK:       bb0(%0 : $*any AddrOnly, %1 : $*any AddrOnly, %2 : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    // function_ref
   // CHECK-NEXT:    %3 = function_ref @$s9witnesses23ConformsWithMoreGenericV8addrOnly{{[_0-9a-zA-Z]*}}F : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
-  // CHECK-NEXT:    %4 = apply %3<AddrOnly>(%0, %1, %2) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
+  // CHECK-NEXT:    %4 = apply %3<any AddrOnly>(%0, %1, %2) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
   // CHECK-NEXT:    [[RESULT:%.*]] = tuple ()
   // CHECK-NEXT:    return [[RESULT]] : $()
   // CHECK-NEXT:  }
@@ -250,15 +250,14 @@ struct ConformsWithMoreGeneric : X, Y {
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses23ConformsWithMoreGenericVAA1XA2aDP7classes{{[_0-9a-zA-Z]*}}FTW :
   // CHECK:       bb0([[ARG0:%.*]] : @guaranteed $τ_0_0, [[ARG1:%.*]] : $*ConformsWithMoreGeneric):
   // CHECK-NEXT:    [[SELF_BOX:%.*]] = alloc_stack $τ_0_0
-  // CHECK-NEXT:    [[ARG0_COPY:%.*]] = copy_value [[ARG0]]
-  // CHECK-NEXT:    store [[ARG0_COPY]] to [init] [[SELF_BOX]] : $*τ_0_0
+  // CHECK-NEXT:    [[SELF_BOX_BORROW:%.*]] = store_borrow [[ARG0]] to [[SELF_BOX]]
   // CHECK-NEXT:    // function_ref witnesses.ConformsWithMoreGeneric.classes
   // CHECK-NEXT:    [[WITNESS_FN:%.*]] = function_ref @$s9witnesses23ConformsWithMoreGenericV7classes{{[_0-9a-zA-Z]*}}F : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
   // CHECK-NEXT:    [[RESULT_BOX:%.*]] = alloc_stack $τ_0_0
-  // CHECK-NEXT:    [[RESULT:%.*]] = apply [[WITNESS_FN]]<τ_0_0>([[RESULT_BOX]], [[SELF_BOX]], %1) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
+  // CHECK-NEXT:    [[RESULT:%.*]] = apply [[WITNESS_FN]]<τ_0_0>([[RESULT_BOX]], [[SELF_BOX_BORROW]], %1) : $@convention(method) <τ_0_0> (@in_guaranteed τ_0_0, @inout ConformsWithMoreGeneric) -> @out τ_0_0
   // CHECK-NEXT:    [[RESULT:%.*]] = load [take] [[RESULT_BOX]] : $*τ_0_0
   // CHECK-NEXT:    dealloc_stack [[RESULT_BOX]] : $*τ_0_0
-  // CHECK-NEXT:    destroy_addr [[SELF_BOX]]
+  // CHECK-NEXT:    end_borrow [[SELF_BOX_BORROW]]
   // CHECK-NEXT:    dealloc_stack [[SELF_BOX]] : $*τ_0_0
   // CHECK-NEXT:    return [[RESULT]] : $τ_0_0
   // CHECK-NEXT:  }
@@ -435,7 +434,7 @@ struct GenericParameterNameCollision<T: HasAssoc> :
   func foo<U>(_ x: U) {}
 
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses29GenericParameterNameCollisionVyxGAA0bcdE8ProtocolA2aEP3baryy6Assoc2Qzqd__XElFTW :
-  // CHECK:       bb0(%0 : ${{.*}}, %1 : $*{{.*}}):
+  // CHECK:       bb0(%0 : @guaranteed ${{.*}}, %1 : $*{{.*}}):
   // CHECK:         apply {{%.*}}<τ_0_0, τ_1_0>
   func bar<V>(_ x: (V) -> T.Assoc) {}
 }
@@ -512,7 +511,7 @@ class CrashableBase {
 class GenericCrashable<T> : CrashableBase, Crashable {}
 
 // rdar://problem/35297911: allow witness with a noescape parameter to
-// match a requirement with an escaping paameter.
+// match a requirement with an escaping parameter.
 protocol EscapingReq {
   func f(_: @escaping (Int) -> Int)
 }

@@ -11,13 +11,30 @@
   public init() {}
 }
 @_spi(S) public protocol SPIProtocol {}
+public enum PublicEnum {
+  case publicCase
+  @_spi(S) case spiCase
+}
 
 public func useOfSPITypeOk(_ p0: SPIProtocol, p1: SPIClass) -> SPIClass { fatalError() }
 
 @inlinable
-func inlinable() -> SPIClass {
+public func inlinable() -> SPIClass {
   spiFunc()
   _ = SPIClass()
+}
+
+@inlinable
+public func inlinable(_ e: PublicEnum) {
+  switch e {
+  case .publicCase: break
+  case .spiCase: break
+  @unknown default: break
+  }
+
+  if case .spiCase = e {}
+
+  _ = PublicEnum.spiCase
 }
 
 @frozen public struct FrozenStruct {

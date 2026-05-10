@@ -1,5 +1,9 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+
 // REQUIRES: concurrency
+// REQUIRES: asserts
 
 // expected-note@+2{{add 'async' to function 'missingAsync' to make it asynchronous}}
 @available(SwiftStdlib 5.1, *)
@@ -9,7 +13,8 @@ func missingAsync<T : AsyncSequence>(_ seq: T) throws {
 
 @available(SwiftStdlib 5.1, *)
 func missingThrows<T : AsyncSequence>(_ seq: T) async {
-  for try await _ in seq { } // expected-error{{error is not handled because the enclosing function is not declared 'throws'}}
+  for try await _ in seq { } 
+  // expected-error@-1 {{errors thrown from here are not handled}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -27,7 +32,8 @@ func missingThrowingInBlock<T : AsyncSequence>(_ seq: T) {
 @available(SwiftStdlib 5.1, *)
 func missingTryInBlock<T : AsyncSequence>(_ seq: T) { 
   executeAsync { 
-    for await _ in seq { } // expected-error{{call can throw, but the error is not handled}}
+    for await _ in seq { } 
+    // expected-error@-1{{call can throw, but it is not marked with 'try' and the error is not handled}}
   }
 }
 
@@ -43,7 +49,6 @@ func missingAsyncInBlock<T : AsyncSequence>(_ seq: T) {
 @available(SwiftStdlib 5.1, *)
 func doubleDiagCheckGeneric<T : AsyncSequence>(_ seq: T) async {
   var it = seq.makeAsyncIterator()
-  // expected-note@+2{{call is to 'rethrows' function, but a conformance has a throwing witness}}
   // expected-error@+1{{call can throw, but it is not marked with 'try' and the error is not handled}}
   let _ = await it.next()
 }
@@ -81,4 +86,46 @@ func forAwaitWithConcreteType(_ seq: ThrowingAsyncSequence) throws { // expected
   for try await elt in seq { // expected-error {{'async' in a function that does not support concurrency}}
     _ = elt
   }
+}
+
+@available(SwiftStdlib 5.1, *)
+func forTryAwaitReturningExistentialType() async throws {
+  struct S {
+    func seq() -> any AsyncSequence { fatalError() }
+  }
+
+  for try await _ in S().seq() { // Ok
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+public struct ReaderSeq: AsyncSequence, Sendable {
+  public enum Failure: Error {
+    case x
+  }
+
+  public typealias Element = Int
+
+  public func makeAsyncIterator() -> Reader {}
+
+  public actor Reader: AsyncIteratorProtocol {
+    public func next() async throws -> Element? {}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func test1() -> Error {
+  return ReaderSeq.Failure.x
+}
+
+@available(SwiftStdlib 5.1, *)
+public struct MineOwnIterator<Element>: AsyncSequence, AsyncIteratorProtocol {
+  public mutating func next() async -> Element? { nil }
+  public func makeAsyncIterator() -> Self { self }
+
+  @_implements(AsyncIteratorProtocol, Failure)
+  public typealias __AsyncIteratorProtocol_Failure = Never
+
+  @_implements(AsyncSequence, Failure)
+  public typealias __AsyncSequence_Failure = Never
 }

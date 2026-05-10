@@ -22,13 +22,15 @@
 #include "SourceKit/Support/Tracing.h"
 #include "SwiftInterfaceGenContext.h"
 #include "swift/AST/DiagnosticConsumer.h"
+#include "swift/AST/PluginRegistry.h"
 #include "swift/Basic/ThreadSafeRefCounted.h"
+#include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CancellableResult.h"
-#include "swift/IDE/CompileInstance.h"
-#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/Indenting.h"
-#include "swift/IDE/Refactoring.h"
+#include "swift/IDETool/CompileInstance.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 #include "swift/Index/IndexSymbol.h"
+#include "swift/Refactoring/Refactoring.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Mutex.h"
@@ -46,18 +48,16 @@ namespace swift {
   class SourceFile;
   class SILOptions;
   class ValueDecl;
+  class ParamDecl;
   class GenericSignature;
   enum class AccessorKind;
 
-namespace syntax {
-  class SourceFileSyntax;
-}
-
 namespace ide {
   class CodeCompletionCache;
-  class CompletionInstance;
+  class IDEInspectionInstance;
   class OnDiskCodeCompletionCache;
   class SourceEditConsumer;
+  class SyntacticMacroExpansion;
   enum class CodeCompletionDeclKind : uint8_t;
   enum class SyntaxNodeKind : uint8_t;
   enum class SyntaxStructureKind : uint8_t;
@@ -108,12 +108,12 @@ public:
   void updateSemaInfo(SourceKitCancellationToken CancellationToken);
 
   void removeCachedAST();
+  void cancelBuildsForCachedAST();
 
   ImmutableTextSnapshotRef getLatestSnapshot() const;
 
   void resetSyntaxInfo(ImmutableTextSnapshotRef Snapshot,
-                       SwiftLangSupport &Lang, bool BuildSyntaxTree,
-                       swift::SyntaxParsingCache *SyntaxCache = nullptr);
+                       SwiftLangSupport &Lang);
   void readSyntaxInfo(EditorConsumer &consumer, bool ReportDiags);
   void readSemanticInfo(ImmutableTextSnapshotRef Snapshot,
                         EditorConsumer& Consumer);
@@ -127,14 +127,8 @@ public:
   static void reportDocumentStructure(swift::SourceFile &SrcFile,
                                       EditorConsumer &Consumer);
 
-  const llvm::Optional<swift::syntax::SourceFileSyntax> &getSyntaxTree() const;
-
   std::string getFilePath() const;
-
-  /// Whether or not the AST stored for this document is up-to-date or just an
-  /// artifact of incremental syntax parsing
-  bool isIncrementalParsingEnabled() const;
-
+      
   /// Returns the virtual filesystem associated with this document.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> getFileSystem() const;
 };
@@ -283,28 +277,15 @@ public:
                         const swift::DiagnosticInfo &Info) override;
 };
 
-class RequestRenameRangeConsumer : public swift::ide::FindRenameRangesConsumer,
-                                   public swift::DiagnosticConsumer {
-  class Implementation;
-  Implementation &Impl;
-
-public:
-  RequestRenameRangeConsumer(CategorizedRenameRangesReceiver Receiver);
-  ~RequestRenameRangeConsumer();
-  void accept(swift::SourceManager &SM, swift::ide::RegionType RegionType,
-              ArrayRef<swift::ide::RenameRangeDetail> Ranges) override;
-  void handleDiagnostic(swift::SourceManager &SM,
-                        const swift::DiagnosticInfo &Info) override;
-};
-
 namespace compile {
 class Session {
   swift::ide::CompileInstance Compiler;
 
 public:
-  Session(const std::string &RuntimeResourcePath,
-          const std::string &DiagnosticDocumentationPath)
-  : Compiler(RuntimeResourcePath, DiagnosticDocumentationPath) {}
+  Session(const std::string &SwiftExecutablePath,
+          const std::string &RuntimeResourcePath,
+          std::shared_ptr<swift::PluginRegistry> Plugins)
+      : Compiler(SwiftExecutablePath, RuntimeResourcePath, Plugins) {}
 
   bool
   performCompile(llvm::ArrayRef<const char *> Args,
@@ -316,8 +297,9 @@ public:
 };
 
 class SessionManager {
+  const std::string &SwiftExecutablePath;
   const std::string &RuntimeResourcePath;
-  const std::string &DiagnosticDocumentationPath;
+  const std::shared_ptr<swift::PluginRegistry> Plugins;
 
   llvm::StringMap<std::shared_ptr<Session>> sessions;
   WorkQueue compileQueue{WorkQueue::Dequeuing::Concurrent,
@@ -325,10 +307,11 @@ class SessionManager {
   mutable llvm::sys::Mutex mtx;
 
 public:
-  SessionManager(std::string &RuntimeResourcePath,
-                 std::string &DiagnosticDocumentationPath)
-      : RuntimeResourcePath(RuntimeResourcePath),
-        DiagnosticDocumentationPath(DiagnosticDocumentationPath) {}
+  SessionManager(const std::string &SwiftExecutablePath,
+                 const std::string &RuntimeResourcePath,
+                 const std::shared_ptr<swift::PluginRegistry> Plugins)
+      : SwiftExecutablePath(SwiftExecutablePath),
+        RuntimeResourcePath(RuntimeResourcePath), Plugins(Plugins) {}
 
   std::shared_ptr<Session> getSession(StringRef name);
 
@@ -354,7 +337,6 @@ class SwiftLangSupport : public LangSupport {
   /// Used to find clang relative to it.
   std::string SwiftExecutablePath;
   std::string RuntimeResourcePath;
-  std::string DiagnosticDocumentationPath;
   std::shared_ptr<SwiftASTManager> ASTMgr;
   std::shared_ptr<SwiftEditorDocumentFileMap> EditorDocuments;
   std::shared_ptr<RequestTracker> ReqTracker;
@@ -365,8 +347,9 @@ class SwiftLangSupport : public LangSupport {
   ThreadSafeRefCntPtr<SwiftCustomCompletions> CustomCompletions;
   std::shared_ptr<SwiftStatistics> Stats;
   llvm::StringMap<std::unique_ptr<FileSystemProvider>> FileSystemProviders;
-  std::shared_ptr<swift::ide::CompletionInstance> CompletionInst;
-  compile::SessionManager CompileManager;
+  std::shared_ptr<swift::ide::IDEInspectionInstance> IDEInspectionInst;
+  std::shared_ptr<compile::SessionManager> CompileManager;
+  std::shared_ptr<swift::ide::SyntacticMacroExpansion> SyntacticMacroExpansions;
 
 public:
   explicit SwiftLangSupport(SourceKit::Context &SKCtx);
@@ -377,9 +360,6 @@ public:
   }
 
   StringRef getRuntimeResourcePath() const { return RuntimeResourcePath; }
-  StringRef getDiagnosticDocumentationPath() const {
-    return DiagnosticDocumentationPath;
-  }
 
   std::shared_ptr<SwiftASTManager> getASTManager() { return ASTMgr; }
 
@@ -389,8 +369,9 @@ public:
     return CCCache;
   }
 
-  std::shared_ptr<swift::ide::CompletionInstance> getCompletionInstance() {
-    return CompletionInst;
+  std::shared_ptr<swift::ide::IDEInspectionInstance>
+  getIDEInspectionInstance() {
+    return IDEInspectionInst;
   }
 
   /// Returns the FileSystemProvider registered under Name, or nullptr if not
@@ -419,8 +400,8 @@ public:
   ///                   get the real file system.
   /// \param error Set to a description of the error, if appropriate.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-  getFileSystem(const Optional<VFSOptions> &vfsOptions,
-                Optional<StringRef> primaryFile, std::string &error);
+  getFileSystem(const std::optional<VFSOptions> &vfsOptions,
+                std::optional<StringRef> primaryFile, std::string &error);
 
   static SourceKit::UIdent getUIDForDeclLanguage(const swift::Decl *D);
   static SourceKit::UIdent getUIDForDecl(const swift::Decl *D,
@@ -452,9 +433,11 @@ public:
 
   static SourceKit::UIdent getUIDForRefactoringRangeKind(swift::ide::RefactoringRangeKind Kind);
 
-  static Optional<UIdent> getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
+  static std::optional<UIdent>
+  getUIDForDeclAttribute(const swift::DeclAttribute *Attr);
 
-  static SourceKit::UIdent getUIDForFormalAccessScope(const swift::AccessScope Scope);
+  static SourceKit::UIdent
+  getUIDForAccessLevel(const clang::index::SymbolProperty Scope);
 
   static std::vector<UIdent> UIDsFromDeclAttributes(const swift::DeclAttributes &Attrs);
 
@@ -465,8 +448,11 @@ public:
   static bool printDisplayName(const swift::ValueDecl *D, llvm::raw_ostream &OS);
 
   /// Generate a USR for a Decl, including the prefix.
+  /// @param distinguishSynthesizedDecls Whether to use the USR of the
+  /// synthesized declaration instead of the USR of the underlying Clang USR.
   /// \returns true if the results should be ignored, false otherwise.
-  static bool printUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS);
+  static bool printUSR(const swift::ValueDecl *D, llvm::raw_ostream &OS,
+                       bool distinguishSynthesizedDecls = false);
 
   /// Generate a USR for the Type of a given decl.
   /// \returns true if the results should be ignored, false otherwise.
@@ -525,11 +511,14 @@ public:
     std::shared_ptr<std::atomic<bool>> CancellationFlag;
   };
 
-  /// Execute \p PerformOperation sychronously with the parameters necessary to
-  /// invoke a completion-like operation on \c CompletionInstance.
+  /// Execute \p PerformOperation synchronously with the parameters necessary to
+  /// invoke a completion-like operation on \c IDEInspectionInstance.
+  /// If \p InsertCodeCompletionToken is \c true, a code completion token will
+  /// be inserted into the source buffer, if \p InsertCodeCompletionToken is \c
+  /// false, the buffer is left as-is.
   void performWithParamsToCompletionLikeOperation(
       llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-      ArrayRef<const char *> Args,
+      bool InsertCodeCompletionToken, ArrayRef<const char *> Args,
       llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
       SourceKitCancellationToken CancellationToken,
       llvm::function_ref<
@@ -540,18 +529,38 @@ public:
   // LangSupport Interface
   //==========================================================================//
 
+  void *getOpaqueSwiftIDEInspectionInstance() override {
+    return IDEInspectionInst.get();
+  }
+
   void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) override;
 
   void dependencyUpdated() override;
 
+  void demangleNames(
+      ArrayRef<const char *> MangledNames, bool Simplified,
+      std::function<void(const RequestResult<ArrayRef<std::string>> &)>
+          Receiver) override;
+
+  void mangleSimpleClassNames(
+      ArrayRef<std::pair<StringRef, StringRef>> ModuleClassPairs,
+      std::function<void(const RequestResult<ArrayRef<std::string>> &)>
+          Receiver) override;
+
   void indexSource(StringRef Filename, IndexingConsumer &Consumer,
                    ArrayRef<const char *> Args) override;
+
+  void indexToStore(StringRef InputFile,
+                    ArrayRef<const char *> Args,
+                    IndexStoreOptions Opts,
+                    SourceKitCancellationToken CancellationToken,
+                    IndexToStoreReceiver Receiver) override;
 
   void codeComplete(llvm::MemoryBuffer *InputBuf, unsigned Offset,
                     OptionsDictionary *options,
                     SourceKit::CodeCompletionConsumer &Consumer,
                     ArrayRef<const char *> Args,
-                    Optional<VFSOptions> vfsOptions,
+                    std::optional<VFSOptions> vfsOptions,
                     SourceKitCancellationToken CancellationToken) override;
 
   void codeCompleteOpen(StringRef name, llvm::MemoryBuffer *inputBuf,
@@ -559,7 +568,7 @@ public:
                         ArrayRef<FilterRule> rawFilterRules,
                         GroupedCodeCompletionConsumer &consumer,
                         ArrayRef<const char *> args,
-                        Optional<VFSOptions> vfsOptions,
+                        std::optional<VFSOptions> vfsOptions,
                         SourceKitCancellationToken CancellationToken) override;
 
   void codeCompleteClose(StringRef name, unsigned offset,
@@ -578,17 +587,15 @@ public:
   void
   codeCompleteSetCustom(ArrayRef<CustomCompletionInfo> completions) override;
 
-  void editorOpen(
-      StringRef Name, llvm::MemoryBuffer *Buf, EditorConsumer &Consumer,
-      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions) override;
+  void editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
+                  EditorConsumer &Consumer, ArrayRef<const char *> Args,
+                  std::optional<VFSOptions> vfsOptions) override;
 
-  void editorOpenInterface(EditorConsumer &Consumer,
-                           StringRef Name,
-                           StringRef ModuleName,
-                           Optional<StringRef> Group,
+  void editorOpenInterface(EditorConsumer &Consumer, StringRef Name,
+                           StringRef ModuleName, std::optional<StringRef> Group,
                            ArrayRef<const char *> Args,
                            bool SynthesizedExtensions,
-                           Optional<StringRef> InterestedUSR) override;
+                           std::optional<StringRef> InterestedUSR) override;
 
   void editorOpenTypeInterface(EditorConsumer &Consumer,
                                ArrayRef<const char *> Args,
@@ -604,10 +611,12 @@ public:
 
   void editorOpenSwiftSourceInterface(
       StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
+      bool CancelOnSubsequentRequest,
       SourceKitCancellationToken CancellationToken,
       std::shared_ptr<EditorConsumer> Consumer) override;
 
-  void editorClose(StringRef Name, bool RemoveCache) override;
+  void editorClose(StringRef Name, bool CancelBuilds,
+                   bool RemoveCache) override;
 
   void editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                          unsigned Offset, unsigned Length,
@@ -628,78 +637,102 @@ public:
   void editorExpandPlaceholder(StringRef Name, unsigned Offset, unsigned Length,
                                EditorConsumer &Consumer) override;
 
-  void getCursorInfo(StringRef Filename, unsigned Offset, unsigned Length,
-                     bool Actionables, bool SymbolGraph,
-                     bool CancelOnSubsequentRequest,
+  void getCursorInfo(StringRef PrimaryFilePath, StringRef InputBufferName,
+                     unsigned Offset, unsigned Length, bool Actionables,
+                     bool SymbolGraph, bool CancelOnSubsequentRequest,
                      ArrayRef<const char *> Args,
-                     Optional<VFSOptions> vfsOptions,
+                     std::optional<VFSOptions> vfsOptions,
                      SourceKitCancellationToken CancellationToken,
                      std::function<void(const RequestResult<CursorInfoData> &)>
                          Receiver) override;
 
   void
-  getDiagnostics(StringRef InputFile, ArrayRef<const char *> Args,
-                 Optional<VFSOptions> VfsOptions,
+  getDiagnostics(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+                 std::optional<VFSOptions> VfsOptions,
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) override;
 
+  void
+  getPolyglotAST(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+                 std::optional<VFSOptions> VfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<std::string> &)>
+                     Receiver) override;
+
+  void getSemanticTokens(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, std::optional<VFSOptions> VfsOptions,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<SemanticTokensResult> &)> Receiver)
+      override;
+
   void getNameInfo(
-      StringRef Filename, unsigned Offset, NameTranslatingInfo &Input,
-      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      NameTranslatingInfo &Input, ArrayRef<const char *> Args,
+      SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<NameTranslatingInfo> &)> Receiver)
       override;
 
   void getRangeInfo(
-      StringRef Filename, unsigned Offset, unsigned Length,
-      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
-      SourceKitCancellationToken CancellationToken,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      unsigned Length, bool CancelOnSubsequentRequest,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<RangeInfo> &)> Receiver) override;
 
   void getCursorInfoFromUSR(
-      StringRef Filename, StringRef USR, bool CancelOnSubsequentRequest,
-      ArrayRef<const char *> Args, Optional<VFSOptions> vfsOptions,
+      StringRef PrimaryFilePath, StringRef InputBufferName, StringRef USR,
+      bool CancelOnSubsequentRequest, ArrayRef<const char *> Args,
+      std::optional<VFSOptions> vfsOptions,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<CursorInfoData> &)> Receiver)
       override;
 
   void findRelatedIdentifiersInFile(
-      StringRef Filename, unsigned Offset, bool CancelOnSubsequentRequest,
+      StringRef PrimaryFilePath, StringRef InputBufferName, unsigned Offset,
+      bool IncludeNonEditableBaseNames, bool CancelOnSubsequentRequest,
       ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
-      std::function<void(const RequestResult<RelatedIdentsInfo> &)> Receiver)
+      std::function<void(const RequestResult<RelatedIdentsResult> &)> Receiver)
       override;
 
-  void syntacticRename(llvm::MemoryBuffer *InputBuf,
-                       ArrayRef<RenameLocations> RenameLocations,
-                       ArrayRef<const char*> Args,
-                       CategorizedEditsReceiver Receiver) override;
+  void findActiveRegionsInFile(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<ActiveRegionsInfo> &)> Receiver)
+      override;
 
-  void findRenameRanges(llvm::MemoryBuffer *InputBuf,
-                        ArrayRef<RenameLocations> RenameLocations,
-                        ArrayRef<const char *> Args,
-                        CategorizedRenameRangesReceiver Receiver) override;
+  CancellableResult<std::vector<CategorizedRenameRanges>>
+  findRenameRanges(llvm::MemoryBuffer *InputBuf,
+                   ArrayRef<RenameLoc> RenameLocations,
+                   ArrayRef<const char *> Args) override;
 
   void findLocalRenameRanges(StringRef Filename, unsigned Line, unsigned Column,
                              unsigned Length, ArrayRef<const char *> Args,
+                             bool CancelOnSubsequentRequest,
                              SourceKitCancellationToken CancellationToken,
                              CategorizedRenameRangesReceiver Receiver) override;
 
   void collectExpressionTypes(
-      StringRef FileName, ArrayRef<const char *> Args,
-      ArrayRef<const char *> ExpectedProtocols, bool CanonicalType,
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, ArrayRef<const char *> ExpectedProtocols,
+      bool FullyQualified, bool CanonicalType,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
           Receiver) override;
 
   void collectVariableTypes(
-      StringRef FileName, ArrayRef<const char *> Args,
-      Optional<unsigned> Offset, Optional<unsigned> Length,
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, std::optional<unsigned> Offset,
+      std::optional<unsigned> Length, bool FullyQualified,
+      bool CancelOnSubsequentRequest,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<VariableTypesInFile> &)> Receiver)
       override;
 
-  void semanticRefactoring(StringRef Filename, SemanticRefactoringInfo Info,
+  void semanticRefactoring(StringRef PrimaryFilePath,
+                           SemanticRefactoringInfo Info,
                            ArrayRef<const char *> Args,
+                           bool CancelOnSubsequentRequest,
                            SourceKitCancellationToken CancellationToken,
                            CategorizedEditsReceiver Receiver) override;
 
@@ -708,8 +741,8 @@ public:
                   ArrayRef<const char *> Args,
                   DocInfoConsumer &Consumer) override;
 
-  llvm::Optional<std::pair<unsigned, unsigned>>
-      findUSRRange(StringRef DocumentName, StringRef USR) override;
+  std::optional<std::pair<unsigned, unsigned>>
+  findUSRRange(StringRef DocumentName, StringRef USR) override;
 
   void findInterfaceDocument(StringRef ModuleName, ArrayRef<const char *> Args,
                std::function<void(const RequestResult<InterfaceDocInfo> &)> Receiver) override;
@@ -722,7 +755,7 @@ public:
                                 ArrayRef<const char *> Args,
                                 SourceKitCancellationToken CancellationToken,
                                 TypeContextInfoConsumer &Consumer,
-                                Optional<VFSOptions> vfsOptions) override;
+                                std::optional<VFSOptions> vfsOptions) override;
 
   void getConformingMethodList(llvm::MemoryBuffer *inputBuf, unsigned Offset,
                                OptionsDictionary *options,
@@ -730,11 +763,22 @@ public:
                                ArrayRef<const char *> ExpectedTypes,
                                SourceKitCancellationToken CancellationToken,
                                ConformingMethodListConsumer &Consumer,
-                               Optional<VFSOptions> vfsOptions) override;
+                               std::optional<VFSOptions> vfsOptions) override;
+
+  void getSignatureHelp(StringRef PrimaryFilePath, unsigned Offset,
+                        ArrayRef<const char *> Args,
+                        SourceKitCancellationToken CancellationToken,
+                        SignatureHelpConsumer &Consumer,
+                        std::optional<VFSOptions> vfsOptions) override;
+
+  void expandMacroSyntactically(llvm::MemoryBuffer *inputBuf,
+                                ArrayRef<const char *> args,
+                                ArrayRef<MacroExpansionInfo> expansions,
+                                CategorizedEditsReceiver receiver) override;
 
   void
   performCompile(StringRef Name, ArrayRef<const char *> Args,
-                 Optional<VFSOptions> vfsOptions,
+                 std::optional<VFSOptions> vfsOptions,
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<CompilationResult> &)>
                      Receiver) override;
@@ -773,6 +817,10 @@ public:
 
 /// Disable expensive SIL options which do not affect indexing or diagnostics.
 void disableExpensiveSILOptions(swift::SILOptions &Opts);
+
+swift::SourceFile *retrieveInputFile(StringRef inputBufferName,
+                                     const swift::CompilerInstance &CI,
+                                     bool haveRealPath = false);
 
 } // namespace SourceKit
 

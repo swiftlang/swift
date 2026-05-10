@@ -12,7 +12,7 @@
 
 #include <cstring>
 
-#include "SwiftShims/ThreadLocalStorage.h"
+#include "swift/shims/ThreadLocalStorage.h"
 #include "swift/Runtime/Debug.h"
 #include "swift/Threading/ThreadLocalStorage.h"
 

@@ -15,8 +15,6 @@
 #include "gtest/gtest.h"
 #include <string>
 
-using namespace swift::dependencies;
-
 namespace swift {
 namespace unittest {
 
@@ -27,7 +25,7 @@ public:
 
 protected:
   // The tool used to execute tests' scanning queries
-  DependencyScanningTool ScannerTool;
+  swift::dependencies::DependencyScanningTool ScannerTool;
 
   // Test workspace directory
   llvm::SmallString<256> TemporaryTestWorkspace;

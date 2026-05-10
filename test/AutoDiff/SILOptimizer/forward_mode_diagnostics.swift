@@ -89,7 +89,7 @@ func activeInoutParamControlFlow(_ array: [Float]) -> Float {
 struct X: Differentiable {
   var x: Float
 
-  @differentiable(reverse, wrt: y)
+  @differentiable(reverse, wrt: (self, y))
   mutating func mutate(_ y: X) { self.x = y.x }
 }
 
@@ -104,7 +104,7 @@ func activeMutatingMethod(_ x: Float) -> Float {
 
 struct Mut: Differentiable {}
 extension Mut {
-  @differentiable(reverse, wrt: x)
+  @differentiable(reverse, wrt: (self, x))
   mutating func mutatingMethod(_ x: Mut) {}
 }
 
@@ -119,12 +119,11 @@ func activeInoutParamMutatingMethod(_ x: Mut) -> Mut {
 // Subset parameter differentiation thunks
 //===----------------------------------------------------------------------===//
 
-// FIXME(SR-13046): Non-differentiability diagnostic crash due to invalid source location.
-/*
 func testNoDerivativeParameter(_ f: @differentiable(reverse) (Float, @noDerivative Float) -> Float) -> Float {
+  // expected-error @+2 {{function is not differentiable}}
+  // expected-note @+1 {{cannot differentiate with respect to a '@noDerivative' parameter}}
   return derivative(at: 2, 3) { (x, y) in f(x * x, y) }
 }
-*/
 
 //===----------------------------------------------------------------------===//
 // Stored property access differentiation
@@ -238,7 +237,7 @@ final class ClassTangentPropertyWrongType: Differentiable {
   func move(by offset: TangentVector) {}
 }
 
-// SR-13464: Missing support for classes in forward-mode AD
+// FIXME: Missing support for classes in forward-mode AD causes crash (https://github.com/apple/swift/issues/55906).
 /*
 // xpected-error @+2 {{function is not differentiable}}
 // xpected-note @+3 {{when differentiating this function definition}}
@@ -287,7 +286,7 @@ final class ClassTangentPropertyNotStored: Differentiable {
   func move(by offset: TangentVector) {}
 }
 
-// SR-13464: Missing support for classes in forward-mode AD
+// FIXME: Missing support for classes in forward-mode AD causes crash (https://github.com/apple/swift/issues/55906).
 /*
 // xpected-error @+2 {{function is not differentiable}}
 // xpected-note @+3 {{when differentiating this function definition}}

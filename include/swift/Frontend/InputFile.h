@@ -57,8 +57,7 @@ public:
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
       : InputFile(name, isPrimary, buffer,
-                  file_types::lookupTypeForExtension(
-                      llvm::sys::path::extension(name))) {}
+                  file_types::lookupTypeFromFilename(name)) {}
 
   /// Constructs an input file from the provided data.
   InputFile(StringRef name, bool isPrimary, llvm::MemoryBuffer *buffer,
@@ -95,7 +94,7 @@ public:
   /// llvm::MemoryBuffer::getFileOrSTDIN, which uses "<stdin>" instead of "-".
   static StringRef convertBufferNameFromLLVM_getFileOrSTDIN_toSwiftConventions(
       StringRef filename) {
-    return filename.equals("<stdin>") ? "-" : filename;
+    return filename == "<stdin>" ? "-" : filename;
   }
 
   /// Retrieves the name of the output file corresponding to this input.
@@ -132,6 +131,9 @@ public:
   }
   StringRef getLoadedModuleTracePath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs.LoadedModuleTracePath;
+  }
+  StringRef getFineModuleTracePath() const {
+    return getPrimarySpecificPaths().SupplementaryOutputs.FineModuleTracePath;
   }
   StringRef getSerializedDiagnosticsPath() const {
     return getPrimarySpecificPaths().SupplementaryOutputs

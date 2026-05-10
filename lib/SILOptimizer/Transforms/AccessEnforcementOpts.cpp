@@ -40,7 +40,7 @@
 /// considerable difference in the implementation. For example,
 /// DiagnoseStaticExclusivity must be able to fully analyze all @inout_aliasable
 /// parameters because they aren't dynamically enforced. This optimization
-/// completely ignores @inout_aliasable paramters because it only cares about
+/// completely ignores @inout_aliasable parameters because it only cares about
 /// dynamic enforcement. This optimization also does not attempt to
 /// differentiate accesses on disjoint subaccess paths, because it should not
 /// weaken enforcement in any way--a program that traps at -Onone should also
@@ -54,11 +54,11 @@
 ///
 /// When none of the local accesses on local storage (box/stack) have nested
 /// conflicts, then all the local accesses may be disabled by setting their
-/// enforcement to `static`. This is somwhat rare because static diagnostics
+/// enforcement to `static`. This is somewhat rare because static diagnostics
 /// already promote the obvious cases to static checks. However, there are two
 /// reasons that dynamic local markers may be disabled: (1) inlining may cause
 /// closure access to become local access (2) local storage may truly escape,
-/// but none of the the local access scopes cross a call site.
+/// but none of the local access scopes cross a call site.
 ///
 /// TODO: Perform another run of AccessEnforcementSelection immediately before
 /// this pass. Currently, that pass only works well when run before
@@ -73,12 +73,13 @@
 /// When a pair of non-overlapping accesses, where the first access dominates
 /// the second and there are no conflicts on the same storage in the paths
 /// between them, and they are part of the same sub-region
-/// be it the same block or the sampe loop, merge those accesses to create
+/// be it the same block or the sample loop, merge those accesses to create
 /// a new, larger, scope with a single begin_access for the accesses.
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "access-enforcement-opts"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
@@ -87,6 +88,7 @@
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopRegionAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/MapVector.h"
@@ -630,9 +632,9 @@ void AccessConflictAndMergeAnalysis::propagateAccessSetsBottomUp(
             accessResult.mergeFrom(calleeAccess.getResult());
             continue;
           }
-          // FIXME: Treat may-release conservatively in the anlysis itself by
+          // FIXME: Treat may-release conservatively in the analysis itself by
           // adding a mayRelease flag, in addition to the unidentified flag.
-          accessResult.analyzeInstruction(&instr);
+          accessResult.analyzeInstruction(&instr, ASA->getDestructorAnalysis());
         }
       }
     }
@@ -695,7 +697,7 @@ void AccessConflictAndMergeAnalysis::visitBeginAccess(
   // end_access %x
   if (BeginAccessInst *mergeableAccess =
           findMergeableOutOfScopeAccess(state, beginAccess)) {
-    LLVM_DEBUG(llvm::dbgs() << "Found mergable pair: " << *mergeableAccess
+    LLVM_DEBUG(llvm::dbgs() << "Found mergeable pair: " << *mergeableAccess
                             << "  with " << *beginAccess << "\n");
     result.mergePairs.emplace_back(mergeableAccess, beginAccess);
   }
@@ -743,12 +745,10 @@ void AccessConflictAndMergeAnalysis::visitMayRelease(SILInstruction *instr,
   // If they don't alias - we might get away with not recording a conflict
   LLVM_DEBUG(llvm::dbgs() << "MayRelease Instruction: " << *instr);
 
-  // This is similar to recordUnknownConflict, but only class and and global
+  // This is similar to recordUnknownConflict, but only class and global
   // accesses can be affected by a deinitializer.
   auto isHeapAccess = [](AccessStorage::Kind accessKind) {
-    return accessKind == AccessStorage::Class
-           || accessKind == AccessStorage::Class
-           || accessKind == AccessStorage::Global;
+    return accessKind == AccessStorage::Class || accessKind == AccessStorage::Global;
   };
   // Mark the in-scope accesses as having a nested conflict
   llvm::for_each(state.inScopeConflictFreeAccesses, [&](BeginAccessInst *bai) {
@@ -814,7 +814,7 @@ RegionState &AccessConflictAndMergeAnalysis::mergePredAccesses(
     (void)bbRegionParentID;
     auto predStateIter = localRegionStates.find(pred);
     if (predStateIter == localRegionStates.end()) {
-      // Backedge / irreducable control flow - bail
+      // Backedge / irreducible control flow - bail
       state.reset();
       break;
     }
@@ -839,7 +839,8 @@ void AccessConflictAndMergeAnalysis::localDataFlowInBlock(RegionState &state,
       visitFullApply(fullApply, state);
       continue;
     }
-    if (instr.mayRelease()) {
+    if (instr.mayRelease() &&
+        !isDestructorSideEffectFree(&instr, ASA->getDestructorAnalysis())) {
       visitMayRelease(&instr, state);
     }
   }
@@ -989,6 +990,10 @@ canMergeBegin(PostDominanceInfo *postDomTree,
   return true;
 }
 
+static bool isDirectBaseAccess(BeginAccessInst *beginAccess) {
+  return beginAccess->getSource() == getAccessBase(beginAccess->getSource());
+}
+
 static bool
 canMerge(PostDominanceInfo *postDomTree,
          const llvm::DenseMap<SILBasicBlock *, SCCInfo> &blockToSCCMap,
@@ -997,6 +1002,17 @@ canMerge(PostDominanceInfo *postDomTree,
   // introducing new conflicts that were previously ignored. Merging read/modify
   // will require additional data flow information.
   if (childIns->getAccessKind() != parentIns->getAccessKind())
+    return false;
+
+  // 'parentIns' and 'childIns' have the same AccessStorage, but their address
+  // operands may originate from a different chain of address projections or
+  // address casts. 'mergeAccesses()' simply replaces all uses of 'childInst'
+  // with 'parentIns' rather than rematerializing those address projections or
+  // casts. Therefore, filter out access scopes unless they directly use the
+  // access base. It is unexpected for dynamic access to be on a projection, but
+  // it can result from optimization and inlining. And even though this pass
+  // will probably convert them to static accesses, they remain in the worklist.
+  if (!isDirectBaseAccess(childIns) || !isDirectBaseAccess(parentIns))
     return false;
 
   if (!canMergeBegin(postDomTree, blockToSCCMap, parentIns, childIns))
@@ -1009,7 +1025,8 @@ static bool extendOwnership(BeginAccessInst *parentInst,
                             BeginAccessInst *childInst,
                             InstructionDeleter &deleter,
                             DeadEndBlocks &deBlocks) {
-  GuaranteedOwnershipExtension extension(deleter, deBlocks);
+  GuaranteedOwnershipExtension extension(deleter, deBlocks,
+                                         parentInst->getFunction());
   auto status = extension.checkAddressOwnership(parentInst, childInst);
   switch (status) {
   case GuaranteedOwnershipExtension::Invalid:
@@ -1082,7 +1099,7 @@ mergeAccesses(SILFunction *F, PostDominanceInfo *postDomTree,
       continue;
 
     if (!extendOwnership(parentIns, childIns, deleter, deBlocks))
-      return false;
+      continue;
 
     LLVM_DEBUG(llvm::dbgs()
                << "Merging " << *childIns << " into " << *parentIns << "\n");

@@ -18,6 +18,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "SemanticARCOptVisitor.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/DebugUtils.h"
 
@@ -73,7 +74,7 @@ bool SemanticARCOptVisitor::processWorklist() {
   while (!worklist.empty()) {
     // Pop the last element off the list. If we were returned None, we blotted
     // this element, so skip it.
-    SILValue next = worklist.pop_back_val().getValueOr(SILValue());
+    SILValue next = worklist.pop_back_val().value_or(SILValue());
     if (!next)
       continue;
 

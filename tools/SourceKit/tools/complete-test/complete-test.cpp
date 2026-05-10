@@ -13,13 +13,13 @@
 #include "sourcekitd/sourcekitd.h"
 
 #include "llvm/ADT/ArrayRef.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/Support/CommandLine.h"
-#include "llvm/Support/MemoryBuffer.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/Signals.h"
 #include "llvm/Support/FileSystem.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Signals.h"
+#include "llvm/Support/raw_ostream.h"
 #include <fstream>
+#include <optional>
 #include <regex>
 #if defined(__unix__) || (defined(__APPLE__) && defined(__MACH__))
 #include <unistd.h>
@@ -47,23 +47,24 @@ struct TestOptions {
   StringRef completionToken;
   StringRef popularAPI;
   StringRef unpopularAPI;
-  Optional<bool> sortByName;
-  Optional<bool> useImportDepth;
-  Optional<bool> groupOverloads;
-  Optional<bool> groupStems;
-  Optional<bool> includeExactMatch;
-  Optional<bool> addInnerResults;
-  Optional<bool> addInnerOperators;
-  Optional<bool> addInitsToTopLevel;
-  Optional<unsigned> requestStart;
-  Optional<unsigned> requestLimit;
-  Optional<unsigned> hideUnderscores;
-  Optional<bool> hideByName;
-  Optional<bool> hideLowPriority;
-  Optional<unsigned> showTopNonLiteral;
-  Optional<bool> fuzzyMatching;
-  Optional<unsigned> fuzzyWeight;
-  Optional<unsigned> popularityBonus;
+  std::optional<bool> sortByName;
+  std::optional<bool> useImportDepth;
+  std::optional<bool> groupOverloads;
+  std::optional<bool> groupStems;
+  std::optional<bool> includeExactMatch;
+  std::optional<bool> addInnerResults;
+  std::optional<bool> addInnerOperators;
+  std::optional<bool> addInitsToTopLevel;
+  std::optional<unsigned> requestStart;
+  std::optional<unsigned> requestLimit;
+  std::optional<unsigned> hideUnderscores;
+  std::optional<bool> hideByName;
+  std::optional<bool> hideLowPriority;
+  std::optional<unsigned> showTopNonLiteral;
+  std::optional<bool> fuzzyMatching;
+  std::optional<unsigned> fuzzyWeight;
+  std::optional<unsigned> popularityBonus;
+  std::optional<bool> verifyUSRToDecl;
   StringRef filterRulesJSON;
   std::string moduleCachePath;
   bool rawOutput = false;
@@ -115,6 +116,7 @@ static sourcekitd_uid_t KeyResults;
 static sourcekitd_uid_t KeyPopular;
 static sourcekitd_uid_t KeyUnpopular;
 static sourcekitd_uid_t KeySubStructure;
+static sourcekitd_uid_t KeyVerifyUSRToDecl;
 
 // Returns false and sets 'error' on failure.
 static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
@@ -126,12 +128,12 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.compilerArgs = args.slice(i + 1);
       break;
     }
-    if (opt == "-" || !opt.startswith("-")) {
+    if (opt == "-" || !opt.starts_with("-")) {
       options.sourceFile = args[i];
       continue;
     }
 
-    if (opt.startswith("--")) {
+    if (opt.starts_with("--")) {
       error = std::string("unrecognized option '") + args[i] + "'";
       return false;
     }
@@ -260,6 +262,10 @@ static bool parseOptions(ArrayRef<const char *> args, TestOptions &options,
       options.disableImplicitConcurrencyModuleImport = true;
     } else if (opt == "disable-implicit-string-processing-module-import") {
       options.disableImplicitStringProcessingModuleImport = true;
+    } else if (opt == "verify-usr-to-decl") {
+      options.verifyUSRToDecl = true;
+    } else if (opt == "no-verify-usr-to-decl") {
+      options.verifyUSRToDecl = false;
     }
   }
 
@@ -342,6 +348,8 @@ static int skt_main(int argc, const char **argv) {
       sourcekitd_uid_get_from_cstr("key.codecomplete.sort.popularitybonus");
   KeyTopNonLiteral =
       sourcekitd_uid_get_from_cstr("key.codecomplete.showtopnonliteralresults");
+  KeyVerifyUSRToDecl =
+      sourcekitd_uid_get_from_cstr("key.codecomplete.verifyusrtodecl");
   KeySourceFile = sourcekitd_uid_get_from_cstr("key.sourcefile");
   KeySourceText = sourcekitd_uid_get_from_cstr("key.sourcetext");
   KeyName = sourcekitd_uid_get_from_cstr("key.name");
@@ -358,8 +366,10 @@ static int skt_main(int argc, const char **argv) {
   KeyUnpopular = sourcekitd_uid_get_from_cstr("key.unpopular");
   KeySubStructure = sourcekitd_uid_get_from_cstr("key.substructure");
 
-  auto Args = llvm::makeArrayRef(argv + 1, argc - 1);
+  auto Args = llvm::ArrayRef(argv + 1, argc - 1);
   TestOptions options;
+  // Default to verifying USR to Decl reconstruction.
+  options.verifyUSRToDecl = true;
   std::string error;
   if (!parseOptions(Args, options, error)) {
     llvm::errs() << "usage: complete-test -tok=A file\n" << error << "\n";
@@ -625,7 +635,7 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
 
   auto opts = sourcekitd_request_dictionary_create(nullptr, nullptr, 0);
   {
-    auto addBoolOption = [&](sourcekitd_uid_t key, Optional<bool> option) {
+    auto addBoolOption = [&](sourcekitd_uid_t key, std::optional<bool> option) {
       if (option)
         sourcekitd_request_dictionary_set_int64(opts, key, *option);
     };
@@ -640,8 +650,10 @@ static bool codeCompleteRequest(sourcekitd_uid_t requestUID, const char *name,
     addBoolOption(KeyFuzzyMatching, options.fuzzyMatching);
     addBoolOption(KeyHideLowPriority, options.hideLowPriority);
     addBoolOption(KeyHideByName, options.hideByName);
+    addBoolOption(KeyVerifyUSRToDecl, options.verifyUSRToDecl);
 
-    auto addIntOption = [&](sourcekitd_uid_t key, Optional<unsigned> option) {
+    auto addIntOption = [&](sourcekitd_uid_t key,
+                            std::optional<unsigned> option) {
       if (option)
         sourcekitd_request_dictionary_set_int64(opts, key, *option);
     };

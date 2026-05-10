@@ -33,8 +33,10 @@
 #include "ForeignClassMetadataVisitor.h"
 #include "TupleMetadataVisitor.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
+#include "swift/SIL/SILModule.h"
+#include <optional>
 
 using namespace swift;
 using namespace irgen;
@@ -43,10 +45,10 @@ namespace {
 
 template <class Impl, template <class> class Base>
 class LayoutScanner : public Base<Impl> {
-  Optional<Size> AddressPoint;
+  std::optional<Size> AddressPoint;
 
 protected:
-  Optional<Size> DynamicOffsetBase;
+  std::optional<Size> DynamicOffsetBase;
 
   template <class... As>
   LayoutScanner(As &&... args) : Base<Impl>(std::forward<As>(args)...) {}
@@ -70,7 +72,7 @@ public:
   }
 
   MetadataSize getMetadataSize() const {
-    assert(AddressPoint.hasValue() && !AddressPoint->isInvalid()
+    assert(AddressPoint.has_value() && !AddressPoint->isInvalid()
            && "did not find address point?!");
     assert(*AddressPoint < this->NextOffset
            && "address point is after end?!");
@@ -164,10 +166,10 @@ Offset NominalMetadataLayout::emitOffset(IRGenFunction &IGF,
   if (offset.isStatic())
     return Offset(offset.getStaticOffset());
 
-  Address layoutAddr(
-    IGF.IGM.getAddrOfClassMetadataBounds(cast<ClassDecl>(getDecl()),
-                                         NotForDefinition),
-    IGF.IGM.getPointerAlignment());
+  Address layoutAddr(IGF.IGM.getAddrOfClassMetadataBounds(
+                         cast<ClassDecl>(getDecl()), NotForDefinition),
+                     IGF.IGM.ClassMetadataBaseOffsetTy,
+                     IGF.IGM.getPointerAlignment());
 
   auto offsetBaseAddr = IGF.Builder.CreateStructGEP(layoutAddr, 0, Size(0));
 
@@ -217,9 +219,23 @@ llvm::Value *irgen::emitArgumentMetadataRef(IRGenFunction &IGF,
                                       const GenericTypeRequirements &reqts,
                                             unsigned reqtIndex,
                                             llvm::Value *metadata) {
-  assert(reqts.getRequirements()[reqtIndex].Protocol == nullptr);
+  assert(reqts.getRequirements()[reqtIndex].getKind()
+           == GenericRequirement::Kind::Metadata);
   return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
                                       IGF.IGM.TypeMetadataPtrTy);
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to the nth argument metadata pack.  The type must
+/// have generic arguments.
+llvm::Value *irgen::emitArgumentMetadataPackRef(IRGenFunction &IGF,
+                                                NominalTypeDecl *decl,
+                                      const GenericTypeRequirements &reqts,
+                                                unsigned reqtIndex,
+                                                llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isMetadataPack());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.TypeMetadataPtrPtrTy);
 }
 
 /// Given a reference to nominal type metadata of the given type,
@@ -230,14 +246,58 @@ llvm::Value *irgen::emitArgumentWitnessTableRef(IRGenFunction &IGF,
                                           const GenericTypeRequirements &reqts,
                                                 unsigned reqtIndex,
                                                 llvm::Value *metadata) {
-  assert(reqts.getRequirements()[reqtIndex].Protocol != nullptr);
+  assert(reqts.getRequirements()[reqtIndex].getKind()
+           == GenericRequirement::Kind::WitnessTable);
   return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
                                       IGF.IGM.WitnessTablePtrTy);
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to a protocol witness table pack for the nth
+/// argument metadata.  The type must have generic arguments.
+llvm::Value *irgen::emitArgumentWitnessTablePackRef(IRGenFunction &IGF,
+                                                    NominalTypeDecl *decl,
+                                          const GenericTypeRequirements &reqts,
+                                                    unsigned reqtIndex,
+                                                    llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isWitnessTablePack());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.WitnessTablePtrPtrTy);
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to the pack shape for the nth argument
+/// metadata.  The type must have generic arguments.
+llvm::Value *irgen::emitArgumentPackShapeRef(IRGenFunction &IGF,
+                                             NominalTypeDecl *decl,
+                                       const GenericTypeRequirements &reqts,
+                                             unsigned reqtIndex,
+                                             llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isShape());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.SizeTy);
+}
+
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to the value for the nth argument metadata.
+/// The type must have generic arguments.
+llvm::Value *irgen::emitValueGenericRef(IRGenFunction &IGF,
+                                        NominalTypeDecl *decl,
+                                        const GenericTypeRequirements &reqts,
+                                        unsigned reqtIndex,
+                                        llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isValue());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.SizeTy);
 }
 
 Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                               llvm::Value *metadata,
                                               NominalTypeDecl *decl) {
+  assert(!isa<ClassDecl>(decl)
+            || !cast<ClassDecl>(decl)->getObjCImplementationDecl()
+                && "objcImpl classes don't have a field offset vector");
+
   auto &layout = IGF.IGM.getMetadataLayout(decl);
   auto offset = [&]() {
     if (isa<ClassDecl>(decl)) {
@@ -317,20 +377,12 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::noteStartOfGenericRequirements(forClass);
     }
 
-    void addGenericWitnessTable(GenericRequirement requirement,
-                                ClassDecl *forClass) {
+    void addGenericRequirement(GenericRequirement requirement,
+                               ClassDecl *forClass) {
       if (forClass == Target) {
         ++Layout.NumImmediateMembers;
       }
-      super::addGenericWitnessTable(requirement, forClass);
-    }
-
-    void addGenericArgument(GenericRequirement requirement,
-                            ClassDecl *forClass) {
-      if (forClass == Target) {
-        ++Layout.NumImmediateMembers;
-      }
-      super::addGenericArgument(requirement, forClass);
+      super::addGenericRequirement(requirement, forClass);
     }
 
     void addReifiedVTableEntry(SILDeclRef fn) {
@@ -366,7 +418,8 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
     }
 
     void addFieldOffset(VarDecl *field) {
-      assert(IsInTargetFields == (field->getDeclContext() == Target));
+      assert(IsInTargetFields ==
+              (field->getDeclContext()->getImplementedObjCContext() == Target));
       if (IsInTargetFields) {
         ++Layout.NumImmediateMembers;
         Layout.FieldOffsets.try_emplace(field, getNextOffset());
@@ -381,8 +434,15 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       super::addDefaultActorStorageFieldOffset();
     }
 
+    void addNonDefaultDistributedActorStorageFieldOffset() {
+      if (IsInTargetFields) {
+        ++Layout.NumImmediateMembers;
+      }
+      super::addNonDefaultDistributedActorStorageFieldOffset();
+    }
+
     void addFieldOffsetPlaceholders(MissingMemberDecl *placeholder) {
-      if (placeholder->getDeclContext() == Target) {
+      if (placeholder->getDeclContext()->getImplementedObjCContext() == Target) {
         Layout.NumImmediateMembers +=
           placeholder->getNumberOfFieldOffsetVectorEntries();
       }
@@ -515,8 +575,9 @@ Address irgen::emitAddressOfSuperclassRefInClassMetadata(IRGenFunction &IGF,
   // The superclass field in a class type is the first field past the isa.
   unsigned index = 1;
 
-  Address addr(metadata, IGF.IGM.getPointerAlignment());
-  addr = IGF.Builder.CreateElementBitCast(addr, IGF.IGM.TypeMetadataPtrTy);
+  Address addr(
+      IGF.Builder.CreateBitCast(metadata, IGF.IGM.TypeMetadataPtrPtrTy),
+      IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment());
   return IGF.Builder.CreateConstArrayGEP(addr, index, IGF.IGM.getPointerSize());
 }
 

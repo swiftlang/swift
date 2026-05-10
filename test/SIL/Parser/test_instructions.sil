@@ -1,0 +1,19 @@
+// RUN: %target-sil-opt %s | %target-sil-opt | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Test round-tripping the instruction through the SIL parser.
+//
+// In particular, this doesn't test parsing the components that make up the test
+// specification.
+// CHECK-LABEL: sil [ossa] @for_specify_test : {{.*}} {
+// CHECK:       specify_test "try-running-it foo bar 18 false baz"
+// CHECK-LABEL: } // end sil function 'for_specify_test'
+sil [ossa] @for_specify_test : $@convention(thin) () -> () {
+entry:
+  specify_test "try-running-it foo bar 18 false baz"
+  %4 = tuple()
+  return %4 : $()
+}

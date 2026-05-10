@@ -1,0 +1,16 @@
+// RUN: %scale-test --begin 1 --end 7 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck -Xfrontend=-solver-enable-prune-disjunctions
+// REQUIRES: asserts, no_asan
+
+// https://github.com/swiftlang/swift/issues/55762
+
+struct S {
+  var data: [Int16]
+  var idx = 0
+
+  func f() {
+    let _ = UInt64(self.data[self.idx]) << 56
+%for i in range(0, N):
+          | UInt64(self.data[self.idx + 1]) << 48
+%end
+  }
+}

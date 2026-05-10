@@ -24,3 +24,39 @@ SWIFT_REQUEST(ClangImporter, CXXNamespaceMemberLookup,
 SWIFT_REQUEST(ClangImporter, ClangRecordMemberLookup,
               Decl *(ClangRecordMemberLookupDescriptor), Uncached,
               NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, ClangCategoryLookupRequest,
+              llvm::TinyPtrVector<Decl *>(ClangCategoryLookupDescriptor), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, ObjCInterfaceAndImplementationRequest,
+              ObjCInterfaceAndImplementation(Decl *), SeparatelyCached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, ForeignReferenceTypeInfoRequest,
+              ForeignReferenceTypeInfo(ForeignReferenceTypeInfoDescriptor), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, CxxRecordSemantics,
+              CxxRecordSemanticsKind(CxxRecordSemanticsDescriptor), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, CxxRecordAsSwiftType,
+              ValueDecl *(CxxRecordSemanticsDescriptor), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, IsSafeUseOfCxxDecl,
+              bool(SafeUseOfCxxRecordDescriptor), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, CustomRefCountingOperation,
+              CustomRefCountingOperationResult(CustomRefCountingOperationDescriptor), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, ClangTypeEscapability,
+              CxxEscapability(EscapabilityLookupDescriptor), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, CxxValueSemantics,
+              CxxValueSemanticsKind(CxxValueSemanticsDescriptor), Cached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, ClangDeclExplicitSafety,
+              ExplicitSafety(ClangDeclExplicitSafetyDescriptor), Uncached,
+              NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, ClangRefCountedSmartPointer,
+              RefCountedPtrRequestResult(ClangRefCountedSmartPointerDescriptor),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, CxxIteratorInfoRequest,
+              std::optional<CxxIteratorCategory>(CxxRecordDeclDescriptor),
+              Uncached, NoLocationInfo)

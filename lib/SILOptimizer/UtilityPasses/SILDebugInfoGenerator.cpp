@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "sil-based-debuginfo-gen"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILPrintContext.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -146,15 +147,12 @@ class SILDebugInfoGenerator : public SILModuleTransform {
             ++iter;
             if (isa<DebugValueInst>(I)) {
               // debug_value instructions are not needed anymore.
-              // Also, keeping them might trigger a verifier error.
+              // SIL-based debuginfo only supports line tables.
               I->eraseFromParent();
               continue;
             }
             if (auto *ASI = dyn_cast<AllocStackInst>(I))
-              // Remove the debug variable scope enclosed
-              // within the SILDebugVariable such that we won't
-              // trigger a verification error.
-              ASI->setDebugVarScope(nullptr);
+              ASI->invalidateVarInfo();
 
             SILLocation Loc = I->getLoc();
             auto *filePos = SILLocation::FilenameAndLocation::alloc(

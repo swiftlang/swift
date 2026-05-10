@@ -16,52 +16,52 @@
 import Foundation
 
 @objc public class MyCls1 : NSObject {
-// CHECK: [[@LINE-1]]:20 | class/Swift | MyCls1 | [[MyCls1_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:20 | class(public)/Swift | MyCls1 | [[MyCls1_USR:.*]] | Def
   @objc public func someMeth() {}
-  // CHECK: [[@LINE-1]]:21 | instance-method/Swift | someMeth() | [[MyCls1_someMeth_USR:.*]] | Def
+  // CHECK: [[@LINE-1]]:21 | instance-method(public)/Swift | someMeth() | [[MyCls1_someMeth_USR:.*]] | Def
 
   @objc public var prop = 0
-  // CHECK: [[@LINE-1]]:20 | instance-property/Swift | prop | [[MyCls1_prop_USR:.*]] | Def
+  // CHECK: [[@LINE-1]]:20 | instance-property(public)/Swift | prop | [[MyCls1_prop_USR:.*]] | Def
   // CHECK: [[@LINE-2]]:20 | instance-method/acc-get/Swift | getter:prop | [[MyCls1_prop_get_USR:.*]] | Def
   // CHECK: [[@LINE-3]]:20 | instance-method/acc-set/Swift | setter:prop | [[MyCls1_prop_set_USR:.*]] | Def
 
-  // CHECK: [[@LINE-10]]:38 | constructor/Swift | init() | [[MyCls1_init_USR:.*]] | Def,Impl,RelChild,RelOver | rel: 2
+  // CHECK: [[@LINE-10]]:38 | constructor(public)/Swift | init() | [[MyCls1_init_USR:.*]] | Def,Impl,RelChild,RelOver | rel: 2
   // CHECK-NEXT: RelOver | constructor/Swift | init() | c:objc(cs)NSObject(im)init
   // CHECK-NEXT: RelChild | class/Swift | MyCls1 | [[MyCls1_USR]]
 }
 
 @objc public class MyCls2 : NSObject {
   @objc public init(withInt: Int) {}
-  // CHECK: [[@LINE-1]]:16 | constructor/Swift | init(withInt:) | [[MyCls2_initwithInt_USR:.*]] | Def
+  // CHECK: [[@LINE-1]]:16 | constructor(public)/Swift | init(withInt:) | [[MyCls2_initwithInt_USR:.*]] | Def
 }
 
 @objc public protocol MyProt {
-// CHECK: [[@LINE-1]]:23 | protocol/Swift | MyProt | [[MyProt_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:23 | protocol(public)/Swift | MyProt | [[MyProt_USR:.*]] | Def
   func someProtMeth()
-  // CHECK: [[@LINE-1]]:8 | instance-method/Swift | someProtMeth() | [[MyProt_someProtMeth_USR:.*]] | Def
+  // CHECK: [[@LINE-1]]:8 | instance-method(public)/Swift | someProtMeth() | [[MyProt_someProtMeth_USR:.*]] | Def
 }
 
 public extension MyCls1 {
 // CHECK: [[@LINE-1]]:18 | extension/ext-class/Swift | MyCls1 | s:e:c:@CM@cross_language@objc(cs)MyCls1(im)someExtMeth |
 // CHECK: [[@LINE-2]]:18 | class/Swift | MyCls1 | [[MyCls1_USR]] |
   @objc public func someExtMeth() {}
-  // CHECK: [[@LINE-1]]:21 | instance-method/Swift | someExtMeth() | [[MyCls1_someExtMeth_USR:.*]] | Def
+  // CHECK: [[@LINE-1]]:21 | instance-method(public)/Swift | someExtMeth() | [[MyCls1_someExtMeth_USR:.*]] | Def
 
   @objc public var ext_prop: Int { 0 }
-  // CHECK: [[@LINE-1]]:20 | instance-property/Swift | ext_prop | [[MyCls1_ext_prop_USR:.*]] | Def
+  // CHECK: [[@LINE-1]]:20 | instance-property(public)/Swift | ext_prop | [[MyCls1_ext_prop_USR:.*]] | Def
   // CHECK: [[@LINE-2]]:34 | instance-method/acc-get/Swift | getter:ext_prop | [[MyCls1_ext_prop_get_USR:.*]] | Def
 }
 
 public extension SomeObjCClass {
   // CHECK: [[@LINE-1]]:18 | class/Swift | SomeObjCClass | [[SomeObjCClass_USR:.*]] | Ref
   @objc public func someSwiftExtMeth() {}
-  // CHECK: [[@LINE-1]]:21 | instance-method/Swift | someSwiftExtMeth() | [[SomeObjCClass_someSwiftExtMeth_USR:.*]] | Def
+  // CHECK: [[@LINE-1]]:21 | instance-method(public)/Swift | someSwiftExtMeth() | [[SomeObjCClass_someSwiftExtMeth_USR:.*]] | Def
 }
 
 @objc public enum MyEnum : Int {
-// CHECK: [[@LINE-1]]:19 | enum/Swift | MyEnum | [[MyEnum_USR:.*]] | Def
+// CHECK: [[@LINE-1]]:19 | enum(public)/Swift | MyEnum | [[MyEnum_USR:.*]] | Def
   case someEnumConst = 1
-  // CHECK: [[@LINE-1]]:8 | enumerator/Swift | someEnumConst | [[MyEnum_someEnumConst_USR:.*]] | Def
+  // CHECK: [[@LINE-1]]:8 | enumerator(public)/Swift | someEnumConst | [[MyEnum_someEnumConst_USR:.*]] | Def
 }
 
 #endif

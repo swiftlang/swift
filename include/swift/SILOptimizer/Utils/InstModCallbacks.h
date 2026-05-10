@@ -1,4 +1,4 @@
-//===--- InstModCallbacks.h - intruction modification callbacks -*- C++ -*-===//
+//===--- InstModCallbacks.h - instruction modification callbacks -*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -13,7 +13,7 @@
 /// InstModCallbacks: callbacks for instruction modification.
 ///
 /// Callbacks are generally problematic because a pass cannot anticipate the
-/// state that SIL will be in when lower-level utilties invoke the
+/// state that SIL will be in when lower-level utilities invoke the
 /// callback. This creates implicit coupling across the layers of SIL utilities.
 ///
 /// Alternatives:
@@ -98,7 +98,7 @@ struct InstModCallbacks {
   ///
   ///   instToDelete->eraseFromParent();
   ///
-  /// The reason this callback is reponsible for deleting the instruction is to
+  /// The reason this callback is responsible for deleting the instruction is to
   /// interoperate more easily with
   /// CanonicalizeInstruction::killInstruction(). This allows updates to choose
   /// whether to happen before or after deleting the instruction and possibly

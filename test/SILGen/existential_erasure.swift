@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name existential_erasure %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name existential_erasure %s | %FileCheck %s
 
 protocol P {
   func downgrade(_ m68k: Bool) -> Self
@@ -25,9 +25,9 @@ func throwingFunc() throws -> Bool { return true }
 
 // CHECK-LABEL: sil hidden [ossa] @$s19existential_erasure5PQtoPyyF : $@convention(thin) () -> () {
 func PQtoP() {
-  // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr immutable_access [[PQ:%.*]] : $*P & Q to $*[[OPENED_TYPE:@opened(.*) P & Q]]
-  // CHECK: [[P_PAYLOAD:%.*]] = init_existential_addr [[P:%.*]] : $*P, $[[OPENED_TYPE]]
-  // CHECK: copy_addr [[PQ_PAYLOAD]] to [initialization] [[P_PAYLOAD]]
+  // CHECK: [[PQ_PAYLOAD:%.*]] = open_existential_addr immutable_access [[PQ:%.*]] : $*any P & Q to $*[[OPENED_TYPE:@opened\(.*, any P & Q\) Self]]
+  // CHECK: [[P_PAYLOAD:%.*]] = init_existential_addr [[P:%.*]] : $*any P, $[[OPENED_TYPE]]
+  // CHECK: copy_addr [[PQ_PAYLOAD]] to [init] [[P_PAYLOAD]]
   // CHECK: destroy_addr [[PQ]]
   // CHECK-NOT: destroy_addr [[P]]
   // CHECK-NOT: destroy_addr [[P_PAYLOAD]]
@@ -41,20 +41,20 @@ func PQtoP() {
 
 // CHECK-LABEL: sil hidden [ossa] @$s19existential_erasure19openExistentialToP1yyAA1P_pKF
 func openExistentialToP1(_ p: P) throws {
-// CHECK: bb0(%0 : $*P):
-// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
-// CHECK:   [[RESULT:%.*]] = alloc_stack $P
+// CHECK: bb0(%0 : $*any P):
+// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPEN_TYPE:@opened\(.*, any P\) Self]]
+// CHECK:   [[RESULT:%.*]] = alloc_stack $any P
 // CHECK:   [[FUNC:%.*]] = function_ref @$s19existential_erasure12throwingFuncSbyKF
 // CHECK:   try_apply [[FUNC]]()
 //
 // CHECK: bb1([[SUCCESS:%.*]] : $Bool):
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.downgrade : {{.*}}, [[OPEN]]
-// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
+// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*any P, $[[OPEN_TYPE]]
 // CHECK:   apply [[METHOD]]<[[OPEN_TYPE]]>([[RESULT_ADDR]], [[SUCCESS]], [[OPEN]])
 // CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   return
 //
-// CHECK: bb2([[FAILURE:%.*]] : @owned $Error):
+// CHECK: bb2([[FAILURE:%.*]] : @owned $any Error):
 // CHECK:   dealloc_stack [[RESULT]]
 // CHECK:   throw [[FAILURE]]
 //
@@ -63,18 +63,18 @@ func openExistentialToP1(_ p: P) throws {
 
 // CHECK-LABEL: sil hidden [ossa] @$s19existential_erasure19openExistentialToP2yyAA1P_pKF
 func openExistentialToP2(_ p: P) throws {
-// CHECK: bb0(%0 : $*P):
-// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*P to $*[[OPEN_TYPE:@opened\(.*\) P]]
-// CHECK:   [[RESULT:%.*]] = alloc_stack $P
+// CHECK: bb0(%0 : $*any P):
+// CHECK:   [[OPEN:%.*]] = open_existential_addr immutable_access %0 : $*any P to $*[[OPEN_TYPE:@opened\(.*, any P\) Self]]
+// CHECK:   [[RESULT:%.*]] = alloc_stack $any P
 // CHECK:   [[METHOD:%.*]] = witness_method $[[OPEN_TYPE]], #P.upgrade : {{.*}}, [[OPEN]]
-// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*P, $[[OPEN_TYPE]]
+// CHECK:   [[RESULT_ADDR:%.*]] = init_existential_addr [[RESULT]] : $*any P, $[[OPEN_TYPE]]
 // CHECK:   try_apply [[METHOD]]<[[OPEN_TYPE]]>([[RESULT_ADDR]], [[OPEN]])
 //
 // CHECK: bb1
 // CHECK:  dealloc_stack [[RESULT]]
 // CHECK:  return
 //
-// CHECK: bb2([[FAILURE:%.*]]: @owned $Error):
+// CHECK: bb2([[FAILURE:%.*]]: @owned $any Error):
 // CHECK:  deinit_existential_addr [[RESULT]]
 // CHECK:  dealloc_stack [[RESULT]]
 // CHECK:  throw [[FAILURE]]
@@ -92,23 +92,23 @@ extension Error {
 
 // CHECK-LABEL: sil hidden [ossa] @$s19existential_erasure12errorHandlerys5Error_psAC_pKF
 func errorHandler(_ e: Error) throws -> Error {
-// CHECK: bb0([[ARG:%.*]] : @guaranteed $Error):
-// CHECK:  debug_value [[ARG]] : $Error
-// CHECK:  [[OPEN:%.*]] = open_existential_box [[ARG]] : $Error to $*[[OPEN_TYPE:@opened\(.*\) Error]]
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $any Error):
+// CHECK:  debug_value [[ARG]] : $any Error
+// CHECK:  [[OPEN:%.*]] = open_existential_box [[ARG]] : $any Error to $*[[OPEN_TYPE:@opened\(.*, any Error\) Self]]
 // CHECK:  [[FUNC:%.*]] = function_ref @$ss5ErrorP19existential_erasureE17returnOrThrowSelf{{[_0-9a-zA-Z]*}}F
-// CHECK:  [[RESULT:%.*]] = alloc_existential_box $Error, $[[OPEN_TYPE]]
-// CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $Error
+// CHECK:  [[RESULT:%.*]] = alloc_existential_box $any Error, $[[OPEN_TYPE]]
+// CHECK:  [[ADDR:%.*]] = project_existential_box $[[OPEN_TYPE]] in [[RESULT]] : $any Error
 // CHECK:  store [[RESULT]] to [init] [[RESULT_BUF:%.*]] :
 // CHECK:  try_apply [[FUNC]]<[[OPEN_TYPE]]>([[ADDR]], [[OPEN]])
 //
 // CHECK: bb1
 // CHECK:  [[RESULT2:%.*]] = load [take] [[RESULT_BUF]]
-// CHECK:  return [[RESULT2]] : $Error
+// CHECK:  return [[RESULT2]] : $any Error
 //
-// CHECK: bb2([[FAILURE:%.*]] : @owned $Error):
+// CHECK: bb2([[FAILURE:%.*]] : @owned $any Error):
 // CHECK:  [[RESULT3:%.*]] = load [take] [[RESULT_BUF]]
 // CHECK:  dealloc_existential_box [[RESULT3]]
-// CHECK:  throw [[FAILURE]] : $Error
+// CHECK:  throw [[FAILURE]] : $any Error
 //
   return try e.returnOrThrowSelf()
 }
@@ -127,5 +127,18 @@ class EraseDynamicSelf {
     let instance = self.init()
     let _: Any = instance
     return instance
+  }
+
+// CHECK-LABEL: sil hidden [ossa] @$s19existential_erasure16EraseDynamicSelfC23eraseToClassExistentialyXlyF : $@convention(method) (@guaranteed EraseDynamicSelf) -> @owned AnyObject
+// CHECK: bb0([[ARG:%.*]] : @guaranteed $EraseDynamicSelf):
+// CHECK:  debug_value [[ARG]] : $EraseDynamicSelf, let, name "self", argno 1
+// CHECK:  [[METATYPE:%.*]] = metatype $@thick @dynamic_self EraseDynamicSelf.Type
+// CHECK:  [[UPCAST:%.*]] = upcast [[METATYPE]] : $@thick @dynamic_self EraseDynamicSelf.Type to $@thick EraseDynamicSelf.Type
+// CHECK:  [[METHOD:%.*]] = class_method [[UPCAST]] : $@thick EraseDynamicSelf.Type, #EraseDynamicSelf.factory
+// CHECK:  [[INSTANCE:%.*]] = apply [[METHOD]]([[UPCAST]]) : $@convention(method) (@thick EraseDynamicSelf.Type) -> @owned EraseDynamicSelf
+// CHECK:  [[EXISTENTIAL:%.*]] = init_existential_ref [[INSTANCE]] : $EraseDynamicSelf : $@dynamic_self EraseDynamicSelf, $AnyObject
+// CHECK:  return [[EXISTENTIAL]] : $AnyObject
+  func eraseToClassExistential() -> AnyObject {
+    return Self.factory()
   }
 }

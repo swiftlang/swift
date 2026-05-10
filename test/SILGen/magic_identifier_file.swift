@@ -21,7 +21,9 @@
 // Test in "Swift 6" mode:
 // RUN: %target-swift-emit-silgen -I %t -enable-experimental-concise-pound-file -module-name Foo %/s | %FileCheck --check-prefixes=BOTH,CONCISE %s
 
-// TODO: Update RUN lines currently using -enable-experimental-concise-pound-file to use -swift-version <whatever> instead. (SR-13199)
+// TODO: Update RUN lines currently using
+// -enable-experimental-concise-pound-file to use -swift-version <whatever>
+// instead (https://github.com/apple/swift/issues/55639).
 
 import MagicIdentifierFileSwift5
 import MagicIdentifierFileSwift6

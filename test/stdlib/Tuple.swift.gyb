@@ -9,7 +9,7 @@ var TupleTestSuite = TestSuite("Tuple")
 // Test tuple comparison operators
 // all the tuple types use the same basic implementation for the operators
 // so testing any arity tests the logic for them all.
-// Include at least one invocation for all arities as a sanity check.
+// Include at least one invocation for all arities as a soundness check.
 
 % maxArity = 6 # the highest arity the operators are defined for
 
@@ -57,7 +57,7 @@ TupleTestSuite.test("Tuple/equality") {
 }
 
 TupleTestSuite.test("Tuple/equality/sanity-check") {
-  // sanity check all arities
+  // soundness check all arities
 
   expectTrue(() == ())
   expectFalse(() != ())
@@ -144,7 +144,7 @@ TupleTestSuite.test("Tuple/comparison") {
 }
 
 TupleTestSuite.test("Tuple/comparison/sanity-check") {
-  // sanity check all arities
+  // soundness check all arities
 % for arity in range(2, maxArity + 1):
 %   a = str(tuple(range(1, arity + 1)))
 %   b = "({}, 0)".format(", ".join([str(i) for i in range(1, arity)]))

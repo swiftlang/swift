@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1 -solver-disable-shrink
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
 // REQUIRES: tools-release,no_asan
 
 struct Date {
@@ -16,15 +16,23 @@ struct DatabaseLog {
   }
 }
 
-extension Sequence {
-  public func count(
-    where predicate: (Element) throws -> Bool
-  ) rethrows -> Int { 0 }
-}
-
 
 func rdar47742750(arr1: [Int], arr2: [Int]?) {
   let _ = {
     assert(arr1.count == arr1.count + (arr2 == nil ? 0 : 1 + arr2!.count + arr2!.count + arr2!.count))
   }
+}
+
+func f(
+  a: String?,
+  b: String?,
+  c: Int,
+  d: String?,
+  e: String?
+) -> Int {
+  return (a?.unicodeScalars.count ?? 0) +
+  (b?.unicodeScalars.count ?? 0) +
+  c +
+  (d?.unicodeScalars.count ?? 0) +
+  (e?.unicodeScalars.count ?? 0)
 }

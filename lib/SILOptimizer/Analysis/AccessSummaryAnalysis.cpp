@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-access-summary-analysis"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SILOptimizer/Analysis/AccessSummaryAnalysis.h"
@@ -89,6 +90,12 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
     }
 
     switch (user->getKind()) {
+    case SILInstructionKind::MarkUnresolvedNonCopyableValueInst: {
+      // Pass through to the address being checked.
+      auto inst = cast<MarkUnresolvedNonCopyableValueInst>(user);
+      worklist.append(inst->use_begin(), inst->use_end());
+      break;
+    }
     case SILInstructionKind::BeginAccessInst: {
       auto *BAI = cast<BeginAccessInst>(user);
       if (BAI->getEnforcement() != SILAccessEnforcement::Unsafe) {
@@ -142,7 +149,7 @@ void AccessSummaryAnalysis::processArgument(FunctionInfo *info,
 }
 
 #ifndef NDEBUG
-/// Sanity check to make sure that a noescape partial apply is only ultimately
+/// Soundness check to make sure that a noescape partial apply is only ultimately
 /// used by directly calling it or passing it as argument, but not using it as a
 /// partial_apply callee.
 ///
@@ -209,7 +216,11 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     return llvm::all_of(cast<CopyValueInst>(user)->getUses(),
                         hasExpectedUsesOfNoEscapePartialApply);
 
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::MoveValueInst:
+    return llvm::all_of(cast<MoveValueInst>(user)->getUses(),
+                        hasExpectedUsesOfNoEscapePartialApply);
+
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::StoreInst:
   case SILInstructionKind::DestroyValueInst:
     // @block_storage is passed by storing it to the stack. We know this is
@@ -232,8 +243,15 @@ static bool hasExpectedUsesOfNoEscapePartialApply(Operand *partialApplyUse) {
     // destroy_value %storage : $@callee_owned () -> ()
     return true;
   default:
-    return false;
+    break;
   }
+  if (auto *startAsyncLet = dyn_cast<BuiltinInst>(user)) {
+    if (startAsyncLet->getBuiltinKind() ==
+        BuiltinValueKind::StartAsyncLetWithLocalBuffer) {
+      return true;
+    }
+  }
+  return false;
 }
 #endif
 
@@ -489,6 +507,25 @@ getSingleAddressProjectionUser(SingleValueInstruction *I) {
     if (isa<BeginAccessInst>(I) && isa<EndAccessInst>(User))
       continue;
 
+    if (auto md = MarkDependenceInstruction(User)) {
+      // The base of a mark_dependence or mark_dependence_addr] is a
+      // begin_access. That creates a dependency on any part of the base value
+      // accessed inside this access scope. If, in addition to this dependency,
+      // the begin_access only has a single projection use, then we assume that
+      // only the sub-object at that projection can be accessed with the scope.
+      //
+      // FIXME: this isn't strictly safe because the dependency could, in
+      // theory, represent an access to other parts of the base, and those
+      // accesses may be invisible to the compiler. That is never expected
+      // happen when we have a single projection use. But to be safe, the base
+      // of the mark_dependency should really be the projection address instead
+      // to ensure that no other parts of the base can be accessed. Then we can
+      // remove this special case.
+      if (md.getBase() == Use->get()) {
+        continue;
+      }
+    }
+
     // Ignore sanitizer instrumentation when looking for a single projection
     // user. This ensures that we're able to find a single projection subpath
     // even when sanitization is enabled.
@@ -539,6 +576,37 @@ AccessSummaryAnalysis::findSubPathAccessed(BeginAccessInst *BAI) {
   }
 
   return SubPath;
+}
+
+SILType AccessSummaryAnalysis::getSubPathType(SILType baseType,
+                                              const IndexTrieNode *subPath,
+                                              SILModule &mod,
+                                              TypeExpansionContext context) {
+  // Walk the trie to the root to collect the sequence (in reverse order).
+  llvm::SmallVector<unsigned, 4> reversedIndices;
+  const IndexTrieNode *indexTrieNode = subPath;
+  while (!indexTrieNode->isRoot()) {
+    reversedIndices.push_back(indexTrieNode->getIndex());
+    indexTrieNode = indexTrieNode->getParent();
+  }
+
+  SILType iterType = baseType;
+  for (unsigned index : llvm::reverse(reversedIndices)) {
+    if (StructDecl *decl = iterType.getStructOrBoundGenericStruct()) {
+      VarDecl *var = decl->getStoredProperties()[index];
+      iterType = iterType.getFieldType(var, mod, context);
+      continue;
+    }
+
+    if (auto tupleTy = iterType.getAs<TupleType>()) {
+      iterType = iterType.getTupleElementType(index);
+      continue;
+    }
+
+    llvm_unreachable("unexpected type in projection subpath!");
+  }
+
+  return iterType;
 }
 
 /// Returns a string representation of the SubPath
@@ -636,4 +704,9 @@ void AccessSummaryAnalysis::FunctionSummary::print(raw_ostream &os,
   }
 
   os << ")";
+}
+
+void AccessSummaryAnalysis::FunctionSummary::dump(SILFunction *fn) const {
+  print(llvm::errs(), fn);
+  llvm::errs() << '\n';
 }

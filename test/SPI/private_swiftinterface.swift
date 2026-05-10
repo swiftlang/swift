@@ -13,15 +13,15 @@
 
 // Test the spi parameter of the _specialize attribute in the private interface.
 // RUN: %FileCheck -check-prefix=CHECK-HELPER-PRIVATE %s < %t/SPIHelper.private.swiftinterface
-// CHECK-HELPER-PRIVATE: @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE: @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift::Int)
 // CHECK-HELPER-PRIVATE-NEXT: public func genericFunc<T>(_ t: T)
-// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift::Int)
 // CHECK-HELPER-PRIVATE-NEXT:  public func genericFunc2<T>(_ t: T)
-// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift::Int)
 // CHECK-HELPER-PRIVATE-NEXT:  public func genericFunc3<T>(_ t: T)
-// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE:  @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift::Int)
 // CHECK-HELPER-PRIVATE-NEXT:  public func genericFunc4<T>(_ t: T)
-// CHECK-HELPER-PRIVATE:   @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift.Int)
+// CHECK-HELPER-PRIVATE:   @_specialize(exported: true, spi: HelperSPI, kind: full, where T == Swift::Int)
 // CHECK-HELPER-PRIVATE-NEXT:  public func prespecializedMethod<T>(_ t: T)
 
 
@@ -29,24 +29,16 @@
 
 /// Test the textual interfaces generated from this test.
 // RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/Main.swiftinterface -emit-private-module-interface-path %t/Main.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name Main
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/Main.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/Main.private.swiftinterface
+// RUN: cat %t/Main.swiftinterface | %FileCheck -check-prefix=CHECK-PUBLIC %s
+// RUN: cat %t/Main.private.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.swiftinterface
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Main.private.swiftinterface -module-name Main
-
-/// Serialize and deserialize this module, then print.
-// RUN: %target-swift-frontend -emit-module %s -emit-module-path %t/Merged-partial.swiftmodule -swift-version 5 -I %t -module-name Merged -enable-library-evolution
-// RUN: %target-swift-frontend -merge-modules %t/Merged-partial.swiftmodule -module-name Merged -emit-module -emit-module-path %t/Merged.swiftmodule -I %t -emit-module-interface-path %t/Merged.swiftinterface -emit-private-module-interface-path %t/Merged.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t
-// RUN: %FileCheck -check-prefix=CHECK-PUBLIC %s < %t/Merged.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/Merged.private.swiftinterface
-// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.swiftinterface
-// RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/Merged.private.swiftinterface -module-name Merged
 
 /// Both the public and private textual interfaces should have
 /// SPI information with `-library-level spi`.
 // RUN: %target-swift-frontend -typecheck %s -emit-module-interface-path %t/SPIModule.swiftinterface -emit-private-module-interface-path %t/SPIModule.private.swiftinterface -enable-library-evolution -swift-version 5 -I %t -module-name SPIModule -library-level spi
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/SPIModule.swiftinterface
-// RUN: %FileCheck -check-prefix=CHECK-PRIVATE %s < %t/SPIModule.private.swiftinterface
+// RUN: cat %t/SPIModule.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
+// RUN: cat %t/SPIModule.private.swiftinterface | %FileCheck -check-prefix=CHECK-PRIVATE %s
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/SPIModule.swiftinterface
 // RUN: %target-swift-frontend -typecheck-module-from-interface -I %t %t/SPIModule.private.swiftinterface -module-name SPIModule
 
@@ -73,8 +65,8 @@ public func foo() {}
 }
 
 @_spi(MySPI) public extension SPIClassLocal {
-// CHECK-PRIVATE: @_spi(MySPI) extension {{.+}}.SPIClassLocal
-// CHECK-PUBLIC-NOT: extension {{.+}}.SPIClassLocal
+// CHECK-PRIVATE: @_spi(MySPI) extension {{.+}}::SPIClassLocal
+// CHECK-PUBLIC-NOT: extension {{.+}}::SPIClassLocal
 
   @_spi(MySPI) func extensionMethod() {}
   // CHECK-PRIVATE: @_spi(MySPI) public func extensionMethod
@@ -110,8 +102,8 @@ private class PrivateClassLocal {}
 // CHECK-PUBLIC-NOT: useOfSPITypeOk
 
 @_spi(LocalSPI) extension SPIClass {
-  // CHECK-PRIVATE: @_spi(LocalSPI) extension SPIHelper.SPIClass
-  // CHECK-PUBLIC-NOT: SPIHelper.SPIClass
+  // CHECK-PRIVATE: @_spi(LocalSPI) extension SPIHelper::SPIClass
+  // CHECK-PUBLIC-NOT: SPIHelper::SPIClass
 
   @_spi(LocalSPI) public func extensionSPIMethod() {}
   // CHECK-PRIVATE: @_spi(LocalSPI) public func extensionSPIMethod()
@@ -147,14 +139,58 @@ public class SomeClass {
 }
 
 public struct PublicStruct {
+  @_spi(S) public var spiVar: SomeClass
+  // CHECK-PRIVATE: @_spi(S) public var spiVar: {{.*}}::SomeClass
+  // CHECK-PUBLIC-NOT: spiVar
+
+  public var publicVarWithSPISet: SomeClass {
+    get { SomeClass() }
+    @_spi(S) set {}
+  }
+  // CHECK-PRIVATE: public var publicVarWithSPISet: {{.*}}::SomeClass {
+  // CHECK-PRIVATE-NEXT:   get
+  // CHECK-PRIVATE-NEXT:   @_spi(S) set
+  // CHECK-PRIVATE-NEXT: }
+  // CHECK-PUBLIC: public var publicVarWithSPISet: {{.*}}::SomeClass {
+  // CHECK-PUBLIC-NEXT:   get
+  // CHECK-PUBLIC-NEXT: }
+
   @_spi(S) @Wrapper public var spiWrappedSimple: SomeClass
-  // CHECK-PRIVATE: @_spi(S) @{{.*}}.Wrapper public var spiWrappedSimple: {{.*}}.SomeClass
+  // CHECK-PRIVATE: @_spi(S) @{{.*}}::Wrapper public var spiWrappedSimple: {{.*}}::SomeClass
   // CHECK-PUBLIC-NOT: spiWrappedSimple
 
   @_spi(S) @WrapperWithInitialValue public var spiWrappedDefault: SomeClass
-  // CHECK-PRIVATE: @_spi(S) @{{.*}}.WrapperWithInitialValue @_projectedValueProperty($spiWrappedDefault) public var spiWrappedDefault: {{.*}}.SomeClass
-  // CHECK-PRIVATE: @_spi(S) public var $spiWrappedDefault: {{.*}}.Wrapper<{{.*}}.SomeClass>
+  // CHECK-PRIVATE: @_spi(S) @{{.*}}::WrapperWithInitialValue @_projectedValueProperty($spiWrappedDefault) public var spiWrappedDefault: {{.*}}::SomeClass
+  // CHECK-PRIVATE: @_spi(S) public var $spiWrappedDefault: {{.*}}::Wrapper<{{.*}}::SomeClass>
   // CHECK-PUBLIC-NOT: spiWrappedDefault
+}
+
+@_spi(S) public enum SPIEnum {
+// CHECK-PRIVATE: @_spi(S) public enum SPIEnum
+// CHECK-PUBLIC-NOT: SPIEnum
+
+  case spiEnumCase
+  // CHECK-PRIVATE: case spiEnumCase
+  // CHECK-PUBLIC-NOT: spiEnumCase
+}
+
+public enum PublicEnum {
+  case publicCase
+  // CHECK-PUBLIC: case publicCase
+  // CHECK-PRIVATE: case publicCase
+
+  @_spi(S) case spiCase
+  // CHECK-PRIVATE: @_spi(S) case spiCase
+  // CHECK-PUBLIC-NOT: spiCase
+
+  @_spi(S) case spiCaseA, spiCaseB
+  // CHECK-PRIVATE: @_spi(S) case spiCaseA, spiCaseB
+  // CHECK-PUBLIC-NOT: spiCaseA
+  // CHECK-PUBLIC-NOT: spiCaseB
+
+  @_spi(S) case spiCaseWithPayload(_ c: SomeClass)
+  // CHECK-PRIVATE: @_spi(S) case spiCaseWithPayload(_: {{.*}}::SomeClass)
+  // CHECK-PUBLIC-NOT: spiCaseWithPayload
 }
 
 @_spi(LocalSPI) public protocol SPIProto3 {
@@ -182,7 +218,7 @@ private protocol PrivateConstraint {}
 
 @_spi(LocalSPI)
 extension PublicType: SPIProto2 where T: SPIProto2 {}
-// CHECK-PRIVATE: extension {{.*}}.PublicType : {{.*}}.SPIProto2 where T : {{.*}}.SPIProto2
+// CHECK-PRIVATE: extension {{.*}}::PublicType : {{.*}}::SPIProto2 where T : {{.*}}::SPIProto2
 // CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
 
 public protocol LocalPublicProto {}
@@ -202,11 +238,16 @@ extension IOIPublicStruct : LocalPublicProto {}
   // CHECK-PRIVATE: @_spi(S) private var spiTypeInFrozen1
 }
 
+public struct OpType {}
+@_spi(S) public func +(_ s1: OpType, _ s2: OpType) -> OpType { s1 }
+// CHECK-PRIVATE: @_spi(S) public func + (s1: {{.*}}::OpType, s2: {{.*}}::OpType) -> {{.*}}::OpType
+// CHECK-PUBLIC-NOT: func +
+
 // The dummy conformance should be only in the private swiftinterface for
 // SPI extensions.
 @_spi(LocalSPI)
 extension PublicType: SPIProto where T: PrivateConstraint {}
-// CHECK-PRIVATE: extension {{.*}}.PublicType : {{.*}}.SPIProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
+// CHECK-PRIVATE: extension {{.*}}::PublicType : {{.*}}::SPIProto where T : _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
 // CHECK-PUBLIC-NOT: _ConstraintThatIsNotPartOfTheAPIOfThisLibrary
 
 // Preserve SPI information when printing indirect conformances via
@@ -214,5 +255,5 @@ extension PublicType: SPIProto where T: PrivateConstraint {}
 @_spi(S) public protocol SPIProtocol {}
 internal protocol InternalProtocol: SPIProtocol {}
 public struct PublicStruct2: InternalProtocol {}
-// CHECK-PRIVATE: @_spi(S) extension {{.*}}PublicStruct2 : {{.*}}.SPIProtocol
+// CHECK-PRIVATE: @_spi(S) extension {{.*}}::PublicStruct2 : {{.*}}::SPIProtocol
 // CHECK-PUBLIC-NOT: SPIProtocol

@@ -258,7 +258,7 @@ bb0:
   %9 = function_ref @skipConstructInnerProto : $@convention(thin) () -> @out InnerProto
   %10 = apply %9(%8) : $@convention(thin) () -> @out InnerProto
   %12 = struct_element_addr %1 : $*OuterWithProto, #OuterWithProto.second
-  copy_addr [take] %8 to [initialization] %12 : $*InnerProto
+  copy_addr [take] %8 to [init] %12 : $*InnerProto
   dealloc_stack %8 : $*InnerProto
   %19 = struct_element_addr %1 : $*OuterWithProto, #OuterWithProto.first
   %20 = load %19 : $*Int64
@@ -292,8 +292,8 @@ bb0(%0 : $*Int64):
   return %15 : $()
 }
 
-// CHECK-LABEL: @interpretInteleavedSkipAndNonSkip
-sil @interpretInteleavedSkipAndNonSkip : $@convention(thin) () -> Builtin.Int64 {
+// CHECK-LABEL: @interpretInterleavedSkipAndNonSkip
+sil @interpretInterleavedSkipAndNonSkip : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %0 = alloc_stack $Outer, var, name "outer"
   %1 = integer_literal $Builtin.Int64, 101
@@ -305,7 +305,7 @@ bb0:
   %8 = struct_element_addr %0 : $*Outer, #Outer.second
   store %7 to %8 : $*Inner
 
-  // Mutate the first component and second compoennt in an interleaved way.
+  // Mutate the first component and second component in an interleaved way.
   %9 = struct_element_addr %0: $*Outer, #Outer.first
   %10 = function_ref @increment : $@convention(thin) (@inout Int64) -> ()
   %11 = apply %10(%9) : $@convention(thin) (@inout Int64) -> ()
@@ -330,3 +330,57 @@ bb0:
   dealloc_stack %0 : $*Outer
   return %32 : $Builtin.Int64
 } // CHECK: Returns int: 103
+
+// Test whether the constant evaluator can handle reading and writing into
+// structs containing unknown symbolic values created by skipping functions.
+
+struct UnknownStruct {
+  let value: Int64
+}
+
+struct StructWithSkippedElements {
+  let knownValue: Int64
+  let unknownValue: UnknownStruct
+}
+
+sil @skipUnknownStructCreate : $@convention(thin) () -> UnknownStruct
+
+// CHECK-LABEL: @interpretStructsWithSkippedElements
+sil @interpretStructsWithSkippedElements : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 301
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = function_ref @skipUnknownStructCreate : $@convention(thin) () -> UnknownStruct
+  %3 = apply %2() : $@convention(thin) () -> UnknownStruct
+  %4 = struct $StructWithSkippedElements (%1 : $Int64, %3 : $UnknownStruct)
+  %5 = alloc_stack $StructWithSkippedElements, var, name "s"
+  store %4 to %5 : $*StructWithSkippedElements
+
+  %6 = struct_element_addr %5 : $*StructWithSkippedElements, #StructWithSkippedElements.unknownValue
+  %7 = struct_element_addr %6 : $*UnknownStruct, #UnknownStruct.value
+  %8 = load %7 : $*Int64
+  %9 = struct_extract %8 : $Int64, #Int64._value
+  dealloc_stack %5 : $*StructWithSkippedElements
+  return %9 : $Builtin.Int64
+} // CHECK: Returns unknown
+
+// CHECK-LABEL: @interpretStructsWithSkippedElementsRW
+sil @interpretStructsWithSkippedElementsRW : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 301
+  %1 = struct $Int64 (%0 : $Builtin.Int64)
+  %2 = function_ref @skipUnknownStructCreate : $@convention(thin) () -> UnknownStruct
+  %3 = apply %2() : $@convention(thin) () -> UnknownStruct
+  %4 = struct $StructWithSkippedElements (%1 : $Int64, %3 : $UnknownStruct)
+  %5 = alloc_stack $StructWithSkippedElements, var, name "s"
+  store %4 to %5 : $*StructWithSkippedElements
+
+  %6 = struct_element_addr %5 : $*StructWithSkippedElements, #StructWithSkippedElements.unknownValue
+  %7 = struct_element_addr %6 : $*UnknownStruct, #UnknownStruct.value
+  store %1 to %7 : $*Int64
+  %8 = struct_element_addr %5 : $*StructWithSkippedElements, #StructWithSkippedElements.knownValue
+  %9 = load %8 : $*Int64
+  %10 = struct_extract %9 : $Int64, #Int64._value
+  dealloc_stack %5 : $*StructWithSkippedElements
+  return %10 : $Builtin.Int64
+} // CHECK: Returns int: 301

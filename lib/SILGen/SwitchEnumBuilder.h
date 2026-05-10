@@ -23,7 +23,7 @@ class SILGenFunction;
 
 /// TODO: std::variant.
 struct SwitchCaseBranchDest {
-  Optional<JumpDest> jumpDest;
+  std::optional<JumpDest> jumpDest;
   NullablePtr<SILBasicBlock> block;
 
   SwitchCaseBranchDest() : jumpDest(), block() {}
@@ -35,14 +35,14 @@ struct SwitchCaseBranchDest {
   SwitchCaseBranchDest(SILBasicBlock *block) : jumpDest(), block(block) {}
 
   explicit operator bool() const {
-    return jumpDest.hasValue() || block.isNonNull();
+    return jumpDest.has_value() || block.isNonNull();
   }
 
-  bool hasJumpDest() const { return jumpDest.hasValue(); }
+  bool hasJumpDest() const { return jumpDest.has_value(); }
   bool hasBlock() const { return bool(block); }
 
   SILBasicBlock *getBlock() { return block.getPtrOrNull(); }
-  JumpDest &getJumpDest() { return jumpDest.getValue(); }
+  JumpDest &getJumpDest() { return jumpDest.value(); }
 };
 
 /// A cleanup scope RAII object, like FullExpr, that comes with a JumpDest for a
@@ -135,7 +135,7 @@ private:
   SILGenBuilder &builder;
   SILLocation loc;
   ManagedValue subjectExprOperand;
-  llvm::Optional<DefaultCaseData> defaultBlockData;
+  std::optional<DefaultCaseData> defaultBlockData;
   llvm::SmallVector<NormalCaseData, 8> caseDataArray;
 
 public:

@@ -66,7 +66,7 @@ ERROR(optional_req_changed,APIDigesterBreakage,"%0 is %select{now|no longer}1 an
 
 ERROR(no_longer_open,APIDigesterBreakage,"%0 is no longer open for subclassing", (StringRef))
 
-ERROR(func_type_escaping_changed,APIDigesterBreakage,"%0 has %select{removed|added}2 @escaping in %1", (StringRef, StringRef, bool))
+ERROR(func_type_escaping_changed,APIDigesterBreakage,"%0 has %select{removed|added}2 '@escaping' in %1", (StringRef, StringRef, bool))
 
 ERROR(func_self_access_change,APIDigesterBreakage,"%0 has self access kind changing from %1 to %2", (StringRef, StringRef, StringRef))
 
@@ -78,7 +78,7 @@ ERROR(decl_new_witness_table_entry,APIDigesterBreakage,"%0 now requires%select{|
 
 ERROR(class_member_moved_to_extension,APIDigesterBreakage,"Non-final class member %0 is moved to extension", (StringRef))
 
-WARNING(new_decl_without_intro,APIDigesterBreakage,"%0 is a new API without @available attribute", (StringRef))
+WARNING(new_decl_without_intro,APIDigesterBreakage,"%0 is a new API without '@available'", (StringRef))
 
 ERROR(objc_name_change,APIDigesterBreakage,"%0 has ObjC name change from %1 to %2", (StringRef, StringRef, StringRef))
 

@@ -9,29 +9,49 @@ enum Either {
   case First(Int64), Second(P), Neither
 // CHECK: !DICompositeType({{.*}}name: "Either",
 // CHECK-SAME:             size: {{328|168}},
+
+// DWARF: !DICompositeType(tag: DW_TAG_structure_type, name: "Either",
+// DWARF-SAME:             size: {{328|168}}, num_extra_inhabitants: 253,
+// DWARF-SAME:             identifier: "$s4enum6EitherOD")
+
+// DWARF: !DICompositeType(tag: DW_TAG_variant_part
+
+// DWARF: DIDerivedType(tag: DW_TAG_member, name: "First",
+// DWARF-NEXT: DICompositeType(tag: DW_TAG_structure_type, name: "Int64",
+
+// DWARF: DIDerivedType(tag: DW_TAG_member, name: "Second"
+// DWARF-NEXT: DICompositeType(tag: DW_TAG_structure_type, name: "P",
+
+// DWARF: DIDerivedType(tag: DW_TAG_member, name: "Neither",
+// DWARF-SAME:          baseType: null)
 }
-// CHECK: ![[EMPTY:.*]] = !{}
-// DWARF: ![[INT:.*]] = !DICompositeType({{.*}}identifier: "$sSiD"
 let E : Either = .Neither;
 
 // CHECK: !DICompositeType({{.*}}name: "Color",
 // CHECK-SAME:             size: 8,
 // CHECK-SAME:             identifier: "$s4enum5ColorOD"
+
 enum Color : UInt64 {
 // This is effectively a 2-bit bitfield:
-// DWARF: !DIDerivedType(tag: DW_TAG_member, name: "Red"
-// DWARF-SAME:           baseType: ![[UINT64:[0-9]+]]
-// DWARF-SAME:           size: 8{{[,)]}}
-// DWARF: ![[UINT64]] = !DICompositeType({{.*}}identifier: "$ss6UInt64VD"
+// DWARF: DICompositeType(tag: DW_TAG_enumeration_type, name: "Color",
+// DWARF-NEXT: DICompositeType(tag: DW_TAG_structure_type, name: "UInt64"
+// DWARF: !DIEnumerator(name: "Red", value: 0)
+// DWARF-NEXT: !DIEnumerator(name: "Green", value: 0)
+// DWARF-NEXT: !DIEnumerator(name: "Blue", value: 0)
   case Red, Green, Blue
 }
 
 // CHECK: !DICompositeType({{.*}}name: "MaybeIntPair",
 // CHECK-SAME:             size: 136{{[,)]}}
 // CHECK-SAME:             identifier: "$s4enum12MaybeIntPairOD"
+
+// DWARF: DICompositeType(tag: DW_TAG_structure_type, name: "MaybeIntPair",
+// DWARF-SAME:             identifier: "$s4enum12MaybeIntPairOD"
+// DWARF: DICompositeType(tag: DW_TAG_variant_part
+
 enum MaybeIntPair {
 // DWARF: !DIDerivedType(tag: DW_TAG_member, name: "none"
-// DWARF-SAME:           baseType: ![[INT]]{{[,)]}}
+// DWARF-SAME:           baseType: null)
   case none
 // DWARF: !DIDerivedType(tag: DW_TAG_member, name: "just"
 // DWARF-SAME:           baseType: ![[INTTUP:[0-9]+]]
@@ -47,42 +67,40 @@ enum Maybe<T> {
 
 let r = Color.Red
 let c = MaybeIntPair.just(74, 75)
-// CHECK: !DICompositeType({{.*}}name: "Maybe",
-// CHECK-SAME:             identifier: "$s4enum5MaybeOyAA5ColorOGD"
+// CHECK: !DICompositeType({{.*}}name: "$s4enum5MaybeOyAA5ColorOGD"
 let movie : Maybe<Color> = .none
 
 public enum Nothing { }
 public func foo(_ empty : Nothing) { }
-// CHECK: !DICompositeType({{.*}}name: "Nothing", {{.*}}elements: ![[EMPTY]]
-
-// CHECK: !DICompositeType({{.*}}name: "Rose",
-// CHECK-SAME:             {{.*}}identifier: "$s4enum4RoseOyxG{{z?}}D")
+// CHECK: !DICompositeType({{.*}}name: "Nothing"
+// CHECK: !DICompositeType({{.*}}name: "$s4enum4RoseOyxG{{z?}}D"
 enum Rose<A> {
 	case MkRose(() -> A, () -> [Rose<A>])
-  // DWARF: !DICompositeType({{.*}}name: "Rose",{{.*}}flags: DIFlagFwdDecl{{.*}}identifier: "$s4enum4RoseOyxGD")
+  // DWARF: !DICompositeType(tag: DW_TAG_structure_type, name: "Rose",  {{.*}}identifier: "$s4enum4RoseOyxGD"
 	case IORose(() -> Rose<A>)
 }
 
 func foo<T>(_ x : Rose<T>) -> Rose<T> { return x }
 
-// CHECK: !DICompositeType({{.*}}name: "Tuple", {{.*}}identifier: "$s4enum5TupleOyxGD")
-// DWARF: !DICompositeType({{.*}}name: "Tuple",
-// DWARF-SAME:             {{.*}}identifier: "$s4enum5TupleOyxG{{z?}}D")
+// CHECK: !DICompositeType({{.*}}name: "$s4enum5TupleOyxGD"
+// DWARF: !DICompositeType({{.*}}name: "Tuple", {{.*}}identifier: "$s4enum5TupleOyxGD"
 public enum Tuple<P> {
 	case C(P, () -> Tuple)
 }
 
 func bar<T>(_ x : Tuple<T>) -> Tuple<T> { return x }
 
-// CHECK-DAG: ![[LIST:.*]] = !DICompositeType({{.*}}identifier: "$s4enum4ListOyxGD"
-// CHECK-DAG: ![[LIST_MEMBER:.*]] = !DIDerivedType(tag: DW_TAG_member, {{.*}} baseType: ![[LIST]]
-// CHECK-DAG: ![[LIST_ELTS:.*]] = !{![[LIST_MEMBER]]}
-// CHECK-DAG: ![[LIST_CONTAINER:.*]] = !DICompositeType({{.*}}elements: ![[LIST_ELTS]]
-
-// CHECK-DAG: ![[LET_LIST:.*]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[LIST_CONTAINER]])
-// CHECK-DAG: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE+4]], type: ![[LET_LIST]], flags: DIFlagArtificial)
 public enum List<T> {
        indirect case Tail(List, T)
        case End
        func fooMyList() {}
+// CHECK-DAG: !DILocalVariable(name: "self", arg: 1, {{.*}} line: [[@LINE-1]], type: ![[LET_LIST:[0-9]+]], flags: DIFlagArtificial)
+// CHECK-DAG: ![[LET_LIST]] = !DIDerivedType(tag: DW_TAG_const_type, baseType: ![[LIST_CONTAINER:[0-9]+]])
+// CHECK-DAG: ![[LIST_CONTAINER]] = !DICompositeType({{.*}}elements: ![[LIST_ELTS:[0-9]+]]
+// CHECK-DAG: ![[LIST_ELTS]] = !{![[LIST_MEMBER:[0-9]+]]}
+// CHECK-DAG: ![[LIST_MEMBER]] = !DIDerivedType(tag: DW_TAG_member, {{.*}} baseType: ![[LIST:[0-9]+]]
+// CHECK-DAG: ![[LIST]] = !DICompositeType({{.*}}name: "$s4enum4ListOyxGD",{{.*}}DIFlagFwdDecl
 }
+
+
+

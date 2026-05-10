@@ -39,21 +39,23 @@ class SE0071Derived : SE0071Base {
   }
 }
 
-// SR-3043: Diagnostics when accessing deinit
+// https://github.com/apple/swift/issues/45633
+// Diagnostics when accessing deinit
 
-class SR3043Base {
-}
+class Base {}
 
-class SR3043Derived: SR3043Base {
+class Derived: Base {
   deinit {
     super.deinit() // expected-error {{deinitializers cannot be accessed}}
   }
 }
 
-let sr3043 = SR3043Derived()
-sr3043.deinit() // expected-error {{deinitializers cannot be accessed}}
-sr3043.deinit // expected-error {{deinitializers cannot be accessed}}
-SR3043Derived.deinit() // expected-error {{deinitializers cannot be accessed}}
+do {
+  let derived = Derived()
+  derived.deinit() // expected-error {{deinitializers cannot be accessed}}
+  derived.deinit // expected-error {{deinitializers cannot be accessed}}
+  Derived.deinit() // expected-error {{deinitializers cannot be accessed}}
+}
 
 // Allow deinit functions in classes
 
@@ -61,36 +63,39 @@ class ClassWithDeinitFunc {
   func `deinit`() {
   }
 
-  func `deinit`(a: SR3043Base) {
+  func `deinit`(a: Base) {
   }
 }
 
-let instanceWithDeinitFunc = ClassWithDeinitFunc()
-instanceWithDeinitFunc.deinit()
-_ = instanceWithDeinitFunc.deinit(a:)
-_ = instanceWithDeinitFunc.deinit as () -> Void
-SR3043Derived.deinit() // expected-error {{deinitializers cannot be accessed}}
-
 class ClassWithDeinitMember {
-  var `deinit`: SR3043Base?
+  var `deinit`: Base?
 }
 
-let instanceWithDeinitMember = ClassWithDeinitMember()
-_ = instanceWithDeinitMember.deinit
+do {
+  let instanceWithDeinitFunc = ClassWithDeinitFunc()
+  instanceWithDeinitFunc.deinit()
+  _ = instanceWithDeinitFunc.deinit(a:)
+  _ = instanceWithDeinitFunc.deinit as () -> Void
+
+  let instanceWithDeinitMember = ClassWithDeinitMember()
+  _ = instanceWithDeinitMember.deinit
+}
 
 
-// SR-5715 : Fix variable name in nested static value
-struct SR5715 {
+// https://github.com/apple/swift/issues/48285
+// Fix variable name in nested static value
+
+struct S {
   struct A {
     struct B {}
   }
 }
 
-extension SR5715.A.B {
+extension S.A.B {
   private static let x: Int = 5
     
   func f() -> Int {
-    return x  // expected-error {{static member 'x' cannot be used on instance of type 'SR5715.A.B'}} {{12-12=SR5715.A.B.}}
+    return x  // expected-error {{static member 'x' cannot be used on instance of type 'S.A.B'}} {{12-12=S.A.B.}}
   }
 }
 

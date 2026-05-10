@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
+// RUN: not %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 extension extension_for_invalid_type_1 { // expected-error {{cannot find type 'extension_for_invalid_type_1' in scope}}
   func f() { }
@@ -10,7 +11,7 @@ extension extension_for_invalid_type_3 { // expected-error {{cannot find type 'e
   init() {}
 }
 extension extension_for_invalid_type_4 { // expected-error {{cannot find type 'extension_for_invalid_type_4' in scope}}
-  deinit {} // expected-error {{deinitializers may only be declared within a class or actor}}
+  deinit {} // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 }
 extension extension_for_invalid_type_5 { // expected-error {{cannot find type 'extension_for_invalid_type_5' in scope}}
   typealias X = Int
@@ -87,11 +88,6 @@ protocol P1 {}
 
 protocol P2 {}
 
-extension () {} // expected-error {{non-nominal type '()' cannot be extended}} {{educational-notes=nominal-types}}
-
-typealias TupleAlias = (x: Int, y: Int)
-extension TupleAlias {} // expected-error{{non-nominal type 'TupleAlias' (aka '(x: Int, y: Int)') cannot be extended}} {{educational-notes=nominal-types}}
-
 // Test property accessors in extended types
 class C {}
 extension C {
@@ -104,6 +100,7 @@ var c = C()
 var x = c.p1
 c.p1 = 1
 
+// Reject extension of nominal type via inferred associated type
 protocol P3 {
   associatedtype Assoc
   func foo() -> Assoc
@@ -113,15 +110,17 @@ struct X3 : P3 {
 }
 
 extension X3.Assoc {
+// expected-error@-1 {{extension of type 'X3.Assoc' (aka 'Int') must be declared as an extension of 'Int'}}
+// expected-note@-2 {{did you mean to extend 'Int' instead?}}
 }
 
 extension X3 {
   func foo() -> Int { return 0 }
 }
 
-// Make sure the test case from https://bugs.swift.org/browse/SR-3847 doesn't
-// cause problems when the later extension is incorrectly nested inside another
-// declaration.
+// Make sure the test case from https://github.com/apple/swift/issues/46432
+// doesn't cause problems when the later extension is incorrectly nested inside
+// another declaration.
 extension C1.NestedStruct {
   static let originalValue = 0
 }
@@ -132,7 +131,7 @@ struct WrapperContext {
 }
 
 // Class-constrained extension where protocol does not impose class requirement
-// SR-11298
+// https://github.com/apple/swift/issues/53699
 
 protocol DoesNotImposeClassReq_1 {}
 
@@ -140,6 +139,8 @@ class JustAClass: DoesNotImposeClassReq_1 {
   var property: String = ""
 }
 
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=DoesNotImposeClassReq_1
+// CHECK-NEXT: Generic signature: <Self where Self : JustAClass>
 extension DoesNotImposeClassReq_1 where Self: JustAClass {
   var wrappingProperty1: String {
     get { return property }
@@ -193,17 +194,19 @@ protocol DoesNotImposeClassReq_2 {
   var property: String { get set }
 }
 
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=DoesNotImposeClassReq_2
+// CHECK-NEXT: Generic signature: <Self where Self : AnyObject, Self : DoesNotImposeClassReq_2>
 extension DoesNotImposeClassReq_2 where Self : AnyObject {
   var wrappingProperty1: String {
     get { property }
     set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
-    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-5=mutating }}
+    // expected-note@-1 {{mark setter 'mutating' to make 'self' mutable}}{{5-5=mutating }}
   }
   
   var wrappingProperty2: String {
     get { property }
     nonmutating set { property = newValue } // expected-error {{cannot assign to property: 'self' is immutable}}
-    // expected-note@-1 {{mark accessor 'mutating' to make 'self' mutable}}{{5-16=mutating}}
+    // expected-note@-1 {{mark setter 'mutating' to make 'self' mutable}}{{5-16=mutating}}
   }
   
   var wrappingProperty3: String {
@@ -241,6 +244,8 @@ class JustAClass1: DoesNotImposeClassReq_3 {
   var someProperty = 0
 }
 
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=DoesNotImposeClassReq_3
+// CHECK-NEXT: Generic signature: <Self where Self : JustAClass1>
 extension DoesNotImposeClassReq_3 where Self: JustAClass1 {
   var anotherProperty1: Int {
     get { return someProperty }
@@ -265,7 +270,9 @@ class JustAClass2: ImposeClassReq1 {
   var someProperty = 0
 }
 
-extension ImposeClassReq1 where Self: AnyObject { // expected-warning {{redundant constraint 'Self' : 'AnyObject'}}
+// CHECK-LABEL: ExtensionDecl line={{.*}} base=ImposeClassReq1
+// CHECK-NEXT: Generic signature: <Self where Self : ImposeClassReq1>
+extension ImposeClassReq1 where Self: AnyObject {
   var wrappingProperty1: Int {
     get { return someProperty }
     set { someProperty = newValue }
@@ -331,7 +338,7 @@ extension ImposeClassReq2 {
   }
 }
 
-// Reject extension of nominal type via parameterized typealias
+// Reject extension of nominal type via typealias with dependent underlying type
 
 struct Nest<Egg> { typealias Contents = Egg }
 struct Tree { 
@@ -346,14 +353,15 @@ extension Tree.LimbContent.Contents {
 
 extension Tree.BoughPayload.Contents {
   // expected-error@-1 {{extension of type 'Tree.BoughPayload.Contents' (aka 'Nest<Int>') must be declared as an extension of 'Nest<Int>'}}
-  // expected-note@-2 {{did you mean to extend 'Nest<Int>' instead?}}
+  // expected-note@-2 {{did you mean to extend 'Nest<Int>' instead?}} {{11-37=Nest<Int>}}
 }
 
-// SR-10466 Check 'where' clause when referencing type defined inside extension
-struct SR_10466<T> {
-  var a : A // expected-error {{'SR_10466<T>.A' (aka 'Int') requires the types 'T' and 'Never' be equivalent}}
+// https://github.com/apple/swift/issues/52866
+// Check 'where' clause when referencing type defined inside extension.
+struct S_52866<T> {
+  var a : A // expected-error {{'S_52866<T>.A' (aka 'Int') requires the types 'T' and 'Never' be equivalent}}
 }
-extension SR_10466 where T == Never { // expected-note {{requirement specified as 'T' == 'Never' [with T = T]}}
+extension S_52866 where T == Never { // expected-note {{requirement specified as 'T' == 'Never' [with T = T]}}
   typealias A = Int
 }
 
@@ -363,3 +371,36 @@ protocol Rdar66943328 {
 }
 extension Rdar66943328 where Assoc == Int // expected-error {{expected '{' in extension}}
 #endif
+
+// Reject extension of existential type
+
+protocol P4 {}
+
+extension any P4 {
+// expected-error@-1 {{extension of existential type 'any P4' is not supported}}
+// expected-note@-2 {{did you mean to extend 'P4' instead?}} {{11-17=P4}}
+}
+
+typealias A4 = P4
+
+extension any A4 {
+// expected-error@-1 {{extension of existential type 'any A4' (aka 'any P4') is not supported}}
+// expected-note@-2 {{did you mean to extend 'P4' instead?}} {{11-17=P4}}
+}
+
+typealias B4 = any P4
+extension B4 {
+// expected-error@-1 {{extension of existential type 'B4' (aka 'any P4') is not supported}}
+// expected-note@-2 {{did you mean to extend 'P4' instead?}} {{11-13=P4}}
+}
+
+
+extension Sendable {} // expected-error {{cannot extend protocol 'Sendable'}}
+extension Copyable {} // expected-error {{cannot extend protocol 'Copyable'}}
+extension Escapable {} // expected-error {{cannot extend protocol 'Escapable'}}
+extension BitwiseCopyable {} // expected-error {{cannot extend protocol 'BitwiseCopyable'}}
+
+@_marker protocol MyMarkerProto {}
+extension MyMarkerProto {} // OK
+
+extension _ {} // expected-error {{cannot extend a type that contains placeholders}}

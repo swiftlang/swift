@@ -1,10 +1,10 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -mem2reg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -mem2reg | %FileCheck %s
 
 import Builtin
 import Swift
 
 // We cannot use unchecked_value_cast for conversions to trivial type.
-// Since it is forwarding, the ownersip of the src forwards, but we cannot destroy the dst because it is trivial
+// Since it is forwarding, the ownership of the src forwards, but we cannot destroy the dst because it is trivial
 
 // CHECK-LABEL: sil [ossa] @casttotrivial :
 // CHECK: [[CAST:%.*]]  = unchecked_bitwise_cast %0 : $AnyObject to $UInt8

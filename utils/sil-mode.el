@@ -21,10 +21,8 @@
   (list
    ;; Comments
    '("^#!.*" . font-lock-comment-face)
-   ;; Types
-   '("\\b[A-Z][a-zA-Z_0-9]*\\b" . font-lock-type-face)
    ;; Floating point constants
-   '("\\b[-+]?[0-9]+\.[0-9]+\\b" . font-lock-preprocessor-face)
+   '("\\b[-+]?[0-9]+\\.[0-9]+\\b" . font-lock-preprocessor-face)
    ;; Integer literals
    '("\\b[-]?[0-9]+\\b" . font-lock-preprocessor-face)
    ;; Decl and type keywords
@@ -35,7 +33,10 @@
                     "sil_witness_table" "sil_scope")
                   'words) . font-lock-keyword-face)
    ;; SIL Types
-   '("\\b[$][*]?[A-Z][z-aA-Z_[0-9]*\\b" . font-lock-type-face)
+   '("\\b[$][*]?[A-Z][a-zA-Z_0-9]*\\b" . font-lock-type-face)
+
+   ;; Types
+   '("\\b[A-Z][a-zA-Z_0-9]*\\b" . font-lock-type-face)
 
    ;; SIL Stage
    '("sil_stage" . font-lock-keyword-face)
@@ -92,10 +93,8 @@
                     "fix_lifetime" "mark_dependence"
                     "end_lifetime"
                     "is_unique"
-                    "is_escaping_closure"
-                    "copy_block"
-                    "copy_block_without_escaping"
-                    "is_unique")
+                    "destroy_not_escaped_closure"
+                    "copy_block_without_escaping")
                   'words) . font-lock-keyword-face)
    ;; Literals
    `(,(regexp-opt '("function_ref"
@@ -116,7 +115,7 @@
                   'words) . font-lock-keyword-face)
    ;; Aggregate Types
    `(,(regexp-opt '("retain_value" "release_value_addr" "release_value"
-                    "release_value_addr" "tuple" "tuple_extract"
+                    "tuple" "tuple_extract"
                     "tuple_element_addr" "struct" "struct_extract"
                     "struct_element_addr" "ref_element_addr" "ref_tail_addr"
                     "autorelease_value" "copy_value" "destroy_value"
@@ -130,7 +129,7 @@
    ;; swift declaration as well handled at the top.
    `(,(regexp-opt '("init_enum_data_addr" "unchecked_enum_data"
                     "unchecked_take_enum_data_addr" "inject_enum_addr"
-                    "select_enum" "select_value" "select_enum_addr")
+                    "select_enum" "select_enum_addr")
                   'words) . font-lock-keyword-face)
    ;; Protocol and Protocol Composition Types
    `(,(regexp-opt '("init_existential_addr" "deinit_existential_addr"
@@ -140,8 +139,7 @@
                     "alloc_existential_box" "project_existential_box"
                     "open_existential_box" "dealloc_existential_box"
                     "init_existential_ref" "open_existential_ref"
-                    "open_existential_metatype"
-                    "objc_protocol")
+                    "open_existential_metatype")
                   'words) . font-lock-keyword-face)
    ;; Unchecked Conversions
    `(,(regexp-opt '("upcast"
@@ -186,6 +184,23 @@
    ;; Debug Info
    `(,(regexp-opt '("loc" "scope" "parent" "inlined_at")
                   'words) . font-lock-keyword-face)
+   ;; noimplicit copy
+   `(,(regexp-opt '("moveonlywrapper_to_copyable" "moveonlywrapper_to_copyable_addr"
+                    "copyable_to_moveonlywrapper" "copyable_to_moveonlywrapper_addr"
+                    "moveonlywrapper_to_copyable_box")
+                  'words) . font-lock-keyword-face)
+   ;; pack
+   `(,(regexp-opt '("pack_length" "open_pack_element" "pack_element_get" "pack_element_set"
+                    "alloc_pack" "alloc_pack_metadata"
+                    "tuple_pack_element_addr" "tuple_pack_extract"
+                    "dynamic_pack_index" "pack_pack_index" "scalar_pack_index"
+                    "dealloc_pack" "dealloc_pack_metadata")
+                  'words) . font-lock-keyword-face)
+
+   ;; Misc uses
+   `(,(regexp-opt '("ignored_use")
+                  'words) . font-lock-keyword-face)
+
    ;; SIL Value
    '("\\b[%][A-Za-z_0-9]+\\([#][0-9]+\\)?\\b" . font-lock-variable-name-face)
    ;; Variables
@@ -299,7 +314,6 @@
   (interactive)
   (kill-all-local-variables)
   (use-local-map sil-mode-map)         ;; Provides the local keymap.
-  (setq major-mode 'sil-mode)
 
   (make-local-variable 'font-lock-defaults)
   (setq major-mode 'sil-mode           ;; This is how describe-mode
@@ -312,6 +326,7 @@
   (setq comment-start "//")
   (setq tab-stop-list (number-sequence 2 120 2))
   (setq tab-width 2)
+  (font-lock-mode 1)                   ;; Enable syntax highlighting
   (run-hooks 'sil-mode-hook))          ;; Finally, this permits the user to
                                        ;;   customize the mode with a hook.
 

@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "arc-sequence-opts"
 #include "ARCBBState.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/Debug.h"
 
 using namespace swift;
@@ -31,7 +32,7 @@ using ARCBBState = ARCSequenceDataflowEvaluator::ARCBBState;
 void ARCBBState::mergeSuccBottomUp(ARCBBState &SuccBBState) {
   // For each [(SILValue, BottomUpState)] that we are tracking...
   for (auto &Pair : getBottomupStates()) {
-    if (!Pair.hasValue())
+    if (!Pair.has_value())
       continue;
 
     SILValue RefCountedValue = Pair->first;
@@ -85,7 +86,7 @@ void ARCBBState::initSuccBottomUp(ARCBBState &SuccBBState) {
 void ARCBBState::mergePredTopDown(ARCBBState &PredBBState) {
   // For each [(SILValue, TopDownState)] that we are tracking...
   for (auto &Pair : getTopDownStates()) {
-    if (!Pair.hasValue())
+    if (!Pair.has_value())
       continue;
 
     SILValue RefCountedValue = Pair->first;
@@ -139,9 +140,9 @@ void ARCBBState::initPredTopDown(ARCBBState &PredBBState) {
 
 void ARCBBState::dumpBottomUpState() {
   for (auto state : getBottomupStates()) {
-    if (!state.hasValue())
+    if (!state.has_value())
       continue;
-    auto elem = state.getValue();
+    auto elem = state.value();
     if (!elem.first)
       continue;
     llvm::dbgs() << "SILValue: ";
@@ -153,9 +154,9 @@ void ARCBBState::dumpBottomUpState() {
 
 void ARCBBState::dumpTopDownState() {
   for (auto state : getTopDownStates()) {
-    if (!state.hasValue())
+    if (!state.has_value())
       continue;
-    auto elem = state.getValue();
+    auto elem = state.value();
     if (!elem.first)
       continue;
     llvm::dbgs() << "SILValue: ";
@@ -199,13 +200,13 @@ ARCBBStateInfo::ARCBBStateInfo(SILFunction *F, PostOrderAnalysis *POA,
   }
 }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCBBStateInfo::getBottomUpBBHandle(SILBasicBlock *BB) {
   auto OptID = getBBID(BB);
-  if (!OptID.hasValue())
-    return None;
+  if (!OptID.has_value())
+    return std::nullopt;
 
-  unsigned ID = OptID.getValue();
+  unsigned ID = OptID.value();
 
   auto BackedgeIter = BackedgeMap.find(BB);
   if (BackedgeIter == BackedgeMap.end())
@@ -214,13 +215,13 @@ ARCBBStateInfo::getBottomUpBBHandle(SILBasicBlock *BB) {
                               BackedgeIter->second);
 }
 
-llvm::Optional<ARCBBStateInfoHandle>
+std::optional<ARCBBStateInfoHandle>
 ARCBBStateInfo::getTopDownBBHandle(SILBasicBlock *BB) {
   auto MaybeID = getBBID(BB);
-  if (!MaybeID.hasValue())
-    return None;
+  if (!MaybeID.has_value())
+    return std::nullopt;
 
-  unsigned ID = MaybeID.getValue();
+  unsigned ID = MaybeID.value();
 
   auto BackedgeIter = BackedgeMap.find(BB);
   if (BackedgeIter == BackedgeMap.end())
@@ -229,10 +230,10 @@ ARCBBStateInfo::getTopDownBBHandle(SILBasicBlock *BB) {
                               BackedgeIter->second);
 }
 
-llvm::Optional<unsigned> ARCBBStateInfo::getBBID(SILBasicBlock *BB) const {
+std::optional<unsigned> ARCBBStateInfo::getBBID(SILBasicBlock *BB) const {
   auto Iter = BBToBBIDMap.find(BB);
   if (Iter == BBToBBIDMap.end())
-    return None;
+    return std::nullopt;
   return Iter->second;
 }
 

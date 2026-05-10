@@ -542,7 +542,8 @@ struct MultipleMemberAccesses {
   }
 }
 
-func sr10670() {
+// https://github.com/apple/swift/issues/53069
+do {
   struct S {
     init(_ x: inout String) {} // expected-note {{candidate expects in-out value of type 'String' for parameter #1}}
     init(_ x: inout [Int]) {}  // expected-note {{candidate expects in-out value of type '[Int]' for parameter #1}}

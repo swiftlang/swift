@@ -10,7 +10,7 @@ import Foundation
 public struct S {
   private let x: NSXPCConnection
 
-  subscript<T>(dynamicMember property: ReferenceWritableKeyPath<NSXPCConnection, T>) -> T {
+  public subscript<T>(dynamicMember property: ReferenceWritableKeyPath<NSXPCConnection, T>) -> T {
     get {
       x[keyPath: property]
     }

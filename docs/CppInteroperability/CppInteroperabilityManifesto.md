@@ -1,5 +1,11 @@
 # Interoperability between Swift and C++
 
+# ⚠️ Warning: document is out of date. ⚠️
+
+**This document has not had significant updates in the last three years. The goals and design outlined here do not necessarily reflect those established by the C++ Interop Work Group. For an up-to-date document, please see [the Forward Vision document](https://github.com/swiftlang/swift-evolution/blob/main/visions/using-swift-from-c%2B%2B.md).**
+
+[** ‼️ Additionally, the official C++ interoperability documentation is live at Swift.org and provides an up-to-date guide for mixing Swift and C++ ‼️ **](https://www.swift.org/documentation/cxx-interop/)
+
 This document discusses the design and tradeoffs for bidirectional API-level
 interoperability between Swift and C++.
 
@@ -67,7 +73,7 @@ Assumptions:
     + [Function templates: calls with generic type parameters](#function-templates-calls-with-generic-type-parameters)
     + [Function templates: importing as real generic functions](#function-templates-importing-as-real-generic-functions)
     + [Class templates](#class-templates)
-    + [Class templates: importing instantiation behind typedef](#class-templates-importing-instantiation-behind-typedef)
+    + [Class templates: importing full class template instantiations](#class-templates-importing-full-class-template-instantiations)
     + [Class templates: importing specific specializations](#class-templates-importing-specific-specializations)
     + [Class templates: using with generic type parameters](#class-templates-using-with-generic-type-parameters)
     + [Class templates: using in generic code through a synthesized protocol](#class-templates-using-in-generic-code-through-a-synthesized-protocol)
@@ -184,7 +190,7 @@ that pick different sides, forcing the user to choose.
 
 Swift/C++ interoperability builds on top of the Swift/C interoperability, so it
 helps to be familiar with [Swift's strategy for importing C
-modules](HowSwiftImportsCAPIs.md).
+modules](../HowSwiftImportsCAPIs.md).
 
 # Importing C++ APIs into Swift
 
@@ -274,7 +280,7 @@ func caller() {
 To understand the constraints that Swift puts on `inout` parameters, let's take
 a look at the mental model for introduced in the [Ownership
 manifesto](OwnershipManifesto.md) and in [SE-0176 Enforce Exclusive Access to
-Memory](https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md).
+Memory](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md).
 When the caller binds a storage reference to an `inout` parameter, it starts a
 non-instantaneous access to the whole value that occupies the storage. This
 access ends when the callee returns.  Overlapping accesses are not allowed, and
@@ -1804,7 +1810,7 @@ dynamically, some are undefined behavior.
 
 The backdoors are disallowed by the exclusivity rule (from [SE-0176 Enforce
 Exclusive Access to
-Memory](https://github.com/apple/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md)):
+Memory](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0176-enforce-exclusive-access-to-memory.md)):
 
 > two accesses to the same variable are not allowed to overlap unless both
 > accesses are reads
@@ -2875,7 +2881,7 @@ struct MyCxxCollection {
 
 Swift has an equivalent for C++'s `operator()`: `callAsFunction` (introduced in
 [SE-0253: Callable values of user-defined nominal
-types](https://github.com/apple/swift-evolution/blob/main/proposals/0253-callable.md)).
+types](https://github.com/swiftlang/swift-evolution/blob/main/proposals/0253-callable.md)).
 
 ```c++
 // C++ header.
@@ -2922,7 +2928,7 @@ non-throwing Swift functions. If a C++ function called from Swift throws an
 exception that is not caught within the C++ code, the program will terminate.
 
 This approach is similar to that taken by the [Python interop
-library](https://github.com/pvieito/PythonKit/blob/main/PythonKit/Python.swift),
+library](https://github.com/pvieito/PythonKit/blob/master/PythonKit/Python.swift),
 which also terminates the program by default if a Python exception is raised and
 not caught within the Python code.
 
@@ -3470,7 +3476,7 @@ A sidecar annotation file allows to add arbitrary attributes to declarations
 parsed from a header file. You can find examples of such files in the [apinotes
 directory](../apinotes). APINotes files
 are handled by the [APINotes library in
-Clang](https://github.com/apple/llvm-project/tree/apple/main/clang/lib/APINotes).
+Clang](https://github.com/swiftlang/llvm-project/tree/apple/main/clang/lib/APINotes).
 Clang reads an APINotes file alongside the header file; Clang injects attributes
 specified by APINotes into the AST parsed from the header.
 

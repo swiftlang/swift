@@ -36,8 +36,8 @@ func testReallocation() {
             String(story.bufferID, radix: 16)), intro \(intro)
           """)
 
-        if reallocations >= 15 {
-          print("Reallocations exceeded 15")
+        if reallocations >= 16 {
+          print("Reallocations exceeded 16")
           //return
         }
       }

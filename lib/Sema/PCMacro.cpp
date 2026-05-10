@@ -56,6 +56,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 using namespace swift::instrumenter_support;
@@ -142,10 +143,10 @@ public:
     transformStmtCondition(SC, IS->getStartLoc());
     IS->setCond(SC); // FIXME: is setting required?..
 
-    if (Stmt *TS = IS->getThenStmt()) {
-      Stmt *NTS = transformStmt(TS);
+    if (auto *TS = IS->getThenStmt()) {
+      auto *NTS = transformStmt(TS);
       if (NTS != TS) {
-        IS->setThenStmt(NTS);
+        IS->setThenStmt(cast<BraceStmt>(NTS));
       }
     }
 
@@ -224,7 +225,7 @@ public:
 
       // point at the for stmt, to look nice
       SourceLoc StartLoc = FES->getStartLoc();
-      SourceLoc EndLoc = FES->getParsedSequence()->getEndLoc();
+      SourceLoc EndLoc = FES->getSequence()->getEndLoc();
       // FIXME: get the 'end' of the for stmt
       // if (FD->getResultTypeRepr()) {
       //   EndLoc = FD->getResultTypeSourceRange().End;
@@ -336,8 +337,14 @@ public:
     if (D->isImplicit())
       return D;
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
-      if (BraceStmt *B = FD->getBody()) {
-        BraceStmt *NB = transformBraceStmt(B);
+      if (BraceStmt *B = FD->getTypecheckedBody()) {
+        const ParameterList *PL = FD->getParameters();
+
+        // Use FD's DeclContext as TypeCheckDC for transforms in func body
+        // then swap back TypeCheckDC at end of scope.
+        llvm::SaveAndRestore<DeclContext *> localDC(TypeCheckDC, FD);
+        BraceStmt *NB = transformBraceStmt(B, PL);
+
         // Since it would look strange going straight to the first line in a
         // function body, we throw in a before/after pointing at the function
         // decl at the start of the transformed body
@@ -366,7 +373,9 @@ public:
     return D;
   }
 
-  BraceStmt *transformBraceStmt(BraceStmt *BS, bool TopLevel = false) override {
+  BraceStmt *transformBraceStmt(BraceStmt *BS,
+                                const ParameterList *PL = nullptr,
+                                bool TopLevel = false) override {
     ArrayRef<ASTNode> OriginalElements = BS->getElements();
     SmallVector<swift::ASTNode, 3> Elements(OriginalElements.begin(),
                                             OriginalElements.end());
@@ -398,8 +407,7 @@ public:
                                          : DeclNameLoc(),
                 true, // implicit
                 AccessSemantics::Ordinary, RS->getResult()->getType());
-            ReturnStmt *NRS = new (Context) ReturnStmt(SourceLoc(), DRE,
-                                                       true); // implicit
+            ReturnStmt *NRS = ReturnStmt::createImplicit(Context, DRE);
             Added<Stmt *> LogBefore =
                 buildLoggerCall(LogBeforeName, RS->getSourceRange());
             Added<Stmt *> LogAfter =
@@ -465,7 +473,7 @@ public:
         if (auto *PBD = dyn_cast<PatternBindingDecl>(D)) {
           // FIXME: Should iterate all var decls
           if (VarDecl *VD = PBD->getSingleVar()) {
-            if (VD->getParentInitializer()) {
+            if (VD->getParentExecutableInitializer()) {
 
               SourceRange SR = PBD->getSourceRange();
               if (!SR.isValid()) {
@@ -512,10 +520,10 @@ public:
         new (Context) VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
                               SourceLoc(), Context.getIdentifier(NameBuf),
                               TypeCheckDC);
-    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfContext());
+    VD->setInterfaceType(MaybeLoadInitExpr->getType()->mapTypeOutOfEnvironment());
     VD->setImplicit();
 
-    NamedPattern *NP = NamedPattern::createImplicit(Context, VD);
+    NamedPattern *NP = NamedPattern::createImplicit(Context, VD, VD->getTypeInContext());
     PatternBindingDecl *PBD = PatternBindingDecl::createImplicit(
         Context, StaticSpellingKind::None, NP, MaybeLoadInitExpr, TypeCheckDC);
 
@@ -552,10 +560,10 @@ public:
         Context.SourceMgr.getPresumedLineAndColumnForLoc(
             Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
-    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
-    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);
-    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
-    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
+    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first, SR.Start);
+    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first, SR.End);
+    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second, SR.Start);
+    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second, SR.End);
 
     Expr *ModuleExpr = buildIDArgumentExpr(ModuleIdentifier, SR);
     Expr *FileExpr = buildIDArgumentExpr(FileIdentifier, SR);
@@ -623,10 +631,10 @@ public:
         Context.SourceMgr.getPresumedLineAndColumnForLoc(
             Lexer::getLocForEndOfToken(Context.SourceMgr, SR.End));
 
-    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first);
-    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first);
-    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second);
-    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second);
+    Expr *StartLine = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.first, SR.Start);
+    Expr *EndLine = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.first, SR.End);
+    Expr *StartColumn = IntegerLiteralExpr::createFromUnsigned(Context, StartLC.second, SR.Start);
+    Expr *EndColumn = IntegerLiteralExpr::createFromUnsigned(Context, EndLC.second, SR.End);
 
     Expr *ModuleExpr = buildIDArgumentExpr(ModuleIdentifier, SR);
     Expr *FileExpr = buildIDArgumentExpr(FileIdentifier, SR);
@@ -674,31 +682,35 @@ void swift::performPCMacro(SourceFile &SF) {
   public:
     ExpressionFinder() = default;
 
-    bool walkToDeclPre(Decl *D) override {
+    MacroWalking getMacroWalkingBehavior() const override {
+      return MacroWalking::Expansion;
+    }
+
+    PreWalkAction walkToDeclPre(Decl *D) override {
       ASTContext &ctx = D->getASTContext();
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
         if (!FD->isImplicit()) {
           if (FD->getBody()) {
             Instrumenter I(ctx, FD, TmpNameIndex);
             I.transformDecl(FD);
-            return false;
+            return Action::SkipNode();
           }
         }
       } else if (auto *TLCD = dyn_cast<TopLevelCodeDecl>(D)) {
         if (!TLCD->isImplicit()) {
           if (BraceStmt *Body = TLCD->getBody()) {
             Instrumenter I(ctx, TLCD, TmpNameIndex);
-            BraceStmt *NewBody = I.transformBraceStmt(Body, true);
+            BraceStmt *NewBody = I.transformBraceStmt(Body, nullptr, true);
             if (NewBody != Body) {
               TLCD->setBody(NewBody);
               TypeChecker::checkTopLevelEffects(TLCD);
               TypeChecker::contextualizeTopLevelCode(TLCD);
             }
-            return false;
+            return Action::SkipNode();
           }
         }
       }
-      return true;
+      return Action::Continue();
     }
   };
 

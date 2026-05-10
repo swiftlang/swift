@@ -87,16 +87,15 @@ bool mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
 /// If \p Op has arc uses in the instruction range [Start, End), return the
 /// first such instruction. Otherwise return None. We assume that
 /// Start and End are both in the same basic block.
-Optional<SILBasicBlock::iterator>
-valueHasARCUsesInInstructionRange(SILValue Op,
-                                  SILBasicBlock::iterator Start,
+std::optional<SILBasicBlock::iterator>
+valueHasARCUsesInInstructionRange(SILValue Op, SILBasicBlock::iterator Start,
                                   SILBasicBlock::iterator End,
                                   AliasAnalysis *AA);
 
 /// If \p Op has arc uses in the instruction range [Start, End), return the last
 /// use of such instruction. Otherwise return None. We assume that Start and End
 /// are both in the same basic block.
-Optional<SILBasicBlock::iterator> valueHasARCUsesInReverseInstructionRange(
+std::optional<SILBasicBlock::iterator> valueHasARCUsesInReverseInstructionRange(
     SILValue Op, SILBasicBlock::iterator Start, SILBasicBlock::iterator End,
     AliasAnalysis *AA);
 
@@ -104,7 +103,7 @@ Optional<SILBasicBlock::iterator> valueHasARCUsesInReverseInstructionRange(
 /// decrement it, return the first such instruction. Returns None
 /// if no such instruction exists. We assume that Start and End are both in the
 /// same basic block.
-Optional<SILBasicBlock::iterator>
+std::optional<SILBasicBlock::iterator>
 valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
                                               SILBasicBlock::iterator Start,
                                               SILBasicBlock::iterator End,
@@ -117,7 +116,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 /// in the predecessors. 
 ///
 /// The search stop when we encounter an instruction that may decrement
-/// the return'ed value, as we do not want to create a lifetime gap once the
+/// the returned value, as we do not want to create a lifetime gap once the
 /// retain is moved.
 class ConsumedResultToEpilogueRetainMatcher {
 public:
@@ -222,9 +221,9 @@ private:
 
     /// If we were able to find a set of releases for this argument that joint
     /// post-dominate the argument, return our release set.
-    Optional<ArrayRef<SILInstruction *>> getFullyPostDomReleases() const {
+    std::optional<ArrayRef<SILInstruction *>> getFullyPostDomReleases() const {
       if (releases.empty() || foundSomeButNotAllReleases())
-        return None;
+        return std::nullopt;
       return ArrayRef<SILInstruction *>(releases);
     }
 
@@ -233,9 +232,10 @@ private:
     /// set.
     ///
     /// *NOTE* This returns none if we did not find any releases.
-    Optional<ArrayRef<SILInstruction *>> getPartiallyPostDomReleases() const {
+    std::optional<ArrayRef<SILInstruction *>>
+    getPartiallyPostDomReleases() const {
       if (releases.empty() || !foundSomeButNotAllReleases())
-        return None;
+        return std::nullopt;
       return ArrayRef<SILInstruction *>(releases);
     }
   };
@@ -326,17 +326,17 @@ public:
     auto completeList = iter->second.getFullyPostDomReleases();
     if (!completeList)
       return {};
-    return completeList.getValue();
+    return completeList.value();
   }
 
-  Optional<ArrayRef<SILInstruction *>>
+  std::optional<ArrayRef<SILInstruction *>>
   getPartiallyPostDomReleaseSet(SILArgument *arg) const {
     auto iter = ArgInstMap.find(arg);
     if (iter == ArgInstMap.end())
-      return None;
+      return std::nullopt;
     auto partialList = iter->second.getPartiallyPostDomReleases();
     if (!partialList)
-      return None;
+      return std::nullopt;
     return partialList;
   }
 
@@ -391,35 +391,6 @@ private:
 
 /// Match a call to a trap BB with no ARC relevant side effects.
 bool isARCInertTrapBB(const SILBasicBlock *BB);
-
-/// Get the two result values of the builtin "unsafeGuaranteed" instruction.
-///
-/// Gets the (GuaranteedValue, Token) tuple from a call to "unsafeGuaranteed"
-/// if the tuple elements are identified by a single tuple_extract use.
-/// Otherwise, returns a (nullptr, nullptr) tuple.
-std::pair<SingleValueInstruction *, SingleValueInstruction *>
-getSingleUnsafeGuaranteedValueResult(BuiltinInst *UnsafeGuaranteedInst);
-
-/// Get the single builtin "unsafeGuaranteedEnd" user of a builtin
-/// "unsafeGuaranteed"'s token.
-BuiltinInst *getUnsafeGuaranteedEndUser(SILValue UnsafeGuaranteedToken);
-
-/// Walk forwards from an unsafeGuaranteedEnd builtin instruction looking for a
-/// release on the reference returned by the matching unsafeGuaranteed builtin
-/// ignoring releases on the way.
-/// Return nullptr if no release is found.
-///
-///    %4 = builtin "unsafeGuaranteed"<Foo>(%0 : $Foo) : $(Foo, Builtin.Int8)
-///    %5 = tuple_extract %4 : $(Foo, Builtin.Int8), 0
-///    %6 = tuple_extract %4 : $(Foo, Builtin.Int8), 1
-///    %12 = builtin "unsafeGuaranteedEnd"(%6 : $Builtin.Int8) : $()
-///    strong_release %5 : $Foo // <-- Matching release.
-///
-/// Alternatively, look for the release before the unsafeGuaranteedEnd.
-SILInstruction *findReleaseToMatchUnsafeGuaranteedValue(
-    SILInstruction *UnsafeGuaranteedEndI, SILInstruction *UnsafeGuaranteedI,
-    SILValue UnsafeGuaranteedValue, SILBasicBlock &BB,
-    RCIdentityFunctionInfo &RCFI);
 
 } // end namespace swift
 

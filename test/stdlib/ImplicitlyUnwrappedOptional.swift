@@ -67,7 +67,7 @@ ImplicitlyUnwrappedOptionalTests.test("preferOptional") {
   let j: Int = 1
   if i != j {} // we should choose != for Optionals rather than forcing i
   if i == j {} // we should choose == for Optionals rather than forcing i
-  // FIXME: https://bugs.swift.org/browse/SR-6988
+  // FIXME: https://github.com/apple/swift/issues/49536
   //  if i *^* j {} // we should choose *^* for Optionals rather than forcing i
 }
 

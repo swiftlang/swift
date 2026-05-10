@@ -22,12 +22,13 @@
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/LLVM.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 namespace swift {
 
 class AbstractFunctionDecl;
 class AbstractStorageDecl;
+class Argument;
 class ArgumentList;
 class ASTContext;
 class ClassDecl;
@@ -40,6 +41,7 @@ class ParamDecl;
 class Type;
 class ValueDecl;
 class VarDecl;
+class DerivedConformance;
 
 enum class SelfAccessorKind {
   /// We're building a derived accessor on top of whatever this
@@ -62,6 +64,16 @@ enum class SelfAccessorKind {
 Expr *buildSelfReference(VarDecl *selfDecl, SelfAccessorKind selfAccessorKind,
                          bool isLValue, Type convertTy = Type());
 
+/// Builds a reference to the \c self decl in a function, for use as an argument
+/// to a function.
+///
+/// \param selfDecl The self decl to reference.
+/// \param selfAccessorKind The kind of access being performed.
+/// \param isMutable Whether the resulting argument is for a mutable self
+/// argument. Such an argument is passed 'inout'.
+Argument buildSelfArgument(VarDecl *selfDecl, SelfAccessorKind selfAccessorKind,
+                           bool isMutable);
+
 /// Build an argument list that forwards references to the specified parameter
 /// list.
 ArgumentList *buildForwardingArgumentList(ArrayRef<ParamDecl *> params,
@@ -74,11 +86,29 @@ ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
 // with an initial value.
 bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
 
-/// Add `@_fixed_layout` attribute to the nominal type, if possible.
-void addFixedLayoutAttr(NominalTypeDecl *nominal);
+/// Add 'nonisolated' to the synthesized declaration for a derived
+/// conformance when needed. Returns true if an attribute was added.
+bool addNonIsolatedToSynthesized(DerivedConformance &conformance,
+                                 ValueDecl *value);
 
-/// Add 'nonisolated' to the synthesized declaration when needed.
-void addNonIsolatedToSynthesized(NominalTypeDecl *nominal, ValueDecl *value);
+/// Add 'nonisolated' to the synthesized declaration when needed. Returns true
+/// if an attribute was added.
+bool addNonIsolatedToSynthesized(NominalTypeDecl *nominal, ValueDecl *value);
+
+/// Adds the `@_spi` groups from \p inferredFromDecl to \p decl.
+void applyInferredSPIAccessControlAttr(Decl *decl, const Decl *inferredFromDecl,
+                                       ASTContext &ctx);
+
+/// Asserts that the synthesized fields appear in the expected order.
+///
+/// The `id` and `actorSystem` MUST be the first two fields of a distributed
+/// actor, because we assume their location in IRGen, and also when we allocate
+/// a distributed remote actor, we're able to allocate memory ONLY for those and
+/// without allocating any of the storage for the actor's properties.
+///         [id, actorSystem, unownedExecutor]
+/// followed by the executor fields for a default distributed actor.
+void assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
+                                            NominalTypeDecl *nominal);
 
 } // end namespace swift
 

@@ -12,7 +12,7 @@ func /*no-label:def*/aFunc(_ b:Int) -> Int {
     return /*no-args:call*/aFunc()
 }
 
-func /*whitespace-labels:def*/aFunc(     c  b: Int ,b   a: Int, d c   : Int) {}
+func /*whitespace-labels:def*/<base>aFunc</base>(     <arglabel index=0>a</arglabel> <param index=0> b</param>: Int ,<arglabel index=1>_</arglabel>  <param index=1> a</param>: Int, <arglabel index=2>c</arglabel><param index=2> c</param>   : Int) {}
 
 func /*referenced:def*/bar(a: Int) {}
 
@@ -42,7 +42,7 @@ let aStruct = /*prefix-operator:call*/-AStruct() /*infix-operator:call*/+ AStruc
 /*param-label:call*/aFunc(a: 2)
 /*arg-label:call*/aFunc(b: /*no-args:call*/aFunc() * /*no-args:call*/aFunc())
 let _ = /*no-label:call*/aFunc(3)
-/*whitespace-labels:call*/aFunc( c  :  2 ,b: 2,  d:  4 )
+/*whitespace-labels:call*/<base>aFunc</base>( <callarg index=0>a</callarg><callcolon index=0>  :  </callcolon>2 ,<callcombo index=1></callcombo>2,  <callarg index=2>c</callarg><callcolon index=2>:  </callcolon>4 )
 
 let _ = aStruct . /*method:call*/foo(a: 2, b: 3, 1)
 let _ = AStruct . /*method*/foo(aStruct)(a: 1, b: 8, 10)

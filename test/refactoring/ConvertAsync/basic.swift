@@ -74,7 +74,7 @@ func nonOptionalError(completion: @escaping (String, Error) -> Void) { }
 // ASYNC-NONOPTIONALERROR-NEXT: completion(result.0, result.1)
 // ASYNC-NONOPTIONALERROR-NEXT: }
 // ASYNC-NONOPTIONALERROR-NEXT: }
-// ASYNC-NONOPTIONALERROR: func nonOptionalError() async -> (String, Error) { }
+// ASYNC-NONOPTIONALERROR: func nonOptionalError() async -> (String, any Error) { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=ASYNC-NOPARAMS %s
 func noParams(completion: @escaping () -> Void) { }
@@ -275,7 +275,7 @@ func mixedError(_ completion: @escaping (String?, Int, Error) -> Void) { }
 // MIXED-ERROR-NEXT: completion(result.0, result.1, result.2)
 // MIXED-ERROR-NEXT: }
 // MIXED-ERROR-NEXT: }
-// MIXED-ERROR: func mixedError() async -> (String?, Int, Error) { }
+// MIXED-ERROR: func mixedError() async -> (String?, Int, any Error) { }
 
 // RUN: %refactor-check-compiles -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=GENERIC %s
 func generic<T, R>(completion: @escaping (T, R) -> Void) { }
@@ -301,7 +301,9 @@ func genericResult<T>(completion: @escaping (T?, Error?) -> Void) where T: Numer
 // GENERIC-RESULT-NEXT: }
 // GENERIC-RESULT: func genericResult<T>() async throws -> T where T: Numeric { }
 
-// FIXME: This doesn't compile after refactoring because we aren't using the generic argument `E` in the async method (SR-14560)
+// FIXME: This doesn't compile after refactoring because we aren't using the
+// generic argument 'E' in the async method
+// (https://github.com/apple/swift/issues/56912).
 // RUN: %refactor -add-async-alternative -dump-text -source-filename %s -pos=%(line+1):1 | %FileCheck -check-prefix=GENERIC-ERROR %s
 func genericError<E>(completion: @escaping (String?, E?) -> Void) where E: Error { }
 // GENERIC-ERROR: {

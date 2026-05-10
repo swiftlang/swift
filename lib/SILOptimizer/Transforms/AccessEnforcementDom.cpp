@@ -49,6 +49,7 @@
 
 #define DEBUG_TYPE "access-enforcement-dom"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILBuilder.h"
@@ -128,7 +129,7 @@ class DominatedAccessAnalysis {
 public:
   // The result records information for all dynamic accesses in this
   // function. If an UnpairedAccess exists, then the result will be
-  // consevatively empty.
+  // conservatively empty.
   struct Result {
     llvm::SmallDenseMap<BeginAccessInst *, DomAccessStorage, 32> accessMap;
   };
@@ -286,7 +287,7 @@ void DominatedAccessAnalysis::analyzeAccess(BeginAccessInst *BAI,
   if (!domStorage)
     return;
 
-  // Set the current accesss isInner flag if it's inside a coroutine scope.
+  // Set the current access isInner flag if it's inside a coroutine scope.
   if (!state.inScopeCoroutines.empty())
     domStorage.setIsInner();
 
@@ -389,14 +390,14 @@ void DominatedAccessRemoval::visitBeginAccess(BeginAccessInst *BAI) {
 }
 
 // Track this identifiable dynamic access in storageToDomMap, and optimize it if
-// possible. Return true if the optimization suceeds.
+// possible. Return true if the optimization succeeds.
 bool DominatedAccessRemoval::checkDominatedAccess(
     BeginAccessInst *BAI, DomAccessStorage currDomStorage) {
   // Attempt to add this access to storageToDomMap using its base storage
   // location as the key.
   //
   // Cast this DomAccessStorage back to a plain storage location. The
-  // pass-specific bits will be ignored, but reset them anyway for sanity.
+  // pass-specific bits will be ignored, but reset them anyway for soundness.
   AccessStorage storage = static_cast<AccessStorage>(currDomStorage);
   storage.resetSubclassData();
   auto iterAndInserted =

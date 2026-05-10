@@ -15,7 +15,7 @@ let _ = [1, 2, 3].makeString() // expected-error 3 {{cannot convert value of typ
 
 extension Set<_> {} // expected-error {{cannot extend a type that contains placeholders}}
 
-// https://bugs.swift.org/browse/SR-4875
+// https://github.com/apple/swift/issues/47452
 
 struct Foo<T, U> {
   var x: T
@@ -74,3 +74,21 @@ func testNestedExtensions() {
 
   Tree<Int>.Branch<String>.Nest<Void>.Egg.twite()
 }
+
+// rdar://111059036 - failed to produce a diagnostic in specialized extension
+struct Test {
+  struct Key<Value> {}
+}
+
+class State {
+}
+
+extension Test.Key<State> {
+  static let state = Self<State>()
+}
+
+protocol P {}
+struct S: P {}
+
+extension Sequence<any P> where Self == [S] {}
+// expected-error@-1 {{generic signature requires types 'S' and 'any P' to be the same}}

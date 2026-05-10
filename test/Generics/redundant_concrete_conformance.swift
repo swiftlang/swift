@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift -debug-generic-signatures 2>&1 | %FileCheck %s
 
 protocol P1 {}
 protocol P2 : P1 {}
@@ -10,7 +10,9 @@ protocol P3 {
 struct S : P2 {}
 
 func f1<T : P3>(_: T) where T.A : P1 {}
-// expected-warning@-1 {{redundant conformance constraint 'T.A' : 'P1'}}
+// CHECK-LABEL: .f1@
+// CHECK-NEXT: Generic signature: <T where T : P3>
 
 func f2<T : P3>(_: T) where T.A : P2 {}
-// expected-warning@-1 {{redundant conformance constraint 'T.A' : 'P2'}}
+// CHECK-LABEL: .f2@
+// CHECK-NEXT: Generic signature: <T where T : P3>

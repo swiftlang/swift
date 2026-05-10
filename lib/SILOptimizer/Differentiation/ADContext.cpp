@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
 using llvm::DenseMap;
@@ -61,10 +62,8 @@ ADContext::ADContext(SILModuleTransform &transform)
 
 /// Get the source file for the given `SILFunction`.
 static SourceFile &getSourceFile(SILFunction *f) {
-  if (f->hasLocation())
-    if (auto *declContext = f->getLocation().getAsDeclContext())
-      if (auto *parentSourceFile = declContext->getParentSourceFile())
-        return *parentSourceFile;
+  if (SourceFile *file = f->getSourceFile())
+    return *file;
   for (auto *file : f->getModule().getSwiftModule()->getFiles())
     if (auto *sourceFile = dyn_cast<SourceFile>(file))
       return *sourceFile;
@@ -128,7 +127,7 @@ void ADContext::cleanUp() {
 DifferentiableFunctionInst *ADContext::createDifferentiableFunction(
     SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
     IndexSubset *resultIndices, SILValue original,
-    Optional<std::pair<SILValue, SILValue>> derivativeFunctions) {
+    std::optional<std::pair<SILValue, SILValue>> derivativeFunctions) {
   auto *dfi = builder.createDifferentiableFunction(
       loc, parameterIndices, resultIndices, original, derivativeFunctions);
   processedDifferentiableFunctionInsts.erase(dfi);
@@ -137,7 +136,7 @@ DifferentiableFunctionInst *ADContext::createDifferentiableFunction(
 
 LinearFunctionInst *ADContext::createLinearFunction(
     SILBuilder &builder, SILLocation loc, IndexSubset *parameterIndices,
-    SILValue original, Optional<SILValue> transposeFunction) {
+    SILValue original, std::optional<SILValue> transposeFunction) {
   auto *lfi = builder.createLinearFunction(loc, parameterIndices, original,
                                            transposeFunction);
   processedLinearFunctionInsts.erase(lfi);

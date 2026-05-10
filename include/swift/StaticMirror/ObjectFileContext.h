@@ -13,7 +13,7 @@
 #ifndef SWIFT_OBJECT_FILE_CONTEXT_H
 #define SWIFT_OBJECT_FILE_CONTEXT_H
 
-#include "swift/Reflection/ReflectionContext.h"
+#include "swift/RemoteInspection/ReflectionContext.h"
 
 namespace llvm {
 namespace object {
@@ -39,8 +39,12 @@ private:
   uint64_t HeaderAddress;
   std::vector<Segment> Segments;
   struct DynamicRelocation {
+    /// The symbol name that the pointer refers to. Empty if only an absolute
+    /// address is available.
     StringRef Symbol;
-    uint64_t Offset;
+    // The offset (if the symbol is available), or the resolved remote address
+    // if the symbol is empty.
+    uint64_t OffsetOrAddress;
   };
   llvm::DenseMap<uint64_t, DynamicRelocation> DynamicRelocations;
 
@@ -52,6 +56,8 @@ private:
   void scanELF(const llvm::object::ELFObjectFileBase *O);
 
   void scanCOFF(const llvm::object::COFFObjectFile *O);
+
+  void scanWasm(const llvm::object::WasmObjectFile *O);
 
   bool isMachOWithPtrAuth() const;
 
@@ -88,13 +94,18 @@ class ObjectMemoryReader : public reflection::MemoryReader {
   };
   std::vector<ImageEntry> Images;
 
+  uint64_t PtrauthMask = 0;
+
   std::pair<const Image *, uint64_t>
   decodeImageIndexAndAddress(uint64_t Addr) const;
 
-  uint64_t encodeImageIndexAndAddress(const Image *image,
-                                      uint64_t imageAddr) const;
+  remote::RemoteAddress
+  encodeImageIndexAndAddress(const Image *image,
+                             remote::RemoteAddress imageAddr) const;
 
   StringRef getContentsAtAddress(uint64_t Addr, uint64_t Size);
+
+  uint64_t getPtrauthMask();
 
 public:
   explicit ObjectMemoryReader(
@@ -110,7 +121,7 @@ public:
   // TODO: We could consult the dynamic symbol tables of the images to
   // implement this.
   reflection::RemoteAddress getSymbolAddress(const std::string &name) override {
-    return reflection::RemoteAddress(nullptr);
+    return reflection::RemoteAddress();
   }
 
   ReadBytesResult readBytes(reflection::RemoteAddress Addr,
@@ -144,10 +155,12 @@ T unwrap(llvm::Expected<T> value) {
 }
 
 std::unique_ptr<ReflectionContextHolder> makeReflectionContextForObjectFiles(
-    const std::vector<const llvm::object::ObjectFile *> &objectFiles);
+    const std::vector<const llvm::object::ObjectFile *> &objectFiles,
+    bool objcInterOp);
 
 std::unique_ptr<ReflectionContextHolder> makeReflectionContextForMetadataReader(
-    std::shared_ptr<ObjectMemoryReader> reader);
+    std::shared_ptr<ObjectMemoryReader> reader,
+    bool objcInterOp);
 
 } // end namespace static_mirror
 } // end namespace swift

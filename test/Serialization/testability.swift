@@ -4,11 +4,11 @@
 // the -enable-testing flag correctly...
 
 // RUN: %target-swift-frontend -emit-module -DBASE -o %t %s
-// RUN: llvm-bcanalyzer -dump %t/testability.swiftmodule > %t/testability.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/testability.swiftmodule > %t/testability.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=NO-TESTING %s < %t/testability.dump.txt
 
 // RUN: %target-swift-frontend -emit-module -DBASE -o %t -enable-testing %s
-// RUN: llvm-bcanalyzer -dump %t/testability.swiftmodule > %t/testability2.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/testability.swiftmodule > %t/testability2.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=TESTING %s < %t/testability2.dump.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/testability2.dump.txt
 

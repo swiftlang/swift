@@ -88,10 +88,12 @@ public:
     return callSite;
   }
 
+#ifndef NDEBUG
   void print(SourceManager &SM, llvm::raw_ostream &OS = llvm::errs(),
              unsigned Indent = 0) const;
 
   void print(SILModule &Mod) const;
+#endif
 };
 
 /// Determine whether an instruction may not have a SILDebugScope.

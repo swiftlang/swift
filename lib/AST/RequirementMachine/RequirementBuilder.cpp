@@ -25,6 +25,7 @@
 #include "swift/AST/Requirement.h"
 #include "swift/AST/RequirementSignature.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallVector.h"
@@ -43,6 +44,7 @@ struct ConnectedComponent {
   Type ConcreteType;
 
   void buildRequirements(Type subjectType,
+                         RequirementKind kind,
                          std::vector<Requirement> &reqs,
                          std::vector<ProtocolTypeAlias> &aliases);
 };
@@ -68,6 +70,7 @@ struct ConnectedComponent {
 ///
 ///   A == X, B == X, C == X, D == X
 void ConnectedComponent::buildRequirements(Type subjectType,
+                                           RequirementKind kind,
                                            std::vector<Requirement> &reqs,
                                            std::vector<ProtocolTypeAlias> &aliases) {
   std::sort(Members.begin(), Members.end(),
@@ -81,14 +84,14 @@ void ConnectedComponent::buildRequirements(Type subjectType,
     }
 
     for (auto constraintType : Members) {
-      reqs.emplace_back(RequirementKind::SameType,
-                        subjectType, constraintType);
+      reqs.emplace_back(kind, subjectType, constraintType);
       subjectType = constraintType;
     }
 
-  // For compatibility with the old GenericSignatureBuilder, drop requirements
-  // containing ErrorTypes.
-  } else if (!ConcreteType->hasError()) {
+  } else {
+    // Shape requirements cannot be concrete.
+    ASSERT(kind == RequirementKind::SameType);
+
     // If there are multiple protocol typealiases in the connected component,
     // lower them all to a series of identical concrete-type aliases.
     for (auto name : Aliases) {
@@ -101,12 +104,11 @@ void ConnectedComponent::buildRequirements(Type subjectType,
     if (auto *memberTy = subjectType->getAs<DependentMemberType>()) {
       if (memberTy->getAssocType() == nullptr) {
         auto *paramTy = memberTy->getBase()->castTo<GenericTypeParamType>();
-        assert(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
-        (void) paramTy;
+        ASSERT(paramTy->getDepth() == 0 && paramTy->getIndex() == 0);
 
         aliases.emplace_back(memberTy->getName(), ConcreteType);
 
-        assert(Members.empty());
+        ASSERT(Members.empty());
         return;
       }
     }
@@ -131,13 +133,13 @@ class RequirementBuilder {
   // Input parameters.
   const RewriteSystem &System;
   const PropertyMap &Map;
-  TypeArrayView<GenericTypeParamType> GenericParams;
+  ArrayRef<GenericTypeParamType *> GenericParams;
   bool ReconstituteSugar;
   bool Debug;
 
   // Temporary state populated by addRequirementRules() and
   // addTypeAliasRules().
-  llvm::SmallDenseMap<TypeBase *, ConnectedComponent> Components;
+  llvm::SmallDenseMap<Term, ConnectedComponent> Components;
 
 public:
   // Results.
@@ -145,7 +147,7 @@ public:
   std::vector<ProtocolTypeAlias> Aliases;
 
   RequirementBuilder(const RewriteSystem &system, const PropertyMap &map,
-                     TypeArrayView<GenericTypeParamType> genericParams,
+                     ArrayRef<GenericTypeParamType *> genericParams,
                      bool reconstituteSugar)
     : System(system), Map(map),
       GenericParams(genericParams),
@@ -162,6 +164,14 @@ public:
 };
 
 }  // end namespace
+
+static Type replaceTypeParametersWithErrorTypes(Type type) {
+  return type.transformRec([](Type t) -> std::optional<Type> {
+    if (t->isTypeParameter())
+      return ErrorType::get(t->getASTContext());
+    return std::nullopt;
+  });
+}
 
 void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
   // Convert a rewrite rule into a requirement.
@@ -182,56 +192,31 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
                           prop->getLayoutConstraint());
         return;
 
-      case Symbol::Kind::Superclass: {
-        // Requirements containing unresolved name symbols originate from
-        // invalid code and should not appear in the generic signature.
-        for (auto term : prop->getSubstitutions()) {
-          if (term.containsUnresolvedSymbols())
-            return;
-        }
-
-        // Requirements containing error types originate from invalid code
-        // and should not appear in the generic signature.
-        if (prop->getConcreteType()->hasError())
-          return;
-
-        Type superclassType = Map.getTypeFromSubstitutionSchema(
-                                prop->getConcreteType(),
-                                prop->getSubstitutions(),
-                                GenericParams, MutableTerm());
-
-        if (ReconstituteSugar)
-          superclassType = superclassType->reconstituteSugar(/*recursive=*/true);
-
-        Reqs.emplace_back(RequirementKind::Superclass,
-                          subjectType, superclassType);
-        return;
-      }
-
+      case Symbol::Kind::Superclass:
       case Symbol::Kind::ConcreteType: {
-        // Requirements containing unresolved name symbols originate from
-        // invalid code and should not appear in the generic signature.
+        bool containsNameSymbols = false;
         for (auto term : prop->getSubstitutions()) {
-          if (term.containsUnresolvedSymbols())
-            return;
+          containsNameSymbols |= term.containsNameSymbols();
         }
-
-        // Requirements containing error types originate from invalid code
-        // and should not appear in the generic signature.
-        if (prop->getConcreteType()->hasError())
-          return;
 
         Type concreteType = Map.getTypeFromSubstitutionSchema(
                                 prop->getConcreteType(),
                                 prop->getSubstitutions(),
                                 GenericParams, MutableTerm());
+        if (containsNameSymbols || rule.isRecursive())
+          concreteType = replaceTypeParametersWithErrorTypes(concreteType);
 
         if (ReconstituteSugar)
           concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
 
-        auto &component = Components[subjectType.getPointer()];
-        assert(!component.ConcreteType);
-        component.ConcreteType = concreteType;
+        if (prop->getKind() == Symbol::Kind::Superclass) {
+          Reqs.emplace_back(RequirementKind::Superclass,
+                            subjectType, concreteType);
+        } else {
+          auto &component = Components[rule.getRHS()];
+          ASSERT(!component.ConcreteType);
+          component.ConcreteType = concreteType;
+        }
         return;
       }
 
@@ -243,17 +228,49 @@ void RequirementBuilder::addRequirementRules(ArrayRef<unsigned> rules) {
       case Symbol::Kind::Name:
       case Symbol::Kind::AssociatedType:
       case Symbol::Kind::GenericParam:
+      case Symbol::Kind::Shape:
+      case Symbol::Kind::PackElement:
         break;
       }
 
       llvm_unreachable("Invalid symbol kind");
     }
 
-    assert(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
-    auto constraintType = Map.getTypeForTerm(rule.getLHS(), GenericParams);
-    auto subjectType = Map.getTypeForTerm(rule.getRHS(), GenericParams);
+    MutableTerm constraintTerm = MutableTerm(rule.getLHS());
+    MutableTerm subjectTerm = MutableTerm(rule.getRHS());
 
-    Components[subjectType.getPointer()].Members.push_back(constraintType);
+    RewriteContext &ctx = this->System.getRewriteContext();
+
+    // Drop the [element] symbol from lhs to determine if we need to swap the
+    // sides.
+    if (constraintTerm[0].getKind() == Symbol::Kind::PackElement) {
+      constraintTerm =
+          MutableTerm(constraintTerm.begin() + 1, constraintTerm.end());
+
+      // Make sure that the shorter term is ordered first.
+      if (constraintTerm.compare(subjectTerm, ctx) == -1) {
+        MutableTerm tempTerm = subjectTerm;
+        subjectTerm = constraintTerm;
+        constraintTerm = tempTerm;
+      }
+    }
+
+    ASSERT(rule.getLHS().back().getKind() != Symbol::Kind::Protocol);
+
+    if (constraintTerm.hasShape()) {
+      ASSERT(rule.getRHS().hasShape());
+      // Strip off the shape symbol from the constraint term.
+      constraintTerm.removeShape();
+    }
+
+    if (constraintTerm.front().getKind() == Symbol::Kind::PackElement) {
+      // Strip off the element symbol from the constraint term.
+      constraintTerm = MutableTerm(constraintTerm.begin() + 1,
+                                   constraintTerm.end());
+    }
+
+    auto constraintType = Map.getTypeForTerm(constraintTerm, GenericParams);
+    Components[Term::get(subjectTerm, ctx)].Members.push_back(constraintType);
   };
 
   if (Debug) {
@@ -277,38 +294,33 @@ void RequirementBuilder::addTypeAliasRules(ArrayRef<unsigned> rules) {
   for (unsigned ruleID : rules) {
     const auto &rule = System.getRule(ruleID);
     auto name = *rule.isProtocolTypeAliasRule();
-    Type underlyingType;
-
-    auto subjectType = Map.getTypeForTerm(rule.getRHS(), GenericParams);
 
     if (auto prop = rule.isPropertyRule()) {
-      assert(prop->getKind() == Symbol::Kind::ConcreteType);
+      ASSERT(prop->getKind() == Symbol::Kind::ConcreteType);
 
       // Requirements containing unresolved name symbols originate from
       // invalid code and should not appear in the generic signature.
       for (auto term : prop->getSubstitutions()) {
-        if (term.containsUnresolvedSymbols())
+        if (term.containsNameSymbols())
           continue;
       }
-
-      // Requirements containing error types originate from invalid code
-      // and should not appear in the generic signature.
-      if (prop->getConcreteType()->hasError())
-        continue;
 
       Type concreteType = Map.getTypeFromSubstitutionSchema(
                                prop->getConcreteType(),
                                prop->getSubstitutions(),
                                GenericParams, MutableTerm());
+      if (rule.isRecursive())
+        concreteType = replaceTypeParametersWithErrorTypes(concreteType);
 
       if (ReconstituteSugar)
         concreteType = concreteType->reconstituteSugar(/*recursive=*/true);
 
-      auto &component = Components[subjectType.getPointer()];
-      assert(!component.ConcreteType);
-      Components[subjectType.getPointer()].ConcreteType = concreteType;
+      auto &component = Components[rule.getRHS()];
+      ASSERT(!component.ConcreteType);
+      (void) component;
+      Components[rule.getRHS()].ConcreteType = concreteType;
     } else {
-      Components[subjectType.getPointer()].Aliases.push_back(name);
+      Components[rule.getRHS()].Aliases.push_back(name);
     }
   }
 }
@@ -317,7 +329,22 @@ void RequirementBuilder::processConnectedComponents() {
   // Now, convert each connected component into a series of same-type
   // requirements.
   for (auto &pair : Components) {
-    pair.second.buildRequirements(pair.first, Reqs, Aliases);
+    MutableTerm subjectTerm(pair.first);
+    RequirementKind kind;
+    if (subjectTerm.hasShape()) {
+      kind = RequirementKind::SameShape;
+      // Strip off the shape symbol from the subject term.
+      subjectTerm.removeShape();
+    } else {
+      kind = RequirementKind::SameType;
+      if (subjectTerm.front().getKind() == Symbol::Kind::PackElement) {
+        // Strip off the element symbol from the subject term.
+        subjectTerm = MutableTerm(subjectTerm.begin() + 1, subjectTerm.end());
+      }
+    }
+
+    auto subjectType = Map.getTypeForTerm(subjectTerm, GenericParams);
+    pair.second.buildRequirements(subjectType, kind, Reqs, Aliases);
   }
 }
 
@@ -363,10 +390,13 @@ void
 RequirementMachine::buildRequirementsFromRules(
     ArrayRef<unsigned> requirementRules,
     ArrayRef<unsigned> typeAliasRules,
-    TypeArrayView<GenericTypeParamType> genericParams,
+    ArrayRef<GenericTypeParamType *> genericParams,
     bool reconstituteSugar,
     std::vector<Requirement> &reqs,
     std::vector<ProtocolTypeAlias> &aliases) const {
+  if (Failed)
+    return;
+
   RequirementBuilder builder(System, Map, genericParams, reconstituteSugar);
 
   builder.addRequirementRules(requirementRules);

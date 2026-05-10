@@ -26,7 +26,7 @@ protected:
   using ChunkKind = CodeCompletionString::Chunk::ChunkKind;
 
 private:
-  CodeCompletionResultBuilder &Builder;
+  CodeCompletionStringBuilder &Builder;
   SmallString<16> Buffer;
   ChunkKind CurrChunkKind = ChunkKind::Text;
   ChunkKind NextChunkKind = ChunkKind::Text;
@@ -40,10 +40,10 @@ private:
 
   bool isInType() const { return TypeDepth > 0; }
 
-  Optional<ChunkKind>
+  std::optional<ChunkKind>
   getChunkKindForPrintNameContext(PrintNameContext context) const;
 
-  Optional<ChunkKind>
+  std::optional<ChunkKind>
   getChunkKindForStructureKind(PrintStructureKind Kind) const;
 
   void startNestedGroup(ChunkKind Kind);
@@ -54,7 +54,7 @@ protected:
   void setNextChunkKind(ChunkKind Kind) { NextChunkKind = Kind; }
 
 public:
-  CodeCompletionStringPrinter(CodeCompletionResultBuilder &Builder)
+  CodeCompletionStringPrinter(CodeCompletionStringBuilder &Builder)
       : Builder(Builder) {}
 
   ~CodeCompletionStringPrinter() {

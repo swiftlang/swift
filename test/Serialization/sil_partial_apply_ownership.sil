@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -emit-module -Xllvm -verify-skip-convert-escape-to-noescape-attributes -Xfrontend -disable-diagnostic-passes -whole-module-optimization -o %t/sil_partial_apply_ownership.swiftmodule %s
-// RUN: %target-build-swift -Xllvm -verify-skip-convert-escape-to-noescape-attributes -emit-sil -I %t %s | %FileCheck %s
+// RUN: %target-build-swift -Xllvm -sil-disable-pass=simplification -emit-module -Xllvm -verify-skip-convert-escape-to-noescape-attributes -Xfrontend -disable-diagnostic-passes -whole-module-optimization -o %t/sil_partial_apply_ownership.swiftmodule %s
+// RUN: %target-build-swift -Xllvm -sil-disable-pass=simplification -Xllvm -verify-skip-convert-escape-to-noescape-attributes -Xllvm -sil-print-types -emit-sil -I %t %s | %FileCheck %s
 
 import Builtin
 

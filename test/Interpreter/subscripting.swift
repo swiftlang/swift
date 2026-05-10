@@ -27,7 +27,7 @@ print(Foo[]) // CHECK: static subscript
 print(Foo.subscript()) // CHECK: static func
 
 
-// SR-7418
+// https://github.com/apple/swift/issues/49961
 
 protocol P {
   subscript<T : Y>(_: T) -> Int { get set }

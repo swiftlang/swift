@@ -206,10 +206,10 @@ func mapEveryN<S: Sequence>(
 ) -> [S.Element] {
     let isNth = isMultipleOf(n)
     return source.enumerated().map {
-        (pair: (index: Int, elem: S.Element)) in
-        isNth(pair.index+1)
-            ? transform(pair.elem)
-            : pair.elem
+        (pair: (offset: Int, element: S.Element)) in
+        isNth(pair.offset+1)
+            ? transform(pair.element)
+            : pair.element
     }
 }
 

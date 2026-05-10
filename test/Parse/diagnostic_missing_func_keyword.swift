@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift
 
-// https://bugs.swift.org/browse/SR-10477
+// https://github.com/apple/swift/issues/52877
 
 protocol Brew { // expected-note {{in declaration of 'Brew'}}
   tripel() -> Int // expected-error {{expected 'func' keyword in instance method declaration}} {{3-3=func }}

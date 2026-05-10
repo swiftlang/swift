@@ -195,7 +195,7 @@ public func decodeCustomNonContiguousAsUTF8(_ c: CustomNonContiguousCollection) 
 // UTF-16
 //
 // NOTE: The SIL optimizer cannot currently fold away a (UTF16.self ==
-// UTF8.self) metatype comparison, so we have to disabel the check-not for UTF-8
+// UTF8.self) metatype comparison, so we have to disable the check-not for UTF-8
 // construction :-(
 //
 // CHECK-LABEL: sil {{.*}}decodeUTF16{{.*}} : $@convention

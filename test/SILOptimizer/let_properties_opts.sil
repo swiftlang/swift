@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -let-properties-opt -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -let-properties-opt -enable-sil-verify-all %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -6,7 +6,9 @@ import Builtin
 import Swift
 
 // Test initialization of a constant aggregate "let".
-// <rdar://problem/45691574> [SR-9146] IBAnimatable - SILCloner crash in LetPropertiesOpt.
+// rdar://problem/45691574
+// https://github.com/apple/swift/issues/51642
+// IBAnimatable - 'SILCloner' crash in 'LetPropertiesOpt'
 
 struct Point {
   var x: Int64

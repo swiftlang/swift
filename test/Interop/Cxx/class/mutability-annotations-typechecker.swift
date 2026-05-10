@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs %s -enable-experimental-cxx-interop -verify -verify-additional-file %S/Inputs/mutability-annotations.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S%{fs-sep}Inputs %s -enable-experimental-cxx-interop -verify -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}mutability-annotations.h
 
 import MutabilityAnnotations
 

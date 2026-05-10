@@ -1,26 +1,26 @@
 /*
-    /*foo:unknown*/bar() is not /*foo:unknown*/bar(first:)
+    /*foo:unknown*/<base>foo</base>() is not /*foo:unknown*/foo(first:)
 */
-/// This describes /*foo:unknown*/bar and /*foo:unknown*/bar
-func /*foo:def*/bar() {
-    let /*foo:def*/bar = "Here is /*foo:unknown*/bar"
-    // /*foo:unknown*/bar's return
+/// This describes /*foo:unknown*/<base>foo</base> and /*foo:unknown*/<base>foo</base>
+func /*foo:def*/<base>foo</base>() {
+    let /*foo:def*/<base>foo</base> = "Here is /*foo:unknown*/<base>foo</base>"
+    // /*foo:unknown*/<base>foo</base>'s return
     #selector(Struct . /*foo:unknown*/foo(_:aboveSubview:))
     #selector(/*foo:unknown*/foo(_:))
-    #selector(#selector(/*foo:unknown*/bar))
+    #selector(#selector(/*foo:unknown*/foo))
 
     #if true
-        /*foo*/bar = 2
-        /*foo*/bar()
-        /*foo:call*/bar()
+        /*foo*/<base>foo</base> = 2
+        /*foo*/<base>foo</base>()
+        /*foo:call*/<base>foo</base>()
         /*foo:unknown*/foo = 3
         /*foo:unknown*/foo()
         #if false
-            /*foo:unknown*/bar += 2
-            /*foo:unknown*/bar()
+            /*foo:unknown*/foo += 2
+            /*foo:unknown*/foo()
         #endif
     #else
-        /*foo:unknown*/bar = 4
+        /*foo:unknown*/foo = 4
     #endif
 
     return 1
@@ -36,3 +36,4 @@ _ = /*MyClass:unknown*/Mismatch()
 _ = /*MyClass:unknown*/MyClass()
 #endif
 
+// All occcurrences of MyClass are outside of comments and string literals, so there's nothing to rename. swift-refactor indicates this by outputing empty results.

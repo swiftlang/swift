@@ -16,6 +16,9 @@
 // REQUIRES: swift_interpreter
 // REQUIRES: OS=macosx
 
+// This requires executable tests to be run on the same machine as the compiler.
+// (rdar://99051588)
+// UNSUPPORTED: remote_run || device_run
 
 import Darwin
 #if IMPORT

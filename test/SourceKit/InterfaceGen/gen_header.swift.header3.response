@@ -1,7 +1,5 @@
-
 public enum SKFuelKind : UInt32 {
 
-    
     case H2 = 0
 
     case CH4 = 1
@@ -18,151 +16,151 @@ extension SKFuelKind {
 [
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 1,
+    key.offset: 0,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 8,
+    key.offset: 7,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 13,
+    key.offset: 12,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 26,
+    key.offset: 25,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 45,
+    key.offset: 39,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 50,
+    key.offset: 44,
     key.length: 2
   },
   {
     key.kind: source.lang.swift.syntaxtype.number,
-    key.offset: 55,
+    key.offset: 49,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 62,
+    key.offset: 56,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 67,
+    key.offset: 61,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.number,
-    key.offset: 73,
+    key.offset: 67,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 80,
+    key.offset: 74,
     key.length: 4
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 85,
+    key.offset: 79,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.number,
-    key.offset: 94,
+    key.offset: 88,
     key.length: 1
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 98,
+    key.offset: 92,
     key.length: 9
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 108,
+    key.offset: 102,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 126,
+    key.offset: 120,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 133,
+    key.offset: 127,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 137,
+    key.offset: 131,
     key.length: 11
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 150,
+    key.offset: 144,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 159,
+    key.offset: 153,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.attribute.builtin,
-    key.offset: 170,
+    key.offset: 164,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 177,
+    key.offset: 171,
     key.length: 3
   },
   {
     key.kind: source.lang.swift.syntaxtype.identifier,
-    key.offset: 181,
+    key.offset: 175,
     key.length: 14
   },
   {
     key.kind: source.lang.swift.syntaxtype.typeidentifier,
-    key.offset: 197,
+    key.offset: 191,
     key.length: 6
   },
   {
     key.kind: source.lang.swift.syntaxtype.keyword,
-    key.offset: 206,
+    key.offset: 200,
     key.length: 3
   }
 ]
 [
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 26,
+    key.offset: 25,
     key.length: 6,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.enum,
-    key.offset: 108,
+    key.offset: 102,
     key.length: 10
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 150,
+    key.offset: 144,
     key.length: 6,
     key.is_system: 1
   },
   {
     key.kind: source.lang.swift.ref.struct,
-    key.offset: 197,
+    key.offset: 191,
     key.length: 6,
     key.is_system: 1
   }
@@ -172,12 +170,12 @@ extension SKFuelKind {
     key.kind: source.lang.swift.decl.enum,
     key.accessibility: source.lang.swift.accessibility.public,
     key.name: "SKFuelKind",
-    key.offset: 8,
-    key.length: 89,
-    key.nameoffset: 13,
+    key.offset: 7,
+    key.length: 84,
+    key.nameoffset: 12,
     key.namelength: 10,
-    key.bodyoffset: 34,
-    key.bodylength: 62,
+    key.bodyoffset: 33,
+    key.bodylength: 57,
     key.inheritedtypes: [
       {
         key.name: "UInt32"
@@ -185,7 +183,7 @@ extension SKFuelKind {
     ],
     key.attributes: [
       {
-        key.offset: 1,
+        key.offset: 0,
         key.length: 6,
         key.attribute: source.decl.attribute.public
       }
@@ -193,28 +191,28 @@ extension SKFuelKind {
     key.elements: [
       {
         key.kind: source.lang.swift.structure.elem.typeref,
-        key.offset: 26,
+        key.offset: 25,
         key.length: 6
       }
     ],
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.enumcase,
-        key.offset: 45,
+        key.offset: 39,
         key.length: 11,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.accessibility: source.lang.swift.accessibility.public,
             key.name: "H2",
-            key.offset: 50,
+            key.offset: 44,
             key.length: 6,
-            key.nameoffset: 50,
+            key.nameoffset: 44,
             key.namelength: 2,
             key.elements: [
               {
                 key.kind: source.lang.swift.structure.elem.init_expr,
-                key.offset: 55,
+                key.offset: 49,
                 key.length: 1
               }
             ]
@@ -223,21 +221,21 @@ extension SKFuelKind {
       },
       {
         key.kind: source.lang.swift.decl.enumcase,
-        key.offset: 62,
+        key.offset: 56,
         key.length: 12,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.accessibility: source.lang.swift.accessibility.public,
             key.name: "CH4",
-            key.offset: 67,
+            key.offset: 61,
             key.length: 7,
-            key.nameoffset: 67,
+            key.nameoffset: 61,
             key.namelength: 3,
             key.elements: [
               {
                 key.kind: source.lang.swift.structure.elem.init_expr,
-                key.offset: 73,
+                key.offset: 67,
                 key.length: 1
               }
             ]
@@ -246,21 +244,21 @@ extension SKFuelKind {
       },
       {
         key.kind: source.lang.swift.decl.enumcase,
-        key.offset: 80,
+        key.offset: 74,
         key.length: 15,
         key.substructure: [
           {
             key.kind: source.lang.swift.decl.enumelement,
             key.accessibility: source.lang.swift.accessibility.public,
             key.name: "C12H26",
-            key.offset: 85,
+            key.offset: 79,
             key.length: 10,
-            key.nameoffset: 85,
+            key.nameoffset: 79,
             key.namelength: 6,
             key.elements: [
               {
                 key.kind: source.lang.swift.structure.elem.init_expr,
-                key.offset: 94,
+                key.offset: 88,
                 key.length: 1
               }
             ]
@@ -272,27 +270,27 @@ extension SKFuelKind {
   {
     key.kind: source.lang.swift.decl.extension,
     key.name: "SKFuelKind",
-    key.offset: 98,
+    key.offset: 92,
     key.length: 115,
-    key.nameoffset: 108,
+    key.nameoffset: 102,
     key.namelength: 10,
-    key.bodyoffset: 120,
+    key.bodyoffset: 114,
     key.bodylength: 92,
     key.substructure: [
       {
         key.kind: source.lang.swift.decl.var.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "isCryogenic",
-        key.offset: 133,
+        key.offset: 127,
         key.length: 31,
         key.typename: "UInt32",
-        key.nameoffset: 137,
+        key.nameoffset: 131,
         key.namelength: 11,
-        key.bodyoffset: 158,
+        key.bodyoffset: 152,
         key.bodylength: 5,
         key.attributes: [
           {
-            key.offset: 126,
+            key.offset: 120,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }
@@ -302,16 +300,16 @@ extension SKFuelKind {
         key.kind: source.lang.swift.decl.var.instance,
         key.accessibility: source.lang.swift.accessibility.public,
         key.name: "isNotCryogenic",
-        key.offset: 177,
+        key.offset: 171,
         key.length: 34,
         key.typename: "UInt32",
-        key.nameoffset: 181,
+        key.nameoffset: 175,
         key.namelength: 14,
-        key.bodyoffset: 205,
+        key.bodyoffset: 199,
         key.bodylength: 5,
         key.attributes: [
           {
-            key.offset: 170,
+            key.offset: 164,
             key.length: 6,
             key.attribute: source.decl.attribute.public
           }

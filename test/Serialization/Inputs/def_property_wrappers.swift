@@ -19,7 +19,8 @@ public struct HasWrappers {
   @SomeWrapper public var x: Int = 17
 }
 
-// SR-10844
+// https://github.com/apple/swift/issues/53234
+
 @propertyWrapper
 class A<T: Equatable> {
 

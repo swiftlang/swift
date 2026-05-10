@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-typecheck-verify-swift -I %S/Inputs/implementation-only-override -DERRORS -enable-library-evolution -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -I %S/Inputs/implementation-only-override -DERRORS -enable-library-evolution -enable-objc-interop
 
 // RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -I %S/Inputs/implementation-only-override -enable-objc-interop
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -I %S/Inputs/implementation-only-override
@@ -13,7 +13,7 @@
 import FooKit
 @_implementationOnly import FooKit_SECRET
 
-// CHECK-LABEL: class GoodChild : FooKit.Parent {
+// CHECK-LABEL: class GoodChild : FooKit::Parent {
 //  CHECK-NEXT:   @objc override dynamic public init()
 //  CHECK-NEXT:   @objc deinit
 //  CHECK-NEXT: }
@@ -38,7 +38,7 @@ public class GoodChild: Parent {
   }
 }
 
-// CHECK-LABEL: class QuietChild : FooKit.Parent {
+// CHECK-LABEL: class QuietChild : FooKit::Parent {
 //  CHECK-NEXT:   @objc deinit
 //  CHECK-NEXT: }
 public class QuietChild: Parent {
@@ -47,7 +47,7 @@ public class QuietChild: Parent {
   internal required init(requiredSECRET: Int32) {}
 }
 
-// CHECK-LABEL: class GoodGenericChild<Toy> : FooKit.Parent {
+// CHECK-LABEL: class GoodGenericChild<Toy> : FooKit::Parent {
 //  CHECK-NEXT:   @objc override dynamic public init()
 //  CHECK-NEXT:   @objc deinit
 //  CHECK-NEXT: }
@@ -102,7 +102,7 @@ internal class PrivateGrandchild: GoodChild {
   }
 }
 
-// CHECK-LABEL: class SubscriptChild : FooKit.SubscriptParent {
+// CHECK-LABEL: class SubscriptChild : FooKit::SubscriptParent {
 //  CHECK-NEXT:   @objc deinit
 //  CHECK-NEXT: }
 public class SubscriptChild: SubscriptParent {

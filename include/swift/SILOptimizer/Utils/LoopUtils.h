@@ -24,9 +24,11 @@ namespace swift {
 
 class SILFunction;
 class SILBasicBlock;
+class SILInstruction;
 class SILLoop;
 class DominanceInfo;
 class SILLoopInfo;
+class DeadEndBlocks;
 
 /// Canonicalize the loop for rotation and downstream passes.
 ///
@@ -36,6 +38,10 @@ bool canonicalizeLoop(SILLoop *L, DominanceInfo *DT, SILLoopInfo *LI);
 /// Canonicalize all loops in the function F for which \p LI contains loop
 /// information. We update loop info and dominance info while we do this.
 bool canonicalizeAllLoops(DominanceInfo *DT, SILLoopInfo *LI);
+
+/// Check whether it is safe to duplicate this instruction when duplicating
+/// this loop by unrolling or versioning.
+bool canDuplicateLoopInstruction(SILLoop *L, SILInstruction *Inst, DeadEndBlocks *deb);
 
 /// A visitor that visits loops in a function in a bottom up order. It only
 /// performs the visit.

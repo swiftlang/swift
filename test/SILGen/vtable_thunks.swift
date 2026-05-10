@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sdk %S/Inputs -I %S/Inputs -enable-source-import %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
 
 protocol AddrOnly {}
 
@@ -145,30 +145,28 @@ class H: G {
 // CHECK-LABEL: sil private [thunk] [ossa] @$s13vtable_thunks1DC3iuo{{[_0-9a-zA-Z]*}}FTV
 // CHECK: bb0([[X:%.*]] : @guaranteed $B, [[Y:%.*]] : @guaranteed $Optional<B>, [[Z:%.*]] : @guaranteed $B, [[W:%.*]] : @guaranteed $D):
 // CHECK:   [[WRAP_X:%.*]] = enum $Optional<B>, #Optional.some!enumelt, [[X]] : $B
-// CHECK:   [[Y_COPY:%.*]] = copy_value [[Y]]
-// CHECK:   switch_enum [[Y_COPY]] : $Optional<B>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
+// CHECK:   switch_enum [[Y]] : $Optional<B>, case #Optional.some!enumelt: [[SOME_BB:bb[0-9]+]], case #Optional.none!enumelt: [[NONE_BB:bb[0-9]+]]
 
 // CHECK: [[NONE_BB]]:
 // CHECK:   [[DIAGNOSE_UNREACHABLE_FUNC:%.*]] = function_ref @$ss30_diagnoseUnexpectedNilOptional{{.*}}
 // CHECK:   apply [[DIAGNOSE_UNREACHABLE_FUNC]]
 // CHECK:   unreachable
 
-// CHECK: [[SOME_BB]]([[UNWRAP_Y:%.*]] : @owned $B):
-// CHECK:   [[BORROWED_UNWRAP_Y:%.*]] = begin_borrow [[UNWRAP_Y]]
+// CHECK: [[SOME_BB]]([[UNWRAP_Y:%.*]] : @guaranteed $B):
 // CHECK:   [[THUNK_FUNC:%.*]] = function_ref @$s13vtable_thunks1DC3iuo{{.*}}
-// CHECK:   [[RES:%.*]] = apply [[THUNK_FUNC]]([[WRAP_X]], [[BORROWED_UNWRAP_Y]], [[Z]], [[W]])
+// CHECK:   [[RES:%.*]] = apply [[THUNK_FUNC]]([[WRAP_X]], [[UNWRAP_Y]], [[Z]], [[W]])
 // CHECK:   [[WRAP_RES:%.*]] = enum $Optional<B>, {{.*}} [[RES]]
 // CHECK:   return [[WRAP_RES]]
 
 // CHECK-LABEL: sil private [thunk] [ossa] @$s13vtable_thunks1DC1g{{[_0-9a-zA-Z]*}}FTV
 // TODO: extra copies here
 // CHECK:         [[WRAPPED_X_ADDR:%.*]] = init_enum_data_addr [[WRAP_X_ADDR:%.*]] :
-// CHECK:         copy_addr [take] {{%.*}} to [initialization] [[WRAPPED_X_ADDR]]
+// CHECK:         copy_addr [take] {{%.*}} to [init] [[WRAPPED_X_ADDR]]
 // CHECK:         inject_enum_addr [[WRAP_X_ADDR]]
 // CHECK:         [[RES_ADDR:%.*]] = alloc_stack
 // CHECK:         apply {{%.*}}([[RES_ADDR]], [[WRAP_X_ADDR]], %2, %3)
 // CHECK:         [[DEST_ADDR:%.*]] = init_enum_data_addr %0
-// CHECK:         copy_addr [take] [[RES_ADDR]] to [initialization] [[DEST_ADDR]]
+// CHECK:         copy_addr [take] [[RES_ADDR]] to [init] [[DEST_ADDR]]
 // CHECK:         inject_enum_addr %0
 
 class ThrowVariance {

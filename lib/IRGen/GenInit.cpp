@@ -17,6 +17,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Pattern.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/IRGen/Linking.h"
@@ -43,11 +44,12 @@ void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   // variable directly, don't actually emit it; just return undef.
   if (ti.isKnownEmpty(expansion)) {
     if (DebugInfo && var->getDecl()) {
-      auto DbgTy = DebugTypeInfo::getGlobal(var, Int8Ty, Size(0), Alignment(1));
-      DebugInfo->emitGlobalVariableDeclaration(
-          nullptr, var->getDecl()->getName().str(), "", DbgTy,
-          var->getLinkage() != SILLinkage::Public,
-          IRGenDebugInfo::NotHeapAllocated, SILLocation(var->getDecl()));
+      auto DbgTy = DebugTypeInfo::getGlobal(var, *this);
+      DebugInfo->emitGlobalVariableDeclaration(nullptr, var->getDecl()->getName().str(),
+                                               "", DbgTy,
+                                               var->getLinkage() != SILLinkage::Public &&
+                                               var->getLinkage() != SILLinkage::Package,
+                                               SILLocation(var->getDecl()));
     }
     return;
   }
@@ -57,19 +59,17 @@ void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
                      var->isDefinition() ? ForDefinition : NotForDefinition);
 }
 
-StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
-                                          const Twine &name) const {
+StackAddress
+FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T, const Twine &name,
+                             StackAllocationIsNested_t isNested) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty(ResilienceExpansion::Maximal)) {
     auto addr = getUndefAddress();
-    return { addr };
+    return StackAddress(addr, StackAddress::StaticAlloca, nullptr);
   }
 
-  Address alloca =
-    IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
-  IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
-  
-  return { alloca };
+  return IGF.emitStaticAlloca(getStorageType(), getFixedSize(),
+                              getFixedAlignment(), name);
 }
 
 void FixedTypeInfo::destroyStack(IRGenFunction &IGF, StackAddress addr,
@@ -96,5 +96,9 @@ void TemporarySet::destroyAll(IRGenFunction &IGF) const {
 
 void Temporary::destroy(IRGenFunction &IGF) const {
   auto &ti = IGF.getTypeInfo(Type);
+  if (Type.isSensitive()) {
+    llvm::Value *size = ti.getSize(IGF, Type);
+    IGF.emitClearSensitive(Addr.getAddress(), size);
+  }
   ti.deallocateStack(IGF, Addr, Type);
 }

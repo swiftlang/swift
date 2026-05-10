@@ -34,18 +34,18 @@ namespace swift {
 namespace unittests {
 
 enum LocalDiagID : uint32_t {
-#define DIAG(KIND, ID, Options, Text, Signature) ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) ID,
 #include "swift/AST/DiagnosticsAll.def"
   NumDiags
 };
 
 static constexpr const char *const diagnosticID[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) #ID,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) #ID,
 #include "swift/AST/DiagnosticsAll.def"
 };
 
 static constexpr const char *const diagnosticMessages[] = {
-#define DIAG(KIND, ID, Options, Text, Signature) Text,
+#define DIAG(KIND, ID, Group, Options, Text, Signature) Text,
 #include "swift/AST/DiagnosticsAll.def"
 };
 
@@ -53,15 +53,15 @@ struct LocalizationTest : public ::testing::Test {
   llvm::SmallVector<std::string, 4> TempFiles;
 
 public:
-  std::string YAMLPath;
+  std::string DiagsPath;
 
   LocalizationTest() {
-    YAMLPath = std::string(createTemporaryFile("en", "yaml"));
+    DiagsPath = std::string(createTemporaryFile("en", "strings"));
   }
 
   void SetUp() override {
-    bool failed = convertDefIntoYAML(YAMLPath);
-    assert(!failed && "failed to generate a YAML file");
+    bool failed = convertDefIntoStrings(DiagsPath);
+    assert(!failed && "failed to generate a `.strings` file");
   }
 
   void TearDown() override {
@@ -85,7 +85,7 @@ public:
   unsigned RandNumber(unsigned n) { return unsigned(rand()) % n; }
 
 protected:
-  static bool convertDefIntoYAML(std::string outputPath) {
+  static bool convertDefIntoStrings(std::string outputPath) {
     std::error_code error;
     llvm::raw_fd_ostream OS(outputPath, error, llvm::sys::fs::OF_None);
     if (OS.has_error() || error)
@@ -95,7 +95,7 @@ protected:
     llvm::ArrayRef<const char *> messages(diagnosticMessages,
                                           LocalDiagID::NumDiags);
 
-    DefToYAMLConverter converter(ids, messages);
+    DefToStringsConverter converter(ids, messages);
     converter.convert(OS);
 
     OS.flush();

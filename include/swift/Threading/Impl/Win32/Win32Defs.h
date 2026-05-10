@@ -36,17 +36,40 @@ typedef unsigned char BYTE;
 typedef BYTE BOOLEAN;
 typedef int BOOL;
 typedef unsigned long DWORD;
+typedef long LONG;
+typedef unsigned long ULONG;
+#if defined(_WIN64)
+typedef unsigned __int64 ULONG_PTR;
+#else
+typedef unsigned long ULONG_PTR;
+#endif
+typedef PVOID HANDLE;
 
 typedef VOID(NTAPI *PFLS_CALLBACK_FUNCTION)(PVOID lpFlsData);
 
 typedef struct _RTL_SRWLOCK *PRTL_SRWLOCK;
 typedef PRTL_SRWLOCK PSRWLOCK;
 
+typedef struct _RTL_CONDITION_VARIABLE *PRTL_CONDITION_VARIABLE;
+typedef PRTL_CONDITION_VARIABLE PCONDITION_VARIABLE;
+
+typedef struct _RTL_CRITICAL_SECTION_DEBUG *PRTL_CRITICAL_SECTION_DEBUG;
+typedef struct _RTL_CRITICAL_SECTION *PRTL_CRITICAL_SECTION;
+typedef PRTL_CRITICAL_SECTION PCRITICAL_SECTION;
+typedef PRTL_CRITICAL_SECTION LPCRITICAL_SECTION;
+
 // These have to be #defines, to avoid problems with <windows.h>
-#define RTL_SRWLOCK_INIT                                                       \
-  { 0 }
+#define RTL_SRWLOCK_INIT {0}
 #define SRWLOCK_INIT RTL_SRWLOCK_INIT
 #define FLS_OUT_OF_INDEXES ((DWORD)0xFFFFFFFF)
+
+#define RTL_CONDITION_VARIABLE_INIT {0}
+#define CONDITION_VARIABLE_INIT RTL_CONDITION_VARIABLE_INIT
+
+#define RTL_CONDITION_VARIABLE_LOCKMODE_SHARED 0x1
+#define CONDITION_VARIABLE_LOCKMODE_SHARED RTL_CONDITION_VARIABLE_LOCKMODE_SHARED
+
+#define INFINITE 0xFFFFFFFF // Infinite timeout
 
 extern "C" {
 WINBASEAPI DWORD WINAPI GetCurrentThreadId(VOID);
@@ -55,6 +78,35 @@ WINBASEAPI VOID WINAPI InitializeSRWLock(PSRWLOCK SRWLock);
 WINBASEAPI VOID WINAPI ReleaseSRWLockExclusive(PSRWLOCK SRWLock);
 WINBASEAPI VOID WINAPI AcquireSRWLockExclusive(PSRWLOCK SRWLock);
 WINBASEAPI BOOLEAN WINAPI TryAcquireSRWLockExclusive(PSRWLOCK SRWLock);
+
+WINBASEAPI VOID WINAPI InitializeConditionVariable(
+  PCONDITION_VARIABLE ConditionVariable
+);
+WINBASEAPI VOID WINAPI WakeConditionVariable(
+  PCONDITION_VARIABLE ConditionVariable
+);
+WINBASEAPI VOID WINAPI WakeAllConditionVariable(
+  PCONDITION_VARIABLE ConditionVariable
+);
+WINBASEAPI BOOL WINAPI SleepConditionVariableSRW(
+  PCONDITION_VARIABLE ConditionVariable,
+  PSRWLOCK SRWLock,
+  DWORD dwMilliseconds,
+  ULONG Flags
+);
+
+WINBASEAPI VOID WINAPI InitializeCriticalSection(
+  LPCRITICAL_SECTION lpCriticalSection
+);
+WINBASEAPI VOID WINAPI DeleteCriticalSection(
+  LPCRITICAL_SECTION lpCriticalSection
+);
+WINBASEAPI VOID WINAPI EnterCriticalSection(
+  LPCRITICAL_SECTION lpCriticalSection
+);
+WINBASEAPI VOID WINAPI LeaveCriticalSection(
+  LPCRITICAL_SECTION lpCriticalSection
+);
 
 WINBASEAPI DWORD WINAPI FlsAlloc(PFLS_CALLBACK_FUNCTION lpCallback);
 WINBASEAPI PVOID WINAPI FlsGetValue(DWORD dwFlsIndex);
@@ -84,6 +136,61 @@ inline VOID AcquireSRWLockExclusive(PSWIFT_SRWLOCK SRWLock) {
 }
 inline BOOLEAN TryAcquireSRWLockExclusive(PSWIFT_SRWLOCK SRWLock) {
   return ::TryAcquireSRWLockExclusive(reinterpret_cast<PSRWLOCK>(SRWLock));
+}
+
+// Similarly we have the same problem with _RTL_CONDITION_VARIABLE
+struct SWIFT_CONDITION_VARIABLE {
+  PVOID Ptr;
+};
+
+typedef SWIFT_CONDITION_VARIABLE *PSWIFT_CONDITION_VARIABLE;
+
+inline VOID InitializeConditionVariable(PSWIFT_CONDITION_VARIABLE CondVar) {
+  ::InitializeConditionVariable(reinterpret_cast<PCONDITION_VARIABLE>(CondVar));
+}
+inline VOID WakeConditionVariable(PSWIFT_CONDITION_VARIABLE CondVar) {
+  ::WakeConditionVariable(reinterpret_cast<PCONDITION_VARIABLE>(CondVar));
+}
+inline VOID WakeAllConditionVariable(PSWIFT_CONDITION_VARIABLE CondVar) {
+  ::WakeAllConditionVariable(reinterpret_cast<PCONDITION_VARIABLE>(CondVar));
+}
+inline BOOL SleepConditionVariableSRW(PSWIFT_CONDITION_VARIABLE CondVar,
+                                      PSWIFT_SRWLOCK SRWLock,
+                                      DWORD dwMilliseconds,
+                                      ULONG Flags) {
+  return ::SleepConditionVariableSRW(
+    reinterpret_cast<PCONDITION_VARIABLE>(CondVar),
+    reinterpret_cast<PSRWLOCK>(SRWLock),
+    dwMilliseconds,
+    Flags);
+}
+
+// And with CRITICAL_SECTION
+#pragma pack(push, 8)
+typedef struct SWIFT_CRITICAL_SECTION {
+  PRTL_CRITICAL_SECTION_DEBUG DebugInfo;
+  LONG LockCount;
+  LONG RecursionCount;
+  HANDLE OwningThread;
+  HANDLE LockSemaphore;
+  ULONG_PTR SpinCount;
+} SWIFT_CRITICAL_SECTION, *PSWIFT_CRITICAL_SECTION;
+#pragma pack(pop)
+
+inline VOID InitializeCriticalSection(PSWIFT_CRITICAL_SECTION CritSec) {
+  ::InitializeCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(CritSec));
+}
+
+inline VOID DeleteCriticalSection(PSWIFT_CRITICAL_SECTION CritSec) {
+  ::DeleteCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(CritSec));
+}
+
+inline VOID EnterCriticalSection(PSWIFT_CRITICAL_SECTION CritSec) {
+  ::EnterCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(CritSec));
+}
+
+inline VOID LeaveCriticalSection(PSWIFT_CRITICAL_SECTION CritSec) {
+  ::LeaveCriticalSection(reinterpret_cast<LPCRITICAL_SECTION>(CritSec));
 }
 
 } // namespace threading_impl

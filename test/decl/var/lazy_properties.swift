@@ -124,7 +124,8 @@ struct Outer {
   }
 }
 
-// https://bugs.swift.org/browse/SR-2616
+// https://github.com/apple/swift/issues/45221
+
 struct Construction {
   init(x: Int, y: Int? = 42) { }
 }
@@ -203,6 +204,12 @@ class LazyVarContainer {
   }
 }
 
+// The backing storage for lazy locals just isn't exposed through name lookup.
+func testLazyLocal() {
+  lazy var foo = 0
+  print($__lazy_storage_$_foo) // expected-error {{cannot find '$__lazy_storage_$_foo' in scope}}
+}
+
 // Make sure we can still access a synthesized variable with the same name as a lazy storage variable
 // i.e. $__lazy_storage_$_{property_name} when using property wrapper where the property name is 
 // '__lazy_storage_$_{property_name}'.
@@ -216,5 +223,17 @@ struct PropertyWrapperContainer {
   @Wrapper var __lazy_storage_$_foo
   func test() {
     _ = $__lazy_storage_$_foo  // This is okay.
+  }
+}
+
+// rdar://problem/129255769
+struct X {
+  struct Y { }
+
+  func f() {
+    _ = {
+      lazy var x: [Y] = []
+      _ = Y()
+    }
   }
 }

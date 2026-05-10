@@ -1,0 +1,3 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name HasBuiltinImport -enable-builtin-module
+import Builtin

@@ -1,4 +1,0 @@
-module gizmo {
-  header "Gizmo.h"
-  export *
-}

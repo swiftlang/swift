@@ -3,13 +3,15 @@
 
 namespace ClassesNS1 {
 struct BasicStruct {
-  const char *basicMember() { return "ClassesNS1::BasicStruct::basicMember"; }
+  const char *basicMember() __attribute__((swift_attr("import_unsafe"))) {
+    return "ClassesNS1::BasicStruct::basicMember";
+  }
 };
 struct ForwardDeclaredStruct;
 } // namespace ClassesNS1
 
 struct ClassesNS1::ForwardDeclaredStruct {
-  const char *basicMember() {
+  const char *basicMember() __attribute__((swift_attr("import_unsafe"))) {
     return "ClassesNS1::ForwardDeclaredStruct::basicMember";
   }
 };
@@ -17,7 +19,7 @@ struct ClassesNS1::ForwardDeclaredStruct {
 namespace ClassesNS1 {
 namespace ClassesNS2 {
 struct BasicStruct {
-  const char *basicMember() {
+  const char *basicMember() __attribute__((swift_attr("import_unsafe"))) {
     return "ClassesNS1::ClassesNS2::BasicStruct::basicMember";
   }
 };
@@ -28,7 +30,7 @@ struct DefinedInDefs;
 
 namespace ClassesNS1 {
 struct ClassesNS2::ForwardDeclaredStruct {
-  const char *basicMember() {
+  const char *basicMember() __attribute__((swift_attr("import_unsafe"))) {
     return "ClassesNS1::ClassesNS2::ForwardDeclaredStruct::basicMember";
   }
 };
@@ -36,7 +38,9 @@ struct ClassesNS2::ForwardDeclaredStruct {
 
 namespace ClassesNS3 {
 struct BasicStruct {
-  const char *basicMember() { return "ClassesNS3::BasicStruct::basicMember"; }
+  const char *basicMember() __attribute__((swift_attr("import_unsafe"))) {
+    return "ClassesNS3::BasicStruct::basicMember";
+  }
 };
 } // namespace ClassesNS3
 

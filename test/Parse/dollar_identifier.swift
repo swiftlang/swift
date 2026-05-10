@@ -1,6 +1,7 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
-// SR-1661: Dollar was accidentally allowed as an identifier in Swift 3.
+// https://github.com/apple/swift/issues/44270
+// Dollar was accidentally allowed as an identifier in Swift 3.
 // SE-0144: Reject this behavior in the future.
 
 func dollarVar() {
@@ -56,10 +57,9 @@ func escapedDollarFunc() {
 }
 
 func escapedDollarAnd() {
-  // FIXME: Bad diagnostics.
-  `$0` = 1 // expected-error {{expected expression}}
-  `$$` = 2
-  `$abc` = 3
+  `$0` = 1 // expected-error {{cannot find '$0' in scope}}
+  `$$` = 2 // expected-error {{cannot find '$$' in scope}}
+  `$abc` = 3 // expected-error {{cannot find '$abc' in scope}}
 }
 
 // Test that we disallow user-defined $-prefixed identifiers. However, the error
@@ -102,10 +102,11 @@ precedencegroup $Precedence { // expected-error {{cannot declare entity named '$
   higherThan: $Precedence // expected-error {{cycle in 'higherThan' relation}}
 }
 infix operator **: $Precedence
-#$UnknownDirective() // expected-error {{use of unknown directive '#$UnknownDirective'}}
+#$UnknownDirective() // expected-error {{no macro named '$UnknownDirective'}}
 
 
-// SR-13232
+// https://github.com/apple/swift/issues/55672
+
 @propertyWrapper
 struct Wrapper {
   var wrappedValue: Int
@@ -118,5 +119,8 @@ struct S {
 
 let _ = S().$café // Okay
 
-infix operator $ // expected-error{{'$' is considered an identifier and must not appear within an operator name}} // SR-13092
-infix operator `$` // expected-error{{'$' is considered an identifier and must not appear within an operator name}} // SR-13092
+// https://github.com/apple/swift/issues/55538
+infix operator $ // expected-error{{'$' is considered an identifier and must not appear within an operator name}}
+infix operator `$` // expected-error{{'$' is considered an identifier and must not appear within an operator name}}
+
+func `$declareEscapedWithDollar`() { } // expected-error{{cannot declare entity named '$declareEscapedWithDollar'}}

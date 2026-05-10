@@ -1,0 +1,418 @@
+//===--- Devirtualization.swift -------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+import AST
+import SIL
+
+/// Devirtualizes all value-type deinitializers of a `destroy_value`.
+///
+/// This may be a no-op if the destroy doesn't call any deinitializers.
+/// Returns true if all deinitializers could be devirtualized.
+func devirtualizeDeinits(of destroy: DestroyValueInst, isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+  if destroy.isDeadEnd {
+    // It doesn't make sense to de-virtualize `destroy_value [dead_end]` because such operations
+    // are no-ops anyway. This is especially important for Embedded Swift, because introducing
+    // calls to generic deinit functions after the mandatory pipeline can result in IRGen crashes.
+    return true
+  }
+  return devirtualize(destroy: destroy, isMandatory: isMandatory, context)
+}
+
+/// Devirtualizes all value-type deinitializers of a `destroy_addr`.
+///
+/// This may be a no-op if the destroy doesn't call any deinitializers.
+/// Returns true if all deinitializers could be devirtualized.
+func devirtualizeDeinits(of destroy: DestroyAddrInst, isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+  return devirtualize(destroy: destroy, isMandatory: isMandatory, context)
+}
+
+func devirtualizeDeinits(of builtin: BuiltinInst, isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+  switch builtin.id {
+  case .DestroyArray:
+    return devirtualize(builtinDestroyArray: builtin, isMandatory: isMandatory, context)
+  default:
+    return true
+  }
+}
+
+private func devirtualize(destroy: some DevirtualizableDestroy,
+                          isMandatory: Bool,
+                          _ context: some MutatingContext
+) -> Bool {
+  let type = destroy.type
+  if !type.isMoveOnly {
+    return true
+  }
+
+  if type.isBuiltinFixedArray {
+    return devirtualizeFixedSizeArray(destroy: destroy, isMandatory: isMandatory, context)
+  }
+
+  guard let nominal = type.nominal else {
+    // E.g. a non-copyable generic function parameter
+    return true
+  }
+
+  // We cannot de-virtualize C++ destructor calls of C++ move-only types because we cannot get
+  // its destructor (`nominal.valueTypeDestructor` is nil).
+  if nominal.hasClangNode {
+    return false
+  }
+
+  if nominal.valueTypeDestructor != nil && !destroy.shouldDropDeinit {
+    guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
+      return false
+    }
+    // In mandatory mode, de-virtualization might create function references to functions with wrong linkage.
+    // MandatoryPerformanceOptimization fixes this later.
+    if !isMandatory {
+      // In non-mandatory mode, we don't allow this.
+      let serialized = destroy.parentFunction.serializedKind
+      guard serialized == .notSerialized || deinitFunc.hasValidLinkageForFragileRef(serialized) else {
+        return false
+      }
+    }
+
+    if deinitFunc.linkage == .shared && !deinitFunc.isDefinition {
+      // Make sure to not have an external shared function, which is illegal in SIL.
+      _ = context.loadFunction(function: deinitFunc, loadCalleesRecursively: false)
+    }
+    destroy.createDeinitCall(to: deinitFunc, context)
+    context.erase(instruction: destroy)
+    return true
+  }
+  // If there is no deinit to be called for the original type we have to recursively visit
+  // the struct fields or enum cases.
+  if type.isStruct {
+    return destroy.devirtualizeStructFields(isMandatory: isMandatory, context)
+  }
+  if type.isEnum {
+    return destroy.devirtualizeEnumPayloads(isMandatory: isMandatory, context)
+  }
+  precondition(type.isClass, "unknown non-copyable type")
+  // A class reference cannot be further de-composed.
+  return true
+}
+
+private func devirtualizeFixedSizeArray(destroy: some DevirtualizableDestroy,
+                                        isMandatory: Bool,
+                                        _ context: some MutatingContext
+) -> Bool {
+  guard let arraySize = destroy.type.builtinFixedArraySizeType.valueOfInteger else {
+    return false
+  }
+  let elementType = destroy.type.builtinFixedArrayElementType(in: destroy.parentFunction)
+
+  let destroyAddr = destroy.materializeAsDestroyAddr(context)
+
+  let builder = Builder(before: destroyAddr, context)
+  let base = builder.createVectorBaseAddr(vector: destroyAddr.destroyedAddress)
+  let count = builder.createIntegerLiteral(arraySize, type: context.getBuiltinWordType())
+
+  let success = createArrayDestroyLoop(baseAddress: base,
+                                       arrayCount: count,
+                                       elementType: elementType,
+                                       insertionPoint: destroyAddr,
+                                       isMandatory: isMandatory,
+                                       context)
+
+  context.erase(instruction: destroyAddr)
+  return success
+}
+
+// Used to dispatch devirtualization tasks to `destroy_value` and `destroy_addr`.
+private protocol DevirtualizableDestroy : UnaryInstruction {
+  var shouldDropDeinit: Bool { get }
+  func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext)
+  func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool
+  func devirtualizeEnumPayload(enumCase: EnumCase,
+                               in block: BasicBlock,
+                               isMandatory: Bool,
+                               _ context: some MutatingContext) -> Bool
+  func createSwitchEnum(atEndOf block: BasicBlock, cases: [(Int, BasicBlock)], _ context: some MutatingContext)
+  func materializeAsDestroyAddr(_ context: some MutatingContext) -> DestroyAddrInst
+}
+
+private extension DevirtualizableDestroy {
+  var type: Type { operand.value.type }
+
+  func devirtualizeEnumPayloads(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+    guard let cases = type.getEnumCases(in: parentFunction) else {
+      return false
+    }
+    defer {
+      context.erase(instruction: self)
+    }
+
+    if cases.allPayloadsAreTrivial(in: parentFunction) {
+      let builder = Builder(before: self, context)
+      builder.createEndLifetime(of: operand.value)
+      return true
+    }
+
+    var caseBlocks: [(caseIndex: Int, targetBlock: BasicBlock)] = []
+    let switchBlock = parentBlock
+    let endBlock = context.splitBlock(before: self)
+    var result = true
+
+    for enumCase in cases {
+      let caseBlock = context.createBlock(after: switchBlock)
+      caseBlocks.append((enumCase.index, caseBlock))
+      let builder = Builder(atEndOf: caseBlock, location: location, context)
+      builder.createBranch(to: endBlock)
+      if !devirtualizeEnumPayload(enumCase: enumCase, in: caseBlock, isMandatory: isMandatory, context) {
+        result = false
+      }
+    }
+    createSwitchEnum(atEndOf: switchBlock, cases: caseBlocks, context)
+    return result
+  }
+}
+
+extension DestroyValueInst : DevirtualizableDestroy {
+  fileprivate var shouldDropDeinit: Bool { operand.value.lookThoughOwnershipInstructions is DropDeinitInst }
+
+  fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
+    let builder = Builder(before: self, context)
+    let subs = deinitializer.isGeneric ? context.getContextSubstitutionMap(for: type) : SubstitutionMap()
+    let deinitRef = builder.createFunctionRef(deinitializer)
+    if deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
+      let allocStack = builder.createAllocStack(type)
+      builder.createStore(source: destroyedValue, destination: allocStack, ownership: .initialize)
+      builder.createApply(function: deinitRef, subs, arguments: [allocStack])
+      builder.createDeallocStack(allocStack)
+    } else {
+      builder.createApply(function: deinitRef, subs, arguments: [destroyedValue])
+    }
+  }
+
+  fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+    guard let fields = type.getNominalFields(in: parentFunction) else {
+      return false
+    }
+
+    defer {
+      context.erase(instruction: self)
+    }
+
+    let builder = Builder(before: self, context)
+    if fields.allFieldsAreTrivial(in: parentFunction) {
+      builder.createEndLifetime(of: operand.value)
+      return true
+    }
+    let destructure = builder.createDestructureStruct(struct: destroyedValue)
+    var result = true
+
+    for fieldValue in destructure.results where !fieldValue.type.isTrivial(in: parentFunction) {
+      let destroyField = builder.createDestroyValue(operand: fieldValue)
+      if !devirtualizeDeinits(of: destroyField, isMandatory: isMandatory, context) {
+        result = false
+      }
+    }
+    return result
+  }
+
+  fileprivate func devirtualizeEnumPayload(
+    enumCase: EnumCase,
+    in block: BasicBlock,
+    isMandatory: Bool,
+    _ context: some MutatingContext
+  ) -> Bool {
+    let builder = Builder(atBeginOf: block, location: location, context)
+    if let payloadTy = enumCase.payload {
+      let payload = block.addArgument(type: payloadTy, ownership: .owned, context)
+      if !payloadTy.isTrivial(in: parentFunction) {
+        let destroyPayload = builder.createDestroyValue(operand: payload)
+        return devirtualizeDeinits(of: destroyPayload, isMandatory: isMandatory, context)
+      }
+    }
+    return true
+  }
+
+  fileprivate func createSwitchEnum(
+    atEndOf block: BasicBlock,
+    cases: [(Int, BasicBlock)],
+    _ context: some MutatingContext
+  ) {
+    let builder = Builder(atEndOf: block, location: location, context)
+    builder.createSwitchEnum(enum: destroyedValue, cases: cases)
+  }
+
+  fileprivate func materializeAsDestroyAddr(_ context: some MutatingContext) -> DestroyAddrInst {
+    let builder = Builder(before: self, context)
+    let allocStack = builder.createAllocStack(destroyedValue.type)
+    builder.createStore(source: destroyedValue, destination: allocStack, ownership: .initialize)
+    let destroyAddr = builder.createDestroyAddr(address: allocStack)
+    builder.createDeallocStack(allocStack)
+    context.erase(instruction: self)
+    return destroyAddr
+  }
+}
+
+extension DestroyAddrInst : DevirtualizableDestroy {
+  fileprivate var shouldDropDeinit: Bool {
+    // The deinit is always called by a destroy_addr. There must not be a `drop_deinit` as operand.
+    false
+  }
+
+  fileprivate func createDeinitCall(to deinitializer: Function, _ context: some MutatingContext) {
+    let builder = Builder(before: self, context)
+    let subs = context.getContextSubstitutionMap(for: destroyedAddress.type)
+    let deinitRef = builder.createFunctionRef(deinitializer)
+    if !deinitializer.argumentConventions[deinitializer.selfArgumentIndex!].isIndirect {
+      let value = builder.createLoad(fromAddress: destroyedAddress, ownership: .take)
+      builder.createApply(function: deinitRef, subs, arguments: [value])
+    } else {
+      builder.createApply(function: deinitRef, subs, arguments: [destroyedAddress])
+    }
+  }
+
+  fileprivate func devirtualizeStructFields(isMandatory: Bool, _ context: some MutatingContext) -> Bool {
+    let builder = Builder(before: self, context)
+
+    guard let fields = type.getNominalFields(in: parentFunction) else {
+      return false
+    }
+    defer {
+      context.erase(instruction: self)
+    }
+    if fields.allFieldsAreTrivial(in: parentFunction) {
+      builder.createEndLifetime(of: operand.value)
+      return true
+    }
+    var result = true
+    for (fieldIdx, fieldTy) in fields.enumerated()
+      where !fieldTy.isTrivial(in: parentFunction)
+    {
+      let fieldAddr = builder.createStructElementAddr(structAddress: destroyedAddress, fieldIndex: fieldIdx)
+      let destroyField = builder.createDestroyAddr(address: fieldAddr)
+      if !devirtualizeDeinits(of: destroyField, isMandatory: isMandatory, context) {
+        result = false
+      }
+    }
+    return result
+  }
+
+  fileprivate func devirtualizeEnumPayload(
+    enumCase: EnumCase,
+    in block: BasicBlock,
+    isMandatory: Bool,
+    _ context: some MutatingContext
+  ) -> Bool {
+    let builder = Builder(atBeginOf: block, location: location, context)
+    if let payloadTy = enumCase.payload,
+       !payloadTy.isTrivial(in: parentFunction)
+    {
+      let caseAddr = builder.createUncheckedTakeEnumDataAddr(enumAddress: destroyedAddress, caseIndex: enumCase.index)
+      let destroyPayload = builder.createDestroyAddr(address: caseAddr)
+      return devirtualizeDeinits(of: destroyPayload, isMandatory: isMandatory, context)
+    }
+    return true
+  }
+
+  fileprivate func createSwitchEnum(
+    atEndOf block: BasicBlock,
+    cases: [(Int, BasicBlock)],
+    _ context: some MutatingContext
+  ) {
+    let builder = Builder(atEndOf: block, location: location, context)
+    builder.createSwitchEnumAddr(enumAddress: destroyedAddress, cases: cases)
+  }
+
+  fileprivate func materializeAsDestroyAddr(_ context: some MutatingContext) -> DestroyAddrInst {
+    return self
+  }
+}
+
+private func devirtualize(builtinDestroyArray: BuiltinInst,
+                          isMandatory: Bool,
+                          _ context: some MutatingContext
+) -> Bool {
+  let function = builtinDestroyArray.parentFunction
+  let elementType = builtinDestroyArray.substitutionMap.replacementType.loweredType(in: function)
+  guard elementType.isMoveOnly,
+        // This avoids lowering the loop if the element is a non-copyable generic type.
+        (elementType.isStruct || elementType.isEnum || elementType.isBuiltinFixedArray)
+  else {
+    return true
+  }
+
+  // Lower the `builtin "destroyArray" to a loop which destroys all elements
+
+  let builder = Builder(before: builtinDestroyArray, context)
+  let baseAddress = builder.createPointerToAddress(pointer: builtinDestroyArray.arguments[1],
+                                                   addressType: elementType.addressType,
+                                                   isStrict: true, isInvariant: false)
+
+  let success = createArrayDestroyLoop(baseAddress: baseAddress,
+                                       arrayCount: builtinDestroyArray.arguments[2],
+                                       elementType: elementType,
+                                       insertionPoint: builtinDestroyArray,
+                                       isMandatory: isMandatory,
+                                       context)
+
+  context.erase(instruction: builtinDestroyArray)
+  return success
+}
+
+private func createArrayDestroyLoop(baseAddress: Value,
+                                    arrayCount: Value,
+                                    elementType: Type,
+                                    insertionPoint: Instruction,
+                                    isMandatory: Bool,
+                                    _ context: some MutatingContext
+) -> Bool {
+  let indexType = arrayCount.type
+  let boolType = context.getBuiltinIntegerType(bitWidth: 1)
+
+  let preheaderBlock = insertionPoint.parentBlock
+  let exitBlock = context.splitBlock(after: insertionPoint)
+  let headerBlock = context.createBlock(after: preheaderBlock)
+  let bodyBlock = context.createBlock(after: headerBlock)
+
+  let preheaderBuilder = Builder(atEndOf: preheaderBlock, location: insertionPoint.location, context)
+  let zero = preheaderBuilder.createIntegerLiteral(0, type: indexType)
+  let one = preheaderBuilder.createIntegerLiteral(1, type: indexType)
+  let falseValue = preheaderBuilder.createBoolLiteral(false);
+  preheaderBuilder.createBranch(to: headerBlock, arguments: [zero])
+
+  let inductionVariable = headerBlock.addArgument(type: indexType, ownership: .none, context)
+  let headerBuilder = Builder(atEndOf: headerBlock, location: insertionPoint.location, context)
+  let cmp = headerBuilder.createBuiltinBinaryFunction(name: "cmp_slt", operandType: indexType, resultType: boolType,
+                                                      arguments: [inductionVariable, arrayCount])
+  headerBuilder.createCondBranch(condition: cmp, trueBlock: bodyBlock, falseBlock: exitBlock)
+
+  let bodyBuilder = Builder(atEndOf: bodyBlock, location: insertionPoint.location, context)
+  let elementAddr = bodyBuilder.createIndexAddr(base: baseAddress, index: inductionVariable,
+                                                needStackProtection: false)
+  let destroy = bodyBuilder.createDestroyAddr(address: elementAddr)
+  let resultType = context.getTupleType(elements: [indexType, boolType]).loweredType(in: insertionPoint.parentFunction)
+  let increment = bodyBuilder.createBuiltinBinaryFunction(name: "sadd_with_overflow", operandType: indexType,
+                                                          resultType: resultType,
+                                                          arguments: [inductionVariable, one, falseValue])
+  let incrResult = bodyBuilder.createTupleExtract(tuple: increment, elementIndex: 0)
+  bodyBuilder.createBranch(to: headerBlock, arguments: [incrResult])
+
+  return devirtualize(destroy: destroy, isMandatory: isMandatory, context)
+}
+
+private extension EnumCases {
+  func allPayloadsAreTrivial(in function: Function) -> Bool {
+    allSatisfy({ $0.payload?.isTrivial(in: function) ?? true })
+  }
+}
+
+private extension NominalFieldsArray {
+  func allFieldsAreTrivial(in function: Function) -> Bool {
+    allSatisfy({ $0.isTrivial(in: function)})
+  }
+}

@@ -9,5 +9,5 @@ extension protocol<X, Y> {
 extension AnyObject {
     func x() { #^B^# }
 }
-// Sanity check results.
+// Soundness check results.
 // CHECK:  Keyword[let]/None:                  let

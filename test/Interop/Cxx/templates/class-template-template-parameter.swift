@@ -14,13 +14,19 @@ TemplatesTestSuite.test("typedeffed-template-template-parameter") {
   expectEqual(templatedWrappedMagicInt.getValuePlusTwiceTheArg(10), 62)
 }
 
-// TODO(SR-13261): test below doesn't work because Swift needs concrete generic
-// arguments for MagicWrapper.
+// TODO: Test below doesn't work because Swift needs concrete generic
+// arguments for 'MagicWrapper' (https://github.com/apple/swift/issues/55701).
 // TemplatesTestSuite.test("template-template-parameter") {
 //   let myInt = IntWrapper(value: 42)
 //   var magicInt = MagicWrapper<IntWrapper>(t: myInt)
 //   var templatedWrappedMagicInt = TemplatedMagicWrapper<MagicWrapper>(i: magicInt)
 //   expectEqual(templatedWrappedMagicInt.getValuePlusTwiceTheArg(10), 62)
 // }
+
+TemplatesTestSuite.test("template-template-parameter-distinct-names") {
+  var x = HasTraits1()
+  var y = HasTraits2()
+  var z = HasNestedTraits()
+}
 
 runAllTests()

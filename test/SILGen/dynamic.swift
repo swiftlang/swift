@@ -2,8 +2,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-silgen-test-overlays
 
-// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift | %FileCheck %s
-// RUN: %target-swift-emit-sil(mock-sdk: -sdk %S/Inputs -I %t) -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -verify
+// RUN: %target-swift-emit-silgen(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift | %FileCheck %s
+// RUN: %target-swift-emit-sil(mock-sdk: -sdk %S/Inputs -I %t) -Xllvm -sil-print-types -module-name dynamic -Xllvm -sil-full-demangle -primary-file %s %S/Inputs/dynamic_other.swift -verify
 
 // REQUIRES: objc_interop
 
@@ -409,9 +409,9 @@ func objcMethodDispatchFromOtherFile() {
   // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.objcProp!setter :
   c.objcProp = x
   // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!getter :
-  let y = c[objc: 0]
+  let y = c[objc: 0 as AnyObject]
   // CHECK: class_method {{%.*}} : $FromOtherFile, #FromOtherFile.subscript!setter :
-  c[objc: 0] = y
+  c[objc: 0 as AnyObject] = y
 }
 
 // CHECK-LABEL: sil hidden [ossa] @$s7dynamic0A27MethodDispatchFromOtherFileyyF : $@convention(thin) () -> ()
@@ -466,14 +466,14 @@ public class Base {
 public class Sub : Base {
   // CHECK-LABEL: sil hidden [ossa] @$s7dynamic3SubC1xSbvg : $@convention(method) (@guaranteed Sub) -> Bool {
   // CHECK: bb0([[SELF:%.*]] : @guaranteed $Sub):
-  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @$s7dynamic3SubC1xSbvgSbyKXEfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error)
+  // CHECK:     [[AUTOCLOSURE:%.*]] = function_ref @$s7dynamic3SubC1xSbvgSbyKXEfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error any Error)
   // CHECK:     [[SELF_COPY:%.*]] = copy_value [[SELF]]
   // CHECK:     = partial_apply [callee_guaranteed] [[AUTOCLOSURE]]([[SELF_COPY]])
   // CHECK:     return {{%.*}} : $Bool
   // CHECK: } // end sil function '$s7dynamic3SubC1xSbvg'
 
-  // CHECK-LABEL: sil private [transparent] [ossa] @$s7dynamic3SubC1xSbvgSbyKXEfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error Error) {
-  // CHECK: bb0([[VALUE:%.*]] : @guaranteed $Sub):
+  // CHECK-LABEL: sil private [transparent] [ossa] @$s7dynamic3SubC1xSbvgSbyKXEfu_ : $@convention(thin) (@guaranteed Sub) -> (Bool, @error any Error) {
+  // CHECK: bb0([[VALUE:%.*]] : @closureCapture @guaranteed $Sub):
   // CHECK:     [[VALUE_COPY:%.*]] = copy_value [[VALUE]]
   // CHECK:     [[CAST_VALUE_COPY:%.*]] = upcast [[VALUE_COPY]]
   // CHECK:     [[BORROWED_CAST_VALUE_COPY:%.*]] = begin_borrow [[CAST_VALUE_COPY]]

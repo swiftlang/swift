@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -o %t/newSDK %target-link-sdk-future-version
+// RUN: %target-build-swift %s -o %t/newSDK %target-link-sdk-2021-version
 // RUN: %target-codesign %t/newSDK
 // RUN: %target-run %t/newSDK newSDK
 // RUN: %target-build-swift %s -o %t/oldSDK %target-link-sdk-2020-version
@@ -13,6 +13,7 @@
 // UNSUPPORTED: DARWIN_SIMULATOR=ios
 // UNSUPPORTED: DARWIN_SIMULATOR=tvos
 // UNSUPPORTED: DARWIN_SIMULATOR=watchos
+// UNSUPPORTED: DARWIN_SIMULATOR=xros
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

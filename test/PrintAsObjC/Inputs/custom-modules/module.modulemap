@@ -1,0 +1,70 @@
+module Base {
+  module ImplicitSub {
+    header "Base.ImplicitSub.h"
+    module ImSub {
+      header "Base.ImplicitSub.ImSub.h"
+    }
+    explicit module ExSub {
+      header "Base.ImplicitSub.ExSub.h"
+    }
+  }
+  explicit module ExplicitSub {
+    header "Base.ExplicitSub.h"
+    module ImSub {
+      header "Base.ExplicitSub.ImSub.h"
+    }
+    explicit module ExSub {
+      header "Base.ExplicitSub.ExSub.h"
+    }
+  }
+}
+
+module SingleGenericClass {
+  header "SingleGenericClass.h"
+  export *
+}
+
+module OverrideBase [system] {
+  header "override.h"
+  export *
+}
+
+module OtherModule {
+  // Deliberately empty. Used by depends-on-swift-framework.swift.
+}
+
+module CompatibilityAlias {
+  header "CompatibilityAlias.h"
+  export *
+}
+
+module VersionedFMWK {
+  header "VersionedFMWK.h"
+  export *
+}
+
+module resilient_objc_class {
+  header "resilient_objc_class.h"
+  export *
+}
+
+module MiserablePileOfSecrets {
+  header "MiserablePileOfSecrets.h"
+  export *
+}
+
+module EmitClangHeaderNonmodularIncludesStressTest {
+  header "header_subdirectory/header-regular.h"
+  header "header_subdirectory/header-symlink.h"
+  export *
+}
+
+module objc_implementation {
+  header "objc_implementation/objc_implementation.h"
+  export *
+}
+
+module bridging_header {
+  header "bridging_header/bridging_header.h"
+  export *
+}

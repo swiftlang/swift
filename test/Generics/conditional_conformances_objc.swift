@@ -37,6 +37,6 @@ extension ObjC.Class: Bar where T: Bar {}
 class X<T> {}
 
 extension X: ObjCProtocol where T: Foo {}
-// expected-error@-1{{type 'X<T>' cannot conditionally conform to @objc protocol 'ObjCProtocol' because Objective-C does not support conditional conformances}}
+// expected-error@-1{{type 'X<T>' cannot conditionally conform to '@objc' protocol 'ObjCProtocol' because Objective-C does not support conditional conformances}}
 extension X: AtObjCProtocol where T: Foo {}
-// expected-error@-1{{type 'X<T>' cannot conditionally conform to @objc protocol 'AtObjCProtocol' because Objective-C does not support conditional conformances}}
+// expected-error@-1{{type 'X<T>' cannot conditionally conform to '@objc' protocol 'AtObjCProtocol' because Objective-C does not support conditional conformances}}

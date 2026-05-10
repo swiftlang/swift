@@ -106,8 +106,8 @@ class OuterGenericClass<T> {
   }
 
   class Middle {
-    class Inner1<T> {}
-    class Inner2<T> : Middle where T: Inner1<Int> {}
+    class Inner1<U> {}
+    class Inner2<U> : Middle where U: Inner1<Int> {}
   }
 }
 
@@ -205,7 +205,7 @@ struct GS<T> { //expected-note {{arguments to generic parameter 'T' ('T' and 'In
     }
   }
 
-  struct NestedGeneric<U> { // expected-note{{generic type 'NestedGeneric' declared here}}
+  struct NestedGeneric<U> { // expected-note{{generic struct 'NestedGeneric' declared here}}
     func fff() -> (GS, NestedGeneric) {
       let gs = GS()
       let ns = NestedGeneric()
@@ -340,7 +340,9 @@ class DerivedClass : BaseClass {
   }
 }
 
-// https://bugs.swift.org/browse/SR-3847: Resolve members in inner types.
+// https://github.com/apple/swift/issues/46432
+// Resolve members in inner types.
+//
 // This first extension isn't necessary; we could have put 'originalValue' in
 // the original declaration.
 extension OuterNonGenericClass.InnerNonGenericBase {
@@ -372,7 +374,8 @@ extension OuterGeneric.MidGeneric where D == Int, F == String {
   }
 }
 
-// https://bugs.swift.org/browse/SR-4672
+// https://github.com/apple/swift/issues/47249
+
 protocol ExpressibleByCatLiteral {}
 protocol ExpressibleByDogLiteral {}
 
@@ -380,7 +383,7 @@ struct Kitten : ExpressibleByCatLiteral {}
 struct Puppy : ExpressibleByDogLiteral {}
 
 struct Claws<A: ExpressibleByCatLiteral> { // expected-note 3 {{'A' declared as parameter to type 'Claws'}}
-  struct Fangs<B: ExpressibleByDogLiteral> { } // expected-note {{where 'B' = 'NotADog'}}
+  struct Fangs<B: ExpressibleByDogLiteral> { } // expected-note 3 {{where 'B' = 'NotADog'}}
 }
 
 struct NotADog {}
@@ -393,10 +396,10 @@ func something<T>() -> T {
   while true {}
 }
 
-func test() {
+do {
   let _: Claws<Kitten>.Fangs<Puppy> = pets(fur: Puppy())
 
-  // <https://bugs.swift.org/browse/SR-5600>
+  // https://github.com/apple/swift/issues/48172
   let _: Claws.Fangs<Puppy> = pets(fur: Puppy())
   let _: Claws.Fangs<Puppy> = Claws<Kitten>.Fangs()
   let _: Claws.Fangs<Puppy> = Claws.Fangs()
@@ -404,13 +407,18 @@ func test() {
   // expected-note@-2 {{explicitly specify the generic arguments to fix this issue}} {{36-36=<<#A: ExpressibleByCatLiteral#>>}}
   let _: Claws.Fangs<NotADog> = something()
   // expected-error@-1 {{generic parameter 'A' could not be inferred}}
+  // expected-error@-2 {{generic struct 'Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
+
+  // FIXME: We get a duplicate diagnostic here because we don't differentiate
+  // constraint locators when opening generic requirements, we just use a
+  // locator for the top-level TypeRepr.
   _ = Claws.Fangs<NotADog>()
   // expected-error@-1 {{generic parameter 'A' could not be inferred}}
-  // expected-error@-2 {{generic struct 'Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
+  // expected-error@-2 2{{generic struct 'Fangs' requires that 'NotADog' conform to 'ExpressibleByDogLiteral'}}
   // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}} {{12-12=<<#A: ExpressibleByCatLiteral#>>}}
 }
 
-// https://bugs.swift.org/browse/SR-4379
+// https://github.com/apple/swift/issues/46958
 extension OuterGeneric.MidNonGeneric {
   func doStuff() -> OuterGeneric {
     return OuterGeneric()
@@ -422,5 +430,19 @@ extension OuterGeneric.MidNonGeneric {
 
   func doMoreStuffWrong() -> Self {
 
+  }
+}
+
+protocol P {}
+
+struct A<T> {}
+extension A where T: P { // expected-note {{where 'T' = 'T'}}
+  struct B<U> {
+    init(_ u: U) {}
+  }
+}
+extension A {
+  func bar() {
+    B(0) // expected-error {{referencing generic struct 'B' on 'A' requires that 'T' conform to 'P'}}
   }
 }

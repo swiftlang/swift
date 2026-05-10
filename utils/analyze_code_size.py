@@ -154,6 +154,7 @@ class Categories(object):
             ['@objc thunk', re.compile(r'@objc')],
             ['@nonobjc thunk', re.compile(r'@nonobjc')],
             ['Value witness', re.compile(r'.*value witness for')],
+            ['Type layout string', re.compile(r'.*type_layout_string')],
             ['Block copy helper', re.compile(r'_block_copy_helper')],
             ['Block destroy helper', re.compile(r'_block_destroy_helper')],
             ['Block literal global', re.compile(r'___block_literal_global')],
@@ -440,14 +441,14 @@ class Categories(object):
                       (category[0], category[1], category[2]))
         print("%60s: %8d (%6.2f%%)" % ('TOTAL', total_size, float(100)))
 
-    def uncatorizedSymbols(self):
+    def uncategorizedSymbols(self):
         category = self.categories.get('Unknown')
         if category:
             return category.symbols
         return None
 
     def print_uncategorizedSymbols(self):
-        syms = self.uncatorizedSymbols()
+        syms = self.uncategorizedSymbols()
         if syms:
             for symbol in syms:
                 print(symbol.mangled_name + " " + symbol.name + " " +

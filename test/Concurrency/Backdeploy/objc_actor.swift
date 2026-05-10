@@ -5,6 +5,7 @@
 // REQUIRES: OS=macosx
 // REQUIRES: executable_test
 // REQUIRES: concurrency_runtime
+// REQUIRES: objc_interop
 // UNSUPPORTED: back_deployment_runtime
 
 import Foundation

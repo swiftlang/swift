@@ -83,6 +83,9 @@ precedencegroup D {
 precedencegroup E {
   higherThan:
 } // expected-error {{expected name of related precedence group after 'higherThan'}}
+precedencegroup EE {
+  higherThan: E,
+} // expected-error {{expected name of related precedence group after 'higherThan'}}
 
 precedencegroup F {
   higherThan: A, B, C
@@ -110,3 +113,8 @@ protocol Proto {}
 infix operator *<*< : F, Proto
 // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
 // expected-error@-2 {{expected expression}}
+
+// https://github.com/apple/swift/issues/60932
+
+// expected-error@+2 {{expected precedence group name after ':' in operator declaration}}
+postfix operator ++: // expected-error {{only infix operators may declare a precedence}} {{20-21=}}

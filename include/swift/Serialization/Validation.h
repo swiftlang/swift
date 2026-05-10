@@ -13,15 +13,25 @@
 #ifndef SWIFT_SERIALIZATION_VALIDATION_H
 #define SWIFT_SERIALIZATION_VALIDATION_H
 
+#include "swift/AST/Identifier.h"
+#include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LangOptions.h"
+#include "swift/Basic/SourceLoc.h"
+#include "swift/Basic/Version.h"
+#include "swift/Parse/ParseVersion.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/TargetParser/Triple.h"
 
 namespace swift {
 
 class ModuleFile;
+enum class CodeGenerationModel: uint8_t;
+struct ExplicitSwiftModuleMap;
+struct ExplicitClangModuleMap;
 enum class ResilienceStrategy : unsigned;
 
 namespace serialization {
@@ -42,8 +52,8 @@ enum class Status {
   /// The precise revision version doesn't match.
   RevisionIncompatible,
 
-  /// The module is required to be in OSSA, but is not.
-  NotInOSSA,
+  /// The distribution channel doesn't match.
+  ChannelIncompatible,
 
   /// The module file depends on another module that can't be loaded.
   MissingDependency,
@@ -76,8 +86,15 @@ enum class Status {
 
   /// The module file was built with a different SDK than the one in use
   /// to build the client.
-  SDKMismatch
+  SDKMismatch,
+
+  /// The module file was built for embedded and is being used with a
+  /// non-embedded client, or vice-versa.
+  EmbeddedMismatch,
 };
+
+/// Returns the string for the Status enum.
+std::string StatusToString(Status S);
 
 /// Returns true if the data looks like it contains a serialized AST.
 bool isSerializedAST(StringRef data);
@@ -91,8 +108,12 @@ struct ValidationInfo {
   version::Version compatibilityVersion = {};
   llvm::VersionTuple userModuleVersion;
   StringRef sdkName = {};
+  StringRef sdkVersion = {};
+  StringRef problematicRevision = {};
+  StringRef problematicChannel = {};
   size_t bytes = 0;
   Status status = Status::Malformed;
+  std::vector<StringRef> allowableClients;
 };
 
 /// A collection of options that can be used to set up a new AST context
@@ -104,19 +125,39 @@ struct ValidationInfo {
 /// \sa validateSerializedAST()
 class ExtendedValidationInfo {
   SmallVector<StringRef, 4> ExtraClangImporterOpts;
+
+  SmallVector<std::pair<PluginSearchOption::Kind, StringRef>, 2>
+      PluginSearchOptions;
+
   std::string SDKPath;
   StringRef ModuleABIName;
+  StringRef ModulePackageName;
+  StringRef ExportAsName;
+  StringRef PublicModuleName;
+  StringRef OSLogStringSectionName;
+  CXXStdlibKind CXXStdlib;
+  version::Version SwiftInterfaceCompilerVersion;
   struct {
     unsigned ArePrivateImportsEnabled : 1;
     unsigned IsSIB : 1;
     unsigned IsStaticLibrary : 1;
     unsigned HasHermeticSealAtLink : 1;
+    unsigned IsEmbeddedSwiftModule : 1;
     unsigned IsTestable : 1;
     unsigned ResilienceStrategy : 2;
     unsigned IsImplicitDynamicEnabled : 1;
+    unsigned IsBuiltFromInterface : 1;
     unsigned IsAllowModuleWithCompilerErrorsEnabled : 1;
     unsigned IsConcurrencyChecked : 1;
+    unsigned HasCxxInteroperability : 1;
+    unsigned AllowNonResilientAccess: 1;
+    unsigned SerializePackageEnabled: 1;
+    unsigned StrictMemorySafety: 1;
+    unsigned CodeGenModel: 2;
+    unsigned AggressiveCMOEnabled : 1;
+    unsigned LibraryLevel : 2;
   } Bits;
+
 public:
   ExtendedValidationInfo() : Bits() {}
 
@@ -131,6 +172,15 @@ public:
   }
   void addExtraClangImporterOption(StringRef option) {
     ExtraClangImporterOpts.push_back(option);
+  }
+
+  ArrayRef<std::pair<PluginSearchOption::Kind, StringRef>>
+  getPluginSearchOptions() const {
+    return PluginSearchOptions;
+  }
+  void addPluginSearchOption(
+      const std::pair<PluginSearchOption::Kind, StringRef> &opt) {
+    PluginSearchOptions.push_back(opt);
   }
 
   bool isSIB() const { return Bits.IsSIB; }
@@ -153,6 +203,10 @@ public:
   void setHasHermeticSealAtLink(bool val) {
     Bits.HasHermeticSealAtLink = val;
   }
+  bool isEmbeddedSwiftModule() const { return Bits.IsEmbeddedSwiftModule; }
+  void setIsEmbeddedSwiftModule(bool val) {
+    Bits.IsEmbeddedSwiftModule = val;
+  }
   bool isTestable() const { return Bits.IsTestable; }
   void setIsTestable(bool val) {
     Bits.IsTestable = val;
@@ -162,6 +216,18 @@ public:
   }
   void setResilienceStrategy(ResilienceStrategy resilience) {
     Bits.ResilienceStrategy = unsigned(resilience);
+  }
+  bool isBuiltFromInterface() const { return Bits.IsBuiltFromInterface; }
+  void setIsBuiltFromInterface(bool val) {
+    Bits.IsBuiltFromInterface = val;
+  }
+  bool allowNonResilientAccess() const { return Bits.AllowNonResilientAccess; }
+  void setAllowNonResilientAccess(bool val) {
+    Bits.AllowNonResilientAccess = val;
+  }
+  bool serializePackageEnabled() const { return Bits.SerializePackageEnabled; }
+  void setSerializePackageEnabled(bool val) {
+    Bits.SerializePackageEnabled = val;
   }
   bool isAllowModuleWithCompilerErrorsEnabled() {
     return Bits.IsAllowModuleWithCompilerErrorsEnabled;
@@ -173,12 +239,76 @@ public:
   StringRef getModuleABIName() const { return ModuleABIName; }
   void setModuleABIName(StringRef name) { ModuleABIName = name; }
 
+  StringRef getModulePackageName() const { return ModulePackageName; }
+  void setModulePackageName(StringRef name) { ModulePackageName = name; }
+
+  StringRef getPublicModuleName() const { return PublicModuleName; }
+  void setPublicModuleName(StringRef name) { PublicModuleName = name; }
+
+  StringRef getOSLogStringSectionName() const { return OSLogStringSectionName; }
+  void setOSLogStringSectionName(StringRef name) {
+    OSLogStringSectionName = name;
+  }
+
+  StringRef getExportAsName() const { return ExportAsName; }
+  void setExportAsName(StringRef name) { ExportAsName = name; }
+
   bool isConcurrencyChecked() const {
     return Bits.IsConcurrencyChecked;
   }
   void setIsConcurrencyChecked(bool val = true) {
     Bits.IsConcurrencyChecked = val;
   }
+  bool strictMemorySafety() const {
+    return Bits.StrictMemorySafety;
+  }
+  void setStrictMemorySafety(bool val = true) {
+    Bits.StrictMemorySafety = val;
+  }
+
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.CodeGenModel);
+  }
+  void setCodeGenerationModel(CodeGenerationModel val) {
+    Bits.CodeGenModel = static_cast<unsigned>(val);
+  }
+
+  bool isAggressiveCMOEnabled() const {
+    return Bits.AggressiveCMOEnabled;
+  }
+  void setAggressiveCMOEnabled(bool val = true) {
+    Bits.AggressiveCMOEnabled = val;
+  }
+
+  LibraryLevel getLibraryLevel() const {
+    return LibraryLevel(Bits.LibraryLevel);
+  }
+  void setLibraryLevel(LibraryLevel level) {
+    Bits.LibraryLevel = unsigned(level);
+  }
+
+  bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
+  void setHasCxxInteroperability(bool val) {
+    Bits.HasCxxInteroperability = val;
+  }
+
+  CXXStdlibKind getCXXStdlibKind() const { return CXXStdlib; }
+  void setCXXStdlibKind(CXXStdlibKind kind) { CXXStdlib = kind; }
+
+  version::Version getSwiftInterfaceCompilerVersion() const {
+    return SwiftInterfaceCompilerVersion;
+  }
+  void setSwiftInterfaceCompilerVersion(StringRef version) {
+    if (auto genericVersion = VersionParser::parseVersionString(
+            version, SourceLoc(), /*Diags=*/nullptr))
+      SwiftInterfaceCompilerVersion = genericVersion.value();
+  }
+};
+
+struct SearchPath {
+  std::string Path;
+  bool IsFramework;
+  bool IsSystem;
 };
 
 /// Returns info about the serialized AST in the given data.
@@ -194,20 +324,25 @@ public:
 ///
 /// \param data A buffer containing the serialized AST. Result information
 /// refers directly into this buffer.
-/// \param requiresOSSAModules If true, necessitates the module to be
-/// compiled with -enable-ossa-modules.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
+/// \param target The target triple of the current compilation for
+/// validating that the module we are attempting to load is compatible.
 /// \param[out] extendedInfo If present, will be populated with additional
 /// compilation options serialized into the AST at build time that may be
 /// necessary to load it properly.
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules, StringRef requiredSDK,
+    StringRef data, StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
-        nullptr);
+        nullptr,
+    SmallVectorImpl<SearchPath> *searchPaths = nullptr,
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap = nullptr,
+    ExplicitClangModuleMap *explicitClangModuleMa = nullptr,
+    std::optional<llvm::Triple> target = std::nullopt,
+    std::optional<bool> isEmbedded = std::nullopt);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.
 ///
@@ -225,6 +360,28 @@ void diagnoseSerializedASTLoadFailure(
     ASTContext &Ctx, SourceLoc diagLoc, const ValidationInfo &loadInfo,
     StringRef moduleBufferID, StringRef moduleDocBufferID,
     ModuleFile *loadedModuleFile, Identifier ModuleName);
+
+/// Emit diagnostics explaining a failure to load a serialized AST,
+/// this version only supports diagnostics relevant to transitive dependencies:
+/// missing dependency, missing underlying module, or circular dependency.
+///
+/// \see diagnoseSerializedASTLoadFailure that supports all diagnostics.
+///
+/// - \p Ctx is an AST context through which any diagnostics are surfaced.
+/// - \p diagLoc is the (possibly invalid) location used in the diagnostics.
+/// - \p status describes the issue with loading the AST. It must not be
+///   Status::Valid.
+/// - \p loadedModuleFile is an invalid loaded module.
+/// - \p ModuleName is the name used to refer to the module in diagnostics.
+/// - \p forTestable indicates if we loaded the AST for a @testable import.
+void diagnoseSerializedASTLoadFailureTransitive(
+    ASTContext &Ctx, SourceLoc diagLoc, const serialization::Status status,
+    ModuleFile *loadedModuleFile, Identifier ModuleName, bool forTestable);
+
+/// Determine whether two triples are considered to be compatible for module
+/// serialization purposes.
+bool areCompatible(const llvm::Triple &moduleTarget,
+                   const llvm::Triple &ctxTarget);
 
 } // end namespace serialization
 } // end namespace swift

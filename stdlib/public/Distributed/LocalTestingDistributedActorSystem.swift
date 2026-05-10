@@ -12,10 +12,14 @@
 
 import Swift
 
-#if canImport(Darwin)
-import Darwin
+#if canImport(Darwin.os.lock)
+import Darwin.os.lock
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
+#elseif canImport(Android)
+import Android
 #elseif os(Windows)
 import WinSDK
 #endif
@@ -27,7 +31,7 @@ import WinSDK
 /// prototyping stages of development where a real system is not necessary yet.
 @available(SwiftStdlib 5.7, *)
 public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @unchecked Sendable {
-  public typealias ActorID = LocalTestingActorAddress
+  public typealias ActorID = LocalTestingActorID
   public typealias ResultHandler = LocalTestingInvocationResultHandler
   public typealias InvocationEncoder = LocalTestingInvocationEncoder
   public typealias InvocationDecoder = LocalTestingInvocationDecoder
@@ -43,7 +47,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   public init() {}
 
   public func resolve<Act>(id: ActorID, as actorType: Act.Type)
-    throws -> Act? where Act: DistributedActor, Act.ID == ActorID {
+    throws -> Act? where Act: DistributedActor {
     guard let anyActor = self.activeActorsLock.withLock({ self.activeActors[id] }) else {
       throw LocalTestingDistributedActorSystemError(message: "Unable to locate id '\(id)' locally")
     }
@@ -54,7 +58,7 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
   }
 
   public func assignID<Act>(_ actorType: Act.Type) -> ActorID
-    where Act: DistributedActor, Act.ID == ActorID {
+    where Act: DistributedActor {
     let id = self.idProvider.next()
     self.assignedIDsLock.withLock {
       self.assignedIDs.insert(id)
@@ -114,12 +118,12 @@ public final class LocalTestingDistributedActorSystem: DistributedActorSystem, @
 
     init() {}
 
-    mutating func next() -> LocalTestingActorAddress {
+    mutating func next() -> LocalTestingActorID {
       let id: Int = self.counterLock.withLock {
         self.counter += 1
         return self.counter
       }
-      return LocalTestingActorAddress(parse: "\(id)")
+      return LocalTestingActorID(id: "\(id)")
     }
   }
 }
@@ -232,8 +236,9 @@ public struct LocalTestingDistributedActorSystemError: DistributedActorSystemErr
 // === lock ----------------------------------------------------------------
 
 @available(SwiftStdlib 5.7, *)
+@safe
 fileprivate class _Lock {
-  #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+  #if os(anyAppleOS)
   private let underlying: UnsafeMutablePointer<os_unfair_lock>
   #elseif os(Windows)
   private let underlying: UnsafeMutablePointer<SRWLOCK>
@@ -246,65 +251,65 @@ fileprivate class _Lock {
   #endif
 
   init() {
-    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    self.underlying.initialize(to: os_unfair_lock())
+    #if os(anyAppleOS)
+    unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    unsafe self.underlying.initialize(to: os_unfair_lock())
     #elseif os(Windows)
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    InitializeSRWLock(self.underlying)
+    unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    unsafe InitializeSRWLock(self.underlying)
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
-    self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
-    guard pthread_mutex_init(self.underlying, nil) == 0 else {
+    unsafe self.underlying = UnsafeMutablePointer.allocate(capacity: 1)
+    guard unsafe pthread_mutex_init(self.underlying, nil) == 0 else {
       fatalError("pthread_mutex_init failed")
     }
     #endif
   }
 
   deinit {
-    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+    #if os(anyAppleOS)
     // `os_unfair_lock`s do not need to be explicitly destroyed
     #elseif os(Windows)
     // `SRWLOCK`s do not need to be explicitly destroyed
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
-    guard pthread_mutex_destroy(self.underlying) == 0 else {
+    guard unsafe pthread_mutex_destroy(self.underlying) == 0 else {
       fatalError("pthread_mutex_destroy failed")
     }
     #endif
 
     #if !os(WASI)
-    self.underlying.deinitialize(count: 1)
-    self.underlying.deallocate()
+    unsafe self.underlying.deinitialize(count: 1)
+    unsafe self.underlying.deallocate()
     #endif
   }
 
 
   @discardableResult
   func withLock<T>(_ body: () -> T) -> T {
-    #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-    os_unfair_lock_lock(self.underlying)
+    #if os(anyAppleOS)
+    unsafe os_unfair_lock_lock(self.underlying)
     #elseif os(Windows)
-    AcquireSRWLockExclusive(self.underlying)
+    unsafe AcquireSRWLockExclusive(self.underlying)
     #elseif os(WASI)
     // WASI environment has only a single thread
     #else
-    guard pthread_mutex_lock(self.underlying) == 0 else {
+    guard unsafe pthread_mutex_lock(self.underlying) == 0 else {
       fatalError("pthread_mutex_lock failed")
     }
     #endif
 
     defer {
-      #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
-      os_unfair_lock_unlock(self.underlying)    
+      #if os(anyAppleOS)
+      unsafe os_unfair_lock_unlock(self.underlying)    
       #elseif os(Windows)
-      ReleaseSRWLockExclusive(self.underlying)
+      unsafe ReleaseSRWLockExclusive(self.underlying)
       #elseif os(WASI)
       // WASI environment has only a single thread
       #else
-      guard pthread_mutex_unlock(self.underlying) == 0 else {
+      guard unsafe pthread_mutex_unlock(self.underlying) == 0 else {
         fatalError("pthread_mutex_unlock failed")
       }
       #endif

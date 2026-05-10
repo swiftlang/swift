@@ -72,7 +72,6 @@ func f1() {
 	I3 = #^ASSIGN_1^#
 }
 
-// ASSIGN_1: Begin completions
 // ASSIGN_1-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]:               	I3[#Int#]; name=I3
 // ASSIGN_1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      	I1[#Int#]; name=I1
 // ASSIGN_1-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      	I2[#Int#]; name=I2
@@ -85,7 +84,6 @@ func f2() {
 	I3 = #^ASSIGN_2^#
 }
 
-// ASSIGN_2-DAG: Begin completions
 // ASSIGN_2-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]:               		I3[#Int?#]; name=I3
 // ASSIGN_2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      	I1[#Int#]; name=I1
 // ASSIGN_2-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:      	I2[#Int#]; name=I2
@@ -99,7 +97,6 @@ func f2() {
 		S3 = #^ASSIGN_3^#
 	}
 
-// ASSIGN_3-DAG: Begin completions
 // ASSIGN_3-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]:                S3[#String#]; name=S3
 // ASSIGN_3-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:       S1[#String#]; name=S1
 // ASSIGN_3-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:       S2[#String#]; name=S2
@@ -112,7 +109,6 @@ func f2() {
 		S4 = #^ASSIGN_4^#
 	}
 
-// ASSIGN_4-DAG: Begin completions
 // ASSIGN_4-DAG: Decl[LocalVar]/Local/TypeRelation[Convertible]:                S4[#String?#]; name=S4
 // ASSIGN_4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:     S1[#String#]; name=S1
 // ASSIGN_4-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:     S2[#String#]; name=S2
@@ -146,7 +142,6 @@ func f2() {
     i = C.#^ASSIGN_7^#
   }
 
-// ASSIGN_7: Begin completions
 // ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]
 // ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_7-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
@@ -159,7 +154,6 @@ func f2() {
     i = C.#^ASSIGN_8^#
   }
 
-// ASSIGN_8: Begin completions
 // ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]
 // ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntOpGen()[#Int?#]
 // ASSIGN_8-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
@@ -172,7 +166,6 @@ func f2() {
     d = C.#^ASSIGN_9^#
   }
 
-// ASSIGN_9: Begin completions
 // ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_9-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: D1Gen()[#D1#]
@@ -185,7 +178,6 @@ func f2() {
     d = C.InternalC2.#^ASSIGN_10^#
   }
 
-// ASSIGN_10: Begin completions
 // ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_10-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: D1Gen()[#D1#]
@@ -197,7 +189,6 @@ func f2() {
     d = C.#^ASSIGN_11^#
   }
 
-// ASSIGN_11: Begin completions
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_11-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
@@ -210,7 +201,6 @@ func f2() {
     i = C2Gen().#^ASSIGN_12^#
   }
 
-// ASSIGN_12: Begin completions
 // ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]
 // ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_12-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
@@ -221,7 +211,6 @@ func f2() {
   func f13() {
     var i : Int = #^ASSIGN_13^#
   }
-// ASSIGN_13: Begin completions
 // ASSIGN_13-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:       I1[#Int#]; name=I1
 // ASSIGN_13-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:       I2[#Int#]; name=I2
 // ASSIGN_13-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]:    IntGenerator()[#Int#]; name=IntGenerator()
@@ -232,7 +221,6 @@ func f2() {
     let i : Int? = #^ASSIGN_14^#
   }
 
-// ASSIGN_14-DAG: Begin completions
 // ASSIGN_14-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:       I1[#Int#]; name=I1
 // ASSIGN_14-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:       I2[#Int#]; name=I2
 // ASSIGN_14-DAG: Decl[InstanceVar]/CurrNominal/TypeRelation[Convertible]:         IO1[#Int?#]; name=IO1
@@ -249,7 +237,6 @@ func f2() {
     var d : D1 = C.InternalC2.#^ASSIGN_16^#
   }
 
-// ASSIGN_16: Begin completions
 // ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_16-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: D1Gen()[#D1#]
@@ -261,7 +248,6 @@ func f2() {
     var i : Int = C2Gen().#^ASSIGN_17^#
   }
 
-// ASSIGN_17: Begin completions
 // ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: IntGen()[#Int#]
 // ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_17-DAG: Decl[InstanceMethod]/CurrNominal:   D1Gen()[#D1#]
@@ -273,7 +259,6 @@ func f2() {
     var d : D1 = C.#^ASSIGN_18^#
   }
 
-// ASSIGN_18: Begin completions
 // ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal:   IntGen()[#Int#]
 // ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal:   IntOpGen()[#Int?#]
 // ASSIGN_18-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: D1Gen()[#D1#]

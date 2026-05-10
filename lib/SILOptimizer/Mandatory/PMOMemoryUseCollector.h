@@ -28,12 +28,12 @@
 /// connections to Definite Initialization. This is because early in the
 /// development of Swift, Predictable Memory Optimizations and Definite
 /// Initialization were actually the same pass. The pass grew really big and the
-/// two passes were split, but still used similra utility code. This became the
+/// two passes were split, but still used similar utility code. This became the
 /// original DIMemoryUseCollector.*. This code was full of conditional logic for
 /// all of the various cases that made it difficult to understand which code was
 /// needed for Predictable Mem Opts and what was needed for DI. The introduction
 /// of the SIL ownership model to SIL was used as an opportunity to split the
-/// two, flatten the sphagetti conditional code so the logic was clear, and
+/// two, flatten the spaghetti conditional code so the logic was clear, and
 /// allow the two passes to diverge and hew their form closer to their function.
 ///
 //===----------------------------------------------------------------------===//
@@ -122,6 +122,9 @@ enum PMOUseKind {
   /// An indirect 'in' parameter of an Apply instruction.
   IndirectIn,
 
+  /// The base of a dependence.
+  DependenceBase,
+
   /// This instruction is a general escape of the value, e.g. a call to a
   /// closure that captures it.
   Escape,
@@ -145,13 +148,21 @@ struct PMOMemoryUse {
   bool isValid() const { return Inst != nullptr; }
 };
 
-/// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
-/// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
-/// and storing the information found into the Uses and Releases lists.
-LLVM_NODISCARD bool
+/// Analyze all uses of the specified allocation instruction (alloc_box,
+/// alloc_stack or mark_uninitialized), classifying them and storing the
+/// information found into the Uses lists.
+[[nodiscard]] bool
 collectPMOElementUsesFrom(const PMOMemoryObjectInfo &MemoryInfo,
-                          SmallVectorImpl<PMOMemoryUse> &Uses,
-                          SmallVectorImpl<SILInstruction *> &Releases);
+                          SmallVectorImpl<PMOMemoryUse> &Uses);
+
+/// Analyze all uses of the specified allocation instruction (alloc_box,
+/// alloc_stack or mark_uninitialized), classifying them and storing the
+/// information found into the Uses and Releases lists.
+[[nodiscard]] bool
+collectPMOElementUsesAndDestroysFrom(
+  const PMOMemoryObjectInfo &MemoryInfo,
+  SmallVectorImpl<PMOMemoryUse> &Uses,
+  SmallVectorImpl<SILInstruction *> &Releases);
 
 } // end namespace swift
 

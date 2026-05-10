@@ -10,7 +10,8 @@ if (BUILD_SOURCEKIT_XPC_SERVICE)
   else()
     target_link_libraries(SourceKitService PRIVATE
       SourceKitSwiftLang
-      sourcekitdAPI)
+      sourcekitdAPI
+      sourcekitdService)
   endif()
 endif()
 

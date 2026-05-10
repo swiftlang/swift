@@ -22,6 +22,7 @@
 #define DEBUG_TYPE "sil-simplify"
 
 #include "swift/SILOptimizer/Analysis/SimplifyInstruction.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
@@ -46,14 +47,11 @@ namespace {
     SILValue visitStructExtractInst(StructExtractInst *SEI);
     SILValue visitEnumInst(EnumInst *EI);
     SILValue visitSelectEnumInst(SelectEnumInst *SEI);
-    SILValue visitUncheckedEnumDataInst(UncheckedEnumDataInst *UEDI);
     SILValue visitAddressToPointerInst(AddressToPointerInst *ATPI);
-    SILValue visitPointerToAddressInst(PointerToAddressInst *PTAI);
     SILValue visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
     SILValue
     visitUnconditionalCheckedCastInst(UnconditionalCheckedCastInst *UCCI);
     SILValue visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI);
-    SILValue visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI);
     SILValue visitStructInst(StructInst *SI);
     SILValue visitTupleInst(TupleInst *SI);
     SILValue visitBuiltinInst(BuiltinInst *AI);
@@ -66,7 +64,6 @@ namespace {
     SILValue
     visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
     SILValue visitEndCOWMutationInst(EndCOWMutationInst *ECM);
-    SILValue visitBeginAccessInst(BeginAccessInst *BAI);
     SILValue visitMetatypeInst(MetatypeInst *MTI);
     SILValue visitConvertFunctionInst(ConvertFunctionInst *cfi);
 
@@ -166,22 +163,6 @@ SILValue InstSimplifier::visitStructExtractInst(StructExtractInst *sei) {
   // struct_extract(struct(x, y), x) -> x
   if (auto *si = dyn_cast<StructInst>(op))
     return si->getFieldValue(sei->getField());
-
-  return SILValue();
-}
-
-SILValue
-InstSimplifier::visitUncheckedEnumDataInst(UncheckedEnumDataInst *uedi) {
-  // (unchecked_enum_data (enum payload)) -> payload
-  auto opt = lookThroughOwnershipInsts(uedi->getOperand());
-  if (auto *ei = dyn_cast<EnumInst>(opt)) {
-    if (ei->getElement() != uedi->getElement())
-      return SILValue();
-
-    assert(ei->hasOperand() &&
-           "Should only get data from an enum with payload.");
-    return lookThroughOwnershipInsts(ei->getOperand());
-  }
 
   return SILValue();
 }
@@ -302,16 +283,6 @@ SILValue InstSimplifier::visitAddressToPointerInst(AddressToPointerInst *ATPI) {
   return SILValue();
 }
 
-SILValue InstSimplifier::visitPointerToAddressInst(PointerToAddressInst *PTAI) {
-  // If this address is not strict, then it cannot be replaced by an address
-  // that may be strict.
-  if (auto *ATPI = dyn_cast<AddressToPointerInst>(PTAI->getOperand()))
-    if (ATPI->getOperand()->getType() == PTAI->getType() && PTAI->isStrict())
-      return ATPI->getOperand();
-
-  return SILValue();
-}
-
 SILValue InstSimplifier::visitRefToRawPointerInst(RefToRawPointerInst *RefToRaw) {
   // Perform the following simplification:
   //
@@ -384,21 +355,6 @@ visitUncheckedRefCastInst(UncheckedRefCastInst *OPRI) {
   return simplifyDeadCast(OPRI);
 }
 
-SILValue
-InstSimplifier::
-visitUncheckedAddrCastInst(UncheckedAddrCastInst *UACI) {
-  // (unchecked-addr-cast Y->X (unchecked-addr-cast x X->Y)) -> x
-  if (auto *OtherUACI = dyn_cast<UncheckedAddrCastInst>(&*UACI->getOperand()))
-    if (OtherUACI->getOperand()->getType() == UACI->getType())
-      return OtherUACI->getOperand();
-
-  // (unchecked-addr-cast X->X x) -> x
-  if (UACI->getOperand()->getType() == UACI->getType())
-    return UACI->getOperand();
-
-  return SILValue();
-}
-
 SILValue InstSimplifier::visitUpcastInst(UpcastInst *UI) {
   // (upcast Y->X (unchecked-ref-cast x X->Y)) -> x
   if (auto *URCI = dyn_cast<UncheckedRefCastInst>(UI->getOperand()))
@@ -462,25 +418,15 @@ visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *UBCI) {
   return SILValue();
 }
 
-SILValue InstSimplifier::visitBeginAccessInst(BeginAccessInst *BAI) {
-  // Remove "dead" begin_access.
-  if (llvm::all_of(BAI->getUses(), [](Operand *operand) -> bool {
-        return isIncidentalUse(operand->getUser());
-      })) {
-    return BAI->getOperand();
-  }
-  return SILValue();
-}
-
 SILValue InstSimplifier::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
   // Eliminate round trip convert_function. Non round-trip is performed in
   // SILCombine.
   //
   // (convert_function Y->X (convert_function x X->Y)) -> x
-  SILValue convertedValue = lookThroughOwnershipInsts(cfi->getConverted());
+  SILValue convertedValue = lookThroughOwnershipInsts(cfi->getOperand());
   if (auto *subCFI = dyn_cast<ConvertFunctionInst>(convertedValue))
-    if (subCFI->getConverted()->getType() == cfi->getType())
-      return lookThroughOwnershipInsts(subCFI->getConverted());
+    if (subCFI->getOperand()->getType() == cfi->getType())
+      return lookThroughOwnershipInsts(subCFI->getOperand());
 
   return SILValue();
 }
@@ -709,7 +655,7 @@ SILValue InstSimplifier::simplifyOverflowBuiltin(BuiltinInst *BI) {
     if (match(BI, m_CheckedTrunc(m_Ext(m_SILValue(Result)))))
       if (Result->getType() == BI->getType().getTupleElementType(0))
         if (auto signBit = computeSignBit(Result))
-          if (!signBit.getValue())
+          if (!signBit.value())
             return Result;
     }
     break;
@@ -749,7 +695,7 @@ swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
 
   if (svi->getFunction()->hasOwnership()) {
     OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
-    OwnershipRAUWHelper helper(ctx, svi, result);
+    OwnershipRAUWHelper helper(ctx, svi, result, /*respectLexicalFlags=*/ true);
     return helper.perform();
   }
   return replaceAllUsesAndErase(svi, result, callbacks);
@@ -795,13 +741,15 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
   if (!svi->getFunction()->hasOwnership())
     return replaceAllUsesAndErase(svi, result, callbacks);
 
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
   // If we weren't passed a dead end blocks, we can't optimize without ownership
   // enabled.
   if (!deadEndBlocks)
     return next;
+#endif
 
   OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
-  OwnershipRAUWHelper helper(ctx, svi, result);
+  OwnershipRAUWHelper helper(ctx, svi, result, /*respectLexicalFlags=*/ true);
 
   // If our RAUW helper is invalid, we do not support RAUWing this case, so
   // just return next.

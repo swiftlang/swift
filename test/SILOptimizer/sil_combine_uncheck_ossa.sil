@@ -15,14 +15,8 @@ class D : C {
 class E {
 }
 
-// CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast
-// CHECK: bb0
-// CHECK-NEXT: unchecked_ref_cast
-// CHECK-NEXT: return
-sil [ossa] @test_unconditional_checked_cast : $@convention(thin) <T_0_0, T_0_1> (@owned RawBuffer) -> @owned HeapBufferStorage<T_0_0, T_0_1> {
-bb0(%0 : @owned $RawBuffer):
-  %3 = unconditional_checked_cast %0 : $RawBuffer to HeapBufferStorage<T_0_0, T_0_1>
-  return %3 : $HeapBufferStorage<T_0_0, T_0_1>
+struct S {
+  var x: Int
 }
 
 // CHECK-LABEL: sil [ossa] @test_cond_fail
@@ -36,11 +30,22 @@ bb0(%0 : $Builtin.Int1):
   return %2 : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_remove_unconditional_cond_fail :
+// CHECK:         %0 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    cond_fail %0
+// CHECK:       } // end sil function 'dont_remove_unconditional_cond_fail'
+sil [ossa] @dont_remove_unconditional_cond_fail : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Int1, -1
+  cond_fail %0
+  %2 = tuple ()
+  return %2 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast_addr_fail
-// CHECK: bb0
-// CHECK-NEXT: builtin "int_trap"
-// CHECK: unreachable
-// CHECK: }
+// CHECK:         cond_fail
+// CHECK-NEXT:    unconditional_checked_cast_addr
+// CHECK:       } // end sil function 'test_unconditional_checked_cast_addr_fail'
 sil [ossa] @test_unconditional_checked_cast_addr_fail : $@convention(thin) (@in E, @in D) -> @out D {
 bb0(%0 : $*D, %1 : $*E, %2 : $*D):
   unconditional_checked_cast_addr E in %1 : $*E to D in %0 : $*D
@@ -52,9 +57,7 @@ bb0(%0 : $*D, %1 : $*E, %2 : $*D):
 
 // CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast_other_use
 // CHECK: bb0([[ARG:%.*]] : @owned $C
-// CHECK-NEXT:  [[COPY_ARG:%.*]] = copy_value [[ARG]]
-// CHECK-NEXT:  destroy_value [[ARG]]
-// CHECK-NEXT:  return [[COPY_ARG]]
+// CHECK-NEXT:  return [[ARG]]
 sil [ossa] @test_unconditional_checked_cast_other_use : $@convention(thin) (@owned C) -> @owned C {
 bb0(%0 : @owned $C):
   %0a = copy_value %0 : $C
@@ -63,19 +66,43 @@ bb0(%0 : @owned $C):
   return %3 : $C
 }
 
-protocol Class : class {
+// CHECK-LABEL: sil [ossa] @no_infinite_optimization_loop_with_failing_cast :
+// CHECK:         %2 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    cond_fail %2
+// CHECK-NEXT:    unconditional_checked_cast_addr
+// CHECK:       } // end sil function 'no_infinite_optimization_loop_with_failing_cast'
+sil [ossa] @no_infinite_optimization_loop_with_failing_cast : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S
+  %1 = alloc_stack $()
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_fail %2, "failed cast"
+  unconditional_checked_cast_addr () in %1 to S in %0
+  dealloc_stack %1
+  dealloc_stack %0
+  %7 = tuple ()
+  return %7
 }
 
-class G : Class {
+// CHECK-LABEL: sil [ossa] @no_infinite_optimization_loop_with_failing_cast2 :
+// CHECK:         %2 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    cond_fail %2
+// CHECK-NEXT:    debug_step
+// CHECK-NEXT:    %5 = integer_literal $Builtin.Int1, -1
+// CHECK-NEXT:    cond_fail %5
+// CHECK-NEXT:    unconditional_checked_cast_addr
+// CHECK:       } // end sil function 'no_infinite_optimization_loop_with_failing_cast2'
+sil [ossa] @no_infinite_optimization_loop_with_failing_cast2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $S
+  %1 = alloc_stack $()
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_fail %2, "failed cast"
+  debug_step
+  unconditional_checked_cast_addr () in %1 to S in %0
+  dealloc_stack %1
+  dealloc_stack %0
+  %7 = tuple ()
+  return %7
 }
 
-// CHECK-LABEL: sil [ossa] @test_unconditional_checked_cast_class_exist
-// CHECK: unchecked_ref_cast
-// CHECK: return
-sil [ossa] @test_unconditional_checked_cast_class_exist : $@convention(thin) (@owned Class) -> @owned G {
-bb0(%0 : @owned $Class):
-  %0a = copy_value %0 : $Class
-  %2 = unconditional_checked_cast %0a : $Class to G
-  destroy_value %0 : $Class
-  return %2 : $G
-}

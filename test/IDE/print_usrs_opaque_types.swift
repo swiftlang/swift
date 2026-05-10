@@ -2,7 +2,7 @@
 // opaque result types, even in the presence of errors or unusual generic
 // signatures.
 
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 // RUN: %target-swift-ide-test -print-usrs -source-filename %s | %FileCheck -strict-whitespace %s
 
 // CHECK: [[@LINE+1]]:{{[0-9]+}} s:14swift_ide_test0C21UnifyingGenericParams1xQrx_tq_Rszr0_lF

@@ -1,5 +1,6 @@
-// rdar://82252704 - [SR-15070]: Declaring a class inside a async throws
-//                   function crashes compiler
+// rdar://82252704
+// https://github.com/apple/swift/issues/57396
+// Declaring a class inside a 'async throws' function crashes compiler
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -c %s -o %t/test.o

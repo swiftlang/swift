@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -warn-concurrency %s
+// RUN: %target-swift-emit-silgen -strict-concurrency=complete %s
 
 protocol ServerStream {}
 protocol Message {}

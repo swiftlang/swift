@@ -18,7 +18,6 @@ from . import cmark
 from . import foundation
 from . import libcxx
 from . import libdispatch
-from . import libicu
 from . import llbuild
 from . import llvm
 from . import product
@@ -27,6 +26,7 @@ from . import swiftpm
 from . import swiftsyntax
 from . import xctest
 from .. import shell
+from .. import targets
 
 
 class SwiftFormat(product.Product):
@@ -50,24 +50,48 @@ class SwiftFormat(product.Product):
     def is_swiftpm_unified_build_product(cls):
         return True
 
+    def configuration(self):
+        return 'release' if self.is_release() else 'debug'
+
     def run_build_script_helper(self, action, host_target, additional_params=[]):
         script_path = os.path.join(
             self.source_dir, 'build-script-helper.py')
-
-        configuration = 'release' if self.is_release() else 'debug'
 
         helper_cmd = [
             script_path,
             action,
             '--toolchain', self.install_toolchain_path(host_target),
-            '--configuration', configuration,
+            '--configuration', self.configuration(),
             '--build-path', self.build_dir,
             '--multiroot-data-file', MULTIROOT_DATA_FILE_PATH,
-            # There might have been a Package.resolved created by other builds
-            # or by the package being opened using Xcode. Discard that and
-            # reset the dependencies to be local.
-            '--update'
         ]
+
+        install_destdir = self.host_install_destdir(host_target)
+        toolchain_path = self.native_toolchain_path(host_target)
+
+        # Pass Cross compile host info unless we're testing.
+        # It doesn't make sense to run tests of the cross compile host.
+        if self.has_cross_compile_hosts() and action != 'test':
+            if self.is_darwin_host(host_target):
+                if len(self.args.cross_compile_hosts) != 1:
+                    raise RuntimeError("Cross-Compiling swift-format to multiple " +
+                                       "targets is not supported")
+                helper_cmd += ['--cross-compile-host', self.args.cross_compile_hosts[0]]
+            elif self.is_cross_compile_target(host_target):
+                helper_cmd.extend(['--cross-compile-host', host_target])
+                build_toolchain_path = install_destdir + self.args.install_prefix
+                resource_dir = f'{build_toolchain_path}/lib/swift'
+                cross_compile_config = targets.StdlibDeploymentTarget \
+                    .get_target_for_name(host_target) \
+                    .platform \
+                    .swiftpm_config(
+                        self.args,
+                        output_dir=build_toolchain_path,
+                        swift_toolchain=toolchain_path,
+                        resource_path=resource_dir
+                    )
+                helper_cmd += ['--cross-compile-config', cross_compile_config]
+
         if self.args.verbose_build:
             helper_cmd.append('--verbose')
         helper_cmd.extend(additional_params)
@@ -87,14 +111,35 @@ class SwiftFormat(product.Product):
         self.run_build_script_helper('test', host_target)
 
     def should_install(self, host_target):
-        return False
+        return self.args.install_swiftformat
+
+    def install(self, host_target):
+        install_destdir = self.host_install_destdir(host_target)
+        install_prefix = install_destdir + self.args.install_prefix
+        self.run_build_script_helper(
+            'install',
+            host_target,
+            additional_params=['--prefix', install_prefix]
+        )
+        if self.args.sourcekitlsp_lint:
+            self.lint_sourcekitlsp(install_prefix)
+
+    def lint_sourcekitlsp(self, install_prefix):
+        linting_cmd = [
+            os.path.join(install_prefix, 'bin', 'swift-format'),
+            'lint',
+            '--parallel',
+            '--strict',
+            '--recursive',
+            os.path.join(os.path.dirname(self.source_dir), 'sourcekit-lsp'),
+        ]
+        shell.call(linting_cmd)
 
     @classmethod
     def get_dependencies(cls):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU,
                 swift.Swift,
                 libdispatch.LibDispatch,
                 foundation.Foundation,

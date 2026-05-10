@@ -14,10 +14,10 @@
 #define SWIFT_MARKUP_AST_H
 
 #include "swift/Markup/LineList.h"
-#include "llvm/ADT/Optional.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TrailingObjects.h"
+#include <optional>
 
 namespace swift {
 namespace markup {
@@ -34,26 +34,27 @@ class LocalizationKeyField;
 /// The basic structure of a doc comment attached to a Swift
 /// declaration.
 struct CommentParts {
-  Optional<const Paragraph *> Brief;
+  std::optional<const Paragraph *> Brief;
   ArrayRef<const MarkupASTNode *> BodyNodes;
   ArrayRef<ParamField *> ParamFields;
-  Optional<const swift::markup::ReturnsField *> ReturnsField;
-  Optional<const swift::markup::ThrowsField *> ThrowsField;
+  std::optional<const swift::markup::ReturnsField *> ReturnsField;
+  std::optional<const swift::markup::ThrowsField *> ThrowsField;
   llvm::SmallSetVector<StringRef, 8> Tags;
-  Optional<const swift::markup::LocalizationKeyField *> LocalizationKeyField;
+  std::optional<const swift::markup::LocalizationKeyField *>
+      LocalizationKeyField;
 
   bool isEmpty() const {
-    return !Brief.hasValue() &&
-           !ReturnsField.hasValue() &&
-           !ThrowsField.hasValue() &&
+    return !Brief.has_value() &&
+           !ReturnsField.has_value() &&
+           !ThrowsField.has_value() &&
            BodyNodes.empty() &&
            ParamFields.empty();
   }
 
   bool hasFunctionDocumentation() const {
     return !ParamFields.empty() ||
-             ReturnsField.hasValue() ||
-             ThrowsField.hasValue();
+             ReturnsField.has_value() ||
+             ThrowsField.has_value();
   }
 };
 
@@ -111,11 +112,11 @@ public:
                           ArrayRef<MarkupASTNode *> Children);
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -135,11 +136,11 @@ public:
   static BlockQuote *create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children);
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -161,17 +162,16 @@ public:
                       bool IsOrdered);
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   void setChildren(ArrayRef<MarkupASTNode *> NewChildren) {
     assert(NewChildren.size() <= NumChildren);
-    std::copy(NewChildren.begin(), NewChildren.end(),
-              getTrailingObjects<MarkupASTNode *>());
+    std::copy(NewChildren.begin(), NewChildren.end(), getTrailingObjects());
     NumChildren = NewChildren.size();
   }
 
@@ -196,11 +196,11 @@ public:
   static Item *create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children);
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -264,11 +264,11 @@ public:
                            ArrayRef<MarkupASTNode *> Children);
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -290,11 +290,11 @@ public:
                         ArrayRef<MarkupASTNode *> Children);
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   unsigned getLevel() const {
@@ -481,11 +481,11 @@ public:
                           ArrayRef<MarkupASTNode *> Children);
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -505,11 +505,11 @@ public:
                         ArrayRef<MarkupASTNode *> Children);
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -535,11 +535,11 @@ public:
   StringRef getDestination() const { return Destination; }
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -555,37 +555,66 @@ class Image final : public InlineContent,
 
   // FIXME: Hyperlink destinations can't be wrapped - use a Line
   StringRef Destination;
-  Optional<StringRef> Title;
+  std::optional<StringRef> Title;
 
-  Image(StringRef Destination, Optional<StringRef> Title,
+  Image(StringRef Destination, std::optional<StringRef> Title,
         ArrayRef<MarkupASTNode *> Children);
 
 public:
-  static Image *create(MarkupContext &MC,
-                      StringRef Destination,
-                      Optional<StringRef> Title,
-                      ArrayRef<MarkupASTNode *> Children);
+  static Image *create(MarkupContext &MC, StringRef Destination,
+                       std::optional<StringRef> Title,
+                       ArrayRef<MarkupASTNode *> Children);
 
   StringRef getDestination() const { return Destination; }
 
   bool hasTitle() const {
-    return Title.hasValue();
+    return Title.has_value();
   }
 
   StringRef getTitle() const {
-    return StringRef(Title.getValue());
+    return StringRef(Title.value());
   }
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   static bool classof(const MarkupASTNode *N) {
     return N->getKind() == ASTNodeKind::Image;
+  }
+};
+
+class InlineAttributes final : public InlineContent, private llvm::TrailingObjects<Image, MarkupASTNode *> {
+  friend TrailingObjects;
+
+  // Note that inline attributes are like links, in that there are child inline nodes that are
+  // collectively styled by the attribute text. The child nodes are the text that should be
+  // displayed.
+
+  size_t NumChildren;
+  StringRef Attributes;
+
+  InlineAttributes(StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
+
+public:
+  static InlineAttributes *create(MarkupContext &MC, StringRef Attributes, ArrayRef<MarkupASTNode *> Children);
+
+  StringRef getAttributes() const { return Attributes; }
+
+  ArrayRef<MarkupASTNode *> getChildren() {
+    return getTrailingObjects(NumChildren);
+  }
+
+  ArrayRef<const MarkupASTNode *> getChildren() const {
+    return getTrailingObjects(NumChildren);
+  }
+
+  static bool classof(const MarkupASTNode *N) {
+    return N->getKind() == ASTNodeKind::InlineAttributes;
   }
 };
 
@@ -621,7 +650,7 @@ class ParamField final : public PrivateExtension,
 
   // Parameter fields can contain a substructure describing a
   // function or closure parameter.
-  llvm::Optional<CommentParts> Parts;
+  std::optional<CommentParts> Parts;
 
   ParamField(StringRef Name, ArrayRef<MarkupASTNode *> Children);
 
@@ -634,27 +663,25 @@ public:
     return Name;
   }
 
-  llvm::Optional<CommentParts> getParts() const {
-    return Parts;
-  }
+  std::optional<CommentParts> getParts() const { return Parts; }
 
   void setParts(CommentParts P) {
     Parts = P;
   }
 
   bool isClosureParameter() const {
-    if (!Parts.hasValue())
+    if (!Parts.has_value())
       return false;
 
-    return Parts.getValue().hasFunctionDocumentation();
+    return Parts.value().hasFunctionDocumentation();
   }
 
   ArrayRef<MarkupASTNode *> getChildren() {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   ArrayRef<const MarkupASTNode *> getChildren() const {
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren};
+    return getTrailingObjects(NumChildren);
   }
 
   static bool classof(const MarkupASTNode *N) {
@@ -675,11 +702,11 @@ public: \
   static Id *create(MarkupContext &MC, ArrayRef<MarkupASTNode *> Children); \
 \
   ArrayRef<MarkupASTNode *> getChildren() { \
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren}; \
+    return getTrailingObjects(NumChildren); \
   } \
 \
   ArrayRef<const MarkupASTNode *> getChildren() const { \
-    return {getTrailingObjects<MarkupASTNode *>(), NumChildren}; \
+    return getTrailingObjects(NumChildren); \
   } \
 \
   static bool classof(const MarkupASTNode *N) { \

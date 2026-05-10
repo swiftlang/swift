@@ -1,8 +1,8 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_func.swift
-// RUN: llvm-bcanalyzer %t/def_func.swiftmodule | %FileCheck %s
-// RUN: %target-swift-frontend -module-name function -emit-silgen -I %t %s | %FileCheck %s -check-prefix=SIL
+// RUN: %llvm-bcanalyzer %t/def_func.swiftmodule | %FileCheck %s
+// RUN: %target-swift-frontend -module-name function -Xllvm -sil-print-types -emit-silgen -I %t %s | %FileCheck %s -check-prefix=SIL
 
 // CHECK-NOT: FALL_BACK_TO_TRANSLATION_UNIT
 // CHECK-NOT: UnknownCode
@@ -113,8 +113,8 @@ do {
   try throws1()
   _ = try throws2(1)
 } catch _ {}
-// SIL: sil @$s8def_func7throws1yyKF : $@convention(thin) () -> @error Error
-// SIL: sil @$s8def_func7throws2{{[_0-9a-zA-Z]*}}F : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error Error)
+// SIL: sil @$s8def_func7throws1yyKF : $@convention(thin) () -> @error any Error
+// SIL: sil @$s8def_func7throws2{{[_0-9a-zA-Z]*}}F : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> (@out τ_0_0, @error any Error)
 
 // LLVM: }
 

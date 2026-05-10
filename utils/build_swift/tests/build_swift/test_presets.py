@@ -29,7 +29,7 @@ PRESET_DEFAULTS = {
     'darwin_toolchain_alias': 'Alias',
     'darwin_toolchain_bundle_identifier': 'BundleIdentifier',
     'darwin_toolchain_display_name': 'DisplayName',
-    'darwin_toolchain_display_name_short': 'DispalyNameShort',
+    'darwin_toolchain_display_name_short': 'DisplayNameShort',
     'darwin_toolchain_version': '1.0',
     'darwin_toolchain_xctoolchain_name': 'default',
     'extra_swift_args': '',
@@ -44,6 +44,7 @@ PRESET_DEFAULTS = {
     'ndk_path': '/path/to/ndk',
     'arm_dir': '/path/to/arm',
     'toolchain_path': '/tmp/toolchain',
+    'build_subdir': 'test_build_subdir',
 }
 
 SAMPLE_PRESET = """

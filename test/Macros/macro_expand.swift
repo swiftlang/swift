@@ -1,0 +1,845 @@
+// REQUIRES: swift_swift_parser, executable_test
+
+// RUN: %empty-directory(%t)
+// RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/Inputs/syntax_macro_definitions.swift
+
+// Diagnostics testing
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS
+
+// Diagnostics testing by importing macros from a module
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library.swiftmodule %S/Inputs/freestanding_macro_library.swift -module-name freestanding_macro_library -load-plugin-library %t/%target-library-name(MacroDefinition)
+// RUN: %target-swift-frontend -swift-version 5 -emit-module -o %t/freestanding_macro_library_2.swiftmodule %S/Inputs/freestanding_macro_library_2.swift -module-name freestanding_macro_library_2 -load-plugin-library %t/%target-library-name(MacroDefinition) -I %t
+
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5 -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -I %t -DIMPORT_MACRO_LIBRARY
+
+// RUN: not %target-swift-frontend -swift-version 5 -typecheck -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name MacroUser -DTEST_DIAGNOSTICS -serialize-diagnostics-path %t/macro_expand.dia %s -emit-macro-expansion-files no-diagnostics -Rmacro-loading > %t/macro-printing.txt
+// RUN: c-index-test -read-diagnostics %t/macro_expand.dia 2>&1 | %FileCheck -check-prefix CHECK-DIAGS -dump-input=always %s
+
+// RUN: %FileCheck %s  --check-prefix CHECK-MACRO-PRINTED < %t/macro-printing.txt
+
+// RUN: not %target-swift-frontend -swift-version 5 -typecheck -diagnostic-style=swift -load-plugin-library %t/%target-library-name(MacroDefinition)  -module-name MacroUser -DTEST_DIAGNOSTICS %s > %t/pretty-macro-diagnostics.txt 2>&1
+// RUN: %FileCheck %s --check-prefix PRETTY-DIAGS < %t/pretty-macro-diagnostics.txt
+
+// Debug info SIL testing
+// RUN: %target-swift-frontend -swift-version 5 -emit-sil -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-SIL %s
+
+// Debug info IR testing
+// RUN: %target-swift-frontend -swift-version 5 -dwarf-version=4 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR-DWARF4 %s
+// RUN: %target-swift-frontend -swift-version 5 -dwarf-version=5 -emit-ir -load-plugin-library %t/%target-library-name(MacroDefinition) %s -module-name MacroUser -o - -g | %FileCheck --check-prefix CHECK-IR %s
+
+// Execution testing
+// RUN: %target-build-swift -swift-version 5 -g -load-plugin-library %t/%target-library-name(MacroDefinition) %s -o %t/main -module-name MacroUser -Xfrontend -emit-dependencies-path -Xfrontend %t/main.d -Xfrontend -emit-reference-dependencies-path -Xfrontend %t/main.swiftdeps
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main | %FileCheck %s
+
+// Plugin search path and loaded module trace testing
+// RUN: %target-swift-frontend -swift-version 5 -emit-sil -plugin-path %t %s -module-name MacroUser -emit-loaded-module-trace -o %t/loaded_module_trace
+// RUN: %FileCheck -check-prefix=CHECK-MODULE-TRACE %s < %t/loaded_module_trace.trace.json
+
+// CHECK-MODULE-TRACE: {{libMacroDefinition.dylib|libMacroDefinition.so|MacroDefinition.dll}}
+
+// CHECK-DIAGS: loaded macro implementation module 'MacroDefinition' from shared library
+
+#if IMPORT_MACRO_LIBRARY
+import freestanding_macro_library
+import freestanding_macro_library_2
+#else
+@freestanding(declaration, names: named(StructWithUnqualifiedLookup))
+macro structWithUnqualifiedLookup() = #externalMacro(module: "MacroDefinition", type: "DefineStructWithUnqualifiedLookupMacro")
+
+@freestanding(declaration)
+macro anonymousTypes(_: () -> String) = #externalMacro(module: "MacroDefinition", type: "DefineAnonymousTypesMacro")
+
+@freestanding(declaration)
+macro freestandingWithClosure<T>(_ value: T, body: (T) -> T) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+
+@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+
+@freestanding(expression) macro stringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+@freestanding(declaration, names: arbitrary) macro bitwidthNumberedStructs(_ baseName: String, blah: Bool) = #externalMacro(module: "MacroDefinition", type: "DefineBitwidthNumberedStructsMacro")
+
+@freestanding(declaration, names: named(value)) macro varValue() = #externalMacro(module: "MacroDefinition", type: "VarValueMacro")
+
+#endif
+
+@freestanding(declaration, names: named(storedProperty))
+public macro AddStoredProperty<T>(_ x: T) = #externalMacro(module: "MacroDefinition", type: "StoredPropertyMacro")
+
+#if TEST_DIAGNOSTICS
+@freestanding(declaration)
+macro NotCovered() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
+
+struct MemberNotCovered {
+  #NotCovered
+  // expected-note@-1 {{in expansion of macro 'NotCovered' here}}
+  /*
+  expected-expansion@-3:3 {{
+    expected-error@1:5{{declaration name 'value' is not covered by macro 'NotCovered'}}
+  }}
+  */
+}
+
+@attached(peer)
+macro Invalid() = #externalMacro(module: "MacroDefinition", type: "InvalidMacro")
+
+@Invalid
+struct Bad {}
+// expected-note@-2 18 {{in expansion of macro 'Invalid' on struct 'Bad' here}}
+/*
+expected-expansion@-3:14 {{
+  expected-error@1:8{{macro expansion cannot introduce import}}
+  expected-error@3:17{{macro expansion cannot introduce precedence group}}
+  expected-error@6:25{{macro 'myMacro()' requires a definition}}
+  expected-error@6:25{{macro expansion cannot introduce macro}}
+  expected-error@8:1{{macro expansion cannot introduce extension}}
+  expected-error@11:1{{macro expansion cannot introduce '@main' type}}
+  expected-error@12:8{{declaration name 'MyMain' is not covered by macro 'Invalid'}}
+  expected-error@17:11{{declaration name 'Array' is not covered by macro 'Invalid'}}
+  expected-error@19:11{{declaration name 'Dictionary' is not covered by macro 'Invalid'}}
+  expected-error@21:11{{macro expansion cannot introduce default literal type 'BooleanLiteralType'}}
+  expected-error@23:11{{macro expansion cannot introduce default literal type 'ExtendedGraphemeClusterType'}}
+  expected-error@25:11{{macro expansion cannot introduce default literal type 'FloatLiteralType'}}
+  expected-error@27:11{{macro expansion cannot introduce default literal type 'IntegerLiteralType'}}
+  expected-error@29:11{{macro expansion cannot introduce default literal type 'StringLiteralType'}}
+  expected-error@31:11{{macro expansion cannot introduce default literal type 'UnicodeScalarType'}}
+  expected-error@33:11{{macro expansion cannot introduce default literal type '_ColorLiteralType'}}
+  expected-error@35:11{{macro expansion cannot introduce default literal type '_ImageLiteralType'}}
+  expected-error@37:11{{macro expansion cannot introduce default literal type '_FileReferenceLiteralType'}}
+}}
+*/
+
+
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser3Bad7InvalidfMp_.swift
+// CHECK-DIAGS: import Swift
+// CHECK-DIAGS: precedencegroup MyPrecedence {
+// CHECK-DIAGS: }
+// CHECK-DIAGS: @attached(member) macro myMacro()
+// CHECK-DIAGS: extension Int {
+// CHECK-DIAGS: }
+// CHECK-DIAGS: @main
+// CHECK-DIAGS: struct MyMain {
+// CHECK-DIAGS:   static func main() {
+// CHECK-DIAGS:   }
+// CHECK-DIAGS: }
+// CHECK-DIAGS: typealias Array = Void
+// CHECK-DIAGS: typealias Dictionary = Void
+// CHECK-DIAGS: typealias BooleanLiteralType = Void
+// CHECK-DIAGS: typealias ExtendedGraphemeClusterType = Void
+// CHECK-DIAGS: typealias FloatLiteralType = Void
+// CHECK-DIAGS: typealias IntegerLiteralType = Void
+// CHECK-DIAGS: typealias StringLiteralType = Void
+// CHECK-DIAGS: typealias UnicodeScalarType = Void
+// CHECK-DIAGS: typealias _ColorLiteralType = Void
+// CHECK-DIAGS: typealias _ImageLiteralType = Void
+// CHECK-DIAGS: typealias _FileReferenceLiteralType = Void
+// CHECK-DIAGS: END CONTENTS OF FILE
+
+class HasStoredPropertyClassInvalid {
+  #AddStoredProperty((Self.self, 0).1) // expected-note {{in expansion of macro 'AddStoredProperty' here}}
+  /*
+  expected-expansion@-2:3 {{
+    expected-error@1:22{{covariant 'Self' type cannot be referenced from a stored property initializer}}
+  }}
+  */
+}
+
+// Redeclaration checking should behave as though expansions are part of the
+// source file.
+struct RedeclChecking {
+  #varValue
+  /*
+  expected-expansion@-2:3 {{
+    expected-note@1:5{{'value' previously declared here}}
+  }}
+  */
+
+  // expected-error@+1 {{invalid redeclaration of 'value'}}
+  var value: Int { 0 }
+}
+
+// CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX[[@LINE-12]]_2_33_4361AD9339943F52AE6186DD51E04E91Ll8varValuefMf_.swift:
+// CHECK-DIAGS: var value: Int {
+// CHECK-DIAGS:     1
+// CHECK-DIAGS: }
+// CHECK-DIAGS: END CONTENTS OF FILE
+
+@attached(body)
+public macro ThrowCancellation() = #externalMacro(module: "MacroDefinition", type: "ThrowCancellationMacro")
+
+// https://github.com/swiftlang/swift/issues/79039 - Make sure we diagnose the
+// error mismatch.
+@ThrowCancellation // expected-note {{in expansion of macro 'ThrowCancellation' on global function 'issue79039()' here}}
+func issue79039() throws(DecodingError)
+/*
+expected-expansion@-2:39 {{
+  expected-error@2:11{{thrown expression type 'CancellationError' cannot be converted to error type 'DecodingError'}}
+}}
+*/
+
+@ThrowCancellation // expected-note {{in expansion of macro 'ThrowCancellation' on global function 'issue79039_2()' here}}
+func issue79039_2() throws(DecodingError) {}
+/*
+expected-expansion@-2:43 {{
+  expected-error@2:11{{thrown expression type 'CancellationError' cannot be converted to error type 'DecodingError'}}
+}}
+*/
+#endif
+
+@freestanding(declaration)
+macro accidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "FakeCodeItemMacro")
+
+@attached(peer)
+macro AccidentalCodeItem() = #externalMacro(module: "MacroDefinition", type: "FakeCodeItemMacro")
+
+#if TEST_DIAGNOSTICS
+func invalidDeclarationMacro() {
+  #accidentalCodeItem
+  // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
+  /*
+  expected-expansion@-3:3 {{
+    expected-error@1:1{{expected macro expansion to produce a declaration}}
+  }}
+  */
+
+  @AccidentalCodeItem struct S {}
+  // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
+  /*
+  expected-expansion@-3:34 {{
+    expected-error@1:1{{expected macro expansion to produce a declaration}}
+  }}
+  */
+
+  do {
+    @AccidentalCodeItem struct S {}
+    // expected-note@-1 {{in expansion of macro 'AccidentalCodeItem' on struct 'S' here}}
+    /*
+    expected-expansion@-3:36 {{
+      expected-error@1:1{{expected macro expansion to produce a declaration}}
+    }}
+    */
+  }
+}
+#endif
+
+@freestanding(expression) macro customFileID() -> String = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
+@freestanding(expression) macro fileID<T: ExpressibleByStringLiteral>() -> T = #externalMacro(module: "MacroDefinition", type: "FileIDMacro")
+@freestanding(expression) macro recurse(_: Bool) = #externalMacro(module: "MacroDefinition", type: "RecursiveMacro")
+@freestanding(expression) macro assert(_: Bool) = #externalMacro(module: "MacroDefinition", type: "AssertMacro")
+
+func testFileID(a: Int, b: Int) {
+  // CHECK: MacroUser/macro_expand.swift
+  print("Result is \(#customFileID)")
+  // CHECK-SIL: sil_scope [[SRC_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-3]]:6 parent {{.*}}testFileID
+  // CHECK-SIL: sil_scope [[EXPANSION_SCOPE:[0-9]+]] { loc "{{.*}}macro_expand.swift":[[@LINE-2]]:22 parent [[SRC_SCOPE]]
+  // CHECK-SIL: sil_scope [[MACRO_SCOPE:[0-9]+]] { loc "@__swiftmacro{{.*}}":1:1 parent @$s9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_ {{.*}} inlined_at [[EXPANSION_SCOPE]] }
+  // CHECK-SIL: string_literal utf8 "MacroUser/macro_expand.swift", loc "@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_.swift":1:1, scope [[MACRO_SCOPE]]
+  // CHECK-IR-DAG: !DISubprogram(name: "customFileID", linkageName: "$s9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_"
+
+  // CHECK: Builtin result is MacroUser/macro_expand.swift
+  // CHECK-AST: macro_expansion_expr type='String'{{.*}}name=line
+  print("Builtin result is \(#fileID)")
+  print(
+    // CHECK-IR-DAG: ![[L1:[0-9]+]] = distinct !DILocation(line: [[@LINE+4]], column: 5
+    // CHECK-IR-DAG: ![[L2:[0-9]+]] = distinct !DILocation({{.*}}inlinedAt: ![[L1]])
+    // CHECK-IR-DAG: !DIFile(filename: "{{.*}}@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_12customFileIDfMf_.swift", {{.*}}source: "{{.*}}MacroUser/macro_expand.swift{{.*}}// original-source-range: {{.*}}")
+    // CHECK-IR-DWARF4: {{(target triple = .*-unknown-windows-msvc)|(!DIFile\(filename: ".*generated-.*@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX.*_12customFileIDfMf_.swift", directory: "[^"]*"\))}}
+    #addBlocker(
+      #stringify(a - b)
+      )
+    )
+}
+
+testFileID(a: 1, b: 2)
+
+@freestanding(expression) macro stringifyAndTry<T>(_ value: T) -> (T, String) =
+    #externalMacro(module: "MacroDefinition", type: "StringifyAndTryMacro")
+
+enum Angle {
+case degrees(Double)
+case radians(Double)
+}
+
+func testStringify(a: Int, b: Int) {
+  let s = #stringify(a + b)
+  print(s)
+
+  // CHECK-AST: macro_expansion_expr type='(Int, String)'{{.*}}name=stringify
+  // CHECK-AST-NEXT: argument_list
+  // CHECK-AST: tuple_expr type='(Int, String)' location=Macro expansion of #stringify
+
+  let (b, s2) = #stringify({ () -> Bool in return true })
+  // CHECK-AST: macro_expansion_expr type='(() -> Bool, String)'{{.*}}name=stringify
+  // CHECK-AST-NEXT: argument_list
+  // CHECK-AST: tuple_expr type='(() -> Bool, String)' location=Macro expansion of #stringify
+
+  let (b2, s3) = #stringify<Double>(1 + 2)
+  // CHECK-AST: macro_expansion_expr type='(Double, String)'{{.*}}name=stringify
+  // CHECK-AST-NEXT: argument_list
+  // CHECK-AST: tuple_expr type='(Double, String)' location=Macro expansion of #stringify
+
+  _ = (b, b2, s2, s3)
+
+  let angle = Angle.degrees(17)
+  switch angle {
+  case .degrees(let value):
+    _ = #stringify(value)
+  case .radians(let value):
+    _ = #stringify(value)
+  }
+}
+
+func testAssert(a: Int, b: Int) {
+  #assert(a == b)
+}
+
+public struct Outer {
+  var value: Int = 0
+  public func test() {
+    let (a, b) = #stringify(1 + value)
+
+    let (c, d) = #stringify({ x in
+      x + 1
+    })
+
+    _ = a
+    _ = b
+    _ = c
+    _ = d
+  }
+}
+
+// CHECK: (2, "a + b")
+testStringify(a: 1, b: 1)
+
+protocol P { }
+extension Int: P { }
+
+// Stringify with closures that have local types.
+@available(SwiftStdlib 5.1, *)
+func testStringifyWithLocalTypes() {
+  _ = #stringify({
+    struct LocalType: P {
+      static var name: String = "Taylor"
+      var something: some P { self }
+    }
+
+    func f() -> some P { return LocalType().something }
+  })
+}
+
+// Stringify in closures that have anonymous parameters.
+func testStringifyWithAnonymousParameters() {
+  {
+    _ = #stringify($0 + $1)
+  }(1, 2)
+}
+
+func maybeThrowing() throws -> Int { 5 }
+
+#if TEST_DIAGNOSTICS
+@freestanding(expression) @discardableResult
+macro discardableStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+func testDiscardableStringify(x: Int) {
+  #stringify(x + 1) // expected-warning{{expression of type '(Int, String)' is unused}}
+  #discardableStringify(x + 1)
+}
+#endif
+
+#if TEST_DIAGNOSTICS
+// This causes an error when non-'Bool' value is passed.
+@freestanding(expression) macro assertAny<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "AssertMacro")
+
+func testNested() {
+  struct Nested { }
+  _ = #stringify(#assertAny(Nested()))
+  // expected-note@-1 {{in expansion of macro 'stringify' here}}
+  /*
+  expected-expansion@-3:7 {{
+    expected-note@1:2{{in expansion of macro 'assertAny' here}}
+    expected-expansion@1:2{{
+      expected-error@1:8{{cannot convert value of type 'Nested' to expected argument type 'Bool'}}
+    }}
+  }}
+  */
+
+  // PRETTY-DIAGS: 1:8: error: cannot convert value of type 'Nested' to expected argument type 'Bool'
+  // PRETTY-DIAGS: macro_expand.swift:{{.*}}:39: note: expanded code originates here
+  // PRETTY-DIAGS: --- macro expansion #stringify
+  // PRETTY-DIAGS: --- macro expansion #assertAny
+  // PRETTY-DIAGS-NEXT: 1 | assert(Nested())
+  // PRETTY-DIAGS-NEXT:   |        `- error: cannot convert value
+}
+#endif
+
+func testStringifyWithThrows() throws {
+  // Okay, we can put the try inside or outside
+  _ = try #stringify(maybeThrowing())
+  _ = #stringify(try maybeThrowing())
+
+#if TEST_DIAGNOSTICS
+  // FIXME: Lots of duplicate notes here
+  _ = #stringify(maybeThrowing()) // expected-note 4{{in expansion of macro 'stringify' here}}
+  /*
+  expected-expansion@-2:7 {{
+    expected-error@1:2{{call can throw but is not marked with 'try'}}
+    expected-note@1:2{{did you mean to disable error propagation?}}
+    expected-note@1:2{{did you mean to handle error as optional value?}}
+    expected-note@1:2{{did you mean to use 'try'?}}
+  }}
+  */
+
+#endif
+
+  // The macro adds the 'try' for us.
+  _ = #stringifyAndTry(maybeThrowing())
+}
+
+@available(SwiftStdlib 5.1, *)
+func throwingFunc() async throws -> Int { 5 }
+
+@freestanding(expression) macro callThrowingFunc<T>(_ body: () -> T) -> T = #externalMacro(module: "MacroDefinition", type: "TryCallThrowingFuncMacro")
+
+@available(SwiftStdlib 5.1, *)
+func testThrowingCall() async throws -> Int {
+  #callThrowingFunc {
+    [1, 2, 3, 4, 5].map { $0 + 1 }.first!
+  }
+}
+
+func testStringifyWithLocalType() throws {
+  _ =  #stringify({
+    struct QuailError: Error {}
+    throw QuailError()
+    })
+}
+
+@freestanding(expression) macro addBlocker<T>(_ value: T) -> T = #externalMacro(module: "MacroDefinition", type: "AddBlocker")
+
+struct OnlyAdds {
+  static func +(lhs: OnlyAdds, rhs: OnlyAdds) -> OnlyAdds { lhs }
+}
+
+func testAddBlocker(a: Int, b: Int, c: Int, oa: OnlyAdds) {
+  _ = #addBlocker(a * b * c)
+#if TEST_DIAGNOSTICS
+  _ = #addBlocker(a + b * c) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
+  // expected-note@-1{{use '-'}}{{21-22=-}}
+  _ = #addBlocker(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
+  // expected-note@-1{{in expansion of macro 'addBlocker' here}}
+  // expected-note@-2{{use '-'}}{{22-23=-}}
+  /*
+  expected-expansion@-4:7 {{
+    expected-error@1:4{{binary operator '-' cannot be applied to two 'OnlyAdds' operands}}
+  }}
+  */
+
+  _ = #addBlocker({ // expected-note{{in expansion of macro 'addBlocker' here}}
+  /*
+  expected-expansion@-2:7 {{
+    expected-error@9:16{{referencing operator function '-' on 'FloatingPoint' requires that 'OnlyAdds' conform to 'FloatingPoint'}}
+  }}
+  */
+
+      print("hello")
+      print(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
+      // expected-note@-1{{use '-'}}
+      print(oa + oa) // expected-error{{blocked an add; did you mean to subtract? (from macro 'addBlocker')}}
+      // expected-note@-1{{use '-'}}
+    }())
+
+  // Check recursion.
+  #recurse(false) // okay
+  #recurse(true)
+  /*
+  expected-expansion@-2:3 {{
+    expected-error@1:1{{recursive expansion of macro 'recurse'}}
+  }}
+  expected-note@-5{{in expansion of macro 'recurse' here}}
+  */
+#endif
+}
+
+@freestanding(expression) macro leftHandOperandFinder<T>(_ value: T) -> T = #externalMacro(module: "MacroDefinition", type: "LeftHandOperandFinderMacro")
+
+
+// Test source location information.
+func testSourceLocations(x: Int, yolo: Int, zulu: Int) {
+  // CHECK-MACRO-PRINTED: Source range for LHS is "MacroUser/macro_expand.swift": [[@LINE+3]]:5-[[@LINE+3]]:13
+  // CHECK-MACRO-PRINTED: Source range for LHS is "MacroUser/macro_expand.swift": [[@LINE+2]]:5-[[@LINE+2]]:6
+  _ = #leftHandOperandFinder(
+    x + yolo + zulu
+  )
+}
+
+// Make sure we don't crash with declarations produced by expansions.
+@freestanding(expression) macro nestedDeclInExpr() -> () -> Void = #externalMacro(module: "MacroDefinition", type: "NestedDeclInExprMacro")
+
+func testNestedDeclInExpr() {
+  let _: () -> Void = #nestedDeclInExpr
+}
+
+// Test non-arbitrary names
+@freestanding(declaration, names: named(A), named(B), named(foo), named(addOne))
+macro defineDeclsWithKnownNames() = #externalMacro(module: "MacroDefinition", type: "DefineDeclsWithKnownNamesMacro")
+
+// Freestanding macros are not in inlined scopes.
+// CHECK-SIL: sil_scope {{.*}} { loc "@__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_25defineDeclsWithKnownNamesfMf_.swift"{{.*}} -> Int }
+
+// FIXME: Macros producing arbitrary names are not supported yet
+#if false
+#bitwidthNumberedStructs("MyIntGlobal")
+
+#bitwidthNumberedStructs("MyIntGlobalTwo", blah: false)
+
+let blah = false
+#bitwidthNumberedStructs("MyIntGlobalThree", blah: blah)
+#endif
+
+// Test unqualified lookup from within a macro expansion
+let world = 3 // to be used by the macro expansion below
+#structWithUnqualifiedLookup()
+_ = StructWithUnqualifiedLookup().foo()
+
+#anonymousTypes { "hello" }
+
+func testFreestandingMacroExpansion() {
+  // Explicit structs to force macros to be parsed as decl.
+  struct Foo {
+    static let singleton = Foo()
+
+    static let s2 = Foo.singleton
+
+    #bitwidthNumberedStructs("MyIntOne")
+  }
+
+  // CHECK: MyIntOne8
+  print(Foo.MyIntOne8.self)
+  // CHECK: MyIntOne16
+  print(Foo.MyIntOne16.self)
+  // CHECK: MyIntOne32
+  print(Foo.MyIntOne32.self)
+  // CHECK: MyIntOne64
+  print(Foo.MyIntOne64.self)
+
+  struct Foo2 {
+    #bitwidthNumberedStructs("MyIntTwo", blah: false)
+    #defineDeclsWithKnownNames()
+  }
+  // CHECK: MyIntTwo8
+  print(Foo2.MyIntTwo8.self)
+  // CHECK: MyIntTwo16
+  print(Foo2.MyIntTwo16.self)
+  // CHECK: MyIntTwo32
+  print(Foo2.MyIntTwo32.self)
+  // CHECK: MyIntTwo64
+  print(Foo2.MyIntTwo64.self)
+  // CHECK: A
+  print(Foo2.A.self)
+  // CHECK: B
+  print(Foo2.B.self)
+  // CHECK: 1
+  print(Foo2().foo)
+  // CHECK: 2
+  print(Foo2().addOne(1))
+
+  #if TEST_DIAGNOSTICS
+  struct Foo3 {
+    #bitwidthNumberedStructs("BUG", blah: false)
+    // expected-note@-1 4{{in expansion of macro 'bitwidthNumberedStructs' here}}
+    /*
+    expected-expansion@-3:5 {{
+      expected-error@3:14{{unexpected non-void return value in void function}}
+      expected-note@3:14{{did you mean to add a return type?}}
+      expected-error@6:14{{unexpected non-void return value in void function}}
+      expected-note@6:14{{did you mean to add a return type?}}
+    }}
+    */
+    // CHECK-DIAGS: CONTENTS OF FILE @__swiftmacro_9MacroUser0023macro_expandswift_elFCffMX{{.*}}_23bitwidthNumberedStructsfMf_.swift
+    // CHECK-DIAGS: struct BUG {
+    // CHECK-DIAGS:   func $s9MacroUser0023macro_expandswift_elFCffMX{{.*}}_23bitwidthNumberedStructsfMf_6methodfMu_()
+    // CHECK-DIAGS:   func $s9MacroUser0023macro_expandswift_elFCffMX{{.*}}_23bitwidthNumberedStructsfMf_6methodfMu0{{_?}}()
+  }
+  #endif
+
+  // FIXME: Arbitrary name lookup is not yet supported.
+  // HECK: MyIntGlobal8
+  // print(MyIntGlobal8.self)
+  // HECK: MyIntGlobal16
+  // print(MyIntGlobal16.self)
+  // HECK: MyIntGlobal32
+  // print(MyIntGlobal32.self)
+  // HECK: MyIntGlobal64
+  // print(MyIntGlobal64.self)
+
+  #anonymousTypes { "hello" }
+}
+testFreestandingMacroExpansion()
+
+// Explicit structs to force macros to be parsed as decl.
+var globalBool = true
+struct ContainerOfNumberedStructs {
+  #bitwidthNumberedStructs("MyIntOne")
+  #bitwidthNumberedStructs("MyIntTwo", blah: globalBool)
+}
+
+// Avoid re-type-checking declaration macro arguments.
+func testFreestandingWithClosure(i: Int) {
+  #freestandingWithClosure(i) { x in x }
+
+  #freestandingWithClosure(i) {
+    let x = $0
+    return x
+  }
+}
+
+// Nested macros with closures
+@freestanding(expression) macro coerceToInt<T>(_ value: T) -> Int = #externalMacro(module: "MacroDefinition", type: "CoerceToIntMacro")
+
+func testFreestandingClosureNesting() {
+  _ = #stringify({ () -> Int in
+    #coerceToInt(2)
+  })
+}
+
+// Freestanding declaration macros that produce local variables
+func testLocalVarsFromDeclarationMacros() {
+  #varValue
+}
+
+// Variadic macro
+@freestanding(declaration, names: arbitrary) macro emptyDecl(_: String...) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+
+struct TakesVariadic {
+  #emptyDecl("foo", "bar")
+}
+
+// Funkiness with static functions introduced via macro expansions.
+@freestanding(declaration, names: named(foo())) public macro staticFooFunc() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+@freestanding(declaration, names: arbitrary) public macro staticFooFuncArbitrary() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
+
+class HasAnExpandedStatic {
+  #staticFooFunc()
+}
+
+class HasAnExpandedStatic2 {
+  #staticFooFuncArbitrary()
+}
+
+func testHasAnExpandedStatic() {
+#if TEST_DIAGNOSTICS
+  foo() // expected-error{{cannot find 'foo' in scope}}
+#endif
+}
+
+@freestanding(declaration, names: named(==)) public macro addSelfEqualsOperator() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@freestanding(declaration, names: arbitrary) public macro addSelfEqualsOperatorArbitrary() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@attached(member, names: named(==)) public macro AddSelfEqualsMemberOperator() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+@attached(member, names: arbitrary) public macro AddSelfEqualsMemberOperatorArbitrary() = #externalMacro(module: "MacroDefinition", type: "SelfAlwaysEqualOperator")
+
+struct HasEqualsSelf {
+  #addSelfEqualsOperator
+}
+
+struct HasEqualsSelf2 {
+  #addSelfEqualsOperatorArbitrary
+}
+
+@AddSelfEqualsMemberOperator
+struct HasEqualsSelf3 {
+}
+
+@AddSelfEqualsMemberOperatorArbitrary
+struct HasEqualsSelf4 {
+}
+
+protocol SelfEqualsBoolProto { // expected-note 4{{where 'Self' =}}
+  static func ==(lhs: Self, rhs: Bool) -> Bool
+}
+
+struct HasEqualsSelfP: SelfEqualsBoolProto {
+  #addSelfEqualsOperator
+}
+
+struct HasEqualsSelf2P: SelfEqualsBoolProto {
+  #addSelfEqualsOperatorArbitrary
+}
+
+@AddSelfEqualsMemberOperator
+struct HasEqualsSelf3P: SelfEqualsBoolProto {
+}
+
+@AddSelfEqualsMemberOperatorArbitrary
+struct HasEqualsSelf4P: SelfEqualsBoolProto {
+}
+
+func testHasEqualsSelf(
+  x: HasEqualsSelf, y: HasEqualsSelf2, z: HasEqualsSelf3, w: HasEqualsSelf4,
+  xP: HasEqualsSelfP, yP: HasEqualsSelf2P, zP: HasEqualsSelf3P,
+  wP: HasEqualsSelf4P
+) {
+#if TEST_DIAGNOSTICS
+  // Global operator lookup doesn't find member operators introduced by macros.
+  _ = (x == true) // expected-error{{referencing operator function '=='}}
+  _ = (y == true) // expected-error{{referencing operator function '=='}}
+  _ = (z == true) // expected-error{{referencing operator function '=='}}
+  _ = (w == true) // expected-error{{referencing operator function '=='}}
+#endif
+
+  // These should be found through the protocol.
+  _ = (xP == true)
+  _ = (yP == true)
+  _ = (zP == true)
+  _ = (wP == true)
+}
+
+// Macro whose implementation is both an expression and declaration macro.
+@freestanding(declaration)
+macro AsDeclMacro<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "ExprAndDeclMacro")
+
+@freestanding(expression)
+macro AsExprMacro<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "ExprAndDeclMacro")
+
+func testExpressionAndDeclarationMacro() {
+  #AsExprMacro(1 + 1) // expected-warning{{expression of type '(Int, String)' is unused}}
+  struct Inner {
+    #AsDeclMacro(1 + 1)
+  }
+  #AsDeclMacro(1 + 1)
+}
+
+// Expression macro implementation with declaration macro role
+@freestanding(declaration) macro stringifyAsDeclMacro<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+func testExpressionAsDeclarationMacro() {
+#if TEST_DIAGNOSTICS
+  #stringifyAsDeclMacro(1+1)
+  // expected-error@-1{{macro implementation type 'StringifyMacro' doesn't conform to required protocol 'DeclarationMacro' (from macro 'stringifyAsDeclMacro')}}
+#endif
+}
+
+// Deprecated macro
+@available(*, deprecated, message: "This macro is deprecated.")
+@freestanding(expression) macro deprecatedStringify<T>(_ value: T) -> (T, String) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+@available(*, deprecated, message: "This macro is deprecated.")
+@freestanding(declaration) macro deprecatedStringifyAsDeclMacro<T>(_ value: T) = #externalMacro(module: "MacroDefinition", type: "StringifyMacro")
+
+func testDeprecated() {
+  // expected-warning@+1{{'deprecatedStringify' is deprecated: This macro is deprecated.}}
+  _ = #deprecatedStringify(1 + 1)
+}
+
+#if TEST_DIAGNOSTICS
+struct DeprecatedStructWrapper {
+  // expected-error@+2{{macro implementation type 'StringifyMacro' doesn't conform to required protocol 'DeclarationMacro' (from macro 'deprecatedStringifyAsDeclMacro')}}
+  // expected-warning@+1{{'deprecatedStringifyAsDeclMacro' is deprecated: This macro is deprecated.}}
+  #deprecatedStringifyAsDeclMacro(1 + 1)
+}
+#endif
+
+
+@freestanding(declaration, names: named(ComparableType))
+macro DefineComparableType() = #externalMacro(module: "MacroDefinition", type: "DefineComparableTypeMacro")
+
+struct HasNestedType {
+  #DefineComparableType
+}
+
+@attached(accessor)
+macro AddGetter() = #externalMacro(module: "MacroDefinition", type: "AddGetterMacro")
+
+// Make sure the mangling for the accessor macro doesn't kick local
+// discriminator assignment, which would miss the autoclosure.
+func testLocalAccessorMacroWithAutoclosure() {
+  @AddGetter
+  var x: Int = 2
+
+  func takesAutoclosure(_ x: @autoclosure () -> Int) {}
+  takesAutoclosure(1)
+}
+
+@propertyWrapper
+struct SomePropertyWrapper<T> {
+  var wrappedValue: T
+  init(wrappedValue: T) {
+    self.wrappedValue = wrappedValue
+  }
+  init(projectedValue: Self) {
+    self = projectedValue
+  }
+  var projectedValue: Self { self }
+}
+
+// Property wrappers on macros probably aren't all that useful, but make sure
+// we don't crash.
+@freestanding(expression)
+macro hasPropertyWrapperParam(@SomePropertyWrapper x: Int) = #externalMacro(module: "MacroDefinition", type: "GenericToVoidMacro")
+
+func testPropertyWrapperMacro() {
+  #hasPropertyWrapperParam(x: 0)
+  #hasPropertyWrapperParam($x: .init(wrappedValue: 0))
+}
+
+#if swift(>=1.0) && TEST_DIAGNOSTICS
+// Test that macros can't be used in @abi
+
+struct ABIAttrWithFreestandingMacro1 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  #varValue
+  // expected-note@-1 {{in expansion of macro 'varValue' here}}
+  /*
+  expected-expansion@-3:3 {{
+    expected-error@2:6{{cannot use pound literal in '@abi'}}
+  }}
+  */
+}
+
+struct ABIAttrWithFreestandingMacro2 {
+  // expected-error@+1 {{cannot use pound literal in '@abi'}}
+  @abi(#varValue)
+  var value: Int { 0 }
+}
+
+struct ABIAttrWithFreestandingMacro3 {
+  @abi(var value: Int)
+  #varValue
+}
+
+#endif
+
+#if TEST_DIAGNOSTICS
+@freestanding(expression)
+macro missingMacro() = #externalMacro(module: "MacroDefinition", type: "BluhBlah")
+// FIXME: xpected-warning@-1 {{external macro implementation type 'MacroDefinition.BluhBlah' could not be found for macro 'missingMacro()'; 'MacroDefinition.BluhBlah' could not be found in library plugin '}}
+@freestanding(expression)
+macro notMacro() = #externalMacro(module: "MacroDefinition", type: "NotMacroStruct")
+// FIXME: xpected-warning@-1 {{macro implementation type 'MacroDefinition.NotMacroStruct' could not be found for macro 'notMacro()'; 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}
+
+// Because this is a method in a local decl, it ends up getting delayed, so
+// we need to check it at the end of the file.
+// FIXME: We either need to switch to using CHECK-DAG, or ideally teach
+// the diagnostic verifier about macro expansion buffers.
+func invalidDeclarationMacro2() {
+  struct LocalThing1 {
+    func f() {
+      #accidentalCodeItem
+      // expected-note@-1 {{in expansion of macro 'accidentalCodeItem' here}}
+      /*
+      expected-expansion@-3:7 {{
+        expected-error@1:1{{expected macro expansion to produce a declaration}}
+      }}
+      */
+    }
+  }
+}
+#endif
+
+// Make sure we compute captures for the introduced stored property here.
+struct HasStoredProperty {
+  #AddStoredProperty(0)
+}
+class HasStoredPropertyClass {
+  #AddStoredProperty(0)
+}

@@ -1,0 +1,283 @@
+// RUN: %target-sil-opt -test-runner -enable-sil-opaque-values %s -o /dev/null 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage raw
+
+import Builtin
+
+class C {
+  init()
+}
+
+struct CPair {
+  var a: C
+  var b: C
+}
+
+public enum OptionalC {
+  case none
+  case some(C)
+}
+
+// Test all the basic singleForwarededOperand implementations.
+//
+// CHECK-LABEL: begin running test 1 of 2 on forwardingTest: forwarding_def_use_test with: %0
+// CHECK: USE: operand #0 of   destroy_value %{{.*}} : $(OptionalC, C)
+// CHECK-LABEL: end running test 1 of 2 on forwardingTest: forwarding_def_use_test with: %0
+//
+// CHECK-LABEL: begin running test 2 of 2 on forwardingTest: forwarding_use_def_test with: %final
+// CHECK: INTRODUCER: %0 = argument of bb0 : $C
+// CHECK: INTRODUCER: %1 = argument of bb0 : $C
+// CHECK-LABEL: end running test 2 of 2 on forwardingTest: forwarding_use_def_test with: %final
+sil [ossa] @forwardingTest : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%0 : @owned $C, %1 : @owned $C):
+  %word0 = integer_literal $Builtin.Word, 0
+  %word1 = integer_literal $Builtin.Word, 1
+  %bridge = ref_to_bridge_object %0: $C, %word0: $Builtin.Word
+  %ref = bridge_object_to_ref %bridge: $Builtin.BridgeObject to $C
+  %dependence = mark_dependence %ref: $C on %1: $C
+  %cast = unchecked_ref_cast %dependence: $C to $C
+  %pair1 = struct $CPair (%cast: $C, %1: $C)
+  (%pair_a, %pair_b) = destructure_struct %pair1: $CPair
+  %optional = enum $OptionalC, #OptionalC.some!enumelt, %pair_a: $C
+  %final = tuple (%optional: $OptionalC, %pair_b: $C)
+
+  specify_test "forwarding_def_use_test %0"
+  specify_test "forwarding_use_def_test %final"
+
+  destroy_value %final: $(OptionalC, C)
+  %void = tuple()
+  return %void : $()
+}
+
+// In opaque SIL values mode, handle the tuple_pack_extract forwarded operand.
+//
+// CHECK-LABEL: begin running test 1 of 2 on tuplePackExtractTest: forwarding_def_use_test with: %tuple
+// CHECK: USE: operand #0 of   end_borrow %1 : $(repeat each T)
+// CHECK: USE: operand #0 of   %{{.*}} = copy_value %{{.*}} : $@pack_element("00000000-0000-0000-0000-000000000002") each U_1
+// CHECK-LABEL: end running test 1 of 2 on tuplePackExtractTest: forwarding_def_use_test with: %tuple
+//
+// CHECK-LABEL: begin running test 2 of 2 on tuplePackExtractTest: forwarding_use_def_test with: %final
+// CHECK: INTRODUCER: %1 = load_borrow %0 : $*(repeat each T)
+// CHECK-LABEL: end running test 2 of 2 on tuplePackExtractTest: forwarding_use_def_test with: %final
+sil [ossa] @tuplePackExtractTest : $@convention(thin) <each T> (@in_guaranteed (repeat each T)) -> () {
+entry(%tuple_addr : $*(repeat each T)):
+  %tuple = load_borrow %tuple_addr : $*(repeat each T)
+  %zero = integer_literal $Builtin.Word, 0
+  %index = dynamic_pack_index %zero of $Pack{repeat each T}
+  %opened = open_pack_element %index of <each U_1> at <Pack{repeat each T}>, shape $U_1, uuid "00000000-0000-0000-0000-000000000002"
+  %final = tuple_pack_extract %index of %tuple : $(repeat each T) as $@pack_element("00000000-0000-0000-0000-000000000002") U_1
+
+  specify_test "forwarding_def_use_test %tuple"
+  specify_test "forwarding_use_def_test %final"
+
+  %copy = copy_value %final : $@pack_element("00000000-0000-0000-0000-000000000002") U_1
+  end_borrow %tuple : $(repeat each T)
+  destroy_value %copy : $@pack_element("00000000-0000-0000-0000-000000000002") U_1
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// Handle forwarded guaranteed values.
+//
+// CHECK-LABEL: begin running test 1 of 2 on forwardingGuaranteedTest: forwarding_def_use_test with: %0
+// CHECK: USE: dead value:   %5 = tuple (%3 : $C, %4 : $C)
+// CHECK-LABEL: end running test 1 of 2 on forwardingGuaranteedTest: forwarding_def_use_test with: %0
+//
+// CHECK-LABEL: begin running test 2 of 2 on forwardingGuaranteedTest: forwarding_use_def_test with: %t1
+// CHECK: INTRODUCER: %0 = argument of bb0 : $C
+// CHECK: INTRODUCER: %1 = argument of bb0 : $C
+// CHECK-LABEL: end running test 2 of 2 on forwardingGuaranteedTest: forwarding_use_def_test with: %t1
+sil [ossa] @forwardingGuaranteedTest : $@convention(thin) (@guaranteed C, @guaranteed C) -> () {
+entry(%0 : @guaranteed $C, %1 : @guaranteed $C):
+  %t0 = tuple (%0: $C, %1: $C)
+  %t00 = tuple_extract %t0: $(C, C), 0
+  %t01 = tuple_extract %t0: $(C, C), 1
+  %t1 = tuple (%t00: $C, %t01: $C)
+
+  specify_test "forwarding_def_use_test %0"
+  specify_test "forwarding_use_def_test %t1"
+
+  %void = tuple()
+  return %void : $()
+}
+
+// A borrow scope currently intoduces a lifetime.
+//
+// CHECK-LABEL: begin running test 1 of 2 on forwardingBorrowTest: forwarding_def_use_test with: %0
+// CHECK: USE: operand #0 of   destroy_value %0 : $CPair
+// CHECK: USE: operand #0 of   %{{.*}} = begin_borrow %0 : $CPair
+// CHECK-LABEL: end running test 1 of 2 on forwardingBorrowTest: forwarding_def_use_test with: %0
+//
+// CHECK-LABEL: begin running test 2 of 2 on forwardingBorrowTest: forwarding_use_def_test with: %field
+// CHECK: INTRODUCER:   %{{.*}} = begin_borrow %0 : $CPair
+// CHECK-LABEL: end running test 2 of 2 on forwardingBorrowTest: forwarding_use_def_test with: %field
+sil [ossa] @forwardingBorrowTest : $@convention(thin) (@owned CPair) -> () {
+entry(%0 : @owned $CPair):
+  %borrow = begin_borrow %0 : $CPair
+  %field = struct_extract %borrow: $CPair, #CPair.a
+
+  specify_test "forwarding_def_use_test %0"
+  specify_test "forwarding_use_def_test %field"
+
+  end_borrow %borrow : $CPair
+  destroy_value %0: $CPair  
+  %void = tuple()
+  return %void : $()
+}  
+
+// Test forwarding switch_enum.
+//
+// CHECK-LABEL: begin running test 1 of 2 on forwardingSwitchTest: forwarding_def_use_test with: %0
+// CHECK: USE: operand #0 of   destroy_value %{{.*}} : $C
+// CHECK-LABEL: end running test 1 of 2 on forwardingSwitchTest: forwarding_def_use_test with: %0
+//
+// CHECK-LABEL: begin running test 2 of 2 on forwardingSwitchTest: forwarding_use_def_test with: %result
+// CHECK: INTRODUCER: %0 = argument of bb0 : $OptionalC
+// CHECK-LABEL: end running test 2 of 2 on forwardingSwitchTest: forwarding_use_def_test with: %result
+sil [ossa] @forwardingSwitchTest : $@convention(thin) (@owned OptionalC) -> () {
+entry(%0 : @owned $OptionalC):
+  specify_test "forwarding_def_use_test %0"
+  switch_enum %0 : $OptionalC, case #OptionalC.some: bbSome, default bbNone
+
+bbSome(%result: @owned $C):
+  specify_test "forwarding_use_def_test %result"
+  destroy_value %result: $C
+  br bbExit
+
+bbNone:
+  br bbExit
+
+bbExit:
+  %void = tuple()
+  return %void : $()
+}
+
+// Test forwarding checked_cast_br.
+//
+// CHECK-LABEL: begin running test 1 of 2 on forwardingCheckedCastTest: forwarding_def_use_test with: %0
+// CHECK: USE: operand #0 of   destroy_value %{{.*}} : $C
+// CHECK: USE: operand #0 of   destroy_value %{{.*}} : $C
+// CHECK-LABEL: end running test 1 of 2 on forwardingCheckedCastTest: forwarding_def_use_test with: %0
+//
+// CHECK-LABEL: begin running test 2 of 2 on forwardingCheckedCastTest: forwarding_use_def_test with: %passResult
+// CHECK: INTRODUCER: %0 = argument of bb0 : $C
+// CHECK-LABEL: end running test 2 of 2 on forwardingCheckedCastTest: forwarding_use_def_test with: %passResult
+sil [ossa] @forwardingCheckedCastTest : $@convention(thin) (@owned C) -> () {
+entry(%0 : @owned $C):
+  specify_test "forwarding_def_use_test %0"
+  checked_cast_br C in %0 : $C to C, bbPass, bbFail
+
+bbPass(%passResult: @owned $C):
+  specify_test "forwarding_use_def_test %passResult"
+  destroy_value %passResult: $C
+  br bbExit
+
+bbFail(%failResult: @owned $C):
+  destroy_value %failResult: $C
+  br bbExit
+
+bbExit:
+  %void = tuple()
+  return %void : $()
+}
+
+// Test forwarding phis.
+//
+// CHECK-LABEL: begin running test 1 of 2 on forwardingPhiTest: forwarding_def_use_test with: %0
+// CHECK: USE: operand #0 of   destroy_value %{{.*}} : $C
+// CHECK-LABEL: end running test 1 of 2 on forwardingPhiTest: forwarding_def_use_test with: %0
+//
+// CHECK-LABEL: begin running test 2 of 2 on forwardingPhiTest: forwarding_use_def_test with: %cast
+// CHECK: INTRODUCER: %0 = argument of bb0 : $C
+// CHECK-LABEL: end running test 2 of 2 on forwardingPhiTest: forwarding_use_def_test with: %cast
+sil [ossa] @forwardingPhiTest : $@convention(thin) (@owned C) -> () {
+entry(%0 : @owned $C):
+  specify_test "forwarding_def_use_test %0"
+  br bbLoop(%0 : $C)
+
+bbLoop(%loop : @owned $C):
+  %cast = unchecked_ref_cast %loop: $C to $C
+  cond_br undef, bbTail, bbExit
+
+bbTail:
+  br bbLoop(%cast: $C)
+
+bbExit:
+  specify_test "forwarding_use_def_test %cast"
+  destroy_value %cast: $C
+  %void = tuple()
+  return %void : $()
+}
+
+// Chain of owned values. Needs to resolve in a reasonable amount of time.
+//
+// CHECK-LABEL: begin running test 1 of 2 on forwardingTuplesTest: forwarding_def_use_test with: %0
+// CHECK: USE: operand #0 of   destroy_value %{{.*}} : $(C, C)
+// CHECK-LABEL: end running test 1 of 2 on forwardingTuplesTest: forwarding_def_use_test with: %0
+//
+// CHECK-LABEL: begin running test 2 of 2 on forwardingTuplesTest: forwarding_use_def_test with: %final
+// CHECK: INTRODUCER: %0 = argument of bb0 : $C
+// CHECK: INTRODUCER: %1 = argument of bb0 : $C
+// CHECK-LABEL: end running test 2 of 2 on forwardingTuplesTest: forwarding_use_def_test with: %final
+sil [ossa] @forwardingTuplesTest : $@convention(thin) (@owned C, @owned C) -> () {
+entry(%0 : @owned $C, %1 : @owned $C):
+  specify_test "forwarding_def_use_test %0"
+
+  %t0 = tuple (%0: $C, %1: $C)
+  (%t1_0, %t1_1) = destructure_tuple %t0: $(C, C)
+  %t1 = tuple (%t1_0: $C, %t1_1: $C)
+  (%t2_0, %t2_1) = destructure_tuple %t1: $(C, C)
+  %t2 = tuple (%t2_0: $C, %t2_1: $C)
+  (%t3_0, %t3_1) = destructure_tuple %t2: $(C, C)
+  %t3 = tuple (%t3_0: $C, %t3_1: $C)
+  (%t4_0, %t4_1) = destructure_tuple %t3: $(C, C)
+  %t4 = tuple (%t4_0: $C, %t4_1: $C)
+  (%t5_0, %t5_1) = destructure_tuple %t4: $(C, C)
+  %t5 = tuple (%t5_0: $C, %t5_1: $C)
+  (%t6_0, %t6_1) = destructure_tuple %t5: $(C, C)
+  %t6 = tuple (%t6_0: $C, %t6_1: $C)
+  (%t7_0, %t7_1) = destructure_tuple %t6: $(C, C)
+  %t7 = tuple (%t7_0: $C, %t7_1: $C)
+  (%t8_0, %t8_1) = destructure_tuple %t7: $(C, C)
+  %t8 = tuple (%t8_0: $C, %t8_1: $C)
+  (%t9_0, %t9_1) = destructure_tuple %t8: $(C, C)
+  %t9 = tuple (%t9_0: $C, %t9_1: $C)
+  (%t10_0, %t10_1) = destructure_tuple %t9: $(C, C)
+  %t10 = tuple (%t10_0: $C, %t10_1: $C)
+  (%t11_0, %t11_1) = destructure_tuple %t10: $(C, C)
+  %t11 = tuple (%t11_0: $C, %t11_1: $C)
+  (%t12_0, %t12_1) = destructure_tuple %t11: $(C, C)
+  %t12 = tuple (%t12_0: $C, %t12_1: $C)
+  (%t13_0, %t13_1) = destructure_tuple %t12: $(C, C)
+  %t13 = tuple (%t13_0: $C, %t13_1: $C)
+  (%t14_0, %t14_1) = destructure_tuple %t13: $(C, C)
+  %t14 = tuple (%t14_0: $C, %t14_1: $C)
+  (%t15_0, %t15_1) = destructure_tuple %t14: $(C, C)
+  %t15 = tuple (%t15_0: $C, %t15_1: $C)
+  (%t16_0, %t16_1) = destructure_tuple %t15: $(C, C)
+  %t16 = tuple (%t16_0: $C, %t16_1: $C)
+  (%t17_0, %t17_1) = destructure_tuple %t16: $(C, C)
+  %t17 = tuple (%t17_0: $C, %t17_1: $C)
+  (%t18_0, %t18_1) = destructure_tuple %t17: $(C, C)
+  %t18 = tuple (%t18_0: $C, %t18_1: $C)
+  (%t19_0, %t19_1) = destructure_tuple %t18: $(C, C)
+  %t19 = tuple (%t19_0: $C, %t19_1: $C)
+  (%t20_0, %t20_1) = destructure_tuple %t19: $(C, C)
+  %t20 = tuple (%t20_0: $C, %t20_1: $C)
+  (%t21_0, %t21_1) = destructure_tuple %t20: $(C, C)
+  %t21 = tuple (%t21_0: $C, %t21_1: $C)
+  (%t22_0, %t22_1) = destructure_tuple %t21: $(C, C)
+  %t22 = tuple (%t22_0: $C, %t22_1: $C)
+  (%t23_0, %t23_1) = destructure_tuple %t22: $(C, C)
+  %t23 = tuple (%t23_0: $C, %t23_1: $C)
+  (%t24_0, %t24_1) = destructure_tuple %t23: $(C, C)
+  %final = tuple (%t24_0: $C, %t24_1: $C)
+
+  specify_test "forwarding_use_def_test %final"
+
+  destroy_value %final: $(C, C)
+  %void = tuple()
+  return %void : $()
+}

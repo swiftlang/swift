@@ -298,14 +298,6 @@ code for the target that is not the build machine:
 
   Add ``REQUIRES: executable_test`` to the test.
 
-* ``%target-run-simple-swift``: build a one-file Swift program and run it on
-  the target machine.
-
-  Use this substitution for executable tests that don't require special
-  compiler arguments.
-
-  Add ``REQUIRES: executable_test`` to the test.
-
 * ``%target-run-stdlib-swift``: like ``%target-run-simple-swift`` with
   ``-parse-stdlib -Xfrontend -disable-access-control``.
 
@@ -343,6 +335,12 @@ code for the target that is not the build machine:
   *other arguments*: run ``swift-frontend`` for the target, emitting a
   swiftinterface to the given path and passing additional default flags
   appropriate for resilient frameworks.
+
+* ``%target-swift-emit-module-interfaces(`` *swift interface path*,
+  *swift private interface path* ``)`` *other arguments*:
+  run ``swift-frontend`` for the target, emitting both swiftinterfaces
+  to the given paths and passing additional default flags appropriate for
+  resilient frameworks.
 
 * ``%target-swift-typecheck-module-from-interface(`` *swift interface path*
   ``)`` *other arguments*: run ``swift-frontend`` for the target, verifying
@@ -483,6 +481,11 @@ Other substitutions:
   directory exists and is empty.  Equivalent to
   ``rm -rf directory-name && mkdir -p directory-name``.
 
+* ``%host_sdk%``, ``%host_triple%``: Host SDK path and triple for '-target'.
+  These can be used for build host tools/libraries in test cases.
+
+* ``%host-swift-build``: Build swift tools/libraries for the host.
+
 When writing a test where output (or IR, SIL) depends on the bitness of the
 target CPU, use this pattern::
 
@@ -537,6 +540,27 @@ FIXME: full list.
 
 * ``XFAIL: linux``: tests that need to be adapted for Linux, for example parts
   that depend on Objective-C interop need to be split out.
+
+#### Features ``REQUIRES: swift_feature_...``
+
+Each of the Swift compiler features defined in `include/swift/Basic/Features.def`
+will get a LLVM Lit feature prefixing `swift_feature_` to the feature name
+automatically. The LLVM Lit features will be available only in those
+configurations where the compiler supports the given feature, and will not be
+available when the compiler does not support the feature. This means that
+standard language features and upcoming features will always be available,
+while experimental features will only be available when the compiler supports
+them.
+
+For every test that uses `--enable-experimental-feature` or
+`--enable-upcoming-feature` add a `REQUIRES: swift_feature_...` for each of the
+used features. The `Misc/verify-swift-feature-testing.test-sh` will check that
+every test with those command line arguments have the necessary `REQUIRES:` and
+fail otherwise.
+
+Do NOT add `REQUIRES: asserts` for experimental features anymore. The correct
+usage of `REQUIRES: swift_feature_...` will take care of testing the feature as
+it evolves from experimental, to upcoming, to language feature.
 
 #### Feature ``REQUIRES: executable_test``
 
@@ -595,3 +619,36 @@ actually unblocks PR testing by running the smoke test build preset locally.
 To enable the lldb test allowlist, add `-G swiftpr` to the
 `LLDB_TEST_CATEGORIES` variable in `utils/build-script-impl`. Disable it by
 removing that option.
+
+#### String constants in IR tests
+
+IRGen often needs to create private constants containing the NUL-terminated
+contents of strings, such as for string literals in user code or names in type
+metadata. When it does, IRGen names them in a specific format: they will
+have the prefix `.str.`, followed by the size in bytes (excluding terminator),
+followed by a `.`, followed by the contents of the string (excluding
+terminator). For example:
+
+```
+@.str.5.Hello             ; A constant containing "Hello\0"
+@".str.11.Hello World"    ; A constant containing "Hello World\0"
+@".str.7.Hello!\0A"       ; A constant containing "Hello!\n\0"
+@".str.4.\F0\9F\8F\8E"    ; A constant containing "🏎️\0"
+@.str.0.                  ; A constant containing "\0"
+```
+
+When writing IRGen tests, you can assume that names in this format have the
+expected contents, so you don't need to capture the constant's name and then
+check that it's referred to correctly at the use site.
+
+Note that this name format treats NUL characters (\00) specially. All string
+constants generated in this manner are NUL-terminated, so the terminator is not
+included in the count *or* the content. To work around LLVM IR limitations, NUL
+characters elsewhere in the content are replaced with `_` and a `.nul<index>`
+suffix is appended to the name, in order from lowest to highest index:
+
+```
+@.str.1._.nul0            ; A constant containing "\0\0"
+@.str.2.__.nul0.nul1      ; A constant containing "\0\0\0"
+@".str.6.nul: _.nul5"     ; A constant containing "nul: \0\0"
+```

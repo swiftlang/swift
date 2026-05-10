@@ -5,3 +5,9 @@ struct IdentifiableValue: Identifiable {
 }
 
 class IdentifiableClass: Identifiable {}
+
+extension IdentifiableValue {
+  var nextID: ID {
+    return id + 1
+  }
+}

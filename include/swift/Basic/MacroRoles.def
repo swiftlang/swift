@@ -1,0 +1,90 @@
+//===--- MacroRoles.def - Known macro roles --*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+// This file defines all of the kinds of macro roles. Clients should define
+// either MACRO_ROLE or both ATTACHED_MACRO_ROLE and FREESTANDING_MACRO_ROLE.
+//
+// The order of the macro roles in this file is significant for the
+// serialization of module files. Please do not re-order the entries without
+// also bumping the module format version. When introducing new macro roles,
+// please add them to the end of the file.
+//
+//===----------------------------------------------------------------------===//
+
+#ifndef ATTACHED_MACRO_ROLE
+#  define ATTACHED_MACRO_ROLE(Name, Description, MangledChar) MACRO_ROLE(Name, Description)
+#endif
+
+#ifndef FREESTANDING_MACRO_ROLE
+#  define FREESTANDING_MACRO_ROLE(Name, Description) MACRO_ROLE(Name, Description)
+#endif
+
+#ifndef EXPERIMENTAL_ATTACHED_MACRO_ROLE
+#  define EXPERIMENTAL_ATTACHED_MACRO_ROLE(Name, Description, MangledChar, Feature) \
+     ATTACHED_MACRO_ROLE(Name, Description, MangledChar)
+#endif
+
+#ifndef EXPERIMENTAL_FREESTANDING_MACRO_ROLE
+#  define EXPERIMENTAL_FREESTANDING_MACRO_ROLE(Name, Description, Feature) \
+     FREESTANDING_MACRO_ROLE(Name, Description)
+#endif
+
+/// An expression macro, referenced explicitly via "#stringify" or similar
+/// in the source code.
+FREESTANDING_MACRO_ROLE(Expression, "expression")
+
+/// A freestanding declaration macro.
+FREESTANDING_MACRO_ROLE(Declaration, "declaration")
+
+
+/// An attached macro that declares accessors for a variable or subscript
+/// declaration.
+ATTACHED_MACRO_ROLE(Accessor, "accessor", "a")
+
+/// An attached macro that generates attributes for the
+/// members inside the declaration.
+ATTACHED_MACRO_ROLE(MemberAttribute, "memberAttribute", "r")
+
+/// An attached macro that generates synthesized members
+/// inside the declaration.
+ATTACHED_MACRO_ROLE(Member, "member", "m")
+
+/// An attached macro that generates declarations that are peers
+/// of the declaration the macro is attached to.
+ATTACHED_MACRO_ROLE(Peer, "peer", "p")
+
+/// An attached macro that adds conformances to the declaration the
+/// macro is attached to.
+ATTACHED_MACRO_ROLE(Conformance, "conformance", "c")
+
+/// A freestanding macro that expands to expressions, statements and
+/// declarations in a code block.
+EXPERIMENTAL_FREESTANDING_MACRO_ROLE(CodeItem, "codeItem", CodeItemMacros)
+
+/// An attached macro that adds extensions to the declaration the
+/// macro is attached to.
+ATTACHED_MACRO_ROLE(Extension, "extension", "e")
+
+/// An attached macro that expands to a preamble to a function.
+EXPERIMENTAL_ATTACHED_MACRO_ROLE(Preamble, "preamble", "q", PreambleMacros)
+
+/// An attached macro that expands to a function body.
+ATTACHED_MACRO_ROLE(Body, "body", "b")
+
+#undef ATTACHED_MACRO_ROLE
+#undef FREESTANDING_MACRO_ROLE
+#undef EXPERIMENTAL_ATTACHED_MACRO_ROLE
+#undef EXPERIMENTAL_FREESTANDING_MACRO_ROLE
+
+#ifdef MACRO_ROLE
+#  undef MACRO_ROLE
+#endif

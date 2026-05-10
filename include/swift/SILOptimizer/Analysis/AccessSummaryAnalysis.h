@@ -108,7 +108,7 @@ public:
   public:
     FunctionSummary(unsigned argCount) : ArgAccesses(argCount) {}
 
-    /// Returns of summary of the the function accesses that argument at the
+    /// Returns of summary of the function accesses that argument at the
     /// given index.
     ArgumentSummary &getAccessForArgument(unsigned argument) {
       return ArgAccesses[argument];
@@ -122,6 +122,7 @@ public:
     unsigned getArgumentCount() const { return ArgAccesses.size(); }
 
     void print(raw_ostream &os, SILFunction *fn) const;
+    void dump(SILFunction *fn) const;
   };
 
   class FunctionInfo;
@@ -204,6 +205,12 @@ public:
                                            SILModule &M,
                                            TypeExpansionContext context);
 
+  /// Returns the type associated with the subpath \p SubPath.
+  ///
+  /// \p BaseType must be the type of the root of the path.
+  static SILType getSubPathType(SILType BaseType, const IndexTrieNode *SubPath,
+                                SILModule &M, TypeExpansionContext context);
+
   /// Performs a lexicographic comparison of two subpaths, first by path length
   /// and then by index of the last path component. Returns true when lhs
   /// is less than rhs.
@@ -229,7 +236,7 @@ private:
   void processFunction(FunctionInfo *info, FunctionOrder &order);
 
   /// Summarize how the function uses the given argument.
-  void processArgument(FunctionInfo *info, SILFunctionArgument *argment,
+  void processArgument(FunctionInfo *info, SILFunctionArgument *argument,
                         ArgumentSummary &summary, FunctionOrder &order);
 
   /// Summarize a partial_apply instruction.

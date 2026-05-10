@@ -1,4 +1,4 @@
-// RUN: %swift -typecheck -verify -parse-stdlib -target i386-apple-watchos2.0 %s
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target i386-apple-watchos2.0 %s
 
 @available(watchOS, introduced: 1.0, deprecated: 1.5, obsoleted: 2.0,
               message: "you don't want to do that anyway")
@@ -59,7 +59,7 @@ if #available(iOS 9.3, *) {
 }
 
 if #available(iOS 9.3, watchOS 2.1, *) {
-  functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available in watchOS 2.2 or newer}} {{32-35=2.2}}
+  functionIntroducedOnwatchOS2_2() // expected-error {{'functionIntroducedOnwatchOS2_2()' is only available in watchOS 2.2 or newer}} {{-1:32-35=2.2}}
 }
 
 if #available(iOS 9.1, watchOS 2.2, *) {

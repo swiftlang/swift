@@ -23,7 +23,7 @@ UnicodeScalarPropertiesTests.test("properties.booleanProperties") {
       falseScalar.properties[keyPath: keyPath], message, file: file, line: line)
   }
 
-  // Some sanity checks for basic properties. Not intended to be comprehensive.
+  // Some soundness checks for basic properties. Not intended to be comprehensive.
   expectBooleanProperty(\.isAlphabetic, trueFor: "A", falseFor: "5")
   expectBooleanProperty(\.isASCIIHexDigit, trueFor: "F", falseFor: "G")
   // U+200E LEFT-TO-RIGHT MARK

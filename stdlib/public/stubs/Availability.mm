@@ -19,8 +19,8 @@
 #if SWIFT_OBJC_INTEROP && defined(SWIFT_RUNTIME_OS_VERSIONING)
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Debug.h"
+#include "swift/shims/FoundationShims.h"
 #include <TargetConditionals.h>
-#include "SwiftShims/FoundationShims.h"
 
 struct os_system_version_s {
     unsigned int major;

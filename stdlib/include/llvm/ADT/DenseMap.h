@@ -89,7 +89,7 @@ public:
     return makeConstIterator(getBucketsEnd(), getBucketsEnd(), true);
   }
 
-  LLVM_NODISCARD bool empty() const {
+  [[nodiscard]] bool empty() const {
     return getNumEntries() == 0;
   }
   unsigned size() const { return getNumEntries(); }
@@ -128,6 +128,7 @@ public:
           P->getFirst() = EmptyKey;
         }
       }
+      (void)NumEntries;
       assert(NumEntries == 0 && "Node count imbalance!");
     }
     setNumEntries(0);

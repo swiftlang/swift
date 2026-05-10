@@ -32,10 +32,10 @@
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -emit-executable %/s -L=. | %FileCheck %s -check-prefix=L_PATH
 // L_PATH: -L {{"?}}SOURCE_DIR/test/Driver/Inputs
 
-// RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -disable-bridging-pch -import-objc-header bridging-header.h | %FileCheck %s -check-prefix=OBJC_HEADER1
-// OBJC_HEADER1: -import-objc-header {{"?}}SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}bridging-header.h
+// RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -disable-bridging-pch -import-bridging-header bridging-header.h | %FileCheck %s -check-prefix=OBJC_HEADER1
+// OBJC_HEADER1: -import-bridging-header {{"?}}SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}bridging-header.h
 
-// RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -enable-bridging-pch -import-objc-header bridging-header.h | %FileCheck %s -check-prefix=OBJC_HEADER2
+// RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -enable-bridging-pch -import-bridging-header bridging-header.h | %FileCheck %s -check-prefix=OBJC_HEADER2
 // OBJC_HEADER2: SOURCE_DIR/test/Driver/Inputs{{/|\\\\}}bridging-header.h{{"? .*}}-emit-pch
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c %/s -o main.o | %FileCheck %s -check-prefix=OUTPUT_OBJ
@@ -65,15 +65,9 @@
 // RUN: cd %S && %swiftc_driver -driver-print-jobs -working-directory %/t -c main.swift -output-file-map=ofmo2.json | %FileCheck %s -check-prefix=OUTPUT_FILE_MAP_2 --enable-yaml-compatibility
 // OUTPUT_FILE_MAP_2: BUILD_DIR{{.*}}main-modified.o
 
-// RUN: %empty-directory(%t/sub)
-// RUN: echo "{\"\": {\"swift-dependencies\": \"br.swiftdeps\"}}" > %t/sub/ofmo.json
-// RUN: touch %t/sub/a.swift %t/sub/b.swift
-// RUN: cd %t && %swiftc_driver -incremental -working-directory %/t/sub -emit-dependencies -c -module-name ab a.swift b.swift -output-file-map=%/t/sub/ofmo.json
-// RUN: ls %t/sub/br.swiftdeps
-
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -Xcc -working-directory -Xcc %/t -c %/s | %FileCheck %s -check-prefix=CLANG
 // CLANG: -Xcc -working-directory -Xcc SOURCE_DIR
-// CLANG-SAME: -Xcc -working-directory -Xcc BUILD_DIR
+// CLANG-SAME: -Xcc -working-directory -Xcc TMP_DIR
 
 // RUN: cd %t && %swiftc_driver -driver-print-jobs -working-directory %/S/Inputs -c main.swift | %FileCheck %s -check-prefix=OUTPUT_IMPLICIT_OBJ
 // OUTPUT_IMPLICIT_OBJ: -o {{"?}}SOURCE_DIR/test/Driver/Inputs{{\\\\|/}}main.o

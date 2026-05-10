@@ -10,11 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "NullEditorConsumer.h"
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
 #include "SourceKit/Core/NotificationCenter.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/SwiftLang/Factory.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
@@ -33,74 +35,13 @@ static SmallString<128> getSwiftExecutablePath() {
   return path;
 }
 
-static void *createCancallationToken() {
+static void *createCancellationToken() {
   static std::atomic<size_t> handle(1000);
   return reinterpret_cast<void *>(
       handle.fetch_add(1, std::memory_order_relaxed));
 }
 
 namespace {
-
-class NullEditorConsumer : public EditorConsumer {
-  bool needsSemanticInfo() override { return needsSema; }
-
-  void handleRequestError(const char *Description) override {
-    llvm_unreachable("unexpected error");
-  }
-
-  bool syntaxMapEnabled() override { return true; }
-
-  void handleSyntaxMap(unsigned Offset, unsigned Length, UIdent Kind) override {
-  }
-
-  void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
-                                bool isSystem) override {}
-
-  bool documentStructureEnabled() override { return false; }
-
-  void beginDocumentSubStructure(unsigned Offset, unsigned Length,
-                                 UIdent Kind, UIdent AccessLevel,
-                                 UIdent SetterAccessLevel,
-                                 unsigned NameOffset,
-                                 unsigned NameLength,
-                                 unsigned BodyOffset,
-                                 unsigned BodyLength,
-                                 unsigned DocOffset,
-                                 unsigned DocLength,
-                                 StringRef DisplayName,
-                                 StringRef TypeName,
-                                 StringRef RuntimeName,
-                                 StringRef SelectorName,
-                                 ArrayRef<StringRef> InheritedTypes,
-                                 ArrayRef<std::tuple<UIdent, unsigned, unsigned>> Attrs) override {
-  }
-
-  void endDocumentSubStructure() override {}
-
-  void handleDocumentSubStructureElement(UIdent Kind, unsigned Offset,
-                                         unsigned Length) override {}
-
-  void recordAffectedRange(unsigned Offset, unsigned Length) override {}
-
-  void recordAffectedLineRange(unsigned Line, unsigned Length) override {}
-
-  bool diagnosticsEnabled() override { return false; }
-
-  void setDiagnosticStage(UIdent DiagStage) override {}
-  void handleDiagnostic(const DiagnosticEntryInfo &Info,
-                        UIdent DiagStage) override {}
-  void recordFormattedText(StringRef Text) override {}
-
-  void handleSourceText(StringRef Text) override {}
-  void handleSyntaxTree(const swift::syntax::SourceFileSyntax &SyntaxTree) override {}
-
-  SyntaxTreeTransferMode syntaxTreeTransferMode() override {
-    return SyntaxTreeTransferMode::Off;
-  }
-
-public:
-  bool needsSema = false;
-};
 
 struct TestCursorInfo {
   // Empty if no error.
@@ -123,19 +64,16 @@ public:
   LangSupport &getLang() { return getContext().getSwiftLangSupport(); }
 
   void SetUp() override {
-    llvm::InitializeAllTargets();
-    llvm::InitializeAllTargetMCs();
-    llvm::InitializeAllAsmPrinters();
-    llvm::InitializeAllAsmParsers();
     NumTasks = 0;
   }
 
   CursorInfoTest()
-      : Ctx(*new SourceKit::Context(getSwiftExecutablePath(),
-                                    getRuntimeLibPath(),
-                                    /*diagnosticDocumentationPath*/ "",
-                                    SourceKit::createSwiftLangSupport,
-                                    /*dispatchOnMain=*/false)) {
+      : Ctx(*new SourceKit::Context(
+            getSwiftExecutablePath(), getRuntimeLibPath(),
+            SourceKit::createSwiftLangSupport,
+            [](SourceKit::Context &Ctx) { return nullptr; },
+            /*dispatchOnMain=*/false)) {
+    INITIALIZE_LLVM();
     // This is avoiding destroying \p SourceKit::Context because another
     // thread may be active trying to use it to post notifications.
     // FIXME: Use shared_ptr ownership to avoid such issues.
@@ -146,11 +84,11 @@ public:
   }
 
   void open(const char *DocName, StringRef Text,
-            Optional<ArrayRef<const char *>> CArgs = llvm::None) {
-    auto Args = CArgs.hasValue() ? makeArgs(DocName, *CArgs)
-                                 : std::vector<const char *>{};
+            std::optional<ArrayRef<const char *>> CArgs = std::nullopt) {
+    auto Args = CArgs.has_value() ? makeArgs(DocName, *CArgs)
+                                  : std::vector<const char *>{};
     auto Buf = MemoryBuffer::getMemBufferCopy(Text, DocName);
-    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, None);
+    getLang().editorOpen(DocName, Buf.get(), Consumer, Args, std::nullopt);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,
@@ -168,9 +106,9 @@ public:
 
     TestCursorInfo TestInfo;
     getLang().getCursorInfo(
-        DocName, Offset, /*Length=*/0, /*Actionables=*/false,
+        DocName, DocName, Offset, /*Length=*/0, /*Actionables=*/false,
         /*SymbolGraph=*/false, CancelOnSubsequentRequest, Args,
-        /*vfsOptions=*/None, CancellationToken,
+        /*vfsOptions=*/std::nullopt, CancellationToken,
         [&](const RequestResult<CursorInfoData> &Result) {
           assert(!Result.isCancelled());
           if (Result.isError()) {
@@ -410,7 +348,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   // info, to ensure the ASTManager doesn't try to handle this cursor info with
   // the wrong AST.
   setNeedsSema(true);
-  open(DocName, Contents, llvm::makeArrayRef(Args));
+  open(DocName, Contents, llvm::ArrayRef(Args));
   // Change 'foo' to 'fog' by replacing the last character.
   replaceText(DocName, FooOffs + 2, 1, "g");
   replaceText(DocName, FooRefOffs + 2, 1, "g");
@@ -424,8 +362,7 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
   EXPECT_EQ(strlen("fog"), Info.Length);
 }
 
-// Disabled until we re-enable cancellation (rdar://91251055)
-TEST_F(CursorInfoTest, DISABLED_CursorInfoCancelsPreviousRequest) {
+TEST_F(CursorInfoTest, CursorInfoCancelsPreviousRequest) {
   // TODO: This test case relies on the following snippet being slow to type 
   // check so that the first cursor info request takes longer to execute than it 
   // takes time to schedule the second request. If that is fixed, we need to 
@@ -436,7 +373,7 @@ TEST_F(CursorInfoTest, DISABLED_CursorInfoCancelsPreviousRequest) {
                              "}\n";
   auto SlowOffset = findOffset("x", SlowContents);
   const char *Args[] = {"-parse-as-library"};
-  std::vector<const char *> ArgsForSlow = llvm::makeArrayRef(Args).vec();
+  std::vector<const char *> ArgsForSlow = llvm::ArrayRef(Args).vec();
   ArgsForSlow.push_back(SlowDocName);
 
   const char *FastDocName = "fast.swift";
@@ -444,19 +381,19 @@ TEST_F(CursorInfoTest, DISABLED_CursorInfoCancelsPreviousRequest) {
                              "    let foo = 123\n"
                              "}\n";
   auto FastOffset = findOffset("foo", FastContents);
-  std::vector<const char *> ArgsForFast = llvm::makeArrayRef(Args).vec();
+  std::vector<const char *> ArgsForFast = llvm::ArrayRef(Args).vec();
   ArgsForFast.push_back(FastDocName);
 
-  open(SlowDocName, SlowContents, llvm::makeArrayRef(Args));
-  open(FastDocName, FastContents, llvm::makeArrayRef(Args));
+  open(SlowDocName, SlowContents, llvm::ArrayRef(Args));
+  open(FastDocName, FastContents, llvm::ArrayRef(Args));
 
   // Schedule a cursor info request that takes long to execute. This should be
   // cancelled as the next cursor info (which is faster) gets requested.
   Semaphore FirstCursorInfoSema(0);
   getLang().getCursorInfo(
-      SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
+      SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/true, ArgsForSlow,
-      /*vfsOptions=*/None, /*CancellationToken=*/nullptr,
+      /*vfsOptions=*/std::nullopt, /*CancellationToken=*/nullptr,
       [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         FirstCursorInfoSema.signal();
@@ -472,11 +409,12 @@ TEST_F(CursorInfoTest, DISABLED_CursorInfoCancelsPreviousRequest) {
 
   bool expired = FirstCursorInfoSema.wait(30 * 1000);
   if (expired)
-    llvm::report_fatal_error("Did not receive a resonse for the first request");
+    llvm::report_fatal_error("Did not receive a response for the first request");
 }
 
-// Disabled until we re-enable cancellation (rdar://91251055)
 TEST_F(CursorInfoTest, DISABLED_CursorInfoCancellation) {
+  // Disabled due to a race condition (rdar://88652757)
+
   // TODO: This test case relies on the following snippet being slow to type
   // check so that the first cursor info request takes longer to execute than it
   // takes time to schedule the second request. If that is fixed, we need to
@@ -487,20 +425,20 @@ TEST_F(CursorInfoTest, DISABLED_CursorInfoCancellation) {
                              "}\n";
   auto SlowOffset = findOffset("x", SlowContents);
   const char *Args[] = {"-parse-as-library"};
-  std::vector<const char *> ArgsForSlow = llvm::makeArrayRef(Args).vec();
+  std::vector<const char *> ArgsForSlow = llvm::ArrayRef(Args).vec();
   ArgsForSlow.push_back(SlowDocName);
 
-  open(SlowDocName, SlowContents, llvm::makeArrayRef(Args));
+  open(SlowDocName, SlowContents, llvm::ArrayRef(Args));
 
-  SourceKitCancellationToken CancellationToken = createCancallationToken();
+  SourceKitCancellationToken CancellationToken = createCancellationToken();
 
   // Schedule a cursor info request that takes long to execute. This should be
   // cancelled as the next cursor info (which is faster) gets requested.
   Semaphore CursorInfoSema(0);
   getLang().getCursorInfo(
-      SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
+      SlowDocName, SlowDocName, SlowOffset, /*Length=*/0, /*Actionables=*/false,
       /*SymbolGraph=*/false, /*CancelOnSubsequentRequest=*/false, ArgsForSlow,
-      /*vfsOptions=*/None, /*CancellationToken=*/CancellationToken,
+      /*vfsOptions=*/std::nullopt, /*CancellationToken=*/CancellationToken,
       [&](const RequestResult<CursorInfoData> &Result) {
         EXPECT_TRUE(Result.isCancelled());
         CursorInfoSema.signal();
@@ -510,5 +448,5 @@ TEST_F(CursorInfoTest, DISABLED_CursorInfoCancellation) {
 
   bool expired = CursorInfoSema.wait(30 * 1000);
   if (expired)
-    llvm::report_fatal_error("Did not receive a resonse for the first request");
+    llvm::report_fatal_error("Did not receive a response for the first request");
 }

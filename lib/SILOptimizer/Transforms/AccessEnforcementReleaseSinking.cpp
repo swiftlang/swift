@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -25,6 +25,7 @@
 
 #define DEBUG_TYPE "access-enforcement-release"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -51,7 +52,7 @@ static bool isSinkable(SILInstruction &inst) {
 static bool isBarrier(SILInstruction *inst) {
   // Calls hide many dangers, from checking reference counts, to beginning
   // keypath access, to forcing memory to be live. Checking for these and other
-  // possible barries at ever call is certainly not worth it.
+  // possible barriers at ever call is certainly not worth it.
   if (FullApplySite::isa(inst) != FullApplySite())
     return true;
 
@@ -75,7 +76,7 @@ static bool isBarrier(SILInstruction *inst) {
     // Whitelist the safe builtin categories. Builtins should generally be
     // treated conservatively, because introducing a new builtin does not
     // require updating all passes to be aware of it.
-    switch (kind.getValue()) {
+    switch (kind.value()) {
     case BuiltinValueKind::None:
       llvm_unreachable("Builtin must has a non-empty kind.");
 
@@ -120,38 +121,54 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::OnFastPath:
     case BuiltinValueKind::ExtractElement:
     case BuiltinValueKind::InsertElement:
+    case BuiltinValueKind::Select:
     case BuiltinValueKind::ShuffleVector:
+    case BuiltinValueKind::Interleave:
+    case BuiltinValueKind::Deinterleave:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::AssertConf:
+    case BuiltinValueKind::InfiniteLoopTrueCondition:
     case BuiltinValueKind::StringObjectOr:
     case BuiltinValueKind::UToSCheckedTrunc:
     case BuiltinValueKind::SToUCheckedTrunc:
     case BuiltinValueKind::SToSCheckedTrunc:
     case BuiltinValueKind::UToUCheckedTrunc:
     case BuiltinValueKind::IntToFPWithOverflow:
+    case BuiltinValueKind::BitWidth:
+    case BuiltinValueKind::IsNegative:
+    case BuiltinValueKind::WordAtIndex:
     case BuiltinValueKind::ZeroInitializer:
+    case BuiltinValueKind::PrepareInitialization:
     case BuiltinValueKind::Once:
     case BuiltinValueKind::OnceWithContext:
     case BuiltinValueKind::GetObjCTypeEncoding:
-    case BuiltinValueKind::Swift3ImplicitObjCEntrypoint:
     case BuiltinValueKind::WillThrow:
     case BuiltinValueKind::CondFailMessage:
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::TypePtrAuthDiscriminator:
     case BuiltinValueKind::TargetOSVersionAtLeast:
+    case BuiltinValueKind::TargetVariantOSVersionAtLeast:
+    case BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast:
     case BuiltinValueKind::GlobalStringTablePointer:
     case BuiltinValueKind::COWBufferForReading:
-    case BuiltinValueKind::IntInstrprofIncrement:
     case BuiltinValueKind::GetCurrentAsyncTask:
     case BuiltinValueKind::GetCurrentExecutor:
-    case BuiltinValueKind::AutoDiffCreateLinearMapContext:
-    case BuiltinValueKind::EndAsyncLet:
+    case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     case BuiltinValueKind::EndAsyncLetLifetime:
     case BuiltinValueKind::CreateTaskGroup:
+    case BuiltinValueKind::CreateTaskGroupWithFlags:
     case BuiltinValueKind::DestroyTaskGroup:
     case BuiltinValueKind::StackAlloc:
+    case BuiltinValueKind::UnprotectedStackAlloc:
     case BuiltinValueKind::StackDealloc:
+    case BuiltinValueKind::AllocVector:
     case BuiltinValueKind::AssumeAlignment:
+    case BuiltinValueKind::GetEnumTag:
+    case BuiltinValueKind::InjectEnumTag:
+    case BuiltinValueKind::ExtractFunctionIsolation:
+    case BuiltinValueKind::FlowSensitiveSelfIsolation:
+    case BuiltinValueKind::FlowSensitiveDistributedSelfIsolation:
+    case BuiltinValueKind::AddressOfRawLayout:
       return false;
 
     // Handle some rare builtins that may be sensitive to object lifetime
@@ -175,27 +192,39 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignCopyArrayFrontToBack:
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
-    case BuiltinValueKind::UnsafeGuaranteed:
-    case BuiltinValueKind::Move:
-    case BuiltinValueKind::Copy:
-    case BuiltinValueKind::UnsafeGuaranteedEnd:
     case BuiltinValueKind::CancelAsyncTask:
-    case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTask:
-    case BuiltinValueKind::CreateAsyncTaskInGroup:
+    case BuiltinValueKind::TaskRunInline:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
+    case BuiltinValueKind::FinishAsyncLet:
     case BuiltinValueKind::ConvertTaskToJob:
     case BuiltinValueKind::InitializeDefaultActor:
     case BuiltinValueKind::DestroyDefaultActor:
     case BuiltinValueKind::InitializeDistributedRemoteActor:
+    case BuiltinValueKind::InitializeNonDefaultDistributedActor:
+    case BuiltinValueKind::BuildOrdinaryTaskExecutorRef:
     case BuiltinValueKind::BuildOrdinarySerialExecutorRef:
+    case BuiltinValueKind::BuildComplexEqualitySerialExecutorRef:
     case BuiltinValueKind::BuildDefaultActorExecutorRef:
     case BuiltinValueKind::BuildMainActorExecutorRef:
     case BuiltinValueKind::ResumeNonThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationReturning:
     case BuiltinValueKind::ResumeThrowingContinuationThrowing:
     case BuiltinValueKind::AutoDiffProjectTopLevelSubcontext:
-    case BuiltinValueKind::AutoDiffAllocateSubcontext:
+    case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
+    case BuiltinValueKind::AddressOfBorrowOpaque:
+    case BuiltinValueKind::UnprotectedAddressOfBorrowOpaque:
+    case BuiltinValueKind::DistributedActorAsAnyActor:
+    case BuiltinValueKind::TaskAddCancellationHandler:
+    case BuiltinValueKind::TaskRemoveCancellationHandler:
+    case BuiltinValueKind::TaskAddPriorityEscalationHandler:
+    case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
+    case BuiltinValueKind::TaskLocalValuePush:
+    case BuiltinValueKind::TaskLocalValuePop:
+    case BuiltinValueKind::AddTaskLocalValue:
+    case BuiltinValueKind::RemoveTaskLocalValue:
+    case BuiltinValueKind::TaskCancellationShieldPush:
+    case BuiltinValueKind::TaskCancellationShieldPop:
       return true;
     }
   }

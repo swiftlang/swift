@@ -1,8 +1,6 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -Xfrontend -validate-tbd-against-ir=none)
+// RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
-
-// TODO: See why -validate-tbd-against-ir=none is needed here (SR-14069)
 
 import StaticVarInitCallsFunction
 import StdlibUnittest

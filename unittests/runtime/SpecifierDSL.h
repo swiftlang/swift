@@ -310,7 +310,8 @@ inline void addSameTypeRequirement(AnyObjectBuilder &builder,
                                    ObjectRef<const char> type2) {
   auto flags = GenericRequirementFlags(GenericRequirementKind::SameType,
                                        /*key argument*/ false,
-                                       /*extra argument*/ false);
+                                       /*is pack requirement*/ false,
+                                       /*is value requirement*/ false);
   builder.add32(flags.getIntValue());
   builder.addRelativeReference(type1);
   builder.addRelativeReference(type2);
@@ -331,7 +332,8 @@ inline void addConformanceRequirement(AnyObjectBuilder &builder,
                                       bool isKeyArgument = true) {
   auto flags = GenericRequirementFlags(GenericRequirementKind::Protocol,
                                        isKeyArgument,
-                                       /*extra argument*/ false);
+                                       /*is pack requirement*/ false,
+                                       /*is value requirement*/ false);
   builder.add32(flags.getIntValue());
   builder.addRelativeReference(type);
   addProtocolDescriptorRef(builder, protocol);

@@ -183,7 +183,7 @@ extension String: RangeReplaceableCollection {
   /// string.
   ///
   /// - Parameters:
-  ///   - bounds: The range of text to replace. The bounds of the range must be
+  ///   - subrange: The range of text to replace. The bounds of the range must be
   ///     valid indices of the string.
   ///   - newElements: The new characters to add to the string.
   ///
@@ -218,7 +218,7 @@ extension String: RangeReplaceableCollection {
   /// - Complexity: O(*n*), where *n* is the length of the string.
   public mutating func insert(_ newElement: Character, at i: Index) {
     let i = _guts.validateInclusiveScalarIndex(i)
-    let range = Range(_uncheckedBounds: (i, i))
+    let range = unsafe Range(_uncheckedBounds: (i, i))
     _guts.replaceSubrange(range, with: newElement._str)
   }
 
@@ -243,7 +243,7 @@ extension String: RangeReplaceableCollection {
     contentsOf newElements: S, at i: Index
   ) where S.Element == Character {
     let i = _guts.validateInclusiveScalarIndex(i)
-    let range = Range(_uncheckedBounds: (i, i))
+    let range = unsafe Range(_uncheckedBounds: (i, i))
     _guts.replaceSubrange(range, with: newElements)
   }
 
@@ -339,15 +339,15 @@ extension String {
 }
 
 extension String {
-  // This is needed because of the issue described in SR-4660 which causes
-  // source compatibility issues when String becomes a collection
+  // FIXME: This is needed because of https://github.com/apple/swift/issues/47237,
+  // which causes source compatibility issues when String becomes a collection.
   @_transparent
   public func max<T: Comparable>(_ x: T, _ y: T) -> T {
     return Swift.max(x,y)
   }
 
-  // This is needed because of the issue described in SR-4660 which causes
-  // source compatibility issues when String becomes a collection
+  // FIXME: This is needed because of https://github.com/apple/swift/issues/47237,
+  // which causes source compatibility issues when String becomes a collection.
   @_transparent
   public func min<T: Comparable>(_ x: T, _ y: T) -> T {
     return Swift.min(x,y)

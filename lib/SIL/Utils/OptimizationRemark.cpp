@@ -136,7 +136,7 @@ static bool hasForceEmitSemanticAttr(SILFunction &fn, StringRef passName) {
 }
 
 static bool isMethodWithForceEmitSemanticAttrNominalType(SILFunction &fn) {
-  if (!fn.hasSelfParam())
+  if (!fn.hasSelfParam() || fn.getArguments().empty())
     return false;
 
   auto selfType = fn.getSelfArgument()->getType();

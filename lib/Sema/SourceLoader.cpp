@@ -20,12 +20,14 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Parse/PersistentParserState.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/SaveAndRestore.h"
 #include <system_error>
 
@@ -46,7 +48,7 @@ static FileOrError findModule(ASTContext &ctx, Identifier moduleID,
   StringRef moduleNameRef = ctx.getRealModuleName(moduleID).str();
 
   for (const auto &Path : ctx.SearchPathOpts.getImportSearchPaths()) {
-    inputFilename = Path;
+    inputFilename = Path.Path;
     llvm::sys::path::append(inputFilename, moduleNameRef);
     inputFilename.append(".swift");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -69,9 +71,9 @@ void SourceLoader::collectVisibleTopLevelModuleNames(
   // TODO: Implement?
 }
 
-bool SourceLoader::canImportModule(ImportPath::Module path,
-                                   llvm::VersionTuple version,
-                                   bool underlyingVersion) {
+bool SourceLoader::canImportModule(ImportPath::Module path, SourceLoc loc,
+                                   ModuleVersionInfo *versionInfo,
+                                   bool isTestableDependencyLookup) {
   // FIXME: Swift submodules?
   if (path.hasSubmodule())
     return false;
@@ -89,11 +91,13 @@ bool SourceLoader::canImportModule(ImportPath::Module path,
 
     return false;
   }
+
   return true;
 }
 
 ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
-                                     ImportPath::Module path) {
+                                     ImportPath::Module path,
+                                     bool AllowMemoryCache) {
   // FIXME: Swift submodules?
   if (path.size() > 1)
     return nullptr;
@@ -121,7 +125,7 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   unsigned bufferID;
   if (auto BufID =
        Ctx.SourceMgr.getIDForBufferIdentifier(inputFile->getBufferIdentifier()))
-    bufferID = BufID.getValue();
+    bufferID = BufID.value();
   else
     bufferID = Ctx.SourceMgr.addNewSourceBuffer(std::move(inputFile));
 
@@ -129,23 +133,29 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   importInfo.StdlibKind = Ctx.getStdlibModule() ? ImplicitStdlibKind::Stdlib
                                                 : ImplicitStdlibKind::None;
 
-  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx, importInfo);
-  if (EnableLibraryEvolution)
+  auto *importMod = ModuleDecl::create(
+      moduleID.Item, Ctx, importInfo, [&](ModuleDecl *importMod, auto addFile) {
+    auto opts = SourceFile::getDefaultParsingOptions(Ctx.LangOpts);
+    addFile(new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
+                                 opts));
+  });
+  if (Ctx.LangOpts.hasFeature(Feature::LibraryEvolution))
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.addLoadedModule(importMod);
+  Ctx.bumpGeneration();
+  ModulesToBindExtensions.push_back(importMod);
 
-  auto *importFile =
-      new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
-                           SourceFile::getDefaultParsingOptions(Ctx.LangOpts));
-  importMod->addFile(*importFile);
-  performImportResolution(*importFile);
-  importMod->setHasResolvedImports();
-  bindExtensions(*importMod);
+  performImportResolution(importMod);
   return importMod;
 }
 
 void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
                                   unsigned previousGeneration) {
-  // Type-checking the source automatically loads all extensions; there's
-  // nothing to do here.
+  // Given we do full extension binding per module, there's no benefit to
+  // tracking generations, we just bind extensions for any modules we haven't
+  // yet bound. We take the vector before iterating to avoid reentrancy.
+  std::vector<ModuleDecl *> modulesToBind;
+  std::swap(ModulesToBindExtensions, modulesToBind);
+  for (auto *M : modulesToBind)
+    bindExtensions(*M);
 }

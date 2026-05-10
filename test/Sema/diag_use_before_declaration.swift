@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
-// SR-5163
-func sr5163() {
+// https://github.com/apple/swift/issues/47739
+do {
   func foo(_ x: Int) -> Int? { return 1 }
   
   func fn() {
@@ -11,17 +11,18 @@ func sr5163() {
   }
 }
 
-// SR-6726
+// https://github.com/apple/swift/issues/49275
+
 var foo: Int?
 
-func test() {
+test: do {
   guard let bar = foo else {
-    return
+    break test
   }
   let foo = String(bar) // expected-warning {{initialization of immutable value 'foo' was never used; consider replacing with assignment to '_' or removing it}}
 }
 
-// SR-7660
+// https://github.com/apple/swift/issues/50200
 class C {
   var variable: Int?
   func f() {
@@ -30,16 +31,16 @@ class C {
   }
 }
 
-// SR-7517
-func testExample() {
+// https://github.com/apple/swift/issues/50059
+do {
   let app = app2 // expected-error {{use of local variable 'app2' before its declaration}}
   let app2 = app // expected-note {{'app2' declared here}}
 }
 
-// SR-8447
+// https://github.com/apple/swift/issues/50968
 func test_circular() {
-  let obj = sr8447 // expected-error {{use of local variable 'sr8447' before its declaration}}
-  let _ = obj.prop, sr8447 // expected-note {{'sr8447' declared here}} expected-error {{type annotation missing in pattern}}
+  let obj = x // expected-error {{use of local variable 'x' before its declaration}}
+  let _ = obj.prop, x // expected-note {{'x' declared here}} expected-error {{type annotation missing in pattern}}
 }
 
 //===----------------------------------------------------------------------===//
@@ -77,6 +78,141 @@ func nested_scope_3() {
     }
     let x = 11 // expected-warning {{initialization of immutable value 'x' was never used; consider replacing with assignment to '_' or removing it}}
   }
+}
+
+func captureInClosure() {
+  let x = { (i: Int) in
+    currentTotal += i // expected-error {{use of local variable 'currentTotal' before its declaration}}
+  }
+
+  var currentTotal = 0 // expected-note {{'currentTotal' declared here}}
+
+  _ = x
+}
+
+class class77933460 {}
+
+func func77933460() {
+  var obj: class77933460 = { obj }()
+  // expected-error@-1 {{use of local variable 'obj' before its declaration}}
+  // expected-note@-2 {{'obj' declared here}}
+}
+
+protocol P {}
+
+enum E {
+  static func static_gen_fwd<T>(_ g: () -> T) -> T { g() }
+}
+
+func global_fwd(_ a: () -> Any) -> Any { a() }
+func global_gen_fwd<T>(_ g: () -> T) -> T { g() }
+func global_fwd_p(_ p: () -> any P) -> any P { p() }
+
+func forward_declared_let_captures() {
+  do {
+    let bad: Any = { bad }()
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    func fwd(_ i: () -> Any) -> Any { i() }
+    let bad = fwd { bad }
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    let bad = global_fwd { bad }
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    let bad: Any = global_gen_fwd { bad }
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    let bad: Any = E.static_gen_fwd { bad }
+    // expected-error@-1 {{use of local variable 'bad' before its declaration}}
+    // expected-note@-2 {{'bad' declared here}}
+  }
+
+  do {
+    let badNested: Any = global_fwd { { [badNested] in badNested }() }
+    // expected-error@-1 {{use of local variable 'badNested' before its declaration}}
+    // expected-note@-2 {{'badNested' declared here}}
+  }
+
+  do {
+    let badOpt: Any? = { () -> Any? in badOpt }()
+    // expected-error@-1 {{use of local variable 'badOpt' before its declaration}}
+    // expected-note@-2 {{'badOpt' declared here}}
+  }
+
+  do {
+    let badTup: (Any, Any) = { (badTup.0, badTup.1) }()
+    // expected-error@-1 2{{use of local variable 'badTup' before its declaration}}
+    // expected-note@-2 2{{'badTup' declared here}}
+  }
+
+  do {
+    let badTup: (Int, Any) = { (badTup.0, badTup.1) }()
+    // expected-error@-1 2{{use of local variable 'badTup' before its declaration}}
+    // expected-note@-2 2{{'badTup' declared here}}
+  }
+
+  do {
+    let (badTup3, badTup4): (Any, Any) = { (badTup4, badTup3) }()
+    // expected-error@-1 {{use of local variable 'badTup3' before its declaration}}
+    // expected-note@-2 {{'badTup3' declared here}}
+    // expected-error@-3 {{use of local variable 'badTup4' before its declaration}}
+    // expected-note@-4 {{'badTup4' declared here}}
+  }
+
+  do {
+    struct S { var p: Any }
+    let badStruct: S = { S(p: badStruct.p) }()
+    // expected-error@-1 {{use of local variable 'badStruct' before its declaration}}
+    // expected-note@-2 {{'badStruct' declared here}}
+  }
+
+  do {
+    enum EE {
+      case boring
+      case weird(Any)
+      case strange(Any)
+    }
+
+    let badEnum: EE = { .weird(EE.strange(badEnum)) }()
+    // expected-error@-1 {{use of local variable 'badEnum' before its declaration}}
+    // expected-note@-2 {{'badEnum' declared here}}
+  }
+
+  do {
+    let badproto: any P = global_fwd_p { badproto }
+    // expected-error@-1 {{use of local variable 'badproto' before its declaration}}
+    // expected-note@-2 {{'badproto' declared here}}
+  }
+}
+
+func forward_declared_local_lazy_captures() {
+  lazy var infiniteRecurse: Any = { infiniteRecurse }()
+  // expected-error@-1 {{use of local variable 'infiniteRecurse' before its declaration}}
+  // expected-note@-2 {{'infiniteRecurse' declared here}}
+
+  lazy var hmm: () -> Any = { hmm }
+  // expected-error@-1 {{use of local variable 'hmm' before its declaration}}
+  // expected-note@-2 {{'hmm' declared here}}
+}
+
+func forward_declared_computed_locals() {
+  // In principle we could allow these, but it's simpler to just reject them.
+  let x = z // expected-error {{use of local variable 'z' before its declaration}}
+  let y = { z } // expected-error {{use of local variable 'z' before its declaration}}
+  var z: Int { 0 } // expected-note 2{{'z' declared here}}
 }
 
 //===----------------------------------------------------------------------===//

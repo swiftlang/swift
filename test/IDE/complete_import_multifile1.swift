@@ -4,7 +4,6 @@
 
 import #^CLANG_IMPORT1^#
 
-// CLANG_IMPORT1:	Begin completions
 // CLANG_IMPORT1-DAG:	Decl[Module]/None:                       Foo[#Module#]; name=Foo
 // CLANG_IMPORT1-DAG:	Decl[Module]/None:                 FooHelper[#Module#]; name=FooHelper
 // CLANG_IMPORT1-DAG:	Decl[Module]/None:                       Bar[#Module#]; name=Bar

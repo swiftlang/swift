@@ -15,6 +15,7 @@
 
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILBasicBlock.h"
@@ -53,15 +54,33 @@ public:
   class ErrorBuilder;
 
 private:
-  friend class ReborrowVerifier;
+  friend class GuaranteedPhiVerifier;
   friend class SILOwnershipVerifier;
   friend class SILValueOwnershipChecker;
 
-  DeadEndBlocks &deadEndBlocks;
+  // TODO: migrate away from using dead end blocks for OSSA values. end_borrow
+  // or destroy_value should ideally exist on all paths. However, deadEndBlocks
+  // may still be useful for checking memory lifetime for address uses.
+  DeadEndBlocks *deadEndBlocks;
+
+  // If not null, `instIndices` are used for efficiently computing dominance
+  // relations between instructions in the same basic block.
+  // If null, the algorithm falls back to linear search.
+  InstructionIndices *instIndices;
 
 public:
-  LinearLifetimeChecker(DeadEndBlocks &deadEndBlocks)
-      : deadEndBlocks(deadEndBlocks) {}
+  /// \p deadEndBlocks should be provided for lifetimes that do not require
+  /// consuming uses on dead-end paths, which end in an unreachable terminator.
+  /// OSSA values require consumes on all paths, so \p deadEndBlocks are *not*
+  /// required for OSSA lifetimes. Memory lifetimes and access scopes only
+  /// require destroys on non-dead-end paths.
+  ///
+  /// TODO: The verifier currently requires OSSA borrow scopes to end on all
+  /// paths. Owned OSSA lifetimes may still be missing destroys on dead-end
+  /// paths. Once owned values are fully enforced, the same invariant will hold
+  /// for all OSSA values.
+  LinearLifetimeChecker(DeadEndBlocks *deadEndBlocks, InstructionIndices *instIndices)
+      : deadEndBlocks(deadEndBlocks), instIndices(instIndices) {}
 
   /// Returns true that \p value forms a linear lifetime with consuming uses \p
   /// consumingUses, non consuming uses \p nonConsumingUses. Returns false
@@ -117,8 +136,8 @@ private:
   Error checkValueImpl(
       SILValue value, ArrayRef<Operand *> consumingUses,
       ArrayRef<Operand *> nonConsumingUses, ErrorBuilder &errorBuilder,
-      Optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
-      Optional<function_ref<void(Operand *)>>
+      std::optional<function_ref<void(SILBasicBlock *)>> leakingBlockCallback,
+      std::optional<function_ref<void(Operand *)>>
           nonConsumingUsesOutsideLifetimeCallback);
 };
 

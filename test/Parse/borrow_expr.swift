@@ -1,0 +1,14 @@
+// RUN: %target-typecheck-verify-swift -enable-experimental-move-only
+
+var global: Int = 5
+func testGlobal() {
+    let _ = _borrow global
+}
+
+func testVar() {
+    var t = String()
+    t = String()
+    let _ = _borrow t
+}
+
+

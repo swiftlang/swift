@@ -11,7 +11,7 @@
 
 // 2. check if the generated IR looks like expected:
 
-// RUN: %target-swift-frontend -module-name=Main -I%t %s -emit-ir -g -o - | %FileCheck %s
+// RUN: %target-swift-frontend -module-name=Main -I%t %s -emit-ir -g -o - | %FileCheck %s -check-prefix=CHECK -check-prefix=CHECK-%target-objc-interop
 
 // REQUIRES: executable_test
 
@@ -28,6 +28,7 @@ final class DerivedFromResilient : ResilientClasses.OpenBase {
 }
 
 final class Generic<T> : Classes.OpenBase {
+   final class Inner : Classes.OpenBase {}
 }
 
 // CHECK-LABEL: define {{.*}} @"$s4Main14castToNonfinaly7Classes0D0CSgAC4BaseCF"
@@ -47,10 +48,20 @@ func castToFinal(_ b: Classes.Base) -> Classes.Final? {
 }
 
 // CHECK-LABEL: define {{.*}} @"$s4Main24unconditionalCastToFinaly7Classes0E0CAC4BaseCF"
+// CHECK-NOT:     call {{.*}}@object_getClass
 // CHECK-NOT:     @swift_dynamicCastClass
 // CHECK:       }
 @inline(never)
 func unconditionalCastToFinal(_ b: Classes.Base) -> Classes.Final {
+  return b as! Classes.Final
+}
+
+// CHECK-LABEL: define {{.*}} @"$s4Main32unconditionalOptionalCastToFinaly7Classes0F0CAC4BaseCSgF"
+// CHECK-NOT:     call {{.*}}@object_getClass
+// CHECK-NOT:     @swift_dynamicCastClass
+// CHECK:       }
+@inline(never)
+func unconditionalOptionalCastToFinal(_ b: Classes.Base?) -> Classes.Final {
   return b as! Classes.Final
 }
 
@@ -63,6 +74,8 @@ func castToResilientFinal(_ b: ResilientClasses.Base) -> ResilientClasses.Final?
 }
 
 // CHECK-LABEL: define {{.*}} @"$s4Main19castProtocolToFinaly7Classes0E0CSgAC1P_pF"
+// CHECK-objc:    call {{.*}}@object_getClass
+// CHECK-nonobjc: load
 // CHECK-NOT:     @swift_dynamicCastClass
 // CHECK:       }
 @inline(never)
@@ -102,6 +115,15 @@ func castToGeneric(_ b: Classes.OpenBase) -> Generic<Int>? {
   return b as? Generic<Int>
 }
 
+// CHECK-LABEL: define {{.*}} @"$s4Main18castToGenericInneryAA0D0C0E0CySi_GSg7Classes8OpenBaseCF"
+// CHECK:         @swift_dynamicCastClass
+// CHECK:       }
+@inline(never)
+func castToGenericInner(_ b: Classes.OpenBase) -> Generic<Int>.Inner? {
+  return b as? Generic<Int>.Inner
+}
+
+
 // CHECK-LABEL: define {{.*}} @"$s4Main14getAnyHashableys0cD0VAA8InternalCF"
 @inline(never)
 func getAnyHashable(_ i: Internal) -> AnyHashable {
@@ -119,7 +141,9 @@ func test() {
   // CHECK-OUTPUT: Optional(Classes.Final)
   print(castToFinal(Classes.Final()) as Any)
   // CHECK-OUTPUT: Classes.Final
-  print(unconditionalCastToFinal(Classes.Final()) as Any)
+  print(unconditionalCastToFinal(Classes.Final()))
+  // CHECK-OUTPUT: Classes.Final
+  print(unconditionalOptionalCastToFinal(Classes.Final()))
 
   // CHECK-OUTPUT: nil
   print(castToResilientFinal(ResilientClasses.Base()) as Any)
@@ -153,6 +177,11 @@ func test() {
   print(castToGeneric(Classes.OpenBase()) as Any)
   // CHECK-OUTPUT: Optional(Main.Generic<Swift.Int>)
   print(castToGeneric(Generic<Int>()) as Any)
+
+  // CHECK-OUTPUT: nil
+  print(castToGenericInner(Classes.OpenBase()) as Any)
+  // CHECK-OUTPUT: Optional(Main.Generic<Swift.Int>.Inner)
+  print(castToGenericInner(Generic<Int>.Inner()) as Any)
 }
 
 test()

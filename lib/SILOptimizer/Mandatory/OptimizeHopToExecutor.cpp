@@ -11,12 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "optimize-hop-to-executor"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/MemAccessUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
-#include "swift/SIL/ApplySite.h"
-#include "swift/SIL/MemoryLocations.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SIL/MemAccessUtils.h"
 
 using namespace swift;
 
@@ -119,6 +119,11 @@ public:
 /// Search for hop_to_executor instructions and add their operands to \p actors.
 void OptimizeHopToExecutor::collectActors(Actors &actors) {
   int uniqueActorID = 0;
+
+  if (function->getActorIsolation().isNonisolatedNonsending()) {
+    actors[function->maybeGetIsolatedArgument()] = uniqueActorID++;
+  }
+
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       if (auto *hop = dyn_cast<HopToExecutorInst>(&inst)) {
@@ -191,14 +196,17 @@ void OptimizeHopToExecutor::solveDataflowBackward() {
 }
 
 /// Returns true if \p inst is a suspension point or an async call.
-static bool isSuspentionPoint(SILInstruction *inst) {
+static bool isSuspensionPoint(SILInstruction *inst) {
   if (auto applySite = FullApplySite::isa(inst)) {
-    if (applySite.isAsync())
+    if (applySite.isAsync() && !applySite.isNonisolatedNonsending())
       return true;
     return false;
   }
   if (isa<AwaitAsyncContinuationInst>(inst))
     return true;
+  if (isBuiltinInst(inst, BuiltinValueKind::FinishAsyncLet))
+    return true;
+
   return false;
 }
 
@@ -209,11 +217,22 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
 
   // Initialize the dataflow.
   for (BlockState &state : blockStates) {
-    state.entry = (state.block == function->getEntryBlock() ?
-                     BlockState::Unknown : BlockState::NotSet);
+    state.entry = [&]() -> int {
+      if (state.block != function->getEntryBlock()) {
+        return BlockState::NotSet;
+      }
+
+      if (function->getActorIsolation().isNonisolatedNonsending()) {
+        auto *fArg =
+            cast<SILFunctionArgument>(function->maybeGetIsolatedArgument());
+        return actors.lookup(SILValue(fArg));
+      }
+
+      return BlockState::Unknown;
+    }();
     state.intra = BlockState::NotSet;
     for (SILInstruction &inst : *state.block) {
-      if (isSuspentionPoint(&inst)) {
+      if (isSuspensionPoint(&inst)) {
         // A suspension point (like an async call) can switch to another
         // executor.
         state.intra = BlockState::Unknown;
@@ -234,7 +253,7 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
     int actorIdx = state.entry;
     for (auto iter = state.block->begin(); iter != state.block->end();) {
       SILInstruction *inst = &*iter++;
-      if (isSuspentionPoint(inst)) {
+      if (isSuspensionPoint(inst)) {
         actorIdx = BlockState::Unknown;
         continue;
       }
@@ -266,7 +285,7 @@ bool OptimizeHopToExecutor::removeRedundantHopToExecutors(const Actors &actors) 
 bool OptimizeHopToExecutor::removeDeadHopToExecutors() {
 
   // Initialize the dataflow: go bottom up and if we see any instruction which
-  // might require a dedicated executor, don't remove a preceeding
+  // might require a dedicated executor, don't remove a preceding
   // hop_to_executor instruction.
   for (BlockState &state : blockStates) {
     state.exit = (state.block->getSuccessors().empty() ?
@@ -311,10 +330,12 @@ void OptimizeHopToExecutor::updateNeedExecutor(int &needExecutor,
     needExecutor = BlockState::NoExecutorNeeded;
     return;
   }
-  if (isSuspentionPoint(inst)) {
+
+  if (isSuspensionPoint(inst)) {
     needExecutor = BlockState::NoExecutorNeeded;
     return;
   }
+
   if (needsExecutor(inst))
     needExecutor = BlockState::ExecutorNeeded;
 }
@@ -331,11 +352,67 @@ bool OptimizeHopToExecutor::needsExecutor(SILInstruction *inst) {
   if (auto *copy = dyn_cast<CopyAddrInst>(inst)) {
     return isGlobalMemory(copy->getSrc()) || isGlobalMemory(copy->getDest());
   }
+  // Certain builtins have memory effects that are known to not depend on
+  // the current executor.
+  if (auto builtin = dyn_cast<BuiltinInst>(inst)) {
+    if (auto kind = builtin->getBuiltinKind()) {
+      switch (*kind) {
+      // The initialization of the default actor header isn't
+      // executor-dependent, and it's important to recognize here because
+      // we really want to eliminate the initial hop to the generic executor
+      // in async actor initializers.
+      //
+      // Now, we can't safely hop to the actor before its initialization is
+      // complete, and that includes the default-actor header.  But this
+      // optimization pass never causes us to hop to an executor *earlier*
+      // than we would have otherwise.  If we wanted to do that, we'd need
+      // to have some way to ensure we don't skip over the initialization of
+      // the stored properties as well, which is important even for default
+      // actors because the mechanics of destroying an incomplete object don't
+      // account for it being a "zombie" current executor in the runtime.
+      case BuiltinValueKind::InitializeDefaultActor:
+        return false;
+      default:
+        break;
+      }
+    }
+  }
+  // BeginBorrowInst and EndBorrowInst currently have
+  // MemoryBehavior::MayHaveSideEffects.  Fixing that is tracked by
+  // rdar://111875527.  These instructions only have effects in the sense of
+  // memory dependencies, which aren't relevant for hop_to_executor
+  // elimination.
+  if (isa<BeginBorrowInst>(inst) || isa<EndBorrowInst>(inst)) {
+    return false;
+  }
+
+  // A call to a caller isolation inheriting function does not create dead
+  // executors since caller isolation inheriting functions do not hop in their
+  // prologue.
+  if (auto fas = FullApplySite::isa(inst);
+      fas && fas.isAsync() && fas.isNonisolatedNonsending()) {
+    return true;
+  }
+
+  // Treat function exits from a caller isolation inheriting function as
+  // requiring the liveness of hop to executors before it.
+  //
+  // DISCUSSION: We do this since callers of callee functions with isolation
+  // inheriting isolation are not required to have a hop after the return from
+  // the callee function... so we have no guarantee that there isn't code in the
+  // caller that needs this hop to executor to run on the correct actor.
+  if (auto *term = dyn_cast<TermInst>(inst);
+      term && term->isFunctionExiting()) {
+    if (inst->getFunction()->getActorIsolation().isNonisolatedNonsending()) {
+      return true;
+    }
+  }
+
   return inst->mayReadOrWriteMemory();
 }
 
 bool OptimizeHopToExecutor::isGlobalMemory(SILValue addr) {
-  // TODO: use esacpe analysis to rule out locally allocated non-stack objects.
+  // TODO: use escape analysis to rule out locally allocated non-stack objects.
   SILValue base = getAccessBase(addr);
   return !isa<AllocStackInst>(base);
 }

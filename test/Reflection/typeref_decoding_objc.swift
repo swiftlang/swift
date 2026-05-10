@@ -1,13 +1,20 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %S/Inputs/ObjectiveCTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
-// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
-// REQUIRES: objc_interop
+// RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
 
-// Temporarily disable on arm64e (rdar://89986398)
-// UNSUPPORTED: CPU=arm64e
+// Test objective c symbolic references
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -Xfrontend -enable-objective-c-protocol-symbolic-references -target %target-future-triple %S/Inputs/ObjectiveCTypes.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) | %FileCheck %s --check-prefix=CHECK-%target-ptrsize --check-prefix=CHECK
+
+// REQUIRES: objc_interop
 
 // Disable asan builds until we build swift-reflection-dump and the reflection library with the same compile: rdar://problem/30406870
 // REQUIRES: no_asan
+
+// rdar://100558042
+// UNSUPPORTED: CPU=arm64e
 
 // CHECK: FIELDS:
 // CHECK: =======

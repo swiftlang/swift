@@ -98,12 +98,11 @@ public:
   /// Get the linkage of the default witness table.
   SILLinkage getLinkage() const { return Linkage; }
 
-  /// Set the linkage of the default witness table.
-  void setLinkage(SILLinkage l) { Linkage = l; }
-
   void convertToDefinition(ArrayRef<Entry> entries);
 
   ~SILDefaultWitnessTable();
+
+  SILModule &getModule() const { return Mod; }
 
   /// Return true if this is a declaration with no body.
   bool isDeclaration() const { return IsDeclaration; }

@@ -78,7 +78,7 @@ bool ARCPairingContext::performMatching(
   /// For each increment that we matched to a decrement, try to match it to a
   /// decrement -> increment pair.
   for (auto Pair : IncToDecStateMap) {
-    if (!Pair.hasValue())
+    if (!Pair.has_value())
       continue;
 
     SILInstruction *Increment = Pair->first;
@@ -258,6 +258,17 @@ class ARCSequenceOpts : public SILFunctionTransform {
     // FIXME: We should support ownership.
     if (F->hasOwnership())
       return;
+
+    // Bail if the function is too large. ARCSequenceOpt has quadratic
+    // complexity and for some large functions it takes too long to run.
+    int numInsts = 0;
+    for (auto &b : *F) {
+      for (auto &i : b) {
+        (void)i;
+        if (++numInsts > 10000)
+          return;
+      }
+    }
 
     if (!EnableLoopARC) {
       auto *AA = getAnalysis<AliasAnalysis>(F);

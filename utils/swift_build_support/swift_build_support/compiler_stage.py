@@ -16,7 +16,7 @@ class StageArgs(object):
         self.__dict__['postfix'] = stage.postfix
         self.__dict__['stage'] = stage
         self.__dict__['args'] = args
-        assert(not isinstance(self.args, StageArgs))
+        assert not isinstance(self.args, StageArgs)
 
     def _get_stage_prefix(self):
         return self.__dict__['postfix']

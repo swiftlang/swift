@@ -14,7 +14,7 @@ import TestsUtils
 
 public let benchmarks =
   BenchmarkInfo(
-    name: "Fibonacci",
+    name: "Fibonacci2",
     runFunction: run_Fibonacci,
     tags: [.algorithm])
 
@@ -34,11 +34,11 @@ func fibonacci(_ n: Int) -> Int {
 }
 
 @inline(never)
-public func run_Fibonacci(_ n: Int) {
+public func run_Fibonacci(_ N: Int) {
   let n = 24
   let ref_result = 46368
   var result = 0
-  for _ in 1...n {
+  for _ in 1...N {
     result = fibonacci(n)
     if result != ref_result {
       break

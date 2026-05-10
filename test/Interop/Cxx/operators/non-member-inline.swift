@@ -52,6 +52,14 @@ OperatorsTestSuite.test("caret (^)") {
   expectEqual(61, result.value)
 }
 
+OperatorsTestSuite.test("tilde (~)") {
+  let lhs = LoadableIntWrapper(value: 42)
+
+  let result = ~lhs
+
+  expectEqual(-43, result.value)
+}
+
 OperatorsTestSuite.test("percent (%)") {
   let lhs = LoadableIntWrapper(value: 11)
   let rhs = LoadableIntWrapper(value: 2)
@@ -151,6 +159,24 @@ OperatorsTestSuite.test("greater equal (>=)") {
   expectEqual(true, result)
 }
 
+OperatorsTestSuite.test("slash equal (/=)") {
+  var lhs = LoadableIntWrapper(value: 8)
+  let rhs = LoadableIntWrapper(value: 2)
+
+  lhs /= rhs
+
+  expectEqual(lhs.value, 4)
+}
+
+OperatorsTestSuite.test("star equal (*=)") {
+  var lhs = LoadableIntWrapper(value: 8)
+  let rhs = LoadableIntWrapper(value: 2)
+
+  lhs *= rhs
+
+  expectEqual(lhs.value, 16)
+}
+
 OperatorsTestSuite.test("amp amp (&&)") {
   let lhs = LoadableBoolWrapper(value: true)
   let rhs = LoadableBoolWrapper(value: false)
@@ -167,6 +193,28 @@ OperatorsTestSuite.test("pipe pipe (||)") {
   let result = lhs || rhs
 
   expectEqual(true, result.value)
+}
+
+OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
+  let lhs = ClassWithOperatorEqualsParamUnnamed()
+  let rhs = ClassWithOperatorEqualsParamUnnamed()
+  expectFalse(lhs == rhs)
+}
+
+OperatorsTestSuite.test("LValueAndRValueArithmetic.+") {
+  let lhs = LValueAndRValueArithmetic(value: 123)
+  let rhs = LValueAndRValueArithmetic(value: 146)
+
+  expectEqual(269, (lhs + rhs).value)
+}
+
+OperatorsTestSuite.test("AllStar (unary vs binary *)") {
+  let a = AllStar()
+  let b = AllStar()
+  var c = a * b
+  // FIXME: unary non-member operator*() not imported as .pointee
+  // expectEqual(111 * 111, c.pointee)
+  expectEqual(111 * 111, c.L)
 }
 
 runAllTests()

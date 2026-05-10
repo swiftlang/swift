@@ -1,0 +1,86 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %s -c -o %t/a.o
+// RUN: %target-clang %t/a.o %target-embedded-posix-shim -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: %target-run %t/a.out | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_in_compiler
+// REQUIRES: optimized_stdlib
+// REQUIRES: OS=macosx || OS=wasip1
+// REQUIRES: swift_feature_Embedded
+
+import _Concurrency
+
+func fib(_ n: Int) -> Int {
+  var first = 0
+  var second = 1
+  for _ in 0..<n {
+    let temp = first
+    first = second
+    second = temp + first
+  }
+  return first
+}
+
+@available(SwiftStdlib 5.1, *)
+func asyncFib(_ n: Int) async -> Int {
+  if n == 0 || n == 1 {
+    return n
+  }
+
+  async let first = await asyncFib(n-2)
+  async let second = await asyncFib(n-1)
+
+  let result = await first + second
+
+  return result
+}
+
+enum FibError: Error {
+case unhandledValue(Int)
+}
+
+@available(SwiftStdlib 5.1, *)
+func throwingFib(_ n: Int) async throws -> Int {
+  if n == 0 || n == 1 {
+    return n
+  }
+
+  async let first = throwingFib(n-2)
+  async let second = throwingFib(n-1)
+
+  let result = try await first + second
+
+  let s2nd = try await second
+  if s2nd > 17 && s2nd % 17 == 0 {
+    throw FibError.unhandledValue(try await second)
+  }
+
+  return result
+}
+
+@available(SwiftStdlib 5.1, *)
+func runFibonacci(_ n: Int) async {
+  let result = await asyncFib(n)
+
+  print("")
+  print(result == fib(n) ? "OK!" : "???")
+  // CHECK: OK!
+}
+
+@available(SwiftStdlib 5.1, *)
+@main struct Main {
+  static func main() async {
+    await runFibonacci(10)
+
+    do {
+      _ = try await throwingFib(10)
+      fatalError("Throwing test failed to fail")
+    } catch let FibError {
+      // CHECK: Caught a FibError
+      print("Caught a FibError")
+    } catch {
+      fatalError("Caught something else??")
+    }
+  }
+}

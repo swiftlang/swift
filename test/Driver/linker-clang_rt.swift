@@ -6,40 +6,41 @@
 
 // RUN: rm -rf %t
 // RUN: %empty-directory(%t/bin)
+// RUN: %empty-directory(%t/lib)
 // RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t/bin/swiftc)
 // RUN: %empty-directory(%t/lib/swift/clang/lib/darwin/)
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-NO-RUNTIME %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-NO-RUNTIME %s
 
 // RUN: touch %t/lib/swift/clang/lib/darwin/libclang_rt.osx.a %t/lib/swift/clang/lib/darwin/libclang_rt.ios.a %t/lib/swift/clang/lib/darwin/libclang_rt.iossim.a %t/lib/swift/clang/lib/darwin/libclang_rt.tvos.a %t/lib/swift/clang/lib/darwin/libclang_rt.tvossim.a %t/lib/swift/clang/lib/darwin/libclang_rt.watchos.a %t/lib/swift/clang/lib/darwin/libclang_rt.watchossim.a
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACOS %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios13.1-macabi %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACCATALYST %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target x86_64-apple-macosx10.9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACOS %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios13.1-macabi %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-MACCATALYST %s
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-ios7-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios7-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target armv7s-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target arm64-apple-ios7-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target arm64-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target i386-apple-ios7-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target i386-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios7-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target x86_64-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target armv7s-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target arm64-apple-ios7-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target arm64-apple-ios7 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-IOS %s
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-tvos9-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target x86_64-apple-tvos9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target arm64-apple-tvos9-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target arm64-apple-tvos9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOS %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target x86_64-apple-tvos9-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target x86_64-apple-tvos9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target arm64-apple-tvos9-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target arm64-apple-tvos9 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-TVOS %s
 
-// RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-watchos2-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target i386-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOSSIM %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target armv7k-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOS %s
-// RUN: %t/bin/swiftc -driver-print-jobs -target arm64-apple-watchos2-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target i386-apple-watchos2-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target i386-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOSSIM %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target armv7k-apple-watchos2 %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOS %s
+// RUN: %host-library-env %t/bin/swiftc -driver-print-jobs -target arm64-apple-watchos2-simulator %S/../Inputs/empty.swift | %FileCheck -check-prefix CHECK -check-prefix CHECK-WATCHOSSIM %s
 
 // Clean up the test executable because hard links are expensive.
 // RUN: rm -f %t/bin/swiftc
 
 // swift-frontend cannot be copied to another location with bootstrapping because
 // it will not find the libswiftCore library with its relative RPATH.
-// UNSUPPORTED: bootstrapping_mode
+// UNSUPPORTED: swift_in_compiler
 
 // CHECK: {{(bin/)?}}ld{{(.exe)?"? }}
 // CHECK-NO-RUNTIME-NOT: libclang_rt

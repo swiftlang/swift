@@ -1,4 +1,7 @@
-# Conforming to `StringInterpolationProtocol`
+# Conforming to `StringInterpolationProtocol` (StringInterpolationConformance)
+
+## Overview
+
 A type conforming to `ExpressibleByStringInterpolation` uses a helper type called `StringInterpolation` to perform its interpolation. Many types can use `DefaultStringInterpolation`, which implements `String`'s interpolation behavior. Types can also implement custom behavior by providing their own type conforming to `StringInterpolationProtocol`.
 
 In addition to its formal requirements, `init(literalCapacity:interpolationCount:)` and `appendLiteral(_:)`, `StringInterpolationProtocol` has an additional, informal requirement, `appendInterpolation`. String interpolations using `\()` syntax are translated into calls to matching `appendInterpolation` methods.

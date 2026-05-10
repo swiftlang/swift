@@ -55,6 +55,10 @@ struct ValueLifetimeBoundary {
   /// excluding dead-end blocks. This is only useful when it is known that none
   /// of the lastUsers ends the lifetime, for example when creating a new borrow
   /// scope to enclose all uses.
+  ///
+  /// This requires that none of the lastUsers are phi nodes. Phi nodes that end
+  /// the lifetime are already prohibited, but clients must also check for
+  /// guaranteed forwarding and unowned phis.
   void visitInsertionPoints(
       llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
       DeadEndBlocks *deBlocks = nullptr);
@@ -138,6 +142,20 @@ public:
     propagateLiveness();
   }
 
+  ValueLifetimeAnalysis(SILArgument *def, ArrayRef<Operand *> useRange)
+      : defValue(def), inLiveBlocks(def->getFunction()), userSet() {
+    for (auto *use : useRange)
+      userSet.insert(use->getUser());
+    propagateLiveness();
+  }
+
+  ValueLifetimeAnalysis(SILInstruction *def, ArrayRef<Operand *> useRange)
+      : defValue(def), inLiveBlocks(def->getFunction()), userSet() {
+    for (auto *use : useRange)
+      userSet.insert(use->getUser());
+    propagateLiveness();
+  }
+
   /// Compute the LifetimeBoundary--the last users and boundary edges. This
   /// always succeeds.
   ///
@@ -174,7 +192,7 @@ public:
   /// instructions of the frontier that are not in the critical edges. Note that
   /// the method getCriticalEdges can be used to retrieve the critical edges.
   ///
-  /// An edge is also considered as "critical" if it has a single precedessor
+  /// An edge is also considered as "critical" if it has a single predecessor
   /// but the predecessor's terminal instruction is a user of the value.
   ///
   /// If \p deBlocks is provided, all dead-end blocks are ignored. This
@@ -209,14 +227,14 @@ private:
     if (auto *inst = defValue.dyn_cast<SILInstruction *>()) {
       return inst->getFunction();
     }
-    return defValue.get<SILArgument *>()->getFunction();
+    return cast<SILArgument *>(defValue)->getFunction();
   }
 
   SILBasicBlock *getDefValueParentBlock() const {
     if (auto *inst = defValue.dyn_cast<SILInstruction *>()) {
       return inst->getParent();
     }
-    return defValue.get<SILArgument *>()->getParent();
+    return cast<SILArgument *>(defValue)->getParent();
   }
 
   /// Propagates the liveness information up the control flow graph.

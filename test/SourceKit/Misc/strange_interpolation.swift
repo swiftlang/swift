@@ -1,5 +1,6 @@
 // Parse-only modes, like swift -parse and SourceKit, should not emit strange
-// interpolation errors in `#if swift(>=5)` blocks. (SR-9937)
+// interpolation errors in `#if swift(>=5)` blocks
+// (https://github.com/apple/swift/issues/52343).
 //
 // Even though this is in the test/SourceKit directory, it also tests
 // -frontend -parse behavior because the test cases are exactly the same.

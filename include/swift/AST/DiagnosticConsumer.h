@@ -19,9 +19,11 @@
 #ifndef SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 #define SWIFT_BASIC_DIAGNOSTICCONSUMER_H
 
+#include "swift/AST/DiagnosticKind.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/Support/SourceMgr.h"
+#include <optional>
 
 namespace swift {
   class DiagnosticArgument;
@@ -29,13 +31,10 @@ namespace swift {
   class SourceManager;
   enum class DiagID : uint32_t;
 
-/// Describes the kind of diagnostic.
-///
-enum class DiagnosticKind : uint8_t {
-  Error,
-  Warning,
-  Remark,
-  Note
+/// Information about a diagostic's diagnostic group
+struct DiagnosticCategoryInfo {
+  StringRef Name;
+  std::string DocumentationURL;
 };
 
 /// Information about a diagnostic passed to DiagnosticConsumers.
@@ -45,7 +44,6 @@ struct DiagnosticInfo {
   DiagnosticKind Kind;
   StringRef FormatString;
   ArrayRef<DiagnosticArgument> FormatArgs;
-  StringRef Category;
 
   /// Only used when directing diagnostics to different outputs.
   /// In batch mode a diagnostic may be
@@ -58,8 +56,10 @@ struct DiagnosticInfo {
   /// DiagnosticInfo of notes which are children of this diagnostic, if any
   ArrayRef<DiagnosticInfo *> ChildDiagnosticInfo;
 
-  /// Paths to "educational note" diagnostic documentation in the toolchain.
-  ArrayRef<std::string> EducationalNotePaths;
+  /// Full diagnostic group chain, ordered leaf-first.
+  /// Index 0 = this diagnostic's category, index 1+ = parent groups toward root.
+  /// Empty if the diagnostic has no category.
+  std::vector<DiagnosticCategoryInfo> CategoryChain;
 
   /// Represents a fix-it, a replacement of one range of text with another.
   class FixIt {
@@ -74,6 +74,17 @@ struct DiagnosticInfo {
 
     StringRef getText() const { return Text; }
   };
+
+  StringRef getCategoryName() const {
+    return CategoryChain.empty() ? StringRef() : CategoryChain[0].Name;
+  }
+  StringRef getCategoryDocumentationURL() const {
+    return CategoryChain.empty() ? StringRef() : CategoryChain[0].DocumentationURL;
+  }
+  void setCategoryDocumentationURL(std::string url) {
+    if (!CategoryChain.empty())
+      CategoryChain[0].DocumentationURL = std::move(url);
+  }
 
   /// Extra source ranges that are attached to the diagnostic.
   ArrayRef<CharSourceRange> Ranges;
@@ -94,10 +105,13 @@ struct DiagnosticInfo {
                  ArrayRef<CharSourceRange> Ranges, ArrayRef<FixIt> FixIts,
                  bool IsChildNote)
       : ID(ID), Loc(Loc), Kind(Kind), FormatString(FormatString),
-        FormatArgs(FormatArgs), Category(Category),
+        FormatArgs(FormatArgs),
         BufferIndirectlyCausingDiagnostic(BufferIndirectlyCausingDiagnostic),
         ChildDiagnosticInfo(ChildDiagnosticInfo), Ranges(Ranges),
-        FixIts(FixIts), IsChildNote(IsChildNote) {}
+        FixIts(FixIts), IsChildNote(IsChildNote) {
+    if (!Category.empty())
+      CategoryChain.push_back({Category, ""});
+  }
 };
   
 /// Abstract interface for classes that present diagnostics to the user.
@@ -120,7 +134,9 @@ public:
   /// Invoked whenever the frontend emits a diagnostic.
   ///
   /// \param SM The source manager associated with the source locations in
-  /// this diagnostic.
+  /// this diagnostic. NOTE: Do not persist either the SourceManager, or the
+  /// buffer names from the SourceManager, since it may not outlive the
+  /// DiagnosticConsumer (this is the case when building module interfaces).
   ///
   /// \param Info Information describing the diagnostic.
   virtual void handleDiagnostic(SourceManager &SM,
@@ -295,7 +311,7 @@ private:
   ///
   /// If None, Note diagnostics are sent to every consumer.
   /// If null, diagnostics are suppressed.
-  Optional<Subconsumer *> SubconsumerForSubsequentNotes = None;
+  std::optional<Subconsumer *> SubconsumerForSubsequentNotes = std::nullopt;
 
   bool HasAnErrorBeenConsumed = false;
 
@@ -323,16 +339,16 @@ private:
   /// Returns nullptr if diagnostic is to be suppressed,
   /// None if diagnostic is to be distributed to every consumer,
   /// a particular consumer if diagnostic goes there.
-  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  std::optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   subconsumerForLocation(SourceManager &SM, SourceLoc loc);
 
-  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  std::optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumer(SourceManager &SM, const DiagnosticInfo &Info);
 
-  Optional<FileSpecificDiagnosticConsumer::Subconsumer *>
+  std::optional<FileSpecificDiagnosticConsumer::Subconsumer *>
   findSubconsumerForNonNote(SourceManager &SM, const DiagnosticInfo &Info);
 };
-  
+
 } // end namespace swift
 
 #endif // SWIFT_BASIC_DIAGNOSTICCONSUMER_H

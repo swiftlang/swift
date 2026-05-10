@@ -9,14 +9,14 @@
 // Make sure cursor info within the generated interface of A on one of the
 // decls originally from a cross-import decls shows 'A' as the parent module.
 //
-// RUN: %sourcekitd-test -req=interface-gen-open -module A -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -I %S/../Inputs/CrossImport -module-cache-path %t.mod/mcp == -req=cursor -print-raw-response -pos=11:15 -- -I %S/../Inputs/CrossImport -Xfrontend -enable-cross-import-overlays > %t.response
+// RUN: %sourcekitd-test -req=interface-gen-open -module A -- -Xfrontend -disable-implicit-concurrency-module-import -Xfrontend -disable-implicit-string-processing-module-import  -I %S/../Inputs/CrossImport -module-cache-path %t.mod/mcp == -req=cursor -print-raw-response -pos=9:15 -- -I %S/../Inputs/CrossImport -Xfrontend -enable-cross-import-overlays > %t.response
 // RUN: %FileCheck --input-file %t.response %s
 //
 // CHECK: key.name: "From_ABAdditionsType"
 // CHECK: key.modulename: "A"
 
 // Set up a cross-import module with doc comments that also uses cross-imports.
-// This lets us check that that imports of overlays are printed as their
+// This lets us check that imports of overlays are printed as their
 // underlying modules, and that the synthesized comment above each decl
 // originally from an overlay appears before any doc comments.
 //

@@ -19,6 +19,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/TypeID.h"
+#include <optional>
 
 namespace swift {
 
@@ -29,18 +30,18 @@ enum class BodyInitKind;
 struct BodyInitKindAndExpr;
 class BraceStmt;
 class ClosureExpr;
-class CodeCompletionCallbacksFactory;
+class IDEInspectionCallbacksFactory;
 class ConstructorDecl;
 class CustomAttr;
 class Decl;
 class EnumDecl;
 class Fingerprint;
 class FuncDecl;
-enum class ResultBuilderBodyPreCheck : uint8_t;
 class GenericParamList;
 class GenericSignature;
 class GenericTypeParamType;
 class InfixOperatorDecl;
+class IsSingleValueStmtResult;
 class IterableDeclContext;
 class ModuleDecl;
 struct ImplicitImportList;
@@ -68,7 +69,6 @@ struct FragileFunctionKind;
 enum class PolymorphicEffectKind : uint8_t;
 class PolymorphicEffectRequirementList;
 class SourceFile;
-class SymbolSourceMap;
 struct TangentPropertyInfo;
 class Type;
 class TypeAliasDecl;
@@ -82,6 +82,7 @@ enum class ImplicitMemberAction : uint8_t;
 struct FingerprintAndMembers;
 class Identifier;
 class BodyAndFingerprint;
+struct ConstValueTypeInfo;
 
 // Define the AST type zone (zone 1)
 #define SWIFT_TYPEID_ZONE AST

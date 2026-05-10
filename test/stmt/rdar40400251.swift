@@ -31,6 +31,7 @@ func bar(_ e: E2) {
     // expected-error@-1 {{switch must be exhaustive}}
     // expected-note@-2 {{add missing case: '.bar(_)'}}
     // expected-note@-3 {{add missing case: '.baz'}}
+    // expected-note@-4 {{add missing cases}}
 
     case .foo((_, _, _)): break
   }

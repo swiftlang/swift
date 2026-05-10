@@ -15,10 +15,21 @@ if(SWIFT_RUNTIME_USE_SANITIZERS)
   endif()
 endif()
 
-list(APPEND  SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-verify-syntax-tree")
-
 if(SWIFT_STDLIB_SIL_DEBUGGING)
   list(APPEND SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS "-Xfrontend" "-sil-based-debuginfo")
+endif()
+
+option(SWIFT_RUNTIME_DYLD_SHARED_CACHE_COMPATIBLE
+       "On Darwin platforms, link the standard library in a way that
+       allows inclusion in the dyld shared cache"
+       FALSE)
+
+if(CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
+   LLVM_LINKER_IS_APPLE AND
+   NOT SWIFT_RUNTIME_DYLD_SHARED_CACHE_COMPATIBLE)
+  set(shared_cache_link_flags "LINKER:-not_for_dyld_shared_cache")
+  list(APPEND SWIFT_RUNTIME_LINK_FLAGS ${shared_cache_link_flags})
+  list(APPEND SWIFT_RUNTIME_SWIFT_LINK_FLAGS ${shared_cache_link_flags})
 endif()
 
 # Build the runtime with -Wall to catch, e.g., uninitialized variables
@@ -62,11 +73,21 @@ if(CXX_SUPPORTS_EXIT_TIME_DESTRUCTORS_WARNING)
     "-Werror=exit-time-destructors")
 endif()
 
-add_subdirectory(SwiftShims)
+add_subdirectory(SwiftShims/swift/shims)
 add_subdirectory(CommandLineSupport)
+if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
+  add_subdirectory(Cxx)
+else()
+  # SwiftCompilerSources rely on C++ interop, specifically on being able to
+  # import the C++ standard library into Swift. On Linux, this is only possible
+  # when using the modulemap that Swift provides for libstdc++. Make sure we
+  # include the libstdc++ modulemap into the build even when not building
+  # C++ interop modules.
+  add_subdirectory(Cxx/libstdcxx)
+endif()
 add_subdirectory(Threading)
 
-# This static library is shared across swiftCore and swiftReflection
+# This static library is shared across swiftCore and swiftRemoteInspection
 if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
   # TODO: due to the use of `add_swift_target_library` rather than `add_library`
   # we cannot use `target_sources` and thus must resort to list manipulations to
@@ -79,7 +100,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Punycode.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/Remangler.cpp"
     "${SWIFT_SOURCE_DIR}/lib/Demangling/NodeDumper.cpp"
-    "${SWIFT_SOURCE_DIR}/lib/Demangling/Errors.cpp")
+    "${SWIFT_SOURCE_DIR}/lib/Demangling/DemanglingErrorHandling.cpp")
   set(swiftDemanglingCRSources
     "${SWIFT_SOURCE_DIR}/lib/Demangling/CrashReporter.cpp")
 
@@ -123,24 +144,230 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
     INSTALL_IN_COMPONENT never_install)
 endif()
 
+option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
+      "Enable build of the embedded Swift standard library and runtime"
+      TRUE)
+
+option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
+      "Enable build of the embedded Swift standard library and runtime for cross-compiling targets"
+      FALSE)
+
+option(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM
+       "Whether to build the Embedded Swift standard library using the hooks in swift/EmbeddedPlatform.h"
+       FALSE)
+
+set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
+    "List of extra target triples to build the embedded Swift standard library for")
+
+set(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES "" CACHE STRING
+    "List of SDKs to use for target triples, in the form triple@sdkpath.
+    Using this variable precludes setting directly the value for  SWIFT_SDK_embedded_ARCH_\$\{ARCH\}_PATH")
+
+set(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS "${SWIFT_NATIVE_LLVM_TOOLS_PATH}/llvm-ar;crsU"
+    CACHE STRING
+    "Archiver to use when building static archives for non Darwin platform targeting the macOS SDK.
+    This is required when using Xcode 26.4 beta 1 and later.")
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_HOST_VARIANT STREQUAL "macosx")
+  list(GET SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS 0 ARCHIVER_EXECUTABLE)
+  if(NOT EXISTS "${ARCHIVER_EXECUTABLE}" OR IS_DIRECTORY "${ARCHIVER_EXECUTABLE}")
+    message(WARNING "'${ARCHIVER_EXECUTABLE}' is not a valid program, unsetting SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS to be able to pick up a different value at next run.")
+    unset(SWIFT_EMBEDDED_STDLIB_ARCHIVER_FOR_NON_DARWIN_PLATFORMS_UNDER_MACOS CACHE)
+  endif()
+endif()
+
+option(SWIFT_EMBEDDED_STDLIB_BUILD_EXTRA_TARGET_TRIPLES_ONLY
+       "Whether to skip building the Embedded Swift triples hardcoded in the build system"
+       FALSE)
+
+if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
+  (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
+  (NOT SWIFT_HOST_VARIANT STREQUAL "wasi") AND
+  (NOT SWIFT_HOST_VARIANT STREQUAL "windows"))
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
+  set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
+endif()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  add_custom_target(embedded-libraries ALL)
+endif()
+
+set(EMBEDDED_STDLIB_TARGET_TRIPLES)
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
+  if(SWIFT_WASI_SYSROOT_PATH)
+    # Also include none-wasm triples, which don't require a sysroot.
+    # Skip non-Wasm targets.
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "wasm32    wasm32-unknown-wasip1    wasm32-unknown-wasip1"
+      "wasm32    wasm32-unknown-none-wasm  wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm  wasm64-unknown-none-wasm"
+    )
+  else()
+    if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        # arch    module_name               target triple
+        "armv6    armv6-apple-none-macho    armv6-apple-none-macho"
+        "armv6m   armv6m-apple-none-macho   armv6m-apple-none-macho"
+        "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
+        "armv7m   armv7m-apple-none-macho   armv7m-apple-none-macho"
+        "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
+        "armv8m.main   armv8m.main-apple-none-macho   armv8m.main-apple-none-macho"
+        "armv8.1m.main armv8.1m.main-apple-none-macho armv8.1m.main-apple-none-macho"
+      )
+    endif()
+    if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
+        "arm64e   arm64e-apple-none-macho   arm64e-apple-none-macho"
+        "arm64    arm64-apple-ios           arm64-apple-ios18"
+        "arm64e   arm64e-apple-ios          arm64e-apple-ios18"
+      )
+    endif()
+
+    # the following are all ELF targets
+    if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "armv4t   armv4t-none-none-eabi     armv4t-none-none-eabi"
+        "armv6    armv6-none-none-eabi      armv6-none-none-eabi"
+        "armv6m   armv6m-none-none-eabi     armv6m-none-none-eabi"
+        "armv7    armv7-none-none-eabi      armv7-none-none-eabi"
+        "armv7em  armv7em-none-none-eabi    armv7em-none-none-eabi"
+        "armv8m.main  armv8m.main-none-none-eabi    armv8m.main-none-none-eabi"
+        "armv8.1m.main  armv8.1m.main-none-none-eabi    armv8.1m.main-none-none-eabi"
+      )
+    endif()
+    if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "aarch64  aarch64-none-none-elf     aarch64-none-none-elf"
+      )
+    endif()
+    if("RISCV" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "riscv32  riscv32-none-none-eabi    riscv32-none-none-eabi"
+        "riscv64  riscv64-none-none-eabi    riscv64-none-none-eabi"
+      )
+    endif()
+    if("X86" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "i686    i686-unknown-none-elf       i686-unknown-none-elf"
+        "x86_64  x86_64-unknown-none-elf     x86_64-unknown-none-elf"
+      )
+    endif()
+
+    if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
+        "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
+      )
+    endif()
+
+    if("AVR" IN_LIST LLVM_TARGETS_TO_BUILD)
+      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+        "avr  avr-none-none-elf    avr-none-none-elf"
+      )
+    endif()
+  endif()
+endif()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND NOT SWIFT_WASI_SYSROOT_PATH)
+  if (SWIFT_HOST_VARIANT STREQUAL "linux")
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"
+      # In practice this expands to either:
+      # "x86_64   x86_64-unknown-linux-gnu  x86_64-unknown-linux-gnu"
+      # "aarch64  aarch64-unknown-linux-gnu aarch64-unknown-linux-gnu"
+    )
+  elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "x86_64   x86_64-apple-macos        x86_64-apple-macos14"
+      "arm64    arm64-apple-macos         arm64-apple-macos14"
+      "arm64e   arm64e-apple-macos        arm64e-apple-macos14"
+    )
+  elseif (SWIFT_HOST_VARIANT STREQUAL "windows")
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      # Without specifying the `windows` component LLVM refuses to
+      # generate valid COFF object files.
+      "i686    i686-unknown-windows-msvc   i686-unknown-windows-msvc"
+      "x86_64  x86_64-unknown-windows-msvc x86_64-unknown-windows-msvc"
+    )
+  endif()
+endif()
+
+if(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES 
+   AND SWIFT_EMBEDDED_STDLIB_BUILD_EXTRA_TARGET_TRIPLES_ONLY)
+  set(EMBEDDED_STDLIB_TARGET_TRIPLES "")
+endif()
+
+foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
+  if(triple STREQUAL "")
+    continue()
+  endif()
+
+  string(REGEX REPLACE "-" ";" list "${triple}")
+  list(GET list 0 arch)
+  list(GET list 1 vendor)
+  list(GET list 2 os)
+  string(REGEX REPLACE "[0-9]+(\\.[0-9]+)+" "" mod "${triple}")
+
+  list(FILTER EMBEDDED_STDLIB_TARGET_TRIPLES EXCLUDE REGEX " ${mod} ")
+
+  list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+    "${arch} ${mod} ${triple}"
+  )
+endforeach()
+
+if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+  message(WARNING "Configuring SDKs using content of SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES \
+    Setting directly SWIFT_SDK_embedded_ARCH_\$\{ARCH\}_PATH will not work")
+  foreach(triple_configuration ${SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES})
+    if(triple_configuration STREQUAL "")
+      continue()
+    endif()
+
+    # Line format: <triple>[@<path to SDK>]
+    string(REPLACE "@" ";" triple_configuration_list "${triple_configuration}")
+    list(LENGTH triple_configuration_list triple_configuration_list_length)
+    if(triple_configuration_list_length GREATER_EQUAL 2)
+      list(GET triple_configuration_list 0 triple)
+      list(GET triple_configuration_list 1 sdk_path)
+      set(EMBEDDED_STDLIB_SDK_FOR_${triple} "${sdk_path}")
+    endif()
+  endforeach()
+endif()
+
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+  set(triples)
+  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
+    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
+    list(GET list 2 triple)
+    list(APPEND triples ${triple})
+  endforeach()
+
+  message(STATUS "Building Embedded Swift standard libraries for targets: ${triples}")
+  message(STATUS "")
+endif()
+
 if(SWIFT_BUILD_STDLIB)
   # These must be kept in dependency order so that any referenced targets
   # exist at the time we look for them in add_swift_*.
+  if(SWIFT_BUILD_SWIFT_DIRECT_RUNTIME)
+    add_subdirectory(SwiftDirectRuntime)
+  endif()
+
   add_subdirectory(runtime)
   add_subdirectory(stubs)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
+  add_subdirectory(EmbeddedPlatform)
 
-  if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
-    add_subdirectory(Differentiation)
+  if(SWIFT_BUILD_CLANG_OVERLAYS OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+    add_subdirectory(ClangOverlays)
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
     add_subdirectory(Concurrency)
-  endif()
-
-  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
-    add_subdirectory(Distributed)
   endif()
 
   if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
@@ -150,21 +377,52 @@ if(SWIFT_BUILD_STDLIB)
   endif()
 endif()
 
-if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_REMOTE_MIRROR)
-  add_subdirectory(Reflection)
+if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
+  # In some internal Apple configurations we have the need
+  # to build Core and Onone separately from the rest
+  # of the stdlib
+  if(SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING)
+    add_subdirectory(Differentiation)
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED)
+    add_subdirectory(Distributed)
+  endif()
+
+  if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
+    add_subdirectory(Observation)
+  endif()
+
+  if(SWIFT_ENABLE_RUNTIME_MODULE)
+    add_subdirectory(RuntimeModule)
+  endif()
+
+  if(SWIFT_ENABLE_SYNCHRONIZATION)
+    add_subdirectory(Synchronization)
+  endif()
+
+  if(SWIFT_ENABLE_VOLATILE)
+    add_subdirectory(Volatile)
+  endif()
+endif()
+
+if(SWIFT_BUILD_REMOTE_MIRROR)
+  add_subdirectory(RemoteInspection)
   add_subdirectory(SwiftRemoteMirror)
 endif()
 
-if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+if(SWIFT_BUILD_SDK_OVERLAY OR (SWIFT_BUILD_TEST_SUPPORT_MODULES AND SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default))
   add_subdirectory(Platform)
-  add_subdirectory(Cxx)
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)
-  # On Apple platforms, we aren't building any overlays (other than Darwin in
-  # Platform above). Instead, we're picking them up from the SDK.
+  # On Apple platforms, we aren't building any overlays. Instead, we're picking them up from the SDK.
 
   if(WINDOWS IN_LIST SWIFT_SDKS)
     add_subdirectory(Windows)
   endif()
+endif()
+
+if(SWIFT_BUILD_LIBEXEC)
+add_subdirectory(libexec)
 endif()

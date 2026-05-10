@@ -2,7 +2,6 @@ SWIFT_CLASS("_TtC8comments4A000")
 @interface A000
 @end
 
-
 /// Aaa.  A010.  Bbb.
 SWIFT_CLASS("_TtC8comments21A010_AttachToEntities")
 @interface A010_AttachToEntities
@@ -17,12 +16,10 @@ SWIFT_CLASS_PROPERTY(@property (nonatomic, class, readonly) NSInteger v2;)
 + (NSInteger)v2 SWIFT_WARN_UNUSED_RESULT;
 @end
 
-
 /// Aaa.  A013.
 SWIFT_PROTOCOL("_TtP8comments21A013_AttachToEntities_")
 @protocol A013_AttachToEntities
 @end
-
 
 SWIFT_CLASS("_TtC8comments10ATXHeaders")
 @interface ATXHeaders
@@ -31,6 +28,12 @@ SWIFT_CLASS("_TtC8comments10ATXHeaders")
 - (void)f0;
 @end
 
+SWIFT_CLASS("_TtC8comments10Attributes")
+@interface Attributes
+/// Here is an attribute:
+/// Attribute text
+- (void)f0;
+@end
 
 SWIFT_CLASS("_TtC8comments13AutomaticLink")
 @interface AutomaticLink
@@ -38,7 +41,6 @@ SWIFT_CLASS("_TtC8comments13AutomaticLink")
 /// <a href="http://developer.apple.com/swift/">http://developer.apple.com/swift/</a>
 - (void)f0;
 @end
-
 
 SWIFT_CLASS("_TtC8comments10BlockQuote")
 @interface BlockQuote
@@ -53,7 +55,6 @@ SWIFT_CLASS("_TtC8comments10BlockQuote")
 /// </blockquote>
 - (void)f0;
 @end
-
 
 SWIFT_CLASS("_TtC8comments5Brief")
 @interface Brief
@@ -73,13 +74,11 @@ SWIFT_CLASS("_TtC8comments5Brief")
 - (void)f3;
 @end
 
-
 SWIFT_CLASS("_TtC8comments15ClosingComments")
 @interface ClosingComments
 /// Some comment. */
 - (void)closingComment;
 @end
-
 
 SWIFT_CLASS("_TtC8comments16ClosureContainer")
 @interface ClosureContainer
@@ -148,7 +147,6 @@ SWIFT_CLASS("_TtC8comments16ClosureContainer")
 - (void)closureParameterOutlineOutlineWithA:(NSInteger)a combine:(SWIFT_NOESCAPE NSInteger (^ _Nonnull)(NSInteger, NSInteger))combine;
 @end
 
-
 SWIFT_CLASS("_TtC8comments9CodeBlock")
 @interface CodeBlock
 /// This is how you use this code.
@@ -161,14 +159,12 @@ SWIFT_CLASS("_TtC8comments9CodeBlock")
 - (void)f0;
 @end
 
-
 SWIFT_CLASS("_TtC8comments8Emphasis")
 @interface Emphasis
 /// Aaa <em>bbb</em> ccc.
 /// Aaa <em>bbb</em> ccc.
 - (void)f0;
 @end
-
 
 SWIFT_CLASS("_TtC8comments13EmptyComments")
 @interface EmptyComments
@@ -184,6 +180,14 @@ SWIFT_CLASS("_TtC8comments13EmptyComments")
 - (void)f4;
 @end
 
+SWIFT_CLASS("_TtC8comments9Footnotes")
+@interface Footnotes
+/// Has some footnotes.
+/// Footnotes aren’t handled by swiftMarkup yet[^footnote], but they may in the future.
+/// [^footnote]: Footnotes aren’t parsed by default in swift-cmark, and swiftMarkup doesn’t
+/// enable the feature.
+- (void)f0;
+@end
 
 SWIFT_CLASS("_TtC8comments19HasThrowingFunction")
 @interface HasThrowingFunction
@@ -196,7 +200,6 @@ SWIFT_CLASS("_TtC8comments19HasThrowingFunction")
 - (void)f1:(NSInteger)x;
 @end
 
-
 SWIFT_CLASS("_TtC8comments15HorizontalRules")
 @interface HorizontalRules
 /// Briefly.
@@ -205,13 +208,11 @@ SWIFT_CLASS("_TtC8comments15HorizontalRules")
 - (void)f0;
 @end
 
-
 SWIFT_CLASS("_TtC8comments16ImplicitNameLink")
 @interface ImplicitNameLink
 /// <a href="https://www.apple.com/">Apple</a>
 - (void)f0;
 @end
-
 
 SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
 @interface IndentedBlockComment
@@ -239,20 +240,17 @@ SWIFT_CLASS("_TtC8comments20IndentedBlockComment")
 - (void)f2;
 @end
 
-
 SWIFT_CLASS("_TtC8comments10InlineCode")
 @interface InlineCode
 /// Aaa <code>bbb</code> ccc.
 - (void)f0;
 @end
 
-
 SWIFT_CLASS("_TtC8comments10InlineLink")
 @interface InlineLink
 /// Aaa <a href="/path/to/something">bbb</a> ccc.
 - (void)f0;
 @end
-
 
 SWIFT_CLASS("_TtC8comments14MultiLineBrief")
 @interface MultiLineBrief
@@ -261,7 +259,6 @@ SWIFT_CLASS("_TtC8comments14MultiLineBrief")
 /// Some paragraph text.
 - (void)f0;
 @end
-
 
 SWIFT_CLASS("_TtC8comments11OrderedList")
 @interface OrderedList
@@ -276,7 +273,6 @@ SWIFT_CLASS("_TtC8comments11OrderedList")
 /// </ol>
 - (void)f0;
 @end
-
 
 /// \param x A number
 ///
@@ -322,7 +318,6 @@ SWIFT_CLASS("_TtC8comments15ParamAndReturns")
 - (void)f4;
 @end
 
-
 SWIFT_CLASS("_TtC8comments16ParameterOutline")
 @interface ParameterOutline
 /// \param x A number
@@ -333,7 +328,6 @@ SWIFT_CLASS("_TtC8comments16ParameterOutline")
 ///
 - (void)f0:(NSInteger)x y:(NSInteger)y z:(NSInteger)z;
 @end
-
 
 SWIFT_CLASS("_TtC8comments22ParameterOutlineMiddle")
 @interface ParameterOutlineMiddle
@@ -354,11 +348,9 @@ SWIFT_CLASS("_TtC8comments22ParameterOutlineMiddle")
 - (void)f0:(NSInteger)x y:(NSInteger)y z:(NSInteger)z;
 @end
 
-
 SWIFT_CLASS("_TtC8comments13ReferenceLink")
 @interface ReferenceLink
 @end
-
 
 SWIFT_CLASS("_TtC8comments7Returns")
 @interface Returns
@@ -368,14 +360,12 @@ SWIFT_CLASS("_TtC8comments7Returns")
 - (NSInteger)f0 SWIFT_WARN_UNUSED_RESULT;
 @end
 
-
 SWIFT_CLASS("_TtC8comments18SeparateParameters")
 @interface SeparateParameters
 /// \param x A number
 ///
 - (void)f0:(NSInteger)x y:(NSInteger)y;
 @end
-
 
 SWIFT_CLASS("_TtC8comments13SetextHeaders")
 @interface SetextHeaders
@@ -388,14 +378,12 @@ SWIFT_CLASS("_TtC8comments13SetextHeaders")
 - (void)f0;
 @end
 
-
 SWIFT_CLASS("_TtC8comments14StrongEmphasis")
 @interface StrongEmphasis
 /// Aaa <em>bbb</em> ccc.
 /// Aaa <em>bbb</em> ccc.
 - (void)f0;
 @end
-
 
 SWIFT_CLASS("_TtC8comments13UnorderedList")
 @interface UnorderedList
@@ -424,11 +412,11 @@ SWIFT_CLASS("_TtC8comments13UnorderedList")
 - (void)f0;
 @end
 
-#endif
-#if defined(__cplusplus)
-#endif
+#endif // defined(__OBJC__)
 #if __has_attribute(external_source_symbol)
 # pragma clang attribute pop
+#endif
+#if defined(__cplusplus)
 #endif
 #pragma clang diagnostic pop
 #endif

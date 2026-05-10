@@ -14,21 +14,36 @@ set(swift_string_processing_link_libraries
   swiftCore
   swift_RegexParser)
 
+set(swift_string_processing_compile_flags)
+
+# Pass a flag to the build indicating that _StringProcessing's dependencies
+# will be built with library evolution.
+list(APPEND swift_string_processing_compile_flags
+  "-DRESILIENT_LIBRARIES")
+
+if(SWIFT_BUILD_STATIC_STDLIB)
+  # Explicitly autolink swift_RegexParser because it's imported with @_implementationOnly
+  list(APPEND swift_string_processing_compile_flags
+    "-Xfrontend" "-public-autolink-library" "-Xfrontend" "swift_RegexParser")
+endif()
+
 file(GLOB_RECURSE _STRING_PROCESSING_SOURCES
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_StringProcessing/*.swift"
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_CUnicode/*.h"
-  "${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}/Sources/_CUnicode/*.c")
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_StringProcessing/*.swift"
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_CUnicode/*.h"
+  "${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}/Sources/_CUnicode/*.c")
 set(STRING_PROCESSING_SOURCES)
 foreach(source ${_STRING_PROCESSING_SOURCES})
   file(TO_CMAKE_PATH "${source}" source)
   list(APPEND STRING_PROCESSING_SOURCES ${source})
 endforeach()
-message(STATUS "Using Experimental String Processing library for _StringProcessing (${EXPERIMENTAL_STRING_PROCESSING_SOURCE_DIR}).")
+message(STATUS "Using Experimental String Processing library for _StringProcessing (${SWIFT_PATH_TO_STRING_PROCESSING_SOURCE}).")
 
 add_swift_target_library(swift_StringProcessing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   "${STRING_PROCESSING_SOURCES}"
 
+  SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc
@@ -40,9 +55,11 @@ add_swift_target_library(swift_StringProcessing ${SWIFT_STDLIB_LIBRARY_BUILD_TYP
   C_COMPILE_FLAGS
     -Dswift_StringProcessing_EXPORTS
   SWIFT_COMPILE_FLAGS
+    ${swift_string_processing_compile_flags}
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
   LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
 
   SWIFT_MODULE_DEPENDS _RegexParser
   INSTALL_IN_COMPONENT stdlib
+  MACCATALYST_BUILD_FLAVOR "zippered"
 )

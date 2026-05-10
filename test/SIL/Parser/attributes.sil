@@ -20,6 +20,19 @@ bb0:
   return %1 : $()
 }
 
+// CHECK-LABEL: sil [perf_constraint] [ossa] @test_perf_constraint : $@convention(thin) () -> () {
+sil [perf_constraint] [ossa] @test_perf_constraint : $@convention(thin) () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}
+
 // Make sure we don't try to parse the Swift decl as '@owned() func baz()'.
 sil @bar : $@convention(thin) () -> @owned ()
 func baz()
+
+sil [unsafe_nonescapable_result] [ossa] @test_unsafe_nonescapable : $@convention(thin) () -> () {
+bb0:
+  %1 = tuple ()
+  return %1 : $()
+}

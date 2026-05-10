@@ -15,6 +15,7 @@
 
 #define DEBUG_TYPE "remove-redundant-overflow-checks"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
@@ -518,11 +519,11 @@ public:
     return false;
   }
 
-  Optional<ValueRelation> getArithOpRelation(BuiltinInst *BI) {
+  std::optional<ValueRelation> getArithOpRelation(BuiltinInst *BI) {
     ValueRelation Rel;
     switch (BI->getBuiltinInfo().ID) {
     default:
-      return None;
+      return std::nullopt;
     case BuiltinValueKind::SAddOver:
       Rel = ValueRelation::SAdd;
       break;
@@ -629,8 +630,8 @@ public:
         return;
 
       // The relationship expressed in the builtin.
-      Optional<ValueRelation> Rel = getArithOpRelation(BI);
-      if (!Rel.hasValue())
+      std::optional<ValueRelation> Rel = getArithOpRelation(BI);
+      if (!Rel.has_value())
         return;
 
       // Construct and register the constraint.

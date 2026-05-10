@@ -1,0 +1,32 @@
+// RUN: %scale-test --begin 1 --end 30  --step 1 --select NumLeafScopes --polynomial-threshold 1 %s
+
+// REQUIRES: OS=macosx
+// REQUIRES: asserts,no_asan
+
+protocol P {}
+
+struct G<A> {}
+struct S<A> {}
+
+@available(macOS 1000.0, *)
+extension G: P where G: P {}
+
+@available(macOS 1000.0, *)
+extension Int: P {}
+
+extension S: P where A: P {}
+
+func test<T>(v: T) -> G<T> { fatalError() }
+func test<U: P>(v: U) -> S<U> { fatalError() }
+
+func test(value: Int) {
+    let _ =
+% for i in range(N):
+    test(v:
+% end
+    value
+% for i in range(N):
+    )
+% end
+}
+

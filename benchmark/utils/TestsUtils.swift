@@ -27,7 +27,7 @@ public enum BenchmarkCategory : String {
   case sdk
   case runtime, refcount, metadata
   // Other general areas of compiled code validation.
-  case abstraction, safetychecks, exceptions, bridging, concurrency, existential
+  case abstraction, safetychecks, exceptions, bridging, concurrency, existential, cxxInterop
   case exclusivity, differentiation
 
   // Algorithms are "micro" that test some well-known algorithm in isolation:
@@ -68,6 +68,9 @@ public enum BenchmarkCategory : String {
   // reimplementing or call into code paths that have known opportunities for
   // significant optimization.
   case cpubench
+
+  // Benchmarks to skip on -Onone runs.
+  case long
 
   // Explicit skip marker
   case skip
@@ -113,10 +116,10 @@ public struct BenchmarkInfo {
   public var name: String
 
   /// Shadow static variable for runFunction.
-  private var _runFunction: (Int) -> ()
+  private var _runFunction: (Int) async -> ()
 
   /// A function that invokes the specific benchmark routine.
-  public var runFunction: ((Int) -> ())? {
+  public var runFunction: ((Int) async -> ())? {
     if !shouldRun {
       return nil
     }
@@ -171,7 +174,7 @@ public struct BenchmarkInfo {
   /// to be interrupted by a context switch.
   public var legacyFactor: Int?
 
-  public init(name: String, runFunction: @escaping (Int) -> (), tags: [BenchmarkCategory],
+  public init(name: String, runFunction: @escaping (Int) async -> (), tags: [BenchmarkCategory],
               setUpFunction: (() -> ())? = nil,
               tearDownFunction: (() -> ())? = nil,
               unsupportedPlatforms: BenchmarkPlatformSet = [],
@@ -307,6 +310,7 @@ public func autoreleasepool<Result>(
 }
 #endif
 
+@_semantics("optimize.no.crossmodule")
 public func getFalse() -> Bool { return false }
 
 @available(*, deprecated, renamed: "getFalse()")

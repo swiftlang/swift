@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -o /dev/null %s
 // REQUIRES: asserts
+// REQUIRES: swift_in_compiler
 
 sil_stage canonical
 
@@ -28,6 +29,17 @@ struct Mixed {
   var t: T
   var i: Int
 }
+
+enum KlassOrBool {
+  case value(T)
+  case bool(Bool)
+}
+
+struct IntPair {
+  var a: Int
+  var b: Int
+}
+
 
 sil [ossa] @test_struct : $@convention(thin) (@in Outer) -> @owned T {
 bb0(%0 : $*Outer):
@@ -89,7 +101,7 @@ bb2(%4 : @owned $Error):
 sil [ossa] @test_alloc_stack_simple : $@convention(thin) (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %2 = alloc_stack $T
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   br bb1
 
 bb1:
@@ -102,17 +114,17 @@ bb1:
 sil [ossa] @test_alloc_stack_nested : $@convention(thin) (@in_guaranteed T) -> () {
 bb0(%0 : $*T):
   %1 = alloc_stack $T
-  copy_addr %0 to [initialization] %1 : $*T
+  copy_addr %0 to [init] %1 : $*T
   %2 = alloc_stack $T
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   cond_br undef, bb1, bb2
 bb1:
   %3 = alloc_stack $T
   %4 = alloc_stack $T
-  copy_addr %0 to [initialization] %3 : $*T
-  copy_addr %0 to [initialization] %4 : $*T
+  copy_addr %0 to [init] %3 : $*T
+  copy_addr %0 to [init] %4 : $*T
   destroy_addr %3 : $*T
   destroy_addr %4 : $*T
   dealloc_stack %4 : $*T
@@ -123,22 +135,6 @@ bb2:
 bb3:
   destroy_addr %1 : $*T
   dealloc_stack %1 : $*T
-  %r = tuple ()
-  return %r : $()
-}
-
-sil [ossa] @test_unreachable_block : $@convention(thin) (@owned T) -> () {
-bb0(%0 : @owned $T):
-  %2 = alloc_stack $T
-  store %0 to [init] %2 : $*T
-  br bb2
-
-bb1:
-  br bb2
-
-bb2:
-  destroy_addr %2 : $*T
-  dealloc_stack %2 : $*T
   %r = tuple ()
   return %r : $()
 }
@@ -169,23 +165,23 @@ sil [ossa] @test_many_locations_in_block : $@convention(thin) <A, B, C, D, E, G,
 bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $*I, %9 : $*A, %10 : $*B, %11 : $*C, %12 : $*D, %13 : $*E, %14 : $*G, %15 : $*H, %16 : $*I):
   %18 = alloc_stack $(A, B, C, D, E, G, H, I), let, name "a", argno 1
   %19 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 0
-  copy_addr %9 to [initialization] %19 : $*A
+  copy_addr %9 to [init] %19 : $*A
   %21 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 1
-  copy_addr %10 to [initialization] %21 : $*B
+  copy_addr %10 to [init] %21 : $*B
   %23 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 2
-  copy_addr %11 to [initialization] %23 : $*C
+  copy_addr %11 to [init] %23 : $*C
   %25 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 3
-  copy_addr %12 to [initialization] %25 : $*D
+  copy_addr %12 to [init] %25 : $*D
   %27 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 4
-  copy_addr %13 to [initialization] %27 : $*E
+  copy_addr %13 to [init] %27 : $*E
   %29 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 5
-  copy_addr %14 to [initialization] %29 : $*G
+  copy_addr %14 to [init] %29 : $*G
   %31 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 6
-  copy_addr %15 to [initialization] %31 : $*H
+  copy_addr %15 to [init] %31 : $*H
   %33 = tuple_element_addr %18 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr %16 to [initialization] %33 : $*I
+  copy_addr %16 to [init] %33 : $*I
   %41 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %41 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %41 : $*(A, B, C, D, E, G, H, I)
   %43 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 0
   %44 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 1
   %45 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 2
@@ -194,9 +190,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %48 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 5
   %49 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 6
   %50 = tuple_element_addr %41 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %43 to [initialization] %0 : $*A
+  copy_addr [take] %43 to [init] %0 : $*A
   %52 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %52 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %52 : $*(A, B, C, D, E, G, H, I)
   %54 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 0
   %55 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 1
   %56 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 2
@@ -205,9 +201,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %59 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 5
   %60 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 6
   %61 = tuple_element_addr %52 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %55 to [initialization] %1 : $*B
+  copy_addr [take] %55 to [init] %1 : $*B
   %63 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %63 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %63 : $*(A, B, C, D, E, G, H, I)
   %65 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 0
   %66 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 1
   %67 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 2
@@ -216,9 +212,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %70 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 5
   %71 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 6
   %72 = tuple_element_addr %63 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %67 to [initialization] %2 : $*C
+  copy_addr [take] %67 to [init] %2 : $*C
   %74 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %74 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %74 : $*(A, B, C, D, E, G, H, I)
   %76 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 0
   %77 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 1
   %78 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 2
@@ -227,9 +223,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %81 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 5
   %82 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 6
   %83 = tuple_element_addr %74 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %79 to [initialization] %3 : $*D
+  copy_addr [take] %79 to [init] %3 : $*D
   %85 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %85 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %85 : $*(A, B, C, D, E, G, H, I)
   %87 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 0
   %88 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 1
   %89 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 2
@@ -238,9 +234,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %92 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 5
   %93 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 6
   %94 = tuple_element_addr %85 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %91 to [initialization] %4 : $*E
+  copy_addr [take] %91 to [init] %4 : $*E
   %96 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %96 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %96 : $*(A, B, C, D, E, G, H, I)
   %98 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 0
   %99 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 1
   %100 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 2
@@ -249,9 +245,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %103 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 5
   %104 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 6
   %105 = tuple_element_addr %96 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %103 to [initialization] %5 : $*G
+  copy_addr [take] %103 to [init] %5 : $*G
   %107 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %107 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %107 : $*(A, B, C, D, E, G, H, I)
   %109 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 0
   %110 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 1
   %111 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 2
@@ -260,9 +256,9 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %114 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 5
   %115 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 6
   %116 = tuple_element_addr %107 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %115 to [initialization] %6 : $*H
+  copy_addr [take] %115 to [init] %6 : $*H
   %118 = alloc_stack $(A, B, C, D, E, G, H, I)
-  copy_addr %18 to [initialization] %118 : $*(A, B, C, D, E, G, H, I)
+  copy_addr %18 to [init] %118 : $*(A, B, C, D, E, G, H, I)
   %120 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 0
   %121 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 1
   %122 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 2
@@ -271,7 +267,7 @@ bb0(%0 : $*A, %1 : $*B, %2 : $*C, %3 : $*D, %4 : $*E, %5 : $*G, %6 : $*H, %7 : $
   %125 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 5
   %126 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 6
   %127 = tuple_element_addr %118 : $*(A, B, C, D, E, G, H, I), 7
-  copy_addr [take] %127 to [initialization] %7 : $*I
+  copy_addr [take] %127 to [init] %7 : $*I
   destroy_addr %126 : $*H
   destroy_addr %125 : $*G
   destroy_addr %124 : $*E
@@ -368,6 +364,7 @@ bb3:
 
 // An inconsistent state is allowed at unreachable blocks.
 bb4(%23 : @owned $Error):
+  destroy_value [dead_end] %23
   unreachable
 
 bb5(%43 : @owned $Error):
@@ -400,7 +397,7 @@ bb0(%0 : $*Optional<T>):
   switch_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
   destroy_addr %2 : $*T
   br bb3
 
@@ -419,7 +416,7 @@ bb0(%0 : $*Optional<T>):
 
 bb1(%3 : @guaranteed $T):
   end_borrow %1 : $Optional<T>
-  %2 = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+  %2 = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
   destroy_addr %2 : $*T
   br bb3
 
@@ -442,13 +439,23 @@ bb1:
 
 bb2:
   %5 = init_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
-  copy_addr %1 to [initialization] %5 : $*T
+  copy_addr %1 to [init] %5 : $*T
   inject_enum_addr %0 : $*Optional<T>, #Optional.some!enumelt
   br bb3
 
 bb3:
   %r = tuple ()
   return %r : $()
+}
+
+sil [ossa] @test_init_enum2 : $@convention(thin) (@inout Optional<T>, @in T) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %11 = init_enum_data_addr %0, #Optional.some!enumelt
+  destroy_addr %0
+  copy_addr [take] %1 to [init] %11
+  inject_enum_addr %0, #Optional.some!enumelt
+  %121 = tuple ()
+  return %121
 }
 
 sil [ossa] @test_store_to_enum : $@convention(thin) (@owned T) -> () {
@@ -489,7 +496,7 @@ sil [ossa] @test_non_escaping_closure : $@convention(thin) (@in_guaranteed T) ->
 bb0(%0 :  $*T):
   %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
   %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
-  dealloc_stack %pa : $@noescape @callee_guaranteed () -> () 
+  destroy_value %pa : $@noescape @callee_guaranteed () -> () 
   %res = tuple ()
   return %res : $()
 }
@@ -506,8 +513,20 @@ bb0(%0 :  $*T):
 sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed T) -> () {
 bb0(%0 :  @guaranteed $T):
   %s = alloc_stack $T
-  store_borrow %0 to %s : $*T
+  %sb = store_borrow %0 to %s : $*T
+  end_borrow %sb : $*T
   dealloc_stack %s : $*T
+  %res = tuple ()
+  return %res : $()
+}
+
+sil [ossa] @test_store_borrow_nested : $@convention(thin) (@guaranteed Inner) -> () {
+bb0(%0 :  @guaranteed $Inner):
+  %s = alloc_stack $Inner
+  %sb = store_borrow %0 to %s
+  %elem = struct_element_addr %sb, #Inner.a
+  end_borrow %sb
+  dealloc_stack %s
   %res = tuple ()
   return %res : $()
 }
@@ -586,12 +605,12 @@ sil [ossa] @test_existentials : $@convention(thin) <U: P> (@in_guaranteed U) -> 
 bb0(%0 : $*U):
   %s = alloc_stack $P
   %i = init_existential_addr %s : $*P, $U
-  copy_addr %0 to [initialization] %i : $*U
-  %o = open_existential_addr immutable_access %s : $*P to $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
-  %s2 = alloc_stack $@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
-  copy_addr %o to [initialization] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
-  destroy_addr %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
-  dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D") P
+  copy_addr %0 to [init] %i : $*U
+  %o = open_existential_addr immutable_access %s : $*P to $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  %s2 = alloc_stack $@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  copy_addr %o to [init] %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  destroy_addr %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
+  dealloc_stack %s2 : $*@opened("5B62392E-7C62-11EB-BF90-D0817AD9985D", P) Self
   destroy_addr %s : $*P
   dealloc_stack %s : $*P
   %5 = tuple ()
@@ -602,10 +621,10 @@ sil [ossa] @test_init_two_existentials : $@convention(thin) <U: P, V: P> (@in_gu
 bb0(%0 : $*U, %1 : $*V):
   %s = alloc_stack $P
   %t = init_existential_addr %s : $*P, $U
-  copy_addr %0 to [initialization] %t : $*U
+  copy_addr %0 to [init] %t : $*U
   destroy_addr %s : $*P
   %v = init_existential_addr %s : $*P, $V
-  copy_addr %1 to [initialization] %v : $*V
+  copy_addr %1 to [init] %v : $*V
   destroy_addr %s : $*P
   dealloc_stack %s : $*P
   %5 = tuple ()
@@ -680,5 +699,281 @@ bb3:
   dealloc_stack %0 : $*Result<(), Error>
   %14 = tuple ()
   return %14 : $()
+}
+
+sil [ossa] @begin_apply_in_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in U
+  destroy_addr %instance : $*Inner
+  end_apply %token as $()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @begin_apply_in_constant_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_constant U
+  destroy_addr %instance : $*Inner
+  end_apply %token as $()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @begin_apply_in_guaranteed_no_destroy : $@convention(thin) () -> () {
+entry:
+  (%instance, %token) = begin_apply undef<Inner>() : $@yield_once @convention(thin) <U> () -> @yields @in_guaranteed U
+  end_apply %token as $()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @test : $@convention(thin) (@guaranteed KlassOrBool) -> () {
+bb0(%0 : @guaranteed $KlassOrBool):
+  %1 = alloc_stack $KlassOrBool                   
+  %2 = copy_value %0 : $KlassOrBool               
+  store %2 to [init] %1 : $*KlassOrBool           
+  %4 = load_borrow %1 : $*KlassOrBool             
+  switch_enum %4 : $KlassOrBool, case #KlassOrBool.bool!enumelt: bb1, case #KlassOrBool.value!enumelt: bb2 
+
+bb1(%6 : $Bool):                                  
+  end_borrow %4 : $KlassOrBool                    
+  %8 = alloc_stack $KlassOrBool                   
+  %9 = load [copy] %1 : $*KlassOrBool             
+  store %9 to [init] %8 : $*KlassOrBool           
+  %11 = load_borrow %8 : $*KlassOrBool            
+  %12 = unchecked_enum_data %11 : $KlassOrBool, #KlassOrBool.bool!enumelt
+  end_borrow %11 : $KlassOrBool                   
+  dealloc_stack %8 : $*KlassOrBool                
+  br bb3                                          
+
+bb2(%16 : @guaranteed $T):                    
+  end_borrow %4 : $KlassOrBool                    
+  %18 = load [take] %1 : $*KlassOrBool            
+  destroy_value %18 : $KlassOrBool                
+  br bb3                                          
+
+bb3:                                              
+  dealloc_stack %1 : $*KlassOrBool                
+  %22 = tuple ()                                  
+  return %22 : $()                                
+} 
+
+sil @$testTrivialThinToThickClosure : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+sil @$testTrivialThinToThickApply : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+
+// Test alloc_stack of a non-trivial (thick) function.
+// Initialize by storing a thin function, which as ownership .none.
+// Deallocation does not require a destroy_adr.
+sil [ossa] @testTrivialThinToThick : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @$testTrivialThinToThickClosure : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %1 = thin_to_thick_function %0 : $@convention(thin) @substituted <τ_0_0> () -> @out τ_0_0 for <Int> to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %2 = alloc_stack $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  store %1 to [trivial] %2 : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %4 = function_ref @$testTrivialThinToThickApply : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  %5 = apply %4<() -> Int>(%2) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  dealloc_stack %2 : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Int>
+  %7 = tuple ()
+  return %7 : $()
+}
+
+sil [ossa] @test_init_enum_switch_value : $@convention(thin) (@in_guaranteed Optional<T>, @in_guaranteed T) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %stk = alloc_stack $Optional<T>
+  %2 = init_enum_data_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  copy_addr %1 to [init] %2 : $*T
+  inject_enum_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  %one = integer_literal $Builtin.Word, 1
+  %two = integer_literal $Builtin.Word, 2
+  switch_value %one : $Builtin.Word, case %one: bb1, case %two: bb2
+
+bb1:
+  destroy_addr %stk : $*Optional<T>
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb2:
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+sil [ossa] @mark_dependence : $@convention(method) (@owned T, @owned Inner) -> @owned Inner {
+bb0(%0 : @owned $T, %1 : @owned $Inner):
+  %2 = alloc_stack $T
+  store %0 to [init] %2
+  %4 = alloc_stack $Inner
+  store %1 to [init] %4
+  %6 = mark_dependence %4 on %2
+  %7 = begin_access [modify] [dynamic] %6
+  %8 = load [take] %7
+  end_access %7
+  dealloc_stack %4
+  destroy_addr %2
+  dealloc_stack %2
+  return %8
+}
+
+sil [ossa] @mark_dependence_addr : $@convention(method) (@owned T, @owned Inner) -> @owned Inner {
+bb0(%0 : @owned $T, %1 : @owned $Inner):
+  %2 = alloc_stack $T
+  store %0 to [init] %2
+  %4 = alloc_stack $Inner
+  store %1 to [init] %4
+  mark_dependence_addr %4 on %2
+  %7 = begin_access [modify] [dynamic] %4
+  %8 = load [take] %7
+  end_access %7
+  dealloc_stack %4
+  destroy_addr %2
+  dealloc_stack %2
+  return %8
+}
+
+sil @initfn : $@convention(thin) () -> @out T 
+
+sil [ossa] @inject_enum_case : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  %1 = function_ref @initfn : $@convention(thin) () -> @out T 
+  %2 = init_enum_data_addr %0, #Optional.some!enumelt 
+  %3 = apply %1(%2) : $@convention(thin) () -> @out T
+  inject_enum_addr %0, #Optional.some!enumelt
+  destroy_addr %0
+  dealloc_stack %0
+  %10 = tuple ()                                  
+  return %10                                      
+} 
+
+sil [ossa] @storage_leaked_into_dead_ends : $@convention(thin) () -> () {
+  %t = apply undef() : $@convention(thin) () -> (@owned T)
+  %t_addr = alloc_stack $T
+  store %t to [init] %t_addr
+  dealloc_stack %t_addr
+  unreachable
+}
+
+sil [ossa] @read_a : $@convention(thin) (@inout IntPair) -> () {
+[%0: read s0.v**]
+}
+
+sil [ossa] @callee_reads_unknown_subfield : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $IntPair
+  %2 = struct_element_addr %1, #IntPair.a
+  store %0 to [trivial] %2
+  %4 = function_ref @read_a : $@convention(thin) (@inout IntPair) -> ()
+  %5 = apply %4(%1) : $@convention(thin) (@inout IntPair) -> ()
+  dealloc_stack %1
+  %7 = tuple ()
+  return %7
+}
+
+sil [ossa] @callee_reads_known_subfield : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  %1 = alloc_stack $IntPair
+  %2 = struct_element_addr %1, #IntPair.a
+  %3 = struct_element_addr %1, #IntPair.b
+  store %0 to [trivial] %2
+  %4 = function_ref @read_a : $@convention(thin) (@inout IntPair) -> ()
+  %5 = apply %4(%1) : $@convention(thin) (@inout IntPair) -> ()
+  dealloc_stack %1
+  %7 = tuple ()
+  return %7
+}
+
+sil @dont_read_from_inout : $@convention(thin) (@inout Bool) -> ()
+
+sil [ossa] @no_read_from_inout : $@convention(thin) (Bool) -> () {
+bb0(%0 : $Bool):
+  %1 = alloc_stack $Bool
+  %8 = function_ref @dont_read_from_inout : $@convention(thin) (@inout Bool) -> ()
+  %9 = apply %8(%1) : $@convention(thin) (@inout Bool) -> ()
+  dealloc_stack %1 : $*Bool
+  %10 = tuple ()
+  return %10 : $()
+}
+
+struct BoolAndObj {
+  var b: Bool
+  var obj: AnyObject
+}
+
+sil [ossa] @test_store_assign : $@convention(thin) (@owned BoolAndObj, @owned AnyObject) -> () {
+bb0(%0 : @owned $BoolAndObj, %1 : @owned $AnyObject):
+  %2 = alloc_stack $BoolAndObj
+  %3 = struct_element_addr %2, #BoolAndObj.b
+  %4 = struct_element_addr %2, #BoolAndObj.obj
+  store %1 to [init] %4
+  store %0 to [assign] %2
+  %7 = load [take] %2
+  destroy_value %7
+  dealloc_stack %2
+  return undef : $()
+}
+
+sil [ossa] @test_switch_value_default_block : $@convention(thin) (@in_guaranteed Optional<T>, @in_guaranteed T) -> () {
+bb0(%0 : $*Optional<T>, %1 : $*T):
+  %stk = alloc_stack $Optional<T>
+  %2 = init_enum_data_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  copy_addr %1 to [init] %2 : $*T
+  inject_enum_addr %stk : $*Optional<T>, #Optional.some!enumelt
+  %val = integer_literal $Builtin.Int1, 0
+  %true_val = integer_literal $Builtin.Int1, -1
+  switch_value %val : $Builtin.Int1, case %true_val: bb1, default bb2
+
+bb1:
+  destroy_addr %stk : $*Optional<T>
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb2:
+  dealloc_stack %stk : $*Optional<T>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
+class Klass {}
+
+enum TripleCaseEnum {
+  case none
+  case some1(Klass)
+  case some2(Int)
+}
+
+sil [ossa] @test_switch_value_case_block : $@convention(thin) (@in_guaranteed TripleCaseEnum, @in_guaranteed Int) -> () {
+bb0(%0 : $*TripleCaseEnum, %1 : $*Int):
+  %stk = alloc_stack $TripleCaseEnum
+  %2 = init_enum_data_addr %stk : $*TripleCaseEnum, #TripleCaseEnum.some2!enumelt
+  copy_addr %1 to [init] %2 : $*Int
+  inject_enum_addr %stk : $*TripleCaseEnum, #TripleCaseEnum.some2!enumelt
+  %val = integer_literal $Builtin.Int32, 2
+  %none_val = integer_literal $Builtin.Int32, 0
+  %some1_val = integer_literal $Builtin.Int32, 1
+  %some2_val = integer_literal $Builtin.Int32, 2
+  switch_value %val, case %none_val: bb1, case %some1_val: bb2, case %some2_val: bb3
+
+bb1:
+  dealloc_stack %stk : $*TripleCaseEnum
+  br bb4
+
+bb2:
+  destroy_addr %stk : $*TripleCaseEnum
+  dealloc_stack %stk : $*TripleCaseEnum
+  br bb4
+
+bb3:
+  dealloc_stack %stk : $*TripleCaseEnum
+  br bb4
+
+bb4:
+  %r = tuple ()
+  return %r : $()
 }
 

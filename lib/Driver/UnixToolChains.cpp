@@ -10,9 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include <fstream>
+
 #include "ToolChains.h"
 
-#include "swift/Basic/Dwarf.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -21,6 +23,7 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/IDETool/CompilerInvocation.h"
 #include "swift/Option/Options.h"
 #include "swift/Option/SanitizerOptions.h"
 #include "clang/Basic/Version.h"
@@ -37,6 +40,7 @@
 using namespace swift;
 using namespace swift::driver;
 using namespace llvm::opt;
+using namespace swift::driver::toolchains;
 
 std::string
 toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,
@@ -85,32 +89,7 @@ ToolChain::InvocationInfo toolchains::GenericUnix::constructInvocation(
 }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
-  if (getTriple().isAndroid())
-    return "lld";
-
-  switch (getTriple().getArch()) {
-  case llvm::Triple::arm:
-  case llvm::Triple::aarch64:
-  case llvm::Triple::aarch64_32:
-  case llvm::Triple::armeb:
-  case llvm::Triple::thumb:
-  case llvm::Triple::thumbeb:
-    // BFD linker has issues wrt relocation of the protocol conformance
-    // section on these targets, it also generates COPY relocations for
-    // final executables, as such, unless specified, we default to gold
-    // linker.
-    return "gold";
-  case llvm::Triple::x86:
-  case llvm::Triple::x86_64:
-  case llvm::Triple::ppc64:
-  case llvm::Triple::ppc64le:
-  case llvm::Triple::systemz:
-    // BFD linker has issues wrt relocations against protected symbols.
-    return "gold";
-  default:
-    // Otherwise, use the default BFD linker.
-    return "";
-  }
+  return "";
 }
 
 bool toolchains::GenericUnix::addRuntimeRPath(const llvm::Triple &T,
@@ -133,10 +112,15 @@ bool toolchains::GenericUnix::addRuntimeRPath(const llvm::Triple &T,
 
   // Honour the user's request to add a rpath to the binary.  This defaults to
   // `true` on non-android and `false` on android since the library must be
-  // copied into the bundle.
+  // copied into the bundle. An exception is made for the Termux app as it
+  // builds and runs natively like a Unix environment on Android.
+#if defined(__TERMUX__)
+  bool apply_rpath = true;
+#else
+  bool apply_rpath = !T.isAndroid();
+#endif
   return Args.hasFlag(options::OPT_toolchain_stdlib_rpath,
-                      options::OPT_no_toolchain_stdlib_rpath,
-                      !T.isAndroid());
+                      options::OPT_no_toolchain_stdlib_rpath, apply_rpath);
 }
 
 ToolChain::InvocationInfo
@@ -183,6 +167,15 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString("-use-ld=" + Linker));
 #else
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
+#endif
+  }
+
+  if (tripleBTCFIByDefaultInOpenBSD(getTriple())) {
+#ifndef SWIFT_OPENBSD_BTCFI
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("-z");
+    Arguments.push_back("-Xlinker");
+    Arguments.push_back("nobtcfi");
 #endif
   }
 
@@ -238,13 +231,16 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   SmallString<128> SharedResourceDirPath;
-  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+  getResourceDirPath(SharedResourceDirPath, context.Args,
+                     /*Shared=*/!(staticExecutable || staticStdlib));
 
-  SmallString<128> swiftrtPath = SharedResourceDirPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.o");
-  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  if (!context.Args.hasArg(options::OPT_nostartfiles)) {
+    SmallString<128> swiftrtPath = SharedResourceDirPath;
+    llvm::sys::path::append(swiftrtPath,
+                            swift::getMajorArchitectureName(getTriple()));
+    llvm::sys::path::append(swiftrtPath, "swiftrt.o");
+    Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  }
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);
@@ -318,13 +314,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     }
   }
 
-  // Link against the desired C++ standard library.
-  if (const Arg *A =
-          context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
-    Arguments.push_back(
-        context.Args.MakeArgString(Twine("-stdlib=") + A->getValue()));
-  }
-
   // Explicitly pass the target to the linker
   Arguments.push_back(
       context.Args.MakeArgString("--target=" + getTriple().str()));
@@ -342,14 +331,13 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     }
   }
 
-  if (context.Args.hasArg(options::OPT_profile_generate)) {
+  if (needsInstrProfileRuntime(context.Args)) {
     SmallString<128> LibProfile(SharedResourceDirPath);
     llvm::sys::path::remove_filename(LibProfile); // remove platform name
     llvm::sys::path::append(LibProfile, "clang", "lib");
-
-    llvm::sys::path::append(LibProfile, getTriple().getOSName(),
-                            Twine("libclang_rt.profile-") +
-                                getTriple().getArchName() + ".a");
+    llvm::sys::path::append(
+        LibProfile, getUnversionedTriple(getTriple()).getOSName(),
+        Twine("libclang_rt.profile-") + getTriple().getArchName() + ".a");
     Arguments.push_back(context.Args.MakeArgString(LibProfile));
     Arguments.push_back(context.Args.MakeArgString(
         Twine("-u", llvm::getInstrProfRuntimeHookVarName())));
@@ -416,5 +404,9 @@ std::string toolchains::Cygwin::getDefaultLinker() const {
 }
 
 std::string toolchains::OpenBSD::getDefaultLinker() const {
+  return "lld";
+}
+
+std::string toolchains::FreeBSD::getDefaultLinker() const {
   return "lld";
 }

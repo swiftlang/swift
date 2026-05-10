@@ -24,6 +24,11 @@
 // CHECK-NEXT:     key.length: 6
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
+// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.operator,
+// CHECK-NEXT:     key.offset: 14,
+// CHECK-NEXT:     key.length: 1
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.comment,
 // CHECK-NEXT:     key.offset: 16,
 // CHECK-NEXT:     key.length: 6
@@ -44,6 +49,16 @@
 // CHECK-NEXT: key.diagnostic_stage: source.diagnostic.stage.swift.parse,
 // CHECK-NEXT: key.syntaxmap: [
 // CHECK-NEXT:   {
+// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.operator,
+// CHECK-NEXT:     key.offset: 9,
+// CHECK-NEXT:     key.length: 1
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.operator,
+// CHECK-NEXT:     key.offset: 12,
+// CHECK-NEXT:     key.length: 1
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.comment,
 // CHECK-NEXT:     key.offset: 13,
 // CHECK-NEXT:     key.length: 6
@@ -61,6 +76,11 @@
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.comment,
 // CHECK-NEXT:     key.offset: 8,
 // CHECK-NEXT:     key.length: 6
+// CHECK-NEXT:   },
+// CHECK-NEXT:   {
+// CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.operator,
+// CHECK-NEXT:     key.offset: 14,
+// CHECK-NEXT:     key.length: 1
 // CHECK-NEXT:   },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     key.kind: source.lang.swift.syntaxtype.comment,

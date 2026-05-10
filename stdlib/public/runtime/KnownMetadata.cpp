@@ -93,10 +93,17 @@ namespace ctypes {
       void *storage[NumWords_DefaultActor];
     };
 
-    // ExecutorRef type.
+    // SerialExecutorRef type.
     struct Be {
       HeapObject *Identity;
       uintptr_t Implementation;
+    };
+
+    // Types that are defined in the Distributed library
+
+    // Non-default distributed actor storage type.
+    struct alignas(2 * alignof(void*)) Bd {
+      void *storage[NumWords_NonDefaultDistributedActor];
     };
   }
 }
@@ -233,12 +240,30 @@ namespace {
       return FunctionPointerBox::getExtraInhabitantTag((void *const *)src);
     }
   };
+  struct DiffFunctionBox
+    : AggregateBox<ThickFunctionBox, ThickFunctionBox, ThickFunctionBox> {
+
+    static constexpr unsigned numExtraInhabitants =
+      ThickFunctionBox::numExtraInhabitants;
+
+    static void storeExtraInhabitantTag(char *dest, unsigned tag) {
+      ThickFunctionBox::storeExtraInhabitantTag(dest, tag);
+    }
+
+    static unsigned getExtraInhabitantTag(const char *src) {
+      return ThickFunctionBox::getExtraInhabitantTag(src);
+    }
+  };
 } // end anonymous namespace
 
 /// The basic value-witness table for escaping function types.
 const ValueWitnessTable
   swift::VALUE_WITNESS_SYM(FUNCTION_MANGLING) =
     ValueWitnessTableForBox<ThickFunctionBox>::table;
+
+const ValueWitnessTable
+  swift::VALUE_WITNESS_SYM(DIFF_FUNCTION_MANGLING) =
+    ValueWitnessTableForBox<DiffFunctionBox>::table;
 
 /// The basic value-witness table for @noescape function types.
 const ValueWitnessTable

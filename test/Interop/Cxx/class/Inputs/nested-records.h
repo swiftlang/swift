@@ -63,7 +63,7 @@ struct HasForwardDeclaredTemplateChild {
 };
 
 
-// TODO: Nested class templates (SR-13853).
+// TODO: Nested class templates (https://github.com/apple/swift/issues/56251).
 
 namespace NestedDeclIsAFirstForwardDeclaration {
 

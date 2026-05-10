@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -13,14 +13,18 @@
 import SwiftShims
 
 /// CR and LF are common special cases in grapheme breaking logic
-private var _CR: UInt8 { return 0x0d }
-private var _LF: UInt8 { return 0x0a }
+private var _CR: UInt8 { return 0x0D }
+private var _LF: UInt8 { return 0x0A }
 
-internal func _hasGraphemeBreakBetween(
+/// Perform a quick-check to determine if there's a grapheme-break between two
+/// scalars, without consulting the data tables. Returns true if there
+/// definitely is a break, false if there definitely is none, and nil if a
+/// break couldn't be determined
+internal func _quickHasGraphemeBreakBetween(
   _ lhs: Unicode.Scalar, _ rhs: Unicode.Scalar
-) -> Bool {
-
-  // CR-LF is a special case: no break between these
+) -> Bool? {
+  // GB3:
+  //   CR-LF is a special case: no break between these
   if lhs == Unicode.Scalar(_CR) && rhs == Unicode.Scalar(_LF) {
     return false
   }
@@ -80,7 +84,10 @@ internal func _hasGraphemeBreakBetween(
     default: return false
     }
   }
-  return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
+  if hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs) {
+    return true
+  }
+  return nil
 }
 
 extension _StringGuts {
@@ -196,9 +203,30 @@ extension _StringGuts {
   /// inconsistent with `_opaqueCharacterStride(endingAt:)`. On the other hand,
   /// this behavior makes this suitable for use in substrings whose start index
   /// itself does not fall on a cluster boundary.
-  @usableFromInline @inline(never)
+  @usableFromInline @inline(__always)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
+    _internalInvariant(i < endIndex._encodedOffset)
+    if isFastUTF8 {
+      let fast = withFastUTF8 { utf8 in
+        if i &+ 1 == utf8.count { return true }
+        let pair = unsafe UnsafeRawPointer(
+          utf8.baseAddress.unsafelyUnwrapped
+        ).loadUnaligned(fromByteOffset: i, as: UInt16.self)
+        //& 0x8080 == 0 is "both not ASCII", != 0x0A0D is "not CRLF"
+        return pair & 0x8080 == 0 && pair != 0x0A0D
+      }
+      if _fastPath(fast) {
+        _internalInvariant(_opaqueComplexCharacterStride(startingAt: i) == 1)
+        return 1
+      }
+    }
+
+    return _opaqueComplexCharacterStride(startingAt: i)
+  }
+
+  @_effects(releasenone) @inline(never)
+  internal func _opaqueComplexCharacterStride(startingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(startingAt: i)
     }
@@ -207,7 +235,7 @@ extension _StringGuts {
       nextBoundary(startingAt: i) { j in
         _internalInvariant(j >= 0)
         guard j < utf8.count else { return nil }
-        let (scalar, len) = _decodeScalar(utf8, startingAt: j)
+        let (scalar, len) = unsafe _decodeScalar(utf8, startingAt: j)
         return (scalar, j &+ len)
       }
     }
@@ -221,9 +249,32 @@ extension _StringGuts {
   ///
   /// Note: unlike `_opaqueCharacterStride(startingAt:)`, this method always
   /// finds a correct grapheme cluster boundary.
-  @usableFromInline @inline(never)
+
+  @usableFromInline @inline(__always)
   @_effects(releasenone)
   internal func _opaqueCharacterStride(endingAt i: Int) -> Int {
+    if i <= 1 {
+      return i
+    }
+    if isFastUTF8 {
+      let fast = withFastUTF8 { utf8 in
+        let pair = unsafe UnsafeRawPointer(
+          utf8.baseAddress.unsafelyUnwrapped
+        ).loadUnaligned(fromByteOffset: i &- 2, as: UInt16.self)
+        //& 0x8080 == 0 is "both not ASCII", != 0x0A0D is "not CRLF"
+        return pair & 0x8080 == 0 && pair != 0x0A0D
+      }
+      if _fastPath(fast) {
+        _internalInvariant(_opaqueComplexCharacterStride(endingAt: i) == 1)
+        return 1
+      }
+    }
+
+    return _opaqueComplexCharacterStride(endingAt: i)
+  }
+
+  @_effects(releasenone) @inline(never)
+  internal func _opaqueComplexCharacterStride(endingAt i: Int) -> Int {
     if _slowPath(isForeign) {
       return _foreignOpaqueCharacterStride(endingAt: i)
     }
@@ -232,7 +283,7 @@ extension _StringGuts {
       previousBoundary(endingAt: i) { j in
         _internalInvariant(j <= utf8.count)
         guard j > 0 else { return nil }
-        let (scalar, len) = _decodeScalar(utf8, endingAt: j)
+        let (scalar, len) = unsafe _decodeScalar(utf8, endingAt: j)
         return (scalar, j &- len)
       }
     }
@@ -261,7 +312,7 @@ extension _StringGuts {
       previousBoundary(endingAt: i) { j in
         _internalInvariant(j <= bounds.upperBound)
         guard j > bounds.lowerBound else { return nil }
-        let (scalar, len) = _decodeScalar(utf8, endingAt: j)
+        let (scalar, len) = unsafe _decodeScalar(utf8, endingAt: j)
         return (scalar, j &- len)
       }
     }
@@ -376,11 +427,16 @@ extension _StringGuts {
 }
 
 extension Unicode.Scalar {
-  fileprivate var _isLinkingConsonant: Bool {
-    _swift_stdlib_isLinkingConsonant(value)
+  fileprivate var _isInCBConsonant: Bool {
+    _swift_stdlib_isInCB_Consonant(value)
   }
 
-  fileprivate var _isVirama: Bool {
+  fileprivate var _isInCBExtend: Bool {
+    // Assuming that we're already an Extend or ZWJ...
+    !(_isInCBConsonant || _isInCBLinker || value == 0x200C)
+  }
+
+  fileprivate var _isInCBLinker: Bool {
     switch value {
     // Devanagari
     case 0x94D:
@@ -407,12 +463,12 @@ extension Unicode.Scalar {
   }
 }
 
-internal struct _GraphemeBreakingState {
+internal struct _GraphemeBreakingState: Sendable, Equatable {
   // When we're looking through an indic sequence, one of the requirements is
-  // that there is at LEAST 1 Virama present between two linking consonants.
+  // that there is at LEAST 1 InCB=Linker present between two InCB=Consonant.
   // This value helps ensure that when we ultimately need to decide whether or
   // not to break that we've at least seen 1 when walking.
-  var hasSeenVirama = false
+  var hasSeenInCBLinker = false
 
   // When walking forwards in a string, we need to know whether or not we've
   // entered an emoji sequence to be able to eventually break after all of the
@@ -436,6 +492,140 @@ internal struct _GraphemeBreakingState {
   var shouldBreakRI = false
 }
 
+extension _GraphemeBreakingState: CustomStringConvertible {
+  var description: String {
+    var r = "["
+    if hasSeenInCBLinker { r += "L" }
+    if isInEmojiSequence { r += "E" }
+    if isInIndicSequence { r += "I" }
+    if shouldBreakRI { r += "R" }
+    r += "]"
+    return r
+  }
+}
+
+extension Unicode {
+  /// A state machine for recognizing character (i.e., extended grapheme
+  /// cluster) boundaries in an arbitrary series of Unicode scalars.
+  ///
+  /// To detect grapheme breaks in a sequence of Unicode scalars, feed each of
+  /// them to the `hasBreak(before:)` method. The method returns true if the
+  /// sequence has a grapheme break preceding the given value.
+  ///
+  /// The results produced by this state machine are guaranteed to match the way
+  /// `String` splits its contents into `Character` values.
+  @available(SwiftStdlib 5.8, *)
+  public // SPI(Foundation) FIXME: We need API for this
+  struct _CharacterRecognizer: Sendable {
+    internal var _previous: Unicode.Scalar
+    internal var _state: _GraphemeBreakingState
+
+    /// Refactoring TODO: should we use a quick check result?
+    ///
+    /// Returns a non-nil value if it can be determined whether there is a
+    /// grapheme break between `scalar1` and `scalar2` without knowing anything
+    /// about the scalars that precede `scalar1`. This can optionally be used as
+    /// a fast (but incomplete) test before spinning up a full state machine
+    /// session.
+    @_effects(releasenone)
+    public static func quickBreak(
+      between scalar1: Unicode.Scalar,
+      and scalar2: Unicode.Scalar
+    ) -> Bool? {
+      _quickHasGraphemeBreakBetween(scalar1, scalar2)
+    }
+
+    /// Initialize a new character recognizer at the _start of text_ (sot)
+    /// position.
+    ///
+    /// The resulting state machine will report a grapheme break on the
+    /// first scalar that is fed to it.
+    public init() {
+      _state = _GraphemeBreakingState()
+      // To avoid having to handle the empty case specially, we use NUL as the
+      // placeholder before the first scalar. NUL is a control character, so per
+      // rule GB5, it will induce an unconditional grapheme break before the
+      // first actual scalar, emulating GB1.
+      _previous = Unicode.Scalar(0 as UInt8)
+    }
+
+    /// Feeds the next scalar to the state machine, returning a Boolean value
+    /// indicating whether it starts a new extended grapheme cluster.
+    ///
+    /// This method will always report a break the first time it is called
+    /// on a newly initialized recognizer.
+    ///
+    /// The state machine does not carry information across character
+    /// boundaries. I.e., if this method returns true, then `self` after the
+    /// call is equivalent to feeding the same scalar to a newly initialized
+    /// recognizer instance.
+    @_effects(releasenone)
+    public mutating func hasBreak(
+      before next: Unicode.Scalar
+    ) -> Bool {
+      let r = _state.shouldBreak(between: _previous, and: next)
+      if r {
+        _state = _GraphemeBreakingState()
+      }
+      _previous = next
+      return r
+    }
+
+    /// Decode the scalars in the given UTF-8 buffer and feed them to the
+    /// recognizer up to and including the scalar following the first grapheme
+    /// break. If the buffer contains a grapheme break, then this function
+    /// returns the index range of the scalar that follows the first one;
+    /// otherwise it returns `nil`.
+    ///
+    /// On return, the state of the recognizer is updated to reflect the scalars
+    /// up to and including the returned one. You can detect additional grapheme
+    /// breaks by feeding the recognizer subsequent data.
+    ///
+    /// - Parameter buffer: A buffer containing valid UTF-8 data, starting and
+    ///    ending on Unicode scalar boundaries.
+    ///
+    /// - Parameter start: A valid index into `buffer`, addressing the first
+    ///    code unit of a UTF-8 scalar in the buffer, or the end.
+    ///
+    /// - Returns: The index range of the scalar that follows the first grapheme
+    ///    break in the buffer, if there is one. If the buffer contains no
+    ///    grapheme breaks, then this function returns `nil`.
+    ///
+    /// - Warning: This function does not validate that the buffer contains
+    ///    valid UTF-8 data; its behavior is undefined if given invalid input.
+    @_effects(releasenone)
+    public mutating func _firstBreak(
+      inUncheckedUnsafeUTF8Buffer buffer: UnsafeBufferPointer<UInt8>,
+      startingAt start: Int = 0
+    ) -> Range<Int>? {
+      var i = start
+      while i < buffer.endIndex {
+        let (next, n) = unsafe _decodeScalar(buffer, startingAt: i)
+        if hasBreak(before: next) {
+          return unsafe Range(_uncheckedBounds: (i, i &+ n))
+        }
+        i &+= n
+      }
+      return nil
+    }
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension Unicode._CharacterRecognizer: Equatable {
+  public static func ==(left: Self, right: Self) -> Bool {
+    left._previous == right._previous && left._state == right._state
+  }
+}
+
+@available(SwiftStdlib 5.9, *)
+extension Unicode._CharacterRecognizer: CustomStringConvertible {
+  public var description: String {
+    return "\(_state)U+\(String(_previous.value, radix: 16, uppercase: true))"
+  }
+}
+
+
 extension _StringGuts {
   // Returns the stride of the grapheme cluster starting at offset `index`,
   // assuming it is on a grapheme cluster boundary.
@@ -450,62 +640,79 @@ extension _StringGuts {
     nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
   ) -> Int {
     _internalInvariant(index < endIndex._encodedOffset)
-
-    // Note: If `index` in't already on a boundary, then starting with an empty
-    // state here sometimes leads to this method returning results that diverge
-    // from the true breaks in the string.
-    var state = _GraphemeBreakingState()
-    var (scalar, index) = nextScalar(index)!
-
-    while true {
-      guard let (scalar2, nextIndex) = nextScalar(index) else { break }
-      if shouldBreak(between: scalar, and: scalar2, at: index, with: &state) {
-        break
-      }
-      index = nextIndex
-      scalar = scalar2
-    }
-
-    return index
-  }
-
-  // Returns the stride of the grapheme cluster ending at offset `index`.
-  //
-  // This method uses `previousScalar` to looks back in the string as far as
-  // necessary to find a correct grapheme cluster boundary, whether or not
-  // `index` happens to be on a boundary itself.
-  internal func previousBoundary(
-    endingAt index: Int,
-    previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
-  ) -> Int {
-    // FIXME: This requires potentially arbitrary lookback in each iteration,
-    // leading to quadratic behavior in some edge cases. Ideally lookback should
-    // only be done once per cluster (or in the case of RI sequences, once per
-    // flag sequence). One way to avoid most quadratic behavior is to replace
-    // this implementation with a scheme that first searches backwards for a
-    // safe point then iterates forward using the regular `shouldBreak` until we
-    // reach `index`, as recommended in section 6.4 of TR#29.
-    //
-    // https://www.unicode.org/reports/tr29/#Random_Access
-
-    var (scalar2, index) = previousScalar(index)!
-
-    while true {
-      guard let (scalar1, previousIndex) = previousScalar(index) else { break }
-      if shouldBreakWithLookback(
-        between: scalar1, and: scalar2, at: index, with: previousScalar
-      ) {
-        break
-      }
-      index = previousIndex
-      scalar2 = scalar1
-    }
-
-    return index
+    return _nextGraphemeClusterBoundary(startingAt: index, nextScalar: nextScalar)
   }
 }
 
+internal func _nextGraphemeClusterBoundary(
+  startingAt index: Int,
+  nextScalar: (Int) -> (scalar: Unicode.Scalar, end: Int)?
+) -> Int {
+
+  // Note: If `index` isn't already on a boundary, then starting with an empty
+  // state here sometimes leads to this method returning results that diverge
+  // from the true breaks in the string.
+  var state = _GraphemeBreakingState()
+  var (scalar, index) = nextScalar(index)!
+
+  while true {
+    guard let (scalar2, nextIndex) = nextScalar(index) else { break }
+    if state.shouldBreak(between: scalar, and: scalar2) {
+      break
+    }
+    index = nextIndex
+    scalar = scalar2
+  }
+
+  return index
+}
+
 extension _StringGuts {
+  fileprivate func previousBoundary(
+    endingAt index: Int,
+    previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
+  ) -> Int {
+    _previousGraphemeClusterBoundary(endingAt: index, previousScalar: previousScalar)
+  }
+
+}
+
+// Returns the stride of the grapheme cluster ending at offset `index`.
+//
+// This method uses `previousScalar` to looks back in the string as far as
+// necessary to find a correct grapheme cluster boundary, whether or not
+// `index` happens to be on a boundary itself.
+internal func _previousGraphemeClusterBoundary(
+  endingAt index: Int,
+  previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
+) -> Int {
+  // FIXME: This requires potentially arbitrary lookback in each iteration,
+  // leading to quadratic behavior in some edge cases. Ideally lookback should
+  // only be done once per cluster (or in the case of RI sequences, once per
+  // flag sequence). One way to avoid most quadratic behavior is to replace
+  // this implementation with a scheme that first searches backwards for a
+  // safe point then iterates forward using the regular `shouldBreak` until we
+  // reach `index`, as recommended in section 6.4 of TR#29.
+  //
+  // https://www.unicode.org/reports/tr29/#Random_Access
+
+  var (scalar2, index) = previousScalar(index)!
+
+  while true {
+    guard let (scalar1, previousIndex) = previousScalar(index) else { break }
+    if _shouldBreakWithLookback(
+      between: scalar1, and: scalar2, at: index, with: previousScalar
+    ) {
+      break
+    }
+    index = previousIndex
+    scalar2 = scalar1
+  }
+
+  return index
+}
+
+extension _GraphemeBreakingState {
   // Return true if there is an extended grapheme cluster boundary between two
   // scalars, based on state information previously collected about preceding
   // scalars.
@@ -517,23 +724,20 @@ extension _StringGuts {
   //
   // This is based on the Unicode Annex #29 for [Grapheme Cluster Boundary
   // Rules](https://unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules).
-  internal func shouldBreak(
+  internal mutating func shouldBreak(
     between scalar1: Unicode.Scalar,
-    and scalar2: Unicode.Scalar,
-    at index: Int,
-    with state: inout _GraphemeBreakingState
+    and scalar2: Unicode.Scalar
   ) -> Bool {
-    // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
-      return false
-    }
-
-    if _hasGraphemeBreakBetween(scalar1, scalar2) {
-      return true
+    if let result = _quickHasGraphemeBreakBetween(scalar1, scalar2) {
+      return result
     }
 
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
-    let y = Unicode._GraphemeBreakProperty(from: scalar2)
+
+    // GB4 handled here because we don't need to know `y` for this case
+    if x == .control {
+      return true
+    }
 
     // This variable and the defer statement help toggle the isInEmojiSequence
     // state variable to false after every decision of 'shouldBreak'. If we
@@ -545,138 +749,10 @@ extension _StringGuts {
     var enterIndicSequence = false
 
     defer {
-      state.isInEmojiSequence = enterEmojiSequence
-      state.isInIndicSequence = enterIndicSequence
+      isInEmojiSequence = enterEmojiSequence
+      isInIndicSequence = enterIndicSequence
     }
 
-    switch (x, y) {
-
-    // Fast path: If we know our scalars have no properties the decision is
-    //            trivial and we don't need to crawl to the default statement.
-    case (.any, .any):
-      return true
-
-    // GB4
-    case (.control, _):
-      return true
-
-    // GB5
-    case (_, .control):
-      return true
-
-    // GB6
-    case (.l, .l),
-         (.l, .v),
-         (.l, .lv),
-         (.l, .lvt):
-      return false
-
-    // GB7
-    case (.lv, .v),
-         (.v, .v),
-         (.lv, .t),
-         (.v, .t):
-      return false
-
-    // GB8
-    case (.lvt, .t),
-         (.t, .t):
-      return false
-
-    // GB9 (partial GB11)
-    case (_, .extend),
-         (_, .zwj):
-
-      // If we're currently in an emoji sequence, then extends and ZWJ help
-      // continue the grapheme cluster by combining more scalars later. If we're
-      // not currently in an emoji sequence, but our lhs scalar is a pictograph,
-      // then that's a signal that it's the start of an emoji sequence.
-      if state.isInEmojiSequence || x == .extendedPictographic {
-        enterEmojiSequence = true
-      }
-
-      // If we're currently in an indic sequence (or if our lhs is a linking
-      // consonant), then this check and everything underneath ensures that
-      // we continue being in one and may check if this extend is a Virama.
-      if state.isInIndicSequence || scalar1._isLinkingConsonant {
-        if y == .extend {
-          let extendNormData = Unicode._NormData(scalar2, fastUpperbound: 0x300)
-
-          // If our extend's CCC is 0, then this rule does not apply.
-          guard extendNormData.ccc != 0 else {
-            return false
-          }
-        }
-
-        enterIndicSequence = true
-
-        if scalar2._isVirama {
-          state.hasSeenVirama = true
-        }
-      }
-
-      return false
-
-    // GB9a
-    case (_, .spacingMark):
-      return false
-
-    // GB9b
-    case (.prepend, _):
-      return false
-
-    // GB11
-    case (.zwj, .extendedPictographic):
-      return !state.isInEmojiSequence
-
-    // GB12 & GB13
-    case (.regionalIndicator, .regionalIndicator):
-      defer {
-        state.shouldBreakRI.toggle()
-      }
-
-      return state.shouldBreakRI
-
-    // GB999
-    default:
-      // GB9c
-      if
-        state.isInIndicSequence,
-        state.hasSeenVirama,
-        scalar2._isLinkingConsonant
-      {
-        state.hasSeenVirama = false
-        return false
-      }
-
-      return true
-    }
-  }
-
-  // Return true if there is an extended grapheme cluster boundary between two
-  // scalars, with no previous knowledge about preceding scalars.
-  //
-  // This method looks back as far as it needs to determine the correct
-  // placement of boundaries.
-  //
-  // This is based off of the Unicode Annex #29 for [Grapheme Cluster Boundary
-  // Rules](https://unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules).
-  internal func shouldBreakWithLookback(
-    between scalar1: Unicode.Scalar,
-    and scalar2: Unicode.Scalar,
-    at index: Int,
-    with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
-  ) -> Bool {
-    // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
-      return false
-    }
-
-    if _hasGraphemeBreakBetween(scalar1, scalar2) {
-      return true
-    }
-
-    let x = Unicode._GraphemeBreakProperty(from: scalar1)
     let y = Unicode._GraphemeBreakProperty(from: scalar2)
 
     switch (x, y) {
@@ -686,9 +762,7 @@ extension _StringGuts {
     case (.any, .any):
       return true
 
-    // GB4
-    case (.control, _):
-      return true
+    // (GB4 is handled above)
 
     // GB5
     case (_, .control):
@@ -713,9 +787,67 @@ extension _StringGuts {
          (.t, .t):
       return false
 
-    // GB9 (partial GB11)
+    // GB9 (partial GB9c and partial GB11)
     case (_, .extend),
          (_, .zwj):
+
+      // Prepare for recognizing GB11, by remembering if we're in an emoji
+      // sequence.
+      //
+      //   GB11: Extended_Pictographic Extend* ZWJ × Extended_Pictographic
+      //
+      // If our left-side scalar is a pictograph, then it starts a new emoji
+      // sequence; the sequence continues through subsequent extend/extend and
+      // extend/zwj pairs.
+      if (
+        scalar1._isExtendedPictographic || (isInEmojiSequence && x == .extend)
+      ) {
+        enterEmojiSequence = true
+      }
+
+      // GB9c: InCB=Consonant [InCB=Extend InCB=Linker]* InCB=Linker [InCB=Extend InCB=Linker]* × InCB=Consonant
+      //
+      // If our lhs is an InCB=Consonant and our rhs is either an InCB=Extend or
+      // an InCB=Linker, then enter into an indic sequence and mark if scalar 2
+      // is a linker and that we've seen a linker.
+      //
+      // If the lhs is not an InCB=Consonant, then check if we're currently in
+      // an indic sequence to properly propagate that back to the state.
+      // Otherwise, we're not in an indic sequence, but our rhs is still an
+      // extension scalar so don't break regardless right here. If we are in an
+      // indic sequence, tell the state that we've seen a linker if our rhs is
+      // one.
+      switch (scalar1._isInCBConsonant, scalar2._isInCBExtend, scalar2._isInCBLinker) {
+      // (InCB=Consonant, InCB=Extend)
+      case (true, true, false):
+        enterIndicSequence = true
+
+      // (InCB=Consonant, InCB=Linker)
+      case (true, false, true):
+        enterIndicSequence = true
+        hasSeenInCBLinker = true
+
+      // (_, InCB=Extend)
+      case (false, true, false):
+        guard isInIndicSequence else {
+          break
+        }
+
+        enterIndicSequence = true
+
+      // (_, InCB=Linker)
+      case (false, false, true):
+        guard isInIndicSequence else {
+          break
+        }
+
+        enterIndicSequence = true
+        hasSeenInCBLinker = true
+
+      default:
+        break
+      }
+
       return false
 
     // GB9a
@@ -727,213 +859,303 @@ extension _StringGuts {
       return false
 
     // GB11
-    case (.zwj, .extendedPictographic):
-      return !checkIfInEmojiSequence(at: index, with: previousScalar)
+    case (.zwj, _) where scalar2._isExtendedPictographic:
+      return !isInEmojiSequence
 
     // GB12 & GB13
     case (.regionalIndicator, .regionalIndicator):
-      return countRIs(at: index, with: previousScalar)
+      defer {
+        shouldBreakRI.toggle()
+      }
+
+      return shouldBreakRI
 
     // GB999
     default:
       // GB9c
-      switch (x, scalar2._isLinkingConsonant) {
-      case (.extend, true):
-        let extendNormData = Unicode._NormData(scalar1, fastUpperbound: 0x300)
-
-        guard extendNormData.ccc != 0 else {
-          return true
-        }
-
-        return !checkIfInIndicSequence(at: index, with: previousScalar)
-
-      case (.zwj, true):
-        return !checkIfInIndicSequence(at: index, with: previousScalar)
-
-      default:
-        return true
-      }
-    }
-  }
-
-  // When walking backwards, it's impossible to know whether we were in an emoji
-  // sequence without walking further backwards. This walks the string backwards
-  // enough until we figure out whether or not to break our
-  // (.zwj, .extendedPictographic) question. For example:
-  //
-  // Scalar view #1:
-  //
-  //     [.control, .zwj, .extendedPictographic]
-  //                     ^
-  //                     | = To determine whether or not we break here, we need
-  //                         to see the previous scalar's grapheme property.
-  //          ^
-  //          | = This is neither .extendedPictographic nor .extend, thus we
-  //              were never in an emoji sequence, so break between the .zwj
-  //              and .extendedPictographic.
-  //
-  // Scalar view #2:
-  //
-  //     [.extendedPictographic, .zwj, .extendedPictographic]
-  //                                  ^
-  //                                  | = Same as above, move backwards one to
-  //                                      view the previous scalar's property.
-  //                ^
-  //                | = This is an .extendedPictographic, so this indicates that
-  //                    we are in an emoji sequence, so we should NOT break
-  //                    between the .zwj and .extendedPictographic.
-  //
-  // Scalar view #3:
-  //
-  //     [.extendedPictographic, .extend, .extend, .zwj, .extendedPictographic]
-  //                                                    ^
-  //                                                    | = Same as above
-  //                                         ^
-  //                                         | = This is an .extend which means
-  //                                             there is a potential emoji
-  //                                             sequence, walk further backwards
-  //                                             to find an .extendedPictographic.
-  //
-  //                               <-- = Another extend, go backwards more.
-  //                ^
-  //                | = We found our starting .extendedPictographic letting us
-  //                    know that we are in an emoji sequence so our initial
-  //                    break question is answered as NO.
-  internal func checkIfInEmojiSequence(
-    at index: Int,
-    with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
-  ) -> Bool {
-    guard var i = previousScalar(index)?.start else { return false }
-    while let prev = previousScalar(i) {
-      i = prev.start
-      let gbp = Unicode._GraphemeBreakProperty(from: prev.scalar)
-
-      switch gbp {
-      case .extend:
-        continue
-      case .extendedPictographic:
-        return true
-      default:
+      if isInIndicSequence, hasSeenInCBLinker, scalar2._isInCBConsonant {
+        hasSeenInCBLinker = false
         return false
       }
+
+      return true
     }
+  }
+}
+
+// Return true if there is an extended grapheme cluster boundary between two
+// scalars, with no previous knowledge about preceding scalars.
+//
+// This method looks back as far as it needs to determine the correct
+// placement of boundaries.
+//
+// This is based off of the Unicode Annex #29 for [Grapheme Cluster Boundary
+// Rules](https://unicode.org/reports/tr29/#Grapheme_Cluster_Boundary_Rules).
+fileprivate func _shouldBreakWithLookback(
+  between scalar1: Unicode.Scalar,
+  and scalar2: Unicode.Scalar,
+  at index: Int,
+  with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
+) -> Bool {
+  if let result = _quickHasGraphemeBreakBetween(scalar1, scalar2) {
+    return result
+  }
+
+  let x = Unicode._GraphemeBreakProperty(from: scalar1)
+  let y = Unicode._GraphemeBreakProperty(from: scalar2)
+
+  switch (x, y) {
+
+  // Fast path: If we know our scalars have no properties the decision is
+  //            trivial and we don't need to crawl to the default statement.
+  case (.any, .any):
+    return true
+
+  // GB4
+  case (.control, _):
+    return true
+
+  // GB5
+  case (_, .control):
+    return true
+
+  // GB6
+  case (.l, .l),
+       (.l, .v),
+       (.l, .lv),
+       (.l, .lvt):
     return false
-  }
 
-  // When walking backwards, it's impossible to know whether we break when we
-  // see our first ((.extend|.zwj), .linkingConsonant) without walking
-  // further backwards. This walks the string backwards enough until we figure
-  // out whether or not to break this indic sequence. For example:
-  //
-  // Scalar view #1:
-  //
-  //     [.virama, .extend, .linkingConsonant]
-  //                       ^
-  //                       | = To be able to know whether or not to break these
-  //                           two, we need to walk backwards to determine if
-  //                           this is a legitimate indic sequence.
-  //      ^
-  //      | = The scalar sequence ends without a starting linking consonant,
-  //          so this is in fact not an indic sequence, so we can break the two.
-  //
-  // Scalar view #2:
-  //
-  //     [.linkingConsonant, .virama, .extend, .linkingConsonant]
-  //                                          ^
-  //                                          | = Same as above
-  //                            ^
-  //                            | = This is a virama, so we at least have seen
-  //                                1 to be able to return true if we see a
-  //                                linking consonant later.
-  //         ^
-  //         | = Is a linking consonant and we've seen a virama, so this is a
-  //             legitimate indic sequence, so do NOT break the initial question.
-  internal func checkIfInIndicSequence(
-    at index: Int,
-    with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
-  ) -> Bool {
-    guard let p = previousScalar(index) else { return false }
-
-    var hasSeenVirama = p.scalar._isVirama
-    var i = p.start
-
-    while let (scalar, prev) = previousScalar(i) {
-      i = prev
-      let gbp = Unicode._GraphemeBreakProperty(from: scalar)
-
-      switch (gbp, scalar._isLinkingConsonant) {
-      case (.extend, false):
-        let extendNormData = Unicode._NormData(scalar, fastUpperbound: 0x300)
-
-        guard extendNormData.ccc != 0 else {
-          return false
-        }
-
-        if scalar._isVirama {
-          hasSeenVirama = true
-        }
-
-      case (.zwj, false):
-        continue
-
-      // LinkingConsonant
-      case (_, true):
-        return hasSeenVirama
-
-      default:
-        return false
-      }
-    }
+  // GB7
+  case (.lv, .v),
+       (.v, .v),
+       (.lv, .t),
+       (.v, .t):
     return false
-  }
 
-  // When walking backwards, it's impossible to know whether we break when we
-  // see our first (.regionalIndicator, .regionalIndicator) without walking
-  // further backwards. This walks the string backwards enough until we figure
-  // out whether or not to break these RIs. For example:
-  //
-  // Scalar view #1:
-  //
-  //     [.control, .regionalIndicator, .regionalIndicator]
-  //                                   ^
-  //                                   | = To be able to know whether or not to
-  //                                       break these two, we need to walk
-  //                                       backwards to determine if there were
-  //                                       any previous .regionalIndicators in
-  //                                       a row.
-  //         ^
-  //         | = Not a .regionalIndicator, so our total riCount is 0 and 0 is
-  //             even thus we do not break.
-  //
-  // Scalar view #2:
-  //
-  //     [.control, .regionalIndicator, .regionalIndicator, .regionalIndicator]
-  //                                                       ^
-  //                                                       | = Same as above
-  //                         ^
-  //                         | = This is a .regionalIndicator, so continue
-  //                             walking backwards for more of them. riCount is
-  //                             now equal to 1.
-  //         ^
-  //         | = Not a .regionalIndicator. riCount = 1 which is odd, so break
-  //             the last two .regionalIndicators.
-  internal func countRIs(
-    at index: Int,
-    with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
-  ) -> Bool {
-    guard let p = previousScalar(index) else { return false }
-    var i = p.start
-    var riCount = 0
-    while let p = previousScalar(i) {
-      i = p.start
+  // GB8
+  case (.lvt, .t),
+       (.t, .t):
+    return false
 
-      let gbp = Unicode._GraphemeBreakProperty(from: p.scalar)
-      guard gbp == .regionalIndicator else {
-        break
-      }
+  // GB9
+  case (_, .extend),
+       (_, .zwj):
+    return false
 
-      riCount += 1
+  // GB9a
+  case (_, .spacingMark):
+    return false
+
+  // GB9b
+  case (.prepend, _):
+    return false
+
+  // GB11
+  case (.zwj, _) where scalar2._isExtendedPictographic:
+    return !_checkIfInEmojiSequence(at: index, with: previousScalar)
+
+  // GB12 & GB13
+  case (.regionalIndicator, .regionalIndicator):
+    return _countRIs(at: index, with: previousScalar)
+
+  // GB999
+  default:
+    // GB9c
+    //
+    // Check if our rhs is an InCB=Consonant first because we can more easily
+    // exit out of this branch in most cases. Otherwise, this is a consonant.
+    // Check that the lhs is an InCB=Extend or InCB=Linker (we have to check
+    // if it's an .extend or .zwj first because _isInCBExtend assumes that it
+    // is true).
+    if scalar2._isInCBConsonant,
+       (x == .extend || x == .zwj),
+       (scalar1._isInCBExtend || scalar1._isInCBLinker) {
+      return !_checkIfInIndicSequence(at: index, with: previousScalar)
     }
-    return riCount & 1 != 0
+
+    return true
   }
+}
+
+// When walking backwards, it's impossible to know whether we were in an emoji
+// sequence without walking further backwards. This walks the string backwards
+// enough until we figure out whether or not to break our
+// (.zwj, .extendedPictographic) question. For example:
+//
+// Scalar view #1:
+//
+//     [.control, .zwj, .extendedPictographic]
+//                     ^
+//                     | = To determine whether or not we break here, we need
+//                         to see the previous scalar's grapheme property.
+//          ^
+//          | = This is neither .extendedPictographic nor .extend, thus we
+//              were never in an emoji sequence, so break between the .zwj
+//              and .extendedPictographic.
+//
+// Scalar view #2:
+//
+//     [.extendedPictographic, .zwj, .extendedPictographic]
+//                                  ^
+//                                  | = Same as above, move backwards one to
+//                                      view the previous scalar's property.
+//                ^
+//                | = This is an .extendedPictographic, so this indicates that
+//                    we are in an emoji sequence, so we should NOT break
+//                    between the .zwj and .extendedPictographic.
+//
+// Scalar view #3:
+//
+//     [.extendedPictographic, .extend, .extend, .zwj, .extendedPictographic]
+//                                                    ^
+//                                                    | = Same as above
+//                                         ^
+//                                         | = This is an .extend which means
+//                                             there is a potential emoji
+//                                             sequence, walk further backwards
+//                                             to find an .extendedPictographic.
+//
+//                               <-- = Another extend, go backwards more.
+//                ^
+//                | = We found our starting .extendedPictographic letting us
+//                    know that we are in an emoji sequence so our initial
+//                    break question is answered as NO.
+fileprivate func _checkIfInEmojiSequence(
+  at index: Int,
+  with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
+) -> Bool {
+  guard var i = previousScalar(index)?.start else { return false }
+  while let prev = previousScalar(i) {
+    i = prev.start
+    let gbp = Unicode._GraphemeBreakProperty(from: prev.scalar)
+
+    if gbp == .extend {
+      continue
+    }
+
+    return prev.scalar._isExtendedPictographic
+  }
+  return false
+}
+
+// When walking backwards, it's impossible to know whether we break when we
+// see our first (InCB=Extend, InCB=Consonant) or (InCB=Linker, InCB=Consonant)
+// without walking further backwards. This walks the string backwards enough
+// until we figure out whether or not to break this indic sequence. For example:
+//
+// Scalar view #1:
+//
+//     [InCB=Linker, InCB=Extend, InCB=Consonant]
+//                               ^
+//                               | = To be able to know whether or not to
+//                                   break these two, we need to walk
+//                                   backwards to determine if this is a
+//                                   legitimate indic sequence.
+//      ^
+//      | = The scalar sequence ends without a starting InCB=Consonant,
+//          so this is in fact not an indic sequence, so we can break the two.
+//
+// Scalar view #2:
+//
+//     [InCB=Consonant, InCB=Linker, InCB=Extend, InCB=Consonant]
+//                                               ^
+//                                               | = Same as above
+//                            ^
+//                            | = This is a Linker, so we at least have seen
+//                                1 to be able to return true if we see a
+//                                consonant later.
+//         ^
+//         | = Is a consonant and we've seen a linker, so this is a
+//             legitimate indic sequence, so do NOT break the initial question.
+fileprivate func _checkIfInIndicSequence(
+  at index: Int,
+  with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
+) -> Bool {
+  guard let p = previousScalar(index) else { return false }
+
+  var hasSeenInCBLinker = p.scalar._isInCBLinker
+  var i = p.start
+
+  while let (scalar, prev) = previousScalar(i) {
+    i = prev
+
+    if scalar._isInCBConsonant {
+      return hasSeenInCBLinker
+    }
+
+    let gbp = Unicode._GraphemeBreakProperty(from: scalar)
+
+    guard gbp == .extend || gbp == .zwj else {
+      return false
+    }
+
+    switch (scalar._isInCBExtend, scalar._isInCBLinker) {
+    case (false, false):
+      return false
+
+    case (false, true):
+      hasSeenInCBLinker = true
+
+    case (true, false):
+      continue
+
+    case (true, true):
+      // This case should never happen, but if it does then just be cautious
+      // and say this is invalid.
+      return false
+    }
+  }
+
+  return false
+}
+
+// When walking backwards, it's impossible to know whether we break when we
+// see our first (.regionalIndicator, .regionalIndicator) without walking
+// further backwards. This walks the string backwards enough until we figure
+// out whether or not to break these RIs. For example:
+//
+// Scalar view #1:
+//
+//     [.control, .regionalIndicator, .regionalIndicator]
+//                                   ^
+//                                   | = To be able to know whether or not to
+//                                       break these two, we need to walk
+//                                       backwards to determine if there were
+//                                       any previous .regionalIndicators in
+//                                       a row.
+//         ^
+//         | = Not a .regionalIndicator, so our total riCount is 0 and 0 is
+//             even thus we do not break.
+//
+// Scalar view #2:
+//
+//     [.control, .regionalIndicator, .regionalIndicator, .regionalIndicator]
+//                                                       ^
+//                                                       | = Same as above
+//                         ^
+//                         | = This is a .regionalIndicator, so continue
+//                             walking backwards for more of them. riCount is
+//                             now equal to 1.
+//         ^
+//         | = Not a .regionalIndicator. riCount = 1 which is odd, so break
+//             the last two .regionalIndicators.
+fileprivate func _countRIs(
+  at index: Int,
+  with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
+) -> Bool {
+  guard let p = previousScalar(index) else { return false }
+  var i = p.start
+  var riCount = 0
+  while let p = previousScalar(i) {
+    i = p.start
+
+    let gbp = Unicode._GraphemeBreakProperty(from: p.scalar)
+    guard gbp == .regionalIndicator else {
+      break
+    }
+
+    riCount += 1
+  }
+  return riCount & 1 != 0
 }

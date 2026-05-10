@@ -1,0 +1,7 @@
+module ProtocolFoo {
+    header "ProtocolFoo.h"
+}
+
+module ForwardDeclaredInterfaceFoo {
+    header "ForwardDeclaredInterfaceFoo.h"
+}

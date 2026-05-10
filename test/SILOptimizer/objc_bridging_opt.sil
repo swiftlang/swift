@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -objc-bridging-opt %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -objc-bridging-opt %s | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

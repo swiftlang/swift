@@ -30,13 +30,13 @@ bb0(%0 : $*U, %1 : $*V):
   // function_ref use
   %4 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %5 = alloc_stack $U
-  copy_addr %0 to [initialization] %5 : $*U
+  copy_addr %0 to [init] %5 : $*U
   %7 = apply %4<U>(%5) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %5 : $*U
   // function_ref use
   %9 = function_ref @use : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   %10 = alloc_stack $V
-  copy_addr %1 to [initialization] %10 : $*V
+  copy_addr %1 to [init] %10 : $*V
   %12 = apply %9<V>(%10) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
   dealloc_stack %10 : $*V
   destroy_addr %1 : $*V
@@ -51,7 +51,7 @@ bb0(%0 : $*U):
   // function_ref simple_generic_callee<A, B>(_:_:)
   %2 = function_ref @simple_generic_callee : $@convention(thin) <τ_0_0, τ_0_1> (@in τ_0_0, @in τ_0_1) -> ()
   %3 = alloc_stack $U
-  copy_addr %0 to [initialization] %3 : $*U
+  copy_addr %0 to [init] %3 : $*U
   %5 = integer_literal $Builtin.Int32, 1
   %6 = struct $Int32 (%5 : $Builtin.Int32)
   %7 = alloc_stack $Int32

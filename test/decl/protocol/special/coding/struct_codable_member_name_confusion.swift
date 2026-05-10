@@ -1,7 +1,8 @@
 // RUN: %target-typecheck-verify-swift
 
+// https://github.com/apple/swift/issues/52448
 // Tests that, when synthesizing init(from:), we don't accidentally confuse
-// static and instance properties with the same name. (SR-10045)
+// static and instance properties with the same name.
 // The test fails if this file produces errors.
 
 struct X: Codable {

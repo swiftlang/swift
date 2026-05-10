@@ -22,6 +22,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "BytecodeLayouts.h"
 #include "swift/Runtime/Config.h"
 #include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Metadata.h"
@@ -110,6 +111,16 @@ static void array_copy_operation(OpaqueValue *dest, OpaqueValue *src,
 
   // Call the witness to do the copy.
   if (copyKind == ArrayCopy::NoAlias || copyKind == ArrayCopy::FrontToBack) {
+    if (self->hasLayoutString() && destOp == ArrayDest::Init &&
+        srcOp == ArraySource::Copy) {
+      return swift_cvw_arrayInitWithCopy(dest, src, count, stride, self);
+    }
+
+    if (self->hasLayoutString() && destOp == ArrayDest::Assign &&
+        srcOp == ArraySource::Copy) {
+      return swift_cvw_arrayAssignWithCopy(dest, src, count, stride, self);
+    }
+
     auto copy = get_witness_function<destOp, srcOp>(wtable);
     for (size_t i = 0; i < count; ++i) {
       auto offset = i * stride;
@@ -202,6 +213,10 @@ void swift_arrayDestroy(OpaqueValue *begin, size_t count, const Metadata *self) 
     return;
 
   auto stride = wtable->getStride();
+  if (self->hasLayoutString()) {
+    return swift_cvw_arrayDestroy(begin, count, stride, self);
+  }
+
   for (size_t i = 0; i < count; ++i) {
     auto offset = i * stride;
     auto *obj = reinterpret_cast<OpaqueValue *>((char *)begin + offset);

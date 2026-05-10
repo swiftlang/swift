@@ -1,0 +1,27 @@
+/**
+ *===--- fr.strings - Localized diagnostic messages for French ------------===*
+ *
+ * This source file is part of the Swift.org open source project
+ *
+ * Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
+ * Licensed under Apache License v2.0 with Runtime Library Exception
+ *
+ * See https://swift.org/LICENSE.txt for license information
+ * See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+ *
+ *===----------------------------------------------------------------------===*
+ *
+ * This file defines the diagnostic messages for the French language.
+ * Each diagnostic is described in the following format:
+ *  "<diagnostic-id>" = "<diagnostic-message>";
+ *
+ */
+
+/* Different order from `en.strings` */
+"var_init_self_referential" = "variable utilisée dans sa propre valeur initiale";
+
+"lex_unterminated_string" = "chaîne non terminée littérale";
+
+"cannot_find_in_scope" = "impossible %select{de trouver|de trouver opérateur}1 %0 portée";
+
+"warning_invalid_locale_code" = "code de paramètres régionaux non pris en charge; les codes pris en charge sont '%0'";

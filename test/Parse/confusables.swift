@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 // expected-error @+4 {{type annotation missing in pattern}}
 // expected-error @+3 {{cannot find operator '⁚' in scope}}
@@ -11,18 +11,15 @@ let number⁚ Int // expected-note {{operator '⁚' (Two Dot Punctuation) looks 
 // expected-error @+1 {{consecutive statements on a line must be separated by ';'}}
 5 ‒ 5 // expected-note {{unicode character '‒' (Figure Dash) looks similar to '-' (Hyphen Minus); did you mean to use '-' (Hyphen Minus)?}} {{3-6=-}}
 
+// expected-error @+3 {{cannot convert value of type '(Bool, _)' to expected condition type 'Bool'}}
 // expected-error @+2 {{cannot find 'ꝸꝸꝸ' in scope}}
 // expected-error @+1 {{expected ',' separator}}
 if (true ꝸꝸꝸ false) {} // expected-note {{identifier 'ꝸꝸꝸ' contains possibly confused characters; did you mean to use '&&&'?}} {{10-19=&&&}}
 
 // expected-error @+3 {{invalid character in source file}}
 // expected-error @+2 {{expected ',' separator}}
-// expected-error @+1 {{type '(Int, Int)' cannot conform to 'BinaryInteger'}}
+// expected-error @+1 {{binary operator '==' cannot be applied to operands of type '(Int, Int)' and 'Int'}}
 if (5 ‒ 5) == 0 {} // expected-note {{unicode character '‒' (Figure Dash) looks similar to '-' (Hyphen Minus); did you mean to use '-' (Hyphen Minus)?}} {{7-10=-}}
-// expected-note @-1 {{operator function '=='}}
-// expected-note @-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
-
-// FIXME(rdar://61028087): The above note should read "required by referencing operator function '==' on 'BinaryInteger' where 'Self' = '(Int, Int)'".
 
 // GREEK QUESTION MARK (which looks like a semicolon) 
 print("A"); print("B")

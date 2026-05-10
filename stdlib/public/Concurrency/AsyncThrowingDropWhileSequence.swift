@@ -91,6 +91,11 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
   /// The drop-while sequence produces whatever type of element its base
   /// sequence produces.
   public typealias Element = Base.Element
+  /// The type of element produced by this asynchronous sequence.
+  ///
+  /// The drop-while sequence produces errors from either the base
+  /// sequence or the filtering closure.
+  public typealias Failure = any Error
   /// The type of iterator that produces elements of the sequence.
   public typealias AsyncIterator = Iterator
 
@@ -147,6 +152,39 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
         return nil
       }
       return try await baseIterator.next()
+    }
+
+    /// Produces the next element in the drop-while sequence.
+    ///
+    /// This iterator calls `next(isolation:)` on its base iterator and
+    /// evaluates the result with the `predicate` closure. As long as the
+    /// predicate returns `true`, this method returns `nil`. After the predicate
+    /// returns `false`, for a value received from the base iterator, this
+    /// method returns that value. After that, the iterator returns values
+    /// received from its base iterator as-is, and never executes the predicate
+    /// closure again.  If calling the closure throws an error, the sequence
+    /// ends and `next(isolation:)` rethrows the error.
+    @available(SwiftStdlib 6.0, *)
+    @inlinable
+    public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
+      while !finished && !doneDropping {
+        guard let element = try await baseIterator.next(isolation: actor) else {
+          return nil
+        }
+        do {
+          if try await predicate(element) == false {
+            doneDropping = true
+            return element
+          }
+        } catch {
+          finished = true
+          throw error
+        }
+      }
+      guard !finished else { 
+        return nil
+      }
+      return try await baseIterator.next(isolation: actor)
     }
   }
 

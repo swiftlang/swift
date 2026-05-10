@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -diagnostic-constant-propagation | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -performance-constant-propagation | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -143,7 +143,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSString, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSString, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   destroy_value [[DEFAULT_ARG]]
@@ -158,8 +158,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<String>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
@@ -210,7 +210,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSString, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSString, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
@@ -225,8 +225,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<String>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_value [[CASTED_INPUT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -282,7 +282,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSString, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSString, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
@@ -297,8 +297,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<String>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   destroy_addr [[INPUT]]
@@ -353,7 +353,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSArray, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSArray, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   destroy_value [[DEFAULT_ARG]]
@@ -368,8 +368,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Array<Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
@@ -420,7 +420,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSArray, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSArray, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
@@ -435,8 +435,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Array<Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_value [[CASTED_INPUT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -492,7 +492,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSArray, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSArray, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
@@ -507,8 +507,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Array<Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   destroy_addr [[INPUT]]
@@ -563,7 +563,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSDictionary, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSDictionary, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   destroy_value [[DEFAULT_ARG]]
@@ -578,8 +578,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Dictionary<AnyHashable, Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
@@ -630,7 +630,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSDictionary, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSDictionary, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
@@ -645,8 +645,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Dictionary<AnyHashable, Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_value [[CASTED_INPUT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -702,7 +702,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSDictionary, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSDictionary, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
@@ -717,8 +717,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Dictionary<AnyHashable, Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   destroy_addr [[INPUT]]
@@ -773,7 +773,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSSet, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSSet, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   destroy_value [[DEFAULT_ARG]]
@@ -788,8 +788,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Set<AnyHashable>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   br [[EXIT_BB:bb[0-9]+]]
@@ -840,7 +840,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSSet, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSSet, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
@@ -855,8 +855,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Set<AnyHashable>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_value [[CASTED_INPUT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -912,7 +912,7 @@ bb4:
 //
 // CHECK: bb1:
 // CHECK:   [[LOADED_INPUT:%.*]] = load [take] [[INPUT]]
-// CHECK:   checked_cast_br [[LOADED_INPUT]] : $NSObject to NSSet, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
+// CHECK:   checked_cast_br NSObject in [[LOADED_INPUT]] : $NSObject to NSSet, [[YES_BB:bb[0-9]+]], [[NO_BB:bb[0-9]+]]
 //
 // CHECK: [[NO_BB]]([[DEFAULT_ARG:%.*]] :
 // CHECK-NEXT:   store [[DEFAULT_ARG]] to [init] [[INPUT]]
@@ -927,8 +927,8 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Set<AnyHashable>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
-// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [initialization] [[OUTPUT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
+// CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
 // CHECK:   destroy_addr [[INPUT]]

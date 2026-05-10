@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -22,6 +22,7 @@
 ///     let b = a + CollectionOfOne(toAdd)
 ///     // b == [1, 2, 3, 4, 100]
 @frozen // trivial-implementation
+@_addressableForDependencies
 public struct CollectionOfOne<Element> {
   @usableFromInline // trivial-implementation
   internal var _element: Element
@@ -158,6 +159,34 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension CollectionOfOne {
+
+  @_alwaysEmitIntoClient
+  public var span: Span<Element> {
+    @lifetime(borrow self)
+    get {
+      let pointer = unsafe UnsafePointer<Element>(Builtin.addressOfBorrow(self))
+      let span = unsafe Span(_unsafeStart: pointer, count: 1)
+      return unsafe _overrideLifetime(span, borrowing: self)
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  public var mutableSpan: MutableSpan<Element> {
+    @lifetime(&self)
+    mutating get {
+      let pointer = unsafe UnsafeMutablePointer<Element>(
+        Builtin.addressOfBorrow(self)
+      )
+      let span = unsafe MutableSpan(_unsafeStart: pointer, count: 1)
+      return unsafe _overrideLifetime(span, mutating: &self)
+    }
+  }
+}
+
+@_unavailableInEmbedded
 extension CollectionOfOne: CustomDebugStringConvertible {
   /// A textual representation of the collection, suitable for debugging.
   public var debugDescription: String {
@@ -175,3 +204,35 @@ extension CollectionOfOne: CustomReflectable {
 
 extension CollectionOfOne: Sendable where Element: Sendable { }
 extension CollectionOfOne.Iterator: Sendable where Element: Sendable { }
+
+extension CollectionOfOne where Element: Equatable {
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: CollectionOfOne<Element>, rhs: CollectionOfOne<Element>) -> Bool {
+    return lhs._element == rhs._element
+  }
+}
+
+extension CollectionOfOne where Element: Hashable {
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self._element)
+  }
+
+  @_alwaysEmitIntoClient
+  public var hashValue: Int { // Prevent compiler from synthesizing hashValue.
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension CollectionOfOne: Equatable where Element: Equatable {}
+
+@available(SwiftStdlib 6.4, *)
+extension CollectionOfOne: Hashable where Element: Hashable {}
+
+extension CollectionOfOne: ConvertibleToBytes
+  where Element: ConvertibleToBytes {}
+extension CollectionOfOne: ConvertibleFromBytes
+  where Element: ConvertibleFromBytes {}

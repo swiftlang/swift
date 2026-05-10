@@ -38,7 +38,7 @@ struct S1 {
 // CHECK3: public func fea1()
 // CHECK3: public func fea2()
 
-// CHECK4: public struct Array<gen_swift_type.A>
+// CHECK4: public struct Array<A>
 
 public protocol P1 { }
 public class T1 : P1 { }
@@ -63,12 +63,12 @@ extension D {
   public func unconditionalFunc2(t : T) -> T {return t}
 }
 
-// CHECK5: public class D<gen_swift_type.T1> {
+// CHECK5: public class D<T1> {
 // CHECK5: public func foo()
 // CHECK5: public func conditionalFunc1()
-// CHECK5: public func conditionalFunc2(t: gen_swift_type.T1) -> gen_swift_type.T1
+// CHECK5: public func conditionalFunc2(t: T1) -> T1
 // CHECK5: public func unconditionalFunc1()
-// CHECK5: public func unconditionalFunc2(t: gen_swift_type.T1) -> gen_swift_type.T1
+// CHECK5: public func unconditionalFunc2(t: T1) -> T1
 
 // CHECK6: public class D<Int> {
 // CHECK6: public func foo()

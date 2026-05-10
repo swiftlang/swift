@@ -148,7 +148,7 @@ How do we get there?
 
 The proposed architecture is significantly different from the current type checker architecture, so how do we get there from here? There are a few concrete steps we can take:
 
-**Make all AST nodes phase-aware**: Introduce a trait that can ask an arbitrary AST node (``Decl``, ``TypeRepr``, ``Pattern``, etc.) its current phase. AST nodes may compute this information on-the-fly or store it, as appropriate. For example, a ``TypeRepr`` can generally determine its phase based on the existing state of the ``IdentTypeRepr`` nodes it includes.
+**Make all AST nodes phase-aware**: Introduce a trait that can ask an arbitrary AST node (``Decl``, ``TypeRepr``, ``Pattern``, etc.) its current phase. AST nodes may compute this information on-the-fly or store it, as appropriate. For example, a ``TypeRepr`` can generally determine its phase based on the existing state of the ``DeclRefTypeRepr`` nodes it includes.
 
 **Make name lookup phase-aware**: Name lookup is currently one of the worst offenders when violating phase ordering. Parameterize name lookup based on the phase at which it's operating. For example, asking for name lookup at the "extension binding" phase might not resolve type aliases, look into superclasses, or look into protocols.
 

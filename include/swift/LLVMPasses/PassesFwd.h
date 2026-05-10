@@ -20,23 +20,19 @@ namespace llvm {
   class PassRegistry;
 
   void initializeSwiftAAWrapperPassPass(PassRegistry &);
-  void initializeSwiftRCIdentityPass(PassRegistry &);
   void initializeSwiftARCOptPass(PassRegistry &);
   void initializeSwiftARCContractPass(PassRegistry &);
   void initializeInlineTreePrinterPass(PassRegistry &);
-  void initializeSwiftMergeFunctionsPass(PassRegistry &);
-  void initializeSwiftDbgAddrBlockSplitterPass(PassRegistry &);
+  void initializeLegacySwiftMergeFunctionsPass(PassRegistry &);
 }
 
 namespace swift {
   llvm::FunctionPass *createSwiftARCOptPass();
   llvm::FunctionPass *createSwiftARCContractPass();
   llvm::ModulePass *createInlineTreePrinterPass();
-  llvm::ModulePass *createSwiftMergeFunctionsPass(bool ptrAuthEnabled,
-                                                  unsigned ptrAuthKey);
-  llvm::FunctionPass *createSwiftDbgAddrBlockSplitter();
+  llvm::ModulePass *createLegacySwiftMergeFunctionsPass(bool ptrAuthEnabled,
+                                                        unsigned ptrAuthKey);
   llvm::ImmutablePass *createSwiftAAWrapperPass();
-  llvm::ImmutablePass *createSwiftRCIdentityPass();
 } // end namespace swift
 
 #endif

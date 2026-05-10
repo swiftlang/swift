@@ -18,11 +18,11 @@
 #define SWIFT_TYPECHECK_SOLUTION_RESULT_H
 
 #include "llvm/ADT/ArrayRef.h"
+#include <optional>
 
 namespace swift {
 
 using llvm::ArrayRef;
-using llvm::makeArrayRef;
 
 namespace constraints {
 
@@ -65,7 +65,7 @@ private:
   Solution *solutions = nullptr;
 
   /// A source range that was too complex to solve.
-  Optional<SourceRange> TooComplexAt = None;
+  std::optional<SourceRange> TooComplexAt = std::nullopt;
 
   /// General constructor for the named constructors.
   SolutionResult(Kind kind) : kind(kind) {
@@ -76,8 +76,10 @@ public:
   SolutionResult(const SolutionResult &other) = delete;
 
   SolutionResult(SolutionResult &&other)
-      : kind(other.kind), numSolutions(other.numSolutions),
-        solutions(other.solutions) {
+      : kind(other.kind),
+        numSolutions(other.numSolutions),
+        solutions(other.solutions),
+        TooComplexAt(other.TooComplexAt) {
     emittedDiagnostic = false;
     other.kind = Error;
     other.numSolutions = 0;
@@ -98,7 +100,7 @@ public:
 
   /// Produce a "too complex" failure, which was not yet been
   /// diagnosed.
-  static SolutionResult forTooComplex(Optional<SourceRange> affected);
+  static SolutionResult forTooComplex(std::optional<SourceRange> affected);
 
   /// Produce a failure that has already been diagnosed.
   static SolutionResult forError() {
@@ -126,7 +128,7 @@ public:
 
   /// Retrieve a range of source that has been determined to be too
   /// complex to solve in a reasonable time.
-  Optional<SourceRange> getTooComplexAt() const { return TooComplexAt; }
+  std::optional<SourceRange> getTooComplexAt() const { return TooComplexAt; }
 
   /// Whether this solution requires the client to produce a diagnostic.
   bool requiresDiagnostic() const {

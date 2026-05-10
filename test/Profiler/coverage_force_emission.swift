@@ -5,21 +5,21 @@
 final class VarInit {
   // COVERAGE: sil_coverage_map {{.*}} "$s23coverage_force_emission7VarInitC04lazydE033_7D375D72BA8B0C53C9AD7E4DBC7FF493LLSSvgSSyXEfU_"
   // PGO-LABEL: coverage_force_emission.VarInit.(lazyVarInit in _7D375D72BA8B0C53C9AD7E4DBC7FF493).getter : Swift.String
-  // PGO: int_instrprof_increment
+  // PGO: increment_profiler_counter
   private lazy var lazyVarInit: String = {
     return "Hello"
   }()
 
   // CHECK: sil_coverage_map {{.*}} "$s23coverage_force_emission7VarInitC05basicdE033_7D375D72BA8B0C53C9AD7E4DBC7FF493LLSSvpfiSSyXEfU_"
   // PGO-LABEL: closure #1 () -> Swift.String in variable initialization expression of coverage_force_emission.VarInit.(basicVarInit in _7D375D72BA8B0C53C9AD7E4DBC7FF493) : Swift.String
-  // PGO: int_instrprof_increment
+  // PGO: increment_profiler_counter
   private var basicVarInit: String = {
     return "Hello"
   }()
 
   // CHECK: sil_coverage_map {{.*}} "$s23coverage_force_emission7VarInitC06simpleD033_7D375D72BA8B0C53C9AD7E4DBC7FF493LLSSvg"
   // PGO-LABEL: coverage_force_emission.VarInit.(simpleVar in _7D375D72BA8B0C53C9AD7E4DBC7FF493).getter : Swift.String
-  // PGO: int_instrprof_increment
+  // PGO: increment_profiler_counter
   private var simpleVar: String {
     return "Hello"
   }

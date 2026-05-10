@@ -26,4 +26,4 @@ do {
 
 // CHECK: @callee_guaranteed (Int, @guaranteed Class, @owned Class, @in_guaranteed Any, @inout Int) -> (Int, @owned Class, @out Any)
 // CHECK: @callee_guaranteed () -> @error Error
-// CHECK: @callee_guaranteed (@in_constant Int) -> @owned Int
+// CHECK: @callee_guaranteed (@in Int) -> @owned Int

@@ -8,18 +8,18 @@ add_sourcekit_library(sourcekitdAPI
   DocStructureArray.cpp
   DocSupportAnnotationArray.cpp
   RawData.cpp
-  Requests.cpp
   sourcekitdAPI-Common.cpp
+  DeclarationsArray.cpp
   TokenAnnotationsArray.cpp
   ExpressionTypeArray.cpp
   VariableTypeArray.cpp
-  UIDHandling.cpp
-)
+  UIDHandling.cpp)
+
+target_compile_definitions(sourcekitdAPI PRIVATE
+  sourcekitd_EXPORTS)
 target_link_libraries(sourcekitdAPI PRIVATE
   swiftBasic
-  SourceKitSupport
-  SourceKitSwiftLang
-  swiftCompilerModules)
+  SourceKitSupport)
 
 if(APPLE AND HAVE_XPC_H)
   target_sources(sourcekitdAPI PRIVATE

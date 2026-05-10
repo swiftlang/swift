@@ -21,4 +21,6 @@
 // CHECK: - Target: {{.+}}-{{.+}}-{{.+}}
 // CHECK: - SDK path: {{.*}}MacOS{{.*}}.sdk
 // CHECK: - -Xcc options: -working-directory {{.+}} -DA -DB
-// CHECK: Importing ASTSection... ok!
+// CHECK: Importing ASTSection...
+// CHECK: Import successful!
+

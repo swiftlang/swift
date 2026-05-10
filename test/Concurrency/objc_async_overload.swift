@@ -1,13 +1,20 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -disable-availability-checking -typecheck -verify -import-objc-header %S/Inputs/Delegate.h %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=targeted
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk)  -target %target-swift-5.1-abi-triple -emit-sil -o /dev/null -verify -import-objc-header %S/Inputs/Delegate.h -enable-experimental-feature SendableCompletionHandlers %s -strict-concurrency=complete
+
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
-
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 // overload resolution should pick sync version in a sync context
 func syncContext() {
   let r = Request()
   let d = Delegate()
-  d.makeRequest1(r) // NOTE: this use to trigger an overload resolution error, see SR-13760
+
+  // https://github.com/apple/swift/issues/56157
+  // This use to trigger an overload resolution error.
+  d.makeRequest1(r)
+
   d.makeRequest2(r)
   d.makeRequest3(r)
 }
@@ -34,10 +41,10 @@ func asyncWithAwait() async {
 // completion handler's implicit `@Sendable` isn't respected.
 extension Delegate {
   nonisolated func makeRequest(_ req: Request??, completionHandler: (() -> Void)? = nil) {
-    // expected-note@-1 {{parameter 'completionHandler' is implicitly non-sendable}}
+    // expected-note@-1 {{parameter 'completionHandler' is implicitly non-Sendable}}
     if let req = (req ?? nil) {
       makeRequest1(req, completionHandler: completionHandler)
-      // expected-warning@-1 {{passing non-sendable parameter 'completionHandler' to function expecting a @Sendable closure}}
+      // expected-warning@-1 {{passing non-Sendable parameter 'completionHandler' to function expecting a '@Sendable' closure}}
     }
   }
 }
@@ -49,7 +56,7 @@ extension Delegate {
   func handle(_ req: Request, with delegate: Delegate) {
     delegate.makeRequest1(req) {
       self.finish()
-      // expected-warning@-1 {{call to main actor-isolated instance method 'finish()' in a synchronous nonisolated context; this is an error in Swift 6}}
+      // expected-warning@-1 {{call to main actor-isolated instance method 'finish()' in a synchronous nonisolated context}}
     }
   }
 }
@@ -58,5 +65,4 @@ extension Delegate {
 
 extension Delegate {
   @objc public func makeRequest(fromSwift: Request, completionHandler: (() -> Void)?) {}
-  // expected-warning@-1 {{method 'makeRequest(fromSwift:completionHandler:)' with Objective-C selector 'makeRequestFromSwift:completionHandler:' conflicts with method 'makeRequest(fromSwift:)' with the same Objective-C selector; this is an error in Swift 6}}
 }

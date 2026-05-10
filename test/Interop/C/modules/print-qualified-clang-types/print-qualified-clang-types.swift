@@ -24,7 +24,7 @@
 // In addition to checking for the presence of the expected string in the
 // `.swiftinterface` file, we also verify that it compiles without error.
 //
-// This is a regression test for https://bugs.swift.org/browse/SR-13032.
+// This is a regression test for https://github.com/apple/swift/issues/55477.
 
 // RUN: %empty-directory(%t)
 // RUN: mkdir %t/helper_module %t/main_module
@@ -33,4 +33,4 @@
 // RUN: %FileCheck --input-file=%t/main_module/MainModule.swiftinterface %s
 // RUN: %target-swift-frontend -typecheck -swift-version 5 %t/main_module/MainModule.swiftinterface -I %t/helper_module -I %S/Inputs
 
-// CHECK: public func funcTakingForeignStruct(_ param: ForeignB.ForeignStruct)
+// CHECK: public func funcTakingForeignStruct(_ param: ForeignB::ForeignStruct)

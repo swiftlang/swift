@@ -7,6 +7,7 @@
 // 5.7 so that we can test new behavior even if the SDK we're using predates it.
 
 // REQUIRES: executable_test
+// REQUIRES: optimized_stdlib
 // UNSUPPORTED: freestanding
 
 import StdlibUnittest
@@ -233,7 +234,8 @@ suite.test("String.Index(_:within) / Range<String.Index>(_:in:)") {
 
       expectEqual(strRange, substrRange)
       guard strLB != nil && strUB != nil else {
-        expectNil(strRange)
+        // TODO: rdar://112643333
+        //expectNil(strRange)
         continue
       }
       expectEqual(strRange, Range(uncheckedBounds: (strLB!, strUB!)))
@@ -656,8 +658,8 @@ suite.test("Fully exhaustive index interchange")
 
 #if _runtime(_ObjC)
 suite.test("Fully exhaustive index interchange/GraphemeBreakTests") {
-  for string in graphemeBreakTests.map { $0.0 } {
-    fullyExhaustiveIndexInterchange(string)
+  for test in graphemeBreakTests {
+    fullyExhaustiveIndexInterchange(test.string)
   }
 }
 #endif
@@ -995,6 +997,66 @@ suite.test("Index encoding correction/UTF-8→16/conversions/UTF-16") {
 }
 #endif
 
+suite.test("UTF-16 breadcrumbs") {
+
+  let string = #"""
+    The powerful programming language that is also easy to learn.
+    손쉽게 학습할 수 있는 강력한 프로그래밍 언어.
+    🪙 A 🥞 short 🍰 piece 🫘 of 🌰 text 👨‍👨‍👧‍👧 with 👨‍👩‍👦 some 🚶🏽 emoji 🇺🇸🇨🇦 characters 🧈
+    some🔩times 🛺 placed 🎣 in 🥌 the 🆘 mid🔀dle 🇦🇶or🏁 around 🏳️‍🌈 a 🍇 w🍑o🥒r🥨d
+    Unicode is such fun!
+    U̷n̷i̷c̷o̴d̴e̷ ̶i̸s̷ ̸s̵u̵c̸h̷ ̸f̵u̷n̴!̵
+    U̴̡̲͋̾n̵̻̳͌ì̶̠̕c̴̭̈͘ǫ̷̯͋̊d̸͖̩̈̈́ḛ̴́ ̴̟͎͐̈i̴̦̓s̴̜̱͘ ̶̲̮̚s̶̙̞͘u̵͕̯̎̽c̵̛͕̜̓h̶̘̍̽ ̸̜̞̿f̵̤̽ṷ̴͇̎͘ń̷͓̒!̷͍̾̚
+    U̷̢̢̧̨̼̬̰̪͓̞̠͔̗̼̙͕͕̭̻̗̮̮̥̣͉̫͉̬̲̺͍̺͊̂ͅ\#
+    n̶̨̢̨̯͓̹̝̲̣̖̞̼̺̬̤̝̊̌́̑̋̋͜͝ͅ\#
+    ḭ̸̦̺̺͉̳͎́͑\#
+    c̵̛̘̥̮̙̥̟̘̝͙̤̮͉͔̭̺̺̅̀̽̒̽̏̊̆͒͌̂͌̌̓̈́̐̔̿̂͑͠͝͝ͅ\#
+    """#
+
+  let indices = Array(string.utf16.indices) + [string.utf16.endIndex]
+  for i in 0 ..< indices.count {
+    for j in 0 ..< indices.count {
+      let distance = string.utf16.distance(from: indices[i], to: indices[j])
+      expectEqual(distance, j - i,
+        """
+        i: \(i), indices[i]: \(indices[i])
+        j: \(j), indices[j]: \(indices[j])
+        """)
+
+      let target = string.utf16.index(indices[i], offsetBy: j - i)
+      expectEqual(target, indices[j],
+        """
+        i: \(i), indices[i]: \(indices[i])
+        j: \(j), indices[j]: \(indices[j])
+        target: \(target)
+        """)
+    }
+  }
+}
+
+// For Strings decoded from UTF16, we store their UTF16 length as a single crumb
+suite.test("UTF-16 single breadcrumb") {
+  let original = #"""
+    The powerful programming language that is also easy to learn.
+    손쉽게 학습할 수 있는 강력한 프로그래밍 언어.
+    🪙 A 🥞 short 🍰 piece 🫘 of 🌰 text 👨‍👨‍👧‍👧 with 👨‍👩‍👦 some 🚶🏽 emoji 🇺🇸🇨🇦 characters 🧈
+    some🔩times 🛺 placed 🎣 in 🥌 the 🆘 mid🔀dle 🇦🇶or🏁 around 🏳️‍🌈 a 🍇 w🍑o🥒r🥨d
+    Unicode is such fun!
+    U̷n̷i̷c̷o̴d̴e̷ ̶i̸s̷ ̸s̵u̵c̸h̷ ̸f̵u̷n̴!̵
+    U̴̡̲͋̾n̵̻̳͌ì̶̠̕c̴̭̈͘ǫ̷̯͋̊d̸͖̩̈̈́ḛ̴́ ̴̟͎͐̈i̴̦̓s̴̜̱͘ ̶̲̮̚s̶̙̞͘u̵͕̯̎̽c̵̛͕̜̓h̶̘̍̽ ̸̜̞̿f̵̤̽ṷ̴͇̎͘ń̷͓̒!̷͍̾̚
+    U̷̢̢̧̨̼̬̰̪͓̞̠͔̗̼̙͕͕̭̻̗̮̮̥̣͉̫͉̬̲̺͍̺͊̂ͅ\#
+    n̶̨̢̨̯͓̹̝̲̣̖̞̼̺̬̤̝̊̌́̑̋̋͜͝ͅ\#
+    ḭ̸̦̺̺͉̳͎́͑\#
+    c̵̛̘̥̮̙̥̟̘̝͙̤̮͉͔̭̺̺̅̀̽̒̽̏̊̆͒͌̂͌̌̓̈́̐̔̿̂͑͠͝͝ͅ\#
+    """#
+  
+  var string = String(decoding: original.utf16, as: UTF16.self)
+  string.reserveCapacity(1000) //make sure that when we mutate, we mutate in-place
+  expectEqual(string.utf16.count, original.utf16.count)
+  string.append(contentsOf: "test")
+  expectNotEqual(string.utf16.count, original.utf16.count)
+}
+
 suite.test("String.replaceSubrange index validation")
 .forEach(in: examples) { string in
   guard #available(SwiftStdlib 5.7, *) else {
@@ -1059,3 +1121,195 @@ suite.test("String.replaceSubrange index validation")
     }
   }
 }
+
+suite.test("Substring.removeSubrange entire range") {
+  guard #available(SwiftStdlib 5.8, *) else {
+    // This was a regression in 5.7.0, fixed in 5.7.1+
+    return
+  }
+
+  var a: Substring = "abcdef"
+  let aStart = a.startIndex
+  let aEnd = a.endIndex
+
+  a.removeSubrange(aStart ..< aEnd)
+
+  expectTrue(a.isEmpty)
+
+#if _runtime(_ObjC)
+  var b: Substring = ("å∫ç∂éƒ" as NSString) as Substring
+  let bStart = b.startIndex
+  let bEnd = b.endIndex
+
+  b.removeSubrange(bStart ..< bEnd)
+
+  expectTrue(b.isEmpty)
+#endif
+}
+
+if #available(SwiftStdlib 5.8, *) {
+  suite.test("String index rounding/Characters")
+  .forEach(in: examples) { string in
+    for index in string.allIndices(includingEnd: true) {
+      let end = string.endIndex
+      let expected = (index < end
+        ? string.indices.lastIndex { $0 <= index }!
+        : end)
+      let actual = string._index(roundingDown: index)
+      expectEqual(actual, expected,
+        """
+        index: \(index)
+        actual: \(actual)
+        expected: \(expected)
+        """)
+    }
+  }
+}
+
+suite.test("String index rounding/Scalars")
+.forEach(in: examples) { string in
+  for index in string.allIndices(includingEnd: true) {
+    let end = string.unicodeScalars.endIndex
+    let expected = (index < end
+      ? string.unicodeScalars.indices.lastIndex { $0 <= index }!
+      : end)
+    let actual = string.unicodeScalars._index(roundingDown: index)
+    expectEqual(actual, expected,
+      """
+      index: \(index)
+      actual: \(actual)
+      expected: \(expected)
+      """)
+  }
+}
+
+suite.test("String index rounding/UTF-16")
+.forEach(in: examples) { string in
+  //string.dumpIndices()
+  var utf16Indices = Set(string.utf16.indices)
+  utf16Indices.insert(string.utf16.endIndex)
+
+  for index in string.allIndices(includingEnd: true) {
+    let expected: String.Index
+    if utf16Indices.contains(index) {
+      expected = index
+    } else {
+      // If the index isn't valid in the UTF-16 view, it gets rounded down
+      // to the nearest scalar boundary. (Unintuitively, this is generally *not*
+      // the closest valid index within the UTF-16 view.)
+      expected = string.unicodeScalars.indices.lastIndex { $0 <= index }!
+    }
+    let actual = string.utf16._index(roundingDown: index)
+    expectEqual(actual, expected,
+      """
+      index: \(index)
+      actual: \(actual)
+      expected: \(expected)
+      """)
+  }
+}
+
+suite.test("String index rounding/UTF-8")
+.forEach(in: examples) { string in
+  //string.dumpIndices()
+  var utf8Indices = Set(string.utf8.indices)
+  utf8Indices.insert(string.utf8.endIndex)
+  for index in string.allIndices(includingEnd: true) {
+    let expected: String.Index
+    if utf8Indices.contains(index) {
+      expected = index
+    } else {
+      // If the index isn't valid in the UTF-8 view, it gets rounded down
+      // to the nearest scalar boundary. (Unintuitively, this is generally *not*
+      // the closest valid index within the UTF-8 view.)
+      expected = string.unicodeScalars.indices.lastIndex { $0 <= index }!
+    }
+    let actual = string.utf8._index(roundingDown: index)
+    expectEqual(actual, expected,
+      """
+      index: \(index)
+      actual: \(actual)
+      expected: \(expected)
+      """)
+  }
+}
+
+if #available(SwiftStdlib 6.1, *) {
+  suite.test("String index printing (native)") {
+    let str = "nai\u{308}ve 🪻"
+
+    let utf8Indices = [
+      "0[any]", "1[utf8]", "2[utf8]", "3[utf8]", "4[utf8]", "5[utf8]",
+      "6[utf8]", "7[utf8]", "8[utf8]", "9[utf8]", "10[utf8]", "11[utf8]"
+    ]
+    expectEqual(str.utf8.indices.map { "\($0)" }, utf8Indices)
+
+    let utf16Indices = [
+      "0[any]", "1[utf8]", "2[utf8]", "3[utf8]", "5[utf8]", "6[utf8]",
+      "7[utf8]", "8[utf8]", "8[utf8]+1"
+    ]
+    expectEqual(str.utf16.indices.map { "\($0)" }, utf16Indices)
+
+    let scalarIndices = [
+      "0[any]", "1[utf8]", "2[utf8]", "3[utf8]", "5[utf8]", "6[utf8]",
+      "7[utf8]", "8[utf8]"
+    ]
+    expectEqual(str.unicodeScalars.indices.map { "\($0)" }, scalarIndices)
+
+    let characterIndices = [
+      "0[any]", "1[utf8]", "2[utf8]", "5[utf8]", "6[utf8]", "7[utf8]", "8[utf8]"
+    ]
+    expectEqual(str.indices.map { "\($0)" }, characterIndices)
+  }
+}
+
+suite.test("String index debugDescription backdeployment") {
+  // Note: no availability check
+  let str = "i\u{308}"
+  // Result can be `any` or `unknown` depending on inlining behavior
+  expectTrue(
+    str.startIndex.debugDescription == "0[any]" ||
+    str.startIndex.debugDescription == "0[unknown]"
+  )
+  // Result can be `utf8` or `unknown` depending on inlining behavior
+  expectTrue(
+    str.endIndex.debugDescription == "3[utf8]" ||
+    str.endIndex.debugDescription == "3[unknown]"
+  )
+}
+
+
+#if _runtime(_ObjC)
+if #available(SwiftStdlib 6.1, *) {
+  suite.test("String index printing (bridged Cocoa)") {
+    let utf16 = Array("nai\u{308}ve 🪻".utf16)
+    let nsstr = NSString(characters: utf16, length: utf16.count)
+    let str = nsstr as String
+
+    let utf8Indices = [
+      "0[any]", "1[utf16]", "2[utf16]", "3[utf16]", "3[utf16]+1", "4[utf16]",
+      "5[utf16]", "6[utf16]", "7[utf16]", "7[utf16]+1", "7[utf16]+2",
+      "7[utf16]+3"
+    ]
+    expectEqual(str.utf8.indices.map { "\($0)" }, utf8Indices)
+
+    let utf16Indices = [
+      "0[any]", "1[utf16]", "2[utf16]", "3[utf16]", "4[utf16]", "5[utf16]",
+      "6[utf16]", "7[utf16]", "8[utf16]"
+    ]
+    expectEqual(str.utf16.indices.map { "\($0)" }, utf16Indices)
+
+    let scalarIndices = [
+      "0[any]", "1[utf16]", "2[utf16]", "3[utf16]", "4[utf16]", "5[utf16]",
+      "6[utf16]", "7[utf16]"
+    ]
+    expectEqual(str.unicodeScalars.indices.map { "\($0)" }, scalarIndices)
+
+    let characterIndices = [
+      "0[any]", "1[utf16]", "2[utf16]", "4[utf16]", "5[utf16]", "6[utf16]",
+      "7[utf16]"
+    ]
+    expectEqual(str.indices.map { "\($0)" }, characterIndices)
+  }
+}
+#endif

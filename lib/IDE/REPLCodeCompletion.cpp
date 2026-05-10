@@ -21,11 +21,10 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/ADT/SmallString.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/raw_ostream.h"
 #include <algorithm>
 
 using namespace swift;
@@ -159,6 +158,10 @@ static void toDisplayString(CodeCompletionResult *Result,
         case CodeCompletionDeclKind::GlobalVar:
           OS << ": ";
           break;
+
+        case CodeCompletionDeclKind::Macro:
+          OS << ": ";
+          break;
         }
       } else {
         OS << ": ";
@@ -170,7 +173,7 @@ static void toDisplayString(CodeCompletionResult *Result,
 }
 
 namespace swift {
-class REPLCodeCompletionConsumer : public SimpleCachingCodeCompletionConsumer {
+class REPLCodeCompletionConsumer : public CodeCompletionConsumer {
   REPLCompletions &Completions;
 
 public:
@@ -182,7 +185,7 @@ public:
         context.getResultSink().Results);
     for (auto Result : SortedResults) {
       std::string InsertableString = toInsertableString(Result);
-      if (StringRef(InsertableString).startswith(Completions.Prefix)) {
+      if (StringRef(InsertableString).starts_with(Completions.Prefix)) {
         llvm::SmallString<128> PrintedResult;
         {
           llvm::raw_svector_ostream OS(PrintedResult);
@@ -209,14 +212,14 @@ REPLCompletions::REPLCompletions()
 
   // Create a factory for code completion callbacks that will feed the
   // Consumer.
-  CompletionCallbacksFactory.reset(
+  IDEInspectionCallbacksFactory.reset(
       ide::makeCodeCompletionCallbacksFactory(CompletionContext,
                                               *Consumer));
 }
 
 static void
 doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
-                 CodeCompletionCallbacksFactory *CompletionCallbacksFactory) {
+                 IDEInspectionCallbacksFactory *CompletionCallbacksFactory) {
   // Temporarily disable printing the diagnostics.
   ASTContext &Ctx = SF.getASTContext();
   DiagnosticSuppression SuppressedDiags(Ctx.Diags);
@@ -227,7 +230,7 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
 
   const unsigned CodeCompletionOffset = AugmentedCode.size() - 1;
 
-  Ctx.SourceMgr.setCodeCompletionPoint(*BufferID, CodeCompletionOffset);
+  Ctx.SourceMgr.setIDEInspectionTarget(*BufferID, CodeCompletionOffset);
 
   // Import the last module.
   auto *lastModule = SF.getParentModule();
@@ -246,15 +249,15 @@ doCodeCompletion(SourceFile &SF, StringRef EnteredCode, unsigned *BufferID,
   // Create a new module and file for the code completion buffer, similar to how
   // we handle new lines of REPL input.
   auto *newModule = ModuleDecl::create(
-      Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports);
-  auto &newSF =
-      *new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID);
-  newModule->addFile(newSF);
+      Ctx.getIdentifier("REPL_Code_Completion"), Ctx, implicitImports,
+      [&](ModuleDecl *newModule, auto addFile) {
+    addFile(new (Ctx) SourceFile(*newModule, SourceFileKind::Main, *BufferID));
+  });
 
+  auto &newSF = newModule->getMainSourceFile();
   performImportResolution(newSF);
-  bindExtensions(*newModule);
 
-  performCodeCompletionSecondPass(newSF, *CompletionCallbacksFactory);
+  performIDEInspectionSecondPass(newSF, *CompletionCallbacksFactory);
 
   // Reset the error state because it's only relevant to the code that we just
   // processed, which now gets thrown away.
@@ -271,7 +274,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
 
   unsigned BufferID;
   doCodeCompletion(SF, EnteredCode, &BufferID,
-                   CompletionCallbacksFactory.get());
+                   IDEInspectionCallbacksFactory.get());
 
   ASTContext &Ctx = SF.getASTContext();
   std::vector<Token> Tokens = tokenize(Ctx.LangOpts, Ctx.SourceMgr, BufferID);
@@ -288,7 +291,7 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
                                                            BufferID);
 
       doCodeCompletion(SF, EnteredCode.substr(0, Offset),
-                       &BufferID, CompletionCallbacksFactory.get());
+                       &BufferID, IDEInspectionCallbacksFactory.get());
     }
   }
 
@@ -302,25 +305,30 @@ void REPLCompletions::populate(SourceFile &SF, StringRef EnteredCode) {
 
 StringRef REPLCompletions::getRoot() const {
   if (Root)
-    return Root.getValue();
+    return Root.value();
 
   if (CookedResults.empty()) {
     Root = std::string();
-    return Root.getValue();
+    return Root.value();
   }
 
   std::string RootStr = CookedResults[0].InsertableString.str();
   for (auto R : CookedResults) {
+    if (RootStr.empty())
+      break;
+
     if (R.NumBytesToErase != 0) {
       RootStr.resize(0);
       break;
     }
-    auto MismatchPlace = std::mismatch(RootStr.begin(), RootStr.end(),
-                                       R.InsertableString.begin());
+
+    auto MismatchPlace =
+        std::mismatch(RootStr.begin(), RootStr.end(),
+                      R.InsertableString.begin(), R.InsertableString.end());
     RootStr.resize(MismatchPlace.first - RootStr.begin());
   }
   Root = RootStr;
-  return Root.getValue();
+  return Root.value();
 }
 
 REPLCompletions::CookedResult REPLCompletions::getPreviousStem() const {

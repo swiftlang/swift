@@ -12,9 +12,12 @@
 
 #define DEBUG_TYPE "sil-sea"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Analysis/AccessStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 
 using namespace swift;
@@ -35,7 +38,7 @@ bool AccessStorageResult::mayConflictWith(
     SILAccessKind otherAccessKind, const AccessStorage &otherStorage) const {
   if (hasUnidentifiedAccess()
       && accessKindMayConflict(otherAccessKind,
-                               unidentifiedAccess.getValue())) {
+                               unidentifiedAccess.value())) {
     return true;
   }
   for (auto &storageAccess : storageAccessSet) {
@@ -75,16 +78,16 @@ static bool updateAccessKind(SILAccessKind &LHS, SILAccessKind RHS) {
   return changed;
 }
 
-static bool updateOptionalAccessKind(Optional<SILAccessKind> &LHS,
-                                     Optional<SILAccessKind> RHS) {
-  if (RHS == None)
+static bool updateOptionalAccessKind(std::optional<SILAccessKind> &LHS,
+                                     std::optional<SILAccessKind> RHS) {
+  if (RHS == std::nullopt)
     return false;
 
-  if (LHS == None) {
+  if (LHS == std::nullopt) {
     LHS = RHS;
     return true;
   }
-  return updateAccessKind(LHS.getValue(), RHS.getValue());
+  return updateAccessKind(LHS.value(), RHS.value());
 }
 
 bool StorageAccessInfo::mergeFrom(const StorageAccessInfo &RHS) {
@@ -104,11 +107,11 @@ bool StorageAccessInfo::mergeFrom(const StorageAccessInfo &RHS) {
 }
 
 bool AccessStorageResult::updateUnidentifiedAccess(SILAccessKind accessKind) {
-  if (unidentifiedAccess == None) {
+  if (unidentifiedAccess == std::nullopt) {
     unidentifiedAccess = accessKind;
     return true;
   }
-  return updateAccessKind(unidentifiedAccess.getValue(), accessKind);
+  return updateAccessKind(unidentifiedAccess.value(), accessKind);
 }
 
 // Merge the given AccessStorageResult in `other` into this
@@ -148,7 +151,7 @@ bool AccessStorageResult::mergeAccesses(
     otherRegionAccesses = &regionAccessCopy;
   }
   bool changed = false;
-  // Nondeterminstically iterate for the sole purpose of inserting into another
+  // Nondeterministically iterate for the sole purpose of inserting into another
   // unordered set.
   for (auto &rawStorageInfo : otherRegionAccesses->storageAccessSet) {
     const StorageAccessInfo &otherStorageInfo =
@@ -172,8 +175,8 @@ bool AccessStorageResult::mergeAccesses(
     // Merge StorageAccessInfo into already-mapped AccessStorage.
     changed |= result.first->mergeFrom(otherStorageInfo);
   }
-  if (other.unidentifiedAccess != None)
-    changed |= updateUnidentifiedAccess(other.unidentifiedAccess.getValue());
+  if (other.unidentifiedAccess != std::nullopt)
+    changed |= updateUnidentifiedAccess(other.unidentifiedAccess.value());
 
   return changed;
 }
@@ -312,13 +315,16 @@ void AccessStorageResult::visitBeginAccess(B *beginAccess) {
     result.first->mergeFrom(storageAccess);
 }
 
-void AccessStorageResult::analyzeInstruction(SILInstruction *I) {
+void AccessStorageResult::analyzeInstruction(SILInstruction *I,
+                                             DestructorAnalysis *DA) {
   assert(!FullApplySite::isa(I) && "caller should merge");
 
   if (auto *BAI = dyn_cast<BeginAccessInst>(I))
     visitBeginAccess(BAI);
   else if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I))
     visitBeginAccess(BUAI);
+  else if (I->mayRelease() && !isDestructorSideEffectFree(I, DA))
+    setWorstEffects();
 }
 
 void StorageAccessInfo::print(raw_ostream &os) const {
@@ -334,9 +340,9 @@ void AccessStorageResult::print(raw_ostream &os) const {
   for (auto &storageAccess : storageAccessSet)
     storageAccess.print(os);
 
-  if (unidentifiedAccess != None) {
+  if (unidentifiedAccess != std::nullopt) {
     os << "  unidentified accesses: "
-       << getSILAccessKindName(unidentifiedAccess.getValue()) << "\n";
+       << getSILAccessKindName(unidentifiedAccess.value()) << "\n";
   }
 }
 
@@ -357,27 +363,192 @@ bool FunctionAccessStorage::summarizeFunction(SILFunction *F) {
   // conservative value, since analyzeInstruction will never be called.
   //
   // If FunctionSideEffects can be summarized, use that information.
-  FunctionSideEffects functionSideEffects;
-  if (!functionSideEffects.summarizeFunction(F)) {
+
+  auto b = F->getMemoryBehavior(/*observeRetains*/ false);
+  if (b == MemoryBehavior::MayHaveSideEffects) {
     setWorstEffects();
     // May as well consider this a successful summary since there are no
     // instructions to visit anyway.
     return true;
   }
-  bool mayRead = functionSideEffects.getGlobalEffects().mayRead();
-  bool mayWrite = functionSideEffects.getGlobalEffects().mayWrite();
-  for (auto &paramEffects : functionSideEffects.getParameterEffects()) {
-    mayRead |= paramEffects.mayRead();
-    mayWrite |= paramEffects.mayWrite();
-  }
-  if (mayWrite)
+  if (b >= MemoryBehavior::MayWrite) {
     accessResult.setUnidentifiedAccess(SILAccessKind::Modify);
-  else if (mayRead)
+  } else if (b == MemoryBehavior::MayRead) {
     accessResult.setUnidentifiedAccess(SILAccessKind::Read);
+  }
 
   // If function side effects is "readnone" then this result will have an empty
   // storageAccessSet and unidentifiedAccess == None.
   return true;
+}
+
+bool FunctionAccessStorage::summarizeCall(FullApplySite fullApply) {
+  assert(accessResult.isEmpty() && "expected uninitialized results.");
+  
+  if (SILFunction *callee = fullApply.getReferencedFunctionOrNull()) {
+    if (callee->getName() == "_swift_stdlib_malloc_size" ||
+        callee->getName() == "_swift_stdlib_has_malloc_size") {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+void AccessStorageAnalysis::initialize(
+    SILPassManager *PM) {
+  BCA = PM->getAnalysis<BasicCalleeAnalysis>();
+  DA = PM->getAnalysis<DestructorAnalysis>();
+}
+
+void AccessStorageAnalysis::invalidate() {
+  functionInfoMap.clear();
+  allocator.DestroyAll();
+  LLVM_DEBUG(llvm::dbgs() << "invalidate all\n");
+}
+
+void AccessStorageAnalysis::invalidate(
+    SILFunction *F, InvalidationKind K) {
+  if (FunctionInfo *FInfo = functionInfoMap.lookup(F)) {
+    LLVM_DEBUG(llvm::dbgs() << "  invalidate " << FInfo->F->getName() << '\n');
+    invalidateIncludingAllCallers(FInfo);
+  }
+}
+
+void AccessStorageAnalysis::getCalleeEffects(
+    FunctionAccessStorage &calleeEffects, FullApplySite fullApply) {
+  if (calleeEffects.summarizeCall(fullApply))
+    return;
+
+  auto callees = BCA->getCalleeList(fullApply);
+  if (!callees.allCalleesVisible() ||
+      // @callee_owned function calls implicitly release the context, which
+      // may call deinits of boxed values.
+      // TODO: be less conservative about what destructors might be called.
+      fullApply.getOrigCalleeType()->isCalleeConsumed()) {
+    calleeEffects.setWorstEffects();
+    return;
+  }
+
+  // We can see all the callees, so merge the effects from all of them.
+  for (auto *callee : callees)
+    calleeEffects.mergeFrom(getEffects(callee));
+}
+
+void AccessStorageAnalysis::analyzeFunction(
+    FunctionInfo *functionInfo, FunctionOrder &bottomUpOrder,
+    int recursionDepth) {
+  functionInfo->needUpdateCallers = true;
+
+  if (bottomUpOrder.prepareForVisiting(functionInfo))
+    return;
+
+  auto *F = functionInfo->F;
+  if (functionInfo->functionEffects.summarizeFunction(F))
+    return;
+
+  LLVM_DEBUG(llvm::dbgs() << "  >> analyze " << F->getName() << '\n');
+
+  // Check all instructions of the function
+  for (auto &BB : *F) {
+    for (auto &I : BB) {
+      if (auto fullApply = FullApplySite::isa(&I))
+        analyzeCall(functionInfo, fullApply, bottomUpOrder, recursionDepth);
+      else
+        functionInfo->functionEffects.analyzeInstruction(&I, DA);
+    }
+  }
+  LLVM_DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');
+}
+
+void AccessStorageAnalysis::analyzeCall(
+    FunctionInfo *functionInfo, FullApplySite fullApply,
+    FunctionOrder &bottomUpOrder, int recursionDepth) {
+
+  FunctionAccessStorage applyEffects;
+  if (applyEffects.summarizeCall(fullApply)) {
+    functionInfo->functionEffects.mergeFromApply(applyEffects, fullApply);
+    return;
+  }
+
+  if (recursionDepth >= MaxRecursionDepth) {
+    functionInfo->functionEffects.setWorstEffects();
+    return;
+  }
+  CalleeList callees = BCA->getCalleeList(fullApply);
+  if (!callees.allCalleesVisible() ||
+      // @callee_owned function calls implicitly release the context, which
+      // may call deinits of boxed values.
+      // TODO: be less conservative about what destructors might be called.
+      fullApply.getOrigCalleeType()->isCalleeConsumed()) {
+    functionInfo->functionEffects.setWorstEffects();
+    return;
+  }
+  // Derive the effects of the apply from the known callees.
+  // Defer merging callee effects until the callee is scheduled
+  for (SILFunction *callee : callees) {
+    FunctionInfo *calleeInfo = getFunctionInfo(callee);
+    calleeInfo->addCaller(functionInfo, fullApply);
+    if (!calleeInfo->isVisited()) {
+      // Recursively visit the called function.
+      analyzeFunction(calleeInfo, bottomUpOrder, recursionDepth + 1);
+      bottomUpOrder.tryToSchedule(calleeInfo);
+    }
+  }
+}
+
+void AccessStorageAnalysis::recompute(
+    FunctionInfo *initialInfo) {
+  allocNewUpdateID();
+
+  LLVM_DEBUG(llvm::dbgs() << "recompute function-effect analysis with UpdateID "
+                          << getCurrentUpdateID() << '\n');
+
+  // Collect and analyze all functions to recompute, starting at initialInfo.
+  FunctionOrder bottomUpOrder(getCurrentUpdateID());
+  analyzeFunction(initialInfo, bottomUpOrder, 0);
+
+  // Build the bottom-up order.
+  bottomUpOrder.tryToSchedule(initialInfo);
+  bottomUpOrder.finishScheduling();
+
+  // Second step: propagate the side-effect information up the call-graph until
+  // it stabilizes.
+  bool needAnotherIteration;
+  do {
+    LLVM_DEBUG(llvm::dbgs() << "new iteration\n");
+    needAnotherIteration = false;
+
+    for (FunctionInfo *functionInfo : bottomUpOrder) {
+      if (!functionInfo->needUpdateCallers)
+        continue;
+
+      LLVM_DEBUG(llvm::dbgs() << "  update callers of "
+                              << functionInfo->F->getName() << '\n');
+      functionInfo->needUpdateCallers = false;
+
+      // Propagate the function effects to all callers.
+      for (const auto &E : functionInfo->getCallers()) {
+        assert(E.isValid());
+
+        // Only include callers which we are actually recomputing.
+        if (!bottomUpOrder.wasRecomputedWithCurrentUpdateID(E.Caller))
+          continue;
+
+        LLVM_DEBUG(llvm::dbgs() << "    merge into caller "
+                                << E.Caller->F->getName() << '\n');
+
+        if (E.Caller->functionEffects.mergeFromApply(
+                functionInfo->functionEffects, FullApplySite(E.FAS))) {
+          E.Caller->needUpdateCallers = true;
+          if (!E.Caller->isScheduledAfter(functionInfo)) {
+            // This happens if we have a cycle in the call-graph.
+            needAnotherIteration = true;
+          }
+        }
+      }
+    }
+  } while (needAnotherIteration);
 }
 
 SILAnalysis *swift::createAccessStorageAnalysis(SILModule *) {

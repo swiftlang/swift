@@ -15,8 +15,8 @@
 #include "SwiftEditorDiagConsumer.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
-#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/TypeContextInfo.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
 #include "clang/AST/Decl.h"
@@ -91,7 +91,7 @@ static void deliverResults(SourceKit::TypeContextInfoConsumer &SKConsumer,
               memberElem.BriefComment = RC->getBriefText(ClangContext);
           }
         } else {
-          memberElem.BriefComment = member->getBriefComment();
+          memberElem.BriefComment = member->getSemanticBriefComment();
         }
       }
 
@@ -130,7 +130,7 @@ void SwiftLangSupport::getExpressionContextInfo(
     OptionsDictionary *optionsDict, ArrayRef<const char *> Args,
     SourceKitCancellationToken CancellationToken,
     SourceKit::TypeContextInfoConsumer &SKConsumer,
-    Optional<VFSOptions> vfsOptions) {
+    std::optional<VFSOptions> vfsOptions) {
   std::string error;
 
   TypeContextInfo::Options options;
@@ -140,17 +140,19 @@ void SwiftLangSupport::getExpressionContextInfo(
 
   // FIXME: the use of None as primary file is to match the fact we do not read
   // the document contents using the editor documents infrastructure.
-  auto fileSystem = getFileSystem(vfsOptions, /*primaryFile=*/None, error);
+  auto fileSystem =
+      getFileSystem(vfsOptions, /*primaryFile=*/std::nullopt, error);
   if (!fileSystem) {
     return SKConsumer.failed(error);
   }
 
   performWithParamsToCompletionLikeOperation(
-      UnresolvedInputFile, Offset, Args, fileSystem, CancellationToken,
+      UnresolvedInputFile, Offset, /*InsertCodeCompletionToken=*/true, Args,
+      fileSystem, CancellationToken,
       [&](CancellableResult<CompletionLikeOperationParams> ParamsResult) {
         ParamsResult.mapAsync<TypeContextInfoResult>(
             [&](auto &CIParams, auto DeliverTransformed) {
-              getCompletionInstance()->typeContextInfo(
+              getIDEInspectionInstance()->typeContextInfo(
                   CIParams.Invocation, Args, fileSystem,
                   CIParams.completionBuffer, Offset, CIParams.DiagC,
                   CIParams.CancellationFlag, DeliverTransformed);

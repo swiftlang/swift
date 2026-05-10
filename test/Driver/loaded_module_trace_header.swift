@@ -1,6 +1,7 @@
-// RUN: rm -f %t
-// RUN: env SWIFT_LOADED_MODULE_TRACE_FILE=%t %target-build-swift -module-name loaded_module_trace_header -c %s -o- -import-objc-header %S/Inputs/loaded_module_trace_header.h > /dev/null
-// RUN: %FileCheck %s < %t
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/cache)
+// RUN: env SWIFT_LOADED_MODULE_TRACE_FILE=%t/trace %target-build-swift -module-name loaded_module_trace_header -c %s -o- -import-objc-header %S/Inputs/loaded_module_trace_header.h -module-cache-path %t/cache > /dev/null
+// RUN: %FileCheck %s < %t/trace
 
 // REQUIRES: objc_interop
 
@@ -10,7 +11,7 @@
 // CHECK: "swiftmodules":[
 // CHECK-DAG: "{{[^"]*}}/ObjectiveC.swiftmodule{{(\\/[^"]+[.]swift(module|interface))?}}"
 // CHECK-DAG: "{{[^"]*}}/Dispatch.swiftmodule{{(\\/[^"]+[.]swift(module|interface))?}}"
-// CHECK-DAG: "{{[^"]*}}/Darwin.swiftmodule{{(\\/[^"]+[.]swiftmodule)?}}"
+// CHECK-DAG: "{{[^"]*}}/Darwin.swiftmodule{{(\\/[^"]+[.]swift(module|interface))?}}"
 // CHECK-DAG: "{{[^"]*}}/Foundation.swiftmodule{{(\\/[^"]+[.]swift(module|interface))?}}"
 // CHECK-DAG: "{{[^"]*}}/Swift.swiftmodule{{(\\/[^"]+[.]swiftmodule)?}}"
 // CHECK-DAG: "{{[^"]*}}/SwiftOnoneSupport.swiftmodule{{(\\/[^"]+[.]swiftmodule)?}}"

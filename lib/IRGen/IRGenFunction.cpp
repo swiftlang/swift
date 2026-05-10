@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/IRGen/Linking.h"
 #include "llvm/IR/Instructions.h"
@@ -40,12 +41,14 @@ static llvm::cl::opt<bool> EnableTrapDebugInfo(
     llvm::cl::desc("Generate failure-message functions in the debug info"));
 
 IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
+                             bool isPerformanceConstraint,
                              OptimizationMode OptMode,
                              const SILDebugScope *DbgScope,
-                             Optional<SILLocation> DbgLoc)
+                             std::optional<SILLocation> DbgLoc)
     : IGM(IGM), Builder(IGM.getLLVMContext(),
                         IGM.DebugInfo && !IGM.Context.LangOpts.DebuggerSupport),
-      OptMode(OptMode), CurFn(Fn), DbgScope(DbgScope) {
+      OptMode(OptMode), isPerformanceConstraint(isPerformanceConstraint),
+      CurFn(Fn), DbgScope(DbgScope) {
 
   // Make sure the instructions in this function are attached its debug scope.
   if (IGM.DebugInfo) {
@@ -60,6 +63,11 @@ IRGenFunction::IRGenFunction(IRGenModule &IGM, llvm::Function *Fn,
 }
 
 IRGenFunction::~IRGenFunction() {
+  // Move the trap basic blocks to the end of the function.
+  for (auto *FailBB : FailBBs) {
+    CurFn->splice(CurFn->end(), CurFn, FailBB->getIterator());
+  }
+
   emitEpilogue();
 
   // Restore the debug location.
@@ -67,6 +75,8 @@ IRGenFunction::~IRGenFunction() {
 
   // Tear down any side-table data structures.
   if (LocalTypeData) destroyLocalTypeData();
+
+  // All dynamically allocated metadata should have been cleaned up.
 }
 
 OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
@@ -74,6 +84,17 @@ OptimizationMode IRGenFunction::getEffectiveOptimizationMode() const {
     return OptMode;
 
   return IGM.getOptions().OptMode;
+}
+
+bool IRGenFunction::canStackPromotePackMetadata() const {
+  return IGM.getSILModule().getOptions().EnablePackMetadataStackPromotion &&
+         !packMetadataStackPromotionDisabled;
+}
+
+bool IRGenFunction::outliningCanCallValueWitnesses() const {
+  if (!IGM.getOptions().UseTypeLayoutValueHandling)
+    return false;
+  return !isPerformanceConstraint && !IGM.Context.LangOpts.hasFeature(Feature::Embedded);
 }
 
 ModuleDecl *IRGenFunction::getSwiftModule() const {
@@ -120,13 +141,12 @@ void IRGenFunction::emitMemCpy(Address dest, Address src, llvm::Value *size) {
              std::min(dest.getAlignment(), src.getAlignment()));
 }
 
-static llvm::Value *emitAllocatingCall(IRGenFunction &IGF,
-                                       llvm::Constant *fn,
-                                       ArrayRef<llvm::Value*> args,
+static llvm::Value *emitAllocatingCall(IRGenFunction &IGF, FunctionPointer fn,
+                                       ArrayRef<llvm::Value *> args,
                                        const llvm::Twine &name) {
   auto allocAttrs = IGF.IGM.getAllocAttrs();
   llvm::CallInst *call =
-    IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
+      IGF.Builder.CreateCall(fn, llvm::ArrayRef(args.begin(), args.size()));
   call->setAttributes(allocAttrs);
   return call;
 }
@@ -137,26 +157,38 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
                                              llvm::Value *alignMask,
                                              const llvm::Twine &name) {
   // For now, all we have is swift_slowAlloc.
-  return emitAllocatingCall(*this, IGM.getSlowAllocFn(),
-                            {size, alignMask},
-                            name);
+  return emitAllocatingCall(*this, IGM.getSlowAllocFunctionPointer(),
+                            {size, alignMask}, name);
 }
 
 /// Emit a heap allocation.
-llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
-                                                llvm::Value *size,
-                                                llvm::Value *alignMask,
-                                                const llvm::Twine &name) {
+llvm::Value *IRGenFunction::emitAllocObjectCall(
+    llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &name) {
+  if (mallocTypeId) {
+    auto descriptorConst = llvm::ConstantInt::get(IGM.Int64Ty, *mallocTypeId);
+    return emitAllocObjectTypedCall(metadata, size, alignMask, descriptorConst,
+                                    name);
+  }
   // For now, all we have is swift_allocObject.
-  return emitAllocatingCall(*this, IGM.getAllocObjectFn(),
-                            { metadata, size, alignMask }, name);
+  return emitAllocatingCall(*this, IGM.getAllocObjectFunctionPointer(),
+                            {metadata, size, alignMask}, name);
+}
+
+/// Emit a typed heap allocation.
+llvm::Value *IRGenFunction::emitAllocObjectTypedCall(
+    llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
+    llvm::Value *typeDescriptor, const llvm::Twine &name) {
+  // For now, all we have is swift_allocObjectTyped.
+  return emitAllocatingCall(*this, IGM.getAllocObjectTypedFunctionPointer(),
+                            {metadata, size, alignMask, typeDescriptor}, name);
 }
 
 llvm::Value *IRGenFunction::emitInitStackObjectCall(llvm::Value *metadata,
                                                     llvm::Value *object,
                                                     const llvm::Twine &name) {
-  llvm::CallInst *call =
-    Builder.CreateCall(IGM.getInitStackObjectFn(), { metadata, object }, name);
+  llvm::CallInst *call = Builder.CreateCall(
+      IGM.getInitStackObjectFunctionPointer(), {metadata, object}, name);
   call->setDoesNotThrow();
   return call;
 }
@@ -164,16 +196,16 @@ llvm::Value *IRGenFunction::emitInitStackObjectCall(llvm::Value *metadata,
 llvm::Value *IRGenFunction::emitInitStaticObjectCall(llvm::Value *metadata,
                                                      llvm::Value *object,
                                                      const llvm::Twine &name) {
-  llvm::CallInst *call =
-    Builder.CreateCall(IGM.getInitStaticObjectFn(), { metadata, object }, name);
+  llvm::CallInst *call = Builder.CreateCall(
+      IGM.getInitStaticObjectFunctionPointer(), {metadata, object}, name);
   call->setDoesNotThrow();
   return call;
 }
 
 llvm::Value *IRGenFunction::emitVerifyEndOfLifetimeCall(llvm::Value *object,
                                                       const llvm::Twine &name) {
-  llvm::CallInst *call =
-    Builder.CreateCall(IGM.getVerifyEndOfLifetimeFn(), { object }, name);
+  llvm::CallInst *call = Builder.CreateCall(
+      IGM.getVerifyEndOfLifetimeFunctionPointer(), {object}, name);
   call->setDoesNotThrow();
   return call;
 }
@@ -182,7 +214,7 @@ void IRGenFunction::emitAllocBoxCall(llvm::Value *typeMetadata,
                                       llvm::Value *&box,
                                       llvm::Value *&valueAddress) {
   llvm::CallInst *call =
-    Builder.CreateCall(IGM.getAllocBoxFn(), typeMetadata);
+      Builder.CreateCall(IGM.getAllocBoxFunctionPointer(), typeMetadata);
   call->addFnAttr(llvm::Attribute::NoUnwind);
 
   box = Builder.CreateExtractValue(call, 0);
@@ -194,8 +226,8 @@ void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
                                           llvm::Value *alignMask,
                                           llvm::Value *&outBox,
                                           llvm::Value *&outValueAddress) {
-  llvm::CallInst *call = Builder.CreateCall(IGM.getMakeBoxUniqueFn(),
-                                            {box, typeMetadata, alignMask});
+  llvm::CallInst *call = Builder.CreateCall(
+      IGM.getMakeBoxUniqueFunctionPointer(), {box, typeMetadata, alignMask});
   call->addFnAttr(llvm::Attribute::NoUnwind);
 
   outBox = Builder.CreateExtractValue(call, 0);
@@ -206,7 +238,7 @@ void IRGenFunction::emitMakeBoxUniqueCall(llvm::Value *box,
 void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
                                         llvm::Value *typeMetadata) {
   llvm::CallInst *call =
-    Builder.CreateCall(IGM.getDeallocBoxFn(), box);
+      Builder.CreateCall(IGM.getDeallocBoxFunctionPointer(), box);
   call->setCallingConv(IGM.DefaultCC);
   call->addFnAttr(llvm::Attribute::NoUnwind);
 }
@@ -214,31 +246,24 @@ void IRGenFunction::emitDeallocBoxCall(llvm::Value *box,
 llvm::Value *IRGenFunction::emitProjectBoxCall(llvm::Value *box,
                                                 llvm::Value *typeMetadata) {
   llvm::CallInst *call =
-    Builder.CreateCall(IGM.getProjectBoxFn(), box);
+      Builder.CreateCall(IGM.getProjectBoxFunctionPointer(), box);
   call->setCallingConv(IGM.DefaultCC);
   call->addFnAttr(llvm::Attribute::NoUnwind);
-  call->addFnAttr(llvm::Attribute::ReadNone);
   return call;
 }
 
 llvm::Value *IRGenFunction::emitAllocEmptyBoxCall() {
   llvm::CallInst *call =
-    Builder.CreateCall(IGM.getAllocEmptyBoxFn(), {});
+      Builder.CreateCall(IGM.getAllocEmptyBoxFunctionPointer(), {});
   call->setCallingConv(IGM.DefaultCC);
   call->addFnAttr(llvm::Attribute::NoUnwind);
   return call;
 }
 
-static void emitDeallocatingCall(IRGenFunction &IGF, llvm::Constant *fn,
+static void emitDeallocatingCall(IRGenFunction &IGF, FunctionPointer fn,
                                  std::initializer_list<llvm::Value *> args) {
-  auto cc = IGF.IGM.DefaultCC;
-  if (auto fun = dyn_cast<llvm::Function>(fn))
-    cc = fun->getCallingConv();
-
-
   llvm::CallInst *call =
-    IGF.Builder.CreateCall(fn, makeArrayRef(args.begin(), args.size()));
-  call->setCallingConv(cc);
+      IGF.Builder.CreateCall(fn, llvm::ArrayRef(args.begin(), args.size()));
   call->setDoesNotThrow();
 }
 
@@ -248,12 +273,12 @@ void IRGenFunction::emitDeallocRawCall(llvm::Value *pointer,
                                        llvm::Value *size,
                                        llvm::Value *alignMask) {
   // For now, all we have is swift_slowDealloc.
-  return emitDeallocatingCall(*this, IGM.getSlowDeallocFn(),
+  return emitDeallocatingCall(*this, IGM.getSlowDeallocFunctionPointer(),
                               {pointer, size, alignMask});
 }
 
 void IRGenFunction::emitTSanInoutAccessCall(llvm::Value *address) {
-  llvm::Function *fn = cast<llvm::Function>(IGM.getTSanInoutAccessFn());
+  auto fn = IGM.getTSanInoutAccessFunctionPointer();
 
   llvm::Value *castAddress = Builder.CreateBitCast(address, IGM.Int8PtrTy);
 
@@ -284,8 +309,10 @@ static unsigned getBaseMachOPlatformID(const llvm::Triple &TT) {
     return llvm::MachO::PLATFORM_TVOS;
   case llvm::Triple::WatchOS:
     return llvm::MachO::PLATFORM_WATCHOS;
+  case llvm::Triple::XROS:
+    return llvm::MachO::PLATFORM_XROS;
   default:
-    return /*Unknown platform*/ 0;
+    return llvm::MachO::PLATFORM_UNKNOWN;
   }
 }
 
@@ -293,12 +320,52 @@ llvm::Value *
 IRGenFunction::emitTargetOSVersionAtLeastCall(llvm::Value *major,
                                               llvm::Value *minor,
                                               llvm::Value *patch) {
+  // compiler-rt in the NDK does not include __isPlatformVersionAtLeast
+  // but only __isOSVersionAtLeast
+  if (IGM.Triple.isAndroid()) {
+    auto fn = IGM.getOSVersionAtLeastFunctionPointer();
+    return Builder.CreateCall(fn, {major, minor, patch});
+  } else {
+    auto fn = IGM.getPlatformVersionAtLeastFunctionPointer();
+
+    llvm::Value *platformID =
+      llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
+    return Builder.CreateCall(fn, {platformID, major, minor, patch});
+  }
+}
+
+llvm::Value *
+IRGenFunction::emitTargetVariantOSVersionAtLeastCall(llvm::Value *major,
+                                                     llvm::Value *minor,
+                                                     llvm::Value *patch) {
   auto *fn = cast<llvm::Function>(IGM.getPlatformVersionAtLeastFn());
 
-  llvm::Value *platformID =
-    llvm::ConstantInt::get(IGM.Int32Ty, getBaseMachOPlatformID(IGM.Triple));
-  return Builder.CreateCall(fn, {platformID, major, minor, patch});
+  llvm::Value *iOSPlatformID =
+    llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_IOS);
+  return Builder.CreateCall(fn->getFunctionType(), fn, {iOSPlatformID, major, minor, patch});
 }
+
+llvm::Value *
+IRGenFunction::emitTargetOSVersionOrVariantOSVersionAtLeastCall(
+    llvm::Value *major, llvm::Value *minor, llvm::Value *patch,
+    llvm::Value *variantMajor, llvm::Value *variantMinor,
+    llvm::Value *variantPatch) {
+  auto *fn = cast<llvm::Function>(
+      IGM.getTargetOSVersionOrVariantOSVersionAtLeastFn());
+
+  llvm::Value *macOSPlatformID =
+      llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_MACOS);
+
+  llvm::Value *iOSPlatformID =
+    llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_IOS);
+
+  return Builder.CreateCall(fn->getFunctionType(),
+                            fn, {macOSPlatformID, major, minor, patch,
+                                 iOSPlatformID, variantMajor, variantMinor,
+                                 variantPatch});
+}
+
+
 
 /// Initialize a relative indirectable pointer to the given value.
 /// This always leaves the value in the direct state; if it's not a
@@ -321,7 +388,7 @@ void IRGenFunction::emitStoreOfRelativeIndirectablePointer(llvm::Value *value,
 
 llvm::Value *
 IRGenFunction::emitLoadOfRelativePointer(Address addr, bool isFar,
-                                         llvm::PointerType *expectedType,
+                                         llvm::Type *expectedPointedToType,
                                          const llvm::Twine &name) {
   llvm::Value *value = Builder.CreateLoad(addr);
   assert(value->getType() ==
@@ -332,77 +399,32 @@ IRGenFunction::emitLoadOfRelativePointer(Address addr, bool isFar,
   auto *addrInt = Builder.CreatePtrToInt(addr.getAddress(), IGM.IntPtrTy);
   auto *uncastPointerInt = Builder.CreateAdd(addrInt, value);
   auto *uncastPointer = Builder.CreateIntToPtr(uncastPointerInt, IGM.Int8PtrTy);
-  auto uncastPointerAddress = Address(uncastPointer, IGM.getPointerAlignment());
-  auto pointer = Builder.CreateBitCast(uncastPointerAddress, expectedType);
+  auto uncastPointerAddress =
+      Address(uncastPointer, IGM.Int8Ty, IGM.getPointerAlignment());
+  auto pointer =
+      Builder.CreateElementBitCast(uncastPointerAddress, expectedPointedToType);
   return pointer.getAddress();
 }
 
-llvm::Value *
-IRGenFunction::emitLoadOfCompactFunctionPointer(Address addr, bool isFar,
-                                                 llvm::PointerType *expectedType,
-                                                 const llvm::Twine &name) {
+llvm::Value *IRGenFunction::emitLoadOfCompactFunctionPointer(
+    Address addr, bool isFar, llvm::Type *expectedPointedToType,
+    const llvm::Twine &name) {
   if (IGM.getOptions().CompactAbsoluteFunctionPointer) {
     llvm::Value *value = Builder.CreateLoad(addr);
     auto *uncastPointer = Builder.CreateIntToPtr(value, IGM.Int8PtrTy);
-    auto pointer = Builder.CreateBitCast(Address(uncastPointer, IGM.getPointerAlignment()), expectedType);
+    auto pointer = Builder.CreateElementBitCast(
+        Address(uncastPointer, IGM.Int8Ty, IGM.getPointerAlignment()),
+        expectedPointedToType);
     return pointer.getAddress();
   } else {
-    return emitLoadOfRelativePointer(addr, isFar, expectedType, name);
+    return emitLoadOfRelativePointer(addr, isFar, expectedPointedToType, name);
   }
-}
-
-llvm::Value *
-IRGenFunction::emitLoadOfRelativeIndirectablePointer(Address addr,
-                                                bool isFar,
-                                                llvm::PointerType *expectedType,
-                                                const llvm::Twine &name) {
-  // Load the pointer and turn it back into a pointer.
-  llvm::Value *value = Builder.CreateLoad(addr);
-  assert(value->getType() == (isFar ? IGM.FarRelativeAddressTy
-                                    : IGM.RelativeAddressTy));
-  if (!isFar) {
-    value = Builder.CreateSExt(value, IGM.IntPtrTy);
-  }
-  assert(value->getType() == IGM.IntPtrTy);
-
-  llvm::BasicBlock *origBB = Builder.GetInsertBlock();
-  llvm::Value *directResult = Builder.CreateIntToPtr(value, expectedType);
-
-  // Check whether the low bit is set.
-  llvm::Constant *one = llvm::ConstantInt::get(IGM.IntPtrTy, 1);
-  llvm::BasicBlock *indirectBB = createBasicBlock("relptr.indirect");
-  llvm::BasicBlock *contBB = createBasicBlock("relptr.cont");
-  llvm::Value *isIndirect = Builder.CreateAnd(value, one);
-  isIndirect = Builder.CreateIsNotNull(isIndirect);
-  Builder.CreateCondBr(isIndirect, indirectBB, contBB);
-
-  // In the indirect block, clear the low bit and perform an additional load.
-  llvm::Value *indirectResult; {
-    Builder.emitBlock(indirectBB);
-
-    // Clear the low bit.
-    llvm::Value *ptr = Builder.CreateSub(value, one);
-    ptr = Builder.CreateIntToPtr(ptr, expectedType->getPointerTo());
-
-    // Load.
-    Address indirectAddr(ptr, IGM.getPointerAlignment());
-    indirectResult = Builder.CreateLoad(indirectAddr);
-
-    Builder.CreateBr(contBB);
-  }
-
-  Builder.emitBlock(contBB);
-  auto phi = Builder.CreatePHI(expectedType, 2, name);
-  phi->addIncoming(directResult, origBB);
-  phi->addIncoming(indirectResult, indirectBB);
-
-  return phi;
 }
 
 void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
                                       Explosion &explosion) {
   if (!isa<LoadableTypeInfo>(type)) {
-    explosion.add(llvm::UndefValue::get(type.getStorageType()->getPointerTo()));
+    explosion.add(llvm::UndefValue::get(IGM.PtrTy));
     return;
   }
 
@@ -410,7 +432,7 @@ void IRGenFunction::emitFakeExplosion(const TypeInfo &type,
   for (auto &element : schema) {
     llvm::Type *elementType;
     if (element.isAggregate()) {
-      elementType = element.getAggregateType()->getPointerTo();
+      elementType = IGM.PtrTy;
     } else {
       elementType = element.getScalarType();
     }
@@ -426,7 +448,7 @@ void IRGenFunction::unimplemented(SourceLoc Loc, StringRef Message) {
 // Debug output for Explosions.
 
 void Explosion::print(llvm::raw_ostream &OS) {
-  for (auto value : makeArrayRef(Values).slice(NextValue)) {
+  for (auto value : llvm::ArrayRef(Values).slice(NextValue)) {
     value->print(OS);
     OS << '\n';
   }
@@ -463,53 +485,60 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
     Size objectSize(IGM.DataLayout.getTypeAllocSize(objectTy));
     if (byteOffset.isMultipleOf(objectSize)) {
       // Cast to T*.
-      auto objectPtrTy = objectTy->getPointerTo();
-      base = Builder.CreateBitCast(base, objectPtrTy);
+      base = Builder.CreateBitCast(base, IGM.PtrTy);
 
       // GEP to the slot, computing the index as a signed number.
       auto scaledIndex =
         int64_t(byteOffset.getValue()) / int64_t(objectSize.getValue());
       auto indexValue = IGM.getSize(Size(scaledIndex));
-      auto slotPtr = Builder.CreateInBoundsGEP(
-          base->getType()->getScalarType()->getPointerElementType(), base,
-          indexValue);
+      auto slotPtr = Builder.CreateInBoundsGEP(objectTy, base, indexValue);
 
-      return Address(slotPtr, objectAlignment);
+      return Address(slotPtr, objectTy, objectAlignment);
     }
   }
 
   // GEP to the slot.
   auto offsetValue = offset.getAsValue(*this);
-  auto slotPtr = emitByteOffsetGEP(base, offsetValue, objectTy);
-  return Address(slotPtr, objectAlignment);
+  auto slotPtr = emitByteOffsetGEP(base, offsetValue);
+  return Address(slotPtr, objectTy, objectAlignment);
+}
+
+llvm::CallInst *IRBuilder::CreateExpectCond(IRGenModule &IGM,
+                                            llvm::Value *value,
+                                            bool expectedValue,
+                                            const Twine &name) {
+  unsigned flag = expectedValue ? 1 : 0;
+  return CreateExpect(value, llvm::ConstantInt::get(IGM.Int1Ty, flag), name);
 }
 
 llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
                                                   StringRef failureMsg) {
-  if (IGM.IRGen.Opts.shouldOptimize()) {
-    // Emit unique side-effecting inline asm calls in order to eliminate
-    // the possibility that an LLVM optimization or code generation pass
-    // will merge these blocks back together again. We emit an empty asm
-    // string with the side-effect flag set, and with a unique integer
-    // argument for each cond_fail we see in the function.
-    llvm::IntegerType *asmArgTy = IGM.Int32Ty;
-    llvm::Type *argTys = {asmArgTy};
-    llvm::FunctionType *asmFnTy =
-        llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
-    llvm::InlineAsm *inlineAsm =
-        llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
-    CreateAsmCall(inlineAsm,
-                  llvm::ConstantInt::get(asmArgTy, NumTrapBarriers++));
+  if (IGM.DebugInfo && IGM.getOptions().isDebugInfoCodeView()) {
+    auto TrapLoc = getCurrentDebugLocation();
+    // Line 0 is invalid in CodeView, so create a new location that uses the
+    // line and column from the inlined location of the trap, that should
+    // correspond to its original source location.
+    if (TrapLoc.getLine() == 0 && TrapLoc.getInlinedAt()) {
+      auto DL = llvm::DILocation::getDistinct(
+          IGM.getLLVMContext(), TrapLoc.getInlinedAt()->getLine(),
+          TrapLoc.getInlinedAt()->getColumn(), TrapLoc.getScope(),
+          TrapLoc.getInlinedAt());
+      SetCurrentDebugLocation(DL);
+    }
   }
 
   // Emit the trap instruction.
-  llvm::Function *trapIntrinsic =
-      llvm::Intrinsic::getDeclaration(&IGM.Module, llvm::Intrinsic::trap);
+  llvm::Function *trapIntrinsic = llvm::Intrinsic::getOrInsertDeclaration(
+      &IGM.Module, llvm::Intrinsic::trap);
   if (EnableTrapDebugInfo && IGM.DebugInfo && !failureMsg.empty()) {
     IGM.DebugInfo->addFailureMessageToCurrentLoc(*this, failureMsg);
   }
   auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});
   setCallingConvUsingCallee(Call);
+
+  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
+    Call->addFnAttr(llvm::Attribute::NoMerge);
+  }
 
   if (!IGM.IRGen.Opts.TrapFuncName.empty()) {
     auto A = llvm::Attribute::get(getContext(), "trap-func-name",
@@ -526,16 +555,49 @@ void IRGenFunction::emitTrap(StringRef failureMessage, bool EmitUnreachable) {
     Builder.CreateUnreachable();
 }
 
+void IRGenFunction::emitConditionalTrap(llvm::Value *condition, StringRef failureMessage,
+                                        const SILDebugScope *debugScope) {
+  // The condition should be false, or we die.
+  auto expectedCond = Builder.CreateExpect(condition,
+                                           llvm::ConstantInt::get(IGM.Int1Ty, 0));
+
+  // Emit individual fail blocks so that we can map the failure back to a source
+  // line.
+  auto origInsertionPoint = Builder.GetInsertBlock();
+
+  llvm::BasicBlock *failBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGM.getLLVMContext());
+  auto br = Builder.CreateCondBr(expectedCond, failBB, contBB);
+
+  if (IGM.getOptions().AnnotateCondFailMessage && !failureMessage.empty())
+    br->addAnnotationMetadata(failureMessage);
+
+  Builder.SetInsertPoint(&CurFn->back());
+  Builder.emitBlock(failBB);
+  if (IGM.DebugInfo && debugScope) {
+    // If we are emitting DWARF, this does nothing. Otherwise the ``llvm.trap``
+    // instruction emitted from ``Builtin.condfail`` should have an inlined
+    // debug location. This is because zero is not an artificial line location
+    // in CodeView.
+    IGM.DebugInfo->setInlinedTrapLocation(Builder, debugScope);
+  }
+  emitTrap(failureMessage, /*EmitUnreachable=*/true);
+
+  Builder.SetInsertPoint(origInsertionPoint);
+  Builder.emitBlock(contBB);
+  FailBBs.push_back(failBB);
+}
+
 Address IRGenFunction::emitTaskAlloc(llvm::Value *size, Alignment alignment) {
-  auto *call = Builder.CreateCall(IGM.getTaskAllocFn(), {size});
+  auto *call = Builder.CreateCall(IGM.getTaskAllocFunctionPointer(), {size});
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
-  auto address = Address(call, alignment);
+  auto address = Address(call, IGM.Int8Ty, alignment);
   return address;
 }
 
 void IRGenFunction::emitTaskDealloc(Address address) {
-  auto *call = Builder.CreateCall(IGM.getTaskDeallocFn(),
+  auto *call = Builder.CreateCall(IGM.getTaskDeallocFunctionPointer(),
                                   {address.getAddress()});
   call->setDoesNotThrow();
   call->setCallingConv(IGM.SwiftCC);
@@ -565,7 +627,7 @@ static llvm::Value *emitLoadOfResumeContextFromTask(IRGenFunction &IGF,
   const unsigned taskResumeContextIndex = 8;
   const Size taskResumeContextOffset = (7 * IGF.IGM.getPointerSize()) + Size(8);
 
-  auto addr = Address(task, IGF.IGM.getPointerAlignment());
+  auto addr = Address(task, IGF.IGM.SwiftTaskTy, IGF.IGM.getPointerAlignment());
   auto resumeContextAddr = IGF.Builder.CreateStructGEP(
     addr, taskResumeContextIndex, taskResumeContextOffset);
   llvm::Value *resumeContext = IGF.Builder.CreateLoad(resumeContextAddr);
@@ -582,7 +644,8 @@ static Address emitLoadOfContinuationContext(IRGenFunction &IGF,
                                              llvm::Value *continuation) {
   auto ptr = emitLoadOfResumeContextFromTask(IGF, continuation);
   ptr = IGF.Builder.CreateBitCast(ptr, IGF.IGM.ContinuationAsyncContextPtrTy);
-  return Address(ptr, IGF.IGM.getAsyncContextAlignment());
+  return Address(ptr, IGF.IGM.ContinuationAsyncContextTy,
+                 IGF.IGM.getAsyncContextAlignment());
 }
 
 static Address emitAddrOfContinuationNormalResultPointer(IRGenFunction &IGF,
@@ -600,7 +663,7 @@ static Address emitAddrOfContinuationErrorResultPointer(IRGenFunction &IGF,
 }
 
 void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
-                                             StackAddress resultAddr,
+                                             Address resultAddr,
                                              Explosion &out,
                                              bool canThrow) {
   // A continuation is just a reference to the current async task,
@@ -610,7 +673,7 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   //   std::atomic<size_t> awaitSynchronization;
   //   SwiftError *errResult;
   //   Result *result;
-  //   ExecutorRef resumeExecutor;
+  //   SerialExecutorRef resumeExecutor;
   // };
   //
   // We need fill out this context essentially as if we were calling
@@ -646,13 +709,14 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
   //   lifetime.end within the await after we take from the slot.
   auto normalResultAddr =
     emitAddrOfContinuationNormalResultPointer(*this, continuationContext);
-  if (!resultAddr.getAddress().isValid()) {
+  if (!resultAddr.isValid()) {
     auto &resumeTI = getTypeInfo(resumeTy);
     resultAddr =
-      resumeTI.allocateStack(*this, resumeTy, "async.continuation.result");
+      resumeTI.allocateStack(*this, resumeTy, "async.continuation.result")
+        .getAddress();
   }
   Builder.CreateStore(Builder.CreateBitOrPointerCast(
-                            resultAddr.getAddress().getAddress(),
+                            resultAddr.getAddress(),
                             IGM.OpaquePtrTy),
                       normalResultAddr);
 
@@ -685,10 +749,9 @@ void IRGenFunction::emitGetAsyncContinuation(SILType resumeTy,
 
   // Call the swift_continuation_init runtime function to initialize
   // the rest of the continuation and return the task pointer back to us.
-  auto task = Builder.CreateCall(IGM.getContinuationInitFn(), {
-    continuationContext.getAddress(),
-    IGM.getSize(Size(flags.getOpaqueValue()))
-  });
+  auto task = Builder.CreateCall(IGM.getContinuationInitFunctionPointer(),
+                                 {continuationContext.getAddress(),
+                                  IGM.getSize(Size(flags.getOpaqueValue()))});
   task->setCallingConv(IGM.SwiftCC);
 
   // TODO: if we have a better idea of what executor to return to than
@@ -715,6 +778,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     llvm::PHINode *&optionalErrorResult, llvm::BasicBlock *&optionalErrorBB) {
   assert(AsyncCoroutineCurrentContinuationContext && "no active continuation");
   Address continuationContext(AsyncCoroutineCurrentContinuationContext,
+                              IGM.ContinuationAsyncContextTy,
                               IGM.getAsyncContextAlignment());
 
   // Call swift_continuation_await to check whether the continuation
@@ -730,11 +794,9 @@ void IRGenFunction::emitAwaitAsyncContinuation(
                               3 * IGM.getPointerSize()).getAddress();
 
     auto pendingV = llvm::ConstantInt::get(
-        contAwaitSyncAddr->getType()->getPointerElementType(),
-        unsigned(ContinuationStatus::Pending));
+        IGM.SizeTy, unsigned(ContinuationStatus::Pending));
     auto awaitedV = llvm::ConstantInt::get(
-        contAwaitSyncAddr->getType()->getPointerElementType(),
-        unsigned(ContinuationStatus::Awaited));
+        IGM.SizeTy, unsigned(ContinuationStatus::Awaited));
     auto results = Builder.CreateAtomicCmpXchg(
         contAwaitSyncAddr, pendingV, awaitedV, llvm::MaybeAlign(),
         llvm::AtomicOrdering::Release /*success ordering*/,
@@ -751,7 +813,7 @@ void IRGenFunction::emitAwaitAsyncContinuation(
       // because the continuation result is not available yet. When the
       // continuation is later resumed, the task will get scheduled
       // starting from the suspension point.
-      emitCoroutineOrAsyncExit();
+      emitCoroutineOrAsyncExit(false);
     }
 
     Builder.emitBlock(contBB);
@@ -802,6 +864,12 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto nullError = llvm::Constant::getNullValue(errorRes->getType());
     auto hasError = Builder.CreateICmpNE(errorRes, nullError);
     optionalErrorResult->addIncoming(errorRes, Builder.GetInsertBlock());
+
+    // Predict no error.
+    hasError =
+        getSILModule().getOptions().EnableThrowsPrediction ?
+        Builder.CreateExpectCond(IGM, hasError, false) : hasError;
+
     Builder.CreateCondBr(hasError, optionalErrorBB, normalContBB);
     Builder.emitBlock(normalContBB);
   }
@@ -818,9 +886,8 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto &resumeTI = cast<LoadableTypeInfo>(getTypeInfo(resumeTy));
     auto resultStorageTy = resumeTI.getStorageType();
     auto resultAddr =
-        Address(Builder.CreateBitOrPointerCast(resultAddrVal,
-                                               resultStorageTy->getPointerTo()),
-                resumeTI.getFixedAlignment());
+        Address(Builder.CreateBitOrPointerCast(resultAddrVal, IGM.PtrTy),
+                resultStorageTy, resumeTI.getFixedAlignment());
     resumeTI.loadAsTake(*this, resultAddr, outDirectResult);
   }
 
@@ -840,24 +907,41 @@ void IRGenFunction::emitResumeAsyncContinuationReturning(
   // pointer type.
   Address context = emitLoadOfContinuationContext(*this, continuation);
   auto destPtrAddr = emitAddrOfContinuationNormalResultPointer(*this, context);
-  auto destPtr = Builder.CreateBitCast(Builder.CreateLoad(destPtrAddr),
-                                     valueTI.getStorageType()->getPointerTo());
+  auto destPtr =
+      Builder.CreateBitCast(Builder.CreateLoad(destPtrAddr), IGM.PtrTy);
   Address destAddr = valueTI.getAddressForPointer(destPtr);
 
   valueTI.initializeWithTake(*this, destAddr, srcAddr, valueTy,
-                             /*outlined*/ false);
+                             /*outlined*/ false, /*zeroizeIfSensitive=*/ true);
 
-  auto call = Builder.CreateCall(throwing
-                                   ? IGM.getContinuationThrowingResumeFn()
-                                   : IGM.getContinuationResumeFn(),
-                                 { continuation });
+  auto call = Builder.CreateCall(
+      throwing ? IGM.getContinuationThrowingResumeFunctionPointer()
+               : IGM.getContinuationResumeFunctionPointer(),
+      {continuation});
   call->setCallingConv(IGM.SwiftCC);
 }
 
 void IRGenFunction::emitResumeAsyncContinuationThrowing(
                         llvm::Value *continuation, llvm::Value *error) {
   continuation = Builder.CreateBitCast(continuation, IGM.SwiftTaskPtrTy);
-  auto call = Builder.CreateCall(IGM.getContinuationThrowingResumeWithErrorFn(),
-                                 { continuation, error });
+  auto call = Builder.CreateCall(
+      IGM.getContinuationThrowingResumeWithErrorFunctionPointer(),
+      {continuation, error});
   call->setCallingConv(IGM.SwiftCC);
+}
+
+void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
+  // If our deployment target doesn't contain the new swift_clearSensitive,
+  // fall back to memset_s
+  auto deploymentAvailability =
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
+  auto clearSensitiveAvail = IGM.Context.getClearSensitiveAvailability();
+  if (!deploymentAvailability.isContainedIn(clearSensitiveAvail)) {
+    Builder.CreateCall(IGM.getMemsetSFunctionPointer(),
+                         {address.getAddress(), size,
+                          llvm::ConstantInt::get(IGM.Int32Ty, 0), size});
+    return;
+  }
+  Builder.CreateCall(IGM.getClearSensitiveFunctionPointer(),
+                         {address.getAddress(), size});
 }

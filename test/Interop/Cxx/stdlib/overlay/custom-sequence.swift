@@ -1,19 +1,14 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 //
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=freebsd
+
+// REQUIRES: rdar102364960
 
 import StdlibUnittest
 import CustomSequence
-import Cxx
 
 var CxxSequenceTestSuite = TestSuite("CxxSequence")
-
-extension SimpleSequence.ConstIterator: UnsafeCxxInputIterator {}
-extension SimpleSequence: CxxSequence {}
-
-extension SimpleEmptySequence: CxxSequence {}
-
 
 CxxSequenceTestSuite.test("SimpleSequence as Swift.Sequence") {
   let seq = SimpleSequence()

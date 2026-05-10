@@ -10,67 +10,83 @@
 #
 # ----------------------------------------------------------------------------
 
-from .backdeployconcurrency import BackDeployConcurrency
 from .benchmarks import Benchmarks
 from .cmark import CMark
 from .curl import LibCurl
 from .earlyswiftdriver import EarlySwiftDriver
 from .foundation import Foundation
+from .foundationtests import FoundationTests
 from .indexstoredb import IndexStoreDB
 from .libcxx import LibCXX
 from .libdispatch import LibDispatch
-from .libicu import LibICU
 from .libxml2 import LibXML2
 from .llbuild import LLBuild
 from .lldb import LLDB
 from .llvm import LLVM
+from .minimalstdlib import MinimalStdlib
 from .ninja import Ninja
 from .playgroundsupport import PlaygroundSupport
 from .skstresstester import SKStressTester
 from .sourcekitlsp import SourceKitLSP
+from .staticswiftlinux import StaticSwiftLinuxConfig
+from .stdlib_docs import StdlibDocs
 from .swift import Swift
+from .swift_testing import SwiftTesting
+from .swift_testing_macros import SwiftTestingMacros
 from .swiftdocc import SwiftDocC
 from .swiftdoccrender import SwiftDocCRender
 from .swiftdriver import SwiftDriver
-from .swiftevolve import SwiftEvolve
 from .swiftformat import SwiftFormat
+from .swiftfoundationtests import SwiftFoundationTests
 from .swiftinspect import SwiftInspect
 from .swiftpm import SwiftPM
 from .swiftsyntax import SwiftSyntax
 from .tsan_libdispatch import TSanLibDispatch
+from .wasisysroot import WASISysroot
+from .wasmkit import WasmKit
+from .wasistdlib import WASIStdlib, WASIThreadsStdlib
+from .wasiswiftsdk import WASISwiftSDK
 from .xctest import XCTest
 from .zlib import Zlib
 
 __all__ = [
-    'BackDeployConcurrency',
     'CMark',
-    'Ninja',
     'Foundation',
+    'FoundationTests',
+    'SwiftFoundationTests',
     'LibCXX',
     'LibDispatch',
-    'LibICU',
     'LibXML2',
     'Zlib',
     'LibCurl',
     'LLBuild',
     'LLDB',
     'LLVM',
+    'MinimalStdlib',
     'Ninja',
     'PlaygroundSupport',
+    'StaticSwiftLinuxConfig',
+    'StdlibDocs',
     'Swift',
     'SwiftFormat',
     'SwiftInspect',
     'SwiftPM',
     'SwiftDriver',
+    'SwiftTesting',
+    'SwiftTestingMacros',
     'EarlySwiftDriver',
     'XCTest',
     'SwiftSyntax',
     'SKStressTester',
-    'SwiftEvolve',
     'IndexStoreDB',
     'SourceKitLSP',
     'Benchmarks',
     'TSanLibDispatch',
     'SwiftDocC',
-    'SwiftDocCRender'
+    'SwiftDocCRender',
+    'WASISysroot',
+    'WasmKit',
+    'WASIStdlib',
+    'WASIThreadsStdlib',
+    'WASISwiftSDK',
 ]

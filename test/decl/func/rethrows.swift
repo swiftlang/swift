@@ -22,7 +22,7 @@ protocol P {
   func rhf(_ f: () throws -> ()) rethrows // expected-note {{protocol requires}}
 }
 
-struct T0 : P { // expected-error {{type 'T0' does not conform to protocol 'P'}}
+struct T0 : P { // expected-error {{type 'T0' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   func tf() throws {}
   func nf() throws {} // expected-note {{candidate throws, but protocol does not allow it}}
 
@@ -40,7 +40,7 @@ struct T1 : P {
   func rhf(_ f: () throws -> ()) {}
 }
 
-struct T2 : P { // expected-error {{type 'T2' does not conform to protocol 'P'}}
+struct T2 : P { // expected-error {{type 'T2' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   func tf() {}
   func nf() {}
 
@@ -468,7 +468,7 @@ func testThrowsInCatchInRethrows(_ fn: () throws -> Void) rethrows {
   }
 }
 
-// Sanity-check that throwing in catch blocks behaves as expected outside of
+// Soundness-check that throwing in catch blocks behaves as expected outside of
 // rethrows functions
 
 func testThrowsInCatch(_ fn: () throws -> Void) {
@@ -536,7 +536,7 @@ func testDoRethrow() {
   DoRethrowGeneric<Int>().method(fn:) { (a, b) in return a }
 }
 
-// https://bugs.swift.org/browse/SR-7120 - capture lists
+// https://github.com/apple/swift/issues/49668
 func rethrowsWithCaptureList<R, T>(
   array: [T],
   operation: (Int) throws -> R
@@ -553,10 +553,10 @@ public func rdar40472018() {
 }
 
 
-// https://bugs.swift.org/browse/SR-6299
+// https://github.com/apple/swift/issues/48849
 // Verify that we do not emit an invalid
 //   "... can throw but the expression is not marked with 'try'"
-// error on the use of the operators.
+// error on the use of operators.
 
 infix operator <|: infixr0
 infix operator |>: infixl1
@@ -613,12 +613,16 @@ func rdar_47550715() {
   func bar(_: A<F>? = .none) {} // Ok
 }
 
-// SR-14270 - test case for diagnostic note 'because_rethrows_default_argument_throws'
+// https://github.com/apple/swift/issues/56630
+// Test cases for diagnostic note 'because_rethrows_default_argument_throws'
+
 func nonThrowableDefaultRethrows(_ f: () throws -> () = {}) rethrows {
   try f()
 }
-// NOTE: This should compile and not emit a diagnostic because ideally the compiler could statically
-// know the default argument value could never throw. See SR-1524.
+
+// FIXME: This should compile and not emit a diagnostic because ideally the
+// compiler could statically know the default argument value could never throw.
+// (https://github.com/apple/swift/issues/44143)
 nonThrowableDefaultRethrows() // expected-error {{call can throw but is not marked with 'try'}}
                               // expected-note@-1 {{call is to 'rethrows' function, but a defaulted argument function can throw}}
 
@@ -645,4 +649,42 @@ func callsOptionalRethrowsDefaultArg2() throws {
                                  // expected-note@-1 {{call is to 'rethrows' function, but a defaulted argument function can throw}}
   optionalRethrowsDefaultArg2(nil)
   try optionalRethrowsDefaultArg2 { throw SomeError.Badness }
+}
+
+protocol P1 {
+  var id: Int { get }
+  func test(_: some Sequence) -> [any P1]
+}
+
+func open(p: any P1, s: any Sequence) throws {
+  _ = p.test(s).map(\.id)
+}
+
+// Rethrows checking and parameter packs, oh my.
+func rethrowsWithParameterPacks<each Arg>(_ arguments: repeat each Arg, body: () throws -> Void) rethrows { }
+
+enum MyError: Error {
+case fail
+}
+
+func testRethrowsWithParameterPacks() throws {
+  try rethrowsWithParameterPacks { throw MyError.fail }
+  rethrowsWithParameterPacks { }
+
+  try rethrowsWithParameterPacks(1) { throw MyError.fail }
+  rethrowsWithParameterPacks(1) { }
+
+  try rethrowsWithParameterPacks(1, "hello") { throw MyError.fail }
+  rethrowsWithParameterPacks(1, "hello") { }
+
+  rethrowsWithParameterPacks { throw MyError.fail }
+  // expected-error@-1{{call can throw but is not marked with 'try'}}
+  // expected-note@-2{{call is to 'rethrows' function, but argument function can throw}}
+}
+
+// Rethrows checking with the original parameter type providing the cues.
+func takesArbitraryAndRethrows<T>(_ value: T, body: () throws -> Void) rethrows { }
+
+func testArbitraryAndRethrows() {
+  takesArbitraryAndRethrows(throwingFunc) { }
 }

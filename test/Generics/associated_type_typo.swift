@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 
 // RUN: not %target-swift-frontend -typecheck -debug-generic-signatures %s > %t.dump 2>&1 
 // RUN: %FileCheck -check-prefix CHECK-GENERIC %s < %t.dump
@@ -62,9 +62,10 @@ protocol Pattern {
 
   // FIXME: This works for all of the wrong reasons, but it is correct that
   // it works.
-  // FIXME(rqm-diagnostics): Bogus warning here.
+  // CHECK-GENERIC-LABEL: .matched(atStartOf:)@
+  // CHECK-GENERIC-NEXT: Generic signature: <Self, C where Self : Pattern, C : Sequence, C : Indexable, Self.[Pattern]Element == C.[Sequence]Element, C.[Sequence]Element == C.[_Indexable1]Slice.[Sequence]Element, C.[_Indexable1]Slice : Sequence>
   func matched<C: Indexable>(atStartOf c: C)
-  where Element_<C> == Element // expected-warning {{redundant same-type constraint 'Element_<C>' (aka 'C.Iterator.Element') == 'Self.Element'}}
+  where Element_<C> == Element
   , Element_<C.Slice> == Element
 }
 

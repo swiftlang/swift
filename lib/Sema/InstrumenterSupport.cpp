@@ -54,21 +54,23 @@ class ErrorFinder : public ASTWalker {
 
 public:
   ErrorFinder() {}
-  std::pair<bool, Expr *> walkToExprPre(Expr *E) override {
-    if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError()) {
-      error = true;
-      return {false, E};
-    }
-    return {true, E};
+
+  MacroWalking getMacroWalkingBehavior() const override {
+    return MacroWalking::Expansion;
   }
-  bool walkToDeclPre(Decl *D) override {
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    if (isa<ErrorExpr>(E) || !E->getType() || E->getType()->hasError())
+      error = true;
+
+    return Action::StopIf(error, E);
+  }
+  PreWalkAction walkToDeclPre(Decl *D) override {
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
-      if (!VD->hasInterfaceType() || VD->getInterfaceType()->hasError()) {
+      if (!VD->hasInterfaceType() || VD->getInterfaceType()->hasError())
         error = true;
-        return false;
-      }
     }
-    return true;
+    return Action::StopIf(error);
   }
   bool hadError() { return error; }
 };
@@ -132,12 +134,11 @@ bool InstrumenterBase::doTypeCheckImpl(ASTContext &Ctx, DeclContext *DC,
   return false;
 }
 
-Expr *InstrumenterBase::buildIDArgumentExpr(Optional<DeclNameRef> name,
+Expr *InstrumenterBase::buildIDArgumentExpr(std::optional<DeclNameRef> name,
                                             SourceRange SR) {
   if (!name)
-    return IntegerLiteralExpr::createFromUnsigned(Context, 0);
+    return IntegerLiteralExpr::createFromUnsigned(Context, 0, SR.End);
 
   return new (Context) UnresolvedDeclRefExpr(*name, DeclRefKind::Ordinary,
                                              DeclNameLoc(SR.End));
 }
-

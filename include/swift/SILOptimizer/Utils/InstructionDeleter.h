@@ -24,7 +24,7 @@
 /// is highly bug prone and infeasible.
 ///
 /// 3. Fixup OSSA after deletion so SIL remains valid. Allowing OSSA to be
-/// invalid across API boundaries creates an intractible problem and makes it
+/// invalid across API boundaries creates an intractable problem and makes it
 /// impossible to design composable OSSA utilities.
 ///
 /// Strategies for SIL transformation:
@@ -53,7 +53,7 @@
 /// instruction iterators during deletion. This is because deleting a single
 /// instruction may require deleting other instructions, such as debug info and
 /// scope-ending instructions. In OSSA code, deleting an instruction may even
-/// cause new instructions to be inserted. This is best handled by aquiring an
+/// cause new instructions to be inserted. This is best handled by acquiring an
 /// UpdatingInstructionIterator from the InstructionDeleter. This is usually
 /// done via InstructionDeleter::updatingRange(SILBasicBlock *).
 /// InstructionDeleter::getIteratorRegistry().makeIterator() offers more
@@ -64,7 +64,7 @@
 /// For data structures that contain instruction pointers and persist across
 /// calls to forceDelete* or cleanupDeadInstructions... There is no need to
 /// create an updating iterator. Simply check Instruction::isDeleted() when
-/// retriving a pointer from the data structure.
+/// retrieving a pointer from the data structure.
 ///
 /// Using InstModCallbacks:
 ///
@@ -97,7 +97,7 @@
 
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Utils/InstModCallbacks.h"
-#include "swift/SILOptimizer/Utils/UpdatingInstructionIterator.h"
+#include "llvm/ADT/SetVector.h"
 
 namespace swift {
 
@@ -114,30 +114,25 @@ class InstructionDeleter {
   /// instructions in this set is important as when a dead instruction is
   /// removed, new instructions will be generated to fix the lifetime of the
   /// instruction's operands. This has to be deterministic.
-  SmallSetVector<SILInstruction *, 8> deadInstructions;
+  llvm::SmallSetVector<SILInstruction *, 8> deadInstructions;
 
-  UpdatingInstructionIteratorRegistry iteratorRegistry;
+  /// Callbacks used when adding/deleting instructions.
+  InstModCallbacks callbacks;
+
+  bool assumeFixedLifetimes = true;
 
 public:
-  InstructionDeleter() : deadInstructions(), iteratorRegistry() {}
+  InstructionDeleter(bool assumeFixedLifetimes = true)
+    : deadInstructions(), assumeFixedLifetimes(assumeFixedLifetimes) {}
 
-  InstructionDeleter(InstModCallbacks &&chainedCallbacks)
-    : deadInstructions(), iteratorRegistry(std::move(chainedCallbacks)) {}
+  InstructionDeleter(InstModCallbacks &&callbacks, bool assumeFixedLifetimes = true)
+    : deadInstructions(), callbacks(std::move(callbacks)),
+      assumeFixedLifetimes(assumeFixedLifetimes) {}
 
-  UpdatingInstructionIteratorRegistry &getIteratorRegistry() {
-    return iteratorRegistry;
-  }
+  InstModCallbacks &getCallbacks() { return callbacks; }
 
-  InstModCallbacks &getCallbacks() { return iteratorRegistry.getCallbacks(); }
-
-  llvm::iterator_range<UpdatingInstructionIterator>
-  updatingRange(SILBasicBlock *bb) {
-    return iteratorRegistry.makeIteratorRange(bb);
-  }
-
-  llvm::iterator_range<UpdatingReverseInstructionIterator>
-  updatingReverseRange(SILBasicBlock *bb) {
-    return iteratorRegistry.makeReverseIteratorRange(bb);
+  void setCallbacks(const InstModCallbacks &newCallbacks) {
+    callbacks = newCallbacks;
   }
 
   bool hadCallbackInvocation() const {
@@ -169,6 +164,7 @@ public:
   ///
   /// Calls callbacks.notifyWillBeDeleted().
   bool deleteIfDead(SILInstruction *inst);
+  bool deleteIfDead(SILInstruction *inst, bool fixLifetime);
 
   /// Delete the instruction \p inst, ignoring its side effects. If any operand
   /// definitions will become dead after deleting this instruction, track them
@@ -192,7 +188,7 @@ public:
   /// lifetimes of the operands of \c inst once it is deleted. This function
   /// will not clean up dead code resulting from the instruction's removal. To
   /// do so, invoke the method \c cleanupDeadCode of this instance, once the SIL
-  /// of the contaning function is made consistent.
+  /// of the containing function is made consistent.
   ///
   /// \pre the instruction to be deleted must not have any use other than
   /// incidental uses.
@@ -213,7 +209,7 @@ public:
   /// Clean up dead instructions that are tracked by this instance and all
   /// instructions that transitively become dead.
   ///
-  /// \pre the function contaning dead instructions must be consistent (i.e., no
+  /// \pre the function containing dead instructions must be consistent (i.e., no
   /// under or over releases). Note that if \c forceDelete call leaves the
   /// function body in an inconsistent state, it needs to be made consistent
   /// before this method is invoked.

@@ -1,12 +1,15 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -temp-lvalue-opt | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -temp-lvalue-elimination | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
 
 import Swift
 import Builtin
+import SwiftShims
 
 // CHECK-LABEL: sil [ossa] @test_enum_with_initialize :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_enum_data_addr %0
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[E]]
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[E]]
 // CHECK-NEXT:   inject_enum_addr %0 : $*Optional<Any>, #Optional.some!enumelt
 // CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'test_enum_with_initialize'
@@ -14,9 +17,9 @@ sil [ossa] @test_enum_with_initialize : $@convention(thin) (@in Any) -> @out Opt
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %2 to [initialization] %0 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
   %6 = tuple ()
   return %6 : $()
@@ -26,7 +29,7 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   destroy_addr %0
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_enum_data_addr %0
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[E]]
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[E]]
 // CHECK-NEXT:   inject_enum_addr %0 : $*Optional<Any>, #Optional.some!enumelt
 // CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'test_enum_without_initialize'
@@ -34,7 +37,7 @@ sil [ossa] @test_enum_without_initialize : $@convention(thin) (@inout Optional<A
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
   copy_addr [take] %2 to %0 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
@@ -49,17 +52,17 @@ struct ConformingStruct : Proto {
 }
 
 // CHECK-LABEL: sil [ossa] @test_existential :
-// CHECK:      bb0(%0 : $*Proto, %1 : $*ConformingStruct):
+// CHECK:      bb0(%0 : $*any Proto, %1 : $*ConformingStruct):
 // CHECK-NEXT:   [[E:%[0-9]+]] = init_existential_addr %0
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[E]]
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[E]]
 // CHECK-NOT:    copy_addr
 // CHECK: } // end sil function 'test_existential'
 sil [ossa] @test_existential : $@convention(thin) (@in ConformingStruct) -> @out Proto {
 bb0(%0 : $*Proto, %1 : $*ConformingStruct):
   %2 = alloc_stack $Proto
   %3 = init_existential_addr %2 : $*Proto, $ConformingStruct
-  copy_addr [take] %1 to [initialization] %3 : $*ConformingStruct
-  copy_addr [take] %2 to [initialization] %0 : $*Proto
+  copy_addr [take] %1 to [init] %3 : $*ConformingStruct
+  copy_addr [take] %2 to [init] %0 : $*Proto
   dealloc_stack %2 : $*Proto
   %6 = tuple ()
   return %6 : $()
@@ -85,7 +88,7 @@ struct AddressOnlyPayload {
 // CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr %0
 // CHECK-NEXT:   [[LEFT:%[0-9]+]] = init_enum_data_addr [[E]]
 // CHECK-NEXT:   [[A:%[0-9]+]] = struct_element_addr [[LEFT]]
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[A]]
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[A]]
 // CHECK-NEXT:   [[I:%[0-9]+]] = struct_element_addr [[LEFT]]
 // CHECK-NEXT:   store %2 to [trivial] [[I]]
 // CHECK-NEXT:   inject_enum_addr [[E]]
@@ -97,17 +100,17 @@ bb0(%0 : $*TestStruct, %1 : $*Any, %2 : $Int):
   %4 = alloc_stack $Either<AddressOnlyPayload, Int>
   %5 = alloc_stack $AddressOnlyPayload
   %6 = struct_element_addr %5 : $*AddressOnlyPayload, #AddressOnlyPayload.a
-  copy_addr [take] %1 to [initialization] %6 : $*Any
+  copy_addr [take] %1 to [init] %6 : $*Any
   %8 = struct_element_addr %5 : $*AddressOnlyPayload, #AddressOnlyPayload.i
   store %2 to [trivial] %8 : $*Int
   %10 = init_enum_data_addr %4 : $*Either<AddressOnlyPayload, Int>, #Either.left!enumelt
-  copy_addr [take] %5 to [initialization] %10 : $*AddressOnlyPayload
+  copy_addr [take] %5 to [init] %10 : $*AddressOnlyPayload
   inject_enum_addr %4 : $*Either<AddressOnlyPayload, Int>, #Either.left!enumelt
   dealloc_stack %5 : $*AddressOnlyPayload
   %14 = struct_element_addr %3 : $*TestStruct, #TestStruct.e
-  copy_addr [take] %4 to [initialization] %14 : $*Either<AddressOnlyPayload, Int>
+  copy_addr [take] %4 to [init] %14 : $*Either<AddressOnlyPayload, Int>
   dealloc_stack %4 : $*Either<AddressOnlyPayload, Int>
-  copy_addr %3 to [initialization] %0 : $*TestStruct
+  copy_addr %3 to [init] %0 : $*TestStruct
   destroy_addr %3 : $*TestStruct
   dealloc_stack %3 : $*TestStruct
   %20 = tuple ()
@@ -123,31 +126,31 @@ sil [ossa] @bail_on_write_to_dest : $@convention(thin) (@inout Optional<Any>, @i
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
   destroy_addr %0 : $*Optional<Any>
-  copy_addr [take] %2 to [initialization] %0 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
   %6 = tuple ()
   return %6 : $()
 }
 
-// CHECK-LABEL: sil [ossa] @write_to_dest_ok_if_before_liferange :
+// CHECK-LABEL: sil [ossa] @write_to_dest_ok_if_before_liverange :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
 // CHECK-NEXT:   destroy_addr
 // CHECK-NEXT:   init_enum_data_addr
 // CHECK-NEXT:   copy_addr
 // CHECK-NEXT:   inject_enum_addr
 // CHECK-NOT:    copy_addr
-// CHECK: } // end sil function 'write_to_dest_ok_if_before_liferange'
-sil [ossa] @write_to_dest_ok_if_before_liferange : $@convention(thin) (@inout Optional<Any>, @in Any) -> () {
+// CHECK: } // end sil function 'write_to_dest_ok_if_before_liverange'
+sil [ossa] @write_to_dest_ok_if_before_liverange : $@convention(thin) (@inout Optional<Any>, @in Any) -> () {
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   destroy_addr %0 : $*Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %2 to [initialization] %0 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
   %6 = tuple ()
   return %6 : $()
@@ -162,12 +165,12 @@ struct StructWithEnum : Proto {
 }
 
 // CHECK-LABEL: sil [ossa] @move_projections :
-// CHECK:      bb0(%0 : $*Proto, %1 : $*Any):
-// CHECK-NEXT:   [[S:%[0-9]+]] = init_existential_addr %0 : $*Proto, $StructWithEnum
+// CHECK:      bb0(%0 : $*any Proto, %1 : $*Any):
+// CHECK-NEXT:   [[S:%[0-9]+]] = init_existential_addr %0 : $*any Proto, $StructWithEnum
 // CHECK-NEXT:   [[E:%[0-9]+]] = struct_element_addr [[S]] : $*StructWithEnum, #StructWithEnum.e
 // CHECK-NEXT:   [[ENUMA:%[0-9]+]] = init_enum_data_addr [[E]] : $*Enum, #Enum.A!enumelt
 // CHECK-NEXT:   [[OPTIONAL:%[0-9]+]] = init_enum_data_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
-// CHECK-NEXT:   copy_addr [take] %1 to [initialization] [[OPTIONAL]] : $*Any
+// CHECK-NEXT:   copy_addr [take] %1 to [init] [[OPTIONAL]] : $*Any
 // CHECK-NEXT:   inject_enum_addr [[ENUMA]] : $*Optional<Any>, #Optional.some!enumelt
 // CHECK-NEXT:   inject_enum_addr [[E]] : $*Enum, #Enum.A!enumelt
 // CHECK-NOT:    copy_addr
@@ -176,12 +179,12 @@ sil [ossa] @move_projections : $@convention(thin) (@in Any) -> @out Proto {
 bb0(%0 : $*Proto, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
   %4 = init_existential_addr %0 : $*Proto, $StructWithEnum
   %5 = struct_element_addr %4 : $*StructWithEnum, #StructWithEnum.e
   %6 = init_enum_data_addr %5 : $*Enum, #Enum.A!enumelt
-  copy_addr [take] %2 to [initialization] %6 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %6 : $*Optional<Any>
   inject_enum_addr %5 : $*Enum, #Enum.A!enumelt
   dealloc_stack %2 : $*Optional<Any>
   %10 = tuple ()
@@ -198,11 +201,11 @@ sil [ossa] @cant_move_projections : $@convention(thin) (@in Any, @in_guaranteed 
 bb0(%0 : $*Any, %1 : $*Builtin.RawPointer):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %0 to [initialization] %3 : $*Any
+  copy_addr [take] %0 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
   %4 = load [trivial] %1 : $*Builtin.RawPointer
   %5 = pointer_to_address %4 : $Builtin.RawPointer to $*Optional<Any>
-  copy_addr [take] %2 to [initialization] %5 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %5 : $*Optional<Any>
   dealloc_stack %2 : $*Optional<Any>
   %10 = tuple ()
   return %10 : $()
@@ -220,9 +223,9 @@ sil [ossa] @instructions_after_copy_addr : $@convention(thin) (@in Any) -> @out 
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
   %2 = alloc_stack $Optional<Any>
   %3 = init_enum_data_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %1 to [initialization] %3 : $*Any
+  copy_addr [take] %1 to [init] %3 : $*Any
   inject_enum_addr %2 : $*Optional<Any>, #Optional.some!enumelt
-  copy_addr [take] %2 to [initialization] %0 : $*Optional<Any>
+  copy_addr [take] %2 to [init] %0 : $*Optional<Any>
   %4 = function_ref @init_optional : $@convention(thin) () -> @out Optional<Any>
   %5 = apply %4(%2) : $@convention(thin) () -> @out Optional<Any>
   destroy_addr %2 : $*Optional<Any>
@@ -241,9 +244,9 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
 sil [ossa] @dont_optimize_swap : $@convention(thin) <T> (@inout T, @inout T) -> () {
 bb0(%0 : $*T, %1 : $*T):
   %2 = alloc_stack $T
-  copy_addr [take] %0 to [initialization] %2 : $*T
-  copy_addr [take] %1 to [initialization] %0 : $*T
-  copy_addr [take] %2 to [initialization] %1 : $*T
+  copy_addr [take] %0 to [init] %2 : $*T
+  copy_addr [take] %1 to [init] %0 : $*T
+  copy_addr [take] %2 to [init] %1 : $*T
   dealloc_stack %2 : $*T
   %78 = tuple ()
   return %78 : $()
@@ -272,7 +275,7 @@ bb0(%0 :@owned  $Child):
   %func = function_ref @gen_child : $@convention(thin) () -> @out Child
   %10 = apply %func(%7) : $@convention(thin)() -> @out Child
   %11 = struct_element_addr %2 : $*Parent, #Parent.c
-  copy_addr [take] %7 to [initialization] %11 : $*Child
+  copy_addr [take] %7 to [init] %11 : $*Child
   dealloc_stack %7 : $*Child
   copy_addr [take] %4 to %11 : $*Child
   %17 = tuple ()
@@ -291,12 +294,456 @@ sil [ossa] @cleanup_debuginsts : $@convention(thin) <T> (@in T) -> () {
 bb0(%0 : $*T):
   %2 = alloc_stack $T
   debug_value %0 : $*T, expr op_deref
-  copy_addr %0 to [initialization] %2 : $*T
+  copy_addr %0 to [init] %2 : $*T
   debug_value %0 : $*T, expr op_deref
   destroy_addr %0 : $*T
   destroy_addr %2 : $*T
   dealloc_stack %2 : $*T
   %78 = tuple ()
   return %78 : $()
+}
+
+sil @createAny : $@convention(thin) () -> @out Any
+sil @createAny_no_barrier : $@convention(thin) () -> @out Any {
+ [global:]
+}
+
+// CHECK-LABEL: sil [ossa] @test_deinit_barrier :
+// CHECK:         copy_addr [take]
+// CHECK-LABEL: } // end sil function 'test_deinit_barrier'
+sil [ossa] @test_deinit_barrier : $@convention(thin) (@guaranteed Any, @inout Any) -> () {
+bb0(%0 : @guaranteed $Any, %1 : $*Any):
+  %2 = alloc_stack $Any
+  %4 = function_ref @createAny : $@convention(thin) () -> @out Any
+  %5 = apply %4(%2) : $@convention(thin) () -> @out Any
+  copy_addr [take] %2 to %1 : $*Any
+  dealloc_stack %2 : $*Any
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_deinit_barrier :
+// CHECK-NOT:     copy_addr
+// CHECK-LABEL: } // end sil function 'test_no_deinit_barrier'
+sil [ossa] @test_no_deinit_barrier : $@convention(thin) (@guaranteed Any, @inout Any) -> () {
+bb0(%0 : @guaranteed $Any, %1 : $*Any):
+  %2 = alloc_stack $Any
+  %4 = function_ref @createAny_no_barrier : $@convention(thin) () -> @out Any
+  %5 = apply %4(%2) : $@convention(thin) () -> @out Any
+  copy_addr [take] %2 to %1 : $*Any
+  dealloc_stack %2 : $*Any
+  %11 = tuple ()
+  return %11 : $()
+}
+
+sil [readnone] @createAny_effects : $@convention(thin) () -> @out Any
+sil [readnone] @createAny_no_barrier_effects : $@convention(thin) () -> @out Any {
+ [global:]
+}
+
+// CHECK-LABEL: sil [ossa] @test_deinit_barrier_effects :
+// CHECK:         copy_addr [take]
+// CHECK-LABEL: } // end sil function 'test_deinit_barrier_effects'
+sil [ossa] @test_deinit_barrier_effects : $@convention(thin) (@guaranteed Any, @inout Any) -> () {
+bb0(%0 : @guaranteed $Any, %1 : $*Any):
+  %2 = alloc_stack $Any
+  %4 = function_ref @createAny_effects : $@convention(thin) () -> @out Any
+  %5 = apply %4(%2) : $@convention(thin) () -> @out Any
+  copy_addr [take] %2 to %1 : $*Any
+  dealloc_stack %2 : $*Any
+  %11 = tuple ()
+  return %11 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_no_deinit_barrier_effects :
+// CHECK-NOT:     copy_addr
+// CHECK-LABEL: } // end sil function 'test_no_deinit_barrier_effects'
+sil [ossa] @test_no_deinit_barrier_effects : $@convention(thin) (@guaranteed Any, @inout Any) -> () {
+bb0(%0 : @guaranteed $Any, %1 : $*Any):
+  %2 = alloc_stack $Any
+  %4 = function_ref @createAny_no_barrier_effects : $@convention(thin) () -> @out Any
+  %5 = apply %4(%2) : $@convention(thin) () -> @out Any
+  copy_addr [take] %2 to %1 : $*Any
+  dealloc_stack %2 : $*Any
+  %11 = tuple ()
+  return %11 : $()
+}
+
+struct TwoFields {
+  var a: Child
+  var b: Child
+}
+
+sil @no_read : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child {
+[%0: write v**]
+[global: ]
+}
+sil @no_reads : $@convention(thin) (@in_guaranteed Child, @in_guaranteed TwoFields) -> () {
+[global: ]
+}
+
+// CHECK-LABEL: sil [ossa] @argument_aliasing :
+// CHECK:         %1 = alloc_stack
+// CHECK:         apply %{{[0-9]+}}(%1, %0)
+// CHECK-LABEL: } // end sil function 'argument_aliasing'
+sil [ossa] @argument_aliasing : $@convention(thin) (@inout TwoFields) -> () {
+bb0(%0 : $*TwoFields):
+  %1 = alloc_stack $Child
+  %2 = function_ref @no_read : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child
+  %3 = apply %2(%1, %0) : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child
+  %4 = struct_element_addr %0, #TwoFields.a
+  copy_addr [take] %1 to %4
+  dealloc_stack %1
+  %7 = tuple ()
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @no_argument_aliasing :
+// CHECK-NOT:     alloc_stack
+// CHECK:         [[A:%.*]] = struct_element_addr %0 : $*TwoFields, #TwoFields.a
+// CHECK-NEXT:    destroy_addr [[A]]
+// CHECK:         apply %{{[0-9]+}}([[A]], %1)
+// CHECK-NOT:     copy_addr
+// CHECK-LABEL: } // end sil function 'no_argument_aliasing'
+sil [ossa] @no_argument_aliasing : $@convention(thin) (@inout TwoFields, @inout TwoFields) -> () {
+bb0(%0 : $*TwoFields, %1 : $*TwoFields):
+  %2 = alloc_stack $Child
+  %3 = function_ref @no_read : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child
+  %4 = apply %3(%2, %1) : $@convention(thin) (@in_guaranteed TwoFields) -> @out Child
+  %5 = struct_element_addr %0, #TwoFields.a
+  copy_addr [take] %2 to %5
+  dealloc_stack %2
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @guaranteed_argument_aliasing :
+// CHECK:         alloc_stack
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'guaranteed_argument_aliasing'
+sil [ossa] @guaranteed_argument_aliasing : $@convention(thin) (@inout TwoFields, @owned Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @owned $Child):
+  %2 = alloc_stack $Child
+  store %1 to [init] %2
+  %3 = function_ref @no_reads : $@convention(thin) (@in_guaranteed Child, @in_guaranteed TwoFields) -> ()
+  %4 = apply %3(%2, %0) : $@convention(thin) (@in_guaranteed Child, @in_guaranteed TwoFields) -> ()
+  %5 = struct_element_addr %0, #TwoFields.a
+  copy_addr [take] %2 to %5
+  dealloc_stack %2
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @multi_block :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    [[SA:%.*]] = struct_element_addr %0
+// CHECK-NEXT:    destroy_addr [[SA]]
+// CHECK-NEXT:    cond_br
+// CHECK:       bb1:
+// CHECK:         store {{.*}} to [init] [[SA]]
+// CHECK:       bb2:
+// CHECK:         store {{.*}} to [init] [[SA]]
+// CHECK:       bb3:
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'multi_block'
+sil [ossa] @multi_block : $@convention(thin) (@inout TwoFields, @guaranteed Child, @guaranteed Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @guaranteed $Child, %2 : @guaranteed $Child):
+  %3 = alloc_stack $Child
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = copy_value %1
+  store %5 to [init] %3
+  br bb3
+
+bb2:
+  %8 = copy_value %2
+  store %8 to [init] %3
+  br bb3
+
+bb3:
+  %11 = struct_element_addr %0, #TwoFields.a
+  copy_addr [take] %3 to %11
+  dealloc_stack %3
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @multi_block_with_mutation :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_block_with_mutation'
+sil [ossa] @multi_block_with_mutation : $@convention(thin) (@inout TwoFields, @guaranteed Child, @guaranteed Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @guaranteed $Child, %2 : @guaranteed $Child):
+  %3 = alloc_stack $Child
+  %4 = struct_element_addr %0, #TwoFields.a
+  cond_br undef, bb1, bb2
+
+bb1:
+  %5 = copy_value %1
+  store %5 to [init] %3
+  br bb3
+
+bb2:
+  %8 = copy_value %2
+  store %8 to [init] %3
+  %10 = copy_value %2
+  store %10 to [assign] %4
+  br bb3
+
+bb3:
+  copy_addr [take] %3 to %4
+  dealloc_stack %3
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @multi_block_with_multiple_deallocs :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    alloc_stack
+// CHECK-LABEL: } // end sil function 'multi_block_with_multiple_deallocs'
+sil [ossa] @multi_block_with_multiple_deallocs : $@convention(thin) (@inout TwoFields, @guaranteed Child, @guaranteed Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @guaranteed $Child, %2 : @guaranteed $Child):
+  %3 = alloc_stack $Child
+  %4 = struct_element_addr %0, #TwoFields.a
+  %5 = struct_element_addr %0, #TwoFields.b
+  cond_br undef, bb1, bb2
+
+bb1:
+  %6 = copy_value %1
+  store %6 to [init] %3
+  copy_addr [take] %3 to %4
+  dealloc_stack %3
+  br bb3
+
+bb2:
+  %8 = copy_value %2
+  store %8 to [init] %3
+  copy_addr [take] %3 to %5
+  dealloc_stack %3
+  br bb3
+
+bb3:
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_not_in_dealloc_block :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    alloc_stack
+// CHECK-LABEL: } // end sil function 'copy_addr_not_in_dealloc_block'
+sil [ossa] @copy_addr_not_in_dealloc_block : $@convention(thin) (@inout TwoFields, @guaranteed Child, @guaranteed Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @guaranteed $Child, %2 : @guaranteed $Child):
+  %3 = alloc_stack $Child
+  %4 = struct_element_addr %0, #TwoFields.a
+  %5 = struct_element_addr %0, #TwoFields.b
+  cond_br undef, bb1, bb2
+
+bb1:
+  %6 = copy_value %1
+  store %6 to [init] %3
+  copy_addr [take] %3 to %4
+  br bb3
+
+bb2:
+  %8 = copy_value %2
+  store %8 to [init] %3
+  copy_addr [take] %3 to %5
+  br bb3
+
+bb3:
+  dealloc_stack %3
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @empty :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    alloc_stack
+// CHECK-LABEL: } // end sil function 'empty'
+sil [ossa] @empty : $@convention(thin) () -> @out () {
+bb0(%0 : $*()):
+  %1 = alloc_stack $()
+  copy_addr [take] %1 to %0
+  dealloc_stack %1
+  %4 = tuple ()
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @load_store :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    [[A:%.*]] = struct_element_addr %0 : $*TwoFields, #TwoFields.a
+// CHECK-NEXT:    destroy_addr [[A]]
+// CHECK-NEXT:    store %1 to [init] [[A]]
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'load_store'
+sil [ossa] @load_store : $@convention(thin) (@inout TwoFields, @owned Child) -> () {
+bb0(%0 : $*TwoFields, %1 : @owned $Child):
+  %2 = alloc_stack $Child
+  store %1 to [init] %2
+  %4 = load [take] %2
+  dealloc_stack %2
+  %6 = struct_element_addr %0, #TwoFields.a
+  store %4 to [assign] %6
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @load_store_with_mutation :
+// CHECK:         alloc_stack
+// CHECK-LABEL: } // end sil function 'load_store_with_mutation'
+sil [ossa] @load_store_with_mutation : $@convention(thin) (@inout TwoFields, @owned Child, @owned TwoFields) -> () {
+bb0(%0 : $*TwoFields, %1 : @owned $Child, %2 : @owned $TwoFields):
+  %3 = alloc_stack $Child
+  store %1 to [init] %3
+  %4 = load [take] %3
+  dealloc_stack %3
+  %6 = struct_element_addr %0, #TwoFields.a
+  store %2 to [assign] %0
+  store %4 to [assign] %6
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @load_store_trivial :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    store %1 to [trivial] %0
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'load_store_trivial'
+sil [ossa] @load_store_trivial : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %1 to [trivial] %2
+  %4 = load [trivial] %2
+  dealloc_stack %2
+  store %4 to [trivial] %0
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @copy_addr_trivial :
+// CHECK:       bb0({{.*}}):
+// CHECK-NEXT:    store %1 to [trivial] %0
+// CHECK-NEXT:    tuple
+// CHECK-NEXT:    return
+// CHECK-LABEL: } // end sil function 'copy_addr_trivial'
+sil [ossa] @copy_addr_trivial : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  store %1 to [trivial] %2
+  copy_addr %2 to %0
+  dealloc_stack %2
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @projections_outside_liverange :
+// CHECK-NOT:     alloc_stack
+// CHECK-LABEL: } // end sil function 'projections_outside_liverange'
+sil [ossa] @projections_outside_liverange : $@convention(thin) (@guaranteed __ContiguousArrayStorageBase) -> () {
+bb0(%0 : @guaranteed $__ContiguousArrayStorageBase):
+  %1 = alloc_stack $Int
+  %2 = ref_element_addr %0, #__ContiguousArrayStorageBase.countAndCapacity
+  %3 = struct_element_addr %2, #_ArrayBody._storage
+  %4 = struct_element_addr %3, #_SwiftArrayBodyStorage.count
+  %5 = struct_element_addr %4, #Int._value
+  %6 = load [trivial] %5
+  %7 = struct $Int (%6)
+  store %7 to [trivial] %1
+  %9 = load [trivial] %1
+  store %9 to [trivial] %4
+  dealloc_stack %1
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_before_copy :
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_addr
+// CHECK-LABEL: } // end sil function 'destroy_before_copy'
+sil [ossa] @destroy_before_copy : $@convention(thin) (@in_guaranteed Child) -> @out Child {
+bb0(%0 : $*Child, %1 : $*Child):
+  %2 = alloc_stack $Child
+  copy_addr %1 to [init] %2
+  br bb1
+
+bb1:
+  destroy_addr %2
+  copy_addr %1 to [init] %2
+  copy_addr %2 to [init] %0
+  br bb2
+
+bb2:
+  copy_addr [take] %2 to %0
+  dealloc_stack %2
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_propagate_with_access_scope :
+// CHECK:         alloc_stack
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'dont_propagate_with_access_scope'
+sil [ossa] @dont_propagate_with_access_scope : $@convention(thin) (@inout Int, Int) -> () {
+bb0(%0 : $*Int, %1 : $Int):
+  %2 = alloc_stack $Int
+  %3 = begin_access [modify] [dynamic] %2
+  store %1 to [trivial] %3
+  end_access %3
+  copy_addr %2 to %0
+  dealloc_stack %2
+  %8 = tuple ()
+  return %8
+}
+
+class Klass {}
+
+struct NonTrivialStruct {
+  var val:Klass
+}
+
+sil @get_nontrivialstruct : $@convention(thin) () -> @owned NonTrivialStruct
+
+// CHECK-LABEL: sil [ossa] @dont_eliminate_dynamic_lifetime_in_loop :
+// CHECK:         alloc_stack [dynamic_lifetime]
+// CHECK:         copy_addr
+// CHECK-LABEL: } // end sil function 'dont_eliminate_dynamic_lifetime_in_loop'
+sil [ossa] @dont_eliminate_dynamic_lifetime_in_loop : $@convention(thin) (@owned NonTrivialStruct) -> () {
+bb0(%0 : @owned $NonTrivialStruct):
+  %dest = alloc_stack [var_decl] $NonTrivialStruct
+  %temp = alloc_stack [dynamic_lifetime] $NonTrivialStruct
+  %flag_init = integer_literal $Builtin.Int1, 0
+  br bb1(%flag_init : $Builtin.Int1)
+
+bb1(%flag : $Builtin.Int1):
+  cond_br %flag, bb2, bb3
+
+bb2:
+  destroy_addr %temp : $*NonTrivialStruct
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %flag_set = integer_literal $Builtin.Int1, -1
+  %copy = copy_value %0 : $NonTrivialStruct
+  store %copy to [init] %temp : $*NonTrivialStruct
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1(%flag_set : $Builtin.Int1)
+
+bb6:
+  copy_addr [take] %temp to [init] %dest : $*NonTrivialStruct
+  dealloc_stack %temp : $*NonTrivialStruct
+  destroy_addr %dest : $*NonTrivialStruct
+  dealloc_stack %dest : $*NonTrivialStruct
+  destroy_value %0 : $NonTrivialStruct
+  %res = tuple ()
+  return %res : $()
 }
 

@@ -20,6 +20,7 @@
 #include "GenEnum.h"
 #include "GenExistential.h"
 #include "GenHeap.h"
+#include "GenMeta.h"
 #include "GenProto.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -31,6 +32,7 @@
 
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILModule.h"
@@ -41,8 +43,11 @@ using namespace swift;
 using namespace irgen;
 
 /// Compute the flags to pass to swift_dynamicCast.
-static DynamicCastFlags getDynamicCastFlags(CastConsumptionKind consumptionKind,
-                                            CheckedCastMode mode) {
+static DynamicCastFlags getDynamicCastFlags(
+    CastConsumptionKind consumptionKind,
+    CheckedCastMode mode,
+    CheckedCastInstOptions options
+) {
   DynamicCastFlags flags = DynamicCastFlags::Default;
 
   if (mode == CheckedCastMode::Unconditional)
@@ -51,6 +56,14 @@ static DynamicCastFlags getDynamicCastFlags(CastConsumptionKind consumptionKind,
     flags |= DynamicCastFlags::DestroyOnFailure;
   if (shouldTakeOnSuccess(consumptionKind))
     flags |= DynamicCastFlags::TakeOnSuccess;
+
+  switch (options.isolatedConformances()) {
+  case CastingIsolatedConformances::Allow:
+    break;
+  case CastingIsolatedConformances::Prohibit:
+    flags |= DynamicCastFlags::ProhibitIsolatedConformances;
+    break;
+  }
 
   return flags;
 }
@@ -62,14 +75,15 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
                                     Address dest,
                                     CanType targetType,
                                     CastConsumptionKind consumptionKind,
-                                    CheckedCastMode mode) {
+                                    CheckedCastMode mode,
+                                    CheckedCastInstOptions options) {
   // TODO: attempt to specialize this based on the known types.
 
-  DynamicCastFlags flags = getDynamicCastFlags(consumptionKind, mode);
+  DynamicCastFlags flags = getDynamicCastFlags(consumptionKind, mode, options);
 
   // Cast both addresses to opaque pointer type.
-  dest = IGF.Builder.CreateBitCast(dest, IGF.IGM.OpaquePtrTy);
-  src = IGF.Builder.CreateBitCast(src, IGF.IGM.OpaquePtrTy);
+  dest = IGF.Builder.CreateElementBitCast(dest, IGF.IGM.OpaqueTy);
+  src = IGF.Builder.CreateElementBitCast(src, IGF.IGM.OpaqueTy);
 
   // Load type metadata for the source's static type and the target type.
   llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType);
@@ -81,7 +95,8 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
     IGF.IGM.getSize(Size(unsigned(flags)))
   };
 
-  auto call = IGF.Builder.CreateCall(IGF.IGM.getDynamicCastFn(), args);
+  auto call =
+      IGF.Builder.CreateCall(IGF.IGM.getDynamicCastFunctionPointer(), args);
   call->setDoesNotThrow();
 
   return call;
@@ -90,8 +105,7 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
 FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                                  llvm::Value *from,
                                                  SILType fromType,
-                                                 SILType toType,
-                                                 GenericSignature fnSig) {
+                                                 SILType toType) {
   // Check metatype objects directly. Don't try to find their meta-metatype.
   auto isMetatype = false;
   if (auto metaType = toType.getAs<MetatypeType>()) {
@@ -124,11 +138,11 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // of the metatype value to the subclass's static metatype instance.
   //
   // %1 = value_metatype $Super.Type, %0 : $A
-  // checked_cast_br [exact] %1 : $Super.Type to $Sub.Type
+  // checked_cast_br [exact] Super.Type in %1 : $Super.Type to $Sub.Type
   // =>
   // icmp eq %1, @metadata.Sub
   llvm::Value *objectMetadata = isMetatype ? from :
-    emitHeapMetadataRefForHeapObject(IGF, from, fromType, fnSig);
+    emitHeapMetadataRefForHeapObject(IGF, from, fromType);
 
   objectMetadata = IGF.Builder.CreateBitCast(objectMetadata,
                                              targetMetadata->getType());
@@ -159,7 +173,7 @@ getDynamicCastArguments(IRGenFunction &IGF,
     return argsBuf;
       
   case CheckedCastMode::Conditional:
-    return llvm::makeArrayRef(argsBuf, n-3);
+    return llvm::ArrayRef(argsBuf, n - 3);
     break;
   }
   llvm_unreachable("covered switch");
@@ -175,7 +189,7 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
   // Emit a reference to the metadata and figure out what cast
   // function to use.
   llvm::Value *metadataRef;
-  llvm::Constant *castFn;
+  FunctionPointer castFn;
 
   // If true, the target class is not known at compile time because it is a
   // class-bounded archetype or the dynamic Self type.
@@ -197,15 +211,16 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 
   // If the destination type is known to have a Swift-compatible
   // implementation, use the most specific entrypoint.
-  if (destClass && destClass->hasKnownSwiftImplementation()) {
+  if ((destClass && destClass->hasKnownSwiftImplementation()) ||
+      IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     metadataRef = IGF.emitTypeMetadataRef(toType);
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
-      castFn = IGF.IGM.getDynamicCastClassUnconditionalFn();
+      castFn = IGF.IGM.getDynamicCastClassUnconditionalFunctionPointer();
       break;
     case CheckedCastMode::Conditional:
-      castFn = IGF.IGM.getDynamicCastClassFn();
+      castFn = IGF.IGM.getDynamicCastClassFunctionPointer();
       break;
     }
 
@@ -217,10 +232,10 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
-      castFn = IGF.IGM.getDynamicCastUnknownClassUnconditionalFn();
+      castFn = IGF.IGM.getDynamicCastUnknownClassUnconditionalFunctionPointer();
       break;
     case CheckedCastMode::Conditional:
-      castFn = IGF.IGM.getDynamicCastUnknownClassFn();
+      castFn = IGF.IGM.getDynamicCastUnknownClassFunctionPointer();
       break;
     }
 
@@ -230,10 +245,10 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
 
     switch (mode) {
     case CheckedCastMode::Unconditional:
-      castFn = IGF.IGM.getDynamicCastObjCClassUnconditionalFn();
+      castFn = IGF.IGM.getDynamicCastObjCClassUnconditionalFunctionPointer();
       break;
     case CheckedCastMode::Conditional:
-      castFn = IGF.IGM.getDynamicCastObjCClassFn();
+      castFn = IGF.IGM.getDynamicCastObjCClassFunctionPointer();
       break;
     }
   }
@@ -242,10 +257,6 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
     metadataRef = IGF.Builder.CreateBitCast(metadataRef, IGF.IGM.Int8PtrTy);
 
   // Call the (unconditional) dynamic cast.
-  auto cc = IGF.IGM.DefaultCC;
-  if (auto fun = dyn_cast<llvm::Function>(castFn))
-    cc = fun->getCallingConv();
-
   llvm::Value *argsBuf[] = {
     from,
     metadataRef,
@@ -254,10 +265,8 @@ llvm::Value *irgen::emitClassDowncast(IRGenFunction &IGF, llvm::Value *from,
     nullptr,
   };
 
-  auto call
-    = IGF.Builder.CreateCall(castFn,
-                             getDynamicCastArguments(IGF, argsBuf, mode));
-  call->setCallingConv(cc);
+  auto call = IGF.Builder.CreateCall(
+      castFn, getDynamicCastArguments(IGF, argsBuf, mode));
   call->setDoesNotThrow();
 
   llvm::Type *subTy = IGF.getTypeInfoForUnlowered(toType).getStorageType();
@@ -272,7 +281,7 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
                                  Explosion &ex) {
   // Pick a runtime entry point and target metadata based on what kind of
   // representation we're casting.
-  llvm::Constant *castFn;
+  FunctionPointer castFn;
   llvm::Value *toMetadata;
 
   switch (toMetatype->getRepresentation()) {
@@ -281,10 +290,10 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
     toMetadata = IGF.emitTypeMetadataRef(toMetatype.getInstanceType());
     switch (mode) {
     case CheckedCastMode::Unconditional:
-      castFn = IGF.IGM.getDynamicCastMetatypeUnconditionalFn();
+      castFn = IGF.IGM.getDynamicCastMetatypeUnconditionalFunctionPointer();
       break;
     case CheckedCastMode::Conditional:
-      castFn = IGF.IGM.getDynamicCastMetatypeFn();
+      castFn = IGF.IGM.getDynamicCastMetatypeFunctionPointer();
       break;
     }
     break;
@@ -299,10 +308,11 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
                                           MetadataState::Complete);
     switch (mode) {
     case CheckedCastMode::Unconditional:
-      castFn = IGF.IGM.getDynamicCastObjCClassMetatypeUnconditionalFn();
+      castFn =
+          IGF.IGM.getDynamicCastObjCClassMetatypeUnconditionalFunctionPointer();
       break;
     case CheckedCastMode::Conditional:
-      castFn = IGF.IGM.getDynamicCastObjCClassMetatypeFn();
+      castFn = IGF.IGM.getDynamicCastObjCClassMetatypeFunctionPointer();
       break;
     }
     break;
@@ -312,10 +322,6 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
     llvm_unreachable("not implemented");
   }
 
-  auto cc = IGF.IGM.DefaultCC;
-  if (auto fun = dyn_cast<llvm::Function>(castFn))
-    cc = fun->getCallingConv();
-  
   llvm::Value *argsBuf[] = {
     metatype,
     toMetadata,
@@ -324,9 +330,8 @@ void irgen::emitMetatypeDowncast(IRGenFunction &IGF,
     nullptr,
   };
 
-  auto call = IGF.Builder.CreateCall(castFn,
-                                   getDynamicCastArguments(IGF, argsBuf, mode));
-  call->setCallingConv(cc);
+  auto call = IGF.Builder.CreateCall(
+      castFn, getDynamicCastArguments(IGF, argsBuf, mode));
   call->setDoesNotThrow();
   ex.add(call);
 }
@@ -338,12 +343,9 @@ llvm::Value *irgen::emitReferenceToObjCProtocol(IRGenFunction &IGF,
 
   // Get the address of the global variable the protocol reference gets
   // indirected through.
-  llvm::Constant *protocolRefAddr
-    = IGF.IGM.getAddrOfObjCProtocolRef(proto, NotForDefinition);
-
-  // Load the protocol reference.
-  Address addr(protocolRefAddr, IGF.IGM.getPointerAlignment());
-  return IGF.Builder.CreateLoad(addr);
+  auto protocolRefAddr =
+      IGF.IGM.getAddrOfObjCProtocolRef(proto, NotForDefinition);
+  return IGF.Builder.CreateLoad(protocolRefAddr);
 }
 
 /// Emit a helper function to look up \c numProtocols witness tables given
@@ -360,11 +362,9 @@ llvm::Value *irgen::emitReferenceToObjCProtocol(IRGenFunction &IGF,
 /// The function's output type is (value, witnessTable...)
 ///
 /// The value is NULL if the cast failed.
-static llvm::Constant *
-emitExistentialScalarCastFn(IRGenModule &IGM,
-                            unsigned numProtocols,
-                            CheckedCastMode mode,
-                            bool checkClassConstraint,
+static FunctionPointer
+emitExistentialScalarCastFn(IRGenModule &IGM, unsigned numProtocols,
+                            CheckedCastMode mode, bool checkClassConstraint,
                             bool checkSuperclassConstraint) {
   assert(!checkSuperclassConstraint || checkClassConstraint);
 
@@ -403,76 +403,79 @@ emitExistentialScalarCastFn(IRGenModule &IGM,
   
   llvm::Type *returnTy = llvm::StructType::get(IGM.getLLVMContext(), returnTys);
 
-  return IGM.getOrCreateHelperFunction(name, returnTy, argTys,
-                                       [&](IRGenFunction &IGF) {
-    Explosion args = IGF.collectParameters();
+  auto fn = IGM.getOrCreateHelperFunction(
+      name, returnTy, argTys, [&](IRGenFunction &IGF) {
+        Explosion args = IGF.collectParameters();
 
-    auto value = args.claimNext();
-    auto ref = args.claimNext();
-    auto failBB = IGF.createBasicBlock("fail");
-    auto conformsToProtocol = IGM.getConformsToProtocolFn();
+        auto value = args.claimNext();
+        auto ref = args.claimNext();
+        auto failBB = IGF.createBasicBlock("fail");
+        auto conformsToProtocol = IGM.getConformsToProtocolFunctionPointer();
 
-    Explosion rets;
-    rets.add(value);
+        Explosion rets;
+        rets.add(value);
 
-    // Check the class constraint if necessary.
-    if (checkSuperclassConstraint) {
-      auto superclassMetadata = args.claimNext();
-      auto castFn = IGF.IGM.getDynamicCastMetatypeFn();
-      auto castResult = IGF.Builder.CreateCall(castFn, {ref,
-                                                        superclassMetadata});
+        // Check the class constraint if necessary.
+        if (checkSuperclassConstraint) {
+          auto superclassMetadata = args.claimNext();
+          auto castFn = IGF.IGM.getDynamicCastMetatypeFunctionPointer();
+          auto castResult =
+              IGF.Builder.CreateCall(castFn, {ref, superclassMetadata});
 
-      auto cc = cast<llvm::Function>(castFn)->getCallingConv();
+          // FIXME: Eventually, we may want to throw.
+          castResult->setDoesNotThrow();
 
-      // FIXME: Eventually, we may want to throw.
-      castResult->setCallingConv(cc);
-      castResult->setDoesNotThrow();
+          auto isClass = IGF.Builder.CreateICmpNE(
+              castResult,
+              llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
 
-      auto isClass = IGF.Builder.CreateICmpNE(
-          castResult,
-          llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
+          auto contBB = IGF.createBasicBlock("cont");
+          IGF.Builder.CreateCondBr(isClass, contBB, failBB);
+          IGF.Builder.emitBlock(contBB);
+        } else if (checkClassConstraint) {
+          auto isClass =
+              IGF.Builder.CreateCall(IGM.getIsClassTypeFunctionPointer(), ref);
+          auto contBB = IGF.createBasicBlock("cont");
+          IGF.Builder.CreateCondBr(isClass, contBB, failBB);
+          IGF.Builder.emitBlock(contBB);
+        }
 
-      auto contBB = IGF.createBasicBlock("cont");
-      IGF.Builder.CreateCondBr(isClass, contBB, failBB);
-      IGF.Builder.emitBlock(contBB);
-    } else if (checkClassConstraint) {
-      auto isClass = IGF.Builder.CreateCall(IGM.getIsClassTypeFn(), ref);
-      auto contBB = IGF.createBasicBlock("cont");
-      IGF.Builder.CreateCondBr(isClass, contBB, failBB);
-      IGF.Builder.emitBlock(contBB);
-    }
+        // Look up each protocol conformance we want.
+        for (unsigned i = 0; i < numProtocols; ++i) {
+          auto proto = args.claimNext();
+          auto witness =
+              IGF.Builder.CreateCall(conformsToProtocol, {ref, proto});
+          auto isNull = IGF.Builder.CreateICmpEQ(
+              witness, llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
+          auto contBB = IGF.createBasicBlock("cont");
+          IGF.Builder.CreateCondBr(isNull, failBB, contBB);
 
-    // Look up each protocol conformance we want.
-    for (unsigned i = 0; i < numProtocols; ++i) {
-      auto proto = args.claimNext();
-      auto witness = IGF.Builder.CreateCall(conformsToProtocol, {ref, proto});
-      auto isNull = IGF.Builder.CreateICmpEQ(witness,
-                       llvm::ConstantPointerNull::get(IGM.WitnessTablePtrTy));
-      auto contBB = IGF.createBasicBlock("cont");
-      IGF.Builder.CreateCondBr(isNull, failBB, contBB);
+          IGF.Builder.emitBlock(contBB);
+          rets.add(witness);
+        }
 
-      IGF.Builder.emitBlock(contBB);
-      rets.add(witness);
-    }
+        // If we succeeded, return the witnesses.
+        IGF.emitScalarReturn(returnTy, rets);
 
-    // If we succeeded, return the witnesses.
-    IGF.emitScalarReturn(returnTy, rets);
-    
-    // If we failed, return nil or trap.
-    IGF.Builder.emitBlock(failBB);
-    switch (mode) {
-    case CheckedCastMode::Conditional: {
-      auto null = llvm::ConstantStruct::getNullValue(returnTy);
-      IGF.Builder.CreateRet(null);
-      break;
-    }
+        // If we failed, return nil or trap.
+        IGF.Builder.emitBlock(failBB);
+        switch (mode) {
+        case CheckedCastMode::Conditional: {
+          auto null = llvm::ConstantStruct::getNullValue(returnTy);
+          IGF.Builder.CreateRet(null);
+          break;
+        }
 
-    case CheckedCastMode::Unconditional: {
-      IGF.emitTrap("type cast failed", /*EmitUnreachable=*/true);
-      break;
-    }
-    }
-  });
+        case CheckedCastMode::Unconditional: {
+          IGF.emitTrap("type cast failed", /*EmitUnreachable=*/true);
+          break;
+        }
+        }
+      });
+  auto fnType = llvm::FunctionType::get(returnTy, argTys, false);
+  auto sig = Signature(fnType, {}, IGM.DefaultCC);
+  return FunctionPointer::forDirect(FunctionPointer::Kind::Function, fn,
+                                    nullptr, sig);
 }
 
 llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
@@ -512,20 +515,18 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
     }
 
     // Ask the runtime whether this is class metadata.
-    llvm::Constant *castFn;
+    FunctionPointer castFn;
     switch (mode) {
     case CheckedCastMode::Conditional:
-      castFn = IGF.IGM.getDynamicCastMetatypeToObjectConditionalFn();
+      castFn =
+          IGF.IGM.getDynamicCastMetatypeToObjectConditionalFunctionPointer();
       break;
     case CheckedCastMode::Unconditional:
-      castFn = IGF.IGM.getDynamicCastMetatypeToObjectUnconditionalFn();
+      castFn =
+          IGF.IGM.getDynamicCastMetatypeToObjectUnconditionalFunctionPointer();
       break;
     }
-    
-    auto cc = IGF.IGM.DefaultCC;
-    if (auto fun = dyn_cast<llvm::Function>(castFn))
-      cc = fun->getCallingConv();
-    
+
     llvm::Value *argsBuf[] = {
       metatypeValue,
       nullptr,
@@ -533,25 +534,39 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
       nullptr,
     };
 
-    auto call = IGF.Builder.CreateCall(castFn,
-                                   getDynamicCastArguments(IGF, argsBuf, mode));
-    call->setCallingConv(cc);
+    auto call = IGF.Builder.CreateCall(
+        castFn, getDynamicCastArguments(IGF, argsBuf, mode));
     return call;
   }
   }
   llvm_unreachable("invalid metatype representation");
 }
 
+static std::optional<unsigned> getFastLookupIndex(IRGenModule &IGM,
+                                                  CanType srcInstanceType,
+                                                  ProtocolDecl *proto) {
+  ClassDecl *cDecl = srcInstanceType.getClassOrBoundGenericClass();
+  if (!cDecl)
+    return std::nullopt;
+
+  SILVTable *vTable = IGM.getSILModule().lookUpVTable(cDecl);
+  if (!vTable)
+    return std::nullopt;
+
+  unsigned idx = 0;
+  for (auto c : vTable->getConformances()) {
+    if (c.getProtocol() == proto)
+      return idx;
+    idx += 1;
+  }
+  return std::nullopt;
+}
 
 /// Emit a checked cast to a protocol or protocol composition.
-void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
-                                  llvm::Value *value,
-                                  SILType srcType,
-                                  SILType destType,
-                                  CheckedCastMode mode,
-                                  Optional<MetatypeRepresentation> metatypeKind,
-                                  GenericSignature fnSig,
-                                  Explosion &ex) {
+void irgen::emitScalarExistentialDowncast(
+    IRGenFunction &IGF, llvm::Value *value, SILType srcType, SILType destType,
+    CheckedCastMode mode, bool sourceWrappedInOptional,
+    std::optional<MetatypeRepresentation> metatypeKind, Explosion &ex) {
   auto srcInstanceType = srcType.getASTType();
   auto destInstanceType = destType.getASTType();
   while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(
@@ -686,17 +701,21 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     
     // Pick the cast function based on the cast mode and on whether we're
     // casting a Swift metatype or ObjC object.
-    llvm::Constant *castFn;
+    FunctionPointer castFn;
     switch (mode) {
     case CheckedCastMode::Unconditional:
-      castFn = objcObject
-        ? IGF.IGM.getDynamicCastObjCProtocolUnconditionalFn()
-        : IGF.IGM.getDynamicCastTypeToObjCProtocolUnconditionalFn();
+      castFn =
+          objcObject
+              ? IGF.IGM.getDynamicCastObjCProtocolUnconditionalFunctionPointer()
+              : IGF.IGM
+                    .getDynamicCastTypeToObjCProtocolUnconditionalFunctionPointer();
       break;
     case CheckedCastMode::Conditional:
-      castFn = objcObject
-        ? IGF.IGM.getDynamicCastObjCProtocolConditionalFn()
-        : IGF.IGM.getDynamicCastTypeToObjCProtocolConditionalFn();
+      castFn =
+          objcObject
+              ? IGF.IGM.getDynamicCastObjCProtocolConditionalFunctionPointer()
+              : IGF.IGM
+                    .getDynamicCastTypeToObjCProtocolConditionalFunctionPointer();
       break;
     }
     llvm::Value *objcCastObject = objcObject ? objcObject : value;
@@ -706,8 +725,8 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
                                                              objcProtos.size()),
                                         IGF.IGM.getPointerAlignment(),
                                         "objc_protocols");
-    protoRefsBuf = IGF.Builder.CreateBitCast(protoRefsBuf,
-                                             IGF.IGM.Int8PtrPtrTy);
+    protoRefsBuf =
+        IGF.Builder.CreateElementBitCast(protoRefsBuf, IGF.IGM.Int8PtrTy);
 
     for (unsigned index : indices(objcProtos)) {
       Address protoRefSlot = IGF.Builder.CreateConstArrayGEP(
@@ -716,11 +735,6 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
       IGF.Builder.CreateStore(objcProtos[index], protoRefSlot);
       ++index;
     }
-
-    
-    auto cc = IGF.IGM.DefaultCC;
-    if (auto fun = dyn_cast<llvm::Function>(castFn))
-      cc = fun->getCallingConv();
 
     llvm::Value *argsBuf[] = {
       objcCastObject,
@@ -732,9 +746,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     };
 
     auto call = IGF.Builder.CreateCall(
-      castFn,
-      getDynamicCastArguments(IGF, argsBuf, mode));
-    call->setCallingConv(cc);
+        castFn, getDynamicCastArguments(IGF, argsBuf, mode));
     objcCast = call;
     resultValue = IGF.Builder.CreateBitCast(objcCast, resultType);
   }
@@ -747,7 +759,7 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
 
   // If we're doing a conditional cast, and the ObjC protocol checks failed,
   // then the cast is done.
-  Optional<ConditionalDominanceScope> condition;
+  std::optional<ConditionalDominanceScope> condition;
   llvm::BasicBlock *origBB = nullptr, *successBB = nullptr, *contBB = nullptr;
   if (!objcProtos.empty()) {
     switch (mode) {
@@ -785,8 +797,34 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
     // Get the type metadata for the instance.
     metadataValue = emitDynamicTypeOfHeapObject(IGF, value,
                                                 MetatypeRepresentation::Thick,
-                                                srcType,
-                                                fnSig);
+                                                srcType);
+  }
+
+  // If the vtable has conformance entries (at negative offsets), we can do the cast
+  // by simply loading the witness table from those entries.
+  std::optional<unsigned> fastLookupIndex = std::nullopt;
+
+  if (layout.getProtocols().size() == 1 &&
+      // If we need to check anything else than the conformance, let the runtime
+      // function do it.
+      !checkSuperclassConstraint && !checkClassConstraint) {
+    fastLookupIndex  = getFastLookupIndex(IGF.IGM, srcInstanceType, layout.getProtocols()[0]);
+  }
+  if (fastLookupIndex.has_value()) {
+    llvm::Value *indices[] = {
+         llvm::ConstantInt::get(IGF.IGM.Int32Ty, -(int)fastLookupIndex.value() - MetadataAdjustmentIndex::Class - 1)};
+    auto addr = IGF.Builder.CreateGEP(IGF.IGM.WitnessTablePtrTy, metadataValue, indices);
+    auto wt = IGF.Builder.CreateLoad(Address(
+        addr, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment()));
+
+    // If the class does _not_ conform to the protocol, the witness table pointer is null.
+    // However, in this case we need to set the resulting class reference to null.
+    auto nullPtr = llvm::ConstantPointerNull::get(cast<llvm::PointerType>(IGF.IGM.Int8PtrTy));
+    auto isNotNil = IGF.Builder.CreateICmpNE(wt, nullPtr);
+    auto retVal = IGF.Builder.CreateSelect(isNotNil, value, nullPtr);
+    ex.add(retVal);
+    ex.add(wt);
+    return;
   }
 
   // Look up witness tables for the protocols that need them.
@@ -810,7 +848,36 @@ void irgen::emitScalarExistentialDowncast(IRGenFunction &IGF,
   for (auto proto : witnessTableProtos)
     args.push_back(proto);
 
-  auto valueAndWitnessTables = IGF.Builder.CreateCall(fn, args);
+  llvm::BasicBlock *nilCheckedCont = nullptr;
+  llvm::BasicBlock *nilBB = nullptr;
+  llvm::BasicBlock *nonNilBB = nullptr;
+  if (sourceWrappedInOptional) {
+    nilBB = IGF.createBasicBlock("is-nil");
+    nonNilBB = IGF.createBasicBlock("is-non-nil");
+    nilCheckedCont = IGF.createBasicBlock("nil-checked-cont");
+
+    auto isNotNil = IGF.Builder.CreateICmpNE(
+        metadataValue, llvm::ConstantPointerNull::get(
+                           cast<llvm::PointerType>(IGF.IGM.Int8PtrTy)));
+
+    IGF.Builder.CreateCondBr(isNotNil, nonNilBB, nilBB);
+    IGF.Builder.emitBlock(nilBB);
+    IGF.Builder.CreateBr(nilCheckedCont);
+    IGF.Builder.emitBlock(nonNilBB);
+  }
+
+  llvm::Value *valueAndWitnessTables = IGF.Builder.CreateCall(fn, args);
+
+  if (nilCheckedCont) {
+    IGF.Builder.CreateBr(nilCheckedCont);
+    IGF.Builder.emitBlock(nilCheckedCont);
+    auto *returnTy = valueAndWitnessTables->getType();
+    auto failureVal = llvm::Constant::getNullValue(returnTy);
+    auto phi = IGF.Builder.CreatePHI(returnTy, 2);
+    phi->addIncoming(valueAndWitnessTables, nonNilBB);
+    phi->addIncoming(failureVal, nilBB);
+    valueAndWitnessTables = phi;
+  }
 
   resultValue = IGF.Builder.CreateExtractValue(valueAndWitnessTables, 0);
   if (resultValue->getType() != resultType)
@@ -869,7 +936,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                   SILType targetLoweredType,
                                   CanType targetFormalType,
                                   CheckedCastMode mode,
-                                  GenericSignature fnSig,
+                                  CheckedCastInstOptions options,
                                   Explosion &out) {
   assert(sourceLoweredType.isObject());
   assert(targetLoweredType.isObject());
@@ -902,6 +969,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     }
   };
 
+  bool sourceWrappedInOptional = false;
+
+  std::optional<ConditionalDominanceScope> domScope;
   if (auto sourceOptObjectType = sourceLoweredType.getOptionalObjectType()) {
     // Translate the value from an enum representation to a possibly-null
     // representation.  Note that we assume that this projection is safe
@@ -915,6 +985,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     value = std::move(optValue);
     sourceLoweredType = sourceOptObjectType;
     sourceFormalType = sourceFormalType.getOptionalObjectType();
+    sourceWrappedInOptional = true;
 
     // We need a null-check because the runtime function can't handle null in
     // some of the cases.
@@ -930,6 +1001,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
       Builder.CreateCondBr(isNotNil, isNotNilContBB, nilMergeBB);
 
       Builder.emitBlock(isNotNilContBB);
+      domScope.emplace(IGF);
     }
   }
 
@@ -950,11 +1022,9 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 
     // Casts to existential metatypes.
     if (auto existential = targetLoweredType.getAs<ExistentialMetatypeType>()) {
-      emitScalarExistentialDowncast(IGF, metatypeVal, sourceLoweredType,
-                                    targetLoweredType, mode,
-                                    existential->getRepresentation(),
-                                    fnSig,
-                                    out);
+      emitScalarExistentialDowncast(
+          IGF, metatypeVal, sourceLoweredType, targetLoweredType, mode,
+          sourceWrappedInOptional, existential->getRepresentation(), out);
       return;
 
     // Casts to concrete metatypes.
@@ -986,7 +1056,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                        IGF.IGM.getPointerAlignment(),
                                        "castSrc");
         IGF.Builder.CreateStore(metatypeVal, src);
-        llvm::PointerType *destPtrType = IGF.IGM.getStoragePointerType(targetLoweredType);
+        llvm::PointerType *destPtrType = IGF.IGM.PtrTy;
         Address dest = IGF.createAlloca(destPtrType,
                                         IGF.IGM.getPointerAlignment(),
                                         "castDest");
@@ -995,7 +1065,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                                src, sourceFormalType,
                                                dest, targetFormalType,
                                                CastConsumptionKind::TakeAlways,
-                                               mode);
+                                               mode, options);
         llvm::Value *successResult = IGF.Builder.CreateLoad(dest);
         llvm::Value *failureResult = llvm::ConstantPointerNull::get(destPtrType);
         llvm::Value *result = IGF.Builder.CreateSelect(success, successResult, failureResult);
@@ -1022,7 +1092,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   llvm::Value *instance;
   if (sourceLoweredType.isExistentialType()) {
     instance = emitClassExistentialProjection(IGF, value, sourceLoweredType,
-                                              CanArchetypeType(), fnSig);
+                                              CanArchetypeType());
   } else {
     instance = value.claimNext();
   }
@@ -1031,16 +1101,18 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     Explosion outRes;
     emitScalarExistentialDowncast(IGF, instance, sourceLoweredType,
                                   targetLoweredType, mode,
-                                  /*not a metatype*/ None,
-                                  fnSig,
-                                  outRes);
+                                  /*sourceWrappedInOptional*/ false,
+                                  /*not a metatype*/ std::nullopt, outRes);
     returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }
 
-  if (llvm::Value *fastResult = emitFastClassCastIfPossible(IGF, instance,
-                                        sourceFormalType, targetFormalType)) {
-    out.add(fastResult);
+  if (llvm::Value *fastResult = emitFastClassCastIfPossible(
+          IGF, instance, sourceFormalType, targetFormalType, mode,
+          sourceWrappedInOptional, nilCheckBB, nilMergeBB)) {
+    Explosion fastExplosion;
+    fastExplosion.add(fastResult);
+    returnNilCheckedResult(IGF.Builder, fastExplosion);
     return;
   }
 
@@ -1056,10 +1128,10 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
 /// It also avoids a call to the metadata accessor of the class (which calls
 /// `swift_getInitializedObjCClass`). For comparing the metadata pointers it's
 /// not required that the metadata is fully initialized.
-llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
-                                                llvm::Value *instance,
-                                                CanType sourceFormalType,
-                                                CanType targetFormalType) {
+llvm::Value *irgen::emitFastClassCastIfPossible(
+    IRGenFunction &IGF, llvm::Value *instance, CanType sourceFormalType,
+    CanType targetFormalType, CheckedCastMode mode, bool sourceWrappedInOptional,
+    llvm::BasicBlock *&nilCheckBB, llvm::BasicBlock *&nilMergeBB) {
   if (!doesCastPreserveOwnershipForTypes(IGF.IGM.getSILModule(),
                                          sourceFormalType, targetFormalType)) {
     return nullptr;
@@ -1070,14 +1142,19 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
   if (!classTy)
     return nullptr;
 
+  ClassDecl *toClass = classTy->getDecl();
+
+  // Also exclude non-generic classes nested inside other generic types.
+  if (toClass->isGenericContext())
+    return nullptr;
+
   // TODO: we could use the ClassHierarchyAnalysis do also handle "effectively"
   // final classes, e.g. not-subclassed internal classes in WMO.
   // This would need some rearchitecting of ClassHierarchyAnalysis to make it
   // available in IRGen.
-  ClassDecl *toClass = classTy->getDecl();
   if (!toClass->isFinal())
     return nullptr;
-    
+
   AncestryOptions forbidden = AncestryOptions(AncestryFlags::ObjC) |
                               AncestryFlags::Resilient |
                               AncestryFlags::ResilientOther |
@@ -1085,6 +1162,22 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
                               AncestryFlags::ObjCObjectModel;
   if (toClass->checkAncestry() & forbidden)
     return nullptr;
+
+  // If the source was originally wrapped in an Optional, check it for nil now.
+  if (sourceWrappedInOptional) {
+    auto isNil = IGF.Builder.CreateICmpEQ(
+        instance, llvm::ConstantPointerNull::get(
+                      cast<llvm::PointerType>(instance->getType())));
+    if (mode == CheckedCastMode::Unconditional) {
+      IGF.emitConditionalTrap(isNil, "Unexpectedly found nil while unwrapping an Optional value");
+    } else {
+      auto *isNotNilContBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      nilMergeBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+      nilCheckBB = IGF.Builder.GetInsertBlock();
+      IGF.Builder.CreateCondBr(isNil, nilMergeBB, isNotNilContBB);
+      IGF.Builder.emitBlock(isNotNilContBB);
+    }
+  }
 
   // Get the metadata pointer of the destination class type.
   llvm::Value *destMetadata = IGF.IGM.getAddrOfTypeMetadata(targetFormalType);
@@ -1103,15 +1196,19 @@ llvm::Value *irgen::emitFastClassCastIfPossible(IRGenFunction &IGF,
     
   // Load the isa pointer.
   llvm::Value *objMetadata = emitHeapMetadataRefForHeapObject(IGF, instance,
-      targetFormalType, GenericSignature(), /*suppress cast*/ true);
+      sourceFormalType, /*suppress cast*/ true);
   llvm::Value *rhs = IGF.Builder.CreateBitCast(objMetadata, IGF.IGM.Int8PtrTy);
   
   // return isa_ptr == metadata_ptr ? instance : nullptr
-  llvm::Value *isEqual = IGF.Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_EQ,
+  llvm::Value *isNotEqual = IGF.Builder.CreateCmp(llvm::CmpInst::Predicate::ICMP_NE,
                                               lhs, rhs);
+  if (mode == CheckedCastMode::Unconditional) {
+    IGF.emitConditionalTrap(isNotEqual, "Unconditional cast failed");
+    return instance;
+  }
   auto *instanceTy = cast<llvm::PointerType>(instance->getType());
   auto *nullPtr = llvm::ConstantPointerNull::get(instanceTy);
-  auto *select = IGF.Builder.CreateSelect(isEqual, instance, nullPtr);
+  auto *select = IGF.Builder.CreateSelect(isNotEqual, nullPtr, instance);
   llvm::Type *destTy = IGF.getTypeInfoForUnlowered(targetFormalType).getStorageType();
   return IGF.Builder.CreateBitCast(select, destTy);
 }

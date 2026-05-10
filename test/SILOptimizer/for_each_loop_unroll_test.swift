@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -primary-file %s -sil-verify-all | %FileCheck %s
 
 // Tests for the ForEachLoopUnroll mandatory optimization pass that unrolls
 // Sequence.forEach calls over array literals.
@@ -57,15 +57,15 @@ func unrollLetArrayLiteralWithNonTrivialElements() {
   // CHECK: try_apply {{.*}}([[STACK]])
 }
 
-// This test mimics the array liteal and forEach created by the OSLogOptimization pass.
+// This test mimics the array literal and forEach created by the OSLogOptimization pass.
 // CHECK-LABEL: sil hidden @$s25for_each_loop_unroll_test0D27LetArrayLiteralWithClosures1i1jys5Int32V_AFtF
 func unrollLetArrayLiteralWithClosures(i: Int32, j: Int32) {
   let a = [{ i } , { j }]
   a.forEach { print($0()) }
   // CHECK: [[ALLOCATE:%[0-9]+]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF
   // CHECK: [[ARRAYTUP:%[0-9]+]] = apply [[ALLOCATE]]<() -> Int32>
-  // CHECK: [[STORAGEPTR:%[0-9]+]] =  tuple_extract [[ARRAYTUP]] : $(Array<() -> Int32>, Builtin.RawPointer), 1
-  // CHECK: [[STORAGEADDR:%[0-9]+]] = pointer_to_address [[STORAGEPTR]]
+  // CHECK: [[ARRAYVAL:%[0-9]+]] =  tuple_extract [[ARRAYTUP]] : $(Array<() -> Int32>, Builtin.RawPointer), 0
+  // CHECK: [[STORAGEADDR:%[0-9]+]] =  ref_tail_addr
   // CHECK: store [[CLOSURE1:%[0-9]+]] to [[STORAGEADDR]]
   // CHECK: [[INDEX1:%[0-9]+]] = index_addr [[STORAGEADDR]]
   // CHECK: store [[CLOSURE2:%[0-9]+]] to [[INDEX1]]
@@ -89,7 +89,7 @@ func testNoUnrollScenario() {
 }
 
 // FIXME: Currently, array literals with address-only types cannot be unrolled
-// as they are initialied using copy_addr instead of store.
+// as they are initialized using copy_addr instead of store.
 // CHECK-LABEL: sil hidden @$s25for_each_loop_unroll_test0E27UnrollingOfAddressOnlyTypes1x1yyx_xtlF
 func testUnrollingOfAddressOnlyTypes<T>(x: T, y: T) {
   let a = [x, y]
@@ -108,4 +108,17 @@ func unrollMultipleLoops(x: Int64, y: Int64, z: Bool) {
   }
     // CHECK-NOT: forEach
     // CHECK-LABEL: end sil function '$s25for_each_loop_unroll_test0D13MultipleLoops1x1y1zys5Int64V_AGSbtF'
+}
+
+// Ensure no verifier crash
+func testNonDominatingElementStores() {
+  let string : String? = String("http://domain")
+  let validURLs : [String?] = [
+      string!, string!,
+      string!, string!,
+  ]
+
+  validURLs.forEach { url in
+    print(url)
+  }
 }

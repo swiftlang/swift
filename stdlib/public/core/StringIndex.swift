@@ -512,3 +512,55 @@ extension String.Index: Hashable {
     hasher.combine(orderingValue)
   }
 }
+
+extension String.Index {
+  @_alwaysEmitIntoClient
+  internal var _encodingDescription: String {
+    switch (_rawBits & Self.__utf8Bit != 0, _rawBits & Self.__utf16Bit != 0) {
+    case (false, false): return "unknown"
+    case (true, false): return "utf8"
+    case (false, true): return "utf16"
+    case (true, true): return "any"
+    }
+  }
+
+  /// A textual representation of this instance, intended for debugging.
+  ///
+  /// - Important: The contents of the returned string are not guaranteed to
+  ///    remain stable: they may arbitrarily change in any Swift release.
+  @_alwaysEmitIntoClient // FIXME: Use @backDeployed
+  @inline(never)
+  public var debugDescription: String {
+    // 23[utf8]+1
+    var d = "\(_encodedOffset)[\(_encodingDescription)]"
+    if transcodedOffset != 0 {
+      d += "+\(transcodedOffset)"
+    }
+    return d
+  }
+}
+
+@available(SwiftStdlib 6.1, *)
+extension String.Index: CustomDebugStringConvertible {}
+
+extension String.Index {
+  /// A textual representation of this instance, intended for debugging.
+  ///
+  /// - Important: The contents of the returned string are not guaranteed to
+  ///    remain stable: they may arbitrarily change in any Swift release.
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "debugDescription")
+  public var _description: String {
+    debugDescription
+  }
+
+  /// A textual representation of this instance, intended for debugging.
+  ///
+  /// - Important: The contents of the returned string are not guaranteed to
+  ///    remain stable: they may arbitrarily change in any Swift release.
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, renamed: "debugDescription")
+  public var _debugDescription: String {
+    debugDescription
+  }
+}

@@ -11,5 +11,5 @@
 //===----------------------------------------------------------------------===//
 
 /// Dummy source file to force CMake generated SwiftInTheCompiler.xcodeproj
-/// to sucessfully build static libraries conatining only object files used
+/// to successfully build static libraries containing only object files used
 /// during "bootstrap" process to link Swift sources into the compiler.

@@ -18,9 +18,10 @@
 #ifndef SWIFT_IRGEN_FULFILLMENT_H
 #define SWIFT_IRGEN_FULFILLMENT_H
 
-#include "llvm/ADT/DenseMap.h"
-#include "swift/AST/Types.h"
+#include "llvm/ADT/MapVector.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Types.h"
+#include "swift/IRGen/GenericRequirement.h"
 #include "MetadataPath.h"
 
 namespace swift {
@@ -36,10 +37,10 @@ struct Fulfillment {
     : SourceIndex(sourceIndex), State(unsigned(state)), Path(std::move(path)) {}
 
   /// The source index.
-  unsigned SourceIndex : 30;
+  uint64_t SourceIndex : 56;
 
   /// The state of the metadata at the fulfillment.
-  unsigned State : 2;
+  uint64_t State : 8;
 
   /// The path from the source metadata.
   MetadataPath Path;
@@ -48,9 +49,7 @@ struct Fulfillment {
 };
 
 class FulfillmentMap {
-  using FulfillmentKey = std::pair<Type, ProtocolDecl*>;
-
-  llvm::DenseMap<FulfillmentKey, Fulfillment> Fulfillments;
+  llvm::MapVector<GenericRequirement, Fulfillment> Fulfillments;
 
 public:
   struct InterestingKeysCallback {
@@ -62,6 +61,10 @@ public:
     ///
     /// It's okay to conservatively return true here.
     virtual bool hasInterestingType(CanType type) const = 0;
+
+    /// Is the given pack expansion a simple expansion of an interesting
+    /// type?
+    virtual bool isInterestingPackExpansion(CanPackExpansionType type) const = 0;
 
     /// Are we only interested in a subset of the conformances for a
     /// given type?
@@ -99,6 +102,23 @@ public:
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
 
+  /// Metadata fulfillment in tuple conformance witness thunks.
+  ///
+  /// \return true if any fulfillments were added by this search.
+  bool searchTupleTypeMetadata(IRGenModule &IGM, CanTupleType type, IsExact_t isExact,
+                               MetadataState metadataState,
+                               unsigned sourceIndex, MetadataPath &&path,
+                               const InterestingKeysCallback &interestingKeys);
+
+  /// Search the given type metadata pack for useful fulfillments.
+  ///
+  /// \return true if any fulfillments were added by this search.
+  bool searchTypeMetadataPack(IRGenModule &IGM, CanPackType type,
+                              IsExact_t isExact,
+                              MetadataState metadataState,
+                              unsigned sourceIndex, MetadataPath &&path,
+                              const InterestingKeysCallback &interestingKeys);
+
   bool searchConformance(IRGenModule &IGM,
                          const ProtocolConformance *conformance,
                          unsigned sourceIndex, MetadataPath &&path,
@@ -111,15 +131,19 @@ public:
                           unsigned sourceIndex, MetadataPath &&path,
                           const InterestingKeysCallback &interestingKeys);
 
+  /// Consider a shape requirement for the given type.
+  bool searchShapeRequirement(IRGenModule &IGM, CanType type,
+                              unsigned sourceIndex, MetadataPath &&path);
+
   /// Register a fulfillment for the given key.
   ///
   /// \return true if the fulfillment was added, which won't happen if there's
   ///   already a fulfillment that was at least as good
-  bool addFulfillment(FulfillmentKey key, unsigned source,
+  bool addFulfillment(GenericRequirement key, unsigned source,
                       MetadataPath &&path, MetadataState state);
 
-  const Fulfillment *getTypeMetadata(CanType type) const {
-    auto it = Fulfillments.find({type, nullptr});
+  const Fulfillment *getFulfillment(GenericRequirement key) const {
+    auto it = Fulfillments.find(key);
     if (it != Fulfillments.end()) {
       return &it->second;
     } else {
@@ -127,13 +151,16 @@ public:
     }
   }
 
+  const Fulfillment *getShape(CanType type) const {
+    return getFulfillment(GenericRequirement::forShape(type));
+  }
+
+  const Fulfillment *getTypeMetadata(CanType type) const {
+    return getFulfillment(GenericRequirement::forMetadata(type));
+  }
+
   const Fulfillment *getWitnessTable(CanType type, ProtocolDecl *proto) const {
-    auto it = Fulfillments.find({type, proto});
-    if (it != Fulfillments.end()) {
-      return &it->second;
-    } else {
-      return nullptr;
-    }
+    return getFulfillment(GenericRequirement::forWitnessTable(type, proto));
   }
 
   void dump() const;

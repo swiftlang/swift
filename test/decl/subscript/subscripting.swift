@@ -152,16 +152,16 @@ protocol ProtocolGetSet4 {
 }
 
 protocol ProtocolWillSetDidSet1 {
-  subscript(i: Int) -> Int { willSet } // expected-error {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
+  subscript(i: Int) -> Int { willSet } // expected-error {{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet2 {
-  subscript(i: Int) -> Int { didSet } // expected-error {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
+  subscript(i: Int) -> Int { didSet } // expected-error {{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet3 {
-  subscript(i: Int) -> Int { willSet didSet } // expected-error 2 {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
+  subscript(i: Int) -> Int { willSet didSet } // expected-error 2 {{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 protocol ProtocolWillSetDidSet4 {
-  subscript(i: Int) -> Int { didSet willSet } // expected-error 2 {{expected get or set in a protocol property}} expected-error {{subscript declarations must have a getter}}
+  subscript(i: Int) -> Int { didSet willSet } // expected-error 2 {{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}} expected-error {{subscript declarations must have a getter}}
 }
 
 class DidSetInSubscript {
@@ -226,7 +226,7 @@ struct RetOverloadedSubscript {
 
 struct MissingGetterSubscript1 {
   subscript (i : Int) -> Int {
-  } // expected-error {{missing return in subscript expected to return 'Int'}}
+  } // missing return expectations moved to `SILOptimizer/missing_returns`
 }
 struct MissingGetterSubscript2 {
   subscript (i : Int, j : Int) -> Int {
@@ -320,7 +320,7 @@ struct MutableComputedGetter {
 struct MutableSubscriptInGetter {
   var value: Int
   subscript(index: Int) -> Int {
-    get { // expected-note {{mark accessor 'mutating' to make 'self' mutable}}
+    get { // expected-note {{mark getter 'mutating' to make 'self' mutable}}
       value = 5 // expected-error{{cannot assign to property: 'self' is immutable}}
       return 5
     }
@@ -412,7 +412,7 @@ struct SubscriptTest2 {
 }
 
 func testSubscript1(_ s2 : SubscriptTest2) {
-  _ = s2["foo"] // expected-error {{missing argument for parameter #2 in call}}
+  _ = s2["foo"] // expected-error {{missing argument for parameter #2 in subscript}}
 
   let a = s2["foo", 1.0] // expected-error {{no exact matches in call to subscript}}
 
@@ -424,7 +424,8 @@ func testSubscript1(_ s2 : SubscriptTest2) {
   let v: (Int?, [Int]?) = (nil [17]) // expected-error {{cannot subscript a nil literal value}}
 }
 
-// sr-114 & rdar://22007370
+// rdar://22007370
+// https://github.com/apple/swift/issues/42736
 
 class Foo {
     subscript(key: String) -> String { // expected-note {{'subscript(_:)' previously declared here}}
@@ -447,29 +448,31 @@ protocol r23952125 {
   var c : Int // expected-error {{property in protocol must have explicit { get } or { get set } specifier}} {{14-14= { get <#set#> \}}}
 }
 
-// SR-2575
-struct SR2575 {
-  subscript() -> Int { // expected-note {{declared here}}
-    return 1
+// https://github.com/apple/swift/issues/45180
+do {
+  struct S {
+    subscript() -> Int { // expected-note {{declared here}}
+      return 1
+    }
   }
+
+  S().subscript()
+  // expected-error@-1 {{value of type 'S' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{6-7=}} {{7-16=}} {{16-17=[}} {{17-18=]}}
 }
 
-SR2575().subscript()
-// expected-error@-1 {{value of type 'SR2575' has no property or method named 'subscript'; did you mean to use the subscript operator?}} {{9-10=}} {{10-19=}} {{19-20=[}} {{20-21=]}}
-
-// SR-7890
+// https://github.com/apple/swift/issues/50425
 
 struct InOutSubscripts {
   subscript(x1: inout Int) -> Int { return 0 }
-  // expected-error@-1 {{'inout' must not be used on subscript parameters}}
+  // expected-error@-1 {{'inout' may only be used on function or initializer parameters}}
 
   subscript(x2: inout Int, y2: inout Int) -> Int { return 0 }
-  // expected-error@-1 2{{'inout' must not be used on subscript parameters}}
+  // expected-error@-1 2{{'inout' may only be used on function or initializer parameters}}
 
   subscript(x3: (inout Int) -> ()) -> Int { return 0 } // ok
   subscript(x4: (inout Int, inout Int) -> ()) -> Int { return 0 } // ok
 
   subscript(inout x5: Int) -> Int { return 0 }
   // expected-error@-1 {{'inout' before a parameter name is not allowed, place it before the parameter type instead}}
-  // expected-error@-2 {{'inout' must not be used on subscript parameters}}
+  // expected-error@-2 {{'inout' may only be used on function or initializer parameters}}
 }

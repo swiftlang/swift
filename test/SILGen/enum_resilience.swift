@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
-// RUN: %target-swift-emit-silgen -module-name enum_resilience -I %t -enable-library-evolution %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name enum_resilience -I %t -enable-library-evolution %s | %FileCheck %s
 
 import resilient_enum
 
@@ -11,7 +11,7 @@ import resilient_enum
 
 // CHECK-LABEL: sil hidden [ossa] @$s15enum_resilience15resilientSwitchyy0c1_A06MediumOF : $@convention(thin) (@in_guaranteed Medium) -> ()
 // CHECK:         [[BOX:%.*]] = alloc_stack $Medium
-// CHECK-NEXT:    copy_addr %0 to [initialization] [[BOX]]
+// CHECK-NEXT:    copy_addr %0 to [init] [[BOX]]
 // CHECK-NEXT:    [[METATYPE:%.+]] = value_metatype $@thick Medium.Type, [[BOX]] : $*Medium
 // CHECK-NEXT:    switch_enum_addr [[BOX]] : $*Medium, case #Medium.Paper!enumelt: bb1, case #Medium.Canvas!enumelt: bb2, case #Medium.Pamphlet!enumelt: bb3, case #Medium.Postcard!enumelt: bb4, default bb5
 // CHECK:       bb1:
@@ -119,13 +119,13 @@ public enum MyResilientEnum {
   // CHECK-LABEL: sil hidden [ossa] @$s15enum_resilience15MyResilientEnumOACycfC : $@convention(method) (@thin MyResilientEnum.Type) -> @out MyResilientEnum
   // CHECK:       [[SELF_BOX:%.*]] = alloc_box ${ var MyResilientEnum }, var, name "self"
   // CHECK:       [[SELF_TMP:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var MyResilientEnum }
-  // CHECK:       [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[SELF_TMP]]
-  // CHECK:       [[SELF_ADDR:%.*]] = project_box [[SELF_LIFETIME]] : ${ var MyResilientEnum }, 0
+  // CHECK:       [[LIFETIME:%.*]] = begin_borrow [var_decl] [[SELF_TMP]]
+  // CHECK:       [[SELF_ADDR:%.*]] = project_box [[LIFETIME]] : ${ var MyResilientEnum }, 0
   // CHECK:       [[NEW_SELF:%.*]] = enum $MyResilientEnum, #MyResilientEnum.loki!enumelt
   // CHECK:       [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_ADDR]] : $*MyResilientEnum
   // CHECK:       assign [[NEW_SELF]] to [[ACCESS]] : $*MyResilientEnum
   // CHECK:       end_access [[ACCESS]] : $*MyResilientEnum
-  // CHECK:       copy_addr [[SELF_ADDR]] to [initialization] %0 : $*MyResilientEnum
+  // CHECK:       copy_addr [[SELF_ADDR]] to [init] %0 : $*MyResilientEnum
   // CHECK:       destroy_value [[SELF_TMP]] : ${ var MyResilientEnum }
   // CHECK:       return
   init() {
@@ -148,7 +148,7 @@ public enum MoreHorses {
   // CHECK-LABEL: sil hidden [ossa] @$s15enum_resilience10MoreHorsesOACycfC : $@convention(method) (@thin MoreHorses.Type) -> @out MoreHorses
   // CHECK:       [[SELF_BOX:%.*]] = alloc_box ${ var MoreHorses }, var, name "self"
   // CHECK:       [[SELF_TMP:%.*]] = mark_uninitialized [delegatingself] [[SELF_BOX]] : ${ var MoreHorses }
-  // CHECK:       [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [[SELF_TMP]]
+  // CHECK:       [[SELF_LIFETIME:%.*]] = begin_borrow [lexical] [var_decl] [[SELF_TMP]]
   // CHECK:       [[SELF_ADDR:%.*]] = project_box [[SELF_LIFETIME]] : ${ var MoreHorses }, 0
   // CHECK:       [[BUILTIN_INT:%.*]] = integer_literal $Builtin.IntLiteral, 0
   // CHECK:       [[INT_METATYPE:%.*]] = metatype $@thin Int.Type
@@ -158,7 +158,7 @@ public enum MoreHorses {
   // CHECK:       [[ACCESS:%.*]] = begin_access [modify] [unknown] [[SELF_ADDR]] : $*MoreHorses
   // CHECK:       assign [[NEW_SELF]] to [[ACCESS]] : $*MoreHorses
   // CHECK:       end_access [[ACCESS]] : $*MoreHorses
-  // CHECK:       copy_addr [[SELF_ADDR]] to [initialization] %0 : $*MoreHorses
+  // CHECK:       copy_addr [[SELF_ADDR]] to [init] %0 : $*MoreHorses
   // CHECK:       destroy_value [[SELF_TMP]] : ${ var MoreHorses }
   // CHECK:       return
   init() {
@@ -198,7 +198,7 @@ public func resilientIfCase(_ e: MyResilientEnum) -> Bool {
 
 // CHECK-LABEL: sil [serialized] [ossa] @$s15enum_resilience15inlinableSwitchyyAA15MyResilientEnumOF : $@convention(thin) (@in_guaranteed MyResilientEnum) -> ()
 // CHECK:      [[ENUM:%.*]] = alloc_stack $MyResilientEnum
-// CHECK:      copy_addr %0 to [initialization] [[ENUM]] : $*MyResilientEnum
+// CHECK:      copy_addr %0 to [init] [[ENUM]] : $*MyResilientEnum
 // CHECK:      switch_enum_addr [[ENUM]] : $*MyResilientEnum, case #MyResilientEnum.kevin!enumelt: bb1, case #MyResilientEnum.loki!enumelt: bb2, default bb3
 // CHECK:      return
 @inlinable public func inlinableSwitch(_ e: MyResilientEnum) {

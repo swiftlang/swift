@@ -1,6 +1,6 @@
 #include "swift/ABI/Metadata.h"
 #include "swift/Demangling/Demangle.h"
-#include "swift/Reflection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "swift/Remote/MetadataReader.h"
 #include "swift/Remote/InProcessMemoryReader.h"
 

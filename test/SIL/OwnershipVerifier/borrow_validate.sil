@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -disable-swift-verification -sil-ownership-verifier-enable-testing -ownership-verifier-textual-error-dumper -enable-sil-verify-all=0 %s -o /dev/null 2>&1 | %FileCheck %s
 // REQUIRES: asserts
 
 import Builtin
@@ -528,24 +528,6 @@ bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
   return %ret : $()
 }
 
-// CHECK-NOT: Function: 'infinite_loop'
-sil [ossa] @infinite_loop : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
-bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
-  cond_br undef, bb1, bb4
-
-bb1:
-  %copy0 = copy_value %0 : $WrapperStruct
-  %borrow0 = begin_borrow %copy0 : $WrapperStruct
-  br bb3(%borrow0 : $WrapperStruct, %copy0 : $WrapperStruct)
-
-bb3(%newborrow : @guaranteed $WrapperStruct, %newowned : @owned $WrapperStruct):
-  br bb3(%newborrow : $WrapperStruct, %newowned : $WrapperStruct)
-
-bb4:
-  %ret = tuple ()
-  return %ret : $()
-}
-
 // CHECK-NOT: Function: 'diamond_within_loop'
 sil [ossa] @diamond_within_loop : $@convention(thin) (@guaranteed WrapperStruct, @guaranteed WrapperStruct) -> () {
 bb0(%0 : @guaranteed $WrapperStruct, %1 : @guaranteed $WrapperStruct):
@@ -685,13 +667,15 @@ bb1:
   return %9999 : $()
 
 bb2:
+  end_borrow %1
+  destroy_value [dead_end] %0
   unreachable
 }
 
 // CHECK-NOT: Function: 'test_borrow_checked_cast_switch_enum_control_flow'
 sil [ossa] @test_borrow_checked_cast_switch_enum_control_flow : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  checked_cast_br %0 : $Klass to SuperKlass, bb1, bb2
+  checked_cast_br Klass in %0 : $Klass to SuperKlass, bb1, bb2
 
 bb1(%1 : @owned $SuperKlass):
   destroy_value %1 : $SuperKlass
@@ -721,7 +705,7 @@ bb3(%borrow : @guaranteed $FakeOptional<Klass>, %mKlass : @owned $FakeOptional<K
 // CHECK-NOT: Error#: {{[0-9][0-9]*}}. End Error in Function: 'test_borrow_checked_cast_switch_enum_control_flow_incorrect'
 sil [ossa] @test_borrow_checked_cast_switch_enum_control_flow_incorrect : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
-  checked_cast_br %0 : $Klass to SuperKlass, bb1, bb2
+  checked_cast_br Klass in %0 : $Klass to SuperKlass, bb1, bb2
 
 bb1(%1 : @owned $SuperKlass):
   destroy_value %1 : $SuperKlass
@@ -767,4 +751,44 @@ bb3(%borrowphi : @guaranteed $Klass):
   destroy_value %alloc : $Klass
   %99 = tuple ()
   return %99 : $()
+}
+
+// CHECK: Error#: 0. Begin Error in Function: 'test_scope_end_order1'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %3 = begin_borrow %1 : $Klass                   // users: %5, %4
+// CHECK: Consuming User:   end_borrow %3 : $Klass                          // id: %5
+// CHECK: Non Consuming User:   end_borrow %4 : $*Klass                         // id: %6
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'test_scope_end_order1'
+sil [ossa] @test_scope_end_order1 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %copy = copy_value %0 : $Klass
+  %stk = alloc_stack $Klass
+  %borrow = begin_borrow %copy : $Klass
+  %ra = store_borrow %borrow to %stk : $*Klass
+  end_borrow %borrow : $Klass
+  end_borrow %ra : $*Klass
+  destroy_value %copy : $Klass
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
+}
+
+// CHECK: Error#: 0. Begin Error in Function: 'test_scope_end_order2'
+// CHECK: Found outside of lifetime use?!
+// CHECK: Value:   %2 = load_borrow %0 : $*Klass                   // users: %4, %3
+// CHECK: Consuming User:   end_borrow %2 : $Klass                          // id: %4
+// CHECK: Non Consuming User:   end_borrow %3 : $*Klass                         // id: %5
+// CHECK: Block: bb0
+// CHECK: Error#: 0. End Error in Function: 'test_scope_end_order2'
+sil [ossa] @test_scope_end_order2 : $@convention(thin) (@in_guaranteed Klass) -> () {
+bb0(%0 : $*Klass):
+  %stk = alloc_stack $Klass
+  %borrow = load_borrow %0 : $*Klass
+  %ra = store_borrow %borrow to %stk : $*Klass
+  end_borrow %borrow : $Klass
+  end_borrow %ra : $*Klass
+  dealloc_stack %stk : $*Klass
+  %1 = tuple ()
+  return %1 : $()
 }

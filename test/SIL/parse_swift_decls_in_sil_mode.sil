@@ -2,7 +2,7 @@
 
 typealias Int = ()
 
-deinit // expected-error {{deinitializers may only be declared within a class or actor}}
+deinit // expected-error {{deinitializers may only be declared within a class, actor, or noncopyable type}}
 
 subscript (x : Int, y : Int) -> Int { get }// expected-error{{'subscript' functions may only be declared within a type}}
 

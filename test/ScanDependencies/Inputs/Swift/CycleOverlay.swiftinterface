@@ -1,0 +1,4 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name CycleOverlay
+import Swift
+import CycleSwiftMiddle

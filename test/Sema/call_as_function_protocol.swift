@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift
 
 protocol P0 {
-  // expected-note @+1 {{protocol requires function 'callAsFunction()' with type '() -> Missing'; do you want to add a stub?}}
+  // expected-note @+1 {{protocol requires function 'callAsFunction()' with type '() -> Missing'}}
   func callAsFunction() -> Self
 }
 func testProtocol(_ x: P0) {
@@ -28,6 +28,7 @@ extension P2 {
   }
 }
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error @+1 {{type 'Missing' does not conform to protocol 'P0'}}
 struct Missing : P0 {}
 struct S0 : P0 {

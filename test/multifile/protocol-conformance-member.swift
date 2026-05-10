@@ -4,9 +4,9 @@
 
 // CHECK: Name: {{_?}}$s4Test10CoolStructV10coolFactorSdvg
 
-// SR-156: Make sure we synthesize getters for members used as protocol
-// witnesses. Check that we link correctly; we don't care which file
-// synthesizes it.
+// https://github.com/apple/swift/issues/42778
+// Make sure we synthesize getters for members used as protocol witnesses.
+// Check that we link correctly; we don't care which file synthesizes it.
 
 protocol CoolStructProtocol {
   var coolFactor: Double { get }

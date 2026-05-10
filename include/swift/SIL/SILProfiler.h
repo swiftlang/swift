@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -31,15 +31,64 @@ class SILCoverageMap;
 class SILFunction;
 class SILModule;
 
-/// Returns whether the given AST node requires profiling instrumentation.
-bool doesASTRequireProfiling(SILModule &M, ASTNode N);
+/// A reference to a given profiler counter.
+class ProfileCounterRef final {
+public:
+  enum class Kind : uint8_t {
+    /// References an ASTNode.
+    Node,
+
+    /// References the error branch for an apply or access.
+    ErrorBranch
+  };
+
+private:
+  friend struct llvm::DenseMapInfo<ProfileCounterRef>;
+
+  ASTNode Node;
+  Kind RefKind;
+
+  ProfileCounterRef(ASTNode node, Kind kind) : Node(node), RefKind(kind) {}
+
+public:
+  /// A profile counter that is associated with a given ASTNode.
+  static ProfileCounterRef node(ASTNode node) {
+    assert(node && "Must have non-null ASTNode");
+    return ProfileCounterRef(node, Kind::Node);
+  }
+
+  /// A profile counter that is associated with the error branch of a particular
+  /// error-throwing AST node.
+  static ProfileCounterRef errorBranchOf(ASTNode node) {
+    return ProfileCounterRef(node, Kind::ErrorBranch);
+  }
+
+  /// Retrieve the corresponding location of the counter.
+  SILLocation getLocation() const;
+
+  SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &OS) const;
+
+  /// A simpler dump output for inline printing.
+  void dumpSimple(raw_ostream &OS) const;
+
+  friend bool operator==(const ProfileCounterRef &lhs,
+                         const ProfileCounterRef &rhs) {
+    return lhs.Node == rhs.Node && lhs.RefKind == rhs.RefKind;
+  }
+  friend bool operator!=(const ProfileCounterRef &lhs,
+                         const ProfileCounterRef &rhs) {
+    return !(lhs == rhs);
+  }
+  friend llvm::hash_code hash_value(const ProfileCounterRef &ref) {
+    return llvm::hash_combine(ref.Node, ref.RefKind);
+  }
+};
 
 /// SILProfiler - Maps AST nodes to profile counters.
 class SILProfiler : public SILAllocated<SILProfiler> {
 private:
   SILModule &M;
-
-  ASTNode Root;
 
   SILDeclRef forDecl;
 
@@ -55,25 +104,26 @@ private:
 
   unsigned NumRegionCounters = 0;
 
-  llvm::DenseMap<ASTNode, unsigned> RegionCounterMap;
+  llvm::DenseMap<ProfileCounterRef, unsigned> RegionCounterMap;
 
-  llvm::DenseMap<ASTNode, ProfileCounter> RegionLoadedCounterMap;
+  llvm::DenseMap<ProfileCounterRef, ProfileCounter> RegionLoadedCounterMap;
 
   llvm::DenseMap<ASTNode, ASTNode> RegionCondToParentMap;
 
   std::vector<std::tuple<std::string, uint64_t, std::string>> CoverageData;
 
-  SILProfiler(SILModule &M, ASTNode Root, SILDeclRef forDecl,
-              bool EmitCoverageMapping)
-      : M(M), Root(Root), forDecl(forDecl),
-        EmitCoverageMapping(EmitCoverageMapping) {}
+  SILProfiler(SILModule &M, SILDeclRef forDecl, bool EmitCoverageMapping)
+      : M(M), forDecl(forDecl), EmitCoverageMapping(EmitCoverageMapping) {}
 
 public:
-  static SILProfiler *create(SILModule &M, ForDefinition_t forDefinition,
-                             ASTNode N, SILDeclRef forDecl);
+  static SILProfiler *create(SILModule &M, SILDeclRef Ref);
 
   /// Check if the function is set up for profiling.
   bool hasRegionCounters() const { return NumRegionCounters != 0; }
+
+  /// Get the execution count corresponding to \p Ref from a profile, if one
+  /// is available.
+  ProfileCounter getExecutionCount(ProfileCounterRef Ref);
 
   /// Get the execution count corresponding to \p Node from a profile, if one
   /// is available.
@@ -81,7 +131,7 @@ public:
 
   /// Get the node's parent ASTNode (e.g to get the parent IfStmt or IfCond of
   /// a condition), if one is available.
-  Optional<ASTNode> getPGOParent(ASTNode Node);
+  std::optional<ASTNode> getPGOParent(ASTNode Node);
 
   /// Get the function name mangled for use with PGO.
   StringRef getPGOFuncName() const { return PGOFuncName; }
@@ -92,9 +142,13 @@ public:
   /// Get the number of region counters.
   unsigned getNumRegionCounters() const { return NumRegionCounters; }
 
-  /// Get the mapping from \c ASTNode to its corresponding profile counter.
-  const llvm::DenseMap<ASTNode, unsigned> &getRegionCounterMap() const {
-    return RegionCounterMap;
+  /// Retrieve the counter index for a given counter reference, asserting that
+  /// it is present.
+  unsigned getCounterIndexFor(ProfileCounterRef ref);
+
+  /// Whether a counter has been recorded for the given counter reference.
+  bool hasCounterFor(ProfileCounterRef ref) {
+    return RegionCounterMap.contains(ref);
   }
 
 private:
@@ -103,5 +157,28 @@ private:
 };
 
 } // end namespace swift
+
+namespace llvm {
+using swift::ProfileCounterRef;
+using swift::ASTNode;
+
+template <> struct DenseMapInfo<ProfileCounterRef> {
+  static inline ProfileCounterRef getEmptyKey() {
+    return ProfileCounterRef(DenseMapInfo<ASTNode>::getEmptyKey(),
+                             ProfileCounterRef::Kind::Node);
+  }
+  static inline ProfileCounterRef getTombstoneKey() {
+    return ProfileCounterRef(DenseMapInfo<ASTNode>::getTombstoneKey(),
+                             ProfileCounterRef::Kind::Node);
+  }
+  static unsigned getHashValue(const ProfileCounterRef &ref) {
+    return hash_value(ref);
+  }
+  static bool isEqual(const ProfileCounterRef &lhs,
+                      const ProfileCounterRef &rhs) {
+    return lhs == rhs;
+  }
+};
+} // end namespace llvm
 
 #endif // SWIFT_SIL_PROFILER_H

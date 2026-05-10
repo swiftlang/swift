@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -15,14 +15,16 @@ func setChildren(p: Parent, c: Child) {
   p.children = [c]
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s19objc_bridging_array11setChildren1p1cyAA6Parent_p_AA5ChildCtF : $@convention(thin) (@guaranteed Parent, @guaranteed Child) -> () {
-// CHECK: [[OPENED:%.*]] = open_existential_ref %0 : $Parent to $[[OPENED_TYPE:.* Parent]]
+// CHECK-LABEL: sil hidden [ossa] @$s19objc_bridging_array11setChildren1p1cyAA6Parent_p_AA5ChildCtF : $@convention(thin) (@guaranteed any Parent, @guaranteed Child) -> () {
+// CHECK: [[OPENED:%.*]] = open_existential_ref %0 : $any Parent to $[[OPENED_TYPE:@opened\(.*, any Parent\) Self]]
 // CHECK: [[COPIED:%.*]] = copy_value [[OPENED]] : $[[OPENED_TYPE]]
 // CHECK: [[LENGTH:%.*]] = integer_literal $Builtin.Word, 1
 // CHECK: [[FN:%.*]] = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: [[ARRAY_AND_BUFFER:%.*]] = apply [[FN]]<Child>([[LENGTH]]) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer)
 // CHECK: ([[ARRAY:%.*]], [[BUFFER_PTR:%.*]]) = destructure_tuple [[ARRAY_AND_BUFFER]] : $(Array<Child>, Builtin.RawPointer)
-// CHECK: [[BUFFER:%.*]] = pointer_to_address [[BUFFER_PTR]] : $Builtin.RawPointer to [strict] $*Child
+// CHECK: [[BB:%.*]] = begin_borrow [[ARRAY]]
+// CHECK:            = struct_extract [[BB]]
+// CHECK: [[BUFFER:%.*]] = ref_tail_addr
 // CHECK: [[CHILD:%.*]] = copy_value %1 : $Child
 // CHECK: store [[CHILD]] to [init] [[BUFFER]] : $*Child
 // CHECK: [[FIN_FN:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF

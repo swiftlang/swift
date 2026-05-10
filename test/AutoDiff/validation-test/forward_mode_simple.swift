@@ -1,5 +1,8 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-forward-mode-differentiation)
 // REQUIRES: executable_test
+/* Temporary disabled until https://github.com/swiftlang/swift/issues/84840 is fixed
+   We cannot use `Tracked<T>` :( */
+// XFAIL: *
 
 import StdlibUnittest
 import DifferentiationUnittest
@@ -361,7 +364,7 @@ ForwardModeTests.test("TupleNonDifferentiableElements") {
     tuple.2 = x
     return tuple.1.1 * tuple.2
   }
-  // FIXME(SR-12911): Fix runtime segfault.
+  // FIXME: Fix runtime segfault (https://github.com/apple/swift/issues/55357).
   // expectEqual((16, 8), valueWithDerivative(at: 4, of: nested))
 
   struct Wrapper<T> {
@@ -746,7 +749,7 @@ ForwardModeTests.test("SimpleWrtSelf") {
     // FIXME(TF-648): Dummy to make `Super.AllDifferentiableVariables` be nontrivial.
     var _nontrivial: [Float] = []
 
-    // FIXME(SR-12175): Fix forward-mode differentiation tangent buffer crash.
+    // FIXME: Fix forward-mode differentiation tangent buffer crash (https://github.com/apple/swift/issues/54600).
     // @differentiable(reverse)
     required init(base: Float) {
       self.base = base
@@ -792,7 +795,7 @@ ForwardModeTests.test("SimpleWrtSelf") {
     }
   }
 
-    // FIXME(SR-12175): Fix forward-mode differentiation tangent buffer crash.
+  // FIXME: Fix forward-mode differentiation tangent buffer crash (https://github.com/apple/swift/issues/54600).
   // let v = Super.TangentVector(base: 100, _nontrivial: [])
   // expectEqual(100, pullback(at: 1337) { x in Super(base: x) }(v))
   // expectEqual(100, pullback(at: 1337) { x in SubOverride(base: x) }(v))
@@ -1070,7 +1073,7 @@ ForwardModeTests.test("ResultSelection") {
   expectEqual(1, derivative(at: 3, 3, of: { x, y in tuple(x, y).0 }))
   expectEqual(1, derivative(at: 3, 3, of: { x, y in tuple(x, y).1 }))
 
-  // FIXME(SR-12175): Fix forward-mode differentiation tangent buffer crash.
+  // FIXME: Fix forward-mode differentiation tangent buffer crash (https://github.com/apple/swift/issues/54600).
   /*
   func tupleGeneric<T>(_ x: T, _ y: T) -> (T, T) {
     return (x, y)
@@ -1320,28 +1323,13 @@ ForwardModeTests.test("ForceUnwrapping") {
 }
 
 ForwardModeTests.test("NonVariedResult") {
-  @differentiable(reverse, wrt: x)
-  func nonWrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
-    y = x
-  }
-
   @differentiable(reverse)
   func wrtInoutParam<T: Differentiable>(_ x: T, _ y: inout T) {
     y = x
   }
 
-  @differentiable(reverse, wrt: x)
-  func nonWrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
-
-  @differentiable(reverse, wrt: x)
+  @differentiable(reverse, wrt: (x, y))
   func wrtInoutParamNonVaried<T: Differentiable>(_ x: T, _ y: inout T) {}
-
-  @differentiable(reverse)
-  func variedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
-    var result: Tracked<Float> = 0
-    nonWrtInoutParam(x, &result)
-    return result
-  }
 
   @differentiable(reverse)
   func variedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
@@ -1352,13 +1340,6 @@ ForwardModeTests.test("NonVariedResult") {
 
   @differentiable(reverse)
   func nonVariedResultTracked(_ x: Tracked<Float>) -> Tracked<Float> {
-    var result: Tracked<Float> = 0
-    nonWrtInoutParamNonVaried(x, &result)
-    return result
-  }
-
-  @differentiable(reverse)
-  func nonVariedResultTracked2(_ x: Tracked<Float>) -> Tracked<Float> {
     // expected-warning @+1 {{variable 'result' was never mutated}}
     var result: Tracked<Float> = 0
     return result
@@ -1389,15 +1370,16 @@ ForwardModeTests.test("ApplyNonActiveIndirectResult") {
   expectEqual(1.0, derivative(at: 2, of: applyNonactiveArgumentActiveIndirectResult))
 }
 
-ForwardModeTests.test("SR-13530") {
-  // SR-13530: Test "leaked owned value" ownership verification failure related
-  // to differential generation for `copy_value` instruction.
+ForwardModeTests.test("https://github.com/apple/swift/issues/55967") {
+  // https://github.com/apple/swift/issues/55967
+  // Test "leaked owned value" ownership verification failure related to
+  // differential generation for `copy_value` instruction.
   @differentiable(reverse)
-  func SR_13530(_ x: NonresilientTracked<Float>) -> NonresilientTracked<Float> {
+  func f(_ x: NonresilientTracked<Float>) -> NonresilientTracked<Float> {
     precondition(x >= 0)
     return x
   }
-  expectEqual(1, derivative(at: 2, of: SR_13530))
+  expectEqual(1, derivative(at: 2, of: f))
 }
 
 runAllTests()

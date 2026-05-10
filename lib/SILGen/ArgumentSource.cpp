@@ -17,6 +17,8 @@
 #include "ArgumentSource.h"
 #include "Conversion.h"
 #include "Initialization.h"
+#include "swift/Basic/Assertions.h"
+#include "clang/AST/DeclCXX.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -81,8 +83,10 @@ ManagedValue ArgumentSource::getAsSingleValue(SILGenFunction &SGF,
                                               SILType loweredTy,
                                               SGFContext C) && {
   auto substFormalType = getSubstRValueType();
+  auto loweredFormalTy = SGF.getLoweredType(substFormalType);
   auto conversion =
-    Conversion::getSubstToOrig(origFormalType, substFormalType, loweredTy);
+    Conversion::getSubstToOrig(origFormalType, substFormalType,
+                               loweredFormalTy, loweredTy);
   return std::move(*this).getConverted(SGF, conversion, C);
 }
 
@@ -163,9 +167,10 @@ ManagedValue ArgumentSource::materialize(SILGenFunction &SGF,
                                          AbstractionPattern origFormalType,
                                          SILType destType) && {
   auto substFormalType = getSubstRValueType();
-  assert(!destType || destType.getObjectType() ==
-               SGF.getLoweredType(origFormalType,
-                                  substFormalType).getObjectType());
+  assert(
+      !destType ||
+      destType.getObjectType() ==
+          SGF.getLoweredType(origFormalType, substFormalType).getObjectType());
 
   // Fast path: if the types match exactly, no abstraction difference
   // is possible and we can just materialize as normal.
@@ -329,6 +334,91 @@ ArgumentSource ArgumentSource::copyForDiagnostics() const {
     return {getKnownRValueLocation(), asKnownRValue().copyForDiagnostics()};
   case Kind::Expr:
     return asKnownExpr();
+  }
+  llvm_unreachable("bad kind");
+}
+
+ArgumentSourceExpansion::ArgumentSourceExpansion(SILGenFunction &SGF,
+                                                 ArgumentSource &&arg,
+                                                 bool vanishes) {
+  if (vanishes) {
+    StoredKind = Kind::Vanishing;
+    Storage.emplace<ArgumentSource *>(StoredKind, &arg);
+#ifndef NDEBUG
+    NumRemainingElements = 1;
+#endif
+    return;
+  }
+
+#ifndef NDEBUG
+  NumRemainingElements =
+    cast<TupleType>(arg.getSubstRValueType())->getNumElements();
+#endif
+
+  // If we have an expression, check whether it's something we can
+  // naturally split.
+  assert(!arg.isLValue());
+  Expr *expr = nullptr;
+  if (arg.isExpr()) {
+    expr = std::move(arg).asKnownExpr()->getSemanticsProvidingExpr();
+
+    // Currently, the only case of this is a tuple literal.
+    if (auto tupleExpr = dyn_cast<TupleExpr>(expr)) {
+      StoredKind = Kind::TupleExpr;
+      Storage.emplace<TupleExpr*>(StoredKind, tupleExpr);
+      return;
+    }
+  }
+
+  // Otherwise, get the arg as an r-value and extract the elements.
+  // The location will be overwritten in the cases below.
+  StoredKind = Kind::ElementRValues;
+  auto &rvalues = Storage.emplace<ElementRValuesStorage>(StoredKind,
+                                                         SILLocation::invalid());
+
+  // This may require emitting the expression if we had a non-TupleExpr
+  // expression above.
+  if (expr) {
+    rvalues.Loc = expr;
+    auto rvalue = SGF.emitRValue(expr);
+    std::move(rvalue).extractElements(rvalues.Elements);
+  } else {
+    rvalues.Loc = arg.getKnownRValueLocation();
+    std::move(arg).asKnownRValue(SGF).extractElements(rvalues.Elements);
+  }
+  assert(rvalues.Elements.size() == NumRemainingElements);
+}
+
+void ArgumentSourceExpansion::withElement(unsigned i,
+                 llvm::function_ref<void (ArgumentSource &&)> function) {
+#ifndef NDEBUG
+  assert(NumRemainingElements > 0);
+  NumRemainingElements--;
+#endif
+  switch (StoredKind) {
+  case Kind::ElementRValues: {
+    auto &storage = Storage.get<ElementRValuesStorage>(StoredKind);
+    auto &eltRV = storage.Elements[i];
+    assert(!eltRV.isNull());
+    function(ArgumentSource(storage.Loc, std::move(eltRV)));
+#ifndef NDEBUG
+    eltRV = RValue();
+#endif
+    return;
+  }
+
+  case Kind::TupleExpr: {
+    auto expr = Storage.get<TupleExpr*>(StoredKind);
+    function(ArgumentSource(expr->getElement(i)));
+    return;
+  }
+
+  case Kind::Vanishing: {
+    assert(NumRemainingElements == 0);
+    auto &source = *Storage.get<ArgumentSource *>(StoredKind);
+    function(std::move(source));
+    return;
+  }
   }
   llvm_unreachable("bad kind");
 }

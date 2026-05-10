@@ -17,6 +17,8 @@
 
 #define DEBUG_TYPE "differentiation"
 
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Differentiation/TangentBuilder.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
@@ -34,11 +36,10 @@ void TangentBuilder::emitZeroIntoBuffer(SILLocation loc, SILValue buffer,
     }
     return;
   }
-  auto *swiftMod = getModule().getSwiftModule();
   // Look up conformance to `AdditiveArithmetic`.
   auto *additiveArithmeticProto = adContext.getAdditiveArithmeticProtocol();
   auto astType = buffer->getType().getASTType();
-  auto confRef = swiftMod->lookupConformance(astType, additiveArithmeticProto);
+  auto confRef = lookupConformance(astType, additiveArithmeticProto);
   assert(!confRef.isInvalid() && "Missing conformance to `AdditiveArithmetic`");
   SILDeclRef accessorDeclRef(adContext.getAdditiveArithmeticZeroGetter(),
                              SILDeclRef::Kind::Func);
@@ -95,9 +96,8 @@ void TangentBuilder::emitInPlaceAdd(
     return;
   }
   // Call the combiner function and return.
-  auto *swiftMod = getModule().getSwiftModule();
   auto astType = type.getASTType();
-  auto confRef = swiftMod->lookupConformance(
+  auto confRef = lookupConformance(
       astType, adContext.getAdditiveArithmeticProtocol());
   assert(!confRef.isInvalid() &&
          "Missing conformance to `AdditiveArithmetic`");
@@ -144,8 +144,7 @@ void TangentBuilder::emitAddIntoBuffer(SILLocation loc,
   auto *proto = adContext.getAdditiveArithmeticProtocol();
   auto *combinerFuncDecl = adContext.getPlusDecl();
   // Call the combiner function and return.
-  auto *swiftMod = getModule().getSwiftModule();
-  auto confRef = swiftMod->lookupConformance(astType, proto);
+  auto confRef = lookupConformance(astType, proto);
   assert(!confRef.isInvalid() &&
          "Missing conformance to `AdditiveArithmetic`");
   SILDeclRef declRef(combinerFuncDecl, SILDeclRef::Kind::Func);

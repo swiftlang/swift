@@ -40,7 +40,7 @@ bool SemanticARCOptVisitor::visitUncheckedOwnershipConversionInst(
     return false;
 
   auto op = uoci->getOperand();
-  auto opKind = op.getOwnershipKind();
+  auto opKind = op->getOwnershipKind();
   if (opKind != OwnershipKind::Owned && opKind != OwnershipKind::Guaranteed)
     return false;
 
@@ -56,7 +56,7 @@ bool SemanticARCOptVisitor::visitUncheckedOwnershipConversionInst(
 
   // Ok, now we need to perform our lifetime check.
   SmallVector<Operand *, 8> consumingUses(op->getConsumingUses());
-  LinearLifetimeChecker checker(ctx.getDeadEndBlocks());
+  LinearLifetimeChecker checker(&ctx.getDeadEndBlocks(),  /*instIndices=*/ nullptr);
   if (!checker.validateLifetime(op, consumingUses, newUses))
     return false;
 

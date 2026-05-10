@@ -1,12 +1,14 @@
 // RUN: %target-sil-opt %s -verify-continue-on-failure=true -o /dev/null 2>&1 | %FileCheck %s
 
+import Builtin
+
 class Klass {}
 
 sil @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
 
 // Write:   store {{.*}} [assign] {{.*}}
 // CHECK: Begin Error in function test_write_reborrow
-// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
+// CHECK: SIL verification failed: read-only scope invalidated by a local write
 // CHECK: End Error in function test_write_reborrow
 sil [ossa] @test_write_reborrow : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
@@ -15,7 +17,8 @@ bb0(%0 : @owned $Klass, %1 : @owned $Klass):
   %ld1 = load_borrow %stk : $*Klass
   br bb2(%ld1 : $Klass)
 
-bb2(%ld : @guaranteed $Klass):
+bb2(%ldarg : @guaranteed $Klass):
+  %ld = borrowed %ldarg : $Klass from ()
   store %1 to [assign] %stk : $*Klass
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
   %4 = apply %3(%ld) : $@convention(thin) (@guaranteed Klass) -> ()
@@ -26,13 +29,10 @@ bb2(%ld : @guaranteed $Klass):
   return %6 : $()
 }
 
-// CHECK: Write:   destroy_addr %2 : $*Klass
 // CHECK: Begin Error in function test_multiple_loadborrows
-// CHECK: SIL verification failed: Found load borrow that is invalidated by a local write?!: loadBorrowImmutabilityAnalysis.isImmutable(LBI)
+// CHECK: SIL verification failed: read-only scope invalidated by a local write
 // CHECK: Verifying instruction:
-// CHECK:      %2 = alloc_stack [lexical] $Klass
-// CHECK: ->   %14 = load_borrow %2 : $*Klass
-// CHECK:      br bb6(%14 : $Klass)
+// CHECK: ->  destroy_addr
 // CHECK: End Error in function test_multiple_loadborrows
 sil [ossa] @test_multiple_loadborrows : $@convention(thin) (@owned Klass, @owned Klass) -> () {
 bb0(%0 : @owned $Klass, %1 : @owned $Klass):
@@ -62,12 +62,41 @@ bb5:
   destroy_addr %stk : $*Klass
   br bb6(%ld2 : $Klass)
 
-bb6(%ld : @guaranteed $Klass):
+bb6(%ldarg : @guaranteed $Klass):
+  %ld = borrowed %ldarg : $Klass from ()
   %3 = function_ref @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
   %4 = apply %3(%ld) : $@convention(thin) (@guaranteed Klass) -> ()
   end_borrow %ld : $Klass
   dealloc_stack %stk : $*Klass
   %6 = tuple ()
   return %6 : $()
+}
+
+struct ArrayIntBuffer {
+  var storage : Builtin.NativeObject
+}
+
+struct MyArray<T> {
+  var buffer : ArrayIntBuffer
+}
+
+struct MyStruct {
+}
+
+// CHECK: Begin Error in function test_is_unique
+// CHECK: SIL verification failed: read-only scope invalidated by a local write
+// CHECK: -> %4 = is_unique %1 : $*ArrayIntBuffer
+// CHECK: End Error in function test_is_unique
+sil [ossa] @test_is_unique : $@convention(thin) (@in MyArray<MyStruct>) -> () {
+bb0(%0 : $*MyArray<MyStruct>):
+  %1 = struct_element_addr %0 : $*MyArray<MyStruct>, #MyArray.buffer
+  %2 = load_borrow %1 : $*ArrayIntBuffer
+  %3 = struct $MyArray<MyStruct>(%2 : $ArrayIntBuffer)
+  %6 = is_unique %1 : $*ArrayIntBuffer
+  %7 = struct $MyArray<MyStruct>(%2 : $ArrayIntBuffer)
+  end_borrow %2 : $ArrayIntBuffer
+  destroy_addr %0 : $*MyArray<MyStruct>
+  %t = tuple ()
+  return %t : $()
 }
 

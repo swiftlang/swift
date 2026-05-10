@@ -9,7 +9,7 @@
 // XFAIL: OS=windows-msvc
 
 import StdlibUnittest
-import Namespace
+import Namespaces
 import NamespaceExtensionLib
 
 var NamespacesTestSuite = TestSuite("Extension in library on namespace")

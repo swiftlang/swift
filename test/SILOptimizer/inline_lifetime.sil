@@ -1,8 +1,64 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -inline -enable-lexical-lifetimes | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -inline -enable-lexical-lifetimes | %FileCheck %s
 
 import Swift
 
 class C {}
+
+@_eagerMove
+class EagerC {}
+
+struct InferredEagerD1S1 {
+  var c1: EagerC
+  var c2: EagerC
+}
+
+struct InferredEagerD1S2 {
+  @_eagerMove var c1: C
+  var c2: EagerC
+}
+
+struct InferredEagerD1S3 {
+  @_eagerMove var c1: C
+  @_eagerMove let c2: C
+}
+
+struct InferredEagerD1S4 {
+  @_eagerMove var c1: (one: C, two: C)
+  @_eagerMove let c2: C
+}
+
+struct InferredEagerD2S1 {
+  var i1: InferredEagerD1S1
+  var i2: InferredEagerD1S2
+  var i3: InferredEagerD1S3
+  var i4: InferredEagerD1S4
+}
+
+@_noEagerMove
+struct LexicalS {
+  var i: InferredEagerD2S1
+}
+
+struct InferredLexicalD1S1 {
+  var c1: C
+  var c2: C
+  var c3: C
+  var c4: C
+}
+
+struct InferredLexicalD1S2 {
+  @_noEagerMove var i: InferredEagerD2S1
+}
+
+struct InferredLexicalD1S3 {
+  @_noEagerMove var i: InferredEagerD2S1
+  var j: InferredEagerD2S1
+}
+
+struct InferredLexicalD1S4 {
+  var i: C
+  var j: InferredEagerD2S1
+}
 
 struct S {}
 
@@ -12,32 +68,166 @@ struct S {}
 
 // declarations
 
-sil [ossa] [always_inline] @callee_owned : $@convention(thin) (@owned C) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned : $@convention(thin) (@owned C) -> () {
 entry(%instance : @owned $C):
     destroy_value %instance : $C
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> () {
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move : $@convention(thin) (@owned C) -> () {
+entry(%instance : @_eagerMove @owned $C):
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_annotation : $@convention(thin) (@owned EagerC) -> () {
+entry(%instance : @owned $EagerC):
+    destroy_value %instance : $EagerC
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d1_s1 : $@convention(thin) (@owned InferredEagerD1S1) -> () {
+entry(%instance : @owned $InferredEagerD1S1):
+    destroy_value %instance : $InferredEagerD1S1
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d1_s2 : $@convention(thin) (@owned InferredEagerD1S2) -> () {
+entry(%instance : @owned $InferredEagerD1S2):
+    destroy_value %instance : $InferredEagerD1S2
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d1_s3 : $@convention(thin) (@owned InferredEagerD1S3) -> () {
+entry(%instance : @owned $InferredEagerD1S3):
+    destroy_value %instance : $InferredEagerD1S3
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d1_s4 : $@convention(thin) (@owned InferredEagerD1S4) -> () {
+entry(%instance : @owned $InferredEagerD1S4):
+    destroy_value %instance : $InferredEagerD1S4
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_owned_eager_move__type_inferred_d2_s1 : $@convention(thin) (@owned InferredEagerD2S1) -> () {
+entry(%instance : @owned $InferredEagerD2S1):
+    destroy_value %instance : $InferredEagerD2S1
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_owned_lexical : $@convention(thin) (@owned InferredEagerD2S1) -> () {
+entry(%instance : @_lexical @owned $InferredEagerD2S1):
+    destroy_value %instance : $InferredEagerD2S1
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 entry(%instance : @guaranteed $C):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_trivial : $@convention(thin) (S) -> () {
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @_eagerMove @guaranteed $C):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_annotation : $@convention(thin) (@guaranteed EagerC) -> () {
+entry(%instance : @guaranteed $EagerC):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s1 : $@convention(thin) (@guaranteed InferredEagerD1S1) -> () {
+entry(%instance : @guaranteed $InferredEagerD1S1):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s2 : $@convention(thin) (@guaranteed InferredEagerD1S2) -> () {
+entry(%instance : @guaranteed $InferredEagerD1S2):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s3 : $@convention(thin) (@guaranteed InferredEagerD1S3) -> () {
+entry(%instance : @guaranteed $InferredEagerD1S3):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d1_s4 : $@convention(thin) (@guaranteed InferredEagerD1S4) -> () {
+entry(%instance : @guaranteed $InferredEagerD1S4):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_eager_move__type_inferred_d2_s1 : $@convention(thin) (@guaranteed InferredEagerD2S1) -> () {
+entry(%instance : @guaranteed $InferredEagerD2S1):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical : $@convention(thin) (@guaranteed InferredEagerD2S1) -> () {
+entry(%instance : @_lexical @guaranteed $InferredEagerD2S1):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_annotation : $@convention(thin) (@guaranteed LexicalS) -> () {
+entry(%instance : @guaranteed $LexicalS):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_inferred_d1_s1 : $@convention(thin) (@guaranteed InferredLexicalD1S1) -> () {
+entry(%instance : @guaranteed $InferredLexicalD1S1):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_inferred_d1_s2 : $@convention(thin) (@guaranteed InferredLexicalD1S2) -> () {
+entry(%instance : @guaranteed $InferredLexicalD1S2):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_inferred_d1_s3 : $@convention(thin) (@guaranteed InferredLexicalD1S3) -> () {
+entry(%instance : @guaranteed $InferredLexicalD1S3):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_guaranteed_lexical__type_inferred_d1_s4 : $@convention(thin) (@guaranteed InferredLexicalD1S4) -> () {
+entry(%instance : @guaranteed $InferredLexicalD1S4):
+    %retval = tuple ()
+    return %retval : $()
+}
+
+sil [ossa] [heuristic_always_inline] @callee_trivial : $@convention(thin) (S) -> () {
 entry(%instance : $S):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [ossa] [always_inline] @callee_in : $@convention(thin) (@in S) -> () {
+sil [ossa] [heuristic_always_inline] @callee_in : $@convention(thin) (@in S) -> () {
 entry(%instance : $*S):
     %retval = tuple ()
     return %retval : $()
 }
 
-sil [always_inline] [ossa] @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
+sil [heuristic_always_inline] [ossa] @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> () {
 entry(%arg : $*T):
   %retval = tuple ()
   return %retval : $()
@@ -55,9 +245,89 @@ entry(%instance : @owned $C):
     return %result : $()
 }
 
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_owned_eager_move : $@convention(thin) (@owned C) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_owned_eager_move'
+sil [ossa] @caller_owned_callee_owned_eager_move : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+    %callee_owned = function_ref @callee_owned_eager_move : $@convention(thin) (@owned C) -> ()
+    %result = apply %callee_owned(%instance) : $@convention(thin) (@owned C) -> ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_owned_eager_move__type_annotation : {{.*}} {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_owned_eager_move__type_annotation'
+sil [ossa] @caller_owned_callee_owned_eager_move__type_annotation : $@convention(thin) (@owned EagerC) -> () {
+entry(%instance : @owned $EagerC):
+    %callee_owned = function_ref @callee_owned_eager_move__type_annotation : $@convention(thin) (@owned EagerC) -> ()
+    %result = apply %callee_owned(%instance) : $@convention(thin) (@owned EagerC) -> ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d1_s1 : {{.*}} {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_owned_eager_move__type_inferred_d1_s1'
+sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d1_s1 : $@convention(thin) (@owned InferredEagerD1S1) -> () {
+entry(%instance : @owned $InferredEagerD1S1):
+    %callee_owned = function_ref @callee_owned_eager_move__type_inferred_d1_s1 : $@convention(thin) (@owned InferredEagerD1S1) -> ()
+    %result = apply %callee_owned(%instance) : $@convention(thin) (@owned InferredEagerD1S1) -> ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d1_s2 : {{.*}} {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_owned_eager_move__type_inferred_d1_s2'
+sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d1_s2 : $@convention(thin) (@owned InferredEagerD1S2) -> () {
+entry(%instance : @owned $InferredEagerD1S2):
+    %callee_owned = function_ref @callee_owned_eager_move__type_inferred_d1_s2 : $@convention(thin) (@owned InferredEagerD1S2) -> ()
+    %result = apply %callee_owned(%instance) : $@convention(thin) (@owned InferredEagerD1S2) -> ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d1_s3 : {{.*}} {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_owned_eager_move__type_inferred_d1_s3'
+sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d1_s3 : $@convention(thin) (@owned InferredEagerD1S3) -> () {
+entry(%instance : @owned $InferredEagerD1S3):
+    %callee_owned = function_ref @callee_owned_eager_move__type_inferred_d1_s3 : $@convention(thin) (@owned InferredEagerD1S3) -> ()
+    %result = apply %callee_owned(%instance) : $@convention(thin) (@owned InferredEagerD1S3) -> ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d1_s4 : {{.*}} {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_owned_eager_move__type_inferred_d1_s4'
+sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d1_s4 : $@convention(thin) (@owned InferredEagerD1S4) -> () {
+entry(%instance : @owned $InferredEagerD1S4):
+    %callee_owned = function_ref @callee_owned_eager_move__type_inferred_d1_s4 : $@convention(thin) (@owned InferredEagerD1S4) -> ()
+    %result = apply %callee_owned(%instance) : $@convention(thin) (@owned InferredEagerD1S4) -> ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d2_s1 : {{.*}} {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_owned_eager_move__type_inferred_d2_s1'
+sil [ossa] @caller_owned_callee_owned_eager_move__type_inferred_d2_s1 : $@convention(thin) (@owned InferredEagerD2S1) -> () {
+entry(%instance : @owned $InferredEagerD2S1):
+    %callee_owned = function_ref @callee_owned_eager_move__type_inferred_d2_s1 : $@convention(thin) (@owned InferredEagerD2S1) -> ()
+    %result = apply %callee_owned(%instance) : $@convention(thin) (@owned InferredEagerD2S1) -> ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_owned_lexical : {{.*}} {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_owned_lexical'
+sil [ossa] @caller_owned_callee_owned_lexical : $@convention(thin) (@owned InferredEagerD2S1) -> () {
+entry(%instance : @owned $InferredEagerD2S1):
+    %callee_owned = function_ref @callee_owned_lexical : $@convention(thin) (@owned InferredEagerD2S1) -> ()
+    %result = apply %callee_owned(%instance) : $@convention(thin) (@owned InferredEagerD2S1) -> ()
+    return %result : $()
+}
+
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         destroy_value [[INSTANCE]]
@@ -71,16 +341,169 @@ entry(%instance : @owned $C):
     return %result : $()
 }
 
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_eager_move : $@convention(thin) (@owned C) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_eager_move'
+sil [ossa] @caller_owned_callee_guaranteed_eager_move : $@convention(thin) (@owned C) -> () {
+entry(%instance : @owned $C):
+    %callee_guaranteed = function_ref @callee_guaranteed_eager_move : $@convention(thin) (@guaranteed C) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %instance : $C
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_annotation : $@convention(thin) (@owned EagerC) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_eager_move__type_annotation'
+sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_annotation : $@convention(thin) (@owned EagerC) -> () {
+entry(%instance : @owned $EagerC):
+    %callee_guaranteed = function_ref @callee_guaranteed_eager_move__type_annotation : $@convention(thin) (@guaranteed EagerC) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed EagerC) -> ()
+    destroy_value %instance : $EagerC
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s1 : $@convention(thin) (@owned InferredEagerD1S1) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s1'
+sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s1 : $@convention(thin) (@owned InferredEagerD1S1) -> () {
+entry(%instance : @owned $InferredEagerD1S1):
+    %callee_guaranteed = function_ref @callee_guaranteed_eager_move__type_inferred_d1_s1 : $@convention(thin) (@guaranteed InferredEagerD1S1) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredEagerD1S1) -> ()
+    destroy_value %instance : $InferredEagerD1S1
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s2 : $@convention(thin) (@owned InferredEagerD1S2) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s2'
+sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s2 : $@convention(thin) (@owned InferredEagerD1S2) -> () {
+entry(%instance : @owned $InferredEagerD1S2):
+    %callee_guaranteed = function_ref @callee_guaranteed_eager_move__type_inferred_d1_s2 : $@convention(thin) (@guaranteed InferredEagerD1S2) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredEagerD1S2) -> ()
+    destroy_value %instance : $InferredEagerD1S2
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s3 : $@convention(thin) (@owned InferredEagerD1S3) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s3'
+sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s3 : $@convention(thin) (@owned InferredEagerD1S3) -> () {
+entry(%instance : @owned $InferredEagerD1S3):
+    %callee_guaranteed = function_ref @callee_guaranteed_eager_move__type_inferred_d1_s3 : $@convention(thin) (@guaranteed InferredEagerD1S3) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredEagerD1S3) -> ()
+    destroy_value %instance : $InferredEagerD1S3
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s4 : $@convention(thin) (@owned InferredEagerD1S4) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s4'
+sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d1_s4 : $@convention(thin) (@owned InferredEagerD1S4) -> () {
+entry(%instance : @owned $InferredEagerD1S4):
+    %callee_guaranteed = function_ref @callee_guaranteed_eager_move__type_inferred_d1_s4 : $@convention(thin) (@guaranteed InferredEagerD1S4) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredEagerD1S4) -> ()
+    destroy_value %instance : $InferredEagerD1S4
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d2_s1 : $@convention(thin) (@owned InferredEagerD2S1) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_eager_move__type_inferred_d2_s1'
+sil [ossa] @caller_owned_callee_guaranteed_eager_move__type_inferred_d2_s1 : $@convention(thin) (@owned InferredEagerD2S1) -> () {
+entry(%instance : @owned $InferredEagerD2S1):
+    %callee_guaranteed = function_ref @callee_guaranteed_eager_move__type_inferred_d2_s1 : $@convention(thin) (@guaranteed InferredEagerD2S1) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredEagerD2S1) -> ()
+    destroy_value %instance : $InferredEagerD2S1
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical : {{.*}} {
+// CHECK:         begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical'
+sil [ossa] @caller_owned_callee_guaranteed_lexical : $@convention(thin) (@owned InferredEagerD2S1) -> () {
+entry(%instance : @owned $InferredEagerD2S1):
+    %callee_guaranteed = function_ref @callee_guaranteed_lexical : $@convention(thin) (@guaranteed InferredEagerD2S1) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredEagerD2S1) -> ()
+    destroy_value %instance : $InferredEagerD2S1
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_annotation : {{.*}} {
+// CHECK:         begin_borrow
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_annotation'
+sil [ossa] @caller_owned_callee_guaranteed_lexical__type_annotation : $@convention(thin) (@owned LexicalS) -> () {
+entry(%instance : @owned $LexicalS):
+    %callee_guaranteed = function_ref @callee_guaranteed_lexical__type_annotation : $@convention(thin) (@guaranteed LexicalS) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed LexicalS) -> ()
+    destroy_value %instance : $LexicalS
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s1 : {{.*}} {
+// CHECK:         begin_borrow
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_inferred_d1_s1'
+sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s1 : $@convention(thin) (@owned InferredLexicalD1S1) -> () {
+entry(%instance : @owned $InferredLexicalD1S1):
+    %callee_guaranteed = function_ref @callee_guaranteed_lexical__type_inferred_d1_s1 : $@convention(thin) (@guaranteed InferredLexicalD1S1) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredLexicalD1S1) -> ()
+    destroy_value %instance : $InferredLexicalD1S1
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s2 : {{.*}} {
+// CHECK:         begin_borrow
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_inferred_d1_s2'
+sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s2 : $@convention(thin) (@owned InferredLexicalD1S2) -> () {
+entry(%instance : @owned $InferredLexicalD1S2):
+    %callee_guaranteed = function_ref @callee_guaranteed_lexical__type_inferred_d1_s2 : $@convention(thin) (@guaranteed InferredLexicalD1S2) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredLexicalD1S2) -> ()
+    destroy_value %instance : $InferredLexicalD1S2
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s3 : {{.*}} {
+// CHECK:         begin_borrow
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_inferred_d1_s3'
+sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s3 : $@convention(thin) (@owned InferredLexicalD1S3) -> () {
+entry(%instance : @owned $InferredLexicalD1S3):
+    %callee_guaranteed = function_ref @callee_guaranteed_lexical__type_inferred_d1_s3 : $@convention(thin) (@guaranteed InferredLexicalD1S3) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredLexicalD1S3) -> ()
+    destroy_value %instance : $InferredLexicalD1S3
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s4 : {{.*}} {
+// CHECK:         begin_borrow
+// CHECK-LABEL: } // end sil function 'caller_owned_callee_guaranteed_lexical__type_inferred_d1_s4'
+sil [ossa] @caller_owned_callee_guaranteed_lexical__type_inferred_d1_s4 : $@convention(thin) (@owned InferredLexicalD1S4) -> () {
+entry(%instance : @owned $InferredLexicalD1S4):
+    %callee_guaranteed = function_ref @callee_guaranteed_lexical__type_inferred_d1_s4 : $@convention(thin) (@guaranteed InferredLexicalD1S4) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed InferredLexicalD1S4) -> ()
+    destroy_value %instance : $InferredLexicalD1S4
+    return %result : $()
+}
+
 // CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK-NOT:     begin_borrow [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK-NOT:     end_borrow
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_guaranteed'
 sil [ossa] @caller_guaranteed_callee_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 entry(%instance : @guaranteed $C):
     %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
+    %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_guaranteed_eager_move : $@convention(thin) (@guaranteed C) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_guaranteed_eager_move'
+sil [ossa] @caller_guaranteed_callee_guaranteed_eager_move : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+    %callee_guaranteed = function_ref @callee_guaranteed_eager_move : $@convention(thin) (@guaranteed C) -> ()
     %result = apply %callee_guaranteed(%instance) : $@convention(thin) (@guaranteed C) -> ()
     return %result : $()
 }
@@ -92,6 +515,17 @@ sil [ossa] @caller_guaranteed_callee_owned : $@convention(thin) (@guaranteed C) 
 entry(%instance : @guaranteed $C):
     %copy = copy_value %instance : $C
     %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+    %result = apply %callee_owned(%copy) : $@convention(thin) (@owned C) -> ()
+    return %result : $()
+}
+
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_owned_eager_move : $@convention(thin) (@guaranteed C) -> () {
+// CHECK-NOT:     begin_borrow [lexical]
+// CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_owned_eager_move'
+sil [ossa] @caller_guaranteed_callee_owned_eager_move : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+    %copy = copy_value %instance : $C
+    %callee_owned = function_ref @callee_owned_eager_move : $@convention(thin) (@owned C) -> ()
     %result = apply %callee_owned(%copy) : $@convention(thin) (@owned C) -> ()
     return %result : $()
 }
@@ -130,13 +564,27 @@ bb0(%instance : $*T):
   return %retval : $()
 }
 
+// CHECK-LABEL: sil [ossa] @caller_allocstack_callee_inguaranteed : $@convention(thin) <T> () -> () {
+// CHECK:         alloc_stack [lexical]
+// CHECK-LABEL: } // end sil function 'caller_allocstack_callee_inguaranteed'
+sil [ossa] @caller_allocstack_callee_inguaranteed : $@convention(thin) <T> () -> () {
+bb0:
+  %addr = alloc_stack $T
+  apply undef<T>(%addr) : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  %callee_inguaranteed = function_ref @callee_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  %retval = apply %callee_inguaranteed<T>(%addr) : $@convention(thin) <T> (@in_guaranteed T) -> ()
+  destroy_addr %addr : $*T
+  dealloc_stack %addr : $*T
+  return %retval : $()
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // begin_apply
 ////////////////////////////////////////////////////////////////////////////////
 
 // declarations
 
-sil [ossa] [always_inline] @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C {
+sil [ossa] [heuristic_always_inline] @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C {
 bb0(%instance : @owned $C):
   %addr = alloc_stack $C
   store %instance to [init] %addr : $*C
@@ -152,7 +600,7 @@ bb2:
   unwind
 }
 
-sil [ossa] [always_inline] @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C {
+sil [ossa] [heuristic_always_inline] @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C {
 bb0(%instance : @guaranteed $C):
   %copy = copy_value %instance : $C
   %addr = alloc_stack $C
@@ -169,7 +617,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_trivial : $@yield_once @convention(thin) (S) -> @yields @inout S {
+sil hidden [ossa] [heuristic_always_inline] @callee_coro_trivial : $@yield_once @convention(thin) (S) -> @yields @inout S {
 bb0(%instance : $S):
   %addr = alloc_stack $S
   store %instance to [trivial] %addr : $*S
@@ -183,7 +631,7 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_in : $@yield_once @convention(thin) (@in S) -> @yields @inout S {
+sil hidden [ossa] [heuristic_always_inline] @callee_coro_in : $@yield_once @convention(thin) (@in S) -> @yields @inout S {
 bb0(%instance : $*S):
   yield %instance : $*S, resume bb1, unwind bb2
 bb1:
@@ -193,10 +641,10 @@ bb2:
   unwind
 }
 
-sil hidden [ossa] [always_inline] @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T {
+sil hidden [ossa] [heuristic_always_inline] @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T {
 bb0(%instance : $*T):
   %addr = alloc_stack $T
-  copy_addr %instance to [initialization] %addr : $*T
+  copy_addr %instance to [init] %addr : $*T
   yield %addr : $*T, resume bb1, unwind bb2
 bb1:
   destroy_addr %addr : $*T
@@ -218,14 +666,14 @@ sil [ossa] @caller_owned_callee_coro_owned : $@convention(thin) (@owned C) -> ()
 bb0(%instance : @owned $C):
   %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
   (%addr, %continuation) = begin_apply %callee_coro_owned(%instance) : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
-  end_apply %continuation
+  end_apply %continuation as $()
   %retval = tuple ()
   return %retval : $()
 }
 
 // CHECK-LABEL: sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(thin) (@owned C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
 // CHECK:         store [[LIFETIME_OWNED]] to [init] [[ADDR]]
@@ -236,16 +684,12 @@ bb0(%instance : @owned $C):
 // CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK:       bb1:
-// CHECK:         destroy_addr [[ADDR]]
-// CHECK:         dealloc_stack [[ADDR]]
-// CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_coro_guaranteed'
 sil [ossa] @caller_owned_callee_coro_guaranteed : $@convention(thin) (@owned C) -> () {
 bb0(%instance : @owned $C):
   %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
   (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
-  end_apply %continuation
+  end_apply %continuation as $()
   destroy_value %instance : $C
   %retval = tuple ()
   return %retval : $()
@@ -259,33 +703,29 @@ bb0(%instance : @guaranteed $C):
   %copy = copy_value %instance : $C
   %callee_coro_owned = function_ref @callee_coro_owned : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
   (%addr, %continuation) = begin_apply %callee_coro_owned(%copy) : $@yield_once @convention(thin) (@owned C) -> @yields @inout C
-  end_apply %continuation
+  end_apply %continuation as $()
   %retval = tuple ()
   return %retval : $()
 }
 
 // CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
-// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[LIFETIME]]
+// CHECK-NOT:     begin_borrow
+// CHECK:         [[LIFETIME_OWNED:%[^,]+]] = copy_value [[INSTANCE]]
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $C
 // CHECK:         store [[LIFETIME_OWNED]] to [init] [[ADDR]]
 // CHECK:         destroy_addr [[ADDR]]
 // CHECK:         dealloc_stack [[ADDR]]
 // CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK-NOT:     end_borrow
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK:       bb1:
-// CHECK:         destroy_addr [[ADDR]]
-// CHECK:         dealloc_stack [[ADDR]]
-// CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_coro_guaranteed'
 sil [ossa] @caller_guaranteed_callee_coro_guaranteed : $@convention(thin) (@guaranteed C) -> () {
 bb0(%instance : @guaranteed $C):
   %callee_coro_guaranteed = function_ref @callee_coro_guaranteed : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
   (%addr, %continuation) = begin_apply %callee_coro_guaranteed(%instance) : $@yield_once @convention(thin) (@guaranteed C) -> @yields @inout C
-  end_apply %continuation
+  end_apply %continuation as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -298,15 +738,12 @@ bb0(%instance : @guaranteed $C):
 // CHECK:         [[REGISTER_4:%[^,]+]] = tuple ()
 // CHECK:         [[REGISTER_5:%[^,]+]] = tuple ()
 // CHECK:         return [[REGISTER_5]] : $()
-// CHECK:       {{bb[0-9]+}}:
-// CHECK:         dealloc_stack [[REGISTER_1]] : $*S
-// CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_trivial_callee_coro_trivial'
 sil hidden [ossa] @caller_trivial_callee_coro_trivial : $@convention(thin) (S) -> () {
 bb0(%instance : $S):
   %callee_coro_trivial = function_ref @callee_coro_trivial : $@yield_once @convention(thin) (S) -> @yields @inout S
   (%addr, %continuation) = begin_apply %callee_coro_trivial(%instance) : $@yield_once @convention(thin) (S) -> @yields @inout S
-  end_apply %continuation
+  end_apply %continuation as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -316,14 +753,12 @@ bb0(%instance : $S):
 // CHECK:         {{%[^,]+}} = tuple ()
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
-// CHECK:       {{bb[^,]+}}:
-// CHECK:         unreachable
 // CHECK-LABEL: } // end sil function 'caller_in_callee_coro_in'
 sil hidden [ossa] @caller_in_callee_coro_in : $@convention(thin) (@in S) -> () {
 bb0(%instance : $*S):
   %callee_coro_in = function_ref @callee_coro_in : $@yield_once @convention(thin) (@in S) -> @yields @inout S
   (%addr, %continuation) = begin_apply %callee_coro_in(%instance) : $@yield_once @convention(thin) (@in S) -> @yields @inout S
-  end_apply %continuation
+  end_apply %continuation as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -335,7 +770,7 @@ sil hidden [ossa] @caller_inguaranteed_callee_coro_inguaranteed : $@convention(t
 bb0(%instance : $*T):
   %callee_coro_inguaranteed = function_ref @callee_coro_inguaranteed : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
   (%addr_out, %continuation) = begin_apply %callee_coro_inguaranteed<T>(%instance) : $@yield_once @convention(thin) <T> (@in_guaranteed T) -> @yields @inout T
-  end_apply %continuation
+  end_apply %continuation as $()
   %retval = tuple ()
   return %retval : $()
 }
@@ -346,7 +781,7 @@ bb0(%instance : $*T):
 
 // declarations
 
-sil [ossa] [always_inline] @callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
+sil [ossa] [heuristic_always_inline] @callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
 bb0(%instance : @owned $C):
   cond_br undef, bb1, bb2
 bb1:
@@ -358,7 +793,7 @@ bb2:
   return %18 : $()
 }
 
-sil [ossa] [always_inline] @callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
+sil [ossa] [heuristic_always_inline] @callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
 bb0(%0 : @guaranteed $C):
   cond_br undef, bb1, bb2
 bb1:
@@ -400,7 +835,7 @@ bb2:
 
 // tests
 
-// CHECK-LABEL: sil [ossa] @caller_owned_callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_error_owned : $@convention(thin) (@owned C) -> @error any Error {
 // CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_owned_callee_error_owned'
 sil [ossa] @caller_owned_callee_error_owned : $@convention(thin) (@owned C) -> @error Error {
@@ -415,9 +850,9 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil [ossa] @caller_owned_callee_error_guaranteed : $@convention(thin) (@owned C) -> @error Error {
+// CHECK-LABEL: sil [ossa] @caller_owned_callee_error_guaranteed : $@convention(thin) (@owned C) -> @error any Error {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @owned $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [[INSTANCE]]
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
 // CHECK:         end_borrow [[LIFETIME]]
@@ -443,7 +878,7 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_error_owned : $@convention(thin) (@guaranteed C) -> @error Error {
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_error_owned : $@convention(thin) (@guaranteed C) -> @error any Error {
 // CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_error_owned'
 sil [ossa] @caller_guaranteed_callee_error_owned : $@convention(thin) (@guaranteed C) -> @error Error {
@@ -458,16 +893,16 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error Error {
+// CHECK-LABEL: sil [ossa] @caller_guaranteed_callee_error_guaranteed : $@convention(thin) (@guaranteed C) -> @error any Error {
 // CHECK:       {{bb[^,]+}}([[INSTANCE:%[^,]+]] : @guaranteed $C):
-// CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[INSTANCE]]
+// CHECK-NOT:     begin_borrow
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK-NOT:     end_borrow
 // CHECK:         throw undef
 // CHECK:       [[REGULAR_BLOCK]]:
 // CHECK:         [[ORIGINAL_RETVAL:%[^,]+]] = tuple ()
-// CHECK:         end_borrow [[LIFETIME]]
+// CHECK-NOT:     end_borrow
 // CHECK:         [[RETVAL:%[^,]+]] = tuple ()
 // CHECK:         return [[RETVAL]]
 // CHECK-LABEL: } // end sil function 'caller_guaranteed_callee_error_guaranteed'
@@ -482,7 +917,7 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil hidden [ossa] @caller_trivial_callee_error_trivial : $@convention(thin) (S) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @caller_trivial_callee_error_trivial : $@convention(thin) (S) -> @error any Error {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $S):
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[^,]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
@@ -503,7 +938,7 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil hidden [ossa] @caller_in_callee_error_in : $@convention(thin) (@in S) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @caller_in_callee_error_in : $@convention(thin) (@in S) -> @error any Error {
 // CHECK:       {{bb[^,]+}}({{%[^,]+}} : $*S):
 // CHECK:         cond_br undef, [[THROW_BLOCK:bb[0-9]+]], [[REGULAR_BLOCK:bb[0-9]+]]
 // CHECK:       [[THROW_BLOCK]]:
@@ -524,7 +959,7 @@ bb2(%12 : @owned $Error):
   throw %12 : $Error
 }
 
-// CHECK-LABEL: sil hidden [ossa] @caller_inguaranteed_callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {
+// CHECK-LABEL: sil hidden [ossa] @caller_inguaranteed_callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error any Error {
 // CHECK-NOT:     begin_borrow [lexical]
 // CHECK-LABEL: // end sil function 'caller_inguaranteed_callee_error_inguaranteed'
 sil hidden [ossa] @caller_inguaranteed_callee_error_inguaranteed : $@convention(thin) <T> (@in_guaranteed T) -> @error Error {

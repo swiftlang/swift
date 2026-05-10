@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
-// RUN: %target-swift-frontend -I %t -disable-availability-checking -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -I %t -target %target-swift-5.1-abi-triple -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 import resilient_struct
 
@@ -23,14 +23,14 @@ func valueToAddr(x: String) -> some P {
 // CHECK-LABEL: sil hidden {{.*}}10addrToAddr1xQr
 func addrToAddr(x: AddrOnly) -> some P {
   // CHECK: bb0([[ARG0:%.*]] : $*AddrOnly, [[ARG1:%.*]] : $*AddrOnly):
-  // CHECK: copy_addr [[ARG1]] to [initialization] [[ARG0]]
+  // CHECK: copy_addr [[ARG1]] to [init] [[ARG0]]
   return x
 }
 
 // CHECK-LABEL: sil hidden {{.*}}13genericAddrToE01xQr
 func genericAddrToAddr<T: P>(x: T) -> some P {
   // CHECK: bb0([[ARG0:%.*]] : $*T, [[ARG1:%.*]] : $*T):
-  // CHECK: copy_addr [[ARG1]] to [initialization] [[ARG0]]
+  // CHECK: copy_addr [[ARG1]] to [init] [[ARG0]]
   return x
 }
 

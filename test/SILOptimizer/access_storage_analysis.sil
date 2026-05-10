@@ -103,12 +103,12 @@ bb0(%0 : ${ var Int }, %1 : $Int):
 }
 
 // CHECK-LABEL: @writeIdentifiedBox
-// CHECK: [read] Box   %1 = alloc_box ${ var Int }
+// CHECK: [modify] Box   %1 = alloc_box ${ var Int }
 sil @writeIdentifiedBox : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = alloc_box ${ var Int }
   %2 = project_box %1 : ${ var Int }, 0
-  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
   store %0 to %3 : $*Int
   end_access %3 : $*Int
   %6 = tuple ()
@@ -271,9 +271,9 @@ bb0:
 // A sil_global such as this without a corresponding Swift declaration must be
 // defined in another module. Such a global can only be identified when accessed
 // via global_addr instruction (as happens with C imports). Any access via an
-// addessor (as with Swift imports) will be Unidentified. For the purpose of
-// access analysis, a global is considered "external" based on the availabitiy
-// of a Swift declaraion. We only consider an global to be a disjoint access
+// accessor (as with Swift imports) will be Unidentified. For the purpose of
+// access analysis, a global is considered "external" based on the availability
+// of a Swift declaration. We only consider an global to be a disjoint access
 // location if its declaration is available.
 sil_global @external_global : $Int64
 
@@ -398,7 +398,7 @@ bb0(%0 : $C):
 sil @writeIdentifiedNestedClass : $@convention(thin) (@guaranteed C, Int) -> () {
 bb0(%0 : $C, %1 : $Int):
   %2 = ref_element_addr %0 : $C, #C.property
-  %3 = begin_access [read] [dynamic] %2 : $*Int
+  %3 = begin_access [modify] [dynamic] %2 : $*Int
   %4 = begin_access [modify] [dynamic] %3 : $*Int
   store %1 to %4 : $*Int
   end_access %4 : $*Int
@@ -439,7 +439,7 @@ bb0(%0 : $*TreeB<T>, %1 : $*TreeB<T>):
   %boxAddr = project_box %box : $<τ_0_0> { var (left: TreeB<τ_0_0>, right: TreeB<τ_0_0>) } <T>, 0
   %boxAccess = begin_access [read] [dynamic] %boxAddr : $*(left: TreeB<T>, right: TreeB<T>)
   %leftAddr = tuple_element_addr %boxAccess : $*(left: TreeB<T>, right: TreeB<T>), 0
-  copy_addr %leftAddr to [initialization] %0 : $*TreeB<T>
+  copy_addr %leftAddr to [init] %0 : $*TreeB<T>
   end_access %boxAccess : $*(left: TreeB<T>, right: TreeB<T>)
   %v = tuple ()
   return %v : $()
@@ -461,9 +461,9 @@ bb0(%out : $*Int, %i : $Int, %e : $Error):
   %eload = load %pebAccess : $*SomeError
   end_access %pebAccess : $*SomeError
 
-  %oeb = open_existential_box %e : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
-  %oebAccess = begin_access [read] [dynamic] %oeb : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
-  end_access %oebAccess : $*@opened("01234567-89AB-CDEF-0123-333333333333") Error
+  %oeb = open_existential_box %e : $Error to $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  %oebAccess = begin_access [read] [dynamic] %oeb : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
+  end_access %oebAccess : $*@opened("01234567-89AB-CDEF-0123-333333333333", Error) Self
 
   %v = tuple ()
   return %v : $()
@@ -542,6 +542,7 @@ bb0(%0 : $Int):
   %access = begin_access [modify] [dynamic] %s1 : $*Int
   %call = apply %npa(%access) : $@noescape @callee_guaranteed (@inout Int) -> ()
   end_access %access : $*Int
+  destroy_value %npa : $@noescape @callee_guaranteed (@inout Int) -> ()
   end_borrow %borrow : $@callee_guaranteed (@inout Int) -> ()
   destroy_value %copy : $@callee_guaranteed (@inout Int) -> ()
   destroy_value %pa : $@callee_guaranteed (@inout Int) -> ()
@@ -651,41 +652,6 @@ bb3(%result : $Int):
   return %result : $Int
 }
 
-// Make sure identifyFormalAccess returns a valid storage object for an address-phi
-// that feeds ref_element_addr instructions. The ref_element_addr's need to have the
-// same base object and same field id.
-// <rdar://problem/46114512> SIL verification failed: Unknown formal access pattern: storage
-class BaseClass {
-  var f: Float = 0.0
-}
-
-class SubClass : BaseClass {}
-
-// CHECK-LABEL: @testElementAddressPhiAccess
-// CHECK: [read] [no_nested_conflict] Class %{{.*}} = argument of bb0 : $SubClass
-// CHECK: Field: @_hasInitialValue var f: Float
-sil @testElementAddressPhiAccess : $@convention(thin) (@guaranteed SubClass) -> () {
-bb0(%0 : $SubClass):
-  %base = upcast %0 : $SubClass to $BaseClass
-  cond_br undef, bb1, bb2
-
-bb1:
-  %ref1 = ref_element_addr %base : $BaseClass, #BaseClass.f
-  br bb3(%ref1 : $*Float)
-
-bb2:
-  %ref2 = ref_element_addr %base : $BaseClass, #BaseClass.f
-  br bb3(%ref2 : $*Float)
-
-bb3(%phi : $*Float):
-  %access = begin_access [read] [dynamic] [no_nested_conflict] %phi : $*Float
-  %addr = struct_element_addr %access : $*Float, #Float._value
-  %val = load %addr : $*Builtin.FPIEEE32
-  end_access %access : $*Float
-  %v = tuple ()
-  return %v : $()
-}
-
 // Test an inlined global variable addressor after simplify-cfg has
 // cloned the call to the addressor.
 // <rdar://problem/47555992> SIL verification failed: Unknown formal access pattern
@@ -724,7 +690,7 @@ bb3(%7 : $Builtin.RawPointer):
   return %10 : $Int64
 }
 
-// Test storage for SIL global variable declations.
+// Test storage for SIL global variable declarations.
 
 sil_global hidden @testGlobal : $Builtin.Int64
 
@@ -744,4 +710,89 @@ bb0:
   %6 = load %5 : $*Builtin.Int64
   end_access %5 : $*Builtin.Int64
   return %6 : $Builtin.Int64
+}
+
+// CHECK:      @test_harmless_regardless_of_type_pod
+// CHECK-NEXT: @test_harmless_regardless_of_type_ref
+// CHECK-NEXT: @test_harmless_typedependent
+// CHECK-NEXT: @test_not_harmless_typedependent
+// CHECK-NEXT:   unidentified accesses: modify
+// CHECK-NEXT: @test_not_harmless_typedependent_2
+// CHECK-NEXT:   unidentified accesses: modify
+// CHECK-NEXT: @test_not_harmless_typedependent_3
+// CHECK-NEXT:   unidentified accesses: modify
+// CHECK-NEXT: @test_not_harmless_typedependent_4
+// CHECK-NEXT:   unidentified accesses: modify
+// CHECK-NEXT: @test_not_harmless_typedependent_5
+// CHECK-NEXT:   unidentified accesses: modify
+
+sil hidden [transparent] @test_harmless_regardless_of_type_pod : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin UInt8.Type
+  %4 = builtin "copyArray"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %5 = builtin "takeArrayFrontToBack"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %6 = builtin "takeArrayBackToFront"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %7 = builtin "takeArrayNoAlias"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+
+sil hidden [transparent] @test_harmless_regardless_of_type_ref : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %4 = builtin "copyArray"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %5 = builtin "takeArrayFrontToBack"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %6 = builtin "takeArrayBackToFront"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %7 = builtin "takeArrayNoAlias"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+
+sil hidden [transparent] @test_harmless_typedependent : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin UInt8.Type
+  %8 = builtin "assignCopyArrayNoAlias"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %9 = builtin "assignCopyArrayFrontToBack"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %10 = builtin "assignCopyArrayBackToFront"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %11 = builtin "assignTakeArray"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %12 = builtin "destroyArray"<UInt8>(%3 : $@thin UInt8.Type, %0 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+
+sil hidden [transparent] @test_not_harmless_typedependent : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %8 = builtin "assignCopyArrayNoAlias"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+
+sil hidden [transparent] @test_not_harmless_typedependent_2 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %9 = builtin "assignCopyArrayFrontToBack"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+sil hidden [transparent] @test_not_harmless_typedependent_3 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %10 = builtin "assignCopyArrayBackToFront"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+sil hidden [transparent] @test_not_harmless_typedependent_4 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %11 = builtin "assignTakeArray"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
+}
+sil hidden [transparent] @test_not_harmless_typedependent_5 : $@convention(thin) (Builtin.RawPointer, Builtin.RawPointer, Builtin.Word) -> () {
+bb0(%0 : $Builtin.RawPointer, %1: $Builtin.RawPointer, %2: $Builtin.Word):
+  %3 = metatype $@thin C.Type
+  %12 = builtin "destroyArray"<C>(%3 : $@thin C.Type, %0 : $Builtin.RawPointer, %2 : $Builtin.Word) : $()
+  %t = tuple()
+  return %t: $()
 }

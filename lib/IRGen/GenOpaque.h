@@ -30,6 +30,7 @@ namespace irgen {
   class IRGenModule;
   class TypeInfo;
   enum class ValueWitness : unsigned;
+  class ComputedWitnessIndex;
   class WitnessIndex;
 
   /// Return the size of a fixed buffer.
@@ -40,8 +41,11 @@ namespace irgen {
 
   /// Given a witness table (protocol or value), return the address of the slot
   /// for one of the witnesses.
+  /// If \p areEntriesRelative is true we are emitting code for a relative
+  /// protocol witness table.
   Address slotForLoadOfOpaqueWitness(IRGenFunction &IGF, llvm::Value *table,
-                                     WitnessIndex index);
+                                     ComputedWitnessIndex index,
+                                     bool areEntriesRelative = false);
 
   /// Given a witness table (protocol or value), load one of the
   /// witnesses.
@@ -49,8 +53,9 @@ namespace irgen {
   /// The load is marked invariant. This should not be used in contexts where
   /// the referenced witness table is still undergoing initialization.
   llvm::Value *emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                bool isProtocolWitness,
                                                 llvm::Value *table,
-                                                WitnessIndex index,
+                                                ComputedWitnessIndex index,
                                                 llvm::Value **slot = nullptr);
 
   /// Given a witness table (protocol or value), load one of the
@@ -59,6 +64,7 @@ namespace irgen {
   /// The load is marked invariant. This should not be used in contexts where
   /// the referenced witness table is still undergoing initialization.
   llvm::Value *emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
+                                                bool isProtocolWitness,
                                                 llvm::Value *table,
                                                 llvm::Value *index,
                                                 llvm::Value **slot = nullptr);
@@ -210,11 +216,18 @@ namespace irgen {
   /// Emit a load of the 'alignmentMask' value witness.
   llvm::Value *emitLoadOfAlignmentMask(IRGenFunction &IGF, SILType T);
 
-  /// Emit a load of the 'isPOD' value witness.
-  llvm::Value *emitLoadOfIsPOD(IRGenFunction &IGF, SILType T);
+  /// Emit a load of the 'isTriviallyDestroyable' value witness.
+  llvm::Value *emitLoadOfIsTriviallyDestroyable(IRGenFunction &IGF, SILType T);
 
   /// Emit a load of the 'isBitwiseTakable' value witness.
   llvm::Value *emitLoadOfIsBitwiseTakable(IRGenFunction &IGF, SILType T);
+
+  /// Emit a load of the 'isBitwiseBorrowable' value witness.
+  llvm::Value *emitLoadOfIsBitwiseBorrowable(IRGenFunction &IGF, SILType T);
+
+  /// Emit a load of the 'isAddressableForDependencies' value witness.
+  llvm::Value *emitLoadOfIsAddressableForDependencies(IRGenFunction &IGF,
+                                                      SILType T);
 
   /// Emit a load of the 'isInline' value witness.
   llvm::Value *emitLoadOfIsInline(IRGenFunction &IGF, SILType T);

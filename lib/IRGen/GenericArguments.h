@@ -1,4 +1,4 @@
-//===--- MetadataRequest.cpp - IR generation for metadata requests --------===//
+//===--- GenericArguments.h - IR generation for metadata requests ---------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -29,6 +29,7 @@
 #include "IRGenFunction.h"
 #include "IRGenMangler.h"
 #include "IRGenModule.h"
+#include "MetadataRequest.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -49,12 +50,7 @@ struct GenericArguments {
   /// The values to use to initialize the arguments structure.
   SmallVector<llvm::Value *, 8> Values;
   SmallVector<llvm::Type *, 8> Types;
-
-  static unsigned getNumGenericArguments(IRGenModule &IGM,
-                                         NominalTypeDecl *nominal) {
-    GenericTypeRequirements requirements(IGM, nominal);
-    return requirements.getNumTypeRequirements();
-  }
+  bool hasPacks = false;
 
   void collectTypes(IRGenModule &IGM, NominalTypeDecl *nominal) {
     GenericTypeRequirements requirements(IGM, nominal);
@@ -64,32 +60,23 @@ struct GenericArguments {
   void collectTypes(IRGenModule &IGM,
                     const GenericTypeRequirements &requirements) {
     for (auto &requirement : requirements.getRequirements()) {
-      if (requirement.Protocol) {
-        Types.push_back(IGM.WitnessTablePtrTy);
-      } else {
-        Types.push_back(IGM.TypeMetadataPtrTy);
-      }
+      hasPacks = hasPacks || requirement.isAnyPack();
+      Types.push_back(requirement.getType(IGM));
     }
   }
 
   void collect(IRGenFunction &IGF, CanType type) {
-    auto decl = type.getNominalOrBoundGenericNominal();
-    auto subs = type->getContextSubstitutionMap(IGF.IGM.getSwiftModule(), decl);
+    auto subs = type->getContextSubstitutionMap();
     collect(IGF, subs);
   }
 
   void collect(IRGenFunction &IGF, SubstitutionMap subs) {
     GenericTypeRequirements requirements(IGF.IGM, subs.getGenericSignature());
 
-    requirements.enumerateFulfillments(
-        IGF.IGM, subs,
-        [&](unsigned reqtIndex, CanType type, ProtocolConformanceRef conf) {
-          if (conf) {
-            Values.push_back(emitWitnessTableRef(IGF, type, conf));
-          } else {
-            Values.push_back(IGF.emitAbstractTypeMetadataRef(type));
-          }
-        });
+    for (auto requirement : requirements.getRequirements()) {
+      Values.push_back(emitGenericRequirementFromSubstitutions(
+          IGF, requirement, MetadataState::Abstract, subs));
+    }
 
     collectTypes(IGF.IGM, requirements);
     assert(Types.size() == Values.size());

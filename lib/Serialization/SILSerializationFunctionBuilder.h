@@ -1,4 +1,4 @@
-//===--- SerializationFunctionBuilder.h -----------------------------------===//
+//===--- SILSerializationFunctionBuilder.h --------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -28,10 +28,11 @@ public:
   SILFunction *createDeclaration(StringRef name, SILType type,
                                  SILLocation loc) {
     return builder.createFunction(
-        SILLinkage::Private, name, type.getAs<SILFunctionType>(), nullptr,
-        loc, IsNotBare, IsNotTransparent,
-        IsNotSerialized, IsNotDynamic, IsNotDistributed, ProfileCounter(),
-        IsNotThunk, SubclassScope::NotApplicable);
+        SILLinkage::Private, name, type.getAs<SILFunctionType>(),
+        ActorIsolation::forUnspecified(), nullptr, loc, IsNotBare,
+        IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible, ProfileCounter(), IsNotThunk,
+        SubclassScope::NotApplicable);
   }
 
   void setHasOwnership(SILFunction *f, bool newValue) {

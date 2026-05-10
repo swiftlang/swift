@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -jumpthread-simplify-cfg | %FileCheck %s
 //
 // Test SimplifyCFG's handling of address-type phis. In other words, makes sure it doesn't create them at all!
 
@@ -135,7 +135,7 @@ bb5:
   return %val : $Builtin.Int32
 }
 
-// Test that debug_value is not unnecessarilly lost during address projection sinking.
+// Test that debug_value is not unnecessarily lost during address projection sinking.
 public class CC<R> {
   let r : R
   init(_ _r: R) { r = _r }

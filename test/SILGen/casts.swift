@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name casts %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name casts %s | %FileCheck %s
 
 class B { }
 class D : B { }
@@ -19,7 +19,7 @@ func downcast(b: B) -> D {
 func isa(b: B) -> Bool {
   // CHECK: bb0([[ARG:%.*]] : @guaranteed $B):
   // CHECK:   [[COPIED_BORROWED_ARG:%.*]] = copy_value [[ARG]]
-  // CHECK:   checked_cast_br [[COPIED_BORROWED_ARG]] : $B to D, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  // CHECK:   checked_cast_br B in [[COPIED_BORROWED_ARG]] : $B to D, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   //
   // CHECK: [[YES]]([[CASTED_VALUE:%.*]] : @owned $D):
   // CHECK:   integer_literal {{.*}} -1
@@ -55,7 +55,7 @@ func downcast_archetype<T : B>(b: B) -> T {
 // CHECK-LABEL: sil hidden [ossa] @$s5casts12is_archetype{{[_0-9a-zA-Z]*}}F
 func is_archetype<T : B>(b: B, _: T) -> Bool {
   // CHECK: bb0([[ARG1:%.*]] : @guaranteed $B, [[ARG2:%.*]] : @guaranteed $T):
-  // CHECK:   checked_cast_br {{%.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+  // CHECK:   checked_cast_br {{.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
   // CHECK: [[YES]]([[CASTED_ARG:%.*]] : @owned $T):
   // CHECK:   integer_literal {{.*}} -1
   // CHECK:   destroy_value [[CASTED_ARG]]
@@ -67,7 +67,7 @@ func is_archetype<T : B>(b: B, _: T) -> Bool {
 // CHECK: } // end sil function '$s5casts12is_archetype{{[_0-9a-zA-Z]*}}F'
 
 // CHECK: sil hidden [ossa] @$s5casts20downcast_conditional{{[_0-9a-zA-Z]*}}F
-// CHECK:   checked_cast_br {{%.*}} : $B to D
+// CHECK:   checked_cast_br B in {{%.*}} : $B to D
 // CHECK:   bb{{[0-9]+}}({{.*}} : $Optional<D>)
 func downcast_conditional(b: B) -> D? {
   return b as? D
@@ -77,11 +77,11 @@ protocol P {}
 struct S : P {}
 
 // CHECK: sil hidden [ossa] @$s5casts32downcast_existential_conditional{{[_0-9a-zA-Z]*}}F
-// CHECK: bb0([[IN:%.*]] : $*P):
-// CHECK:   [[COPY:%.*]] = alloc_stack $P
-// CHECK:   copy_addr [[IN]] to [initialization] [[COPY]]
+// CHECK: bb0([[IN:%.*]] : $*any P):
+// CHECK:   [[COPY:%.*]] = alloc_stack $any P
+// CHECK:   copy_addr [[IN]] to [init] [[COPY]]
 // CHECK:   [[TMP:%.*]] = alloc_stack $S
-// CHECK:   checked_cast_addr_br take_always P in [[COPY]] : $*P to S in [[TMP]] : $*S, bb1, bb2
+// CHECK:   checked_cast_addr_br take_always any P in [[COPY]] : $*any P to S in [[TMP]] : $*S, bb1, bb2
 //   Success block.
 // CHECK: bb1:
 // CHECK:   [[T0:%.*]] = load [trivial] [[TMP]] : $*S

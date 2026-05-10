@@ -15,9 +15,14 @@
 
 #include "OutputLanguageMode.h"
 
+#include "PrintClangFunction.h"
+#include "swift/AST/Decl.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
 // for OptionalTypeKind
+#include "swift/AST/TypeRepr.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/StringSet.h"
 
 namespace clang {
   class NamedDecl;
@@ -25,9 +30,35 @@ namespace clang {
 
 namespace swift {
 
+class AccessorDecl;
 class PrimitiveTypeMapping;
 class ValueDecl;
 class SwiftToClangInteropContext;
+
+/// Tracks which C++ declarations have been emitted in a lexical
+/// C++ scope.
+struct CxxDeclEmissionScope {
+  /// Records information about an emitted C++ function overload.
+  struct EmittedFunctionOverload {
+    const AbstractFunctionDecl *funcDecl;
+    /// The C++ parameter types as they appear in the C++ inline thunk
+    /// signature, used to detect genuinely ambiguous overloads.
+    llvm::SmallVector<std::string, 4> cxxParamTypes;
+  };
+
+  /// Additional Swift declarations that are unrepresentable in C++.
+  /// The string holds a reason why the declaration is unrepresentable;
+  /// empty string means the reason should be acqured from
+  /// 'getDeclRepresentation'.
+  llvm::DenseMap<const ValueDecl *, std::string>
+      additionalUnrepresentableDeclarations;
+  /// Records the C++ declaration names already emitted in this lexical scope.
+  llvm::StringSet<> emittedDeclarationNames;
+  /// Records the names of the function overloads already emitted in this
+  /// lexical scope.
+  llvm::StringMap<llvm::SmallVector<EmittedFunctionOverload, 2>>
+      emittedFunctionOverloads;
+};
 
 /// Responsible for printing a Swift Decl or Type in Objective-C, to be
 /// included in a Swift module's ObjC compatibility header.
@@ -38,15 +69,21 @@ public:
 private:
   class Implementation;
   friend class Implementation;
+  friend class DeclAndTypeClangFunctionPrinter;
 
   ModuleDecl &M;
   raw_ostream &os;
   raw_ostream &prologueOS;
-  const DelayedMemberSet &delayedMembers;
+  raw_ostream &outOfLineDefinitionsOS;
+  const DelayedMemberSet &objcDelayedMembers;
+  CxxDeclEmissionScope *cxxDeclEmissionScope;
   PrimitiveTypeMapping &typeMapping;
   SwiftToClangInteropContext &interopContext;
   AccessLevel minRequiredAccess;
+  bool requiresExposedAttribute;
+  llvm::StringSet<> &exposedModules;
   OutputLanguageMode outputLang;
+  llvm::DenseMap<Type, std::optional<ClangRepresentation>> typeRepresentations;
 
   /// The name 'CFTypeRef'.
   ///
@@ -57,20 +94,59 @@ private:
 
 public:
   DeclAndTypePrinter(ModuleDecl &mod, raw_ostream &out, raw_ostream &prologueOS,
-                     DelayedMemberSet &delayed,
+                     raw_ostream &outOfLineDefinitionsOS,
+                     const DelayedMemberSet &delayed,
+                     CxxDeclEmissionScope &topLevelEmissionScope,
                      PrimitiveTypeMapping &typeMapping,
                      SwiftToClangInteropContext &interopContext,
-                     AccessLevel access, OutputLanguageMode outputLang)
-      : M(mod), os(out), prologueOS(prologueOS), delayedMembers(delayed),
-        typeMapping(typeMapping), interopContext(interopContext),
-        minRequiredAccess(access), outputLang(outputLang) {}
+                     AccessLevel access, bool requiresExposedAttribute,
+                     llvm::StringSet<> &exposedModules,
+                     OutputLanguageMode outputLang)
+      : M(mod), os(out), prologueOS(prologueOS),
+        outOfLineDefinitionsOS(outOfLineDefinitionsOS),
+        objcDelayedMembers(delayed),
+        cxxDeclEmissionScope(&topLevelEmissionScope), typeMapping(typeMapping),
+        interopContext(interopContext), minRequiredAccess(access),
+        requiresExposedAttribute(requiresExposedAttribute),
+        exposedModules(exposedModules), outputLang(outputLang) {}
+
+  PrimitiveTypeMapping &getTypeMapping() { return typeMapping; }
+
+  SwiftToClangInteropContext &getInteropContext() { return interopContext; }
+
+  CxxDeclEmissionScope &getCxxDeclEmissionScope() {
+    return *cxxDeclEmissionScope;
+  }
+
+  DeclAndTypePrinter withOutputStream(raw_ostream &s) {
+    return DeclAndTypePrinter(
+        M, s, prologueOS, outOfLineDefinitionsOS, objcDelayedMembers,
+        *cxxDeclEmissionScope, typeMapping, interopContext, minRequiredAccess,
+        requiresExposedAttribute, exposedModules, outputLang);
+  }
+
+  void setCxxDeclEmissionScope(CxxDeclEmissionScope &scope) {
+    cxxDeclEmissionScope = &scope;
+  }
 
   /// Returns true if \p VD should be included in a compatibility header for
   /// the options the printer was constructed with.
   bool shouldInclude(const ValueDecl *VD);
 
+  bool isZeroSized(const NominalTypeDecl *decl);
+
+  /// Returns true if \p vd is visible given the current access level and thus
+  /// can be included in the generated header.
+  bool isVisible(const ValueDecl *vd) const;
+
   void print(const Decl *D);
-  void print(Type ty);
+  void print(Type ty, std::optional<OptionalTypeKind> overrideOptionalTypeKind =
+                          std::nullopt);
+
+  /// Prints the name of the type including generic arguments.
+  void printTypeName(raw_ostream &os, Type ty, const ModuleDecl *moduleContext);
+
+  void printAvailability(raw_ostream &os, const Decl *D);
 
   /// Is \p ED empty of members and protocol conformances to include?
   bool isEmptyExtensionDecl(const ExtensionDecl *ED);
@@ -96,6 +172,10 @@ public:
   static std::pair<Type, OptionalTypeKind>
   getObjectTypeAndOptionality(const ValueDecl *D, Type ty);
 };
+
+bool isStringNestedType(const ValueDecl *VD, StringRef Typename);
+
+bool hasExposeNotCxxAttr(const ValueDecl *VD);
 
 } // end namespace swift
 

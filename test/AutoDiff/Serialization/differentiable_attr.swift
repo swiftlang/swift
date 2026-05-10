@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
-// RUN: llvm-bcanalyzer %t/differentiable_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/differentiable_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -enable-sil-verify-all %t/differentiable_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
@@ -41,6 +41,29 @@ func vjpSimple(x: Float) -> (Float, (Float) -> Float) {
 @differentiable(reverse, wrt: x)
 func testWrtClause(x: Float, y: Float) -> Float {
   return x
+}
+
+// CHECK: @differentiable(reverse, wrt: x)
+// CHECK-NEXT: func testInout(x: inout Float)
+@differentiable(reverse)
+func testInout(x: inout Float) {
+  x = x * 2.0
+}
+
+// CHECK: @differentiable(reverse, wrt: x)
+// CHECK-NEXT: func testInoutResult(x: inout Float) -> Float
+@differentiable(reverse)
+func testInoutResult(x: inout Float) -> Float {
+  x = x * 2.0
+  return x
+}
+
+// CHECK: @differentiable(reverse, wrt: (x, y))
+// CHECK-NEXT: func testMultipleInout(x: inout Float, y: inout Float)
+@differentiable(reverse)
+func testMultipleInout(x: inout Float, y: inout Float) {
+  x = x * y
+  y = x
 }
 
 struct InstanceMethod : Differentiable {

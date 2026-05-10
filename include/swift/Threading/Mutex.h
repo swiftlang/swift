@@ -10,8 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Provides a system-independent Mutex abstraction, as well as some
-// related utilities like ScopedLock.
+// Provides a system-independent Mutex abstraction.
 //
 //===----------------------------------------------------------------------===//
 
@@ -21,44 +20,11 @@
 #include <type_traits>
 #include <utility>
 
+#include "ScopedLock.h"
+
 #include "Impl.h"
 
 namespace swift {
-
-// -- ScopedLock ---------------------------------------------------------------
-
-/// Compile time adjusted stack based object that locks/unlocks the supplied
-/// Mutex type. Use the provided typedefs instead of this directly.
-template <typename T, bool Inverted>
-class ScopedLockT {
-  ScopedLockT() = delete;
-  ScopedLockT(const ScopedLockT &) = delete;
-  ScopedLockT &operator=(const ScopedLockT &) = delete;
-  ScopedLockT(ScopedLockT &&) = delete;
-  ScopedLockT &operator=(ScopedLockT &&) = delete;
-
-public:
-  explicit ScopedLockT(T &l) : Lock(l) {
-    if (Inverted) {
-      Lock.unlock();
-    } else {
-      Lock.lock();
-    }
-  }
-
-  ~ScopedLockT() {
-    if (Inverted) {
-      Lock.lock();
-    } else {
-      Lock.unlock();
-    }
-  }
-
-private:
-  T &Lock;
-};
-
-// -- Mutex --------------------------------------------------------------------
 
 /// A Mutex object that supports `BasicLockable` and `Lockable` C++ concepts.
 /// See http://en.cppreference.com/w/cpp/concept/BasicLockable
@@ -178,7 +144,7 @@ class LazyMutex {
   LazyMutex &operator=(LazyMutex &&) = delete;
 
 public:
-  constexpr LazyMutex() : Handle(threading_impl::lazy_mutex_initializer()) {}
+  constexpr LazyMutex() : Handle(SWIFT_LAZY_MUTEX_INITIALIZER) {}
 
   // No destructor; this is intentional; this class is for STATIC allocation
   // and you don't need to delete mutexes on termination.
@@ -274,6 +240,48 @@ private:
 /// when that is small, and otherwise uses IndirectMutex.
 using SmallMutex =
     std::conditional_t<sizeof(Mutex) <= sizeof(void *), Mutex, IndirectMutex>;
+
+/// A recursive variant of Mutex.
+class RecursiveMutex {
+
+  RecursiveMutex(const RecursiveMutex &) = delete;
+  RecursiveMutex &operator=(const RecursiveMutex &) = delete;
+  RecursiveMutex(RecursiveMutex &&) = delete;
+  RecursiveMutex &operator=(RecursiveMutex &&) = delete;
+
+public:
+  /// Constructs a non-recursive mutex.
+  ///
+  /// If `checked` is true the mutex will attempt to check for misuse and
+  /// fatalError when detected. If `checked` is false (the default) the
+  /// mutex will make little to no effort to check for misuse (more efficient).
+  explicit RecursiveMutex(bool checked = false) {
+    threading_impl::recursive_mutex_init(Handle, checked);
+  }
+  ~RecursiveMutex() { threading_impl::recursive_mutex_destroy(Handle); }
+
+  /// The lock() method has the following properties:
+  /// - Behaves as an atomic operation.
+  /// - Blocks the calling thread until exclusive ownership of the mutex
+  ///   can be obtained.
+  /// - Prior m.unlock() operations on the same mutex synchronize-with
+  ///   this lock operation.
+  /// - Does not throw exceptions but will halt on error (fatalError).
+  void lock() { threading_impl::recursive_mutex_lock(Handle); }
+
+  /// The unlock() method has the following properties:
+  /// - Behaves as an atomic operation.
+  /// - Releases the calling thread's ownership of the mutex and
+  ///   synchronizes-with the subsequent successful lock operations on
+  ///   the same object.
+  /// - The behavior is undefined if the calling thread does not own
+  ///   the mutex.
+  /// - Does not throw exceptions but will halt on error (fatalError).
+  void unlock() { threading_impl::recursive_mutex_unlock(Handle); }
+
+protected:
+  threading_impl::recursive_mutex_handle Handle;
+};
 
 } // namespace swift
 

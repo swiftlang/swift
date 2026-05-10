@@ -70,6 +70,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-rr-code-motion"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
@@ -140,6 +141,8 @@ struct BlockState {
 /// code motion procedure should be.
 class CodeMotionContext {
 protected:
+  SILFunctionTransform *parentTransform;
+
   /// Dataflow needs multiple iteration to converge. If this is false, then we
   /// do not need to generate the genset or killset, i.e. we can simply do 1
   /// pessimistic data flow iteration.
@@ -161,7 +164,7 @@ protected:
   RCIdentityFunctionInfo *RCFI;
 
   /// All the unique refcount roots retained or released in the function.
-  llvm::SetVector<SILValue> RCRootVault;
+  llvm::SmallVector<SILValue, 16> RCRootVault;
 
   /// Contains a map between RC roots to their index in the RCRootVault.
   /// used to facilitate fast RC roots to index lookup.
@@ -184,7 +187,7 @@ protected:
 #ifndef NDEBUG
   // SILPrintContext is used to print block IDs in RPO order.
   // It is optional so only the final insertion point interference is printed.
-  Optional<SILPrintContext> printCtx;
+  std::optional<SILPrintContext> printCtx;
 #endif
 
   /// Return the rc-identity root of the SILValue.
@@ -202,11 +205,13 @@ protected:
 
 public:
   /// Constructor.
-  CodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+  CodeMotionContext(SILFunctionTransform *parentTransform,
+                    llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
                     SILFunction *F,
                     PostOrderFunctionInfo *PO, AliasAnalysis *AA,
                     RCIdentityFunctionInfo *RCFI)
-    : MultiIteration(true), BPA(BPA), F(F), PO(PO), AA(AA), RCFI(RCFI),
+    : parentTransform(parentTransform),
+      MultiIteration(true), BPA(BPA), F(F), PO(PO), AA(AA), RCFI(RCFI),
       InterestBlocks(F) {}
 
   /// virtual destructor.
@@ -254,6 +259,17 @@ bool CodeMotionContext::run() {
   // Initialize the data flow.
   initializeCodeMotionDataFlow();
 
+  if (RCRootVault.size() > 500) {
+    // Emergency exit to avoid bad compile time problems in rare corner cases.
+    // This limit is more than enough for "real world" code.
+    // Even large functions have < 100 locations.
+    // But in some corner cases - especially in generated code - we can run
+    // into quadratic complexity for large functions.
+    // TODO: eventually the ARCCodeMotion passes will be replaced by OSSA
+    //       optimizations which shouldn't have this problem.
+    return false;
+  }
+
   // Converge the BBSetOut with iterative data flow.
   if (MultiIteration) {
     initializeCodeMotionBBMaxSet();
@@ -299,23 +315,28 @@ public:
 
 /// RetainCodeMotionContext - Context to perform retain code motion.
 class RetainCodeMotionContext : public CodeMotionContext {
-  /// All the retain block state for all the basic blocks in the function. 
+  /// All the retain block state for all the basic blocks in the function.
   BasicBlockData<RetainBlockState> BlockStates;
+
+  InstructionSet retainInstructions;
 
   ProgramTerminationFunctionInfo PTFI;
 
+  bool isRetain(SILInstruction *inst) const {
+    return retainInstructions.contains(inst);
+  }
   /// Return true if the instruction blocks the Ptr to be moved further.
   bool mayBlockCodeMotion(SILInstruction *II, SILValue Ptr) override {
     // NOTE: If more checks are to be added, place the most expensive in the
     // end, this function is called many times.
     //
     // These terminator instructions block.
-    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<UnwindInst>(II) ||
-        isa<UnreachableInst>(II))
+    if (isa<ReturnInst>(II) || isa<ThrowInst>(II) || isa<ThrowAddrInst>(II) ||
+        isa<UnwindInst>(II) || isa<UnreachableInst>(II))
       return true;
     // Identical RC root blocks code motion, we will be able to move this retain
     // further once we move the blocking retain.
-    if (isRetainInstruction(II) && getRCRoot(II) == Ptr) {
+    if (isRetain(II) && getRCRoot(II) == Ptr) {
       LLVM_DEBUG(if (printCtx) llvm::dbgs()
                  << "Retain " << Ptr << "  at matching retain " << *II);
       return true;
@@ -342,17 +363,19 @@ class RetainCodeMotionContext : public CodeMotionContext {
     if (&*I->getParent()->begin() == I)
       return nullptr;
     auto Prev = &*std::prev(SILBasicBlock::iterator(I));
-    if (isRetainInstruction(Prev) && getRCRoot(Prev) == Root)
+    if (isRetain(Prev) && getRCRoot(Prev) == Root)
       return Prev;
     return nullptr;
   }
 
 public:
   /// Constructor.
-  RetainCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+  RetainCodeMotionContext(SILFunctionTransform *parentTransform,
+                          llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
                           SILFunction *F, PostOrderFunctionInfo *PO,
                           AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI)
-      : CodeMotionContext(BPA, F, PO, AA, RCFI), BlockStates(F), PTFI(F) {}
+      : CodeMotionContext(parentTransform, BPA, F, PO, AA, RCFI),
+        BlockStates(F), retainInstructions(F), PTFI(F) {}
 
   /// virtual destructor.
   ~RetainCodeMotionContext() override {}
@@ -408,12 +431,18 @@ void RetainCodeMotionContext::initializeCodeMotionDataFlow() {
     for (auto &II : BB) {
       if (!isRetainInstruction(&II))
         continue;
-      RCInstructions.insert(&II);
+      if (!parentTransform->continueWithNextSubpassRun(&II))
+        continue;
       SILValue Root = getRCRoot(&II);
+      if (Root->getType().isMoveOnly()) {
+        continue;
+      }
+      retainInstructions.insert(&II);
+      RCInstructions.insert(&II);
       if (RCRootIndex.find(Root) != RCRootIndex.end())
         continue;
       RCRootIndex[Root] = RCRootVault.size();
-      RCRootVault.insert(Root);
+      RCRootVault.push_back(Root);
       LLVM_DEBUG(llvm::dbgs()
                  << "Retain Root #" << RCRootVault.size() << " " << Root);
     }
@@ -446,7 +475,7 @@ void RetainCodeMotionContext::initializeCodeMotionBBMaxSet() {
    // NOTE: this is a conservative approximation, because some retains may be
    // blocked before it reaches this block.
    for (auto &II : *BB) {
-      if (!isRetainInstruction(&II))
+      if (!isRetain(&II))
         continue;
       State.BBMaxSet.set(RCRootIndex[getRCRoot(&II)]);
     }
@@ -468,7 +497,7 @@ void RetainCodeMotionContext::computeCodeMotionGenKillSet() {
         State.BBGenSet.reset(i);
       }
       // If this is a retain instruction, it also generates.
-      if (isRetainInstruction(&I)) {
+      if (isRetain(&I)) {
         unsigned idx = RCRootIndex[getRCRoot(&I)];
         State.BBGenSet.set(idx);
         assert(State.BBKillSet.test(idx) && "Killset computed incorrectly");
@@ -611,7 +640,7 @@ void RetainCodeMotionContext::computeCodeMotionInsertPoints() {
       }
 
       // If this is a retain instruction, it also generates.
-      if (isRetainInstruction(&*I)) {
+      if (isRetain(&*I)) {
         S.BBSetIn.set(RCRootIndex[getRCRoot(&*I)]);
       }
     }
@@ -657,14 +686,20 @@ public:
 
 /// ReleaseCodeMotionContext - Context to perform release code motion.
 class ReleaseCodeMotionContext : public CodeMotionContext {
-  /// All the release block state for all the basic blocks in the function. 
+  /// All the release block state for all the basic blocks in the function.
   BasicBlockData<ReleaseBlockState> BlockStates;
+
+  InstructionSet releaseInstructions;
 
   /// We are not moving epilogue releases.
   bool FreezeEpilogueReleases;
 
   /// The epilogue release matcher we are currently using.
   ConsumedArgToEpilogueReleaseMatcher &ERM;
+
+  bool isRelease(SILInstruction *inst) const {
+    return releaseInstructions.contains(inst);
+  }
 
   /// Return true if the instruction blocks the Ptr to be moved further.
   bool mayBlockCodeMotion(SILInstruction *II, SILValue Ptr) override {
@@ -677,7 +712,7 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
       return true;
     // Identical RC root blocks code motion, we will be able to move this release
     // further once we move the blocking release.
-    if (isReleaseInstruction(II) && getRCRoot(II) == Ptr) {
+    if (isRelease(II) && getRCRoot(II) == Ptr) {
       LLVM_DEBUG(if (printCtx) llvm::dbgs()
                  << "Release " << Ptr << "  at matching release " << *II);
       return true;
@@ -698,19 +733,22 @@ class ReleaseCodeMotionContext : public CodeMotionContext {
     if (&*I->getParent()->begin() == I)
       return nullptr;
     auto Prev = &*std::prev(SILBasicBlock::iterator(I));
-    if (isReleaseInstruction(Prev) && getRCRoot(Prev) == Root)
+    if (isRelease(Prev) && getRCRoot(Prev) == Root)
       return Prev;
     return nullptr;
   }
 
 public:
   /// Constructor.
-  ReleaseCodeMotionContext(llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
+  ReleaseCodeMotionContext(SILFunctionTransform *parentTransform,
+                           llvm::SpecificBumpPtrAllocator<BlockState> &BPA,
                            SILFunction *F, PostOrderFunctionInfo *PO,
                            AliasAnalysis *AA, RCIdentityFunctionInfo *RCFI,
                            bool FreezeEpilogueReleases,
                            ConsumedArgToEpilogueReleaseMatcher &ERM)
-      : CodeMotionContext(BPA, F, PO, AA, RCFI), BlockStates(F),
+      : CodeMotionContext(parentTransform, BPA, F, PO, AA, RCFI),
+        BlockStates(F),
+        releaseInstructions(F),
         FreezeEpilogueReleases(FreezeEpilogueReleases), ERM(ERM) {}
 
   /// virtual destructor.
@@ -781,12 +819,18 @@ void ReleaseCodeMotionContext::initializeCodeMotionDataFlow() {
       // Do not try to enumerate if we are not hoisting epilogue releases.
       if (FreezeEpilogueReleases && ERM.isEpilogueRelease(&II))
         continue;
+      if (!parentTransform->continueWithNextSubpassRun(&II))
+        continue;
       SILValue Root = getRCRoot(&II);
+      if (Root->getType().isMoveOnly()) {
+        continue;
+      }
+      releaseInstructions.insert(&II);
       RCInstructions.insert(&II);
       if (RCRootIndex.find(Root) != RCRootIndex.end())
         continue;
       RCRootIndex[Root] = RCRootVault.size();
-      RCRootVault.insert(Root);
+      RCRootVault.push_back(Root);
       LLVM_DEBUG(llvm::dbgs()
                  << "Release Root #" << RCRootVault.size() << " " << Root);
     }
@@ -831,7 +875,7 @@ void ReleaseCodeMotionContext::initializeCodeMotionBBMaxSet() {
    // NOTE: this is a conservative approximation, because some releases may be
    // blocked before it reaches this block.
    for (auto II = BB->rbegin(), IE = BB->rend(); II != IE; ++II) {
-      if (!isReleaseInstruction(&*II))
+      if (!isRelease(&*II))
         continue;
       State.BBMaxSet.set(RCRootIndex[getRCRoot(&*II)]);
     }
@@ -859,7 +903,7 @@ void ReleaseCodeMotionContext::computeCodeMotionGenKillSet() {
         continue;
 
       // If this is a release instruction, it also generates.
-      if (isReleaseInstruction(&*I)) {
+      if (isRelease(&*I)) {
         unsigned idx = RCRootIndex[getRCRoot(&*I)];
         State.BBGenSet.set(idx);
         assert(State.BBKillSet.test(idx) && "Killset computed incorrectly");
@@ -1049,7 +1093,7 @@ void ReleaseCodeMotionContext::computeCodeMotionInsertPoints() {
         continue;
 
       // This release generates.
-      if (isReleaseInstruction(&*I)) {
+      if (isRelease(&*I)) {
         S.BBSetOut.set(RCRootIndex[getRCRoot(&*I)]);
       }
     }
@@ -1201,12 +1245,12 @@ public:
             Conv,
             ConsumedArgToEpilogueReleaseMatcher::ExitKind::Return);
 
-      ReleaseCodeMotionContext RelCM(BPA, F, PO, AA, RCFI, 
+      ReleaseCodeMotionContext RelCM(this, BPA, F, PO, AA, RCFI, 
                                      FreezeEpilogueReleases, ERM); 
       // Run release hoisting.
       InstChanged |= RelCM.run();
     } else {
-      RetainCodeMotionContext RetCM(BPA, F, PO, AA, RCFI);
+      RetainCodeMotionContext RetCM(this, BPA, F, PO, AA, RCFI);
       // Run retain sinking.
       InstChanged |= RetCM.run();
       // Eliminate any retains that are right before program termination

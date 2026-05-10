@@ -75,11 +75,11 @@ class AnotherClass {
 AnotherClass() . /*nested:call*/foo(a: 1) . /*nested2*/bar . /*nested2*/bar . /*nested:call*/foo(a: 2) . /*nested:call*/foo(a: 3) . /*nested:unknown*/foo . foo(a: 4)
 
 struct Memberwise {
-    let /*memberwise-x:def*/new_x: Int
+    let /*memberwise-x:def*/<base>x</base>: Int
     let y: Int = 0
     var z: Int = 2
 }
-_ = Memberwise(/*memberwise-x:ref*/new_x: 1, z: 3)
-let memberwise = Memberwise.init(/*memberwise-x:ref*/new_x:z:)
-_ = memberwise . /*memberwise-x:ref*/new_x
+_ = Memberwise(/*memberwise-x:ref*/<base>x</base>: 1, z: 3)
+let memberwise = Memberwise.init(/*memberwise-x:ref*/<base>x</base>:z:)
+_ = memberwise . /*memberwise-x:ref*/<base>x</base>
 

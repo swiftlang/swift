@@ -21,7 +21,7 @@
 
 #if SWIFT_RUNTIME_ENABLE_LEAK_CHECKER
 
-#include "../SwiftShims/Visibility.h"
+#include "swift/shims/Visibility.h"
 
 #include "swift/Runtime/Config.h"
 

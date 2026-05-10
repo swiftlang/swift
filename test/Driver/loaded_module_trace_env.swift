@@ -1,6 +1,7 @@
-// RUN: rm -f %t
-// RUN: env SWIFT_LOADED_MODULE_TRACE_FILE=%t %target-build-swift -module-name loaded_module_trace_env -c %s -o- > /dev/null
-// RUN: %FileCheck %s < %t
+// RUN: %empty-directory(%t)
+// RUN: %empty-directory(%t/cache)
+// RUN: env SWIFT_LOADED_MODULE_TRACE_FILE=%t/trace %target-build-swift -module-name loaded_module_trace_env -c %s -o- -module-cache-path %t/cache > /dev/null
+// RUN: %FileCheck %s < %t/trace
 
 // CHECK: {
 // CHECK: "version":2

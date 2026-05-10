@@ -30,6 +30,8 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/ClangImporter/ClangModule.h"
+#include "swift/Parse/Lexer.h"
 #include "llvm/Support/Compiler.h"
 
 using namespace swift;
@@ -46,7 +48,26 @@ void ASTScopeImpl::unqualifiedLookup(
 
 const ASTScopeImpl *ASTScopeImpl::findStartingScopeForLookup(
     SourceFile *sourceFile, const SourceLoc loc) {
-  auto *const fileScope = sourceFile->getScope().impl;
+  auto *fileScope = sourceFile->getScope().impl;
+
+  // Workaround for bad locations; just return the file scope.
+  if (loc.isInvalid())
+    return fileScope;
+
+  // Some callers get the actual source file wrong. Look for the actual
+  // source file containing this location.
+  auto actualSF =
+      sourceFile->getParentModule()->getSourceFileContainingLocation(loc);
+
+  // If there is no source file containing this location, just return the
+  // scope we have.
+  if (!actualSF)
+    return fileScope;
+
+  // Grab the new file scope.
+  if (actualSF != sourceFile)
+    fileScope = actualSF->getScope().impl;
+
   const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
   ASTScopeAssert(innermost->getWasExpanded(),
                  "If looking in a scope, it must have been expanded.");
@@ -76,11 +97,11 @@ ASTScopeImpl *ASTScopeImpl::findInnermostEnclosingScopeImpl(
 /// If the \p loc is in a new buffer but \p range is not, consider the location
 /// is at the start of replaced range. Otherwise, returns \p loc as is.
 static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
-                                              CharSourceRange range,
+                                              SourceLoc rangeStart,
                                               SourceLoc loc) {
   for (const auto &pair : sourceMgr.getReplacedRanges()) {
     if (sourceMgr.rangeContainsTokenLoc(pair.second, loc) &&
-        !sourceMgr.rangeContainsTokenLoc(pair.second, range.getStart())) {
+        !sourceMgr.rangeContainsTokenLoc(pair.second, rangeStart)) {
       return pair.first.Start;
     }
   }
@@ -90,23 +111,23 @@ static SourceLoc translateLocForReplacedRange(SourceManager &sourceMgr,
 NullablePtr<ASTScopeImpl>
 ASTScopeImpl::findChildContaining(SourceLoc loc,
                                   SourceManager &sourceMgr) const {
+  if (loc.isInvalid())
+    return nullptr;
+
   // Use binary search to find the child that contains this location.
   auto *const *child = llvm::lower_bound(
       getChildren(), loc,
-      [&sourceMgr](const ASTScopeImpl *scope, SourceLoc loc) {
+      [&](const ASTScopeImpl *scope, SourceLoc loc) {
         auto rangeOfScope = scope->getCharSourceRangeOfScope(sourceMgr);
-        ASTScopeAssert(!sourceMgr.isBeforeInBuffer(rangeOfScope.getEnd(),
-                                                   rangeOfScope.getStart()),
-                       "Source range is backwards");
-        loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
-        return (rangeOfScope.getEnd() == loc ||
-                sourceMgr.isBeforeInBuffer(rangeOfScope.getEnd(), loc));
+        loc = translateLocForReplacedRange(sourceMgr, rangeOfScope.Start, loc);
+        return sourceMgr.isAtOrBefore(rangeOfScope.End, loc);
       });
 
   if (child != getChildren().end()) {
     auto rangeOfScope = (*child)->getCharSourceRangeOfScope(sourceMgr);
-    loc = translateLocForReplacedRange(sourceMgr, rangeOfScope, loc);
-    if (rangeOfScope.contains(loc))
+    loc = translateLocForReplacedRange(sourceMgr, rangeOfScope.Start, loc);
+    if (sourceMgr.isAtOrBefore(rangeOfScope.Start, loc) &&
+        sourceMgr.isBefore(loc, rangeOfScope.End))
       return *child;
   }
 
@@ -123,8 +144,7 @@ void ASTScopeImpl::lookup(const NullablePtr<const ASTScopeImpl> limit,
   consumer.startingNextLookupStep();
 #endif
 
-  // Certain illegal nestings, e.g. protocol nestled inside a struct,
-  // require that lookup stop at the outer scope.
+  // Certain illegal nestings require that lookup stop at the outer scope.
   if (this == limit.getPtrOrNull()) {
 #ifndef NDEBUG
     consumer.finishingLookup("limit return");
@@ -166,10 +186,10 @@ NullablePtr<const GenericParamList> ASTScopeImpl::genericParams() const {
 }
 NullablePtr<const GenericParamList>
 AbstractFunctionDeclScope::genericParams() const {
-  return decl->getGenericParams();
+  return decl->getParsedGenericParams();
 }
 NullablePtr<const GenericParamList> SubscriptDeclScope::genericParams() const {
-  return decl->getGenericParams();
+  return decl->getParsedGenericParams();
 }
 NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
   // For Decls:
@@ -188,6 +208,20 @@ NullablePtr<const GenericParamList> GenericTypeScope::genericParams() const {
 }
 NullablePtr<const GenericParamList> ExtensionScope::genericParams() const {
   return decl->getGenericParams();
+}
+NullablePtr<const GenericParamList> MacroDeclScope::genericParams() const {
+  return decl->getParsedGenericParams();
+}
+
+bool MacroDeclScope::lookupLocalsOrMembers(
+    DeclConsumer consumer) const {
+  if (auto *paramList = decl->parameterList) {
+    for (auto *paramDecl : *paramList)
+      if (consumer.consume({paramDecl}))
+        return true;
+  }
+
+  return false;
 }
 
 #pragma mark lookInMyGenericParameters
@@ -228,6 +262,20 @@ bool ASTScopeImpl::lookupLocalsOrMembers(DeclConsumer) const {
   return false; // many kinds of scopes have none
 }
 
+bool AbstractFunctionDeclScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
+  // Special case: if we're within a function inside a type context, but the
+  // parent context is within a Clang module unit, we need to make sure to
+  // look for members in it.
+  auto dc = decl->getDeclContext();
+  if (!dc->isTypeContext())
+    return false;
+
+  if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+    return false;
+
+  return consumer.lookInMembers(cast<GenericContext>(dc->getAsDecl()));
+}
+
 bool GenericTypeOrExtensionScope::lookupLocalsOrMembers(
     ASTScopeImpl::DeclConsumer consumer) const {
   return portion->lookupMembersOf(this, consumer);
@@ -238,22 +286,24 @@ bool Portion::lookupMembersOf(const GenericTypeOrExtensionScope *,
   return false;
 }
 
-bool GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
+bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
+    const GenericTypeOrExtensionScope *scope,
+    ASTScopeImpl::DeclConsumer consumer) const {
+  if (scope->getCorrespondingNominalTypeDecl().isNull())
+    return false;
+
+  if (!scope->areMembersVisibleFromWhereClause())
+    return false;
+
+  return consumer.lookInMembers(scope->getGenericContext());
+}
+
+bool IterableTypeBodyPortion::lookupMembersOf(
     const GenericTypeOrExtensionScope *scope,
     ASTScopeImpl::DeclConsumer consumer) const {
   if (scope->getCorrespondingNominalTypeDecl().isNull())
     return false;
   return consumer.lookInMembers(scope->getGenericContext());
-}
-
-bool GenericTypeOrExtensionWherePortion::lookupMembersOf(
-    const GenericTypeOrExtensionScope *scope,
-    ASTScopeImpl::DeclConsumer consumer) const {
-  if (!scope->areMembersVisibleFromWhereClause())
-    return false;
-
-  return GenericTypeOrExtensionWhereOrBodyPortion::lookupMembersOf(
-    scope, consumer);
 }
 
 bool GenericTypeOrExtensionScope::areMembersVisibleFromWhereClause() const {
@@ -269,12 +319,10 @@ PatternEntryInitializerScope::getLookupParent() const {
 
   // Skip generic parameter scopes, which occur here due to named opaque
   // result types.
-  // FIXME: Proper isa/dyn_cast support would be better than a string
-  // comparison here.
-  while (parent->getClassName() == "GenericParamScope")
+  while (isa<GenericParamScope>(parent))
     parent = parent->getLookupParent().get();
 
-  ASTScopeAssert(parent->getClassName() == "PatternEntryDeclScope",
+  ASTScopeAssert(isa<PatternEntryDeclScope>(parent),
                  "PatternEntryInitializerScope in unexpected place");
 
   // Lookups from inside a pattern binding initializer skip the parent
@@ -291,7 +339,7 @@ PatternEntryInitializerScope::getLookupParent() const {
 NullablePtr<const ASTScopeImpl>
 ConditionalClauseInitializerScope::getLookupParent() const {
   auto parent = getParent().get();
-  ASTScopeAssert(parent->getClassName() == "ConditionalClausePatternUseScope",
+  ASTScopeAssert(isa<ConditionalClausePatternUseScope>(parent),
                  "ConditionalClauseInitializerScope in unexpected place");
 
   // Lookups from inside a conditional clause initializer skip the parent
@@ -327,10 +375,10 @@ bool CaseLabelItemScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 }
 
 bool CaseStmtBodyScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
-  for (auto *var : stmt->getCaseBodyVariablesOrEmptyArray())
+  for (auto *var : stmt->getCaseBodyVariables()) {
     if (consumer.consume({var}))
-        return true;
-
+      return true;
+  }
   return false;
 }
 
@@ -403,9 +451,7 @@ bool BraceStmtScope::lookupLocalsOrMembers(DeclConsumer consumer) const {
 bool PatternEntryInitializerScope::lookupLocalsOrMembers(
     DeclConsumer consumer) const {
   // 'self' is available within the pattern initializer of a 'lazy' variable.
-  auto *initContext = dyn_cast_or_null<PatternBindingInitializer>(
-      decl->getInitContext(0));
-  if (initContext) {
+  if (auto *initContext = decl->getInitContext(0)) {
     if (auto *selfParam = initContext->getImplicitSelfDecl()) {
       return consumer.consume({selfParam});
     }
@@ -440,8 +486,13 @@ bool ASTScopeImpl::lookupLocalBindingsInPattern(const Pattern *p,
     return false;
   bool isDone = false;
   p->forEachVariable([&](VarDecl *var) {
-    if (!isDone)
-      isDone = consumer.consume({var});
+    if (!isDone) {
+      SmallVector<ValueDecl *, 2> vars = { var };
+      auto abiRole = ABIRoleInfo(var);
+      if (!abiRole.providesABI())
+        vars.push_back(abiRole.getCounterpart());
+      isDone = consumer.consume(vars);
+    }
   });
   return isDone;
 }
@@ -474,13 +525,13 @@ GenericTypeOrExtensionScope::getLookupLimitForDecl() const {
 
 NullablePtr<const ASTScopeImpl>
 NominalTypeScope::getLookupLimitForDecl() const {
-  if (isa<ProtocolDecl>(decl)) {
-    // ProtocolDecl can only be legally nested in a SourceFile,
-    // so any other kind of Decl is illegal
-    return parentIfNotChildOfTopScope();
-  }
-  // AFAICT, a struct, decl, or enum can be nested inside anything
-  // but a ProtocolDecl.
+  // If a protocol is (invalidly) nested in a generic context,
+  // do not look in to those outer generic contexts,
+  // as types found there may contain implicitly inferred generic parameters.
+  if (isa<ProtocolDecl>(decl) && decl->getDeclContext()->isGenericContext())
+    return getLookupParent();
+
+  // Otherwise, nominals can be nested inside anything but a ProtocolDecl.
   return ancestorWithDeclSatisfying(
       [&](const Decl *const d) { return isa<ProtocolDecl>(d); });
 }
@@ -529,6 +580,12 @@ bool CaseStmtBodyScope::isLabeledStmtLookupTerminator() const {
 }
 
 bool PatternEntryDeclScope::isLabeledStmtLookupTerminator() const {
+  return false;
+}
+
+bool PatternEntryInitializerScope::isLabeledStmtLookupTerminator() const {
+  // This is needed for SingleValueStmtExprs, which may be used in bindings,
+  // and have nested statements.
   return false;
 }
 
@@ -586,4 +643,131 @@ std::pair<CaseStmt *, CaseStmt *> ASTScopeImpl::lookupFallthroughSourceAndDest(
   }
 
   return { nullptr, nullptr };
+}
+
+void ASTScopeImpl::lookupEnclosingMacroScope(
+    SourceFile *sourceFile, SourceLoc loc,
+    llvm::function_ref<bool(ASTScope::PotentialMacro)> consume) {
+  if (!sourceFile || sourceFile->Kind == SourceFileKind::Interface)
+    return;
+
+  if (loc.isInvalid())
+    return;
+
+  auto *fileScope = sourceFile->getScope().impl;
+  auto *scope = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  do {
+    if (auto expansionScope = dyn_cast<MacroExpansionDeclScope>(scope)) {
+      auto *expansionDecl = expansionScope->decl;
+      if (expansionDecl && consume(expansionDecl))
+        return;
+    }
+
+    if (auto customAttrScope = dyn_cast<CustomAttributeScope>(scope)) {
+      if (consume(customAttrScope->attr))
+        return;
+    }
+
+    // If we've reached a source file scope, we can't be inside of
+    // a macro argument. Either this is a top-level source file, or
+    // it's macro expansion buffer. We have to check for this because
+    // macro expansion buffers for freestanding macros are children of
+    // MacroExpansionDeclScope, and child scopes of freestanding macros
+    // are otherwise inside the macro argument.
+    if (isa<ASTSourceFileScope>(scope))
+      return;
+
+  } while ((scope = scope->getParent().getPtrOrNull()));
+}
+
+ABIAttr *ASTScopeImpl::
+lookupEnclosingABIAttributeScope(SourceFile *sourceFile, SourceLoc loc) {
+  if (!sourceFile || loc.isInvalid())
+    return nullptr;
+
+  auto *fileScope = sourceFile->getScope().impl;
+  auto *scope = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  do {
+    if (auto abiAttrScope = dyn_cast<ABIAttributeScope>(scope)) {
+      return abiAttrScope->attr;
+    }
+  } while ((scope = scope->getParent().getPtrOrNull()));
+  
+  return nullptr;
+}
+
+/// Retrieve the catch node associated with this scope, if any.
+static CatchNode getCatchNode(const ASTScopeImpl *scope) {
+  // Closures introduce a catch scope for errors initiated in their body.
+  if (auto closureParams = dyn_cast<ClosureParametersScope>(scope)) {
+    if (auto closure = dyn_cast<ClosureExpr>(closureParams->closureExpr))
+      return closure;
+  }
+
+  // Functions introduce a catch scope for errors initiated in their body.
+  if (auto function = dyn_cast<FunctionBodyScope>(scope))
+    return function->decl;
+
+  // Do..catch blocks introduce a catch scope for errors initiated in the `do`
+  // body.
+  if (auto doCatch = dyn_cast<DoCatchStmtScope>(scope))
+    return doCatch->stmt;
+
+  return CatchNode();
+}
+
+/// Check whether the given location precedes the start of the catch location
+/// despite being technically within the catch node's source range.
+static bool locationIsPriorToStartOfCatchScope(SourceLoc loc, CatchNode node) {
+  auto closure = node.dyn_cast<ClosureExpr *>();
+  if (!closure)
+    return false;
+
+  SourceManager &sourceMgr = closure->getASTContext().SourceMgr;
+  SourceLoc inLoc = closure->getInLoc();
+  if (inLoc.isValid())
+    return sourceMgr.isBefore(loc, inLoc);
+
+  return sourceMgr.isAtOrBefore(loc, closure->getStartLoc());
+}
+
+CatchNode ASTScopeImpl::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
+  auto sourceFile = module->getSourceFileContainingLocation(loc);
+  if (!sourceFile)
+    return nullptr;
+
+  auto *fileScope = sourceFile->getScope().impl;
+  const auto *innermost = fileScope->findInnermostEnclosingScope(loc, nullptr);
+  ASTScopeAssert(innermost->getWasExpanded(),
+                 "If looking in a scope, it must have been expanded.");
+
+  // Look for a body scope that's the direct descendent of a catch node.
+  const BraceStmtScope *innerBodyScope = nullptr;
+  for (auto scope = innermost; scope; scope = scope->getParent().getPtrOrNull()) {
+    // If we are at a catch node and in the body of the region from which that
+    // node catches thrown errors, we have our result.
+    if (innerBodyScope && innerBodyScope->getParent() == scope) {
+      // For a macro expansion, we may have an intermediate source file scope,
+      // we can look through it.
+      auto catchScope = scope;
+      if (auto *sfScope = dyn_cast<ASTSourceFileScope>(catchScope)) {
+        if (auto parent = sfScope->getParent())
+          catchScope = parent.get();
+      }
+      auto caught = getCatchNode(catchScope);
+      if (caught && !locationIsPriorToStartOfCatchScope(loc, caught))
+          return caught;
+    }
+
+    // If this is a try scope for a try! or try?, it catches the error.
+    if (auto tryScope = dyn_cast<TryScope>(scope)) {
+      if (isa<ForceTryExpr>(tryScope->expr) ||
+          isa<OptionalTryExpr>(tryScope->expr))
+        return tryScope->expr;
+    }
+
+    innerBodyScope = dyn_cast<BraceStmtScope>(scope);
+  }
+
+  return nullptr;
 }

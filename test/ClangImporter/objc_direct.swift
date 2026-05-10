@@ -1,9 +1,7 @@
-// RUN: %target-swift-frontend-verify -typecheck %s -enable-objc-interop -import-objc-header %S/../Inputs/objc_direct.h
+// RUN: %target-swift-frontend-verify -verify-ignore-unrelated -typecheck %s -enable-objc-interop -import-objc-header %S/../Inputs/objc_direct.h
 
 // REQUIRES: objc_interop
 
-let _ = Bar(value: 4)               // expected-error {{'init(value:)' is unavailable in Swift}}
-let _ = Bar.init(value: 5)          // expected-error {{'init(value:)' is unavailable in Swift}}
 var something = Bar() as AnyObject
 
 something.directProperty = 123      // expected-error {{value of type 'AnyObject' has no member 'directProperty'}}

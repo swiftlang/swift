@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -355,6 +355,33 @@ public protocol Sequence<Element> {
   ///   In this case, see the documentation of `Collection.underestimatedCount`.
   var underestimatedCount: Int { get }
 
+  /// Sequences whose `Element` is `Equatable` and that are able to quickly
+  /// check if they contain a particular value can implement this requirement
+  /// to speed up the standard `contains` method.
+  ///
+  /// The default implementation returns nil, indicating that `contains` should
+  /// fall back to the standard linear search algorithm.
+  ///
+  /// `Sequence` and `Collection` algorithms other than `contains` itself may
+  /// adapt their behavior based on whether or not this function returns nil.
+  /// For example, a generic algorithm that needs to do containment checks for
+  /// many different values may decide not to copy items into a temporary `Set`
+  /// if it sees that the sequence implements this method. Therefore, sequences
+  /// should only implement this method if they can do it in better than linear
+  /// time.
+  ///
+  /// For sequences that are destructively consumed by iteration, calling this
+  /// method must not consume any elements. (Such sequences usually leave this
+  /// method with its default, `nil`-returning implementation, which trivially
+  /// satisfies this requirement.)
+  ///
+  /// - Returns: `nil` if containment cannot be verified in better than linear
+  ///    time; otherwise, the method returns a boolean value indicating whether
+  ///    or not the item is an element of this sequence.
+  ///
+  /// - Complexity: If this function returns `nil`, it must do so in constant
+  ///    (O(1)) time. If this returns non-`nil`, then it must have better than linear
+  ///    (O(*n*)) complexity.
   func _customContainsEquatableElement(
     _ element: Element
   ) -> Bool?
@@ -418,6 +445,7 @@ public protocol Sequence<Element> {
   /// - Returns: The value returned from `body`, unless the sequence doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @safe
   func withContiguousStorageIfAvailable<R>(
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R?
@@ -426,7 +454,7 @@ public protocol Sequence<Element> {
 // Provides a default associated type witness for Iterator when the
 // Self type is both a Sequence and an Iterator.
 extension Sequence where Self: IteratorProtocol {
-  // @_implements(Sequence, Iterator)
+  @_implements(Sequence, Iterator)
   public typealias _Default_Iterator = Self
 }
 
@@ -460,12 +488,15 @@ public struct DropFirstSequence<Base: Sequence> {
   }
 }
 
+extension DropFirstSequence: Sendable where Base: Sendable {}
+
 extension DropFirstSequence: Sequence {
   public typealias Element = Base.Element
   public typealias Iterator = Base.Iterator
   public typealias SubSequence = AnySequence<Element>
   
   @inlinable
+  @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     var it = _base.makeIterator()
     var dropped = 0
@@ -503,6 +534,8 @@ public struct PrefixSequence<Base: Sequence> {
   }
 }
 
+extension PrefixSequence: Sendable where Base: Sendable {}
+
 extension PrefixSequence {
   @frozen
   public struct Iterator {
@@ -518,6 +551,8 @@ extension PrefixSequence {
     }
   }  
 }
+
+extension PrefixSequence.Iterator: Sendable where Base.Iterator: Sendable {}
 
 extension PrefixSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element
@@ -576,6 +611,9 @@ public struct DropWhileSequence<Base: Sequence> {
   }
 }
 
+extension DropWhileSequence: Sendable
+  where Base.Iterator: Sendable, Element: Sendable {}
+
 extension DropWhileSequence {
   @frozen
   public struct Iterator {
@@ -591,6 +629,9 @@ extension DropWhileSequence {
     }
   }
 }
+
+extension DropWhileSequence.Iterator: Sendable
+  where Base.Iterator: Sendable, Element: Sendable {}
 
 extension DropWhileSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element
@@ -643,9 +684,10 @@ extension Sequence {
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
   @inlinable
-  public func map<T>(
-    _ transform: (Element) throws -> T
-  ) rethrows -> [T] {
+  @_alwaysEmitIntoClient
+  public func map<T, E>(
+    _ transform: (Element) throws(E) -> T
+  ) throws(E) -> [T] {
     let initialCapacity = underestimatedCount
     var result = ContiguousArray<T>()
     result.reserveCapacity(initialCapacity)
@@ -662,6 +704,20 @@ extension Sequence {
     }
     return Array(result)
   }
+
+#if !$Embedded
+  // ABI-only entrypoint for the rethrows version of map, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @usableFromInline
+  @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
+  func __rethrows_map<T>(
+    _ transform: (Element) throws -> T
+  ) throws -> [T] {
+    try map(transform)
+  }
+#endif
 
   /// Returns an array containing, in order, the elements of the sequence
   /// that satisfy the given predicate.
@@ -680,17 +736,35 @@ extension Sequence {
   /// - Returns: An array of the elements that `isIncluded` allowed.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public __consuming func filter(
-    _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  @_alwaysEmitIntoClient
+  public __consuming func filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
     return try _filter(isIncluded)
   }
 
-  @_transparent
-  public func _filter(
+#if !hasFeature(Embedded)
+  // ABI-only entrypoint for the rethrows version of filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_filter(
     _ isIncluded: (Element) throws -> Bool
-  ) rethrows -> [Element] {
+  ) throws -> [Element] {
+    try filter(isIncluded)
+  }
+#endif // !hasFeature(Embedded)
+
+  @_alwaysEmitIntoClient  @_transparent
+  public func _filter<E: Error>(
+    _ isIncluded: (Element) throws(E) -> Bool
+  ) throws(E) -> [Element] {
 
     var result = ContiguousArray<Element>()
 
@@ -704,6 +778,24 @@ extension Sequence {
 
     return Array(result)
   }
+
+#if !hasFeature(Embedded)
+  // ABI-only entrypoint for the rethrows version of _filter, which has been
+  // superseded by the typed-throws version. Expressed as "throws", which is
+  // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    __consuming func _filter(
+      _ isIncluded: (Element) throws -> Bool
+    ) throws -> [Element]
+  )
+  @usableFromInline
+  internal __consuming func __legacyABI_underscore_filter(
+    _ isIncluded: (Element) throws -> Bool
+  ) throws -> [Element] {
+    try _filter(isIncluded)
+  }
+#endif // !hasFeature(Embedded)
 
   /// A value less than or equal to the number of elements in the sequence,
   /// calculated nondestructively.
@@ -961,7 +1053,10 @@ extension Sequence {
         ringBuffer.append(element)
       } else {
         ringBuffer[i] = element
-        i = (i + 1) % maxLength
+        i += 1
+        if i >= maxLength {
+          i = 0
+        }
       }
     }
 
@@ -1040,7 +1135,10 @@ extension Sequence {
       } else {
         result.append(ringBuffer[i])
         ringBuffer[i] = element
-        i = (i + 1) % k
+        i += 1
+        if i >= k {
+          i = 0
+        }
       }
     }
     return Array(result)
@@ -1165,7 +1263,7 @@ extension Sequence {
   public __consuming func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
-    return _copySequenceContents(initializing: buffer)
+    return unsafe _copySequenceContents(initializing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -1178,13 +1276,14 @@ extension Sequence {
       guard let x = it.next() else {
         return (it, idx)
       }
-      ptr.initialize(to: x)
-      ptr += 1
+      unsafe ptr.initialize(to: x)
+      unsafe ptr += 1
     }
     return (it, buffer.endIndex)
   }
     
   @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -1214,6 +1313,9 @@ public struct IteratorSequence<Base: IteratorProtocol> {
 }
 
 extension IteratorSequence: IteratorProtocol, Sequence {
+
+  public typealias Element = Base.Element
+
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///

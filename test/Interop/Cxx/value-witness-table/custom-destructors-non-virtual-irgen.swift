@@ -6,33 +6,32 @@
 import CustomDestructor
 
 protocol InitWithDummy {
-  init(dummy: DummyStruct)
+  init(_: DummyStruct)
 }
 
 extension HasUserProvidedDestructorAndDummy : InitWithDummy { }
 
 // Make sure the destructor is added as a witness.
 // CHECK: @"$sSo33HasUserProvidedDestructorAndDummyVWV" = linkonce_odr hidden constant %swift.vwtable
-// CHECK-SAME: i8* bitcast (void (%swift.opaque*, %swift.type*)* @"$sSo33HasUserProvidedDestructorAndDummyVwxx" to i8*)
+// CHECK-SAME: ptr @"$sSo33HasUserProvidedDestructorAndDummyVwxx"
 
 // CHECK-LABEL: define {{.*}}void @"$s4main37testHasUserProvidedDestructorAndDummyyyF"
 // CHECK: [[OBJ:%.*]] = alloca %TSo33HasUserProvidedDestructorAndDummyV
-// CHECK: [[CXX_OBJ:%.*]] = bitcast %TSo33HasUserProvidedDestructorAndDummyV* [[OBJ]] to %struct.HasUserProvidedDestructorAndDummy*
-// CHECK: call {{.*}}@{{_ZN33HasUserProvidedDestructorAndDummyD(1|2)Ev|"\?\?1HasUserProvidedDestructorAndDummy@@QEAA@XZ"}}(%struct.HasUserProvidedDestructorAndDummy* [[CXX_OBJ]])
+// CHECK: call {{.*}}@{{_ZN33HasUserProvidedDestructorAndDummyD(1|2)Ev|"\?\?1HasUserProvidedDestructorAndDummy@@QEAA@XZ"}}(ptr [[OBJ]])
 // CHECK: ret void
 
 // Make sure we not only declare but define the destructor.
 // CHECK-LABEL: define {{.*}}@{{_ZN33HasUserProvidedDestructorAndDummyD(1|2)Ev|"\?\?1HasUserProvidedDestructorAndDummy@@QEAA@XZ"}}
 // CHECK: ret
 public func testHasUserProvidedDestructorAndDummy() {
-  _ = HasUserProvidedDestructorAndDummy(dummy: DummyStruct())
+  _ = HasUserProvidedDestructorAndDummy(DummyStruct())
 }
 
 // CHECK-LABEL: define {{.*}}void @"$s4main26testHasDefaultedDestructoryyF"
-// CHECK: call {{.*}}@{{_ZN22HasDefaultedDestructorC(1|2)Ev|"\?\?0HasDefaultedDestructor@@QEAA@XZ"}}(%struct.HasDefaultedDestructor*
+// CHECK: call {{.*}}@{{_ZN22HasDefaultedDestructorC(1|2)Ev|"\?\?0HasDefaultedDestructor@@QEAA@XZ"}}(ptr
 // CHECK: ret void
 
-// CHECK-LABEL: define {{.*}}@{{_ZN22HasDefaultedDestructorC(1|2)Ev|"\?\?0HasDefaultedDestructor@@QEAA@XZ"}}(%struct.HasDefaultedDestructor*
+// CHECK-LABEL: define {{.*}}@{{_ZN22HasDefaultedDestructorC(1|2)Ev|"\?\?0HasDefaultedDestructor@@QEAA@XZ"}}(ptr
 // CHECK: ret
 public func testHasDefaultedDestructor() {
   _ = HasDefaultedDestructor()
@@ -40,5 +39,5 @@ public func testHasDefaultedDestructor() {
 
 // Make sure the destroy value witness calls the destructor.
 // CHECK-LABEL: define {{.*}}void @"$sSo33HasUserProvidedDestructorAndDummyVwxx"
-// CHECK: call {{.*}}@{{_ZN33HasUserProvidedDestructorAndDummyD(1|2)Ev|"\?\?1HasUserProvidedDestructorAndDummy@@QEAA@XZ"}}(%struct.HasUserProvidedDestructorAndDummy*
+// CHECK: call {{.*}}@{{_ZN33HasUserProvidedDestructorAndDummyD(1|2)Ev|"\?\?1HasUserProvidedDestructorAndDummy@@QEAA@XZ"}}(ptr
 // CHECK: ret

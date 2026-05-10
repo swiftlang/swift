@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -Onone -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=NONE
-// RUN: %target-swift-frontend -Osize -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
-// RUN: %target-swift-frontend -O -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
-// RUN: %target-swift-frontend -Ounchecked -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=UNCHECKED
+// RUN: %target-swift-frontend -Onone -Xllvm -sil-print-types -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=NONE
+// RUN: %target-swift-frontend -Osize -Xllvm -sil-print-types -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=OPT
+// RUN: %target-swift-frontend -Ounchecked -Xllvm -sil-print-types -emit-sil -parse-as-library %s | %FileCheck %s --check-prefix=CHECK --check-prefix=UNCHECKED
 
 @inline(never)
 func takesInoutAndEscaping(_: inout Int, _ f: @escaping () -> ()) {
@@ -29,7 +29,7 @@ public func accessIntTwice() {
 
 // closure #1 in accessIntTwice()
 // CHECK-LABEL: sil {{.*}}@$s26access_enforcement_options0A8IntTwiceyyFyycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
-// CHECK: bb0(%0 : ${ var Int }):
+// CHECK: bb0(%0 : @closureCapture ${ var Int }):
 // CHECK: [[PROJ:%.*]] = project_box %0 : ${ var Int }, 0
 // NONE: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [[PROJ]] : $*Int
 // OPT: [[ACCESS:%.*]] = begin_access [modify] [dynamic] [no_nested_conflict] [[PROJ]] : $*Int

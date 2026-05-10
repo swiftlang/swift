@@ -97,7 +97,7 @@ class TestPathType(unittest.TestCase):
         path_type(__file__)
 
         with self.assertRaises(ArgumentTypeError):
-            path_type('/nonsensisal/path/')
+            path_type('/nonsensical/path/')
 
         with self.assertRaises(ArgumentTypeError):
             path_type('~/not-a-real/path to a file')

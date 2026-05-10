@@ -13,9 +13,9 @@
 #include "swift/StaticMirror/BinaryScanningTool.h"
 #include "swift/Basic/Unreachable.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/Reflection/ReflectionContext.h"
-#include "swift/Reflection/TypeRefBuilder.h"
-#include "swift/Reflection/TypeLowering.h"
+#include "swift/RemoteInspection/ReflectionContext.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
+#include "swift/RemoteInspection/TypeLowering.h"
 #include "swift/Remote/CMemoryReader.h"
 #include "swift/StaticMirror/ObjectFileContext.h"
 
@@ -52,7 +52,13 @@ BinaryScanningTool::BinaryScanningTool(
     ObjectOwners.push_back(std::move(ObjectOwner));
     ObjectFiles.push_back(O);
   }
-  Context = makeReflectionContextForObjectFiles(ObjectFiles);
+  // FIXME: This could/should be configurable.
+#if SWIFT_OBJC_INTEROP
+  bool ObjCInterop = true;
+#else
+  bool ObjCInterop = false;
+#endif
+  Context = makeReflectionContextForObjectFiles(ObjectFiles, ObjCInterop);
   PointerSize = Context->PointerSize;
 }
 
@@ -106,15 +112,19 @@ BinaryScanningTool::collectAllAssociatedTypes() {
     case 4:
       // FIXME: This could/should be configurable.
 #if SWIFT_OBJC_INTEROP
-      return Context->Builder.collectAssociatedTypes<WithObjCInterop, 4>(llvm::Optional<std::string>());
+      return Context->Builder.collectAssociatedTypes<WithObjCInterop, 4>(
+          std::optional<std::string>());
 #else
-      return Context->Builder.collectAssociatedTypes<NoObjCInterop, 4>(llvm::Optional<std::string>());
+      return Context->Builder.collectAssociatedTypes<NoObjCInterop, 4>(
+          std::optional<std::string>());
 #endif
     case 8:
 #if SWIFT_OBJC_INTEROP
-      return Context->Builder.collectAssociatedTypes<WithObjCInterop, 8>(llvm::Optional<std::string>());
+      return Context->Builder.collectAssociatedTypes<WithObjCInterop, 8>(
+          std::optional<std::string>());
 #else
-      return Context->Builder.collectAssociatedTypes<NoObjCInterop, 8>(llvm::Optional<std::string>());
+      return Context->Builder.collectAssociatedTypes<NoObjCInterop, 8>(
+          std::optional<std::string>());
 #endif
     default:
       fputs("unsupported word size in object file\n", stderr);
@@ -129,7 +139,7 @@ BinaryScanningTool::collectFieldTypes(const std::string &mangledTypeName) {
 
 FieldTypeCollectionResult
 BinaryScanningTool::collectAllFieldTypes() {
-  return Context->Builder.collectFieldTypes(llvm::Optional<std::string>());
+  return Context->Builder.collectFieldTypes(std::optional<std::string>());
 }
 } // end namespace static_mirror
 } // end namespace swift

@@ -17,9 +17,8 @@
 #ifndef SWIFT_LEXERSTATE_H
 #define SWIFT_LEXERSTATE_H
 
-#include "llvm/ADT/Optional.h"
 #include "swift/Basic/SourceLoc.h"
-#include "swift/Parse/ParsedTrivia.h"
+#include <optional>
 
 namespace swift {
 class Lexer;
@@ -39,7 +38,6 @@ public:
 private:
   explicit LexerState(SourceLoc Loc) : Loc(Loc) {}
   SourceLoc Loc;
-  StringRef LeadingTrivia;
   friend class Lexer;
 };
 

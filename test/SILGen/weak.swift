@@ -1,5 +1,4 @@
-
-// RUN: %target-swift-emit-silgen -module-name weak -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name weak -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 class C {
   func f() -> Int { return 42 }
@@ -16,25 +15,25 @@ func test0(c c: C) {
   var c = c
 // CHECK:    bb0(%0 : @guaranteed $C):
 // CHECK:      [[C:%.*]] = alloc_box ${ var C }
-// CHECK:      [[C_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[C]]
+// CHECK:      [[C_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[C]]
 // CHECK-NEXT: [[PBC:%.*]] = project_box [[C_LIFETIME]]
 
   var a: A
 // CHECK:      [[A1:%.*]] = alloc_box ${ var A }
 // CHECK:      [[MARKED_A1:%.*]] = mark_uninitialized [var] [[A1]]
-// CHECK:      [[A1_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MARKED_A1]]
+// CHECK:      [[A1_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[MARKED_A1]]
 // CHECK-NEXT: [[PBA:%.*]] = project_box [[A1_LIFETIME]]
 
   weak var x = c
 // CHECK:      [[X:%.*]] = alloc_box ${ var @sil_weak Optional<C> }, var, name "x"
-// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[X]]
+// CHECK:      [[X_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[X]]
 // CHECK-NEXT: [[PBX:%.*]] = project_box [[X_LIFETIME]]
 //   Implicit conversion
 // CHECK-NEXT: [[READ:%.*]] = begin_access [read] [unknown] [[PBC]]
 // CHECK-NEXT: [[TMP:%.*]] = load [copy] [[READ]] : $*C
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[OPTVAL:%.*]] = enum $Optional<C>, #Optional.some!enumelt, [[TMP]] : $C
-// CHECK-NEXT: store_weak [[OPTVAL]] to [initialization] [[PBX]] : $*@sil_weak Optional<C>
+// CHECK-NEXT: store_weak [[OPTVAL]] to [init] [[PBX]] : $*@sil_weak Optional<C>
 // CHECK-NEXT: destroy_value [[OPTVAL]] : $Optional<C>
 
   a.x = c
@@ -56,7 +55,7 @@ func test0(c c: C) {
 // <rdar://problem/16871284> silgen crashes on weak capture
 // CHECK: closure #1 () -> Swift.Int in weak.testClosureOverWeak() -> ()
 // CHECK-LABEL: sil private [ossa] @$s4weak19testClosureOverWeakyyFSiycfU_ : $@convention(thin) (@guaranteed { var @sil_weak Optional<C> }) -> Int {
-// CHECK: bb0(%0 : @guaranteed ${ var @sil_weak Optional<C> }):
+// CHECK: bb0(%0 : @closureCapture @guaranteed ${ var @sil_weak Optional<C> }):
 // CHECK-NEXT:  %1 = project_box %0
 // CHECK-NEXT:  debug_value %1 : $*@sil_weak Optional<C>, var, name "bC", argno 1, expr op_deref
 // CHECK-NEXT:  [[READ:%.*]] = begin_access [read] [unknown] %1
@@ -67,6 +66,16 @@ func testClosureOverWeak() {
   takeClosure { bC!.f() }
 }
 
+func testClosureOverWeakLet() {
+  weak let bC = C()
+  takeClosure { bC!.f() }
+}
+
+func testClosureOverWeakCapture() {
+  let bC = C()
+  takeClosure { [weak bC] in bC!.f() }
+}
+
 class CC {
   weak var x: CC?
 
@@ -74,7 +83,7 @@ class CC {
   // CHECK:  bb0([[SELF:%.*]] : @owned $CC):
   // CHECK:    [[UNINIT_SELF:%.*]] = mark_uninitialized [rootself] [[SELF]] : $CC
   // CHECK:    [[FOO:%.*]] = alloc_box ${ var Optional<CC> }, var, name "foo"
-  // CHECK:    [[FOO_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[FOO]]
+  // CHECK:    [[FOO_LIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[FOO]]
   // CHECK:    [[PB:%.*]] = project_box [[FOO_LIFETIME]]
   // CHECK:    [[BORROWED_UNINIT_SELF:%.*]] = begin_borrow [[UNINIT_SELF]]
   // CHECK:    [[X:%.*]] = ref_element_addr [[BORROWED_UNINIT_SELF]] : $CC, #CC.x

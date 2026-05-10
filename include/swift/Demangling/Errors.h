@@ -19,7 +19,6 @@
 #ifndef SWIFT_DEMANGLING_ERRORS_H
 #define SWIFT_DEMANGLING_ERRORS_H
 
-#include "../../../stdlib/public/SwiftShims/Visibility.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include <inttypes.h>
 #include <stdarg.h>
@@ -41,6 +40,14 @@
 #define SWIFT_VFORMAT(fmt) __attribute__((format(printf, fmt, 0)))
 #else
 #define SWIFT_VFORMAT(fmt)
+#endif
+#endif
+
+#ifndef SWIFT_NORETURN
+#if __has_attribute(noreturn)
+#define SWIFT_NORETURN __attribute__((__noreturn__))
+#else
+#define SWIFT_NORETURN
 #endif
 #endif
 

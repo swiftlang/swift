@@ -20,7 +20,7 @@
 //
 // func test() {
 //   let k = Klass()
-//   // k is deallocated immediatly after the closure capture (a store_weak).
+//   // k is deallocated immediately after the closure capture (a store_weak).
 //   functionWithClosure({ [weak k] in
 //                         // crash!
 //                         k!.foo()
@@ -31,6 +31,7 @@
 
 #define DEBUG_TYPE "diagnose-lifetime-issues"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
@@ -63,8 +64,10 @@ class DiagnoseLifetimeIssues {
   /// callgraphs, with pass down references.
   static constexpr int maxCallDepth = 8;
 
+  SILFunction *function = nullptr;
+
   /// The liveness of the object in question, computed in visitUses.
-  PrunedLiveness liveness;
+  BitfieldRef<SSAPrunedLiveness> liveness;
 
   /// All weak stores of the object, which are found in visitUses.
   llvm::SmallVector<SILInstruction *, 8> weakStores;
@@ -74,7 +77,7 @@ class DiagnoseLifetimeIssues {
   /// We could also cache this information in an Analysis, so that it persists
   /// over runs of this pass for different functions. But computing the state
   /// is very cheap and we avoid worst case scenarios with maxCallDepth. So it's
-  /// propably not worth doing it.
+  /// probably not worth doing it.
   llvm::DenseMap<SILFunctionArgument *, State> argumentStates;
 
   State visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth);
@@ -84,9 +87,9 @@ class DiagnoseLifetimeIssues {
   void reportDeadStore(SILInstruction *allocationInst);
 
 public:
-  DiagnoseLifetimeIssues() {}
+  DiagnoseLifetimeIssues(SILFunction *function) : function(function) {}
 
-  void diagnose(SILFunction *function);
+  void diagnose();
 };
 
 /// Returns true if def is an owned value resulting from an object allocation.
@@ -149,7 +152,7 @@ static bool isStoreObjcWeak(SILInstruction *inst, Operand *op) {
   return objcDecl->getSetterKind() == clang::ObjCPropertyDecl::Weak;
 }
 
-/// Transitively iterates over all uses of \p def and and - if \p
+/// Transitively iterates over all uses of \p def and - if \p
 /// updateLivenessAndWeakStores is true - adds them to self.liveness.
 /// If any weak stores are seen, add them to self.weakStores (also only if
 /// \p updateLivenessAndWeakStores is true).
@@ -187,6 +190,8 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         // Try to get information from the called function.
         switch (getArgumentState(ai, use, callDepth)) {
         case DoesNotEscape:
+          if (updateLivenessAndWeakStores)
+            liveness->updateForUse(user, /*lifetimeEnding*/ false);
           break;
         case CanEscape:
           return CanEscape;
@@ -212,9 +217,9 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::BitwiseEscape:
         if (updateLivenessAndWeakStores)
-          liveness.updateForUse(user, /*lifetimeEnding*/ false);
+          liveness->updateForUse(user, /*lifetimeEnding*/ false);
         break;
-      case OperandOwnership::ForwardingBorrow:
+      case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::ForwardingConsume:
         // TermInst includes ReturnInst, which is generally an escape.
         // If this is called as part of getArgumentState, then it is not really
@@ -226,7 +231,7 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
           // This assumes that forwarding to a trivial value cannot extend the
           // lifetime. This way, simply projecting a trivial value out of an
           // aggregate isn't considered an escape.
-          if (result.getOwnershipKind() == OwnershipKind::None)
+          if (result->getOwnershipKind() == OwnershipKind::None)
             continue;
 
           pushDef(result);
@@ -239,8 +244,10 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         break;
       case OperandOwnership::Borrow: {
         if (updateLivenessAndWeakStores &&
-            !liveness.updateForBorrowingOperand(use))
+            (liveness->updateForBorrowingOperand(use) !=
+             InnerBorrowKind::Contained)) {
           return CanEscape;
+        }
         BorrowingOperand borrowOper(use);
         if (borrowOper.hasBorrowIntroducingUser()) {
           if (auto *beginBorrow = dyn_cast<BeginBorrowInst>(user))
@@ -254,6 +261,7 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         continue;
 
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
         // Treat most interior pointers as escapes until they can be audited.
         // But if the interior pointer cannot be used to copy the parent
         // reference, then it does not need to be considered an escape.
@@ -304,36 +312,37 @@ getArgumentState(ApplySite ai, Operand *applyOperand, int callDepth) {
   return argState;
 }
 
-/// Returns true if \p inst is outside the the pruned \p liveness.
-static bool isOutOfLifetime(SILInstruction *inst, PrunedLiveness &liveness) {
+/// Returns true if \p inst is outside the pruned \p liveness.
+static bool isOutOfLifetime(SILInstruction *inst, SSAPrunedLiveness &liveness) {
   // Check if the lifetime of the stored object ends at the store_weak.
   //
   // A more sophisticated analysis would be to check if there are no
   // (potential) loads from the store's destination address after the store,
-  // but within the object's liferange. But without a good alias analysis (and
-  // we don't want to use AliasAnalysis in a mandatory pass) it's practially
+  // but within the object's liverange. But without a good alias analysis (and
+  // we don't want to use AliasAnalysis in a mandatory pass) it's practically
   // impossible that a use of the object is not a potential load. So we would
   // always see a potential load if the lifetime of the object goes beyond the
   // store_weak.
-  return !liveness.isWithinBoundary(inst);
+  return !liveness.isWithinBoundary(inst, /*deadEndBlocks=*/nullptr);
 }
 
 /// Reports a warning if the stored object \p storedObj is never loaded within
 /// the lifetime of the stored object.
 void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
-  liveness.clear();
+  BitfieldRef<SSAPrunedLiveness>::StackState livenessBitfieldContainer(
+      liveness, allocationInst->getFunction());
   weakStores.clear();
 
   SILValue storedDef = cast<SingleValueInstruction>(allocationInst);
-  liveness.initializeDefBlock(storedDef->getParentBlock());
+  liveness->initializeDef(storedDef);
 
-  // Compute the canoncial lifetime of storedDef, like the copy-propagation pass
+  // Compute the canonical lifetime of storedDef, like the copy-propagation pass
   // would do.
   State state = visitUses(storedDef, /*updateLivenessAndWeakStores*/ true,
                           /*callDepth*/ 0);
 
   // If the allocation escapes (e.g. it is stored somewhere), we should not
-  // give a warning, becuase it can be a false alarm. The allocation could be
+  // give a warning, because it can be a false alarm. The allocation could be
   // kept alive by references we don't see.
   if (state == CanEscape)
     return;
@@ -341,7 +350,7 @@ void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
   assert((state == IsStoredWeakly) == !weakStores.empty());
 
   for (SILInstruction *storeInst : weakStores) {
-    if (isOutOfLifetime(storeInst, liveness)) {
+    if (isOutOfLifetime(storeInst, *liveness)) {
       // Issue the warning.
       storeInst->getModule().getASTContext().Diags.diagnose(
         storeInst->getLoc().getSourceLoc(), diag::warn_dead_weak_store);
@@ -350,7 +359,7 @@ void DiagnoseLifetimeIssues::reportDeadStore(SILInstruction *allocationInst) {
 }
 
 /// Prints warnings for dead weak stores in \p function.
-void DiagnoseLifetimeIssues::diagnose(SILFunction *function) {
+void DiagnoseLifetimeIssues::diagnose() {
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       // Only for allocations we know that a destroy will actually deallocate
@@ -380,8 +389,8 @@ private:
     if (!function->hasOwnership())
       return;
 
-    DiagnoseLifetimeIssues diagnoser;
-    diagnoser.diagnose(function);
+    DiagnoseLifetimeIssues diagnoser(function);
+    diagnoser.diagnose();
   }
 };
 

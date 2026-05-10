@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -enable-objc-interop
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-objc-interop
 
 infix operator +++
 
@@ -205,11 +205,9 @@ struct R24267414<T> {  // expected-note {{'T' declared as parameter to type 'R24
 var _ : Int = R24267414.foo() // expected-error {{generic parameter 'T' could not be inferred}} expected-note {{explicitly specify the generic arguments to fix this issue}} {{24-24=<Any>}}
 
 
-// https://bugs.swift.org/browse/SR-599
-func SR599<T: FixedWidthInteger>() -> T.Type { return T.self }  // expected-note {{in call to function 'SR599()'}}
-_ = SR599()         // expected-error {{generic parameter 'T' could not be inferred}}
-
-
+// https://github.com/apple/swift/issues/43216
+func f_43216<T: FixedWidthInteger>() -> T.Type { return T.self } // expected-note {{in call to function 'f_43216()'}}
+_ = f_43216() // expected-error {{generic parameter 'T' could not be inferred}}
 
 
 // <rdar://problem/19215114> QoI: Poor diagnostic when we are unable to infer type
@@ -263,23 +261,23 @@ protocol SubProto: BaseProto {}
   func copy() -> Any
 }
 
-struct FullyGeneric<Foo> {} // expected-note 13 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic type 'FullyGeneric' declared here}}
+struct FullyGeneric<Foo> {} // expected-note 13 {{'Foo' declared as parameter to type 'FullyGeneric'}} expected-note 1 {{generic struct 'FullyGeneric' declared here}}
 
-struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic type 'AnyClassBound' declared here}}
+struct AnyClassBound<Foo: AnyObject> {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound'}} expected-note {{generic struct 'AnyClassBound' declared here}}
 // expected-note@-1{{requirement specified as 'Foo' : 'AnyObject'}}
 struct AnyClassBound2<Foo> where Foo: AnyObject {} // expected-note {{'Foo' declared as parameter to type 'AnyClassBound2'}}
 // expected-note@-1{{requirement specified as 'Foo' : 'AnyObject' [with Foo = Any]}}
 
-struct ProtoBound<Foo: SubProto> {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound'}} expected-note {{generic type 'ProtoBound' declared here}}
+struct ProtoBound<Foo: SubProto> {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound'}} expected-note {{generic struct 'ProtoBound' declared here}}
 struct ProtoBound2<Foo> where Foo: SubProto {} // expected-note {{'Foo' declared as parameter to type 'ProtoBound2'}}
 
-struct ObjCProtoBound<Foo: NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound'}} expected-note {{generic type 'ObjCProtoBound' declared here}}
+struct ObjCProtoBound<Foo: NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound'}} expected-note {{generic struct 'ObjCProtoBound' declared here}}
 struct ObjCProtoBound2<Foo> where Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ObjCProtoBound2'}}
 
-struct ClassBound<Foo: X> {} // expected-note {{generic type 'ClassBound' declared here}}
-struct ClassBound2<Foo> where Foo: X {} // expected-note {{generic type 'ClassBound2' declared here}}
+struct ClassBound<Foo: X> {} // expected-note {{generic struct 'ClassBound' declared here}}
+struct ClassBound2<Foo> where Foo: X {} // expected-note {{generic struct 'ClassBound2' declared here}}
 
-struct ProtosBound<Foo> where Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound'}} expected-note {{generic type 'ProtosBound' declared here}}
+struct ProtosBound<Foo> where Foo: SubProto & NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound'}} expected-note {{generic struct 'ProtosBound' declared here}}
 struct ProtosBound2<Foo: SubProto & NSCopyish> {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound2'}}
 struct ProtosBound3<Foo: SubProto> where Foo: NSCopyish {} // expected-note {{'Foo' declared as parameter to type 'ProtosBound3'}}
 
@@ -454,23 +452,29 @@ class GenericClass<A> {}
 func genericFunc<T>(t: T) {
   _ = [T: GenericClass] // expected-error {{generic parameter 'A' could not be inferred}}
   // expected-note@-1 {{explicitly specify the generic arguments to fix this issue}}
+  // expected-error@-2 {{generic struct 'Dictionary' requires that 'T' conform to 'Hashable'}}
 }
 
-struct SR_3525<T> {}
-func sr3525_arg_int(_: inout SR_3525<Int>) {}
-func sr3525_arg_gen<T>(_: inout SR_3525<T>) {}
-func sr3525_1(t: SR_3525<Int>) {
-  let _ = sr3525_arg_int(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
-}
-func sr3525_2(t: SR_3525<Int>) {
-  let _ = sr3525_arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
-}
-func sr3525_3<T>(t: SR_3525<T>) {
-  let _ = sr3525_arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+// https://github.com/apple/swift/issues/46113
+do {
+  struct S<T> {}
+
+  func arg_int(_: inout S<Int>) {}
+  func arg_gen<T>(_: inout S<T>) {}
+
+  func f1(t: S<Int>) {
+    let _ = arg_int(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+    let _ = arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+  }
+  func f2<T>(t: S<T>) {
+    let _ = arg_gen(&t) // expected-error {{cannot pass immutable value as inout argument: 't' is a 'let' constant}}
+  }
 }
 
 class testStdlibType {
-  let _: Array // expected-error {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+  let _: Array
+  // expected-error@-1 {{reference to generic type 'Array' requires arguments in <...>}} {{15-15=<Any>}}
+  // expected-error@-2 {{property declaration does not bind any variables}}
 }
 
 // rdar://problem/32697033
@@ -507,11 +511,12 @@ public struct S5 {
 
 // rdar://problem/24329052 - QoI: call argument archetypes not lining up leads to ambiguity errors
 
-struct S_24329052<T> { // expected-note {{generic parameter 'T' of generic struct 'S_24329052' declared here}}
+struct S_24329052<T> { // expected-note {{generic parameter 'T' of generic struct 'S_24329052' declared here}} expected-note {{'T' previously declared here}}
   var foo: (T) -> Void
   // expected-note@+1 {{generic parameter 'T' of instance method 'bar(_:)' declared here}}
   func bar<T>(_ v: T) { foo(v) }
   // expected-error@-1 {{cannot convert value of type 'T' (generic parameter of instance method 'bar(_:)') to expected argument type 'T' (generic parameter of generic struct 'S_24329052')}}
+  // expected-warning@-2 {{generic parameter 'T' shadows generic parameter from outer scope with the same name; this is an error in the Swift 6 language mode}}
 }
 
 extension Sequence {
@@ -566,20 +571,6 @@ func rdar35541153() {
   bar(y, "ultimate question", 42) // Ok
 }
 
-// rdar://problem/38159133 - [SR-7125]: Swift 4.1 Xcode 9.3b4 regression
-
-protocol P_38159133 {}
-
-do {
-  class Super {}
-  class A: Super, P_38159133 {}
-  class B: Super, P_38159133 {}
-
-  func rdar38159133(_ a: A?, _ b: B?) {
-    let _: [P_38159133] = [a, b].compactMap { $0 } // Ok
-  }
-}
-
 func rdar35890334(_ arr: inout [Int]) {
   _ = arr.popFirst() // expected-error {{referencing instance method 'popFirst()' on 'Collection' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent}}
 }
@@ -601,9 +592,8 @@ func rdar39616039() {
   c += 1 // ok
 }
 
-// https://bugs.swift.org/browse/SR-8075
-
-func sr8075() {
+// https://github.com/apple/swift/issues/50608
+do {
   struct UIFont {
     init(ofSize: Float) {}
   }
@@ -640,7 +630,7 @@ func rdar40537858() {
   let _: E = .bar([s]) // expected-error {{generic enum 'E' requires that 'S' conform to 'P'}}
 }
 
-// https://bugs.swift.org/browse/SR-8934
+// https://github.com/apple/swift/issues/51439
 struct BottleLayout {
     let count : Int
 }
@@ -650,40 +640,38 @@ let ix = arr.firstIndex(of:layout) // expected-error {{referencing instance meth
 
 let _: () -> UInt8 = { .init("a" as Unicode.Scalar) } // expected-error {{missing argument label 'ascii:' in call}}
 
-// https://bugs.swift.org/browse/SR-9068
+// https://github.com/apple/swift/issues/51569
 func compare<C: Collection, Key: Hashable, Value: Equatable>(c: C)
   -> Bool where C.Element == (key: Key, value: Value)
 {
   _ = Dictionary(uniqueKeysWithValues: Array(c))
 }
 
-// https://bugs.swift.org/browse/SR-7984
-struct SR_7984<Bar> {
+// https://github.com/apple/swift/issues/50517
+
+struct S1_50517<Bar> {
   func doSomething() {}
 }
+extension S1_50517 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{29-30= ==}}
 
-extension SR_7984 where Bar: String {} // expected-error {{type 'Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{28-29= ==}}
-
-protocol SR_7984_Proto {
+protocol P1_50517 {
   associatedtype Bar
 }
+extension P1_50517 where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{29-30= ==}}
 
-extension SR_7984_Proto where Bar: String {} // expected-error {{type 'Self.Bar' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'Bar == String' to require 'Bar' to be 'String'}} {{34-35= ==}}
-
-protocol SR_7984_HasFoo {
+protocol P2_50517 {
   associatedtype Foo
 }
-protocol SR_7984_HasAssoc {
-  associatedtype Assoc: SR_7984_HasFoo
+protocol P3_50517 {
+  associatedtype Assoc: P2_50517
 }
+struct S2_50517<T: P3_50517> {}
+extension S2_50517 where T.Assoc.Foo: String {} // expected-error {{type 'T.Assoc.Foo' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Assoc.Foo == String' to require 'T.Assoc.Foo' to be 'String'}} {{37-38= ==}}
 
-struct SR_7984_X<T: SR_7984_HasAssoc> {}
-extension SR_7984_X where T.Assoc.Foo: String {} // expected-error {{type 'T.Assoc.Foo' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Assoc.Foo == String' to require 'T.Assoc.Foo' to be 'String'}} {{38-39= ==}}
+struct S3_50517<T: Sequence> where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{45-46= ==}}
+func f_50517<T: Sequence>(foo: T) where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{50-51= ==}}
 
-struct SR_7984_S<T: Sequence> where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{46-47= ==}}
-func SR_7984_F<T: Sequence>(foo: T) where T.Element: String {} // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{52-53= ==}}
-
-protocol SR_7984_P {
+protocol P4_50517 {
   func S<T : Sequence>(bar: T) where T.Element: String // expected-error {{type 'T.Element' constrained to non-protocol, non-class type 'String'}} expected-note {{use 'T.Element == String' to require 'T.Element' to be 'String'}} {{47-48= ==}}
 }
 
@@ -710,10 +698,11 @@ protocol Q {
   init<T : P>(_ x: T) // expected-note 2{{where 'T' = 'T'}}
 }
 
-struct SR10694 {
+// https://github.com/apple/swift/issues/53091
+struct S_53091 {
   init<T : P>(_ x: T) {} // expected-note 3{{where 'T' = 'T'}}
-  func bar<T>(_ x: T, _ s: SR10694, _ q: Q) {
-    SR10694.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+  func bar<T>(_ x: T, _ s: S_53091, _ q: Q) {
+    S_53091.self(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
 
     type(of: s)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
@@ -724,14 +713,17 @@ struct SR10694 {
     type(of: q)(x)  // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
 
-    var srTy = SR10694.self
-    srTy(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
+    var ty = S_53091.self
+    ty(x) // expected-error {{initializer 'init(_:)' requires that 'T' conform to 'P'}}
     // expected-error@-1 {{initializing from a metatype value must reference 'init' explicitly}}
   }
 }
 
-// SR-7003 (rdar://problem/51203824) - Poor diagnostics when attempting to access members on unfulfilled generic type
-func sr_7003() {
+// rdar://problem/51203824
+// https://github.com/apple/swift/issues/49551
+// Poor diagnostics when attempting to access members on unfulfilled
+// generic type
+func f_49551() {
   struct E<T> { // expected-note 4 {{'T' declared as parameter to type 'E'}}
     static var foo: String { return "" }
     var bar: String { return "" }
@@ -817,20 +809,22 @@ func test_correct_identification_of_requirement_source() {
   // expected-error@-1 {{initializer 'init(_:_:)' requires that 'Int' conform to 'P'}}
 }
 
-struct SR11435<T> {
+// https://github.com/apple/swift/issues/53836
+
+struct S_53836<T> {
   subscript<U : P & Hashable>(x x: U) -> U { x } // expected-note {{where 'U' = 'Int'}}
 }
-
-extension SR11435 where T : P { // expected-note {{where 'T' = 'Int'}}
+extension S_53836 where T : P { // expected-note {{where 'T' = 'Int'}}
   var foo: Int { 0 }
 }
 
 func test_identification_of_key_path_component_callees() {
-  _ = \SR11435<Int>.foo // expected-error {{property 'foo' requires that 'Int' conform to 'P'}}
-  _ = \SR11435<Int>.[x: 5] // expected-error {{subscript 'subscript(x:)' requires that 'Int' conform to 'P'}}
+  _ = \S_53836<Int>.foo // expected-error {{property 'foo' requires that 'Int' conform to 'P'}}
+  _ = \S_53836<Int>.[x: 5] // expected-error {{subscript 'subscript(x:)' requires that 'Int' conform to 'P'}}
 }
 
-func sr_11491(_ value: [String]) {
+// https://github.com/apple/swift/issues/53891
+func f_53891(_ value: [String]) {
   var arr: Set<String> = []
   arr.insert(value)
   // expected-error@-1 {{cannot convert value of type '[String]' to expected argument type 'String'}}
@@ -874,7 +868,7 @@ func test_ternary_operator_with_regular_conformance_to_literal_protocol() {
 // rdar://78623338 - crash due to leftover inactive constraints
 func rdar78623338() {
   func any<T : Sequence>(_ sequence: T) -> AnySequence<T.Element> {
-    // expected-note@-1 {{required by local function 'any' where 'T' = '() -> ReversedCollection<(ClosedRange<Int>)>'}}
+    // expected-note@-1 {{required by local function 'any' where 'T' = '() -> ReversedCollection<ClosedRange<Int>>'}}
     AnySequence(sequence.makeIterator)
   }
 
@@ -882,7 +876,7 @@ func rdar78623338() {
     any(0...3),
     // TODO: It should be possible to suggest making a call to `reserved` here but we don't have machinery to do so
     //       at the moment because there is no way to go from a requirement to the underlying argument/parameter location.
-    any((1...3).reversed) // expected-error {{type '() -> ReversedCollection<(ClosedRange<Int>)>' cannot conform to 'Sequence'}}
+    any((1...3).reversed) // expected-error {{type '() -> ReversedCollection<ClosedRange<Int>>' cannot conform to 'Sequence'}}
     // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
   ]
 }
@@ -890,7 +884,7 @@ func rdar78623338() {
 // rdar://78781552 - crash in `getFunctionArgApplyInfo`
 func rdar78781552() {
   struct Test<Data, Content> where Data : RandomAccessCollection {
-    // expected-note@-1 {{where 'Data' = '(((Int) throws -> Bool) throws -> [Int])?'}}
+    // expected-note@-1 {{where 'Data' = '(((Int) throws(E) -> Bool) throws(E) -> [Int])?'}}
     // expected-note@-2 {{'init(data:filter:)' declared here}}
     // expected-note@-3 {{'Content' declared as parameter to type 'Test'}}
     var data: [Data]
@@ -899,11 +893,12 @@ func rdar78781552() {
 
   func test(data: [Int]?) {
     Test(data?.filter)
-    // expected-error@-1 {{generic struct 'Test' requires that '(((Int) throws -> Bool) throws -> [Int])?' conform to 'RandomAccessCollection'}}
+    // expected-error@-1 {{generic struct 'Test' requires that '(((Int) throws(E) -> Bool) throws(E) -> [Int])?' conform to 'RandomAccessCollection'}}
     // expected-error@-2 {{generic parameter 'Content' could not be inferred}} expected-note@-2 {{explicitly specify the generic arguments to fix this issue}}
-    // expected-error@-3 {{cannot convert value of type '(((Int) throws -> Bool) throws -> [Int])?' to expected argument type '[(((Int) throws -> Bool) throws -> [Int])?]'}}
+    // expected-error@-3 {{cannot convert value of type '(((Int) throws(E) -> Bool) throws(E) -> [Int])?' to expected argument type '[(((Int) throws(E) -> Bool) throws(E) -> [Int])?]'}}
     // expected-error@-4 {{missing argument label 'data:' in call}}
     // expected-error@-5 {{missing argument for parameter 'filter' in call}}
+    // expected-error@-6 {{generic parameter 'E' could not be inferred}}
   }
 }
 
@@ -937,8 +932,171 @@ do {
   struct Outer<T: P_eaf0300ff7a> {
     struct Inner<U> {}
 
-    func container<T>() -> Inner<T> {
+    func container<V>() -> Inner<V> {
       return Inner()
     }
+  }
+}
+
+// https://github.com/apple/swift/issues/43527
+do {
+  struct Box<Contents, U> {}
+
+  class Sweets {}
+  class Chocolate {}
+
+  struct Gift<Contents> {
+    // expected-note@-1 2 {{arguments to generic parameter 'Contents' ('Chocolate' and 'Sweets') are expected to be equal}}
+
+    init(_: Box<[Contents], Never>) {}
+  }
+
+  let box = Box<[Chocolate], Never>()
+
+  var g1: Gift<Sweets>
+  g1 = Gift<Chocolate>(box)
+  // expected-error@-1 {{cannot assign value of type 'Gift<Chocolate>' to type 'Gift<Sweets>'}}
+
+  let g2: Gift<Sweets> = Gift<Chocolate>(box)
+  // expected-error@-1 {{cannot assign value of type 'Gift<Chocolate>' to type 'Gift<Sweets>'}}
+}
+
+func testOverloadGenericVarFn() {
+  struct S<T> {
+    var foo: T
+    func foo(_ y: Int) {}
+    init() { fatalError() }
+  }
+  // Make sure we can pick the variable overload over the function.
+  S<(String) -> Void>().foo("")
+  S<((String) -> Void)?>().foo?("")
+  S<((String) -> Void)?>().foo!("")
+}
+
+do {
+  func foo<T, U>(_: T, _: U) where T: Sequence, U: Sequence, T.Element == U.Element {}
+  // expected-note@-1 {{required by local function 'foo' where 'T' = 'Set<Int>.Type'}}
+  // expected-note@-2 {{required by local function 'foo' where 'U' = 'Array<String>.Type'}}
+  // expected-note@-3 {{where 'T.Element' = 'Set<Int>.Type.Element', 'U.Element' = 'Array<String>.Type.Element'}}
+
+  foo(Set<Int>, Array<String>)
+  // expected-error@-1 {{type 'Set<Int>.Type' cannot conform to 'Sequence'}}
+  // expected-error@-2 {{type 'Array<String>.Type' cannot conform to 'Sequence'}}
+  // expected-error@-3 {{local function 'foo' requires the types 'Set<Int>.Type.Element' and 'Array<String>.Type.Element' be equivalent}}
+  // expected-note@-4 2 {{only concrete types such as structs, enums and classes can conform to protocols}}
+}
+
+// https://github.com/apple/swift/issues/56173
+protocol P_56173 {
+  associatedtype Element
+}
+protocol Q_56173 {
+  associatedtype Element
+}
+
+func test_requirement_failures_in_ambiguous_context() {
+  struct A : P_56173 {
+    typealias Element = String
+  }
+  struct B : Q_56173 {
+    typealias Element = Int
+  }
+
+  func f1<T: Equatable>(_: T, _: T) {} // expected-note {{where 'T' = 'A'}}
+
+  f1(A(), B()) // expected-error {{local function 'f1' requires that 'A' conform to 'Equatable'}}
+  // expected-error@-1 {{cannot convert value of type 'B' to expected argument type 'A'}}
+
+  func f2<T: P_56173, U: P_56173>(_: T, _: U) {}
+  // expected-note@-1 {{candidate requires that 'B' conform to 'P_56173' (requirement specified as 'U' : 'P_56173')}}
+  func f2<T: Q_56173, U: Q_56173>(_: T, _: U) {}
+  // expected-note@-1 {{candidate requires that 'A' conform to 'Q_56173' (requirement specified as 'T' : 'Q_56173')}}
+
+  f2(A(), B()) // expected-error {{no exact matches in call to local function 'f2'}}
+
+  func f3<T: P_56173>(_: T) where T.Element == Int {}
+  // expected-note@-1 {{candidate requires that the types 'A.Element' (aka 'String') and 'Int' be equivalent (requirement specified as 'T.Element' == 'Int')}}
+  func f3<U: Q_56173>(_: U) where U.Element == String {}
+  // expected-note@-1 {{candidate requires that 'A' conform to 'Q_56173' (requirement specified as 'U' : 'Q_56173')}}
+
+  f3(A()) // expected-error {{no exact matches in call to local function 'f3'}}
+}
+
+// rdar://106054263 - failed to produce a diagnostic upon generic argument mismatch
+func test_mismatches_with_dependent_member_generic_arguments() {
+  struct Binding<T, U> {}
+  // expected-note@-1 {{arguments to generic parameter 'T' ('Double?' and 'Data.SomeAssociated' (aka 'String')) are expected to be equal}}
+  // expected-note@-2 {{arguments to generic parameter 'U' ('Int' and 'Data.SomeAssociated' (aka 'String')) are expected to be equal}}
+
+  struct Data : SomeProtocol {
+    typealias SomeAssociated = String
+  }
+
+  func test1<T: SomeProtocol>(_: Binding<T.SomeAssociated, T.SomeAssociated>, _: T) where T.SomeAssociated == String {
+  }
+
+  func test2<T: SomeProtocol>(_: Optional<T.SomeAssociated>, _: T) where T.SomeAssociated == String {
+  }
+
+  test1(Binding<Double?, Int>(), Data())
+  // expected-error@-1 {{cannot convert value of type 'Binding<Double?, Int>' to expected argument type 'Binding<Data.SomeAssociated, Data.SomeAssociated>'}}
+
+  test2(Optional<Int>(nil), Data())
+  // expected-error@-1 {{cannot convert value of type 'Optional<Int>' to expected argument type 'Optional<Data.SomeAssociated>'}}
+  // expected-note@-2 {{arguments to generic parameter 'Wrapped' ('Int' and 'Data.SomeAssociated' (aka 'String')) are expected to be equal}}
+}
+
+extension Dictionary where Value == Any { // expected-note {{where 'Value' = 'any P'}}
+  func compute() {}
+}
+
+do {
+  struct S {
+    var test: [String: any P] = [:]
+  }
+
+  func test_existential_mismatch(s: S) {
+    s.test.compute()
+    // expected-error@-1 {{referencing instance method 'compute()' on 'Dictionary' requires the types 'any P' and 'Any' be equivalent}}
+  }
+}
+
+func testHolePropagation() {
+  struct S<T: P> {}
+  struct R {}
+
+  // The hole from the contextual type should propagate such that we don't
+  // complain about not being able to infer 'T'.
+  _ = { () -> S<R> in S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { () -> S<R> in return S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { () -> S<R> in (); return S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+
+  let _: () -> S<R> = { S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  let _: () -> S<R> = { return S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  let _: () -> S<R> = { (); return S() } // expected-error {{type 'R' does not conform to protocol 'P'}}
+
+  _ = { S() }() as S<R> // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { return S() }() as S<R> // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { (); return S() } as () -> S<R> // expected-error {{type 'R' does not conform to protocol 'P'}}
+
+  func makeT<T>() -> T {}
+
+  _ = { () -> (S<R>, Int) in (makeT(), 0) } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { () -> (S<R>, Int) in return (makeT(), 0) } // expected-error {{type 'R' does not conform to protocol 'P'}}
+  _ = { () -> (S<R>, Int) in (); return (makeT(), 0) } // expected-error {{type 'R' does not conform to protocol 'P'}}
+}
+
+@freestanding(expression) macro overloadedMacro<T>() -> String = #file
+@freestanding(expression) macro overloadedMacro<T>(_ x: T = 0) -> String = #file
+
+do {
+  func foo(_ fn: () -> Int) {}
+  func foo(_ fn: () -> String) {}
+
+  // Make sure we only emit a single note here.
+  foo {
+    #overloadedMacro < Undefined >
+    // expected-error@-1 {{cannot find type 'Undefined' in scope}}
+    // expected-note@-2 {{while parsing this '<' as a type parameter bracket}}
   }
 }

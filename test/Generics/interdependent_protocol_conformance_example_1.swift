@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift %s -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift %s
 // RUN: %target-swift-frontend -typecheck %s -debug-generic-signatures 2>&1 | %FileCheck %s
 
 // The GenericSignatureBuilder was unable to derive the redundant conformance requirement 'B: P4'
@@ -12,7 +12,6 @@
 protocol P1 {
   associatedtype A: P2 where Self.A.B == Self.B
   associatedtype B: P4
-  // expected-warning@-1 {{redundant conformance constraint 'Self.B' : 'P4'}}
 }
 
 // CHECK-LABEL: .P2@

@@ -7,8 +7,6 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
-  BasicBlockRange.swift
-  BasicBlockSet.swift
-  BasicBlockWorklist.swift
-  InstructionRange.swift
-  Stack.swift)
+  DeadEndBlocks.swift
+  FunctionUses.swift
+  ReachableBlocks.swift)

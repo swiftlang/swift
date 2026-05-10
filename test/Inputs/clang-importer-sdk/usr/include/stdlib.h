@@ -16,4 +16,6 @@ void free(void *);
 ldiv_t ldiv(long int, long int);
 lldiv_t lldiv(long long int, long long int);
 
+_Noreturn void abort(void);
+
 #endif // SDK_STDLIB_H

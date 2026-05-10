@@ -88,11 +88,15 @@ class LibCurl(cmake_product.CMakeProduct):
         self.cmake_options.define('CMAKE_INSTALL_LIBDIR', 'lib')
         self.cmake_options.define('CMAKE_INSTALL_PREFIX', '/usr')
         self.cmake_options.define('BUILD_CURL_EXE', 'NO')
+        self.cmake_options.define('BUILD_LIBCURL_DOCS', 'NO')
+        self.cmake_options.define('BUILD_MISC_DOCS', 'NO')
         self.cmake_options.define('CMAKE_USE_OPENSSL', 'NO')
         self.cmake_options.define('CURL_CA_PATH', 'none')
         self.cmake_options.define('CMAKE_USE_SCHANNEL', 'NO')
         self.cmake_options.define('CMAKE_USE_LIBSSH2', 'NO')
         self.cmake_options.define('HAVE_POLL_FINE', 'NO')
+        self.cmake_options.define('CURL_DISABLE_BINDLOCAL', 'NO')
+        self.cmake_options.define('CURL_DISABLE_HEADERS_API', 'YES')
         self.cmake_options.define('CURL_DISABLE_LDAP', 'YES')
         self.cmake_options.define('CURL_DISABLE_LDAPS', 'YES')
         self.cmake_options.define('CURL_DISABLE_TELNET', 'YES')
@@ -106,26 +110,18 @@ class LibCurl(cmake_product.CMakeProduct):
         self.cmake_options.define('CURL_DISABLE_SMTP', 'YES')
         self.cmake_options.define('CURL_DISABLE_GOPHER', 'YES')
         self.cmake_options.define('CURL_ZLIB', 'YES')
+        self.cmake_options.define('CURL_BROTLI', 'YES')
+        self.cmake_options.define('ENABLE_CURL_MANUAL', 'NO')
         self.cmake_options.define('ENABLE_UNIX_SOCKETS', 'NO')
         self.cmake_options.define('ENABLE_THREADED_RESOLVER', 'NO')
+        self.cmake_options.define('USE_ECH', 'NO')
+        self.cmake_options.define('USE_HTTPSRR', 'NO')
+        self.cmake_options.define('USE_OPENSSL_QUIC', 'NO')
 
-        (platform, arch) = host_target.split('-')
-        common_c_flags = ' '.join(self.common_cross_c_flags(platform, arch))
-        self.cmake_options.define('CMAKE_C_FLAGS', common_c_flags)
-        self.cmake_options.define('CMAKE_CXX_FLAGS', common_c_flags)
-
-        if host_target.startswith("macosx") or \
-           host_target.startswith("iphone") or \
-           host_target.startswith("appletv") or \
-           host_target.startswith("watch"):
-            toolchain_file = self.generate_darwin_toolchain_file(platform, arch)
-            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-        elif platform == "linux":
-            toolchain_file = self.generate_linux_toolchain_file(platform, arch)
-            self.cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
+        self.generate_toolchain_file_for_darwin_or_linux(host_target)
 
         if self.args.build_zlib:
             # If we're building zlib, make cmake search in the built toolchain
             toolchain_path = self.host_install_destdir(host_target)
             self.cmake_options.define('CMAKE_FIND_ROOT_PATH', toolchain_path)
-        self.build_with_cmake(['libcurl'], self.args.curl_build_variant, [])
+        self.build_with_cmake(['libcurl_static'], self.args.curl_build_variant, [])

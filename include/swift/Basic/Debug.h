@@ -20,8 +20,7 @@
 /// This deprecates the method so it won't be called directly and marks it as
 /// used so it won't be eliminated as dead code.
 #define SWIFT_DEBUG_HELPER(method) \
-  LLVM_ATTRIBUTE_DEPRECATED(method LLVM_ATTRIBUTE_USED, \
-                            "only for use in the debugger")
+  [[deprecated("only for use in the debugger")]] method LLVM_ATTRIBUTE_USED
 
 /// Declares a const void instance method with the name and parameters provided.
 /// Methods declared with this macro should never be called except in the

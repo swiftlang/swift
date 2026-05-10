@@ -21,9 +21,11 @@
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Fingerprint.h"
 #include "swift/Parse/Token.h"
-#include "swift/Syntax/SyntaxNodes.h"
 
 namespace swift {
+
+struct ASTNode;
+class AvailabilityMacroMap;
 
 /// Report that a request of the given kind is being evaluated, so it
 /// can be recorded by the stats reporter.
@@ -32,7 +34,7 @@ void reportEvaluatedRequest(UnifiedStatsReporter &stats,
                             const Request &request);
 
 struct FingerprintAndMembers {
-  Optional<Fingerprint> fingerprint = None;
+  std::optional<Fingerprint> fingerprint = std::nullopt;
   ArrayRef<Decl *> members = {};
   bool operator==(const FingerprintAndMembers &x) const {
     return fingerprint == x.fingerprint && members == x.members;
@@ -80,18 +82,17 @@ private:
 public:
   // Caching
   bool isCached() const { return true; }
-  Optional<BodyAndFingerprint> getCachedResult() const;
+  std::optional<BodyAndFingerprint> getCachedResult() const;
   void cacheResult(BodyAndFingerprint value) const;
 };
 
 struct SourceFileParsingResult {
-  ArrayRef<Decl *> TopLevelDecls;
-  Optional<ArrayRef<Token>> CollectedTokens;
-  Optional<StableHasher> InterfaceHasher;
-  Optional<syntax::SourceFileSyntax> SyntaxRoot;
+  ArrayRef<ASTNode> TopLevelItems;
+  std::optional<ArrayRef<Token>> CollectedTokens;
+  std::optional<Fingerprint> Fingerprint;
 };
 
-/// Parse the top-level decls of a SourceFile.
+/// Parse the top-level items of a SourceFile.
 class ParseSourceFileRequest
     : public SimpleRequest<
           ParseSourceFileRequest, SourceFileParsingResult(SourceFile *),
@@ -108,7 +109,7 @@ private:
 public:
   // Caching.
   bool isCached() const { return true; }
-  Optional<SourceFileParsingResult> getCachedResult() const;
+  std::optional<SourceFileParsingResult> getCachedResult() const;
   void cacheResult(SourceFileParsingResult result) const;
 
 public:
@@ -116,12 +117,49 @@ public:
   readDependencySource(const evaluator::DependencyRecorder &) const;
 };
 
-void simple_display(llvm::raw_ostream &out,
-                    const CodeCompletionCallbacksFactory *factory);
+/// Parse the ExportedSourceFile for a given SourceFile.
+class ExportedSourceFileRequest
+    : public SimpleRequest<ExportedSourceFileRequest,
+                           void *(const SourceFile *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
 
-class CodeCompletionSecondPassRequest
-    : public SimpleRequest<CodeCompletionSecondPassRequest,
-                           bool(SourceFile *, CodeCompletionCallbacksFactory *),
+private:
+  friend SimpleRequest;
+
+  void *evaluate(Evaluator &evaluator, const SourceFile *SF) const;
+
+public:
+  // Cached.
+  bool isCached() const { return true; }
+};
+
+/// Parse the top-level items of a SourceFile.
+class ParseTopLevelDeclsRequest
+    : public SimpleRequest<
+          ParseTopLevelDeclsRequest, ArrayRef<Decl *>(SourceFile *),
+          RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ArrayRef<Decl *> evaluate(Evaluator &evaluator, SourceFile *SF) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const IDEInspectionCallbacksFactory *factory);
+
+class IDEInspectionSecondPassRequest
+    : public SimpleRequest<IDEInspectionSecondPassRequest,
+                           bool(SourceFile *, IDEInspectionCallbacksFactory *),
                            RequestFlags::Uncached|RequestFlags::DependencySource> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -131,12 +169,54 @@ private:
 
   // Evaluation.
   bool evaluate(Evaluator &evaluator, SourceFile *SF,
-                CodeCompletionCallbacksFactory *Factory) const;
+                IDEInspectionCallbacksFactory *Factory) const;
 
 public:
   evaluator::DependencySource
   readDependencySource(const evaluator::DependencyRecorder &) const;
 };
+
+class EvaluateIfConditionRequest
+    : public SimpleRequest<EvaluateIfConditionRequest,
+          std::pair<bool, bool>(SourceFile *, SourceRange conditionRange,
+                                bool shouldEvaluate),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::pair<bool, bool> evaluate(
+      Evaluator &evaluator, SourceFile *SF, SourceRange conditionRange,
+      bool shouldEvaluate) const;
+};
+
+/// Parse the '-define-availability' arguments.
+class AvailabilityMacroArgumentsRequest
+    : public SimpleRequest<AvailabilityMacroArgumentsRequest,
+                           const AvailabilityMacroMap *(ASTContext *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  const AvailabilityMacroMap *evaluate(Evaluator &evaluator,
+                                       ASTContext *ctx) const;
+
+public:
+  // Caching.
+  bool isCached() const { return true; }
+
+  // Source location.
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+};
+
+void simple_display(llvm::raw_ostream &out, const ASTContext *state);
 
 /// The zone number for the parser.
 #define SWIFT_TYPEID_ZONE Parse

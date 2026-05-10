@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -17,6 +17,7 @@
 #include "GenIntegerLiteral.h"
 
 #include "swift/ABI/MetadataValues.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/GlobalVariable.h"
@@ -43,7 +44,7 @@ public:
   IntegerLiteralTypeInfo(llvm::StructType *storageType,
                          Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits), align,
-                                  IsPOD, IsFixedSize) {}
+                            IsTriviallyDestroyable, IsCopyable, IsFixedSize, IsABIAccessible) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -52,9 +53,15 @@ public:
     return ".data";
   }
 
-  TypeLayoutEntry *buildTypeLayoutEntry(IRGenModule &IGM,
-                                        SILType T) const override {
-    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T);
+  TypeLayoutEntry
+  *buildTypeLayoutEntry(IRGenModule &IGM,
+                        SILType T,
+                        bool useStructLayouts) const override {
+    if (!useStructLayouts) {
+      return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+    }
+    return IGM.typeLayoutCache.getOrCreateScalarEntry(*this, T,
+                                            ScalarKind::TriviallyDestroyable);
   }
 
   static Size getSecondElementOffset(IRGenModule &IGM) {
@@ -90,7 +97,7 @@ public:
     auto mask = BitPatternBuilder(IGM.Triple.isLittleEndian());
     mask.appendSetBits(pointerSize.getValueInBits());
     mask.appendClearBits(pointerSize.getValueInBits());
-    return mask.build().getValue();
+    return mask.build().value();
   }
   void storeExtraInhabitant(IRGenFunction &IGF, llvm::Value *index,
                             Address dest, SILType T,
@@ -104,11 +111,9 @@ public:
 
 llvm::StructType *IRGenModule::getIntegerLiteralTy() {
   if (!IntegerLiteralTy) {
-    IntegerLiteralTy =
-      llvm::StructType::create(getLLVMContext(), {
-                                 SizeTy->getPointerTo(),
-                                 SizeTy
-                               }, "swift.int_literal");
+    IntegerLiteralTy = llvm::StructType::create(
+        getLLVMContext(), {PtrTy, SizeTy},
+        "swift.int_literal");
   }
   return IntegerLiteralTy;
 }
@@ -148,7 +153,7 @@ ConstantIntegerLiteralMap::get(IRGenModule &IGM, APInt &&value) {
   auto &entry = map[value];
   if (entry.Data) return entry;
 
-  assert(value.getMinSignedBits() == value.getBitWidth() &&
+  assert(value.getSignificantBits() == value.getBitWidth() &&
          "expected IntegerLiteral value to be maximally compact");
 
   // We're going to break the value down into pointer-sized chunks.
@@ -202,12 +207,12 @@ ConstantIntegerLiteralMap::get(IRGenModule &IGM, APInt &&value) {
   return entry;
 }
 
-void irgen::emitIntegerLiteralCheckedTrunc(IRGenFunction &IGF,
-                                           Explosion &in,
+void irgen::emitIntegerLiteralCheckedTrunc(IRGenFunction &IGF, Explosion &in,
+                                           llvm::Type *FromTy,
                                            llvm::IntegerType *resultTy,
                                            bool resultIsSigned,
                                            Explosion &out) {
-  Address data(in.claimNext(), IGF.IGM.getPointerAlignment());
+  Address data(in.claimNext(), FromTy, IGF.IGM.getPointerAlignment());
   auto flags = in.claimNext();
 
   size_t chunkWidth = IGF.IGM.getPointerSize().getValueInBits();
@@ -355,8 +360,8 @@ static llvm::Value *emitIntegerLiteralToFloatCall(IRGenFunction &IGF,
                                                   llvm::Value *flags,
                                                   unsigned bitWidth) {
   assert(bitWidth == 32 || bitWidth == 64);
-  auto fn = bitWidth == 32 ? IGF.IGM.getIntToFloat32Fn()
-                           : IGF.IGM.getIntToFloat64Fn();
+  auto fn = bitWidth == 32 ? IGF.IGM.getIntToFloat32FunctionPointer()
+                           : IGF.IGM.getIntToFloat64FunctionPointer();
   auto call = IGF.Builder.CreateCall(fn, {data, flags});
   call->setCallingConv(IGF.IGM.SwiftCC);
   call->setDoesNotThrow();
@@ -396,4 +401,46 @@ llvm::Value *irgen::emitIntegerLiteralToFP(IRGenFunction &IGF,
   default:
     llvm_unreachable("not a floating-point type");
   }
+}
+
+llvm::Value *irgen::emitIntLiteralBitWidth(
+  IRGenFunction &IGF,
+  Explosion &in
+) {
+  auto data = in.claimNext();
+  auto flags = in.claimNext();
+  (void)data; // [[maybe_unused]]
+  return IGF.Builder.CreateLShr(
+    flags,
+    IGF.IGM.getSize(Size(IntegerLiteralFlags::BitWidthShift))
+  );
+}
+
+llvm::Value *irgen::emitIntLiteralIsNegative(
+  IRGenFunction &IGF,
+  Explosion &in
+) {
+  auto data = in.claimNext();
+  auto flags = in.claimNext();
+  (void)data; // [[maybe_unused]]
+  static_assert(
+    IntegerLiteralFlags::IsNegativeFlag == 1,
+    "hardcoded in this truncation"
+  );
+  return IGF.Builder.CreateTrunc(flags, IGF.IGM.Int1Ty);
+}
+
+llvm::Value *irgen::emitIntLiteralWordAtIndex(
+  IRGenFunction &IGF,
+  Explosion &in
+) {
+  auto data = in.claimNext();
+  auto flags = in.claimNext();
+  auto index = in.claimNext();
+  (void)flags; // [[maybe_unused]]
+  return IGF.Builder.CreateLoad(
+    IGF.Builder.CreateInBoundsGEP(IGF.IGM.SizeTy, data, index),
+    IGF.IGM.SizeTy,
+    IGF.IGM.getPointerAlignment()
+  );
 }

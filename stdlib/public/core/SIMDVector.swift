@@ -33,8 +33,12 @@ prefix operator .!
 /// conform to `SIMD`.
 public protocol SIMDStorage {
   /// The type of scalars in the vector space.
+  #if $Embedded
+  associatedtype Scalar: Hashable
+  #else
   associatedtype Scalar: Codable, Hashable
-  
+  #endif
+
   /// The number of scalars, or elements, in the vector.
   var scalarCount: Int { get }
   
@@ -60,7 +64,7 @@ extension SIMDStorage {
 }
 
 /// A type that can be used as an element in a SIMD vector.
-public protocol SIMDScalar {
+public protocol SIMDScalar : BitwiseCopyable {
   associatedtype SIMDMaskScalar: SIMDScalar & FixedWidthInteger & SignedInteger
     where SIMDMaskScalar.SIMDMaskScalar == SIMDMaskScalar
   associatedtype SIMD2Storage: SIMDStorage where SIMD2Storage.Scalar == Self
@@ -70,6 +74,20 @@ public protocol SIMDScalar {
   associatedtype SIMD32Storage: SIMDStorage where SIMD32Storage.Scalar == Self
   associatedtype SIMD64Storage: SIMDStorage where SIMD64Storage.Scalar == Self
 }
+
+#if $Embedded
+/// A SIMD vector of a fixed number of elements.
+public protocol SIMD<Scalar>:
+  SIMDStorage,
+  Hashable,
+  ExpressibleByArrayLiteral
+{
+  /// The mask type resulting from pointwise comparisons of this vector type.
+  associatedtype MaskStorage: SIMD
+    where MaskStorage.Scalar: FixedWidthInteger & SignedInteger
+}
+
+#else
 
 /// A SIMD vector of a fixed number of elements.
 public protocol SIMD<Scalar>:
@@ -84,6 +102,8 @@ public protocol SIMD<Scalar>:
     where MaskStorage.Scalar: FixedWidthInteger & SignedInteger
 }
 
+#endif
+
 extension SIMD {
   /// The valid indices for subscripting the vector.
   @_transparent
@@ -91,7 +111,15 @@ extension SIMD {
     return 0 ..< scalarCount
   }
   
-  /// A vector with the specified value in all lanes.
+  /// A vector with the specified scalar in all lanes.
+  ///
+  /// Equivalent to:
+  /// ```
+  /// var result = Self()
+  /// for i in result.indices {
+  ///   result[i] = scalar
+  /// }
+  /// ```
   @_transparent
   public init(repeating value: Scalar) {
     self.init()
@@ -111,7 +139,9 @@ extension SIMD {
   public func hash(into hasher: inout Hasher) {
     for i in indices { hasher.combine(self[i]) }
   }
-  
+
+#if !$Embedded
+
   /// Encodes the scalars of this vector into the given encoder in an unkeyed
   /// container.
   ///
@@ -125,7 +155,7 @@ extension SIMD {
       try container.encode(self[i])
     }
   }
-  
+
   /// Creates a new vector by decoding scalars from the given decoder.
   ///
   /// This initializer throws an error if reading from the decoder fails, or
@@ -147,14 +177,16 @@ extension SIMD {
       self[i] = try container.decode(Scalar.self)
     }
   }
-  
+
   /// A textual description of the vector.
   public var description: String {
     get {
       return "\(Self.self)(" + indices.map({"\(self[$0])"}).joined(separator: ", ") + ")"
     }
   }
-  
+
+#endif
+
   /// A vector mask with the result of a pointwise equality comparison.
   ///
   /// Equivalent to:
@@ -560,7 +592,7 @@ extension SIMD where Scalar: FixedWidthInteger {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
   }
-  
+
   /// Returns a vector with random values from within the specified range in
   /// all lanes, using the given generator as a source for randomness.
   @inlinable
@@ -582,6 +614,7 @@ extension SIMD where Scalar: FixedWidthInteger {
     var g = SystemRandomNumberGenerator()
     return Self.random(in: range, using: &g)
   }
+
 }
 
 extension SIMD where Scalar: FloatingPoint {
@@ -694,6 +727,8 @@ public struct SIMDMask<Storage>: SIMD
     }
   }
 }
+
+extension SIMDMask: Sendable where Storage: Sendable {}
 
 extension SIMDMask {
   /// Returns a vector mask with `true` or `false` randomly assigned in each
@@ -821,7 +856,11 @@ extension SIMD where Scalar: FixedWidthInteger {
   /// Equivalent to `indices.reduce(into: 0) { $0 &+= self[$1] }`.
   @_alwaysEmitIntoClient
   public func wrappedSum() -> Scalar {
-    return indices.reduce(into: 0) { $0 &+= self[$1] }
+    var result: Scalar = 0
+    for i in indices {
+      result &+= self[i]
+    }
+    return result
   }
 }
 
@@ -898,7 +937,13 @@ extension SIMD where Scalar: FloatingPoint {
     // llvm.experimental.vector.reduce.fadd or an explicit tree-sum. Open-
     // coding the tree sum is problematic, we probably need to define a
     // Swift Builtin to support it.
-    return indices.reduce(into: 0) { $0 += self[$1] }
+    //
+    // Use -0 so that LLVM can optimize away initial value + self[0].
+    var result = -Scalar.zero
+    for i in indices {
+      result += self[i]
+    }
+    return result
   }
 }
 

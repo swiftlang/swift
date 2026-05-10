@@ -7,9 +7,10 @@
 
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/usr/bin
+// RUN: mkdir -p %t/usr/lib
 // RUN: %hardlink-or-copy(from: %swift_frontend_plain, to: %t/usr/bin/swift)
 
-// RUN: %t/usr/bin/swift -sdk "" -deprecated-integrated-repl -### | %FileCheck -check-prefix=INTEGRATED %s
+// RUN: %host-library-env %t/usr/bin/swift -sdk "" -deprecated-integrated-repl -### | %FileCheck -check-prefix=INTEGRATED %s
 
 // INTEGRATED: swift{{c?(\.exe)?"?}} -frontend -repl
 // INTEGRATED: -module-name REPL
@@ -20,7 +21,7 @@
 
 // swift-frontend cannot be copied to another location with bootstrapping because
 // it will not find the libswiftCore library with its relative RPATH.
-// UNSUPPORTED: bootstrapping_mode
+// UNSUPPORTED: swift_in_compiler
 
 // LLDB: lldb{{(\.exe)?"?}} {{"?}}--repl=
 // LLDB-NOT: -module-name
@@ -44,10 +45,10 @@
 // like the Xcode installation environment. We use hard links to make sure
 // the Swift driver really thinks it's been moved.
 
-// RUN: %t/usr/bin/swift -sdk "" -repl -### | %FileCheck -check-prefix=INTEGRATED %s
-// RUN: %t/usr/bin/swift -sdk "" -### | %FileCheck -check-prefix=INTEGRATED %s
+// RUN: %host-library-env %t/usr/bin/swift -sdk "" -repl -### | %FileCheck -check-prefix=INTEGRATED %s
+// RUN: %host-library-env %t/usr/bin/swift -sdk "" -### | %FileCheck -check-prefix=INTEGRATED %s
 
 // RUN: touch %t/usr/bin/lldb
 // RUN: chmod +x %t/usr/bin/lldb
-// RUN: %t/usr/bin/swift -sdk "" -repl -### | %FileCheck -check-prefix=LLDB %s
-// RUN: %t/usr/bin/swift -sdk "" -### | %FileCheck -check-prefix=LLDB %s
+// RUN: %host-library-env %t/usr/bin/swift -sdk "" -repl -### | %FileCheck -check-prefix=LLDB %s
+// RUN: %host-library-env %t/usr/bin/swift -sdk "" -### | %FileCheck -check-prefix=LLDB %s

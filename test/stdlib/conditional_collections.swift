@@ -25,8 +25,8 @@ extension A: BidirectionalCollection where C: BidirectionalCollection {
   func index(before i: C.Index) -> C.Index { return c.index(before: i) }
 }
 
-// SR-8022
-func sr8022() {
+// https://github.com/apple/swift/issues/50555
+do {
   var c = A(c: X())
   _ = c.popLast()
   _ = c.removeLast()
@@ -34,5 +34,3 @@ func sr8022() {
   _ = c.dropLast(2)
   _ = c.suffix(2)
 }
-
-sr8022()

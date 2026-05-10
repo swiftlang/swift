@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -verify -primary-file %s %S/Inputs/struct_differentiable_other_module.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -primary-file %s %S/Inputs/struct_differentiable_other_module.swift
 
 import _Differentiation
 
@@ -361,9 +361,10 @@ where T: AdditiveArithmetic {}
 extension NoMemberwiseInitializerExtended: Differentiable
 where T: Differentiable & AdditiveArithmetic {}
 
-// SR-12793: Test interaction with `@differentiable` and `@derivative` type-checking.
+// https://github.com/apple/swift/issues/55238
+// Test interaction with `@differentiable` and `@derivative` type-checking.
 
-struct SR_12793: Differentiable {
+struct S_55238: Differentiable {
   var x: Float
 
   @differentiable(reverse)
@@ -408,7 +409,9 @@ struct WrappedProperties: Differentiable {
 
   @Wrapper var float: Generic<Float>
   @ClassWrapper var float2: Generic<Float>
-  // SR-13071: Test `@differentiable` wrapped property.
+
+  // https://github.com/apple/swift/issues/55517
+  // Test `@differentiable` wrapped property.
   @differentiable(reverse) @Wrapper var float3: Generic<Float>
 
   @noDerivative @ImmutableWrapper var nondiff: Generic<Int>
@@ -421,7 +424,9 @@ struct WrappedProperties: Differentiable {
 // Verify that cross-file derived conformances are disallowed.
 
 extension OtherFileNonconforming: Differentiable {}
-// expected-error @-1 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-error@-1 {{extension outside of file declaring struct 'OtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-note@-2 {{add stubs for conformance}}
 
 extension GenericOtherFileNonconforming: Differentiable {}
-// expected-error @-1 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-error@-1 {{extension outside of file declaring generic struct 'GenericOtherFileNonconforming' prevents automatic synthesis of 'move(by:)' for protocol 'Differentiable'}}
+// expected-note@-2 {{add stubs for conformance}}

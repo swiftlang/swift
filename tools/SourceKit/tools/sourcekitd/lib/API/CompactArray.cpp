@@ -51,9 +51,9 @@ void CompactArrayBuilderImpl::addImpl(UIdent Val) {
   }
 }
 
-void CompactArrayBuilderImpl::addImpl(Optional<llvm::StringRef> Val) {
-  if (Val.hasValue()) {
-    addImpl(Val.getValue());
+void CompactArrayBuilderImpl::addImpl(std::optional<llvm::StringRef> Val) {
+  if (Val.has_value()) {
+    addImpl(Val.value());
   } else {
     addImpl(unsigned(-1));
   }

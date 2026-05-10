@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop | grep 'define.*swiftcc.*$' | grep -o '[[:alnum:]]*__CxxTemplateInst[[:alnum:]]*' | xargs %swift-demangle | %FileCheck %s
+// RUN: %target-swift-emit-ir %s -I %S/Inputs -enable-experimental-cxx-interop | grep 'define.*swiftcc.*$' | xargs %swift-demangle | %FileCheck %s
 
 import Mangling
 
@@ -8,5 +8,5 @@ public func returnInstantiation() -> WrappedMagicInt {
   return WrappedMagicInt()
 }
 
-// CHECK: $s4main20receiveInstantiationyySo34__CxxTemplateInst12MagicWrapperIiEVzF ---> main.receiveInstantiation(inout __C.__CxxTemplateInst12MagicWrapperIiE) -> ()
-// CHECK: $s4main19returnInstantiationSo34__CxxTemplateInst12MagicWrapperIiEVyF ---> main.returnInstantiation() -> __C.__CxxTemplateInst12MagicWrapperIiE
+// CHECK: $s4main20receiveInstantiationyySo0024MagicWrapperCInt_npAIefbVzF(ptr ---> @$s4main20receiveInstantiationyySo0024MagicWrapperCInt_npAIefbVzF(ptr
+// CHECK: $s4main19returnInstantiationSo0024MagicWrapperCInt_npAIefbVyF() ---> @$s4main19returnInstantiationSo0024MagicWrapperCInt_npAIefbVyF()

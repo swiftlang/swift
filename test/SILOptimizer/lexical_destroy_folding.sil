@@ -1,10 +1,11 @@
-// RUN: %target-sil-opt -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -enable-sil-verify-all %s | %FileCheck %s
 
 // =============================================================================
 // = DECLARATIONS                                                             {{
 // =============================================================================
 
 class C {}
+class D {}
 
 sil [ossa] @barrier : $@convention(thin) () -> ()
 sil [ossa] @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
@@ -27,13 +28,15 @@ sil [ossa] @get_owned : $@convention(thin) () -> @owned C
 // with an apply.
 //
 // CHECK-LABEL: sil [ossa] @fold_simplest : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[CALEE_OWNED:%[^,]+]] = function_ref @callee_owned
 // CHECK:         [[MOVE:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         apply [[CALEE_OWNED]]([[MOVE]])
 // CHECK-LABEL: } // end sil function 'fold_simplest'
-sil [ossa] @fold_simplest : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_simplest : $@convention(thin) () -> () {
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
   %lifetime = begin_borrow [lexical] %instance : $C
   %copy = copy_value %lifetime : $C
@@ -82,7 +85,8 @@ entry(%instance : @owned $C):
 // borrowee intact on other paths.
 //
 // CHECK-LABEL: sil [ossa] @fold_left_only : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
@@ -94,8 +98,10 @@ entry(%instance : @owned $C):
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
 // CHECK-LABEL: } // end sil function 'fold_left_only'
-sil [ossa] @fold_left_only : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_left_only : $@convention(thin) () -> () {
+entry:
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
   cond_br undef, left, right
 
@@ -121,7 +127,8 @@ exit:
 // independents owned lexical scopes.
 //
 // CHECK-LABEL: sil [ossa] @fold_two_independent_scopes : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
@@ -134,8 +141,10 @@ exit:
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
 // CHECK-LABEL: } // end sil function 'fold_two_independent_scopes'
-sil [ossa] @fold_two_independent_scopes : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_two_independent_scopes : $@convention(thin) () -> () {
+entry:
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
   cond_br undef, left, right
 
@@ -205,12 +214,13 @@ exit:
   return %retval : $()
 }
 
-// Enclose a single guaranteed lexical scope that contains two paralell
+// Enclose a single guaranteed lexical scope that contains two parallel
 // applies of owned arguments with the destroy at a noncanonical position
 // within a single owned lexical scope.
 //
 // CHECK-LABEL: sil [ossa] @fold_two_parallel_applies___canonical_destroys : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
 // CHECK:         [[MOVE:%[^,]+]] = move_value [lexical] [[INSTANCE]] : $C
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
@@ -222,8 +232,10 @@ exit:
 // CHECK:         br [[EXIT]]
 // CHECK:       [[EXIT]]:
 // CHECK-LABEL: } // end sil function 'fold_two_parallel_applies___canonical_destroys'
-sil [ossa] @fold_two_parallel_applies___canonical_destroys : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_two_parallel_applies___canonical_destroys : $@convention(thin) () -> () {
+entry:
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
   %lifetime = begin_borrow [lexical] %instance : $C
   cond_br undef, left, right
@@ -252,7 +264,8 @@ exit:
 // borrowee that is not within the scope.
 //
 // CHECK-LABEL: sil [ossa] @fold_multiblock_borrow_single_apply_with_parallel_use : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
 // CHECK:         cond_br undef, [[LEFT1:bb[0-9]+]], [[RIGHT:bb[0-9]+]]                         
 // CHECK:       [[LEFT1]]:                                              
@@ -269,8 +282,10 @@ exit:
 // CHECK:         br [[EXIT]]                                          
 // CHECK:       [[EXIT]]:                                              
 // CHECK-LABEL: } // end sil function 'fold_multiblock_borrow_single_apply_with_parallel_use'
-sil [ossa] @fold_multiblock_borrow_single_apply_with_parallel_use : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_multiblock_borrow_single_apply_with_parallel_use : $@convention(thin) () -> () {
+entry:
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
   cond_br undef, left1, right
 
@@ -305,7 +320,8 @@ exit:
 // borrowee that is not within the scope.
 //
 // CHECK-LABEL: sil [ossa] @fold_multiblock_borrow_single_apply_and_parallel_singleblock_borrow : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
 // CHECK:         cond_br undef, [[LEFT1:bb[0-9]+]], [[RIGHT:bb[0-9]+]]                         
 // CHECK:       [[LEFT1]]:                                              
@@ -323,8 +339,10 @@ exit:
 // CHECK:         br [[EXIT]]                                          
 // CHECK:       [[EXIT]]:                                              
 // CHECK-LABEL: } // end sil function 'fold_multiblock_borrow_single_apply_and_parallel_singleblock_borrow'
-sil [ossa] @fold_multiblock_borrow_single_apply_and_parallel_singleblock_borrow : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_multiblock_borrow_single_apply_and_parallel_singleblock_borrow : $@convention(thin) () -> () {
+entry:
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
   cond_br undef, left1, right
 
@@ -363,7 +381,8 @@ exit:
 // guaranteed lifetime remains.
 //
 // CHECK-LABEL: sil [ossa] @fold_single_block_one_apply_double_use_all_owned : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[LIFETIME_GUARANTEED:%[^,]+]] = begin_borrow [lexical] [[LIFETIME]]
 // CHECK:         [[CALLEE_GUARANTEED:%[^,]+]] = function_ref @callee_guaranteed
@@ -373,8 +392,10 @@ exit:
 // CHECK:         [[CALLEE_OWNED_OWNED:%[^,]+]] = function_ref @callee_owned_owned
 // CHECK:         apply [[CALLEE_OWNED_OWNED]]([[LIFETIME]], [[COPY]])
 // CHECK-LABEL: } // end sil function 'fold_single_block_one_apply_double_use_all_owned'
-sil [ossa] @fold_single_block_one_apply_double_use_all_owned : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_single_block_one_apply_double_use_all_owned : $@convention(thin) () -> () {
+entry:
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %lifetime = begin_borrow [lexical] %instance : $C
   %callee_guaranteed = function_ref @callee_guaranteed : $@convention(thin) (@guaranteed C) -> ()
   apply %callee_guaranteed(%lifetime) : $@convention(thin) (@guaranteed C) -> ()
@@ -392,14 +413,17 @@ entry(%instance : @owned $C):
 // guaranteed lifetime remains.
 //
 // CHECK-LABEL: sil [ossa] @fold_single_block_one_apply_double_use_all_owned__no_remaining_uses : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[MOVE:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[MOVE]]
 // CHECK:         [[CALLEE_OWNED_OWNED:%[^,]+]] = function_ref @callee_owned_owned
 // CHECK:         apply [[CALLEE_OWNED_OWNED]]([[MOVE]], [[COPY]])
 // CHECK-LABEL: } // end sil function 'fold_single_block_one_apply_double_use_all_owned__no_remaining_uses'
-sil [ossa] @fold_single_block_one_apply_double_use_all_owned__no_remaining_uses : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_single_block_one_apply_double_use_all_owned__no_remaining_uses : $@convention(thin) () -> () {
+entry:
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %lifetime = begin_borrow [lexical] %instance : $C
   %copy_1 = copy_value %lifetime : $C
   %copy_2 = copy_value %lifetime : $C
@@ -463,7 +487,8 @@ entry(%instance : @owned $C):
 // Fold with the last consuming use but not with a previous consuming use.
 //
 // CHECK-LABEL: sil [ossa] @fold_single_block_two_applies_first_only : {{.*}} {
-// CHECK:       bb0([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[MOVE:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         [[LIFETIME:%[^,]+]] = begin_borrow [lexical] [[MOVE]]
 // CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
@@ -473,8 +498,9 @@ entry(%instance : @owned $C):
 // CHECK:         tuple ()
 // CHECK:         apply [[CALLEE_OWNED]]([[MOVE]])
 // CHECK-LABEL: } // end sil function 'fold_single_block_two_applies_first_only'
-sil [ossa] @fold_single_block_two_applies_first_only : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_single_block_two_applies_first_only : $@convention(thin) () -> () {
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %lifetime = begin_borrow [lexical] %instance : $C
   %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
   %copy_1 = copy_value %lifetime : $C
@@ -518,51 +544,6 @@ exit:
   return %retval : $()
 }
 
-// Fold apply when guaranteed lexical value used in one but not two branches
-// and the lexical scope ends before the use on the non-lexical branch.
-//
-// CHECK-LABEL: sil [ossa] @nofold_two_parallel_owned_uses_one_lexical___scope_ends_before_use : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
-// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
-// CHECK:         [[MOVE:%[^,]+]] = move_value [lexical] [[INSTANCE]]
-// CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
-// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
-// CHECK:       [[LEFT]]:
-// CHECK:         apply [[CALLEE_OWNED]]([[MOVE]])
-// CHECK:         destroy_value [[COPY]]
-// CHECK:         br [[EXIT:bb[0-9]+]]
-// CHECK:       [[RIGHT]]:
-// CHECK:         destroy_value [[MOVE]]
-// CHECK:         apply [[CALLEE_OWNED]]([[COPY]])
-// CHECK:         br [[EXIT]]
-// CHECK:       [[EXIT]]:
-// CHECK-LABEL: } // end sil function 'nofold_two_parallel_owned_uses_one_lexical___scope_ends_before_use'
-sil [ossa] @nofold_two_parallel_owned_uses_one_lexical___scope_ends_before_use : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
-  %copy_2 = copy_value %instance : $C
-  %lifetime = begin_borrow [lexical] %instance : $C
-  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
-  cond_br undef, left, right
-
-left:
-  %copy_1 = copy_value %lifetime : $C
-  apply %callee_owned(%copy_1) : $@convention(thin) (@owned C) -> ()
-  end_borrow %lifetime : $C
-  destroy_value %instance : $C
-  destroy_value %copy_2 : $C
-  br exit
-
-right:
-  end_borrow %lifetime : $C
-  destroy_value %instance : $C
-  apply %callee_owned(%copy_2) : $@convention(thin) (@owned C) -> ()
-  br exit
-
-exit:
-  %retval = tuple ()
-  return %retval : $()
-}
-
 // Fold even if there is a noncanonicalized copy which is otherwise used.
 // CHECK-LABEL: sil [ossa] @fold_noncanonical_copy_with_other_use : {{.*}} {
 // CHECK:       {{bb[0-9]+}}:
@@ -573,8 +554,8 @@ exit:
 // CHECK:         [[COPY:%[^,]+]] = copy_value [[LIFETIME]]
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
-// CHECK:         destroy_value [[COPY]]
 // CHECK:         [[CALLEE_OWNED:%[^,]+]] = function_ref @callee_owned
+// CHECK:         destroy_value [[COPY]]
 // CHECK:         end_borrow [[LIFETIME]]
 // CHECK:         apply [[CALLEE_OWNED]]([[MOVE]])
 // CHECK:         br [[EXIT:bb[0-9]+]]
@@ -617,7 +598,8 @@ exit:
 // use of %original_borrowee in that unreachable-terminated branch.
 //
 // CHECK-LABEL: sil [ossa] @fold_unreachable : {{.*}} {
-// CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] :
+// CHECK:         [[GET_OWNED:%[^,]+]] = function_ref @get_owned
+// CHECK:         [[INSTANCE:%[^,]+]] = apply [[GET_OWNED]]
 // CHECK:         [[MOVE:%[^,]+]] = move_value [lexical] [[INSTANCE]]
 // CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
 // CHECK:       [[LEFT]]:
@@ -628,12 +610,16 @@ exit:
 // CHECK:         br [[EXIT:bb[0-9]+]]
 // CHECK:       [[EXIT]]:
 // CHECK-LABEL: } // end sil function 'fold_unreachable'
-sil [ossa] @fold_unreachable : $@convention(thin) (@owned C) -> () {
-entry(%instance : @owned $C):
+sil [ossa] @fold_unreachable : $@convention(thin) () -> () {
+entry:
+  %get_owned = function_ref @get_owned : $@convention(thin) () -> (@owned C)
+  %instance = apply %get_owned() : $@convention(thin) () -> (@owned C)
   %lifetime = begin_borrow [lexical] %instance : $C
   cond_br undef, left, right
 
 left:
+  end_borrow %lifetime
+  destroy_value [dead_end] %instance
   unreachable
 
 right:
@@ -662,6 +648,7 @@ entry(%instance : @owned $C):
   cond_br undef, left, right
 
 left:
+  end_borrow %lifetime
   apply %callee_owned(%instance) : $@convention(thin) (@owned C) -> ()
   unreachable
 
@@ -817,30 +804,6 @@ exit:
   return %retval : $()
 }
 
-// Don't fold if the borrow scope begins in an unreachable-from-entry block.
-//
-// CHECK-LABEL: sil [ossa] @nofold_deadblock : $@convention(thin) () -> () {
-// CHECK-NOT: move_value [lexical]
-// CHECK-LABEL: } // end sil function 'nofold_deadblock'
-sil [ossa] @nofold_deadblock : $@convention(thin) () -> () {
-entry:
-  br exit
-dead:
-  %get_owned = function_ref @get_owned : $@convention(thin) () -> @owned C
-  %instance = apply %get_owned() : $@convention(thin) () -> @owned C
-  %lifetime = begin_borrow [lexical] %instance : $C
-  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
-  %copy = copy_value %lifetime : $C
-  apply %callee_owned(%copy) : $@convention(thin) (@owned C) -> ()
-  end_borrow %lifetime : $C
-  destroy_value %instance : $C
-  br exit
-
-exit:
-  %retval = tuple ()
-  return %retval : $()
-}
-
 // Don't fold applies of the borrowed value.
 //
 // CHECK-LABEL: sil [ossa] @nofold_closure : $@convention(thin) (@owned () -> ()) -> () {
@@ -854,6 +817,30 @@ entry(%instance : @owned $@convention(thick) () -> ()):
   destroy_value %instance : $@convention(thick) () -> ()
   %retval = tuple ()
   return %retval : $()
+}
+
+// Lexical destroy folding cannot handle a PointerEscape.
+//
+// CHECK-LABEL: sil [ossa] @dont_fold_over_escape : $@convention(thin) (@owned C) -> @owned D {
+// CHECK: bb0(%0 : @owned $C):
+// CHECK:   [[CAST:%.*]] = unchecked_bitwise_cast %0 : $C to $D
+// CHECK:   [[BORROW:%.*]] = begin_borrow [lexical] %0 : $C
+// CHECK:   [[COPY0:%.*]] = copy_value [[BORROW]] : $C
+// CHECK:   apply %{{.*}}([[COPY0]]) : $@convention(thin) (@owned C) -> ()
+// CHECK:   [[COPY1:%.*]] = copy_value [[CAST]] : $D
+// CHECK:   destroy_value %0 : $C
+// CHECK-LABEL: } // end sil function 'dont_fold_over_escape'
+sil [ossa] @dont_fold_over_escape : $@convention(thin) (@owned C) -> @owned D {
+bb0(%0 : @owned $C):
+  %callee_owned = function_ref @callee_owned : $@convention(thin) (@owned C) -> ()
+  %cast = unchecked_bitwise_cast %0 : $C to $D
+  %lifetime = begin_borrow [lexical] %0 : $C
+  %copy0 = copy_value %lifetime : $C
+  apply %callee_owned(%copy0) : $@convention(thin) (@owned C) -> ()
+  end_borrow %lifetime : $C
+  %copy = copy_value %cast : $D
+  destroy_value %0 : $C
+  return %copy : $D
 }
 
 // =============================================================================

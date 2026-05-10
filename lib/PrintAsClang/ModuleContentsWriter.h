@@ -17,12 +17,14 @@
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallPtrSet.h"
+#include "llvm/ADT/StringSet.h"
 
 namespace clang {
   class Module;
 }
 
 namespace swift {
+class Decl;
 class ModuleDecl;
 class SwiftToClangInteropContext;
 
@@ -33,14 +35,30 @@ using ImportModuleTy = PointerUnion<ModuleDecl*, const clang::Module*>;
 void printModuleContentsAsObjC(raw_ostream &os,
                                llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
                                ModuleDecl &M,
-                               SwiftToClangInteropContext &interopContext);
+                               SwiftToClangInteropContext &interopContext,
+                               std::optional<AccessLevel> minAccess);
 
-/// Prints the declarations of \p M to \p os in C++ language mode and collects
-/// imports in \p imports along the way.
-void printModuleContentsAsCxx(raw_ostream &os,
-                              llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
-                              ModuleDecl &M,
-                              SwiftToClangInteropContext &interopContext);
+void printModuleContentsAsC(raw_ostream &os,
+                            llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
+                            ModuleDecl &M,
+                            SwiftToClangInteropContext &interopContext,
+                            std::optional<AccessLevel> minAccess);
+
+struct EmittedClangHeaderDependencyInfo {
+    /// The set of imported modules used by this module.
+    SmallPtrSet<ImportModuleTy, 8> imports;
+    /// True if the printed module depends on types from the Stdlib module.
+    bool dependsOnStandardLibrary = false;
+};
+
+/// Prints the declarations of \p M to \p os in C++ language mode.
+///
+/// \returns Dependencies required by this module.
+EmittedClangHeaderDependencyInfo
+printModuleContentsAsCxx(raw_ostream &os, ModuleDecl &M,
+                         SwiftToClangInteropContext &interopContext,
+                         AccessLevel minAccess, bool requiresExposedAttribute,
+                         llvm::StringSet<> &exposedModules);
 
 } // end namespace swift
 

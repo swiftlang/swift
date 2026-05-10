@@ -59,10 +59,6 @@ public:
   /// True if at least one solution was passed via the \c sawSolution
   /// callback.
   bool gotCallback() const { return GotCallback; }
-
-  /// Typecheck the code completion expression in its outermost expression
-  /// context, calling \c sawSolution for each solution formed.
-  virtual void fallbackTypeCheck(DeclContext *DC);
 };
 
 // MARK: - Utility functions for subclasses of TypeCheckCompletionCallback
@@ -82,8 +78,43 @@ void getSolutionSpecificVarTypes(
     const constraints::Solution &S,
     llvm::SmallDenseMap<const VarDecl *, Type> &Result);
 
-/// Whether the given completion expression is the only expression in its
-/// containing closure or function body and its value is implicitly returned.
+/// While this RAII is alive the interface types of the variables defined in
+/// \c SolutionSpecificVarTypes are temporarily set to the types in the map.
+/// Afterwards, their types are restored.
+struct WithSolutionSpecificVarTypesRAII {
+  llvm::SmallDenseMap<const VarDecl *, Type> RestoreVarTypes;
+
+  WithSolutionSpecificVarTypesRAII(
+      llvm::SmallDenseMap<const VarDecl *, Type> SolutionSpecificVarTypes) {
+    for (auto &[var, ty] : SolutionSpecificVarTypes) {
+      if (var->hasInterfaceType()) {
+        RestoreVarTypes[var] = var->getInterfaceType();
+      } else {
+        RestoreVarTypes[var] = Type();
+      }
+      if (!ty->hasArchetype()) {
+        setInterfaceType(const_cast<VarDecl *>(var), ty);
+      } else {
+        setInterfaceType(const_cast<VarDecl *>(var), ErrorType::get(ty));
+      }
+    }
+  }
+
+  ~WithSolutionSpecificVarTypesRAII() {
+    for (auto Var : RestoreVarTypes) {
+      setInterfaceType(const_cast<VarDecl *>(Var.first), Var.second);
+    }
+  }
+
+private:
+  /// Sets the interface type of \p VD, similar to \c VD->setInterfaceType
+  /// but also allows resetting the interface type of \p VD to null.
+  static void setInterfaceType(VarDecl *VD, Type Ty);
+};
+
+/// Whether the given completion expression is an implied result of a closure
+/// or function (e.g in a single-expression closure where the return is
+/// implicit).
 ///
 /// If these conditions are met, code completion needs to avoid penalizing
 /// completion results that don't match the expected return type when
@@ -91,8 +122,7 @@ void getSolutionSpecificVarTypes(
 /// written by the user, it's possible they intend the single expression not
 /// as the return value but merely the first entry in a multi-statement body
 /// they just haven't finished writing yet.
-bool isImplicitSingleExpressionReturn(constraints::ConstraintSystem &CS,
-                                      Expr *CompletionExpr);
+bool isImpliedResult(const constraints::Solution &S, Expr *CompletionExpr);
 
 /// Returns \c true iff the decl context \p DC allows calling async functions.
 bool isContextAsync(const constraints::Solution &S, DeclContext *DC);

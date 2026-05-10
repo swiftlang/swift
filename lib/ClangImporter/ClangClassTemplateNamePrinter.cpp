@@ -1,0 +1,296 @@
+//===--- ClangClassTemplateNamePrinter.cpp --------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+#include "ClangClassTemplateNamePrinter.h"
+#include "ImporterImpl.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
+#include "clang/AST/TemplateArgumentVisitor.h"
+#include "clang/AST/Type.h"
+#include "clang/AST/TypeVisitor.h"
+
+using namespace swift;
+using namespace swift::importer;
+
+struct TemplateInstantiationNamePrinter
+    : clang::TypeVisitor<TemplateInstantiationNamePrinter, std::string> {
+  ASTContext &swiftCtx;
+  NameImporter *nameImporter;
+  ImportNameVersion version;
+
+  ClangImporter::Implementation *importerImpl;
+
+  TemplateInstantiationNamePrinter(ASTContext &swiftCtx,
+                                   NameImporter *nameImporter,
+                                   ImportNameVersion version,
+                                   ClangImporter::Implementation *importerImpl)
+      : swiftCtx(swiftCtx), nameImporter(nameImporter), version(version),
+        importerImpl(importerImpl) {}
+
+  std::string VisitType(const clang::Type *type) {
+    // Print "_" as a fallback if we couldn't emit a more meaningful type name.
+    return "_";
+  }
+
+  std::string VisitBuiltinType(const clang::BuiltinType *type) {
+    switch (type->getKind()) {
+    case clang::BuiltinType::Void:
+      return "Void";
+    case clang::BuiltinType::NullPtr:
+      return "__cxxNullPtrT";
+
+#define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)                  \
+    case clang::BuiltinType::CLANG_BUILTIN_KIND:                               \
+      return #SWIFT_TYPE_NAME;
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+    default:
+      break;
+    }
+
+    return VisitType(type);
+  }
+
+  void emitWithCVQualifiers(llvm::raw_svector_ostream &buffer,
+                            clang::QualType type) {
+    if (type.isConstQualified())
+      buffer << "__cxxConst<";
+    if (type.isVolatileQualified())
+      buffer << "__cxxVolatile<";
+
+    buffer << Visit(type.getTypePtr());
+
+    if (type.isVolatileQualified())
+      buffer << ">";
+    if (type.isConstQualified())
+      buffer << ">";
+  }
+
+  void emitQualifiedName(const clang::NamedDecl *namedDecl,
+                          llvm::raw_svector_ostream &buffer) {
+    SmallVector<DeclName, 2> qualifiedNameComponents;
+    auto unqualifiedName = nameImporter->importName(namedDecl, version);
+    qualifiedNameComponents.push_back(unqualifiedName.getDeclName());
+    const clang::DeclContext *parentCtx =
+        unqualifiedName.getEffectiveContext().getAsDeclContext();
+    while (parentCtx) {
+      if (auto namedParentDecl = dyn_cast<clang::NamedDecl>(parentCtx)) {
+        // If this component of the fully-qualified name is a decl that is
+        // imported into Swift, remember its name.
+        auto componentName = nameImporter->importName(namedParentDecl, version);
+        qualifiedNameComponents.push_back(componentName.getDeclName());
+        parentCtx = componentName.getEffectiveContext().getAsDeclContext();
+      } else {
+        // If this component is not imported into Swift, skip it.
+        parentCtx = parentCtx->getParent();
+      }
+    }
+
+    llvm::interleave(
+        llvm::reverse(qualifiedNameComponents),
+        [&](const DeclName &each) { each.print(buffer); },
+        [&]() { buffer << "."; });
+  }
+
+  std::string VisitTagType(const clang::TagType *type) {
+    auto tagDecl = type->getAsTagDecl();
+    if (auto namedArg = dyn_cast_or_null<clang::NamedDecl>(tagDecl)) {
+      if (auto typeDefDecl = tagDecl->getTypedefNameForAnonDecl())
+        namedArg = typeDefDecl;
+      llvm::SmallString<128> storage;
+      llvm::raw_svector_ostream buffer(storage);
+      emitQualifiedName(namedArg, buffer);
+      return buffer.str().str();
+    }
+    return "_";
+  }
+
+  std::string VisitReferenceType(const clang::ReferenceType *type) {
+    llvm::SmallString<128> storage;
+    llvm::raw_svector_ostream buffer(storage);
+    if (type->isLValueReferenceType()) {
+      buffer << "__cxxLRef<";
+    } else {
+      buffer << "__cxxRRef<";
+    }
+
+    emitWithCVQualifiers(buffer, type->getPointeeType());
+
+    buffer << ">";
+    return buffer.str().str();
+  }
+
+  std::string VisitPointerType(const clang::PointerType *type) {
+    clang::QualType pointee = type->getPointeeType();
+    std::string pointeeResult = Visit(pointee.getTypePtr());
+
+    // If this is a pointer to foreign reference type, we should not wrap
+    // it in Unsafe(Mutable)?Pointer, since it will be imported as a class
+    // in Swift.
+    bool isReferenceType = false;
+    if (auto *rd = pointee->getAsRecordDecl())
+      isReferenceType =
+          evaluateOrDefault(swiftCtx.evaluator,
+                            ForeignReferenceTypeInfoRequest({rd}), {})
+              .isReference();
+
+    llvm::SmallString<128> storage;
+    llvm::raw_svector_ostream buffer(storage);
+
+    if (pointee.isVolatileQualified())
+      buffer << "__cxxVolatile<";
+
+    if (!isReferenceType) {
+      buffer << (pointee.isConstQualified() ? "UnsafePointer<"
+                                            : "UnsafeMutablePointer<");
+      buffer << pointeeResult;
+      buffer << '>';
+    } else {
+      if (pointee.isConstQualified())
+        buffer << "__cxxConst<";
+      buffer << pointeeResult;
+      if (pointee.isConstQualified())
+        buffer << ">";
+    }
+
+    if (pointee.isVolatileQualified())
+      buffer << ">";
+
+    return buffer.str().str();
+  }
+
+  std::string VisitFunctionProtoType(const clang::FunctionProtoType *type) {
+    llvm::SmallString<128> storage;
+    llvm::raw_svector_ostream buffer(storage);
+
+    buffer << "((";
+    llvm::interleaveComma(type->getParamTypes(), buffer,
+                          [&](const clang::QualType &paramType) {
+                            buffer << Visit(paramType.getTypePtr());
+                          });
+    buffer << ") -> ";
+    buffer << Visit(type->getReturnType().getTypePtr());
+    buffer << ")";
+
+    return buffer.str().str();
+  }
+
+  std::string VisitVectorType(const clang::VectorType *type) {
+    return (Twine("SIMD") + std::to_string(type->getNumElements()) + "<" +
+            Visit(type->getElementType().getTypePtr()) + ">")
+        .str();
+  }
+
+  std::string VisitArrayType(const clang::ArrayType *type) {
+    llvm::SmallString<128> storage;
+    llvm::raw_svector_ostream buffer(storage);
+    buffer << "[";
+    emitWithCVQualifiers(buffer, type->getElementType());
+    buffer << "]";
+    return buffer.str().str();
+  }
+
+  std::string VisitConstantArrayType(const clang::ConstantArrayType *type) {
+    llvm::SmallString<128> storage;
+    llvm::raw_svector_ostream buffer(storage);
+    buffer << "Vector<";
+    emitWithCVQualifiers(buffer, type->getElementType());
+    buffer << ", ";
+    buffer << type->getSExtSize();
+    buffer << ">";
+    return buffer.str().str();
+  }
+};
+
+struct TemplateArgumentPrinter
+    : clang::ConstTemplateArgumentVisitor<TemplateArgumentPrinter, void,
+                                          llvm::raw_svector_ostream &> {
+  TemplateInstantiationNamePrinter typePrinter;
+
+  TemplateArgumentPrinter(ASTContext &swiftCtx, NameImporter *nameImporter,
+                          ImportNameVersion version,
+                          ClangImporter::Implementation *importerImpl)
+      : typePrinter(swiftCtx, nameImporter, version, importerImpl) {}
+
+  void VisitTemplateArgument(const clang::TemplateArgument &arg,
+                             llvm::raw_svector_ostream &buffer) {
+    // Print "_" as a fallback if we couldn't emit a more meaningful type name.
+    buffer << "_";
+  }
+
+  void VisitTypeTemplateArgument(const clang::TemplateArgument &arg,
+                                 llvm::raw_svector_ostream &buffer) {
+    auto ty = arg.getAsType();
+
+    typePrinter.emitWithCVQualifiers(buffer, ty);
+  }
+
+  void VisitIntegralTemplateArgument(const clang::TemplateArgument &arg,
+                                     llvm::raw_svector_ostream &buffer) {
+    buffer << "_";
+    if (arg.getIntegralType()->isBuiltinType()) {
+      buffer << typePrinter.Visit(arg.getIntegralType().getTypePtr()) << "_";
+    }
+    auto value = arg.getAsIntegral();
+    if (value.isNegative()) {
+      value.negate();
+      buffer << "Neg_";
+    }
+    value.print(buffer, arg.getIntegralType()->isSignedIntegerType());
+  }
+
+  void VisitPackTemplateArgument(const clang::TemplateArgument &arg,
+                                 llvm::raw_svector_ostream &buffer) {
+    VisitTemplateArgumentArray(arg.getPackAsArray(), buffer);
+  }
+
+  void VisitTemplateArgumentArray(ArrayRef<clang::TemplateArgument> args,
+                                  llvm::raw_svector_ostream &buffer) {
+    bool needsComma = false;
+    for (auto &arg : args) {
+      // Do not try to print empty packs.
+      if (arg.getKind() == clang::TemplateArgument::ArgKind::Pack &&
+          arg.getPackAsArray().empty())
+        continue;
+
+      if (needsComma)
+        buffer << ", ";
+      Visit(arg, buffer);
+      needsComma = true;
+    }
+  }
+
+  void VisitTemplateTemplateArgument(const clang::TemplateArgument &arg,
+                                     llvm::raw_svector_ostream &buffer) {
+    auto templateName = arg.getAsTemplate();
+    if (auto templateDecl = templateName.getAsTemplateDecl()) {
+      typePrinter.emitQualifiedName(templateDecl, buffer);
+    } else {
+      buffer << "_";
+    }
+  }
+};
+
+std::string swift::importer::printClassTemplateSpecializationName(
+    const clang::ClassTemplateSpecializationDecl *decl, ASTContext &swiftCtx,
+    NameImporter *nameImporter, ImportNameVersion version) {
+  TemplateArgumentPrinter templateArgPrinter(swiftCtx, nameImporter, version,
+                                             nameImporter->getImporterImpl());
+
+  llvm::SmallString<128> storage;
+  llvm::raw_svector_ostream buffer(storage);
+  decl->printName(buffer);
+  buffer << "<";
+  templateArgPrinter.VisitTemplateArgumentArray(
+      decl->getTemplateArgs().asArray(), buffer);
+  buffer << ">";
+  return buffer.str().str();
+}

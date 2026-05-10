@@ -14,7 +14,7 @@
 // RUN: %target-swift-frontend -module-name LibA %t/FileLib.swift -module-alias XLogging=AppleLogging -I %t -emit-module -emit-module-path %t/LibA.swiftmodule -Rmodule-loading 2> %t/result-LibA.output
 // RUN: test -f %t/LibA.swiftmodule
 // RUN: %FileCheck %s -input-file %t/result-LibA.output -check-prefix CHECK-LOAD
-// CHECK-LOAD: remark: loaded module at {{.*}}AppleLogging.swiftmodule
+// CHECK-LOAD: remark: loaded module {{.*}}AppleLogging.swiftmodule
 
 /// 2. Fail: trying to access a non-member of a module (with module aliasing) should fail with the module alias in the diags
 /// Try building module Lib that imports XLogging WITH -module-alias XLogging=AppleLogging

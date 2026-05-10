@@ -17,6 +17,7 @@
 #ifndef SWIFT_REMOTE_TYPEINFOPROVIDER_H
 #define SWIFT_REMOTE_TYPEINFOPROVIDER_H
 
+#include <stdint.h>
 namespace swift {
 namespace reflection {
 class TypeInfo;
@@ -25,6 +26,8 @@ namespace remote {
 
 /// An abstract interface for providing external type layout information.
 struct TypeInfoProvider {
+  using IdType = void *;
+
   virtual ~TypeInfoProvider() = default;
 
   /// Attempt to read type information about (Clang)imported types that are not
@@ -32,6 +35,13 @@ struct TypeInfoProvider {
   /// info, for example.
   virtual const reflection::TypeInfo *
   getTypeInfo(llvm::StringRef mangledName) = 0;
+
+  /// A key that can be used to identify the type info provider (for example, 
+  /// for caching purposes).
+  virtual IdType getId() {
+    // Default implementation is the instance's ID.
+    return (void *) this;
+  }
 };
 
 } // namespace remote

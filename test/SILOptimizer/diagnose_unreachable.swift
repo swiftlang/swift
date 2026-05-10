@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -O -emit-sil -primary-file %s -o /dev/null -verify
 
 func ifFalse() -> Int {
-  if false { // expected-note {{always evaluates to false}}
+  if 1 == 0 { // expected-note {{always evaluates to false}}
     return 0 // expected-warning {{will never be executed}}
   } else {
     return 1
@@ -13,7 +13,7 @@ func ifFalse() -> Int {
 
 func ifTrue() -> Int {
   _ = 0
-  if true { // expected-note {{always evaluates to true}}
+  if 1 == 1 { // expected-note {{always evaluates to true}}
     return 1
   }
   return 0 // expected-warning {{will never be executed}}
@@ -68,7 +68,7 @@ func userCode() {}
 
 func whileTrue() {
   var x = 0
-  while true { // expected-note {{always evaluates to true}}
+  while 1 == 1 { // expected-note {{always evaluates to true}}
     x += 1
   }
   userCode() // expected-warning {{will never be executed}}
@@ -92,7 +92,7 @@ func whileTrueReachable(_ v: Int) -> () {
 
 func whileTrueTwoPredecessorsEliminated() -> () {
   var x = 0
-  while (true) { // expected-note {{always evaluates to true}}
+  while (1 == 1) { // expected-note {{always evaluates to true}}
     if false {
       break
     }
@@ -102,7 +102,7 @@ func whileTrueTwoPredecessorsEliminated() -> () {
 }
 
 func unreachableBranch() -> Int {
-  if false { // expected-note {{always evaluates to false}}
+  if 1 == 0 { // expected-note {{always evaluates to false}}
     // FIXME: It'd be nice if the warning were on 'if true' instead of the 
     // body.
     if true {
@@ -344,12 +344,15 @@ while true {
  // no warning!
 
 
-// SR-1010 - rdar://25278336 - Spurious "will never be executed" warnings when building standard library
-struct SR1010<T> {
+// rdar://25278336
+// https://github.com/apple/swift/issues/43622
+// Spurious 'will never be executed' warnings when building standard library
+
+struct S_43622<T> {
   var a : T
 }
 
-extension SR1010 {
+extension S_43622 {
   @available(*, unavailable, message: "use the 'enumerated()' method on the sequence")
   init(_ base: Int) {
     fatalError("unavailable function can't be called")
@@ -373,7 +376,7 @@ class FailingClass {
   }
 }
 
-// <https://bugs.swift.org/browse/SR-2729>
+// https://github.com/apple/swift/issues/45333
 // We should not report unreachable code inside protocol witness thunks
 
 protocol Fooable {
@@ -437,7 +440,7 @@ func sillyGenericExample() -> Never {
   }
 }
 
-// https://bugs.swift.org/browse/SR-7472
+// https://github.com/apple/swift/issues/50015
 
 protocol P {
     static var theThing: Self { get }
@@ -489,7 +492,7 @@ func keypathToEmptyEnum() -> Never {
   // does not trigger an unreachable code warning here.
   let kp = \StructWithNeverProp.property // no warning
   let s = StructWithNeverProp()
-  // Emit a diagnostic here becase the keypath is actually used.
+  // Emit a diagnostic here because the keypath is actually used.
   let prop = s[keyPath: kp]
     // expected-warning@-1 {{will never be executed}} \
     // expected-note {{a call to a never-returning function}} \
@@ -504,7 +507,7 @@ struct OuterStruct {
 }
 
 @dynamicMemberLookup
-public enum DynamicLookupEnum {
+enum DynamicLookupEnum {
     subscript<T>(dynamicMember keyPath: KeyPath<OuterStruct, T>) -> T {
         fatalError()
     }
@@ -512,6 +515,78 @@ public enum DynamicLookupEnum {
 
 func keypathWithDynamicLookup() {
   // Check that we still don't diagnose the keypath getter as unreachable
-  // when used in conjuction with a dynamicMemberLookup enum.
+  // when used in conjunction with a dynamicMemberLookup enum.
   let _ = \DynamicLookupEnum.innerEnum // no warning
 }
+
+func test_no_warnings_with_fatalError_when_wrapped_in_buildExpression() {
+  enum Either<T,U> {
+    case first(T)
+    case second(U)
+  }
+
+  @resultBuilder
+  struct MyBuilder {
+    static func buildExpression<T>(_ e: T) -> T { e }
+    static func buildBlock() -> () { }
+
+    static func buildBlock<T1>(_ t1: T1) -> T1 {
+      return t1
+    }
+
+    static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
+      return (t1, t2)
+    }
+
+    static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3) -> (T1, T2, T3) {
+      return (t1, t2, t3)
+    }
+
+    static func buildEither<T,U>(first value: T) -> Either<T, U> {
+      return .first(value)
+    }
+
+    static func buildEither<T,U>(second value: U) -> Either<T, U> {
+      return .second(value)
+    }
+  }
+
+  func test<T>(@MyBuilder _: (Int) -> T) {}
+
+  test {
+    if $0 < 0 {
+      fatalError() // ok, no warning even though fatalError() is wrapped
+    } else if $0 > 0 {
+      42
+    } else {
+      0
+    }
+  }
+
+  test {
+    switch $0 {
+    case 0: "0"
+    default: fatalError() // Ok, no warning even though fatalError() is wrapped
+    }
+  }
+}
+
+class C2 {
+  var s: String
+  var i: Int
+
+  init(s: String, b: Bool) {
+    var i = 0
+    if b {
+      exit()  // no-warning
+    }
+    self.s = s
+    i = i + 1
+    self.i = i
+  }
+}
+
+func noWarningForWait(for task: Task<Never, any Error>) async throws -> Never {
+    try await task.value
+}
+

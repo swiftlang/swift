@@ -1,6 +1,6 @@
 // RUN: not %target-swift-frontend -parse %s 2>&1 | %FileCheck %s
 
-// From SR-4866 <https://bugs.swift.org/browse/SR-4866>
+// https://github.com/apple/swift/issues/47443
 
 // CHECK: :[[@LINE+2]]:1019: error: structure nesting level exceeded maximum of 256
 let x =

@@ -227,6 +227,11 @@ public class Zoo {
   public func getCurrentAnimalInlinable() -> [some Animal] {
     return [Dog()]
   }
+
+  @available(visionOS 1.50.4, *)
+  public func getAnimailOnVision() -> [some Animal] {
+    return [Dog()]
+  }
 }
 
 public func returnFunctionTypeOwnershipChange() -> (__owned C1) -> () { return { _ in } }
@@ -252,3 +257,5 @@ public extension Float {
 }
 
 infix operator <==> : AssignmentPrecedence
+
+public func addingAnInverse<T: ~Copyable>(_ t: borrowing T) {}

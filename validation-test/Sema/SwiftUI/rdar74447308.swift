@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -target %target-cpu-apple-macosx10.15 -swift-version 5
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
@@ -14,6 +14,7 @@ class ItemList: ObservableObject {
   @Published var items = [Item]()
 }
 
+@available(SwiftStdlib 5.3, *)
 struct ContentView: View {
   @StateObject var list = ItemList()
 

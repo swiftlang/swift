@@ -65,9 +65,9 @@ namespace swift {
   /// lists of passes.
   enum class PassKind {
 #define PASS(ID, TAG, NAME) ID,
-#define PASS_RANGE(ID, START, END) ID##_First = START, ID##_Last = END,
 #include "Passes.def"
-    invalidPassKind
+    invalidPassKind,
+    numPasses = invalidPassKind,
   };
 
   PassKind PassKindFromString(StringRef ID);
@@ -76,9 +76,6 @@ namespace swift {
 
 #define PASS(ID, TAG, NAME) \
   SILTransform *create##ID();
-#define SWIFT_FUNCTION_PASS_WITH_LEGACY(ID, TAG, NAME) \
-  PASS(ID, TAG, NAME) \
-  SILTransform *createLegacy##ID();
 #define IRGEN_PASS(ID, TAG, NAME)
 #include "Passes.def"
 

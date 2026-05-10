@@ -9,9 +9,9 @@ enum E {
 func test1(_ e: E) {
   switch e {                                  // SCOPE: sil_scope [[test1_switch:[0-9]+]] {{.*}}:[[@LINE]]:3
   case .one(let payload), .two(let payload):  // SCOPE-NEXT: sil_scope [[test1_case1:[0-9]+]] {{.*}}:[[@LINE]]:3 parent [[test1_switch]]
-    print(payload)                            // SCOPE-NEXT: sil_scope {{.*}}:[[@LINE]]:5 parent [[test1_case1]]
+    print(payload)                            // SCOPE-NEXT: sil_scope                        {{.*}}:[[@LINE]]:5 parent [[test1_case1]]
   case .three(let payload):                   // SCOPE-NEXT: sil_scope [[test1_case2:[0-9]+]] {{.*}}:[[@LINE]]:3 parent [[test1_switch]]
-    print(payload)                            // SCOPE-NEXT: sil_scope {{.*}}:[[@LINE]]:5 parent [[test1_case2]]
+    print(payload)
   }
 }
 
@@ -22,7 +22,7 @@ func test2(_ e: E) {
   case .two(let x):                           // SCOPE-NEXT: sil_scope [[test2_case2:[0-9]+]] {{.*}}:[[@LINE]]:3 parent [[test2_switch]]
     print(x)                                  // SCOPE-NEXT: sil_scope {{.*}}:[[@LINE]]:5 parent [[test2_case2]]
   case .three(let x):                         // SCOPE-NEXT: sil_scope [[test2_case3:[0-9]+]] {{.*}}:[[@LINE]]:3 parent [[test2_switch]]
-    print(x)                                  // SCOPE-NEXT: sil_scope {{.*}}:[[@LINE]]:5 parent [[test2_case3]]
+    print(x)
   }
 }
 
@@ -43,11 +43,11 @@ func test4(_ e: E) {
     print(x)                                  // SCOPE-NEXT: sil_scope {{.*}}:[[@LINE]]:5 parent [[test4_case1]]
     fallthrough
   case .two(let x):                           // SCOPE-NEXT: sil_scope [[test4_case2:[0-9]+]] {{.*}}:[[@LINE]]:3 parent [[test4_switch]]
-    print(x)                                  // SCOPE-NEXT: sil_scope {{.*}}:[[@LINE]]:5 parent [[test4_case2]]
+    print(x)                                  // SCOPE-NEXT:                                    {{.*}}:[[@LINE]]:5 parent [[test4_case2]]
     fallthrough
-  default:
-    print("default")                          // SCOPE-NEXT: sil_scope [[test4_default:[0-9]+]] {{.*}}:[[@LINE]]:5 parent [[test4_switch]]
-                                              // SCOPE: string_literal utf8 "default", {{.*}} scope [[test4_default]]
+  default:                                    // SCOPE-NEXT: sil_scope [[test4_default:[0-9]+]] {{.*}}:[[@LINE]]:3 parent [[test4_switch]]
+    print("default")                          // SCOPE:      sil_scope [[test4_default1:[0-9]+]] {{.*}}:[[@LINE]]:5
+                                              // SCOPE: string_literal utf8 "default", {{.*}} scope [[test4_default1]]
   }
 }
 

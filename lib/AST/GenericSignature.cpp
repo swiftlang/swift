@@ -22,6 +22,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "RequirementMachine/RequirementMachine.h"
@@ -29,7 +30,7 @@
 
 using namespace swift;
 
-void ConformanceAccessPath::print(raw_ostream &out) const {
+void ConformancePath::print(raw_ostream &out) const {
   llvm::interleave(
       begin(), end(),
       [&](const Entry &entry) {
@@ -39,18 +40,18 @@ void ConformanceAccessPath::print(raw_ostream &out) const {
       [&] { out << " -> "; });
 }
 
-void ConformanceAccessPath::dump() const {
+void ConformancePath::dump() const {
   print(llvm::errs());
   llvm::errs() << "\n";
 }
 
 GenericSignatureImpl::GenericSignatureImpl(
-    TypeArrayView<GenericTypeParamType> params,
+    ArrayRef<GenericTypeParamType *> params,
     ArrayRef<Requirement> requirements, bool isKnownCanonical)
     : NumGenericParams(params.size()), NumRequirements(requirements.size()),
       CanonicalSignatureOrASTContext() {
   std::uninitialized_copy(params.begin(), params.end(),
-                          getTrailingObjects<Type>());
+                          getTrailingObjects<GenericTypeParamType *>());
   std::uninitialized_copy(requirements.begin(), requirements.end(),
                           getTrailingObjects<Requirement>());
 
@@ -75,11 +76,11 @@ GenericSignatureImpl::GenericSignatureImpl(
         &GenericSignature::getASTContext(params, requirements);
 }
 
-TypeArrayView<GenericTypeParamType>
+ArrayRef<GenericTypeParamType *>
 GenericSignatureImpl::getInnermostGenericParams() const {
   const auto params = getGenericParams();
 
-  const unsigned maxDepth = params.back()->getDepth();
+  const unsigned maxDepth = getMaxDepth();
   if (params.front()->getDepth() == maxDepth)
     return params;
 
@@ -95,6 +96,16 @@ GenericSignatureImpl::getInnermostGenericParams() const {
   return params.slice(sliceCount);
 }
 
+unsigned GenericSignatureImpl::getMaxDepth() const {
+  return getGenericParams().back()->getDepth();
+}
+
+unsigned GenericSignature::getNextDepth() const {
+  if (!getPointer())
+    return 0;
+  return getPointer()->getMaxDepth() + 1;
+}
+
 void GenericSignatureImpl::forEachParam(
     llvm::function_ref<void(GenericTypeParamType *, bool)> callback) const {
   // Figure out which generic parameters are concrete or same-typed to another
@@ -104,28 +115,47 @@ void GenericSignatureImpl::forEachParam(
     SmallVector<bool, 4>(genericParams.size(), true);
 
   for (auto req : getRequirements()) {
-    if (req.getKind() != RequirementKind::SameType) continue;
-
     GenericTypeParamType *gp;
-    if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
-      // If two generic parameters are same-typed, then the right-hand one
-      // is non-canonical.
-      assert(req.getFirstType()->is<GenericTypeParamType>());
-      gp = secondGP;
-    } else {
-      // Otherwise, the right-hand side is an associated type or concrete type,
-      // and the left-hand one is non-canonical.
-      gp = req.getFirstType()->getAs<GenericTypeParamType>();
-      if (!gp) continue;
+    bool isCanonical = false;
+    switch (req.getKind()) {
+    case RequirementKind::SameType: {
+      if (req.getSecondType()->isParameterPack() != 
+          req.getFirstType()->isParameterPack()) {
+        // This is a same-element requirement, which does not make
+        // type parameters non-canonical.
+        isCanonical = true;
+      }
 
-      // If an associated type is same-typed, it doesn't constrain the generic
-      // parameter itself. That is, if T == U.Foo, then T is canonical, whereas
-      // U.Foo is not.
-      if (req.getSecondType()->isTypeParameter()) continue;
+      if (auto secondGP = req.getSecondType()->getAs<GenericTypeParamType>()) {
+        // If two generic parameters are same-typed, then the right-hand one
+        // is non-canonical.
+        assert(req.getFirstType()->is<GenericTypeParamType>());
+        gp = secondGP;
+      } else {
+        // Otherwise, the right-hand side is an associated type or concrete
+        // type, and the left-hand one is non-canonical.
+        gp = req.getFirstType()->getAs<GenericTypeParamType>();
+        if (!gp)
+          continue;
+
+        // If an associated type is same-typed, it doesn't constrain the generic
+        // parameter itself. That is, if T == U.Foo, then T is canonical,
+        // whereas U.Foo is not.
+        if (req.getSecondType()->isTypeParameter())
+          continue;
+      }
+      break;
+    }
+
+    case RequirementKind::Superclass:
+    case RequirementKind::Conformance:
+    case RequirementKind::Layout:
+    case RequirementKind::SameShape:
+      continue;
     }
 
     unsigned index = GenericParamKey(gp).findIndexIn(genericParams);
-    genericParamsAreCanonical[index] = false;
+    genericParamsAreCanonical[index] = isCanonical;
   }
 
   // Call the callback with each parameter and the result of the above analysis.
@@ -136,18 +166,38 @@ void GenericSignatureImpl::forEachParam(
 bool GenericSignatureImpl::areAllParamsConcrete() const {
   unsigned numConcreteGenericParams = 0;
   for (const auto &req : getRequirements()) {
-    if (req.getKind() != RequirementKind::SameType) continue;
-    if (!req.getFirstType()->is<GenericTypeParamType>()) continue;
-    if (req.getSecondType()->isTypeParameter()) continue;
+    switch (req.getKind()) {
+    case RequirementKind::SameType:
+      if (!req.getFirstType()->is<GenericTypeParamType>())
+        continue;
+      if (req.getSecondType()->isTypeParameter())
+        continue;
 
-    ++numConcreteGenericParams;
+      ++numConcreteGenericParams;
+      break;
+
+    case RequirementKind::Conformance:
+    case RequirementKind::Superclass:
+    case RequirementKind::Layout:
+    case RequirementKind::SameShape:
+      continue;
+    }
   }
 
   return numConcreteGenericParams == getGenericParams().size();
 }
 
+bool GenericSignatureImpl::hasParameterPack() const {
+  for (auto *paramTy : getGenericParams()) {
+    if (paramTy->isParameterPack())
+      return true;
+  }
+
+  return false;
+}
+
 ASTContext &GenericSignature::getASTContext(
-                                    TypeArrayView<GenericTypeParamType> params,
+                                    ArrayRef<GenericTypeParamType *> params,
                                     ArrayRef<swift::Requirement> requirements) {
   // The params and requirements cannot both be empty.
   if (!params.empty())
@@ -157,9 +207,9 @@ ASTContext &GenericSignature::getASTContext(
 }
 
 /// Retrieve the generic parameters.
-TypeArrayView<GenericTypeParamType> GenericSignature::getGenericParams() const {
+ArrayRef<GenericTypeParamType *> GenericSignature::getGenericParams() const {
   return isNull()
-      ? TypeArrayView<GenericTypeParamType>{}
+      ? ArrayRef<GenericTypeParamType *>()
       : getPointer()->getGenericParams();
 }
 
@@ -167,9 +217,9 @@ TypeArrayView<GenericTypeParamType> GenericSignature::getGenericParams() const {
 ///
 /// Given a generic signature for a nested generic type, produce an
 /// array of the generic parameters for the innermost generic type.
-TypeArrayView<GenericTypeParamType> GenericSignature::getInnermostGenericParams() const {
+ArrayRef<GenericTypeParamType *> GenericSignature::getInnermostGenericParams() const {
   return isNull()
-      ? TypeArrayView<GenericTypeParamType>{}
+      ? ArrayRef<GenericTypeParamType *>()
       : getPointer()->getInnermostGenericParams();
 }
 
@@ -196,13 +246,13 @@ bool GenericSignatureImpl::isEqual(GenericSignature Other) const {
 }
 
 bool GenericSignatureImpl::isCanonical() const {
-  if (CanonicalSignatureOrASTContext.is<ASTContext *>())
+  if (isa<ASTContext *>(CanonicalSignatureOrASTContext))
     return true;
   return getCanonicalSignature().getPointer() == this;
 }
 
 CanGenericSignature
-CanGenericSignature::getCanonical(TypeArrayView<GenericTypeParamType> params,
+CanGenericSignature::getCanonical(ArrayRef<GenericTypeParamType *> params,
                                   ArrayRef<Requirement> requirements) {
   // Canonicalize the parameters and requirements.
   SmallVector<GenericTypeParamType*, 8> canonicalParams;
@@ -250,12 +300,12 @@ CanGenericSignature GenericSignatureImpl::getCanonicalSignature() const {
 
   // A stored ASTContext indicates that this is the canonical
   // signature.
-  if (CanonicalSignatureOrASTContext.is<ASTContext *>())
+  if (isa<ASTContext *>(CanonicalSignatureOrASTContext))
     return CanGenericSignature(this);
 
   // Otherwise, return the stored canonical signature.
   return CanGenericSignature(
-      CanonicalSignatureOrASTContext.get<const GenericSignatureImpl *>());
+      cast<const GenericSignatureImpl *>(CanonicalSignatureOrASTContext));
 }
 
 GenericEnvironment *GenericSignature::getGenericEnvironment() const {
@@ -267,7 +317,7 @@ GenericEnvironment *GenericSignature::getGenericEnvironment() const {
 GenericEnvironment *GenericSignatureImpl::getGenericEnvironment() const {
   if (GenericEnv == nullptr) {
     const auto impl = const_cast<GenericSignatureImpl *>(this);
-    impl->GenericEnv = GenericEnvironment::getIncomplete(this);
+    impl->GenericEnv = GenericEnvironment::forPrimary(this);
   }
 
   return GenericEnv;
@@ -277,8 +327,7 @@ GenericSignature::LocalRequirements
 GenericSignatureImpl::getLocalRequirements(Type depType) const {
   assert(depType->isTypeParameter() && "Expected a type parameter here");
 
-  return getRequirementMachine()->getLocalRequirements(
-      depType, getGenericParams());
+  return getRequirementMachine()->getLocalRequirements(depType);
 }
 
 ASTContext &GenericSignatureImpl::getASTContext() const {
@@ -288,18 +337,6 @@ ASTContext &GenericSignatureImpl::getASTContext() const {
 
   // For everything else, just get it from the generic parameter.
   return GenericSignature::getASTContext(getGenericParams(), getRequirements());
-}
-
-ProtocolConformanceRef
-GenericSignatureImpl::lookupConformance(CanType type,
-                                        ProtocolDecl *proto) const {
-  // FIXME: Actually implement this properly.
-  auto *M = proto->getParentModule();
-
-  if (type->isTypeParameter())
-    return ProtocolConformanceRef(proto);
-
-  return M->lookupConformance(type, proto, /*allowMissing=*/true);
 }
 
 bool GenericSignatureImpl::requiresClass(Type type) const {
@@ -334,6 +371,44 @@ bool GenericSignatureImpl::requiresProtocol(Type type,
   return getRequirementMachine()->requiresProtocol(type, proto);
 }
 
+std::optional<std::pair<Type, ProtocolDecl *>>
+GenericSignatureImpl::prohibitsIsolatedConformance(Type type) const {
+  type = getReducedType(type);
+
+  if (!type->isTypeParameter())
+    return std::nullopt;
+
+  // An isolated conformance cannot be used in a context where the type
+  // parameter can escape the isolation domain in which the conformance
+  // was formed. To establish this, we look for Sendable or SendableMetatype
+  // requirements on the type parameter itself.
+  ASTContext &ctx = type->getASTContext();
+  auto sendableProto = ctx.getProtocol(KnownProtocolKind::Sendable);
+  auto sendableMetatypeProto =
+      ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+
+  // Check for a conformance requirement to SendableMetatype, which is
+  // implied by Sendable.
+  if (sendableMetatypeProto && requiresProtocol(type, sendableMetatypeProto)) {
+    // Check for a conformance requirement to Sendable and return that if
+    // it exists, because it's more recognizable and specific.
+    if (sendableProto && requiresProtocol(type, sendableProto))
+      return std::make_pair(type, sendableProto);
+
+    return std::make_pair(type, sendableMetatypeProto);
+  }
+
+  // If this is a nested type, also check whether the parent type conforms to
+  // SendableMetatype, because one can derive this type from the parent type.
+  // FIXME: This is not a complete check, because there are other ways in which
+  // one might be able to derive this type. This needs to determine whether
+  // there is any path from a SendableMetatype-conforming type to this type.
+  if (auto depMemTy = type->getAs<DependentMemberType>())
+    return prohibitsIsolatedConformance(depMemTy->getBase());
+
+  return std::nullopt;
+}
+
 /// Determine whether the given dependent type is equal to a concrete type.
 bool GenericSignatureImpl::isConcreteType(Type type) const {
   assert(type->isTypeParameter() && "Expected a type parameter");
@@ -357,7 +432,7 @@ LayoutConstraint GenericSignatureImpl::getLayoutConstraint(Type type) const {
   return getRequirementMachine()->getLayoutConstraint(type);
 }
 
-bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
+bool GenericSignatureImpl::areReducedTypeParametersEqual(Type type1,
                                                          Type type2) const {
   assert(type1->isTypeParameter());
   assert(type2->isTypeParameter());
@@ -365,33 +440,54 @@ bool GenericSignatureImpl::areSameTypeParameterInContext(Type type1,
   if (type1.getPointer() == type2.getPointer())
     return true;
 
-  return getRequirementMachine()->areSameTypeParameterInContext(type1, type2);
+  return getRequirementMachine()->areReducedTypeParametersEqual(type1, type2);
 }
 
 bool GenericSignatureImpl::isRequirementSatisfied(
-    Requirement requirement, bool allowMissing) const {
+    Requirement requirement,
+    bool allowMissing,
+    bool brokenPackBehavior) const {
   if (requirement.getFirstType()->hasTypeParameter()) {
     auto *genericEnv = getGenericEnvironment();
 
-    auto substituted = requirement.subst(
-        [&](SubstitutableType *type) -> Type {
-          if (auto *paramType = type->getAs<GenericTypeParamType>())
-            return genericEnv->mapTypeIntoContext(paramType);
+    if (brokenPackBehavior) {
+      // Swift 5.9 shipped with a bug here where this method would return
+      // incorrect results. Maintain the old behavior specifically for two
+      // call sites in the ASTMangler.
+      if ((requirement.getKind() == RequirementKind::SameType ||
+           requirement.getKind() == RequirementKind::Superclass) &&
+          !requirement.getSecondType()->isTypeParameter() &&
+          requirement.getSecondType().findIf([&](Type t) -> bool {
+            return t->is<PackExpansionType>();
+          })) {
+        return false;
+      }
+    }
 
-          return type;
-        },
-        LookUpConformanceInSignature(this));
-
-    if (!substituted)
-      return false;
-
-    requirement = *substituted;
+    requirement = requirement.subst(
+        QueryInterfaceTypeSubstitutions{genericEnv},
+        LookUpConformanceInModule(),
+        SubstFlags::PreservePackExpansionLevel);
   }
 
-  // FIXME: Need to check conditional requirements here.
-  ArrayRef<Requirement> conditionalRequirements;
+  SmallVector<Requirement, 2> subReqs;
+  switch (requirement.checkRequirement(subReqs, allowMissing)) {
+  case CheckRequirementResult::Success:
+    return true;
 
-  return requirement.isSatisfied(conditionalRequirements, allowMissing);
+  case CheckRequirementResult::ConditionalConformance:
+    // FIXME: Need to check conditional requirements here.
+    return true;
+
+  case CheckRequirementResult::PackRequirement:
+    // FIXME
+    assert(false && "Refactor this");
+    return true;
+
+  case CheckRequirementResult::RequirementFailure:
+  case CheckRequirementResult::SubstitutionFailure:
+    return false;
+  }
 }
 
 SmallVector<Requirement, 4>
@@ -431,57 +527,60 @@ SmallVector<Requirement, 4> GenericSignatureImpl::requirementsNotSatisfiedBy(
   return result;
 }
 
-bool GenericSignatureImpl::isCanonicalTypeInContext(Type type) const {
-  // If the type isn't independently canonical, it's certainly not canonical
-  // in this context.
+bool GenericSignatureImpl::isReducedType(Type type) const {
+  // If the type isn't canonical, it's not reduced.
   if (!type->isCanonical())
     return false;
 
-  // All the contextual canonicality rules apply to type parameters, so if the
-  // type doesn't involve any type parameters, it's already canonical.
+  // A fully concrete canonical type is reduced.
   if (!type->hasTypeParameter())
     return true;
 
-  return getRequirementMachine()->isCanonicalTypeInContext(type);
+  return getRequirementMachine()->isReducedType(type);
 }
 
-CanType GenericSignature::getCanonicalTypeInContext(Type type) const {
+CanType GenericSignature::getReducedType(Type type) const {
   // The null generic signature has no requirements so cannot influence the
   // structure of the can type computed here.
   if (isNull()) {
     return type->getCanonicalType();
   }
-  return getPointer()->getCanonicalTypeInContext(type);
+  return getPointer()->getReducedType(type);
 }
 
-CanType GenericSignatureImpl::getCanonicalTypeInContext(Type type) const {
+CanType GenericSignatureImpl::getReducedType(Type type) const {
   type = type->getCanonicalType();
 
-  // All the contextual canonicality rules apply to type parameters, so if the
-  // type doesn't involve any type parameters, it's already canonical.
+  // A fully concrete type is already reduced.
   if (!type->hasTypeParameter())
     return CanType(type);
 
-  return getRequirementMachine()->getCanonicalTypeInContext(
+  return getRequirementMachine()->getReducedType(
       type, { })->getCanonicalType();
 }
 
-bool GenericSignatureImpl::isValidTypeInContext(Type type) const {
-  return getRequirementMachine()->isValidTypeInContext(type);
+CanType GenericSignatureImpl::getReducedTypeParameter(CanType type) const {
+  return getRequirementMachine()->getReducedTypeParameter(
+      type, { })->getCanonicalType();
+}
+
+bool GenericSignatureImpl::isValidTypeParameter(Type type) const {
+  return getRequirementMachine()->isValidTypeParameter(type);
 }
 
 ArrayRef<CanTypeWrapper<GenericTypeParamType>>
 CanGenericSignature::getGenericParams() const {
-  auto params = this->GenericSignature::getGenericParams().getOriginalArray();
-  auto base = static_cast<const CanTypeWrapper<GenericTypeParamType>*>(
+  auto params =
+      this->GenericSignature::getGenericParams();
+  auto base = reinterpret_cast<const CanTypeWrapper<GenericTypeParamType> *>(
                                                               params.data());
   return {base, params.size()};
 }
 
-ConformanceAccessPath
-GenericSignatureImpl::getConformanceAccessPath(Type type,
-                                               ProtocolDecl *protocol) const {
-  return getRequirementMachine()->getConformanceAccessPath(type, protocol);
+ConformancePath
+GenericSignatureImpl::getConformancePath(Type type,
+                                         ProtocolDecl *protocol) const {
+  return getRequirementMachine()->getConformancePath(type, protocol);
 }
 
 TypeDecl *
@@ -491,8 +590,31 @@ GenericSignatureImpl::lookupNestedType(Type type, Identifier name) const {
   return getRequirementMachine()->lookupNestedType(type, name);
 }
 
+Type
+GenericSignatureImpl::getReducedShape(Type type) const {
+  return getRequirementMachine()->getReducedShape(type, getGenericParams());
+}
+
+bool
+GenericSignatureImpl::haveSameShape(Type type1, Type type2) const {
+  return getRequirementMachine()->haveSameShape(type1, type2);
+}
+
+llvm::SmallVector<CanType, 2> GenericSignatureImpl::getShapeClasses() const {
+  llvm::SmallSetVector<CanType, 2> result;
+
+  forEachParam([&](GenericTypeParamType *gp, bool canonical) {
+    if (!canonical || !gp->isParameterPack())
+      return;
+
+    result.insert(getReducedShape(gp)->getCanonicalType());
+  });
+
+  return result.takeVector();
+}
+
 unsigned GenericParamKey::findIndexIn(
-                      TypeArrayView<GenericTypeParamType> genericParams) const {
+                      ArrayRef<GenericTypeParamType *> genericParams) const {
   // For depth 0, we have random access. We perform the extra checking so that
   // we can return
   if (Depth == 0 && Index < genericParams.size() &&
@@ -513,10 +635,13 @@ unsigned GenericParamKey::findIndexIn(
 
 SubstitutionMap GenericSignatureImpl::getIdentitySubstitutionMap() const {
   return SubstitutionMap::get(const_cast<GenericSignatureImpl *>(this),
-                              [](SubstitutableType *t) -> Type {
-                                return Type(cast<GenericTypeParamType>(t));
-                              },
-                              MakeAbstractConformanceForGenericType());
+    [](SubstitutableType *t) -> Type {
+      auto param = cast<GenericTypeParamType>(t);
+      if (!param->isParameterPack())
+        return param;
+      return PackType::getSingletonPackExpansion(param);
+    },
+    LookUpConformanceInModule());
 }
 
 GenericTypeParamType *GenericSignatureImpl::getSugaredType(
@@ -529,11 +654,11 @@ Type GenericSignatureImpl::getSugaredType(Type type) const {
   if (!type->hasTypeParameter())
     return type;
 
-  return type.transform([this](Type Ty) -> Type {
-    if (auto GP = dyn_cast<GenericTypeParamType>(Ty.getPointer())) {
+  return type.transformRec([this](TypeBase *Ty) -> std::optional<Type> {
+    if (auto GP = dyn_cast<GenericTypeParamType>(Ty)) {
       return Type(getSugaredType(GP));
     }
-    return Ty;
+    return std::nullopt;
   });
 }
 
@@ -542,35 +667,118 @@ unsigned GenericSignatureImpl::getGenericParamOrdinal(
   return GenericParamKey(param).findIndexIn(getGenericParams());
 }
 
-Type GenericSignatureImpl::getNonDependentUpperBounds(Type type) const {
+Type GenericSignatureImpl::getUpperBound(Type type,
+                                         bool forExistentialSelf,
+                                         bool includeParameterizedProtocols) const {
   assert(type->isTypeParameter());
 
   llvm::SmallVector<Type, 2> types;
-  if (Type superclass = getSuperclassBound(type)) {
-    // If the class contains a type parameter, try looking for a non-dependent
-    // superclass.
-    while (superclass && superclass->hasTypeParameter()) {
-      superclass = superclass->getSuperclass();
+  unsigned rootDepth = type->getRootGenericParam()->getDepth();
+
+  auto accept = [forExistentialSelf, rootDepth](Type t) {
+    if (!forExistentialSelf)
+      return true;
+
+    return !t.findIf([rootDepth](Type t) {
+      if (auto *paramTy = t->getAs<GenericTypeParamType>())
+        return (paramTy->getDepth() == rootDepth);
+      return false;
+    });
+  };
+
+  // We start with the assumption we'll add a '& AnyObject' member to our
+  // composition, but we might clear this below.
+  bool hasExplicitAnyObject = requiresClass(type);
+
+  // Look for the most derived superclass that does not involve the type
+  // being erased.
+  Type superclass = getSuperclassBound(type);
+  if (superclass) {
+    do {
+      superclass = getReducedType(superclass);
+      if (accept(superclass))
+        break;
+    } while ((superclass = superclass->getSuperclass()));
+
+    // If we're going to have a superclass, we can drop the '& AnyObject'.
+    if (superclass) {
+      types.push_back(getSugaredType(superclass));
+      hasExplicitAnyObject = false;
     }
-
-    if (superclass)
-      types.push_back(superclass);
-  }
-  for (const auto &elt : getRequiredProtocols(type)) {
-    types.push_back(elt->getDeclaredInterfaceType());
   }
 
-  const auto layout = getLayoutConstraint(type);
-  const auto boundsTy = ProtocolCompositionType::get(
-      getASTContext(), types,
-      /*HasExplicitAnyObject=*/layout &&
-          layout->getKind() == LayoutConstraintKind::Class);
+  auto &ctx = getASTContext();
 
-  if (boundsTy->isExistentialType()) {
-    return ExistentialType::get(boundsTy);
+  // Record the absence of Copyable and Escapable conformance, but only if
+  // we didn't have a superclass or require AnyObject.
+  InvertibleProtocolSet inverses;
+
+  if (!superclass && !hasExplicitAnyObject) {
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      auto *kp = ctx.getProtocol(::getKnownProtocolKind(ip));
+      if (!requiresProtocol(type, kp))
+        inverses.insert(ip);
+    }
   }
 
-  return boundsTy;
+  for (auto *proto : getRequiredProtocols(type)) {
+    // Don't add invertible protocols to the composition, because we recorded
+    // their absence above.
+    if (proto->getInvertibleProtocolKind())
+      continue;
+
+    if (proto->requiresClass())
+      hasExplicitAnyObject = false;
+
+    auto *baseType = proto->getDeclaredInterfaceType()->castTo<ProtocolType>();
+
+    auto primaryAssocTypes = proto->getPrimaryAssociatedTypes();
+    if (includeParameterizedProtocols && !primaryAssocTypes.empty()) {
+      SmallVector<Type, 2> argTypes;
+
+      // Attempt to recover same-type requirements on primary associated types.
+      for (auto *assocType : primaryAssocTypes) {
+        // For each primary associated type A of P, compute the reduced type
+        // of T.[P]A.
+        auto memberType = getReducedType(DependentMemberType::get(type, assocType));
+
+        // If the reduced type is at a lower depth than the root generic
+        // parameter of T, then it's constrained.
+        if (accept(memberType)) {
+          argTypes.push_back(getSugaredType(memberType));
+        }
+      }
+
+      // If we have constrained all primary associated types, create a
+      // parameterized protocol type. During code completion, we might call
+      // `getExistentialType` (which calls this method) on a generic parameter
+      // that doesn't have all parameters specified, e.g. to get a consise
+      // description of the parameter type to the following function.
+      //
+      // func foo<P: Publisher>(p: P) where P.Failure == Never
+      //
+      // In that case just add the base type in the default branch below.
+      if (argTypes.size() == primaryAssocTypes.size()) {
+        types.push_back(ParameterizedProtocolType::get(
+            getASTContext(), baseType, argTypes));
+        continue;
+      }
+    }
+    types.push_back(baseType);
+  }
+
+  return ProtocolCompositionType::get(ctx, types, inverses,
+                                      hasExplicitAnyObject);
+}
+
+Type GenericSignatureImpl::getExistentialType(Type paramTy) const {
+  auto upperBound = getUpperBound(paramTy,
+                                  /*forExistentialSelf=*/true,
+                                  /*includeParameterizedProtocols=*/true);
+  if (upperBound->isConstraintType())
+    return ExistentialType::get(upperBound);
+  assert(upperBound->getClassOrBoundGenericClass());
+  return upperBound;
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &id) const {
@@ -579,9 +787,17 @@ void GenericSignature::Profile(llvm::FoldingSetNodeID &id) const {
 }
 
 void GenericSignature::Profile(llvm::FoldingSetNodeID &ID,
-                               TypeArrayView<GenericTypeParamType> genericParams,
+                               ArrayRef<GenericTypeParamType *> genericParams,
                                ArrayRef<Requirement> requirements) {
   return GenericSignatureImpl::Profile(ID, genericParams, requirements);
+}
+
+void swift::simple_display(raw_ostream &out,
+                           DefaultRequirementOptions options) {
+  out << "DefaultRequirementOptions(expandingDefaults="
+      << options.contains(ExpandDefaults)
+      << ", inferOutOfScopeImpliedInverses="
+      << options.contains(InferOutOfScopeImpliedInverses) << ")";
 }
 
 void swift::simple_display(raw_ostream &out, GenericSignature sig) {
@@ -589,165 +805,6 @@ void swift::simple_display(raw_ostream &out, GenericSignature sig) {
     sig->print(out);
   else
     out << "NULL";
-}
-
-bool Requirement::hasError() const {
-  if (getFirstType()->hasError())
-    return true;
-
-  if (getKind() != RequirementKind::Layout &&
-      getSecondType()->hasError())
-    return true;
-
-  return false;
-}
-
-bool Requirement::isCanonical() const {
-  if (!getFirstType()->isCanonical())
-    return false;
-
-  switch (getKind()) {
-  case RequirementKind::Conformance:
-  case RequirementKind::SameType:
-  case RequirementKind::Superclass:
-    if (!getSecondType()->isCanonical())
-      return false;
-    break;
-
-  case RequirementKind::Layout:
-    break;
-  }
-
-  return true;
-}
-
-/// Get the canonical form of this requirement.
-Requirement Requirement::getCanonical() const {
-  Type firstType = getFirstType()->getCanonicalType();
-
-  switch (getKind()) {
-  case RequirementKind::Conformance:
-  case RequirementKind::SameType:
-  case RequirementKind::Superclass: {
-    Type secondType = getSecondType()->getCanonicalType();
-    return Requirement(getKind(), firstType, secondType);
-  }
-
-  case RequirementKind::Layout:
-    return Requirement(getKind(), firstType, getLayoutConstraint());
-  }
-  llvm_unreachable("Unhandled RequirementKind in switch");
-}
-
-ProtocolDecl *Requirement::getProtocolDecl() const {
-  assert(getKind() == RequirementKind::Conformance);
-  return getSecondType()->castTo<ProtocolType>()->getDecl();
-}
-
-bool
-Requirement::isSatisfied(ArrayRef<Requirement> &conditionalRequirements,
-                         bool allowMissing) const {
-  switch (getKind()) {
-  case RequirementKind::Conformance: {
-    auto *proto = getProtocolDecl();
-    auto *module = proto->getParentModule();
-    auto conformance = module->lookupConformance(
-        getFirstType(), proto, allowMissing);
-    if (!conformance)
-      return false;
-
-    conditionalRequirements = conformance.getConditionalRequirements();
-    return true;
-  }
-
-  case RequirementKind::Layout: {
-    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
-      auto layout = archetypeType->getLayoutConstraint();
-      return (layout && layout.merge(getLayoutConstraint()));
-    }
-
-    if (getLayoutConstraint()->isClass())
-      return getFirstType()->satisfiesClassConstraint();
-
-    // TODO: Statically check other layout constraints, once they can
-    // be spelled in Swift.
-    return true;
-  }
-
-  case RequirementKind::Superclass:
-    return getSecondType()->isExactSuperclassOf(getFirstType());
-
-  case RequirementKind::SameType:
-    return getFirstType()->isEqual(getSecondType());
-  }
-
-  llvm_unreachable("Bad requirement kind");
-}
-
-bool Requirement::canBeSatisfied() const {
-  switch (getKind()) {
-  case RequirementKind::Conformance:
-    return getFirstType()->is<ArchetypeType>();
-
-  case RequirementKind::Layout: {
-    if (auto *archetypeType = getFirstType()->getAs<ArchetypeType>()) {
-      auto layout = archetypeType->getLayoutConstraint();
-      return (!layout || layout.merge(getLayoutConstraint()));
-    }
-
-    return false;
-  }
-
-  case RequirementKind::Superclass:
-    return (getFirstType()->isBindableTo(getSecondType()) ||
-            getSecondType()->isBindableTo(getFirstType()));
-
-  case RequirementKind::SameType:
-    return (getFirstType()->isBindableTo(getSecondType()) ||
-            getSecondType()->isBindableTo(getFirstType()));
-  }
-
-  llvm_unreachable("Bad requirement kind");
-}
-
-/// Determine the canonical ordering of requirements.
-static unsigned getRequirementKindOrder(RequirementKind kind) {
-  switch (kind) {
-  case RequirementKind::Conformance: return 2;
-  case RequirementKind::Superclass: return 0;
-  case RequirementKind::SameType: return 3;
-  case RequirementKind::Layout: return 1;
-  }
-  llvm_unreachable("unhandled kind");
-}
-
-/// Linear order on requirements in a generic signature.
-int Requirement::compare(const Requirement &other) const {
-  int compareLHS =
-    compareDependentTypes(getFirstType(), other.getFirstType());
-
-  if (compareLHS != 0)
-    return compareLHS;
-
-  int compareKind = (getRequirementKindOrder(getKind()) -
-                     getRequirementKindOrder(other.getKind()));
-
-  if (compareKind != 0)
-    return compareKind;
-
-  // We should only have multiple conformance requirements.
-  if (getKind() != RequirementKind::Conformance) {
-    llvm::errs() << "Unordered generic requirements\n";
-    llvm::errs() << "LHS: "; dump(llvm::errs()); llvm::errs() << "\n";
-    llvm::errs() << "RHS: "; other.dump(llvm::errs()); llvm::errs() << "\n";
-    abort();
-  }
-
-  int compareProtos =
-    TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
-  assert(compareProtos != 0 && "Duplicate conformance requirements");
-
-  return compareProtos;
 }
 
 /// Compare two associated types.
@@ -782,8 +839,7 @@ int swift::compareAssociatedTypes(AssociatedTypeDecl *assocType1,
   return 0;
 }
 
-/// Canonical ordering for type parameters.
-int swift::compareDependentTypes(Type type1, Type type2) {
+static int compareDependentTypesRec(Type type1, Type type2) {
   // Fast-path check for equality.
   if (type1->isEqual(type2)) return 0;
 
@@ -804,7 +860,7 @@ int swift::compareDependentTypes(Type type1, Type type2) {
 
   // - by base, so t_0_n.`P.T` < t_1_m.`P.T`
   if (int compareBases =
-        compareDependentTypes(depMemTy1->getBase(), depMemTy2->getBase()))
+        compareDependentTypesRec(depMemTy1->getBase(), depMemTy2->getBase()))
     return compareBases;
 
   // - by name, so t_n_m.`P.T` < t_n_m.`P.U`
@@ -820,6 +876,17 @@ int swift::compareDependentTypes(Type type1, Type type2) {
   return 0;
 }
 
+/// Canonical ordering for type parameters.
+int swift::compareDependentTypes(Type type1, Type type2) {
+  auto *root1 = type1->getRootGenericParam();
+  auto *root2 = type2->getRootGenericParam();
+  if (root1->getWeight() != root2->getWeight()) {
+    return root2->getWeight() ? -1 : +1;
+  }
+
+  return compareDependentTypesRec(type1, type2);
+}
+
 #pragma mark Generic signature verification
 
 void GenericSignature::verify() const {
@@ -827,6 +894,19 @@ void GenericSignature::verify() const {
 }
 
 void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
+  auto dumpAndAbort =
+      [&](llvm::function_ref<void(llvm::raw_ostream &)> message) {
+        ABORT([&](auto &out) {
+          message(out);
+          out << "\nAll requirements:\n";
+          for (auto reqt : reqts) {
+            reqt.dump(out);
+            out << "\n";
+          }
+          getPointer()->getRequirementMachine()->dump(out);
+        });
+      };
+
   auto canSig = getCanonicalSignature();
 
   PrettyStackTraceGenericSignature debugStack("checking", canSig);
@@ -844,28 +924,58 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     // Left-hand side must be a canonical type parameter.
     if (reqt.getKind() != RequirementKind::SameType) {
       if (!reqt.getFirstType()->isTypeParameter()) {
-        llvm::errs() << "Left-hand side must be a type parameter: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        abort();
+        dumpAndAbort([&](auto &out) {
+          out << "Left-hand side must be a type parameter: ";
+          reqt.dump(out);
+        });
       }
 
-      if (!canSig->isCanonicalTypeInContext(reqt.getFirstType())) {
-        llvm::errs() << "Left-hand side is not canonical: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        abort();
+      if (!canSig->isReducedType(reqt.getFirstType())) {
+        dumpAndAbort([&](auto &out) {
+          out << "Left-hand side is not reduced: ";
+          reqt.dump(out);
+        });
       }
     }
 
     // Check canonicalization of requirement itself.
     switch (reqt.getKind()) {
+    case RequirementKind::SameShape:
+      if (!reqt.getFirstType()->is<GenericTypeParamType>()) {
+        dumpAndAbort([&](auto &out) {
+          out << "Left hand side is not a generic parameter: ";
+          reqt.dump(out);
+        });
+      }
+
+      if (!reqt.getFirstType()->isRootParameterPack()) {
+        dumpAndAbort([&](auto &out) {
+          out << "Left hand side is not a parameter pack: ";
+          reqt.dump(out);
+        });
+      }
+
+      if (!reqt.getSecondType()->is<GenericTypeParamType>()) {
+        dumpAndAbort([&](auto &out) {
+          out << "Right hand side is not a generic parameter: ";
+          reqt.dump(out);
+        });
+      }
+
+      if (!reqt.getSecondType()->isRootParameterPack()) {
+        dumpAndAbort([&](auto &out) {
+          out << "Right hand side is not a parameter pack: ";
+          reqt.dump(out);
+        });
+      }
+
+      break;
     case RequirementKind::Superclass:
-      if (!canSig->isCanonicalTypeInContext(reqt.getSecondType())) {
-        llvm::errs() << "Right-hand side is not canonical: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        abort();
+      if (!canSig->isReducedType(reqt.getSecondType())) {
+        dumpAndAbort([&](auto &out) {
+          out << "Right-hand side is not reduced: ";
+          reqt.dump(out);
+        });
       }
       break;
 
@@ -873,9 +983,9 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
       break;
 
     case RequirementKind::SameType: {
-      auto hasCanonicalOrConcreteParent = [&](Type type) {
+      auto hasReducedOrConcreteParent = [&](Type type) {
         if (auto *dmt = type->getAs<DependentMemberType>()) {
-          return (canSig->isCanonicalTypeInContext(dmt->getBase()) ||
+          return (canSig->isReducedType(dmt->getBase()) ||
                   canSig->isConcreteType(dmt->getBase()));
         }
         return type->is<GenericTypeParamType>();
@@ -884,56 +994,57 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
       auto firstType = reqt.getFirstType();
       auto secondType = reqt.getSecondType();
 
-      auto canType = canSig->getCanonicalTypeInContext(firstType);
+      auto canType = canSig->getReducedType(firstType);
       auto &component = sameTypeComponents[canType];
 
-      if (!hasCanonicalOrConcreteParent(firstType)) {
-        llvm::errs() << "Left hand side does not have a canonical parent: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        abort();
+      if (!hasReducedOrConcreteParent(firstType)) {
+        dumpAndAbort([&](auto &out) {
+          out << "Left hand side does not have a reduced parent: ";
+          reqt.dump(out);
+        });
       }
 
       if (reqt.getSecondType()->isTypeParameter()) {
-        if (!hasCanonicalOrConcreteParent(secondType)) {
-          llvm::errs() << "Right hand side does not have a canonical parent: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          abort();
+        if (!hasReducedOrConcreteParent(secondType)) {
+          dumpAndAbort([&](auto &out) {
+            out << "Right hand side does not have a reduced parent: ";
+            reqt.dump(out);
+          });
         }
+
         if (compareDependentTypes(firstType, secondType) >= 0) {
-          llvm::errs() << "Out-of-order type parameters: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          abort();
+          dumpAndAbort([&](auto &out) {
+            out << "Out-of-order type parameters: ";
+            reqt.dump(out);
+          });
         }
 
         if (component.empty()) {
           component.push_back(firstType);
         } else if (!component.back()->isEqual(firstType)) {
-          llvm::errs() << "Same-type requirement within an equiv. class "
-                       << "is out-of-order: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          abort();
+          dumpAndAbort([&](auto &out) {
+            out << "Same-type requirement within an equiv. class "
+                << "is out-of-order: ";
+            reqt.dump(out);
+          });
         }
 
         component.push_back(secondType);
       } else {
-        if (!canSig->isCanonicalTypeInContext(secondType)) {
-          llvm::errs() << "Right hand side is not canonical: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          abort();
+        if (!canSig->isReducedType(secondType)) {
+          dumpAndAbort([&](auto &out) {
+            out << "Right hand side is not reduced: ";
+            reqt.dump(out);
+          });
         }
 
         if (component.empty()) {
           component.push_back(secondType);
         } else if (!component.back()->isEqual(secondType)) {
-          llvm::errs() << "Inconsistent concrete requirement in equiv. class: ";
-          reqt.dump(llvm::errs());
-          llvm::errs() << "\n";
-          abort();
+          dumpAndAbort([&](auto &out) {
+            out << "Inconsistent concrete requirement in equiv. class: ";
+            reqt.dump(out);
+          });
         }
       }
       break;
@@ -954,10 +1065,10 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     int compareLHS =
       compareDependentTypes(prevReqt.getFirstType(), reqt.getFirstType());
     if (compareLHS > 0) {
-      llvm::errs() << "Out-of-order left-hand side: ";
-      reqt.dump(llvm::errs());
-      llvm::errs() << "\n";
-      abort();
+      dumpAndAbort([&](auto &out) {
+        out << "Out-of-order left-hand side: ";
+        reqt.dump(out);
+      });
     }
 
     // If we have a concrete same-type requirement, we shouldn't have any
@@ -965,19 +1076,19 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     if (reqt.getKind() == RequirementKind::SameType &&
         !reqt.getSecondType()->isTypeParameter()) {
       if (compareLHS >= 0) {
-        llvm::errs() << "Concrete subject type should not have "
-                     << "any other requirements: ";
-        reqt.dump(llvm::errs());
-        llvm::errs() << "\n";
-        abort();
+        dumpAndAbort([&](auto &out) {
+          out << "Concrete subject type should not have "
+              << "any other requirements: ";
+          reqt.dump(out);
+        });
       }
     }
 
     if (prevReqt.compare(reqt) >= 0) {
-      llvm::errs() << "Out-of-order requirement: ";
-      reqt.dump(llvm::errs());
-      llvm::errs() << "\n";
-      abort();
+      dumpAndAbort([&](auto &out) {
+        out << "Out-of-order requirement: ";
+        reqt.dump(out);
+      });
     }
   }
 
@@ -992,24 +1103,33 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
     ProtocolType::canonicalizeProtocols(canonicalProtos);
 
     if (protos.size() != canonicalProtos.size()) {
-      llvm::errs() << "Redundant conformance requirements in signature\n";
-      abort();
+      dumpAndAbort([&](auto &out) {
+        out << "Redundant conformance requirements in signature " << *this
+            << ":\n";
+        out << "Ours:\n";
+        for (auto *proto : protos)
+          out << "- " << proto->getName() << "\n";
+        out << "Theirs:\n";
+        for (auto *proto : canonicalProtos)
+          out << "- " << proto->getName();
+      });
     }
     if (!std::equal(protos.begin(), protos.end(), canonicalProtos.begin())) {
-      llvm::errs() << "Out-of-order conformance requirements\n";
-      abort();
+      dumpAndAbort([&](auto &out) {
+        out << "Out-of-order conformance requirements";
+      });
     }
   }
 
   // Check same-type components for consistency.
   for (const auto &pair : sameTypeComponents) {
     if (pair.second.front()->isTypeParameter() &&
-        !canSig->isCanonicalTypeInContext(pair.second.front())) {
-      llvm::errs() << "Abstract same-type requirement involving concrete types\n";
-      llvm::errs() << "Canonical type: " << pair.first << "\n";
-      llvm::errs() << "Left hand side of first requirement: "
-                   << pair.second.front() << "\n";
-      abort();
+        !canSig->isReducedType(pair.second.front())) {
+      dumpAndAbort([&](auto &out) {
+        out << "Abstract same-type requirement involving concrete types\n";
+        out << "Reduced type: " << pair.first << "\n";
+        out << "Left hand side of first requirement: " << pair.second.front();
+      });
     }
   }
 }
@@ -1028,6 +1148,10 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
   auto subjectType = stripBoundDependentMemberTypes(req.getFirstType());
 
   switch (req.getKind()) {
+  case RequirementKind::SameShape:
+    // Same-shape requirements do not involve dependent member types.
+    return req;
+
   case RequirementKind::Conformance:
     return Requirement(RequirementKind::Conformance, subjectType,
                        req.getSecondType());
@@ -1035,8 +1159,10 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
     return Requirement(req.getKind(), subjectType,
-                       req.getSecondType().transform([](Type t) {
-                         return stripBoundDependentMemberTypes(t);
+                       req.getSecondType().transformRec([](Type t) -> std::optional<Type> {
+                         if (t->isTypeParameter())
+                           return stripBoundDependentMemberTypes(t);
+                         return std::nullopt;
                        }));
 
   case RequirementKind::Layout:
@@ -1049,10 +1175,6 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
 
 void swift::validateGenericSignature(ASTContext &context,
                                      GenericSignature sig) {
-  llvm::errs() << "Validating generic signature: ";
-  sig->print(llvm::errs());
-  llvm::errs() << "\n";
-
   // Try building a new signature having the same requirements.
   SmallVector<GenericTypeParamType *, 2> genericParams;
   for (auto *genericParam :  sig.getGenericParams())
@@ -1065,14 +1187,9 @@ void swift::validateGenericSignature(ASTContext &context,
   {
     PrettyStackTraceGenericSignature debugStack("verifying", sig);
 
-    auto newSigWithError = evaluateOrDefault(
-        context.evaluator,
-        AbstractGenericSignatureRequest{
-            nullptr,
-            genericParams,
-            requirements},
-        GenericSignatureWithError());
-
+    auto newSigWithError = buildGenericSignatureWithError(
+        context, GenericSignature(), genericParams, requirements,
+        DefaultRequirementOptions());
     // If there were any errors, the signature was invalid.
     auto errorFlags = newSigWithError.getInt();
     if (errorFlags.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
@@ -1106,7 +1223,8 @@ void swift::validateGenericSignature(ASTContext &context,
         AbstractGenericSignatureRequest{
           nullptr,
           genericParams,
-          newRequirements},
+          newRequirements,
+          DefaultRequirementOptions()},
         GenericSignatureWithError());
 
     // If there were any errors, we formed an invalid signature, so
@@ -1123,7 +1241,39 @@ void swift::validateGenericSignature(ASTContext &context,
 
     // If the removed requirement is satisfied by the new generic signature,
     // it is redundant. Complain.
-    if (newSig->isRequirementSatisfied(requirements[victimIndex])) {
+    auto satisfied = [&](Requirement victim) {
+      if (!newSig->isValidTypeParameter(victim.getFirstType()))
+        return false;
+
+      switch (victim.getKind()) {
+      case RequirementKind::SameShape:
+        return (newSig->isValidTypeParameter(victim.getSecondType()) &&
+                newSig->haveSameShape(victim.getFirstType(),
+                                      victim.getSecondType()));
+      case RequirementKind::Conformance:
+        return newSig->requiresProtocol(victim.getFirstType(),
+                                        victim.getProtocolDecl());
+      case RequirementKind::Superclass: {
+        auto superclass = newSig->getSuperclassBound(victim.getFirstType());
+        return (superclass && superclass->isEqual(victim.getSecondType()));
+      }
+      case RequirementKind::SameType:
+        if (!victim.getSecondType().findIf([&](Type t) -> bool {
+            return (!t->isTypeParameter() ||
+                    newSig->isValidTypeParameter(t));
+          })) {
+          return false;
+        }
+        return newSig.getReducedType(victim.getFirstType())
+          ->isEqual(newSig.getReducedType(victim.getSecondType()));
+      case RequirementKind::Layout: {
+        auto layout = newSig->getLayoutConstraint(victim.getFirstType());
+        return (layout && layout == victim.getLayoutConstraint());
+      }
+      }
+    };
+
+    if (satisfied(requirements[victimIndex])) {
       SmallString<32> reqString;
       {
         llvm::raw_svector_ostream out(reqString);
@@ -1159,18 +1309,31 @@ void swift::validateGenericSignaturesInModule(ModuleDecl *module) {
   }
 }
 
-GenericSignature
-swift::buildGenericSignature(ASTContext &ctx,
+GenericSignatureWithError
+swift::buildGenericSignatureWithError(ASTContext &ctx,
                              GenericSignature baseSignature,
                              SmallVector<GenericTypeParamType *, 2> addedParameters,
-                             SmallVector<Requirement, 2> addedRequirements) {
+                             SmallVector<Requirement, 2> addedRequirements,
+                             DefaultRequirementOptions options) {
   return evaluateOrDefault(
       ctx.evaluator,
       AbstractGenericSignatureRequest{
         baseSignature.getPointer(),
         addedParameters,
-        addedRequirements},
-      GenericSignatureWithError()).getPointer();
+        addedRequirements,
+        options},
+      GenericSignatureWithError());
+}
+
+GenericSignature
+swift::buildGenericSignature(ASTContext &ctx,
+                             GenericSignature baseSignature,
+                             SmallVector<GenericTypeParamType *, 2> addedParameters,
+                             SmallVector<Requirement, 2> addedRequirements,
+                             DefaultRequirementOptions options) {
+  return buildGenericSignatureWithError(ctx, baseSignature,
+                                        addedParameters, addedRequirements,
+                                        options).getPointer();
 }
 
 GenericSignature GenericSignature::withoutMarkerProtocols() const {
@@ -1192,4 +1355,212 @@ GenericSignature GenericSignature::withoutMarkerProtocols() const {
     return *this;
 
   return GenericSignature::get(getGenericParams(), reducedRequirements);
+}
+
+void GenericSignatureImpl::getRequirementsWithInverses(
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses) const {
+  auto &ctx = getASTContext();
+
+  // TODO: deprecate support for this old version of the feature.
+  const bool LegacySuppAssoc =
+      ctx.LangOpts.hasFeature(Feature::SuppressedAssociatedTypes);
+
+  llvm::SmallSet<CanType, 12> seenDMTs;
+  auto addInverses = [&](Type tyParam) {
+    // We keep track of member types for which we tried to add an inverse,
+    // as they're the same set of types for which we should filter-out
+    // any positive requirements as well, as they may not need an inverse.
+    if (tyParam->getAs<DependentMemberType>() &&
+        !seenDMTs.insert(tyParam->getCanonicalType()).second)
+      return;
+
+    // Any generic parameter with a superclass bound or concrete type does not
+    // have an inverse.
+    if (getSuperclassBound(tyParam) || getConcreteType(tyParam))
+      return;
+
+    // Variable generics never have inverses (or the positive thereof).
+    if (auto gp = tyParam->getAs<GenericTypeParamType>()) {
+      if (gp->isValue())
+        return;
+    }
+
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+
+      // If we can derive a conformance to this protocol, then don't add an
+      // inverse.
+      if (requiresProtocol(tyParam, proto))
+        continue;
+
+      // Nothing implies a conformance to this protocol, so record the inverse.
+      inverses.push_back({tyParam, proto, SourceLoc()});
+    }
+  };
+
+  // Record the absence of conformances to invertible protocols
+  // for generic parameters.
+  for (auto gp : getGenericParams()) {
+    addInverses(gp);
+  }
+
+  const unsigned MinDepth = getGenericParams().front()->getDepth();
+
+  /// Add inverses for all primary associated types (PATs) that are suppressed.
+  /// For example, given this protocol:
+  ///
+  ///     public protocol P<A> {
+  ///       associatedtype A: ~Copyable
+  ///     }
+  ///     public func i<T: P>(..) where T.A: ~Copyable {}
+  ///     public func c<T: P>(..) where T.A: Copyable {}
+  ///
+  /// The legacy version of the feature, without defaults, `i` would not mention
+  /// any inverses, as it was taken as a given it's ~Copyable, and only in `c`
+  /// would we see (both in mangling and interfaces) `T.A: Copyable`.
+  ///
+  /// In the new version, WITH defaults for PATs, it's the opposite.
+  /// Function `f` now WILL mention the inverse `T.A: ~Copyable` in `i`,
+  /// but `c` will not mention `T.A: Copyable`, as it's a given.
+  ///
+  /// For non-primary associated types, the behavior is the same as the legacy
+  /// version of the feature.
+  for (auto req : getRequirements()) {
+
+    // We never emitted inverses for any associated types in the legacy version.
+    if (LegacySuppAssoc)
+      break;
+
+    if (req.getKind() != RequirementKind::Conformance)
+      continue;
+
+    auto subject = req.getFirstType();
+    auto *proto = req.getProtocolDecl();
+
+    // Only consider conformance requirements whose subject is rooted in
+    // a generic parameter that is within this signature's depth.
+    if (subject->getRootGenericParam()->getDepth() < MinDepth)
+      continue;
+
+    // Try to add inverses all primary associated types, if they're suppressed
+    // within this signature.
+    for (auto pat : proto->getPrimaryAssociatedTypes()) {
+      auto member = DependentMemberType::get(subject, pat);
+
+      // Can end up in a situation where member is τ_1_0.Element under this sig:
+      //   <τ_1_0 where τ_0_0 : P7, τ_1_0 : Sequence, τ_0_0.A == τ_1_0.Element>
+      // and thus we end up with a type parameter τ_0_0.[P7:A] outside the sig.
+      if (!isValidTypeParameter(member))
+        continue;
+
+      addInverses(member);
+    }
+  }
+
+  // Filter out most explicit conformances to invertible protocols.
+  for (auto req : getRequirements()) {
+    // If it's not a conformance to an invertible protocol, always include it.
+    if (req.getKind() != RequirementKind::Conformance ||
+        !req.getProtocolDecl()->getInvertibleProtocolKind()) {
+      reqs.push_back(req);
+      continue;
+    }
+
+    auto subject = req.getFirstType();
+
+    // Drop conformances to invertibles for generic type parameters, as we do
+    // infer a default for them.
+    if (subject->is<GenericTypeParamType>())
+      continue;
+
+    // If the subject matches a primary associated type we identified earlier,
+    // then we will infer a default for them, so drop this requirement.
+    if (seenDMTs.contains(subject->getCanonicalType()))
+      continue;
+
+    // Otherwise, for a non-primary associated type, no default is inferred,
+    // thus this conformance requirement was explicitly stated. Keep it.
+    reqs.push_back(req);
+  }
+}
+
+/// If we we can't build a requirement signature because of a request cycle or
+/// failure in Knuth-Bendix completion, we give the protocol a requirement
+/// signature that still has inherited protocol requirements on Self, and also
+/// conformances to Copyable and Escapable for all associated types. Otherwise,
+/// we'll see invariant violations from the inheritance clause mismatch, as
+/// well as spurious downstream diagnostics concerning move-only types.
+RequirementSignature RequirementSignature::getPlaceholderRequirementSignature(
+    const ProtocolDecl *proto, GenericSignatureErrors errors) {
+  auto &ctx = proto->getASTContext();
+
+  // Pretend the protocol inherits from Copyable and Escapable.
+  SmallVector<Requirement, 2> requirements;
+  for (auto ip : InvertibleProtocolSet::allKnown()) {
+    auto *otherProto = ctx.getProtocol(getKnownProtocolKind(ip));
+    requirements.emplace_back(RequirementKind::Conformance,
+                              proto->getSelfInterfaceType(),
+                              otherProto->getDeclaredInterfaceType());
+  }
+
+  // Maintain invariants.
+  llvm::array_pod_sort(requirements.begin(), requirements.end(),
+                       [](const Requirement *lhs, const Requirement *rhs) -> int {
+                         return lhs->compare(*rhs);
+                       });
+
+  return RequirementSignature(ctx.AllocateCopy(requirements),
+                              ArrayRef<ProtocolTypeAlias>(),
+                              errors);
+}
+
+void RequirementSignature::getRequirementsWithInverses(
+    ProtocolDecl *owner,
+    SmallVector<Requirement, 2> &reqs,
+    SmallVector<InverseRequirement, 2> &inverses) const {
+  auto &ctx = owner->getASTContext();
+  auto sig = owner->getGenericSignature();
+
+  llvm::SmallDenseSet<CanType, 2> assocTypes;
+
+  auto visit = [&](Type interfaceType) {
+    assocTypes.insert(interfaceType->getCanonicalType());
+
+    // Any associated type declaration with a superclass bound or concrete type
+    // does not have an inverse.
+    if (sig->getSuperclassBound(interfaceType) ||
+        sig->getConcreteType(interfaceType))
+      return;
+
+    for (auto ip : InvertibleProtocolSet::allKnown()) {
+      auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
+
+      // If we can derive a conformance to this protocol, then don't add an
+      // inverse.
+      if (sig->requiresProtocol(interfaceType, proto))
+        continue;
+
+      // Nothing implies a conformance to this protocol, so record the inverse.
+      inverses.push_back({interfaceType, proto, SourceLoc()});
+    }
+  };
+
+  visit(owner->getSelfInterfaceType());
+
+  // Record the absence of conformances to invertible protocols.
+  for (auto assocType : owner->getAssociatedTypeMembers()) {
+    visit(assocType->getDeclaredInterfaceType());
+  }
+
+  // Filter out explicit conformances to invertible protocols.
+  for (auto req : getRequirements()) {
+    if (req.getKind() == RequirementKind::Conformance &&
+        assocTypes.count(req.getFirstType()->getCanonicalType()) &&
+        req.getProtocolDecl()->getInvertibleProtocolKind()) {
+      continue;
+    }
+
+    reqs.push_back(req);
+  }
 }

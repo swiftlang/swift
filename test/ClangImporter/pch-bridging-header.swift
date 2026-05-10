@@ -7,13 +7,15 @@
 // RUN: %target-typecheck-verify-swift -import-objc-header %t/sdk-bridging-header.pch
 
 // Now test the driver-automated version is inert when disabled
-// RUN: env TMPDIR=%t/tmp/ %target-swiftc_driver -typecheck -disable-bridging-pch -save-temps %s -import-objc-header %S/Inputs/sdk-bridging-header.h
+// Output path of the PCH differs in the new driver, so force SWIFT_USE_OLD_DRIVER for now.
+// RUN: env TMPDIR=%t/tmp/ SWIFT_USE_OLD_DRIVER=1 %target-swiftc_driver -typecheck -disable-bridging-pch -save-temps %s -import-objc-header %S/Inputs/sdk-bridging-header.h
 // RUN: not ls %t/tmp/*.pch >/dev/null 2>&1
 
 // Test the driver-automated version works by default
-// RUN: env TMPDIR=%t/tmp/ %target-swiftc_driver -typecheck -save-temps %s -import-objc-header %S/Inputs/sdk-bridging-header.h
+// Output path of the PCH differs in the new driver, so force SWIFT_USE_OLD_DRIVER for now.
+// RUN: env TMPDIR=%t/tmp/ SWIFT_USE_OLD_DRIVER=1 %target-swiftc_driver -typecheck -save-temps %s -import-objc-header %S/Inputs/sdk-bridging-header.h
 // RUN: ls %t/tmp/*.pch >/dev/null 2>&1
-// RUN: llvm-objdump --raw-clang-ast %t/tmp/*.pch | llvm-bcanalyzer -dump | %FileCheck %s
+// RUN: llvm-objdump --raw-clang-ast %t/tmp/*.pch | %llvm-bcanalyzer -dump | %FileCheck %s
 // CHECK: ORIGINAL_FILE{{.*}}Inputs/sdk-bridging-header.h
 
 // Test the driver-automated version deletes its PCH file when done
@@ -39,7 +41,7 @@
 // Test the driver-automated version using persistent PCH
 // RUN: %target-swiftc_driver -typecheck -save-temps %s -import-objc-header %S/Inputs/sdk-bridging-header.h -pch-output-dir %t/pch3
 // RUN: ls %t/pch3/*.pch >/dev/null 2>&1
-// RUN: llvm-objdump --raw-clang-ast %t/pch3/*.pch | llvm-bcanalyzer -dump | %FileCheck %s -check-prefix=PERSISTENT
+// RUN: llvm-objdump --raw-clang-ast %t/pch3/*.pch | %llvm-bcanalyzer -dump | %FileCheck %s -check-prefix=PERSISTENT
 // PERSISTENT: ORIGINAL_FILE{{.*}}Inputs/sdk-bridging-header.h
 
 // Test that -pch-disable-validation works in that it won't implicitly create a PCH
@@ -58,3 +60,7 @@ let not = MyPredicate.not()
 let and = MyPredicate.and([])
 let or = MyPredicate.or([not, and])
 
+// When a bridging header macro refers to a macro imported from another module,
+// do we actually find the other module's macro definition, or do we just fail
+// to import it?
+if MY_TRUE == 1 {}

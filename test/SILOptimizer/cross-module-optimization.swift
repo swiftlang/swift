@@ -18,12 +18,28 @@
 // RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
 
 // REQUIRES: executable_test
+// REQUIRES: swift_in_compiler
+
 
 // Second test: check if CMO really imports the SIL of functions in other modules.
 
 // RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -Xllvm -sil-disable-pass=FunctionSignatureOpts -emit-sil -o %t/out.sil
 // RUN: %FileCheck %s -check-prefix=CHECK-SIL < %t/out.sil
 // RUN: %FileCheck %s -check-prefix=CHECK-SIL2 < %t/out.sil
+
+// With -enable-experimental-feature CoroutineAccessors.
+// REQUIRES: swift_feature_CoroutineAccessors
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Submodule.swiftmodule -module-name=Submodule %S/Inputs/cross-module/cross-submodule.swift -c -o %t/submodule.o -enable-experimental-feature CoroutineAccessors
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/PrivateSubmodule.swiftmodule -module-name=PrivateSubmodule %S/Inputs/cross-module/cross-private-submodule.swift -c -o %t/privatesubmodule.o -enable-experimental-feature CoroutineAccessors
+// RUN: %target-clang -c --language=c %S/Inputs/cross-module/c-module.c -o %t/c-module.o
+// RUN: %target-build-swift -O -wmo -parse-as-library -cross-module-optimization -emit-module -emit-module-path=%t/Test.swiftmodule -module-name=Test -I%t -I%S/Inputs/cross-module %S/Inputs/cross-module/cross-module.swift -c -o %t/test.o -enable-experimental-feature CoroutineAccessors
+// RUN: %target-build-swift -O -wmo -module-name=Main -I%t %s -c -o %t/main.o -enable-experimental-feature CoroutineAccessors
+// RUN: %target-swiftc_driver %t/main.o %t/test.o %t/submodule.o %t/privatesubmodule.o %t/c-module.o -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %target-run %t/a.out | %FileCheck %s -check-prefix=CHECK-OUTPUT
+
 
 import Test
 
@@ -32,19 +48,19 @@ import Test
 func testNestedTypes() {
   let c = Container()
 
-  // CHECK-OUTPUT [Test.Container.Base]
+  // CHECK-OUTPUT: [Test.Container.(unknown context at{{[^)]*}}).Base]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV9testclassyxxlFSi_Tg5
   print(c.testclass(27))
-  // CHECK-OUTPUT [Test.Container.Base]
+  // CHECK-OUTPUT: [Test.Container.(unknown context at{{[^)]*}}).Base]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test9ContainerV13testclass_genyxxlF
   print(c.testclass_gen(27))
-  // CHECK-OUTPUT [Test.PE<Swift.Int>.B(27)]
+  // CHECK-OUTPUT: [Test.(unknown context at{{[^)]*}}).PE<Swift.Int>.B(27)]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil shared [noinline] @$s4Test9ContainerV8testenumyxxlFSi_Tg5
   print(c.testenum(27))
-  // CHECK-OUTPUT [Test.PE<Swift.Int>.B(27)]
+  // CHECK-OUTPUT: [Test.(unknown context at{{[^)]*}}).PE<Swift.Int>.B(27)]
   // CHECK-OUTPUT: 27
   // CHECK-SIL-DAG: sil public_external {{.*}} @$s4Test9ContainerV12testenum_genyxxlF
   print(c.testenum_gen(27))
@@ -66,11 +82,11 @@ func testClass() {
 func testError() {
   // CHECK-OUTPUT: PrivateError()
   // CHECK-SIL2: struct $PrivateError ()
-  // CHECK-SIL2: alloc_existential_box $Error, $PrivateError
+  // CHECK-SIL2: alloc_existential_box $any Error, $PrivateError
   print(returnPrivateError(27))
   // CHECK-OUTPUT: InternalError()
   // CHECK-SIL2: struct $InternalError ()
-  // CHECK-SIL2: alloc_existential_box $Error, $InternalError
+  // CHECK-SIL2: alloc_existential_box $any Error, $InternalError
   print(returnInternalError(27))
   // CHECK-SIL2: } // end sil function '$s4Main9testErroryyF'
 }
@@ -164,6 +180,16 @@ func testImplementationOnly() {
   // CHECK-SIL2: } // end sil function '$s4Main22testImplementationOnlyyyF'
 }
 
+@inline(never)
+func testPrivateVar() {
+  // CHECK-OUTPUT: {{[0-9]+}}
+  print(getRandom())
+}
+
+func testKeyPathAccess() -> KeyPath<StructWithInternal, Int> {
+  return getKP()
+}
+
 testNestedTypes()
 testClass()
 testError()
@@ -174,4 +200,5 @@ testKeypath()
 testMisc()
 testGlobal()
 testImplementationOnly()
-
+testPrivateVar()
+testKeyPathAccess()

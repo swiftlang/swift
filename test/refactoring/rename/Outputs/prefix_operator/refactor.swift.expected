@@ -1,6 +1,6 @@
-let bar: Int = 12
-let negfoo = -bar
-print("opposite of \(bar) is \(negfoo)")
+let <base>foo</base>: Int = 12
+let negfoo = -<base>foo</base>
+print("opposite of \(<base>foo</base>) is \(negfoo)")
 
 
 

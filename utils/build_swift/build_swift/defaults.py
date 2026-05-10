@@ -13,6 +13,8 @@ Default option value definitions.
 
 import os
 import platform
+import re
+from typing import Optional
 
 from . import shell
 from .versions import Version
@@ -31,6 +33,7 @@ __all__ = [
     'DARWIN_DEPLOYMENT_VERSION_IOS',
     'DARWIN_DEPLOYMENT_VERSION_TVOS',
     'DARWIN_DEPLOYMENT_VERSION_WATCHOS',
+    'DARWIN_DEPLOYMENT_VERSION_XROS',
     'UNIX_INSTALL_PREFIX',
     'DARWIN_INSTALL_PREFIX',
     'LLVM_MAX_PARALLEL_LTO_LINK_JOBS',
@@ -42,19 +45,22 @@ __all__ = [
 
 # Options that can be "configured" by command line options
 
-BUILD_VARIANT = 'Debug'
+BUILD_VARIANT = 'RelWithDebInfo'
 CMAKE_GENERATOR = 'Ninja'
 
 COMPILER_VENDOR = 'none'
-SWIFT_USER_VISIBLE_VERSION = Version('5.8')
-CLANG_USER_VISIBLE_VERSION = Version('13.0.0')
+SWIFT_USER_VISIBLE_VERSION = Version('6.4')
+CLANG_USER_VISIBLE_VERSION = Version('21.0.0')
 SWIFT_ANALYZE_CODE_COVERAGE = 'false'
 
 DARWIN_XCRUN_TOOLCHAIN = 'default'
-DARWIN_DEPLOYMENT_VERSION_OSX = '10.9'
-DARWIN_DEPLOYMENT_VERSION_IOS = '7.0'
-DARWIN_DEPLOYMENT_VERSION_TVOS = '9.0'
-DARWIN_DEPLOYMENT_VERSION_WATCHOS = '2.0'
+DARWIN_DEPLOYMENT_VERSION_OSX = '13.0'
+DARWIN_DEPLOYMENT_VERSION_IOS = '16.0'
+DARWIN_DEPLOYMENT_VERSION_TVOS = '16.0'
+# FIXME: 9.0 would be the aligned watchOS version, but is held back to keep
+# support for armv7k (dropped in 9) and i386 simulator (dropped in 7)
+DARWIN_DEPLOYMENT_VERSION_WATCHOS = '6.0'
+DARWIN_DEPLOYMENT_VERSION_XROS = '1.0'
 
 UNIX_INSTALL_PREFIX = '/usr'
 DARWIN_INSTALL_PREFIX = ('/Applications/Xcode.app/Contents/Developer/'
@@ -63,19 +69,42 @@ DARWIN_INSTALL_PREFIX = ('/Applications/Xcode.app/Contents/Developer/'
 DSYMUTIL_JOBS = 1
 
 
-def _system_memory():
-    """Returns the system memory as an int. None if the system memory cannot
+def _system_memory() -> Optional[int]:
+    """Returns the system memory as an int in bytes. None if the system memory cannot
     be determined.
 
-    TODO: Support Linux and Windows platforms.
+    TODO: Support Windows platforms.
     """
 
-    if platform.platform() == 'Darwin':
-        try:
-            output = shell.check_output(['sysctl', 'hw.memsize']).strip()
-            return int(output.split(' ')[1])
-        except shell.CalledProcessError:
-            return None
+    try:
+        platform_system = platform.system()
+
+        if platform_system == "Darwin":
+            output = shell.check_output(["sysctl", "-n", "hw.memsize"]).strip()
+            return int(output)
+        elif platform_system == "FreeBSD":
+            output = shell.check_output(["sysctl", "-n", "hw.physmem"]).strip()
+            return int(output)
+        elif platform_system == "Linux":
+            with open("/proc/meminfo", "r") as file:
+                meminfo_data = file.read()
+                # Line to match "MemTotal: 239402943 kB"
+                matched = re.search(r"^MemTotal:\s+(\d+)\s*(\w*)?", meminfo_data)
+                if not matched:
+                    return None
+                total_memory, meminfo_unit = matched.groups()
+                total_memory = int(total_memory)
+                unit_multiplier = {
+                    "b": 1,
+                    "kb": 1024,
+                    "mb": 1024 * 1024,
+                    "gb": 1024 * 1024 * 1024,
+                }
+                memory_unit = unit_multiplier.get(meminfo_unit.lower(), 1024)
+                return total_memory * memory_unit
+
+    except (shell.CalledProcessError, FileNotFoundError, ValueError):
+        return None
 
     return None
 
@@ -84,7 +113,7 @@ def _default_llvm_lto_link_jobs():
     """Use the formula (GB Memory - 3)/6.0GB to get the number of parallel
     link threads we can support. This gives the OS 3 GB of room to work with.
 
-    This is a bit conservative, but I have found that this hueristic prevents
+    This is a bit conservative, but I have found that this heuristic prevents
     me from swapping on my test machine.
     """
 
@@ -99,7 +128,7 @@ def _default_swift_lto_link_jobs():
     """Use the formula (GB Memory - 3)/8.0GB to get the number of parallel
     link threads we can support. This gives the OS 3 GB of room to work with.
 
-    This is a bit conservative, but I have found that this hueristic prevents
+    This is a bit conservative, but I have found that this heuristic prevents
     me from swapping on my test machine.
     """
 
@@ -118,12 +147,13 @@ def llvm_install_components():
     """Convenience function for getting the default llvm install components for
     platforms.
     """
-    components = ['llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
-                  'clang-resource-headers', 'compiler-rt', 'clangd']
+    # llvm build product will take care of replacing compiler-rt with
+    # builtins,runtimes if need be
+    components = ['llvm-ar', 'llvm-cov', 'llvm-profdata', 'IndexStore', 'clang',
+                  'clang-resource-headers', 'compiler-rt', 'clangd', 'LTO',
+                  'lld']
     if os.sys.platform == 'darwin':
         components.extend(['dsymutil'])
-    else:
-        components.extend(['lld'])
     return ';'.join(components)
 
 

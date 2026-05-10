@@ -17,7 +17,9 @@
 #include "swift/AST/GenericParamList.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 SourceRange RequirementRepr::getSourceRange() const {
@@ -37,8 +39,7 @@ GenericParamList::GenericParamList(SourceLoc LAngleLoc,
     WhereLoc(WhereLoc), Requirements(Requirements),
     OuterParameters(nullptr)
 {
-  std::uninitialized_copy(Params.begin(), Params.end(),
-                          getTrailingObjects<GenericTypeParamDecl *>());
+  std::uninitialized_copy(Params.begin(), Params.end(), getTrailingObjects());
 }
 
 GenericParamList *
@@ -73,11 +74,16 @@ GenericParamList::clone(DeclContext *dc) const {
   auto &ctx = dc->getASTContext();
   SmallVector<GenericTypeParamDecl *, 2> params;
   for (auto param : getParams()) {
-    auto *newParam = GenericTypeParamDecl::create(
-        dc, param->getName(), SourceLoc(), param->isTypeSequence(),
-        GenericTypeParamDecl::InvalidDepth, param->getIndex(),
-        param->isOpaqueType(), param->getOpaqueTypeRepr());
-    newParam->setImplicit(true);
+    auto *newParam = GenericTypeParamDecl::createImplicit(
+        dc, param->getName(), GenericTypeParamDecl::InvalidDepth,
+        param->getIndex(), param->getParamKind(), param->getOpaqueTypeRepr());
+    newParam->setInherited(param->getInherited().getEntries());
+
+    // Cache the value type computed from the previous param to the new one.
+    ctx.evaluator.cacheOutput(
+        GenericTypeParamDeclGetValueTypeRequest{newParam},
+        param->getValueType());
+
     params.push_back(newParam);
   }
 
@@ -116,7 +122,7 @@ TrailingWhereClause::TrailingWhereClause(
     NumRequirements(requirements.size())
 {
   std::uninitialized_copy(requirements.begin(), requirements.end(),
-                          getTrailingObjects<RequirementRepr>());
+                          getTrailingObjects());
 }
 
 TrailingWhereClause *TrailingWhereClause::create(

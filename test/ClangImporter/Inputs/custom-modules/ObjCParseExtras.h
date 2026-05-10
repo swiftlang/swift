@@ -260,3 +260,10 @@ struct TrivialToCopy {
 @interface SuperclassWithDesignatedInitInCategory ()
 -(instancetype) initWithI:(NSInteger)i __attribute__((objc_designated_initializer));
 @end
+
+__attribute__((swift_attr("@_hasMissingDesignatedInitializers")))
+@interface NoConvenienceInitInheritanceBase : NSObject
+@end
+
+@interface NoConvenienceInitInheritance : NoConvenienceInitInheritanceBase
+@end

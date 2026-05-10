@@ -1,7 +1,8 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple -parse-as-library)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
+// UNSUPPORTED: freestanding
 
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
@@ -43,7 +44,7 @@ extension MP {
 
 @main struct Main {
   static func main() async {
-    var tests = TestSuite("Async Throw")
+    let tests = TestSuite("Async Throw")
 
     if #available(SwiftStdlib 5.1, *) {
       tests.test("throwing of naturally direct but indirect reabstraction") {

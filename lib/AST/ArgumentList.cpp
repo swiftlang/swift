@@ -18,36 +18,41 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
 Type swift::__Expr_getType(Expr *E) { return E->getType(); }
 
 SourceRange Argument::getSourceRange() const {
-  auto labelLoc = getLabelLoc();
-  if (labelLoc.isInvalid())
-    return getExpr()->getSourceRange();
+  return SourceRange::combine(getLabelLoc(), getExpr()->getSourceRange());
+}
 
-  auto exprEndLoc = getExpr()->getEndLoc();
-  if (exprEndLoc.isInvalid())
-    return labelLoc;
+Argument Argument::implicitInOut(ASTContext &ctx, Expr *expr) {
+  assert(!isa<InOutExpr>(expr) && "Cannot nest InOutExpr");
 
-  return SourceRange(labelLoc, exprEndLoc);
+  // Eventually this will set an 'inout' bit on Argument, but for now,
+  // synthesize in the InOutExpr.
+  Type objectTy;
+  if (auto subTy = expr->getType())
+    objectTy = subTy->castTo<LValueType>()->getObjectType();
+
+  return Argument::unlabeled(
+      new (ctx) InOutExpr(SourceLoc(), expr, objectTy, /*isImplicit*/ true));
 }
 
 bool Argument::isInOut() const {
   return ArgExpr->isSemanticallyInOutExpr();
 }
 
-bool Argument::isConst() const {
+bool Argument::isCompileTimeLiteral() const {
   return ArgExpr->isSemanticallyConstExpr();
 }
 
-ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
-                                   ArrayRef<Argument> args, SourceLoc rParenLoc,
-                                   Optional<unsigned> firstTrailingClosureIndex,
-                                   bool isImplicit, ArgumentList *originalArgs,
-                                   AllocationArena arena) {
+ArgumentList *ArgumentList::create(
+    ASTContext &ctx, SourceLoc lParenLoc, ArrayRef<Argument> args,
+    SourceLoc rParenLoc, std::optional<unsigned> firstTrailingClosureIndex,
+    bool isImplicit, ArgumentList *originalArgs, AllocationArena arena) {
   SmallVector<Expr *, 4> exprs;
   SmallVector<Identifier, 4> labels;
   SmallVector<SourceLoc, 4> labelLocs;
@@ -95,7 +100,7 @@ ArgumentList *ArgumentList::create(ASTContext &ctx, SourceLoc lParenLoc,
 ArgumentList *
 ArgumentList::createParsed(ASTContext &ctx, SourceLoc lParenLoc,
                            ArrayRef<Argument> args, SourceLoc rParenLoc,
-                           Optional<unsigned> firstTrailingClosureIndex) {
+                           std::optional<unsigned> firstTrailingClosureIndex) {
   return create(ctx, lParenLoc, args, rParenLoc, firstTrailingClosureIndex,
                 /*implicit*/ false);
 }
@@ -104,14 +109,15 @@ ArgumentList *ArgumentList::createTypeChecked(ASTContext &ctx,
                                               ArgumentList *originalArgs,
                                               ArrayRef<Argument> newArgs) {
   return create(ctx, originalArgs->getLParenLoc(), newArgs,
-                originalArgs->getRParenLoc(), /*trailingClosureIdx*/ None,
-                originalArgs->isImplicit(), originalArgs);
+                originalArgs->getRParenLoc(),
+                /*trailingClosureIdx*/ std::nullopt, originalArgs->isImplicit(),
+                originalArgs);
 }
 
 ArgumentList *
 ArgumentList::createImplicit(ASTContext &ctx, SourceLoc lParenLoc,
                              ArrayRef<Argument> args, SourceLoc rParenLoc,
-                             Optional<unsigned> firstTrailingClosureIndex,
+                             std::optional<unsigned> firstTrailingClosureIndex,
                              AllocationArena arena) {
   return create(ctx, lParenLoc, args, rParenLoc, firstTrailingClosureIndex,
                 /*implicit*/ true,
@@ -120,7 +126,7 @@ ArgumentList::createImplicit(ASTContext &ctx, SourceLoc lParenLoc,
 
 ArgumentList *
 ArgumentList::createImplicit(ASTContext &ctx, ArrayRef<Argument> args,
-                             Optional<unsigned> firstTrailingClosureIndex,
+                             std::optional<unsigned> firstTrailingClosureIndex,
                              AllocationArena arena) {
   return createImplicit(ctx, SourceLoc(), args, SourceLoc(),
                         firstTrailingClosureIndex, arena);
@@ -209,8 +215,8 @@ ArgumentList::getArgumentLabels(SmallVectorImpl<Identifier> &scratch) const {
   return scratch;
 }
 
-Optional<unsigned> ArgumentList::findArgumentExpr(Expr *expr,
-                                                  bool allowSemantic) const {
+std::optional<unsigned>
+ArgumentList::findArgumentExpr(Expr *expr, bool allowSemantic) const {
   if (allowSemantic)
     expr = expr->getSemanticsProvidingExpr();
   for (auto idx : indices(*this)) {
@@ -221,7 +227,7 @@ Optional<unsigned> ArgumentList::findArgumentExpr(Expr *expr,
     if (expr == argExpr)
       return idx;
   }
-  return None;
+  return std::nullopt;
 }
 
 Expr *ArgumentList::packIntoImplicitTupleOrParen(
@@ -233,7 +239,7 @@ Expr *ArgumentList::packIntoImplicitTupleOrParen(
   if (auto *unary = getUnlabeledUnaryExpr()) {
     auto *paren = new (ctx) ParenExpr(getLParenLoc(), unary, getRParenLoc());
     if (auto ty = getType(unary))
-      paren->setType(ParenType::get(ctx, ty));
+      paren->setType(ty);
     paren->setImplicit();
     return paren;
   }
@@ -260,32 +266,6 @@ Expr *ArgumentList::packIntoImplicitTupleOrParen(
     tuple->setType(TupleType::get(tupleEltTypes, ctx));
 
   return tuple;
-}
-
-Type ArgumentList::composeTupleOrParenType(
-    ASTContext &ctx, llvm::function_ref<Type(Expr *)> getType) const {
-  if (auto *unary = getUnlabeledUnaryExpr()) {
-    auto ty = getType(unary);
-    assert(ty);
-    ParameterTypeFlags flags;
-    if (get(0).isInOut()) {
-      ty = ty->getInOutObjectType();
-      flags = flags.withInOut(true);
-    }
-    return ParenType::get(ctx, ty, flags);
-  }
-  SmallVector<TupleTypeElt, 4> elts;
-  for (auto arg : *this) {
-    auto ty = getType(arg.getExpr());
-    assert(ty);
-    ParameterTypeFlags flags;
-    if (arg.isInOut()) {
-      ty = ty->getInOutObjectType();
-      flags = flags.withInOut(true);
-    }
-    elts.emplace_back(ty, arg.getLabel(), flags);
-  }
-  return TupleType::get(elts, ctx);
 }
 
 bool ArgumentList::matches(ArrayRef<AnyFunctionType::Param> params,

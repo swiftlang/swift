@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -verify-ignore-unrelated %s
 // REQUIRES: objc_interop
 
 import Foundation
@@ -43,8 +43,9 @@ func test(_ a : CFString!, b : CFString) {
 let r22507759: NSObject! = "test" as NSString
 let _: NSString! = unsafeDowncast(r22507759)  // expected-error {{missing argument for parameter 'to' in call}}
 
-// rdar://problem/29496775 / SR-3319
-func sr3319(f: CGFloat, n: NSNumber) {
+// rdar://problem/29496775
+// https://github.com/apple/swift/issues/45907
+func f_45907(f: CGFloat, n: NSNumber) {
   let _ = [f].map { $0 as NSNumber }
   let _ = [n].map { $0 as! CGFloat }
 }
@@ -81,8 +82,8 @@ func optionalityMismatchingCasts(f: CGFloat, n: NSNumber, fooo: CGFloat???,
                                  nooo: NSNumber???) {
   _ = f as NSNumber?
   _ = f as NSNumber??
-  let _ = fooo as NSNumber?? // expected-error{{'CGFloat???' is not convertible to 'NSNumber??'}}
-  //expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{16-18=as!}}
+  let _ = fooo as NSNumber?? // expected-error{{cannot convert value of type 'CGFloat???' to type 'NSNumber??' in coercion}}
+  //expected-note@-1 {{arguments to generic parameter 'Wrapped' ('CGFloat?' and 'NSNumber') are expected to be equal}}
   let _ = fooo as NSNumber???? // okay: injects extra optionals
 }
 

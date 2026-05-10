@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -54,6 +54,7 @@ extension _StringGuts {
     return i
   }
 
+  @_alwaysEmitIntoClient
   internal func validateInclusiveSubscalarIndex(
     _ i: String.Index,
     in bounds: Range<String.Index>
@@ -79,7 +80,7 @@ extension _StringGuts {
     _precondition(upper <= endIndex && lower <= upper,
       "String index range is out of bounds")
 
-    return Range(_uncheckedBounds: (lower, upper))
+    return unsafe Range(_uncheckedBounds: (lower, upper))
   }
 
   @_alwaysEmitIntoClient
@@ -101,7 +102,7 @@ extension _StringGuts {
       && upper <= bounds.upperBound,
       "Substring index range is out of bounds")
 
-    return Range(_uncheckedBounds: (lower, upper))
+    return unsafe Range(_uncheckedBounds: (lower, upper))
   }
 }
 
@@ -175,6 +176,7 @@ extension _StringGuts {
   /// - has an encoding that matches this string,
   /// - is within the bounds of this string (including the `endIndex`), and
   /// - is aligned on a scalar boundary.
+  @_alwaysEmitIntoClient
   internal func validateInclusiveScalarIndex(
     _ i: String.Index,
     in bounds: Range<String.Index>
@@ -211,7 +213,7 @@ extension _StringGuts {
     }
 
     let r = validateSubscalarRange(range)
-    return Range(
+    return unsafe Range(
       _uncheckedBounds: (scalarAlign(r.lowerBound), scalarAlign(r.upperBound)))
   }
 
@@ -241,7 +243,7 @@ extension _StringGuts {
     let r = validateSubscalarRange(range, in: bounds)
     let upper = scalarAlign(r.upperBound)
     let lower = scalarAlign(r.lowerBound)
-    return Range(_uncheckedBounds: (lower, upper))
+    return unsafe Range(_uncheckedBounds: (lower, upper))
   }
 }
 
@@ -354,7 +356,7 @@ extension _StringGuts {
     _precondition(upper <= endIndex && lower <= upper,
       "String index range is out of bounds")
 
-    return Range(_uncheckedBounds: (lower, upper))
+    return unsafe Range(_uncheckedBounds: (lower, upper))
   }
 
   /// A version of `validateScalarRange` that only traps if the main executable
@@ -375,7 +377,7 @@ extension _StringGuts {
     }
 
     let r = validateSubscalarRange_5_7(range)
-    return Range(
+    return unsafe Range(
       _uncheckedBounds: (scalarAlign(r.lowerBound), scalarAlign(r.upperBound)))
   }
 
@@ -396,22 +398,5 @@ extension _StringGuts {
 
     return roundDownToNearestCharacter(
       scalarAlign(validateInclusiveSubscalarIndex_5_7(i)))
-  }
-}
-
-// Word index validation (String)
-extension _StringGuts {
-  internal func validateWordIndex(
-    _ i: String.Index
-  ) -> String.Index {
-    return roundDownToNearestWord(scalarAlign(validateSubscalarIndex(i)))
-  }
-
-  internal func validateInclusiveWordIndex(
-    _ i: String.Index
-  ) -> String.Index {
-    return roundDownToNearestWord(
-      scalarAlign(validateInclusiveSubscalarIndex(i))
-    )
   }
 }

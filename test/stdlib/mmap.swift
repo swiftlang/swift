@@ -1,13 +1,17 @@
 // RUN: %target-run-simple-swift %t
 // REQUIRES: executable_test
 // UNSUPPORTED: OS=windows-msvc
-// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: OS=wasip1
 
 import StdlibUnittest
 #if canImport(Darwin)
   import Darwin
 #elseif canImport(Glibc)
   import Glibc
+#elseif canImport(Android)
+  import Android
+  // MAP_FAILED is not available on android.
+  let MAP_FAILED = UnsafeMutableRawPointer(bitPattern: -1)
 #else
 #error("Unsupported platform")
 #endif

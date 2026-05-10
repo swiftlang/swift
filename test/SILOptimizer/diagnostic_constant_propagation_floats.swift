@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
-// RUN: %target-swift-frontend -emit-sil -primary-file %s -o /dev/null -verify
 //
 // These are tests for diagnostics produced by constant propagation pass
 // on floating-point operations.
@@ -87,7 +86,7 @@ func testFloatConvertOverflow() {
   let f5: Float32 = -3.4028236E+38 // expected-warning {{'-3.4028236E+38' overflows to -inf during conversion to 'Float32' (aka 'Float')}}
   _blackHole(f5)
 
-  // Diagnositcs for Double truncations have architecture dependent
+  // Diagnostics for Double truncations have architecture dependent
   // messages. See _nonx86 and _x86 test files.
   let d1: Double = 1E308
   _blackHole(d1)
@@ -138,7 +137,7 @@ func testFloatConvertUnderflow() {
   let d1: Double = 1E-307
   _blackHole(d1)
 
-   // All warnings are disabled during explict conversions.
+   // All warnings are disabled during explicit conversions.
   _blackHole(Float(1E-37))
   _blackHole(Float(1E-39))
   _blackHole(Float(1E-45))
@@ -181,7 +180,7 @@ func testHexFloatImprecision() {
   let d5: Float = 0x1.8p-149 // expected-warning {{'0x1.8p-149' loses precision during conversion to 'Float}}
   _blackHole(d5)
 
-  // All warnings are disabled during explict conversions.
+  // All warnings are disabled during explicit conversions.
   _blackHole(Float(0x1.000002p-126))
   _blackHole(Float(0x1.0000002p-126))
   _blackHole(Float(0x1.000002p-127))

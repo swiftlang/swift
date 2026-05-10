@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name objc_attr_NSManaged -sdk %S/Inputs %s -I %S/Inputs -enable-source-import | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name objc_attr_NSManaged -sdk %S/Inputs %s -I %S/Inputs -enable-source-import | %FileCheck %s
 
 // REQUIRES: objc_interop
 
@@ -80,7 +80,9 @@ func testFinal(_ obj: FinalGizmo) -> String {
   return obj.y
 }
 
-// SR-2673: @NSManaged property can't satisfy protocol requirement
+// https://github.com/apple/swift/issues/45278
+// '@NSManaged' property can't satisfy protocol requirement
+
 @objc protocol ObjCProto {
   var managedProp: String { get set }
   var managedExtProp: AnyObject { get }
@@ -94,7 +96,9 @@ extension ProtoAdopter {
 }
 
 
-// SR-6534: @NSManaged properties can be 'final'
+// https://github.com/apple/swift/issues/49084
+// '@NSManaged' properties can be 'final'
+
 protocol EntityIDProto {
   var entityID: String { get set }
 }

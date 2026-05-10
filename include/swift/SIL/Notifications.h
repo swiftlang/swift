@@ -15,6 +15,7 @@
 
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/SILMoveOnlyDeinit.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -26,6 +27,7 @@ class SILNode;
 class ModuleDecl;
 class SILFunction;
 class SILWitnessTable;
+class SILDefaultOverrideTable;
 class SILDefaultWitnessTable;
 class SILGlobalVariable;
 class SILVTable;
@@ -49,6 +51,12 @@ public:
   virtual void didDeserializeWitnessTableEntries(ModuleDecl *mod,
                                                  SILWitnessTable *wt) = 0;
 
+  /// Observe that we successfully deserialized a default override table's
+  /// entries.
+  virtual void
+  didDeserializeDefaultOverrideTableEntries(ModuleDecl *mod,
+                                            SILDefaultOverrideTable *ot) = 0;
+
   /// Observe that we successfully deserialized a default witness table's
   /// entries.
   virtual void
@@ -67,6 +75,13 @@ public:
   /// Observe that we deserialized a default witness-table declaration.
   virtual void didDeserialize(ModuleDecl *mod,
                               SILDefaultWitnessTable *wtable) = 0;
+
+  /// Observe that we deserialized a default override table declaration.
+  virtual void didDeserialize(ModuleDecl *mod,
+                              SILDefaultOverrideTable *otable) = 0;
+
+  /// Observe that we deserialized a move only deinit declaration.
+  virtual void didDeserialize(ModuleDecl *mod, SILMoveOnlyDeinit *deinit) = 0;
 
   virtual ~DeserializationNotificationHandlerBase() = default;
 };
@@ -89,6 +104,10 @@ public:
                                                  SILWitnessTable *wt) override {
   }
 
+  /// Observe that we successfully deserialized a override table's entries.
+  virtual void didDeserializeDefaultOverrideTableEntries(
+      ModuleDecl *mod, SILDefaultOverrideTable *ot) override {}
+
   /// Observe that we successfully deserialized a default witness table's
   /// entries.
   virtual void didDeserializeDefaultWitnessTableEntries(
@@ -108,6 +127,14 @@ public:
   /// Observe that we deserialized a default witness-table declaration.
   virtual void didDeserialize(ModuleDecl *mod,
                               SILDefaultWitnessTable *wtable) override {}
+
+  /// Observe that we deserialized a default override table declaration.
+  virtual void didDeserialize(ModuleDecl *mod,
+                              SILDefaultOverrideTable *otable) override {}
+
+  /// Observe that we deserialized a move only deinit declaration.
+  virtual void didDeserialize(ModuleDecl *mod,
+                              SILMoveOnlyDeinit *deinit) override {}
 
   virtual StringRef getName() const = 0;
 
@@ -234,11 +261,16 @@ public:
   void
   didDeserializeDefaultWitnessTableEntries(ModuleDecl *mod,
                                            SILDefaultWitnessTable *wt) override;
+  void didDeserializeDefaultOverrideTableEntries(
+      ModuleDecl *mod, SILDefaultOverrideTable *ot) override;
   void didDeserialize(ModuleDecl *mod, SILGlobalVariable *var) override;
   void didDeserialize(ModuleDecl *mod, SILVTable *vtable) override;
   void didDeserialize(ModuleDecl *mod, SILWitnessTable *wtable) override;
   void didDeserialize(ModuleDecl *mod,
                       SILDefaultWitnessTable *wtable) override;
+  void didDeserialize(ModuleDecl *mod,
+                      SILDefaultOverrideTable *otable) override;
+  void didDeserialize(ModuleDecl *mod, SILMoveOnlyDeinit *deinit) override;
 };
 } // namespace swift
 

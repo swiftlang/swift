@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-optimize-block-arguments"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILArgument.h"
@@ -95,7 +96,7 @@ void RedundantPhiEliminationPass::run() {
 
 #ifndef NDEBUG
 static bool hasOnlyNoneOwnershipIncomingValues(SILPhiArgument *phi) {
-  SmallSetVector<SILPhiArgument *, 4> worklist;
+  llvm::SmallSetVector<SILPhiArgument *, 4> worklist;
   SmallVector<SILValue, 4> incomingValues;
   worklist.insert(phi);
 
@@ -103,7 +104,7 @@ static bool hasOnlyNoneOwnershipIncomingValues(SILPhiArgument *phi) {
   for (unsigned idx = 0; idx < worklist.size(); idx++) {
     phi->getIncomingPhiValues(incomingValues);
     for (auto incomingValue : incomingValues) {
-      if (incomingValue.getOwnershipKind() == OwnershipKind::None)
+      if (incomingValue->getOwnershipKind() == OwnershipKind::None)
         continue;
       if (auto *incomingPhi = dyn_cast<SILPhiArgument>(incomingValue)) {
         if (incomingPhi->isPhi()) {
@@ -265,7 +266,7 @@ bool RedundantPhiEliminationPass::valuesAreEqual(SILValue val1, SILValue val2) {
     
     if (auto *inst1 = dyn_cast<SingleValueInstruction>(val1)) {
       // Bail if the instructions have any side effects.
-      if (inst1->getMemoryBehavior() != SILInstruction::MemoryBehavior::None)
+      if (inst1->getMemoryBehavior() != MemoryBehavior::None)
         return false;
 
       // Allocation instructions are defined to have no side-effects.
@@ -368,8 +369,8 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
 
   VarDecl *field = nullptr;
   SILType newType;
-  Optional<SILLocation> loc;
-  
+  std::optional<SILLocation> loc;
+
   // First step: collect all phi-arguments which can be transformed.
   unsigned workIdx = 0;
   while (workIdx < collectedPhiArgs.size()) {
@@ -439,6 +440,13 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
     }
   
     for (DebugValueInst *dvi : debugValueUsers) {
+      // Recreate the debug_value with a fragment.
+      SILBuilder B(dvi, dvi->getDebugScope());
+      SILDebugVariable var = *dvi->getVarInfo();
+      if (!var.Type)
+        var.Type = initialArg->getType();
+      var.DIExpr.append(SILDebugInfoExpression::createFragment(field));
+      B.createDebugValue(dvi->getLoc(), dvi->getOperand(), var);
       dvi->eraseFromParent();
     }
     for (StructExtractInst *sei : structExtractUsers) {
@@ -459,7 +467,7 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
 
       SILInstruction *branchInst = op->getUser();
       SILBuilder builder(branchInst);
-      auto *strExtract = builder.createStructExtract(loc.getValue(),
+      auto *strExtract = builder.createStructExtract(loc.value(),
                                                      op->get(), field, newType);
       op->set(strExtract);
     }

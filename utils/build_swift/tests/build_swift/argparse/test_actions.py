@@ -390,7 +390,7 @@ class TestToggleFalseAction(unittest.TestCase):
         self.assertFalse(args.foo)
 
 
-class TestUnuspportedAction(unittest.TestCase):
+class TestUnsupportedAction(unittest.TestCase):
 
     def test_default_attributes(self):
         action = actions.UnsupportedAction(['--foo'])

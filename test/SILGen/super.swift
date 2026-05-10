@@ -9,7 +9,7 @@
 
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/../Inputs/fixed_layout_class.swift
 
-// RUN: %target-swift-emit-silgen -module-name super -parse-as-library -I %t %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name super -parse-as-library -I %t %s | %FileCheck %s
 
 import resilient_class
 import fixed_layout_class
@@ -171,8 +171,10 @@ public class ChildToFixedParent : OutsideParent {
   // CHECK: } // end sil function '$s5super18ChildToFixedParentC11returnsSelfACXDyFZ'
 }
 
-// https://bugs.swift.org/browse/SR-10260 - super.foo() call across a module
-// boundary from a subclass that does not override foo().
+// https://github.com/apple/swift/issues/52660
+// 'super.foo()' call across a module boundary from a subclass that does
+// not override 'foo()'.
+
 public class SuperCallToNonOverriddenMethod : OutsideParent {
   public func newMethod() {
     super.method()

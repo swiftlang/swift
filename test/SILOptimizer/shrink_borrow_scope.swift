@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -c -O -enable-copy-propagation=true -enable-lexical-lifetimes=true -sil-verify-all -Xllvm -sil-print-final-ossa-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -c -O -enable-copy-propagation=optimizing -enable-lexical-lifetimes=true -sil-verify-all -Xllvm -sil-print-final-ossa-module %s | %FileCheck %s
 
 // =============================================================================
 // = DECLARATIONS                                                             {{
@@ -20,19 +20,16 @@ public func eliminate_copy_of_returned_then_consumed_owned_value(arg: __owned An
   // CHECK-LABEL: sil [ossa] @eliminate_copy_of_returned_then_consumed_owned_value : {{.*}} {
   // CHECK:       {{bb[0-9]+}}([[ARG:%[^,]+]] : @owned $AnyObject):
   // retain arg
-  // CHECK:       [[ARG_LIFETIME:%[^,]+]] = begin_borrow [lexical] [[ARG]]
-  // CHECK:       [[ARG_COPY:%[^,]+]] = copy_value [[ARG_LIFETIME]]
+  // CHECK:       [[ARG_COPY:%[^,]+]] = copy_value [[ARG]]
   let x = consumeAndProduce(arg)
   // CHECK:       [[X:%[^,]+]] = apply {{%[^,]+}}([[ARG_COPY]])
-  // CHECK:       [[MOVE_X:%[^,]+]] = move_value [lexical] [[X]]
   // no copy of 'x'
   _ = consumeAndProduce(x)
-  // CHECK:       [[RESULT:%[^,]+]] = apply {{%[^,]+}}([[MOVE_X]])
-  // CHECK:       end_borrow [[ARG_LIFETIME]]
-  // release result
+  // CHECK:       [[RESULT:%[^,]+]] = apply {{%[^,]+}}([[X]])
   // release arg
-  // CHECK:       destroy_value [[ARG]]
+  // release result
   // CHECK:       destroy_value [[RESULT]]
+  // CHECK:       destroy_value [[ARG]]
   // CHECK-LABEL: } // end sil function 'eliminate_copy_of_returned_then_consumed_owned_value'
 }
 

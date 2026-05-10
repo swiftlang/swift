@@ -18,7 +18,7 @@ add_dependencies(libStaticMirror
 
 target_link_libraries(libStaticMirror PRIVATE
     swiftStaticMirror
-    swiftReflection)
+    swiftRemoteInspection)
 
 set_target_properties(libStaticMirror
     PROPERTIES

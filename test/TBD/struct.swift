@@ -9,9 +9,9 @@
 // RUN: %target-swift-frontend -emit-ir -o/dev/null -parse-as-library -module-name test -validate-tbd-against-ir=all %s -enable-library-evolution -enable-testing -O
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd
-// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd
-// RUN: diff -u %t/typecheck.tbd %t/emit-ir.tbd
+// RUN: %target-swift-frontend -typecheck -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/typecheck.tbd -tbd-install_name test
+// RUN: %target-swift-frontend -emit-ir -parse-as-library -module-name test %s -emit-tbd -emit-tbd-path %t/emit-ir.tbd -tbd-install_name test
+// RUN: %llvm-readtapi --compare %t/typecheck.tbd %t/emit-ir.tbd
 
 public struct StructPublicNothing {}
 
@@ -285,4 +285,26 @@ private struct StructPrivateGeneric<T, U, V> {
   private func privateGeneric<A>(_: A) {}
 
   private static func privateStaticGeneric<A>(_: A) {}
+}
+
+public struct StructDynamicMembers {
+  public dynamic init() {}
+  public dynamic init(x: Int) {
+    self.init()
+  }
+  public dynamic func dynamicMethod() {}
+  public dynamic static func dynamicStaticMethod() {}
+}
+
+extension StructDynamicMembers {
+  @_dynamicReplacement(for: init(x:))
+  public init(y: Int) {
+    self.init()
+  }
+
+  @_dynamicReplacement(for: dynamicMethod())
+  public func methodReplacement() {}
+
+  @_dynamicReplacement(for: dynamicStaticMethod())
+  public static func staticMethodReplacement() {}
 }

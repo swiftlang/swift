@@ -191,45 +191,47 @@ InoutParameterAutoDiffTests.test("InoutClassParameter") {
   }
 }
 
-// SR-13305: Test function with non-wrt `inout` parameter, which should be
-// treated as a differentiability result.
+// Test function with wrt `inout` parameter, which should be treated as a differentiability result.
+// Original issue https://github.com/apple/swift/issues/55745 deals with non-wrt `inout` which
+// we explicitly disallow now
 
-protocol SR_13305_Protocol {
-  @differentiable(reverse, wrt: x)
+
+protocol P_55745 {
+  @differentiable(reverse, wrt: (x, y))
   func method(_ x: Float, _ y: inout Float)
 
-  @differentiable(reverse, wrt: x)
+  @differentiable(reverse, wrt: (x, y))
   func genericMethod<T: Differentiable>(_ x: T, _ y: inout T)
 }
 
 InoutParameterAutoDiffTests.test("non-wrt inout parameter") {
-  struct SR_13305_Struct: SR_13305_Protocol {
-    @differentiable(reverse, wrt: x)
+  struct Struct: P_55745 {
+    @differentiable(reverse, wrt: (x, y))
     func method(_ x: Float, _ y: inout Float) {
       y = y * x
     }
 
-    @differentiable(reverse, wrt: x)
+    @differentiable(reverse, wrt: (x, y))
     func genericMethod<T: Differentiable>(_ x: T, _ y: inout T) {
       y = x
     }
   }
 
   @differentiable(reverse, wrt: x)
-  func foo(_ s: SR_13305_Struct, _ x: Float, _ y: Float) -> Float {
+  func foo(_ s: Struct, _ x: Float, _ y: Float) -> Float {
     var y = y
     s.method(x, &y)
     return y
   }
 
   @differentiable(reverse, wrt: x)
-  func fooGeneric<T: SR_13305_Protocol>(_ s: T, _ x: Float, _ y: Float) -> Float {
+  func fooGeneric<T: P_55745>(_ s: T, _ x: Float, _ y: Float) -> Float {
     var y = y
     s.method(x, &y)
     return x
   }
 
-  let s = SR_13305_Struct()
+  let s = Struct()
 
   do {
     let (value, (dx, dy)) = valueWithGradient(at: 2, 3, of: { foo(s, $0, $1) })

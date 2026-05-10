@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-sil -I %S/Inputs/custom-modules %s -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 
@@ -209,4 +209,15 @@ extension SuperclassWithDesignatedInitInCategory {
 
 func testConvenienceInitInheritance() {
   _ = SubclassWithSwiftPrivateDesignatedInit(y: 5)
+}
+
+// ...unless the superclass has been marked with
+// @_hasMissingDesignatedInitializers to disable this behavior.
+extension NoConvenienceInitInheritanceBase {
+  convenience init(y: Int) { self.init() }
+}
+
+func testNoConvenienceInitInheritance() {
+  _ = NoConvenienceInitInheritanceBase(y: 42)
+  _ = NoConvenienceInitInheritance(y: 42) // expected-error {{argument passed to call that takes no arguments}}
 }

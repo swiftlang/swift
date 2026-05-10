@@ -75,7 +75,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
@@ -84,7 +84,7 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
   builder.setCurrentDebugScope(original->getDebugScope());
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
-      *original.getVarInfo(), false, true /*was moved*/);
+      *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
 }
 
 //===----------------------------------------------------------------------===//
@@ -125,8 +125,8 @@ struct DebugInfoCanonicalizer {
       SILBasicBlock *startBlock,
       llvm::SmallDenseSet<SILDebugVariable, 8> &seenDebugVars) {
     LLVM_DEBUG(llvm::dbgs() << "==> PROPAGATING VALUE\n");
-    if (insertPt.is<SILInstruction *>()) {
-      LLVM_DEBUG(llvm::dbgs() << "Inst: " << *insertPt.get<SILInstruction *>());
+    if (isa<SILInstruction *>(insertPt)) {
+      LLVM_DEBUG(llvm::dbgs() << "Inst: " << *cast<SILInstruction *>(insertPt));
     }
 
     auto *dt = getDominance();
@@ -172,7 +172,7 @@ struct DebugInfoCanonicalizer {
         if (auto *inst = insertPt.dyn_cast<SILInstruction *>()) {
           cloneDebugValue(pred.second, inst);
         } else {
-          cloneDebugValue(pred.second, insertPt.get<SILBasicBlock *>());
+          cloneDebugValue(pred.second, cast<SILBasicBlock *>(insertPt));
         }
 
         madeChange = true;
@@ -221,6 +221,9 @@ bool DebugInfoCanonicalizer::process() {
           LLVM_DEBUG(llvm::dbgs() << "        Has no var info?! Skipping!\n");
           continue;
         }
+        // Strip things we don't need in the map.
+        debugInfo->DIExpr = debugInfo->DIExpr.getFragmentPart();
+        debugInfo->Type = {};
 
         // Otherwise, we may have a new debug_value to track. Try to begin
         // tracking it...

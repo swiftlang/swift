@@ -83,6 +83,12 @@ FRONTEND_STATISTIC(Frontend, NumProcessFailures)
 /// Total instructions-executed count in each frontend process.
 FRONTEND_STATISTIC(Frontend, NumInstructionsExecuted)
 
+/// Total processor cycles-executed count in each frontend process.
+FRONTEND_STATISTIC(Frontend, NumCyclesExecuted)
+
+/// Elapsed wall clock time in microseconds in each frontend process.
+FRONTEND_STATISTIC(Frontend, WallClockMicroseconds)
+
 /// Maximum number of bytes allocated via malloc.
 FRONTEND_STATISTIC(Frontend, MaxMallocUsage)
 
@@ -115,6 +121,7 @@ FRONTEND_STATISTIC(AST, NumASTBytesAllocated)
 /// AST context's dependency collector.
 FRONTEND_STATISTIC(AST, NumDependencies)
 FRONTEND_STATISTIC(AST, NumIncrementalDependencies)
+FRONTEND_STATISTIC(AST, NumMacroPluginDependencies)
 
 /// Number of top-level, dynamic, and member names referenced in this frontend
 /// job's source file, as tracked by the AST context's referenced-name tracker.
@@ -164,6 +171,9 @@ FRONTEND_STATISTIC(AST, ModuleVisibilityCacheMiss)
 FRONTEND_STATISTIC(AST, ModuleShadowCacheHit)
 FRONTEND_STATISTIC(AST, ModuleShadowCacheMiss)
 
+/// Number of types deserialized.
+FRONTEND_STATISTIC(AST, NumDepScanFilesystemLookups)
+
 /// Number of full function bodies parsed.
 FRONTEND_STATISTIC(Parse, NumFunctionsParsed)
 
@@ -183,9 +193,22 @@ FRONTEND_STATISTIC(Sema, NumCrossImportsChecked)
 /// Number of pairs of modules we've actually found cross-imports for.
 FRONTEND_STATISTIC(Sema, NumCrossImportsFound)
 
+/// Number of bytes allocated in the solver arena, summed across all
+/// constraint systems for all expressions.
+FRONTEND_STATISTIC(Sema, NumSolverBytesAllocated)
+
+/// Number of bytes allocated in the solver arena, maximum across all
+/// constraint systems for all expressions.
+FRONTEND_STATISTIC(Sema, MaxSolverBytesAllocated)
+
+/// Number of steps recorded in the trail while solving expression type
+/// constraints. A rough proxy for "how much work the expression
+/// type checker did".
+FRONTEND_STATISTIC(Sema, NumTrailSteps)
+
 /// Number of constraint-solving scopes created in the typechecker, while
-/// solving expression type constraints. A rough proxy for "how much work the
-/// expression typechecker did".
+/// solving expression type constraints. Another rough proxy for "how much
+/// work the expression type checker did".
 FRONTEND_STATISTIC(Sema, NumConstraintScopes)
 
 /// Number of constraint-solving scopes that were created but which
@@ -230,16 +253,8 @@ FRONTEND_STATISTIC(Sema, NumRequirementMachineCompletionSteps)
 /// Number of new rules added by concrete term unification.
 FRONTEND_STATISTIC(Sema, NumRequirementMachineUnifiedConcreteTerms)
 
-/// Number of generic signature builders constructed. Rough proxy for
-/// amount of work the GSB does analyzing type signatures.
-FRONTEND_STATISTIC(Sema, NumGenericSignatureBuilders)
-
-/// Number of steps in the GSB's redundant requirements algorithm, which is in
-/// the worst-case exponential.
-FRONTEND_STATISTIC(Sema, NumRedundantRequirementSteps)
-
-/// Number of conformance access paths we had to compute.
-FRONTEND_STATISTIC(Sema, NumConformanceAccessPathsRecorded)
+/// Number of conformance paths we had to compute.
+FRONTEND_STATISTIC(Sema, NumConformancePathsRecorded)
 
 /// Number of lazy requirement signatures registered.
 FRONTEND_STATISTIC(Sema, NumLazyRequirementSignatures)
@@ -259,6 +274,10 @@ FRONTEND_STATISTIC(Sema, NumTypesDeserialized)
 /// Number of lazy iterable declaration contexts left unloaded.
 FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 
+/// Number of Swift 6 errors, including those that are downgraded to
+/// warnings in Swift 5 mode.
+FRONTEND_STATISTIC(Sema, NumSwift6Errors)
+
 /// Number of lookups into a module and its imports.
 
 /// All type check requests go into the Sema area.
@@ -269,6 +288,7 @@ FRONTEND_STATISTIC(Sema, NumUnloadedLazyIterableDeclContexts)
 #include "swift/Sema/IDETypeCheckingRequestIDZone.def"
 #include "swift/IDE/IDERequestIDZone.def"
 #include "swift/ClangImporter/ClangImporterTypeIDZone.def"
+#include "swift/ConstExtract/ConstExtractTypeIDZone.def"
 #undef SWIFT_REQUEST
 
 #define SWIFT_REQUEST(ZONE, NAME, Sig, Caching, LocOptions) FRONTEND_STATISTIC(SILGen, NAME)

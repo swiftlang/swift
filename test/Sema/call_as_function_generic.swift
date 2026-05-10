@@ -42,7 +42,8 @@ _ = genericString("Hello")
 let genericInt = GenericType<Set<Int>>(collection: [1, 2, 3])
 _ = genericInt(initialValue: 1)
 
-// SR-11386
+// https://github.com/apple/swift/issues/53787
+
 class C<T> {}
 protocol P1 {}
 extension C where T : P1 { // expected-note {{where 'T' = 'Int'}}

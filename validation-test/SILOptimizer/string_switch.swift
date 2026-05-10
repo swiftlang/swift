@@ -5,15 +5,15 @@
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: stress_test
 // REQUIRES: executable_test
-// UNSUPPORTED: single_threaded_runtime
+// UNSUPPORTED: threading_none
+
 
 import StdlibUnittest
 
-// CHECK-LABEL: // SmallEnum.init(rawValue:)
-// CHECK-NEXT:  sil {{.*}} @{{.*}}SmallEnum{{.*}}rawValue{{.*}} :
+// CHECK-LABEL: sil hidden @$s4test9SmallEnumO8rawValueACSgSS_tcfC :
 // CHECK-DAG:     global_value @{{.*}}SmallEnum{{.*}}rawValue{{.*}}
 // CHECK-DAG:     // function_ref _findStringSwitchCase(cases:string:)
-// CHECK:         return
+// CHECK:       } // end sil function '$s4test9SmallEnumO8rawValueACSgSS_tcfC'
 
 enum SmallEnum : String {
   case c1 = "Swift"
@@ -23,11 +23,10 @@ enum SmallEnum : String {
   case c5 = "programming language"
 }
 
-// CHECK-LABEL: // LargeEnum.init(rawValue:)
-// CHECK-NEXT:  sil {{.*}} @{{.*}}LargeEnum{{.*}}rawValue{{.*}} :
+// CHECK-LABEL: sil hidden @$s4test9LargeEnumO8rawValueACSgSS_tcfC :
 // CHECK-DAG:     global_value @{{.*}}LargeEnum{{.*}}rawValue{{.*}}
 // CHECK-DAG:     // function_ref _findStringSwitchCaseWithCache(cases:string:cache:)
-// CHECK:         return
+// CHECK:       } // end sil function '$s4test9LargeEnumO8rawValueACSgSS_tcfC'
 
 enum LargeEnum : String {
   case c1 = "Swift"

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2022 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -56,16 +56,19 @@ ConstantIntegerLiteral
 emitConstantIntegerLiteral(IRGenModule &IGM, IntegerLiteralInst *ILI);
 
 /// Emit a checked truncation of an IntegerLiteral value.
-void emitIntegerLiteralCheckedTrunc(IRGenFunction &IGF,
-                                    Explosion &in,
+void emitIntegerLiteralCheckedTrunc(IRGenFunction &IGF, Explosion &in,
+                                    llvm::Type *FromTy,
                                     llvm::IntegerType *resultTy,
-                                    bool resultIsSigned,
-                                    Explosion &out);
+                                    bool resultIsSigned, Explosion &out);
 
 /// Emit a sitofp operation on an IntegerLiteral value.
 llvm::Value *emitIntegerLiteralToFP(IRGenFunction &IGF,
                                     Explosion &in,
                                     llvm::Type *toType);
+
+llvm::Value *emitIntLiteralBitWidth(IRGenFunction &IGF, Explosion &in);
+llvm::Value *emitIntLiteralIsNegative(IRGenFunction &IGF, Explosion &in);
+llvm::Value *emitIntLiteralWordAtIndex(IRGenFunction &IGF, Explosion &in);
 
 }
 }

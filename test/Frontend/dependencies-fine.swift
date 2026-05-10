@@ -1,17 +1,15 @@
-// REQUIRES: shell
-// Also uses awk:
-// XFAIL OS=windows
+// REQUIRES: rdar114207865
 
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-dependencies-path - -resolve-imports "%S/../Inputs/empty file.swift" | %FileCheck -check-prefix=CHECK-BASIC %s
 // RUN: %target-swift-frontend -emit-reference-dependencies-path - -typecheck -primary-file "%S/../Inputs/empty file.swift" > %t.swiftdeps
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t.swiftdeps %t-processed.swiftdeps
+// RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t.swiftdeps > %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=CHECK-BASIC-YAML %s <%t-processed.swiftdeps
 
 // RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -typecheck -primary-file "%S/../Inputs/empty file.swift"
 // RUN: %FileCheck -check-prefix=CHECK-BASIC %s < %t.d
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t.swiftdeps %t-processed.swiftdeps
+// RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t.swiftdeps > %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=CHECK-BASIC-YAML %s < %t-processed.swiftdeps
 
 // CHECK-BASIC-LABEL: - :
@@ -20,7 +18,7 @@
 // CHECK-BASIC-NOT: {{ }}:{{ }}
 
 // CHECK-BASIC-YAML-NOT: externalDepend {{.*}}empty
-// CHECK-BASIC-YAML: externalDepend {{.*}} '{{.*}}Swift.swiftmodule{{(/.+[.]swiftmodule)?}}'
+// CHECK-BASIC-YAML: externalDepend {{.*}} '{{.*}}Swift.swiftmodule{{/|\\}}{{(.+[.]swiftmodule)?}}'
 
 
 // RUN: %target-swift-frontend -emit-dependencies-path %t.d -emit-reference-dependencies-path %t.swiftdeps -typecheck "%S/../Inputs/empty file.swift" 2>&1 | %FileCheck -check-prefix=NO-PRIMARY-FILE %s
@@ -48,7 +46,7 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -track-system-dependencies -emit-dependencies-path - -resolve-imports %s | %FileCheck -check-prefix=CHECK-IMPORT-TRACK-SYSTEM %s
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-objc-interop -disable-objc-attr-requires-foundation-module -import-objc-header %S/Inputs/dependencies/extra-header.h -emit-reference-dependencies-path %t.swiftdeps -typecheck -primary-file %s
-// RUN: %S/../Inputs/process_fine_grained_swiftdeps.sh %swift-dependency-tool %t.swiftdeps %t-processed.swiftdeps
+// RUN: %{python} %S/../Inputs/process_fine_grained_swiftdeps.py %swift-dependency-tool %t.swiftdeps > %t-processed.swiftdeps
 // RUN: %FileCheck -check-prefix=CHECK-IMPORT-YAML %s <%t-processed.swiftdeps
 
 // CHECK-IMPORT-LABEL: - :
@@ -82,19 +80,19 @@
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}Foundation.h
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}NSObject.h
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}ObjectiveC.apinotes
-// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}module.map
+// CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}module.modulemap
 // CHECK-IMPORT-TRACK-SYSTEM-DAG: usr{{/|\\}}include{{/|\\}}objc{{/|\\}}objc.h
 // CHECK-IMPORT-TRACK-SYSTEM-NOT: {{[^\\]}}:
 
 // CHECK-IMPORT-YAML-NOT: externalDepend {{.*}}dependencies-fine.swift
-// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}{{/|\\}}Swift.swiftmodule{{(/.+[.]swiftmodule)?}}'
+// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}{{/|\\}}Swift.swiftmodule{{/|\\}}{{(.+[.]swiftmodule)?}}'
 // CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}Inputs/dependencies/$$$$$.h'
-// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}Inputs/dependencies{{/|\\\\}}UserClangModule.h'
+// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}Inputs/dependencies{{/|\\}}UserClangModule.h'
 // CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}Inputs/dependencies/extra-header.h'
-// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}Inputs/dependencies{{/|\\\\}}module.modulemap'
-// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}{{/|\\\\}}ObjectiveC.swift'
-// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}{{/|\\\\}}Foundation.swift'
-// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}{{/|\\\\}}CoreGraphics.swift'
+// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}Inputs/dependencies{{/|\\}}module.modulemap'
+// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}{{/|\\}}ObjectiveC.swift'
+// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}{{/|\\}}Foundation.swift'
+// CHECK-IMPORT-YAML-DAG: externalDepend {{.*}} '{{.*}}{{/|\\}}CoreGraphics.swift'
 
 // CHECK-ERROR-YAML: # Dependencies are unknown because a compilation error occurred.
 

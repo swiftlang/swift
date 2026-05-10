@@ -4,4 +4,3 @@ Decl[TypeAlias]/CurrNominal:        Stride[#Int#]; name=Stride
 Decl[TypeAlias]/CurrNominal:        IntegerLiteralType[#Int#]; name=IntegerLiteralType
 Keyword/None:                       Type[#Int.Type#]; name=Type
 Keyword/CurrNominal:                self[#Int#]; name=self
-End completions

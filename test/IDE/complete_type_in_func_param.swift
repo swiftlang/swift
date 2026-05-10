@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t
+// RUN: %batch-code-completion
 
 //===--- Helper types that are used in this test
 
@@ -35,14 +34,12 @@ protocol BarProtocol {
 
 typealias FooTypealias = Int
 
-// WITH_GLOBAL_TYPES: Begin completions
 // Global completions
 // WITH_GLOBAL_TYPES-DAG: Decl[Struct]/CurrModule:    FooStruct[#FooStruct#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES-DAG: Decl[Enum]/CurrModule:      FooEnum[#FooEnum#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES-DAG: Decl[Class]/CurrModule:     FooClass[#FooClass#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES-DAG: Decl[Protocol]/CurrModule:  FooProtocol[#FooProtocol#]{{; name=.+$}}
 // WITH_GLOBAL_TYPES-DAG: Decl[TypeAlias]/CurrModule: FooTypealias[#Int#]{{; name=.+$}}
-// WITH_GLOBAL_TYPES: End completions
 
 // GLOBAL_NEGATIVE-NOT: fooObject
 // GLOBAL_NEGATIVE-NOT: fooFunc
@@ -54,7 +51,6 @@ typealias FooTypealias = Int
 // WITHOUT_GLOBAL_TYPES-NOT: FooTypealias
 
 // ERROR_COMMON: found code completion token
-// ERROR_COMMON-NOT: Begin completions
 
 //===---
 //===--- Test that we can complete types inside function parameters and
@@ -133,9 +129,7 @@ func testTypeInResult6(a: Int, b ) -> #^TYPE_IN_FUNC_RESULT_6?check=WITH_GLOBAL_
 func testTypeInResult7(a: Int, b: ) -> #^TYPE_IN_FUNC_RESULT_7?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 func testTypeInResult8(a: Int, b: unknown_type) -> #^TYPE_IN_FUNC_RESULT_8?check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#
 
-// TYPE_IN_PARAM_FORWARD: Begin completions
 // TYPE_IN_PARAM_FORWARD-DAG: Decl[TypeAlias]/CurrNominal: NestedTypealias[#Int#]{{; name=.+$}}
-// TYPE_IN_PARAM_FORWARD: End completions
 
 class TestTypesForwardInParam1 {
   init(a: #^TYPE_IN_PARAM_FORWARD_1?check=TYPE_IN_PARAM_FORWARD;check=WITH_GLOBAL_TYPES;check=GLOBAL_NEGATIVE^#

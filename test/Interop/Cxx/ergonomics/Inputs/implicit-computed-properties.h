@@ -136,20 +136,22 @@ struct MultipleArgsSetter {
   void setX(int a, int b);
 };
 
-struct NonTrivial {
+struct __attribute__((swift_attr("import_unsafe"))) NonTrivial {
   int value = 42;
   ~NonTrivial() {}
 };
 
 struct PtrGetterSetter {
   int value = 42;
-  int *getX() { return &value; }
+  int *getX() __attribute__((swift_attr("import_unsafe"))) { return &value; }
   void setX(int *v) { value = *v; }
 };
 
 struct RefGetterSetter {
   int value = 42;
-  const int &getX() { return value; }
+  const int &getX() __attribute__((swift_attr("import_unsafe"))) {
+    return value;
+  }
   void setX(const int &v) { value = v; }
 };
 

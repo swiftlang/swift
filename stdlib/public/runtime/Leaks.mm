@@ -228,5 +228,5 @@ static void _swift_leaks_stopTrackingObjCObject(id Object) {
 }
 
 #else
-static char DummyDecl = '';
+static char DummyDecl = '\0';
 #endif

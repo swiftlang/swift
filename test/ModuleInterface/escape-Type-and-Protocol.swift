@@ -2,7 +2,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name main
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// CHECK: public let Type: Swift.Int
+// CHECK: public let Type: Swift::Int
 public let Type = 0
 
 // CHECK: public struct A {
@@ -19,7 +19,7 @@ public class B {
   // CHECK: }
   public class `Type` {}
 
-  // CHECK-NEXT: public var `Type`: Swift.Int
+  // CHECK-NEXT: public var `Type`: Swift::Int
   public var `Type` = 0
 // CHECK: }
 }
@@ -35,7 +35,7 @@ public struct C {
 
 // CHECK: public struct D {
 public struct D {
-  // CHECK: public typealias `Type` = Swift.Int
+  // CHECK: public typealias `Type` = Swift::Int
   public typealias `Type` = Int
 // CHECK-NEXT: }
 }

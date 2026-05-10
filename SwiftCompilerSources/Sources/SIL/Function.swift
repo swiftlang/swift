@@ -11,76 +11,532 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
-final public class Function : CustomStringConvertible, HasShortDescription {
+@_semantics("arc.immortal")
+final public class Function : CustomStringConvertible, HasShortDescription, Hashable {
   public private(set) var effects = FunctionEffects()
 
   public var name: StringRef {
-    return StringRef(bridged: SILFunction_getName(bridged))
+    return StringRef(bridged: bridged.getName())
   }
 
+  public var location: Location {
+    return Location(bridged: bridged.getLocation())
+  }
+
+  public var declRef: DeclRef { DeclRef(bridged: bridged.getDeclRef()) }
+
+  public var sourceFile: SourceFile? { declRef.sourceFile }
+
   final public var description: String {
-    let stdString = SILFunction_debugDescription(bridged)
-    return String(_cxxString: stdString)
+    return String(taking: bridged.getDebugDescription())
   }
 
   public var shortDescription: String { name.string }
 
-  public var hasOwnership: Bool { SILFunction_hasOwnership(bridged) != 0 }
-
-  public var entryBlock: BasicBlock {
-    SILFunction_firstBlock(bridged).block!
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(ObjectIdentifier(self))
   }
 
-  public var blocks : List<BasicBlock> {
-    return List(first: SILFunction_firstBlock(bridged).block)
+  /// True if this function is referenced from anywhere within the module,
+  /// e.g. from a `function_ref` instruction.
+  public var isReferencedInModule: Bool { bridged.isReferencedInModule() }
+
+  /// True if this function should be optimized, i.e. the module is compiled with optimizations
+  /// and the function has no `@_optimize(none)` attribute.
+  public var shouldOptimize: Bool { bridged.shouldOptimize() }
+
+  public var wasDeserializedCanonical: Bool { bridged.wasDeserializedCanonical() }
+
+  public var isTrapNoReturn: Bool { bridged.isTrapNoReturn() }
+
+  public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
+
+  public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
+
+  public var isAddressor: Bool { bridged.isAddressor() }
+
+  public var specializationLevel: Int { bridged.specializationLevel() }
+
+  public var isSpecialization: Bool { bridged.isSpecialization() }
+
+  public var hasOwnership: Bool { bridged.hasOwnership() }
+
+  public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
+
+  public var loweredFunctionType: CanonicalType {
+    CanonicalType(bridged: bridged.getLoweredFunctionType())
+  }
+
+  /// The lowered function type, with opaque archetypes erased.
+  ///
+  /// For example:
+  ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
+  /// is lowered to this inside its module:
+  ///    @substituted <τ_0_0> () -> @out τ_0_0 for <ActualResultType>
+  /// and this outside its module
+  ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
+  public var loweredFunctionTypeInContext: CanonicalType {
+    CanonicalType(bridged: bridged.getLoweredFunctionTypeInContext())
+  }
+
+  public var genericSignature: GenericSignature {
+    GenericSignature(bridged: bridged.getGenericSignature())
+  }
+
+  public var forwardingSubstitutionMap: SubstitutionMap {
+    SubstitutionMap(bridged: bridged.getForwardingSubstitutionMap())
+  }
+
+  public func mapTypeIntoEnvironment(_ type: AST.`Type`) -> AST.`Type` {
+    return AST.`Type`(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
+  }
+
+  public func mapTypeIntoEnvironment(_ type: Type) -> Type {
+    return Type(bridged: bridged.mapTypeIntoEnvironment(type.bridged))
+  }
+
+  /// Returns true if the function is a definition and not only an external declaration.
+  ///
+  /// This is the case if the function contains a body, i.e. some basic blocks.
+  public var isDefinition: Bool { blocks.first != nil }
+
+  public var blocks : BasicBlockList { BasicBlockList(first: bridged.getFirstBlock().block) }
+
+  public var entryBlock: BasicBlock { blocks.first! }
+
+  public func appendNewBlock(_ context: some MutatingContext) -> BasicBlock {
+    context.notifyBranchesChanged()
+    return context._bridged.appendBlock(bridged).block
   }
 
   public var arguments: LazyMapSequence<ArgumentArray, FunctionArgument> {
     entryBlock.arguments.lazy.map { $0 as! FunctionArgument }
   }
 
-  public var numIndirectResultArguments: Int {
-    SILFunction_numIndirectResultArguments(bridged)
+  public func argument(at index: Int) -> FunctionArgument {
+    entryBlock.arguments[index] as! FunctionArgument
   }
 
-  public var hasSelfArgument: Bool {
-    SILFunction_getSelfArgumentIndex(bridged) >= 0
+  /// All instructions of all blocks.
+  public var instructions: LazySequence<FlattenSequence<LazyMapSequence<BasicBlockList, InstructionList>>> {
+    blocks.lazy.flatMap { $0.instructions }
   }
 
-  public var selfArgumentIndex: Int {
-    let selfIdx = SILFunction_getSelfArgumentIndex(bridged)
-    assert(selfIdx >= 0)
-    return selfIdx
+  public var reversedInstructions: LazySequence<FlattenSequence<LazyMapSequence<ReverseBasicBlockList, ReverseInstructionList>>>  {
+    blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }
   
-  public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
-  public var resultType: Type { SILFunction_getSILResultType(bridged).type }
-
-  public var returnInstruction: ReturnInst? {
+  public var returnInstruction: ReturnInstruction? {
     for block in blocks.reversed() {
-      if let retInst = block.terminator as? ReturnInst { return retInst }
+      if let retInst = block.terminator as? ReturnInstruction { return retInst }
     }
     return nil
   }
 
+  /// True if the callee function is annotated with @_semantics("programtermination_point").
+  /// This means that the function terminates the program.
+  public var isProgramTerminationPoint: Bool { hasSemanticsAttribute("programtermination_point") }
+
+  public var isTransparent: Bool { bridged.isTransparent() }
+
+  public var isAsync: Bool { bridged.isAsync() }
+
+  /// True if this is a `[global_init]` function.
+  ///
+  /// Such a function is typically a global addressor which calls the global's
+  /// initializer (`[global_init_once_fn]`) via a `builtin "once"`.
+  public var isGlobalInitFunction: Bool { bridged.isGlobalInitFunction() }
+
+  /// True if this is a `[global_init_once_fn]` function.
+  ///
+  /// Such a function allocates a global and stores the global's init value.
+  /// It's called from a `[global_init]` function via a `builtin "once"`.
+  public var isGlobalInitOnceFunction: Bool { bridged.isGlobalInitOnceFunction() }
+
+  public var isDestructor: Bool { bridged.isDestructor() }
+
+  public var isGeneric: Bool { bridged.isGeneric() }
+
+  public var linkage: Linkage { bridged.getLinkage().linkage }
+
+  /// True, if the linkage of the function indicates that it is visible outside the current
+  /// compilation unit and therefore not all of its uses are known.
+  ///
+  /// For example, `public` linkage.
+  public var isPossiblyUsedExternally: Bool {
+    return bridged.isPossiblyUsedExternally()
+  }
+
+  /// True, if the linkage of the function indicates that it has a definition outside the
+  /// current compilation unit.
+  ///
+  /// For example, `public_external` linkage.
+  public var isDefinedExternally: Bool { linkage.isExternal }
+
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
-      SILFunction_hasSemanticsAttr(bridged, BridgedStringRef(data: buffer.baseAddress!, length: buffer.count)) != 0
+      bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
+  }
+
+  public var isSerialized: Bool {
+    switch serializedKind {
+    case .notSerialized, .serializedForPackage:
+      return false
+    case .serialized:
+      return true
+    }
+  }
+
+  public var isAnySerialized: Bool {
+    switch serializedKind {
+    case .notSerialized:
+      return false
+    case .serialized, .serializedForPackage:
+      return true
+    }
+  }
+
+  public enum SerializedKind {
+    case notSerialized, serialized, serializedForPackage
+  }
+
+  public var serializedKind: SerializedKind {
+    switch bridged.getSerializedKind() {
+    case .IsNotSerialized: return .notSerialized
+    case .IsSerialized: return .serialized
+    case .IsSerializedForPackage: return .serializedForPackage
+    @unknown default: fatalError()
+    }
+  }
+
+  private func serializedKindBridged(_ arg: SerializedKind) -> BridgedFunction.SerializedKind {
+    switch arg {
+    case .notSerialized: return .IsNotSerialized
+    case .serialized: return .IsSerialized
+    case .serializedForPackage: return .IsSerializedForPackage
+    }
+  }
+
+  public func canBeInlinedIntoCaller(withSerializedKind callerSerializedKind: SerializedKind) -> Bool {
+    switch serializedKind {
+    // If both callee and caller are not_serialized, the callee can be inlined into the caller
+    // during SIL inlining passes even if it (and the caller) might contain private symbols.
+    case .notSerialized:
+      return callerSerializedKind == .notSerialized;
+
+    // If Package-CMO is enabled, we serialize package, public, and @usableFromInline decls as
+    // [serialized_for_package].
+    // Their bodies must not, however, leak into @inlinable functions (that are [serialized])
+    // since they are inlined outside of their defining module.
+    //
+    // If this callee is [serialized_for_package], the caller must be either non-serialized
+    // or [serialized_for_package] for this callee's body to be inlined into the caller.
+    // It can however be referenced by [serialized] caller.
+    case .serializedForPackage:
+      return callerSerializedKind != .serialized;
+    case .serialized:
+      return true;
+    }
+  }
+
+  public func hasValidLinkageForFragileRef(_ kind: SerializedKind) -> Bool {
+    bridged.hasValidLinkageForFragileRef(serializedKindBridged(kind))
+  }
+
+  public enum ThunkKind {
+    case noThunk, thunk, reabstractionThunk, signatureOptimizedThunk
+  }
+
+  public var thunkKind: ThunkKind {
+    switch bridged.isThunk() {
+    case .IsNotThunk:                return .noThunk
+    case .IsThunk:                   return .thunk
+    case .IsReabstractionThunk:      return .reabstractionThunk
+    case .IsSignatureOptimizedThunk: return .signatureOptimizedThunk
+    default:
+      fatalError()
+    }
+  }
+  public func set(thunkKind: ThunkKind, _ context: some MutatingContext) {
+    context.notifyEffectsChanged()
+    switch thunkKind {
+    case .noThunk:                 bridged.setThunk(.IsNotThunk)
+    case .thunk:                   bridged.setThunk(.IsThunk)
+    case .reabstractionThunk:      bridged.setThunk(.IsReabstractionThunk)
+    case .signatureOptimizedThunk: bridged.setThunk(.IsSignatureOptimizedThunk)
+    }
+  }
+
+  public var accessorKindName: String? {
+    guard bridged.isAccessor() else {
+      return nil
+    }
+    return StringRef(bridged: bridged.getAccessorName()).string
+  }
+
+  public var isInitializer: Bool {
+    return bridged.isInitializer()
+  }
+
+  public var isDeinitializer: Bool {
+    return bridged.isDeinitializer()
+  }
+
+  public var isImplicit: Bool {
+    return bridged.isImplicit()
   }
 
   /// True, if the function runs with a swift 5.1 runtime.
   /// Note that this is function specific, because inlinable functions are de-serialized
   /// in a client module, which might be compiled with a different deployment target.
   public var isSwift51RuntimeAvailable: Bool {
-    SILFunction_isSwift51RuntimeAvailable(bridged) != 0
+    bridged.isSwift51RuntimeAvailable()
   }
 
-  // Only to be called by PassContext
-  public func _modifyEffects(_ body: (inout FunctionEffects) -> ()) {
+  public var needsStackProtection: Bool {
+    bridged.needsStackProtection()
+  }
+  public func set(needStackProtection: Bool, _ context: some MutatingContext) {
+    context.notifyEffectsChanged()
+    bridged.setNeedStackProtection(needStackProtection)
+  }
+
+  public var isDeinitBarrier: Bool {
+    effects.sideEffects?.global.isDeinitBarrier ?? true
+  }
+
+  public enum PerformanceConstraints {
+    case none
+    case noAllocations
+    case noLocks
+    case noRuntime
+    case noExistentials
+    case noObjCRuntime
+    case manualOwnership
+  }
+
+  public var performanceConstraints: PerformanceConstraints {
+    switch bridged.getPerformanceConstraints() {
+      case .None: return .none
+      case .NoAllocation: return .noAllocations
+      case .NoLocks: return .noLocks
+      case .NoRuntime: return .noRuntime
+      case .NoExistentials: return .noExistentials
+      case .NoObjCBridging: return .noObjCRuntime
+      case .ManualOwnership: return .manualOwnership
+      default: fatalError("unknown performance constraint")
+    }
+  }
+  public func set(isPerformanceConstraint: Bool, _ context: some MutatingContext) {
+    context.notifyEffectsChanged()
+    bridged.setIsPerformanceConstraint(isPerformanceConstraint)
+  }
+
+  public enum InlineStrategy {
+    case automatic
+    case never
+    case heuristicAlways
+    case always
+  }
+
+  public var inlineStrategy: InlineStrategy {
+    switch bridged.getInlineStrategy() {
+      case .InlineDefault: return .automatic
+      case .NoInline: return .never
+      case .HeuristicAlwaysInline: return .heuristicAlways
+      case .AlwaysInline: return .always
+      default:
+        fatalError()
+    }
+  }
+
+  public enum ABILanguage {
+    case C
+    case Swift
+  }
+
+  public var abi: ABILanguage {
+    switch bridged.getSILFunctionLanguage() {
+      case .C:     return .C
+      case .Swift: return .Swift
+      default:
+        fatalError()
+    }
+  }
+
+  public enum SourceFileKind {
+    case library         /// A normal .swift file.
+    case main            /// A .swift file that can have top-level code.
+    case sil             /// Came from a .sil file.
+    case interface       /// Came from a .swiftinterface file, representing another module.
+    case macroExpansion  /// Came from a macro expansion.
+    case defaultArgument /// Came from default argument at caller side
+  };
+
+  public var sourceFileKind: SourceFileKind? {
+    switch bridged.getSourceFileKind() {
+    case .Library: return .library
+    case .Main: return .main
+    case .SIL: return .sil
+    case .Interface: return .interface
+    case .MacroExpansion: return .macroExpansion
+    case .DefaultArgument: return .defaultArgument
+    case .None: return nil
+    @unknown default:
+      fatalError("unknown enum case")
+    }
+  }
+}
+
+public func == (lhs: Function, rhs: Function) -> Bool { lhs === rhs }
+public func != (lhs: Function, rhs: Function) -> Bool { lhs !== rhs }
+
+// Function conventions.
+extension Function {
+  public var convention: FunctionConvention {
+    FunctionConvention(for: loweredFunctionTypeInContext, in: self)
+  }
+
+  public var argumentConventions: ArgumentConventions {
+    ArgumentConventions(convention: convention)
+  }
+
+  // FIXME: Change this to argumentConventions.indirectSILResultCount.
+  // This is incorrect in two cases: it does not include the indirect
+  // error result, and, prior to address lowering, does not include
+  // pack results.
+  public var numIndirectResultArguments: Int { bridged.getNumIndirectFormalResults() }
+
+  public var hasIndirectErrorArgument: Bool { bridged.hasIndirectErrorResult() }
+
+  /// The number of arguments which correspond to parameters (and not to indirect results).
+  public var numParameterArguments: Int { convention.parameters.count }
+
+  /// The slice of arguments starting at argumentConventions.firstParameterIndex.
+  public var parameters: LazyMapSequence<Slice<ArgumentArray>, FunctionArgument> {
+    let args = arguments
+    return args[argumentConventions.firstParameterIndex..<args.count]
+  }
+
+  /// The total number of arguments.
+  ///
+  /// This is the sum of indirect result arguments and parameter arguments.
+  /// If the function is a definition (i.e. it has at least an entry block), this is the
+  /// number of arguments of the function's entry block.
+  public var numArguments: Int { argumentConventions.count }
+
+  public var hasSelfArgument: Bool { argumentConventions.selfIndex != nil }
+
+  public var selfArgumentIndex: Int? { argumentConventions.selfIndex }
+
+  public var selfArgument: FunctionArgument? {
+    if let selfArgIdx = selfArgumentIndex {
+      return arguments[selfArgIdx]
+    }
+    return nil
+  }
+
+  public var dynamicSelfMetadata: FunctionArgument? {
+    if bridged.hasDynamicSelfMetadata() {
+      return arguments.last!
+    }
+    return nil
+  }
+
+  public var argumentTypes: ArgumentTypeArray { ArgumentTypeArray(function: self) }
+
+  public var resultType: Type { bridged.getSILResultType().type }
+
+  public var hasUnsafeNonEscapableResult: Bool {
+    return bridged.hasUnsafeNonEscapableResult()
+  }
+
+  public var hasResultDependence: Bool {
+    convention.resultDependencies != nil
+  }
+}
+
+public struct ArgumentTypeArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let function: Function
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { function.bridged.getNumSILArguments() }
+
+  public subscript(_ index: Int) -> Type {
+    function.bridged.getSILArgumentType(index).type
+  }
+}
+
+// Function effects.
+extension Function {
+  /// Kinds of effect attributes which can be defined for a Swift function.
+  public enum EffectAttribute {
+    /// No effect attribute is specified.
+    case none
+    
+    /// `[readnone]`
+    ///
+    /// A readnone function does not have any observable memory read or write operations.
+    /// This does not mean that the function cannot read or write at all. For example,
+    /// it’s allowed to allocate and write to local objects inside the function.
+    ///
+    /// A function can be marked as readnone if two calls of the same function with the
+    /// same parameters can be simplified to one call (e.g. by the CSE optimization).
+    /// Some conclusions:
+    /// * A readnone function must not return a newly allocated class instance.
+    /// * A readnone function can return a newly allocated copy-on-write object,
+    ///   like an Array, because COW data types conceptually behave like value types.
+    /// * A readnone function must not release any parameter or any object indirectly
+    ///   referenced from a parameter.
+    /// * Any kind of observable side-effects are not allowed, like `print`, file IO, etc.
+    case readNone
+    
+    /// `[readonly]`
+    ///
+    /// A readonly function does not have any observable memory write operations.
+    /// Similar to readnone, a readonly function is allowed to contain writes to e.g. local objects, etc.
+    ///
+    /// A function can be marked as readonly if it’s save to eliminate a call to such
+    /// a function if its return value is not used.
+    /// The same conclusions as for readnone also apply to readonly.
+    case readOnly
+    
+    /// `[releasenone]`
+    ///
+    /// A releasenone function must not perform any observable release-operation on an object.
+    /// This means, it must not do anything which might let the caller observe any decrement of
+    /// a reference count or any deallocations.
+    /// Note that it's allowed to release an object if the release is balancing a retain in the
+    /// same function. Also, it's allowed to release (and deallocate) local objects which were
+    /// allocated in the same function.
+    case releaseNone
+  }
+
+  /// The effect attribute which is specified in the source code (if any).
+  public var effectAttribute: EffectAttribute {
+    switch bridged.getEffectAttribute() {
+      case .ReadNone: return .readNone
+      case .ReadOnly: return .readOnly
+      case .ReleaseNone: return .releaseNone
+      default: return .none
+    }
+  }
+
+  public func modifyEffects(_ context: some MutatingContext, _ body: (inout FunctionEffects) -> ()) {
+    context.notifyEffectsChanged()
     body(&effects)
+  }
+}
+
+// Bridging utilities
+
+extension Function {
+  public var bridged: BridgedFunction {
+    BridgedFunction(obj: SwiftObject(self))
   }
 
   static func register() {
@@ -91,7 +547,7 @@ final public class Function : CustomStringConvertible, HasShortDescription {
     }
 
     let metatype = unsafeBitCast(Function.self, to: SwiftMetatype.self)
-    Function_register(metatype,
+    BridgedFunction.registerBridging(metatype,
       // initFn
       { (f: BridgedFunction, data: UnsafeMutableRawPointer, size: Int) in
         checkLayout(&f.function.effects, data: data, size: size)
@@ -104,33 +560,56 @@ final public class Function : CustomStringConvertible, HasShortDescription {
       },
       // writeFn
       { (f: BridgedFunction, os: BridgedOStream, idx: Int) in
-        let s = f.function.effects.argumentEffects[idx].description
-        s.withBridgedStringRef { OStream_write(os, $0) }
+        let s: String
+        let effects = f.function.effects
+        if idx >= 0 {
+          if idx < effects.escapeEffects.arguments.count {
+            s = effects.escapeEffects.arguments[idx].bodyDescription
+          } else {
+            let globalIdx = idx - effects.escapeEffects.arguments.count
+            if globalIdx == 0 {
+              s = effects.sideEffects!.global.description
+            } else {
+              let seIdx = globalIdx - 1
+              s = effects.sideEffects!.getArgumentEffects(for: seIdx).bodyDescription
+            }
+          }
+        } else {
+          s = effects.description
+        }
+        s._withBridgedStringRef { $0.write(os) }
       },
       // parseFn:
-      { (f: BridgedFunction, str: BridgedStringRef, fromSIL: Int, isDerived: Int, paramNames: BridgedArrayRef) -> BridgedParsingError in
+      { (f: BridgedFunction, str: BridgedStringRef, mode: BridgedFunction.ParseEffectsMode, argumentIndex: Int, paramNames: BridgedArrayRef) -> BridgedFunction.ParsingError in
         do {
-          var parser = StringParser(str.string)
-          let effect: ArgumentEffect
-          if fromSIL != 0 {
-            effect = try parser.parseEffectFromSIL(for: f.function, isDerived: isDerived != 0)
-          } else {
+          var parser = StringParser(String(str))
+          let function = f.function
+
+          switch mode {
+          case .argumentEffectsFromSource:
             let paramToIdx = paramNames.withElements(ofType: BridgedStringRef.self) {
                 (buffer: UnsafeBufferPointer<BridgedStringRef>) -> Dictionary<String, Int> in
-              let keyValPairs = buffer.enumerated().lazy.map { ($0.1.string, $0.0) }
+              let keyValPairs = buffer.enumerated().lazy.map { (String($0.1), $0.0) }
               return Dictionary(uniqueKeysWithValues: keyValPairs)
             }
-            effect = try parser.parseEffectFromSource(for: f.function, params: paramToIdx)
+            let effect = try parser.parseEffectFromSource(for: function, params: paramToIdx)
+            function.effects.escapeEffects.arguments.append(effect)
+          case .argumentEffectsFromSIL:
+            try parser.parseEffectsFromSIL(argumentIndex: argumentIndex, to: &function.effects)
+          case .globalEffectsFromSIL:
+            try parser.parseGlobalSideEffectsFromSIL(to: &function.effects)
+          case .multipleEffectsFromSIL:
+            try parser.parseEffectsFromSIL(to: &function.effects)
+          default:
+            fatalError("invalid ParseEffectsMode")
           }
           if !parser.isEmpty() { try parser.throwError("syntax error") }
-
-          f.function.effects.argumentEffects.append(effect)
         } catch let error as ParsingError {
-          return BridgedParsingError(message: error.message.utf8Start, position: error.position)
+          return BridgedFunction.ParsingError(message: error.message.utf8Start, position: error.position)
         } catch {
           fatalError()
         }
-        return BridgedParsingError(message: nil, position: 0)
+        return BridgedFunction.ParsingError(message: nil, position: 0)
       },
       // copyEffectsFn
       { (toFunc: BridgedFunction, fromFunc: BridgedFunction) -> Int in
@@ -150,92 +629,56 @@ final public class Function : CustomStringConvertible, HasShortDescription {
                           resultArgDelta: destResultArgs - srcResultArgs)
         return 1
       },
-      // getEffectFlags
-      {  (f: BridgedFunction, idx: Int) -> Int in
-        let argEffects = f.function.effects.argumentEffects
-        if idx >= argEffects.count { return 0 }
-        let effect = argEffects[idx]
-        var flags = 0
-        switch effect.kind {
-          case .notEscaping, .escaping:
-            flags |= Int(EffectsFlagEscape)
+      // getEffectInfo
+      {  (f: BridgedFunction, idx: Int) -> BridgedFunction.EffectInfo in
+        let effects = f.function.effects
+        if idx < effects.escapeEffects.arguments.count {
+          let effect = effects.escapeEffects.arguments[idx]
+          return BridgedFunction.EffectInfo(argumentIndex: effect.argumentIndex,
+                                            isDerived: effect.isDerived, isEmpty: false, isValid: true)
         }
-        if effect.isDerived {
-          flags |= Int(EffectsFlagDerived)
+        if let sideEffects = effects.sideEffects {
+          let globalIdx = idx - effects.escapeEffects.arguments.count
+          if globalIdx == 0 {
+            return BridgedFunction.EffectInfo(argumentIndex: -1, isDerived: true, isEmpty: false, isValid: true)
+          }
+          let seIdx = globalIdx - 1
+          if seIdx < sideEffects.arguments.count {
+            return BridgedFunction.EffectInfo(argumentIndex: seIdx, isDerived: true,
+                                              isEmpty: sideEffects.arguments[seIdx].isEmpty, isValid: true)
+          }
         }
-        return flags
+        return BridgedFunction.EffectInfo(argumentIndex: -1, isDerived: false, isEmpty: true, isValid: false)
+      },
+      // getMemBehaviorFn
+      { (f: BridgedFunction, observeRetains: Bool) -> BridgedMemoryBehavior in
+        let e = f.function.getSideEffects()
+        return e.getMemBehavior(observeRetains: observeRetains)
+      },
+      // argumentMayRead  (used by the MemoryLifetimeVerifier)
+      { (f: BridgedFunction, bridgedArgOp: BridgedOperand, bridgedAddr: BridgedValue) -> Bool in
+        let argOp = Operand(bridged: bridgedArgOp)
+        let addr = bridgedAddr.value
+        let applySite = argOp.instruction as! FullApplySite
+        let addrPath = addr.accessPath
+        let calleeArgIdx = applySite.calleeArgumentIndex(of: argOp)!
+        let convention = applySite.convention(of: argOp)!
+        assert(convention.isIndirectIn || convention.isInout)
+        let argPath = argOp.value.accessPath
+        assert(!argPath.isDistinct(from: addrPath))
+        let path = argPath.getProjection(to: addrPath) ?? SmallProjectionPath()
+        let effects = f.function.getSideEffects(forArgument: argOp.value.at(path),
+                                                atIndex: calleeArgIdx,
+                                                withConvention: convention)
+        return effects.memory.read
+      },
+      // isDeinitBarrier
+      { (f: BridgedFunction) -> Bool in
+        return f.function.getSideEffects().isDeinitBarrier
       }
     )
   }
-
-  public var bridged: BridgedFunction { BridgedFunction(obj: SwiftObject(self)) }
 }
-
-public func == (lhs: Function, rhs: Function) -> Bool { lhs === rhs }
-public func != (lhs: Function, rhs: Function) -> Bool { lhs !== rhs }
-
-public struct ArgumentTypeArray : RandomAccessCollection, FormattedLikeArray {
-  fileprivate let function: Function
-
-  public var startIndex: Int { return 0 }
-  public var endIndex: Int { SILFunction_getNumSILArguments(function.bridged) }
-
-  public subscript(_ index: Int) -> Type {
-    SILFunction_getSILArgumentType(function.bridged, index).type
-  }
-}
-
-public enum ArgumentConvention {
-  /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory.  The callee is responsible for destroying the
-  /// object.  The callee may assume that the address does not alias any valid
-  /// object.
-  case indirectIn
-
-  /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory.  The callee must treat the object as read-only
-  /// The callee may assume that the address does not alias any valid object.
-  case indirectInConstant
-
-  /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory.  The callee may not modify and does not destroy
-  /// the object.
-  case indirectInGuaranteed
-
-  /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory.  The object is always valid, but the callee may
-  /// assume that the address does not alias any valid object and reorder loads
-  /// stores to the parameter as long as the whole object remains valid. Invalid
-  /// single-threaded aliasing may produce inconsistent results, but should
-  /// remain memory safe.
-  case indirectInout
-
-  /// This argument is passed indirectly, i.e. by directly passing the address
-  /// of an object in memory. The object is allowed to be aliased by other
-  /// well-typed references, but is not allowed to be escaped. This is the
-  /// convention used by mutable captures in @noescape closures.
-  case indirectInoutAliasable
-
-  /// This argument represents an indirect return value address. The callee stores
-  /// the returned value to this argument. At the time when the function is called,
-  /// the memory location referenced by the argument is uninitialized.
-  case indirectOut
-
-  /// This argument is passed directly.  Its type is non-trivial, and the callee
-  /// is responsible for destroying it.
-  case directOwned
-
-  /// This argument is passed directly.  Its type may be trivial, or it may
-  /// simply be that the callee is not responsible for destroying it. Its
-  /// validity is guaranteed only at the instant the call begins.
-  case directUnowned
-
-  /// This argument is passed directly.  Its type is non-trivial, and the caller
-  /// guarantees its validity for the entirety of the call.
-  case directGuaranteed
-}
-
-// Bridging utilities
 
 extension BridgedFunction {
   public var function: Function { obj.getAs(Function.self) }
@@ -245,20 +688,56 @@ extension OptionalBridgedFunction {
   public var function: Function? { obj.getAs(Function.self) }
 }
 
-extension BridgedArgumentConvention {
-  var convention: ArgumentConvention {
-    switch self {
-      case ArgumentConvention_Indirect_In:             return .indirectIn
-      case ArgumentConvention_Indirect_In_Constant:    return .indirectInConstant
-      case ArgumentConvention_Indirect_In_Guaranteed:  return .indirectInGuaranteed
-      case ArgumentConvention_Indirect_Inout:          return .indirectInout
-      case ArgumentConvention_Indirect_InoutAliasable: return .indirectInoutAliasable
-      case ArgumentConvention_Indirect_Out:            return .indirectOut
-      case ArgumentConvention_Direct_Owned:            return .directOwned
-      case ArgumentConvention_Direct_Unowned:          return .directUnowned
-      case ArgumentConvention_Direct_Guaranteed:       return .directGuaranteed
-      default:
-        fatalError("unsupported argument convention")
+public extension SideEffects.GlobalEffects {
+  func getMemBehavior(observeRetains: Bool) -> BridgedMemoryBehavior {
+    if allocates || ownership.destroy || (ownership.copy && observeRetains) {
+      return .MayHaveSideEffects
+    }
+    switch (memory.read, memory.write) {
+    case (false, false): return .None
+    case (true, false): return .MayRead
+    case (false, true): return .MayWrite
+    case (true, true): return .MayReadWrite
     }
   }
+}
+
+public struct BasicBlockList : CollectionLikeSequence, IteratorProtocol {
+  private var currentBlock: BasicBlock?
+
+  public init(first: BasicBlock?) { currentBlock = first }
+
+  public mutating func next() -> BasicBlock? {
+    if let block = currentBlock {
+      currentBlock = block.next
+      return block
+    }
+    return nil
+  }
+
+  public var first: BasicBlock? { currentBlock }
+
+  public func reversed() -> ReverseBasicBlockList {
+    if let block = currentBlock {
+      let lastBlock = block.parentFunction.bridged.getLastBlock().block
+      return ReverseBasicBlockList(first: lastBlock)
+    }
+    return ReverseBasicBlockList(first: nil)
+  }
+}
+
+public struct ReverseBasicBlockList : CollectionLikeSequence, IteratorProtocol {
+  private var currentBlock: BasicBlock?
+
+  public init(first: BasicBlock?) { currentBlock = first }
+
+  public mutating func next() -> BasicBlock? {
+    if let block = currentBlock {
+      currentBlock = block.previous
+      return block
+    }
+    return nil
+  }
+
+  public var first: BasicBlock? { currentBlock }
 }

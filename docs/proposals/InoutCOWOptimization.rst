@@ -202,7 +202,7 @@ To work with opaque types, ``copy_addr`` must also be able to perform an
 an original value. This can be an additional attribute on the source, mutually
 exclusive with ``[take]``::
 
-  copy_addr [inout] %a to [initialization] %b
+  copy_addr [inout] %a to [init] %b
 
 This implies that value witness tables will need witnesses for
 inout-initialization and inout-reassignment.

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend %S/mutating-method-in-cxx.swift -typecheck -module-name Methods -clang-header-expose-public-decls -emit-clang-header-path %t/methods.h
+// RUN: %target-swift-frontend %S/mutating-method-in-cxx.swift -module-name Methods -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/methods.h
 
 // RUN: %target-interop-build-clangxx -c %s -I %t -o %t/swift-methods-execution.o
 // RUN: %target-interop-build-swift %S/mutating-method-in-cxx.swift -o %t/swift-methods-execution -Xlinker %t/swift-methods-execution.o -module-name Methods -Xfrontend -entry-point-function-name -Xfrontend swiftMain
@@ -9,8 +9,6 @@
 // RUN: %target-run %t/swift-methods-execution | %FileCheck %s
 
 // REQUIRES: executable_test
-
-// UNSUPPORTED: CPU=arm64e
 
 #include <assert.h>
 #include "methods.h"

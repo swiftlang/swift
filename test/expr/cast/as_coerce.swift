@@ -113,40 +113,58 @@ let s : AnyObject = C3()
 s as C3 // expected-error{{'AnyObject' is not convertible to 'C3'}} 
 // expected-note@-1{{did you mean to use 'as!' to force downcast?}} {{3-5=as!}}
 
-// SR-6022
-func sr6022() -> Any { return 0 }
-func sr6022_1() { return; }
-protocol SR6022_P {}
+// https://github.com/apple/swift/issues/48579
 
-_ = sr6022 is SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'any SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{11-11=()}}
-_ = sr6022 as! SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'any SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{11-11=()}}
-_ = sr6022 as? SR6022_P // expected-warning {{cast from '() -> Any' to unrelated type 'any SR6022_P' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'}}{{11-11=()}}
-_ = sr6022_1 is SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'any SR6022_P' always fails}}
-_ = sr6022_1 as! SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'any SR6022_P' always fails}}
-_ = sr6022_1 as? SR6022_P // expected-warning {{cast from '() -> ()' to unrelated type 'any SR6022_P' always fails}}
+protocol P_48579 {}
+do {
+  func f1() -> Any {}
+  func f2() {}
+  @Sendable func f3() {}
 
-func testSR6022_P<T: SR6022_P>(_: T.Type) {
-  _ = sr6022 is T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{13-13=()}}
-  _ = sr6022 as! T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{13-13=()}}
-  _ = sr6022 as? T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'sr6022' with '()'?}}{{13-13=()}}
-  _ = sr6022_1 is T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
-  _ = sr6022_1 as! T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
-  _ = sr6022_1 as? T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
+  _ = f1 is P_48579 // expected-warning {{cast from '() -> Any' to unrelated type 'any P_48579' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{9-9=()}}
+  _ = f1 as! P_48579 // expected-warning {{cast from '() -> Any' to unrelated type 'any P_48579' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{9-9=()}}
+  _ = f1 as? P_48579 // expected-warning {{cast from '() -> Any' to unrelated type 'any P_48579' always fails}} // expected-note {{did you mean to call 'f1' with '()'}}{{9-9=()}}
+  _ = f2 is P_48579 // expected-warning {{cast from '() -> ()' to unrelated type 'any P_48579' always fails}}
+  _ = f2 as! P_48579 // expected-warning {{cast from '() -> ()' to unrelated type 'any P_48579' always fails}}
+  _ = f2 as? P_48579 // expected-warning {{cast from '() -> ()' to unrelated type 'any P_48579' always fails}}
+
+  _ = f1 as! AnyObject // expected-warning {{forced cast from '() -> Any' to 'AnyObject' always succeeds; did you mean to use 'as'?}}
+  _ = f1 as? AnyObject // expected-warning {{conditional cast from '() -> Any' to 'AnyObject' always succeeds}}
+  _ = f2 as! Any // expected-warning {{forced cast from '() -> ()' to 'Any' always succeeds; did you mean to use 'as'?}}
+  _ = f2 as? Any // expected-warning {{conditional cast from '() -> ()' to 'Any' always succeeds}}
+
+
+  func test1<T: P_48579, V: P_48579 & Sendable>(_: T.Type, _: V.Type) {
+    _ = f1 is T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{11-11=()}}
+    _ = f1 as! V // expected-warning {{cast from '() -> Any' to unrelated type 'V' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{11-11=()}}
+    _ = f1 as? T // expected-warning {{cast from '() -> Any' to unrelated type 'T' always fails}} // expected-note {{did you mean to call 'f1' with '()'?}}{{11-11=()}}
+    _ = f2 is T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
+    _ = f2 as! V // expected-warning {{cast from '() -> ()' to unrelated type 'V' always fails}}
+    _ = f2 as? T // expected-warning {{cast from '() -> ()' to unrelated type 'T' always fails}}
+    _ = f3 is T // expected-warning {{cast from '@Sendable () -> ()' to unrelated type 'T' always fails}}
+    _ = f3 as! V // expected-warning {{cast from '@Sendable () -> ()' to unrelated type 'V' always fails}}
+    _ = f3 as? T // expected-warning {{cast from '@Sendable () -> ()' to unrelated type 'T' always fails}}
+  }
+
+  func test2<U, S: Sendable>(_: U.Type, _: S.Type) {
+    _ = f1 is U  // Okay
+    _ = f1 as! U // Okay
+    _ = f1 as? U // Okay
+    _ = f1 is U  // Okay
+    _ = f2 as! U // Okay
+    _ = f2 as? U // Okay
+
+    _ = f2 is S   // expected-warning {{cast from '() -> ()' to unrelated type 'S' always fails}}
+    _ = f2 as! S  // expected-warning {{cast from '() -> ()' to unrelated type 'S' always fails}}
+    _ = f2 as? S  // expected-warning {{cast from '() -> ()' to unrelated type 'S' always fails}}
+    _ = f3 is S   // Okay
+    _ = f3 as! S  // Okay
+    _ = f3 as? S  // Okay
+  }
 }
 
-func testSR6022_P_1<U>(_: U.Type) {
-  _ = sr6022 as! U // Okay
-  _ = sr6022 as? U // Okay
-  _ = sr6022_1 as! U // Okay
-  _ = sr6022_1 as? U // Okay
-}
+// https://github.com/apple/swift/issues/56297
 
-_ = sr6022 as! AnyObject // expected-warning {{forced cast from '() -> Any' to 'AnyObject' always succeeds; did you mean to use 'as'?}}
-_ = sr6022 as? AnyObject // expected-warning {{conditional cast from '() -> Any' to 'AnyObject' always succeeds}}
-_ = sr6022_1 as! Any // expected-warning {{forced cast from '() -> ()' to 'Any' always succeeds; did you mean to use 'as'?}}
-_ = sr6022_1 as? Any // expected-warning {{conditional cast from '() -> ()' to 'Any' always succeeds}}
-
-// SR-13899
 let any: Any = 1
 if let int = any as Int { // expected-error {{'Any' is not convertible to 'Int'}}
 // expected-note@-1 {{did you mean to use 'as?' to conditionally downcast?}} {{18-20=as?}}
@@ -158,3 +176,41 @@ let _: Int = any as Int // expected-error {{'Any' is not convertible to 'Int'}}
 // expected-note@-1 {{did you mean to use 'as!' to force downcast?}} {{18-20=as!}}
 let _: Int? = any as Int // expected-error {{'Any' is not convertible to 'Int'}}
 // expected-note@-1 {{did you mean to use 'as?' to conditionally downcast?}} {{19-21=as?}}
+
+// https://github.com/apple/swift/issues/63926
+
+do {
+  func fn(_: Int) {} // expected-note {{found candidate with type '(Int) -> ()'}}
+  // expected-note@-1 {{candidate '(Int) -> ()' has 1 parameter, but context '() -> Void' has 0}}
+  func fn(_: Bool) {} // expected-note {{found candidate with type '(Bool) -> ()'}}
+  // expected-note@-1 {{candidate '(Bool) -> ()' has 1 parameter, but context '() -> Void' has 0}}
+
+  func fn_1(_: Bool) {} 
+
+  let i = 0
+  // Missing parameters.
+  (fn as (Int, Int) -> Void)(i, i) // expected-error {{cannot convert value of type '(Int) -> ()' to type '(Int, Int) -> Void' in coercion}}
+  (fn as (Bool, Bool) -> Void)(i, i) // expected-error {{cannot convert value of type '(Bool) -> ()' to type '(Bool, Bool) -> Void' in coercion}}
+  // expected-error@-1 2{{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  (fn as (Int, Bool) -> Void)(i, i) // expected-error {{cannot convert value of type '(Int) -> ()' to type '(Int, Bool) -> Void' in coercion}}
+  // expected-error@-1 {{type 'Int' cannot be used as a boolean; test for '!= 0' instead}}
+  (fn as (String) -> Void)(i) // expected-error {{no exact matches in reference to local function 'fn'}}
+  // expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+  // Extraneous parameters.
+  (fn as () -> Void)() // expected-error {{no exact matches in reference to local function 'fn'}}
+  (fn_1 as () -> Void)() // expected-error {{cannot convert value of type '(Bool) -> ()' to type '() -> Void' in coercion}}
+}
+
+// Test generic parameter inference through casts
+do {
+  class A<T> {
+  }
+
+  class B<U> : A<U> {
+  }
+
+  func test(v: any B<Int> & Sendable) {
+    _ = v as A // infers `Int` for `A.T`
+  }
+}

@@ -15,11 +15,11 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/EditorPlaceholder.h"
-#include "llvm/ADT/Optional.h"
+#include <optional>
 
 using namespace swift;
-using namespace llvm;
 
 // Placeholder text must start with '<#' and end with
 // '#>'.
@@ -37,18 +37,18 @@ using namespace llvm;
 // or type-string. If this ends up not the case for some reason, we can consider
 // adding escaping for '##'.
 
-Optional<EditorPlaceholderData>
-swift::parseEditorPlaceholder(StringRef PlaceholderText) {
-  if (!PlaceholderText.startswith("<#") ||
-      !PlaceholderText.endswith("#>"))
-    return None;
+std::optional<EditorPlaceholderData>
+swift::parseEditorPlaceholder(llvm::StringRef PlaceholderText) {
+  if (!PlaceholderText.starts_with("<#") ||
+      !PlaceholderText.ends_with("#>"))
+    return std::nullopt;
 
   PlaceholderText = PlaceholderText.drop_front(2).drop_back(2);
   EditorPlaceholderData PHDataBasic;
   PHDataBasic.Kind = EditorPlaceholderKind::Basic;
   PHDataBasic.Display = PlaceholderText;
 
-  if (!PlaceholderText.startswith("T##")) {
+  if (!PlaceholderText.starts_with("T##")) {
     // Basic.
     return PHDataBasic;
   }
@@ -57,10 +57,10 @@ swift::parseEditorPlaceholder(StringRef PlaceholderText) {
   EditorPlaceholderData PHDataTyped;
   PHDataTyped.Kind = EditorPlaceholderKind::Typed;
 
-  assert(PlaceholderText.startswith("T##"));
+  assert(PlaceholderText.starts_with("T##"));
   PlaceholderText = PlaceholderText.drop_front(3);
   size_t Pos = PlaceholderText.find("##");
-  if (Pos == StringRef::npos) {
+  if (Pos == llvm::StringRef::npos) {
     PHDataTyped.Display = PHDataTyped.Type = PHDataTyped.TypeForExpansion =
       PlaceholderText;
     return PHDataTyped;
@@ -69,7 +69,7 @@ swift::parseEditorPlaceholder(StringRef PlaceholderText) {
 
   PlaceholderText = PlaceholderText.substr(Pos+2);
   Pos = PlaceholderText.find("##");
-  if (Pos == StringRef::npos) {
+  if (Pos == llvm::StringRef::npos) {
     PHDataTyped.Type = PHDataTyped.TypeForExpansion = PlaceholderText;
   } else {
     PHDataTyped.Type = PlaceholderText.substr(0, Pos);
@@ -79,6 +79,6 @@ swift::parseEditorPlaceholder(StringRef PlaceholderText) {
   return PHDataTyped;
 }
 
-bool swift::isEditorPlaceholder(StringRef IdentifierText) {
-  return IdentifierText.startswith("<#");
+bool swift::isEditorPlaceholder(llvm::StringRef IdentifierText) {
+  return IdentifierText.starts_with("<#");
 }

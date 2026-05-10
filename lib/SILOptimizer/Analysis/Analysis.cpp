@@ -14,10 +14,12 @@
 #include "swift/SILOptimizer/Analysis/Analysis.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SILOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/ClassHierarchyAnalysis.h"
+#include "swift/SILOptimizer/Analysis/ColdBlockInfo.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/IVAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
@@ -64,4 +66,8 @@ SILAnalysis *swift::createProtocolConformanceAnalysis(SILModule *M) {
 
 SILAnalysis *swift::createNonLocalAccessBlockAnalysis(SILModule *M) {
   return new NonLocalAccessBlockAnalysis();
+}
+
+SILAnalysis *swift::createColdBlockAnalysis(SILModule *M) {
+  return new ColdBlockAnalysis(M);
 }

@@ -1,5 +1,4 @@
 target_sources(swiftSILOptimizer PRIVATE
-  AADumper.cpp
   AccessSummaryDumper.cpp
   AccessPathVerification.cpp
   AccessStorageAnalysisDumper.cpp
@@ -15,23 +14,20 @@ target_sources(swiftSILOptimizer PRIVATE
   ConstantEvaluableSubsetChecker.cpp
   EpilogueARCMatcherDumper.cpp
   EpilogueRetainReleaseMatcherDumper.cpp
-  EscapeAnalysisDumper.cpp
   FunctionOrderPrinter.cpp
   IVInfoPrinter.cpp
   InstCount.cpp
-  LSLocationPrinter.cpp
   Link.cpp
   LoopCanonicalizer.cpp
   LoopInfoPrinter.cpp
   LoopRegionPrinter.cpp
-  MemBehaviorDumper.cpp
   ModulePrinter.cpp
   RCIdentityDumper.cpp
   SerializeSILPass.cpp
   SILDebugInfoGenerator.cpp
   SILSkippingChecker.cpp
-  SideEffectsDumper.cpp
   SimplifyUnreachableContainingBlocks.cpp
-  StripDebugInfo.cpp
+  TestRunner.cpp
   OwnershipDumper.cpp
   OwnershipVerifierTextualErrorDumper.cpp)
+  

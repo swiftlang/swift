@@ -17,6 +17,7 @@
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
 #include "swift/SILOptimizer/Analysis/PostOrderAnalysis.h"
 #include "swift/SILOptimizer/Analysis/RCIdentityAnalysis.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILSuccessor.h"
@@ -267,9 +268,9 @@ bool LoopARCSequenceDataflowEvaluator::runOnLoop(
 void LoopARCSequenceDataflowEvaluator::dumpDataflowResults() {
   llvm::dbgs() << "IncToDecStateMap:\n";
   for (auto it : IncToDecStateMap) {
-    if (!it.hasValue())
+    if (!it.has_value())
       continue;
-    auto instAndState = it.getValue();
+    auto instAndState = it.value();
     llvm::dbgs() << "Increment: ";
     instAndState.first->dump();
     instAndState.second.dump();
@@ -277,9 +278,9 @@ void LoopARCSequenceDataflowEvaluator::dumpDataflowResults() {
 
   llvm::dbgs() << "DecToIncStateMap:\n";
   for (auto it : DecToIncStateMap) {
-    if (!it.hasValue())
+    if (!it.has_value())
       continue;
-    auto instAndState = it.getValue();
+    auto instAndState = it.value();
     llvm::dbgs() << "Decrement: ";
     instAndState.first->dump();
     instAndState.second.dump();

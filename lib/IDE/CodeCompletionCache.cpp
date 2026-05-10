@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CodeCompletionCache.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Cache.h"
 #include "swift/Basic/StringExtras.h"
 #include "llvm/ADT/APInt.h"
@@ -52,18 +53,18 @@ CodeCompletionCache::ValueRefCntPtr CodeCompletionCache::createValue() {
   return ValueRefCntPtr(new Value);
 }
 
-Optional<CodeCompletionCache::ValueRefCntPtr>
+std::optional<CodeCompletionCache::ValueRefCntPtr>
 CodeCompletionCache::get(const Key &K) {
   auto &TheCache = Impl->TheCache;
-  llvm::Optional<ValueRefCntPtr> V = TheCache.get(K);
+  std::optional<ValueRefCntPtr> V = TheCache.get(K);
   if (V) {
     // Check whether V is up to date.
     llvm::sys::fs::file_status ModuleStatus;
     if (llvm::sys::fs::status(K.ModuleFilename, ModuleStatus) ||
-        V.getValue()->ModuleModificationTime !=
+        V.value()->ModuleModificationTime !=
         ModuleStatus.getLastModificationTime()) {
       // Cache is stale.
-      V = None;
+      V = std::nullopt;
       TheCache.remove(K);
     }
   } else if (nextCache && (V = nextCache->get(K))) {
@@ -103,7 +104,8 @@ CodeCompletionCache::~CodeCompletionCache() {}
 ///
 /// This should be incremented any time we commit a change to the format of the
 /// cached results. This isn't expected to change very often.
-static constexpr uint32_t onDiskCompletionCacheVersion = 7; // Store whether a type can be used as attribute
+static constexpr uint32_t onDiskCompletionCacheVersion =
+    12; // Removed 'IsAsync'.
 
 /// Deserializes CodeCompletionResults from \p in and stores them in \p V.
 /// \see writeCacheModule.
@@ -229,16 +231,20 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto kind = static_cast<CodeCompletionResultKind>(*cursor++);
     auto associatedKind = static_cast<uint8_t>(*cursor++);
     auto opKind = static_cast<CodeCompletionOperatorKind>(*cursor++);
+    auto roles = CodeCompletionMacroRoles(*cursor++);
     auto notRecommended =
         static_cast<ContextFreeNotRecommendedReason>(*cursor++);
     auto diagSeverity =
         static_cast<CodeCompletionDiagnosticSeverity>(*cursor++);
     auto isSystem = static_cast<bool>(*cursor++);
+    auto hasAsyncAlternative = static_cast<bool>(*cursor++);
     auto chunkIndex = read32le(cursor);
     auto moduleIndex = read32le(cursor);
     auto briefDocIndex = read32le(cursor);
     auto diagMessageIndex = read32le(cursor);
     auto filterNameIndex = read32le(cursor);
+    auto nameForDiagnosticsIndex = read32le(cursor);
+    auto swiftUSRIndex = read32le(cursor);
 
     auto assocUSRCount = read32le(cursor);
     SmallVector<NullTerminatedStringRef, 4> assocUSRs;
@@ -258,13 +264,16 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
     auto briefDocComment = getString(briefDocIndex);
     auto diagMessage = getString(diagMessageIndex);
     auto filterName = getString(filterNameIndex);
+    auto nameForDiagnostics = getString(nameForDiagnosticsIndex);
+    auto swiftUSR = getString(swiftUSRIndex);
 
     ContextFreeCodeCompletionResult *result =
         new (*V.Allocator) ContextFreeCodeCompletionResult(
-            kind, associatedKind, opKind, isSystem, string, moduleName,
-            briefDocComment, makeArrayRef(assocUSRs).copy(*V.Allocator),
+            kind, associatedKind, opKind, roles, isSystem, hasAsyncAlternative,
+            string, moduleName, briefDocComment,
+            llvm::ArrayRef(assocUSRs).copy(*V.Allocator), swiftUSR,
             CodeCompletionResultType(resultTypes), notRecommended, diagSeverity,
-            diagMessage, filterName);
+            diagMessage, filterName, nameForDiagnostics);
 
     V.Results.push_back(result);
   }
@@ -297,8 +306,7 @@ static bool readCachedModule(llvm::MemoryBuffer *in,
 static void writeCachedModule(llvm::raw_ostream &out,
                               const CodeCompletionCache::Key &K,
                               CodeCompletionCache::Value &V) {
-  using namespace llvm::support;
-  endian::Writer LE(out, little);
+  llvm::support::endian::Writer LE(out, llvm::endianness::little);
 
   // HEADER
   // Metadata required for reading the completions.
@@ -314,7 +322,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
     llvm::raw_svector_ostream OSS(scratch);
     OSS << K.ModuleFilename << "\0";
     OSS << K.ModuleName << "\0";
-    endian::Writer OSSLE(OSS, little);
+    llvm::support::endian::Writer OSSLE(OSS, llvm::endianness::little);
     OSSLE.write(K.AccessPath.size());
     for (StringRef p : K.AccessPath)
       OSS << p << "\0";
@@ -333,7 +341,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
   llvm::raw_string_ostream results(results_);
   std::string chunks_;
   llvm::raw_string_ostream chunks(chunks_);
-  endian::Writer chunksLE(chunks, little);
+  llvm::support::endian::Writer chunksLE(chunks, llvm::endianness::little);
   std::string strings_;
   llvm::raw_string_ostream strings(strings_);
   llvm::StringMap<uint32_t> knownStrings;
@@ -349,7 +357,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
       return found->second;
     }
     auto size = strings.tell();
-    endian::Writer LE(strings, little);
+    llvm::support::endian::Writer LE(strings, llvm::endianness::little);
     LE.write(static_cast<uint32_t>(str.size()));
     strings << str;
     knownStrings[str] = size;
@@ -374,7 +382,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
     }
 
     auto size = types.tell();
-    endian::Writer LE(types, little);
+    llvm::support::endian::Writer LE(types, llvm::endianness::little);
     StringRef USR = type->getUSR();
     LE.write(static_cast<uint32_t>(USR.size()));
     types << USR;
@@ -407,7 +415,7 @@ static void writeCachedModule(llvm::raw_ostream &out,
 
   // RESULTS
   {
-    endian::Writer LE(results, little);
+    llvm::support::endian::Writer LE(results, llvm::endianness::little);
     for (const ContextFreeCodeCompletionResult *R : V.Results) {
       // FIXME: compress bitfield
       LE.write(static_cast<uint8_t>(R->getKind()));
@@ -417,15 +425,19 @@ static void writeCachedModule(llvm::raw_ostream &out,
       } else {
         LE.write(static_cast<uint8_t>(CodeCompletionOperatorKind::None));
       }
+      LE.write(static_cast<uint8_t>(R->getMacroRoles().toRaw()));
       LE.write(static_cast<uint8_t>(R->getNotRecommendedReason()));
       LE.write(static_cast<uint8_t>(R->getDiagnosticSeverity()));
       LE.write(static_cast<uint8_t>(R->isSystem()));
+      LE.write(static_cast<uint8_t>(R->hasAsyncAlternative()));
       LE.write(
           static_cast<uint32_t>(addCompletionString(R->getCompletionString())));
-      LE.write(addString(R->getModuleName()));      // index into strings
-      LE.write(addString(R->getBriefDocComment())); // index into strings
-      LE.write(addString(R->getDiagnosticMessage())); // index into strings
-      LE.write(addString(R->getFilterName())); // index into strings
+      LE.write(addString(R->getModuleName()));         // index into strings
+      LE.write(addString(R->getBriefDocComment()));    // index into strings
+      LE.write(addString(R->getDiagnosticMessage()));  // index into strings
+      LE.write(addString(R->getFilterName()));         // index into strings
+      LE.write(addString(R->getNameForDiagnostics())); // index into strings
+      LE.write(addString(R->getSwiftUSR()));           // index into strings
 
       LE.write(static_cast<uint32_t>(R->getAssociatedUSRs().size()));
       for (unsigned i = 0; i < R->getAssociatedUSRs().size(); ++i) {
@@ -475,6 +487,12 @@ static std::string getName(StringRef cacheDirectory,
       << (K.AddInitsInToplevel ? "-inits" : "")
       << (K.AddCallWithNoDefaultArgs ? "-nodefaults" : "")
       << (K.Annotated ? "-annotated" : "");
+  if (K.SpiGroups.size() > 0) {
+    OSS << "-spi";
+    for (auto SpiGroup : K.SpiGroups) {
+      OSS << "-" << SpiGroup;
+    }
+  }
 
   // name[-access-path-components]
   for (StringRef component : K.AccessPath)
@@ -489,17 +507,17 @@ static std::string getName(StringRef cacheDirectory,
   return std::string(name.str());
 }
 
-Optional<CodeCompletionCache::ValueRefCntPtr>
+std::optional<CodeCompletionCache::ValueRefCntPtr>
 OnDiskCodeCompletionCache::get(const Key &K) {
   // Try to find the cached file.
   auto bufferOrErr = llvm::MemoryBuffer::getFile(getName(cacheDirectory, K));
   if (!bufferOrErr)
-    return None;
+    return std::nullopt;
 
   // Read the cached results, failing if they are out of date.
   auto V = CodeCompletionCache::createValue();
   if (!readCachedModule(bufferOrErr.get().get(), K, *V))
-    return None;
+    return std::nullopt;
 
   return V;
 }
@@ -531,23 +549,30 @@ std::error_code OnDiskCodeCompletionCache::set(const Key &K, ValueRefCntPtr V) {
   return llvm::sys::fs::rename(tmpName.str(), name);
 }
 
-Optional<CodeCompletionCache::ValueRefCntPtr>
+std::optional<CodeCompletionCache::ValueRefCntPtr>
 OnDiskCodeCompletionCache::getFromFile(StringRef filename) {
   // Try to find the cached file.
   auto bufferOrErr = llvm::MemoryBuffer::getFile(filename);
   if (!bufferOrErr)
-    return None;
+    return std::nullopt;
 
   // Make up a key for readCachedModule.
-  CodeCompletionCache::Key K{filename.str(), "<module-name>", {},
-                             false,          false,           false,
-                             false,          false,           false};
+  CodeCompletionCache::Key K{/*ModuleFilename=*/filename.str(),
+                             /*ModuleName=*/"<module-name>",
+                             /*AccessPath=*/{},
+                             /*ResultsHaveLeadingDot=*/false,
+                             /*ForTestableLookup=*/false,
+                             /*ForPrivateImportLookup=*/false,
+                             /*SpiGroups=*/{},
+                             /*AddInitsInToplevel=*/false,
+                             /*AddCallWithNoDefaultArgs=*/false,
+                             /*Annotated=*/false};
 
   // Read the cached results.
   auto V = CodeCompletionCache::createValue();
   if (!readCachedModule(bufferOrErr.get().get(), K, *V,
                         /*allowOutOfDate*/ true))
-    return None;
+    return std::nullopt;
 
   return V;
 }

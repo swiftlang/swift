@@ -13,7 +13,7 @@
 
 @objc class C1 : P1 {
   @objc(method1renamed)
-  func method1() { // expected-error{{Objective-C method 'method1renamed' provided by method 'method1()' does not match the requirement's selector ('method1')}}{{9-23=method1}}
+  func method1() { // expected-error{{Objective-C method 'method1renamed' provided by method 'method1()' does not match the requirement's selector ('method1')}}{{-1:9-23=method1}}
   }
 
   var property1: ObjCClass {
@@ -261,7 +261,13 @@ class C8SubRW2: C8Base {
 
 @available(macOS 12, iOS 15, tvOS 15, watchOS 8, *)
 @objc protocol P9 {
-  @objc(custom:) func f(_: Any) // expected-warning {{method 'f' with Objective-C selector 'custom:' conflicts with method 'h()' with the same Objective-C selector; this is an error in Swift 6}}
-  @objc(custom:) func g(_: Any) // expected-warning {{method 'g' with Objective-C selector 'custom:' conflicts with method 'h()' with the same Objective-C selector; this is an error in Swift 6}}
+  @objc(custom:) func f(_: Any) // expected-warning {{method 'f' with Objective-C selector 'custom:' conflicts with method 'h()' with the same Objective-C selector; this is an error in the Swift 6 language mode}}
+  @objc(custom:) func g(_: Any) // expected-warning {{method 'g' with Objective-C selector 'custom:' conflicts with method 'h()' with the same Objective-C selector; this is an error in the Swift 6 language mode}}
   @objc(custom:) func h() async // expected-note 2 {{method 'h()' declared here}}
 }
+
+// We forgot to emit diagnostics in the @objc path of StructuralRequirementsRequest.
+struct MyStruct {}
+
+@objc protocol InvalidProtocol where Self: MyStruct {}
+// expected-error@-1 {{type 'Self' constrained to non-protocol, non-class type 'MyStruct'}}

@@ -1,36 +1,39 @@
 // RUN: %target-swift-ide-test -print-module -module-to-print=POD -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
-//
-// XFAIL: OS=linux-android, OS=linux-androideabi
 
 // CHECK: class Empty {
-// CHECK-NOT: init
+// CHECK: init
 // CHECK:   func test() -> Int32
 // CHECK:   func testMutable() -> Int32
 // CHECK:   class func create() -> Empty
 // CHECK: }
+// CHECK: func takesConstRefEmpty(_ e: Empty)
+// CHECK: func takesConstRefEmptyDefaulted(_ e: Empty)
 // CHECK: func mutateIt(_: Empty)
 // CHECK-NOT: func passThroughByValue(_ x: Empty) -> Empty
 
 // CHECK: class MultipleAttrs {
-// CHECK-NOT: init
+// CHECK: init
 // CHECK:   func test() -> Int32
 // CHECK:   func testMutable() -> Int32
 // CHECK:   class func create() -> MultipleAttrs
 // CHECK: }
 
 // CHECK: class IntPair {
-// CHECK-NOT: init
+// CHECK: init
 // CHECK:   var a: Int32
 // CHECK:   var b: Int32
 // CHECK:   func test() -> Int32
 // CHECK:   func testMutable() -> Int32
+// CHECK:   func instancePassThroughByRef(_ ref: IntPair) -> IntPair
+// CHECK:   class func staticPassThroughByRef(_ ref: IntPair) -> IntPair
 // CHECK:   class func create() -> IntPair
 // CHECK: }
 // CHECK: func mutateIt(_ x: IntPair)
 // CHECK-NOT: func passThroughByValue(_ x: IntPair) -> IntPair
+// CHECK: func passThroughByRef(_ x: IntPair) -> IntPair
 
 // CHECK: class RefHoldingPair {
-// CHECK-NOT: init
+// CHECK: init
 // CHECK-NOT: pair
 // CHECK:   var otherValue: Int32
 // CHECK:   func test() -> Int32
@@ -39,7 +42,7 @@
 // CHECK: }
 
 // CHECK: class RefHoldingPairRef {
-// CHECK-NOT: init
+// CHECK: init
 // CHECK:   var pair: IntPair
 // CHECK:   var otherValue: Int32
 // CHECK:   func test() -> Int32
@@ -48,7 +51,7 @@
 // CHECK: }
 
 // CHECK: class RefHoldingPairPtr {
-// CHECK-NOT: init
+// CHECK: init
 // CHECK:   var pair: IntPair
 // CHECK:   var otherValue: Int32
 // CHECK:   func test() -> Int32
@@ -57,7 +60,6 @@
 // CHECK: }
 
 // CHECK: struct ValueHoldingPair {
-// CHECK-NOT: init
 // CHECK-NOT: pair
 // CHECK:   init()
 // CHECK:   var otherValue: Int32
@@ -66,8 +68,16 @@
 // CHECK:   static func create() -> UnsafeMutablePointer<ValueHoldingPair>
 // CHECK: }
 
+// CHECK: struct ValueHoldingPairRef {
+// CHECK-NEXT:   init(pair: IntPair)
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   var pair: IntPair
+// CHECK-NEXT:   func sub(_ other: IntPair) -> Int32
+// CHECK-NEXT:   func max(_ other: IntPair) -> IntPair
+// CHECK-NEXT: }
+
 // CHECK: class BigType {
-// CHECK-NOT: init
+// CHECK: init
 // CHECK:   var a: Int32
 // CHECK:   var b: Int32
 // CHECK:   var buffer:

@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -swift-version 4
 
-// https://bugs.swift.org/browse/SR-6837
+// https://github.com/apple/swift/issues/49386
 
 // FIXME: Can't overload local functions so these must be top-level
 func takePairOverload(_ pair: (Int, Int?)) {}
@@ -18,7 +18,7 @@ do {
   // expected-error@-1 {{contextual closure type '(Int, Int?) -> ()' expects 2 arguments, but 1 was used in closure body}}
 }
 
-// https://bugs.swift.org/browse/SR-6796
+// https://github.com/apple/swift/issues/49345
 do {
   func f(a: (() -> Void)? = nil) {}
   func log<T>() -> ((T) -> Void)? { return nil }

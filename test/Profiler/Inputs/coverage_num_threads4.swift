@@ -1,0 +1,1 @@
+public func func2() {}

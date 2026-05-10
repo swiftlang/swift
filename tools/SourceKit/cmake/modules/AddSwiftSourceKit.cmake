@@ -8,7 +8,7 @@ function(add_sourcekit_default_compiler_flags target)
   _add_host_variant_link_flags(${target})
 
   # Set compilation and link flags.
-  if(${SWIFT_HOST_VARIANT_SDK} STREQUAL WINDOWS)
+  if(SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS")
     swift_windows_include_for_arch(${SWIFT_HOST_VARIANT_ARCH}
       ${SWIFT_HOST_VARIANT_ARCH}_INCLUDE)
     target_include_directories(${target} SYSTEM PRIVATE
@@ -18,9 +18,19 @@ function(add_sourcekit_default_compiler_flags target)
     -fblocks)
 endfunction()
 
-function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
+function(add_sourcekit_swift_runtime_link_flags target path HAS_SWIFT_MODULES)
   set(RPATH_LIST)
-  if(${SWIFT_HOST_VARIANT_SDK} IN_LIST SWIFT_DARWIN_PLATFORMS)
+
+  # If we are linking in the Swift Swift parser, we at least need host tools
+  # to do it.
+  set(ASKD_BOOTSTRAPPING_MODE ${BOOTSTRAPPING_MODE})
+  if (NOT ASKD_BOOTSTRAPPING_MODE)
+    if (SWIFT_BUILD_SWIFT_SYNTAX)
+      set(ASKD_BOOTSTRAPPING_MODE HOSTTOOLS)
+    endif()
+  endif()
+
+  if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
 
     # Lists of rpaths that we are going to add to our executables.
     #
@@ -31,9 +41,9 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
     # If we found a swift compiler and are going to use swift code in swift
     # host side tools but link with clang, add the appropriate -L paths so we
     # find all of the necessary swift libraries on Darwin.
-    if (HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE)
+    if (HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
 
-      if(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
+      if(ASKD_BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
         # Add in the toolchain directory so we can grab compatibility libraries
         get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
         get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/macosx" ABSOLUTE)
@@ -45,15 +55,13 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
+      elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "CROSSCOMPILE-WITH-HOSTLIBS")
 
-        # Intentinally don't add the lib dir of the cross-compiled compiler, so that
+        # Intentionally don't add the lib dir of the cross-compiled compiler, so that
         # the stdlib is not picked up from there, but from the SDK.
         # This requires to explicitly add all the needed compatibility libraries. We
         # can take them from the current build.
-        set(vsuffix "-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-        set(conctarget "swiftCompatibilityConcurrency${vsuffix}")
-        target_link_libraries(${target} PUBLIC ${conctarget})
+        target_link_libraries(${target} PUBLIC HostCompatibilityLibs)
 
         # Add the SDK directory for the host platform.
         target_link_directories(${target} PRIVATE "${sdk_dir}")
@@ -61,7 +69,7 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+      elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
         # Add the SDK directory for the host platform.
         target_link_directories(${target} PRIVATE "${sdk_dir}")
 
@@ -72,7 +80,7 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
         # Include the abi stable system stdlib in our rpath.
         list(APPEND RPATH_LIST "/usr/lib/swift")
 
-      elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
+      elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
         # At build time link against the built swift libraries from the
         # previous bootstrapping stage.
         get_bootstrapping_swift_lib_dir(bs_lib_dir "")
@@ -87,48 +95,54 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
         file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
         list(APPEND RPATH_LIST "@loader_path/${relative_rtlib_path}")
       else()
-        message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${BOOTSTRAPPING_MODE}'")
+        message(FATAL_ERROR "Unknown ASKD_BOOTSTRAPPING_MODE '${ASKD_BOOTSTRAPPING_MODE}'")
       endif()
-
-      # Workaround to make lldb happy: we have to explicitly add all swift compiler modules
-      # to the linker command line.
-      set(swift_ast_path_flags "-Wl")
-      get_property(modules GLOBAL PROPERTY swift_compiler_modules)
-      foreach(module ${modules})
-        get_target_property(module_file "SwiftModule${module}" "module_file")
-        string(APPEND swift_ast_path_flags ",-add_ast_path,${module_file}")
-      endforeach()
-
-      set_property(TARGET ${target} APPEND_STRING PROPERTY
-                   LINK_FLAGS " ${swift_ast_path_flags} ")
 
       # Workaround for a linker crash related to autolinking: rdar://77839981
       set_property(TARGET ${target} APPEND_STRING PROPERTY
                    LINK_FLAGS " -lobjc ")
 
-    endif() # HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE
-
-  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD" AND HAS_SWIFT_MODULES AND BOOTSTRAPPING_MODE)
+    endif() # HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE
+  elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|FREEBSD|OPENBSD" AND HAS_SWIFT_MODULES AND ASKD_BOOTSTRAPPING_MODE)
     set(swiftrt "swiftImageRegistrationObject${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_OBJECT_FORMAT}-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
-    if(${BOOTSTRAPPING_MODE} MATCHES "HOSTTOOLS|CROSSCOMPILE")
-      # At build time and and run time, link against the swift libraries in the
-      # installed host toolchain.
-      get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
-      get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
-      set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+    if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS|CROSSCOMPILE")
+      if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS")
+        # At build time and run time, link against the swift libraries in the
+        # installed host toolchain.
+        get_filename_component(swift_bin_dir ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+        get_filename_component(swift_dir ${swift_bin_dir} DIRECTORY)
 
+        # Detect and handle swiftly-managed hosts.
+        if(swift_bin_dir MATCHES ".*/swiftly/bin")
+          execute_process(COMMAND swiftly use --print-location
+            OUTPUT_VARIABLE swiftly_dir
+            ERROR_VARIABLE err)
+          if(err)
+            message(SEND_ERROR "Failed to find swiftly Swift compiler")
+          endif()
+          string(STRIP "${swiftly_dir}" swiftly_dir)
+          set(swift_dir "${swiftly_dir}/usr")
+        endif()
+
+        set(host_lib_dir "${swift_dir}/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      else()
+        set(host_lib_dir "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      endif()
+      set(host_lib_arch_dir "${host_lib_dir}/${SWIFT_HOST_VARIANT_ARCH}")
+
+      set(swiftrt "${host_lib_arch_dir}/swiftrt${CMAKE_C_OUTPUT_EXTENSION}")
       target_link_libraries(${target} PRIVATE ${swiftrt})
       target_link_libraries(${target} PRIVATE "swiftCore")
 
       target_link_directories(${target} PRIVATE ${host_lib_dir})
-      if(BOOTSTRAPPING_MODE STREQUAL "HOSTTOOLS")
-        list(APPEND RPATH_LIST "${host_lib_dir}")
-      else()
-        file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-        list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
-      endif()
+      target_link_directories(${target} PRIVATE ${host_lib_arch_dir})
 
-    elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
+      file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
+      list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
+      # NOTE: SourceKit components are NOT executed before stdlib is built.
+      # So there's no need to add RUNPATH to builder's runtime libraries.
+
+    elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING")
       get_bootstrapping_swift_lib_dir(bs_lib_dir "")
       target_link_directories(${target} PRIVATE ${bs_lib_dir})
       target_link_libraries(${target} PRIVATE ${swiftrt})
@@ -139,12 +153,56 @@ function(add_sourcekitd_swifrt_linking target path HAS_SWIFT_MODULES)
       file(RELATIVE_PATH relative_rtlib_path "${path}" "${SWIFTLIB_DIR}/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
       list(APPEND RPATH_LIST "$ORIGIN/${relative_rtlib_path}")
 
-    elseif(BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
-      message(FATAL_ERROR "BOOTSTRAPPING_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
+    elseif(ASKD_BOOTSTRAPPING_MODE STREQUAL "BOOTSTRAPPING-WITH-HOSTLIBS")
+      message(FATAL_ERROR "ASKD_BOOTSTRAPPING_MODE 'BOOTSTRAPPING-WITH-HOSTLIBS' not supported on Linux")
     else()
-      message(FATAL_ERROR "Unknown BOOTSTRAPPING_MODE '${BOOTSTRAPPING_MODE}'")
+      message(FATAL_ERROR "Unknown ASKD_BOOTSTRAPPING_MODE '${ASKD_BOOTSTRAPPING_MODE}'")
+    endif()
+  elseif(SWIFT_HOST_VARIANT_SDK STREQUAL "WINDOWS")
+    if(ASKD_BOOTSTRAPPING_MODE MATCHES "HOSTTOOLS")
+      set(swiftrt_obj
+        ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH}/swiftrt${CMAKE_C_OUTPUT_EXTENSION})
+      target_link_libraries(${target} PRIVATE ${swiftrt_obj})
     endif()
   endif()
+
+  if(SWIFT_BUILD_SWIFT_SYNTAX)
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+      # Add rpath to the host Swift libraries.
+      file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host/compiler")
+      list(APPEND RPATH_LIST "@loader_path/${relative_hostlib_path}")
+    elseif(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|FREEBSD|OPENBSD")
+      # Add rpath to the host Swift libraries.
+      file(RELATIVE_PATH relative_hostlib_path "${path}" "${SWIFTLIB_DIR}/host/compiler")
+      list(APPEND RPATH_LIST "$ORIGIN/${relative_hostlib_path}")
+    else()
+      target_link_directories(${target} PRIVATE
+        ${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}/${SWIFT_HOST_VARIANT_ARCH})
+    endif()
+
+    # For the "end step" of bootstrapping configurations on Darwin, need to be
+    # able to fall back to the SDK directory for libswiftCore et al.
+    if (BOOTSTRAPPING_MODE MATCHES "BOOTSTRAPPING.*")
+      if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+        target_link_directories(${target} PRIVATE "${sdk_dir}")
+
+        # Include the abi stable system stdlib in our rpath.
+        set(swift_runtime_rpath "/usr/lib/swift")
+
+        # Add in the toolchain directory so we can grab compatibility libraries
+        get_filename_component(TOOLCHAIN_BIN_DIR ${SWIFT_EXEC_FOR_SWIFT_MODULES} DIRECTORY)
+        get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
+        target_link_directories(${target} PUBLIC ${TOOLCHAIN_LIB_DIR})
+      endif()
+    endif()
+
+    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS AND SWIFT_ALLOW_LINKING_SWIFT_CONTENT_IN_DARWIN_TOOLCHAIN)
+      get_filename_component(TOOLCHAIN_BIN_DIR ${CMAKE_Swift_COMPILER} DIRECTORY)
+      get_filename_component(TOOLCHAIN_LIB_DIR "${TOOLCHAIN_BIN_DIR}/../lib/swift/${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}" ABSOLUTE)
+      target_link_directories(${target} BEFORE PUBLIC ${TOOLCHAIN_LIB_DIR})
+    endif()
+  endif()
+
   set(RPATH_LIST ${RPATH_LIST} PARENT_SCOPE)
 endfunction()
 
@@ -167,7 +225,7 @@ macro(add_sourcekit_library name)
   set(srcs ${SOURCEKITLIB_UNPARSED_ARGUMENTS})
 
   llvm_process_sources(srcs ${srcs})
-  if(MSVC_IDE OR XCODE)
+  if(MSVC_IDE)
     # Add public headers
     file(RELATIVE_PATH lib_path
       ${SOURCEKIT_SOURCE_DIR}/lib/
@@ -197,10 +255,12 @@ macro(add_sourcekit_library name)
     set(libkind)
   endif()
   add_library(${name} ${libkind} ${srcs})
-  if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+  if(NOT SWIFT_BUILT_STANDALONE AND SOURCEKIT_SWIFT_SWAP_COMPILER)
     add_dependencies(${name} clang)
   endif()
   llvm_update_compile_flags(${name})
+
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
 
   set_output_directory(${name}
       BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
@@ -220,10 +280,14 @@ macro(add_sourcekit_library name)
     add_llvm_symbol_exports(${name} ${EXPORTED_SYMBOL_FILE})
   endif()
 
+  # Once the new Swift parser is linked, everything has Swift modules.
+  if (SWIFT_BUILD_SWIFT_SYNTAX AND SOURCEKITLIB_SHARED)
+    set(SOURCEKITLIB_HAS_SWIFT_MODULES ON)
+  endif()
 
   if(SOURCEKITLIB_SHARED)
     set(RPATH_LIST)
-    add_sourcekitd_swifrt_linking(${name} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR} ${SOURCEKITLIB_HAS_SWIFT_MODULES})
+    add_sourcekit_swift_runtime_link_flags(${name} ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR} ${SOURCEKITLIB_HAS_SWIFT_MODULES})
 
     if("${CMAKE_SYSTEM_NAME}" STREQUAL "Darwin")
       set_target_properties(${name} PROPERTIES INSTALL_NAME_DIR "@rpath")
@@ -250,6 +314,7 @@ macro(add_sourcekit_library name)
     RUNTIME
       DESTINATION "bin"
       COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
+
   swift_install_in_component(FILES ${SOURCEKITLIB_HEADERS}
                              DESTINATION "include/SourceKit"
                              COMPONENT "${SOURCEKITLIB_INSTALL_IN_COMPONENT}")
@@ -280,7 +345,7 @@ macro(add_sourcekit_executable name)
     "${SOURCEKIT_EXECUTABLE_multiple_parameter_options}" ${ARGN})
 
   add_executable(${name} ${SOURCEKITEXE_UNPARSED_ARGUMENTS})
-  if(NOT SWIFT_BUILT_STANDALONE AND NOT CMAKE_C_COMPILER_ID MATCHES Clang)
+  if(NOT SWIFT_BUILT_STANDALONE AND SOURCEKIT_SWIFT_SWAP_COMPILER)
     add_dependencies(${name} clang)
   endif()
   llvm_update_compile_flags(${name})
@@ -298,6 +363,8 @@ macro(add_sourcekit_executable name)
 
   set_target_properties(${name} PROPERTIES FOLDER "SourceKit executables")
   add_sourcekit_default_compiler_flags("${name}")
+
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
 endmacro()
 
 # Add a new SourceKit framework.
@@ -317,9 +384,14 @@ macro(add_sourcekit_framework name)
   set(lib_dir ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
   set(framework_location "${lib_dir}/${name}.framework")
 
+  # Once the new Swift parser is linked, everything has Swift modules.
+  if (SWIFT_BUILD_SWIFT_SYNTAX)
+    set(SOURCEKITFW_HAS_SWIFT_MODULES ON)
+  endif()
+
   if (NOT SOURCEKIT_DEPLOYMENT_OS MATCHES "^macosx")
     set(FLAT_FRAMEWORK_NAME "${name}")
-    set(FLAT_FRAMEWORK_IDENTIFIER "com.apple.${name}")
+    set(FLAT_FRAMEWORK_IDENTIFIER "org.swift.${name}")
     set(FLAT_FRAMEWORK_SHORT_VERSION_STRING "1.0")
     set(FLAT_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
     set(FLAT_FRAMEWORK_DEPLOYMENT_TARGET "${SOURCEKIT_DEPLOYMENT_TARGET}")
@@ -337,6 +409,8 @@ macro(add_sourcekit_framework name)
   add_library(${name} SHARED ${srcs})
   llvm_update_compile_flags(${name})
 
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+
   set(headers)
   foreach(src ${srcs})
     get_filename_component(extension ${src} EXT)
@@ -345,9 +419,9 @@ macro(add_sourcekit_framework name)
     endif()
   endforeach()
 
-  if(MSVC_IDE OR XCODE)
+  if(MSVC_IDE)
     set_source_files_properties(${headers} PROPERTIES HEADER_FILE_ONLY ON)
-  endif(MSVC_IDE OR XCODE)
+  endif(MSVC_IDE)
 
   if(LLVM_COMMON_DEPENDS)
     add_dependencies(${name} ${LLVM_COMMON_DEPENDS})
@@ -379,7 +453,14 @@ macro(add_sourcekit_framework name)
         BINARY_DIR ${SOURCEKIT_RUNTIME_OUTPUT_INTDIR}
         LIBRARY_DIR ${SOURCEKIT_LIBRARY_OUTPUT_INTDIR})
     set(RPATH_LIST)
-    add_sourcekitd_swifrt_linking(${name} "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}" ${SOURCEKITFW_HAS_SWIFT_MODULES})
+    add_sourcekit_swift_runtime_link_flags(${name} "${framework_location}/Versions/A" ${SOURCEKITFW_HAS_SWIFT_MODULES})
+    file(RELATIVE_PATH relative_lib_path
+      "${framework_location}/Versions/A" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}")
+    list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
+
+    file(GENERATE OUTPUT "xpc_service_name.txt" CONTENT "org.swift.SourceKitService.${SOURCEKIT_VERSION_STRING}_${SOURCEKIT_TOOLCHAIN_NAME}")
+    target_sources(${name} PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/xpc_service_name.txt")
+
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
                           FOLDER "SourceKit frameworks"
@@ -387,10 +468,11 @@ macro(add_sourcekit_framework name)
                           INSTALL_NAME_DIR "@rpath"
                           INSTALL_RPATH "${RPATH_LIST}"
                           MACOSX_FRAMEWORK_INFO_PLIST "${SOURCEKIT_SOURCE_DIR}/cmake/MacOSXFrameworkInfo.plist.in"
-                          MACOSX_FRAMEWORK_IDENTIFIER "com.apple.${name}"
+                          MACOSX_FRAMEWORK_IDENTIFIER "org.swift.${name}"
                           MACOSX_FRAMEWORK_SHORT_VERSION_STRING "1.0"
                           MACOSX_FRAMEWORK_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}"
-                          PUBLIC_HEADER "${headers}")
+                          PUBLIC_HEADER "${headers}"
+                          RESOURCE "${CMAKE_CURRENT_BINARY_DIR}/xpc_service_name.txt")
     add_dependencies(${SOURCEKITFW_INSTALL_IN_COMPONENT} ${name})
     swift_install_in_component(TARGETS ${name}
                                FRAMEWORK
@@ -410,7 +492,11 @@ macro(add_sourcekit_framework name)
         BINARY_DIR ${framework_location}
         LIBRARY_DIR ${framework_location})
     set(RPATH_LIST)
-    add_sourcekitd_swifrt_linking(${name} "${framework_location}" SOURCEKITFW_HAS_SWIFT_MODULES RPATH_LIST)
+    add_sourcekit_swift_runtime_link_flags(${name} "${framework_location}" SOURCEKITFW_HAS_SWIFT_MODULES RPATH_LIST)
+    file(RELATIVE_PATH relative_lib_path
+      "${framework_location}" "${SOURCEKIT_LIBRARY_OUTPUT_INTDIR}")
+    list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
+
     set_target_properties(${name} PROPERTIES
                           BUILD_WITH_INSTALL_RPATH TRUE
                           FOLDER "SourceKit frameworks"
@@ -464,7 +550,7 @@ macro(add_sourcekit_xpc_service name framework_target)
   endif()
 
   set(XPCSERVICE_NAME ${name})
-  set(XPCSERVICE_IDENTIFIER "com.apple.${name}.${SOURCEKIT_VERSION_STRING}_${SOURCEKIT_TOOLCHAIN_NAME}")
+  set(XPCSERVICE_IDENTIFIER "org.swift.${name}.${SOURCEKIT_VERSION_STRING}_${SOURCEKIT_TOOLCHAIN_NAME}")
   set(XPCSERVICE_BUNDLE_VERSION "${SOURCEKIT_VERSION_STRING}")
   set(XPCSERVICE_SHORT_VERSION_STRING "1.0")
   configure_file(
@@ -492,16 +578,18 @@ macro(add_sourcekit_xpc_service name framework_target)
   swift_common_llvm_config(${name} ${SOURCEKITXPC_LLVM_LINK_COMPONENTS})
   target_link_libraries(${name} PRIVATE ${LLVM_COMMON_LIBS})
 
+  set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+
   add_dependencies(${framework_target} ${name})
 
   set(RPATH_LIST)
-  add_sourcekitd_swifrt_linking(${name} ${xpc_bin_dir} ${SOURCEKITXPC_HAS_SWIFT_MODULES})
+  add_sourcekit_swift_runtime_link_flags(${name} ${xpc_bin_dir} ${SOURCEKITXPC_HAS_SWIFT_MODULES})
 
   file(RELATIVE_PATH relative_lib_path "${xpc_bin_dir}" "${lib_dir}")
   list(APPEND RPATH_LIST "@loader_path/${relative_lib_path}")
 
   # Add rpath for sourcekitdInProc
-  # lib/${framework_taget}.framework/Versions/A/XPCServices/${name}.xpc/Contents/MacOS/${name}
+  # lib/${framework_target}.framework/Versions/A/XPCServices/${name}.xpc/Contents/MacOS/${name}
   set_target_properties(${name} PROPERTIES
                         BUILD_WITH_INSTALL_RPATH On
                         INSTALL_RPATH "${RPATH_LIST}"

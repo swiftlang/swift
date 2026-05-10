@@ -1,5 +1,5 @@
 /// Test the -module-alias flag with an explicit module loader.
-
+// UNSUPPORTED: OS=windows-msvc
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/inputs
 // RUN: mkdir -p %t/outputs
@@ -7,6 +7,8 @@
 /// Create a module Bar
 // RUN: echo 'public func bar() {}' > %t/inputs/FileBar.swift
 // RUN: %target-swift-frontend -module-name Bar %t/inputs/FileBar.swift -emit-module -emit-module-path %t/inputs/Bar.swiftmodule
+// RUN: %target-swift-emit-pcm -module-name SwiftShims %swift-lib-dir/swift/shims/module.modulemap -o %t/inputs/SwiftShims.pcm
+// RUN: %target-swift-emit-pcm -module-name _SwiftConcurrencyShims %swift-lib-dir/swift/shims/module.modulemap -o %t/inputs/_SwiftConcurrencyShims.pcm
 
 /// Check Bar.swiftmodule is created
 // RUN: test -f %t/inputs/Bar.swiftmodule
@@ -35,6 +37,18 @@
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
 // RUN: echo "}," >> %/t/inputs/map.json
 // RUN: echo "{" >> %/t/inputs/map.json
+// RUN: echo "\"moduleName\": \"SwiftShims\"," >> %/t/inputs/map.json
+// RUN: echo "\"isFramework\": false," >> %/t/inputs/map.json
+// RUN: echo "\"clangModuleMapPath\": \"%swift-lib-dir/swift/shims/module.modulemap\"," >> %/t/inputs/map.json
+// RUN: echo "\"clangModulePath\": \"%t/inputs/SwiftShims.pcm\"" >> %/t/inputs/map.json
+// RUN: echo "}," >> %/t/inputs/map.json
+// RUN: echo "{" >> %/t/inputs/map.json
+// RUN: echo "\"moduleName\": \"_SwiftConcurrencyShims\"," >> %/t/inputs/map.json
+// RUN: echo "\"isFramework\": false," >> %/t/inputs/map.json
+// RUN: echo "\"clangModuleMapPath\": \"%swift-lib-dir/swift/shims/module.modulemap\"," >> %/t/inputs/map.json
+// RUN: echo "\"clangModulePath\": \"%t/inputs/_SwiftConcurrencyShims.pcm\"" >> %/t/inputs/map.json
+// RUN: echo "}," >> %/t/inputs/map.json
+// RUN: echo "{" >> %/t/inputs/map.json
 // RUN: echo "\"moduleName\": \"_StringProcessing\"," >> %/t/inputs/map.json
 // RUN: echo "\"modulePath\": \"%/string_processing_module\"," >> %/t/inputs/map.json
 // RUN: echo "\"isFramework\": false" >> %/t/inputs/map.json
@@ -48,4 +62,4 @@
 // RUN: not test -f %t/inputs/Cat.swiftmodule
 
 // RUN: %FileCheck %s -input-file %t/outputs/load-result.output -check-prefix CHECK
-// CHECK: remark: loaded module at {{.*}}Bar.swiftmodule
+// CHECK: remark: loaded module {{.*}}Bar.swiftmodule

@@ -77,7 +77,7 @@ void swift::threading_impl::once_slow(once_t &predicate, void (*fn)(void *),
 }
 
 #if defined(__OpenBSD__)
-llvm::Optional<swift::threading_impl::stack_bounds>
+std::optional<swift::threading_impl::stack_bounds>
 swift::threading_impl::thread_get_current_stack_bounds() {
   stack_t sinfo;
 
@@ -92,7 +92,7 @@ swift::threading_impl::thread_get_current_stack_bounds() {
   return {};
 }
 #else
-llvm::Optional<swift::threading_impl::stack_bounds>
+std::optional<swift::threading_impl::stack_bounds>
 swift::threading_impl::thread_get_current_stack_bounds() {
   pthread_attr_t attr;
   size_t size = 0;
@@ -101,18 +101,26 @@ swift::threading_impl::thread_get_current_stack_bounds() {
 #if defined(__FreeBSD__)
   if (pthread_attr_init(&attr))
     return {};
+
+  if (pthread_attr_get_np(pthread_self(), &attr)) {
+    pthread_attr_destroy(&attr);
+    return {};
+  }
+#elif defined(__linux__)
+  if (pthread_getattr_np(pthread_self(), &attr))
+    return {};
+#else
+  // We don't know how to get the thread attr for this platform.
+  return {};
 #endif
 
-  if (!pthread_getattr_np(pthread_self(), &attr)) {
-    if (!pthread_attr_getstack(&attr, &begin, &size)) {
-      stack_bounds result = { begin, (char *)begin + size };
-      pthread_attr_destroy(&attr);
-      return result;
-    }
-
+  if (!pthread_attr_getstack(&attr, &begin, &size)) {
+    stack_bounds result = { begin, (char *)begin + size };
     pthread_attr_destroy(&attr);
+    return result;
   }
 
+  pthread_attr_destroy(&attr);
   return {};
 }
 #endif

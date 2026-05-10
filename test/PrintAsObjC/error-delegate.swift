@@ -11,7 +11,7 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/error-delegate.h -emit-module -o %t %s
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/error-delegate.h -parse-as-library %t/error-delegate.swiftmodule -typecheck -emit-objc-header-path %t/error-delegate.h
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -import-objc-header %S/Inputs/error-delegate.h -parse-as-library %t/error-delegate.swiftmodule -typecheck -verify -emit-objc-header-path %t/error-delegate.h
 
 // RUN: %FileCheck %s < %t/error-delegate.h
 // RUN: %check-in-clang %t/error-delegate.h

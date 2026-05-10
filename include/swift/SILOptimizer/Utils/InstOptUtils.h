@@ -34,6 +34,8 @@ namespace swift {
 
 class DominanceInfo;
 class DeadEndBlocks;
+class BasicCalleeAnalysis;
+class DestructorAnalysis;
 template <class T> class NullablePtr;
 
 /// Transform a Use Range (Operand*) into a User Range (SILInstruction *)
@@ -66,7 +68,7 @@ NullablePtr<SILInstruction> createDecrementBefore(SILValue ptr,
                                                   SILInstruction *insertpt);
 
 /// Get the insertion point after \p val.
-Optional<SILBasicBlock::iterator> getInsertAfterPoint(SILValue val);
+std::optional<SILBasicBlock::iterator> getInsertAfterPoint(SILValue val);
 
 /// True if this instruction's only uses are debug_value (in -O mode),
 /// destroy_value, end_lifetime or end-of-scope instruction such as end_borrow.
@@ -87,7 +89,8 @@ unsigned getNumInOutArguments(FullApplySite applySite);
 ///
 /// \p callbacks.onDelete() is invoked to delete each instruction.
 void eliminateDeadInstruction(SILInstruction *inst,
-                              InstModCallbacks callbacks = InstModCallbacks());
+                              InstModCallbacks callbacks = InstModCallbacks(),
+                              bool assumeFixedLifetimes = true);
 
 /// For each of the given instructions, if they are dead delete them
 /// along with their dead operands. Note this utility must be phased out and
@@ -127,6 +130,13 @@ bool isInstructionTriviallyDeletable(SILInstruction *inst);
 /// This routine only examines the state of the instruction at hand.
 bool isInstructionTriviallyDead(SILInstruction *inst);
 
+bool canTriviallyDeleteOSSAEndScopeInst(SILInstruction *inst);
+
+/// Return true if \p inst is a forwarding operation that destructures an owned
+/// move-only value. Such instructions must not be deleted because they end
+/// the lifetime of their operand.
+bool canDeleteDeadMoveOnlyOwnedDestructureInst(SILInstruction *inst);
+
 /// Return true if this is a release instruction that's not going to
 /// free the object.
 bool isIntermediateRelease(SILInstruction *inst, EpilogueARCFunctionInfo *erfi);
@@ -139,6 +149,16 @@ void collectUsesOfValue(SILValue V,
 /// Recursively erase all of the uses of the value (but not the
 /// value itself)
 void eraseUsesOfValue(SILValue value);
+
+/// Return true if \p type is a value type (struct/enum) that requires
+/// deinitialization beyond destruction of its members.
+bool hasValueDeinit(SILType type);
+
+/// Return true if \p value has a value type (struct/enum) that requires
+/// deinitialization beyond destruction of its members.
+inline bool hasValueDeinit(SILValue value) {
+  return hasValueDeinit(value->getType());
+}
 
 /// Gets the concrete value which is stored in an existential box.
 /// Returns %value in following pattern:
@@ -175,22 +195,23 @@ SILValue getConcreteValueOfExistentialBoxAddr(SILValue addr,
 /// - a type of the return value is a subclass of the expected return type.
 /// - actual return type and expected return type differ in optionality.
 /// - both types are tuple-types and some of the elements need to be casted.
-///
-/// \p usePoints is required when \p value has guaranteed ownership. It must be
-/// the last users of the returned, casted value. A usePoint cannot be a
-/// BranchInst (a phi is never the last guaranteed user). \p builder's current
-/// insertion point must dominate all \p usePoints.
 std::pair<SILValue, bool /* changedCFG */>
-castValueToABICompatibleType(SILBuilder *builder, SILLocation Loc,
-                             SILValue value, SILType srcTy, SILType destTy,
-                             ArrayRef<SILInstruction *> usePoints);
-/// Peek through trivial Enum initialization, typically for pointless
-/// Optionals.
+castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
+                             SILLocation Loc, SILValue value, SILType srcTy,
+                             SILType destTy);
+
+/// Returns true if the layout of a generic nominal type is dependent on its generic parameters.
+/// This is usually the case. Some examples, where they layout is _not_ dependent:
+/// ```
+///    struct S<T> {
+///      var x: Int // no members which depend on T
+///    }
 ///
-/// The returned InitEnumDataAddr dominates the given
-/// UncheckedTakeEnumDataAddrInst.
-InitEnumDataAddrInst *
-findInitAddressForTrivialEnum(UncheckedTakeEnumDataAddrInst *utedai);
+///    struct S<T> {
+///      var c: SomeClass<T> // a class reference does not depend on the layout of the class
+///    }
+/// ```
+bool layoutIsTypeDependent(NominalTypeDecl *decl);
 
 /// Returns a project_box if it is the next instruction after \p ABI and
 /// and has \p ABI as operand. Otherwise it creates a new project_box right
@@ -220,7 +241,7 @@ SILLinkage getSpecializedLinkage(SILFunction *f, SILLinkage linkage);
 /// Tries to perform jump-threading on all checked_cast_br instruction in
 /// function \p Fn.
 bool tryCheckedCastBrJumpThreading(
-    SILFunction *fn, DominanceInfo *dt, DeadEndBlocks *deBlocks,
+    SILFunction *fn, SILPassManager *pm, DominanceInfo *dt, DeadEndBlocks *deBlocks,
     SmallVectorImpl<SILBasicBlock *> &blocksForWorklist,
     bool EnableOSSARewriteTerminator);
 
@@ -247,7 +268,7 @@ void emitDestroyOperation(SILBuilder &builder, SILLocation loc,
 /// Returns true, if there are no other users beside those collected in \p
 /// destroys, i.e. if \p inst can be considered as "dead".
 bool collectDestroys(SingleValueInstruction *inst,
-                     SmallVectorImpl<SILInstruction *> &destroys);
+                     SmallVectorImpl<Operand *> &destroys);
 
 /// If Closure is a partial_apply or thin_to_thick_function with only local
 /// ref count users and a set of post-dominating releases:
@@ -270,25 +291,38 @@ void releasePartialApplyCapturedArg(
     SILParameterInfo paramInfo,
     InstModCallbacks callbacks = InstModCallbacks());
 
-void deallocPartialApplyCapturedArg(
-    SILBuilder &builder, SILLocation loc, SILValue arg,
-    SILParameterInfo paramInfo);
-
-/// Insert destroys of captured arguments of partial_apply [stack].
+/// Insert destroys of captured arguments of partial_apply [stack]. \p builder
+/// indicates a position at which the closure's lifetime ends.
+///
+/// The \p getValueToDestroy callback allows the caller to handle some captured
+/// arguments specially. For example, ClosureLifetimeFixup generates borrow
+/// scopes for captured arguments; each getValueToDestroy callback then inserts
+/// the corresponding end_borrow and returns the owned operand of the borrow,
+/// which will then be destroyed as usual.
 void insertDestroyOfCapturedArguments(
     PartialApplyInst *pai, SILBuilder &builder,
-    llvm::function_ref<bool(SILValue)> shouldInsertDestroy =
-        [](SILValue arg) -> bool { return true; });
+    llvm::function_ref<SILValue(SILValue)> getValueToDestroy =
+        [](SILValue arg) -> SILValue { return arg; },
+    SILLocation loc = RegularLocation::getAutoGeneratedLocation());
 
-void insertDeallocOfCapturedArguments(
-    PartialApplyInst *pai, SILBuilder &builder);
+void insertDeallocOfCapturedArguments(PartialApplyInst *pai,
+    DominanceInfo *domInfo,
+    llvm::function_ref<SILValue(SILValue)> getAddressToDealloc =
+      [](SILValue arg) -> SILValue { return arg; });
 
 /// This iterator 'looks through' one level of builtin expect users exposing all
 /// users of the looked through builtin expect instruction i.e it presents a
 /// view that shows all users as if there were no builtin expect instructions
 /// interposed.
-class IgnoreExpectUseIterator
-    : public std::iterator<std::forward_iterator_tag, Operand *, ptrdiff_t> {
+class IgnoreExpectUseIterator {
+public:
+  using iterator_category = std::forward_iterator_tag;
+  using value_type = Operand*;
+  using difference_type = std::ptrdiff_t;
+  using pointer = value_type*;
+  using reference = value_type&;    
+
+private:
   ValueBaseUseIterator origUseChain;
   ValueBaseUseIterator currentIter;
 
@@ -376,10 +410,6 @@ ignore_expect_uses(ValueBase *value) {
 /// operations from it. These can be simplified and removed.
 bool simplifyUsers(SingleValueInstruction *inst);
 
-///  True if a type can be expanded
-/// without a significant increase to code size.
-bool shouldExpand(SILModule &module, SILType ty);
-
 /// Check if the value of value is computed by means of a simple initialization.
 /// Store the actual SILValue into \p Val and the reversed list of instructions
 /// initializing it in \p Insns.
@@ -396,14 +426,6 @@ bool canReplaceLoadSequence(SILInstruction *inst);
 /// The sequence is traversed inside out, i.e.
 /// starting with the innermost struct_element_addr
 void replaceLoadSequence(SILInstruction *inst, SILValue value);
-
-/// Do we have enough information to determine all callees that could
-/// be reached by calling the function represented by Decl?
-bool calleesAreStaticallyKnowable(SILModule &module, SILDeclRef decl);
-
-/// Do we have enough information to determine all callees that could
-/// be reached by calling the function represented by Decl?
-bool calleesAreStaticallyKnowable(SILModule &module, ValueDecl *vd);
 
 // Attempt to get the instance for , whose static type is the same as
 // its exact dynamic type, returning a null SILValue() if we cannot find it.
@@ -470,7 +492,7 @@ struct LLVM_LIBRARY_VISIBILITY FindLocalApplySitesResult {
 ///
 /// 1. We discovered that the function_ref never escapes.
 /// 2. We were able to find either a partial apply or a full apply site.
-Optional<FindLocalApplySitesResult>
+std::optional<FindLocalApplySitesResult>
 findLocalApplySites(FunctionRefBaseInst *fri);
 
 /// Gets the base implementation of a method.
@@ -550,7 +572,8 @@ SILValue makeValueAvailable(SILValue value, SILBasicBlock *inBlock);
 /// use blocks inside a loop relative to \p value. The client must create
 /// separate copies for any uses within the loop.
 void endLifetimeAtLeakingBlocks(SILValue value,
-                                ArrayRef<SILBasicBlock *> userBBs);
+                                ArrayRef<SILBasicBlock *> userBBs,
+                                DeadEndBlocks *deadEndBlocks = nullptr);
 
 /// Given a forwarding instruction, eliminate it if all of its users are debug
 /// instructions and ownership uses.
@@ -561,15 +584,41 @@ bool tryEliminateOnlyOwnershipUsedForwardingInst(
 IntegerLiteralInst *optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
                                                   SILBuilder &builder);
 
-/// Performs "predictable" memory access optimizations.
-///
-/// See the PredictableMemoryAccessOptimizations pass.
-bool optimizeMemoryAccesses(SILFunction &fn);
-
 /// Performs "predictable" dead allocation optimizations.
 ///
 /// See the PredictableDeadAllocationElimination pass.
-bool eliminateDeadAllocations(SILFunction &fn);
+bool eliminateDeadAllocations(SILFunction *fn, DominanceInfo *domInfo);
+
+bool specializeClassMethodInst(ClassMethodInst *cm);
+bool specializeWitnessMethodInst(WitnessMethodInst *wm);
+
+bool specializeAppliesInFunction(SILFunction &F,
+                                 SILTransform *transform,
+                                 bool isMandatory);
+
+bool tryOptimizeKeypath(ApplyInst *AI, SILBuilder Builder);
+bool tryOptimizeKeypathApplication(ApplyInst *AI, SILFunction *callee, SILBuilder Builder);
+bool tryOptimizeKeypathOffsetOf(ApplyInst *AI, FuncDecl *calleeFn,
+                                KeyPathInst *kp, SILBuilder Builder);
+bool tryOptimizeKeypathKVCString(ApplyInst *AI, FuncDecl *calleeFn,
+                                KeyPathInst *kp, SILBuilder Builder);
+
+/// Instantiate the specified type by recursively tupling and structing the
+/// unique instances of the empty types and undef "instances" of the non-empty
+/// types aggregated together at each level.
+SILValue createEmptyAndUndefValue(SILType ty, SILInstruction *insertionPoint,
+                                  SILBuilderContext &ctx, bool noUndef = false);
+
+/// Check if a struct or its fields can have unreferenceable storage.
+bool findUnreferenceableStorage(StructDecl *decl, SILType structType,
+                                SILFunction *func);
+
+SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
+
+bool isDestructorSideEffectFree(SILInstruction *mayRelease,
+                                DestructorAnalysis *DA);
+
+bool shouldRemoveCondFail(StringRef withMessage, StringRef functionName);
 
 } // end namespace swift
 

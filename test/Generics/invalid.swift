@@ -105,7 +105,8 @@ class P<N> {
   // expected-error@-1 {{type 'N' constrained to non-protocol, non-class type 'A.XYZ'}}
 }
 
-// SR-5579
+// https://github.com/apple/swift/issues/48151
+
 protocol Foo {
     associatedtype Bar where Bar.Nonsense == Int // expected-error{{'Nonsense' is not a member type of type 'Self.Bar'}}
 }
@@ -152,4 +153,14 @@ func errorMessageVariants(x: X<Int>, x2: X<Bool> = X<Int>()) -> X<Bool> {
   let _ = x as X<Bool> // expected-error {{cannot convert value of type 'X<Int>' to type 'X<Bool>' in coercion}}
   let _: X<Int>.Foo = X<Bool>.Foo() // expected-error {{cannot convert parent type 'X<Bool>' to expected type 'X<Int>'}}
   return x // expected-error {{cannot convert return expression of type 'X<Int>' to return type 'X<Bool>'}}
+}
+
+protocol P2 {
+  func foo()
+}
+
+// Make sure we don't diagnose the conformance failure or 'T.K'.
+struct HasInvalidSameType<T>: P2 where T == Undefined, T.K == Int {
+  // expected-error@-1 {{cannot find type 'Undefined' in scope}}
+  func foo() {}
 }

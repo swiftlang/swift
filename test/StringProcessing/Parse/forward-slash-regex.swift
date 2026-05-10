@@ -1,5 +1,5 @@
-// RUN: %target-typecheck-verify-swift -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
-// REQUIRES: swift_in_compiler
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -enable-bare-slash-regex -disable-availability-checking -typo-correction-limit 0
+// REQUIRES: swift_swift_parser
 // REQUIRES: concurrency
 
 prefix operator /
@@ -52,7 +52,6 @@ do {
   _=/0/
   // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   // expected-error@-2 {{cannot find operator '=/' in scope}}
-  // expected-error@-3 {{'/' is not a postfix unary operator}}
 }
 
 // No closing '/' so a prefix operator.
@@ -94,10 +93,11 @@ _ = /x/!.blah
 // expected-error@-2 {{value of type 'Regex<Substring>' has no member 'blah'}}
 
 do {
+  // expected-error@+2 {{cannot find operator '/?' in scope}}
+  // expected-error@+1 {{'/' is not a prefix unary operator}}
   _ = /x /?
     .blah
-  // expected-error@-2 {{cannot find operator '/?' in scope}}
-  // expected-error@-3 {{'/' is not a prefix unary operator}}
+  // expected-error@-1 {{cannot infer contextual base in reference to member 'blah'}}
 }
 _ = /x/? // expected-error {{cannot use optional chaining on non-optional value of type 'Regex<Substring>'}}
   .blah // expected-error {{value of type 'Regex<Substring>' has no member 'blah'}}
@@ -120,6 +120,7 @@ do {
 } // expected-error {{expected expression after operator}}
 
 _ = /x/??/x/ // expected-error {{'/' is not a postfix unary operator}}
+// expected-error@-1 2 {{cannot use optional chaining on non-optional value of type 'Regex<Substring>'}}
 
 _ = /x/ ... /y/ // expected-error {{referencing operator function '...' on 'Comparable' requires that 'Regex<Substring>' conform to 'Comparable'}}
 
@@ -129,7 +130,6 @@ _ = /x/.../y/
 
 _ = /x/...
 // expected-error@-1 {{unary operator '...' cannot be applied to an operand of type 'Regex<Substring>'}}
-// expected-note@-2 {{overloads for '...' exist with these partially matching parameter lists}}
 
 do {
   _ = /x /...
@@ -167,7 +167,7 @@ func testSubscript(_ x: S) {
   x[/x/]
   x[/x /]
   // expected-error@-1:9 {{expected expression after operator}}
-  // expected-error@-2 {{missing argument for parameter #1 in call}}
+  // expected-error@-2 {{missing argument for parameter #1 in subscript}}
 
   _ = x[/] / 2
 }
@@ -262,8 +262,7 @@ default:
 
 do {} catch /x/ {}
 // expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'any Error'}}
-// expected-error@-2 {{binary operator '~=' cannot be applied to two 'any Error' operands}}
-// expected-warning@-3 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
+// expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 
 switch /x/ {
 default:
@@ -302,7 +301,7 @@ do {
   // expected-warning@-1 {{no calls to throwing functions occur within 'try' expression}}
 } // expected-error {{expected expression after operator}}
 
-_ = await /x/ // expected-warning {{no 'async' operations occur within 'await' expression}}
+_ = await /x/ // expected-warning {{no 'async' operations occur within 'await' expression}}{{5-11=}}
 
 /x/ = 0 // expected-error {{cannot assign to value: literals are not mutable}}
 /x/() // expected-error {{cannot call value of non-function type 'Regex<Substring>'}}
@@ -408,7 +407,7 @@ _ = /\()/
 // expected-error@-1 {{'/' is not a prefix unary operator}}
 // expected-error@-2 {{'/' is not a postfix unary operator}}
 // expected-error@-3 {{invalid component of Swift key path}}
-
+  
 do {
   let _: Regex = (/whatever\)/
   // expected-note@-1 {{to match this opening '('}}
@@ -418,6 +417,7 @@ do {
   // expected-error@-1 {{'/' is not a prefix unary operator}}
   // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
   // expected-error@-3 {{expected expression}}
+  // expected-error@-4 {{cannot call value of non-function type '()'}}
 }
 do {
   _ = /[x])/
@@ -445,7 +445,7 @@ _ = ^/"/"
 _ = ^/"[/"
 // expected-error@-1 {{'^' is not a prefix unary operator}}
 // expected-error@-2 {{unterminated string literal}}
-// expected-error@-3 {{expected custom character class members}}
+// expected-error@-3 {{cannot parse regular expression: expected custom character class members}}
 
 _ = (^/)("/")
 

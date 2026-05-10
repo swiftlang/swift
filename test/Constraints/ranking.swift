@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -verify -swift-version 5 | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -verify -swift-version 5 | %FileCheck %s
 
 protocol P {
   var p: P { get set }
@@ -32,35 +32,35 @@ func genericNoOptional<T>(_: T) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlF
 func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _ = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _: P = p.p
-  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcAaC_pcfu_ : $@convention(thin) (@in_guaranteed P) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
+  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcAaC_pcfu_ : $@convention(thin) (@in_guaranteed any P) -> @owned @callee_guaranteed (@in_guaranteed any P) -> ()
   let _: (P) -> () = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _: P? = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _: Any = p.p
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   let _: Any? = p.p
 
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxlF
   genericOverload(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOverloadyyxSglF
   genericOverload(p.q)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.q!getter
   // CHECK: function_ref @$s7ranking15genericOptionalyyxSglF
   genericOptional(p.q)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.p!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.p!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(p.p)
-  // CHECK: witness_method $@opened("{{.*}}") P, #P.q!getter
+  // CHECK: witness_method $@opened("{{.*}}", any P) Self, #P.q!getter
   // CHECK: function_ref @$s7ranking17genericNoOptionalyyxlF
   genericNoOptional(p.q)
 
@@ -68,7 +68,7 @@ func propertyVersusFunction<T : P>(_ p: P, _ t: T) {
   let _ = t.p
   // CHECK: witness_method $T, #P.p!getter
   let _: P = t.p
-  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcxcfu1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
+  // CHECK: function_ref @$s7ranking22propertyVersusFunctionyyAA1P_p_xtAaCRzlFyAaC_pcxcfu1_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed any P) -> ()
   let _: (P) -> () = t.p
   // CHECK: witness_method $T, #P.p!getter
   let _: P? = t.p
@@ -103,7 +103,7 @@ extension P {
     let _ = self.p
     // CHECK: witness_method $Self, #P.p!getter
     let _: P = self.p
-    // CHECK: function_ref @$s7ranking1PPAAE22propertyVersusFunctionyyFyAaB_pcxcfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed P) -> ()
+    // CHECK: function_ref @$s7ranking1PPAAE22propertyVersusFunctionyyFyAaB_pcxcfu_ : $@convention(thin) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @owned @callee_guaranteed (@in_guaranteed any P) -> ()
     let _: (P) -> () = self.p
     // CHECK: witness_method $Self, #P.p!getter
     let _: P? = self.p
@@ -311,7 +311,7 @@ struct S2 {
     // We currently prefer the non-variadic init due to having
     // "less effective parameters", and we don't compare the types for ranking due
     // to the difference in variadic-ness.
-    // CHECK: function_ref @$s7ranking2S2VyAcA1R_pcfC : $@convention(method) (@in R, @thin S2.Type) -> S2
+    // CHECK: function_ref @$s7ranking2S2VyAcA1R_pcfC : $@convention(method) (@in any R, @thin S2.Type) -> S2
     _ = S2(0)
   }
 }
@@ -439,4 +439,54 @@ extension SignalProtocol where Element: SignalProtocol, Error == Never {
 
 func no_ambiguity_error_vs_never<Element, Error>(_ signals: [Signal<Element, Error>]) -> Signal<Element, Error> {
   return Signal(sequence: signals).flatten() // Ok
+}
+
+// Regression test for a crash I reduced from the stdlib that wasn't covered
+// by tests
+struct HasIntInit {
+  init(_: Int) {}
+}
+
+func compare_solutions_with_bindings(x: UInt8, y: UInt8) -> HasIntInit {
+  return .init(Int(x / numericCast(y)))
+}
+
+// This should pick UnicodeScalar.init(Int) and not one of the other
+// random overloads
+
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking19unicode_scalar_init1sys7UnicodeO6ScalarV_tF : $@convention(thin) (Unicode.Scalar) -> () {
+// CHECK: function_ref @$ss7UnicodeO6ScalarVyADSgSicfC : $@convention(method) (Int, @thin Unicode.Scalar.Type) -> Optional<Unicode.Scalar>
+// CHECK: return
+
+func unicode_scalar_init(s: UnicodeScalar) {
+  if s == UnicodeScalar(0xfe0e) {}
+}
+
+//--------------------------------------------------------------------
+// For loops
+//--------------------------------------------------------------------
+
+// CHECK-LABEL: sil hidden [ossa] @$s7ranking12testForLoopsyyF : $@convention(thin) () -> ()
+func testForLoops() {
+  func foo() -> any Sequence<Int> { [0] }
+  func foo() -> some Sequence<Int> { [0] }
+  func foo() -> [Int] { [0] }
+
+  // CHECK: function_ref @$s7ranking12testForLoopsyyF3fooL1_SaySiGyF : $@convention(thin) () -> @owned Array<Int>
+  for _ in foo() {}
+}
+
+extension Collection {
+  // CHECK-LABEL: sil hidden [ossa] @$sSl7rankingE13testDropFirstyySiF
+  func testDropFirst(_ i: Int) {
+    // These should refer to the default Collection implementation of 'dropFirst'.
+    for _ in self.dropFirst(i) {}
+    // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (Int, @in τ_0_0) -> @out τ_0_0.SubSequence
+
+    // CHECK-LABEL: sil private [ossa] @$sSl7rankingE13testDropFirstyySiFyycfU_
+    _ = {
+      for _ in self.dropFirst(i) {}
+      // CHECK: function_ref @$sSlsE9dropFirsty11SubSequenceQzSiF : $@convention(method) <τ_0_0 where τ_0_0 : Collection> (Int, @in τ_0_0) -> @out τ_0_0.SubSequence
+    }
+  }
 }

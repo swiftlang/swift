@@ -23,7 +23,7 @@ vectorscalarCounts = storagescalarCounts + [3]
 // Protocol conformances
 //===----------------------------------------------------------------------===//
 
-extension SIMD${n}: AdditiveArithmetic where Scalar: FloatingPoint {}
+extension SIMD${n}: @retroactive AdditiveArithmetic where Scalar: FloatingPoint {}
 
 extension SIMD${n}: Differentiable
 where
@@ -405,9 +405,6 @@ where
   }
 }
 
-// FIXME(TF-1103): Derivative registration does not yet support
-// `@_alwaysEmitIntoClient` original functions like `SIMD.sum()`.
-/*
 extension SIMD
 where
   Self: Differentiable,
@@ -417,6 +414,7 @@ where
   TangentVector == Self
 {
   @inlinable
+  @_alwaysEmitIntoClient
   @derivative(of: sum)
   func _vjpSum() -> (
     value: Scalar, pullback: (Scalar.TangentVector) -> TangentVector
@@ -425,6 +423,7 @@ where
   }
 
   @inlinable
+  @_alwaysEmitIntoClient
   @derivative(of: sum)
   func _jvpSum() -> (
     value: Scalar, differential: (TangentVector) -> Scalar.TangentVector
@@ -432,7 +431,6 @@ where
     return (sum(), { v in Scalar.TangentVector(v.sum()) })
   }
 }
-*/
 
 extension SIMD
 where
@@ -457,3 +455,27 @@ where
     return (Self(repeating: value), { v in Self(repeating: v) })
   }
 }
+
+%for (Scalar, bits) in [('Float',32), ('Double',64)]:
+% for n in vectorscalarCounts:
+extension SIMD${n} where Scalar == ${Scalar} {
+  @inlinable
+  @_alwaysEmitIntoClient
+  @derivative(of: init(repeating:))
+  static func _vjpInit(repeating value: Scalar)
+    -> (value: Self, pullback: (TangentVector) -> Scalar.TangentVector)
+  {
+    return (Self(repeating: value), { v in v.sum() })
+  }
+
+  @inlinable
+  @_alwaysEmitIntoClient
+  @derivative(of: init(repeating:))
+  static func _jvpInit(repeating value: Scalar)
+    -> (value: Self, differential: (Scalar.TangentVector) -> TangentVector)
+  {
+    return (Self(repeating: value), { v in Self(repeating: v) })
+  }
+}
+% end
+%end

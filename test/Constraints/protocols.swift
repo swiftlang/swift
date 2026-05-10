@@ -416,8 +416,9 @@ func rdar_50512161() {
   }
 }
 
-// SR-11609: Compiler crash on missing conformance for default param
-func test_sr_11609() {
+// https://github.com/apple/swift/issues/54017
+// Compiler crash on missing conformance for default param
+do {
   func foo<T : Initable>(_ x: T = .init()) -> T { x } // expected-note {{where 'T' = 'String'}}
   let _: String = foo()
   // expected-error@-1 {{local function 'foo' requires that 'String' conform to 'Initable'}}
@@ -431,66 +432,6 @@ func rdar70814576() {
   }
 
   test(S()) // expected-error {{argument type 'S' does not conform to expected type 'Fooable'}}
-}
-
-extension Optional : Trivial {
-  typealias T = Wrapped
-}
-
-extension UnsafePointer : Trivial {
-  typealias T = Int
-}
-
-extension AnyHashable : Trivial {
-  typealias T = Int
-}
-
-extension UnsafeRawPointer : Trivial {
-  typealias T = Int
-}
-
-extension UnsafeMutableRawPointer : Trivial {
-  typealias T = Int
-}
-
-func test_inference_through_implicit_conversion() {
-  struct C : Hashable {}
-
-  func test<T: Trivial>(_: T) -> T {}
-
-  var arr: [C] = []
-  let ptr: UnsafeMutablePointer<C> = UnsafeMutablePointer(bitPattern: 0)!
-  let rawPtr: UnsafeMutableRawPointer = UnsafeMutableRawPointer(bitPattern: 0)!
-
-  let _: C? = test(C()) // Ok -> argument is implicitly promoted into an optional
-  let _: UnsafePointer<C> = test([C()]) // Ok - argument is implicitly converted to a pointer
-  let _: UnsafeRawPointer = test([C()]) // Ok - argument is implicitly converted to a raw pointer
-  let _: UnsafeMutableRawPointer = test(&arr) // Ok - inout Array<T> -> UnsafeMutableRawPointer
-  let _: UnsafePointer<C> = test(ptr) // Ok - UnsafeMutablePointer<T> -> UnsafePointer<T>
-  let _: UnsafeRawPointer = test(ptr) // Ok - UnsafeMutablePointer<T> -> UnsafeRawPointer
-  let _: UnsafeRawPointer = test(rawPtr) // Ok - UnsafeMutableRawPointer -> UnsafeRawPointer
-  let _: UnsafeMutableRawPointer = test(ptr) // Ok - UnsafeMutablePointer<T> -> UnsafeMutableRawPointer
-  let _: AnyHashable = test(C()) // Ok - argument is implicitly converted to `AnyHashable` because it's Hashable
-}
-
-// Make sure that conformances transitively checked through implicit conversions work with conditional requirements
-protocol TestCond {}
-
-extension Optional : TestCond where Wrapped == Int? {}
-
-func simple<T : TestCond>(_ x: T) -> T { x }
-
-func overloaded<T: TestCond>(_ x: T) -> T { x }
-func overloaded<T: TestCond>(_ x: String) -> T { fatalError() }
-
-func overloaded_result() -> Int { 42 }
-func overloaded_result() -> String { "" }
-
-func test_arg_conformance_with_conditional_reqs(i: Int) {
-  let _: Int?? = simple(i)
-  let _: Int?? = overloaded(i)
-  let _: Int?? = simple(overloaded_result())
-  let _: Int?? = overloaded(overloaded_result())
 }
 
 // rdar://77570994 - regression in type unification for literal collections
@@ -520,14 +461,96 @@ case test(cond: Bool, v: Int64)
   }
 }
 
-// SR-15970
-protocol SR15970_P {}
-struct SR15970_S {}
+// https://github.com/apple/swift/issues/58231
 
-func SR15970_F(x: Int) -> SR15970_P {
-  return SR15970_S() // expected-error{{return expression of type 'SR15970_S' does not conform to 'SR15970_P'}}
+protocol P_58231 {}
+struct S_58231 {}
+
+func f1_58231(x: Int) -> P_58231 {
+  return S_58231() // expected-error{{return expression of type 'S_58231' does not conform to 'P_58231'}}
 }
 
-func SR15970_F1(x: Int) -> SR15970_P? {
-  return SR15970_S() // expected-error{{return expression of type 'SR15970_S' does not conform to 'SR15970_P'}}
+func f2_58231(x: Int) -> P_58231? {
+  return S_58231() // expected-error{{return expression of type 'S_58231' does not conform to 'P_58231'}}
+}
+
+// https://github.com/apple/swift/issues/61517
+
+protocol P_61517 {
+  init()
+  init(_: Bool)
+}
+
+_ = P_61517() // expected-error{{type 'any P_61517' cannot be instantiated}}
+_ = P_61517(false) // expected-error{{type 'any P_61517' cannot be instantiated}}
+
+_ = P_61517.init() // expected-error{{type 'any P_61517' cannot be instantiated}}
+_ = P_61517.init(false) // expected-error{{type 'any P_61517' cannot be instantiated}}
+
+@_marker
+protocol Marker {}
+
+do {
+  class C : Fooable, Error {
+    func foo() {}
+  }
+
+  struct Other {}
+
+  func overloaded() -> C & Marker {
+    fatalError()
+  }
+
+  func overloaded() -> Other {
+    fatalError()
+  }
+
+  func isFooable<T: Fooable>(_: T) {}
+
+  isFooable(overloaded()) // Ok
+
+  func isError<T: Error>(_: T) {}
+
+  isError(overloaded()) // Ok
+
+  func isFooableError<T: Fooable & Error>(_: T) {}
+
+  isFooableError(overloaded()) // Ok
+}
+
+do {
+  func takesFooables(_: [any Fooable]) {}
+
+  func test(v: String) {
+    takesFooables([v]) // expected-error {{cannot convert value of type 'String' to expected element type 'any Fooable'}}
+  }
+}
+
+// FIXME: These should all produce correct diagnostics
+do {
+  protocol P {}
+
+  func f1() -> () -> any P {
+    let x: () -> Any = { return 0 }
+    return x
+    // expected-error@-1 {{cannot convert return expression of type '() -> Any' to return type '() -> any P'}}
+  }
+
+  func f2() -> (any P)? {
+    let x: Any? = nil
+    return x
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
+  }
+
+  func f3() -> [any P] {
+    let x: [Any] = []
+    return x
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
+  }
+
+  func f4() -> [Int: any P] {
+    let x: [Int: Any] = [:]
+    return x
+    // expected-error@-1 {{failed to produce diagnostic for expression}}
+  }
 }

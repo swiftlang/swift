@@ -1,54 +1,65 @@
 
 add_swift_host_library(swiftIDE STATIC
   AfterPoundExprCompletion.cpp
+  APIDigesterData.cpp
   ArgumentCompletion.cpp
   CodeCompletion.cpp
   CodeCompletionCache.cpp
   CodeCompletionContext.cpp
-  CodeCompletionConsumer.cpp
   CodeCompletionDiagnostics.cpp
+  CodeCompletionResult.cpp
   CodeCompletionResultBuilder.cpp
   CodeCompletionResultPrinter.cpp
-  CodeCompletionResult.cpp
   CodeCompletionResultType.cpp
   CodeCompletionString.cpp
+  CodeCompletionStringBuilder.cpp
   CodeCompletionStringPrinter.cpp
   CommentConversion.cpp
-  CompileInstance.cpp
-  CompletionInstance.cpp
   CompletionLookup.cpp
   CompletionOverrideLookup.cpp
   ConformingMethodList.cpp
-  DependencyChecking.cpp
-  DotExprCompletion.cpp
+  SignatureHelp.cpp
+  SignatureHelpFormatter.cpp
+  CursorInfo.cpp
   ExprCompletion.cpp
-  ExprContextAnalysis.cpp
   Formatting.cpp
   FuzzyStringMatcher.cpp
-  Refactoring.cpp
+  IDEBridging.cpp
+  IDERequests.cpp
+  IDETypeChecking.cpp
+  ImportDepth.cpp
   KeyPathCompletion.cpp
   ModuleInterfacePrinting.cpp
+  PostfixCompletion.cpp
   REPLCodeCompletion.cpp
+  SelectedOverloadInfo.cpp
+  SourceEntityWalker.cpp
   SwiftSourceDocInfo.cpp
   SyntaxModel.cpp
   TypeCheckCompletionCallback.cpp
+  TypeContextInfo.cpp
   UnresolvedMemberCompletion.cpp
   Utils.cpp
-  IDETypeChecking.cpp
-  ImportDepth.cpp
-  APIDigesterData.cpp
-  SourceEntityWalker.cpp
-  TypeContextInfo.cpp
-  IDERequests.cpp
   )
 target_link_libraries(swiftIDE PRIVATE
   swiftAST
   swiftClangImporter
   swiftDriver
-  swiftFrontend
-  swiftFrontendTool
-  swiftIndex
   swiftParse
   swiftSema)
+
+# Clang dependencies. These are private because IDE's public
+# interface does not use Clang symbols.
+target_link_libraries(swiftIDE PRIVATE
+  clangAST
+  clangBasic
+  clangIndex
+  clangLex)
+
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftIDE PRIVATE
+    swiftIDEUtilsBridging
+  )
+endif()
 
 set_swift_llvm_is_available(swiftIDE)

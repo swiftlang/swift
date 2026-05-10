@@ -149,9 +149,10 @@ func testDefer() {
   }
 }
 
+// https://github.com/apple/swift/issues/55404
 func testPropertyWrapper() {
   @propertyWrapper
-  public struct SR12958 {
+  public struct Wrapper {
     public var wrappedValue: String
     init(_ wrappedValue: String) {
       self.wrappedValue = wrappedValue
@@ -159,7 +160,7 @@ func testPropertyWrapper() {
   }
 
   public struct MyStruct {
-    @SR12958("something")
+    @Wrapper("something")
     public static var somevar: String
     public static var someothervar: Int
   }
@@ -204,7 +205,7 @@ func testPropertyWrapper() {
 // RUN: %target-swift-ide-test -range -pos=133:1 -end-pos=135:65 -source-filename %s | %FileCheck %s -check-prefix=CHECK-NO-PATTERN
 // RUN: %target-swift-ide-test -range -pos=142:12 -end-pos=142:17 -source-filename %s | %FileCheck %s -check-prefix=CHECK-X-Y
 // RUN: %target-swift-ide-test -range -pos=147:1 -end-pos=150:1 -source-filename %s | %FileCheck %s -check-prefix=CHECK-INVALID
-// RUN: %target-swift-ide-test -range -pos=162:5 -end-pos=163:38 -source-filename %s | %FileCheck %s -check-prefix=CHECK-PROPERTY-WRAPPER
+// RUN: %target-swift-ide-test -range -pos=163:5 -end-pos=164:38 -source-filename %s | %FileCheck %s -check-prefix=CHECK-PROPERTY-WRAPPER
 
 
 // CHECK-NO-PATTERN: <Kind>MultiStatement</Kind>
@@ -370,7 +371,7 @@ func testPropertyWrapper() {
 // CHECK13-NEXT:     b = b.bigEndian.bigEndian.byteSwapped
 // CHECK13-NEXT:     print(b + c)</Content>
 // CHECK13-NEXT: <Type>Void</Type>
-// CHECK13-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0</Context>
+// CHECK13-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK13-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK13-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK13-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -395,7 +396,7 @@ func testPropertyWrapper() {
 // CHECK14-NEXT:       return 1
 // CHECK14-NEXT:     }()</Content>
 // CHECK14-NEXT: <Type>Int</Type>
-// CHECK14-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0</Context>
+// CHECK14-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK14-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK14-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK14-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -417,7 +418,7 @@ func testPropertyWrapper() {
 // CHECK15-NEXT:       let c = a.byteSwapped
 // CHECK15-NEXT:       b = b.bigEndian.bigEndian.byteSwapped</Content>
 // CHECK15-NEXT: <Type>Void</Type>
-// CHECK15-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK15-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}.explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK15-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK15-NEXT: <Declared>b</Declared><OutscopeReference>true</OutscopeReference>
 // CHECK15-NEXT: <Declared>c</Declared><OutscopeReference>true</OutscopeReference>
@@ -434,7 +435,7 @@ func testPropertyWrapper() {
 // CHECK16-NEXT:       print(b + c)
 // CHECK16-NEXT:       return 1</Content>
 // CHECK16-NEXT: <Type>Int</Type>
-// CHECK16-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK16-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}.explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK16-NEXT: <Declared>a</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK16-NEXT: <Declared>b</Declared><OutscopeReference>false</OutscopeReference>
 // CHECK16-NEXT: <Declared>c</Declared><OutscopeReference>false</OutscopeReference>
@@ -447,7 +448,7 @@ func testPropertyWrapper() {
 // CHECK17: <Kind>SingleExpression</Kind>
 // CHECK17-NEXT: <Content>print(b + c)</Content>
 // CHECK17-NEXT: <Type>()</Type>
-// CHECK17-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator=0.explicit closure discriminator=0</Context>
+// CHECK17-NEXT: <Context>swift_ide_test.(file).foo6().explicit closure discriminator={{[0-9]+}}.explicit closure discriminator={{[0-9]+}}</Context>
 // CHECK17-NEXT: <Referenced>b</Referenced><Type>Int</Type>
 // CHECK17-NEXT: <Referenced>c</Referenced><Type>Int</Type>
 // CHECK17-NEXT: <ASTNodes>1</ASTNodes>
@@ -496,7 +497,7 @@ func testPropertyWrapper() {
 // CHECK27-NEXT:     foo9(1, 2)</Content>
 // CHECK27-NEXT: <Type>Void</Type>
 // CHECK27-NEXT: <Context>swift_ide_test.(file).foo9(_:_:)</Context>
-// CHECK27-NEXT: <Referenced>foo9</Referenced><Type>(Int, Int) -> Int</Type>
+// CHECK27-NEXT: <Referenced>foo9</Referenced><Type>(_ a: Int, _ b: Int) -> Int</Type>
 // CHECK27-NEXT: <ASTNodes>2</ASTNodes>
 // CHECK27-NEXT: <end>
 
@@ -504,7 +505,7 @@ func testPropertyWrapper() {
 // CHECK-X-Y: <Referenced>y</Referenced><Type>Int</Type>
 
 // CHECK-PROPERTY-WRAPPER: <Kind>SingleDecl</Kind>
-// CHECK-PROPERTY-WRAPPER-NEXT: <Content>@SR12958("something")
+// CHECK-PROPERTY-WRAPPER-NEXT: <Content>@Wrapper("something")
 // CHECK-PROPERTY-WRAPPER-NEXT:     public static var somevar: String</Content>
 // CHECK-PROPERTY-WRAPPER-NEXT: <Context>swift_ide_test.(file).testPropertyWrapper().MyStruct</Context>
 // CHECK-PROPERTY-WRAPPER-NEXT: <Declared>somevar</Declared><OutscopeReference>false</OutscopeReference>

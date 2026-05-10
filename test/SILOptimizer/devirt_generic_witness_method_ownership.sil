@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -devirtualizer | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -devirtualizer | %FileCheck %s
 
 sil_stage canonical
 
@@ -29,7 +29,7 @@ bb0(%0 : $*Item, %1 : @owned $Dictionary<String, Any>, %2 : $@thick Item.Type):
   return %6 : $()
 }
 
-// Check that it is possible to devirtualize a partial_appy of a generic witness_method.
+// Check that it is possible to devirtualize a partial_apply of a generic witness_method.
 // Since it is a derived class that invokes an implementation from a base class,
 // make sure that the resulting closure is properly converted into a required type.
 

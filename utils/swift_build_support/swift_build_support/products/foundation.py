@@ -14,7 +14,6 @@ from . import cmark
 from . import curl
 from . import libcxx
 from . import libdispatch
-from . import libicu
 from . import libxml2
 from . import llvm
 from . import product
@@ -52,7 +51,6 @@ class Foundation(product.Product):
         return [cmark.CMark,
                 llvm.LLVM,
                 libcxx.LibCXX,
-                libicu.LibICU,
                 swift.Swift,
                 libdispatch.LibDispatch,
                 libxml2.LibXML2,

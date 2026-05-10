@@ -18,6 +18,7 @@
 ///
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -46,7 +47,7 @@ static void dumpInstruction(SILInstruction &ii) {
   if (!results.empty()) {
     llvm::outs() << "Results Ownership Kinds:\n";
     for (auto v : results) {
-      auto kind = v.getOwnershipKind();
+      auto kind = v->getOwnershipKind();
       llvm::outs() << "Result: " << v;
       llvm::outs() << "Kind: " << kind << "\n";
     }

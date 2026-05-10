@@ -1,13 +1,13 @@
-
-// RUN: echo %s > %t.filelist.txt
-// RUN: not --crash %target-swift-frontend -interpret -filelist %t.filelist.txt 2>&1 | %FileCheck %s
+// RUN: %empty-directory(%t)
+// RUN: echo %s > %t/filelist.txt
+// RUN: not --crash %target-swift-frontend -interpret -filelist %t/filelist.txt 2>&1 >%t/output.txt
+// %FileCheck %s < %t/output.txt
 
 // REQUIRES: executable_test
 
 // UNSUPPORTED: OS=ios
 // UNSUPPORTED: OS=tvos
 // UNSUPPORTED: OS=watchos
-// UNSUPPORTED: MSVC_VER=15.0
 
 // CHECK: Stack dump:
 // CHECK-NEXT: Program arguments:

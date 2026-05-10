@@ -4,7 +4,8 @@
 class WithStaticMember {
 public:
   static int staticMember;
-  static int *getStaticMemberAddress();
+  static int *getStaticMemberAddress()
+      __attribute__((swift_attr("import_unsafe")));
   static int getStaticMemberFromCxx();
   static void setStaticMemberFromCxx(int);
 };
@@ -15,7 +16,8 @@ public:
   static WithIncompleteStaticMember selfMember;
   int id = 3;
 
-  static WithIncompleteStaticMember *getStaticMemberFromCxx();
+  static WithIncompleteStaticMember *getStaticMemberFromCxx()
+      __attribute__((swift_attr("import_unsafe")));
   static void setStaticMemberFromCxx(WithIncompleteStaticMember);
 };
 

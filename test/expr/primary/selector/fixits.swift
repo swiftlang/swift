@@ -14,22 +14,6 @@
 // Make sure we get the right diagnostics.
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %s -verify
 
-// Copy the source, apply the Fix-Its, and compile it again, making
-// sure that we've cleaned up all of the deprecation warnings.
-// RUN: %empty-directory(%t.sources)
-// RUN: %empty-directory(%t.remapping)
-// RUN: cp %s %t.sources/fixits.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift -fixit-all -emit-fixits-path %t.remapping/fixits.remap
-// RUN: %{python} %utils/apply-fixit-edits.py %t.remapping
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t.overlays) -typecheck %t.sources/fixits.swift 2> %t.result
-
-// RUN: %FileCheck %s < %t.result
-// RUN: grep -c "warning:" %t.result | grep 3
-
-// CHECK: warning: no method declared with Objective-C selector 'unknownMethodWithValue:label:'
-// CHECK: warning: string literal is not a valid Objective-C selector
-// CHECK: warning: string literal is not a valid Objective-C selector
-
 import Foundation
 import Helper
 
@@ -82,4 +66,130 @@ func testSelectorConstruction() {
 
   // Note: from Foundation
   _ = Selector("initWithArray:") // expected-warning{{use '#selector' instead of explicitly constructing a 'Selector'}}{{7-33=#selector(NSSet.init(array:))}}
+}
+
+@objc class Selectors: NSObject {
+  func takeSel(_: Selector) {}
+  @objc func mySel() {}
+  func test() {
+    takeSel("mySel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{13-20=#selector(self.mySel)}}
+    takeSel(Selector("mySel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{13-30=#selector(self.mySel)}}
+  }
+}
+
+@objc class OtherClass: NSObject {
+  func test(s: Selectors) {
+    s.takeSel("mySel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{15-22=#selector(Selectors.mySel)}}
+    s.takeSel(Selector("mySel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{15-32=#selector(Selectors.mySel)}}
+  }
+}
+
+@objc class Base: NSObject {
+  @objc func baseSel() {}
+}
+
+@objc class Outer: NSObject {
+  func takeSel(_: Selector) {}
+  @objc func outerSel() {}
+
+  @objc class Inner: Base {
+    func takeSel(_: Selector) {}
+
+    @objc func innerSel() {}
+
+    func test(s: Selectors, o: Outer) {
+      s.takeSel("mySel")
+      // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{17-24=#selector(Selectors.mySel)}}
+      s.takeSel(Selector("mySel"))
+      // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{17-34=#selector(Selectors.mySel)}}
+
+      takeSel("innerSel")
+      // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{15-25=#selector(self.innerSel)}}
+      takeSel(Selector("innerSel"))
+      // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{15-35=#selector(self.innerSel)}}
+
+      takeSel("baseSel")
+      // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{15-24=#selector(self.baseSel)}}
+      takeSel(Selector("baseSel"))
+      // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{15-34=#selector(self.baseSel)}}
+
+      o.takeSel("outerSel")
+      // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{17-27=#selector(Outer.outerSel)}}
+      o.takeSel(Selector("outerSel"))
+      // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{17-37=#selector(Outer.outerSel)}}
+    }
+  }
+
+  func test(s: Selectors, i: Inner) {
+    s.takeSel("mySel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{15-22=#selector(Selectors.mySel)}}
+    s.takeSel(Selector("mySel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{15-32=#selector(Selectors.mySel)}}
+
+    i.takeSel("innerSel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{15-25=#selector(Inner.innerSel)}}
+    i.takeSel(Selector("innerSel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{15-35=#selector(Inner.innerSel)}}
+
+    i.takeSel("baseSel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{15-24=#selector(Base.baseSel)}}
+    i.takeSel(Selector("baseSel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{15-34=#selector(Base.baseSel)}}
+
+    takeSel("outerSel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{13-23=#selector(self.outerSel)}}
+    takeSel(Selector("outerSel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{13-33=#selector(self.outerSel)}}
+  }
+}
+
+extension Outer {
+  func test2(s: Selectors, i: Inner) {
+    s.takeSel("mySel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{15-22=#selector(Selectors.mySel)}}
+    s.takeSel(Selector("mySel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{15-32=#selector(Selectors.mySel)}}
+
+    i.takeSel("innerSel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{15-25=#selector(Inner.innerSel)}}
+    i.takeSel(Selector("innerSel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{15-35=#selector(Inner.innerSel)}}
+
+    i.takeSel("baseSel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{15-24=#selector(Base.baseSel)}}
+    i.takeSel(Selector("baseSel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{15-34=#selector(Base.baseSel)}}
+
+    takeSel("outerSel")
+    // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{13-23=#selector(self.outerSel)}}
+    takeSel(Selector("outerSel"))
+    // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{13-33=#selector(self.outerSel)}}
+  }
+}
+
+func freeTest(s: Selectors, o: Outer, i: Outer.Inner) {
+  s.takeSel("mySel")
+  // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{13-20=#selector(Selectors.mySel)}}
+  s.takeSel(Selector("mySel"))
+  // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{13-30=#selector(Selectors.mySel)}}
+
+  // FIXME: Fix-it should be 'Outer.Inner.innerSel'.
+  i.takeSel("innerSel")
+  // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{13-23=#selector(Inner.innerSel)}}
+  i.takeSel(Selector("innerSel"))
+  // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{13-33=#selector(Inner.innerSel)}}
+
+  i.takeSel("baseSel")
+  // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{13-22=#selector(Base.baseSel)}}
+  i.takeSel(Selector("baseSel"))
+  // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{13-32=#selector(Base.baseSel)}}
+
+  o.takeSel("outerSel")
+  // expected-warning@-1 {{use of string literal for Objective-C selectors is deprecated; use '#selector' instead}}{{13-23=#selector(Outer.outerSel)}}
+  o.takeSel(Selector("outerSel"))
+  // expected-warning@-1 {{use '#selector' instead of explicitly constructing a 'Selector'}}{{13-33=#selector(Outer.outerSel)}}
 }

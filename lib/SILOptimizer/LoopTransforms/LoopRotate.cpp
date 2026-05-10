@@ -12,11 +12,13 @@
 
 #define DEBUG_TYPE "sil-looprotate"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -24,6 +26,7 @@
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/LoopUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
 
@@ -41,6 +44,13 @@ static llvm::cl::opt<int> LoopRotateSizeLimit("looprotate-size-limit",
                                               llvm::cl::init(20));
 static llvm::cl::opt<bool> RotateSingleBlockLoop("looprotate-single-block-loop",
                                                  llvm::cl::init(false));
+static llvm::cl::opt<bool>
+    LoopRotateInfiniteBudget("looprotate-infinite-budget",
+                             llvm::cl::init(false));
+
+static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
+                       SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
+                       SILBasicBlock *upToBB, SILPassManager *pm);
 
 /// Check whether all operands are loop invariant.
 static bool
@@ -65,12 +75,40 @@ hasLoopInvariantOperands(SILInstruction *inst, SILLoop *loop,
 static bool
 canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
                               SILBasicBlock *bb,
-                              SmallVectorImpl<SILInstruction *> &moves) {
+                              SmallVectorImpl<SILInstruction *> &moves,
+                              SinkAddressProjections &sinkProj) {
   llvm::DenseSet<SILInstruction *> invariants;
   int cost = 0;
   for (auto &instRef : *bb) {
-    OwnershipForwardingMixin *ofm = nullptr;
     auto *inst = &instRef;
+    if (!inst->isTriviallyDuplicatable()) {
+      return false;
+    }
+    // It wouldn't make sense to rotate dealloc_stack without also rotating the
+    // alloc_stack, which is covered by isTriviallyDuplicatable.
+    if (isa<DeallocStackInst>(inst)) {
+      return false;
+    }
+    if (isa<FunctionRefInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (isa<DynamicFunctionRefInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (isa<PreviousDynamicFunctionRefInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (isa<IntegerLiteralInst>(inst)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
     if (auto *MI = dyn_cast<MethodInst>(inst)) {
       if (MI->getMember().isForeign)
         return false;
@@ -78,39 +116,25 @@ canDuplicateOrMoveToPreheader(SILLoop *loop, SILBasicBlock *preheader,
         continue;
       moves.push_back(inst);
       invariants.insert(inst);
-    } else if (!inst->isTriviallyDuplicatable())
-      return false;
-    // It wouldn't make sense to rotate dealloc_stack without also rotating the
-    // alloc_stack, which is covered by isTriviallyDuplicatable.
-    else if (isa<DeallocStackInst>(inst))
-      return false;
-    else if (isa<FunctionRefInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if (isa<DynamicFunctionRefInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if (isa<PreviousDynamicFunctionRefInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if (isa<IntegerLiteralInst>(inst)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else if ((ofm = OwnershipForwardingMixin::get(inst)) &&
-               ofm->getForwardingOwnershipKind() == OwnershipKind::Guaranteed) {
-      return false;
-    } else if (!inst->mayHaveSideEffects() && !inst->mayReadFromMemory()
-               && !isa<TermInst>(inst) && !isa<AllocationInst>(inst)
-               && /* not marked mayhavesideffects */
-               hasLoopInvariantOperands(inst, loop, invariants)) {
-      moves.push_back(inst);
-      invariants.insert(inst);
-    } else {
-      cost += (int)instructionInlineCost(instRef);
+      continue;
     }
+    if (!inst->mayHaveSideEffects() && !inst->mayReadFromMemory() &&
+        !isa<TermInst>(inst) &&
+        !isa<AllocationInst>(inst) && /* not marked mayhavesideeffects */
+        !hasOwnershipOperandsOrResults(inst) &&
+        hasLoopInvariantOperands(inst, loop, invariants)) {
+      moves.push_back(inst);
+      invariants.insert(inst);
+      continue;
+    }
+    if (!sinkProj.analyzeAddressProjections(inst)) {
+      return false;
+    }
+
+    cost += (int)instructionInlineCost(instRef);
   }
 
-  return cost < LoopRotateSizeLimit;
+  return cost < LoopRotateSizeLimit || LoopRotateInfiniteBudget;
 }
 
 static void mapOperands(SILInstruction *inst,
@@ -130,8 +154,7 @@ static void updateSSAForUseOfValue(
     SILSSAUpdater &updater, SmallVectorImpl<SILPhiArgument *> &insertedPhis,
     const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
     SILBasicBlock *Header, SILBasicBlock *EntryCheckBlock, SILValue Res,
-    SmallVectorImpl<std::pair<SILBasicBlock *, unsigned>>
-        &accumulatedAddressPhis) {
+    SILPassManager *pm) {
   // Find the mapped instruction.
   assert(valueMap.count(Res) && "Expected to find value in map!");
   SILValue MappedValue = valueMap.find(Res)->second;
@@ -139,7 +162,8 @@ static void updateSSAForUseOfValue(
   assert(Res->getType() == MappedValue->getType() && "The types must match");
 
   insertedPhis.clear();
-  updater.initialize(Res->getType(), Res.getOwnershipKind());
+  updater.initialize(MappedValue->getFunction(), Res->getType(),
+                     Res->getOwnershipKind());
   updater.addAvailableValue(Header, Res);
   updater.addAvailableValue(EntryCheckBlock, MappedValue);
 
@@ -161,46 +185,30 @@ static void updateSSAForUseOfValue(
     if (user->getParent() == Header)
       continue;
 
-    assert(user->getParent() != EntryCheckBlock
-           && "The entry check block should dominate the header");
+    assert(user->getParent() != EntryCheckBlock &&
+           "The entry check block should dominate the header");
     updater.rewriteUse(*use);
   }
 
-  // Canonicalize inserted phis to avoid extra BB Args and if we find an address
-  // phi, stash it so we can handle it after we are done rewriting.
-  bool hasOwnership = Header->getParent()->hasOwnership();
-  for (SILPhiArgument *arg : insertedPhis) {
-    if (SILValue inst = replaceBBArgWithCast(arg)) {
-      arg->replaceAllUsesWith(inst);
-      // DCE+SimplifyCFG runs as a post-pass cleanup.
-      // DCE replaces dead arg values with undef.
-      // SimplifyCFG deletes the dead BB arg.
-      continue;
-    }
-
-    // If we didn't simplify and have an address phi, stash the value so we can
-    // fix it up.
-    if (hasOwnership && arg->getType().isAddress())
-      accumulatedAddressPhis.emplace_back(arg->getParent(), arg->getIndex());
-  }
+  replacePhisWithIncomingValues(pm, insertedPhis);
 }
 
-static void updateSSAForUseOfInst(
-    SILSSAUpdater &updater, SmallVectorImpl<SILPhiArgument *> &insertedPhis,
-    const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
-    SILBasicBlock *header, SILBasicBlock *entryCheckBlock, SILInstruction *inst,
-    SmallVectorImpl<std::pair<SILBasicBlock *, unsigned>>
-        &accumulatedAddressPhis) {
+static void
+updateSSAForUseOfInst(SILSSAUpdater &updater,
+                      SmallVectorImpl<SILPhiArgument *> &insertedPhis,
+                      const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
+                      SILBasicBlock *header, SILBasicBlock *entryCheckBlock,
+                      SILInstruction *inst, SILPassManager *pm) {
   for (auto result : inst->getResults())
     updateSSAForUseOfValue(updater, insertedPhis, valueMap, header,
-                           entryCheckBlock, result, accumulatedAddressPhis);
+                           entryCheckBlock, result, pm);
 }
 
 /// Rewrite the code we just created in the preheader and update SSA form.
 static void rewriteNewLoopEntryCheckBlock(
     SILBasicBlock *header, SILBasicBlock *entryCheckBlock,
-    const llvm::DenseMap<ValueBase *, SILValue> &valueMap) {
-  SmallVector<std::pair<SILBasicBlock *, unsigned>, 8> accumulatedAddressPhis;
+    const llvm::DenseMap<ValueBase *, SILValue> &valueMap,
+    SILPassManager *pm) {
   SmallVector<SILPhiArgument *, 8> insertedPhis;
   SILSSAUpdater updater(&insertedPhis);
 
@@ -209,7 +217,7 @@ static void rewriteNewLoopEntryCheckBlock(
   for (unsigned i : range(header->getNumArguments())) {
     auto *arg = header->getArguments()[i];
     updateSSAForUseOfValue(updater, insertedPhis, valueMap, header,
-                           entryCheckBlock, arg, accumulatedAddressPhis);
+                           entryCheckBlock, arg, pm);
   }
 
   auto instIter = header->begin();
@@ -218,42 +226,8 @@ static void rewriteNewLoopEntryCheckBlock(
   while (instIter != header->end()) {
     auto &inst = *instIter;
     updateSSAForUseOfInst(updater, insertedPhis, valueMap, header,
-                          entryCheckBlock, &inst, accumulatedAddressPhis);
+                          entryCheckBlock, &inst, pm);
     ++instIter;
-  }
-
-  // Then see if any of our phis were address phis. In such a case, rewrite the
-  // address to be a smuggled through raw pointer. We do this late to
-  // conservatively not interfere with the previous code's invariants.
-  //
-  // We also translate the phis into a BasicBlock, Index form so we are careful
-  // with invalidation issues around branches/args.
-  auto rawPointerTy =
-      SILType::getRawPointerType(header->getParent()->getASTContext());
-  auto rawPointerUndef = SILUndef::get(rawPointerTy, header->getModule());
-  auto loc = RegularLocation::getAutoGeneratedLocation();
-  while (!accumulatedAddressPhis.empty()) {
-    SILBasicBlock *block;
-    unsigned argIndex;
-    std::tie(block, argIndex) = accumulatedAddressPhis.pop_back_val();
-    auto *arg = cast<SILPhiArgument>(block->getArgument(argIndex));
-    assert(arg->getType().isAddress() && "Not an address phi?!");
-    for (auto *predBlock : block->getPredecessorBlocks()) {
-      Operand *predUse = arg->getIncomingPhiOperand(predBlock);
-      SILBuilderWithScope builder(predUse->getUser());
-      auto *newIncomingValue =
-          builder.createAddressToPointer(loc, predUse->get(), rawPointerTy);
-      predUse->set(newIncomingValue);
-    }
-    SILBuilderWithScope builder(arg->getNextInstruction());
-    SILType oldArgType = arg->getType();
-    auto *phiShim = builder.createPointerToAddress(
-        loc, rawPointerUndef, oldArgType, true /*isStrict*/,
-        false /*is invariant*/);
-    arg->replaceAllUsesWith(phiShim);
-    SILArgument *newArg = block->replacePhiArgument(
-        argIndex, rawPointerTy, OwnershipKind::None, nullptr);
-    phiShim->setOperand(newArg);
   }
 }
 
@@ -274,8 +248,7 @@ static void updateDomTree(DominanceInfo *domInfo, SILBasicBlock *preheader,
 }
 
 static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
-                                      SILLoopInfo *loopInfo,
-                                      bool ShouldVerify) {
+                                      SILLoopInfo *loopInfo, SILPassManager *pm) {
   auto *latch = loop->getLoopLatch();
   if (!latch) {
     LLVM_DEBUG(llvm::dbgs()
@@ -285,11 +258,11 @@ static bool rotateLoopAtMostUpToLatch(SILLoop *loop, DominanceInfo *domInfo,
 
   bool didRotate = rotateLoop(
       loop, domInfo, loopInfo,
-      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, ShouldVerify);
+      RotateSingleBlockLoop /* rotateSingleBlockLoops */, latch, pm);
 
   // Keep rotating at most until we hit the original latch.
   if (didRotate)
-    while (rotateLoop(loop, domInfo, loopInfo, false, latch, ShouldVerify)) {
+    while (rotateLoop(loop, domInfo, loopInfo, false, latch, pm)) {
     }
 
   return didRotate;
@@ -317,7 +290,11 @@ static bool isSingleBlockLoop(SILLoop *L) {
          && "Loop not well formed");
 
   // Check whether the back-edge block is just a split-edge.
-  return ++BackEdge->begin() == BackEdge->end();
+  for (SILInstruction &inst : make_range(BackEdge->begin(), --BackEdge->end())) {
+    if (instructionInlineCost(inst) != InlineCost::Free)
+      return false;
+  }
+  return true;
 }
 
 /// We rotated a loop if it has the following properties.
@@ -332,9 +309,9 @@ static bool isSingleBlockLoop(SILLoop *L) {
 ///
 /// Note: The code relies on the 'UpTo' basic block to stay within the rotate
 /// loop for termination.
-bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
+static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
                        SILLoopInfo *loopInfo, bool rotateSingleBlockLoops,
-                       SILBasicBlock *upToBB, bool shouldVerify) {
+                       SILBasicBlock *upToBB, SILPassManager *pm) {
   assert(loop != nullptr && domInfo != nullptr && loopInfo != nullptr
          && "Missing loop information");
 
@@ -378,8 +355,9 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // Make sure we can duplicate the header.
   SmallVector<SILInstruction *, 8> moveToPreheader;
-  if (!canDuplicateOrMoveToPreheader(loop, preheader, header,
-                                     moveToPreheader)) {
+  SinkAddressProjections sinkProj;
+  if (!canDuplicateOrMoveToPreheader(loop, preheader, header, moveToPreheader,
+                                     sinkProj)) {
     LLVM_DEBUG(llvm::dbgs()
                << *loop << " instructions in header preventing rotating\n");
     return false;
@@ -391,6 +369,21 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
     std::swap(newHeader, exit);
   assert(loop->contains(newHeader) && !loop->contains(exit)
          && "Could not find loop header and exit block");
+
+  // It does not make sense to rotate the loop if the new header is loop
+  // exiting as well.
+  if (loop->isLoopExiting(newHeader)) {
+    return false;
+  }
+
+  // Incomplete liveranges in the dead-end exit block can cause a missing adjacent
+  // phi-argument for a re-borrow if there is a borrow-scope is in the loop.
+  // But even when we have complete lifetimes, it's probably not worth rotating
+  // a loop where the header block branches to a dead-end block.
+  auto *deBlocks = pm->getAnalysis<DeadEndBlocksAnalysis>()->get(exit->getParent());
+  if (deBlocks->isDeadEnd(exit)) {
+    return false;
+  }
 
   // We don't want to rotate such that we merge two headers of separate loops
   // into one. This can be turned into an assert again once we have guaranteed
@@ -425,8 +418,22 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // The other instructions are just cloned to the preheader.
   TermInst *preheaderBranch = preheader->getTerminator();
+
+  // sink address projections to avoid address phis.
   for (auto &inst : *header) {
-    if (SILInstruction *cloned = inst.clone(preheaderBranch)) {
+    bool success = sinkProj.analyzeAddressProjections(&inst);
+    assert(success);
+    sinkProj.cloneProjections();
+  }
+
+  for (auto &inst : *header) {
+    if (auto *bfi = dyn_cast<BorrowedFromInst>(&inst)) {
+      // Don't do valueMap[bfi] = valueMap[bfi->getBorrowedValue()]
+      // The subscript operator returns a reference into the map. Due to the
+      // assignment the map might get "reallocated" from under us.
+      auto mappedValue = valueMap[bfi->getBorrowedValue()];
+      valueMap[bfi] = mappedValue;
+    } else if (SILInstruction *cloned = inst.clone(preheaderBranch)) {
       mapOperands(cloned, valueMap);
 
       // The actual operand will sort out which result idx to use.
@@ -443,7 +450,7 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
 
   // If there were any uses of instructions in the duplicated loop entry check
   // block rewrite them using the ssa updater.
-  rewriteNewLoopEntryCheckBlock(header, preheader, valueMap);
+  rewriteNewLoopEntryCheckBlock(header, preheader, valueMap, pm);
 
   loop->moveToHeader(newHeader);
 
@@ -472,12 +479,6 @@ bool swift::rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   splitCriticalEdgesFrom(preheader, domInfo, loopInfo);
   splitCriticalEdgesFrom(newHeader, domInfo, loopInfo);
 
-  if (shouldVerify) {
-    domInfo->verify();
-    loopInfo->verify();
-    latch->getParent()->verify();
-  }
-
   LLVM_DEBUG(llvm::dbgs() << "  to " << *loop);
   LLVM_DEBUG(loop->getHeader()->getParent()->dump());
   return true;
@@ -488,16 +489,16 @@ namespace {
 class LoopRotation : public SILFunctionTransform {
 
   void run() override {
-    SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
-    assert(loopAnalysis);
-    DominanceAnalysis *domAnalysis = PM->getAnalysis<DominanceAnalysis>();
-    assert(domAnalysis);
-
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT
+    // This pass results in verification failures when Swift sources are not
+    // enabled.
+    LLVM_DEBUG(llvm::dbgs() << "Loop Rotate disabled in C++-only Swift compiler\n");
+    return;
+#endif // !SWIFT_ENABLE_SWIFT_IN_SWIFT
     SILFunction *f = getFunction();
-    assert(f);
-
+    SILLoopAnalysis *loopAnalysis = PM->getAnalysis<SILLoopAnalysis>();
+    DominanceAnalysis *domAnalysis = PM->getAnalysis<DominanceAnalysis>();
     SILLoopInfo *loopInfo = loopAnalysis->get(f);
-    assert(loopInfo);
     DominanceInfo *domInfo = domAnalysis->get(f);
 
     if (loopInfo->empty()) {
@@ -505,7 +506,6 @@ class LoopRotation : public SILFunctionTransform {
       return;
     }
     LLVM_DEBUG(llvm::dbgs() << "Rotating loops in " << f->getName() << "\n");
-    bool shouldVerify = getOptions().VerifyAll;
 
     bool changed = false;
     for (auto *LoopIt : *loopInfo) {
@@ -522,11 +522,12 @@ class LoopRotation : public SILFunctionTransform {
         SILLoop *loop = worklist.pop_back_val();
         changed |= canonicalizeLoop(loop, domInfo, loopInfo);
         changed |=
-            rotateLoopAtMostUpToLatch(loop, domInfo, loopInfo, shouldVerify);
+            rotateLoopAtMostUpToLatch(loop, domInfo, loopInfo, getPassManager());
       }
     }
 
     if (changed) {
+      updateAllGuaranteedPhis(PM, f);
       // We preserve loop info and the dominator tree.
       domAnalysis->lockInvalidation();
       loopAnalysis->lockInvalidation();

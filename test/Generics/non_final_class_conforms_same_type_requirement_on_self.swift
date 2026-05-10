@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -warn-redundant-requirements
+// RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures %s 2>&1 | %FileCheck %s
 // RUN: %target-swift-frontend -typecheck -debug-generic-signatures -disable-requirement-machine-concrete-contraction %s 2>&1 | %FileCheck %s
 
@@ -14,7 +14,7 @@ public protocol Q {
 // exactly equal C; since C is not final, this means the conformance
 // is not covariant.
 public class C : P {
-// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self.A.B' is exactly equal to 'Self'; this is an error in Swift 6}}
+// expected-warning@-1 {{non-final class 'C' cannot safely conform to protocol 'P', which requires that 'Self.A.B' is exactly equal to 'Self'; this is an error in the Swift 6 language mode}}
   public typealias A = D
 }
 
@@ -42,11 +42,9 @@ public class FinalD : Q {
 
 // CHECK-LABEL: Generic signature: <T where T : C>
 public func takesBoth1<T>(_: T) where T : P, T : C {}
-// expected-warning@-1 {{redundant conformance constraint 'C' : 'P'}}
 
 // CHECK-LABEL: Generic signature: <U where U : C>
 public func takesBoth2<U>(_: U) where U : C, U : P {}
-// expected-warning@-1 {{redundant conformance constraint 'C' : 'P'}}
 
 // 'Self' can also occur inside of a concrete type or superclass requirement.
 public class G<T> {}
@@ -56,7 +54,7 @@ public protocol ConcreteExampleP {
 }
 
 public class ConcreteExampleC : ConcreteExampleP {
-// expected-warning@-1 {{non-final class 'ConcreteExampleC' cannot safely conform to protocol 'ConcreteExampleP', which requires that 'Self.A.B' is exactly equal to 'G<Self>'; this is an error in Swift 6}}
+// expected-warning@-1 {{non-final class 'ConcreteExampleC' cannot safely conform to protocol 'ConcreteExampleP', which requires that 'Self.A.B' is exactly equal to 'G<Self>'; this is an error in the Swift 6 language mode}}
   public typealias A = ConcreteExampleD
 }
 
@@ -69,7 +67,7 @@ public protocol SuperclassExampleP {
 }
 
 public class SuperclassExampleC : SuperclassExampleP {
-// expected-warning@-1 {{non-final class 'SuperclassExampleC' cannot safely conform to protocol 'SuperclassExampleP', which requires that 'Self.A.B' inherit from 'G<Self>'; this is an error in Swift 6}}
+// expected-warning@-1 {{non-final class 'SuperclassExampleC' cannot safely conform to protocol 'SuperclassExampleP', which requires that 'Self.A.B' inherit from 'G<Self>'; this is an error in the Swift 6 language mode}}
   public typealias A = SuperclassExampleD
 }
 

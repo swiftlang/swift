@@ -11,8 +11,8 @@
 # ===---------------------------------------------------------------------===#
 
 import os
-import pipes
 import platform
+import shlex
 
 from build_swift.build_swift import argparse
 from build_swift.build_swift.constants import BUILD_SCRIPT_IMPL_PATH
@@ -29,11 +29,15 @@ from swift_build_support.swift_build_support.host_specific_configuration \
     import HostSpecificConfiguration
 from swift_build_support.swift_build_support.productpipeline_list_builder \
     import ProductPipelineListBuilder
+from swift_build_support.swift_build_support.products.ninja \
+    import get_ninja_path
 from swift_build_support.swift_build_support.targets \
     import StdlibDeploymentTarget
+from swift_build_support.swift_build_support.utils import clear_log_time
 from swift_build_support.swift_build_support.utils \
     import exit_rejecting_arguments
 from swift_build_support.swift_build_support.utils import fatal_error
+from swift_build_support.swift_build_support.utils import log_time_in_scope
 
 
 class BuildScriptInvocation(object):
@@ -48,26 +52,15 @@ class BuildScriptInvocation(object):
             source_root=SWIFT_SOURCE_ROOT,
             build_root=os.path.join(SWIFT_BUILD_ROOT, args.build_subdir))
 
-        self.build_libparser_only = args.build_libparser_only
+        clear_log_time()
+
+        self.toolchain.ninja = get_ninja_path(self.toolchain,
+                                              self.args,
+                                              self.workspace)
 
     @property
     def install_all(self):
         return self.args.install_all or self.args.infer_dependencies
-
-    def build_ninja(self):
-        if not os.path.exists(self.workspace.source_dir("ninja")):
-            fatal_error(
-                "can't find source directory for ninja "
-                "(tried %s)" % (self.workspace.source_dir("ninja")))
-
-        ninja_build = products.Ninja.new_builder(
-            args=self.args,
-            toolchain=self.toolchain,
-            workspace=self.workspace,
-            host=StdlibDeploymentTarget.get_target_for_name(
-                self.args.host_target))
-        ninja_build.build()
-        self.toolchain.ninja = ninja_build.ninja_bin_path
 
     def convert_to_impl_arguments(self):
         """convert_to_impl_arguments() -> (env, args)
@@ -101,20 +94,22 @@ class BuildScriptInvocation(object):
                 args.darwin_deployment_version_tvos),
             "--darwin-deployment-version-watchos=%s" % (
                 args.darwin_deployment_version_watchos),
+            "--darwin-deployment-version-xros=%s" % (
+                args.darwin_deployment_version_xros),
             "--cmake", toolchain.cmake,
-            "--cmark-build-type", args.cmark_build_variant,
             "--llvm-build-type", args.llvm_build_variant,
             "--swift-build-type", args.swift_build_variant,
             "--swift-stdlib-build-type", args.swift_stdlib_build_variant,
             "--lldb-build-type", args.lldb_build_variant,
             "--foundation-build-type", args.foundation_build_variant,
             "--libdispatch-build-type", args.libdispatch_build_variant,
-            "--libicu-build-type", args.libicu_build_variant,
             "--xctest-build-type", args.build_variant,
             "--llbuild-build-type", args.build_variant,
             "--swift-enable-assertions", str(args.swift_assertions).lower(),
             "--swift-stdlib-enable-assertions", str(
                 args.swift_stdlib_assertions).lower(),
+            "--swift-stdlib-enable-strict-availability", str(
+                args.swift_stdlib_strict_availability).lower(),
             "--swift-analyze-code-coverage", str(
                 args.swift_analyze_code_coverage).lower(),
             "--llbuild-enable-assertions", str(
@@ -124,12 +119,21 @@ class BuildScriptInvocation(object):
             "--cmake-generator", args.cmake_generator,
             "--cross-compile-append-host-target-to-destdir", str(
                 args.cross_compile_append_host_target_to_destdir).lower(),
+            "--cross-compile-build-swift-tools", str(
+                args.cross_compile_build_swift_tools).lower(),
             "--build-jobs", str(args.build_jobs),
+            "--lit-jobs", str(args.lit_jobs),
             "--common-cmake-options=%s" % ' '.join(
-                pipes.quote(opt) for opt in cmake.common_options()),
+                shlex.quote(opt) for opt in cmake.common_options()),
             "--build-args=%s" % ' '.join(
-                pipes.quote(arg) for arg in cmake.build_args()),
+                shlex.quote(arg) for arg in cmake.build_args()),
             "--dsymutil-jobs", str(args.dsymutil_jobs),
+            '--build-swift-libexec', str(args.build_swift_libexec).lower(),
+            '--swift-enable-backtracing', str(args.swift_enable_backtracing).lower(),
+            '--build-swift-clang-overlays', str(
+                args.build_swift_clang_overlays).lower(),
+            '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
+            "--swift-source-dirname", products.Swift.product_source_name(),
         ]
 
         # Compute any product specific cmake arguments.
@@ -162,7 +166,7 @@ class BuildScriptInvocation(object):
                     args.host_target, product_name))
             cmake_opts = product.cmake_options
 
-            # FIXME: We should be using pipes.quote here but we run into issues
+            # FIXME: We should be using shlex.quote here but we run into issues
             # with build-script-impl/cmake not being happy with all of the
             # extra "'" in the strings. To fix this easily, we really need to
             # just invoke cmake from build-script directly rather than futzing
@@ -173,6 +177,11 @@ class BuildScriptInvocation(object):
                     "--{}-cmake-options={}".format(
                         product_name, ' '.join(cmake_opts))
                 ]
+
+        if args.build_toolchain_only:
+            impl_args += [
+                "--build-toolchain-only=1"
+            ]
 
         if args.build_stdlib_deployment_targets:
             impl_args += [
@@ -188,6 +197,9 @@ class BuildScriptInvocation(object):
 
         if args.test_paths:
             impl_args += ["--test-paths", " ".join(args.test_paths)]
+
+        if args.continue_on_test_failure:
+            impl_args += ["--continue-on-test-failure=1"]
 
         if toolchain.ninja:
             impl_args += ["--ninja-bin=%s" % toolchain.ninja]
@@ -237,15 +249,35 @@ class BuildScriptInvocation(object):
 
         if args.swift_disable_dead_stripping:
             args.extra_cmake_options.append('-DSWIFT_DISABLE_DEAD_STRIPPING:BOOL=TRUE')
-        if args.build_backdeployconcurrency:
+
+        if args.build_early_swiftsyntax:
+            swift_syntax_src = os.path.join(self.workspace.source_root,
+                                            "swift-syntax")
             args.extra_cmake_options.append(
-                '-DSWIFT_BACK_DEPLOY_CONCURRENCY:BOOL=TRUE')
+                '-DSWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE:PATH={}'.format(swift_syntax_src))
+            args.extra_cmake_options.append('-DSWIFT_BUILD_SWIFT_SYNTAX:BOOL=TRUE')
+            if self.args.assertions:
+                args.extra_cmake_options.append(
+                    '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
+
+        if args.build_early_swift_driver:
+            configuration = 'release' if str(args.build_variant) in [
+                'Release',
+                'RelWithDebInfo'
+            ] else 'debug'
+            directory = 'earlyswiftdriver-{}'.format(self.args.host_target)
+
+            swift_driver_build = os.path.join(self.workspace.build_root,
+                                              directory,
+                                              configuration,
+                                              'bin')
+            args.extra_cmake_options.append(
+                '-DSWIFT_EARLY_SWIFT_DRIVER_BUILD={}'.format(swift_driver_build))
 
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
         conditional_subproject_configs = [
-            (args.build_cmark, "cmark"),
             (args.build_llvm, "llvm"),
             (args.build_swift, "swift"),
             (args.build_foundation, "foundation"),
@@ -254,10 +286,9 @@ class BuildScriptInvocation(object):
             (args.build_llbuild, "llbuild"),
             (args.build_libcxx, "libcxx"),
             (args.build_libdispatch, "libdispatch"),
-            (args.build_libicu, "libicu"),
             (args.build_libxml2, 'libxml2'),
             (args.build_zlib, 'zlib'),
-            (args.build_curl, 'curl')
+            (args.build_curl, 'curl'),
         ]
         for (should_build, string_name) in conditional_subproject_configs:
             if not should_build and not self.args.infer_dependencies:
@@ -285,13 +316,11 @@ class BuildScriptInvocation(object):
             impl_args += ["--skip-test-swift"]
         if not args.test:
             impl_args += [
-                "--skip-test-cmark",
                 "--skip-test-lldb",
                 "--skip-test-llbuild",
                 "--skip-test-xctest",
                 "--skip-test-foundation",
                 "--skip-test-libdispatch",
-                "--skip-test-libicu",
             ]
         if args.build_runtime_with_host_compiler:
             impl_args += ["--build-runtime-with-host-compiler"]
@@ -307,8 +336,6 @@ class BuildScriptInvocation(object):
             impl_args += ["--only-executable-test"]
         if not args.benchmark:
             impl_args += ["--skip-test-benchmarks"]
-        if args.build_libparser_only:
-            impl_args += ["--build-libparser-only"]
         if args.android:
             impl_args += [
                 "--android-arch", args.android_arch,
@@ -372,12 +399,19 @@ class BuildScriptInvocation(object):
         if args.maccatalyst_ios_tests:
             impl_args += ["--darwin-test-maccatalyst-ios-like=1"]
 
+        # Provide a fixed backtracer path, if required
+        if args.swift_runtime_fixed_backtracer_path is not None:
+            impl_args += [
+                '--swift-runtime-fixed-backtracer-path=%s' %
+                args.swift_runtime_fixed_backtracer_path
+            ]
+
         # If we have extra_cmake_options, combine all of them together and then
         # add them as one command.
         if args.extra_cmake_options:
             impl_args += [
                 "--extra-cmake-options=%s" % ' '.join(
-                    pipes.quote(opt) for opt in args.extra_cmake_options)
+                    shlex.quote(opt) for opt in args.extra_cmake_options)
             ]
 
         if args.lto_type is not None:
@@ -425,21 +459,21 @@ class BuildScriptInvocation(object):
                 os.path.abspath(args.coverage_db)
             ]
 
+        # '--install-swiftsyntax' is a legacy form of 'swift-syntax-lib'
+        # install component.
+        if (args.install_swiftsyntax and
+                '--install-swift' not in args.build_script_impl_args):
+            impl_args += [
+                "--install-swift",
+                "--swift-install-components=swift-syntax-lib"
+            ]
+
         if args.llvm_install_components:
             impl_args += [
                 "--llvm-install-components=%s" % args.llvm_install_components
             ]
 
-        # On non-Darwin platforms, build lld so we can always have a
-        # linker that is compatible with the swift we are using to
-        # compile the stdlib.
-        #
-        # This makes it easier to build target stdlibs on systems that
-        # have old toolchains without more modern linker features.
-        #
-        # On Darwin, only build lld if explicitly requested using --build-lld.
-        should_build_lld = (platform.system() != 'Darwin' or args.build_lld)
-        if not should_build_lld:
+        if not args.build_lld:
             impl_args += [
                 "--skip-build-lld"
             ]
@@ -481,6 +515,30 @@ class BuildScriptInvocation(object):
                 ' '.join(args.darwin_symroot_path_filters)
             ]
 
+        if args.extra_dsymutil_args:
+            impl_args += [
+                "--extra-dsymutil-args=%s" % ' '.join(
+                    shlex.quote(opt) for opt in args.extra_dsymutil_args)
+            ]
+
+        if args.musl_path:
+            impl_args += [
+                "--musl-path=%s" % (args.musl_path, )
+            ]
+        if args.linux_static_archs:
+            impl_args += [
+                "--linux-static-archs=%s" % ';'.join(args.linux_static_archs)
+            ]
+        if args.linux_archs:
+            impl_args += [
+                "--linux-archs=%s" % ';'.join(args.linux_archs)
+            ]
+
+        if not args.build_linux:
+            impl_args += ["--skip-build-linux"]
+        if args.build_linux_static:
+            impl_args += ["--build-linux-static"]
+
         # Compute the set of host-specific variables, which we pass through to
         # the build script via environment variables.
         host_specific_variables = self.compute_host_specific_variables()
@@ -491,6 +549,11 @@ class BuildScriptInvocation(object):
                 # from the `build-script-impl`.
                 impl_env["HOST_VARIABLE_{}__{}".format(
                     host_target.replace("-", "_"), name)] = value
+
+        if args.verbose_build:
+            # This ensures all CMake builds (including the ones
+            # called with `ExternalProject`) have verbose output
+            impl_env["VERBOSE"] = "1"
 
         return (impl_env, impl_args)
 
@@ -518,6 +581,8 @@ class BuildScriptInvocation(object):
                     config.sdks_to_configure)),
                 "SWIFT_STDLIB_TARGETS": " ".join(
                     config.swift_stdlib_build_targets),
+                "SWIFT_LIBEXEC_TARGETS": " ".join(
+                    config.swift_libexec_build_targets),
                 "SWIFT_BENCHMARK_TARGETS": " ".join(
                     config.swift_benchmark_build_targets),
                 "SWIFT_RUN_BENCHMARK_TARGETS": " ".join(
@@ -525,7 +590,7 @@ class BuildScriptInvocation(object):
                 "SWIFT_TEST_TARGETS": " ".join(
                     config.swift_test_run_targets),
                 "SWIFT_FLAGS": config.swift_flags,
-                "SWIFT_TARGET_CMAKE_OPTIONS": config.cmake_options,
+                "SWIFT_TARGET_CMAKE_OPTIONS": " ".join(config.cmake_options),
             }
 
         return options
@@ -544,12 +609,13 @@ class BuildScriptInvocation(object):
         builder = ProductPipelineListBuilder(self.args)
 
         builder.begin_pipeline()
+
         # If --skip-early-swift-driver is passed in, swift will be built
         # as usual, but relying on its own C++-based (Legacy) driver.
         # Otherwise, we build an "early" swift-driver using the host
         # toolchain, which the later-built compiler will forward
         # `swiftc` invocations to. That is, if we find a Swift compiler
-        # in the host toolchain. If the host toolchain is not equpipped with
+        # in the host toolchain. If the host toolchain is not equipped with
         # a Swift compiler, a warning is emitted. In the future, it may become
         # mandatory that the host toolchain come with its own `swiftc`.
         builder.add_product(products.EarlySwiftDriver,
@@ -557,6 +623,15 @@ class BuildScriptInvocation(object):
 
         builder.add_product(products.CMark,
                             is_enabled=self.args.build_cmark)
+
+        # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
+        # Swift still needs a few LLVM targets like tblgen to be built for it to be
+        # configured. Instead, handle this in the product for now.
+        builder.add_product(products.LLVM,
+                            is_enabled=self.args.build_llvm or self.args.build_swift or self.args.build_lldb)
+
+        builder.add_product(products.StaticSwiftLinuxConfig,
+                            is_enabled=self.args.install_static_linux_config)
 
         builder.add_product(products.LibXML2,
                             is_enabled=self.args.build_libxml2)
@@ -575,48 +650,62 @@ class BuildScriptInvocation(object):
         # test, install like a normal build-script product.
         builder.begin_impl_pipeline(should_run_epilogue_operations=False)
 
-        # If --skip-build-llvm is passed in, LLVM cannot be completely disabled, as
-        # Swift still needs a few LLVM targets like tblgen to be built for it to be
-        # configured. Instead, handle this in build-script-impl for now.
-        builder.add_impl_product(products.LLVM,
-                                 is_enabled=True)
         builder.add_impl_product(products.LibCXX,
                                  is_enabled=self.args.build_libcxx)
-        builder.add_impl_product(products.LibICU,
-                                 is_enabled=self.args.build_libicu)
         builder.add_impl_product(products.Swift,
                                  is_enabled=self.args.build_swift)
         builder.add_impl_product(products.LLDB,
                                  is_enabled=self.args.build_lldb)
+        builder.add_impl_product(products.LibDispatch,
+                                 is_enabled=self.args.build_libdispatch)
 
         # Begin a new build-script-impl pipeline that builds libraries that we
         # build as part of build-script-impl but that we should eventually move
         # onto build-script products.
         builder.begin_impl_pipeline(should_run_epilogue_operations=True)
-        builder.add_impl_product(products.LibDispatch,
-                                 is_enabled=self.args.build_libdispatch)
         builder.add_impl_product(products.Foundation,
                                  is_enabled=self.args.build_foundation)
-        builder.add_impl_product(products.XCTest,
-                                 is_enabled=self.args.build_xctest)
+
+        # Build Swift Testing here because it has to come before XCTest but after Foundation
+        builder.begin_pipeline()
+        builder.add_product(products.SwiftTestingMacros,
+                            is_enabled=self.args.build_swift_testing_macros)
+        builder.add_product(products.SwiftTesting,
+                            is_enabled=self.args.build_swift_testing)
+
+        builder.begin_impl_pipeline(should_run_epilogue_operations=True)
         builder.add_impl_product(products.LLBuild,
                                  is_enabled=self.args.build_llbuild)
+        builder.add_impl_product(products.XCTest,
+                                 is_enabled=self.args.build_xctest)
 
         # Begin the post build-script-impl build phase.
         builder.begin_pipeline()
 
-        builder.add_product(products.BackDeployConcurrency,
-                            is_enabled=self.args.build_backdeployconcurrency)
+        builder.add_product(products.WASISysroot,
+                            is_enabled=self.args.build_wasistdlib)
+
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
+
+        builder.add_product(products.WasmKit,
+                            is_enabled=self.args.build_wasmkit)
+        builder.add_product(products.WASIStdlib,
+                            is_enabled=self.args.build_wasistdlib)
+        builder.add_product(products.WASIThreadsStdlib,
+                            is_enabled=self.args.build_wasistdlib)
+        builder.add_product(products.WASISwiftSDK,
+                            is_enabled=self.args.build_wasistdlib)
+        builder.add_product(products.SwiftFoundationTests,
+                            is_enabled=self.args.build_foundation)
+        builder.add_product(products.FoundationTests,
+                            is_enabled=self.args.build_foundation)
         builder.add_product(products.SwiftSyntax,
                             is_enabled=self.args.build_swiftsyntax)
-        builder.add_product(products.SKStressTester,
-                            is_enabled=self.args.build_skstresstester)
         builder.add_product(products.SwiftFormat,
                             is_enabled=self.args.build_swiftformat)
-        builder.add_product(products.SwiftEvolve,
-                            is_enabled=self.args.build_swiftevolve)
+        builder.add_product(products.SKStressTester,
+                            is_enabled=self.args.build_skstresstester)
         builder.add_product(products.IndexStoreDB,
                             is_enabled=self.args.build_indexstoredb)
         builder.add_product(products.PlaygroundSupport,
@@ -631,8 +720,18 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.tsan_libdispatch_test)
         builder.add_product(products.SwiftDocC,
                             is_enabled=self.args.build_swiftdocc)
+        builder.add_product(products.MinimalStdlib,
+                            is_enabled=self.args.build_minimalstdlib)
+
+        # Swift-DocC-Render should be installed whenever Swift-DocC is installed, which
+        # can be either given directly or via install-all
+        install_doccrender = self.args.install_swiftdocc or (
+            self.args.install_all and self.args.build_swiftdocc
+        )
         builder.add_product(products.SwiftDocCRender,
-                            is_enabled=self.args.install_swiftdocc)                  
+                            is_enabled=install_doccrender)
+        builder.add_product(products.StdlibDocs,
+                            is_enabled=self.args.build_stdlib_docs)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully
@@ -659,6 +758,14 @@ class BuildScriptInvocation(object):
             shell.call_without_sleeping([BUILD_SCRIPT_IMPL_PATH] + self.impl_args,
                                         env=self.impl_env, echo=True)
             return
+
+        # Accumulates test failures when --continue-on-test-failure is set.
+        self._test_failures = []
+        self._failed_targets_file = os.path.join(
+            self.workspace.build_root, '.swift-build-failed-test-targets')
+        # Clear any stale file from a previous run.
+        if os.path.exists(self._failed_targets_file):
+            os.remove(self._failed_targets_file)
 
         # Otherwise, we compute and execute the individual actions ourselves.
         # Compute the list of hosts to operate on.
@@ -688,7 +795,7 @@ class BuildScriptInvocation(object):
             if is_impl:
                 self._execute_impl(pipeline, all_hosts, perform_epilogue_opts)
             else:
-                assert(index != last_impl_index)
+                assert index != last_impl_index
                 if index > last_impl_index:
                     non_darwin_cross_compile_hostnames = [
                         target for target in self.args.cross_compile_hosts if not
@@ -701,6 +808,11 @@ class BuildScriptInvocation(object):
                     self._execute(pipeline, all_host_names)
 
         # And then perform the rest of the non-core epilogue actions.
+
+        # If any test failures were deferred, report them now and exit.
+        if self._test_failures:
+            self._print_test_failure_summary()
+            raise SystemExit(f"ERROR: {len(self._test_failures)} test action(s) failed.\n")
 
         # Extract symbols...
         for host_target in all_hosts:
@@ -732,12 +844,31 @@ class BuildScriptInvocation(object):
                     " ".join(config.swift_benchmark_run_targets)))
 
             for product_class in pipeline:
+                if self.args.enable_caching:
+                    build_dir = self.workspace.build_dir(
+                        host_target.name, product_class.product_name())
+                    self._write_caching_config_files(build_dir)
                 self._execute_build_action(host_target, product_class)
 
         # Test...
         for host_target in all_hosts:
             for product_class in pipeline:
-                self._execute_test_action(host_target, product_class)
+                try:
+                    self._execute_test_action(host_target, product_class)
+                except SystemExit as e:
+                    if os.path.exists(self._failed_targets_file):
+                        with open(self._failed_targets_file) as f:
+                            subtargets = [
+                                line.strip() for line in f if line.strip()]
+                        os.remove(self._failed_targets_file)
+                    else:
+                        subtargets = []
+                    self._test_failures.append((
+                        f"Running tests for {product_class.product_name()}",
+                        subtargets))
+                    if not self.args.continue_on_test_failure:
+                        self._print_test_failure_summary()
+                        raise
 
         # Install...
         for host_target in all_hosts:
@@ -759,6 +890,13 @@ class BuildScriptInvocation(object):
             for product_class in pipeline:
                 # Execute clean, build, test, install
                 self.execute_product_build_steps(product_class, host_target)
+
+    def _print_test_failure_summary(self):
+        print("\nERROR: The following test actions failed:")
+        for label, subtargets in self._test_failures:
+            print(f"  - {label}")
+            for subtarget in subtargets:
+                print(f"    - {subtarget}")
 
     def _execute_build_action(self, host_target, product_class):
         action_name = "{}-{}-build".format(host_target.name,
@@ -790,10 +928,11 @@ class BuildScriptInvocation(object):
         self._execute_action("merged-hosts-lipo-core")
 
     def _execute_action(self, action_name):
-        shell.call_without_sleeping(
-            [BUILD_SCRIPT_IMPL_PATH] + self.impl_args +
-            ["--only-execute", action_name],
-            env=self.impl_env, echo=self.args.verbose_build)
+        with log_time_in_scope(action_name):
+            shell.call_without_sleeping(
+                [BUILD_SCRIPT_IMPL_PATH] + self.impl_args +
+                ["--only-execute", action_name],
+                env=self.impl_env, echo=self.args.verbose_build)
 
     def execute_product_build_steps(self, product_class, host_target):
         product_source = product_class.product_source_name()
@@ -809,16 +948,31 @@ class BuildScriptInvocation(object):
             toolchain=self.toolchain,
             source_dir=self.workspace.source_dir(product_source),
             build_dir=build_dir)
+        if self.args.enable_caching:
+            self._write_caching_config_files(build_dir)
         if product.should_clean(host_target):
-            print("--- Cleaning %s ---" % product_name)
-            product.clean(host_target)
+            log_message = "Cleaning %s" % product_name
+            print("--- {} ---".format(log_message), flush=True)
+            with log_time_in_scope(log_message):
+                product.clean(host_target)
         if product.should_build(host_target):
-            print("--- Building %s ---" % product_name)
-            product.build(host_target)
+            log_message = "Building %s" % product_name
+            print("--- {} ---".format(log_message), flush=True)
+            with log_time_in_scope(log_message):
+                product.build(host_target)
         if product.should_test(host_target):
-            print("--- Running tests for %s ---" % product_name)
-            product.test(host_target)
-            print("--- Finished tests for %s ---" % product_name)
+            log_message = "Running tests for %s" % product_name
+            print("--- {} ---".format(log_message), flush=True)
+            try:
+                with log_time_in_scope(log_message):
+                    product.test(host_target)
+                print("--- Finished tests for %s ---" % product_name,
+                      flush=True)
+            except SystemExit as e:
+                self._test_failures.append((log_message, []))
+                if not self.args.continue_on_test_failure:
+                    self._print_test_failure_summary()
+                    raise
         # Install the product if it should be installed specifically, or
         # if it should be built and `install_all` is set to True.
         # The exception is select before_build_script_impl products
@@ -827,5 +981,44 @@ class BuildScriptInvocation(object):
         if product.should_install(host_target) or \
            (self.install_all and product.should_build(host_target) and
            not product.is_ignore_install_all_product()):
-            print("--- Installing %s ---" % product_name)
-            product.install(host_target)
+            log_message = "Installing %s" % product_name
+            print("--- {} ---".format(log_message), flush=True)
+            with log_time_in_scope(log_message):
+                product.install(host_target)
+
+    def _write_caching_config_files(self, build_dir):
+        import json
+        os.makedirs(build_dir, exist_ok=True)
+
+        cas_config = {"CASPath": self.args.caching_cas_path}
+        if self.args.caching_plugin_path:
+            cas_config["PluginPath"] = self.args.caching_plugin_path
+        with open(os.path.join(build_dir, '.cas-config'), 'w') as f:
+            json.dump(cas_config, f, indent=2)
+            f.write('\n')
+
+        if self.args.caching_prefix_map:
+            sdk_path = None
+            try:
+                from build_swift.build_swift.wrappers import xcrun
+                sdk_path = xcrun.sdk_path(sdk='macosx')
+            except Exception:
+                pass
+
+            toolchain_path = None
+            cc_dir = os.path.dirname(self.toolchain.cc)
+            candidate = os.path.dirname(os.path.dirname(cc_dir))
+            if candidate and candidate != '/':
+                toolchain_path = candidate
+
+            prefix_map = {}
+            if sdk_path:
+                prefix_map["/^sdk"] = sdk_path
+            if toolchain_path:
+                prefix_map["/^toolchain"] = toolchain_path
+            prefix_map["/^src"] = SWIFT_SOURCE_ROOT
+
+            with open(os.path.join(build_dir,
+                                   'compilation-prefix-map.json'), 'w') as f:
+                json.dump(prefix_map, f, indent=2)
+                f.write('\n')

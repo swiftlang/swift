@@ -1,4 +1,4 @@
-// RUN: %target-swiftc_driver %s -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch -target %sanitizers-target-triple -g -sanitize=thread -o %t
+// RUN: %target-swiftc_driver %s -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch -g -sanitize=thread -o %t
 // RUN: %target-codesign %t
 // RUN: env %env-TSAN_OPTIONS="abort_on_error=0" not %target-run %t 2>&1 | %swift-demangle --simplified | %FileCheck %s
 
@@ -12,7 +12,7 @@
 // UNSUPPORTED: back_deployment_runtime
 
 // rdar://86825277
-// SR-15805
+// https://github.com/apple/swift/issues/58082
 // UNSUPPORTED: CPU=arm64 || CPU=arm64e
 
 // Disabled because this test is flaky rdar://76542113

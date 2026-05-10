@@ -26,7 +26,7 @@ extension X.Inner {
   func foo(_ other: Self) { }
 }
 
-// SR-695
+// https://github.com/apple/swift/issues/43310
 class Mario {
   func getFriend() -> Self { return self } // expected-note{{overridden declaration is here}}
   func getEnemy() -> Mario { return self }
@@ -259,7 +259,8 @@ class Foo {
   }()
 }
 
-// https://bugs.swift.org/browse/SR-11681 - duplicate diagnostics
+// https://github.com/apple/swift/issues/54090 (duplicate diagnostics)
+
 struct Box<T> {
   let boxed: T
 }
@@ -268,6 +269,7 @@ class Boxer {
   lazy var s = Box<Self>(boxed: self as! Self)
   // expected-error@-1 {{stored property cannot have covariant 'Self' type}}
   // expected-error@-2 {{mutable property cannot have covariant 'Self' type}}
+  // FIXME: [DiagQoI] We can do better than this.
 
   var t = Box<Self>(boxed: Self())
   // expected-error@-1 {{stored property cannot have covariant 'Self' type}}
@@ -276,7 +278,8 @@ class Boxer {
   required init() {}
 }
 
-// https://bugs.swift.org/browse/SR-12133 - a type named 'Self' should be found first
+// https://github.com/apple/swift/issues/54568
+// A type named 'Self' should be found first
 struct OuterType {
   struct `Self` {
     let string: String
@@ -361,7 +364,8 @@ do {
   }
 }
 
-// https://bugs.swift.org/browse/SR-14731
+// https://github.com/apple/swift/issues/57081
+
 struct Generic<T> {
   func foo() -> Self<Int> {}
   // expected-error@-1 {{cannot specialize 'Self'}}
@@ -376,4 +380,29 @@ struct NonGeneric {
 protocol P {
   func foo() -> Self<Int>
   // expected-error@-1 {{cannot specialize non-generic type 'Self'}}
+}
+
+// https://github.com/peripheryapp/periphery/issues/676
+
+class Container {
+  class NestedType {
+    init(value: Int) {}
+  }
+
+  func test<T>(_: T.Type) {}
+  
+  func someFunc() {
+    let _ = [Container.NestedType]()  // ok
+    let _ = [Self.NestedType]()  // ok
+
+    _ = Self.NestedType // expected-warning {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
+    // expected-note@-1 {{add arguments after the type to construct a value of the type}}
+    // expected-note@-2 {{use '.self' to reference the type object}} {{24-24=.self}}
+    let _ = Self.NestedType // expected-warning {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
+    // expected-note@-1 {{add arguments after the type to construct a value of the type}}
+    // expected-note@-2 {{use '.self' to reference the type object}} {{28-28=.self}}
+    test(Self.NestedType) // expected-warning {{expected member name or initializer call after type name; this is an error in the Swift 6 language mode}}
+    // expected-note@-1 {{add arguments after the type to construct a value of the type}}
+    // expected-note@-2 {{use '.self' to reference the type object}} {{25-25=.self}}
+  }
 }

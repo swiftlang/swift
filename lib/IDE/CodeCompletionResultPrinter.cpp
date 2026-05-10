@@ -13,6 +13,7 @@
 #include "swift/IDE/CodeCompletionResultPrinter.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/CodeCompletion.h"
 #include "swift/Markup/XMLUtils.h"
@@ -40,7 +41,7 @@ void swift::ide::printCodeCompletionResultDescription(
 
   auto FirstTextChunk = str->getFirstTextChunkIndex(leadingPunctuation);
   int TextSize = 0;
-  if (FirstTextChunk.hasValue()) {
+  if (FirstTextChunk.has_value()) {
     auto Chunks = str->getChunks().slice(*FirstTextChunk);
     auto I = Chunks.begin(), E = Chunks.end();
     while (I != E) {
@@ -217,7 +218,7 @@ public:
     bool isOperator = result.isOperator();
 
     auto FirstTextChunk = str->getFirstTextChunkIndex(leadingPunctuation);
-    if (FirstTextChunk.hasValue()) {
+    if (FirstTextChunk.has_value()) {
       auto chunks = str->getChunks().slice(*FirstTextChunk);
       auto i = chunks.begin(), e = chunks.end();
       while (i != e) {
@@ -465,7 +466,7 @@ static void printCodeCompletionResultFilterName(
   }
 
   auto FirstTextChunk = str->getFirstTextChunkIndex();
-  if (FirstTextChunk.hasValue()) {
+  if (FirstTextChunk.has_value()) {
     auto chunks = str->getChunks().slice(*FirstTextChunk);
     auto i = chunks.begin(), e = chunks.end();
     while (i != e) {
@@ -516,8 +517,7 @@ static void printCodeCompletionResultFilterName(
       case ChunkKind::CallArgumentColon:
       case ChunkKind::ParameterDeclColon:
         // Since we don't add the type, also don't add the space after ':'.
-        if (shouldPrint)
-          OS << ":";
+        OS << ":";
         ++i;
         continue;
       case ChunkKind::Text:

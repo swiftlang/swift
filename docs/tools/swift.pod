@@ -12,7 +12,7 @@ To invoke the Swift REPL (Read-Eval-Print-Loop):
 
 =over
 
-B<swift>
+B<swift> repl
 
 =back
 
@@ -81,8 +81,9 @@ works, continually evolving to make Swift even better.
 
 =head1 BUGS
 
-Reporting bugs is a great way for anyone to help improve Swift. The bug tracker
-for Swift, an open-source project, is located at L<https://bugs.swift.org>.
+Reporting bugs is a great way for anyone to help improve Swift. The issue
+tracker for Swift, an open-source project, is located at
+L<https://github.com/swiftlang/swift/issues>.
 
 If a bug can be reproduced only within an Xcode project or a playground, or if
 the bug is associated with an Apple NDA, please file a report to Apple's
@@ -100,6 +101,6 @@ L<https://developer.apple.com/swift/resources>
 
 =head2 CODE REPOSITORIES
 
-Swift Programming Language at L<https://github.com/apple/swift>
+Swift Programming Language at L<https://github.com/swiftlang/swift>
 
-Swift Package Manager at L<https://github.com/apple/swift-package-manager>
+Swift Package Manager at L<https://github.com/swiftlang/swift-package-manager>

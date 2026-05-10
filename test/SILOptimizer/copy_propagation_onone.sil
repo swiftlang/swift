@@ -1,0 +1,665 @@
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-verify-all -opt-mode=none %s | %FileCheck %s --check-prefixes=CHECK,CHECK-ONONE
+
+class C {}
+
+sil [ossa] @get : $@convention(thin) () -> @owned C
+
+sil [ossa] @see : $@convention(thin) (@guaranteed C) -> ()
+
+sil [ossa] @end : $@convention(thin) (@owned C) -> ()
+
+sil [ossa] @other : $@convention(thin) () -> ()
+
+// Standard -O copy-propagation behavior.
+//
+// CHECK-LABEL: sil [ossa] @diamond__consume_lb__use_r : {{.*}} {
+// CHECK:       [[INSTANCE:%[^,]+]] = apply
+// CHECK:       cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:     [[LEFT]]:
+// CHECK:       apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:       apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:       br [[BOTTOM:bb[0-9]+]]
+// CHECK:     [[RIGHT]]:
+// CHECK:       [[COPY:%[^,]+]] = copy_value [[INSTANCE]] :
+// CHECK:       apply {{%[^,]+}}([[COPY]])
+// CHECK:       br [[BOTTOM]]
+// CHECK:     [[BOTTOM]]:
+// CHECK:       store [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'diamond__consume_lb__use_r'
+sil [ossa] @diamond__consume_lb__use_r : $@convention(thin) () -> @out C {
+top(%addr : $*C):
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left, right
+left:
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    apply %see(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %instance : $C
+    apply %see(%copy) : $@convention(thin) (@guaranteed C) -> ()
+    br bottom
+right:
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    apply %end(%instance) : $@convention(thin) (@owned C) -> ()
+    br bottom
+bottom:
+    store %copy to [init] %addr : $*C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// There is a consuming use in right.  So bottom is a consumed block.  Liveness
+// is retracted up to the consume in right and up to the bottom of left.
+// CHECK-LABEL: sil [ossa] @diamond__consume_r__use_l__destroy_b : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         destroy_value [[INSTANCE]] : $C
+// CHECK:         br [[BOTTOM:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[BOTTOM]]
+// CHECK:       [[BOTTOM]]:
+// CHECK-NOT:     destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'diamond__consume_r__use_l__destroy_b'
+sil [ossa] @diamond__consume_r__use_l__destroy_b : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left, right
+left:
+    destroy_value %copy : $C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    apply %see(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    br bottom
+right:
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br bottom
+bottom:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Only the consuming in r2 counts as a consume, so only bottom is a consumed
+// block.
+// CHECK-LABEL: sil [ossa] @diamond_2r__consume_r1r2__use_l__destroy_b : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT1:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE:%[^,]+]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:         destroy_value [[INSTANCE:%[^,]+]] : $C
+// CHECK:         br [[BOTTOM:bb[0-9]+]]
+// CHECK:       [[RIGHT1]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE:%[^,]+]] : $C
+// CHECK:         apply {{%[^,]+}}([[COPY]])
+// CHECK:         br [[RIGHT2:bb[0-9]+]]
+// CHECK:       [[RIGHT2]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE:%[^,]+]])
+// CHECK-NOT:     destroy_value
+// CHECK:         br [[BOTTOM]]
+// CHECK:       [[BOTTOM]]:
+// CHECK-NOT: destroy_value
+// CHECK-LABEL: } // end sil function 'diamond_2r__consume_r1r2__use_l__destroy_b'
+sil [ossa] @diamond_2r__consume_r1r2__use_l__destroy_b : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    %copy2 = copy_value %copy : $C
+    cond_br undef, left, right
+left:
+    destroy_value %copy : $C
+    destroy_value %copy2 : $C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    apply %see(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    br bottom
+right:
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br right2
+right2:
+    apply %end(%copy2) : $@convention(thin) (@owned C) -> ()
+    br bottom
+bottom:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// There are no consuming uses, so avoiding copies doesn't entail shortening the
+// lifetime.
+// CHECK-LABEL: sil [ossa] @diamond__use_lr__destroy_b : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[BOTTOM:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[BOTTOM]]
+// CHECK:       [[BOTTOM]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'diamond__use_lr__destroy_b'
+sil [ossa] @diamond__use_lr__destroy_b : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    cond_br undef, left, right
+left:
+    apply %see(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    br bottom
+right:
+    apply %see(%copy) : $@convention(thin) (@guaranteed C) -> ()
+    br bottom
+bottom:
+    destroy_value %instance : $C
+    destroy_value %copy : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't shorten the lifetime if there's a single consuming use.
+// CHECK-LABEL: sil [ossa] @line_3__use_m__destroy_b : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         br [[MIDDLE:bb[0-9]+]]
+// CHECK:       [[MIDDLE]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[BOTTOM:bb[0-9]+]]
+// CHECK:       [[BOTTOM]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK-LABEL: } // end sil function 'line_3__use_m__destroy_b'
+sil [ossa] @line_3__use_m__destroy_b : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    br middle
+middle:
+    apply %see(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    br bottom
+bottom:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Don't shorten the unconsumed lifetime on the left side.
+// CHECK-LABEL: sil [ossa] @diamond_2l_2r__consume_r1__use_l1__destroy_l2 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT1:bb[0-9]+]], [[RIGHT1:bb[0-9]+]]
+// CHECK:       [[LEFT1]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[LEFT2:bb[0-9]+]]
+// CHECK:       [[LEFT2]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:       [[RIGHT1]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK-LABEL: } // end sil function 'diamond_2l_2r__consume_r1__use_l1__destroy_l2'
+sil [ossa] @diamond_2l_2r__consume_r1__use_l1__destroy_l2 : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    cond_br undef, left, right
+left:
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    apply %see(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    br left2
+left2:
+    destroy_value %instance : $C
+    br bottom
+right:
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    apply %end(%instance) : $@convention(thin) (@owned C) -> ()
+    br right2
+right2:
+    br bottom
+bottom:
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that lifetime is not shortened up to boundary block if destroy was
+// previously in its unique successor.
+// CHECK-LABEL: sil [ossa] @doublediamond_2d2l__consume_r11_r21__use_l11__destroy_l11_l22 : $@convention(thin) () -> () {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT11:bb[0-9]+]], [[RIGHT11:bb[0-9]+]]
+// CHECK:       [[LEFT11]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]]) : $@convention(thin) (@guaranteed C) -> ()
+// CHECK:         br [[MIDDLE:bb[0-9]+]]
+// CHECK:       [[RIGHT11]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         apply {{%[^,]+}}([[COPY]])
+// CHECK:         br [[MIDDLE]]
+// CHECK:       [[MIDDLE]]:
+// CHECK:         cond_br undef, [[LEFT21:bb[0-9]+]], [[RIGHT21:bb[0-9]+]]
+// CHECK:       [[LEFT21]]:
+// CHECK:         br [[LEFT22:bb[0-9]+]]
+// CHECK:       [[LEFT22]]:
+//                The main check: the destroy hasn't been hoisted.
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT21]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[EXIT]]
+// CHECK-LABEL: } // end sil function 'doublediamond_2d2l__consume_r11_r21__use_l11__destroy_l11_l22'
+sil [ossa] @doublediamond_2d2l__consume_r11_r21__use_l11__destroy_l11_l22 : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left11, right11
+left11:
+    apply %see(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %instance : $C
+    br middle
+right11:
+    apply %end(%instance) : $@convention(thin) (@owned C) -> ()
+    br middle
+middle:
+    cond_br undef, left21, right21
+left21:
+    br left22
+
+left22:
+    destroy_value %copy : $C
+    br bottom
+right21:
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br bottom
+bottom:
+    %retval = tuple ()
+    return %retval : $()
+}
+
+
+// Verify that we don't shrink the lifetime even when there was a destroy
+// already in the barrier block (left21).
+// CHECK-LABEL: sil [ossa] @doublediamond_2d2l__consume_r11_r21__use_l11__destroy_l11_l21_l22_r21 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT11:bb[0-9]+]], [[RIGHT11:bb[0-9]+]]
+// CHECK:       [[LEFT11]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[MIDDLE:bb[0-9]+]]
+// CHECK:       [[RIGHT11]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         apply {{%[^,]+}}([[COPY]])
+// CHECK:         br [[MIDDLE]]
+// CHECK:       [[MIDDLE]]:
+// CHECK:         cond_br undef, [[LEFT21:bb[0-9]+]], [[RIGHT21:bb[0-9]+]]
+// CHECK:       [[LEFT21]]:
+// CHECK:         br [[LEFT22:bb[0-9]+]]
+// CHECK:       [[LEFT22]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT21]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'doublediamond_2d2l__consume_r11_r21__use_l11__destroy_l11_l21_l22_r21'
+sil [ossa] @doublediamond_2d2l__consume_r11_r21__use_l11__destroy_l11_l21_l22_r21 : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left1, right1
+left1:
+    apply %see(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %instance : $C
+    br middle
+right1:
+    apply %end(%instance) : $@convention(thin) (@owned C) -> ()
+    br middle
+middle:
+    %copy2 = copy_value %copy : $C
+    cond_br undef, left21, right21
+left21:
+    destroy_value %copy2 : $C
+    br left22
+
+left22:
+    destroy_value %copy : $C
+    br bottom
+right21:
+    destroy_value %copy2 : $C
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br bottom
+bottom:
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that lifetime ends in boundary block when there is an extra copy and
+// both it and the original are destroyed in the boundary block.
+// 
+// CHECK-LABEL: sil [ossa] @doublediamond__consume_r11_r21__use_l11__destroy_l11_l21_r21 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT11:bb[0-9]+]], [[RIGHT11:bb[0-9]+]]
+// CHECK:       [[LEFT11]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[MIDDLE:bb[0-9]+]]
+// CHECK:       [[RIGHT11]]:
+// CHECK:         [[COPY:%[^,]+]] = copy_value [[INSTANCE]]
+// CHECK:         apply {{%[^,]+}}([[COPY]])
+// CHECK:         br [[MIDDLE]]
+// CHECK:       [[MIDDLE]]:
+// CHECK:         cond_br undef, [[LEFT21:bb[0-9]+]], [[RIGHT21:bb[0-9]+]]
+// CHECK:       [[LEFT21]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT21]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[EXIT]]
+// CHECK-LABEL: } // end sil function 'doublediamond__consume_r11_r21__use_l11__destroy_l11_l21_r21'
+sil [ossa] @doublediamond__consume_r11_r21__use_l11__destroy_l11_l21_r21 : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left11, right11
+left11:
+    apply %see(%instance) : $@convention(thin) (@guaranteed C) -> ()
+    destroy_value %instance : $C
+    br middle
+right11:
+    apply %end(%instance) : $@convention(thin) (@owned C) -> ()
+    br middle
+middle:
+    %copy2 = copy_value %copy : $C
+    cond_br undef, left21, right21
+left21:
+    destroy_value %copy2 : $C
+    destroy_value %copy : $C
+    br bottom
+right21:
+    destroy_value %copy2 : $C
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br bottom
+bottom:
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that we don't hoist destroys up to a dead arg.
+// CHECK-LABEL: sil [ossa] @line_2__def_arg_b__destroy_b : $@convention(thin) () -> () {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         br [[BOTTOM:bb[0-9]+]]([[INSTANCE]] :
+// CHECK:       [[BOTTOM]]([[PHI:%[^,]+]] :
+// CHECK:         apply
+// CHECK:         apply
+// CHECK:         destroy_value [[PHI]]
+// CHECK-LABEL: } // end sil function 'line_2__def_arg_b__destroy_b'
+sil [ossa] @line_2__def_arg_b__destroy_b : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    %other = function_ref @other : $@convention(thin) () -> ()
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    br bottom(%instance : $C)
+bottom(%phi : @owned $C):
+    apply %other() : $@convention(thin) () -> ()
+    apply %other() : $@convention(thin) () -> ()
+    destroy_value %phi : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that when original liveness extends to the bottom of a control-flow
+// merge block, if there is no subsequent consume, it continues to extend there.
+//
+// CHECK-LABEL: sil [ossa] @consumedAtEntry_predecessor_is_control_flow_merge : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT_TOP:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT_TOP]]:
+// CHECK:         cond_br undef, [[LEFT_LEFT:bb[0-9]+]], [[LEFT_RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT_LEFT]]:
+// CHECK:         br [[LEFT_BOTTOM:bb[0-9]+]]
+// CHECK:       [[LEFT_RIGHT]]:
+// CHECK:         br [[LEFT_BOTTOM]]
+// CHECK:       [[LEFT_BOTTOM]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
+// CHECK-LABEL: } // end sil function 'consumedAtEntry_predecessor_is_control_flow_merge'
+sil [ossa] @consumedAtEntry_predecessor_is_control_flow_merge : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left_top, right
+
+left_top:
+    cond_br undef, left_left, left_right
+
+left_left:
+    br left_bottom
+
+left_right:
+    br left_bottom
+
+left_bottom:
+    destroy_value %copy : $C
+    br exit
+
+right:
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br exit
+
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that multiple live terminators only result in a single extension into
+// the destination block edge.
+//
+// CHECK-LABEL: sil [ossa] @consumedAtEntry_predecessor_is_control_flow_merge__multiple_terminators_live : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT_TOP:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT_TOP]]:
+// CHECK:         cond_br undef, [[LEFT_LEFT:bb[0-9]+]], [[LEFT_RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT_LEFT]]:
+// CHECK:         br [[LEFT_BOTTOM:bb[0-9]+]]
+// CHECK:       [[LEFT_RIGHT]]:
+// CHECK:         br [[LEFT_BOTTOM]]
+// CHECK:       [[LEFT_BOTTOM]]:
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[EXIT]]
+// CHECK-LABEL: } // end sil function 'consumedAtEntry_predecessor_is_control_flow_merge__multiple_terminators_live'
+sil [ossa] @consumedAtEntry_predecessor_is_control_flow_merge__multiple_terminators_live : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left_top, right
+
+left_top:
+    cond_br undef, left_left, left_right
+
+left_left:
+    destroy_value %copy : $C
+    br left_bottom
+
+left_right:
+    destroy_value %copy : $C
+    br left_bottom
+
+left_bottom:
+    br exit
+
+right:
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br exit
+
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that a control-flow branch "grand predecessor" gets destroys in the
+// right places in its successors.
+// CHECK-LABEL: sil [ossa] @consumedAtEntry_predecessor_is_control_flow_branch : {{.*}} {
+// CHECK:         [[REGISTER_3:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT_TOP:bb[0-9]+]], [[RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT_TOP]]:
+// CHECK:         cond_br undef, [[LEFT_LEFT:bb[0-9]+]], [[LEFT_RIGHT:bb[0-9]+]]
+// CHECK:       [[LEFT_LEFT]]:
+// CHECK:         destroy_value [[REGISTER_3]]
+// CHECK:         br [[EXIT:bb[0-9]+]]
+// CHECK:       [[LEFT_RIGHT]]:
+// CHECK:         destroy_value [[REGISTER_3]]
+// CHECK:         br [[EXIT]]
+// CHECK:       [[RIGHT]]:
+// CHECK:         apply {{%[^,]+}}([[REGISTER_3]])
+// CHECK:         br [[EXIT]]
+// CHECK-LABEL: } // end sil function 'consumedAtEntry_predecessor_is_control_flow_branch'
+sil [ossa] @consumedAtEntry_predecessor_is_control_flow_branch : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left_top, right
+
+left_top:
+    destroy_value %copy : $C
+    cond_br undef, left_left, left_right
+
+left_left:
+    br exit
+
+left_right:
+    br exit
+
+right:
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br exit
+
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that a control-flow branch "grand predecessor" gets destroys in the
+// right places in its successors.  When one branch has a destroy.
+// CHECK-LABEL: sil [ossa] @consumedAtEntry_predecessor_is_control_flow_branch__2 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT_TOP:bb[0-9]+]], [[RIGHT:bb[0-9]+]]                         
+// CHECK:       [[LEFT_TOP]]:                                              
+// CHECK:         cond_br undef, [[LEFT_LEFT:bb[0-9]+]], [[LEFT_RIGHT:bb[0-9]+]]                         
+// CHECK:       [[LEFT_LEFT]]:                                              
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]                                          
+// CHECK:       [[LEFT_RIGHT]]:                                              
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[EXIT]]                                          
+// CHECK:       [[RIGHT]]:                                              
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[EXIT]]                                          
+// CHECK-LABEL: } // end sil function 'consumedAtEntry_predecessor_is_control_flow_branch__2'
+sil [ossa] @consumedAtEntry_predecessor_is_control_flow_branch__2 : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left_top, right
+
+left_top:
+    cond_br undef, left_left, left_right
+
+left_left:
+    destroy_value %copy : $C
+    br exit
+
+left_right:
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br exit
+
+right:
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br exit
+
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}
+
+// Verify that a control-flow branch "grand predecessor" gets destroys in the
+// right places in its successors.  When one branch has a destroy the boundary
+// can be extended to.
+// CHECK-LABEL: sil [ossa] @consumedAtEntry_predecessor_is_control_flow_branch__3 : {{.*}} {
+// CHECK:         [[INSTANCE:%[^,]+]] = apply
+// CHECK:         cond_br undef, [[LEFT_TOP:bb[0-9]+]], [[RIGHT:bb[0-9]+]]                         
+// CHECK:       [[LEFT_TOP]]:                                              
+// CHECK:         cond_br undef, [[LEFT_LEFT:bb[0-9]+]], [[LEFT_RIGHT:bb[0-9]+]]                         
+// CHECK:       [[LEFT_LEFT]]:                                              
+// CHECK:         apply
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT:bb[0-9]+]]                                          
+// CHECK:       [[LEFT_RIGHT]]:                                              
+// CHECK:         destroy_value [[INSTANCE]]
+// CHECK:         br [[EXIT]]                                          
+// CHECK:       [[RIGHT]]:                                              
+// CHECK:         apply {{%[^,]+}}([[INSTANCE]])
+// CHECK:         br [[EXIT]]                                          
+// CHECK-LABEL: } // end sil function 'consumedAtEntry_predecessor_is_control_flow_branch__3'
+sil [ossa] @consumedAtEntry_predecessor_is_control_flow_branch__3 : $@convention(thin) () -> () {
+top:
+    %get = function_ref @get : $@convention(thin) () -> @owned C
+    %see = function_ref @see : $@convention(thin) (@guaranteed C) -> ()
+    %end = function_ref @end : $@convention(thin) (@owned C) -> ()
+    %instance = apply %get() : $@convention(thin) () -> @owned C
+    %copy = copy_value %instance : $C
+    cond_br undef, left_top, right
+
+left_top:
+    cond_br undef, left_left, left_right
+
+left_left:
+    %other = function_ref @other : $@convention(thin) () -> ()
+    apply %other() : $@convention(thin) () -> ()
+    destroy_value %copy : $C
+    br exit
+
+left_right:
+    destroy_value %copy : $C
+    br exit
+
+right:
+    apply %end(%copy) : $@convention(thin) (@owned C) -> ()
+    br exit
+
+exit:
+    destroy_value %instance : $C
+    %retval = tuple ()
+    return %retval : $()
+}

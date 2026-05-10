@@ -1,0 +1,112 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+
+struct PairC {
+  var first: C
+  var second: C
+}
+
+// Ensure that forwarding chains don't result in exponential run time.
+//
+sil [ossa] @testSSALongForwardingChain : $@convention(thin) (@guaranteed C) -> () {
+bb0(%0 : @guaranteed $C):
+  specify_test "ssa_liveness @trace[0]"
+  debug_value [trace] %0 : $C
+  %s0 = struct $PairC(%0 : $C, %0 : $C)
+  %s0a = struct_extract %s0 : $PairC, #PairC.first
+  %s0b = struct_extract %s0 : $PairC, #PairC.second
+  %s1 = struct $PairC(%s0a : $C, %s0b : $C)
+  %s1a = struct_extract %s1 : $PairC, #PairC.first
+  %s1b = struct_extract %s1 : $PairC, #PairC.second
+  %s2 = struct $PairC(%s1a : $C, %s1b : $C)
+  %s2a = struct_extract %s2 : $PairC, #PairC.first
+  %s2b = struct_extract %s2 : $PairC, #PairC.second
+  %s3 = struct $PairC(%s2a : $C, %s2b : $C)
+  %s3a = struct_extract %s3 : $PairC, #PairC.first
+  %s3b = struct_extract %s3 : $PairC, #PairC.second
+  %s4 = struct $PairC(%s3a : $C, %s3b : $C)
+  %s4a = struct_extract %s4 : $PairC, #PairC.first
+  %s4b = struct_extract %s4 : $PairC, #PairC.second
+  %s5 = struct $PairC(%s4a : $C, %s4b : $C)
+  %s5a = struct_extract %s5 : $PairC, #PairC.first
+  %s5b = struct_extract %s5 : $PairC, #PairC.second
+  %s6 = struct $PairC(%s5a : $C, %s5b : $C)
+  %s6a = struct_extract %s6 : $PairC, #PairC.first
+  %s6b = struct_extract %s6 : $PairC, #PairC.second
+  %s7 = struct $PairC(%s6a : $C, %s6b : $C)
+  %s7a = struct_extract %s7 : $PairC, #PairC.first
+  %s7b = struct_extract %s7 : $PairC, #PairC.second
+  %s8 = struct $PairC(%s7a : $C, %s7b : $C)
+  %s8a = struct_extract %s8 : $PairC, #PairC.first
+  %s8b = struct_extract %s8 : $PairC, #PairC.second
+  %s9 = struct $PairC(%s8a : $C, %s8b : $C)
+  %s9a = struct_extract %s9 : $PairC, #PairC.first
+  %s9b = struct_extract %s9 : $PairC, #PairC.second
+  %s10 = struct $PairC(%s9a : $C, %s9b : $C)
+  %s10a = struct_extract %s10 : $PairC, #PairC.first
+  %s10b = struct_extract %s10 : $PairC, #PairC.second
+  %s11 = struct $PairC(%s10a : $C, %s10b : $C)
+  %s11a = struct_extract %s11 : $PairC, #PairC.first
+  %s11b = struct_extract %s11 : $PairC, #PairC.second
+  %s12 = struct $PairC(%s11a : $C, %s11b : $C)
+  %s12a = struct_extract %s12 : $PairC, #PairC.first
+  %s12b = struct_extract %s12 : $PairC, #PairC.second
+  %s13 = struct $PairC(%s12a : $C, %s12b : $C)
+  %s13a = struct_extract %s13 : $PairC, #PairC.first
+  %s13b = struct_extract %s13 : $PairC, #PairC.second
+  %s14 = struct $PairC(%s13a : $C, %s13b : $C)
+  %s14a = struct_extract %s14 : $PairC, #PairC.first
+  %s14b = struct_extract %s14 : $PairC, #PairC.second
+  %s15 = struct $PairC(%s14a : $C, %s14b : $C)
+  %s15a = struct_extract %s15 : $PairC, #PairC.first
+  %s15b = struct_extract %s15 : $PairC, #PairC.second
+  %s16 = struct $PairC(%s15a : $C, %s15b : $C)
+  %s16a = struct_extract %s16 : $PairC, #PairC.first
+  %s16b = struct_extract %s16 : $PairC, #PairC.second
+  %s17 = struct $PairC(%s16a : $C, %s16b : $C)
+  %s17a = struct_extract %s17 : $PairC, #PairC.first
+  %s17b = struct_extract %s17 : $PairC, #PairC.second
+  %s18 = struct $PairC(%s17a : $C, %s17b : $C)
+  %s18a = struct_extract %s18 : $PairC, #PairC.first
+  %s18b = struct_extract %s18 : $PairC, #PairC.second
+  %s19 = struct $PairC(%s18a : $C, %s18b : $C)
+  %s19a = struct_extract %s19 : $PairC, #PairC.first
+  %s19b = struct_extract %s19 : $PairC, #PairC.second
+  %s20 = struct $PairC(%s19a : $C, %s19b : $C)
+  %s20a = struct_extract %s20 : $PairC, #PairC.first
+  %s20b = struct_extract %s20 : $PairC, #PairC.second
+  %s21 = struct $PairC(%s20a : $C, %s20b : $C)
+  %s21a = struct_extract %s21 : $PairC, #PairC.first
+  %s21b = struct_extract %s21 : $PairC, #PairC.second
+  %s22 = struct $PairC(%s21a : $C, %s21b : $C)
+  %s22a = struct_extract %s22 : $PairC, #PairC.first
+  %s22b = struct_extract %s22 : $PairC, #PairC.second
+  %s23 = struct $PairC(%s22a : $C, %s22b : $C)
+  %s23a = struct_extract %s23 : $PairC, #PairC.first
+  %s23b = struct_extract %s23 : $PairC, #PairC.second
+  %s24 = struct $PairC(%s23a : $C, %s23b : $C)
+  %s24a = struct_extract %s24 : $PairC, #PairC.first
+  %s24b = struct_extract %s24 : $PairC, #PairC.second
+  %s25 = struct $PairC(%s24a : $C, %s24b : $C)
+  %s25a = struct_extract %s25 : $PairC, #PairC.first
+  %s25b = struct_extract %s25 : $PairC, #PairC.second
+  %s26 = struct $PairC(%s25a : $C, %s25b : $C)
+  %s26a = struct_extract %s26 : $PairC, #PairC.first
+  %s26b = struct_extract %s26 : $PairC, #PairC.second
+  %s27 = struct $PairC(%s26a : $C, %s26b : $C)
+  %s27a = struct_extract %s27 : $PairC, #PairC.first
+  %s27b = struct_extract %s27 : $PairC, #PairC.second
+  %s28 = struct $PairC(%s27a : $C, %s27b : $C)
+  %s28a = struct_extract %s28 : $PairC, #PairC.first
+  %s28b = struct_extract %s28 : $PairC, #PairC.second
+  %s29 = struct $PairC(%s28a : $C, %s28b : $C)
+  %s29a = struct_extract %s29 : $PairC, #PairC.first
+  %s29b = struct_extract %s29 : $PairC, #PairC.second
+  %99 = tuple()
+  return %99 : $()
+}

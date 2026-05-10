@@ -22,7 +22,7 @@ func test(val: E) {
 // rdar://75358153
 // Previously, completing inside single expression body, then completing inside
 // *non* single expression body in the same function caused a crash because the
-// "has single expression" flag didn't cleard. This file tests the scenario not
+// "has single expression" flag didn't clear. This file tests the scenario not
 // to regress again.
 
 // RUN: %empty-directory(%t)

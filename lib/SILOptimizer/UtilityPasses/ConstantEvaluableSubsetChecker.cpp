@@ -17,6 +17,7 @@
 #define DEBUG_TYPE "sil-constant-evaluable-subset-checker"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/CFG.h"
 #include "swift/SIL/SILConstants.h"
@@ -79,8 +80,8 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
         callee = applyInst->getReferencedFunctionOrNull();
       }
 
-      Optional<SILBasicBlock::iterator> nextInstOpt;
-      Optional<SymbolicValue> errorVal;
+      std::optional<SILBasicBlock::iterator> nextInstOpt;
+      std::optional<SymbolicValue> errorVal;
 
       if (!applyInst || !callee || !isConstantEvaluable(callee)) {
 
@@ -100,7 +101,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
           errorVal->emitUnknownDiagnosticNotes(inst->getLoc());
           assert(false && "non-constant control flow in the test driver");
         }
-        currI = nextInstOpt.getValue();
+        currI = nextInstOpt.value();
         continue;
       }
 
@@ -120,7 +121,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       }
 
       if (nextInstOpt) {
-        currI = nextInstOpt.getValue();
+        currI = nextInstOpt.value();
         continue;
       }
 
@@ -173,7 +174,7 @@ class ConstantEvaluableSubsetChecker : public SILModuleTransform {
       constantEvaluateDriver(&fun);
     }
 
-    // Assert that every function annotated as "constant_evaluable" was convered
+    // Assert that every function annotated as "constant_evaluable" was covered
     // by a test driver.
     bool error = false;
     for (SILFunction *constEvalFun : constantEvaluableFunctions) {

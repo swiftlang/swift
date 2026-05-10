@@ -1,0 +1,185 @@
+// RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage raw
+
+import Builtin
+
+// CHECK-LABEL: begin running test 1 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK: test_arg_parsing_reference
+// CHECK: test_arg_parsing_referenceable
+// CHECK: test_arg_parsing
+// CHECK: bool: true
+// CHECK: bool: false
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 2 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK: block:
+// CHECK: bb0:
+// CHECK: function_ref @something_remarkable
+// CHECK: uint: 42
+// CHECK: instruction: {{%[^,]+}} = tuple ({{%[^,]+}}, {{%[^,]+}}, {{%[^,]+}})
+// CHECK-LABEL: end running test 2 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 3 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK: function: test_arg_parsing
+// CHECK: function: test_arg_parsing
+// CHECK-LABEL: end running test 3 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 4 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK: block:
+// CHECK: function_ref @something_remarkable
+// CHECK: block:
+// CHECK: function_ref @something_remarkable
+// CHECK: block:
+// CHECK: function_ref @something_remarkable
+// CHECK: block:
+// CHECK: function_ref @something_remarkable
+// CHECK: block:
+// CHECK: function_ref @something_remarkable
+// CHECK-LABEL: end running test 4 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 5 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK: instruction: // function_ref something_remarkable
+// CHECK: instruction: // function_ref something_remarkable
+// CHECK: instruction: // function_ref something_remarkable
+// CHECK: instruction: // function_ref something_remarkable
+// CHECK: instruction: // function_ref something_remarkable
+// CHECK: instruction: // function_ref something_remarkable
+// CHECK: instruction: // function_ref something_remarkable
+// CHECK: instruction: // function_ref something_remarkable
+// CHECK-LABEL: end running test 5 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 6 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK: operand: operand #0 of return {{%[^,]+}} : $()
+// CHECK: operand: operand #1 of {{%[^,]+}} = tuple
+// CHECK-LABEL: end running test 6 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 7 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK: value: {{%[^,]+}} = tuple ({{%[^,]+}} : $(), {{%[^,]+}} : $(_: ()), {{%[^,]+}} : $((), (_: ())))
+// CHECK: string: howdy
+// CHECK-LABEL: end running test 7 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 8 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+// CHECK: value: 
+// CHECK: function_ref @something_remarkable
+// CHECK-LABEL: end running test 8 of {{[^,]+}} on test_arg_parsing: test_specification_parsing
+sil [ossa] @test_arg_parsing : $() -> () {
+entry:
+  specify_test "test_specification_parsing FFFbb @function[test_arg_parsing_reference] @function[2] @function true false"
+  specify_test "test_specification_parsing BuI @block[0] 42 @function[test_arg_parsing_callee].block[1].instruction[3]"
+  specify_test "test_specification_parsing FF @function @function[0]"
+  specify_test "test_specification_parsing BBBBB @block @function.block @function.block[0] @function[0].block @function[0].block[0]"
+  specify_test "test_specification_parsing IIIIIIII @function.block.instruction @function[0].block.instruction @function.block[0].instruction @function.block.instruction[0] @function[0].block[0].instruction @function[0].block.instruction[0] @function.block[0].instruction[0] @function[0].block[0].instruction[0]"
+  specify_test "test_specification_parsing OO @instruction[2].operand @function[test_arg_parsing_callee].trace.operand[1]"
+  specify_test "test_specification_parsing Vs @function[4].trace[0] howdy"
+  specify_test "test_specification_parsing V @instruction[0]"
+  %something_remarkable = function_ref @something_remarkable : $@convention(thin) () -> ()
+  %retval = tuple ()
+  return %retval : $()
+}
+
+sil [ossa] @test_arg_parsing_reference : $() -> ()
+sil [ossa] @test_arg_parsing_referenceable : $() -> ()
+sil [ossa] @something_remarkable : $() -> ()
+
+sil [ossa] @test_arg_parsing_callee : $() -> () {
+bb0:
+  br bb1
+bb1:
+  %zero = tuple ()
+  %one = tuple (%zero : $())
+  %two = tuple (%zero : $(), %one : $(_ : ()))
+  %three = tuple (%zero : $(), %one : $(_ : ()), %two : $((), (_ : ())))
+  debug_value [trace] %three : $(_ : (), (_ : ()), ((), (_ : ())))
+  return %zero : $()
+}
+
+// CHECK-LABEL: begin running test 1 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+// CHECK: block:
+// CHECK: bb1
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 2 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+// CHECK: instruction:
+// CHECK: tuple
+// CHECK-LABEL: end running test 2 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 3 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+// CHECK: instruction: br bb2
+// CHECK: instruction: {{%[^,]+}} = tuple ()
+// CHECK: instruction: br bb3
+// CHECK: instruction: return
+// CHECK-LABEL: end running test 3 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 4 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+// CHECK: block
+// CHECK: bb0
+// CHECK: block
+// CHECK: bb1
+// CHECK: block
+// CHECK: bb2
+// CHECK: block
+// CHECK: bb3
+// CHECK-LABEL: end running test 4 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+// CHECK-LABEL: begin running test 5 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+// CHECK: function: test_contextual_arg_parsing
+// CHECK-LABEL: end running test 5 of {{[^,]+}} on test_contextual_arg_parsing: test_specification_parsing
+sil [ossa] @test_contextual_arg_parsing : $() -> () {
+entry:
+  br one
+one:
+  specify_test "test_specification_parsing B @block"
+  br two
+two:
+  specify_test "test_specification_parsing I @instruction"
+  specify_test "test_specification_parsing IIII @instruction[-1] @instruction[+0] @instruction[+1] @instruction[+2]"
+  specify_test "test_specification_parsing BBBB @block[-2] @block[-1] @block[+0] @block[+1]"
+  %retval = tuple ()
+  br exit
+exit:
+  specify_test "test_specification_parsing F @function"
+  return %retval : $()
+}
+
+struct X {}
+
+// CHECK-LABEL: begin running test 1 of {{[^,]+}} on test_arg_arg_parsing: test_specification_parsing
+// CHECK: argument:
+// CHECK: %0 = argument of bb0 : $X
+// CHECK: argument:
+// CHECK: %0 = argument of bb0 : $X
+// CHECK: argument:
+// CHECK: %0 = argument of bb0 : $X
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on test_arg_arg_parsing: test_specification_parsing
+sil [ossa] @test_arg_arg_parsing : $(X) -> () {
+entry(%instance : $X):
+  specify_test "test_specification_parsing AAA @argument @block.argument @function.argument[0]"
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test 1 of {{[^,]+}} on test_arg_parsing_2
+// CHECK:       block:
+// CHECK:       {{bb[0-9]+}}:
+// CHECK:         {{%[^,]+}} = tuple ()
+// CHECK:         return {{%[^,]+}}
+// CHECK:       uint: 0
+// CHECK-LABEL: end running test 1 of {{[^,]+}} on test_arg_parsing_2
+sil @test_arg_parsing_2 : $() -> () {
+entry:
+  specify_test "test_specification_parsing Bu @block[1] 0"
+  br exit
+exit:
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_value_literal_parsing: test_specification_parsing with: VVVV, %0, %1, %2, %3
+// CHECK:       value: %0 = argument of bb0 : $Builtin.Int1
+// CHECK:       value:   %2 = integer_literal $Builtin.Int64, 1
+// CHECK:       value:   %1 = integer_literal $Builtin.Int64, 2          
+// CHECK:       value:   %3 = integer_literal $Builtin.Int64, 3          
+// CHECK-LABEL: end running test {{.*}} on test_value_literal_parsing: test_specification_parsing with: VVVV, %0, %1, %2, %3
+sil @test_value_literal_parsing : $(Builtin.Int1) -> () {
+entry(%0 : $Builtin.Int1):
+  %2 = integer_literal $Builtin.Int64, 2
+  specify_test "test_specification_parsing VVVV %0 %1 %2 %3"
+  %1 = integer_literal $Builtin.Int64, 1
+  %3 = integer_literal $Builtin.Int64, 3
+  apply undef(%2) : $@convention(thin) (Builtin.Int64) -> ()
+  apply undef(%3) : $@convention(thin) (Builtin.Int64) -> ()
+  %retval = tuple ()
+  return %retval : $()
+}

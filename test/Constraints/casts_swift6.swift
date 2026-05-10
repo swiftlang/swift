@@ -1,8 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-objc-interop -swift-version 6
 
-// -swift-version 6 is currently asserts-only
-// REQUIRES: asserts
-
 func id<T>(_ x: T) -> T { x }
 func ohno<T>(_ x: T) -> T? { nil }
 

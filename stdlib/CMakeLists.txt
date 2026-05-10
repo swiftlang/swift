@@ -5,6 +5,20 @@
 # standard library from the Swift compiler build.
 project(swift-stdlib LANGUAGES C CXX)
 
+# CMake passes `-external:I` to clang-cl which results in the search order being
+# altered, and this impacts the definitions of the intrinsics. When building
+# with a MSVC toolset 19.29.30036.3 or newer, this will prevent the runtime from
+# being built on Windows.  Since we know that we only support `clang-cl` as the
+# compiler for the runtime due to the use of the Swift calling convention, we
+# simply override the CMake behaviour unconditionally.
+if(CMAKE_SYSTEM_NAME STREQUAL "Windows" AND MSVC AND CLANG_C_COMPILER_ID MATCHES Clang)
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-imsvc ")
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-imsvc ")
+else()
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_C "-Isystem")
+  set(CMAKE_INCLUDE_SYSTEM_FLAG_CXX "-Isystem")
+endif()
+
 # Add path for custom CMake modules.
 list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -13,6 +27,20 @@ if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_INCLUDE_TESTS)
   set(SWIFT_BUILD_TEST_SUPPORT_MODULES_default TRUE)
 else()
   set(SWIFT_BUILD_TEST_SUPPORT_MODULES_default FALSE)
+endif()
+
+# TODO(compnerd) use a target to avoid re-creating this file all the time
+function(generate_windows_vfs_overlay)
+  file(TO_CMAKE_PATH ${VCToolsInstallDir} VCToolsInstallDir)
+  file(TO_CMAKE_PATH ${UniversalCRTSdkDir} UniversalCRTSdkDir)
+  configure_file("${PROJECT_SOURCE_DIR}/cmake/WindowsVFS.yaml.in"
+                 "${CMAKE_CURRENT_BINARY_DIR}/windows-vfs-overlay.yaml"
+                 @ONLY)
+endfunction()
+if(WINDOWS IN_LIST SWIFT_SDKS)
+  generate_windows_vfs_overlay()
+  file(TO_CMAKE_PATH "${CMAKE_CURRENT_BINARY_DIR}/windows-vfs-overlay.yaml"
+       SWIFT_WINDOWS_VFS_OVERLAY)
 endif()
 
 #
@@ -38,6 +66,8 @@ include(StdlibOptions)
 #
 # End of user-configurable options.
 #
+
+set(SWIFT_STDLIB_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")
 
 # Remove llvm-project/llvm/include directory from -I search part when building
 # the stdlib. We have our own fork of LLVM includes (Support, ADT) in
@@ -93,7 +123,7 @@ else()
   # everything and there are various places where we link runtime code with
   # code built by the host compiler. Disable sanitizers for the runtime for
   # now.
-  add_compile_options(-fno-sanitize=all)
+  add_compile_options("$<$<COMPILE_LANGUAGE:C,CXX>:-fno-sanitize=all>")
 endif()
 
 # Do not enforce checks for LLVM's ABI-breaking build settings.
@@ -178,6 +208,19 @@ if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "singlethreaded"
   message(SEND_ERROR "Cannot enable the single-threaded global executor without enabling SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY")
 endif()
 
+if(SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY)
+  if(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY)
+    message(SEND_ERROR "Cannot use the single-threaded concurrency with task-to-thread concurrency model")
+  endif()
+  if(NOT "${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none")
+    message(SEND_ERROR "Task-to-thread concurrency model requires no global executor")
+  endif()
+else()
+  if("${SWIFT_CONCURRENCY_GLOBAL_EXECUTOR}" STREQUAL "none")
+    message(SEND_ERROR "Only task-to-thread concurrency model is usable with no global executor")
+  endif()
+endif()
+
 swift_create_stdlib_targets("swift-stdlib" "" TRUE)
 if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)
   swift_create_stdlib_targets("swift-stdlib" "sib" TRUE)
@@ -185,6 +228,10 @@ if(SWIFT_STDLIB_ENABLE_SIB_TARGETS)
   swift_create_stdlib_targets("swift-stdlib" "sibgen" TRUE)
 endif()
 swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
+
+# Create the libexec targets
+swift_create_stdlib_targets("swift-libexec" "" TRUE)
+swift_create_stdlib_targets("swift-test-libexec" "" FALSE)
 
 # FIXME: Include the toolchain directory before the public directory. Otherwise
 # the clang resource directory symlink stops installing correctly.

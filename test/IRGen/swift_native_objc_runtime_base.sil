@@ -1,10 +1,11 @@
 // RUN: %target-swift-frontend -enable-objc-interop -emit-ir %s | %FileCheck %s
+// REQUIRES: objc_codegen
 
 // CHECK-LABEL: @"$s30swift_native_objc_runtime_base1CCMm" = hidden global %objc_class {
 // -- metaclass "isa" is root metaclass
-// CHECK:         %objc_class* @"OBJC_METACLASS_$_NSObject",
+// CHECK:         ptr @"OBJC_METACLASS_$_NSObject",
 // -- metaclass "super" is super metaclass
-// CHECK:         %objc_class* @"OBJC_METACLASS_$_NSMagicBase"
+// CHECK:         ptr @"OBJC_METACLASS_$_NSMagicBase"
 @_swift_native_objc_runtime_base(NSMagicBase)
 class C {}
 

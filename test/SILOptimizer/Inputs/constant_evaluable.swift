@@ -99,7 +99,7 @@ internal func comparisons(a: Int, b: Int, c: Int8, d: Int8) -> Bool {
 }
 
 @_semantics("test_driver")
-internal func interpretComparisions() -> Bool {
+internal func interpretComparisons() -> Bool {
   return comparisons(a: 20, b: 55, c: 56, d: 101)
 }
 
@@ -174,8 +174,7 @@ internal func interpretIntTruncations() -> Int8 {
 internal func testInvalidIntTruncations(a: Int32) -> Int8 {
   return Int8(a)
     // CHECK: note: {{.*}}: Not enough bits to represent the passed value
-    // CHECK: note: operation performed during this call traps
-    // CHECK: function_ref @$sSZss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")
@@ -220,8 +219,7 @@ internal func interpretSingedUnsignedConversions() -> UInt32 {
 internal func testInvalidSingedUnsignedConversions(a: Int64) -> UInt64 {
   return UInt64(a)
     // CHECK: note: {{.*}}: Negative value is not representable
-    // CHECK: note: operation performed during this call traps
-    // CHECK: function_ref @$sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufC
+    // CHECK: note: operation traps
 }
 
 @_semantics("test_driver")
@@ -766,21 +764,21 @@ func interpretArrayAppendNonEmpty() -> [String] {
   return testArrayAppendNonEmpty("mkdir")
 }
 
-struct StructContaningArray {
+struct StructContainingArray {
   var array: [Int]
 }
 
 // CHECK-LABEL: @testArrayFieldAppend
 // CHECK-NOT: error:
 @_semantics("constant_evaluable")
-func testArrayFieldAppend(_ x: Int) -> StructContaningArray {
-  var s = StructContaningArray(array: [])
+func testArrayFieldAppend(_ x: Int) -> StructContainingArray {
+  var s = StructContainingArray(array: [])
   s.array.append(x)
   return s
 }
 
 @_semantics("test_driver")
-func interpretArrayFieldAppend() -> StructContaningArray {
+func interpretArrayFieldAppend() -> StructContainingArray {
   return testArrayFieldAppend(0)
 }
 

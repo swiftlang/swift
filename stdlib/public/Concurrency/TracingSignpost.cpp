@@ -14,9 +14,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if SWIFT_STDLIB_CONCURRENCY_TRACING
+#if SWIFT_STDLIB_TRACING
 
 #include "TracingSignpost.h"
+#include "swift/Runtime/EnvironmentVariables.h"
 #include <stdio.h>
 
 #define SWIFT_LOG_CONCURRENCY_SUBSYSTEM "com.apple.swift.concurrency"
@@ -30,12 +31,24 @@ namespace trace {
 os_log_t ActorLog;
 os_log_t TaskLog;
 swift::once_t LogsToken;
+bool TracingEnabled;
 
 void setupLogs(void *unused) {
-  ActorLog = os_log_create(SWIFT_LOG_CONCURRENCY_SUBSYSTEM,
-                           SWIFT_LOG_ACTOR_CATEGORY);
-  TaskLog = os_log_create(SWIFT_LOG_CONCURRENCY_SUBSYSTEM,
-                          SWIFT_LOG_TASK_CATEGORY);
+  if (!swift::runtime::trace::shouldEnableTracing()) {
+    TracingEnabled = false;
+    return;
+  }
+
+  TracingEnabled = true;
+
+  const char *subsystem = SWIFT_LOG_CONCURRENCY_SUBSYSTEM;
+  const char *envSubsystem =
+      runtime::environment::concurrencyTracingSubsystem();
+  if (envSubsystem && envSubsystem[0] != '\0')
+    subsystem = envSubsystem;
+
+  ActorLog = os_log_create(subsystem, SWIFT_LOG_ACTOR_CATEGORY);
+  TaskLog = os_log_create(subsystem, SWIFT_LOG_TASK_CATEGORY);
 }
 
 } // namespace trace

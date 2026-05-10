@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
-struct MyType<TyA, TyB> { // expected-note {{generic type 'MyType' declared here}}
+struct MyType<TyA, TyB> { // expected-note {{generic struct 'MyType' declared here}}
   // expected-note @-1 {{arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}
-  // expected-note @-2 4 {{arguments to generic parameter 'TyA' ('Float' and 'Int') are expected to be equal}}
+
   var a : TyA, b : TyB
 }
 
@@ -23,6 +23,22 @@ struct Container {
 let _: OurType<Int, String>
 let _: YourType<Int>
 let _: Container.YourType<Int>
+
+// The question of whether a type alias is implicitly generic should not
+// arise until after we attempt to resolve the underlying type.
+do {
+  struct Outer<T> {
+    typealias NotGeneric = Outer
+    struct Inner<U> {
+      typealias NotGeneric = Outer
+    }
+  }
+
+  let _: Outer<Int>.NotGeneric<Bool>
+  // expected-error@-1 {{cannot specialize non-generic type 'Outer<Int>.NotGeneric' (aka 'Outer<Int>')}}
+  let _: Outer<Int>.Inner<Never>.NotGeneric<Bool>
+  // expected-error@-1 {{cannot specialize non-generic type 'Outer<Int>.Inner<Never>.NotGeneric' (aka 'Outer<Int>')}}
+}
 
 //
 // Bona-fide generic type aliases
@@ -55,7 +71,7 @@ func f() {
 }
 
 
-typealias A<T1, T2> = MyType<T2, T1>  // expected-note {{generic type 'A' declared here}}
+typealias A<T1, T2> = MyType<T2, T1>  // expected-note {{generic type alias 'A' declared here}}
 
 typealias B<T1> = MyType<T1, T1>
 
@@ -64,7 +80,7 @@ typealias C<T> = MyType<String, T>
 // Type aliases with unused generic params.
 typealias D<T1, T2, T3> = MyType<T2, T1>  // expected-note 3 {{'T3' declared as parameter to type 'D'}}
 
-typealias E<T1, T2> = Int  // expected-note {{generic type 'E' declared here}}
+typealias E<T1, T2> = Int  // expected-note {{generic type alias 'E' declared here}}
 // expected-note@-1 {{'T1' declared as parameter to type 'E'}}
 // expected-note@-2 {{'T2' declared as parameter to type 'E'}}
 
@@ -94,7 +110,7 @@ let _ : D<Int, Int, Float> = D(a: 1, b: 2)
 
 let _ : F = { (a : Int) -> Int in a }  // Infer the types of F
 
-let _ : F = { a in a } // expected-error {{unable to infer type of a closure parameter 'a' in the current context}}
+let _ : F = { a in a } // expected-error {{cannot infer type of closure parameter 'a' without a type annotation}}
 
 _ = MyType(a: "foo", b: 42)
 _ = A(a: "foo", b: 42)
@@ -162,7 +178,7 @@ class GenericClass<T> {
   }
 
   func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
-    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'GenericClass<T>.TA<S>' (aka 'MyType<T, S>') to return type 'GenericClass<T>.TA<Int>' (aka 'MyType<T, Int>')}}
+    return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'GenericClass<T>.TA<Int>' (aka 'MyType<T, Int>')}}
   }
 
   func testCaptureInvalid2<S>(s: Int, t: T) -> TA<S> {
@@ -178,7 +194,7 @@ class GenericClass<T> {
   }
 
   // Stupid corner case -- underlying type is not dependent
-  typealias NotDependent<T> = Int
+  typealias NotDependent<U> = Int
 
   func misleadingCode(_: NotDependent<String>) {}
 }
@@ -236,18 +252,14 @@ let _: ConcreteStruct.O<Int> = ConcreteStruct.O(123)
 let _: ConcreteStruct.O<Int> = ConcreteStruct.O<Int>(123)
 
 // Qualified lookup of generic typealiases nested inside generic contexts
-//
-// FIXME marks cases which still don't work correctly, and either produce a
-// spurious diagnostic, or are actually invalid and do not diagnose.
-//
-// This occurs because the constraint solver does the wrong thing with an
-// UnresolvedSpecializeExpr applied to a generic typealias.
-//
-// In the other cases, we manage to fold the UnresolvedSpecializeExpr in the
-// precheckExpression() phase, which handles generic typealiases correctly.
 
-let _ = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
-let _ = GenericClass.TA<Float>(a: 1, b: 4.0)
+do {
+  let x1 = GenericClass.TA<Float>(a: 4.0, b: 1)
+  let x2 = GenericClass.TA<Float>(a: 1, b: 4.0)
+
+  let _: MyType<Double, Float> = x1
+  let _: MyType<Int, Float> = x2
+}
 
 let _ = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _ = GenericClass<Int>.TA(a: 1, b: 4.0)
@@ -258,8 +270,13 @@ let _ = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 let _: GenericClass.TA = GenericClass.TA(a: 4.0, b: 1)
 let _: GenericClass.TA = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // FIXME
-let _: GenericClass.TA = GenericClass.TA<Float>(a: 1, b: 4.0)
+do {
+  let x1: GenericClass.TA = GenericClass.TA<Float>(a: 4.0, b: 1)
+  let x2: GenericClass.TA = GenericClass.TA<Float>(a: 1, b: 4.0)
+
+  let _: MyType<Double, Float> = x1
+  let _: MyType<Int, Float> = x2
+}
 
 let _: GenericClass.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
@@ -270,8 +287,8 @@ let _: GenericClass.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 let _: GenericClass<Int>.TA = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot assign value of type 'MyType<Float, Int>' to type 'MyType<Int, Int>'}}
-let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 1, b: 4.0) // expected-error {{cannot assign value of type 'MyType<Float, Double>' to type 'MyType<Int, Double>'}}
+let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+let _: GenericClass<Int>.TA = GenericClass.TA<Float>(a: 1, b: 4.0)
 
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA = GenericClass<Int>.TA(a: 1, b: 4.0)
@@ -282,8 +299,8 @@ let _: GenericClass<Int>.TA = GenericClass<Int>.TA<Float>(a: 1, b: 4.0)
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass.TA(a: 1, b: 4.0)
 
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
-let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0) // expected-error {{cannot assign value of type 'MyType<Float, Float>' to type 'GenericClass<Int>.TA<Float>' (aka 'MyType<Int, Float>')}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
+let _: GenericClass<Int>.TA<Float> = GenericClass.TA<Float>(a: 1, b: 4.0)
 
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 4.0, b: 1) // expected-error {{cannot convert value of type 'Double' to expected argument type 'Int'}}
 let _: GenericClass<Int>.TA<Float> = GenericClass<Int>.TA(a: 1, b: 4.0)
@@ -306,7 +323,7 @@ func takesSugaredType2(m: GenericClass<Int>.TA<Float>) {
 // parameters of A<>.
 extension A {}
 
-extension A<T> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
+extension A<Int> {}  // expected-error {{generic type 'A' specialized with too few type parameters (got 1, but expected 2)}}
 extension A<Float,Int> {}
 extension C<T> {}  // expected-error {{cannot find type 'T' in scope}}
 extension C<Int> {}
@@ -316,12 +333,14 @@ protocol ErrorQ {
   associatedtype Y
 }
 protocol ErrorP {
-  associatedtype X: ErrorQ // expected-note {{protocol requires nested type 'X'; do you want to add it?}}
+  associatedtype X: ErrorQ // expected-note {{protocol requires nested type 'X'}}
 }
 
 typealias ErrorA<T: ErrorP> = T.X.Y
 
-struct ErrorB : ErrorP { // expected-error {{type 'ErrorB' does not conform to protocol 'ErrorP'}}
+struct ErrorB : ErrorP { 
+  // expected-error@-1 {{type 'ErrorB' does not conform to protocol 'ErrorP'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias X = ErrorC // expected-note {{possibly intended match 'ErrorB.X' (aka 'ErrorC') does not conform to 'ErrorQ'}}
 }
 
@@ -336,8 +355,8 @@ typealias Id<T> = T
 extension Id {} // expected-error {{non-nominal type 'Id' cannot be extended}}
 
 class OuterGeneric<T> {
-  typealias Alias<T> = AnotherGeneric<T>
-  // expected-note@-1 {{generic type 'Alias' declared here}}
+  typealias Alias<U> = AnotherGeneric<U>
+  // expected-note@-1 {{generic type alias 'Alias' declared here}}
   class InnerNonGeneric : Alias {}
   // expected-error@-1 {{reference to generic type 'OuterGeneric<T>.Alias' requires arguments in <...>}}
 }
@@ -446,3 +465,36 @@ func testSugar(_ gx: GX<Int>, _ gy: GX<Int>.GY<Double>, gz: GX<Int>.GY<Double>.E
   let i2: Int = gy  // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>' (aka 'Array<Double>') to specified type 'Int'}}
   let i3: Int = gz // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>.Element' (aka 'Double') to specified type 'Int'}}
 }
+
+func testLocalRequirementInference<T>(_ x: T, y: Int, s: S) {
+  typealias X<U: P> = (T, U) where T == U.A
+  func foo<V>(_ x: X<V>) {} // expected-note {{where 'V' = 'Int'}} expected-note {{where 'T' = 'T', 'V.A' = 'S.A' (aka 'Float')}}
+  foo((x, y)) // expected-error {{local function 'foo' requires that 'Int' conform to 'P'}}
+  foo((x, s)) // expected-error {{local function 'foo' requires the types 'T' and 'S.A' (aka 'Float') be equivalent}}
+}
+
+struct TestNestedRequirementInference<T> {
+  typealias X<U: P> = (T, U) where T == U.A
+  func foo<V>(_ x: X<V>) {} // expected-note {{where 'V' = 'Int'}} expected-note {{where 'T' = 'T', 'V.A' = 'S.A' (aka 'Float')}}
+  func bar(_ x: T, y: Int, s: S) {
+    foo((x, y)) // expected-error {{instance method 'foo' requires that 'Int' conform to 'P'}}
+    foo((x, s)) // expected-error {{instance method 'foo' requires the types 'T' and 'S.A' (aka 'Float') be equivalent}}
+  }
+}
+
+//
+// Nested self-referential generic typealiases
+// (similar to a pattern used for `Task.Handle` backwards compatibility)
+//
+
+extension X where T == Never, U == Never {
+  typealias SelfRef1 = X
+  typealias SelfRef2 = generic.X
+  typealias SelfRef3 = generic::X
+}
+
+func testSelfRefs(
+  _: X.SelfRef1<Int, Int>, // expected-error {{cannot specialize non-generic type 'X<Never, Never>'}}
+  _: X.SelfRef2<Int, Int>, // no-error
+  _: X.SelfRef3<Int, Int> // no-error
+) {}

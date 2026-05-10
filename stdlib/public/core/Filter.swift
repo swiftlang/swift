@@ -36,6 +36,9 @@ public struct LazyFilterSequence<Base: Sequence> {
   }
 }
 
+@available(*, unavailable)
+extension LazyFilterSequence: Sendable {}
+
 extension LazyFilterSequence {
   /// An iterator over the elements traversed by some base iterator that also
   /// satisfy a given predicate.
@@ -61,6 +64,9 @@ extension LazyFilterSequence {
     }
   }
 }
+
+@available(*, unavailable)
+extension LazyFilterSequence.Iterator: Sendable {}
 
 extension LazyFilterSequence.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element
@@ -117,10 +123,11 @@ public typealias LazyFilterCollection<T: Collection> = LazyFilterSequence<T>
 extension LazyFilterCollection: Collection {
   public typealias SubSequence = LazyFilterCollection<Base.SubSequence>
 
+  // https://github.com/apple/swift/issues/46747
   // Any estimate of the number of elements that pass `_predicate` requires
   // iterating the collection and evaluating each element, which can be costly,
   // is unexpected, and usually doesn't pay for itself in saving time through
-  // preventing intermediate reallocations. (SR-4164)
+  // preventing intermediate reallocations.
   @inlinable // lazy-performance
   public var underestimatedCount: Int { return 0 }
 

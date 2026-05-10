@@ -1,7 +1,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: echo "public var x = Int()" | %target-swift-frontend -parse-as-library -module-name FooBar -emit-module -o %t -
-// RUN: %target-swift-emit-silgen -parse-stdlib -module-name expressions %s -I%t -disable-access-control | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-stdlib -module-name expressions %s -I%t -disable-access-control | %FileCheck %s
 
 import Swift
 import FooBar
@@ -296,7 +296,7 @@ func archetype_member_ref<T : Runcible>(_ x: T) {
   x.free_method()
   // CHECK:      [[READ:%.*]] = begin_access [read] [unknown] [[X:%.*]]
   // CHECK-NEXT: [[TEMP:%.*]] = alloc_stack $T
-  // CHECK-NEXT: copy_addr [[READ]] to [initialization] [[TEMP]]
+  // CHECK-NEXT: copy_addr [[READ]] to [init] [[TEMP]]
   // CHECK-NEXT: end_access [[READ]]
   // CHECK-NEXT: witness_method $T, #Runcible.free_method :
   // CHECK-NEXT: apply
@@ -392,7 +392,7 @@ func tuple() -> (Int, Float) { return (1, 1.0) }
 func tuple_element(_ x: (Int, Float)) {
   var x = x
   // CHECK: [[XADDR:%.*]] = alloc_box ${ var (Int, Float) }
-  // CHECK: [[XLIFETIME:%.*]] = begin_borrow [lexical] [[XADDR]]
+  // CHECK: [[XLIFETIME:%.*]] = begin_borrow [var_decl] [[XADDR]]
   // CHECK: [[PB:%.*]] = project_box [[XLIFETIME]]
 
   int(x.0)
@@ -419,8 +419,8 @@ func containers() -> ([Int], Dictionary<String, Int>) {
   return ([1, 2, 3], ["Ankeny": 1, "Burnside": 2, "Couch": 3])
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s11expressions7if_expr{{[_0-9a-zA-Z]*}}F
-func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
+// CHECK-LABEL: sil hidden [ossa] @$s11expressions12ternary_expr{{[_0-9a-zA-Z]*}}F
+func ternary_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var a = a
   var b = b
   var x = x
@@ -428,20 +428,20 @@ func if_expr(_ a: Bool, b: Bool, x: Int, y: Int, z: Int) -> Int {
   var z = z
   // CHECK: bb0({{.*}}):
   // CHECK: [[AB:%[0-9]+]] = alloc_box ${ var Bool }
-  // CHECK: [[AL:%[0-9]+]] = begin_borrow [lexical] [[AB]]
-  // CHECK: [[PBA:%.*]] = project_box [[AL]]
+  // CHECK: [[BAL:%.*]] = begin_borrow [var_decl] [[AB]]
+  // CHECK: [[PBA:%.*]] = project_box [[BAL]]
   // CHECK: [[BB:%[0-9]+]] = alloc_box ${ var Bool }
-  // CHECK: [[BL:%[0-9]+]] = begin_borrow [lexical] [[BB]]
-  // CHECK: [[PBB:%.*]] = project_box [[BL]]
+  // CHECK: [[BBL:%.*]] = begin_borrow [var_decl] [[BB]]
+  // CHECK: [[PBB:%.*]] = project_box [[BBL]]
   // CHECK: [[XB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[XL:%[0-9]+]] = begin_borrow [lexical] [[XB]]
-  // CHECK: [[PBX:%.*]] = project_box [[XL]]
+  // CHECK: [[BXL:%.*]] = begin_borrow [var_decl] [[XB]]
+  // CHECK: [[PBX:%.*]] = project_box [[BXL]]
   // CHECK: [[YB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[YL:%[0-9]+]] = begin_borrow [lexical] [[YB]]
-  // CHECK: [[PBY:%.*]] = project_box [[YL]]
+  // CHECK: [[BYL:%.*]] = begin_borrow [var_decl] [[YB]]
+  // CHECK: [[PBY:%.*]] = project_box [[BYL]]
   // CHECK: [[ZB:%[0-9]+]] = alloc_box ${ var Int }
-  // CHECK: [[ZL:%[0-9]+]] = begin_borrow [lexical] [[ZB]]
-  // CHECK: [[PBZ:%.*]] = project_box [[ZL]]
+  // CHECK: [[BZL:%.*]] = begin_borrow [var_decl] [[ZB]]
+  // CHECK: [[PBZ:%.*]] = project_box [[BZL]]
 
   return a
     ? x
@@ -541,6 +541,7 @@ func dontEmitIgnoredLoadExpr(_ a: NonTrivialStruct) -> NonTrivialStruct.Type {
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
 // CHECK: bb0(%0 : @guaranteed $NonTrivialStruct):
 // CHECK-NEXT: debug_value
+// CHECK-NEXT: ignored_use
 // CHECK-NEXT: [[RESULT:%.*]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[RESULT]] : $@thin NonTrivialStruct.Type
 
@@ -557,7 +558,7 @@ func dontLoadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTrivia
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2:
-// CHECK-NEXT: unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
+// CHECK-NEXT: unchecked_inplace_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -573,12 +574,12 @@ func dontLoadIgnoredLValueDoubleForceUnwrap(_ a: inout NonTrivialStruct??) -> No
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2:
-// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, #Optional.some!enumelt
+// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_inplace_enum_data_addr [[READ]] : $*Optional<Optional<NonTrivialStruct>>, #Optional.some!enumelt
 // CHECK-NEXT: switch_enum_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb3
 // CHECK: bb3:
 // CHECK: unreachable
 // CHECK: bb4:
-// CHECK-NEXT: unchecked_take_enum_data_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
+// CHECK-NEXT: unchecked_inplace_enum_data_addr [[UNWRAPPED]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -595,11 +596,12 @@ func loadIgnoredLValueForceUnwrap(_ a: inout NonTrivialStruct) -> NonTrivialStru
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$s{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
 // CHECK-NEXT: end_borrow [[BORROW]]
-// CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb2, case #Optional.none!enumelt: bb1
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2([[UNWRAPPED_X:%[0-9]+]] : @owned $NonTrivialStruct):
+// CHECK-NEXT: ignored_use [[UNWRAPPED_X]]
+// CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: destroy_value [[UNWRAPPED_X]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -615,17 +617,18 @@ func loadIgnoredLValueThroughForceUnwrap(_ a: inout NonTrivialStruct?) -> NonTri
 // CHECK: bb1:
 // CHECK: unreachable
 // CHECK: bb2:
-// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_take_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
+// CHECK-NEXT: [[UNWRAPPED:%[0-9]+]] = unchecked_inplace_enum_data_addr [[READ]] : $*Optional<NonTrivialStruct>, #Optional.some!enumelt
 // CHECK-NEXT: [[BORROW:%[0-9]+]] = load_borrow [[UNWRAPPED]]
 // CHECK-NEXT: // function_ref NonTrivialStruct.x.getter
 // CHECK-NEXT: [[GETTER:%[0-9]+]] = function_ref @$s{{[_0-9a-zA-Z]*}}vg : $@convention(method) (@guaranteed NonTrivialStruct) -> @owned Optional<NonTrivialStruct>
 // CHECK-NEXT: [[X:%[0-9]+]] = apply [[GETTER]]([[BORROW]])
 // CHECK-NEXT: end_borrow [[BORROW]]
-// CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: switch_enum [[X]] : $Optional<NonTrivialStruct>, case #Optional.some!enumelt: bb4, case #Optional.none!enumelt: bb3
 // CHECK: bb3:
 // CHECK: unreachable
 // CHECK: bb4([[UNWRAPPED_X:%[0-9]+]] : @owned $NonTrivialStruct):
+// CHECK-NEXT: ignored_use [[UNWRAPPED_X]]
+// CHECK-NEXT: end_access [[READ]]
 // CHECK-NEXT: destroy_value [[UNWRAPPED_X]]
 // CHECK-NEXT: [[METATYPE:%[0-9]+]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[METATYPE]]
@@ -641,12 +644,13 @@ func evaluateIgnoredKeyPathExpr(_ s: inout NonTrivialStruct, _ kp: WritableKeyPa
 // CHECK-NEXT: [[S_READ:%[0-9]+]] = begin_access [read] [unknown] %0
 // CHECK-NEXT: [[KP:%[0-9]+]] = upcast [[KP_TEMP]]
 // CHECK-NEXT: [[S_TEMP:%[0-9]+]] = alloc_stack $NonTrivialStruct
-// CHECK-NEXT: copy_addr [[S_READ]] to [initialization] [[S_TEMP]]
+// CHECK-NEXT: copy_addr [[S_READ]] to [init] [[S_TEMP]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: [[PROJECT_FN:%[0-9]+]] = function_ref @swift_getAtKeyPath :
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = alloc_stack $Int
 // CHECK-NEXT: apply [[PROJECT_FN]]<NonTrivialStruct, Int>([[RESULT]], [[S_TEMP]], [[KP]])
-// CHECK-NEXT: load [trivial] [[RESULT]]
+// CHECK-NEXT: [[RESULT_LOAD:%.*]] = load [trivial] [[RESULT]]
+// CHECK-NEXT: ignored_use [[RESULT_LOAD]]
 // CHECK-NEXT: end_access [[S_READ]]
 // CHECK-NEXT: dealloc_stack [[RESULT]]
 // CHECK-NEXT: destroy_addr [[S_TEMP]]
@@ -667,8 +671,10 @@ func implodeRecursiveTuple(_ expr: ((Int, Int), Int)?) {
   // CHECK-NEXT: ([[X:%[0-9]+]], [[Y:%[0-9]+]]) = destructure_tuple [[WHOLE]]
   // CHECK-NEXT: ([[X0:%[0-9]+]], [[X1:%[0-9]+]]) = destructure_tuple [[X]]
   // CHECK-NEXT: [[X:%[0-9]+]] = tuple ([[X0]] : $Int, [[X1]] : $Int)
-  // CHECK-NEXT: debug_value [[X]] : $(Int, Int), let, name "x"
-  // CHECK-NEXT: debug_value [[Y]] : $Int, let, name "y"
+  // CHECK-NEXT: [[MVX:%.*]] = move_value [var_decl] [[X]] : $(Int, Int)
+  // CHECK-NEXT: debug_value [[MVX]] : $(Int, Int), let, name "x"
+  // CHECK-NEXT: [[MVY:%.*]] = move_value [var_decl] [[Y]] : $Int
+  // CHECK-NEXT: debug_value [[MVY]] : $Int, let, name "y"
 
   let (x, y) = expr!
 }
@@ -695,3 +701,27 @@ func test21886435() {
   () = ()
 }
 
+class IgnoredUseComputedGetterWithDiscardedResult {
+   struct S {
+       var x: String
+   }
+
+   var s: S {
+       get { S(x: "") }
+       set {}
+   }
+
+   // CHECK-LABEL: sil hidden [ossa] @$s11expressions43IgnoredUseComputedGetterWithDiscardedResultC1fyyACF : $@convention(method) (@guaranteed IgnoredUseComputedGetterWithDiscardedResult, @guaranteed IgnoredUseComputedGetterWithDiscardedResult) -> () {
+   // CHECK: bb0([[ARG:%.*]] : @guaranteed $IgnoredUseComputedGetterWithDiscardedResult,
+   // CHECK:   [[METHOD:%.*]] = class_method [[ARG]]
+   // CHECK:   [[RESULT:%.*]] = apply [[METHOD]]([[ARG]])
+   // CHECK:   [[BORROW:%.*]] = begin_borrow [[RESULT]]
+   // CHECK:   [[EXTRACT:%.*]] = struct_extract [[BORROW]]
+   // CHECK:   ignored_use [[EXTRACT]]
+   // CHECK:   end_borrow [[BORROW]]
+   // CHECK:   destroy_value [[RESULT]]
+   // CHECK: } // end sil function '$s11expressions43IgnoredUseComputedGetterWithDiscardedResultC1fyyACF'
+   func f(_ o: IgnoredUseComputedGetterWithDiscardedResult) {
+     _ = o.s.x
+   }
+}

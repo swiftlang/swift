@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "condbranch-forwarding"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -18,6 +19,9 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
@@ -115,7 +119,13 @@ private:
       }
     }
     if (Changed) {
+      updateAllGuaranteedPhis(getPassManager(), F);
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+      removeUnreachableBlocks(*F);
+      if (F->needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), F);
+      if (F->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), F);
     }
   }
 
@@ -123,9 +133,26 @@ private:
 
 /// Returns true if all instructions of block \p BB are safe to be moved
 /// across other code.
-static bool hasNoRelevantSideEffects(SILBasicBlock *BB) {
+static bool hasNoRelevantSideEffects(SILBasicBlock *BB, EnumInst *enumInst) {
   for (SILInstruction &I : *BB) {
-    if (I.getMemoryBehavior() == SILInstruction::MemoryBehavior::None)
+    if (BB->getParent()->hasOwnership() && &I != enumInst) {
+      // The instruction must not use any (non-trivial) value because we don't
+      // do liveness analysis. When moving the block, there is no guarantee that
+      // the operand value is still alive at the new location.
+      for (Operand *op : I.getRealOperands()) {
+        SILValue opv = op->get();
+        // The `enum` is an exception, because it's a forwarded value and we already
+        // check that it's forwarded to the `switch_enum` at the new location.
+        if (opv == enumInst)
+          continue;
+        // If the value is defined in the block it's a block-local liferange.
+        if (opv->getParentBlock() == BB)
+          continue;
+        if (opv->getOwnershipKind() != OwnershipKind::None)
+          return false;
+      }
+    }
+    if (I.getMemoryBehavior() == MemoryBehavior::None)
       continue;
     if (auto *CF = dyn_cast<CondFailInst>(&I)) {
       // Allow cond_fail if the condition is "produced" by a builtin in the
@@ -139,9 +166,6 @@ static bool hasNoRelevantSideEffects(SILBasicBlock *BB) {
       auto *BI = dyn_cast<BuiltinInst>(TEI->getOperand());
       if (!BI || BI->getParent() != BB)
         return false;
-      continue;
-    }
-    if (isa<BeginBorrowInst>(&I) || isa<EndBorrowInst>(&I)) {
       continue;
     }
     LLVM_DEBUG(llvm::dbgs() << "Bailing out, found inst with side-effects ");
@@ -158,13 +182,15 @@ static bool hasNoRelevantSideEffects(SILBasicBlock *BB) {
 bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   // The switch_enum argument (an Enum) must be a block argument at the merging
   // point of the condition's destinations.
-  auto *Arg = dyn_cast<SILArgument>(SEI->getOperand());
+  auto *Arg = dyn_cast<SILArgument>(lookThroughBorrowedFromDef(SEI->getOperand()));
   if (!Arg)
     return false;
 
+  SILValue argValue = lookThroughBorrowedFromUser(Arg);
+
   // The switch_enum must be the only use of the Enum, except it may be used in
   // SEI's successors.
-  for (Operand *ArgUse : Arg->getUses()) {
+  for (Operand *ArgUse : argValue->getUses()) {
     SILInstruction *ArgUser = ArgUse->getUser();
     if (ArgUser == SEI)
       continue;
@@ -207,7 +233,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     CommonBranchBlock = PredPred;
 
     // We cannot move the block across other code if it has side-effects.
-    if (!hasNoRelevantSideEffects(Pred))
+    if (!hasNoRelevantSideEffects(Pred, EI))
       return false;
     PredBlocks.push_back(Pred);
   }
@@ -221,7 +247,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   // This optimization works with all kind of terminators, except those which
   // have side-effects, like try_apply.
   TermInst *Condition = CommonBranchBlock->getTerminator();
-  if (Condition->getMemoryBehavior() != SILInstruction::MemoryBehavior::None)
+  if (Condition->getMemoryBehavior() != MemoryBehavior::None)
     return false;
 
   // Are there any other branch block successors beside the predecessors which
@@ -230,20 +256,28 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     return false;
 
   if (getFunction()->hasOwnership()) {
-    // TODO: Currently disabled because this case may need lifetime extension
-    // Disabling this conservatively for now.
-    assert(Condition->getNumOperands() == 1);
-    BorrowedValue conditionOp(Condition->getOperand(0));
-    if (conditionOp && conditionOp.isLocalScope()) {
-      return false;
+    // The terminator's condition will be moved to the location of the
+    // switch_enum. If the condition's operand is within a local borrow scope,
+    // moving it may violate OSSA lifetime rules.
+    assert(Condition->getNumRealOperands() == 1);
+    SILValue condOp = Condition->getOperand(0);
+    if (condOp->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      if (!visitBorrowIntroducers(condOp, [&](SILValue introducer) {
+        if (BorrowedValue(introducer).isLocalScope()) {
+          return false;
+        }
+        return true;
+      })) {
+        return false;
+      }
     }
   }
   // Now do the transformation!
   // First thing to do is to replace all uses of the Enum (= the merging block
   // argument), as this argument gets deleted.
   BasicBlockSet NeedEnumArg(BB->getParent());
-  while (!Arg->use_empty()) {
-    Operand *ArgUse = *Arg->use_begin();
+  while (!argValue->use_empty()) {
+    Operand *ArgUse = *argValue->use_begin();
     SILInstruction *ArgUser = ArgUse->getUser();
     if (ArgUser->isDebugInstruction()) {
       // Don't care about debug instructions. Just remove them.
@@ -271,8 +305,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     }
     assert(ArgUser == SEI);
     // We delete the SEI later anyway. Just get rid of the Arg use.
-    ArgUse->set(SILUndef::get(SEI->getOperand()->getType(),
-                              *getFunction()));
+    ArgUse->set(SILUndef::get(SEI->getOperand()));
   }
 
   // Redirect the predecessors of the condition's merging block to the
@@ -286,15 +319,17 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     llvm::SmallVector<SILValue, 2> BranchArgs;
     unsigned HasEnumArg = NeedEnumArg.contains(SEDest);
     if (SEDest->getNumArguments() == 1 + HasEnumArg) {
-      // The successor block has an original argument, which is the Enum's
-      // payload.
-      BranchArgs.push_back(EI->getOperand());
+      if (SEI->hasDefault() && SEDest == SEI->getDefaultBB()) {
+        BranchArgs.push_back(EI);
+      } else {
+        // The successor block has an original argument, which is the Enum's
+        // payload.
+        BranchArgs.push_back(EI->getOperand());
+      }
     }
     if (HasEnumArg) {
       // The successor block has a new argument (which we created above) where
       // we have to pass the Enum.
-      assert(!getFunction()->hasOwnership() ||
-             EI->getType().isTrivial(*getFunction()));
       BranchArgs.push_back(EI);
     }
     B.createBranch(BI->getLoc(), SEDest, BranchArgs);
@@ -317,6 +352,9 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
         SILBuilderWithScope(term).createDestroyValue(EI->getLoc(), EI);
       }
     }
+  }
+  if (argValue != Arg) {
+    cast<BorrowedFromInst>(argValue)->eraseFromParent();
   }
 
   // Final step: replace the switch_enum by the condition.

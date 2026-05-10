@@ -1,12 +1,13 @@
 // RUN: %target-swift-frontend  -g -enable-objc-interop  -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-objc
 // RUN: %target-swift-frontend  -g -disable-objc-interop -primary-file %s -emit-ir | %FileCheck %s -DINT=i%target-ptrsize --check-prefixes=CHECK,CHECK-native
 
-// REQUIRES: concurrency
+// REQUIRES: concurrency, objc_codegen
 
 sil_stage canonical
 
 import Builtin
 import Swift
+import _Concurrency
 
 public protocol P {}
 public class C : P {}
@@ -49,7 +50,6 @@ entry(%p : $*τ_0_0):
   unreachable
 }
 
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingPTA"(
 sil hidden @reabstract_context : $@async @convention(thin) (@owned C) -> () {
 bb0(%0 : $C):
   %6 = alloc_stack $C
@@ -90,6 +90,11 @@ entry(%e : $EmptyType, %b : $WeakBox<τ_0_0>):
   unreachable
 }
 
+// CHECK-DAG: @"$s7takingQTATu" = internal
+// CHECK-DAG: @"$s11takingQAndSTATu" = internal
+// CHECK-DAG: @"$s13inner_closureTATu" = internal
+// CHECK-DAG: @"$s15returns_closureTATu" = internal
+
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_context(
 // CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA"(
 sil public @bind_polymorphic_param_from_context : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> @owned @async @callee_guaranteed () -> () {
@@ -119,7 +124,6 @@ bb0(%0 : $*τ_0_1, %2: $EmptyType):
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swift{{(tail)?}}cc void @bind_polymorphic_param_from_forwarder_parameter(
-// CHECK-LABEL: define internal swift{{(tail)?}}cc void @"$s7takingQTA.{{[0-9]+}}"(
 sil public @bind_polymorphic_param_from_forwarder_parameter : $@async @convention(thin) <τ_0_1>(@in τ_0_1) -> () {
 bb0(%0 : $*τ_0_1):
   %1 = alloc_ref $WeakBox<BaseProducer<τ_0_1>>

@@ -25,6 +25,7 @@
 
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Utils/InstModCallbacks.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
 
 namespace llvm {
@@ -36,7 +37,7 @@ namespace swift {
 class DominanceInfo;
 class SILLoop;
 class SILLoopInfo;
-struct InstModCallbacks;
+class SILPassManager;
 
 /// Adds a new argument to an edge between a branch and a destination
 /// block. Allows for user injected callbacks via \p callbacks.
@@ -65,22 +66,16 @@ TermInst *changeEdgeValue(TermInst *branch, SILBasicBlock *dest, size_t idx,
 /// specified index. Asserts internally that the argument along the edge does
 /// not have uses.
 TermInst *deleteEdgeValue(TermInst *branch, SILBasicBlock *destBlock,
-                          size_t argIndex);
+                          size_t argIndex, bool cleanupDeadPhiOp = true,
+                          InstModCallbacks callbacks = InstModCallbacks());
 
 /// Erase the \p argIndex phi argument from \p block. Asserts that the argument
 /// is a /real/ phi argument. Removes all incoming values for the argument from
 /// predecessor terminators. Asserts internally that it only ever is given
 /// "true" phi argument.
-void erasePhiArgument(SILBasicBlock *block, unsigned argIndex);
-
-/// Replace a branch target.
-///
-/// \param t The terminating instruction to modify.
-/// \param oldDest The successor block that will be replaced.
-/// \param newDest The new target block.
-/// \param preserveArgs If set, preserve arguments on the replaced edge.
-void replaceBranchTarget(TermInst *t, SILBasicBlock *oldDest,
-                         SILBasicBlock *newDest, bool preserveArgs);
+void erasePhiArgument(SILBasicBlock *block, unsigned argIndex,
+                      bool cleanupDeadPhiOp = true,
+                      InstModCallbacks callbacks = InstModCallbacks());
 
 /// Check if the edge from the terminator is critical.
 bool isCriticalEdge(TermInst *t, unsigned edgeIdx);
@@ -196,6 +191,8 @@ bool mergeBasicBlockWithSuccessor(SILBasicBlock *bb, DominanceInfo *domInfo,
 /// quadratic.
 bool mergeBasicBlocks(SILFunction *f);
 
+bool isTrapNoReturnFunction(SILFunction *f);
+
 /// Return true if we conservatively find all bb's that are non-failure exit
 /// basic blocks and place them in \p bbs. If we find something we don't
 /// understand, bail.
@@ -216,6 +213,31 @@ bool mergeBasicBlocks(SILFunction *f);
 /// TODO:
 bool findAllNonFailureExitBBs(SILFunction *f,
                               llvm::TinyPtrVector<SILBasicBlock *> &bbs);
+
+/// Breaks infinite loops in the control flow by inserting an "artificial" loop exit to a new
+/// dead-end block with an `unreachable`.
+///
+/// Inserts a `cond_br` with a `builtin "infinite_loop_true_condition"`:
+/// ```
+/// bb0:
+///   br bb1
+/// bb1:
+///   br bb1              // back-end branch
+/// ```
+/// ->
+/// ```
+/// bb0:
+///   br bb1
+/// bb1:
+///   %1 = builtin "infinite_loop_true_condition"() // always true, but the compiler doesn't know
+///   cond_br %1, bb2, bb3
+/// bb2:                  // new back-end block
+///   br bb1
+/// bb3:                  // new dead-end block
+///   unreachable
+/// ```
+///
+void breakInfiniteLoops(SILPassManager *pm, SILFunction *f);
 
 } // end namespace swift
 

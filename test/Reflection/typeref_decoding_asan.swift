@@ -1,12 +1,13 @@
-// XFAIL: OS=linux-gnu && CPU=aarch64
+// UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+// XFAIL: OS=windows-msvc
 
-// Temporarily disable on arm64e (rdar://89754240)
+// rdar://100805115
 // UNSUPPORTED: CPU=arm64e
 
 // REQUIRES: asan_runtime
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect -sanitize=address -o %t/%target-library-name(TypesToReflect)
-// RUN: %target-swift-reflection-dump -binary-filename %t/%target-library-name(TypesToReflect) | %FileCheck %s
+// RUN: %target-build-swift -target %target-swift-5.2-abi-triple %S/Inputs/ConcreteTypes.swift %S/Inputs/GenericTypes.swift %S/Inputs/Protocols.swift %S/Inputs/Extensions.swift %S/Inputs/Closures.swift -parse-as-library -emit-module -emit-library -module-name TypesToReflect %no-fixup-chains -sanitize=address -o %t/%target-library-name(TypesToReflect)
+// RUN: %target-swift-reflection-dump %t/%target-library-name(TypesToReflect) | %FileCheck %s
 
 // CHECK: FIELDS:
 // CHECK: =======

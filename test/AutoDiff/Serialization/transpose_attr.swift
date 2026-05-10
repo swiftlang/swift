@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -emit-module -parse-as-library -o %t
-// RUN: llvm-bcanalyzer %t/transpose_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
+// RUN: %llvm-bcanalyzer %t/transpose_attr.swiftmodule | %FileCheck %s -check-prefix=BCANALYZER
 // RUN: %target-sil-opt -enable-sil-verify-all %t/transpose_attr.swiftmodule -o - | %FileCheck %s
 
 // BCANALYZER-NOT: UnknownCode
@@ -89,7 +89,7 @@ extension S {
 extension S {
   subscript<T: Differentiable>(x: T) -> Self { self }
 
-  // CHECK: @transpose(of: subscript, wrt: self)
+  // CHECK: @transpose(of: subscript(_:), wrt: self)
   @transpose(of: subscript(_:), wrt: self)
   static func transposeSubscript<T: Differentiable>(x: T, t: Self) -> Self {
     t

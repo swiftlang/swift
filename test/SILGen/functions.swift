@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name functions -Xllvm -sil-full-demangle -parse-stdlib -parse-as-library %s | %FileCheck %s
 
 import Swift // just for Optional
 
@@ -103,13 +103,13 @@ func calls(_ i:Int, j:Int, k:Int) {
   var k = k
   // CHECK: bb0(%0 : $Builtin.Int64, %1 : $Builtin.Int64, %2 : $Builtin.Int64):
   // CHECK: [[IBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
-  // CHECK: [[ILIFETIME:%[^,]+]] = begin_borrow [lexical] [[IBOX]]
+  // CHECK: [[ILIFETIME:%.*]] = begin_borrow [var_decl] [[IBOX]]
   // CHECK: [[IADDR:%.*]] = project_box [[ILIFETIME]]
   // CHECK: [[JBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
-  // CHECK: [[JLIFETIME:%[^,]+]] = begin_borrow [lexical] [[JBOX]]
+  // CHECK: [[JLIFETIME:%.*]] = begin_borrow [var_decl] [[JBOX]]
   // CHECK: [[JADDR:%.*]] = project_box [[JLIFETIME]]
   // CHECK: [[KBOX:%[0-9]+]] = alloc_box ${ var Builtin.Int64 }
-  // CHECK: [[KLIFETIME:%[^,]+]] = begin_borrow [lexical] [[KBOX]]
+  // CHECK: [[KLIFETIME:%.*]] = begin_borrow [var_decl] [[KBOX]]
   // CHECK: [[KADDR:%.*]] = project_box [[KLIFETIME]]
 
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
@@ -141,7 +141,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // -- Curry 'self' onto method argument lists dispatched using class_method.
 
   // CHECK: [[CBOX:%[0-9]+]] = alloc_box ${ var SomeClass }
-  // CHECK: [[CLIFETIME:%[^,]+]] = begin_borrow [lexical] [[CBOX]]
+  // CHECK: [[CLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[CBOX]]
   // CHECK: [[CADDR:%.*]] = project_box [[CLIFETIME]]
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeClass.Type
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
@@ -232,15 +232,15 @@ func calls(_ i:Int, j:Int, k:Int) {
   // -- Curry the projected concrete value in an existential (or its Type)
   // -- onto protocol type methods dispatched using protocol_method.
 
-  // CHECK: [[PBOX:%[0-9]+]] = alloc_box ${ var SomeProtocol }
-  // CHECK: [[PLIFETIME:%[^,]+]] = begin_borrow [lexical] [[PBOX]]
+  // CHECK: [[PBOX:%[0-9]+]] = alloc_box ${ var any SomeProtocol }
+  // CHECK: [[PLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[PBOX]]
   // CHECK: [[PADDR:%.*]] = project_box [[PLIFETIME]]
   var p : SomeProtocol = ConformsToSomeProtocol()
 
   // CHECK: [[READ:%.*]] = begin_access [read] [unknown] [[PADDR]]
-  // CHECK: [[TEMP:%.*]] = alloc_stack $SomeProtocol
-  // CHECK: copy_addr [[READ]] to [initialization] [[TEMP]]
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[TEMP:%.*]] = alloc_stack $any SomeProtocol
+  // CHECK: copy_addr [[READ]] to [init] [[TEMP]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[TEMP]] : $*any SomeProtocol to $*[[OPENED:@opened\(.*, any SomeProtocol\) Self]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method :
@@ -249,7 +249,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // CHECK: dealloc_stack [[TEMP]]
   p.method(i)
 
-  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[PADDR:%.*]] : $*SomeProtocol to $*[[OPENED:@opened(.*) SomeProtocol]]
+  // CHECK: [[PVALUE:%[0-9]+]] = open_existential_addr immutable_access [[PADDR:%.*]] : $*any SomeProtocol to $*[[OPENED:@opened\(.*, any SomeProtocol\) Self]]
   // CHECK: [[READI:%.*]] = begin_access [read] [unknown] [[IADDR]]
   // CHECK: [[I:%[0-9]+]] = load [trivial] [[READI]]
   // CHECK: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED]], #SomeProtocol.method :
@@ -257,7 +257,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   var sp : SomeProtocol = ConformsToSomeProtocol()
   sp.method(i)
 
-  // FIXME: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED:@opened(.*) SomeProtocol]], #SomeProtocol.static_method :
+  // FIXME: [[PMETHOD:%[0-9]+]] = witness_method $[[OPENED:@opened(.*, SomeProtocol) Self]], #SomeProtocol.static_method :
   // FIXME: [[I:%[0-9]+]] = load [trivial] [[IADDR]]
   // FIXME: apply [[PMETHOD]]([[I]], [[PMETA]])
   // Needs existential metatypes
@@ -266,7 +266,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // -- Use an apply or partial_apply instruction to bind type parameters of a generic.
 
   // CHECK: [[GBOX:%[0-9]+]] = alloc_box ${ var SomeGeneric<Builtin.Int64> }
-  // CHECK: [[GLIFETIME:%[^,]+]] = begin_borrow [lexical] [[GBOX]]
+  // CHECK: [[GLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[GBOX]]
   // CHECK: [[GADDR:%.*]] = project_box [[GLIFETIME]]
   // CHECK: [[META:%[0-9]+]] = metatype $@thick SomeGeneric<Builtin.Int64>.Type
   // CHECK: [[CTOR_GEN:%[0-9]+]] = function_ref @$s9functions11SomeGenericC{{[_0-9a-zA-Z]*}}fC : $@convention(method) <τ_0_0> (@thick SomeGeneric<τ_0_0>.Type) -> @owned SomeGeneric<τ_0_0>
@@ -314,7 +314,7 @@ func calls(_ i:Int, j:Int, k:Int) {
   // "thick" function values when stored, returned, or passed as arguments.
 
   // CHECK: [[FBOX:%[0-9]+]] = alloc_box ${ var @callee_guaranteed (Builtin.Int64, Builtin.Int64) -> Builtin.Int64 }
-  // CHECK: [[FLIFETIME:%[^,]+]] = begin_borrow [lexical] [[FBOX]]
+  // CHECK: [[FLIFETIME:%[^,]+]] = begin_borrow [lexical] [var_decl] [[FBOX]]
   // CHECK: [[FADDR:%.*]] = project_box [[FLIFETIME]]
   // CHECK: [[FUNC_THIN:%[0-9]+]] = function_ref @$s9functions19standalone_function{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> Builtin.Int64
   // CHECK: [[FUNC_THICK:%[0-9]+]] = thin_to_thick_function [[FUNC_THIN]]
@@ -397,7 +397,7 @@ func testNoReturnAttr() -> Never {}
 // CHECK-LABEL: sil hidden [ossa] @$s9functions20testNoReturnAttrPoly{{[_0-9a-zA-Z]*}}F : $@convention(thin) <T> (@in_guaranteed T) -> Never
 func testNoReturnAttrPoly<T>(_ x: T) -> Never {}
 
-// CHECK-LABEL: sil hidden [ossa] @$s9functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@noescape @callee_guaranteed () -> Never) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s9functions21testNoReturnAttrParam{{[_0-9a-zA-Z]*}}F : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> Never) -> ()
 func testNoReturnAttrParam(_ fptr: () -> Never) -> () {}
 
 // CHECK-LABEL: sil hidden [transparent] [ossa] @$s9functions15testTransparent{{[_0-9a-zA-Z]*}}F : $@convention(thin) (Builtin.Int1) -> Builtin.Int1
@@ -481,6 +481,7 @@ func testNoescape() {
 }
 
 // CHECK-LABEL: functions.testNoescape() -> ()
+// CHECK-NEXT: // Isolation:
 // CHECK-NEXT: sil hidden [ossa] @$s9functions12testNoescapeyyF : $@convention(thin) () -> ()
 // CHECK: function_ref closure #1 () -> () in functions.testNoescape() -> ()
 // CHECK-NEXT: function_ref @$s9functions12testNoescapeyyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> ()
@@ -488,6 +489,7 @@ func testNoescape() {
 // Despite being a noescape closure, this needs to capture 'a' by-box so it can
 // be passed to the capturing closure.closure
 // CHECK: closure #1 () -> () in functions.testNoescape() -> ()
+// CHECK-NEXT: Isolation: nonisolated
 // CHECK-NEXT: sil private [ossa] @$s9functions12testNoescapeyyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 
@@ -508,7 +510,9 @@ func testNoescape2() {
 // CHECK-LABEL: sil hidden [ossa] @$s9functions13testNoescape2yyF : $@convention(thin) () -> () {
 
 // CHECK: // closure #1 () -> () in functions.testNoescape2() -> ()
+// CHECK-NEXT: Isolation: nonisolated
 // CHECK-NEXT: sil private [ossa] @$s9functions13testNoescape2yyFyyXEfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {
 
 // CHECK: // closure #1 () -> () in closure #1 () -> () in functions.testNoescape2() -> ()
+// CHECK-NEXT: Isolation: nonisolated
 // CHECK-NEXT: sil private [ossa] @$s9functions13testNoescape2yyFyyXEfU_yycfU_ : $@convention(thin) (@guaranteed { var Int }) -> () {

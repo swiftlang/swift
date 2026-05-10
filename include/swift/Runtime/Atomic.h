@@ -25,6 +25,7 @@
 #include <intrin.h>
 #endif
 
+
 // FIXME: Workaround for rdar://problem/18889711. 'Consume' does not require
 // a barrier on ARM64, but LLVM doesn't know that. Although 'relaxed'
 // is formally UB by C++11 language rules, we should be OK because neither
@@ -36,7 +37,8 @@
 #  define SWIFT_MEMORY_ORDER_CONSUME (std::memory_order_consume)
 #endif
 
-#if defined(_M_ARM) || defined(__arm__) || defined(__aarch64__)
+
+#if defined(_M_ARM) || defined(_M_ARM64) || defined(__arm__) || defined(__aarch64__)
 #define SWIFT_HAS_MSVC_ARM_ATOMICS 1
 #else
 #define SWIFT_HAS_MSVC_ARM_ATOMICS 0

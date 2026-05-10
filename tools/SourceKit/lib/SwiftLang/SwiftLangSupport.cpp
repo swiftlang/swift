@@ -26,9 +26,10 @@
 #include "swift/Config.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CodeCompletionCache.h"
-#include "swift/IDE/CompletionInstance.h"
 #include "swift/IDE/SyntaxModel.h"
 #include "swift/IDE/Utils.h"
+#include "swift/IDETool/IDEInspectionInstance.h"
+#include "swift/IDETool/SyntacticMacroExpansion.h"
 
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/Preprocessor.h"
@@ -62,7 +63,7 @@ using swift::index::SymbolRoleSet;
 #include "SourceKit/Core/ProtocolUIDs.def"
 
 #define REFACTORING(KIND, NAME, ID) static UIdent Kind##Refactoring##KIND("source.refactoring.kind."#ID);
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
 
 static UIdent Attr_IBAction("source.decl.attribute.ibaction");
 static UIdent Attr_IBOutlet("source.decl.attribute.iboutlet");
@@ -74,14 +75,18 @@ static UIdent Attr_ObjcNamed("source.decl.attribute.objc.name");
 static UIdent Attr_Private("source.decl.attribute.private");
 static UIdent Attr_FilePrivate("source.decl.attribute.fileprivate");
 static UIdent Attr_Internal("source.decl.attribute.internal");
+static UIdent Attr_Package("source.decl.attribute.package");
 static UIdent Attr_Public("source.decl.attribute.public");
 static UIdent Attr_Open("source.decl.attribute.open");
 static UIdent Attr_Setter_Private("source.decl.attribute.setter_access.private");
 static UIdent Attr_Setter_FilePrivate("source.decl.attribute.setter_access.fileprivate");
 static UIdent Attr_Setter_Internal("source.decl.attribute.setter_access.internal");
+static UIdent Attr_Setter_Package("source.decl.attribute.setter_access.package");
 static UIdent Attr_Setter_Public("source.decl.attribute.setter_access.public");
 static UIdent Attr_Setter_Open("source.decl.attribute.setter_access.open");
 static UIdent EffectiveAccess_Public("source.decl.effective_access.public");
+static UIdent EffectiveAccess_SPI("source.decl.effective_access.spi");
+static UIdent EffectiveAccess_Package("source.decl.effective_access.package");
 static UIdent EffectiveAccess_Internal("source.decl.effective_access.internal");
 static UIdent EffectiveAccess_FilePrivate("source.decl.effective_access.fileprivate");
 static UIdent EffectiveAccess_LessThanFilePrivate("source.decl.effective_access.less_than_fileprivate");
@@ -126,6 +131,7 @@ public:
   UID_FOR(Destructor)
   UID_FOR(Subscript)
   UID_FOR(OpaqueType)
+  UID_FOR(Macro)
 #undef UID_FOR
 };
 
@@ -204,7 +210,7 @@ namespace {
 /// A simple FileSystemProvider that creates an InMemoryFileSystem for a given
 /// dictionary of file contents and overlays that on top of the real filesystem.
 class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
-  /// Provides the real filesystem, overlayed with an InMemoryFileSystem that
+  /// Provides the real filesystem, overlaid with an InMemoryFileSystem that
   /// contains specified files at specified locations.
   llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
   getFileSystem(OptionsDictionary &options, std::string &error) override {
@@ -253,18 +259,19 @@ class InMemoryFileSystemProvider: public SourceKit::FileSystemProvider {
       return nullptr;
 
     auto OverlayFS = llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem>(
-        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem()));
+        new llvm::vfs::OverlayFileSystem(
+            llvm::vfs::createPhysicalFileSystem()));
     OverlayFS->pushOverlay(std::move(InMemoryFS));
     return OverlayFS;
   }
 };
 }
 
-static void
-configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
-                            std::shared_ptr<GlobalConfig> GlobalConfig) {
-  auto Opts = GlobalConfig->getCompletionOpts();
-  CompletionInst->setOptions({
+static void configureIDEInspectionInstance(
+    std::shared_ptr<IDEInspectionInstance> IDEInspectionInst,
+    std::shared_ptr<GlobalConfig> GlobalConfig) {
+  auto Opts = GlobalConfig->getIDEInspectionOpts();
+  IDEInspectionInst->setOptions({
     Opts.MaxASTContextReuseCount,
     Opts.CheckDependencyInterval
   });
@@ -273,25 +280,32 @@ configureCompletionInstance(std::shared_ptr<CompletionInstance> CompletionInst,
 SwiftLangSupport::SwiftLangSupport(SourceKit::Context &SKCtx)
     : NotificationCtr(SKCtx.getNotificationCenter()),
       SwiftExecutablePath(SKCtx.getSwiftExecutablePath()),
-      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache),
-      CompileManager(RuntimeResourcePath, DiagnosticDocumentationPath) {
+      ReqTracker(SKCtx.getRequestTracker()), CCCache(new SwiftCompletionCache) {
   llvm::SmallString<128> LibPath(SKCtx.getRuntimeLibPath());
   llvm::sys::path::append(LibPath, "swift");
   RuntimeResourcePath = std::string(LibPath.str());
-  DiagnosticDocumentationPath = SKCtx.getDiagnosticDocumentationPath().str();
 
   Stats = std::make_shared<SwiftStatistics>();
   EditorDocuments = std::make_shared<SwiftEditorDocumentFileMap>();
+
+  std::shared_ptr<PluginRegistry> Plugins = std::make_shared<PluginRegistry>();
+
   ASTMgr = std::make_shared<SwiftASTManager>(
       EditorDocuments, SKCtx.getGlobalConfiguration(), Stats, ReqTracker,
-      SwiftExecutablePath, RuntimeResourcePath, DiagnosticDocumentationPath);
+      Plugins, SwiftExecutablePath, RuntimeResourcePath);
 
-  CompletionInst = std::make_shared<CompletionInstance>();
+  IDEInspectionInst = std::make_shared<IDEInspectionInstance>(Plugins);
+  configureIDEInspectionInstance(IDEInspectionInst,
+                                 SKCtx.getGlobalConfiguration());
 
-  configureCompletionInstance(CompletionInst, SKCtx.getGlobalConfiguration());
+  CompileManager = std::make_shared<compile::SessionManager>(
+      SwiftExecutablePath, RuntimeResourcePath, Plugins);
 
   // By default, just use the in-memory cache.
   CCCache->inMemory = std::make_unique<ide::CodeCompletionCache>();
+
+  SyntacticMacroExpansions =
+      std::make_shared<SyntacticMacroExpansion>(SwiftExecutablePath, Plugins);
 
   // Provide a default file system provider.
   setFileSystemProvider("in-memory-vfs", std::make_unique<InMemoryFileSystemProvider>());
@@ -302,11 +316,11 @@ SwiftLangSupport::~SwiftLangSupport() {
 
 void SwiftLangSupport::globalConfigurationUpdated(
     std::shared_ptr<GlobalConfig> Config) {
-  configureCompletionInstance(CompletionInst, Config);
+  configureIDEInspectionInstance(IDEInspectionInst, Config);
 }
 
 void SwiftLangSupport::dependencyUpdated() {
-  CompletionInst->markCachedCompilerInstanceShouldBeInvalidated();
+  IDEInspectionInst->markCachedCompilerInstanceShouldBeInvalidated();
 }
 
 UIdent SwiftLangSupport::getUIDForDeclLanguage(const swift::Decl *D) {
@@ -343,6 +357,7 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
                                            bool IsRef) {
   switch (AccKind) {
   case AccessorKind::Get:
+  case AccessorKind::DistributedGet:
     return IsRef ? KindRefAccessorGetter : KindDeclAccessorGetter;
   case AccessorKind::Set:
     return IsRef ? KindRefAccessorSetter : KindDeclAccessorSetter;
@@ -356,9 +371,17 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
     return IsRef ? KindRefAccessorMutableAddress
                  : KindDeclAccessorMutableAddress;
   case AccessorKind::Read:
+  case AccessorKind::YieldingBorrow:
     return IsRef ? KindRefAccessorRead : KindDeclAccessorRead;
   case AccessorKind::Modify:
+  case AccessorKind::YieldingMutate:
     return IsRef ? KindRefAccessorModify : KindDeclAccessorModify;
+  case AccessorKind::Init:
+    return IsRef ? KindRefAccessorInit : KindDeclAccessorInit;
+  case AccessorKind::Borrow:
+    return IsRef ? KindRefAccessorBorrow : KindDeclAccessorBorrow;
+  case AccessorKind::Mutate:
+    return IsRef ? KindRefAccessorMutate : KindDeclAccessorMutate;
   }
 
   llvm_unreachable("Unhandled AccessorKind in switch.");
@@ -377,8 +400,12 @@ UIdent SwiftLangSupport::getUIDForRefactoringKind(ide::RefactoringKind Kind){
   case ide::RefactoringKind::None: llvm_unreachable("cannot end up here.");
 #define REFACTORING(KIND, NAME, ID)                                            \
   case ide::RefactoringKind::KIND: return KindRefactoring##KIND;
-#include "swift/IDE/RefactoringKinds.def"
+#include "swift/Refactoring/RefactoringKinds.def"
   }
+}
+
+UIdent SwiftSemanticToken::getUIdentForKind() {
+  return SwiftLangSupport::getUIDForCodeCompletionDeclKind(Kind, IsRef);
 }
 
 UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
@@ -412,6 +439,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
     case CodeCompletionDeclKind::InstanceVar: return KindRefVarInstance;
     case CodeCompletionDeclKind::LocalVar: return KindRefVarLocal;
     case CodeCompletionDeclKind::GlobalVar: return KindRefVarGlobal;
+    case CodeCompletionDeclKind::Macro: return KindRefMacro;
     }
   }
 
@@ -440,6 +468,7 @@ UIdent SwiftLangSupport::getUIDForCodeCompletionDeclKind(
   case CodeCompletionDeclKind::InstanceVar: return KindDeclVarInstance;
   case CodeCompletionDeclKind::LocalVar: return KindDeclVarLocal;
   case CodeCompletionDeclKind::GlobalVar: return KindDeclVarGlobal;
+  case CodeCompletionDeclKind::Macro: return KindDeclMacro;
   }
 
   llvm_unreachable("Unhandled CodeCompletionDeclKind in switch.");
@@ -452,6 +481,8 @@ UIdent SwiftLangSupport::getUIDForSyntaxNodeKind(SyntaxNodeKind SC) {
   case SyntaxNodeKind::Identifier:
   case SyntaxNodeKind::DollarIdent:
     return KindIdentifier;
+  case SyntaxNodeKind::Operator:
+    return KindOperator;
   case SyntaxNodeKind::Integer:
   case SyntaxNodeKind::Floating:
     return KindNumber;
@@ -666,6 +697,7 @@ UIdent SwiftLangSupport::getUIDForSymbol(SymbolInfo sym, bool isRef) {
   SIMPLE_CASE(Protocol)
   SIMPLE_CASE(Constructor)
   SIMPLE_CASE(Destructor)
+  SIMPLE_CASE(Macro)
 
   case SymbolKind::EnumConstant:
     return UID_FOR(EnumElement);
@@ -750,99 +782,117 @@ swift::ide::NameKind SwiftLangSupport::getNameKindForUID(SourceKit::UIdent Id) {
   return swift::ide::NameKind::Swift;
 }
 
-Optional<UIdent> SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
+std::optional<UIdent>
+SwiftLangSupport::getUIDForDeclAttribute(const swift::DeclAttribute *Attr) {
   // Check special-case names first.
   switch (Attr->getKind()) {
-    case DAK_IBAction: {
-      return Attr_IBAction;
+  case DeclAttrKind::IBAction: {
+    return Attr_IBAction;
+  }
+  case DeclAttrKind::IBSegueAction: {
+    static UIdent Attr_IBSegueAction("source.decl.attribute.ibsegueaction");
+    return Attr_IBSegueAction;
+  }
+  case DeclAttrKind::IBOutlet: {
+    return Attr_IBOutlet;
+  }
+  case DeclAttrKind::IBDesignable: {
+    return Attr_IBDesignable;
+  }
+  case DeclAttrKind::IBInspectable: {
+    return Attr_IBInspectable;
+  }
+  case DeclAttrKind::GKInspectable: {
+    return Attr_GKInspectable;
+  }
+  case DeclAttrKind::ObjC: {
+    if (cast<ObjCAttr>(Attr)->hasName()) {
+      return Attr_ObjcNamed;
+    } else {
+      return Attr_Objc;
     }
-    case DAK_IBSegueAction: {
-      static UIdent Attr_IBSegueAction("source.decl.attribute.ibsegueaction");
-      return Attr_IBSegueAction;
+  }
+  case DeclAttrKind::AccessControl: {
+    switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
+    case AccessLevel::Private:
+      return Attr_Private;
+    case AccessLevel::FilePrivate:
+      return Attr_FilePrivate;
+    case AccessLevel::Internal:
+      return Attr_Internal;
+    case AccessLevel::Package:
+      return Attr_Package;
+    case AccessLevel::Public:
+      return Attr_Public;
+    case AccessLevel::Open:
+      return Attr_Open;
     }
-    case DAK_IBOutlet: {
-      return Attr_IBOutlet;
+  }
+  case DeclAttrKind::SetterAccess: {
+    switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
+    case AccessLevel::Private:
+      return Attr_Setter_Private;
+    case AccessLevel::FilePrivate:
+      return Attr_Setter_FilePrivate;
+    case AccessLevel::Internal:
+      return Attr_Setter_Internal;
+    case AccessLevel::Package:
+      return Attr_Setter_Package;
+    case AccessLevel::Public:
+      return Attr_Setter_Public;
+    case AccessLevel::Open:
+      return Attr_Setter_Open;
     }
-    case DAK_IBDesignable: {
-      return Attr_IBDesignable;
-    }
-    case DAK_IBInspectable: {
-      return Attr_IBInspectable;
-    }
-    case DAK_GKInspectable: {
-      return Attr_GKInspectable;
-    }
-    case DAK_ObjC: {
-      if (cast<ObjCAttr>(Attr)->hasName()) {
-        return Attr_ObjcNamed;
-      } else {
-        return Attr_Objc;
-      }
-    }
-    case DAK_AccessControl: {
-      switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
-        case AccessLevel::Private:
-          return Attr_Private;
-        case AccessLevel::FilePrivate:
-          return Attr_FilePrivate;
-        case AccessLevel::Internal:
-          return Attr_Internal;
-        case AccessLevel::Public:
-          return Attr_Public;
-        case AccessLevel::Open:
-          return Attr_Open;
-      }
-    }
-    case DAK_SetterAccess: {
-      switch (cast<AbstractAccessControlAttr>(Attr)->getAccess()) {
-        case AccessLevel::Private:
-          return Attr_Setter_Private;
-        case AccessLevel::FilePrivate:
-          return Attr_Setter_FilePrivate;
-        case AccessLevel::Internal:
-          return Attr_Setter_Internal;
-        case AccessLevel::Public:
-          return Attr_Setter_Public;
-        case AccessLevel::Open:
-          return Attr_Setter_Open;
-      }
-    }
+  }
 
     // Ignore these.
-    case DAK_ShowInInterface:
-    case DAK_RawDocComment:
-    case DAK_HasInitialValue:
-    case DAK_HasStorage:
-      return None;
-    default:
-      break;
+  case DeclAttrKind::ShowInInterface:
+  case DeclAttrKind::RawDocComment:
+  case DeclAttrKind::HasInitialValue:
+  case DeclAttrKind::HasStorage:
+    return std::nullopt;
+  default:
+    break;
   }
 
   switch (Attr->getKind()) {
-    case DAK_Count:
-      break;
-#define DECL_ATTR(X, CLASS, ...)\
-    case DAK_##CLASS: {\
-      static UIdent Attr_##X("source.decl.attribute."#X); \
-      return Attr_##X; \
-    }
-#include "swift/AST/Attr.def"
+#define DECL_ATTR(X, CLASS, ...)                                               \
+  case DeclAttrKind::CLASS: {                                                  \
+    static UIdent Attr_##X("source.decl.attribute." #X);                       \
+    return Attr_##X;                                                           \
+  }
+#include "swift/AST/DeclAttr.def"
   }
 
-  return None;
+  return std::nullopt;
 }
 
-UIdent SwiftLangSupport::getUIDForFormalAccessScope(const swift::AccessScope Scope) {
-  if (Scope.isPublic()) {
-    return EffectiveAccess_Public;
-  } else if (Scope.isInternal()) {
-    return EffectiveAccess_Internal;
-  } else if (Scope.isFileScope()) {
-    return EffectiveAccess_FilePrivate;
-  } else if (Scope.isPrivate()) {
+UIdent SwiftLangSupport::getUIDForAccessLevel(
+    const clang::index::SymbolProperty Scope) {
+  switch (Scope) {
+  case clang::index::SymbolProperty::Generic:
+  case clang::index::SymbolProperty::TemplatePartialSpecialization:
+  case clang::index::SymbolProperty::TemplateSpecialization:
+  case clang::index::SymbolProperty::UnitTest:
+  case clang::index::SymbolProperty::IBAnnotated:
+  case clang::index::SymbolProperty::IBOutletCollection:
+  case clang::index::SymbolProperty::GKInspectable:
+  case clang::index::SymbolProperty::Local:
+  case clang::index::SymbolProperty::ProtocolInterface:
+  case clang::index::SymbolProperty::SwiftAsync:
+    llvm_unreachable("Not an access level");
+  case clang::index::SymbolProperty::SwiftAccessControlLessThanFilePrivate:
     return EffectiveAccess_LessThanFilePrivate;
-  } else {
-    llvm_unreachable("Unsupported access scope");
+  case clang::index::SymbolProperty::SwiftAccessControlFilePrivate:
+    return EffectiveAccess_FilePrivate;
+  case clang::index::SymbolProperty::SwiftAccessControlInternal:
+    return EffectiveAccess_Internal;
+  case clang::index::SymbolProperty::SwiftAccessControlPackage:
+    return EffectiveAccess_Package;
+  case clang::index::SymbolProperty::SwiftAccessControlSPI:
+    return EffectiveAccess_SPI;
+  case clang::index::SymbolProperty::SwiftAccessControlPublic:
+    return EffectiveAccess_Public;
   }
 }
 
@@ -851,7 +901,7 @@ std::vector<UIdent> SwiftLangSupport::UIDsFromDeclAttributes(const DeclAttribute
 
   for (auto Attr : Attrs) {
     if (auto AttrUID = getUIDForDeclAttribute(Attr)) {
-      AttrUIDs.push_back(AttrUID.getValue());
+      AttrUIDs.push_back(AttrUID.value());
     }
   }
 
@@ -863,12 +913,14 @@ bool SwiftLangSupport::printDisplayName(const swift::ValueDecl *D,
   if (!D->hasName())
     return true;
 
-  OS << D->getName();
+  D->getName().print(OS, /*skipEmptyArgumentNames*/ false,
+                     /*escapeIfNeeded*/ true);
   return false;
 }
 
-bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
-  return ide::printValueDeclUSR(D, OS);
+bool SwiftLangSupport::printUSR(const ValueDecl *D, llvm::raw_ostream &OS,
+                                bool distinguishSynthesizedDecls) {
+  return ide::printValueDeclUSR(D, OS, distinguishSynthesizedDecls);
 }
 
 bool SwiftLangSupport::printDeclTypeUSR(const ValueDecl *D, llvm::raw_ostream &OS) {
@@ -893,8 +945,7 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
   OS << VD->getBaseName().userFacingName();
 
   // Parameters.
-  auto *M = VD->getModuleContext();
-  auto substMap = baseTy->getMemberSubstitutionMap(M, VD);
+  auto substMap = baseTy->getMemberSubstitutionMap(VD);
   auto printSingleParam = [&](ParamDecl *param) {
     auto paramTy = param->getInterfaceType();
 
@@ -936,7 +987,7 @@ void SwiftLangSupport::printMemberDeclDescription(const swift::ValueDecl *VD,
     OS << ')';
   };
   if (isa<EnumElementDecl>(VD) || isa<FuncDecl>(VD)) {
-    if (const auto ParamList = getParameterList(const_cast<ValueDecl *>(VD))) {
+    if (const auto ParamList = VD->getParameterList()) {
       printParams(ParamList);
     }
   } else if (isa<VarDecl>(VD)) {
@@ -977,8 +1028,8 @@ void SwiftLangSupport::setFileSystemProvider(
 }
 
 llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
-SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
-                                Optional<StringRef> primaryFile,
+SwiftLangSupport::getFileSystem(const std::optional<VFSOptions> &vfsOptions,
+                                std::optional<StringRef> primaryFile,
                                 std::string &error) {
   // First, try the specified vfsOptions.
   if (vfsOptions) {
@@ -999,12 +1050,12 @@ SwiftLangSupport::getFileSystem(const Optional<VFSOptions> &vfsOptions,
   }
 
   // Fallback to the real filesystem.
-  return llvm::vfs::getRealFileSystem();
+  return llvm::vfs::createPhysicalFileSystem();
 }
 
 void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
     llvm::MemoryBuffer *UnresolvedInputFile, unsigned Offset,
-    ArrayRef<const char *> Args,
+    bool InsertCodeCompletionToken, ArrayRef<const char *> Args,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FileSystem,
     SourceKitCancellationToken CancellationToken,
     llvm::function_ref<void(CancellableResult<CompletionLikeOperationParams>)>
@@ -1022,8 +1073,18 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   // Create a buffer for code completion. This contains '\0' at 'Offset'
   // position of 'UnresolvedInputFile' buffer.
   auto origOffset = Offset;
-  auto newBuffer = ide::makeCodeCompletionMemoryBuffer(
-      UnresolvedInputFile, Offset, bufferIdentifier);
+
+  // If we inserted a code completion token into the buffer, this keeps the
+  // buffer alive. Should never be accessed, `buffer` should be used instead.
+  std::unique_ptr<llvm::MemoryBuffer> codeCompletionBuffer;
+  llvm::MemoryBuffer *buffer;
+  if (InsertCodeCompletionToken) {
+    codeCompletionBuffer = ide::makeCodeCompletionMemoryBuffer(
+        UnresolvedInputFile, Offset, bufferIdentifier);
+    buffer = codeCompletionBuffer.get();
+  } else {
+    buffer = UnresolvedInputFile;
+  }
 
   SourceManager SM;
   DiagnosticEngine Diags(SM);
@@ -1051,7 +1112,7 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   std::string CompilerInvocationError;
   bool CreatingInvocationFailed = getASTManager()->initCompilerInvocation(
       Invocation, Args, FrontendOptions::ActionType::Typecheck, Diags,
-      newBuffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
+      buffer->getBufferIdentifier(), FileSystem, CompilerInvocationError);
   if (CreatingInvocationFailed) {
     PerformOperation(CancellableResult<CompletionLikeOperationParams>::failure(
         CompilerInvocationError));
@@ -1064,17 +1125,63 @@ void SwiftLangSupport::performWithParamsToCompletionLikeOperation(
   }
 
   // Pin completion instance.
-  auto CompletionInst = getCompletionInstance();
+  auto CompletionInst = getIDEInspectionInstance();
 
   auto CancellationFlag = std::make_shared<std::atomic<bool>>(false);
   ReqTracker->setCancellationHandler(CancellationToken, [CancellationFlag] {
     CancellationFlag->store(true, std::memory_order_relaxed);
   });
 
-  CompletionLikeOperationParams Params = {Invocation, newBuffer.get(), &CIDiags,
+  CompletionLikeOperationParams Params = {Invocation, buffer, &CIDiags,
                                           CancellationFlag};
   PerformOperation(
       CancellableResult<CompletionLikeOperationParams>::success(Params));
+}
+
+void SwiftLangSupport::getPolyglotAST(
+    StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+    std::optional<VFSOptions> VfsOptions,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<std::string> &)> Receiver) {
+  std::string FileSystemError;
+  auto FileSystem = getFileSystem(VfsOptions, PrimaryFilePath, FileSystemError);
+  if (!FileSystem) {
+    Receiver(RequestResult<std::string>::fromError(FileSystemError));
+    return;
+  }
+
+  // Display diagnostics to stderr.
+  CompilerInstance CI;
+  PrintingDiagnosticConsumer PrintDiags;
+  CI.addDiagnosticConsumer(&PrintDiags);
+
+  std::string Error;
+  CompilerInvocation Invocation;
+  if (getASTManager()->initCompilerInvocation(
+        Invocation, Args,
+        FrontendOptions::ActionType::Typecheck, CI.getDiags(),
+        {}, Error)) {
+    Receiver(RequestResult<std::string>::fromError(Error));
+    return;
+  }
+
+  std::string InstanceSetupError;
+  if (CI.setup(Invocation, InstanceSetupError)) {
+    Receiver(RequestResult<std::string>::fromError(InstanceSetupError));
+    return;
+  }
+
+  auto &Ctx = CI.getASTContext();
+  auto &Importer = static_cast<ClangImporter &>(*Ctx.getClangModuleLoader());
+  Importer.importBridgingHeader(PrimaryFilePath,
+                                CI.getMainModule(),
+                                /*diagLoc=*/{},
+                                /*trackParsedSymbols=*/true);
+
+  std::string buffer;
+  llvm::raw_string_ostream OS(buffer);
+  Importer.printPolyglotAST(PrimaryFilePath, OS);
+  Receiver(RequestResult<std::string>::fromResult(buffer));
 }
 
 CloseClangModuleFiles::~CloseClangModuleFiles() {

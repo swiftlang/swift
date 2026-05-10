@@ -78,6 +78,16 @@ inline void tls_alloc_once(once_t &token, tls_key_t &key, tls_dtor_t dtor) {
 
 // -- High-level TLS classes --------------------------------------------------
 
+/// An extremely silly class which exists to make pointer
+/// default-initialization constexpr.
+template <class T> struct TLSPointer {
+  T *Value;
+  constexpr TLSPointer() : Value(nullptr) {}
+  constexpr TLSPointer(T *value) : Value(value) {}
+  operator T *() const { return Value; }
+  T *operator->() const { return Value; }
+};
+
 // Validate a type stored in thread-local storage, using static asserts. Such
 // types must fit in a pointer and be trivially copyable/destructible.
 #define VALIDATE_THREAD_LOCAL_TYPE(T)                                          \
@@ -115,6 +125,15 @@ public:
   T get() { return value; }
 
   void set(T newValue) { value = newValue; }
+
+  T swap(T newValue) {
+    // There's an implicit optimization here because we implicitly
+    // materialize the address of the thread-local once instead of
+    // separately for two calls to get and set.
+    auto curValue = get();
+    set(newValue);
+    return curValue;
+  }
 };
 #else
 // A wrapper around a TLS key that is lazily initialized using swift::once.
@@ -167,6 +186,12 @@ public:
     void *storedValue;
     memcpy(&storedValue, &newValue, sizeof(T));
     tls_set(key.getKey(), storedValue);
+  }
+
+  T swap(T newValue) {
+    auto curValue = get();
+    set(newValue);
+    return curValue;
   }
 };
 #endif

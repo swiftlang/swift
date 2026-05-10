@@ -43,9 +43,19 @@ protected:
     : super(IGM), Target(target) {}
 
 public:
+
+  void embeddedLayout() {
+    // The embedded layout consists of:
+    // +    // -1 : vwt
+    // +    //  0 : metadata flags
+    super::layout();
+  }
+
   void layout() {
-    static_assert(MetadataAdjustmentIndex::ValueType == 1,
+    static_assert(MetadataAdjustmentIndex::ValueType == 2,
                   "Adjustment index must be synchronized with this layout");
+
+    asImpl().addLayoutStringPointer();
 
     // Metadata header.
     super::layout();
@@ -91,10 +101,10 @@ protected:
 
 public:
   void addMetadataFlags() { addPointer(); }
+  void addLayoutStringPointer() { addPointer(); }
   void addValueWitnessTable() { addPointer(); }
   void addNominalTypeDescriptor() { addPointer(); }
-  void addGenericArgument(GenericRequirement requirement) { addPointer(); }
-  void addGenericWitnessTable(GenericRequirement requirement) { addPointer(); }
+  void addGenericRequirement(GenericRequirement requirement) { addPointer(); }
   void addPayloadSize() { addPointer(); }
   void noteStartOfTypeSpecificMembers() {}
   void addTrailingFlags() { addInt64(); }

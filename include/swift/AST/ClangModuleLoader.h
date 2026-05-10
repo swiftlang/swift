@@ -27,12 +27,17 @@ class Preprocessor;
 class Sema;
 class TargetInfo;
 class Type;
+class SourceLocation;
 } // namespace clang
 
 namespace swift {
 
+class ClangInheritanceInfo;
+class ClangNode;
 class ConcreteDeclRef;
 class Decl;
+class FuncDecl;
+class VarDecl;
 class DeclContext;
 class EffectiveClangContext;
 class SwiftLookupTable;
@@ -121,15 +126,30 @@ protected:
   using ModuleLoader::ModuleLoader;
 
 public:
-  virtual clang::TargetInfo &getTargetInfo() const = 0;
+  /// This module loader's Clang instance may be configured with a different
+  /// (higher) OS version than the compilation target itself in order to be able
+  /// to load pre-compiled Clang modules that are aligned with the broader SDK,
+  /// and match the SDK deployment target against which Swift modules are also
+  /// built.
+  ///
+  /// In this case, we must use the Swift compiler's OS version triple when
+  /// performing codegen, and the importer's Clang instance OS version triple
+  /// during module loading. `getModuleAvailabilityTarget` is for module-loading
+  /// clients only, and uses the latter.
+  ///
+  /// (The implementing `ClangImporter` class maintains separate Target info
+  /// for use by IRGen/CodeGen clients)
+  virtual clang::TargetInfo &getModuleAvailabilityTarget() const = 0;
+
   virtual clang::ASTContext &getClangASTContext() const = 0;
   virtual clang::Preprocessor &getClangPreprocessor() const = 0;
   virtual clang::Sema &getClangSema() const = 0;
   virtual const clang::CompilerInstance &getClangInstance() const = 0;
   virtual void printStatistics() const = 0;
+  virtual void dumpSwiftLookupTables() const = 0;
 
   /// Returns the module that contains imports and declarations from all loaded
-  /// Objective-C header files.
+  /// header files.
   virtual ModuleDecl *getImportedHeaderModule() const = 0;
 
   /// Retrieves the Swift wrapper for the given Clang module, creating
@@ -184,6 +204,37 @@ public:
   /// Imports a clang decl directly, rather than looking up its name.
   virtual Decl *importDeclDirectly(const clang::NamedDecl *decl) = 0;
 
+  /// Returns a decl that was imported earlier or null if it was not found in
+  /// the cache.
+  virtual Decl *lookupImportedDecl(const clang::NamedDecl *decl) = 0;
+
+  /// Clones an imported \param decl from its base class to its derived class
+  /// \param newContext where it is inherited. Its access level is determined
+  /// with respect to \param inheritance, which signifies whether \param decl
+  /// was inherited via C++ public/protected/private inheritance.
+  ///
+  /// This function uses a cache so that it is idempotent; successive
+  /// invocations will only generate one cloned ValueDecl (and all return
+  /// a pointer to it). Returns a NULL pointer upon failure.
+  virtual ValueDecl *importBaseMemberDecl(ValueDecl *decl,
+                                          DeclContext *newContext,
+                                          ClangInheritanceInfo inheritance) = 0;
+
+  /// Returns the original method if \param decl is a clone from a base class
+  virtual ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) = 0;
+
+  /// Returns the forwarding method in the derived class that calls the base
+  /// method.
+  virtual ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) = 0;
+
+  /// Returns true if we synthesize this member for every type so no need to
+  /// clone it for the derived classes.
+  virtual bool isMemberSynthesizedPerType(const ValueDecl *decl) = 0;
+
+  /// Check and emit diagnostics for calls to \param funcDecl.
+  virtual void checkCalledClangFunction(const ValueDecl *funcDecl,
+                                        SourceLoc callSiteLoc) = 0;
+
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
   virtual void diagnoseTopLevelValue(const DeclName &name) = 0;
@@ -227,6 +278,11 @@ public:
   virtual const clang::Decl *
   resolveStableSerializationPath(const StableSerializationPath &path) const = 0;
 
+  struct SerializableInfo {
+    bool Serializable;
+    bool HasSwiftDecl;
+  };
+
   /// Determine whether the given type is serializable.
   ///
   /// If \c checkCanonical is true, checks the canonical type,
@@ -249,8 +305,8 @@ public:
   /// least, it's probably best to use conservative predicates
   /// that work both ways so that language behavior doesn't differ
   /// based on subtleties like the target module interface format.
-  virtual bool isSerializable(const clang::Type *type,
-                              bool checkCanonical) const = 0;
+  virtual SerializableInfo isSerializable(const clang::Type *type,
+                                          bool checkCanonical) const = 0;
 
   virtual clang::FunctionDecl *
   instantiateCXXFunctionTemplate(ASTContext &ctx,
@@ -259,8 +315,38 @@ public:
 
   virtual bool isCXXMethodMutating(const clang::CXXMethodDecl *method) = 0;
 
-  virtual Type importFunctionReturnType(const clang::FunctionDecl *clangDecl,
-                                        DeclContext *dc) = 0;
+  virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
+
+  virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;
+
+  /// Determine whether this is a functional C++ type, e.g. std::function, for
+  /// which Swift provides a synthesized constructor that takes a Swift closure
+  /// as the single parameter.
+  virtual bool
+  needsClosureConstructor(const clang::CXXRecordDecl *recordDecl) const = 0;
+
+  /// Determine whether this is an instantiation of the __SwiftFunctionWrapper
+  /// type, which wraps around a Swift closure along with its context.
+  virtual bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const = 0;
+  virtual bool isDeconstructedSwiftClosure(const clang::Type* type) const = 0;
+
+  /// Given a functional C++ type, e.g. std::function, determine the
+  /// corresponding C++ closure type.
+  ///
+  /// \see needsClosureConstructor
+  virtual const clang::FunctionType *extractCXXFunctionType(
+      const clang::CXXRecordDecl *functionalTypeDecl) const = 0;
+
+  virtual FuncDecl *
+  getAvailabilityDomainPredicate(const clang::VarDecl *var) = 0;
+
+  virtual std::optional<Type>
+  importFunctionReturnType(const clang::FunctionDecl *clangDecl,
+                           DeclContext *dc) = 0;
+
+  virtual Type importVarDeclType(const clang::VarDecl *clangDecl,
+                                 VarDecl *swiftDecl,
+                                 DeclContext *dc) = 0;
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
@@ -269,6 +355,12 @@ public:
   virtual SwiftLookupTable *
   findLookupTable(const clang::Module *clangModule) = 0;
 
+  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+  /// have a valid owning module.
+  ///
+  /// Note that \p Node cannot itself be a clang::Module.
+  virtual const clang::Module *getClangOwningModule(ClangNode Node) const = 0;
+
   virtual DeclName
   importName(const clang::NamedDecl *D,
              clang::DeclarationName givenName = clang::DeclarationName()) = 0;
@@ -276,6 +368,15 @@ public:
   /// Determine the effective Clang context for the given Swift nominal type.
   virtual EffectiveClangContext getEffectiveClangContext(
       const NominalTypeDecl *nominal) = 0;
+
+  virtual const clang::TypedefType *
+  getTypeDefForCXXCFOptionsDefinition(const clang::Decl *candidateDecl) = 0;
+
+  virtual SourceLoc importSourceLocation(clang::SourceLocation loc) = 0;
+
+  /// Just like Decl::getClangNode() except we look through to the 'Code'
+  /// enum of an error wrapper struct.
+  virtual ClangNode getEffectiveClangNode(const Decl *decl) const = 0;
 };
 
 /// Describes a C++ template instantiation error.

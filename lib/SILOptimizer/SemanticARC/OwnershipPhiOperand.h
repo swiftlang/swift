@@ -36,18 +36,19 @@ public:
 
 private:
   Operand *op;
+  SILValue original;
 
   OwnershipPhiOperand(Operand *op) : op(op) {}
 
 public:
-  static Optional<OwnershipPhiOperand> get(const Operand *op) {
+  static std::optional<OwnershipPhiOperand> get(const Operand *op) {
     switch (op->getUser()->getKind()) {
     case SILInstructionKind::BranchInst:
     case SILInstructionKind::StructInst:
     case SILInstructionKind::TupleInst:
       return {{const_cast<Operand *>(op)}};
     default:
-      return None;
+      return std::nullopt;
     }
   }
 
@@ -70,11 +71,13 @@ public:
   Operand *getOperand() const { return op; }
   SILValue getValue() const { return op->get(); }
   SILType getType() const { return op->get()->getType(); }
+  SILValue getOriginal() const { return original; }
 
   unsigned getOperandNumber() const { return op->getOperandNumber(); }
 
   void markUndef() & {
-    op->set(SILUndef::get(getType(), *op->getUser()->getFunction()));
+    original = op->get();
+    op->set(SILUndef::get(getValue()));
   }
 
   SILInstruction *getInst() const { return op->getUser(); }

@@ -1,4 +1,3 @@
-
 # Continuous Integration for Swift
 
 **Table of Contents**
@@ -29,11 +28,11 @@ This page is designed to assist in the understanding of proper practices for tes
 
 ## Pull Request Testing
 
-In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [[1]](#footnote-1). In order to help maintain this green build, the Swift project heavily uses pull request (PR) testing. Specifically, an important general rule is that **all** non-trivial checkins to any Swift Project repository should at least perform a [smoke test](#smoke-testing) if simulators will not be impacted *or* a full [validation test](#validation-testing) if simulators may be impacted. If in addition one is attempting to make a source breaking change across multiple repositories, one should follow the cross repo source breaking changes workflow. We now continue by describing the Swift system for Pull Request testing, @swift-ci:
+In order for the Swift project to be able to advance quickly, it is important that we maintain a green build [^1]. In order to help maintain this green build, the Swift project heavily uses pull request (PR) testing. Specifically, an important general rule is that **all** non-trivial checkins to any Swift Project repository should at least perform a [smoke test](#smoke-testing) if simulators will not be impacted *or* a full [validation test](#validation-testing) if simulators may be impacted. If in addition one is attempting to make a source breaking change across multiple repositories, one should follow the cross repo source breaking changes workflow. We now continue by describing the Swift system for Pull Request testing, @swift-ci:
 
 ### @swift-ci
 
-Users with [commit access](https://swift.org/contributing/#commit-access) can trigger pull request testing by writing a comment on a PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment used. The current test types are:
+Users with [commit access](/CONTRIBUTING.md#commit-access) can trigger pull request testing by writing a comment on a PR addressed to the GitHub user @swift-ci. Different tests will run depending on the specific comment used. The current test types are:
 
 1. Smoke Testing
 2. Validation Testing
@@ -51,8 +50,6 @@ Platform     | Comment | Check Status
 ------------ | ------- | ------------
 All supported platforms     | @swift-ci Please smoke test                      | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
 All supported platforms     | @swift-ci Please clean smoke test                | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
-All supported platforms     | @swift-ci Please smoke test and merge            | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
-All supported platforms     | @swift-ci Please clean smoke test and merge      | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)
 macOS platform              | @swift-ci Please smoke test macOS platform        | Swift Test macOS Platform (smoke test)
 macOS platform              | @swift-ci Please clean smoke test macOS platform  | Swift Test macOS Platform (smoke test)
 Linux platform              | @swift-ci Please smoke test Linux platform       | Swift Test Linux Platform (smoke test)
@@ -86,24 +83,18 @@ Platform     | Comment | Check Status
 ------------ | ------- | ------------
 All supported platforms     | @swift-ci Please test                         | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
 All supported platforms     | @swift-ci Please clean test                   | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br>Swift Test Linux Platform<br>Swift Test macOS Platform<br>
-All supported platforms     | @swift-ci Please test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test macOS Platform
-All supported platforms     | @swift-ci Please clean test and merge               | Swift Test Linux Platform (smoke test)<br>Swift Test macOS Platform (smoke test)<br> Swift Test Linux Platform <br>Swift Test macOS Platform
 macOS platform               | @swift-ci Please test macOS platform           | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform
 macOS platform               | @swift-ci Please clean test macOS platform     | Swift Test macOS Platform (smoke test)<br>Swift Test macOS Platform
 macOS platform               | @swift-ci Please benchmark                    | Swift Benchmark on macOS Platform (many runs - rigorous)
-macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark macOS Platform (few runs - sanity)
+macOS platform               | @swift-ci Please smoke benchmark              | Swift Benchmark macOS Platform (few runs - soundness)
 Linux platform               | @swift-ci Please test Linux platform          | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
 Linux platform               | @swift-ci Please clean test Linux platform    | Swift Test Linux Platform (smoke test)<br>Swift Test Linux Platform
-macOS platform               | @swift-ci Please ASAN test                    | Swift ASAN Test macOS Platform
-Ubuntu 18.04                 | @swift-ci Please test Ubuntu 18.04 platform   | Swift Test Ubuntu 18.04 Platform
-Ubuntu 20.04                 | @swift-ci Please test Ubuntu 20.04 platform   | Swift Test Ubuntu 20.04 Platform
-CentOS 7                     | @swift-ci Please test CentOS 7 platform       | Swift Test CentOS 7 Platform
-CentOS 8                     | @swift-ci Please test CentOS 8 platform       | Swift Test CentOS 8 Platform
-Amazon Linux 2               | @swift-ci Please test Amazon Linux 2 platform | Swift Test Amazon Linux 2 Platform
+Linux platform               | @swift-ci Please test WebAssembly             | Swift Test WebAssembly (Ubuntu 20.04)
+Swift SDK for Android        | @swift-ci Please test android                 | Swift SDK for Android
 
 The core principles of validation testing is that:
 
-1. A validation test should build and run tests for /all/ platforms and all
+1. A validation test should build and run tests for _all_ platforms and all
    architectures supported by the CI.
 2. A validation test should not be incremental. We want there to be a
    definitiveness to a validation test. If one uses a validation test, one
@@ -115,7 +106,7 @@ With that being said, a validation test on macOS does the following:
 1. Removes the workspace.
 2. Builds the compiler.
 3. Builds the standard library for macOS and the simulators for all platforms.
-4. lldb is /not/ built/tested [[2]](#footnote-2)
+4. lldb is _not_ built/tested [^2]
 5. The tests, validation-tests are run for iOS simulator, watchOS simulator and macOS both with
    and without optimizations enabled.
 
@@ -135,7 +126,8 @@ A validation test on Linux does the following:
 Platform        | Comment | Check Status
 ------------    | ------- | ------------
 macOS platform  | @swift-ci Please benchmark       | Swift Benchmark on macOS Platform (many runs - rigorous)
-macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on macOS Platform (few runs - sanity)
+macOS platform (Apple Silicon) | @swift-ci Apple Silicon benchmark | Swift Benchmark on macOS Platform using Apple Silicon (many runs - rigorous)
+macOS platform  | @swift-ci Please smoke benchmark | Swift Benchmark on macOS Platform (few runs - soundness)
 
 ### Linting
 
@@ -162,7 +154,17 @@ macOS platform | @swift-ci Please Sourcekit Stress test | Swift Sourcekit Stress
 Platform       | Comment | Check Status
 ------------   | ------- | ------------
 macOS platform | @swift-ci Please Build Toolchain macOS Platform| Swift Build Toolchain macOS Platform
-Linux platform | @swift-ci Please Build Toolchain Linux Platform| Swift Build Toolchain Linux Platform
+Linux platform | @swift-ci Please Build Toolchain Linux Platform| Swift Build Toolchain Ubuntu 22.04 (x86_64)
+
+You can also build a toolchain for a specific Linux distribution
+
+Distro         | Comment                                          | Check Status
+-------------- | ------------------------------------------------ | ----------------------------------------------
+UBI9           | @swift-ci Please Build Toolchain UBI9            | Swift Build Toolchain UBI9 (x86_64)
+Ubuntu 20.04   | @swift-ci Please Build Toolchain Ubuntu 20.04    | Swift Build Toolchain Ubuntu 20.04 (x86_64)
+Ubuntu 22.04   | @swift-ci Please Build Toolchain Ubuntu 22.04    | Swift Build Toolchain Ubuntu 22.04 (x86_64)
+Ubuntu 24.04   | @swift-ci Please Build Toolchain Ubuntu 24.04    | Swift Build Toolchain Ubuntu 24.04 (x86_64)
+Amazon Linux 2 | @swift-ci Please Build Toolchain Amazon Linux 2  | Swift Build Toolchain Amazon Linux 2 (x86_64)
 
 ### Build and Test Stdlib against Snapshot Toolchain
 
@@ -222,6 +224,12 @@ preset=stdlib_S_standalone_minimal_macho_x86_64,build,test
 @swift-ci please test with toolchain and preset
 ```
 
+### Useful preset triggers
+
+Platform        | Comment | Use
+--------------- | ------- | ---
+macOS platform  | preset=asan <br> @swift-ci Please test with preset macOS platform | Runs the validation test suite with an ASan build
+
 ### Testing Compiler Performance
 
 Platform        | Comment | Check Status
@@ -236,7 +244,7 @@ These commands will:
 3. Compare the obtained data to the baseline (stored in git) and HEAD (version of a compiler built without the PR changes)
 4. Report the results in a pull request comment
 
-For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/apple/swift/blob/main/docs/CompilerPerformance.md).
+For the detailed explanation of how compiler performance is measured, please refer to [this document](https://github.com/swiftlang/swift/blob/main/docs/CompilerPerformance.md).
 
 ## Cross Repository Testing
 
@@ -246,7 +254,7 @@ For example:
 
 ```
 Please test with following pull request:
-https://github.com/apple/swift/pull/4574
+https://github.com/swiftlang/swift/pull/4574
 
 @swift-ci Please test Linux platform
 ```
@@ -254,7 +262,7 @@ https://github.com/apple/swift/pull/4574
 ```
 Please test with following PR:
 https://github.com/apple/swift-lldb/pull/48
-https://github.com/apple/swift-package-manager/pull/632
+https://github.com/swiftlang/swift-package-manager/pull/632
 
 @swift-ci Please test macOS platform
 ```
@@ -267,7 +275,7 @@ apple/swift-lldb#48
 
 1. Create a separate PR for each repository that needs to be changed. Each should reference the main Swift PR and create a reference to all of the others from the main PR.
 
-2. Gate all commits on @swift-ci smoke test and merge. As stated above, it is important that *all* checkins perform PR testing since if breakage enters the tree PR testing becomes less effective. If you have done local testing (using build-toolchain) and have made appropriate changes to the other repositories then perform a smoke test and merge should be sufficient for correctness. This is not meant to check for correctness in your commits, but rather to be sure that no one landed changes in other repositories or in swift that cause your PR to no longer be correct. If you were unable to make workarounds to the other repositories, this smoke test will break *after* Swift has built. Check the log to make sure that it is the expected failure for that platform/repository that coincides with the failure your PR is supposed to fix.
+2. Gate all commits on @swift-ci smoke test. As stated above, it is important that *all* checkins perform PR testing since if breakage enters the tree PR testing becomes less effective. If you have done local testing (using build-toolchain) and have made appropriate changes to the other repositories then perform a smoke test should be sufficient for correctness. This is not meant to check for correctness in your commits, but rather to be sure that no one landed changes in other repositories or in swift that cause your PR to no longer be correct. If you were unable to make workarounds to the other repositories, this smoke test will break *after* Swift has built. Check the log to make sure that it is the expected failure for that platform/repository that coincides with the failure your PR is supposed to fix.
 
 3. Merge all of the pull requests simultaneously.
 
@@ -280,21 +288,12 @@ Currently, supported pull request testing triggers:
 Platform     | Comment | Check Status
 ------------ | ------- | ------------
 Windows      | @swift-ci Please test Windows platform | Swift Test Windows Platform
-Linux        | @swift-ci Please test Tensorflow Linux platform | Swift Test Linux Platform (TensorFlow)
-Linux (GPU)  | @swift-ci Please test Tensorflow Linux GPU platform |Swift Test Linux Platform with GPU (TensorFlow)
-macOS        | @swift-ci Please test Tensorflow macOS platform | Swift Test macOS Platform (TensorFlow)
 
 ## ci.swift.org bots
 
 FIXME: FILL ME IN!
 
-<a name="footnote-1">[1]</a> Even though it should be without saying, the reason why having a green build is important is that:
+<!-- We are making this numbered list with <ol> and <li> HTML tags intead of a regular Markdown numbered list because GitHub doesn't seem capable of rendering multi-line numbered lists in footnotes, even if we put 2 spaces at the end of each line as per the documentation: https://docs.github.com/en/get-started/writing-on-github/getting-started-with-writing-and-formatting-on-github/basic-writing-and-formatting-syntax#footnotes -->
+[^1]: Even though it should go without saying, the reason why having a green build is important is that:<ol><li>A full build break can prevent other developers from testing their work.</li><li>A test break can make it difficult for developers to know whether or not their specific commit has broken a test, requiring them to perform an initial clean build, wasting time.</li><li>@swift-ci pull request testing becomes less effective since one can not perform a test and one must reason about the source of a given failure.</li></ol>
 
-1. A full build break can prevent other developers from testing their work.
-2. A test break can make it difficult for developers to know whether or not their specific commit has broken a test, requiring them to perform an initial clean build, wasting time.
-3. @swift-ci pull request testing becomes less effective since one can not perform a test and merge and one must reason about the source of a given failure.
-
-<a name="footnote-2">[2]</a> This is due to unrelated issues relating to running lldb tests on macOS.
-
-
-
+[^2]: This is due to unrelated issues relating to running lldb tests on macOS.

@@ -104,8 +104,12 @@ def create_parser():
                         help='Enable experimental concurrency model.')
     parser.add_argument('--enable-experimental-distributed', action='store_true',
                         help='Enable experimental distributed actors.')
-    parser.add_argument('--enable-experimental-string-processing', action='store_true',
-                        help='Enable experimental string processing.')
+    parser.add_argument('--enable-experimental-observation', action='store_true',
+                        help='Enable experimental observation.')
+    parser.add_argument('--enable-synchronization', action='store_true',
+                        help='Enable Synchronization.')
+    parser.add_argument('--enable-volatile', action='store_true',
+                        help='Enable Volatile.')
     parser.add_argument('-swift-version', metavar='N',
                         help='the Swift version to use')
     parser.add_argument('-show-overlay', action='store_true',
@@ -127,6 +131,7 @@ def run_command(args):
     proc = subprocess.Popen(
         args, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
+    out = out.decode('UTF8')
     exitcode = proc.returncode
     return (exitcode, out, err)
 
@@ -332,8 +337,6 @@ def main():
     extra_args = ['-skip-imports']
     if args.enable_experimental_concurrency:
         extra_args = extra_args + ['-enable-experimental-concurrency']
-    if args.enable_experimental_string_processing:
-        extra_args = extra_args + ['-enable-experimental-string-processing']
     if args.swift_version:
         extra_args = extra_args + ['-swift-version', '%s' % args.swift_version]
 

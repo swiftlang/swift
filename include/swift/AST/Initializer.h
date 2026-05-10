@@ -21,9 +21,13 @@
 #define SWIFT_INITIALIZER_H
 
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/Decl.h"
+
+namespace llvm {
+class raw_ostream;
+}
 
 namespace swift {
+class ParamDecl;
 class PatternBindingDecl;
 
 enum class InitializerKind : uint8_t {
@@ -36,6 +40,9 @@ enum class InitializerKind : uint8_t {
 
   /// A property wrapper initialization expression.
   PropertyWrapper,
+
+  /// An expression within a custom attribute.
+  CustomAttribute,
 };
 
 /// An Initializer is a kind of DeclContext used for expressions that
@@ -76,28 +83,25 @@ class PatternBindingInitializer : public Initializer {
   // created lazily for 'self' lookup from lazy property initializer
   ParamDecl *SelfParam;
 
-  friend class ASTContext; // calls reset on unused contexts
+  // Sets itself as the parent.
+  friend class PatternBindingDecl;
 
-  void reset(DeclContext *parent) {
-    setParent(parent);
-    Binding = nullptr;
-    SelfParam = nullptr;
-  }
+  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex);
 
-public:
   explicit PatternBindingInitializer(DeclContext *parent)
     : Initializer(InitializerKind::PatternBinding, parent),
       Binding(nullptr), SelfParam(nullptr) {
     SpareBits = 0;
   }
- 
 
-  void setBinding(PatternBindingDecl *binding, unsigned bindingIndex) {
-    setParent(binding->getDeclContext());
-    Binding = binding;
-    SpareBits = bindingIndex;
+public:
+  static PatternBindingInitializer *create(DeclContext *parent) {
+    return new (parent->getASTContext()) PatternBindingInitializer(parent);
   }
-  
+
+  static PatternBindingInitializer *createDeserialized(PatternBindingDecl *PBD,
+                                                       unsigned index);
+
   PatternBindingDecl *getBinding() const { return Binding; }
 
   unsigned getBindingIndex() const { return SpareBits; }
@@ -119,44 +123,19 @@ public:
   }
 };
 
-/// SerializedPatternBindingInitializer - This represents what was originally a
-/// PatternBindingInitializer during serialization. It is preserved as a special
-/// class only to maintain the correct AST structure and remangling after
-/// deserialization.
-class SerializedPatternBindingInitializer : public SerializedLocalDeclContext {
-  PatternBindingDecl *Binding;
-
-public:
-  SerializedPatternBindingInitializer(PatternBindingDecl *Binding,
-                                      unsigned bindingIndex)
-    : SerializedLocalDeclContext(LocalDeclContextKind::PatternBindingInitializer,
-                                 Binding->getDeclContext()),
-      Binding(Binding) {
-    SpareBits = bindingIndex;
-  }
-
-  PatternBindingDecl *getBinding() const {
-    return Binding;
-  }
-
-  unsigned getBindingIndex() const { return SpareBits; }
-
-
-  static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-      LocalDeclContextKind::PatternBindingInitializer;
-    return false;
-  }
-};
-
 /// A default argument expression.  The parent context is the function
 /// (possibly a closure) for which this is a default argument.
 class DefaultArgumentInitializer : public Initializer {
-public:
   explicit DefaultArgumentInitializer(DeclContext *parent, unsigned index)
       : Initializer(InitializerKind::DefaultArgument, parent) {
     SpareBits = index;
+  }
+
+public:
+  static DefaultArgumentInitializer *create(DeclContext *parent,
+                                            unsigned index) {
+    return new (parent->getASTContext())
+        DefaultArgumentInitializer(parent, index);
   }
 
   unsigned getIndex() const { return SpareBits; }
@@ -164,7 +143,7 @@ public:
   /// Change the parent of this context.  This is necessary because
   /// the function signature is parsed before the function
   /// declaration/expression itself is built.
-  void changeFunction(DeclContext *parent, ParameterList *paramLists);
+  void changeFunction(DeclContext *parent);
 
   static bool classof(const DeclContext *DC) {
     if (auto init = dyn_cast<Initializer>(DC))
@@ -173,29 +152,6 @@ public:
   }
   static bool classof(const Initializer *I) {
     return I->getInitializerKind() == InitializerKind::DefaultArgument;
-  }
-};
-
-/// SerializedDefaultArgumentInitializer - This represents what was originally a
-/// DefaultArgumentInitializer during serialization. It is preserved only to
-/// maintain the correct AST structure and remangling after deserialization.
-class SerializedDefaultArgumentInitializer : public SerializedLocalDeclContext {
-  const unsigned Index;
-public:
-  SerializedDefaultArgumentInitializer(unsigned Index, DeclContext *Parent)
-    : SerializedLocalDeclContext(LocalDeclContextKind::DefaultArgumentInitializer,
-                                 Parent),
-      Index(Index) {}
-
-  unsigned getIndex() const {
-    return Index;
-  }
-
-  static bool classof(const DeclContext *DC) {
-    if (auto LDC = dyn_cast<SerializedLocalDeclContext>(DC))
-      return LDC->getLocalDeclContextKind() ==
-        LocalDeclContextKind::DefaultArgumentInitializer;
-    return false;
   }
 };
 
@@ -232,7 +188,35 @@ public:
     return I->getInitializerKind() == InitializerKind::PropertyWrapper;
   }
 };
-  
+
+/// An expression within a custom attribute. The parent context is the
+/// context in which the attributed declaration occurs.
+class CustomAttributeInitializer : public Initializer {
+public:
+  explicit CustomAttributeInitializer(DeclContext *parent)
+      : Initializer(InitializerKind::CustomAttribute, parent) {}
+
+  static CustomAttributeInitializer *create(DeclContext *parent) {
+    return new (parent->getASTContext()) CustomAttributeInitializer(parent);
+  }
+
+  void setEnclosingInitializer(Initializer *newParent) {
+    setParent(newParent);
+  }
+
+  static bool classof(const DeclContext *DC) {
+    if (auto init = dyn_cast<Initializer>(DC))
+      return classof(init);
+    return false;
+  }
+
+  static bool classof(const Initializer *I) {
+    return I->getInitializerKind() == InitializerKind::CustomAttribute;
+  }
+};
+
+void simple_display(llvm::raw_ostream &out, Initializer *init);
+
 } // end namespace swift
 
 #endif

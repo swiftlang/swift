@@ -70,7 +70,7 @@ class _CompoundAction(Action):
 
 class _PartialAction(Action):
     """Action that is partially applied, creating a factory closure used to
-    defer initialization of acitons in the builder DSL.
+    defer initialization of actions in the builder DSL.
     """
 
     def __init__(self, action_class):
@@ -185,7 +185,7 @@ class _Builder(object):
 # -----------------------------------------------------------------------------
 
 class ArgumentParser(argparse.ArgumentParser):
-    """A thin extension class to the standard ArgumentParser which incluldes
+    """A thin extension class to the standard ArgumentParser which includes
     methods to interact with a builder instance.
     """
 

@@ -1,0 +1,5 @@
+---
+Name: OpaquePointerImportAPINotes
+Tags:
+- Name: FileImpl
+  SwiftImportAs: opaque_pointer

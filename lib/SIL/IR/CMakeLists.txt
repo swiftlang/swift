@@ -1,5 +1,6 @@
 target_sources(swiftSIL PRIVATE
   AbstractionPattern.cpp
+  ActorIsolation.cpp
   ApplySite.cpp
   Bridging.cpp
   Linker.cpp
@@ -14,6 +15,7 @@ target_sources(swiftSIL PRIVATE
   SILDebugInfoExpression.cpp
   SILDebugScope.cpp
   SILDeclRef.cpp
+  SILDefaultOverrideTable.cpp
   SILDefaultWitnessTable.cpp
   SILDifferentiabilityWitness.cpp
   SILFunction.cpp
@@ -24,10 +26,13 @@ target_sources(swiftSIL PRIVATE
   SILInstructions.cpp
   SILLocation.cpp
   SILModule.cpp
+  SILMoveOnlyDeinit.cpp
   SILPrinter.cpp
   SILProfiler.cpp
   SILSuccessor.cpp
+  SILSymbolVisitor.cpp
   SILType.cpp
+  SILTypeSubstitution.cpp
   SILUndef.cpp
   SILVTable.cpp
   SILValue.cpp

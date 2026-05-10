@@ -15,14 +15,14 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/NullablePtr.h"
-#include "llvm/ADT/Optional.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/STLExtras.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/raw_ostream.h"
 #include "gtest/gtest.h"
 #include <map>
+#include <optional>
 #include <set>
 
 using namespace swift;
@@ -320,7 +320,7 @@ template <typename T> class BlotMapVectorTest : public ::testing::Test {
 protected:
   T Map;
 
-  Optional<unsigned> NumExpectedLiveTesters;
+  std::optional<unsigned> NumExpectedLiveTesters;
 
   static typename T::key_type *const dummy_key_ptr;
   static typename T::mapped_type *const dummy_value_ptr;
@@ -632,9 +632,9 @@ TEST(BlotMapVectorCustomTest, FindAsTest) {
 
   // Normal lookup tests
   EXPECT_EQ(1u, map.count(1));
-  EXPECT_EQ(1u, map.find(0)->getValue().second);
-  EXPECT_EQ(2u, map.find(1)->getValue().second);
-  EXPECT_EQ(3u, map.find(2)->getValue().second);
+  EXPECT_EQ(1u, map.find(0)->value().second);
+  EXPECT_EQ(2u, map.find(1)->value().second);
+  EXPECT_EQ(3u, map.find(2)->value().second);
   EXPECT_TRUE(map.find(3) == map.end());
 }
 

@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend -typecheck -verify -primary-file %s
-// [SR-12745]
+
 // rdar://problem/62957095
+// https://github.com/apple/swift/issues/55190
+
 struct S1 {
   var x : Int = 0
 }
@@ -26,4 +28,5 @@ struct S4 {
   subscript(v: KeyPath<S4, String>) -> Int { get { 0 } set(newValue) {} }
 }
 var s4 = S4()
-s4[\.x] = 10 // expected-error {{key path value type 'Int' cannot be converted to contextual type 'String'}}
+s4[\.x] = 10 // expected-error {{cannot convert value of type 'KeyPath<S4, Int>' to expected argument type 'KeyPath<S4, String>'}}
+// expected-note@-1 {{arguments to generic parameter 'Value' ('Int' and 'String') are expected to be equal}}

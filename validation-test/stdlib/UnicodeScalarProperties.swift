@@ -1,8 +1,13 @@
-// RUN: %target-run-simple-swift %S/../../utils/gen-unicode-data/Data/
+// RUN: %target-run-simple-swift %S/../../utils/gen-unicode-data/Data/17/
 // REQUIRES: executable_test
 // REQUIRES: long_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: objc_interop
+
+// This test requires access to Unicode data files in the source tree, so
+// it doesn't currently support testing on a remote device. (rdar://98993795)
+// UNSUPPORTED: remote_run
+// UNSUPPORTED: device_run
 
 @_spi(_Unicode)
 import Swift
@@ -16,7 +21,7 @@ var UnicodeScalarPropertiesTest = TestSuite("UnicodeScalarProperties")
 // Binary Properties
 //===----------------------------------------------------------------------===//
 
-if #available(SwiftStdlib 5.6, *) {
+if #available(SwiftStdlib 6.1, *) {
   UnicodeScalarPropertiesTest.test("Binary Properties") {
     // First, check that we correctly parsed the unicode data tables to be able
     // to test against.
@@ -92,7 +97,7 @@ if #available(SwiftStdlib 5.6, *) {
 // Numeric Properties
 //===----------------------------------------------------------------------===//
 
-if #available(SwiftStdlib 5.6, *) {
+if #available(SwiftStdlib 6.1, *) {
   UnicodeScalarPropertiesTest.test("Numeric Properties") {
     for i in 0x0 ... 0x10FFFF {
       guard let scalar = Unicode.Scalar(i) else {
@@ -109,7 +114,7 @@ if #available(SwiftStdlib 5.6, *) {
 // Scalar Mappings
 //===----------------------------------------------------------------------===//
 
-if #available(SwiftStdlib 5.6, *) {
+if #available(SwiftStdlib 6.1, *) {
   UnicodeScalarPropertiesTest.test("Scalar Mappings") {
     for i in 0x0 ... 0x10FFFF {
       guard let scalar = Unicode.Scalar(i) else {
@@ -135,7 +140,7 @@ if #available(SwiftStdlib 5.6, *) {
 // Scalar Age
 //===----------------------------------------------------------------------===//
 
-if #available(SwiftStdlib 5.6, *) {
+if #available(SwiftStdlib 6.1, *) {
   UnicodeScalarPropertiesTest.test("Scalar Age") {
     for i in 0x0 ... 0x10FFFF {
       guard let scalar = Unicode.Scalar(i) else {
@@ -152,7 +157,7 @@ if #available(SwiftStdlib 5.6, *) {
 // Scalar General Category
 //===----------------------------------------------------------------------===//
 
-if #available(SwiftStdlib 5.6, *) {
+if #available(SwiftStdlib 6.1, *) {
   UnicodeScalarPropertiesTest.test("Scalar General Category") {
     for i in 0x0 ... 0x10FFFF {
       guard let scalar = Unicode.Scalar(i) else {
@@ -168,7 +173,7 @@ if #available(SwiftStdlib 5.6, *) {
 // Scalar Name Alias
 //===----------------------------------------------------------------------===//
 
-if #available(SwiftStdlib 5.6, *) {
+if #available(SwiftStdlib 6.1, *) {
   UnicodeScalarPropertiesTest.test("Scalar Name Alias") {
     for i in 0x0 ... 0x10FFFF {
       guard let scalar = Unicode.Scalar(i) else {
@@ -184,7 +189,7 @@ if #available(SwiftStdlib 5.6, *) {
 // Scalar Name
 //===----------------------------------------------------------------------===//
 
-if #available(SwiftStdlib 5.6, *) {
+if #available(SwiftStdlib 6.1, *) {
   UnicodeScalarPropertiesTest.test("Scalar Name") {
     for i in 0x0 ... 0x10FFFF {
       guard let scalar = Unicode.Scalar(i) else {
@@ -200,7 +205,7 @@ if #available(SwiftStdlib 5.6, *) {
 // Case Folded
 //===----------------------------------------------------------------------===//
 
-if #available(SwiftStdlib 5.7, *) {
+if #available(SwiftStdlib 6.1, *) {
   UnicodeScalarPropertiesTest.test("Scalar Case Folding") {
     for i in 0x0 ... 0x10FFFF {
       guard let scalar = Unicode.Scalar(i) else {
@@ -220,7 +225,7 @@ if #available(SwiftStdlib 5.7, *) {
 // Script/Script Extensions
 //===----------------------------------------------------------------------===//
 
-if #available(SwiftStdlib 5.7, *) {
+if #available(SwiftStdlib 6.1, *) {
   UnicodeScalarPropertiesTest.test("Scalar Scripts") {
     for i in 0x0 ... 0x10FFFF {
       guard let scalar = Unicode.Scalar(i) else {
@@ -256,9 +261,9 @@ if #available(SwiftStdlib 5.7, *) {
       )
 
       if let parsedExtensions = scriptExtensions[scalar] {
-        expectEqual(extensions, parsedExtensions)
+        expectEqual(extensions, parsedExtensions, "Scalar: \(String(scalar.value, radix: 16))")
       } else {
-        expectEqual(extensions, [script])
+        expectEqual(extensions, [script], "Scalar: \(String(scalar.value, radix: 16))")
       }
     }
   }

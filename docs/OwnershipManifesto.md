@@ -218,7 +218,7 @@ we mean a specific instance of a semantic, user-language value.
 
 For example, consider the following Swift code:
 
-```
+```swift
 var x = [1,2,3]
 var y = x
 ```
@@ -418,7 +418,7 @@ discussed in the introduction.  For example, suppose that
 the callee loads a value from its argument, then calls
 a function which the optimizer cannot reason about:
 
-```
+```swift
 extension Array {
   mutating func organize(_ predicate: (Element) -> Bool) {
     let first = self[0]
@@ -916,7 +916,7 @@ semantically necessary when working with non-copyable types.
 
 We propose to remove this limitation in a straightforward way:
 
-```
+```swift
 inout root = &tree.root
 
 shared elements = self.queue
@@ -946,7 +946,7 @@ cases to be spelled explicitly:
 
 - A function argument can be explicitly declared `owned`:
 
-  ```
+  ```swift
   func append(_ values: owned [Element]) {
     ...
   }
@@ -960,7 +960,7 @@ cases to be spelled explicitly:
 
 - A function argument can be explicitly declared `shared`.
 
-  ```
+  ```swift
   func ==(left: shared String, right: shared String) -> Bool {
     ...
   }
@@ -994,7 +994,7 @@ cases to be spelled explicitly:
 
 - A method can be explicitly declared `consuming`.
 
-  ```
+  ```swift
   consuming func moveElements(into collection: inout [Element]) {
     ...
   }
@@ -1060,7 +1060,7 @@ sequence cannot be iterated multiple times, this is a
 This can be explicitly requested by declaring the iteration
 variable `owned`:
 
-```
+```swift
 for owned employee in company.employees {
   newCompany.employees.append(employee)
 }
@@ -1083,7 +1083,7 @@ operation on `Collection`.
 This can be explicitly requested by declaring the iteration
 variable `shared`:
 
-```
+```swift
 for shared employee in company.employees {
   if !employee.respected { throw CatastrophicHRFailure() }
 }
@@ -1093,7 +1093,7 @@ It is also used by default when the sequence type is known to
 conform to `Collection`, since this is the optimal way of
 iterating over a collection.
 
-```
+```swift
 for employee in company.employees {
   if !employee.respected { throw CatastrophicHRFailure() }
 }
@@ -1117,7 +1117,7 @@ operation on `MutableCollection`.
 This must be explicitly requested by declaring the
 iteration variable `inout`:
 
-```
+```swift
 for inout employee in company.employees {
   employee.respected = true
 }
@@ -1145,7 +1145,7 @@ languages to conveniently implement iteration.  In Swift,
 to follow this pattern, we would need to allow the definition
 of generator functions, e.g.:
 
-```
+```swift
 mutating generator iterateMutable() -> inout Element {
   var i = startIndex, e = endIndex
   while i != e {
@@ -1193,7 +1193,7 @@ to invoke one because these would only be used in accessors.
 The idea is that, instead of defining `get` and `set`,
 a storage declaration could define `read` and `modify`:
 
-```
+```swift
 var x: String
 var y: String
 var first: String {
@@ -1231,7 +1231,7 @@ For this reason, we propose the `move` function.  Conceptually,
 `move` is simply a top-level function in the Swift standard
 library:
 
-```
+```swift
 func move<T>(_ value: T) -> T {
   return value
 }
@@ -1270,7 +1270,7 @@ variables are initialized before use.
 
 `copy` is a top-level function in the Swift standard library:
 
-```
+```swift
 func copy<T>(_ value: T) -> T {
   return value
 }
@@ -1294,7 +1294,7 @@ value is returned.  This is useful for several reasons:
 
 `endScope` is a top-level function in the Swift standard library:
 
-```
+```swift
 func endScope<T>(_ value: T) -> () {}
 ```
 
@@ -1326,7 +1326,7 @@ every component is statically resolvable to a storage declaration.
 There is some recurring interest in the community in allowing programs
 to abstract over storage, so that you might say:
 
-```
+```swift
 let prop = Widget.weight
 ```
 
@@ -1408,7 +1408,7 @@ a `moveonly` context are also implicitly `moveonly`.
 
 A type can be a `moveonly` context:
 
-```
+```swift
 moveonly struct Array<Element> {
   // Element and Array<Element> are not assumed to be copyable here
 }
@@ -1420,7 +1420,7 @@ hierarchies of associated types.
 
 An extension can be a `moveonly` context:
 
-```
+```swift
 moveonly extension Array {
   // Element and Array<Element> are not assumed to be copyable here
 }
@@ -1429,7 +1429,7 @@ moveonly extension Array {
 A type can declare conditional copyability using a conditional
 conformance:
 
-```
+```swift
 moveonly extension Array: Copyable where Element: Copyable {
   ...
 }
@@ -1450,7 +1450,7 @@ it a non-`moveonly` extension is an error.
 
 A function can be a `moveonly` context:
 
-```
+```swift
 extension Array {
   moveonly func report<U>(_ u: U)
 }
@@ -1483,7 +1483,7 @@ used to express the unique ownership of resources.  For
 example, here is a simple file-handle type that ensures
 that the handle is closed when the value is destroyed:
 
-```
+```swift
 moveonly struct File {
   var descriptor: Int32
 

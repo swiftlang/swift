@@ -59,7 +59,8 @@ class MyCls {
     }
 }
 
-// MARK: fix method called 'self' can be confused with regular 'self' https://bugs.swift.org/browse/SR-4559
+// https://github.com/apple/swift/issues/47136
+// Method called 'self' can be confused with regular 'self'
 
 func funcThatReturnsSomething(_ any: Any) -> Any {
     any

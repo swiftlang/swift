@@ -1,17 +1,18 @@
 // Please keep this file in alphabetical order!
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift -enable-library-evolution
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module-path %t/resilient_objc_class.swiftmodule %S/../Inputs/resilient_objc_class.swift -I %t -enable-library-evolution -emit-objc-header-path %t/resilient_objc_class.h
+// RUN: %target-swift-frontend -target %target-pre-stable-abi-triple -emit-module-path %t/resilient_struct.swiftmodule %S/../Inputs/resilient_struct.swift -enable-library-evolution
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-pre-stable-abi-triple -emit-module-path %t/resilient_objc_class.swiftmodule %S/../Inputs/resilient_objc_class.swift -I %t -enable-library-evolution -emit-objc-header-path %t/resilient_objc_class.h
 
-// RUN: cp %S/Inputs/custom-modules/module.map %t/module.map
+// RUN: cp %S/Inputs/custom-modules/module.modulemap %t/module.modulemap
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -module-name resilient -emit-objc-header-path %t/resilient.h -I %t -enable-library-evolution
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -target %target-pre-stable-abi-triple %s -module-name resilient -typecheck -verify -emit-objc-header-path %t/resilient.h -I %t -enable-library-evolution
 // RUN: %FileCheck %s --check-prefix=NO-STUBS < %t/resilient.h
 // RUN: %check-in-clang %t/resilient.h -I %t
 
 // REQUIRES: objc_interop
 // UNSUPPORTED: OS=iosmac
+// UNSUPPORTED: OS=xros
 
 // See also resilient-ancestry.swift, for the stable ABI deployment target test.
 

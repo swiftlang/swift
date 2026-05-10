@@ -11,55 +11,274 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
-public struct Type : CustomStringConvertible, CustomReflectable {
+/// A Swift type that has been lowered to a SIL representation type.
+/// A `SIL.Type` is basically an `AST.CanonicalType` with the distinction between "object" and "address" type
+/// (`*T` is the type of an address pointing at T).
+/// Note that not all `CanonicalType`s can be represented as a `SIL.Type`.
+public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildren {
   public let bridged: BridgedType
-  
-  public var isAddress: Bool { SILType_isAddress(bridged) != 0 }
+
+  public var description: String {
+    String(taking: bridged.getDebugDescription())
+  }
+
+  public var isAddress: Bool { bridged.isAddress() }
   public var isObject: Bool { !isAddress }
 
+  public var addressType: Type { bridged.getAddressType().type }
+  public var objectType: Type { bridged.getObjectType().type }
+
+  public var rawType: AST.`Type` { canonicalType.rawType }
+  public var canonicalType: CanonicalType { CanonicalType(bridged: bridged.getCanType()) }
+
+  public func getLoweredType(in function: Function) -> Type {
+    function.bridged.getLoweredType(self.bridged).type
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                           Various type properties
+  //===--------------------------------------------------------------------===//
+
   public func isTrivial(in function: Function) -> Bool {
-    return SILType_isTrivial(bridged, function.bridged) != 0
+    return bridged.isTrivial(function.bridged)
+  }
+
+  /// Returns true if the type is a trivial type and is and does not contain a Builtin.RawPointer.
+  public func isTrivialNonPointer(in function: Function) -> Bool {
+    return !bridged.isNonTrivialOrContainsRawPointer(function.bridged)
+  }
+
+  public func isLoadable(in function: Function) -> Bool {
+    return bridged.isLoadable(function.bridged)
   }
 
   public func isReferenceCounted(in function: Function) -> Bool {
-    return SILType_isReferenceCounted(bridged, function.bridged) != 0
+    return bridged.isReferenceCounted(function.bridged)
   }
 
-  public func isNonTrivialOrContainsRawPointer(in function: Function) -> Bool {
-    return SILType_isNonTrivialOrContainsRawPointer(bridged, function.bridged) != 0
+  public var isMoveOnly: Bool { bridged.isMoveOnly() }
+
+  /// Return true if this type conforms to Escapable.
+  ///
+  /// Note: invalid types are non-Escapable, so take care not to make assumptions about non-Escapable types.
+  public func isEscapable(in function: Function) -> Bool {
+    bridged.isEscapable(function.bridged)
   }
 
-  public var isNominal: Bool { SILType_isNominal(bridged) != 0 }
-  public var isClass: Bool { SILType_isClass(bridged) != 0 }
-  public var isStruct: Bool { SILType_isStruct(bridged) != 0 }
-  public var isTuple: Bool { SILType_isTuple(bridged) != 0 }
-  public var isEnum: Bool { SILType_isEnum(bridged) != 0 }
+  /// Return true if this type conforms to Escapable and is not a noescape function type.
+  ///
+  /// Warning: may return true for (source-level) non-escaping closures. After SILGen, all partial_apply instructions
+  /// have an escaping function type. ClosureLifetimeFixup only changes them to noescape function type if they are
+  /// promoted to [on_stack]. But regardless of stack promotion, a non-escaping closure value's lifetime is constrained
+  /// by the lifetime of its captures. Use Value.mayEscape instead to check for this case.
+  public func mayEscape(in function: Function) -> Bool {
+    !isNoEscapeFunction && isEscapable(in: function)
+  }
 
-  public var tupleElements: TupleElementArray { TupleElementArray(type: self) }
+  public func builtinVectorElementType(in function: Function) -> Type {
+    canonicalType.builtinVectorElementType.loweredType(in: function)
+  }
 
-  public func getNominalFields(in function: Function) -> NominalFieldsArray {
-    NominalFieldsArray(type: self, function: function)
+  public func builtinFixedArrayElementType(in function: Function, maximallyAbstracted: Bool = false) -> Type {
+    canonicalType.builtinFixedArrayElementType.loweredType(in: function, maximallyAbstracted: maximallyAbstracted)
+  }
+
+  public var superClassType: Type? { canonicalType.superClassType?.silType }
+
+  public func isExactSuperclass(of type: Type) -> Bool {
+    bridged.isExactSuperclassOf(type.bridged)
+  }
+
+  /// True if this type references a "ref" type that has a single pointer representation.
+  public var isHeapObjectReferenceType: Bool { bridged.isHeapObjectReferenceType() }
+
+  public func loweredInstanceTypeOfMetatype(in function: Function) -> Type {
+    return canonicalType.instanceTypeOfMetatype.loweredType(in: function)
+  }
+
+  public var isMarkedAsImmortal: Bool { bridged.isMarkedAsImmortal() }
+
+  /// True if a value of this type can have its address taken by a lifetime-dependent value.
+  public func isAddressableForDeps(in function: Function) -> Bool {
+    bridged.isAddressableForDeps(function.bridged)
+  }
+
+  /// If this is a raw layout type, returns the substituted like-type.
+  public var rawLayoutSubstitutedLikeType: AST.`Type`? {
+    .init(bridgedOrNil: bridged.getRawLayoutSubstitutedLikeType())
+  }
+
+  /// If this is a raw layout type, returns the substituted count-type.
+  public var rawLayoutSubstitutedCountType: AST.`Type`? {
+    .init(bridgedOrNil: bridged.getRawLayoutSubstitutedCountType())
+  }
+
+  public var approximateFormalPackType: CanonicalType {
+    precondition(isSILPack);
+    return CanonicalType(bridged: bridged.getApproximateFormalPackType());
+  }
+
+  /// True if destroying a value of this type might invoke a custom deinitialer
+  /// with side effects. This includes any recursive deinitializers that may be
+  /// invoked by releasing a reference. False if this only has default
+  /// deinitialization.
+  public func mayHaveCustomDeinit(in function: Function) -> Bool {
+    return bridged.mayHaveCustomDeinit(function.bridged)
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                Properties of lowered `SILFunctionType`s
+  //===--------------------------------------------------------------------===//
+
+  public var containsNoEscapeFunction: Bool { bridged.containsNoEscapeFunction() }
+
+  // Returns a new SILFunctionType with changed "escapeness".
+  public func getFunctionType(withNoEscape: Bool) -> Type {
+    bridged.getFunctionTypeWithNoEscape(withNoEscape).type
+  }
+
+  /// True if a function with this type can be code-generated in Embedded Swift.
+  /// These are basically all non-generic functions. But also certain generic functions are supported:
+  /// Generic function arguments which have a class-bound type are valid in Embedded Swift, because for
+  /// such arguments, no metadata is needed, except the isa-pointer of the class.
+  public var hasValidSignatureForEmbedded: Bool {
+    let genericSignature = invocationGenericSignatureOfFunction
+    for genParam in genericSignature.genericParameters {
+      let mappedParam = genericSignature.mapTypeIntoEnvironment(genParam)
+      if mappedParam.isArchetype && !mappedParam.archetypeRequiresClass {
+        return false
+      }
+    }
+    return true
+  }
+
+  //===--------------------------------------------------------------------===//
+  //                           Aggregates
+  //===--------------------------------------------------------------------===//
+
+  public var isVoid: Bool { isTuple && tupleElements.isEmpty }
+
+  /// True if the type has no stored properties.
+  /// For example an empty tuple or an empty struct or a combination of such.
+  public func isEmpty(in function: Function) -> Bool {
+    bridged.isEmpty(function.bridged)
+  }
+
+  public var tupleElements: TupleElementArray {
+    precondition(isTuple)
+    return TupleElementArray(type: self)
+  }
+
+  public func getBoxFields(in function: Function) -> BoxFieldsArray {
+    precondition(isBox)
+    return BoxFieldsArray(boxType: canonicalType, function: function)
+  }
+
+  public var packElements: PackElementArray {
+    precondition(isSILPack)
+    return PackElementArray(type: self)
+  }
+
+  /// Returns nil if the nominal is a resilient type because in this case the complete list
+  /// of fields is not known.
+  public func getNominalFields(in function: Function) -> NominalFieldsArray? {
+    guard let nominal = nominal, !nominal.isResilient(in: function) else {
+      return nil
+    }
+    if let structDecl = nominal as? StructDecl, structDecl.hasUnreferenceableStorage {
+      return nil
+    }
+    return NominalFieldsArray(type: self, function: function)
+  }
+
+  /// Returns nil if the enum is a resilient type because in this case the complete list
+  /// of cases is not known.
+  public func getEnumCases(in function: Function) -> EnumCases? {
+    guard let nominal = nominal,
+          let en = nominal as? EnumDecl,
+          !en.isResilient(in: function)
+    else {
+      return nil
+    }
+    return EnumCases(enumType: self, function: function)
   }
 
   public func getIndexOfEnumCase(withName name: String) -> Int? {
-    let idx = name.withBridgedStringRef {
-      SILType_getCaseIdxOfEnumType(bridged, $0)
+    let idx = name._withBridgedStringRef {
+      bridged.getCaseIdxOfEnumType($0)
     }
     return idx >= 0 ? idx : nil
   }
 
-  public var description: String {
-    String(_cxxString: SILType_debugDescription(bridged))
+  /// Returns true if this is an aggregate containing `otherType` - or is the same type.
+  ///
+  /// Recurses into the element types of structs, tuples, enum payloads, and `Builtin.FixedArray`.
+  public func aggregateIsOrContains(_ otherType: Type, in function: Function) -> Bool {
+    if self == otherType {
+      return true
+    }
+    if isStruct {
+      guard let fields = getNominalFields(in: function) else {
+        return true
+      }
+      return fields.contains { $0.aggregateIsOrContains(otherType, in: function) }
+    }
+    if isTuple {
+      return tupleElements.contains { $0.aggregateIsOrContains(otherType, in: function) }
+    }
+    if isEnum {
+      guard let cases = getEnumCases(in: function) else {
+        return true
+      }
+      return cases.contains { $0.payload?.aggregateIsOrContains(otherType, in: function) ?? false }
+    }
+    if isBuiltinFixedArray {
+      // Match the address-ness of `self` so TBAA callers that pass address
+      // types recurse correctly into the element type.
+      var elementType = builtinFixedArrayElementType(in: function)
+      if isAddress {
+        elementType = elementType.addressType
+      }
+      return elementType.aggregateIsOrContains(otherType, in: function)
+    }
+    return false
   }
 
-  public var customMirror: Mirror { Mirror(self, children: []) }
+  public func mapOutOfEnvironment(in function: Function) -> Type {
+    rawType.mapOutOfEnvironment().canonical.loweredType(in: function)
+  }
 }
 
-extension Type: Equatable {
+extension Type: Equatable, Hashable {
   public static func ==(lhs: Type, rhs: Type) -> Bool { 
-    lhs.bridged.typePtr == rhs.bridged.typePtr
+    lhs.bridged.opaqueValue == rhs.bridged.opaqueValue
+  }
+
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(bridged.opaqueValue)
+  }
+}
+
+public struct TypeArray : RandomAccessCollection, CustomReflectable {
+  public let bridged: BridgedSILTypeArray
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { return bridged.getCount() }
+
+  public init(bridged: BridgedSILTypeArray) {
+    self.bridged = bridged
+  }
+
+  public subscript(_ index: Int) -> Type {
+    bridged.getAt(index).type
+  }
+
+  public var customMirror: Mirror {
+    let c: [Mirror.Child] = map { (label: nil, value: $0) }
+    return Mirror(self, children: c)
   }
 }
 
@@ -68,17 +287,74 @@ public struct NominalFieldsArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let function: Function
 
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { SILType_getNumNominalFields(type.bridged) }
+  public var endIndex: Int { Int(type.bridged.getNumNominalFields()) }
 
   public subscript(_ index: Int) -> Type {
-    SILType_getNominalFieldType(type.bridged, index, function.bridged).type
+    type.bridged.getFieldType(index, function.bridged).type
   }
 
   public func getIndexOfField(withName name: String) -> Int? {
-    let idx = name.withBridgedStringRef {
-      SILType_getFieldIdxOfNominalType(type.bridged, $0)
+    let idx = name._withBridgedStringRef {
+      type.bridged.getFieldIdxOfNominalType($0)
     }
     return idx >= 0 ? idx : nil
+  }
+
+  public func getNameOfField(withIndex idx: Int) -> StringRef {
+    StringRef(bridged: type.bridged.getFieldName(idx))
+  }
+}
+
+public struct EnumCase : Equatable {
+  public let enumElementDecl : EnumElementDecl
+  public let payload: Type?
+  public let index: Int
+  public var name: StringRef { enumElementDecl.name }
+
+  public static func ==(lhs: Self, rhs: Self) -> Bool {
+    return lhs.enumElementDecl == rhs.enumElementDecl
+  }
+}
+
+public struct EnumCases : CollectionLikeSequence, IteratorProtocol {
+  fileprivate let enumType: Type
+  fileprivate let function: Function
+  private var caseIterator: BridgedType.EnumElementIterator
+  private var caseIndex = 0
+
+  fileprivate init(enumType: Type, function: Function) {
+    self.enumType = enumType
+    self.function = function
+    self.caseIterator = enumType.bridged.getFirstEnumCaseIterator()
+  }
+
+  public mutating func next() -> EnumCase? {
+    if !enumType.bridged.isEndCaseIterator(caseIterator) {
+      defer {
+        caseIterator = caseIterator.getNext()
+        caseIndex += 1
+      }
+      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(caseIterator).getAs(EnumElementDecl.self),
+                      payload: enumType.bridged.getEnumCasePayload(caseIterator, function.bridged).typeOrNil,
+                      index: caseIndex)
+    }
+    return nil
+  }
+
+  // Note: this has O(n) complexity where n is number of enum cases
+  public subscript(_ index: Int) -> EnumCase? {
+    var iterator = enumType.bridged.getFirstEnumCaseIterator()
+    var currentIndex = 0
+    while currentIndex != index && !enumType.bridged.isEndCaseIterator(iterator) {
+      iterator = iterator.getNext()
+      currentIndex += 1
+    }
+    if currentIndex == index && !enumType.bridged.isEndCaseIterator(iterator) {
+      return EnumCase(enumElementDecl: enumType.bridged.getEnumElementDecl(iterator).getAs(EnumElementDecl.self),
+                      payload: enumType.bridged.getEnumCasePayload(iterator, function.bridged).typeOrNil,
+                      index: index)
+    }
+    return nil
   }
 }
 
@@ -86,13 +362,51 @@ public struct TupleElementArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let type: Type
 
   public var startIndex: Int { return 0 }
-  public var endIndex: Int { SILType_getNumTupleElements(type.bridged) }
+  public var endIndex: Int { Int(type.bridged.getNumTupleElements()) }
 
   public subscript(_ index: Int) -> Type {
-    SILType_getTupleElementType(type.bridged, index).type
+    type.bridged.getTupleElementType(index).type
+  }
+
+  public func label(at index: Int) -> Identifier {
+    type.bridged.getTupleElementLabel(index)
+  }
+}
+
+public struct BoxFieldsArray : RandomAccessCollection, FormattedLikeArray {
+  public let boxType: CanonicalType
+  public let function: Function
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { BridgedType.getNumBoxFields(boxType.bridged) }
+
+  public subscript(_ index: Int) -> Type {
+    BridgedType.getBoxFieldType(boxType.bridged, index, function.bridged).type
+  }
+
+  public func isMutable(fieldIndex: Int) -> Bool {
+    BridgedType.getBoxFieldIsMutable(boxType.bridged, fieldIndex)
+  }
+}
+
+public struct PackElementArray : RandomAccessCollection, FormattedLikeArray {
+  fileprivate let type: Type
+
+  public var startIndex: Int { return 0 }
+  public var endIndex: Int { Int(type.bridged.getNumPackElements()) }
+
+  public subscript(_ index: Int) -> Type {
+    type.bridged.getPackElementType(index).type
+  }
+}
+
+extension Type: DiagnosticArgument {
+  public func _withBridgedDiagnosticArgument(_ fn: (BridgedDiagnosticArgument) -> Void) {
+    rawType._withBridgedDiagnosticArgument(fn)
   }
 }
 
 extension BridgedType {
-  var type: Type { Type(bridged: self) }
+  public var type: Type { Type(bridged: self) }
+  var typeOrNil: Type? { isNull() ? nil : type }
 }

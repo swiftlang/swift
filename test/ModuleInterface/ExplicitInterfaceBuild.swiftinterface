@@ -1,0 +1,12 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name DoesNotIgnoreFlags -module-interface-preserve-types-as-written
+
+// REQUIRES: OS=macosx
+// RUN: %empty-directory(%t)
+// Without '-explicit-interface-module-build' this job fails because of the mismatch in 'module-name'
+// RUN: %target-swift-frontend -compile-module-from-interface -module-name IgnoresFlags -explicit-interface-module-build -o %/t/IgnoresFlags.swiftmodule %s -verify
+
+import Swift
+extension Int {
+  public static var fortytwo: Int = 42
+}

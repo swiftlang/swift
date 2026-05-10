@@ -18,7 +18,7 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 
-#include "llvm/Support/Host.h"
+#include "llvm/TargetParser/Host.h"
 
 namespace swift {
 namespace unittest {
@@ -35,11 +35,13 @@ public:
   SearchPathOptions SearchPathOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   SourceManager SourceMgr;
   DiagnosticEngine Diags;
 
-  TestContextBase() : Diags(SourceMgr) {
-    LangOpts.Target = llvm::Triple(llvm::sys::getProcessTriple());
+  TestContextBase(llvm::Triple target) : Diags(SourceMgr) {
+    LangOpts.Target = target;
   }
 };
 
@@ -55,7 +57,12 @@ class TestContext : public TestContextBase {
 public:
   ASTContext &Ctx;
 
-  TestContext(ShouldDeclareOptionalTypes optionals = DoNotDeclareOptionalTypes);
+  TestContext(
+      ShouldDeclareOptionalTypes optionals = DoNotDeclareOptionalTypes,
+      llvm::Triple target = llvm::Triple(llvm::sys::getProcessTriple()));
+
+  TestContext(llvm::Triple target)
+      : TestContext(DoNotDeclareOptionalTypes, target) {};
 
   template <typename Nominal>
   typename std::enable_if<!std::is_same<Nominal, swift::ClassDecl>::value,

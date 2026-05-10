@@ -117,7 +117,7 @@ func testUnreachableAfterNoReturn(x: Int) -> Int {
 
 func testUnreachableAfterNoReturnInADifferentBlock() -> Int {
   let x:Int = 5
-  if true {  // expected-note {{condition always evaluates to true}}
+  if 1 == 1 {  // expected-note {{condition always evaluates to true}}
     exit(); 
   }
   return x; // expected-warning {{will never be executed}}
@@ -159,8 +159,8 @@ struct StructWithIUOinit : InitProtocol {
   init!(_ x: Int) {  } // no missing-return error
 }
 
-func testSR13753() {
-  // SR-13753
+// https://github.com/apple/swift/issues/56150
+func f_56150() {
   let _ : () -> Int = {
     var x : Int {
       get { 0 }
@@ -217,9 +217,17 @@ func testSR13753() {
   }
 }
 
-// SR-14505
-struct SR14505 {
-    let b = true
+// https://github.com/apple/swift/issues/56857
+
+struct S_56857 {
+    init(_ i: Int) {
+        if i > 0 {
+            b = false
+        }
+    } // expected-error {{return from initializer without initializing all stored properties}}
+
+    let b: Bool // expected-note {{'self.b' not initialized}}
+
     var x: Int {
         if b {
             return 0
@@ -236,9 +244,15 @@ struct SR14505 {
     } 
 }
 
-class SR14505_C {
+class C_56857 {
+  init(_ i: Int) {
+    if i > 0 {
+      b = false
+    }
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
   static let a = false
-  let b = true
+  let b: Bool // expected-note {{'self.b' not initialized}}
 
   func method() -> Int {
     if b {

@@ -7,7 +7,7 @@
 // RUN: %target-swift-frontend %S/../Inputs/empty.swift -primary-file %s \
 // RUN:   -emit-ir -g | %FileCheck %s
 // CHECK: !DICompileUnit({{.*}}flags: {{[^,]*}}-private-discriminator [[DISCRIMINATOR:_[A-Z0-9]+]]
-// CHECK: ![[MOD:.*]] = !DIModule(scope: null,
+// CHECK: ![[MOD:.*]] = !DIModule(scope: null, name: "empty"
 // CHECK: !DICompositeType(tag: DW_TAG_structure_type, name: "InA",
 // CHECK-SAME:             scope: ![[A:[0-9]+]],
 // CHECK: ![[A]] = !DICompositeType(tag: DW_TAG_structure_type, name: "A",
