@@ -1191,8 +1191,13 @@ internal struct _UnsafePartiallyInitializedContiguousArrayBuffer<Element> {
   @inline(__always) // For performance reasons.
   internal mutating func add(_ element: Element) {
     if unsafe remainingCapacity == 0 {
-      // Reallocate.
-      let newCapacity = unsafe max(_growArrayCapacity(result.capacity), 1)
+      // Reallocate. The `result.capacity &+ 1` lower bound is load-bearing:
+      // `_growArrayCapacity` has fixed points at small inputs (0 under the old
+      // 2x formula; 0 and 1 under the current 13/8 formula), and this
+      // callsite requires strict growth.
+      let newCapacity = unsafe max(_growArrayCapacity(result.capacity),
+                                   result.capacity &+ 1)
+      _internalInvariant(unsafe newCapacity > result.capacity)
       var newResult = _ContiguousArrayBuffer<Element>(
         _uninitializedCount: newCapacity, minimumCapacity: 0)
       unsafe p = unsafe newResult.firstElementAddress + result.capacity
