@@ -2797,7 +2797,7 @@ internal func parse_float80(_ span: Span<UInt8>) -> Optional<Float80> {
 @usableFromInline
 internal func _swift_stdlib_strtold_clocale(
   _ cText: Optional<UnsafePointer<CChar>>,
-  _ output: Optional<UnsafeMutablePointer<CLongDouble>>
+  _ output: Optional<UnsafeMutableRawPointer>
 ) -> Optional<UnsafePointer<CChar>>
 {
     fatalError("Float80 not supported on this platform")
