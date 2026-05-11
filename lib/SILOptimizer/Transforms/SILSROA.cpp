@@ -300,12 +300,11 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     auto *DVI = dyn_cast<DebugValueInst>(User);
     assert(DVI && "getDebugUses should only return DebugValueInst");
     SILBuilder B(DVI, DVI->getDebugScope());
-    std::optional<SILDebugVariable> DVIVarInfo = DVI->getVarInfo();
-    assert(DVIVarInfo && "debug_value without debug info");
+    SILDebugVariable DVIVarInfo = DVI->getCompleteVarInfo();
 
     for (size_t i : indices(NewAllocations)) {
       auto *NewAI = NewAllocations[i];
-      SILDebugVariable VarInfo = *DVIVarInfo;
+      SILDebugVariable VarInfo = DVIVarInfo;
       if (TT) {
         VarInfo.DIExpr.append(
           SILDebugInfoExpression::createTupleFragment(TT, i));
@@ -313,13 +312,11 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
         VarInfo.DIExpr.append(
           SILDebugInfoExpression::createFragment(SD->getStoredProperties()[i]));
       }
-      if (!VarInfo.Type)
-        VarInfo.Type = AI->getElementType();
       B.createDebugValue(DVI->getLoc(), NewAI, VarInfo);
     }
     if (NewAllocations.empty()) {
       // Don't eliminate empty structs, we can use undef as there is no data
-      B.createDebugValue(DVI->getLoc(), SILUndef::get(AI), *DVIVarInfo);
+      B.createDebugValue(DVI->getLoc(), SILUndef::get(AI), DVIVarInfo);
     }
     ToRemove.push_back(DVI);
   }

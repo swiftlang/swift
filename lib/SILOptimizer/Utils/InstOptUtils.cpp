@@ -1975,18 +1975,13 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       STI->getStructDecl()->getStoredProperties();
     for (Operand *U : getDebugUses(STVal)) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
-      auto VarInfo = DbgInst->getVarInfo();
-      if (!VarInfo)
-        continue;
+      auto VarInfo = DbgInst->getCompleteVarInfo();
       for (VarDecl *FD : FieldDecls) {
-        SILDebugVariable NewVarInfo = *VarInfo;
+        SILDebugVariable NewVarInfo = VarInfo;
         auto FieldVal = STI->getFieldValue(FD);
         // Build the corresponding fragment DIExpression
         auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
         NewVarInfo.DIExpr.append(FragDIExpr);
-
-        if (!NewVarInfo.Type)
-          NewVarInfo.Type = STI->getType();
 
         // Create a new debug_value
         SILBuilder(STI, DbgInst->getDebugScope())
@@ -2001,17 +1996,12 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     auto TTVal = TTI->getResult(0);
     for (Operand *U : getDebugUses(TTVal)) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
-      auto VarInfo = DbgInst->getVarInfo();
-      if (!VarInfo)
-        continue;
+      auto VarInfo = DbgInst->getCompleteVarInfo();
       TupleType *TT = TTI->getTupleType();
       for (auto i : indices(TT->getElements())) {
-        SILDebugVariable NewVarInfo = *VarInfo;
+        SILDebugVariable NewVarInfo = VarInfo;
         auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(TT, i);
         NewVarInfo.DIExpr.append(FragDIExpr);
-
-        if (!NewVarInfo.Type)
-          NewVarInfo.Type = TTI->getType();
 
         // Create a new debug_value
         SILBuilder(TTI, DbgInst->getDebugScope())
@@ -2095,17 +2085,14 @@ void swift::createDebugFragments(SILValue oldValue, Projection proj,
     if (!debugVal)
       continue;
 
-    auto varInfo = debugVal->getVarInfo();
+    auto varInfo = debugVal->getCompleteVarInfo();
 
     SILType baseType = oldValue->getType();
 
     // Copy VarInfo and add the corresponding fragment DIExpression.
-    SILDebugVariable newVarInfo = *varInfo;
+    SILDebugVariable newVarInfo = varInfo;
     newVarInfo.DIExpr.append(
         SILDebugInfoExpression::createFragment(proj.getVarDecl(baseType)));
-
-    if (!newVarInfo.Type)
-      newVarInfo.Type = baseType;
 
     // Create a new debug_value
     SILBuilder(debugVal, debugVal->getDebugScope())

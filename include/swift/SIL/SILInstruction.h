@@ -5662,35 +5662,36 @@ public:
 
   /// Return the debug variable information attached to this instruction.
   ///
-  /// \param complete If true, always retrieve the complete variable with
-  /// location and scope, and the type if possible. If false, only return the
-  /// values if they are stored (if they are different from the instruction's
-  /// location, scope, and type). This should only be set to false in
-  /// SILPrinter. Incomplete var info is unpredictable, as it will sometimes
-  /// have location and scope and sometimes not.
-  ///
-  /// \note The type is not included because it can change during a pass.
-  /// Passes must make sure to not lose the type information.
-  std::optional<SILDebugVariable> getVarInfo(bool complete = true) const {
+  /// \param includeLoc If true (by default), always return a variable with
+  ///   location and scope. If false, only return the stored values (if they
+  ///   are different from the instruction's location, scope, and type). This
+  ///   should only be set to false in SILPrinter. Incomplete var info is
+  ///   unpredictable, as it will sometimes have location and scope and
+  ///   sometimes not.
+  /// \param includeType If true, fills in the variable type from the SSA
+  ///   operand when not explicitly stored. Off by default because passes
+  ///   that copy VarInfo into new debug_values may get a stale type.
+  ///   Passes must make sure to not lose the type information.
+  /// \note Use `getCompleteVarInfo()` to include everything.
+  std::optional<SILDebugVariable>
+  getVarInfo(bool includeLoc = true, bool includeType = false) const {
     std::optional<SILType> AuxVarType;
     std::optional<SILLocation> VarDeclLoc;
     const SILDebugScope *VarDeclScope = nullptr;
 
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
-    // TODO: passes break if we set the type here, as the type of the operand
-    // can be changed during a pass.
-    // else if (complete)
-    //   AuxVarType = getOperand()->getType().getObjectType();
+    else if (includeType)
+      AuxVarType = getOperand()->getType().getObjectType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
-    else if (complete)
+    else if (includeLoc)
       VarDeclLoc = getLoc().strippedForDebugVariable();
 
     if (hasAuxDebugScope())
       VarDeclScope = *getTrailingObjects<const SILDebugScope *>();
-    else if (complete)
+    else if (includeLoc)
       VarDeclScope = getDebugScope();
 
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
@@ -5698,6 +5699,15 @@ public:
 
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
                        VarDeclLoc, VarDeclScope, DIExprElements);
+  }
+
+  /// Like getVarInfo, but always includes the variable type (falling back
+  /// to the SSA operand type), location and scope. Should always be used
+  /// when adding a DIExpr that affects the type.
+  SILDebugVariable getCompleteVarInfo() const {
+    auto info = getVarInfo(/*includeLoc*/ true, /*includeType*/ true);
+    assert(info && "DebugValueInst must always have debug variable info");
+    return *info;
   }
 
   void setDebugVarScope(const SILDebugScope *NewDS) {
