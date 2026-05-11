@@ -2174,14 +2174,45 @@ static SILValue getMakeAddrBorrowOperand(SILBuilder &builder,
   ValueLifetimeAnalysis lifetimeAnalysis(orig, transitiveUsers);
   ValueLifetimeBoundary boundary;
   lifetimeAnalysis.computeLifetimeBoundary(boundary);
-  for (auto *boundaryInst : boundary.lastUsers) {
+
+  LLVM_DEBUG(llvm::dbgs() << "Large borrowed value is being spilled to the stack:\n";
+             orig->print(llvm::dbgs());
+             llvm::dbgs() << "with boundary edges:\n";
+             for (auto *bedge : boundary.boundaryEdges) {
+               bedge->printAsOperand(llvm::dbgs());
+               llvm::dbgs() << '\n';
+             }
+             llvm::dbgs() << "with last users:\n";
+             for (auto *luser : boundary.lastUsers) {
+               luser->print(llvm::dbgs());
+             });
+
+  auto insertAt = [&](SILInstruction *i) {
     SavedInsertionPointRAII save(builder);
-    builder.setInsertionPoint(boundaryInst->getNextInstruction());
+    builder.setInsertionPoint(i);
 
     if (borrow) {
       builder.createEndBorrow(loc, borrow);
     }
     builder.createDeallocStack(loc, stack);
+  };
+
+  for (auto *boundaryInst : boundary.lastUsers) {
+    // End the lifetime of the stack allocation, and end_borrow if needed,
+    // after last users. For terminators, this means going into the successor
+    // blocks.
+    if (auto term = dyn_cast<TermInst>(boundaryInst)) {
+      for (auto succ : term->getSuccessorBlocks()) {
+        insertAt(&*succ->begin());
+      }
+    } else {
+      insertAt(boundaryInst->getNextInstruction());
+    }
+  }
+
+  // End the lifetime at boundary edges as well.
+  for (auto *boundaryEdge : boundary.boundaryEdges)  {
+    insertAt(&*boundaryEdge->begin());
   }
 
   StackNesting::fixNesting(&fn);
@@ -2730,7 +2761,7 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
     rewrittenReturn = rewriteFunctionReturn(pass);
   }
 
-  LLVM_DEBUG(llvm::dbgs() << "\nREWRITING: " << F->getName();
+  LLVM_DEBUG(llvm::dbgs() << "\nREWRITING: " << F->getName() << '\n';
              F->print(llvm::dbgs()));
 
   // Rewrite instructions relating to the loadable struct.

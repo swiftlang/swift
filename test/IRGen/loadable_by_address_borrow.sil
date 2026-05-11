@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -loadable-address | %FileCheck %s
 
+import Builtin
 import Swift
 
 public struct BigArc { var a, b, c, d, e: AnyObject }
@@ -8,6 +9,7 @@ public struct BiggerArc { var bigArc: BigArc }
 
 sil @makeBigArc : $@convention(thin) () -> BigArc
 sil @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+sil @takeBorrowBigArc_throws : $@convention(thin) (@guaranteed Ref<BigArc>) -> @error any Error
 
 // In test1, `%1` is a `BigArc` that will already become indirected because
 // it is the result of a function call that will become an indirect return.
@@ -222,4 +224,189 @@ bb0(%0 : @owned $AnyObject):
   return %15
 }
 
+// In test6, `%5` is a `BigArc` that is formed locally and doesn't directly
+// pass through any function boundaries. Its transitive uses end in a branching
+// try_apply instruction. `make_borrow` of the local value
+// becomes `make_addr_borrow` of a temporary allocation.
 
+// CHECK-LABEL: sil @test6
+// CHECK:         [[BIGARC:%.*]] = struct $BigArc
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         store [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
+// CHECK:         try_apply {{.*}}([[S_BORROW]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// CHECK:       [[NORMAL]]({{.*}}):
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         br [[CONT:bb[0-9]+]]
+// CHECK:       [[ERROR]]({{.*}}):
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         br [[CONT:bb[0-9]+]]
+// CHECK:       [[CONT]]:
+// CHECK:         release_value [[BIGARC]]
+sil @test6 : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  retain_value %0
+  retain_value %0
+  retain_value %0
+  retain_value %0
+
+  %5 = struct $BigArc(%0, %0, %0, %0, %0)
+  %6 = make_borrow %5
+  %7 = struct $Ref<BigArc> (%6)
+  %8 = function_ref @takeBorrowBigArc_throws : $@convention(thin) (@guaranteed Ref<BigArc>) -> @error any Error
+  try_apply %8(%7) : $@convention(thin) (@guaranteed Ref<BigArc>) -> @error any Error, normal bb1, error bb2
+
+bb1(%10 : $()):
+  br bb3
+
+bb2(%12 : $any Error):
+  br bb3
+
+bb3:
+  release_value %5
+  %15 = tuple ()
+  return %15
+}
+
+// In test6a, `%5` is a `BigArc` that is formed locally and doesn't directly
+// pass through any function boundaries. Its transitive uses cross a branch,
+// where it is used on one side but not on the other. `make_borrow` of the local
+// value becomes `make_addr_borrow` of a temporary allocation.
+
+// CHECK-LABEL: sil @test6a
+// CHECK:         [[BIGARC:%.*]] = struct $BigArc
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         store [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
+// CHECK:         try_apply {{.*}}([[S_BORROW]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
+// CHECK:       [[NORMAL]]({{.*}}):
+// CHECK:         apply {{.*}}([[S_BORROW]])
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         br [[CONT:bb[0-9]+]]
+// CHECK:       [[ERROR]]({{.*}}):
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         br [[CONT:bb[0-9]+]]
+// CHECK:       [[CONT]]:
+// CHECK:         release_value [[BIGARC]]
+sil @test6a : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  retain_value %0
+  retain_value %0
+  retain_value %0
+  retain_value %0
+
+  %5 = struct $BigArc(%0, %0, %0, %0, %0)
+  %6 = make_borrow %5
+  %7 = struct $Ref<BigArc> (%6)
+  %8 = function_ref @takeBorrowBigArc_throws : $@convention(thin) (@guaranteed Ref<BigArc>) -> @error any Error
+  try_apply %8(%7) : $@convention(thin) (@guaranteed Ref<BigArc>) -> @error any Error, normal bb1, error bb2
+
+bb1(%10 : $()):
+  %11 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %12 = apply %11(%7) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  br bb3
+
+bb2(%14 : $any Error):
+  br bb3
+
+bb3:
+  release_value %5
+  %17 = tuple ()
+  return %17
+}
+
+sil @condition : $@convention(thin) () -> Builtin.Int1
+
+// In test6b, `%5` is a `BigArc` that is formed locally and doesn't directly
+// pass through any function boundaries. Its transitive uses end in a loop.
+// where it is used on one side but not on the other. `make_borrow` of the local
+// value becomes `make_addr_borrow` of a temporary allocation.
+
+// CHECK-LABEL: sil @test6b
+// CHECK:         [[BIGARC:%.*]] = struct $BigArc
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         store [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
+// CHECK:         br [[ENTRY:bb[0-9]+]]
+// CHECK:       [[ENTRY]]:
+// CHECK:         apply {{.*}}([[S_BORROW]])
+// CHECK:         cond_br {{.*}}, [[SPLIT:bb[0-9]+]], [[END:bb[0-9]+]]
+// CHECK:       [[SPLIT]]:
+// CHECK:         br [[ENTRY]]
+// CHECK:       [[END]]:
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         release_value [[BIGARC]]
+sil @test6b : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : $AnyObject):
+  retain_value %0
+  retain_value %0
+  retain_value %0
+  retain_value %0
+
+  %5 = struct $BigArc(%0, %0, %0, %0, %0)
+  %6 = make_borrow %5
+  %7 = struct $Ref<BigArc> (%6)
+  br bb1
+
+bb1:
+  %11 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %12 = apply %11(%7) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %13 = function_ref @condition : $@convention(thin) () -> Builtin.Int1
+  %14 = apply %13() : $@convention(thin) () -> Builtin.Int1
+  cond_br %14, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  release_value %5
+  %17 = tuple ()
+  return %17
+}
+
+// CHECK-LABEL: sil [ossa] @test6b_ossa
+// CHECK:         [[BIGARC:%.*]] = struct $BigArc
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         [[B_BUF:%.*]] = store_borrow [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[B_BUF]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
+// CHECK:         br [[ENTRY:bb[0-9]+]]
+// CHECK:       [[ENTRY]]:
+// CHECK:         apply {{.*}}([[S_BORROW]])
+// CHECK:         cond_br {{.*}}, [[SPLIT:bb[0-9]+]], [[END:bb[0-9]+]]
+// CHECK:       [[SPLIT]]:
+// CHECK:         br [[ENTRY]]
+// CHECK:       [[END]]:
+// CHECK:         end_borrow [[B_BUF]]
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         destroy_value [[BIGARC]]
+sil [ossa] @test6b_ossa : $@convention(thin) (@owned AnyObject) -> () {
+bb0(%0 : @owned $AnyObject):
+  %1 = copy_value %0
+  %2 = copy_value %0
+  %3 = copy_value %0
+  %4 = copy_value %0
+
+  %5 = struct $BigArc(%0, %1, %2, %3, %4)
+  %6 = make_borrow %5
+  %7 = struct $Ref<BigArc> (%6)
+  br bb1
+
+bb1:
+  %11 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %12 = apply %11(%7) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
+  %13 = function_ref @condition : $@convention(thin) () -> Builtin.Int1
+  %14 = apply %13() : $@convention(thin) () -> Builtin.Int1
+  cond_br %14, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value %5
+  %17 = tuple ()
+  return %17
+}
