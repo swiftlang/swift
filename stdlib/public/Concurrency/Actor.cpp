@@ -36,6 +36,7 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/DispatchShims.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/Exception.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
@@ -2218,6 +2219,7 @@ void DefaultActorImpl::releaseLock() {
 #endif
 
 SWIFT_CC(swift)
+SWIFT_RUNTIME_EXCEPTION_PERSONALITY
 static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
   ExecutorTrackingInfo trackingInfo;
 
