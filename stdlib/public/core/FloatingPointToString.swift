@@ -223,7 +223,7 @@ internal func _Float16ToASCII(
 ) -> Range<Int> {
   // We need a MutableRawSpan in order to use wide store/load operations
   assert(utf8Buffer.count >= 24)
-  var buffer = unsafe utf8Buffer.mutableBytes
+  var buffer = utf8Buffer.mutableBytes
 
   let significandBitCount = Float16.significandBitCount + 1 // 11
   let exponentBias = Int(bitPattern: Float16._exponentBias) - 1 + significandBitCount // 14 + 11 = 25
@@ -438,7 +438,7 @@ internal func _Float32ToASCII(
 ) -> Range<Int> {
   // We need a MutableRawSpan in order to use wide store/load operations
   assert(utf8Buffer.count >= 24)
-  var buffer = unsafe utf8Buffer.mutableBytes
+  var buffer = utf8Buffer.mutableBytes
 
   let significandBitCount = Float.significandBitCount + 1 // 24
   let exponentBias = Int(bitPattern: Float32._exponentBias) - 1 + significandBitCount // 126 + 24
@@ -722,7 +722,7 @@ internal func _Float64ToASCII(
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
   assert(utf8Buffer.count >= 32)
-  var buffer = unsafe utf8Buffer.mutableBytes
+  var buffer = utf8Buffer.mutableBytes
 
   let significandBitCount = Double.significandBitCount + 1 // 53
   let exponentBias = Int(bitPattern: Float64._exponentBias) - 1 + significandBitCount
@@ -928,7 +928,7 @@ internal func _Float80ToASCII(
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
   assert(utf8Buffer.count >= 40)
-  var buffer = unsafe utf8Buffer.mutableBytes
+  var buffer = utf8Buffer.mutableBytes
 
   // Step 1: Handle special cases, decompose the input
 
@@ -1027,7 +1027,7 @@ internal func _Float128ToASCII(
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
   assert(utf8Buffer.count >= 64)
-  var buffer = unsafe utf8Buffer.mutableBytes
+  var buffer = utf8Buffer.mutableBytes
 
   let significandBitCount = Float128.significandBitCount + 1 // 113
   let exponentBias = Int(bitPattern: Float128._exponentBias) - 1 + significandBitCount // 16382 + 113
@@ -1090,7 +1090,7 @@ fileprivate func _Float128Backend(
   significand: _UInt128,
   sign: FloatingPointSign
 ) -> Range<Int> {
-  var buffer = unsafe utf8Buffer.mutableBytes
+  var buffer = utf8Buffer.mutableBytes
 
   // Step 2: Compute the base 10 exponent to match the rounding interval
 
