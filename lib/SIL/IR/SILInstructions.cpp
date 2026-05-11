@@ -533,6 +533,31 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   return block;
 }
 
+void DebugValueInst::killOperand() {
+  if (isa<SILUndef>(getOperand())) {
+    // Already undef: no operand to kill.
+    return;
+  }
+
+  // Use the object type because we may be stripping the deref.
+  SILValue undef =
+      SILUndef::get(getFunction(), getOperand()->getType().getObjectType());
+  setOperand(undef);
+
+  // Strip prependDeref.
+  // The stored DIExpr only contains fragments, which we want to keep.
+  sharedUInt8().DebugValueInst.prependDeref = false;
+
+  // Debug reconstruction block: rather than completely removing it, remove its
+  // argument, as a part of the variable might be constant and recoverable.
+  if (auto bb = getDebugReconstructionBlock()) {
+    ASSERT(bb->getNumArguments() == 1);
+    auto argument = bb->getArgument(0);
+    argument->replaceAllUsesWithUndef();
+    bb->eraseArgument(0);
+  }
+}
+
 bool DebugValueInst::isExprTypeValid() const {
   auto varInfo = getCompleteVarInfo();
 

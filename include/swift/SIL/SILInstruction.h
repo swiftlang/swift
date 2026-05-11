@@ -5788,6 +5788,13 @@ public:
   /// has no arguments and returns undef directly.
   SILBasicBlock *getOrCreateDebugReconstructionBlock();
 
+  /// Drops the operand from this debug value.
+  /// This function must be called by passes whenever the operand of this debug
+  /// value is no longer valid and cannot be salvaged.
+  /// This will replace the operand with an undef, and clear any DIExpr or debug
+  /// reconstruction block.
+  void killOperand();
+
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds
   /// when shortening non-trivial value lifetimes to ensure the debugger cannot
