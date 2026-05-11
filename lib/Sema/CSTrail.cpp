@@ -43,8 +43,14 @@ SolverTrail::~SolverTrail() {
   // If constraint system is in an invalid state, it's
   // possible that constraint graph is corrupted as well
   // so let's not attempt to check change log.
-  if (!CS.inInvalidState())
-    ASSERT(Changes.empty() && "Trail corrupted");
+  if (!CS.inInvalidState()) {
+    if (!Changes.empty()) {
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Trail corrupted; all changes should have been undone by now:\n";
+        dump(out);
+      });
+    }
+  }
 }
 
 #define LOCATOR_CHANGE(Name, _) \
@@ -619,7 +625,7 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RetractedLiteral: {
     auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
-    bindings.inferFromLiteral(TheConstraint.Constraint);
+    bindings.inferFromLiteral(TheConstraint.Constraint, /*recordChange=*/false);
     ++bindings.GenerationNumber;
     break;
   }
@@ -904,7 +910,7 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
 void SolverTrail::recordChange(Change change) {
   LLVM_DEBUG(llvm::dbgs() << "+ "; change.dump(llvm::dbgs(), CS, 0););
-  ASSERT(!UndoActive);
+  ASSERT(!Closed);
 
   Changes.push_back(change);
 
@@ -915,6 +921,8 @@ void SolverTrail::recordChange(Change change) {
 }
 
 void SolverTrail::undo(unsigned toIndex) {
+  ASSERT(!Closed);
+
   // Don't attempt to rollback if constraint system ended up
   // in an invalid state.
   if (CS.inInvalidState())
@@ -934,8 +942,7 @@ void SolverTrail::undo(unsigned toIndex) {
              llvm::dbgs() << "\n");
 
   ASSERT(Changes.size() >= toIndex && "Trail corrupted");
-  ASSERT(!UndoActive);
-  UndoActive = true;
+  close();
 
   for (unsigned i = Changes.size(); i > toIndex; i--) {
     auto change = Changes[i - 1];
@@ -944,7 +951,7 @@ void SolverTrail::undo(unsigned toIndex) {
   }
 
   Changes.resize(toIndex);
-  UndoActive = false;
+  open();
 }
 
 void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,

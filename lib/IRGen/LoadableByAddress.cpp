@@ -36,9 +36,11 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CompileTimeInterpolationUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -2131,6 +2133,62 @@ static void createStructElementAddrInstrAndLoad(LoadableStorageAllocation &alloc
   }
 }
 
+static SILValue getMakeAddrBorrowOperand(SILBuilder &builder,
+                                         MakeBorrowInst *orig) {
+  auto &fn = builder.getFunction();
+  auto loc = orig->getLoc();
+  auto operand = orig->getOperand();
+  
+  // If the operand was already spilled to an address by the pass, then use
+  // it as is.
+  if (operand->getType().isAddress()) {
+    return operand;
+  }
+
+  // If the operand is a load or load_borrow of a memory location, borrow that
+  // original address.
+  if (auto load = dyn_cast<LoadInst>(operand)) {
+    return load->getOperand();
+  }
+  if (auto lb = dyn_cast<LoadBorrowInst>(operand)) {
+    return lb->getOperand();
+  }
+
+  // Otherwise, this value is local, and can be spilled to a local stack
+  // allocation.
+  AllocStackInst *stack = builder.createAllocStack(loc, operand->getType());
+  StoreBorrowInst *borrow = nullptr;
+  SILValue result = stack;
+  bool hasOwnership = fn.hasOwnership()
+                      && !operand->getType().isTrivial(fn);
+  if (hasOwnership) {
+    borrow = builder.createStoreBorrow(loc, operand, stack);
+    result = borrow;
+  } else {
+    builder.createStore(loc, operand, stack, StoreOwnershipQualifier::Unqualified);
+  }
+
+  // End the new stack slot and borrow after the borrow is no longer used.
+  SmallVector<SILInstruction *, 16> transitiveUsers;
+  getTransitiveUsers(orig, transitiveUsers);
+  ValueLifetimeAnalysis lifetimeAnalysis(orig, transitiveUsers);
+  ValueLifetimeBoundary boundary;
+  lifetimeAnalysis.computeLifetimeBoundary(boundary);
+  for (auto *boundaryInst : boundary.lastUsers) {
+    SavedInsertionPointRAII save(builder);
+    builder.setInsertionPoint(boundaryInst->getNextInstruction());
+
+    if (borrow) {
+      builder.createEndBorrow(loc, borrow);
+    }
+    builder.createDeallocStack(loc, stack);
+  }
+
+  StackNesting::fixNesting(&fn);
+  
+  return result;
+}
+
 static void createMakeAddrBorrow(LoadableStorageAllocation &allocator,
                                  MakeBorrowInst *instr,
                                  StructLoweringState &pass) {
@@ -2140,8 +2198,9 @@ static void createMakeAddrBorrow(LoadableStorageAllocation &allocator,
   }
 
   SILBuilderWithScope builder(instr);
+  auto operand = getMakeAddrBorrowOperand(builder, instr);
   SingleValueInstruction *newInstr = builder.createMakeAddrBorrow(
-      instr->getLoc(), instr->getOperand());
+      instr->getLoc(), operand);
 
   // `make_addr_borrow` produces a `Borrow<T>` by-value, like `make_borrow`,
   // so it is a drop-in replacement.

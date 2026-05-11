@@ -315,6 +315,10 @@ public:
 
   virtual bool isCXXMethodMutating(const clang::CXXMethodDecl *method) = 0;
 
+  /// Determine whether the given C++ record is non-copyable (move-only) as
+  /// imported into Swift.
+  virtual bool isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) = 0;
+
   virtual bool isUnsafeCXXMethod(const FuncDecl *func) = 0;
 
   virtual FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) = 0;

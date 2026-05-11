@@ -292,7 +292,7 @@ suite.test("append one safe")
 }
 
 suite.test("append one overflow")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
 
   var a = Allocation(byteCount: 1)
@@ -356,7 +356,7 @@ suite.test("append repeating safe")
 }
 
 suite.test("append repeating negative count")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
 
   var a = Allocation(byteCount: 16)
@@ -443,7 +443,7 @@ suite.test("append(upTo:as:initializingWith:) partial fill")
 }
 
 suite.test("append(upTo:as:initializingWith:) overflow")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
 
   var a = Allocation(byteCount: 16)
@@ -456,7 +456,7 @@ suite.test("append(upTo:as:initializingWith:) overflow")
 }
 
 suite.test("append(upTo:as:initializingWith:) negative count")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
 
   var a = Allocation(byteCount: 16)
@@ -467,7 +467,7 @@ suite.test("append(upTo:as:initializingWith:) negative count")
 }
 
 suite.test("append(upTo:as:initializingWith:) misaligned")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
 
   var a = Allocation(byteCount: 16)
@@ -511,7 +511,7 @@ suite.test("subscript setter")
 }
 
 suite.test("subscript bounds underflow")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
 
   var a = Allocation(byteCount: 16)
@@ -523,7 +523,7 @@ suite.test("subscript bounds underflow")
 }
 
 suite.test("subscript bounds overflow")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
 
   var a = Allocation(byteCount: 16)

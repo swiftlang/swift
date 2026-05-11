@@ -1977,9 +1977,7 @@ private:
     assert(!AvAttr.getRename().empty());
 
     auto *renamedDecl = D->getRenamedDecl(AvAttr.getParsedAttr());
-    if (renamedDecl) {
-      assert(shouldInclude(renamedDecl) &&
-             "ObjC printer logic mismatch with renamed decl");
+    if (renamedDecl && shouldInclude(renamedDecl)) {
       SmallString<128> scratch;
       auto renamedObjCRuntimeName =
           renamedDecl->getObjCRuntimeName()->getString(scratch);

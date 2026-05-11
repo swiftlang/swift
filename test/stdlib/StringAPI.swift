@@ -332,8 +332,8 @@ StringTests.test("SameTypeComparisons") {
   expectFalse(xs != xs)
 }
 
-#if !os(WASI)
 StringTests.test("CompareStringsWithUnpairedSurrogates")
+  .skip(.wasiAny(reason: "Not supported on WASI."))
   .xfail(
     .always("<rdar://problem/18029104> Strings referring to underlying " +
       "storage with unpaired surrogates compare unequal"))
@@ -348,7 +348,6 @@ StringTests.test("CompareStringsWithUnpairedSurrogates")
     ]
   )
 }
-#endif
 
 StringTests.test("[String].joined() -> String") {
   let s = ["hello", "world"].joined()

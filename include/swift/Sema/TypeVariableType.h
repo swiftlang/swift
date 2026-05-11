@@ -249,7 +249,7 @@ public:
       impl = &nextTV->getImpl();
     }
 
-    if (impl == this || !trail || trail->isUndoActive())
+    if (impl == this || !trail || trail->isClosed())
       return result;
 
     // Perform path compression.

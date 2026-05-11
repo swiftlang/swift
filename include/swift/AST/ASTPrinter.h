@@ -368,28 +368,25 @@ public:
     return printedClangDecl.insert(d).second;
   }
 
-  /// Print lifetimeDependence as a SIL lifetime attribute, attached to a
-  /// parameter or result of a function.
-  void printSILLifetimeDependence(
-      std::optional<LifetimeDependenceInfo> lifetimeDependence) {
-    if (!lifetimeDependence.has_value()) {
-      return;
-    }
-    *this << lifetimeDependence->getString();
-  }
+  /// Print a lifetime dependence annotation.
+  ///
+  /// When \p params is provided, Swift-style formatting is used (labels,
+  /// target, '&' for inout). When \p params is \c std::nullopt, SIL-style
+  /// formatting is used (indices only, no target).
+  void printLifetimeDependence(
+      LifetimeDependenceInfo const &info,
+      std::optional<ArrayRef<AnyFunctionType::Param>> params,
+      const PrintOptions &options);
 
   void printLifetimeDependenceAt(
-      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index) {
+      ArrayRef<LifetimeDependenceInfo> lifetimeDependencies, unsigned index,
+      std::optional<ArrayRef<AnyFunctionType::Param>> params,
+      const PrintOptions &options) {
     if (auto lifetimeDependence =
             getLifetimeDependenceFor(lifetimeDependencies, index)) {
-      printSILLifetimeDependence(*lifetimeDependence);
+      printLifetimeDependence(*lifetimeDependence, params, options);
     }
   }
-
-  /// Print lifetimeDependence as a Swift lifetime attribute.
-  void
-  printSwiftLifetimeDependence(LifetimeDependenceInfo const &lifetimeDependence,
-                               ArrayRef<AnyFunctionType::Param> params);
 
 private:
   virtual void anchor();

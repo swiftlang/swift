@@ -667,7 +667,7 @@ suite.test("init(viewing:)")
 }
 
 suite.test("init(viewing:) traps on misaligned pointer")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
   let buffer = UnsafeMutableRawBufferPointer.allocate(
     byteCount: MemoryLayout<Int>.stride * 2 + 1,
@@ -687,7 +687,7 @@ suite.test("init(viewing:) traps on misaligned pointer")
 }
 
 suite.test("init(viewing:) traps on non-stride byteCount")
-.skip(.wasiAny(reason: "Trap tests aren't supported on WASI."))
+.require(.crashTesting)
 .require(.stdlib_6_4).code {
   let buffer = UnsafeMutableRawBufferPointer.allocate(
     byteCount: MemoryLayout<Int>.stride + 1,

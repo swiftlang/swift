@@ -1,5 +1,4 @@
-// REQUIRES: swift_feature_SourceWarningControl
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature SourceWarningControl
+// RUN: %target-typecheck-verify-swift
 
 @available(*, deprecated)
 func dep() -> Bool { return false }

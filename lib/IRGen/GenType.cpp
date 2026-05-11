@@ -21,6 +21,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
