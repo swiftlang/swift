@@ -615,6 +615,9 @@ EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 /// non-resilient modules. Layout will be encoded in the .swiftmodule.
 EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 
+/// Allow use of macros to derive various conformances
+EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
