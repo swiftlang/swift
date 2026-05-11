@@ -1262,7 +1262,7 @@ Added: __ZN5swift26getResilientMetadataBoundsEPKNS_21TargetClassDescriptorINS_9I
 // Ref
 Added: _$ss3RefVMa
 Added: _$ss3RefVMn
-Added: _$ss3RefVsRi_zrlE7builtinxBWvg
+Added: _$ss3RefVsRi_zRi0_zrlE7builtinxBWvg
 
 // MutableRef
 Added: _$ss10MutableRefVMa
