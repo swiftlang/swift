@@ -2,6 +2,9 @@
 
 sil_stage canonical
 
+import Builtin
+import Swift
+
 class Klass {
 }
 
@@ -15,8 +18,8 @@ public enum FakeOptional<T> {
 }
 
 // CHECK-LABEL: sil [ossa] @test_redundantownedphiarg1 :
-// CHECK: bb3([[ARG1:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK: [[COPY:%.*]] = copy_value [[ARG1]]
+// CHECK: bb3([[ARG1:%.*]] : @owned $FakeOptional<Klass>, [[ARG2:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
 // CHECK-LABEL: } // end sil function 'test_redundantownedphiarg1'
 sil [ossa] @test_redundantownedphiarg1 : $@convention(thin) () -> () {
 bb0:
@@ -112,10 +115,10 @@ bb3(%1 : $FakeOptional<Klass>, %2 : @owned $FakeOptional<Klass>):
 }
 
 // CHECK-LABEL: sil [ossa] @test_redundantownedphiarg5 :
-// CHECK: bb1([[ARG1:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK: [[COPY1:%.*]] = copy_value [[ARG1]]
-// CHECK: bb3([[ARG2:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK: [[COPY2:%.*]] = copy_value [[ARG2]]
+// CHECK: bb1([[ARG1:%.*]] : @owned $FakeOptional<Klass>, [[ARG2:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
+// CHECK: bb3([[ARG3:%.*]] : @owned $FakeOptional<Klass>, [[ARG4:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
 // CHECK-LABEL: } // end sil function 'test_redundantownedphiarg5'
 sil [ossa] @test_redundantownedphiarg5 : $@convention(thin) () -> () {
 bb0:
@@ -139,13 +142,12 @@ bb4:
 }
 
 
-// Redundant phi args in bb4 don't get optimized away, because a compensating copy_value is added
-// while optimizing the redundant phi args in bb3.
+// Both-owned phis are no longer collapsed, so both bb3 and bb4 keep both args.
 // CHECK-LABEL: sil [ossa] @test_redundantownedphiarg6 :
-// CHECK: bb3([[ARG1:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK: [[COPY1:%.*]] = copy_value [[ARG1]]
-// CHECK: bb4([[ARG2:%.*]] : @owned $FakeOptional<Klass>, [[ARG3:%.*]] : @owned $FakeOptional<Klass>):
-// CHECK-NOT: [[COPY2:%.*]] = copy_value [[ARG1]]
+// CHECK: bb3([[ARG1:%.*]] : @owned $FakeOptional<Klass>, [[ARG2:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
+// CHECK: bb4([[ARG3:%.*]] : @owned $FakeOptional<Klass>, [[ARG4:%.*]] : @owned $FakeOptional<Klass>):
+// CHECK-NOT: copy_value
 // CHECK-LABEL: } // end sil function 'test_redundantownedphiarg6'
 sil [ossa] @test_redundantownedphiarg6 : $@convention(thin) () -> () {
 bb0:
@@ -246,5 +248,124 @@ bb5:
 bb6:
   %17 = tuple ()
   return %17
+}
+
+// Owned phis where a forwarding instruction wraps a none-ownership value.
+// isIdenticalTo considers these structurally equal to the same enum without
+// forwarding.
+
+sil @callee : $@convention(thin) () -> ()
+
+// Both phis are @owned wrapping a none-ownership thin_to_thick_function result).
+// The enum instructions are structurally identical so valuesAreEqual returns true.
+// However, we chose not to optimize this case because it requires creating
+// a copy.
+//
+// CHECK-LABEL: sil [ossa] @both_owned_phis_from_forwarding_enum :
+// CHECK: bb3([[A:%.*]] : @owned $Optional<@callee_guaranteed () -> ()>):
+// CHECK-LABEL: } // end sil function 'both_owned_phis_from_forwarding_enum'
+sil [ossa] @both_owned_phis_from_forwarding_enum : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %fn to $@callee_guaranteed () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %some1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick, forwarding: @owned
+  %some2 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick, forwarding: @owned
+  br bb3(%some1 : $Optional<@callee_guaranteed () -> ()>, %some2 : $Optional<@callee_guaranteed () -> ()>)
+
+bb2:
+  %none1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  %none2 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb3(%none1 : $Optional<@callee_guaranteed () -> ()>, %none2 : $Optional<@callee_guaranteed () -> ()>)
+
+bb3(%phi1 : @owned $Optional<@callee_guaranteed () -> ()>, %phi2 : @owned $Optional<@callee_guaranteed () -> ()>):
+  destroy_value %phi1 : $Optional<@callee_guaranteed () -> ()>
+  destroy_value %phi2 : $Optional<@callee_guaranteed () -> ()>
+  %r = tuple ()
+  return %r : $()
+}
+
+// phi1 is @owned, phi2 is @none (receives a structurally
+// identical enum without the forwarding override).
+// The pass should collapse the @owned phi into the @none phi.
+//
+// CHECK-LABEL: sil [ossa] @owned_phi_from_forwarding_enum_wrapping_none :
+// CHECK: bb3([[A:%.*]] : $Optional<@callee_guaranteed () -> ()>):
+// CHECK-LABEL: } // end sil function 'owned_phi_from_forwarding_enum_wrapping_none'
+sil [ossa] @owned_phi_from_forwarding_enum_wrapping_none : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %fn to $@callee_guaranteed () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %some_owned = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick, forwarding: @owned
+  %some_none = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick
+  br bb3(%some_owned : $Optional<@callee_guaranteed () -> ()>, %some_none : $Optional<@callee_guaranteed () -> ()>)
+
+bb2:
+  %none1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  %none2 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb3(%none1 : $Optional<@callee_guaranteed () -> ()>, %none2 : $Optional<@callee_guaranteed () -> ()>)
+
+bb3(%phi1 : @owned $Optional<@callee_guaranteed () -> ()>, %phi2 : $Optional<@callee_guaranteed () -> ()>):
+  destroy_value %phi1 : $Optional<@callee_guaranteed () -> ()>
+  %r = tuple ()
+  return %r : $()
+}
+
+// Same as above but with phi positions swapped: phi1 is @none and phi2 is
+// @owned. Covers the symmetric case.
+//
+// CHECK-LABEL: sil [ossa] @none_phi_before_owned_phi_from_forwarding_enum :
+// CHECK: bb3([[A:%.*]] : $Optional<@callee_guaranteed () -> ()>):
+// CHECK-LABEL: } // end sil function 'none_phi_before_owned_phi_from_forwarding_enum'
+sil [ossa] @none_phi_before_owned_phi_from_forwarding_enum : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %fn to $@callee_guaranteed () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %some_none = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick
+  %some_owned = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick, forwarding: @owned
+  br bb3(%some_none : $Optional<@callee_guaranteed () -> ()>, %some_owned : $Optional<@callee_guaranteed () -> ()>)
+
+bb2:
+  %none1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  %none2 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.none!enumelt
+  br bb3(%none1 : $Optional<@callee_guaranteed () -> ()>, %none2 : $Optional<@callee_guaranteed () -> ()>)
+
+bb3(%phi1 : $Optional<@callee_guaranteed () -> ()>, %phi2 : @owned $Optional<@callee_guaranteed () -> ()>):
+  destroy_value %phi2 : $Optional<@callee_guaranteed () -> ()>
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @mixed_forwarding_across_preds :
+// CHECK: bb3([[A:%.*]] : $Optional<@callee_guaranteed () -> ()>):
+// CHECK-LABEL: } // end sil function 'mixed_forwarding_across_preds'
+sil [ossa] @mixed_forwarding_across_preds : $@convention(thin) () -> () {
+bb0:
+  %fn = function_ref @callee : $@convention(thin) () -> ()
+  %thick = thin_to_thick_function %fn to $@callee_guaranteed () -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  %some_owned = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick, forwarding: @owned
+  %some_none1 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick
+  br bb3(%some_owned : $Optional<@callee_guaranteed () -> ()>, %some_none1 : $Optional<@callee_guaranteed () -> ()>)
+
+bb2:
+  %some_none2 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick
+  %some_none3 = enum $Optional<@callee_guaranteed () -> ()>, #Optional.some!enumelt, %thick
+  br bb3(%some_none2 : $Optional<@callee_guaranteed () -> ()>, %some_none3 : $Optional<@callee_guaranteed () -> ()>)
+
+bb3(%phi1 : @owned $Optional<@callee_guaranteed () -> ()>, %phi2 : $Optional<@callee_guaranteed () -> ()>):
+  destroy_value %phi1 : $Optional<@callee_guaranteed () -> ()>
+  %r = tuple ()
+  return %r : $()
 }
 
