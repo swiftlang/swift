@@ -1026,9 +1026,8 @@ mirrors.test("Addressing") {
   expectNil(m.descendant(1, 1, "bork"))
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
 mirrors.test("Invalid Path Type")
+  .require(.crashTesting)
   .skip(.custom(
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
@@ -1039,7 +1038,6 @@ mirrors.test("Invalid Path Type")
   expectCrashLater()
   _ = m.descendant(X())
 }
-#endif
 
 mirrors.test("PlaygroundQuickLook") {
   // Customization works.

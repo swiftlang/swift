@@ -1771,3 +1771,40 @@ bb0(%0 : @guaranteed $String):
   %13 = tuple ()
   return %13
 }
+
+struct Wrapper {
+  @_hasStorage var value: String { get set }
+}
+
+sil @get_value_addr : $@convention(thin) (@in_guaranteed Wrapper) -> @guaranteed_address String {
+bb0(%0 : $*Wrapper):
+  %1 = struct_element_addr %0, #Wrapper.value
+  return %1 : $*String
+}
+
+// CHECK-LABEL: sil shared [noinline] [ossa] @$s11test_borrow4main7WrapperV_Tg5 :
+// CHECK:         store_borrow
+// CHECK:         apply
+// CHECK:         load [copy]
+// CHECK:         end_borrow
+// CHECK-LABEL: } // end sil function '$s11test_borrow4main7WrapperV_Tg5'
+sil hidden [noinline] [ossa] @test_borrow : $@convention(thin) <T> (@in_guaranteed T) -> @owned String {
+bb0(%0 : $*T):
+  %1 = unchecked_addr_cast %0 : $*T to $*Wrapper
+  %2 = function_ref @get_value_addr : $@convention(thin) (@in_guaranteed Wrapper) -> @guaranteed_address String
+  %3 = apply %2(%1) : $@convention(thin) (@in_guaranteed Wrapper) -> @guaranteed_address String
+  %4 = load [copy] %3 : $*String
+  return %4 : $String
+}
+
+sil [ossa] @borrow_caller : $@convention(thin) (@guaranteed Wrapper) -> @owned String {
+bb0(%0 : @guaranteed $Wrapper):
+  %1 = alloc_stack $Wrapper
+  %2 = store_borrow %0 to %1 : $*Wrapper
+  %3 = function_ref @test_borrow : $@convention(thin) <T> (@in_guaranteed T) -> @owned String
+  %4 = apply %3<Wrapper>(%2) : $@convention(thin) <T> (@in_guaranteed T) -> @owned String
+  end_borrow %2 : $*Wrapper
+  dealloc_stack %1 : $*Wrapper
+  return %4 : $String
+}
+

@@ -396,13 +396,15 @@ extension __StringStorage {
   // the resulting StringStorage accordingly
   internal static func create<E: Error>(
     uninitializedCodeUnitCapacity capacity: Int,
+    precalculatedUTF16Count utf16Len: Int? = nil,
     initializingUncheckedUTF8With initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
     ) throws(E) -> Int
   ) throws(E) -> __StringStorage {
     let storage = __StringStorage.create(
       codeUnitCapacity: capacity,
-      countAndFlags: _CountAndFlags(mortalCount: 0, isASCII: false)
+      countAndFlags: _CountAndFlags(mortalCount: 0, isASCII: false),
+      precalculatedUTF16Count: utf16Len
     )
     let buffer = unsafe UnsafeMutableBufferPointer(start: storage.mutableStart,
                                             count: capacity)
@@ -602,7 +604,11 @@ extension __StringStorage {
 extension __StringStorage {
   // Perform common post-RRC adjustments and invariant enforcement.
   @_effects(releasenone)
-  internal func _updateCountAndFlags(newCount: Int, newIsASCII: Bool) {
+  internal func _updateCountAndFlags(
+    newCount: Int,
+    newIsASCII: Bool,
+    precalculatedUTF16Count utf16Len: Int? = nil
+  ) {
     let countAndFlags = _CountAndFlags(
       mortalCount: newCount, isASCII: newIsASCII)
 #if _pointerBitWidth(_64)
@@ -615,8 +621,15 @@ extension __StringStorage {
 #endif
     unsafe self.terminator.pointee = 0
 
-    // TODO(String performance): Consider updating breadcrumbs when feasible.
-    if hasAllocatedBreadcrumbs {
+#if _pointerBitWidth(_64)
+    if let utf16Len, hasBreadcrumbs, utf16Len <= Int32.max {
+      // `_oneCrumb`'s setter uses a raw `storeBytes`, so an ARC reference in
+      // the slot would be leaked. Current callers only pass `utf16Len` on
+      // freshly-created storage where the slot holds a small integer or nil
+      // pointer; this invariant catches future misuse.
+      _internalInvariant(!hasAllocatedBreadcrumbs)
+      self._oneCrumb = utf16Len
+    } else if hasAllocatedBreadcrumbs {
       unsafe self._breadcrumbsAddress.pointee = nil
     } else if hasOneCrumb {
       // The slot holds a raw integer (UTF-16 count), not an ARC reference.
@@ -624,6 +637,14 @@ extension __StringStorage {
       unsafe UnsafeMutableRawPointer(_breadcrumbsAddress)
         .storeBytes(of: 0, as: Int.self)
     }
+#else
+    if hasAllocatedBreadcrumbs {
+      unsafe self._breadcrumbsAddress.pointee = nil
+    } else if hasOneCrumb {
+      unsafe UnsafeMutableRawPointer(_breadcrumbsAddress)
+        .storeBytes(of: 0, as: Int.self)
+    }
+#endif
     _invariantCheck()
   }
 

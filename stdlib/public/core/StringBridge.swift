@@ -292,7 +292,7 @@ internal func _cocoaStringCopyBytes(
   defer {
     remainingRange = cocoaRemainingRange.location ..< cocoaRemainingRange.location + cocoaRemainingRange.length
   }
-  return unsafe withUnsafeMutablePointer(
+  return withUnsafeMutablePointer(
     to: &cocoaRemainingRange
   ) { remainingPtr in
     return unsafe _NSStringCopyBytes(
@@ -712,11 +712,13 @@ extension String {
     if _guts.isSmall {
       return _guts.asSmall.withUTF8 { bufPtr in
         // Smol ASCII a) may bridge to tagged pointers, b) can't contain a BOM
-        if _guts.isSmallASCII, let result = unsafe _createCFString(
-          bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
-          bufPtr.count,
-          kCFStringEncodingUTF8
-        ) {
+        if _guts.isSmallASCII,
+           bufPtr.count <= 11, //tagged pointers can't fit >11 characters
+           let result = unsafe _createCFString(
+            bufPtr.baseAddress._unsafelyUnwrappedUnchecked,
+            bufPtr.count,
+            kCFStringEncodingUTF8
+           ) {
           return result
         }
         // We can't form a tagged pointer String, so make a non-small String,

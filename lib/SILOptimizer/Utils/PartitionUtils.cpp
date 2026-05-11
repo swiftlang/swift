@@ -15,6 +15,15 @@
 // We only use this so we can implement print on our type erased errors.
 #include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
+#include "llvm/ADT/Statistic.h"
+
+#define DEBUG_TYPE "region-isolation"
+
+STATISTIC(NumPartitionMerge, "# of calls to Partition::merge");
+STATISTIC(NumHorizontalUpdate, "# of calls to Partition::horizontalUpdate");
+STATISTIC(NumHorizontalUpdateScans,
+          "# of element-region pairs scanned inside horizontalUpdate loops");
+STATISTIC(NumPartitionJoin, "# of calls to Partition::join");
 
 using namespace swift;
 using namespace swift::PartitionPrimitives;
@@ -465,6 +474,7 @@ void Partition::assignElement(Element oldElt, Element newElt,
 }
 
 Partition Partition::join(const Partition &fst, Partition &mutableSnd) {
+  ++NumPartitionJoin;
   // READ THIS! Remember, we cannot touch mutableSnd after this point. We just
   // use it to canonicalize to avoid having to copy snd. After this point,
   // please use the const reference snd to keep each other honest.
@@ -771,6 +781,7 @@ bool Partition::is_canonical_correct() {
 }
 
 Region Partition::merge(Element fst, Element snd, bool updateHistory) {
+  ++NumPartitionMerge;
   canonicalize();
 
   assert(elementToRegionMap.count(fst) && elementToRegionMap.count(snd));
@@ -874,6 +885,7 @@ void Partition::canonicalize() {
 void Partition::horizontalUpdate(
     Element targetElement, Region newRegion,
     llvm::SmallVectorImpl<Element> &mergedElements) {
+  ++NumHorizontalUpdate;
   // It is on our caller to make sure a value is in elementToRegionMap.
   Region oldRegion = elementToRegionMap.at(targetElement);
 
@@ -883,6 +895,7 @@ void Partition::horizontalUpdate(
     return;
 
   for (auto [element, region] : elementToRegionMap) {
+    ++NumHorizontalUpdateScans;
     if (region == oldRegion) {
       elementToRegionMap.insert_or_assign(element, newRegion);
       mergedElements.push_back(element);

@@ -6693,6 +6693,17 @@ namespace {
       if (auto sendableTy = T->getSendableDependentType())
         printRec(sendableTy, Label::always("sendable_dep"));
 
+      if (T->hasLifetimeDependencies()) {
+        for (auto &dep : T->getLifetimeDependencies()) {
+          std::string str;
+          llvm::raw_string_ostream os(str);
+          StreamPrinter sp(os);
+          sp.printLifetimeDependence(dep, T->getParams(),
+                                     PrintOptions::forDebugging());
+          printFieldQuoted(str, Label::always("lifetime"));
+        }
+      }
+
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));
       printAnyFunctionParamsRec(T->getParams(), Label::always("input"));

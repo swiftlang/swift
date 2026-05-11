@@ -166,61 +166,6 @@ getNameForParsedLifetimeDependenceKind(ParsedLifetimeDependenceKind kind) {
 
 } // namespace swift
 
-std::string LifetimeDependenceInfo::getString() const {
-  std::string lifetimeDependenceString = "@lifetime(";
-  auto addressable = getAddressableIndices();
-  auto condAddressable = getConditionallyAddressableIndices();
-  
-  bool isFirstSpecifier = true;
-  auto getSourceString = [&](IndexSubset *bitvector, StringRef kind) {
-    std::string result;
-    for (unsigned i = 0; i < bitvector->getCapacity(); i++) {
-      if (bitvector->contains(i)) {
-        if (!isFirstSpecifier) {
-          result += ", ";
-        }
-        result += kind;
-        if (addressable && addressable->contains(i)) {
-          result += "address ";
-        } else if (condAddressable && condAddressable->contains(i)) {
-          result += "address_for_deps ";
-        }
-        result += std::to_string(i);
-        isFirstSpecifier = false;
-      }
-    }
-    return result;
-  };
-  // Unlike the AST printer, there is no need check isDefaultSuppressed() for
-  // SIL printing because SIL does not assume any defaults.
-  if (hasCaptures()) {
-    if (!isFirstSpecifier) {
-      lifetimeDependenceString += ", ";
-    }
-    lifetimeDependenceString += LifetimeDescriptor::CapturesContextSpecifier;
-    isFirstSpecifier = false;
-  }
-  if (hasImmortalSpecifier()) {
-    if (!isFirstSpecifier) {
-      lifetimeDependenceString += ", ";
-    }
-    lifetimeDependenceString += "immortal";
-    isFirstSpecifier = false;
-  }
-  if (inheritLifetimeParamIndices) {
-    assert(!inheritLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString +=
-        getSourceString(inheritLifetimeParamIndices, "copy ");
-  }
-  if (scopeLifetimeParamIndices) {
-    assert(!scopeLifetimeParamIndices->isEmpty());
-    lifetimeDependenceString +=
-        getSourceString(scopeLifetimeParamIndices, "borrow ");
-  }
-  lifetimeDependenceString += ") ";
-  return lifetimeDependenceString;
-}
-
 void LifetimeDependenceInfo::Profile(llvm::FoldingSetNodeID &ID) const {
   ID.AddBoolean(hasImmortalSpecifier());
   ID.AddBoolean(isFromAnnotation());

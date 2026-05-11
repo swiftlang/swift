@@ -1939,6 +1939,12 @@ def block_availability_platforms: Separate<["-"], "block-availability-platforms"
   HelpText<"Remove the given platforms from symbol graph availability metadata, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
+def active_platform_availability_only
+    : Flag<["-"], "active-platform-availability-only">,
+      Flags<[SwiftSymbolGraphExtractOption]>,
+      HelpText<"Only emit availability metadata for platforms that are active "
+               "according to the target">;
+
 // swift-synthesize-interface-only options
 def include_submodules : Flag<["-"], "include-submodules">,
   Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,

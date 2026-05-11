@@ -1685,6 +1685,14 @@ shouldVisitAsEndPointUse(Operand *op) {
       return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUser;
     }
   }
+  // A borrow/mutate accessor apply with an address result should be treated
+  // as an endpoint use. The result address will have its own
+  // mark_unresolved_non_copyable_value that will be checked separately.
+  if (auto fas = FullApplySite::isa(op->getUser())) {
+    if (fas.hasAddressResult()) {
+      return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUser;
+    }
+  }
   // A drop_deinit consumes the deinit bit.
   if (isa<DropDeinitInst>(op->getUser())) {
     return TransitiveAddressWalkerTransitiveUseVisitation::BothUserAndUses;
@@ -2719,6 +2727,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
       return true;
     }
   }
+
 
   if (auto *pas = dyn_cast<PartialApplyInst>(user)) {
     if (auto *fArg = dyn_cast<SILFunctionArgument>(

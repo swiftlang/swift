@@ -40,6 +40,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SourceFileExtras.h"
 #include "swift/AST/SynthesizedFileUnit.h"

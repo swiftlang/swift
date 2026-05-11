@@ -124,7 +124,13 @@ func take_bvmut_assign_inout(bv: inout BV, other: inout BV,
   f(&bv, &other) // OK
 }
 
-struct NE2: ~Escapable {}
+struct NE2: ~Escapable {
+  let p: UnsafeRawPointer?
+}
+
+func getLocalPointer() -> UnsafeRawPointer? {
+  return nil
+}
 
 @_lifetime(oNE: copy ne)
 func succeed_transfer_ne(ne: consuming NE2, oNE: inout NE2, f: (NE2) -> NE2) {
@@ -133,7 +139,7 @@ func succeed_transfer_ne(ne: consuming NE2, oNE: inout NE2, f: (NE2) -> NE2) {
 
 func fail_smuggle_ne(oNE: inout NE2, f: (NE2) -> NE2) {
   // expected-error @-1 {{lifetime-dependent variable 'oNE' escapes its scope}}
-  let ne = NE2()
+  let ne = NE2(p: getLocalPointer())
   // expected-note @-1 {{it depends on the lifetime of this parent value}}
   oNE = f(ne)
   // expected-note @+1 {{this use causes the lifetime-dependent value to escape}}
