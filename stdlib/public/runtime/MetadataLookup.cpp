@@ -305,10 +305,12 @@ namespace {
     NominalTypeDescriptorCacheEntry(const llvm::StringRef name,
                                     const ContextDescriptor *description)
         : Description(description) {
-      char *nameCopy = reinterpret_cast<char *>(malloc(name.size()));
-      memcpy(nameCopy, name.data(), name.size());
+      size_t nameSize = name.size();
+      char *nameCopy = reinterpret_cast<char *>(malloc(nameSize));
+      if (nameCopy && nameSize > 0)
+        memcpy(nameCopy, name.data(), nameSize);
       Name = nameCopy;
-      NameLength = name.size();
+      NameLength = nameCopy ? nameSize : 0;
     }
 
     const ContextDescriptor *getDescription() const { return Description; }

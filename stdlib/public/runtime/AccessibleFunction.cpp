@@ -64,11 +64,13 @@ public:
   AccessibleFunctionCacheEntry(llvm::StringRef name,
                                const AccessibleFunctionRecord *record)
       : R(record) {
-    char *Name = reinterpret_cast<char *>(malloc(name.size()));
-    memcpy(Name, name.data(), name.size());
+    size_t nameSize = name.size();
+    char *Name = reinterpret_cast<char *>(malloc(nameSize));
+    if (Name && nameSize > 0)
+      memcpy(Name, name.data(), nameSize);
 
     this->Name = Name;
-    this->NameLength = name.size();
+    this->NameLength = Name ? nameSize : 0;
   }
 
   const AccessibleFunctionRecord *getRecord() const { return R; }
