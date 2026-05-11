@@ -7466,10 +7466,15 @@ const TypeInfo *TypeConverter::convertEnumType(TypeBase *key, CanType type,
 }
 
 void IRGenModule::emitEnumDecl(EnumDecl *theEnum) {
-  if (!IRGen.hasLazyMetadata(theEnum) &&
-      !theEnum->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+  bool isEmbedded = theEnum->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+  // In embedded mode, generic types are handled via specialization, not
+  // eagerly emitted here.
+  bool shouldEmit = !IRGen.hasLazyMetadata(theEnum) &&
+                    !(isEmbedded && theEnum->isGenericContext());
+  if (shouldEmit) {
     emitEnumMetadata(*this, theEnum);
-    emitFieldDescriptor(theEnum);
+    if (!isEmbedded)
+      emitFieldDescriptor(theEnum);
   }
 
   emitNestedTypeDecls(theEnum->getMembers());

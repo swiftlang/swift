@@ -29,6 +29,7 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -1066,7 +1067,9 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     emitClassMetadata(*this, D, fragileLayout, resilientLayout);
     emitFieldDescriptor(D);
   } else {
-    if (!hasEmbeddedWithExistentials && !D->isGenericContext()) {
+    bool isExportInterface = !D->isGenericContext() &&
+        D->getExplicitCodeGenerationModel() == CodeGenerationModel::Interface;
+    if (isExportInterface) {
       emitEmbeddedClassMetadata(*this, D);
     } else {
       // We create all metadata lazily in embedded with existentials mode.

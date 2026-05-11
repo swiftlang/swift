@@ -29,6 +29,7 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1589,10 +1590,19 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   auto &langOpts = SIL.getASTContext().LangOpts;
   if (langOpts.hasFeature(Feature::Embedded) &&
       (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
-    bool isGeneric = cast<NominalTypeDecl>(type)->isGenericContext();
-    HasLazyMetadata[type] = !isGeneric;
-
-    return !isGeneric;
+    auto *nominal = cast<NominalTypeDecl>(type);
+    bool isGeneric = nominal->isGenericContext();
+    // @export(interface) types have a unique definition in their defining
+    // module; importing modules reference them as external symbols rather than
+    // lazily emitting their own copy.
+    bool isExportInterface = false;
+    if (!isGeneric) {
+      if (auto model = nominal->getExplicitCodeGenerationModel())
+        isExportInterface = *model == CodeGenerationModel::Interface;
+    }
+    bool isLazy = !isGeneric && !isExportInterface;
+    HasLazyMetadata[type] = isLazy;
+    return isLazy;
   }
 
   auto canBeLazy = [&]() -> bool {

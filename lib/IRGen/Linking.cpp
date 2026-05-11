@@ -20,6 +20,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -724,19 +725,32 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
     auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
-    case TypeMetadataAddress::FullMetadata:
+    case TypeMetadataAddress::FullMetadata: {
       // For imported types, the full metadata object is a candidate
       // for uniquing.
       if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
         return SILLinkage::Shared;
 
-      // Prespecialization of the same generic metadata may be requested 
+      // Prespecialization of the same generic metadata may be requested
       // multiple times within the same module, so it needs to be uniqued.
       if (nominal->isGenericContext())
         return SILLinkage::Shared;
 
+      // @export(interface) types have a unique definition in their defining
+      // module, so the FullMetadata must be externally linkable.
+      bool isEmbedded =
+        nominal->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+      if (isEmbedded && !nominal->isGenericContext()) {
+        if (auto model = nominal->getExplicitCodeGenerationModel()) {
+          if (*model == CodeGenerationModel::Interface) {
+            return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+          }
+        }
+      }
+
       // The full metadata object is private to the containing module.
       return SILLinkage::Private;
+    }
     case TypeMetadataAddress::AddressPoint: {
       return getSILLinkage(nominal
                            ? getDeclLinkage(nominal)
@@ -1812,11 +1826,22 @@ bool LinkEntity::hasNonUniqueDefinition() const {
     return true;
   }
 
-  // Always treat witness tables as having non-unique definitions.
+  // In embedded Swift, witness tables are treated as having non-unique
+  // definitions (so they get linkonce_odr linkage) unless the underlying
+  // conformance was explicitly marked @export(interface).
   if (getKind() == Kind::ProtocolWitnessTable) {
-    if (auto context = getDeclContextForEmission())
-      if (context->getParentModule()->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    if (auto context = getDeclContextForEmission()) {
+      if (context->getParentModule()->getASTContext().LangOpts.hasFeature(
+              Feature::Embedded)) {
+        if (auto *normal = dyn_cast<NormalProtocolConformance>(
+                getProtocolConformance()->getRootConformance())) {
+          if (auto model = normal->getExplicitCodeGenerationModel())
+            if (*model == CodeGenerationModel::Interface)
+              return false;
+        }
         return true;
+      }
+    }
   }
 
   return false;

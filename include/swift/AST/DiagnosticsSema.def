@@ -8917,6 +8917,12 @@ GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               "creating a circular metadata dependency",
               (Type, Type))
 
+GROUPED_ERROR(export_interface_on_generic_in_embedded_swift,
+              EmbeddedRestrictions, none,
+              "'@export(interface)' cannot be applied to a "
+              "%kind0 in Embedded Swift",
+              (const Decl *))
+
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
 //===----------------------------------------------------------------------===//
