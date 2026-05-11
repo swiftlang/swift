@@ -287,6 +287,51 @@ final class CowTest {
   var container = CowContainer()
 }
 
+@MainActor @Observable final class TickerODMO {
+  private(set) var tick: Int = 0
+  @ObservationIgnored private var tickerTask: Task<Void, Error>?
+  
+  func startTicking() {
+    guard tickerTask == nil else { return }
+    tickerTask = Task {
+      while !Task.isCancelled {
+        try await Task.sleep(for: .milliseconds(100))
+        tick += 1
+      }
+    }
+  }
+  
+  func stopTicking() {
+    tickerTask?.cancel()
+    tickerTask = nil
+  }
+}
+
+@MainActor func observe(ticker: TickerODMO) async throws {
+  let observations = Observations { ticker.tick }
+  let collected = Mutex<[Int]>([])
+  let task1 = Task {
+    for await tick in observations {
+      collected.withLock { $0.append(tick) }
+    }
+  }
+  ticker.startTicking()
+  try await Task.sleep(for: .seconds(0.5))
+  task1.cancel()
+  try await Task.sleep(for: .seconds(0.5))
+  expectGT(collected.withLock { $0.count }, 2)
+  collected.withLock { $0.removeAll() }
+  let task2 = Task {
+    for await tick in observations {
+      collected.withLock { $0.append(tick) }
+    }
+  }
+  try await Task.sleep(for: .seconds(0.5))
+  task2.cancel()
+  ticker.stopTicking()
+  expectGT(collected.withLock { $0.count }, 2)
+}
+
 @main
 struct Validator {
   @MainActor
@@ -602,6 +647,10 @@ struct Validator {
       test.firstName = "e"
       try! await Task.sleep(for: .seconds(0.1))
       expectEqual(changed.state, 3)
+    }
+
+    suite.test("cancellation and duplicate iteration of Observations") {
+      try! await observe(ticker: TickerODMO())
     }
 
     await runAllTestsAsync()
