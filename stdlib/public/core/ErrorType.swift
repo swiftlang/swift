@@ -273,29 +273,33 @@ public func _errorInMainTyped<Failure: Error>(_ error: Failure) -> Never {
 public func _getDefaultErrorCode<T: Error>(_ error: T) -> Int
 
 extension Error {
-#if !$Embedded
   public var _code: Int {
+#if !$Embedded
     return _getDefaultErrorCode(self)
+#else
+    // _swift_stdlib_getDefaultErrorCode() looks up the enum tag of an error
+    // value (for enum types conforming to Error). If the type is not an enum,
+    // it returns 1. We don't have that type metadata under Embedded Swift, so
+    // we always return 1 here.
+    return 1
+#endif
   }
 
   public var _domain: String {
+#if !$Embedded
     return _typeName(type(of: self), qualified: true)
+#else
+    return "(unknown domain in Embedded Swift)"
+#endif
   }
 
+#if !$Embedded
   public var _userInfo: AnyObject? {
 #if _runtime(_ObjC)
     return _getErrorDefaultUserInfo(self)
 #else
     return nil
 #endif
-  }
-#else
-  public var _code: Int {
-    return 1
-  }
-
-  public var _domain: String {
-    return ""
   }
 #endif
 }
