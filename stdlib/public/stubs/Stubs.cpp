@@ -43,16 +43,6 @@
 #include <sstream>
 #endif
 
-#if SWIFT_STDLIB_HAS_LOCALE
-#include <clocale>
-#if __has_include(<xlocale.h>)
-#include <xlocale.h>
-#endif
-#if defined(_WIN32)
-#define locale_t _locale_t
-#endif
-#endif // SWIFT_STDLIB_HAS_LOCALE
-
 #include <limits>
 #ifndef SWIFT_THREADING_NONE
 #include <thread>
@@ -72,40 +62,6 @@
 #include "swift/shims/RuntimeStubs.h"
 
 #include "llvm/ADT/StringExtras.h"
-
-#if SWIFT_STDLIB_HAS_LOCALE
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__ANDROID__)
-static inline locale_t getCLocale() {
-  // On these platforms convenience functions from xlocale.h interpret nullptr
-  // as C locale.
-  return nullptr;
-}
-#elif defined(_WIN32)
-static _locale_t makeCLocale() {
-  _locale_t CLocale = _create_locale(LC_ALL, "C");
-  if (!CLocale) {
-    swift::crash("makeCLocale: _create_locale() returned a null pointer");
-  }
-  return CLocale;
-}
-
-static _locale_t getCLocale() {
-  return SWIFT_LAZY_CONSTANT(makeCLocale());
-}
-#else
-static locale_t makeCLocale() {
-  locale_t CLocale = newlocale(LC_ALL_MASK, "C", nullptr);
-  if (!CLocale) {
-    swift::crash("makeCLocale: newlocale() returned a null pointer");
-  }
-  return CLocale;
-}
-
-static locale_t getCLocale() {
-  return SWIFT_LAZY_CONSTANT(makeCLocale());
-}
-#endif
-#endif // SWIFT_STDLIB_HAS_LOCALE
 
 #if SWIFT_STDLIB_HAS_STDIN
 
@@ -173,52 +129,6 @@ swift_stdlib_readLine_stdin(unsigned char **LinePtr) {
 }
 
 #endif  // SWIFT_STDLIB_HAS_STDIN
-
-static bool swift_stringIsSignalingNaN(const char *nptr) {
-  if (nptr[0] == '+' || nptr[0] == '-') {
-    ++nptr;
-  }
-
-  if ((nptr[0] == 's' || nptr[0] == 'S') &&
-      (nptr[1] == 'n' || nptr[1] == 'N') &&
-      (nptr[2] == 'a' || nptr[2] == 'A') &&
-      (nptr[3] == 'n' || nptr[3] == 'N') && (nptr[4] == '\0')) {
-    return true;
-  }
-
-  return false;
-}
-
-#if defined(__CYGWIN__) || defined(__HAIKU__)
-// This implementation should only be used on platforms without the
-// relevant strto* functions, such as Cygwin or Haiku.
-// Note that using this currently causes test failures.
-template <typename T>
-T _swift_strto(const char *nptr, char **endptr) {
-  std::istringstream ValueStream(nptr);
-  ValueStream.imbue(std::locale::classic());
-  T ParsedValue;
-  ValueStream >> ParsedValue;
-
-  std::streamoff pos = ValueStream.tellg();
-  if (ValueStream.eof())
-    pos = static_cast<std::streamoff>(strlen(nptr));
-  if (pos <= 0) {
-    errno = ERANGE;
-    return 0.0;
-  }
-
-  return ParsedValue;
-}
-#endif
-
-static inline void _swift_set_errno(int to) {
-#if defined(_WIN32)
-  _set_errno(0);
-#else
-  errno = 0;
-#endif
-}
 
 // _swift_stdlib_strto{d,f,f16}_clocale were reimplemented in Swift
 // in December 2025.  See FloatingPointFromString.swift.
