@@ -33,14 +33,16 @@ bb0(%0 : $Int64, %1 : $Int64):
   debug_value %1 : $Int64, let, name "in_y", argno 2, loc "sroa.swift":7:21, scope 2
   %4 = alloc_stack $MyStruct, var, name "my_struct", loc "sroa.swift":8:9, scope 2
   // Make sure SROA propagate the debug info to the splitted alloc_stack instructions
-  // CHECK-SROA: alloc_stack $Int64, var
+  // CHECK-SROA: %[[ALLOC_X:[0-9]+]] = alloc_stack $Int64
+  // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
+  // CHECK-SROA: debug_value %[[ALLOC_X]] : $*Int64, var
   // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
   // CHECK-SROA-SAME:        type $MyStruct, expr op_fragment:#MyStruct.x
+  // CHECK-SROA: %[[ALLOC_Y:[0-9]+]] = alloc_stack $Int64
   // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
-  // CHECK-SROA: alloc_stack $Int64, var
+  // CHECK-SROA: debug_value %[[ALLOC_Y]] : $*Int64, var
   // CHECK-SROA-SAME:        (name "my_struct", loc "sroa.swift":8:9
   // CHECK-SROA-SAME:        type $MyStruct, expr op_fragment:#MyStruct.y
-  // CHECK-SROA-SAME:        loc * "<compiler-generated>":0:0
   %5 = metatype $@thin MyStruct.Type, loc "sroa.swift":8:21, scope 2
   %6 = integer_literal $Builtin.Int64, 0, loc "sroa.swift":8:33, scope 2
   %7 = struct $Int64 (%6 : $Builtin.Int64), loc "sroa.swift":8:33, scope 2
