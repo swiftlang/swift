@@ -602,8 +602,8 @@ bool DiagnosticEngine::finishProcessing() {
 
 bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (getCheckSyntacticControls() && sf &&
-      sf->Kind != SourceFileKind::Interface && sf->getExportedSourceFile()) {
+  if (sf && sf->Kind != SourceFileKind::Interface &&
+      sf->getExportedSourceFile()) {
     auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
     return swift_ASTGen_isWarningGroupEnabledInFile(
         sf->getExportedSourceFile(),
@@ -1365,9 +1365,6 @@ DiagnosticState::determineUserControlledWarningBehavior(
   } else
     userControlledBehavior = std::nullopt;
 
-  if (!checkSyntacticControls)
-    return userControlledBehavior;
-
 #if SWIFT_BUILD_SWIFT_SYNTAX
   // Use the combined global controls (command-line flags such as `-Werror`)
   // and syntactic controls at the source location of this diagnostic to
@@ -1378,9 +1375,8 @@ DiagnosticState::determineUserControlledWarningBehavior(
         sourceMgr.findBufferContainingLoc(loc));
     if (!sourceFiles.empty()) {
       SourceFile *SF = sourceFiles.front();
-      // Don't run syntactic @warn controls for .swiftinterface files.
-      if (getCheckSyntacticControls() && SF &&
-          SF->Kind != SourceFileKind::Interface &&
+      // Don't run syntactic @diagnose controls for .swiftinterface files.
+      if (SF && SF->Kind != SourceFileKind::Interface &&
           SF->getExportedSourceFile()) {
         auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
         WarningGroupBehavior behavior =
