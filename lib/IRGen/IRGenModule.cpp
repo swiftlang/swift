@@ -22,7 +22,9 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1437,9 +1439,16 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   if (Opts.UseJIT)
     return false;
 
-  // witness tables are always emitted lazily in embedded swift.
-  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  // witness tables are always emitted lazily in embedded swift, except for
+  // @export(interface) conformances, which have a unique strong definition
+  // in the owning module.
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (auto *normal = dyn_cast<NormalProtocolConformance>(wt->getConformance()))
+      if (auto model = normal->getExplicitCodeGenerationModel())
+        if (*model == CodeGenerationModel::Interface)
+          return false;
     return true;
+  }
 
   // Regardless of the access level, if the witness table is shared it means
   // we can safely not emit it. Every other module which needs it will generate

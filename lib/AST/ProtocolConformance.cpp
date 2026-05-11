@@ -420,6 +420,18 @@ bool NormalProtocolConformance::isSynthesizedNonUnique() const {
   return false;
 }
 
+std::optional<CodeGenerationModel>
+NormalProtocolConformance::getExplicitCodeGenerationModel() const {
+  // Inherit the code generation model from the declaring nominal type or
+  // extension. @export(interface) on either one implies the conformances
+  // defined directly on that declaration are also @export(interface).
+  if (auto *ext = dyn_cast<ExtensionDecl>(getDeclContext()))
+    return ext->getExplicitCodeGenerationModel();
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(getDeclContext()))
+    return nominal->getExplicitCodeGenerationModel();
+  return std::nullopt;
+}
+
 bool NormalProtocolConformance::isConformanceOfProtocol() const {
   return getDeclContext()->getSelfProtocolDecl() != nullptr;
 }

@@ -149,6 +149,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD3-NEXT:             Keyword/None:                       usableFromInline[#Class Attribute#]; name=usableFromInline
 // KEYWORD3-NEXT:             Keyword/None:                       propertyWrapper[#Class Attribute#]; name=propertyWrapper
 // KEYWORD3-NEXT:             Keyword/None:                       resultBuilder[#Class Attribute#]; name=resultBuilder
+// KEYWORD3-NEXT:             Keyword/None:                       export[#Class Attribute#]; name=export
 // KEYWORD3-NEXT:             Keyword/None:                       globalActor[#Class Attribute#]; name=globalActor
 // KEYWORD3-NEXT:             Keyword/None:                       preconcurrency[#Class Attribute#]; name=preconcurrency
 
@@ -167,6 +168,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD4-NEXT:             Keyword/None:                       frozen[#Enum Attribute#]; name=frozen
 // KEYWORD4-NEXT:             Keyword/None:                       propertyWrapper[#Enum Attribute#]; name=propertyWrapper
 // KEYWORD4-NEXT:             Keyword/None:                       resultBuilder[#Enum Attribute#]; name=resultBuilder
+// KEYWORD4-NEXT:             Keyword/None:                       export[#Enum Attribute#]; name=export
 // KEYWORD4-NEXT:             Keyword/None:                       globalActor[#Enum Attribute#]; name=globalActor
 // KEYWORD4-NEXT:             Keyword/None:                       preconcurrency[#Enum Attribute#]; name=preconcurrency
 
@@ -180,6 +182,7 @@ actor MyGenericGlobalActor<T> {
 // KEYWORD5-NEXT:             Keyword/None:                       frozen[#Struct Attribute#]; name=frozen
 // KEYWORD5-NEXT:             Keyword/None:                       propertyWrapper[#Struct Attribute#]; name=propertyWrapper
 // KEYWORD5-NEXT:             Keyword/None:                       resultBuilder[#Struct Attribute#]; name=resultBuilder
+// KEYWORD5-NEXT:             Keyword/None:                       export[#Struct Attribute#]; name=export
 // KEYWORD5-NEXT:             Keyword/None:                       globalActor[#Struct Attribute#]; name=globalActor
 // KEYWORD5-NEXT:             Keyword/None:                       preconcurrency[#Struct Attribute#]; name=preconcurrency
 
