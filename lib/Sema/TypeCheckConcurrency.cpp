@@ -6537,11 +6537,16 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
             inferred.preconcurrency());
       }
 
-      // Add nonisolated attribute
-      addAttributesForActorIsolation(value, inferred);
+      // NonisolatedAttr cannot appear on AccessorDecl (see DeclAttr.def).
+      // Skip adding the attribute but preserve the correct isolation value.
+      if (!isa<AccessorDecl>(value))
+        addAttributesForActorIsolation(value, inferred);
       break;
     case ActorIsolation::NonisolatedNonsending:
-      addAttributesForActorIsolation(value, inferred);
+      // NonisolatedAttr cannot appear on AccessorDecl (see DeclAttr.def).
+      // Skip adding the attribute but preserve the correct isolation value.
+      if (!isa<AccessorDecl>(value))
+        addAttributesForActorIsolation(value, inferred);
       break;
     case ActorIsolation::Erased:
       llvm_unreachable("cannot infer erased isolation");
@@ -6565,10 +6570,14 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   };
 
   // If this is an accessor, use the actor isolation of its storage
-  // declaration. All of the logic for FuncDecls below only applies to
-  // non-accessor functions.
+  // declaration. The exception is local declarations: their accessors
+  // should inherit actor isolation from their enclosing context, just like
+  // local functions. We let them fall through to the local function handling
+  // below (which applies because AccessorDecl is a FuncDecl).
   if (auto accessor = dyn_cast<AccessorDecl>(value)) {
-    return getInferredActorIsolation(accessor->getStorage());
+    if (!accessor->getStorage()->getDeclContext()->isLocalContext()) {
+      return getInferredActorIsolation(accessor->getStorage());
+    }
   }
 
   // If this is a lazy storage property, use the actor isolation of its original
