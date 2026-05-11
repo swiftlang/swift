@@ -71,3 +71,10 @@ private struct Inaccessible4 {
     return 42
   }
 }
+
+@dynamicMemberLookup
+struct InaccessibleAndInvalidCandidate {
+  private subscript(dynamicMember x: String) -> Void { () }
+  // expected-error@-1 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}
+  subscript(dynamicMember x: Int) -> Void { () }
+}

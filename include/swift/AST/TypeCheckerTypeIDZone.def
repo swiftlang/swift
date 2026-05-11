@@ -674,6 +674,10 @@ SWIFT_REQUEST(TypeChecker, EmitPerformanceHints,
               evaluator::SideEffect(SourceFile *),
               Cached, NoLocationInfo)
 
+SWIFT_REQUEST(TypeChecker, DynamicMemberLookupSubscriptRequest,
+              DynamicMemberLookupSubscriptEligibility(const SubscriptDecl *),
+              Cached, NoLocationInfo)
+
 SWIFT_REQUEST(TypeChecker, DesugarForEachStmtRequest,
               BraceStmt *(ForEachStmt *),
               SeparatelyCached, NoLocationInfo)

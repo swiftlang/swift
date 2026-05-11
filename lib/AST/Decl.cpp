@@ -10077,6 +10077,36 @@ void SubscriptDecl::setElementInterfaceType(Type type) {
                                         std::move(type));
 }
 
+BoundGenericType *
+SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
+  // Allow composing a key path type with a `Sendable` protocol as a way to
+  // express sendability requirements.
+  if (auto *existential = paramTy->getAs<ExistentialType>()) {
+    auto layout = existential->getExistentialLayout();
+
+    auto protocols = layout.getProtocols();
+    if (!llvm::all_of(protocols, [](ProtocolDecl *proto) {
+          return proto->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+                 proto->getInvertibleProtocolKind();
+        })) {
+      return nullptr;
+    }
+
+    paramTy = layout.getSuperclass();
+    if (!paramTy) {
+      return nullptr;
+    }
+  }
+
+  if (!paramTy->isKeyPath() &&
+      !paramTy->isWritableKeyPath() &&
+      !paramTy->isReferenceWritableKeyPath()) {
+    return nullptr;
+  }
+
+  return paramTy->getAs<BoundGenericType>();
+}
+
 SubscriptDecl *
 SubscriptDecl::createDeserialized(ASTContext &Context, DeclName Name,
                                   StaticSpellingKind StaticSpelling,
@@ -10173,6 +10203,28 @@ SourceRange SubscriptDecl::getSignatureSourceRange() const {
     }
   }
   return getSubscriptLoc();
+}
+
+std::optional<SubscriptDecl::DynamicMemberLookupKind>
+SubscriptDecl::getDynamicMemberLookupKind() const {
+  auto &ctx = getASTContext();
+  auto eligibility = evaluateOrFatal(
+      ctx.evaluator,
+      DynamicMemberLookupSubscriptRequest{this});
+
+  // `getDynamicMemberKind()` checks `isValid()`
+  return eligibility.getDynamicMemberKind();
+}
+
+BoundGenericType *SubscriptDecl::getDynamicMemberLookupKeyPathType() const {
+  if (getDynamicMemberLookupKind() != DynamicMemberLookupKind::KeyPath) {
+    return nullptr;
+  }
+
+  auto *indices = getIndices();
+  ASSERT(indices->size() > 0 && "subscript must have at least one arg");
+  return getDynamicMemberParamTypeAsKeyPathType(
+      indices->get(0)->getInterfaceType());
 }
 
 DeclName AbstractFunctionDecl::getEffectiveFullName() const {
