@@ -2963,6 +2963,92 @@ void SwiftLangSupport::collectExpressionTypes(
                                    llvm::vfs::createPhysicalFileSystem());
 }
 
+void SwiftLangSupport::collectInferredIsolations(
+    StringRef PrimaryFilePath, StringRef InputBufferName,
+    ArrayRef<const char *> Args, std::optional<unsigned> Offset,
+    std::optional<unsigned> Length, bool CancelOnSubsequentRequest,
+    SourceKitCancellationToken CancellationToken,
+    std::function<void(const RequestResult<InferredIsolationsInFile> &)>
+        Receiver) {
+  std::string Error;
+  SwiftInvocationRef Invok =
+      ASTMgr->getTypecheckInvocation(Args, PrimaryFilePath, Error);
+  if (!Invok) {
+    LOG_WARN_FUNC("failed to create an ASTInvocation: " << Error);
+    Receiver(RequestResult<InferredIsolationsInFile>::fromError(Error));
+    return;
+  }
+  assert(Invok);
+  class InferredIsolationsCollector : public SwiftASTConsumer {
+    std::function<void(const RequestResult<InferredIsolationsInFile> &)>
+        Receiver;
+    std::string InputFile;
+    std::optional<unsigned> Offset;
+    std::optional<unsigned> Length;
+
+  public:
+    InferredIsolationsCollector(
+        std::function<void(const RequestResult<InferredIsolationsInFile> &)>
+            Receiver,
+        StringRef InputFile, std::optional<unsigned> Offset,
+        std::optional<unsigned> Length)
+        : Receiver(std::move(Receiver)), InputFile(InputFile.str()),
+          Offset(Offset), Length(Length) {}
+
+    void handlePrimaryAST(ASTUnitRef AstUnit) override {
+      SourceFile *SF =
+          retrieveInputFile(InputFile, AstUnit->getCompilerInstance());
+      if (!SF) {
+        Receiver(RequestResult<InferredIsolationsInFile>::fromError(
+            "Unable to find input file"));
+        return;
+      }
+
+      // Construct the range to be searched. If offset/length are unset, the
+      // (default) range will be used, which corresponds to the entire document.
+      SourceRange Range;
+      if (Offset.has_value() && Length.has_value()) {
+        auto &SM = AstUnit->getCompilerInstance().getSourceMgr();
+        unsigned BufferID = SF->getBufferID();
+        SourceLoc Start = Lexer::getLocForStartOfToken(SM, BufferID, *Offset);
+        SourceLoc End =
+            Lexer::getLocForStartOfToken(SM, BufferID, *Offset + *Length);
+        Range = SourceRange(Start, End);
+      }
+
+      std::vector<InferredIsolationInfo> Infos;
+      std::string InfosBuffer;
+      llvm::raw_string_ostream OS(InfosBuffer);
+      InferredIsolationsInFile Result;
+
+      swift::collectInferredIsolations(*SF, Range, Infos, OS);
+
+      for (auto Info : Infos) {
+        Result.Results.push_back(
+            {Info.Offset, Info.Length, Info.IsolationOffset, Info.KindOffset});
+      }
+      Result.StringBuffer = OS.str();
+      Receiver(RequestResult<InferredIsolationsInFile>::fromResult(Result));
+    }
+
+    void cancelled() override {
+      Receiver(RequestResult<InferredIsolationsInFile>::cancelled());
+    }
+
+    void failed(StringRef Error) override {
+      Receiver(RequestResult<InferredIsolationsInFile>::fromError(Error));
+    }
+  };
+
+  auto Collector = std::make_shared<InferredIsolationsCollector>(
+      Receiver, InputBufferName, Offset, Length);
+  static const char OncePerASTToken = 0;
+  const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
+  getASTManager()->processASTAsync(Invok, std::move(Collector), Once,
+                                   CancellationToken,
+                                   llvm::vfs::createPhysicalFileSystem());
+}
+
 void SwiftLangSupport::collectVariableTypes(
     StringRef PrimaryFilePath, StringRef InputBufferName,
     ArrayRef<const char *> Args, std::optional<unsigned> Offset,

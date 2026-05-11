@@ -145,6 +145,19 @@ struct ExpressionTypesInFile {
   StringRef TypeBuffer;
 };
 
+struct InferredIsolation {
+  unsigned Offset;
+  unsigned Length;
+  /// Offsets into `InferredIsolationsInFile.StringBuffer`.
+  unsigned IsolationOffset;
+  unsigned KindOffset;
+};
+
+struct InferredIsolationsInFile {
+  std::vector<InferredIsolation> Results;
+  StringRef StringBuffer;
+};
+
 struct VariableType {
   /// The variable identifier's offset in the file.
   unsigned VarOffset;
@@ -1262,6 +1275,16 @@ public:
       bool FullyQualified, bool CanonicalType,
       SourceKitCancellationToken CancellationToken,
       std::function<void(const RequestResult<ExpressionTypesInFile> &)>
+          Receiver) = 0;
+
+  /// Collects inferred actor isolation for every closure and declaration in
+  /// the file. Skips declarations whose isolation is written explicitly.
+  virtual void collectInferredIsolations(
+      StringRef PrimaryFilePath, StringRef InputBufferName,
+      ArrayRef<const char *> Args, std::optional<unsigned> Offset,
+      std::optional<unsigned> Length, bool CancelOnSubsequentRequest,
+      SourceKitCancellationToken CancellationToken,
+      std::function<void(const RequestResult<InferredIsolationsInFile> &)>
           Receiver) = 0;
 
   /// Collects variable types for a range defined by `Offset` and `Length` in
