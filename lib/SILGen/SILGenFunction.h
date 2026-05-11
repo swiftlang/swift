@@ -1799,12 +1799,10 @@ public:
                             CanType existentialType,
                             SGFContext C = SGFContext());
 
-  RValue emitCollectionConversion(SILLocation loc,
-                                  FuncDecl *fn,
-                                  CanType fromCollection,
-                                  CanType toCollection,
-                                  ManagedValue mv,
-                                  SGFContext C);
+  RValue emitCollectionConversion(SILLocation loc, FuncDecl *fn,
+                                  CanType fromCollection, CanType toCollection,
+                                  ManagedValue mv, ClosureExpr *keyConversion,
+                                  ClosureExpr *valueConversion, SGFContext C);
 
   //===--------------------------------------------------------------------===//
   // Recursive entry points

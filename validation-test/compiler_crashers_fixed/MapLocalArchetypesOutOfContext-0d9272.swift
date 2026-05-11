@@ -2,9 +2,25 @@
 // RUN: %target-swift-frontend -emit-silgen %s
 protocol a {
   func b() -> [() -> Self]
+  func x() -> Self
 }
+
 do {
-  func c(d: a) {
-    let e = d.b
+  func c1(d: any a) {
+    _ = d.b()
+  }
+  
+  func c2(d: any a) {
+    _ = d.b
+  }
+
+  func c3(d: any a) {
+    _ = { d.x() }
+  }
+  
+  func c4(d: any a) {
+    _ = {
+      _ = d.b()
+    }
   }
 }

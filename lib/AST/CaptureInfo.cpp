@@ -74,10 +74,10 @@ CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
   static_assert(IsTriviallyDestructible<CaptureInfo::CaptureInfoStorage>::value,
                 "Capture info is alloc'd on the ASTContext and not destroyed");
 
-  // This is the only kind of local generic environment we can capture right now.
+  // These are the only kinds of local generic environment we can capture right now.
 #ifndef NDEBUG
   for (auto *env : genericEnv) {
-    assert(env->getKind() == GenericEnvironment::Kind::Element);
+    assert(env->getKind() == GenericEnvironment::Kind::Element || env->getKind() == GenericEnvironment::Kind::Existential);
   }
 #endif
 
@@ -192,8 +192,21 @@ void CaptureInfo::print(raw_ostream &OS) const {
 
   interleave(getGenericEnvironments(),
              [&](GenericEnvironment *genericEnv) {
-               OS << " shape_class=";
-               OS << genericEnv->getOpenedElementShapeClass();
+               switch (genericEnv->getKind()) {
+                 case GenericEnvironment::Kind::Primary:
+                   OS << " primary_archetype";
+                   break;
+                 case GenericEnvironment::Kind::Opaque:
+                   OS << " opaque_archetype";
+                   break;
+                 case GenericEnvironment::Kind::Existential:
+                   OS << " existential_archetype";
+                   break;
+                 case GenericEnvironment::Kind::Element:
+                   OS << " shape_class=";
+                   OS << genericEnv->getOpenedElementShapeClass();
+                   break;
+               }
              },
              [&] { OS << ","; });
 
