@@ -54,15 +54,16 @@ extension PlainStruct: Greeter {
 }
 
 // Library IR:
-//  - @export(interface) type metadata: strong public definition (`constant`).
+//  - @export(interface) type metadata: strong public definition (`constant`,
+//    or `protected constant` on ELF).
 //  - @export(interface) conformances (whether declared on the type itself or
 //    on an @export(interface) extension): strong public witness tables
-//    (`constant`).
-// LIBRARY-IR-DAG: @"$e7Library11ExportedFooVMf" = constant
-// LIBRARY-IR-DAG: @"$e7Library13ExportedClassCMf" = constant
-// LIBRARY-IR-DAG: @"$e7Library11ExportedFooVAA7GreeterAAWP" = constant
-// LIBRARY-IR-DAG: @"$e7Library13ExportedClassCAA7GreeterAAWP" = constant
-// LIBRARY-IR-DAG: @"$e7Library11PlainStructVAA7GreeterAAWP" = constant
+//    (`constant`, or `protected constant` on ELF).
+// LIBRARY-IR-DAG: @"$e7Library11ExportedFooVMf" = {{(protected )?}}constant
+// LIBRARY-IR-DAG: @"$e7Library13ExportedClassCMf" = {{(protected )?}}constant
+// LIBRARY-IR-DAG: @"$e7Library11ExportedFooVAA7GreeterAAWP" = {{(protected )?}}constant
+// LIBRARY-IR-DAG: @"$e7Library13ExportedClassCAA7GreeterAAWP" = {{(protected )?}}constant
+// LIBRARY-IR-DAG: @"$e7Library11PlainStructVAA7GreeterAAWP" = {{(protected )?}}constant
 
 // Non-@export(interface) type metadata and conformances are NOT eagerly
 // emitted in the Library (they stay lazy/shared per importing module).
