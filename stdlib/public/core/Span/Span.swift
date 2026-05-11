@@ -26,7 +26,7 @@ import Swift
 @safe
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-public struct Span<Element: ~Copyable>: ~Escapable, Copyable, BitwiseCopyable {
+public struct Span<Element: ~Copyable & ~Escapable>: ~Escapable, Copyable, BitwiseCopyable {
 
   /// The starting address of this `Span`.
   ///
@@ -402,8 +402,7 @@ extension Span where Element: BitwiseCopyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: ~Copyable {
-
+extension Span where Element: ~Copyable & ~Escapable {
   /// The number of elements in the span.
   ///
   /// To check whether the span is empty, use its `isEmpty` property
@@ -436,7 +435,7 @@ extension Span where Element: ~Copyable {
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension Span where Element: ~Copyable {
+extension Span where Element: ~Copyable & ~Escapable {
   // SILOptimizer looks for fixed_storage.check_index semantics for bounds check optimizations.
   @_semantics("fixed_storage.check_index")
   @inline(__always)
@@ -454,6 +453,7 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
     //FIXME: change to unsafeRawAddress when ready
+    @_lifetime(copy self)
     unsafeAddress {
       _checkIndex(position)
       return unsafe _unsafeAddressOfElement(unchecked: position)
@@ -473,6 +473,7 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
     //FIXME: change to unsafeRawAddress when ready
+    @_lifetime(copy self)
     unsafeAddress {
       unsafe _unsafeAddressOfElement(unchecked: position)
     }
@@ -480,6 +481,7 @@ extension Span where Element: ~Copyable {
 
   @unsafe
   @_alwaysEmitIntoClient
+  @_lifetime(copy self)
   internal func _unsafeAddressOfElement(
     unchecked position: Index
   ) -> UnsafePointer<Element> {
