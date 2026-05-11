@@ -1430,3 +1430,20 @@ SpySiGXu
 // CHECK-32-NEXT: (struct size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1
 // CHECK-32-NEXT:   (field name=_rawValue offset=0
 // CHECK-32-NEXT:     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1)))
+
+// Existential metatype of a constrained existential
+12TypeLowering2PP_pSi1TAaCPRts_XPXp
+// CHECK: (existential_metatype
+// CHECK-NEXT: (constrained_existential_type
+// CHECK-NEXT: (protocol_composition
+// CHECK-NEXT: (protocol TypeLowering.PP))
+// CHECK-64: (existential_metatype size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT: (field name=metadata offset=0
+// CHECK-64-NEXT: (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1))
+// CHECK-64-NEXT: (field name=wtable offset=8
+// CHECK-64-NEXT: (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))
+// CHECK-32: (existential_metatype size=8 alignment=4 stride=8 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT: (field name=metadata offset=0
+// CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))
+// CHECK-32-NEXT: (field name=wtable offset=4
+// CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)))
