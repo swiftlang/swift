@@ -803,7 +803,8 @@ public func expectCrash(withMessage message: String = "", executing: () -> Void)
 }
 
 func _defaultTestSuiteFailedCallback() {
-  abort()
+  exit(1)
+  // abort()
 }
 
 var _testSuiteFailedCallback: () -> Void = _defaultTestSuiteFailedCallback
