@@ -75,9 +75,6 @@ public:
   /// Suppress all remarks
   bool SuppressRemarks = false;
 
-  /// Check for `@warn` diagnostic group behavior controls
-  bool CheckSyntacticControls = false;
-
   /// Rules for escalating warnings to errors
   llvm::SmallVector<WarningGroupBehaviorRule, 4> WarningGroupControlRules;
 

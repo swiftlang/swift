@@ -169,6 +169,7 @@ UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypesWithDefaults)
+UNINTERESTING_FEATURE(SourceWarningControl)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
@@ -443,12 +444,6 @@ static bool usesFeatureIsolatedConformances(Decl *decl) {
 }
 
 static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureSourceWarningControl(Decl *decl) {
-  // @diagnose is excluded from module interfaces since it only
-  // affects local diagnostic behavior, so it never needs a feature guard.
   return false;
 }
 
