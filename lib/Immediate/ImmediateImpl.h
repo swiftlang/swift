@@ -20,11 +20,6 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
-namespace llvm {
-  class Function;
-  class Module;
-}
-
 namespace swift {
   class CompilerInstance;
   class DiagnosticEngine;
