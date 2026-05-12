@@ -99,6 +99,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Actor.swift
   AsyncLet.swift
   CheckedContinuation.swift
+  Continuation.swift
   Errors.swift
   Executor.swift
   ExecutorBridge.swift
