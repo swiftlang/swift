@@ -2087,6 +2087,11 @@ function Build-EarlySwiftDriver([Hashtable] $Platform) {
       SWIFT_DRIVER_BUILD_TOOLS = "NO";
       SQLite3_INCLUDE_DIR = "$SourceCache\swift-toolchain-sqlite\Sources\CSQLite\include";
       SQLite3_LIBRARY = "$(Get-ProjectBinaryCache $Platform SQLite)\SQLite3.lib";
+
+      # Prevent re-cloning the soruces
+      FETCHCONTENT_SOURCE_DIR_ARGUMENTPARSER = "$SourceCache\swift-argument-parser";
+      FETCHCONTENT_SOURCE_DIR_LLBUILD = "$SourceCache\llbuild";
+      FETCHCONTENT_SOURCE_DIR_TOOLSSUPPORTCORE = "$SourceCache\swift-tools-support-core";
     }
 }
 
