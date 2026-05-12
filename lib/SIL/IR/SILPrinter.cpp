@@ -743,6 +743,14 @@ static bool hasUnusualResultOwnership(const SILInstruction *inst) {
 
 namespace swift {
 
+static bool hasValidControlFlow(const SILFunction *f) {
+  for (auto &block : *f) {
+    if (!isa<TermInst>(&block.back()))
+      return false;
+  }
+  return true;
+}
+
 /// SILPrinter class - This holds the internal implementation details of
 /// printing SIL structures.
 class SILPrinter : public SILInstructionVisitor<SILPrinter> {
@@ -915,7 +923,7 @@ public:
   //===--------------------------------------------------------------------===//
   // Big entrypoints.
   void print(const SILFunction *F) {
-    if (SILPrintLoopHeaders) {
+    if (SILPrintLoopHeaders && hasValidControlFlow(F)) {
       findLoopHeaders(*const_cast<SILFunction *>(F), loopHeaders);
     }
 
