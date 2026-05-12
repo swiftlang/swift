@@ -159,3 +159,24 @@ public func takeReadBorrower(f: @_lifetime(borrow a) (_ a: AnotherView) -> Anoth
 
 @inlinable
 public func takeWriteBorrower(f: @_lifetime(&a) (_ a: inout AnotherView) -> AnotherView) {}
+
+@inlinable
+public func takeClosureImplicitDependence(f: () -> AnotherView) -> AnotherView {
+  f()
+}
+
+@_lifetime(f)
+@inlinable
+public func takeClosureImplicitDependenceKind(f: () -> AnotherView) -> AnotherView {
+  f()
+}
+
+@inlinable
+public func takeTakeImplicitCopyClosure(f: @_lifetime(copy f) (_ f: () -> AnotherView) -> AnotherView) {
+}
+
+@inlinable
+public func callTTICC() {
+  takeTakeImplicitCopyClosure(f: takeClosureImplicitDependenceKind)
+  takeTakeImplicitCopyClosure(f: takeClosureImplicitDependence)
+}
