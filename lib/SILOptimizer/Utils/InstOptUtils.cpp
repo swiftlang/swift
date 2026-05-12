@@ -2054,32 +2054,6 @@ void swift::salvageLoadDebugInfo(LoadOperation load) {
   }
 }
 
-// TODO: this currently fails to notify the pass with notifyNewInstruction.
-void swift::createDebugFragments(SILValue oldValue, Projection proj,
-                                 SILValue newValue) {
-  if (proj.getKind() != ProjectionKind::Struct)
-    return;
-
-  for (auto *use : getDebugUses(oldValue)) {
-    auto debugVal = dyn_cast<DebugValueInst>(use->getUser());
-    if (!debugVal)
-      continue;
-
-    auto varInfo = debugVal->getCompleteVarInfo();
-
-    SILType baseType = oldValue->getType();
-
-    // Copy VarInfo and add the corresponding fragment DIExpression.
-    SILDebugVariable newVarInfo = varInfo;
-    newVarInfo.DIExpr.append(
-        SILDebugInfoExpression::createFragment(proj.getVarDecl(baseType)));
-
-    // Create a new debug_value
-    SILBuilder(debugVal, debugVal->getDebugScope())
-        .createDebugValue(debugVal->getLoc(), newValue, newVarInfo);
-  }
-}
-
 IntegerLiteralInst *swift::optimizeBuiltinCanBeObjCClass(BuiltinInst *bi,
                                                          SILBuilder &builder) {
   assert(bi->getBuiltinInfo().ID == BuiltinValueKind::CanBeObjCClass);

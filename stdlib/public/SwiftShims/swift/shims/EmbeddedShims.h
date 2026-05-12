@@ -93,13 +93,13 @@ typedef struct {
 #if __has_feature(ptrauth_calls)
   void* (* __ptrauth(0, 1, 0xe3ba) initializeWithCopyFn)(void*, const void*, const void*);
 #else
-  void* (*initializeWithCopyFn)(void*, void*, const void*);
+  void* _Nonnull (* _Nonnull initializeWithCopyFn)(void*, void*, const void*);
 #endif
   void  *assignWithCopyFn;
 #if __has_feature(ptrauth_calls)
   void* (* __ptrauth(0, 1, 0x48d8) initializeWithTakeFn)(void*, void*, const void*);
 #else
-  void* (*initializeWithTakeFn)(void *, void*, const void*);
+  void* _Nonnull (* _Nonnull initializeWithTakeFn)(void *, void*, const void*);
 #endif
   void  *assignWithTakeFn;
   void  *getEnumTagSinglePayloadFn;
@@ -176,7 +176,7 @@ _swift_embedded_initialize_box(void *metadata, void *newObjectAddr, void *oldObj
 }
 
 typedef struct {
-  void *inlineBuffer[3];
+  void * _Nonnull inlineBuffer[3];
   const void *metadata;
 } ExistentialValue;
 
