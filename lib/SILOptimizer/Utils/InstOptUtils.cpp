@@ -1923,12 +1923,19 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   auto VarInfo = DefiningInst.getVarInfo();
   if (!VarInfo)
     return;
-  // Fix the op_deref.
-  if (!isa<CopyAddrInst>(SI) && VarInfo->DIExpr.startsWithDeref())
+  // The debug variable being stored to must describe an address, and have an
+  // op_deref. This creates a debug_value for the stored value itself:
+  // strip the leading op_deref.
+  if (VarInfo->DIExpr.startsWithDeref()) {
     VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
-  else if (isa<CopyAddrInst>(SI) && !VarInfo->DIExpr.startsWithDeref())
-    VarInfo->DIExpr.prependElements({
-      SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+  } else if (isa<DebugValueInst>(*DefiningInst)) {
+    // If there is no op_deref, drop the debug_value as unsalvageable: the
+    // address is unknown, only the value remains.
+    // This would only happen if salvaging pointer types was supported, which
+    // is not the case. The verifier should catch invalid debug info,
+    // so this should be unreachable.
+    return;
+  }
   // Note: The instruction should logically be in the SI's scope.
   // However, LLVM does not support variables and stores in different scopes,
   // so we use the variable's scope.
@@ -2008,33 +2015,6 @@ void swift::salvageDebugInfo(SILInstruction *I) {
           .createDebugValue(DbgInst->getLoc(), TTI->getElement(i), NewVarInfo);
       }
     }
-  }
-
-  if (auto *IA = dyn_cast<IndexAddrInst>(I)) {
-    if (IA->getBase() && IA->getIndex())
-      // Only handle cases where offset is constant.
-      if (const auto *LiteralInst =
-            dyn_cast<IntegerLiteralInst>(IA->getIndex())) {
-        SILValue Base = IA->getBase();
-        SILValue ResultAddr = IA->getResult(0);
-        APInt OffsetVal = LiteralInst->getValue();
-        const SILDIExprElement ExprElements[3] = {
-          SILDIExprElement::createOperator(OffsetVal.isNegative() ?
-            SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
-          SILDIExprElement::createConstInt(OffsetVal.getLimitedValue()),
-          SILDIExprElement::createOperator(SILDIExprOperator::Plus)
-        };
-        for (Operand *U : getDebugUses(ResultAddr)) {
-          auto *DbgInst = cast<DebugValueInst>(U->getUser());
-          auto VarInfo = DbgInst->getVarInfo();
-          if (!VarInfo)
-            continue;
-          VarInfo->DIExpr.prependElements(ExprElements);
-          // Create a new debug_value
-          SILBuilder(IA, DbgInst->getDebugScope())
-            .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
-        }
-      }
   }
 
   if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {

@@ -2923,25 +2923,6 @@ namespace {
           // the clang decl during lazy member lookup.
           result->addMember(p);
         }
-
-        auto it = Impl.cxxSubscripts.find(result);
-        if (it != Impl.cxxSubscripts.end()) {
-          for (const auto &subscriptInfo : it->second) {
-            auto getterAndSetter = subscriptInfo.second;
-            auto subscript = synthesizer.makeSubscript(getterAndSetter.first,
-                                                       getterAndSetter.second);
-            // Also add subscripts directly because they won't be found from the
-            // clang decl.
-            result->addMember(subscript);
-
-            // Add the subscript as an alternative for the getter so that it
-            // gets carried into derived classes.
-            auto *subscriptImpl = getterAndSetter.first
-                                      ? getterAndSetter.first
-                                      : getterAndSetter.second;
-            Impl.addAlternateDecl(subscriptImpl, subscript);
-          }
-        }
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
@@ -3873,42 +3854,10 @@ namespace {
       if (!typeDecl)
         return true;
 
-      if (importedName.isSubscriptAccessor()) {
-        SmallVector<TypeBase *> params;
-        for (auto parameter : *(func->getParameters())) {
-          auto parameterType = parameter->getTypeInContext();
-          if (!parameterType)
-            return false;
-          if (parameter->isInOut())
-            // Subscripts with inout parameters are not allowed in Swift.
-            return false;
-          params.push_back(parameterType.getPointer());
-        }
-        // Subscript setter is marked as mutating in Swift even if the
-        // C++ `operator []` is `const`.
-        if (importedName.getAccessorKind() ==
-                ImportedAccessorKind::SubscriptSetter &&
-            !dc->isModuleScopeContext() &&
-            !typeDecl->getDeclaredType()->isForeignReferenceType())
-          func->setSelfAccessKind(SelfAccessKind::Mutating);
-
-        auto &getterAndSetterMap = Impl.cxxSubscripts[typeDecl];
-        auto &getterAndSetter = getterAndSetterMap[params];
-
-        switch (importedName.getAccessorKind()) {
-        case ImportedAccessorKind::SubscriptGetter:
-          getterAndSetter.first = func;
-          break;
-        case ImportedAccessorKind::SubscriptSetter:
-          getterAndSetter.second = func;
-          break;
-        default:
-          llvm_unreachable("invalid subscript kind");
-        }
-
-        Impl.markUnavailable(func, "use subscript");
+      if (importedName.isSubscriptAccessor())
+        // Subscript accessors do not need any special handling applied here.
+        // They are fixed up in lookupAndImportSubscripts().
         return true;
-      }
 
       // Check if this method _is_ an overloaded operator but is not a
       // call / subscript / dereference / increment. Those
@@ -10820,8 +10769,9 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
 
   if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !storage &&
       !inheritance) {
-    Impl.lookupAndImportPointee(swiftDecl);
-    Impl.lookupAndImportSuccessor(swiftDecl);
+    (void)Impl.lookupAndImportPointee(swiftDecl);
+    (void)Impl.lookupAndImportSuccessor(swiftDecl);
+    (void)Impl.lookupAndImportSubscripts(swiftDecl);
   }
 }
 } // namespace

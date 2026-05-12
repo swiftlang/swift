@@ -25,7 +25,7 @@ bb0:
   %0 = global_addr @g1 : $*Int
   %2 = begin_access [modify] [dynamic] %0
   fix_lifetime %2
-  debug_value %2 : $*Int, name "g1"
+  debug_value %2 : $*Int, name "g1", expr op_deref
   end_access %2
   %r = tuple ()
   return %r

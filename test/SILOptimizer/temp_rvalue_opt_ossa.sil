@@ -119,7 +119,7 @@ bb0(%0 : $*GS<B>, %1 : $*GS<B>):
   %3 = load [trivial] %2 : $*Builtin.Int64
   %4 = alloc_stack $GS<B>
   copy_addr %1 to [init] %4 : $*GS<B>
-  debug_value %4, let, name "x"
+  debug_value %4, let, name "x", expr op_deref
   %6 = struct_element_addr %4 : $*GS<B>, #GS._value
   %7 = load [trivial] %6 : $*Builtin.Int64
   %8 = builtin "cmp_slt_Int64"(%3 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1
@@ -1868,7 +1868,7 @@ bb0(%0 : $*NonTrivialStruct):
   br bb1
 
 bb1:
-  debug_value %1, let, name "x"
+  debug_value %1, let, name "x", expr op_deref
   %3 = struct_element_addr %0, #NonTrivialStruct.val
   copy_addr %3 to [init] %1
   %4 = apply undef(%1) : $@convention(thin) (@in_guaranteed Klass) -> ()
@@ -1933,7 +1933,7 @@ bb1:
   destroy_value %0
   %10 = struct_element_addr %5, #S2.ntv
   %11 = struct_element_addr %10, #NonTrivialStruct.val
-  debug_value %11, let, name "x"
+  debug_value %11, let, name "x", expr op_deref
   destroy_value [dead_end] %6
   unreachable
 

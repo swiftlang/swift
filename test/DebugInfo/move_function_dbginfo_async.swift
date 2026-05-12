@@ -215,7 +215,7 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async16varSimpleTestVaryyYaFTY2_"(ptr swiftasync %0)
 // CHECK: #dbg_value(ptr %{{[0-9]+}}, ![[METADATA:[0-9]+]], !DIExpression(DW_OP_LLVM_entry_value, 1, DW_OP_plus_uconst, 24, DW_OP_deref), ![[ADDR_LOC:[0-9]+]]
-// CHECK: #dbg_value(ptr undef, ![[METADATA]], !DIExpression(), ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr undef, ![[METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async16varSimpleTestVaryyYaFTQ3_"(ptr swiftasync %0)
 // CHECK: #dbg_value(ptr undef,
@@ -224,7 +224,7 @@ public func varSimpleTest<T>(_ msg: inout T, _ msg2: T) async {
 // we should see a #dbg_value to reinit.
 //
 // CHECK-LABEL: define internal swifttailcc void @"$s27move_function_dbginfo_async16varSimpleTestVaryyYaFTY4_"(ptr swiftasync %0)
-// CHECK: #dbg_value(ptr undef, ![[METADATA:[0-9]+]], !DIExpression(), ![[ADDR_LOC:[0-9]+]]
+// CHECK: #dbg_value(ptr undef, ![[METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]+]]
 // CHECK: #dbg_value(ptr %{{[0-9]+}}, ![[METADATA]], !DIExpression(DW_OP_LLVM_entry_value, 1, DW_OP_plus_uconst, 24, DW_OP_deref), ![[ADDR_LOC]]
 
 // We are not an argument, so no problem here.
