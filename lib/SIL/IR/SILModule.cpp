@@ -212,6 +212,15 @@ void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
 }
 
 void SILModule::willDeleteInstruction(SILInstruction *I) {
+  // Clean up debug basic block if this is a DebugValueInst that owns one.
+  if (auto *DVI = dyn_cast<DebugValueInst>(I)) {
+    if (auto *DebugBB = DVI->getDebugBlock()) {
+      DebugBB->dropAllReferences();
+      DebugBB->eraseAllInstructions(*this);
+      DVI->setDebugBlock(nullptr);
+    }
+  }
+
   // Update RootLocalArchetypeDefs.
   I->forEachDefinedLocalEnvironment([&](GenericEnvironment *genericEnv,
                                         SILValue dependency) {

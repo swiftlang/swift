@@ -111,6 +111,7 @@ private:
   /// Used by BasicBlockData to index the Data vector.
   ///
   /// A value of -1 means that the index is not initialized yet.
+  /// A value of -2 means this is a debug-only block (no data).
   int index = -1;
 
   /// Custom bits managed by BasicBlockBitfield.
@@ -524,6 +525,10 @@ public:
 
   /// Returns true if this BB is the entry BB of its parent.
   bool isEntry() const;
+
+  /// Returns true if this block is a debug-only reconstruction block,
+  /// not part of the function's BlockList.
+  bool isDebugOnly() const { return index == -2; }
 
   /// Returns true if this block ends in an unreachable or an apply of a
   /// no-return apply or builtin.

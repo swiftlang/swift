@@ -491,6 +491,10 @@ bool DebugValueInst::exprStartsWithDeref() const {
           == SILDIExprOperator::Dereference;
 }
 
+void DebugValueInst::setDebugBlock(SILBasicBlock *BB) {
+  DebugBB = BB;
+}
+
 bool DebugValueInst::isExprTypeValid() const {
   auto varInfo = getCompleteVarInfo();
 

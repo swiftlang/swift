@@ -5621,6 +5621,9 @@ class DebugValueInst final
   TailAllocatedDebugVariable VarInfo;
   USE_SHARED_UINT8;
 
+  /// Optional debug-only basic block holding reconstruction instructions.
+  SILBasicBlock *DebugBB = nullptr;
+
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                  SILDebugVariable Var, PoisonRefs_t poisonRefs,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
@@ -5743,6 +5746,13 @@ public:
   /// is the right amount of op_deref.
   /// Returns false if the type chain is invalid, true otherwise.
   bool isExprTypeValid() const;
+
+  /// Returns the optional debug-only basic block attached to this instruction.
+  /// The debug BB contains reconstruction instructions for the debug value.
+  SILBasicBlock *getDebugBlock() const { return DebugBB; }
+
+  /// Sets the debug-only basic block for this instruction.
+  void setDebugBlock(SILBasicBlock *BB);
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds

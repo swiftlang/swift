@@ -1569,6 +1569,10 @@ public:
   SILBasicBlock *createBasicBlockAfter(SILBasicBlock *afterBB);
   SILBasicBlock *createBasicBlockBefore(SILBasicBlock *beforeBB);
 
+  /// Creates a standalone debug-only basic block that is NOT inserted into
+  /// the function's BlockList. Used for debug value reconstruction.
+  SILBasicBlock *createDebugBasicBlock();
+
   /// Removes and destroys \p BB;
   void eraseBlock(SILBasicBlock *BB) {
     assert(BB->getParent() == this);
