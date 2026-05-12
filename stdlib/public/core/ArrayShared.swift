@@ -176,15 +176,9 @@ internal func _expectEnd<C: Collection>(of s: C, is i: C.Index) {
 }
 
 /// Returns a grown capacity for a buffer of `capacity` elements.
-///
-/// - Important: This may return a value `<= capacity` for small inputs (0
-///   under any exponential formula; 0 and 1 under the current 13/8 formula,
-///   which has a fixed point at 1 due to integer truncation). Callers that
-///   require the result to strictly exceed `capacity` must guard with
-///   `max(_growArrayCapacity(capacity), capacity &+ 1)` or similar.
 @inlinable @inline(__always)
 internal func _growArrayCapacity(_ capacity: Int) -> Int {
-  return capacity &+ (capacity &>> 1) &+ (capacity &>> 3)
+  return capacity &+ (capacity &>> 2)
 }
 
 @_alwaysEmitIntoClient
