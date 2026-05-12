@@ -3739,8 +3739,6 @@ CONSTANT_TRANSLATION(CopyBlockInst, AssignDirect)
 CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, AssignDirect)
 CONSTANT_TRANSLATION(IndexAddrInst, AssignDirect)
 CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, AssignDirect)
-CONSTANT_TRANSLATION(InitExistentialAddrInst, AssignDirect)
-CONSTANT_TRANSLATION(InitExistentialRefInst, AssignDirect)
 CONSTANT_TRANSLATION(OpenExistentialBoxInst, AssignDirect)
 CONSTANT_TRANSLATION(OpenExistentialRefInst, AssignDirect)
 CONSTANT_TRANSLATION(TailAddrInst, AssignDirect)
@@ -4515,10 +4513,56 @@ PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
 }
 
 TranslationSemantics
+PartitionOpTranslator::visitInitExistentialAddrInst(
+    InitExistentialAddrInst *ieai) {
+  // If the formal concrete type involves an opened archetype, the conformance
+  // is abstract — derived from an existing existential that was already
+  // validated at its formation site. SE-0470's dependent conformance rule
+  // guarantees the associated conformance can never be more isolated than the
+  // parent, so no new isolated-conformance region should be introduced.
+  //
+  // Instead, merge the result into the region of the opened existential (the
+  // type-dependent operand) along with the primary operand (the existential
+  // buffer), without passing a conformance isolation override.
+  if (ieai->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(
+        ieai->getResults(),
+        ArrayRef<Operand *>(),
+        makeOperandRefRange(ieai->getAllOperands()),
+        RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
+  return TranslationSemantics::AssignDirect;
+}
+
+TranslationSemantics
 PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
   if (isStaticallyLookThroughInst(ievi))
     return TranslationSemantics::LookThrough;
 
+  if (ievi->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(
+        ievi->getResults(),
+        ArrayRef<Operand *>(),
+        makeOperandRefRange(ievi->getAllOperands()),
+        RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
+
+  return TranslationSemantics::AssignDirect;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitInitExistentialRefInst(
+    InitExistentialRefInst *ieri) {
+  if (ieri->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(
+        ieri->getResults(),
+        ArrayRef<Operand *>(),
+        makeOperandRefRange(ieri->getAllOperands()),
+        RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
   return TranslationSemantics::AssignDirect;
 }
 
