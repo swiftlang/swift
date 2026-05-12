@@ -26,6 +26,7 @@ import Runtime
 @_spi(MemoryReaders) import Runtime
 
 internal import BacktracingImpl.OS.Windows
+internal import BacktracingImpl.OS.WinNTInternals
 
 enum SomeBacktrace {
   case raw(Backtrace)
@@ -86,18 +87,92 @@ fileprivate func getProcessName(_ hProcess: HANDLE) -> String? {
   }
 }
 
-fileprivate func duplicateHandle(_ handle: HANDLE) -> HANDLE? {
-  var hResult: HANDLE? = nil
-  if DuplicateHandle(GetCurrentProcess(),
-                     handle,
-                     GetCurrentProcess(),
-                     &hResult,
-                     0,
-                     false,
-                     DWORD(DUPLICATE_SAME_ACCESS)) {
-    return hResult
+let ntDll = GetModuleHandleA("ntdll.dll")
+let ntQuerySystemInformation = unsafeBitCast(GetProcAddress(ntDll, "NtQuerySystemInformation")!, to: PNT_QUERY_SYSTEM_INFORMATION.self)
+let ntSuspendProcess = unsafeBitCast(GetProcAddress(ntDll, "NtSuspendProcess")!, to: PNT_SUSPEND_PROCESS.self)
+let ntResumeProcess = unsafeBitCast(GetProcAddress(ntDll, "NtResumeProcess")!, to: PNT_RESUME_PROCESS.self)
+
+fileprivate func threadIdsForProcess(_ processId: DWORD) -> [DWORD]? {
+  var bufferSize: ULONG = 0
+
+  let status = ntQuerySystemInformation(SystemProcessInformation,
+                                        nil,
+                                        0,
+                                        &bufferSize)
+  if status != 0 && status != NTSTATUS(bitPattern: STATUS_INFO_LENGTH_MISMATCH) {
+    return nil
   }
-  return nil
+
+  var threadIds: [DWORD]? = nil
+  while true {
+    let status =
+      withUnsafeTemporaryAllocation(
+        of: UInt8.self, capacity: Int(bufferSize)
+      ) { buffer in
+        let status = ntQuerySystemInformation(SystemProcessInformation,
+                                              buffer.baseAddress,
+                                              ULONG(buffer.count),
+                                              &bufferSize)
+
+        if status != 0 {
+          return status
+        }
+
+        var offset = 0
+        let totalSize = Int(bufferSize)
+        let spiSize = MemoryLayout<SYSTEM_PROCESS_INFORMATION>.size
+        while threadIds == nil
+                && offset < totalSize
+                && totalSize - offset >= spiSize {
+          let slice = UnsafeBufferPointer(rebasing:
+                                            buffer[offset..<offset+spiSize])
+          slice.withMemoryRebound(to: SYSTEM_PROCESS_INFORMATION.self) {
+            info in
+
+            if DWORD(UInt(bitPattern: info[0].UniqueProcessId)) == processId {
+              // If this is the process we're interested in, find the thread
+              // information
+              let threadInfoOffset = offset + spiSize
+              let stiSize = MemoryLayout<SYSTEM_THREAD_INFORMATION>.stride
+              let stiTotal = stiSize * Int(info[0].NumberOfThreads)
+
+              if threadInfoOffset + stiTotal <= totalSize {
+                let slice = buffer[threadInfoOffset..<threadInfoOffset+stiTotal]
+                var result: [DWORD] = []
+
+                UnsafeBufferPointer(rebasing:slice).withMemoryRebound(
+                  to: SYSTEM_THREAD_INFORMATION.self
+                ) { threads in
+                  for thread in threads {
+                    result.append(DWORD(UInt(bitPattern:
+                                               thread.ClientId.UniqueThread)))
+                  }
+                }
+
+                threadIds = result
+              }
+            }
+
+            let nextOffset = Int(info[0].NextEntryOffset)
+            if nextOffset == 0 {
+              offset = totalSize
+            } else {
+              offset += nextOffset
+            }
+          }
+        }
+
+        return status
+      }
+
+    if status == 0 {
+      return threadIds
+    } else if status == NTSTATUS(bitPattern: STATUS_INFO_LENGTH_MISMATCH) {
+      continue
+    } else {
+      return nil
+    }
+  }
 }
 
 class Target {
@@ -154,36 +229,58 @@ class Target {
        symbolicate: SwiftBacktrace.Symbolication) {
     self.pid = pid
 
-    if !DebugActiveProcess(pid) {
+    guard let hProcess = OpenProcess(
+            DWORD(
+              PROCESS_VM_READ
+              | PROCESS_QUERY_LIMITED_INFORMATION
+              | PROCESS_SUSPEND_RESUME
+            ),
+            false,
+            pid
+          ) else {
       let error = GetLastError()
-      print("swift-backtrace: unable to debug process: \(hex(error)).",
+      print("swift-backtrace: unable to open process: \(hex(error)).",
             to: &standardError)
       exit(1)
     }
 
-    // Make sure that if we crash, the original process continues
-    DebugSetProcessKillOnExit(false)
-
-    var event = DEBUG_EVENT()
-
-    // Process the debug events that tell us about the process
-    while WaitForDebugEvent(&event, 0) {
-      switch Int32(event.dwDebugEventCode) {
-        case CREATE_PROCESS_DEBUG_EVENT:
-          hProcess = event.u.CreateProcessInfo.hProcess
-          hThreads.append(event.u.CreateProcessInfo.hThread)
-
-        case CREATE_THREAD_DEBUG_EVENT:
-          hThreads.append(event.u.CreateThread.hThread)
-
-        default:
-          break
-      }
+    let suspendStatus = ntSuspendProcess(hProcess)
+    if suspendStatus != 0 {
+      print("swift-backtrace: unable to suspend process: \(hex(suspendStatus)).",
+            to: &standardError)
+      exit(1)
     }
 
-    if hProcess == INVALID_HANDLE_VALUE {
-      print("swift-backtrace: didn't get a process handle.", to: &standardError)
+    guard let threads = threadIdsForProcess(pid) else {
+      print("swift-backtrace: unable to get thread list.",
+            to: &standardError)
       exit(1)
+    }
+
+    for thread in threads {
+      guard let hThread = OpenThread(
+              DWORD(
+                THREAD_GET_CONTEXT
+                  | THREAD_QUERY_LIMITED_INFORMATION
+                  | THREAD_SUSPEND_RESUME
+              ),
+              false,
+              thread
+            ) else {
+        let error = GetLastError()
+        print("swift-backtrace: unable to open thread \(thread): \(hex(error)).",
+              to: &standardError)
+        continue
+      }
+
+      hThreads.append(hThread)
+      SuspendThread(hThread)
+    }
+
+    let resumeStatus = ntResumeProcess(hProcess)
+    if resumeStatus != 0 {
+      print("swift-backtrace: unable to resume process: \(hex(resumeStatus)).",
+            to: &standardError)
     }
 
     if hThreads.count < 1 {
@@ -286,6 +383,7 @@ class Target {
 
       if id == crashingThread {
         crashingThreadNdx = threads.count
+        ResumeThread(hThread)
       }
 
       if shouldSymbolicate {
@@ -370,20 +468,6 @@ class Target {
   }
 
   func withDebugger(_ body: () -> DebuggerResult) throws {
-    // Suspend all the threads and duplicate the thread handles, since
-    // DebugActiveProcessStop() will close them, and we want to call
-    // ResumeThread() on them after LLDB attaches.
-    var hDuplicateThreadHandles: [HANDLE] = []
-    for hThread in hThreads {
-      if let hDuplicate = duplicateHandle(hThread) {
-        SuspendThread(hThread)
-        hDuplicateThreadHandles.append(hDuplicate)
-      }
-    }
-
-    // Stop debugging the process
-    DebugActiveProcessStop(pid)
-
     let cmdline = """
       cmd.exe "/c echo Once LLDB has attached, \
       return to the other window and press any key \
@@ -427,43 +511,14 @@ class Target {
       CloseHandle(processInfo.hThread)
 
       if body() == .handOffToDebugger {
-        for hThread in hDuplicateThreadHandles {
-          ResumeThread(hThread)
-          CloseHandle(hThread)
+        for (ndx,hThread) in hThreads.enumerated() {
+          if ndx != crashingThreadNdx {
+            ResumeThread(hThread)
+          }
         }
         exit(0)
       }
 
-    }
-
-    // Resume debugging the process
-    while !DebugActiveProcess(pid) {
-      let err = GetLastError()
-      print("swift-backtrace: unable to debug process: \(hex(err)); retrying in 5s")
-      Sleep(5000)
-    }
-
-    // Resume the threads we suspended and close the copied handles
-    for hThread in hDuplicateThreadHandles {
-      ResumeThread(hThread)
-      CloseHandle(hThread)
-    }
-
-    // Update our handles
-    var event = DEBUG_EVENT()
-    hThreads = []
-    while WaitForDebugEvent(&event, 0) {
-      switch Int32(event.dwDebugEventCode) {
-        case CREATE_PROCESS_DEBUG_EVENT:
-          hProcess = event.u.CreateProcessInfo.hProcess
-          hThreads.append(event.u.CreateProcessInfo.hThread)
-
-        case CREATE_THREAD_DEBUG_EVENT:
-          hThreads.append(event.u.CreateThread.hThread)
-
-        default:
-          break
-      }
     }
   }
 }

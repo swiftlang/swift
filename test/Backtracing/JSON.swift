@@ -214,8 +214,16 @@ struct Crash {
 
 // CHECK:          ]
 // CHECK:        }
-// CHECK-NEXT: ],
-// CAPTUREDMEM-NEXT: "capturedMemory": {
+
+// Maybe more threads here (sometimes we see empty ones on Windows, but
+// in general some things may inject threads into processes so we might
+// find more threads than we expect).
+
+// CHECK:     ],
+
+// Might also have an "omittedThreads": {{[0-9]+}}, here
+
+// CAPTUREDMEM: "capturedMemory": {
 // CAPTUREDMEM-NEXT:   "0x{{[[0-9a-f]+}}": "{{([0-9a-f][0-9a-f])+}}",
 
 // More captures here, but system specific
