@@ -1288,9 +1288,28 @@ findConformanceWithDyld(ConformanceState &C, const Metadata *type,
             dyldResult.value);
 
     assert(conformanceDescriptor->getProtocol() == protocol);
-    assert(std::get<const Metadata *>(
+
+    auto *matchingType = std::get<const Metadata *>(
         ConformanceCandidate{*conformanceDescriptor}.getMatchingType(
-            type, instantiateSuperclassMetadata)));
+            type, instantiateSuperclassMetadata));
+    auto *descriptor = type->getTypeContextDescriptor();
+
+    if (!matchingType && descriptor &&
+        descriptor->hasForeignMetadataInitialization()) {
+      // For foreign types, dyld looks up conformances by identity string. For
+      // C++ class template specializations, this string does not include the
+      // namespace, so dyld may return a conformance from a different
+      // namespace. When that happens, equalContexts() rejects the match and
+      // getMatchingType() returns null. Treat this as not found so the caller
+      // falls through to section scanning.
+      DYLD_CONFORMANCES_LOG(
+          "DYLD found foreign type conformance descriptor %p "
+          "for %s, but the type metadata doesn't match the descriptor",
+          conformanceDescriptor, protocol->Name.get());
+      return std::make_tuple(nullptr, nullptr, false);
+    }
+
+    assert(matchingType);
 
     if (conformanceDescriptor->getGenericWitnessTable()) {
       DYLD_CONFORMANCES_LOG(
