@@ -823,18 +823,22 @@ extension Substring.UTF8View {
   ///
   ///   For example, if `string` has the bridged UTF-16 representation,
   ///
-  ///       for word in string.split(separator: " ") {
-  ///           useSpan(word.span)
-  ///       }
+  /// ```swift
+  ///   for word in string.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
   ///
   ///   is accidentally quadratic because of this issue. A workaround is to
   ///   explicitly convert the string into its native UTF-8 representation:
   ///
-  ///       var nativeString = consume string
-  ///       nativeString.makeContiguousUTF8()
-  ///       for word in nativeString.split(separator: " ") {
-  ///           useSpan(word.span)
-  ///       }
+  /// ```swift
+  ///   var nativeString = consume string
+  ///   nativeString.makeContiguousUTF8()
+  ///   for word in nativeString.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
   ///
   ///   This second option has linear time complexity, as expected.
   ///
@@ -858,18 +862,22 @@ extension Substring.UTF8View {
   ///
   ///   For example, if `string` has the bridged UTF-16 representation,
   ///
-  ///       for word in string.split(separator: " ") {
-  ///           useSpan(word.span)
-  ///       }
+  /// ```swift
+  ///   for word in string.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
   ///
   ///   is accidentally quadratic because of this issue. A workaround is to
   ///   explicitly convert the string into its native UTF-8 representation:
   ///
-  ///       var nativeString = consume string
-  ///       nativeString.makeContiguousUTF8()
-  ///       for word in nativeString.split(separator: " ") {
-  ///           useSpan(word.span)
-  ///       }
+  /// ```swift
+  ///   var nativeString = consume string
+  ///   nativeString.makeContiguousUTF8()
+  ///   for word in nativeString.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
   ///
   ///   This second option has linear time complexity, as expected.
   ///
@@ -899,18 +907,22 @@ extension Substring.UTF8View {
   ///
   ///   For example, if `string` has the bridged UTF-16 representation,
   ///
-  ///       for word in string.split(separator: " ") {
-  ///           useSpan(word.span)
-  ///       }
+  /// ```swift
+  ///   for word in string.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
   ///
   ///   is accidentally quadratic because of this issue. A workaround is to
   ///   explicitly convert the string into its native UTF-8 representation:
   ///
-  ///       var nativeString = consume string
-  ///       nativeString.makeContiguousUTF8()
-  ///       for word in nativeString.split(separator: " ") {
-  ///           useSpan(word.span)
-  ///       }
+  /// ```swift
+  ///   var nativeString = consume string
+  ///   nativeString.makeContiguousUTF8()
+  ///   for word in nativeString.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
   ///
   ///   This second option has linear time complexity, as expected.
   ///
