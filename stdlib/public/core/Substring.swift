@@ -817,9 +817,8 @@ extension Substring.UTF8View {
 #if !(os(watchOS) && _pointerBitWidth(_32))
   /// A span over the UTF-8 code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property needs to transcode the code units every time
-  ///   it is called.
+  /// - Note: On Apple platforms, this property must transcode the code
+  ///   units of bridged UTF-16 `String` instances on every access.
   ///
   ///   For example, if `string` has the bridged UTF-16 representation,
   ///
@@ -856,9 +855,8 @@ extension Substring.UTF8View {
 
   /// A span over the UTF-8 code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property needs to transcode the code units every time
-  ///   it is called.
+  /// - Note: On Apple platforms, this property must transcode the code
+  ///   units of bridged UTF-16 `String` instances on every access.
   ///
   ///   For example, if `string` has the bridged UTF-16 representation,
   ///
@@ -901,9 +899,8 @@ extension Substring.UTF8View {
 
   /// A span over the UTF-8 code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property needs to transcode the code units every time
-  ///   it is called.
+  /// - Note: On Apple platforms, this property must transcode the code
+  ///   units of bridged UTF-16 `String` instances on every access.
   ///
   ///   For example, if `string` has the bridged UTF-16 representation,
   ///

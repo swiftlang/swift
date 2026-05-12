@@ -1747,10 +1747,9 @@ extension Array {
 
   /// A span over the elements of this array.
   ///
-  /// - Note: On Apple platforms, bridged `NSArray` instances are copied into
-  ///   contiguous storage the first time this property is called.
-  ///   The contiguous copy is cached, and subsequent calls
-  ///   to `span` can reuse this copy.
+  /// - Note: On Apple platforms, this property copies bridged `NSArray`
+  ///   instances into contiguous storage on first access and caches
+  ///   the result. Subsequent calls can reuse the cached copy.
   ///
   /// - Returns: A `Span` over the elements of this array.
   ///

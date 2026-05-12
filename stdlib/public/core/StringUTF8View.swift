@@ -348,10 +348,9 @@ extension String.UTF8View {
 #if !(os(watchOS) && _pointerBitWidth(_32))
   /// A span over the UTF-8 code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property transcodes the code units the first time
-  ///   it is called. The transcoded buffer is cached, and subsequent calls
-  ///   to `span` can reuse the buffer.
+  /// - Note: On Apple platforms, this property transcodes the code units
+  ///   of bridged UTF-16 `String` instances on first access and caches
+  ///   the result. Subsequent calls can reuse the cached buffer.
   ///
   /// - Returns: A `Span` over the UTF-8 code units of this `String`.
   ///
@@ -367,10 +366,9 @@ extension String.UTF8View {
 
   /// A span over the UTF-8 code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property transcodes the code units the first time
-  ///   it is called. The transcoded buffer is cached, and subsequent calls
-  ///   to `span` can reuse the buffer.
+  /// - Note: On Apple platforms, this property transcodes the code units
+  ///   of bridged UTF-16 `String` instances on first access and caches
+  ///   the result. Subsequent calls can reuse the cached buffer.
   ///
   /// - Returns: A `Span` over the UTF-8 code units of this `String`.
   ///
@@ -395,10 +393,9 @@ extension String.UTF8View {
 
   /// A span over the UTF-8 code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property transcodes the code units the first time
-  ///   it is called. The transcoded buffer is cached, and subsequent calls
-  ///   to `span` can reuse the buffer.
+  /// - Note: On Apple platforms, this property transcodes the code units
+  ///   of bridged UTF-16 `String` instances on first access and caches
+  ///   the result. Subsequent calls can reuse the cached buffer.
   ///
   /// - Returns: A `Span` over the UTF-8 code units of this `String`, or `nil`
   ///   if the `String`'s representation is non-contiguous.

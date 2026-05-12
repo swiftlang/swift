@@ -256,10 +256,9 @@ extension String {
 #if !(os(watchOS) && _pointerBitWidth(_32))
   /// A UTF-8 span over the code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property transcodes the code units the first time
-  ///   it is called. The transcoded buffer is cached, and subsequent calls
-  ///   can reuse the buffer.
+  /// - Note: On Apple platforms, this property transcodes the code units
+  ///   of bridged UTF-16 `String` instances on first access and caches
+  ///   the result. Subsequent calls can reuse the cached buffer.
   ///
   /// - Returns: A `UTF8Span` over the code units of this `String`.
   ///
@@ -277,10 +276,9 @@ extension String {
 
   /// A UTF-8 span over the code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property transcodes the code units the first time
-  ///   it is called. The transcoded buffer is cached, and subsequent calls
-  ///   can reuse the buffer.
+  /// - Note: On Apple platforms, this property transcodes the code units
+  ///   of bridged UTF-16 `String` instances on first access and caches
+  ///   the result. Subsequent calls can reuse the cached buffer.
   ///
   /// - Returns: A `UTF8Span` over the code units of this `String`.
   ///
@@ -302,10 +300,9 @@ extension String {
 
   /// A UTF-8 span over the code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property transcodes the code units the first time
-  ///   it is called. The transcoded buffer is cached, and subsequent calls
-  ///   can reuse the buffer.
+  /// - Note: On Apple platforms, this property transcodes the code units
+  ///   of bridged UTF-16 `String` instances on first access and caches
+  ///   the result. Subsequent calls can reuse the cached buffer.
   ///
   /// - Returns: A `UTF8Span` over the code units of this `String`, or `nil`
   ///   if the `String`'s representation is non-contiguous.
@@ -361,9 +358,8 @@ extension Substring {
 #if !(os(watchOS) && _pointerBitWidth(_32))
   /// A UTF-8 span over the code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property needs to transcode the code units every time
-  ///   it is called.
+  /// - Note: On Apple platforms, this property must transcode the code
+  ///   units of bridged UTF-16 `String` instances on every access.
   ///
   ///   For example, if `string` has the bridged UTF-16 representation,
   ///
@@ -402,9 +398,8 @@ extension Substring {
 
   /// A UTF-8 span over the code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property needs to transcode the code units every time
-  ///   it is called.
+  /// - Note: On Apple platforms, this property must transcode the code
+  ///   units of bridged UTF-16 `String` instances on every access.
   ///
   ///   For example, if `string` has the bridged UTF-16 representation,
   ///
@@ -447,9 +442,8 @@ extension Substring {
 
   /// A UTF-8 span over the code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF-16 `String` instances (on Apple
-  ///   platforms) this property needs to transcode the code units every time
-  ///   it is called.
+  /// - Note: On Apple platforms, this property must transcode the code
+  ///   units of bridged UTF-16 `String` instances on every access.
   ///
   ///   For example, if `string` has the bridged UTF-16 representation,
   ///
