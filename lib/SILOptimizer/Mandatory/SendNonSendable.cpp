@@ -757,6 +757,19 @@ struct DiagnosticEvaluator final
     return {};
   }
 
+  /// If \p element's representative is an indirect out parameter, return
+  /// that parameter.
+  SILValue getSendingIndirectOutParameter(Element element) const {
+    auto rep = info->getValueMap().getRepresentativeValue(element);
+    if (!rep)
+      return {};
+    if (auto value = dyn_cast_or_null<SILFunctionArgument>(rep.maybeGetValue());
+        value && value->getArgumentConvention().isIndirectOutParameter() &&
+        value->isSending())
+      return value;
+    return {};
+  }
+  
   SILValue getInOutSendingParameter(Element elt) const {
     auto rep = info->getValueMap().getRepresentativeValue(elt);
     if (!rep)
