@@ -1171,9 +1171,9 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceRange range,
                                                    swift::Identifier name);
 
-SWIFT_NAME("BridgedWarnAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
-BridgedWarnAttr
-BridgedWarnAttr_createParsed(BridgedASTContext cContext,
+SWIFT_NAME("BridgedDiagnoseAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
+BridgedDiagnoseAttr
+BridgedDiagnoseAttr_createParsed(BridgedASTContext cContext,
                              swift::SourceLoc atLoc,
                              swift::SourceRange range,
                              swift::Identifier diagGroupName,

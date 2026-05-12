@@ -4,12 +4,12 @@
 @available(*, deprecated)
 func bar() -> [Int] { return [1,2,3] }
 
-@warn(DeprecatedDeclaration, as: error)
+@diagnose(DeprecatedDeclaration, as: error)
 func foo() -> [Int] { 
     return bar() // expected-error {{'bar()' is deprecated}}
 }
 
-@warn(DeprecatedDeclaration, as: ignored)
+@diagnose(DeprecatedDeclaration, as: ignored)
 func baz() -> [Int] { 
     return bar()
 }

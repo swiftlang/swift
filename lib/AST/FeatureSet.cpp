@@ -447,7 +447,9 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
 }
 
 static bool usesFeatureSourceWarningControl(Decl *decl) {
-  return decl->getAttrs().hasAttribute<WarnAttr>();
+  // @diagnose is excluded from module interfaces since it only
+  // affects local diagnostic behavior, so it never needs a feature guard.
+  return false;
 }
 
 static bool usesFeatureCompileTimeValues(Decl *decl) {
