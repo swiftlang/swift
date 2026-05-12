@@ -20,6 +20,7 @@
 #include "swift/Demangling/Demangler.h"
 #include "swift/Runtime/AccessibleFunction.h"
 #include "swift/Runtime/Concurrent.h"
+#include "swift/Runtime/Heap.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Metadata.h"
 #include "swift/Threading/Once.h"
@@ -65,12 +66,10 @@ public:
                                const AccessibleFunctionRecord *record)
       : R(record) {
     size_t nameSize = name.size();
-    char *Name = reinterpret_cast<char *>(malloc(nameSize));
-    if (Name && nameSize > 0)
-      memcpy(Name, name.data(), nameSize);
-
+    char *Name = reinterpret_cast<char *>(swift_slowAlloc(nameSize, 0));
+    memcpy(Name, name.data(), nameSize);
     this->Name = Name;
-    this->NameLength = Name ? nameSize : 0;
+    this->NameLength = nameSize;
   }
 
   const AccessibleFunctionRecord *getRecord() const { return R; }

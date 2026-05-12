@@ -306,11 +306,10 @@ namespace {
                                     const ContextDescriptor *description)
         : Description(description) {
       size_t nameSize = name.size();
-      char *nameCopy = reinterpret_cast<char *>(malloc(nameSize));
-      if (nameCopy && nameSize > 0)
-        memcpy(nameCopy, name.data(), nameSize);
+      char *nameCopy = reinterpret_cast<char *>(swift_slowAlloc(nameSize, 0));
+      memcpy(nameCopy, name.data(), nameSize);
       Name = nameCopy;
-      NameLength = nameCopy ? nameSize : 0;
+      NameLength = nameSize;
     }
 
     const ContextDescriptor *getDescription() const { return Description; }
