@@ -176,3 +176,71 @@ func initClassWithAsyncIsolatedInit2(_ k: NonSendableKlass) async {
     // expected-note @-1 {{task-isolated 'k' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
   }
 }
+
+// Iterating over an existential sequence parameter must not produce false
+// positive RBI errors in any of these isolation contexts.
+
+actor ActorWithExistentialSequenceInit {
+  init(sequence: any Sequence<Int>) {
+    for element in sequence {
+      _ = element
+    }
+  }
+}
+
+@MainActor
+class MainActorClassWithExistentialSequenceInit {
+  init(sequence: any Sequence<Int>) {
+    for element in sequence {
+      _ = element
+    }
+  }
+}
+
+@CustomActor
+class CustomActorClassWithExistentialSequenceInit {
+  init(sequence: any Sequence<Int>) async {
+    for element in sequence {
+      _ = element
+    }
+  }
+}
+
+func nonisolatedFuncWithExistentialSequence(sequence: any Sequence<Int>) {
+  for element in sequence {
+    _ = element
+  }
+}
+
+// Class-constrained variant: the iterator associated type is AnyObject-constrained,
+// so erasing it into an existential uses init_existential_ref (not init_existential_addr).
+// This exercises the visitInitExistentialRefInst fix path.
+
+protocol FakeClassIterator: AnyObject {
+  func nextElement()
+}
+
+protocol FakeClassSequence {
+  associatedtype Iterator: FakeClassIterator
+  func makeIterator() -> Iterator
+}
+
+actor ActorWithClassExistentialSequenceInit {
+  init(sequence: any FakeClassSequence) {
+    let iter: any FakeClassIterator = sequence.makeIterator()
+    iter.nextElement()
+  }
+}
+
+@MainActor
+class MainActorClassWithClassExistentialSequenceInit {
+  init(sequence: any FakeClassSequence) {
+    let iter: any FakeClassIterator = sequence.makeIterator()
+    iter.nextElement()
+  }
+}
+
+func nonisolatedFuncWithClassExistentialSequence(sequence: any FakeClassSequence) {
+  let iter: any FakeClassIterator = sequence.makeIterator()
+  iter.nextElement()
+}

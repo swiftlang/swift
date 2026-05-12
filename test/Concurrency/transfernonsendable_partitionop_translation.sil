@@ -66,6 +66,9 @@ enum SendableEnum : @unchecked Sendable {
 protocol NonSendableProtocol {
 }
 
+protocol NonSendableClassProtocol : AnyObject {
+}
+
 class DerivedKlass : NonSendableKlass {}
 
 class KlassWithField {
@@ -597,6 +600,30 @@ bb0(%0 : @guaranteed $NonSendableKlass):
   %2 = init_existential_ref %1 : $NonSendableKlass : $NonSendableKlass, $AnyObject
   specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
   destroy_value %2
+  %r = tuple ()
+  return %r : $()
+}
+
+// When init_existential_ref has a formal concrete type with an opened archetype,
+// the fix merges the result into the operand regions instead of creating a new
+// isolated-conformance region.
+//
+// CHECK-LABEL: begin running test {{.*}} on test_init_existential_ref_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $any NonSendableClassProtocol
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = open_existential_ref %0 : $any NonSendableClassProtocol to $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
+// CHECK-NEXT: require %%1:   %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
+// CHECK-NEXT: require %%1:   %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
+// CHECK-NEXT: assign_direct %%2 = %%1:   %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
+// CHECK-NEXT: end running test {{.*}} on test_init_existential_ref_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_init_existential_ref_opened_archetype : $@convention(thin) (@guaranteed any NonSendableClassProtocol) -> () {
+bb0(%0 : @guaranteed $any NonSendableClassProtocol):
+  %1 = open_existential_ref %0 : $any NonSendableClassProtocol to $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self
+  %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
   %r = tuple ()
   return %r : $()
 }
@@ -2394,6 +2421,35 @@ bb0(%0 : @guaranteed $NonSendableKlass):
   store %copy to [init] %addr
   destroy_addr %exist
   dealloc_stack %exist
+  %r = tuple ()
+  return %r : $()
+}
+
+// When init_existential_addr has a formal concrete type with an opened
+// archetype, the fix merges the result into the operand regions instead of
+// creating a new isolated-conformance region.
+//
+// CHECK-LABEL: begin running test {{.*}} on test_init_existential_addr_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $*any NonSendableProtocol
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %1 = alloc_stack $any NonSendableProtocol
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
+// CHECK-NEXT: require %%1:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
+// CHECK-NEXT: require %%0:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
+// CHECK-NEXT: merge %%1 with %%0:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
+// CHECK-NEXT: assign_direct %%2 = %%1:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
+// CHECK-NEXT: end running test {{.*}} on test_init_existential_addr_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_init_existential_addr_opened_archetype : $@convention(thin) (@in_guaranteed any NonSendableProtocol) -> () {
+bb0(%0 : $*any NonSendableProtocol):
+  %1 = alloc_stack $any NonSendableProtocol
+  %2 = open_existential_addr immutable_access %0 : $*any NonSendableProtocol to $*@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
+  %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  copy_addr %2 to [init] %3
+  destroy_addr %1
+  dealloc_stack %1
   %r = tuple ()
   return %r : $()
 }
