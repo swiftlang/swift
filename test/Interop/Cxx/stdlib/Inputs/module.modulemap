@@ -140,3 +140,9 @@ module IteratorCycleUnrelatedOperator {
   requires cplusplus
   export *
 }
+
+module StdCoroutine {
+  header "std-coroutine.h"
+  requires cplusplus
+  export *
+}
