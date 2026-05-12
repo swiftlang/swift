@@ -91,7 +91,7 @@ public:
 };
 
 class LLVM_LIBRARY_VISIBILITY LinearLifetimeChecker::ErrorBuilder {
-  StringRef functionName;
+  const SILFunction *function;
   ErrorBehaviorKind behavior;
   std::optional<Error> error;
   unsigned *errorMessageCounter;
@@ -100,7 +100,7 @@ public:
   ErrorBuilder(const SILFunction &fn,
                LinearLifetimeChecker::ErrorBehaviorKind behavior,
                unsigned *errorMessageCounter = nullptr)
-      : functionName(fn.getName()), behavior(behavior), error(Error()),
+      : function(&fn), behavior(behavior), error(Error()),
         errorMessageCounter(errorMessageCounter) {}
 
   ErrorBuilder(const SILFunction &fn,
@@ -110,11 +110,11 @@ public:
                      errorMessageCounter) {}
 
   ErrorBuilder(const ErrorBuilder &other)
-      : functionName(other.functionName), behavior(other.behavior),
+      : function(other.function), behavior(other.behavior),
         error(other.error), errorMessageCounter(other.errorMessageCounter) {}
 
   ErrorBuilder &operator=(const ErrorBuilder &other) {
-    functionName = other.functionName;
+    function = other.function;
     behavior = other.behavior;
     error = other.error;
     errorMessageCounter = other.errorMessageCounter;
@@ -147,10 +147,11 @@ public:
 
     if (behavior.shouldPrintMessage()) {
       tryDumpErrorCounter();
-      llvm::errs() << "Begin Error in Function: '" << functionName << "'\n";
+      llvm::errs() << "Begin Error in Function: '" << function->getName() << "'\n";
       messagePrinterFunc();
       tryDumpErrorCounter();
-      llvm::errs() << "End Error in Function: '" << functionName << "'\n";
+      llvm::errs() << "End Error in Function: '" << function->getName() << "'\n";
+      function->print(llvm::errs());
       tryIncrementErrorCounter();
     }
 
@@ -192,12 +193,13 @@ private:
     if (behavior.shouldPrintMessage()) {
       if (!quiet) {
         tryDumpErrorCounter();
-        llvm::errs() << "Begin Error in Function: '" << functionName << "'\n";
+        llvm::errs() << "Begin Error in Function: '" << function->getName() << "'\n";
       }
       messagePrinterFunc();
       if (!quiet) {
         tryDumpErrorCounter();
-        llvm::errs() << "End Error in Function: '" << functionName << "'\n";
+        llvm::errs() << "End Error in Function: '" << function->getName() << "'\n";
+        function->print(llvm::errs());
         auto *self = const_cast<ErrorBuilder *>(this);
         self->tryIncrementErrorCounter();
       }

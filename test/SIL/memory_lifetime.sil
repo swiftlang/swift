@@ -40,6 +40,10 @@ struct IntPair {
   var b: Int
 }
 
+struct MyError : Error {
+  var x: AnyObject
+}
+
 
 sil [ossa] @test_struct : $@convention(thin) (@in Outer) -> @owned T {
 bb0(%0 : $*Outer):
@@ -977,3 +981,13 @@ bb4:
   return %r : $()
 }
 
+sil @not_throwing : $@convention(thin) (Int) -> (Int, @error_indirect MyError)
+
+sil [ossa] @apply_nothrow_with_indirect_error : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %2 = function_ref @not_throwing : $@convention(thin) (Int) -> (Int, @error_indirect MyError)
+  %3 = alloc_stack $MyError
+  %4 = apply [nothrow] %2(%3, %0) : $@convention(thin) (Int) -> (Int, @error_indirect MyError)
+  dealloc_stack %3
+  return %4
+}
