@@ -268,6 +268,8 @@ endmacro()
 # Common cmake project config for additional warnings.
 #
 macro(swift_common_cxx_warnings)
+  check_cxx_compiler_flag("-Werror" CXX_SUPPORTS_W_ERROR_OPTION)
+
   # Make unhandled switch cases be an error in assert builds
   if(DEFINED LLVM_ENABLE_ASSERTIONS)
     check_cxx_compiler_flag("-Werror=switch" CXX_SUPPORTS_WERROR_SWITCH_FLAG)
@@ -281,6 +283,13 @@ macro(swift_common_cxx_warnings)
         add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/we4062>)
       endif()
     endif()
+  endif()
+
+  # Make some warnings errors as they are commonly occurring and flood the build
+  # with unnecessary noise.
+  if(CXX_SUPPORTS_W_ERROR_OPTION)
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-Werror=c++98-compat-extra-semi>)
+    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-Werror=gnu>)
   endif()
 
   check_cxx_compiler_flag("-Werror -Wimplicit-fallthrough" CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)

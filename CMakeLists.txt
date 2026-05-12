@@ -863,16 +863,6 @@ endif()
 # Add any extra C++ compilation options that were passed down.
 add_compile_options($<$<COMPILE_LANGUAGE:CXX>:${SWIFT_EXTRA_CXX_FLAGS}>)
 
-if(CMAKE_C_COMPILER_ID MATCHES Clang)
-  add_compile_options($<$<OR:$<COMPILE_LANGUAGE:C>,$<COMPILE_LANGUAGE:CXX>>:-Werror=gnu>)
-endif()
-
-# Make some warnings errors as they are commonly occurring and flood the build
-# with unnecessary noise.
-if(CMAKE_C_COMPILER_ID MATCHES Clang)
-  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=c++98-compat-extra-semi>)
-endif()
-
 if(CMAKE_CXX_COMPILER_ID MATCHES Clang)
   include(CheckCXXCompilerFlag)
   # Check for '-fsized-deallocation', which we need in IRGen. Clang presumably
