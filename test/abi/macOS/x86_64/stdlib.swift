@@ -753,6 +753,7 @@ Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_3_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_4_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_5_0ABvpZMV
 Added: _$ss7Float80V12signalingNaNABvpZMV
 Added: _$ss7Float80V13_exponentBiasSuvpZMV
 Added: _$ss7Float80V13_quietNaNMasks6UInt64VvpZMV
