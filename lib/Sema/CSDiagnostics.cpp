@@ -765,7 +765,7 @@ bool MissingConformanceFailure::diagnoseTypeCannotConform(
   auto &req = getRequirement();
   auto *reqDC = getRequirementDC();
   auto *genericCtx = getGenericContext();
-  auto noteLocation = reqDC->getAsDecl()->getLoc(/*SerializedOK=*/false);
+  auto noteLocation = reqDC->getAsDecl()->getLoc();
 
   if (!noteLocation.isValid())
     noteLocation = getLoc();

@@ -2,7 +2,7 @@ struct Synthesized: Hashable {
   let a: Int
   // RUN: %sourcekitd-test -req=cursor -pos=%(line-1):10 %s -- %s -target %target-triple | %FileCheck -check-prefix=INT %s
   // INT: Int
-  // INT: s:Si
+  // INT-NEXT: s:Si
   // INT-NOT: SYNTHESIZED
 }
 
