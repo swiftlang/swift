@@ -38,21 +38,19 @@ class IRBuilder;
 class IRGenFunction;
 class IRGenModule;
 
-enum IndirectionKind {
-  DirectValue,
-  IndirectValue,
-  CoroDirectValue,
-  CoroIndirectValue
-};
 enum ArtificialKind : bool { RealValue = false, ArtificialValue = true };
 
-/// Used to signal to emitDbgIntrinsic that we actually want to emit dbg.declare
-/// instead of dbg.value + op_deref. By default, we now emit dbg.value instead of
-/// dbg.declare for normal variables. This is not true for metadata which
-/// truly are function wide and should be llvm.dbg.declare.
+/// Used to signal to emitDbgIntrinsic which kind of debug intrinsic to emit.
+/// - DbgDeclare: llvm.dbg.declare (variable lives at this address for its
+///   entire lifetime). The leading DW_OP_deref is stripped because declare
+///   implicitly provides one level of indirection.
+/// - DbgValue: llvm.dbg.value (expression evaluated as-is; all derefs are
+///   explicit).
+/// - DbgDeclareValue: llvm.dbg.declare_value (coro context variant). The
+///   leading DW_OP_deref is stripped like DbgDeclare.
 enum class AddrDbgInstrKind : uint8_t {
   DbgDeclare,
-  DbgValueDeref,
+  DbgValue,
   DbgDeclareValue,
 };
 
@@ -164,7 +162,7 @@ public:
                                DebugTypeInfo Ty, const SILDebugScope *DS,
                                std::optional<SILLocation> VarLoc,
                                SILDebugVariable VarInfo,
-                               IndirectionKind Indirection = DirectValue,
+                               bool InCoroContext = false,
                                ArtificialKind Artificial = RealValue,
                                AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
 

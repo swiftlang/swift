@@ -267,7 +267,7 @@ public:
                                DebugTypeInfo Ty, const SILDebugScope *DS,
                                std::optional<SILLocation> VarLoc,
                                SILDebugVariable VarInfo,
-                               IndirectionKind = DirectValue,
+                               bool InCoroContext = false,
                                ArtificialKind = RealValue,
                                AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
 
@@ -3727,7 +3727,7 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     const SILDebugScope *DS, std::optional<SILLocation> DbgInstLoc,
-    SILDebugVariable VarInfo, IndirectionKind Indirection,
+    SILDebugVariable VarInfo, bool InCoroContext,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstrKind) {
   assert(DS && "variable has no scope");
 
@@ -3863,9 +3863,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (DbgTy.getType()->isForeignReferenceType())
       Operands.push_back(llvm::dwarf::DW_OP_deref);
 
-    if (Indirection == IndirectValue || Indirection == CoroIndirectValue)
-      Operands.push_back(llvm::dwarf::DW_OP_deref);
-
     if (IsPiece) {
       // Advance the offset for the next piece.
       OffsetInBits += SizeInBits;
@@ -3899,8 +3896,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (DIExpr)
       emitDbgIntrinsic(
           Builder, Piece, Var, DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
-          Indirection == CoroDirectValue || Indirection == CoroIndirectValue,
-          AddrDInstrKind);
+          InCoroContext, AddrDInstrKind);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
@@ -3910,13 +3906,22 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
             appendDIExpression(DBuilder.createExpression(), NoFragment, false))
       emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
                        DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
-                       Indirection == CoroDirectValue ||
-                           Indirection == CoroIndirectValue,
-                       AddrDInstrKind);
+                       InCoroContext, AddrDInstrKind);
   }
 }
 
 namespace {
+
+/// Strip the leading DW_OP_deref from the expression.
+/// dbg.declare implicitly provides one level of dereference, so the first
+/// DW_OP_deref is redundant.
+static llvm::DIExpression *stripLeadingDeref(llvm::DIExpression *Expr,
+                                             llvm::LLVMContext &Ctx) {
+  auto Elements = Expr->getElements();
+  if (!Elements.empty() && Elements[0] == llvm::dwarf::DW_OP_deref)
+    return llvm::DIExpression::get(Ctx, Elements.drop_front(1));
+  return Expr;
+}
 
 /// A helper struct that is used by emitDbgIntrinsic to factor redundant code.
 struct DbgIntrinsicEmitter {
@@ -3959,15 +3964,19 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::Instruction *InsertBefore) {
-    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare) {
+      Expr = stripLeadingDeref(Expr, InsertBefore->getContext());
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL,
                                      InsertBefore->getIterator());
+    }
 
-    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue) {
+      Expr = stripLeadingDeref(Expr, InsertBefore->getContext());
       return DIBuilder.insertDeclareValue(Addr, VarInfo, Expr, DL,
                                           InsertBefore->getIterator());
+    }
 
-    Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
+    // DbgValue: keep expression as-is (all derefs are explicit).
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
                                              InsertBefore->getIterator());
   }
@@ -3976,13 +3985,17 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::BasicBlock *Block) {
-    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare) {
+      Expr = stripLeadingDeref(Expr, Block->getContext());
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
+    }
 
-    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue) {
+      Expr = stripLeadingDeref(Expr, Block->getContext());
       return DIBuilder.insertDeclareValue(Addr, VarInfo, Expr, DL, Block);
+    }
 
-    Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
+    // DbgValue: keep expression as-is (all derefs are explicit).
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
   }
 };
@@ -4039,9 +4052,9 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
   bool optimized = DS->getParentFunction()->shouldOptimize();
   if (optimized && (!InCoroContext || !Var->isParameter()))
-    AddrDInstKind = AddrDbgInstrKind::DbgValueDeref;
+    AddrDInstKind = AddrDbgInstrKind::DbgValue;
 
-  if (InCoroContext && AddrDInstKind != AddrDbgInstrKind::DbgValueDeref)
+  if (InCoroContext && AddrDInstKind != AddrDbgInstrKind::DbgValue)
     AddrDInstKind = AddrDbgInstrKind::DbgDeclareValue;
 
   DbgIntrinsicEmitter inserter{Builder, DBuilder, AddrDInstKind};
@@ -4200,10 +4213,7 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           {}, {OS.str().str(), 0, false},
-                          // swift.type is already a pointer type,
-                          // having a shadow copy doesn't add another
-                          // layer of indirection.
-                          IGF.isAsync() ? CoroDirectValue : DirectValue,
+                          /*InCoroContext=*/IGF.isAsync(),
                           ArtificialValue);
 }
 
@@ -4224,7 +4234,7 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
   auto DbgTy = *CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);
   emitVariableDeclaration(
       IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(), {}, VarInfo,
-      IGF.isAsync() ? CoroDirectValue : DirectValue, ArtificialValue);
+      /*InCoroContext=*/IGF.isAsync(), ArtificialValue);
 }
 
 } // anonymous namespace
@@ -4316,10 +4326,10 @@ void IRGenDebugInfo::emitOutlinedFunction(IRBuilder &Builder,
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
     const SILDebugScope *DS, std::optional<SILLocation> VarLoc,
-    SILDebugVariable VarInfo, IndirectionKind Indirection,
+    SILDebugVariable VarInfo, bool InCoroContext,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstKind) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
-      Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection, Artificial,
+      Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext, Artificial,
       AddrDInstKind);
 }
 
