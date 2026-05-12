@@ -1561,13 +1561,6 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
                              &startupInfo,
                              &processInfo);
   if (!bRet) {
-    const char *message = "CreateProcess failed\n\n";
-    WriteFile(hOutput, message, strlen(message), NULL, NULL);
-    WriteFile(hOutput, swiftBacktracePath, wcslen(swiftBacktracePath) * 2, NULL, NULL);
-    WriteFile(hOutput, "\n", 1, NULL, NULL);
-    WriteFile(hOutput, cmdline_wbuf, wcslen(cmdline_wbuf) * 2, NULL, NULL);
-    WriteFile(hOutput, "\n", 1, NULL, NULL);
-    DebugBreak();
     return false;
   }
 
@@ -1577,8 +1570,6 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   DWORD dwRet = WaitForSingleObject(processInfo.hProcess, INFINITE);
 
   if (dwRet != WAIT_OBJECT_0) {
-    const char *message = "dwRet != WAIT_OBJECT_0\n\n";
-    WriteFile(hOutput, message, strlen(message), NULL, NULL);
     CloseHandle(processInfo.hProcess);
     return false;
   }
@@ -1586,8 +1577,6 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
   // Return based on the process exit code
   DWORD dwExitCode;
   if (!GetExitCodeProcess(processInfo.hProcess, &dwExitCode)) {
-    const char *message = "Can't get exit code\n\n";
-    WriteFile(hOutput, message, strlen(message), NULL, NULL);
     CloseHandle(processInfo.hProcess);
     return false;
   }
