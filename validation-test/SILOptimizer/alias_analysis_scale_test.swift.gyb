@@ -1,10 +1,9 @@
-// RUN: %timer-scale-test --begin 50 --end 800 --superlinear-threshold 3 --trace --select SIL-processing.instr -O %s
+// RUN: %timer-scale-test --begin 50 --end 800 --superlinear-threshold 3 --ignore-no-data --trace --select SIL-processing.instr -O %s
 
 // TODO: there are still compile time problems in CopyPropagation and OSSACanonicalizationOwned (inside SILCombine): rdar://176255056
 //       Once those problems are fixed the threshold should be closer to 1.
 
 // REQUIRES: asserts
-// REQUIRES: OS=macosx
 
 public class Entry {
   private let a: String
