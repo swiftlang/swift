@@ -548,7 +548,7 @@ void DebugValueInst::killOperand() {
   // The stored DIExpr only contains fragments, which we want to keep.
   sharedUInt8().DebugValueInst.prependDeref = false;
 
-  // Debug reconstruction block: rather than completely removing it, remove its
+  // Rather than completely removing the debug reconstruction block, remove its
   // argument, as a part of the variable might be constant and recoverable.
   if (auto bb = getDebugReconstructionBlock()) {
     ASSERT(bb->getNumArguments() == 1);
