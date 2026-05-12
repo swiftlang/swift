@@ -50,7 +50,7 @@ sil_scope 21 { loc "./loadFromStack.swift":1:1 parent 20 }
 // CHECK:   [[STACK:%.*]] = alloc_stack $Int
 // CHECK:   struct_element_addr [[STACK]] : $*Int, #Int._value
 // CHECK:   load [trivial] %{{.*}} : $*Builtin.Int32, loc "./loadFromStack.swift":2:1, scope [[STACKSCOPE1]]
-// CHECK:   debug_value [[STACK]] : $*Int, let, name "sVar", loc "./loadFromStack.swift":3:1, scope [[STACKSCOPE2]]
+// CHECK:   debug_value [[STACK]] : $*Int, let, name "sVar", expr op_deref, loc "./loadFromStack.swift":3:1, scope [[STACKSCOPE2]]
 // CHECK-LABEL: } // end sil function 'loadFromStack'
 sil [ossa] @loadFromStack : $@convention(thin) (Int) -> Builtin.Int32 {
 bb0(%0 : $Int):

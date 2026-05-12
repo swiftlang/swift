@@ -1894,6 +1894,8 @@ SubscriptDecl *SwiftDeclSynthesizer::makeSubscript(FuncDecl *getter,
   ClangImporter::Implementation::recordImplicitUnwrapForDecl(
       subscript, getterImpl->isImplicitlyUnwrappedOptional());
 
+  ImporterImpl.markMemberSynthesizedPerType(subscript);
+
   return subscript;
 }
 

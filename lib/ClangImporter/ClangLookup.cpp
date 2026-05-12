@@ -333,7 +333,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
   if (inheritance) {
     // For inherited members, add members that are synthesized eagerly, such as
-    // subscripts. This is not necessary for non-inherited members because those
+    // operators. This is not necessary for non-inherited members because those
     // should already be in the lookup table.
     for (auto member :
          cast<NominalTypeDecl>(recordDecl)->getCurrentMembersWithoutLoading()) {
@@ -418,12 +418,81 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
                name.getArgumentNames().empty()) {
       if (auto *succ = Importer.Impl.lookupAndImportSuccessor(inheritingDecl))
         result.push_back(succ);
+    } else if (name.getBaseName().isSubscript()) {
+      for (auto *sub : Importer.Impl.lookupAndImportSubscripts(inheritingDecl))
+        result.push_back(sub);
     }
   }
 
   return result;
 }
 
+namespace {
+/// Essentially a pair<CXXMethodDecl *, AccessSpecifier>, from qualified lookup.
+///
+/// The method is the result of the qualified lookup. The access is AS_none if
+/// the method is not inherited, otherwise it denotes the effective access of
+/// the method from the derived class where the qualified lookup originated.
+struct CXXOverload {
+  const clang::CXXMethodDecl *method = nullptr;
+  clang::AccessSpecifier access = clang::AS_none;
+
+  CXXOverload() = default;
+  CXXOverload(const clang::CXXMethodDecl *m, clang::AccessSpecifier a)
+      : method{m}, access{a} {}
+
+  friend bool operator==(const CXXOverload &LHS, const CXXOverload &RHS) {
+    return LHS.method == RHS.method && LHS.access == RHS.access;
+  }
+
+  operator bool() const { return static_cast<bool>(method); }
+
+  /// If no overload has been picked yet, or candidate is const and the current
+  /// pick isn't, take the candidate.
+  void pickPreferringConst(CXXOverload candidate) {
+    if (!candidate)
+      return;
+    if (!*this || (!this->method->isConst() && candidate.method->isConst()))
+      *this = candidate;
+  }
+};
+
+/// The argument types of a C++ method overload.
+///
+/// Note that this does not constitute the full signature of a C++ overload:
+/// overloads with the same argument types but different constness (of 'this')
+/// are still considered distinct overloads.
+///
+/// When looking up and importing certain members like operator[] -> subscript
+/// or operator() -> callAsFunction that can have multiple overloads in Swift,
+/// it is helpful to group overloads of the same argument types, so that if
+/// there are both const and non-const overloads, we can decide which to use as
+/// the getter and which to use as the setter (which is not decided by the
+/// constnes of 'this', but by the constness of the return type). We define
+/// CXXOverloadArgTypes to the key of a map, so that given a bunch of overloads,
+/// we can sort them into these groups of the same argument types.
+struct CXXOverloadArgTypes : llvm::SmallVector<clang::QualType, 4> {
+  using ::CXXOverloadArgTypes::SmallVector::SmallVector;
+  CXXOverloadArgTypes(CXXOverload overload) : SmallVector{} {
+    for (auto p : overload.method->parameters())
+      push_back(p->getType().getCanonicalType());
+  }
+};
+} // namespace
+
+template <>
+struct llvm::DenseMapInfo<CXXOverloadArgTypes> {
+  using Sig = CXXOverloadArgTypes;
+  static inline Sig getEmptyKey() { return {{}}; }
+  static inline Sig getTombstoneKey() { return {{}, {}}; }
+  static unsigned getHashValue(const Sig &Val) {
+    return static_cast<size_t>(llvm::hash_combine_range(llvm::map_range(
+        Val, [](clang::QualType ty) { return ty.getAsOpaquePtr(); })));
+  }
+  static bool isEqual(const Sig &LHS, const Sig &RHS) { return LHS == RHS; }
+};
+
+namespace {
 /// Perform a qualified lookup for \a name in \a Record, suppressing diagnostics
 /// and returning std::nullopt if the lookup was unsuccessful.
 static std::optional<clang::LookupResult>
@@ -444,7 +513,6 @@ lookupCXXMember(clang::Sema &Sema, clang::DeclarationName name,
   }
 }
 
-namespace {
 /// Convenience wrapper around clang::LookupResult::iterator that yields
 /// std::pair<NamedDecl *, AccessSpecifier> rather than just NamedDecl *.
 struct ResultIterator
@@ -457,36 +525,39 @@ struct ResultIterator
     return std::make_pair(I.getDecl(), I.getAccess());
   }
 };
-} // namespace
 
-/// Creates an iterable range of method decl-access pairs for the results found
+/// Creates an iterable range of MethodOverloads for the results found
 /// in \a R, originating from a qualified lookup in \a Origin.
 ///
-/// This helper for the lookupAndImport* functions encapsulates casting the
+/// This helper for the lookupAndImport* functions encapsulates downcasting the
 /// decls to clang::CXXMethodDecl *s and "looking through" using decls. It also
 /// ensures the access is set to clang::AS_none if the method is not inherited.
 static auto filterMethodOverloads(clang::LookupResult &R,
-                                  const clang::CXXRecordDecl *Origin) {
+                                  const clang::CXXRecordDecl *Origin,
+                                  bool withTemplates) {
   return llvm::make_filter_range(
       llvm::map_range(
-          llvm::make_range(ResultIterator{R.begin()},
-                           ResultIterator{R.end()}),
+          llvm::make_range(ResultIterator{R.begin()}, ResultIterator{R.end()}),
           [=](std::pair<const clang::NamedDecl *, clang::AccessSpecifier> da) {
             auto [nd, access] = da;
 
             if (auto *usd = dyn_cast<clang::UsingShadowDecl>(nd))
               nd = usd->getTargetDecl();
 
+            if (auto *ftd = dyn_cast<clang::FunctionTemplateDecl>(nd);
+                ftd && withTemplates)
+              nd = ftd->getTemplatedDecl();
+
             if (nd->getDeclContext() == Origin)
               access = clang::AS_none; // not inherited
 
             auto *md = dyn_cast<clang::CXXMethodDecl>(nd);
-            return std::make_pair(md, access);
+            return CXXOverload{md, access};
           }),
-      [](std::pair<const clang::CXXMethodDecl *, clang::AccessSpecifier> da) {
-        return da.first;
-      });
+      [](CXXOverload o) { return o.method != nullptr; });
 }
+
+} // namespace
 
 /// Imports a C++ \a method to a Swift \a struct as a non-inherited member when
 /// \a access is AS_none, or an inherited member with effective \a access
@@ -494,15 +565,18 @@ static auto filterMethodOverloads(clang::LookupResult &R,
 ///
 /// Helper for the lookupAndImport* functions.
 static FuncDecl *importUnavailableMethod(ClangImporter::Implementation &Impl,
-                                         const clang::CXXMethodDecl *method,
-                                         clang::AccessSpecifier access,
+                                         CXXOverload overload,
                                          NominalTypeDecl *Struct,
                                          StringRef unavailabilityMsg) {
-  auto *func =
-      dyn_cast_or_null<FuncDecl>(Impl.importDecl(method, Impl.CurrentVersion));
+  Decl *imported;
+  if (auto *ftd = overload.method->getDescribedFunctionTemplate())
+    imported = Impl.importDecl(ftd, Impl.CurrentVersion);
+  else
+    imported = Impl.importDecl(overload.method, Impl.CurrentVersion);
+  auto *func = dyn_cast_or_null<FuncDecl>(imported);
   if (!func)
     return nullptr;
-  if (auto inheritance = ClangInheritanceInfo(access))
+  if (auto inheritance = ClangInheritanceInfo(overload.access))
     func = dyn_cast_or_null<FuncDecl>(
         Impl.importBaseMemberDecl(func, Struct, inheritance));
   if (!func)
@@ -538,43 +612,28 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
   if (!R.has_value())
     return {};
 
-  auto overloads = filterMethodOverloads(R.value(), CXXRecord);
+  CXXOverload CXXGetter, CXXSetter;
 
-  const clang::CXXMethodDecl *CXXGetter = nullptr, *CXXSetter = nullptr;
-  clang::AccessSpecifier CXXGetterAccess, CXXSetterAccess;
+  auto overloads =
+      filterMethodOverloads(R.value(), CXXRecord, /*withTemplates=*/false);
 
-  for (auto [method, access] : overloads) {
-    if (method->isStatic() || method->isVolatile() ||
-        method->getMinRequiredArguments() != 0 ||
-        method->getRefQualifier() == clang::RQ_RValue)
+  for (const auto &overload : overloads) {
+    if (overload.method->isStatic() || overload.method->isVolatile() ||
+        overload.method->getMinRequiredArguments() != 0 ||
+        overload.method->getRefQualifier() == clang::RQ_RValue)
       continue;
 
     // A setter is anything that returns a mutable reference; anything else is
     // a getter.
-    auto retTy = method->getReturnType();
+    auto retTy = overload.method->getReturnType();
     bool isSetter =
         retTy->isReferenceType() && !retTy->getPointeeType().isConstQualified();
 
-    if (isSetter) {
-      if (!CXXSetter) {
-        CXXSetter = method;
-        CXXSetterAccess = access;
-      } else if (!CXXSetter->isConst() && method->isConst()) {
-        // Previously found a non-const setter, but prefer a const setter
-        CXXSetter = method;
-        CXXSetterAccess = access;
-      }
-    }
+    if (isSetter)
+      CXXSetter.pickPreferringConst(overload);
 
     // NOTE: a setter can also be used as a getter, so we don't check !isSetter
-    if (!CXXGetter) {
-      CXXGetter = method;
-      CXXGetterAccess = access;
-    } else if (!CXXGetter->isConst() && method->isConst()) {
-      // Previously found a non-const getter, but prefer a const getter
-      CXXGetter = method;
-      CXXGetterAccess = access;
-    }
+    CXXGetter.pickPreferringConst(overload);
   }
 
   if (!CXXGetter && !CXXSetter)
@@ -583,7 +642,7 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
   FuncDecl *getter = nullptr, *setter = nullptr;
 
   if (CXXSetter) {
-    setter = importUnavailableMethod(*this, CXXSetter, CXXSetterAccess, Struct,
+    setter = importUnavailableMethod(*this, CXXSetter, Struct,
                                      "use .pointee property");
     if (!setter)
       return {};
@@ -592,7 +651,7 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
   if (CXXGetter == CXXSetter) {
     getter = setter;
   } else if (CXXGetter) {
-    getter = importUnavailableMethod(*this, CXXGetter, CXXGetterAccess, Struct,
+    getter = importUnavailableMethod(*this, CXXGetter, Struct,
                                      "use .pointee property");
     if (!getter)
       return {};
@@ -603,7 +662,7 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
   if (!pointee)
     return {};
 
-  importAttributes(CXXGetter ? CXXGetter : CXXSetter, pointee);
+  importAttributes(CXXGetter ? CXXGetter.method : CXXSetter.method, pointee);
 
   Struct->addMember(pointee);
   auto pointeeAndOpStar =
@@ -645,33 +704,32 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportSuccessor(
   if (!R.has_value())
     return nullptr;
 
-  auto overloads = filterMethodOverloads(R.value(), CXXRecord);
+  auto overloads =
+      filterMethodOverloads(R.value(), CXXRecord, /*withTemplates=*/false);
 
-  const clang::CXXMethodDecl *CXXMethod = nullptr;
-  clang::AccessSpecifier CXXMethodAccess;
+  CXXOverload CXXMethod;
 
-  for (auto [method, access] : overloads) {
-    if (method->isStatic() || method->isVolatile() ||
-        method->getRefQualifier() == clang::RQ_RValue ||
-        method->getMinRequiredArguments() != 0)
+  for (const auto &overload : overloads) {
+    if (overload.method->isStatic() || overload.method->isVolatile() ||
+        overload.method->getRefQualifier() == clang::RQ_RValue ||
+        overload.method->getMinRequiredArguments() != 0)
       continue;
 
     // FIXME: we currently only support non-const overloads of operator++,
     // so skip const overloads for now. Synthesizing a nonmutating .successor()
     // from a const overload should be possible but currently causes a crash.
 
-    if (method->isConst())
+    if (overload.method->isConst())
       continue;
 
-    CXXMethod = method;
-    CXXMethodAccess = access;
+    CXXMethod = overload;
   }
 
   if (!CXXMethod)
     return nullptr;
 
-  auto *incr = importUnavailableMethod(*this, CXXMethod, CXXMethodAccess,
-                                       Struct, "use .pointee property");
+  auto *incr = importUnavailableMethod(*this, CXXMethod, Struct,
+                                       "use .pointee property");
   if (!incr)
     return nullptr;
 
@@ -680,9 +738,155 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportSuccessor(
   if (!succ)
     return nullptr;
 
-  importAttributes(CXXMethod, succ);
+  importAttributes(CXXMethod.method, succ);
 
   Struct->addMember(succ);
   importedSuccessorCache[Struct] = succ;
   return succ;
+}
+
+llvm::ArrayRef<SubscriptDecl *>
+ClangImporter::Implementation::lookupAndImportSubscripts(
+    NominalTypeDecl *Struct, bool noSynthesize) {
+  const auto *CXXRecord =
+      dyn_cast<clang::CXXRecordDecl>(Struct->getClangDecl());
+
+  if (!CXXRecord)
+    return {};
+
+  auto [it, inserted] = importedSubscriptsCache.try_emplace(
+      Struct, llvm::SmallVector<SubscriptDecl *, 1>{});
+  auto &result = it->second;
+
+  if (noSynthesize) {
+    ASSERT(result.empty() && "should not have cached synthesized subscripts");
+    return result;
+  }
+
+  if (!inserted)
+    return result;
+
+  // From this point onward, if we encounter some error and return, future calls
+  // to this function will return (a reference to) the empty vector we cached.
+  // Note that this may silently suppress unintentional cycles.
+
+  auto &Ctx = getClangASTContext();
+  auto &Sema = getClangSema();
+
+  auto name = Ctx.DeclarationNames.getCXXOperatorName(
+      clang::OverloadedOperatorKind::OO_Subscript);
+  auto R = lookupCXXMember(Sema, name, CXXRecord);
+  if (!R.has_value())
+    return {};
+
+  llvm::SmallDenseMap<CXXOverloadArgTypes, std::pair<CXXOverload, CXXOverload>,
+                      1>
+      CXXSubscripts;
+
+  auto overloads =
+      filterMethodOverloads(R.value(), CXXRecord, /*withTemplates=*/true);
+  for (const auto &overload : overloads) {
+    if (overload.method->isVolatile() ||
+        overload.method->getRefQualifier() == clang::RQ_RValue)
+      continue;
+
+    auto retTy = overload.method->getReturnType();
+    auto isSetter = (retTy->isAnyPointerType() || retTy->isReferenceType()) &&
+                    !retTy->getPointeeType().isConstQualified();
+    auto &[CXXGetter, CXXSetter] = CXXSubscripts[{overload}];
+    if (isSetter)
+      CXXSetter.pickPreferringConst(overload);
+    else
+      CXXGetter.pickPreferringConst(overload);
+  }
+
+  llvm::SmallVector<SubscriptDecl *, 1> subscripts;
+  for (auto [CXXGetter, CXXSetter] : CXXSubscripts.values()) {
+    ASSERT((CXXGetter || CXXSetter) &&
+           "subscript should have at least getter or setter");
+
+    if (CXXGetter && CXXSetter) {
+      // The getter and setter have the same argument types, and neither of them
+      // are volatile or r-value ref qualified (since we skip those overloads),
+      // so they must differ by their const-ness (either const + non-const, or
+      // const l-value ref + non-const l-value ref).
+      //
+      // If this subtle invariant is somehow broken, just skip importing this
+      // getter/setter pair (asserting this invariant risks making ClangImporter
+      // more fragile than necessary).
+      if (!(CXXGetter.method->isConst() ^ CXXSetter.method->isConst()))
+        continue;
+
+      auto stripToUnderlying = [](clang::QualType ty) {
+        if (ty->isPointerType())
+          return ty->getPointeeType().getUnqualifiedType().getCanonicalType();
+        else
+          return ty.getNonReferenceType().getUnqualifiedType().getCanonicalType();
+      };
+      auto getRetTy = stripToUnderlying(CXXGetter.method->getReturnType()),
+           setRetTy = stripToUnderlying(CXXSetter.method->getReturnType());
+      if (getRetTy != setRetTy) {
+        // Getter and setter return types differ; pick the const-overloaded one
+        if (!CXXGetter.method->isConst())
+          CXXGetter = {};
+        if (!CXXSetter.method->isConst())
+          CXXSetter = {};
+      }
+    }
+
+    auto importSubscriptOverload = [&](CXXOverload overload) -> FuncDecl * {
+      if (!overload)
+        return nullptr;
+
+      auto *swiftFunc =
+          importUnavailableMethod(*this, overload, Struct, "use subscript");
+      if (!swiftFunc)
+        return nullptr;
+
+      auto name = swiftFunc->getBaseName();
+      ASSERT(!name.isSpecial() &&
+             "operator[] should not be imported with special name");
+      ASSERT(name.getIdentifier().str().starts_with("__operatorSubscript") &&
+             "operator[] should be imported as __operatorSubscript");
+
+      for (auto *parameter : *(swiftFunc->getParameters())) {
+        if (parameter->isInOut() || !parameter->getTypeInContext())
+          // Subscripts with inout parameters are not allowed in Swift.
+          return nullptr;
+      }
+
+      return swiftFunc;
+    };
+
+    FuncDecl *getter = importSubscriptOverload(CXXGetter),
+             *setter = importSubscriptOverload(CXXSetter);
+
+    // Mark subscript setter as mutating in Swift even if C++ operator is const.
+    if (setter && !setter->getDeclContext()->isModuleScopeContext() &&
+        !Struct->getDeclaredType()->isForeignReferenceType())
+      setter->setSelfAccessKind(SelfAccessKind::Mutating);
+
+    if (!getter && !setter)
+      // Didn't end up with a usable getter or setter, so nothing to synthesize
+      continue;
+
+    SwiftDeclSynthesizer synth{*this};
+    auto *subscript = synth.makeSubscript(getter, setter);
+    if (!subscript)
+      continue;
+
+    // Import attributes from the Clang operator[] decl(s) onto the synthesized
+    // accessor thunks (importAttributes is a no-op on SubscriptDecl itself).
+    if (auto *getterAccessor = subscript->getAccessor(AccessorKind::Get);
+        getterAccessor && CXXGetter)
+      importAttributes(CXXGetter.method, getterAccessor);
+    if (auto *setterAccessor = subscript->getAccessor(AccessorKind::Set);
+        setterAccessor && CXXSetter)
+      importAttributes(CXXSetter.method, setterAccessor);
+
+    Struct->addMember(subscript);
+    result.push_back(subscript);
+  }
+
+  return result;
 }

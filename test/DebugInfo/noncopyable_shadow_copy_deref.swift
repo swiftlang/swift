@@ -21,7 +21,7 @@ public protocol P {
 //
 // CHECK-LABEL: define {{.*}} @"$s{{.*}}9testLocal{{.*}}"(
 // CHECK: #dbg_value(ptr %k.debug, ![[LOCAL_K:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[LOCAL_LOC:[0-9]+]]
-// CHECK: #dbg_value(ptr undef, ![[LOCAL_K]], !DIExpression(), ![[LOCAL_LOC]]
+// CHECK: #dbg_value(ptr undef, ![[LOCAL_K]], !DIExpression(DW_OP_deref), ![[LOCAL_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 public func testLocal<T: P>(_ x: T) {

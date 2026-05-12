@@ -20,10 +20,6 @@ module NestedTypes {
   header "nested-types.h"
 }
 
-module Subscripts {
-  header "subscripts.h"
-}
-
 module TypeAliases {
   header "type-aliases.h"
 }

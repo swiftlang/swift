@@ -87,6 +87,11 @@ static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
 #endif
                                                                 ));
 
+// Verify the type chain of debug_value instructions. Disabled by default
+// while we fix all root causes.
+static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
+                                                llvm::cl::init(false));
+
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
@@ -1937,6 +1942,11 @@ public:
                   " in a di-expression");
       }
     }
+
+    if (VerifyDebugValueExpr)
+      if (auto *DVI = dyn_cast<DebugValueInst>(inst))
+        require(DVI->isExprTypeValid(),
+                "debug_value type chain should hold");
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {

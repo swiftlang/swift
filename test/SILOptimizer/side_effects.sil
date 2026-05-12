@@ -1228,7 +1228,7 @@ bb3:
 sil @test_debug_value_address : $@convention(thin) <T> (@in T, @inout T) -> () {
 bb0(%0 : $*T, %1 : $*T):
   destroy_addr %0 : $*T
-  debug_value %1 : $*T
+  debug_value %1 : $*T, expr op_deref
   %4 = tuple ()
   return %4 : $()
 }

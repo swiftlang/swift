@@ -199,8 +199,8 @@ void Partition::assignStackLocation(
     AllocStack->replaceAllUsesWith(AssignedLoc);
     if (auto VarInfo = AllocStack->getVarInfo()) {
       SILBuilder Builder(AllocStack, AllocStack->getDebugScope());
-      auto *DVI = Builder.createDebugValueAddr(AllocStack->getLoc(),
-                                               AssignedLoc, *VarInfo);
+      auto *DVI = Builder.createDebugValue(AllocStack->getLoc(),
+                                           AssignedLoc, *VarInfo);
       if (hasAtLeastOneMovedElt) {
         DVI->setUsesMoveableValueDebugInfo();
       }
