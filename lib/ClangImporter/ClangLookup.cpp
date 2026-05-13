@@ -418,6 +418,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
                name.getArgumentNames().empty()) {
       if (auto *succ = Importer.Impl.lookupAndImportSuccessor(inheritingDecl))
         result.push_back(succ);
+    } else if (name.getBaseName() == "__convertToBool" &&
+               name.getArgumentNames().empty()) {
+      if (auto *opBool =
+              Importer.Impl.lookupAndImportOperatorBool(inheritingDecl))
+        result.push_back(opBool);
     } else if (name.getBaseName().isSubscript()) {
       for (auto *sub : Importer.Impl.lookupAndImportSubscripts(inheritingDecl))
         result.push_back(sub);
@@ -889,4 +894,123 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
   }
 
   return result;
+}
+
+FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
+    NominalTypeDecl *Struct) {
+  auto *CXXRecord = const_cast<clang::CXXRecordDecl *>(
+      dyn_cast<clang::CXXRecordDecl>(Struct->getClangDecl()));
+
+  if (!CXXRecord)
+    return nullptr;
+
+  if (auto [it, inserted] =
+          importedOperatorBoolCache.try_emplace(Struct, nullptr);
+      !inserted)
+    return it->second;
+
+  // From this point onward, if we encounter some error and return, future calls
+  // to this function will pick up the nullptr we cached using try_emplace. Note
+  // that this may silently suppress unintentional cycles.
+
+  auto &Ctx = getClangASTContext();
+  auto &Sema = getClangSema();
+
+  clang::CXXConversionDecl *OpBool = nullptr;
+
+  auto Conversions = CXXRecord->getVisibleConversionFunctions();
+  for (auto it = Conversions.begin(); it != Conversions.end(); ++it) {
+    auto *CD =
+        dyn_cast<clang::CXXConversionDecl>(it.getDecl()->getUnderlyingDecl());
+    if (!CD || CD->isDeleted() || it.getAccess() != clang::AS_public)
+      // N.B. we need to check it.getAccess() and not CD->getAccess() because
+      // the former gives the effective access via the derived class CXXRecord,
+      // while the latter only gives the access of the decl as it is declared in
+      // the base class.
+      continue;
+
+    if (CD->getConversionType()->isBooleanType() && CD->isConst() &&
+        !CD->isVolatile() && CD->getRefQualifier() != clang::RQ_RValue &&
+        Sema.isReachable(CD)) {
+      if (OpBool && OpBool->getCanonicalDecl() != CD->getCanonicalDecl())
+        return nullptr; // Ambiguous: multiple distinct operator bool() const
+      OpBool = CD;
+    }
+  }
+
+  if (!OpBool)
+    return nullptr; // Did not find suitable operator bool() const
+
+  // N.B. At this point it is still possible to have an ambiguous OpBool due to
+  // non-virtual diamond inheritance. That scenario will be handled by Clang,
+  // when we attempt to construct an ambiguous call with BuildCXXNamedCast(),
+  // producing an invalid expr and causing us to bail out of this function.
+
+  auto Loc = CXXRecord->getLocation();
+
+  // Synthesize method:
+  //
+  //   bool __convertToBool() const { return static_cast<bool>(*this); }
+  //
+
+  clang::QualType MethodTy = OpBool->getType();
+  clang::DeclarationName Name = &Ctx.Idents.get("__convertToBool");
+  clang::DeclarationNameInfo NameInfo(Name, Loc);
+
+  clang::CXXMethodDecl *Method = clang::CXXMethodDecl::Create(
+      Ctx, CXXRecord, Loc, NameInfo, MethodTy,
+      Ctx.getTrivialTypeSourceInfo(MethodTy, Loc),
+      /*StorageClass=*/clang::SC_None,
+      /*UsesFPIntrin=*/false,
+      /*isInline=*/true, clang::ConstexprSpecKind::Unspecified,
+      clang::SourceLocation());
+  Method->setAccess(clang::AS_public);
+  Method->setImplicit();
+
+  {
+    clang::Sema::SynthesizedFunctionScope Scope(Sema, Method);
+
+    auto This = Sema.ActOnCXXThis(Loc);
+    if (This.isInvalid()) {
+      Method->setInvalidDecl();
+      return nullptr;
+    }
+    auto DerefThis =
+        Sema.CreateBuiltinUnaryOp(Loc, clang::UO_Deref, This.get());
+    if (DerefThis.isInvalid()) {
+      Method->setInvalidDecl();
+      return nullptr;
+    }
+
+    auto Cast = Sema.BuildCXXNamedCast(
+        Loc, clang::tok::kw_static_cast,
+        Ctx.getTrivialTypeSourceInfo(Ctx.BoolTy, Loc), DerefThis.get(),
+        clang::SourceRange(Loc, Loc), clang::SourceRange(Loc, Loc));
+    if (Cast.isInvalid()) {
+      Method->setInvalidDecl();
+      return nullptr;
+    }
+
+    auto Return = Sema.BuildReturnStmt(Loc, Cast.get());
+    if (Return.isInvalid()) {
+      Method->setInvalidDecl();
+      return nullptr;
+    }
+
+    Method->setBody(clang::CompoundStmt::Create(
+        Ctx, Return.get(), clang::FPOptionsOverride(), Loc, Loc));
+    Method->markUsed(Ctx);
+  }
+  CXXRecord->addDecl(Method);
+
+  auto *func = importUnavailableMethod(*this, {Method, clang::AS_none}, Struct,
+                                       "use Bool(fromCxx:)");
+  markMemberSynthesizedPerType(func);
+  importAttributes(OpBool, func);
+
+  // The iterator from the try_emplace() at the beginning of this function may
+  // have been invalidated during importUnavailableMethod(), so we must perform
+  // the look up again:
+  importedOperatorBoolCache[Struct] = func;
+  return func;
 }

@@ -55,12 +55,15 @@ UsingBaseTestSuite.test("ProtectedMemberPrivateInheritance") {
 
 UsingBaseTestSuite.test("OperatorBasePrivateInheritance") {
   let p = OperatorBasePrivateInheritance()
-  // FIXME: actually calling operator bool seems to currently be broken
-  //        (although type-checking it is fine)
-  // expectTrue(Bool(fromCxx: p))
-  // expectTrue(Bool(fromCxx: !p))
+  expectTrue(Bool(fromCxx: p))
+  expectTrue(Bool(fromCxx: !p))
   expectEqual(456, p.pointee)
   expectEqual(789, p[789])
+}
+
+UsingBaseTestSuite.test("ProtectedOperatorBoolMadePublic") {
+  let p = ProtectedOperatorBoolMadePublic()
+  expectTrue(Bool(fromCxx: p))
 }
 
 runAllTests()

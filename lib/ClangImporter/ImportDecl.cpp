@@ -10706,6 +10706,11 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
       assert(swiftDecl->getClangDecl() != clangRecord);
       auto baseMember = cast<ValueDecl>(member);
 
+      // Do not clone members that are separately synthesized for each type,
+      // otherwise we will get duplicates.
+      if (Impl.isMemberSynthesizedPerType(baseMember))
+        continue;
+
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
       // name and arity.
@@ -10771,6 +10776,7 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
       !inheritance) {
     (void)Impl.lookupAndImportPointee(swiftDecl);
     (void)Impl.lookupAndImportSuccessor(swiftDecl);
+    (void)Impl.lookupAndImportOperatorBool(swiftDecl);
     (void)Impl.lookupAndImportSubscripts(swiftDecl);
   }
 }
