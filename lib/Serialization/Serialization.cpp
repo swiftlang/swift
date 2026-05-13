@@ -6389,6 +6389,14 @@ public:
                                   integer->isNegative(),
                                   integer->getDigitsText());
   }
+
+  void visitHiddenType(const HiddenType *hidden) {
+    using namespace decls_block;
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[HiddenTypeLayout::Code];
+    HiddenTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                 hidden->getMangledName());
+  }
 };
 
 void Serializer::writeASTBlockEntity(Type ty) {
@@ -6590,6 +6598,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PackTypeLayout>();
   registerDeclTypeAbbr<SILPackTypeLayout>();
   registerDeclTypeAbbr<IntegerTypeLayout>();
+  registerDeclTypeAbbr<HiddenTypeLayout>();
   registerDeclTypeAbbr<InlineArrayTypeLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();

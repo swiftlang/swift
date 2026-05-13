@@ -44,6 +44,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -1889,6 +1890,20 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
         appendOperator("", Index(value));
       }
 
+      return;
+    }
+
+    case TypeKind::Hidden: {
+      // A HiddenType is a placeholder for a real type whose mangled name is
+      // carried in the HiddenType itself. Emit that mangled name so that the
+      // surrounding symbol mangles as if the real type had been used.
+      // The stored name is a complete symbol starting with "$s"; strip the
+      // prefix since we are already mangling inside a larger symbol.
+      auto hidden = cast<HiddenType>(tybase);
+      StringRef name = hidden->getMangledName();
+      if (name.starts_with(MANGLING_PREFIX_STR))
+        name = name.drop_front(StringRef(MANGLING_PREFIX_STR).size());
+      Buffer << name;
       return;
     }
   }

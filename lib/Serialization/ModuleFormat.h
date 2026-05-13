@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 1000; // Statically assert OPTIONS_BLOCK's abbrev-code width
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1001; // HiddenType record
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -1624,6 +1624,11 @@ namespace decls_block {
     INTEGER_TYPE,
     BCFixed<1>,   // is negative?
     BCBlob        // integer value text
+  );
+
+  TYPE_LAYOUT(HiddenTypeLayout,
+    HIDDEN_TYPE,
+    BCBlob        // mangled name of the original (hidden) type
   );
 
   using TypeAliasLayout = BCRecordLayout<

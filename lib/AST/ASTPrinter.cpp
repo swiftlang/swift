@@ -8242,6 +8242,10 @@ public:
 
     Printer << T->getDigitsText();
   }
+
+  void visitHiddenType(HiddenType *T, NonRecursivePrintOptions nrOptions) {
+    Printer << "@_hidden(\"" << T->getMangledName() << "\")";
+  }
 };
 } // unnamed namespace
 
