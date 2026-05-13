@@ -1,0 +1,24 @@
+// RUN: %target-swift-frontend -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o - | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { loc "file.swift":1:6 parent @test_transform_const : $@convention(thin) () -> () }
+
+// CHECK-LABEL: define {{.*}} @test_transform_const
+sil @test_transform_const : $@convention(thin) () -> () {
+bb0:
+// The transform block produces a constant i64 42 that is used in #dbg_value.
+// CHECK: #dbg_value(i64 42, ![[VAR:[0-9]+]]
+  debug_value undef : $Builtin.Int64, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int64, 42
+    return %0 : $Builtin.Int64
+  }, loc "file.swift":2:3, scope 1
+  %r = tuple ()
+  return %r : $(), loc "file.swift":3:3, scope 1
+}
+
+// CHECK: ![[VAR]] = !DILocalVariable(name: "x"
