@@ -346,17 +346,16 @@ extension String.UTF8View {
   }
 
 #if !(os(watchOS) && _pointerBitWidth(_32))
-  /// A span over the UTF8 code units that make up this string.
+  /// A span over the UTF-8 code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property transcodes the code units the first time
-  /// it is called. The transcoded buffer is cached, and subsequent calls
-  /// to `span` can reuse the buffer.
+  /// - Note: On Apple platforms, this property transcodes the code units
+  ///   of bridged UTF-16 `String` instances on first access and caches
+  ///   the result. Subsequent calls can reuse the cached buffer.
   ///
-  ///  Returns: a `Span` over the UTF8 code units of this String.
+  /// - Returns: A `Span` over the UTF-8 code units of this `String`.
   ///
-  ///  Complexity: O(1) for native UTF8 Strings,
-  ///  amortized O(1) for bridged UTF16 Strings.
+  /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
+  ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<UTF8.CodeUnit> {
     @lifetime(borrow self)
@@ -365,17 +364,16 @@ extension String.UTF8View {
     }
   }
 
-  /// A span over the UTF8 code units that make up this string.
+  /// A span over the UTF-8 code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property transcodes the code units the first time
-  /// it is called. The transcoded buffer is cached, and subsequent calls
-  /// to `span` can reuse the buffer.
+  /// - Note: On Apple platforms, this property transcodes the code units
+  ///   of bridged UTF-16 `String` instances on first access and caches
+  ///   the result. Subsequent calls can reuse the cached buffer.
   ///
-  ///  Returns: a `Span` over the UTF8 code units of this String.
+  /// - Returns: A `Span` over the UTF-8 code units of this `String`.
   ///
-  ///  Complexity: O(1) for native UTF8 Strings,
-  ///  amortized O(1) for bridged UTF16 Strings.
+  /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
+  ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
     @_alwaysEmitIntoClient @inline(__always)
@@ -393,18 +391,17 @@ extension String.UTF8View {
     }
   }
 
-  /// A span over the UTF8 code units that make up this string.
+  /// A span over the UTF-8 code units that make up this string.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property transcodes the code units the first time
-  /// it is called. The transcoded buffer is cached, and subsequent calls
-  /// to `span` can reuse the buffer.
+  /// - Note: On Apple platforms, this property transcodes the code units
+  ///   of bridged UTF-16 `String` instances on first access and caches
+  ///   the result. Subsequent calls can reuse the cached buffer.
   ///
-  ///  Returns: a `Span` over the UTF8 code units of this String, or `nil`
-  ///           if the String does not have a contiguous representation.
+  /// - Returns: A `Span` over the UTF-8 code units of this `String`, or `nil`
+  ///   if the `String`'s representation is non-contiguous.
   ///
-  ///  Complexity: O(1) for native UTF8 Strings,
-  ///  amortized O(1) for bridged UTF16 Strings.
+  /// - Complexity: O(1) for native UTF-8 strings, amortized O(1) for bridged
+  ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
     @lifetime(borrow self)

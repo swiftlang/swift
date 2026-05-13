@@ -76,8 +76,11 @@ extension UniqueBox where Value: ~Copyable {
 
 @available(SwiftStdlib 6.4, *)
 extension UniqueBox where Value: ~Copyable {
-  /// Returns a single element span reference to the instance of `Value` stored
-  /// within this unqiue box.
+  /// A span over the single element stored in this box.
+  ///
+  /// - Returns: A `Span` over the element stored in this box.
+  ///
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public var span: Span<Value> {
@@ -88,8 +91,11 @@ extension UniqueBox where Value: ~Copyable {
     }
   }
 
-  /// Returns a single element mutable span reference to the instance of `Value`
-  /// stored within this unqiue box.
+  /// A mutable span over the single element stored in this box.
+  ///
+  /// - Returns: A `MutableSpan` over the element stored in this box.
+  ///
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Value> {
