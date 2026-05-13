@@ -1906,39 +1906,41 @@ static Address addOffset(IRGenFunction &IGF, Address addr,
 }
 
 void AlignedGroupEntry::destroy(IRGenFunction &IGF, Address addr) const {
-  if (isFixedSize(IGF.IGM)) {
-    Size offset(0);
-    for (auto entry : entries) {
-      uint64_t aligned = offset.getValue();
-      // Align the offset
-      aligned += entry->fixedAlignment(IGF.IGM)->getMaskValue();
-      aligned &= ~(entry->fixedAlignment(IGF.IGM)->getMaskValue());
-      offset = Size(aligned);
-      auto projected = IGF.emitByteOffsetGEP(
-          addr.getAddress(),
-          llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()));
-      entry->destroy(IGF, Address(projected, IGF.IGM.OpaquePtrTy,
-                                  *entry->fixedAlignment(IGF.IGM)));
-      offset += *entry->fixedSize(IGF.IGM);
-    }
-  } else {
-    Address currentDest = addr;
-    auto remainingEntries = entries.size();
-    for (auto *entry : entries) {
-      if (currentDest.getAddress() != addr.getAddress()) {
-        // Align upto the current entry's requirement.
-        auto entryMask = entry->alignmentMask(IGF);
-        currentDest = alignAddress(IGF, currentDest, entryMask);
+  if (!tryEmitDestroyUsingDeinit(IGF, addr, ty)) {
+    if (isFixedSize(IGF.IGM)) {
+      Size offset(0);
+      for (auto entry : entries) {
+        uint64_t aligned = offset.getValue();
+        // Align the offset
+        aligned += entry->fixedAlignment(IGF.IGM)->getMaskValue();
+        aligned &= ~(entry->fixedAlignment(IGF.IGM)->getMaskValue());
+        offset = Size(aligned);
+        auto projected = IGF.emitByteOffsetGEP(
+            addr.getAddress(),
+            llvm::ConstantInt::get(IGF.IGM.Int32Ty, offset.getValue()));
+        entry->destroy(IGF, Address(projected, IGF.IGM.OpaquePtrTy,
+                                    *entry->fixedAlignment(IGF.IGM)));
+        offset += *entry->fixedSize(IGF.IGM);
       }
+    } else {
+      Address currentDest = addr;
+      auto remainingEntries = entries.size();
+      for (auto *entry : entries) {
+        if (currentDest.getAddress() != addr.getAddress()) {
+          // Align upto the current entry's requirement.
+          auto entryMask = entry->alignmentMask(IGF);
+          currentDest = alignAddress(IGF, currentDest, entryMask);
+        }
 
-      entry->destroy(IGF, currentDest);
+        entry->destroy(IGF, currentDest);
 
-      --remainingEntries;
-      if (remainingEntries == 0)
-        continue;
+        --remainingEntries;
+        if (remainingEntries == 0)
+          continue;
 
-      auto entrySize = entry->size(IGF);
-      currentDest = addOffset(IGF, currentDest, entrySize);
+        auto entrySize = entry->size(IGF);
+        currentDest = addOffset(IGF, currentDest, entrySize);
+      }
     }
   }
 }
