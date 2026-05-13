@@ -268,50 +268,38 @@ endmacro()
 # Common cmake project config for additional warnings.
 #
 macro(swift_common_cxx_warnings)
+  # Check the `-Werror` flag once and use that to guard `-W/-Werror`
+  # additions instead of calling `check_cxx_compiler_flag` for each option.
+  # Compilers that support these will not error on unknown warning groups by
+  # default anyway. What matters is whether the compiler understands the
+  # `-Werror` part.
   check_cxx_compiler_flag("-Werror" CXX_SUPPORTS_W_ERROR_OPTION)
 
   # Make unhandled switch cases be an error in assert builds
   if(DEFINED LLVM_ENABLE_ASSERTIONS)
-    check_cxx_compiler_flag("-Werror=switch" CXX_SUPPORTS_WERROR_SWITCH_FLAG)
-    if(CXX_SUPPORTS_WERROR_SWITCH_FLAG)
-      add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Werror=switch>)
+    if (CXX_SUPPORTS_W_ERROR_OPTION)
+      add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-Werror=switch>)
     endif()
 
     if(MSVC)
       check_cxx_compiler_flag("/we4062" CXX_SUPPORTS_WE4062)
       if(CXX_SUPPORTS_WE4062)
-        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/we4062>)
+        add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:/we4062>)
       endif()
     endif()
   endif()
 
-  # Make some warnings errors as they are commonly occurring and flood the build
-  # with unnecessary noise.
   if(CXX_SUPPORTS_W_ERROR_OPTION)
-    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-Werror=c++98-compat-extra-semi>)
-    add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-Werror=gnu>)
-  endif()
+    add_compile_options(
+      # Make some warnings errors as they are commonly occurring and flood the
+      # build with unnecessary noise.
+      $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=c++98-compat-extra-semi>
+      $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=gnu>
 
-  check_cxx_compiler_flag("-Werror -Wimplicit-fallthrough" CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)
-  if(CXX_SUPPORTS_IMPLICIT_FALLTHROUGH_FLAG)
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wimplicit-fallthrough>)
-  endif()
-
-  # Check for -Wunreachable-code-aggressive instead of -Wunreachable-code, as that indicates
-  # that we have the newer -Wunreachable-code implementation.
-  check_cxx_compiler_flag("-Werror -Wunreachable-code-aggressive" CXX_SUPPORTS_UNREACHABLE_CODE_FLAG)
-  if(CXX_SUPPORTS_UNREACHABLE_CODE_FLAG)
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wunreachable-code>)
-  endif()
-
-  check_cxx_compiler_flag("-Werror -Woverloaded-virtual" CXX_SUPPORTS_OVERLOADED_VIRTUAL)
-  if(CXX_SUPPORTS_OVERLOADED_VIRTUAL)
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Woverloaded-virtual>)
-  endif()
-
-  check_cxx_compiler_flag("-Werror -Wnested-anon-types" CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
-  if(CXX_SUPPORTS_NO_NESTED_ANON_TYPES_FLAG)
-    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-Wno-nested-anon-types>)
+      $<$<COMPILE_LANGUAGE:С,CXX>:-Wimplicit-fallthrough>
+      $<$<COMPILE_LANGUAGE:C,CXX>:-Wunreachable-code>
+      $<$<COMPILE_LANGUAGE:C,CXX>:-Woverloaded-virtual>
+      $<$<COMPILE_LANGUAGE:C,CXX>:-Wno-nested-anon-types>)
   endif()
 
   # Check for '-fapplication-extension'.  On OS X/iOS we wish to link all
