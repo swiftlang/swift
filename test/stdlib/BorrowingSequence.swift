@@ -1,4 +1,4 @@
-//===--- BorrowingSequence.swift --------------------------------------------------===//
+//===--- Iterable.swift --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -18,7 +18,7 @@
 
 import StdlibUnittest
 
-var suite = TestSuite("BorrowingSequence Tests")
+var suite = TestSuite("Iterable Tests")
 defer { runAllTests() }
 
 enum EE<A: Error, B: Error>: Error {
@@ -27,12 +27,12 @@ enum EE<A: Error, B: Error>: Error {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable & ~Escapable {
+extension Iterable where Self: ~Copyable & ~Escapable, Element: ~Copyable & ~Escapable {
   func reduce<T: ~Copyable>(
     _ initial: consuming T,
     _ nextPartialResult: @escaping (consuming T, borrowing Element) throws(Failure) -> T
   ) throws(Failure) -> T {
-    var borrowIterator = makeBorrowingIterator()
+    var borrowIterator = makeIterableIterator()
     var result = initial
     while true {
       let span = try borrowIterator.nextSpan(maximumCount: .max)
@@ -48,7 +48,7 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
     into initial: consuming T,
     _ nextPartialResult: (inout T, borrowing Element) throws(Failure) -> Void
   ) throws(Failure) -> T {
-    var borrowIterator = makeBorrowingIterator()
+    var borrowIterator = makeIterableIterator()
     var result = initial
     while true {
       let span = try borrowIterator.nextSpan(maximumCount: .max)
@@ -62,9 +62,9 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: Copyable {
+extension Iterable where Self: ~Copyable & ~Escapable, Element: Copyable {
   func collectViaBorrowing() throws(Failure) -> [Element] {
-    var borrowIterator = makeBorrowingIterator()
+    var borrowIterator = makeIterableIterator()
     var result: [Element] = []
     while true {
       let span = try borrowIterator.nextSpan(maximumCount: .max)
@@ -86,14 +86,14 @@ struct NoncopyableInt: ~Copyable, Equatable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Escapable & ~Copyable, Element: Equatable & ~Copyable & ~Escapable {
-  func elementsEqual<S: BorrowingSequence<Element, Failure>>(
+extension Iterable where Self: ~Escapable & ~Copyable, Element: Equatable & ~Copyable & ~Escapable {
+  func elementsEqual<S: Iterable<Element, Failure>>(
     _ rhs: borrowing S
   ) throws(Failure) -> Bool
     where S: ~Copyable & ~Escapable, S.Element: ~Copyable & ~Escapable
   {
-    var iter1 = makeBorrowingIterator()
-    var iter2 = rhs.makeBorrowingIterator()
+    var iter1 = makeIterableIterator()
+    var iter2 = rhs.makeIterableIterator()
     while true {
       var el1 = try iter1.nextSpan(maximumCount: .max)
       

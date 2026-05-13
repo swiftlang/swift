@@ -13,14 +13,14 @@ func getNumber(_ x: borrowing NonCopyable) -> Int32 {
     return x.number
 }
 
-StdListTestSuite.test("ListOfInt conforms to CxxBorrowingSequence") {
+StdListTestSuite.test("ListOfInt conforms to CxxIterable") {
     guard #available(SwiftStdlib 6.4, *) else { return }
     let arr : [Int32] = [1, 2, 3]
     let lst = makeListInt()
     expectEqual(lst.size(), 3)
     expectFalse(lst.empty())
 
-    var iterator : CxxBorrowingIterator<List> = lst.makeBorrowingIterator()
+    var iterator : CxxIterableIterator<List> = lst.makeIterableIterator()
     var counter = 0
     while true {
         var span = iterator.nextSpan()
@@ -33,14 +33,14 @@ StdListTestSuite.test("ListOfInt conforms to CxxBorrowingSequence") {
     expectEqual(counter, lst.size())
 }
 
-StdListTestSuite.test("ListOfNonCopyable conforms to CxxBorrowingSequence") {
+StdListTestSuite.test("ListOfNonCopyable conforms to CxxIterable") {
     guard #available(SwiftStdlib 6.4, *) else { return }
     let arr : [Int32] = [1, 2, 3]
     var lst = makeListOfNonCopyable()
     expectEqual(lst.size(), 3)
     expectFalse(lst.empty())
 
-    var iterator = lst.makeBorrowingIterator()
+    var iterator = lst.makeIterableIterator()
     var counter = 0
     while true {
         var span = iterator.nextSpan()

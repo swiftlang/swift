@@ -21,14 +21,14 @@ import StdVector
 #endif
 import CxxStdlib
 
-var StdVectorBorrowingIteratorTestSuite = TestSuite("StdVectorBorrowingIterator")
+var StdVectorIterableIteratorTestSuite = TestSuite("StdVectorIterableIterator")
 
-StdVectorBorrowingIteratorTestSuite.test("VecOfInt has contiguous iterator").require(.stdlib_6_4).code {
+StdVectorIterableIteratorTestSuite.test("VecOfInt has contiguous iterator").require(.stdlib_6_4).code {
     guard #available(SwiftStdlib 6.4, *) else { return }
     let arr : [Int32] = [1, 2, 3, 4, 5]
     let v = Vector(arr)
     expectEqual(v.size(), 5)
-    var iterator = v.makeBorrowingIterator()
+    var iterator = v.makeIterableIterator()
     var counter = 0
     while true {
         let span = iterator.nextSpan()
@@ -39,11 +39,11 @@ StdVectorBorrowingIteratorTestSuite.test("VecOfInt has contiguous iterator").req
     expectEqual(counter, 1)
 }
 
-StdVectorBorrowingIteratorTestSuite.test("VectorOfNonCopyable has contiguous iterator").require(.stdlib_6_4).code {
+StdVectorIterableIteratorTestSuite.test("VectorOfNonCopyable has contiguous iterator").require(.stdlib_6_4).code {
     guard #available(SwiftStdlib 6.4, *) else { return }
     let v = makeVectorOfNonCopyable()
     expectEqual(v.size(), 3)
-    var iterator = v.makeBorrowingIterator()
+    var iterator = v.makeIterableIterator()
     var counter = 0
     while true {
         let span = iterator.nextSpan()

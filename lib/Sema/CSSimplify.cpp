@@ -9911,10 +9911,10 @@ ConstraintSystem::simplifyForEachElementConstraint(
   auto *seqProto = contextualTy->castTo<ProtocolType>()->getDecl();
   auto isAsync = seqProto->isSpecificProtocol(KnownProtocolKind::AsyncSequence);
   auto isBorrowing =
-      shouldUseBorrowingSequence(ctx, seqTy, isAsync, anchor.getStartLoc(), DC);
+      shouldUseIterable(ctx, seqTy, isAsync, anchor.getStartLoc(), DC);
 
   if (isBorrowing) {
-    seqProto = ctx.getProtocol(KnownProtocolKind::BorrowingSequence);
+    seqProto = ctx.getProtocol(KnownProtocolKind::Iterable);
   }
 
   auto *contextualLoc = getConstraintLocator(
@@ -9932,7 +9932,7 @@ ConstraintSystem::simplifyForEachElementConstraint(
   // `any IteratorProtocol`, so the actual element type is `Any`.
   auto *iteratorAssocTy = seqProto->getAssociatedType(
       isAsync ? ctx.Id_AsyncIterator
-              : (isBorrowing ? ctx.Id_BorrowingIterator : ctx.Id_Iterator));
+              : (isBorrowing ? ctx.Id_IterableIterator : ctx.Id_Iterator));
   auto iterTy = lookupDependentMember(seqTy, iteratorAssocTy,
                                       /*openExistential*/ true, contextualLoc);
   if (!iterTy) {
@@ -9945,7 +9945,7 @@ ConstraintSystem::simplifyForEachElementConstraint(
   // an existential if needed.
   auto *iterProto = ctx.getProtocol(
       isAsync ? KnownProtocolKind::AsyncIteratorProtocol
-              : (isBorrowing ? KnownProtocolKind::BorrowingIteratorProtocol
+              : (isBorrowing ? KnownProtocolKind::IterableIteratorProtocol
                              : KnownProtocolKind::IteratorProtocol));
   auto *eltAssocTy = iterProto->getAssociatedType(Context.Id_Element);
   auto eltTy = lookupDependentMember(iterTy, eltAssocTy,

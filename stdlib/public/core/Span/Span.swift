@@ -1020,11 +1020,11 @@ extension Span where Element == UInt8 {
 
 #if !SPAN_COMPATIBILITY_STUB
 @available(SwiftStdlib 6.4, *)
-extension Span: BorrowingSequence where Element: ~Copyable & ~Escapable {
+extension Span: Iterable where Element: ~Copyable & ~Escapable {
   @available(SwiftStdlib 6.4, *)
   @inlinable
   @lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<Element> {
+  public func makeIterableIterator() -> SpanIterator<Element> {
     SpanIterator(self)
   }
 }

@@ -710,14 +710,14 @@ StdSpanTestSuite.test("Convert between Swift and C++ span types")
   }
 }
 
-StdSpanTestSuite.test("CxxSpan conforms to CxxBorrowingSequence")
+StdSpanTestSuite.test("CxxSpan conforms to CxxIterable")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let s = initSpan()
   let arr : [Int32] = [1, 2, 3]
 
-  var iterator = s.makeBorrowingIterator()
+  var iterator = s.makeIterableIterator()
   var counter = 0
   while true {
     var span = iterator.nextSpan()
@@ -732,14 +732,14 @@ StdSpanTestSuite.test("CxxSpan conforms to CxxBorrowingSequence")
 
 #if hasFeature(BorrowingForLoop)
 
-StdSpanTestSuite.test("CxxSpan of noncopyable conforms to CxxBorrowingSequence")
+StdSpanTestSuite.test("CxxSpan of noncopyable conforms to CxxIterable")
 .require(.stdlib_6_4).code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
   let s = makeSpanOfNonCopyable()
   let arr : [Int32] = [1, 2, 3]
 
-  var iterator = s.makeBorrowingIterator()
+  var iterator = s.makeIterableIterator()
   var counter = 0
   while true {
     var span = iterator.nextSpan()

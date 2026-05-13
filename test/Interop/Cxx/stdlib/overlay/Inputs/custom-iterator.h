@@ -661,7 +661,7 @@ public:
 #endif
 
 // MARK: Iterators with dereference operators that prevent conformance to
-// CxxBorrowingSequence.
+// CxxIterable.
 
 struct NonInlineDereferenceOperator {
   using iterator_category = std::input_iterator_tag;
@@ -743,7 +743,7 @@ struct NoConstDereferenceOperator {
   }
 };
 
-struct ConstRACButNotBorrowingIterator {
+struct ConstRACButNotIterableIterator {
 private:
   const int *value;
 
@@ -754,46 +754,46 @@ public:
   using reference = const int &;
   using difference_type = int;
 
-  ConstRACButNotBorrowingIterator(const int *value) : value(value) {}
-  ConstRACButNotBorrowingIterator(
-      const ConstRACButNotBorrowingIterator &other) = default;
+  ConstRACButNotIterableIterator(const int *value) : value(value) {}
+  ConstRACButNotIterableIterator(
+      const ConstRACButNotIterableIterator &other) = default;
 
   int operator*() const { return *value; }
 
-  ConstRACButNotBorrowingIterator &operator++() {
+  ConstRACButNotIterableIterator &operator++() {
     value++;
     return *this;
   }
-  ConstRACButNotBorrowingIterator operator++(int) {
-    auto tmp = ConstRACButNotBorrowingIterator(value);
+  ConstRACButNotIterableIterator operator++(int) {
+    auto tmp = ConstRACButNotIterableIterator(value);
     value++;
     return tmp;
   }
 
   void operator+=(difference_type v) { value += v; }
   void operator-=(difference_type v) { value -= v; }
-  ConstRACButNotBorrowingIterator operator+(difference_type v) const {
-    return ConstRACButNotBorrowingIterator(value + v);
+  ConstRACButNotIterableIterator operator+(difference_type v) const {
+    return ConstRACButNotIterableIterator(value + v);
   }
-  ConstRACButNotBorrowingIterator operator-(difference_type v) const {
-    return ConstRACButNotBorrowingIterator(value - v);
+  ConstRACButNotIterableIterator operator-(difference_type v) const {
+    return ConstRACButNotIterableIterator(value - v);
   }
-  friend ConstRACButNotBorrowingIterator
-  operator+(difference_type v, const ConstRACButNotBorrowingIterator &it) {
+  friend ConstRACButNotIterableIterator
+  operator+(difference_type v, const ConstRACButNotIterableIterator &it) {
     return it + v;
   }
-  int operator-(const ConstRACButNotBorrowingIterator &other) const {
+  int operator-(const ConstRACButNotIterableIterator &other) const {
     return value - other.value;
   }
 
-  bool operator<(const ConstRACButNotBorrowingIterator &other) const {
+  bool operator<(const ConstRACButNotIterableIterator &other) const {
     return value < other.value;
   }
 
-  bool operator==(const ConstRACButNotBorrowingIterator &other) const {
+  bool operator==(const ConstRACButNotIterableIterator &other) const {
     return value == other.value;
   }
-  bool operator!=(const ConstRACButNotBorrowingIterator &other) const {
+  bool operator!=(const ConstRACButNotIterableIterator &other) const {
     return value != other.value;
   }
 };

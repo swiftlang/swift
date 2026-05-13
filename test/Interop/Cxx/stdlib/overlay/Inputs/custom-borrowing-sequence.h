@@ -77,13 +77,13 @@ struct DifferentResultsDereferenceOperatorSequence {
   }
 };
 
-struct ConstRACButNotBorrowingIteratorSequence {
+struct ConstRACButNotIterableIteratorSequence {
   int arr[5] = {2, 1, 2, 7, 5};
-  ConstRACButNotBorrowingIterator begin() const {
-    return ConstRACButNotBorrowingIterator(&arr[0]);
+  ConstRACButNotIterableIterator begin() const {
+    return ConstRACButNotIterableIterator(&arr[0]);
   }
-  ConstRACButNotBorrowingIterator end() const {
-    return ConstRACButNotBorrowingIterator(&arr[5]);
+  ConstRACButNotIterableIterator end() const {
+    return ConstRACButNotIterableIterator(&arr[5]);
   }
 };
 

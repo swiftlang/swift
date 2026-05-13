@@ -10,19 +10,19 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Use this protocol to conform custom C++ sequence types to Swift's `BorrowingSequence`
+/// Use this protocol to conform custom C++ sequence types to Swift's `Iterable`
 /// protocol like this:
 ///
-///     extension MyCxxSequenceType : CxxBorrowingSequence {}
+///     extension MyCxxSequenceType : CxxIterable {}
 ///
 /// This requires the C++ sequence type to define const methods `begin()` and
 /// `end()` which return input iterators into the C++ sequence. The iterator
 /// types must conform to `UnsafeCxxInputIterator`.
 
 @available(SwiftStdlib 6.4, *)
-public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~Escapable {
+public protocol CxxIterable<Element> : Iterable, ~Copyable, ~Escapable {
   override associatedtype Element: ~Copyable
-  override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element, Never> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self>
+  override associatedtype IterableIterator: IterableIteratorProtocol<Element, Never> & ~Copyable & ~Escapable = CxxIterableIterator<Self>
   associatedtype RawIterator: UnsafeCxxInputIterator
     where RawIterator.Pointee == Element,
           RawIterator.DereferenceResult: _Pointer,
@@ -37,7 +37,7 @@ public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~E
 
 @frozen
 @available(SwiftStdlib 6.4, *)
-public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol<T.Element, Never>, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, T.Element: ~Copyable {
+public struct CxxIterableIterator<T>: IterableIteratorProtocol<T.Element, Never>, ~Escapable, ~Copyable where T: CxxIterable & ~Copyable & ~Escapable, T.Element: ~Copyable {
 
   @usableFromInline
   internal var current: T.RawIterator
@@ -54,7 +54,7 @@ public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol<T.Element, Neve
 
 // For non-contiguous iterators, we create a span of size one for each element
 @available(SwiftStdlib 6.4, *)
-extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.Element: ~Copyable {
+extension CxxIterableIterator where T: ~Copyable & ~Escapable, T.Element: ~Copyable {
   @inlinable
   @_lifetime(&self)
   public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
@@ -72,7 +72,7 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.Element: ~Copy
 
 // For contiguous iterators, we can make iteration more efficient by creating a span with multiple, contiguous, elements
 @available(SwiftStdlib 6.4, *)
-extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: UnsafeCxxContiguousIterator, T.Element: ~Copyable {
+extension CxxIterableIterator where T: ~Copyable & ~Escapable, T.RawIterator: UnsafeCxxContiguousIterator, T.Element: ~Copyable {
   @inlinable
   @_lifetime(&self)
   public mutating func nextSpan() -> Span<Element> {
@@ -100,11 +100,11 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: U
 }
 
 @available(SwiftStdlib 6.4, *)
-extension CxxBorrowingSequence where Element: ~Copyable, Self: ~Copyable {
+extension CxxIterable where Element: ~Copyable, Self: ~Copyable {
   @inlinable
   @_lifetime(borrow self)
-  public borrowing func makeBorrowingIterator() -> CxxBorrowingIterator<Self> {
-    let iterator = CxxBorrowingIterator<Self>(begin: __beginUnsafe(), end: __endUnsafe(), sequence: self)
+  public borrowing func makeIterableIterator() -> CxxIterableIterator<Self> {
+    let iterator = CxxIterableIterator<Self>(begin: __beginUnsafe(), end: __endUnsafe(), sequence: self)
     return iterator
   }
 }

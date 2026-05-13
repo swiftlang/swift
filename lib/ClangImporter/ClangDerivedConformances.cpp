@@ -1005,25 +1005,25 @@ static void conformToCxxOptional(ClangImporter::Implementation &impl,
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxOptional});
 }
 
-static void conformToCxxBorrowingSequenceIfNeeded(
+static void conformToCxxIterableIfNeeded(
     ClangImporter::Implementation &impl, NominalTypeDecl *decl,
     const clang::CXXRecordDecl *clangDecl,
     const ProtocolConformance *rawIteratorConformance) {
-  PrettyStackTraceDecl trace("trying to conform to CxxBorrowingSequence", decl);
+  PrettyStackTraceDecl trace("trying to conform to CxxIterable", decl);
   ASTContext &ctx = decl->getASTContext();
 
   ProtocolDecl *cxxIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  ProtocolDecl *cxxBorrowingSequenceProto =
-      ctx.getProtocol(KnownProtocolKind::CxxBorrowingSequence);
-  if (!cxxIteratorProto || !cxxBorrowingSequenceProto)
+  ProtocolDecl *cxxIterableProto =
+      ctx.getProtocol(KnownProtocolKind::CxxIterable);
+  if (!cxxIteratorProto || !cxxIterableProto)
     return;
 
-  // Take the default definition of `BorrowingIterator` from
-  // CxxBorrowingSequence protocol. This type is currently
-  // `CxxBorrowingIterator<Self>`.
-  auto borrowingIteratorDecl = cxxBorrowingSequenceProto->getAssociatedType(
-      ctx.getIdentifier("BorrowingIterator"));
+  // Take the default definition of `IterableIterator` from
+  // CxxIterable protocol. This type is currently
+  // `CxxIterableIterator<Self>`.
+  auto borrowingIteratorDecl = cxxIterableProto->getAssociatedType(
+      ctx.getIdentifier("IterableIterator"));
   if (!borrowingIteratorDecl)
     return;
   auto borrowingIteratorNominal =
@@ -1043,12 +1043,12 @@ static void conformToCxxBorrowingSequenceIfNeeded(
       rawIteratorConformance->getTypeWitness(dereferenceResultDecl);
 
   if (dereferenceResultTy && dereferenceResultTy->getAnyPointerElementType()) {
-    // Only conform to CxxBorrowingSequence if `__operatorStar` returns
+    // Only conform to CxxIterable if `__operatorStar` returns
     // `UnsafePointer<Pointee>`. Otherwise, we can't create a span for pointee.
-    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("BorrowingIterator"),
+    impl.addSynthesizedTypealias(decl, ctx.getIdentifier("IterableIterator"),
                                  borrowingIteratorTy);
     impl.addSynthesizedProtocolAttrs(decl,
-                                     {KnownProtocolKind::CxxBorrowingSequence});
+                                     {KnownProtocolKind::CxxIterable});
   }
 }
 
@@ -1132,7 +1132,7 @@ conformToCxxSequenceIfNeeded(ClangImporter::Implementation &impl,
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
                                rawIteratorTy);
 
-  conformToCxxBorrowingSequenceIfNeeded(impl, decl, clangDecl,
+  conformToCxxIterableIfNeeded(impl, decl, clangDecl,
                                         rawIteratorConformance);
 
   // `CxxSequence` and `CxxRandomAccessCollection` protocols require `Element`

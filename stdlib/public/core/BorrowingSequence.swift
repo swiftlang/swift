@@ -12,7 +12,7 @@
 
 /// A type that provides borrowed access to the values of a borrowing sequence.
 @available(SwiftStdlib 6.4, *)
-public protocol BorrowingIteratorProtocol<Element, Failure>: ~Copyable, ~Escapable {
+public protocol IterableIteratorProtocol<Element, Failure>: ~Copyable, ~Escapable {
   associatedtype Element: ~Copyable & ~Escapable
 
   /// A type representing an error that can occur during iteration.
@@ -44,7 +44,7 @@ public protocol BorrowingIteratorProtocol<Element, Failure>: ~Copyable, ~Escapab
   /// in bulk, by directly iterating over its piecewise contiguous pieces of
   /// storage:
   ///
-  ///     var it = items.makeBorrowingIterator()
+  ///     var it = items.makeIterableIterator()
   ///     while true {
   ///       let span = it.nextSpan(maximumCount: .max)
   ///       if span.isEmpty { break }
@@ -75,7 +75,7 @@ public protocol BorrowingIteratorProtocol<Element, Failure>: ~Copyable, ~Escapab
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable & ~Escapable {
+extension IterableIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable & ~Escapable {
   /// Returns a span over the next group of elements that are ready to by visited,
   /// up to the specifed maximum.
   @_alwaysEmitIntoClient
@@ -100,7 +100,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
 }
 
 @available(SwiftStdlib 6.4, *)
-public struct SpanIterator<Element>: BorrowingIteratorProtocol, ~Copyable, ~Escapable
+public struct SpanIterator<Element>: IterableIteratorProtocol, ~Copyable, ~Escapable
   where Element: ~Copyable & ~Escapable
 {
   public typealias Failure = Never
@@ -147,7 +147,7 @@ public struct SpanIterator<Element>: BorrowingIteratorProtocol, ~Copyable, ~Esca
 /// A type that provides sequential, borrowing access to its elements.
 @available(SwiftStdlib 6.4, *)
 @reparentable
-public protocol BorrowingSequence<Element, Failure>: ~Copyable, ~Escapable {
+public protocol Iterable<Element, Failure>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
   associatedtype Element: ~Copyable & ~Escapable
 
@@ -156,11 +156,11 @@ public protocol BorrowingSequence<Element, Failure>: ~Copyable, ~Escapable {
   
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
-  associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element, Failure> & ~Copyable & ~Escapable
+  associatedtype IterableIterator: IterableIteratorProtocol<Element, Failure> & ~Copyable & ~Escapable
 
   /// Returns a borrowing iterator over the elements of this sequence.
   @lifetime(borrow self)
-  func makeBorrowingIterator() -> BorrowingIterator
+  func makeIterableIterator() -> IterableIterator
   
   /// A value less than or equal to the number of elements in the sequence,
   /// calculated nondestructively.
@@ -171,7 +171,7 @@ public protocol BorrowingSequence<Element, Failure>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable & ~Escapable {
+extension Iterable where Self: ~Copyable & ~Escapable, Element: ~Copyable & ~Escapable {
   @inlinable
   public var underestimatedCount: Int { 0 }
   @inlinable
@@ -179,10 +179,10 @@ extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyab
 }
 
 // FIXME: Elminate these overloads once Sequence is reparented, they break ambiguity for
-// types that conform to both BorrowingSequence and Sequence or Collection.
+// types that conform to both Iterable and Sequence or Collection.
 
 @available(SwiftStdlib 6.4, *)
-extension Sequence where Self: BorrowingSequence {
+extension Sequence where Self: Iterable {
   @available(SwiftStdlib 6.4, *)
   @inlinable
   public var underestimatedCount: Int { 0 }
@@ -192,7 +192,7 @@ extension Sequence where Self: BorrowingSequence {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Collection where Self: BorrowingSequence {
+extension Collection where Self: Iterable {
   @available(SwiftStdlib 6.4, *)
   @inlinable
   public var underestimatedCount: Int { 0 }
@@ -203,7 +203,7 @@ extension Collection where Self: BorrowingSequence {
 
 @available(SwiftStdlib 6.4, *)
 @frozen
-public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIteratorProtocol {
+public struct IterableIteratorAdapter<Iterator: IteratorProtocol>: IterableIteratorProtocol {
   @usableFromInline
   var iterator: Iterator
   @usableFromInline
@@ -226,11 +226,11 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIte
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Sequence where Self: BorrowingSequence {
+extension Sequence where Self: Iterable {
   @available(SwiftStdlib 6.4, *)
   @_disfavoredOverload
   @_transparent
-  public func makeBorrowingIterator() -> BorrowingIteratorAdapter<Iterator> {
-    BorrowingIteratorAdapter(iterator: makeIterator())
+  public func makeIterableIterator() -> IterableIteratorAdapter<Iterator> {
+    IterableIteratorAdapter(iterator: makeIterator())
   }
 }

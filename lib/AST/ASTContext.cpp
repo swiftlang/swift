@@ -337,14 +337,14 @@ struct ASTContext::Implementation {
   /// The declaration of 'AsyncSequence.makeAsyncIterator()'.
   FuncDecl *MakeAsyncIterator = nullptr;
 
-  /// The declaration of 'BorrowingSequence.makeBorrowingIterator()'.
-  FuncDecl *MakeBorrowingIterator = nullptr;
+  /// The declaration of 'Iterable.makeIterableIterator()'.
+  FuncDecl *MakeIterableIterator = nullptr;
 
   /// The declaration of 'IteratorProtocol.next()'.
   FuncDecl *IteratorNext = nullptr;
 
   /// The declaration of 'IteratorProtocol.nextSpan(maximumCount:)'.
-  FuncDecl *BorrowingIteratorNextSpan = nullptr;
+  FuncDecl *IterableIteratorNextSpan = nullptr;
 
   /// The declaration of 'AsyncIteratorProtocol.next()'.
   FuncDecl *AsyncIteratorNext = nullptr;
@@ -1132,17 +1132,17 @@ FuncDecl *ASTContext::getSequenceMakeIterator() const {
   return nullptr;
 }
 
-FuncDecl *ASTContext::getBorrowingSequenceMakeBorrowingIterator() const {
-  if (getImpl().MakeBorrowingIterator) {
-    return getImpl().MakeBorrowingIterator;
+FuncDecl *ASTContext::getIterableMakeIterableIterator() const {
+  if (getImpl().MakeIterableIterator) {
+    return getImpl().MakeIterableIterator;
   }
 
-  auto proto = getProtocol(KnownProtocolKind::BorrowingSequence);
+  auto proto = getProtocol(KnownProtocolKind::Iterable);
   if (!proto)
     return nullptr;
 
-  if (auto *func = lookupRequirement(proto, Id_makeBorrowingIterator)) {
-    getImpl().MakeBorrowingIterator = func;
+  if (auto *func = lookupRequirement(proto, Id_makeIterableIterator)) {
+    getImpl().MakeIterableIterator = func;
     return func;
   }
 
@@ -1183,13 +1183,13 @@ FuncDecl *ASTContext::getIteratorNext() const {
   return nullptr;
 }
 
-FuncDecl *ASTContext::getBorrowingIteratorNextSpan() const {
-  auto proto = getProtocol(KnownProtocolKind::BorrowingIteratorProtocol);
+FuncDecl *ASTContext::getIterableIteratorNextSpan() const {
+  auto proto = getProtocol(KnownProtocolKind::IterableIteratorProtocol);
   if (!proto)
     return nullptr;
 
   if (auto *func = lookupRequirement(proto, Id_nextSpan)) {
-    getImpl().BorrowingIteratorNextSpan = func;
+    getImpl().IterableIteratorNextSpan = func;
     return func;
   }
 
@@ -1544,7 +1544,7 @@ ProtocolDecl *ASTContext::getProtocol(KnownProtocolKind kind) const {
   case KnownProtocolKind::CxxMutableRandomAccessCollection:
   case KnownProtocolKind::CxxSet:
   case KnownProtocolKind::CxxSequence:
-  case KnownProtocolKind::CxxBorrowingSequence:
+  case KnownProtocolKind::CxxIterable:
   case KnownProtocolKind::CxxUniqueSet:
   case KnownProtocolKind::CxxVector:
   case KnownProtocolKind::CxxSpan:

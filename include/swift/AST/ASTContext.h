@@ -724,8 +724,8 @@ public:
   /// Get Sequence.makeIterator().
   FuncDecl *getSequenceMakeIterator() const;
 
-  /// Get BorrowingSequence.makeBorrowingIterator().
-  FuncDecl *getBorrowingSequenceMakeBorrowingIterator() const;
+  /// Get Iterable.makeIterableIterator().
+  FuncDecl *getIterableMakeIterableIterator() const;
 
   /// Get AsyncSequence.makeAsyncIterator().
   FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
@@ -733,8 +733,8 @@ public:
   /// Get IteratorProtocol.next().
   FuncDecl *getIteratorNext() const;
 
-  /// Get BorrowingIteratorProtocol.nextSpan(maximumCount:).
-  FuncDecl *getBorrowingIteratorNextSpan() const;
+  /// Get IterableIteratorProtocol.nextSpan(maximumCount:).
+  FuncDecl *getIterableIteratorNextSpan() const;
 
   /// Get AsyncIteratorProtocol.next().
   FuncDecl *getAsyncIteratorNext() const;

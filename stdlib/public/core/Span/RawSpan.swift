@@ -1006,11 +1006,11 @@ extension RawSpan {
 
 #if !SPAN_COMPATIBILITY_STUB
 @available(SwiftStdlib 6.4, *)
-extension RawSpan: BorrowingSequence {
+extension RawSpan: Iterable {
   @available(SwiftStdlib 6.4, *)
   @inlinable
   @lifetime(borrow self)
-  public func makeBorrowingIterator() -> SpanIterator<UInt8> {
+  public func makeIterableIterator() -> SpanIterator<UInt8> {
     SpanIterator(Span(viewing: self))
   }
 }

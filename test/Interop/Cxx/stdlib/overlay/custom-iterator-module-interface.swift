@@ -111,7 +111,7 @@
 // CHECK:   var pointee: Int32
 // CHECK: }
 
-// CHECK: struct HasNestedIterator : CxxConvertibleToCollection, CxxBorrowingSequence {
+// CHECK: struct HasNestedIterator : CxxConvertibleToCollection, CxxIterable {
 // CHECK:   struct NestedIterator : UnsafeCxxInputIterator {
 // CHECK:     func __operatorStar() -> HasNestedIterator.NestedIterator.reference
 // CHECK:     var ptr: UnsafePointer<Int32>!
@@ -144,15 +144,15 @@
 // CHECK:   var pointee: Int32 { mutating get set }
 // CHECK: }
 
-// CHECK: struct ConstRACButNotBorrowingIterator : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
+// CHECK: struct ConstRACButNotIterableIterator : UnsafeCxxRandomAccessIterator, UnsafeCxxInputIterator {
 // CHECK:   func __operatorStar() -> Int32
-// CHECK:   func successor() -> ConstRACButNotBorrowingIterator
+// CHECK:   func successor() -> ConstRACButNotIterableIterator
 // CHECK:   typealias Pointee = Int32
 // CHECK:   typealias DereferenceResult = Int32
 // CHECK:   typealias Distance = Int32
-// CHECK:   static func += (lhs: inout ConstRACButNotBorrowingIterator, v: ConstRACButNotBorrowingIterator.difference_type)
-// CHECK:   static func - (lhs: ConstRACButNotBorrowingIterator, other: ConstRACButNotBorrowingIterator) -> Int32
-// CHECK:   static func == (lhs: ConstRACButNotBorrowingIterator, other: ConstRACButNotBorrowingIterator) -> Bool
+// CHECK:   static func += (lhs: inout ConstRACButNotIterableIterator, v: ConstRACButNotIterableIterator.difference_type)
+// CHECK:   static func - (lhs: ConstRACButNotIterableIterator, other: ConstRACButNotIterableIterator) -> Int32
+// CHECK:   static func == (lhs: ConstRACButNotIterableIterator, other: ConstRACButNotIterableIterator) -> Bool
 // CHECK:   var pointee: Int32 { get }
 // CHECK: }
 
