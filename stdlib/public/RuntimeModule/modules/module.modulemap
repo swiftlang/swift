@@ -32,6 +32,7 @@ module BacktracingImpl {
   module OS {
     module Darwin { header "OS/Darwin.h" }
     module Windows { header "OS/Windows.h" }
+    module WinNTInternals { header "OS/WinNTInternals.h" }
     module Libc { header "OS/Libc.h" }
   }
 
