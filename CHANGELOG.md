@@ -5,6 +5,22 @@
 
 ## Swift (next)
 
+* [SE-0522][]: Introduced the `@diagnose` declaration attribute for source-level
+  control over compiler warning behavior. `@diagnose(GroupID, as: error|warning|ignored)`
+  overrides diagnostic behavior for the specified warning group within the
+  lexical scope of the annotated declaration, relative to its enclosing scope.
+  An optional `reason:` parameter accepts a string literal for documentation.
+
+  ```swift
+  @diagnose(DeprecatedDeclaration, as: warning, reason: "Must maintain compatibility until end of release cycle")
+  func bridgeToLegacySystem() {
+    oldAPI() // warning: 'oldAPI()' is deprecated [#DeprecatedDeclaration]
+  }
+  ```
+
+  During the evolution process, this feature existed under the experimental
+  feature named `SourceWarningControl`.
+
 * The compiler API note `SwiftImportAs` now has support for always importing C structs as `OpaquePointer`. 
   This can be used to unify the imported C pointer type in situations where the visibility of the struct might differ.
   For example, the C `FILE` pointer in Android imports differently on API 23 compared to API 24 and above. We can unify that using the new API note:
@@ -11187,6 +11203,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0503]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0503-suppressed-associated-types.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
 [SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
+[SE-0522]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0522-source-warning-control.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>
