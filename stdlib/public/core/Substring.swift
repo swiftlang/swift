@@ -815,27 +815,36 @@ extension Substring.UTF8View {
   }
 
 #if !(os(watchOS) && _pointerBitWidth(_32))
-  /// A span over the UTF8 code units that make up this substring.
+  /// A span over the UTF-8 code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property needs to transcode the code units every time
-  /// it is called.
-  /// For example, if `string` has the bridged UTF16 representation,
-  ///     for word in string.split(separator: " ") {
-  ///         useSpan(word.span)
-  ///     }
-  ///  is accidentally quadratic because of this issue. A workaround is to
-  ///  explicitly convert the string into its native UTF8 representation:
-  ///      var nativeString = consume string
-  ///      nativeString.makeContiguousUTF8()
-  ///      for word in nativeString.split(separator: " ") {
-  ///          useSpan(word.span)
-  ///      }
-  ///  This second option has linear time complexity, as expected.
+  /// - Note: On Apple platforms, this property must transcode the code
+  ///   units of bridged UTF-16 `String` instances on every access.
   ///
-  ///  Returns: a `Span` over the UTF8 code units of this Substring.
+  ///   For example, if `string` has the bridged UTF-16 representation,
   ///
-  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  /// ```swift
+  ///   for word in string.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
+  ///
+  ///   is accidentally quadratic because of this issue. A workaround is to
+  ///   explicitly convert the string into its native UTF-8 representation:
+  ///
+  /// ```swift
+  ///   var nativeString = consume string
+  ///   nativeString.makeContiguousUTF8()
+  ///   for word in nativeString.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
+  ///
+  ///   This second option has linear time complexity, as expected.
+  ///
+  /// - Returns: A `Span` over the UTF-8 code units of this `Substring`.
+  ///
+  /// - Complexity: O(1) for native UTF-8 strings, O(*n*) for bridged UTF-16
+  ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<UTF8.CodeUnit> {
     @lifetime(borrow self)
@@ -844,27 +853,36 @@ extension Substring.UTF8View {
     }
   }
 
-  /// A span over the UTF8 code units that make up this substring.
+  /// A span over the UTF-8 code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property needs to transcode the code units every time
-  /// it is called.
-  /// For example, if `string` has the bridged UTF16 representation,
-  ///     for word in string.split(separator: " ") {
-  ///         useSpan(word.span)
-  ///     }
-  ///  is accidentally quadratic because of this issue. A workaround is to
-  ///  explicitly convert the string into its native UTF8 representation:
-  ///      var nativeString = consume string
-  ///      nativeString.makeContiguousUTF8()
-  ///      for word in nativeString.split(separator: " ") {
-  ///          useSpan(word.span)
-  ///      }
-  ///  This second option has linear time complexity, as expected.
+  /// - Note: On Apple platforms, this property must transcode the code
+  ///   units of bridged UTF-16 `String` instances on every access.
   ///
-  ///  Returns: a `Span` over the UTF8 code units of this Substring.
+  ///   For example, if `string` has the bridged UTF-16 representation,
   ///
-  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  /// ```swift
+  ///   for word in string.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
+  ///
+  ///   is accidentally quadratic because of this issue. A workaround is to
+  ///   explicitly convert the string into its native UTF-8 representation:
+  ///
+  /// ```swift
+  ///   var nativeString = consume string
+  ///   nativeString.makeContiguousUTF8()
+  ///   for word in nativeString.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
+  ///
+  ///   This second option has linear time complexity, as expected.
+  ///
+  /// - Returns: A `Span` over the UTF-8 code units of this `Substring`.
+  ///
+  /// - Complexity: O(1) for native UTF-8 strings, O(*n*) for bridged UTF-16
+  ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
     @_alwaysEmitIntoClient @inline(__always)
@@ -879,28 +897,37 @@ extension Substring.UTF8View {
     fatalError("\(#function) unavailable on 32-bit watchOS")
   }
 
-  /// A span over the UTF8 code units that make up this substring.
+  /// A span over the UTF-8 code units that make up this substring.
   ///
-  /// - Note: In the case of bridged UTF16 String instances (on Apple
-  /// platforms,) this property needs to transcode the code units every time
-  /// it is called.
-  /// For example, if `string` has the bridged UTF16 representation,
-  ///     for word in string.split(separator: " ") {
-  ///         useSpan(word.span)
-  ///     }
-  ///  is accidentally quadratic because of this issue. A workaround is to
-  ///  explicitly convert the string into its native UTF8 representation:
-  ///      var nativeString = consume string
-  ///      nativeString.makeContiguousUTF8()
-  ///      for word in nativeString.split(separator: " ") {
-  ///          useSpan(word.span)
-  ///      }
-  ///  This second option has linear time complexity, as expected.
+  /// - Note: On Apple platforms, this property must transcode the code
+  ///   units of bridged UTF-16 `String` instances on every access.
   ///
-  ///  Returns: a `Span` over the UTF8 code units of this Substring, or `nil`
-  ///           if the Substring does not have a contiguous representation.
+  ///   For example, if `string` has the bridged UTF-16 representation,
   ///
-  ///  Complexity: O(1) for native UTF8 Strings, O(n) for bridged UTF16 Strings.
+  /// ```swift
+  ///   for word in string.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
+  ///
+  ///   is accidentally quadratic because of this issue. A workaround is to
+  ///   explicitly convert the string into its native UTF-8 representation:
+  ///
+  /// ```swift
+  ///   var nativeString = consume string
+  ///   nativeString.makeContiguousUTF8()
+  ///   for word in nativeString.split(separator: " ") {
+  ///       useSpan(word.span)
+  ///   }
+  /// ```
+  ///
+  ///   This second option has linear time complexity, as expected.
+  ///
+  /// - Returns: A `Span` over the UTF-8 code units of this `Substring`, or
+  ///   `nil` if the `Substring`'s representation is non-contiguous.
+  ///
+  /// - Complexity: O(1) for native UTF-8 strings, O(*n*) for bridged UTF-16
+  ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
     @lifetime(borrow self)
