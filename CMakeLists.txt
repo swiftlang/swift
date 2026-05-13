@@ -244,6 +244,10 @@ option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     NOTE: Disabling this will cause many String methods to crash."
     TRUE)
 
+option(SWIFT_STDLIB_ENABLE_SOURCE_INFO
+    "Build .swiftsourceinfo files for the standard library to provide a link back to the standard library sources"
+    FALSE)
+
 option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
