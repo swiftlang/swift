@@ -283,6 +283,7 @@ macro(swift_common_cxx_warnings)
         $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=switch>
         $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=unused>
         $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=uninitialized>
+        $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=unreachable-code>
         $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=implicit-fallthrough>)
     endif()
 
