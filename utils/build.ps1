@@ -1107,6 +1107,84 @@ function Ensure-WindowsAssemblyManifest([string] $ImagePath,
   }
 }
 
+function Set-WindowsManifestDependencies([string] $ToolPath,
+                                         [object[]] $Dependencies,
+                                         [string] $LogPrefix) {
+  if (-not $Dependencies -or $Dependencies.Count -eq 0) {
+    throw "${LogPrefix}: no manifest dependencies provided for '$ToolPath'"
+  }
+
+  $AsmNS = "urn:schemas-microsoft-com:asm.v1"
+  $ExistingManifestPath = Join-Path ([IO.Path]::GetTempPath()) `
+    "swift-sxs-existing-$([guid]::NewGuid().Guid).manifest"
+  $MergedManifestPath = Join-Path ([IO.Path]::GetTempPath()) `
+    "swift-sxs-merged-$([guid]::NewGuid().Guid).manifest"
+  $KeepMergedManifest = $false
+
+  try {
+    & "mt.exe" -nologo -inputresource:"$ToolPath;#1" -out:$ExistingManifestPath 2>&1 | Out-Null
+
+    $Doc = New-Object System.Xml.XmlDocument
+    if (Test-Path $ExistingManifestPath) {
+      try { $Doc.Load($ExistingManifestPath) }
+      catch {
+        Write-Warning "${LogPrefix}: existing manifest in '$ToolPath' is unparsable ($($_.Exception.Message)); replacing it"
+        $Doc = New-Object System.Xml.XmlDocument
+      }
+    }
+    if (-not $Doc.DocumentElement) {
+      [void]$Doc.AppendChild($Doc.CreateXmlDeclaration("1.0", "UTF-8", "yes"))
+      $Root = $Doc.CreateElement("assembly", $AsmNS)
+      $Root.SetAttribute("manifestVersion", "1.0")
+      [void]$Doc.AppendChild($Root)
+    }
+    $Root = $Doc.DocumentElement
+
+    $NSMgr = New-Object System.Xml.XmlNamespaceManager($Doc.NameTable)
+    $NSMgr.AddNamespace("a", $AsmNS)
+    if (-not $Root.SelectSingleNode("a:assemblyIdentity", $NSMgr)) {
+      $AsmId = $Doc.CreateElement("assemblyIdentity", $AsmNS)
+      $AsmId.SetAttribute("type", "win32")
+      $AsmId.SetAttribute("name", [IO.Path]::GetFileNameWithoutExtension($ToolPath))
+      $AsmId.SetAttribute("version", $Dependencies[0].Version)
+      $AsmId.SetAttribute("processorArchitecture", $Dependencies[0].ProcessorArchitecture)
+      [void]$Root.PrependChild($AsmId)
+    }
+
+    foreach ($Node in @($Root.SelectNodes("a:dependency", $NSMgr))) {
+      [void]$Root.RemoveChild($Node)
+    }
+
+    foreach ($Dependency in $Dependencies) {
+      $Dep = $Doc.CreateElement("dependency", $AsmNS)
+      $DepAsm = $Doc.CreateElement("dependentAssembly", $AsmNS)
+      $AsmId  = $Doc.CreateElement("assemblyIdentity", $AsmNS)
+      $AsmId.SetAttribute("type", "win32")
+      $AsmId.SetAttribute("name", $Dependency.Name)
+      $AsmId.SetAttribute("version", $Dependency.Version)
+      $AsmId.SetAttribute("processorArchitecture", $Dependency.ProcessorArchitecture)
+      $AsmId.SetAttribute("language", "*")
+      [void]$DepAsm.AppendChild($AsmId)
+      [void]$Dep.AppendChild($DepAsm)
+      [void]$Root.AppendChild($Dep)
+    }
+
+    $Doc.Save($MergedManifestPath)
+    $Output = & "mt.exe" -nologo -manifest $MergedManifestPath "-outputresource:$ToolPath;#1" 2>&1
+    $ExitCode = $LASTEXITCODE
+    if ($Output) { $Output | ForEach-Object { Write-Host "${LogPrefix}:   mt: $_" } }
+    if ($ExitCode -ne 0) {
+      $KeepMergedManifest = $true
+      throw "${LogPrefix}: mt failed for '$ToolPath' (exit $ExitCode). Merged manifest preserved at '$MergedManifestPath'."
+    }
+  } finally {
+    Remove-Item -Path $ExistingManifestPath -Force -ErrorAction SilentlyContinue
+    if (-not $KeepMergedManifest) {
+      Remove-Item -Path $MergedManifestPath -Force -ErrorAction SilentlyContinue
+    }
+  }
+}
+
 function Invoke-Program() {
   [CmdletBinding(PositionalBinding = $false)]
   param
