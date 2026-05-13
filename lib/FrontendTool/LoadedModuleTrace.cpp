@@ -950,9 +950,10 @@ bool swift::emitLoadedModuleTraceIfNeeded(const ModuleDependencyID &mainModule,
 
   std::vector<SwiftMacroTraceInfo> swiftMacros;
   for (auto &macro : info->macroDependencies) {
-    swiftMacros.push_back({macro.first, macro.second.LibraryPath.empty()
-                                            ? macro.second.ExecutablePath
-                                            : macro.second.LibraryPath});
+    swiftMacros.push_back(
+        {macro.first, macro.second.LibraryPath.empty()
+                          ? realPath(macro.second.ExecutablePath)
+                          : realPath(macro.second.LibraryPath)});
   }
 
   return writeLoadedModuleOutput(
