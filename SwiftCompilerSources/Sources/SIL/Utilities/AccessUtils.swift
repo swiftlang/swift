@@ -428,7 +428,7 @@ public struct AccessPath : CustomStringConvertible, Hashable {
     }
     if let resultPath = projectionPath.subtract(from: other.projectionPath),
        // Indexing is not a projection where the base overlaps the projected address.
-       !resultPath.pop().kind.isIndexedElement
+       !resultPath.pop().kind.mayBeIndexedElement
     {
       return resultPath
     }
