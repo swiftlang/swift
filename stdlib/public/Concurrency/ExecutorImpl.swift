@@ -98,7 +98,7 @@ internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
 internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-  if #available(StdlibDeploymentTarget 6.3, *) {
+  if #available(StdlibDeploymentTarget 9999, *) {
     Task.defaultExecutor.asSchedulingExecutor!.enqueue(ExecutorJob(unownedJob),
                                                        after: .nanoseconds(delay),
                                                        clock: .continuous)
@@ -122,7 +122,7 @@ internal func enqueueOnGlobalExecutor(seconds: CLongLong,
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   let delay = Duration.seconds(seconds) + Duration.nanoseconds(nanoseconds)
   let leeway = Duration.seconds(leewaySeconds) + Duration.nanoseconds(leewayNanoseconds)
-  if #available(StdlibDeploymentTarget 6.3, *) {
+  if #available(StdlibDeploymentTarget 9999, *) {
     switch clock {
       case _ClockID.suspending.rawValue:
         Task.defaultExecutor.asSchedulingExecutor!.enqueue(

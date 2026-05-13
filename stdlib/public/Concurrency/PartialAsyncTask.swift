@@ -46,6 +46,10 @@ internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
 internal func _swiftJobRunOnTaskExecutor(_ job: UnownedJob,
                                          _ serialExecutor: UnownedSerialExecutor,
                                          _ taskExecutor: UnownedTaskExecutor) -> ()
+@available(StdlibDeploymentTarget 9999, *)
+@_silgen_name("swift_job_destroy")
+@usableFromInline
+internal func _swiftJobDestroy(_ job: UnownedJob)
 
 // ==== -----------------------------------------------------------------------
 // MARK: UnownedJob
@@ -180,6 +184,12 @@ public struct UnownedJob: Sendable {
     unsafe _swiftJobRunOnTaskExecutor(self, serialExecutor, taskExecutor)
   }
 
+  /// Retrieve the id of this job
+  @_spi(ExperimentalScheduling)
+  @available(StdlibDeploymentTarget 9999, *)
+  public var id: UInt64 {
+    return _getJobTaskId(self)
+  }
 }
 
 @_unavailableInEmbedded
@@ -366,6 +376,12 @@ public struct ExecutorJob: Sendable, ~Copyable {
     return Kind(rawValue: _jobGetKind(self.context))!
   }
 
+  @_spi(ExperimentalScheduling)
+  @available(StdlibDeploymentTarget 9999, *)
+  public var id: UInt64 {
+    return _getJobTaskId(UnownedJob(context: self.context))
+  }
+
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
   //       we can still offer a description to be called explicitly though.
   @_unavailableInEmbedded
@@ -454,6 +470,25 @@ extension ExecutorJob {
                                taskExecutor: UnownedTaskExecutor) {
     unsafe _swiftJobRunOnTaskExecutor(UnownedJob(self), serialExecutor, taskExecutor)
   }
+}
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 9999, *)
+extension ExecutorJob {
+
+  /// Destroy this job.
+  ///
+  /// This is an unsafe operation; it will simply release the job itself,
+  /// without allowing the job to run, which means that any clean-up that
+  /// the job normally does will not happen.
+  ///
+  /// You should not use this function unless you know the job can be
+  /// safely cancelled in this manner.
+  ///
+  __consuming public func destroy() {
+    unsafe _swiftJobDestroy(UnownedJob(self))
+  }
+
 }
 
 // Helper to create a trampoline job to execute a job on a specified

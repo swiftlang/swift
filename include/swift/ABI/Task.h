@@ -182,6 +182,14 @@ public:
   void runSimpleInFullyEstablishedContext() {
     return RunJob(this); // 'return' forces tail call
   }
+
+  /// Destroy a job (unsafe).
+  void destroy() {
+    if (auto task = dyn_cast<AsyncTask>(this))
+      swift_cxx_deleteObject(task);
+    else
+      swift_cxx_deleteObject(this);
+  }
 };
 
 // The compiler will eventually assume these.

@@ -25,6 +25,7 @@ import Darwin
 // This test specifically checks that our reference counting accounts for existence of
 // objective-c types as TaskExecutors -- which was a bug where we'd swift_release
 // obj-c excecutors by accident (rdar://131151645).
+@available(SwiftStdlib 9999, *)
 final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unchecked Sendable {
   public func enqueue(_ _job: consuming ExecutorJob) {
     let job = UnownedJob(_job)
@@ -36,7 +37,7 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unch
   public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
-                                clock: C) {
+                                clock: C) -> ScheduledJob {
     // Convert to `Swift.Duration`
     let duration = delay as! Swift.Duration
 
@@ -45,19 +46,25 @@ final class NSQueueTaskExecutor: NSData, TaskExecutor, SchedulingExecutor, @unch
     let nanoseconds = attoseconds / 1_000_000_000
 
     // Get a Dispatch time
-    let deadline = DispatchTime.now().advanced(
-      by: .seconds(Int(seconds))
-    ).advanced(
-      by: .nanoseconds(Int(nanoseconds))
-    )
+    let deadline = DispatchTime.now()
+      + .seconds(Int(seconds))
+      + .nanoseconds(Int(nanoseconds))
 
+    let jobId = _job.id
     let job = UnownedJob(_job)
     DispatchQueue.main.asyncAfter(deadline: deadline) {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
+
+    return ScheduledJob(executor: self, jobId: jobId, opaqueData: (0, 0))
+  }
+
+  public func cancel(scheduledJob: ScheduledJob) {
+    // Do nothing
   }
 }
 
+@available(SwiftStdlib 9999, *)
 @main struct Main {
   static func main() async {
     var taskExecutor: (any TaskExecutor)? = NSQueueTaskExecutor()

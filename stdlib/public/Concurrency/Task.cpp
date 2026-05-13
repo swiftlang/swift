@@ -1913,6 +1913,11 @@ static void swift_task_startOnMainActorImpl(AsyncTask* task) {
   _swift_task_setCurrent(originalTask);
 }
 
+extern "C" SWIFT_CC(swift)
+void swift_job_destroy(Job *job) {
+  job->destroy();
+}
+
 // ==== Load-time setup code ----------------------------------------------------
 //
 // The ctor below is placed here so that it must always be linked into the final

@@ -23,7 +23,7 @@ actor MyActor {
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 9999, *)
 final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable {
   var asScheduling: SchedulingExecutor? {
     return self
@@ -39,7 +39,7 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
   public func enqueue<C: Clock>(_ _job: consuming ExecutorJob,
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
-                                clock: C) {
+                                clock: C) -> ScheduledJob {
     // Convert to `Swift.Duration`
     let duration = delay as! Swift.Duration
 
@@ -52,14 +52,21 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
       + .seconds(Int(seconds))
       + .nanoseconds(Int(nanoseconds))
 
+    let jobId = _job.id
     let job = UnownedJob(_job)
     DispatchQueue.main.asyncAfter(deadline: deadline) {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
+
+    return ScheduledJob(executor: self, jobId: jobId, opaqueData: (0, 0))
+  }
+
+  public func cancel(scheduledJob: ScheduledJob) {
+    // Do nothing
   }
 }
 
-@available(SwiftStdlib 6.3, *)
+@available(SwiftStdlib 9999, *)
 @main struct Main {
   static func main() async {
     let tests = TestSuite("sleep_executor")

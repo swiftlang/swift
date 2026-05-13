@@ -37,8 +37,49 @@ public protocol Executor: AnyObject, Sendable {
   #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
+/// Represents a job that is scheduled for future execution.
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
+public struct ScheduledJob {
+  /// The executor that this job was scheduled on
+  public let executor: any SchedulingExecutor
+
+  /// The job ID for this job
+  public let jobId: UInt64
+
+  /// Opaque, executor-specific data
+  public let opaqueData: (UInt, UInt)
+
+  public init(executor: any SchedulingExecutor,
+              jobId: UInt64,
+              opaqueData: (UInt, UInt)) {
+    self.executor = executor
+    self.jobId = jobId
+    self.opaqueData = opaqueData
+  }
+
+  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+  /// Cancel a scheduled job.
+  ///
+  /// Requests that the executor cancel the job identified by the
+  /// `cancellationToken` argument.  Note: executors may not be able
+  /// to cancel any given job, for various reasons including:
+  ///
+  /// - Where the job has already started executing.
+  /// - Where the job has already completed.
+  /// - Where the underlying implementation is unable to cancel
+  ///   future work.
+  ///
+  /// Users of this API should expect it to perform on a best-effort
+  /// basis and should not rely on the job being cancelled.
+  public func cancel() {
+    executor.cancel(scheduledJob: self)
+  }
+  #endif
+}
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 9999, *)
 public protocol SchedulingExecutor: Executor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -58,11 +99,14 @@ public protocol SchedulingExecutor: Executor {
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay.
-  @available(StdlibDeploymentTarget 6.3, *)
+  ///
+  /// Returns a ``ScheduledJobCancellationToken`` that can be used to
+  /// cancel the job before it runs.
+  @available(SwiftStdlib 9999, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          after delay: C.Duration,
                          tolerance: C.Duration?,
-                         clock: C)
+                         clock: C) -> ScheduledJob
 
   /// Enqueue a job to run at a specified time.
   ///
@@ -78,15 +122,67 @@ public protocol SchedulingExecutor: Executor {
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay.
-  @available(StdlibDeploymentTarget 6.3, *)
+  ///
+  /// Returns a ``ScheduledJobCancellationToken`` that can be used to
+  /// cancel the job before it runs.
+  @available(SwiftStdlib 9999, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          at instant: C.Instant,
                          tolerance: C.Duration?,
-                         clock: C)
+                         clock: C) -> ScheduledJob
+
+  /// Cancel a scheduled job.
+  ///
+  /// Requests that the executor cancel the job identified by the
+  /// `scheduledJob` argument.  Note: executors may not be able
+  /// to cancel any given job, for various reasons including:
+  ///
+  /// - Where the job has already started executing.
+  /// - Where the job has already completed.
+  /// - Where the underlying implementation is unable to cancel
+  ///   future work.
+  ///
+  /// Users of this API should expect it to perform on a best-effort
+  /// basis and should not rely on the job being cancelled.
+  ///
+  /// Parameters:
+  ///
+  /// - scheduledJob:  The scheduled job to cancel.
+  ///
+  @available(SwiftStdlib 9999, *)
+  func cancel(scheduledJob: ScheduledJob)
+
 
   #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
 }
+
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 9999, *)
+extension SchedulingExecutor {
+  // This is an implementation detail and is only needed because the
+  // methods on EnqueueingClock are not on Clock.  Once SE-0505 is
+  // accepted, we can move them to Clock and get rid of this.
+
+  public func _openAndEnqueue<E: EnqueueingClock,
+                              C: Clock,
+                              S: SchedulingExecutor>(
+    _ job: consuming ExecutorJob,
+    on executor: S,
+    at instant: C.Instant,
+    tolerance: C.Duration?,
+    clock: C,
+    enqueueingClock: E) -> ScheduledJob {
+    return enqueueingClock.enqueue(
+      job,
+      on: executor,
+      at: instant as! E.Instant,
+      tolerance: tolerance as! E.Duration
+    )
+  }
+}
+#endif
 
 extension Actor {
 
@@ -122,10 +218,7 @@ extension Executor {
   /// Executors that implement SchedulingExecutor should provide their
   /// own copy of this method, which will allow the compiler to avoid a
   /// potentially expensive runtime cast.
-  #if !os(Windows)
-  @_weakLinked
-  #endif
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 9999, *)
   internal var asSchedulingExecutor: (any SchedulingExecutor)? {
     return self as? SchedulingExecutor
   }
@@ -167,31 +260,31 @@ extension Executor {
 
 // Delay support
 @_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension SchedulingExecutor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 9999, *)
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
-                                clock: C) {
+                                clock: C) -> ScheduledJob {
     // If you crash here with a mutual recursion, it's because you didn't
     // implement one of these two functions
-    enqueue(job, at: clock.now.advanced(by: delay),
-            tolerance: tolerance, clock: clock)
+    return enqueue(job, at: clock.now.advanced(by: delay),
+                   tolerance: tolerance, clock: clock)
   }
 
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 9999, *)
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
-                                clock: C) {
+                                clock: C) -> ScheduledJob {
     // If you crash here with a mutual recursion, it's because you didn't
     // implement one of these two functions
-    enqueue(job, after: clock.now.duration(to: instant),
-            tolerance: tolerance, clock: clock)
+    return enqueue(job, after: clock.now.duration(to: instant),
+                   tolerance: tolerance, clock: clock)
   }
 
   #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -721,7 +814,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This follows the same logic as `currentExecutor`, except that it ignores
   /// any executor that isn't a `SchedulingExecutor`.
-  @available(StdlibDeploymentTarget 6.3, *)
+  @available(StdlibDeploymentTarget 9999, *)
   static var currentSchedulingExecutor: (any SchedulingExecutor)? {
     if let activeExecutor = unsafe _getActiveExecutor().asSerialExecutor(),
        let scheduling = activeExecutor.asSchedulingExecutor {

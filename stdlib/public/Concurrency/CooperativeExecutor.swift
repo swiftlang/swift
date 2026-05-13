@@ -17,7 +17,7 @@ import Swift
 // Store the Timestamp in the executor private data, if it will fit; otherwise,
 // use the allocator to allocate space for it and stash a pointer in the private
 // data area.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension ExecutorJob {
   fileprivate var cooperativeExecutorTimestampIsIndirect: Bool {
     return MemoryLayout<(Int, Int)>.size
@@ -99,7 +99,7 @@ extension ExecutorJob {
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 /// A wait queue is a specialised priority queue used to run a timer.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 struct WaitQueue {
   var queue: PriorityQueue<UnownedJob>
   var clock: _ClockID
@@ -140,6 +140,12 @@ struct WaitQueue {
     }
   }
 
+  mutating func cancel(jobId: UInt64) {
+    if let job = queue.removeFirst(where: { $0.id == jobId }) {
+      ExecutorJob(job).destroy()
+    }
+  }
+
   var timeToNextJob: CooperativeExecutor.Duration? {
     if let job = queue.top {
       let deadline = ExecutorJob(job).cooperativeExecutorTimestamp
@@ -157,7 +163,7 @@ struct WaitQueue {
 
 /// A co-operative executor that can be used as the main executor or as a
 /// task executor.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 final class CooperativeExecutor: Executor, @unchecked Sendable {
   var runQueue: PriorityQueue<UnownedJob>
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -244,7 +250,7 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
 }
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: SchedulingExecutor {
 
   func currentTime(clock: _ClockID) -> Timestamp {
@@ -258,25 +264,46 @@ extension CooperativeExecutor: SchedulingExecutor {
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
-                                clock: C) {
+                                clock: C) -> ScheduledJob {
+    let jobId = job.id
+
     // If it's a clock we know, get the duration to wait
     if let _ = clock as? ContinuousClock {
       let continuousDuration = delay as! ContinuousClock.Duration
       let duration = Duration(from: continuousDuration)
       continuousWaitQueue.enqueue(job, after: duration)
+      return ScheduledJob(executor: self, jobId: jobId, opaqueData: (1, 0))
     } else if let _ = clock as? SuspendingClock {
       let suspendingDuration = delay as! SuspendingClock.Duration
       let duration = Duration(from: suspendingDuration)
       suspendingWaitQueue.enqueue(job, after: duration)
+      return ScheduledJob(executor: self, jobId: jobId, opaqueData: (2, 0))
+    } else if let enqueueingClock = clock as? EnqueueingClock {
+      return _openAndEnqueue(
+        job,
+        on: self,
+        at: clock.now.advanced(by: delay),
+        tolerance: tolerance,
+        clock: clock,
+        enqueueingClock: enqueueingClock
+      )
     } else {
       fatalError("Sorry, cannot schedule on an unknown clock")
+    }
+  }
+
+  public func cancel(scheduledJob: ScheduledJob) {
+    if scheduledJob.opaqueData.0 == 1 {
+      continuousWaitQueue.cancel(jobId: scheduledJob.jobId)
+    } else if scheduledJob.opaqueData.0 == 2 {
+      suspendingWaitQueue.cancel(jobId: scheduledJob.jobId)
     }
   }
 
 }
 #endif
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: RunLoopExecutor {
   public func run() throws {
     try runUntil { false }
@@ -334,13 +361,13 @@ extension CooperativeExecutor: RunLoopExecutor {
   }
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: SerialExecutor {}
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: TaskExecutor {}
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: MainExecutor {}
 
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

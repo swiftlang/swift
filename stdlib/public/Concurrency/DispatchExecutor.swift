@@ -24,7 +24,7 @@ import Swift
 // .. Main Executor ............................................................
 
 /// A Dispatch-based main executor.
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
                             @unchecked Sendable {
   var threaded = false
@@ -47,13 +47,19 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
-                                clock: C) {
+                                clock: C) -> ScheduledJob {
+    let jobId = job.id
     _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
                      executor: self, global: false)
+    return ScheduledJob(executor: self, jobId: jobId, opaqueData: (0, 0))
+  }
+
+  public func cancel(scheduledJob: ScheduledJob) {
+    // ###FIXME: Dispatch can't do this
   }
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension DispatchMainExecutor: SerialExecutor {
 
   public func enqueue(_ job: consuming ExecutorJob) {
@@ -65,13 +71,13 @@ extension DispatchMainExecutor: SerialExecutor {
   }
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 extension DispatchMainExecutor: MainExecutor {}
 
 // .. Task Executor ............................................................
 
 /// A Dispatch-based `TaskExecutor`
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
                                   @unchecked Sendable {
   public init() {}
@@ -83,9 +89,15 @@ class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
-                                clock: C) {
+                                clock: C) -> ScheduledJob {
+    let jobId = job.id
     _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
                      executor: self, global: true)
+    return ScheduledJob(executor: self, jobId: jobId, opaqueData: (1, 0))
+  }
+
+  public func cancel(scheduledJob: ScheduledJob) {
+    // ###FIXME: Dispatch can't do this
   }
 }
 
@@ -136,7 +148,7 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
   fatalError("unknown clock in Dispatch Executor")
 }
 
-@available(StdlibDeploymentTarget 6.3, *)
+@available(StdlibDeploymentTarget 9999, *)
 fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
   _ job: consuming ExecutorJob,
   at instant: C.Instant,

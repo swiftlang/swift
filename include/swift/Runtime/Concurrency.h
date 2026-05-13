@@ -1008,6 +1008,11 @@ void swift_job_run_on_serial_and_task_executor(Job *job,
                                     SerialExecutorRef serialExecutor,
                                     TaskExecutorRef taskExecutor);
 
+/// Destroy a job.  Normally jobs are destroyed by running them; using
+/// this function is generally unsafe.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_job_destroy(Job *job);
+
 /// Return the current thread's active task reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 AsyncTask *swift_task_getCurrent(void);

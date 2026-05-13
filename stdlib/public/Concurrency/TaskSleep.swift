@@ -28,7 +28,7 @@ extension Task where Success == Never, Failure == Never {
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
 
-      if #available(StdlibDeploymentTarget 6.3, *) {
+      if #available(StdlibDeploymentTarget 9999, *) {
         #if !$Embedded
         if let executor = Task.currentSchedulingExecutor {
           executor.enqueue(ExecutorJob(context: job),
@@ -196,7 +196,9 @@ extension Task where Success == Never, Failure == Never {
 
   /// Called when the sleep(nanoseconds:) operation has been canceled before
   /// the sleep completed.
-  static func onSleepCancel(_ token: UnsafeSleepStateToken) {
+  @available(StdlibDeploymentTarget 9999, *)
+  static func onSleepCancel(_ token: UnsafeSleepStateToken,
+                            wakeUpJob: ScheduledJob?) {
     while true {
       let state = unsafe token.load()
       switch unsafe state {
@@ -214,6 +216,13 @@ extension Task where Success == Never, Failure == Never {
         // We have an active continuation, so try to transition to the
         // "cancelled" state.
         if unsafe token.exchange(expected: state, desired: .cancelled) {
+          #if !$Embedded
+          // Cancel the wake-up job, if any
+          if let wakeUpJob {
+            wakeUpJob.cancel()
+          }
+          #endif
+
           // We recorded the task cancellation before the sleep finished, so
           // invoke the continuation with the cancellation error.
           unsafe continuation.resume(throwing: _Concurrency.CancellationError())
@@ -238,9 +247,12 @@ extension Task where Success == Never, Failure == Never {
   ///
   /// This function doesn't block the underlying thread.
   public static func sleep(nanoseconds duration: UInt64) async throws {
+    if #available(StdlibDeploymentTarget 9999, *) {
+
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
     let token = unsafe UnsafeSleepStateToken()
+    var wakeUpJob: ScheduledJob? = nil
 
     do {
       // Install a cancellation handler to resume the continuation by
@@ -272,15 +284,12 @@ extension Task where Success == Never, Failure == Never {
 
               let job = Builtin.convertTaskToJob(sleepTask)
 
-              if #available(StdlibDeploymentTarget 6.3, *) {
-                #if !$Embedded
-                if let executor = Task.currentSchedulingExecutor {
-                  executor.enqueue(ExecutorJob(context: job),
-                                   after: .nanoseconds(duration),
-                                   clock: .continuous)
-                  return
-                }
-                #endif
+              #if !$Embedded
+              if let executor = Task.currentSchedulingExecutor {
+                wakeUpJob = executor.enqueue(ExecutorJob(context: job),
+                                             after: .nanoseconds(duration),
+                                             clock: .continuous)
+                return
               }
 
               // If there is no current scheduling executor, fall back to
@@ -303,7 +312,7 @@ extension Task where Success == Never, Failure == Never {
         }
         }
       } onCancel: {
-        unsafe onSleepCancel(token)
+        unsafe onSleepCancel(token, wakeUpJob: wakeUpJob)
       }
 
       // Determine whether we got cancelled before we even started.
@@ -333,6 +342,10 @@ extension Task where Success == Never, Failure == Never {
       // responsible for deallocating the flag word and continuation, if it's
       // still running.
       throw error
+    }
+
+    } else {
+      fatalError("Availability is borked")
     }
   }
 }

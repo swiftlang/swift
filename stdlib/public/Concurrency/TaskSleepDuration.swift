@@ -82,9 +82,12 @@ extension Task where Success == Never, Failure == Never {
     tolerance: C.Duration?,
     clock: C
   ) async throws {
+    if #available(StdlibDeploymentTarget 9999, *) {
+
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
     let token = unsafe UnsafeSleepStateToken()
+    var wakeUpJob: ScheduledJob? = nil
 
     do {
       // Install a cancellation handler to resume the continuation by
@@ -116,18 +119,13 @@ extension Task where Success == Never, Failure == Never {
 
               let job = Builtin.convertTaskToJob(sleepTask)
 
-              if #available(StdlibDeploymentTarget 6.3, *) {
-                #if !$Embedded
-                if let executor = Task.currentSchedulingExecutor {
-                  executor.enqueue(ExecutorJob(context: job),
-                                   at: instant,
-                                   tolerance: tolerance,
-                                   clock: clock)
-                  return
-                }
-                #endif
-              } else {
-                fatalError("we shouldn't get here; if we have, availability is broken")
+              #if !$Embedded
+              if let executor = Task.currentSchedulingExecutor {
+                wakeUpJob = executor.enqueue(ExecutorJob(context: job),
+                                             at: instant,
+                                             tolerance: tolerance,
+                                             clock: clock)
+                return
               }
 
               // If there is no current scheduling executor, fall back to
@@ -173,7 +171,7 @@ extension Task where Success == Never, Failure == Never {
         }
         }
       } onCancel: {
-        unsafe onSleepCancel(token)
+        unsafe onSleepCancel(token, wakeUpJob: wakeUpJob)
       }
 
       // Determine whether we got cancelled before we even started.
@@ -203,6 +201,10 @@ extension Task where Success == Never, Failure == Never {
       // responsible for deallocating the flag word and continuation, if it's
       // still running.
       throw error
+    }
+
+    } else {
+      fatalError("Availability is borked")
     }
   }
 

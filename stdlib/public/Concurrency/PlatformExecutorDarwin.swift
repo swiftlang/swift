@@ -18,18 +18,26 @@ import Swift
 @available(StdlibDeploymentTarget 6.3, *)
 public struct PlatformExecutorFactory: ExecutorFactory {
   public static var mainExecutor: any MainExecutor {
-    if CoreFoundation.isPresent {
-      return CFMainExecutor()
+    if #available(StdlibDeploymentTarget 9999, *) {
+      if CoreFoundation.isPresent {
+        return CFMainExecutor()
+      } else {
+        return DispatchMainExecutor()
+      }
     } else {
-      return DispatchMainExecutor()
+      fatalError("This should never happen")
     }
   }
 
   public static var defaultExecutor: any TaskExecutor {
-    if CoreFoundation.isPresent {
-      return CFTaskExecutor()
+    if #available(StdlibDeploymentTarget 9999, *) {
+      if CoreFoundation.isPresent {
+        return CFTaskExecutor()
+      } else {
+        return DispatchGlobalTaskExecutor()
+      }
     } else {
-      return DispatchGlobalTaskExecutor()
+      fatalError("This should never happen")
     }
   }
 }
