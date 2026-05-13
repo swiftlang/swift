@@ -1425,6 +1425,9 @@ swift_get_host_triple(SWIFT_HOST_TRIPLE)
 set(SWIFT_HOST_MODULE_TRIPLE "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_MODULE}")
 set(SWIFT_HOST_LIBRARIES_DEST_DIR "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}/swift/host")
 
+message(STATUS "Building with pedantic diagnostics: ${SWIFT_PEDANTIC_DIAGNOSTICS}")
+message(STATUS "")
+
 if(SWIFT_INCLUDE_TOOLS)
   message(STATUS "Building host Swift tools for ${SWIFT_HOST_VARIANT_SDK} ${SWIFT_HOST_VARIANT_ARCH}")
   message(STATUS "  Build type:     ${CMAKE_BUILD_TYPE}")

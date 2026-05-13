@@ -41,6 +41,7 @@ class SwiftTestCase(unittest.TestCase):
 
         # Setup args
         self.args = argparse.Namespace(
+            swift_pedantic_diagnostics=True,
             enable_tsan_runtime=False,
             compiler_vendor='none',
             swift_compiler_version=None,
@@ -138,6 +139,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS:STRING=6.0',
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS:STRING=1.0',
             '-DHELLO=YES',
+            '-DSWIFT_PEDANTIC_DIAGNOSTICS:BOOL=TRUE',
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -180,6 +182,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_WATCHOS:STRING=6.0',
             '-DSWIFT_DARWIN_TEST_DEPLOYMENT_VERSION_XROS:STRING=1.0',
             '-DHELLO=YES',
+            '-DSWIFT_PEDANTIC_DIAGNOSTICS:BOOL=TRUE',
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 
@@ -605,3 +608,24 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
              if 'DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS' in x])
+
+    def test_swift_pedantic_diagnostics(self):
+        self.args.swift_pedantic_diagnostics = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DSWIFT_PEDANTIC_DIAGNOSTICS:BOOL=TRUE',
+            swift.cmake_options)
+
+        self.args.swift_pedantic_diagnostics = False
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-DSWIFT_PEDANTIC_DIAGNOSTICS:BOOL=FALSE',
+            swift.cmake_options)

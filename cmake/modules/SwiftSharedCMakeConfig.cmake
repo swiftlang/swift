@@ -275,10 +275,15 @@ macro(swift_common_cxx_warnings)
   # `-Werror` part.
   check_cxx_compiler_flag("-Werror" CXX_SUPPORTS_W_ERROR_OPTION)
 
-  # Make unhandled switch cases be an error in assert builds
-  if(DEFINED LLVM_ENABLE_ASSERTIONS)
-    if (CXX_SUPPORTS_W_ERROR_OPTION)
-      add_compile_options($<$<COMPILE_LANGUAGE:C,CXX>:-Werror=switch>)
+  # These are diagnostics that are useful at desk and help to keep our code
+  # clean.
+  if(SWIFT_PEDANTIC_DIAGNOSTICS)
+    if(CXX_SUPPORTS_W_ERROR_OPTION)
+      add_compile_options(
+        $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=switch>
+        $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=unused>
+        $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=uninitialized>
+        $<$<COMPILE_LANGUAGE:C,CXX>:-Werror=implicit-fallthrough>)
     endif()
 
     if(MSVC)
