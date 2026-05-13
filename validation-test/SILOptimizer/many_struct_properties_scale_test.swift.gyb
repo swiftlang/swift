@@ -1,10 +1,9 @@
-// RUN: %timer-scale-test --begin 100 --end 1000 --superlinear-threshold 4 --trace --select SIL-processing.instr -O %s
+// RUN: %timer-scale-test --begin 100 --end 1000 --superlinear-threshold 4 --ignore-no-data --trace --select SIL-processing.instr -O %s
 
 // TODO: there are still compile time problems in CopyPropagation and OSSACanonicalizationOwned (inside SILCombine): rdar://176255056
 //       Once those problems are fixed the threshold should be closer to 1.
 
 // REQUIRES: asserts
-// REQUIRES: OS=macosx
 
 public typealias Handler = ((Int) -> Int)
 

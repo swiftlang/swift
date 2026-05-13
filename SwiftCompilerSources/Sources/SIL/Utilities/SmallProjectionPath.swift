@@ -118,6 +118,15 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
         return false
       }
     }
+
+    public var mayBeIndexedElement: Bool {
+      switch self {
+      case .anyIndexedElement, .indexedElement, .anything, .anyValueFields:
+        return true
+      default:
+        return false
+      }
+    }
   }
 
   public init() { self.bytes = 0 }
