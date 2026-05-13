@@ -29,6 +29,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -5712,6 +5713,17 @@ void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl) {
 }
 
 void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
+  // @export(interface) classes have a unique definition in their defining
+  // module; importing modules reference them as external symbols rather than
+  // lazily emitting their own copy.
+  if (IGM.isEmbeddedWithExistentials()) {
+    if (auto *classDecl = classTy->getClassOrBoundGenericClass()) {
+      if (auto model = classDecl->getExplicitCodeGenerationModel())
+        if (*model == CodeGenerationModel::Interface)
+          return;
+    }
+  }
+
   // Might already be emitted, skip if that's the case.
   auto entity =
       LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
