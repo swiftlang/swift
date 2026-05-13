@@ -495,6 +495,9 @@ protected:
     asImpl().visit(BB->getTerminator());
   }
 
+  /// Clone a debug-only reconstruction block.
+  void cloneDebugBasicBlock(SILBasicBlock *SrcBB, SILBasicBlock *NewBB);
+
   // CFG cloning requires cloneFunction() or cloneReachableBlocks().
   void visitSILBasicBlock(SILFunction *F) = delete;
 
@@ -638,6 +641,8 @@ protected:
 private:
   /// MARK: SILCloner implementation details hidden from CRTP extensions.
 
+  friend class DebugBasicBlockCloner;
+
   void clonePhiArgs(SILBasicBlock *oldBB);
 
   void visitBlocksDepthFirst(SILBasicBlock *StartBB);
@@ -645,6 +650,28 @@ private:
   /// Also perform fundamental cleanup first, then call the CRTP extension,
   /// `postFixUp`.
   void commonFixUp(SILFunction *F);
+};
+
+/// A minimal cloner for debug-only reconstruction blocks.
+/// Uses the base SILCloner machinery (ValueMap, BBMap, clonePhiArgs).
+class DebugBasicBlockCloner : public SILCloner<DebugBasicBlockCloner> {
+  friend class SILCloner<DebugBasicBlockCloner>;
+  friend class SILInstructionVisitor<DebugBasicBlockCloner>;
+public:
+  explicit DebugBasicBlockCloner(SILFunction &F)
+      : SILCloner<DebugBasicBlockCloner>(F) {}
+  DebugBasicBlockCloner(SILFunction &F,
+                        const SubstitutionMapWithLocalArchetypes &Subs)
+      : SILCloner<DebugBasicBlockCloner>(F) {
+    Functor = Subs;
+  }
+  void clone(SILBasicBlock *SrcBB, SILBasicBlock *NewBB) {
+    Builder.setInsertionPoint(NewBB);
+    BBMap[SrcBB] = NewBB;
+    clonePhiArgs(SrcBB);
+    visitInstructionsInBlock(SrcBB);
+    visit(SrcBB->getTerminator());
+  }
 };
 
 /// A SILBuilder that automatically invokes postprocess on each
@@ -911,6 +938,15 @@ void SILCloner<ImplClass>::clonePhiArgs(SILBasicBlock *oldBB) {
 
     asImpl().mapValue(Arg, mappedArg);
   }
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::cloneDebugBasicBlock(SILBasicBlock *SrcBB,
+                                                SILBasicBlock *NewBB) {
+  // By default, this uses its own cloner, as the debug basic block should
+  // be left untouched by transformations.
+  DebugBasicBlockCloner cloner(*NewBB->getParent(), Functor);
+  cloner.clone(SrcBB, NewBB);
 }
 
 // This private helper visits BBs in depth-first preorder (only processing
@@ -1663,6 +1699,15 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   auto *NewInst = getBuilder().createDebugValue(
       Inst->getLoc(), getOpValue(Inst->getOperand()), *VarInfo,
       Inst->poisonRefs(), Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
+
+  // Clone the debug-only reconstruction block if present.
+  if (auto *SrcDebugBB = Inst->getDebugBlock()) {
+    SILBasicBlock *NewDebugBB =
+        NewInst->getFunction()->createDebugBasicBlock();
+    NewInst->setDebugBlock(NewDebugBB);
+    asImpl().cloneDebugBasicBlock(SrcDebugBB, NewDebugBB);
+  }
+
   recordClonedInstruction(Inst, NewInst);
 }
 template<typename ImplClass>

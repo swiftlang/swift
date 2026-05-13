@@ -2745,7 +2745,8 @@ bool PullbackCloner::Implementation::run() {
   // Prepare and emit a `return` in the pullback exit block.
   auto *origEntry = getOriginal().getEntryBlock();
   auto *pbExit = getPullbackBlocksRegion(origEntry).second;
-  builder.setCurrentDebugScope(pbExit->back().getDebugScope());
+  if (!pbExit->empty())
+    builder.setCurrentDebugScope(pbExit->back().getDebugScope());
   builder.setInsertionPoint(pbExit);
 
   // This vector will contain all the materialized return elements.
