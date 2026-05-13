@@ -2995,6 +2995,102 @@ function Get-WindowsSxSRuntimeDLLs([string] $RuntimeSourceDir) {
     Sort-Object Name
 }
 
+# Bind Windows toolchain executables to the Swift runtime they were linked
+# against, instead of whichever runtime DLLs happen to sit next to them.
+# In-process plugins inherit the EXE activation context and use the same
+# private SxS bundle.  The build-tree test phase must use the bundle form:
+# swift-test-stdlib later produces a flat runtime layout in bin\, which would
+# overwrite or shadow per-DLL private assembly directories.
+function Set-WindowsSxSToolchainRuntime {
+  [CmdletBinding()]
+  param(
+    [Parameter(Mandatory)] [string]   $BinaryDir,
+    [Parameter(Mandatory)] [string]   $RuntimeSourceDir,
+    [Parameter(Mandatory)] [string[]] $Tools,
+    # Keep this distinct from every DLL basename in $BinaryDir; SxS probes
+    # `<assemblyName>.dll` before `<assemblyName>\`.
+    [string]                          $AssemblyName          = "swiftToolchainRuntime",
+    # Windows SxS requires the canonical four-part `a.b.c.d` form.
+    [string]                          $AssemblyVersion       = "1.0.0.0",
+    [Parameter(Mandatory)] [string]   $ProcessorArchitecture
+  )
+
+  if (-not (Test-Path $BinaryDir)) {
+    throw "Set-WindowsSxSToolchainRuntime: BinaryDir '$BinaryDir' does not exist"
+  }
+  if (-not (Test-Path $RuntimeSourceDir)) {
+    # -SkipBuild may run before the runtime is installed.
+    Write-Warning "Set-WindowsSxSToolchainRuntime: RuntimeSourceDir '$RuntimeSourceDir' does not exist; skipping SxS bind"
+    return
+  }
+
+  if ($AssemblyVersion -notmatch '^\d+\.\d+\.\d+\.\d+$') {
+    throw "Set-WindowsSxSToolchainRuntime: AssemblyVersion '$AssemblyVersion' is not in the required 4-part 'a.b.c.d' form (Windows SxS rejects any other shape)."
+  }
+
+  Write-Host "Set-WindowsSxSToolchainRuntime: source            = '$RuntimeSourceDir'"
+  Write-Host "Set-WindowsSxSToolchainRuntime: destination       = '$BinaryDir'"
+  Write-Host "Set-WindowsSxSToolchainRuntime: assembly name     = $AssemblyName"
+  Write-Host "Set-WindowsSxSToolchainRuntime: assembly version  = $AssemblyVersion"
+  Write-Host "Set-WindowsSxSToolchainRuntime: architecture      = $ProcessorArchitecture"
+
+  $DLLItems = @(Get-WindowsSxSRuntimeDLLs $RuntimeSourceDir)
+  if (-not $DLLItems) {
+    Write-Warning "Set-WindowsSxSToolchainRuntime: no *.dll found under '$RuntimeSourceDir'; skipping SxS bind"
+    return
+  }
+  Write-Host "Set-WindowsSxSToolchainRuntime: globbed $($DLLItems.Count) *.dll from source"
+
+  # Use one bundle assembly so the later flat runtime DLLs can coexist with the
+  # test tool binding.  A per-DLL private layout is correct for the final
+  # install image, but it is not stable while the build tree is still producing
+  # flat runtime DLLs in bin\.
+  $AssemblyDir = Join-Path $BinaryDir $AssemblyName
+  New-Item -ItemType Directory -Path $AssemblyDir -Force | Out-Null
+
+  Write-Host "Set-WindowsSxSToolchainRuntime: staging $($DLLItems.Count) DLLs into bundle assembly '$AssemblyName':"
+  $StagedFiles = New-Object System.Collections.Generic.List[string]
+  foreach ($DLL in $DLLItems) {
+    $StagedDLL = Join-Path $AssemblyDir $DLL.Name
+    Copy-Item -Path $DLL.FullName -Destination $StagedDLL -Force
+    Write-Host ("  [{0,-32}]  {1,10:N0}b  ->  {2}" -f $DLL.Name, $DLL.Length, $StagedDLL)
+    [void]$StagedFiles.Add($DLL.Name)
+  }
+
+  $FilesXml = ($StagedFiles | ForEach-Object { "  <file name=`"$_`"/>" }) -join "`r`n"
+  $BundleManifest = @"
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <assemblyIdentity type="win32" name="$AssemblyName" version="$AssemblyVersion"
+      processorArchitecture="$ProcessorArchitecture"/>
+$FilesXml
+</assembly>
+"@
+  $BundleManifestPath = Join-Path $AssemblyDir "$AssemblyName.manifest"
+  Set-Content -Path $BundleManifestPath -Value $BundleManifest -Encoding UTF8
+  Write-Host "Set-WindowsSxSToolchainRuntime: wrote bundle assembly manifest -> '$BundleManifestPath'"
+
+  $Dependency = [pscustomobject]@{
+    Name                  = $AssemblyName
+    Version               = $AssemblyVersion
+    ProcessorArchitecture = $ProcessorArchitecture
+  }
+  foreach ($Tool in $Tools) {
+    $ToolPath = if ([System.IO.Path]::IsPathRooted($Tool)) {
+      $Tool
+    } else {
+      Join-Path $BinaryDir $Tool
+    }
+    if (-not (Test-Path $ToolPath)) {
+      Write-Warning "Set-WindowsSxSToolchainRuntime: tool '$ToolPath' does not exist; skipping"
+      continue
+    }
+
+    Write-Host "Set-WindowsSxSToolchainRuntime: binding '$ToolPath' to assembly '$AssemblyName' v$AssemblyVersion"
+    Set-WindowsExecutableManifestDependencies $ToolPath @($Dependency) "Set-WindowsSxSToolchainRuntime"
+  }
+}
+
 # Return the imported DLL names from a PE file.  Use the pinned host toolchain
 # so this also works while cross-compiling a non-host Windows toolchain.
 function Get-DLLImports([string] $Path) {
@@ -3175,21 +3271,23 @@ function Set-WindowsSxSToolchainRuntimePerDLL {
 
 function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $TestClang, [switch] $TestLLD, [switch] $TestLLDB, [switch] $TestLLDBSwift, [switch] $TestLLVM, [switch] $TestSwift) {
   Invoke-IsolatingEnvVars {
-    $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\tools\swift\libdispatch-windows-$($Platform.Architecture.LLVMName)-prefix\bin;$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
-    $TestingDefines = Get-CompilersDefines $Platform $Variant -Test
+    $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
+    $SwiftRuntime = Resolve-SDKRuntimeBin $Platform $SwiftSDK
+    $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-ProjectBinaryCache $Platform Stage2Compilers)\tools\swift\libdispatch-windows-$($Platform.Architecture.LLVMName)-prefix\bin;$(Get-ProjectBinaryCache $Platform Stage2Compilers)\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
+    $env:PYTHONUTF8 = "1"
+    $TestingDefines = Get-CompilersDefines $Platform $Variant -Test -SwiftSDK $SwiftSDK
+    # Stage2 tests must use the freshly-built native tools, not Stage1.
+    $TestingDefines["SWIFT_NATIVE_SWIFT_TOOLS_PATH"] = ([IO.Path]::Combine((Get-ProjectBinaryCache $Platform Stage2Compilers), "bin"))
+    # check-swift depends on swift-backtrace-${SDK}; build the libexec helpers
+    # with the rest of the test targets.
+    $TestingDefines["SWIFT_BUILD_LIBEXEC"] = "YES"
+    # Keep %host-build-swift on the same platform SDK that Stage2 uses.
+    $TestingDefines["SWIFT_HOST_SDKROOT"] = $SwiftSDK
     if ($TestLLVM) { $Targets += @("check-llvm") }
     if ($TestClang) { $Targets += @("check-clang") }
     if ($TestLLD) { $Targets += @("check-lld") }
     if ($TestSwift) {
-      $Targets += @("check-swift", "SwiftCompilerPlugin")
-
-      # Copy the backtracer into position 
-      $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
-      $CompilerCache = Get-ProjectBinaryCache $BuildPlatform Compilers
-      Copy-Item `
-        -Path $RuntimeBinaryCache\libexec `
-        -Destination $CompilerCache `
-        -Recurse -Force
+      $Targets += @("SwiftCompilerPlugin", "check-swift")
     }
     if ($TestLLDB) { $Targets += @("check-lldb") }
     if ($TestLLDBSwift) { $Targets += @("check-lldb-swift") }
@@ -3197,34 +3295,33 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       # Override test filter for known issues in downstream LLDB
       Load-LitTestOverrides ([IO.Path]::GetFullPath([IO.Path]::Combine($PSScriptRoot, "..", "..", "llvm-project", "lldb", "test", "windows-swift-llvm-lit-test-overrides.txt")))
 
-      # Transitive dependency of _lldb.pyd
-      $RuntimeBinaryCache = Get-ProjectBinaryCache $BuildPlatform Runtime
-      Copy-Item `
-        -Path $RuntimeBinaryCache\bin\swiftCore.dll `
-        -Destination "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\site-packages\lldb"
-
-      # Runtime dependencies of repl_swift.exe
+      $CompilerCache = Get-ProjectBinaryCache $Platform Stage2Compilers
       $SwiftRTSubdir = "lib\swift\windows"
-      Write-Host "Copying '$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir'"
-      Copy-Item `
-        -Path "$RuntimeBinaryCache\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" `
-        -Destination "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\$SwiftRTSubdir"
-      Write-Host "Copying '$RuntimeBinaryCache\bin\swiftCore.dll' to '$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin'"
-      Copy-Item `
-        -Path "$RuntimeBinaryCache\bin\swiftCore.dll" `
-        -Destination "$(Get-ProjectBinaryCache $BuildPlatform Compilers)\bin"
 
+      # Transitive dependency of _lldb.pyd
+      Copy-Item `
+        -Path (Join-Path $SwiftRuntime "swiftCore.dll") `
+        -Destination "$CompilerCache\lib\site-packages\lldb"
+
+      # Runtime dependencies of repl_swift.exe.  The Stage2-compiled swiftCore.dll
+      # already lives in $CompilerCache\bin and is what repl_swift.exe is linked
+      # against, so only swiftrt.obj needs to be staged from the SDK here.
+      New-Item -ItemType Directory -Force "$CompilerCache\$SwiftRTSubdir" | Out-Null
+      Write-Host "Copying '$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj' to '$CompilerCache\$SwiftRTSubdir'"
+      Copy-Item `
+        -Path "$SwiftSDK\usr\$SwiftRTSubdir\$($Platform.Architecture.LLVMName)\swiftrt.obj" `
+        -Destination "$CompilerCache\$SwiftRTSubdir"
       $TestingDefines += @{
         LLDB_INCLUDE_TESTS = "YES";
         # Check for required Python modules in CMake
         LLDB_ENFORCE_STRICT_TEST_REQUIREMENTS = "YES";
         # No watchpoint support on windows: https://github.com/llvm/llvm-project/issues/24820
-        LLDB_TEST_USER_ARGS = "--skip-category=watchpoint;--sysroot=$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)";
-        LLDB_TEST_SWIFT_DRIVER_EXTRA_FLAGS = "-sdk '$(Get-SwiftSDK -OS $Platform.OS -Identifier $Platform.DefaultSDK)'"
+        LLDB_TEST_USER_ARGS = "--skip-category=watchpoint;--sysroot=$SwiftSDK";
+        LLDB_TEST_SWIFT_DRIVER_EXTRA_FLAGS = "-sdk '$SwiftSDK'"
         # gtest sharding breaks llvm-lit's --xfail and LIT_XFAIL inputs: https://github.com/llvm/llvm-project/issues/102264
         LLVM_LIT_ARGS = "-v --no-gtest-sharding --time-tests";
         # LLDB Unit tests link against this library
-        LLVM_UNITTEST_LINK_FLAGS = "$(Get-SwiftSDK -OS Windows -Identifier Windows)\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\swiftCore.lib";
+        LLVM_UNITTEST_LINK_FLAGS = "$SwiftSDK\usr\lib\swift\windows\$($Platform.Architecture.LLVMName)\swiftCore.lib";
       }
     }
 
@@ -3232,24 +3329,89 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
       Write-Warning "Test-Compilers invoked without specifying test target(s)."
     }
 
+    # Build and bind the runtime-loading tools before swift-test-stdlib can
+    # repopulate bin\ with freshly-built runtime DLLs.  This path intentionally
+    # uses the bundle SxS helper rather than the per-DLL install-layout helper
+    # because the test build keeps producing flat runtime DLLs in bin\.  Reuse
+    # the same configure arguments for the final build so ninja does not relink
+    # away the manifests.
+    $BuildCMakeArgs = @{
+      Src           = [IO.Path]::Combine($SourceCache, "llvm-project", "llvm")
+      Bin           = (Get-ProjectBinaryCache $Platform Stage2Compilers)
+      InstallTo     = "$($Platform.ToolchainInstallRoot)\usr"
+      Platform      = $Platform
+      CCompiler     = $Compilers.Stage1.C
+      CXXCompiler   = $Compilers.Stage1.CXX
+      SwiftCompiler = $Compilers.Stage1.Swift
+      SwiftSDK      = $SwiftSDK
+      CacheScript   = [IO.Path]::Combine($SourceCache, "swift", "cmake", "caches", "Windows-$($Platform.Architecture.LLVMName).cmake")
+      Defines       = $TestingDefines
+    }
+
+    Build-CMakeProject @BuildCMakeArgs -BuildTargets @(
+      "swift-frontend",
+      "sourcekitd-test",
+      "swift-ide-test",
+      "swift-plugin-server"
+    )
+
+    # Prefer the platform SDK runtime.  The pre-staged bundle fallback keeps
+    # -SkipBuild usable when the install image is absent.
+    $Stage2BinDir          = [IO.Path]::Combine($BuildCMakeArgs.Bin, "bin")
+    $Stage2LibexecSwiftDir = [IO.Path]::Combine($BuildCMakeArgs.Bin, "libexec", "swift")
+    $RuntimeSourceCandidates = @(
+      $SwiftRuntime,
+      (Join-Path $Stage2BinDir "swiftToolchainRuntime")
+    )
+    Write-Host "SxS bind: searching for toolchain runtime source dir:"
+    $RuntimeSource = $null
+    foreach ($Candidate in $RuntimeSourceCandidates) {
+      $Exists = Test-Path $Candidate
+      $DllCount = if ($Exists) { (Get-ChildItem $Candidate -Filter '*.dll' -File -ErrorAction SilentlyContinue).Count } else { 0 }
+      $Marker = if ($RuntimeSource) { "skip" } elseif ($Exists -and $DllCount -gt 0) { "USE" } else { "miss" }
+      Write-Host ("  [{0,-4}] {1} ({2} dlls)" -f $Marker, $Candidate, $DllCount)
+      if (-not $RuntimeSource -and $Exists -and $DllCount -gt 0) { $RuntimeSource = $Candidate }
+    }
+    if (-not $RuntimeSource) { $RuntimeSource = $RuntimeSourceCandidates[0] }
+
+    Invoke-IsolatingEnvVars {
+      # Test-time tools execute on the build host.
+      Invoke-VsDevShell $BuildPlatform
+      Set-WindowsSxSToolchainRuntime `
+        -BinaryDir              $Stage2BinDir `
+        -RuntimeSourceDir       $RuntimeSource `
+        -ProcessorArchitecture  $BuildPlatform.Architecture.VSName `
+        -Tools                  @(
+                                   "swift.exe",
+                                   "swiftc.exe",
+                                   "swift-driver.exe",
+                                   "swift-frontend.exe",
+                                   "swift-synthesize-interface.exe",
+                                   "sil-opt.exe",
+                                   "sourcekitd-test.exe",
+                                   "swift-ide-test.exe",
+                                   "swift-plugin-server.exe",
+                                   "swiftc-legacy-driver.exe"
+                                 )
+      # SxS only probes the EXE's own directory for the named assembly.
+      if (Test-Path (Join-Path $Stage2LibexecSwiftDir "swift-backtrace.exe")) {
+        Set-WindowsSxSToolchainRuntime `
+          -BinaryDir              $Stage2LibexecSwiftDir `
+          -RuntimeSourceDir       $RuntimeSource `
+          -ProcessorArchitecture  $BuildPlatform.Architecture.VSName `
+          -Tools                  @("swift-backtrace.exe")
+      } else {
+        Write-Warning "SxS bind: '$Stage2LibexecSwiftDir\swift-backtrace.exe' not present; skipping backtracer bind (Build-TestBacktrace did not run or failed)"
+      }
+    }
+
     # TODO(roman-bcny): Workaround for https://github.com/swiftlang/swift/issues/87970
     # Stdlib DLLs must be fully linked before swift-frontend compilations
     # that load them, otherwise the linker races with memory-mapped DLLs
-    # causing LNK1104. Separate ninja invocations enforce ordering.
+    # causing LNK1104. Build swift-test-stdlib first to enforce ordering.
     $Targets = @("swift-test-stdlib") + $Targets
 
-    Build-CMakeProject `
-      -Src $SourceCache\llvm-project\llvm `
-      -Bin $(Get-ProjectBinaryCache $Platform Compilers) `
-      -InstallTo "$($Platform.ToolchainInstallRoot)\usr" `
-      -Platform $Platform `
-      -CCompiler $Compilers.Host.C `
-      -CXXCompiler $Compilers.Host.CXX `
-      -SwiftCompiler $Compilers.Pinned.Swift `
-      -SwiftSDK (Get-PinnedToolchainSDK -OS $Platform.OS) `
-      -BuildTargets $Targets `
-      -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake `
-      -Defines $TestingDefines
+    Build-CMakeProject @BuildCMakeArgs -BuildTargets $Targets
   }
 }
 
