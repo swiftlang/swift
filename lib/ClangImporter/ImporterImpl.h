@@ -753,6 +753,15 @@ public:
   llvm::ArrayRef<SubscriptDecl *>
   lookupAndImportSubscripts(NominalTypeDecl *Struct, bool noSynthesize = false);
 
+  /// Attempt to lookup and import the synthesized __convertToBool() method.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl and is imported from
+  /// a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// __convertToBool() that it returns is a member of \a Record.
+  FuncDecl *lookupAndImportOperatorBool(NominalTypeDecl *Struct);
+
 private:
   /// Stores <.pointee, func __operatorStar(), mutating func __operatorStar()>
   llvm::DenseMap<NominalTypeDecl *,
@@ -761,6 +770,7 @@ private:
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedSuccessorCache;
   llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<SubscriptDecl *, 1>>
       importedSubscriptsCache;
+  llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
 
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
