@@ -427,13 +427,6 @@ ERROR(unsupported_version_of_module_interface,none,
       (StringRef, llvm::VersionTuple))
 ERROR(error_opening_explicit_module_file,none,
       "failed to open explicit Swift module: %0", (StringRef))
-WARNING(warning_module_shadowing_may_break_module_interface,none,
-        "public %0 %1 shadows module %2, which may cause failures when "
-        "importing %3 or its clients in some configurations; please rename "
-        "either the %0 %1 or the module %2, or see "
-        "https://github.com/apple/swift/issues/56573 for workarounds",
-        (DescriptiveDeclKind, FullyQualified<Type>,
-        /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
 REMARK(rebuilding_module_from_interface,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
 NOTE(sdk_version_pbm_version,none,
