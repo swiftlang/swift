@@ -21,6 +21,10 @@ set(swift_string_processing_compile_flags)
 list(APPEND swift_string_processing_compile_flags
   "-DRESILIENT_LIBRARIES")
 
+# For swift_getTupleTypeMetadata().
+list(APPEND swift_string_processing_compile_flags
+  "-enable-experimental-feature" "AllowRuntimeSymbolDeclarations")
+
 if(SWIFT_BUILD_STATIC_STDLIB)
   # Explicitly autolink swift_RegexParser because it's imported with @_implementationOnly
   list(APPEND swift_string_processing_compile_flags
