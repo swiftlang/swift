@@ -1721,3 +1721,18 @@ bb0(%0 : $Int):
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @negative_index_addr :
+// CHECK:         store %1 to [trivial] %4
+// CHECK:         store %1 to [trivial] %2
+// CHECK:       end sil function 'negative_index_addr'
+sil [ossa] @negative_index_addr : $@convention(thin) (Builtin.RawPointer, Int) -> () {
+bb0(%0 : $Builtin.RawPointer, %1 : $Int):
+  %2 = pointer_to_address %0 to [strict] $*Int
+  %3 = integer_literal $Builtin.Word, -1
+  %4 = index_addr [stack_protection] %2, %3
+  store %1 to [trivial] %4
+  store %1 to [trivial] %2
+  %r = tuple ()
+  return %r
+}
+
