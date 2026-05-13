@@ -119,12 +119,14 @@ void swift_ASTGen_freeConfiguredRegions(
 
 swift::WarningGroupBehavior swift_ASTGen_warningGroupBehaviorAtPosition(
     void *_Nonnull sourceFile,
+    BridgedASTContext astContext,
     BridgedArrayRef globalRules,
     BridgedStringRef diagnosticGroupNameStrRef,
     swift::SourceLoc loc);
 
 bool swift_ASTGen_isWarningGroupEnabledInFile(
     void *_Nonnull sourceFile,
+    BridgedASTContext astContext,
     BridgedArrayRef globalRules,
     BridgedStringRef diagnosticGroupNameStrRef);
 
