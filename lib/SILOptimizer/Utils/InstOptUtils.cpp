@@ -2018,21 +2018,22 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   }
 
   if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
-    APInt value = IL->getValue();
-    const SILDIExprElement ExprElements[2] = {
-      SILDIExprElement::createOperator(value.isNegative() ?
-        SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
-      SILDIExprElement::createConstInt(value.getLimitedValue()),
-    };
     for (Operand *U : getDebugUses(IL)) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
       auto VarInfo = DbgInst->getVarInfo();
       if (!VarInfo)
         continue;
-      VarInfo->DIExpr.prependElements(ExprElements);
-      // Create a new debug_value, with undef, and the correct const int
-      SILBuilder(DbgInst, DbgInst->getDebugScope())
-        .createDebugValue(DbgInst->getLoc(), SILUndef::get(IL), *VarInfo);
+      // Create a debug BB containing just the integer literal.
+      SILFunction *F = DbgInst->getFunction();
+      SILBasicBlock *DebugBB = F->createDebugBasicBlock();
+      SILBuilder BBBuilder(DebugBB);
+      auto *NewIL = BBBuilder.createIntegerLiteral(
+          IL->getLoc(), IL->getType(), IL->getValue());
+      BBBuilder.createReturn(IL->getLoc(), NewIL);
+      // Create a new debug_value with undef and attach the debug BB.
+      auto *NewDVI = SILBuilder(DbgInst, DbgInst->getDebugScope())
+          .createDebugValue(DbgInst->getLoc(), SILUndef::get(IL), *VarInfo);
+      NewDVI->setDebugBlock(DebugBB);
     }
   }
 }
