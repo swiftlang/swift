@@ -7994,6 +7994,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // If we're asking if two integer types are the same, then we know they
       // aren't.
       return getTypeMatchFailure(locator);
+
+    case TypeKind::Hidden:
+      // Two HiddenTypes match only if they have the same mangled name.
+      if (cast<HiddenType>(desugar1)->getMangledName() ==
+          cast<HiddenType>(desugar2)->getMangledName())
+        break;
+      return getTypeMatchFailure(locator);
     }
   }
 
@@ -8548,6 +8555,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::GenericTypeParam:
   case TypeKind::UnboundGeneric:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::Join:
   case TypeKind::Meet:
     ABORT([&](llvm::raw_ostream &out) {

@@ -8375,6 +8375,16 @@ Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
 
   return IntegerType::get(blobData, isNegative, ctx);
 }
+
+Expected<Type> DESERIALIZE_TYPE(HIDDEN_TYPE)(ModuleFile &MF,
+                                             SmallVectorImpl<uint64_t> &scratch,
+                                             StringRef blobData) {
+  auto &ctx = MF.getContext();
+
+  decls_block::HiddenTypeLayout::readRecord(scratch);
+
+  return HiddenType::get(ctx, blobData);
+}
 } // namespace decls_block
 } // namespace serialization
 }

@@ -2402,6 +2402,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
     llvm_unreachable("should not be asking for the type info an IntegerType");
+  case TypeKind::Hidden:
+    llvm_unreachable("HiddenType should be resolved before IRGen sees it");
   }
   }
   llvm_unreachable("bad type kind");

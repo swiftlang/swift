@@ -661,6 +661,7 @@ struct ASTContext::Implementation {
   llvm::DenseMap<CanType, SILMoveOnlyWrappedType *> SILMoveOnlyWrappedTypes;
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::FoldingSet<IntegerType> IntegerTypes;
+  llvm::FoldingSet<HiddenType> HiddenTypes;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -3879,6 +3880,25 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
 
   ctx.getImpl().IntegerTypes.InsertNode(intType, insertPos);
   return intType;
+}
+
+HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName) {
+  llvm::FoldingSetNodeID id;
+  HiddenType::Profile(id, mangledName);
+
+  void *insertPos;
+  if (auto *hidden =
+          ctx.getImpl().HiddenTypes.FindNodeOrInsertPos(id, insertPos)) {
+    return hidden;
+  }
+
+  auto nameCopy = ctx.AllocateCopy(mangledName);
+
+  auto *hidden = new (ctx, AllocationArena::Permanent)
+      HiddenType(nameCopy, ctx);
+
+  ctx.getImpl().HiddenTypes.InsertNode(hidden, insertPos);
+  return hidden;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,

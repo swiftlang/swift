@@ -6892,6 +6892,13 @@ namespace {
       printFoot();
     }
 
+    void visitHiddenType(HiddenType *T, Label label) {
+      printCommon("hidden_type", label);
+      printFieldQuoted(T->getMangledName(), Label::always("mangled_name"),
+                       IdentifierColor);
+      printFoot();
+    }
+
 #undef TRIVIAL_TYPE_PRINTER
   };
 
