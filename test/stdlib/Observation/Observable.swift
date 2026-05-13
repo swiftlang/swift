@@ -14,6 +14,7 @@
 
 import StdlibUnittest
 import Observation
+import Synchronization
 
 @usableFromInline
 @inline(never)

@@ -170,10 +170,31 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
   }
   
   public struct Iterator: AsyncIteratorProtocol {
-    var state: _ManagedCriticalState<State>?
+    let extent: Extent
     let emit: Emit
-    let iteratorID: Int
+    
     var started = false
+
+    final class Extent {
+      var state: _ManagedCriticalState<State>?
+      let iteratorID: Int
+
+      init(state: _ManagedCriticalState<State>, iteratorID: Int) {
+        self.state = state
+        self.iteratorID = iteratorID
+      }
+
+      deinit {
+        if let state {
+          State.terminate(state, iteratorID: iteratorID)
+        }
+      }
+    }
+
+    init(state: _ManagedCriticalState<State>, emit: Emit, iteratorID: Int) {
+      self.extent = Extent(state: state, iteratorID: iteratorID)
+      self.emit = emit
+    }
 
     fileprivate static func trackEmission(isolation trackingIsolation: isolated (any Actor)?, state: _ManagedCriticalState<State>, emit: Emit) throws(Failure) -> Iteration {
       if #available(SwiftStdlib 6.4, *) {
@@ -217,11 +238,11 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     }
 
     fileprivate mutating func terminate(throwing failure: Failure? = nil) throws(Failure) -> Element? {
-      if let state {
-        State.terminate(state, iteratorID: iteratorID)
+      if let state = extent.state {
+        State.terminate(state, iteratorID: extent.iteratorID)
       }
       // flag the sequence as terminal by nil'ing out the state
-      state = nil
+      extent.state = nil
       if let failure {
         throw failure
       } else {
@@ -240,7 +261,8 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     }
 
     public mutating func next(isolation iterationIsolation: isolated (any Actor)? = #isolation) async throws(Failure) -> Element? {
-      guard let state else { return nil }
+      guard let state = extent.state else { return nil }
+      let iteratorID = extent.iteratorID
       do {
         // there are two versions;
         // either the tracking has never yet started at all and we need to prime the pump for this specific iterator
