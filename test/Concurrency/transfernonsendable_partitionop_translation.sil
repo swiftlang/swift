@@ -2000,6 +2000,40 @@ bb0(%0 : @guaranteed $NonSendableKlass):
   return %r : $()
 }
 
+// A chained `partial_apply` whose callee is itself a previously-built
+// closure must merge the callee's region into the outer PA. PA1 captures
+// %0; PA2 takes PA1 as its callee and additionally captures %1. The
+// translation of PA2 should `require` and `merge` against both PA1 (the
+// callee, transitively bringing %0 with it) and %1 — verifying that we
+// do not accidentally drop the callee operand when filtering out
+// type-dependent operands.
+// CHECK-LABEL: begin running test {{.*}} on test_chained_partial_apply: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %1 = argument of bb0 : $NonSendableKlass
+// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %4 = partial_apply [callee_guaranteed] %2(%3) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> ()
+// CHECK-NEXT: %%3: TrackableValue. State: TrackableValueState[id: 3][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %6 = partial_apply [callee_guaranteed] %4(%5) : $@callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+// CHECK-NEXT: require %%2:   %6 = partial_apply [callee_guaranteed] %4(%5) : $@callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+// CHECK-NEXT: require %%1:   %6 = partial_apply [callee_guaranteed] %4(%5) : $@callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+// CHECK-NEXT: merge %%2 with %%1:   %6 = partial_apply [callee_guaranteed] %4(%5) : $@callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+// CHECK-NEXT: assign_direct %%3 = %%2:   %6 = partial_apply [callee_guaranteed] %4(%5) : $@callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+// CHECK-NEXT: end running test {{.*}} on test_chained_partial_apply: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_chained_partial_apply : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> () {
+bb0(%0 : @guaranteed $NonSendableKlass, %1 : @guaranteed $NonSendableKlass):
+  %f = function_ref @takes_two : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> ()
+  %copy0 = copy_value %0
+  %pa1 = partial_apply [callee_guaranteed] %f(%copy0) : $@convention(thin) (@guaranteed NonSendableKlass, @guaranteed NonSendableKlass) -> ()
+  %copy1 = copy_value %1
+  %pa2 = partial_apply [callee_guaranteed] %pa1(%copy1) : $@callee_guaranteed (@guaranteed NonSendableKlass) -> ()
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  destroy_value %pa2 : $@callee_guaranteed () -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: Terminator Instructions
 //===----------------------------------------------------------------------===//

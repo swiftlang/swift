@@ -220,8 +220,10 @@ func testReabstraction(body: () async -> Void) async throws {
 // Reabstraction thunk for `testReabstraction` closure
 //
 // CHECK: // thunk for @caller_isolated @callee_guaranteed @async (@guaranteed Builtin.ImplicitActor) -> (@error @owned Error)
+// CHECK: // Isolation: nonisolated(nonsending)
 // CHECK: sil shared [transparent] [reabstraction_thunk] @$sBAs5Error_pINgHgILzo_BAytSgsAA_pIeNgHgILrzo_TR : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @error any Error) -> (@out Optional<()>, @error any Error) {
 // CHECK: bb0(%0 : $*Optional<()>, [[ISOLATION:%.*]] : $Builtin.ImplicitActor, [[CLOSURE:%.*]] : $@caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @error any Error):
-// CHECK:   hop_to_executor [[ISOLATION]]
+// The hop gets eliminated because the parameter is also `nonisolated(nonsending)`
+// CHECK-NOT:   hop_to_executor [[ISOLATION]]
 // CHECK:   try_apply [[CLOSURE]]([[ISOLATION]]) : $@caller_isolated @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> @error any Error, normal bb1, error bb2
 // CHECK: } // end sil function '$sBAs5Error_pINgHgILzo_BAytSgsAA_pIeNgHgILrzo_TR'
