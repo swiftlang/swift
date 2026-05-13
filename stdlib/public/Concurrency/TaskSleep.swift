@@ -28,16 +28,14 @@ extension Task where Success == Never, Failure == Never {
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
 
-      if #available(StdlibDeploymentTarget 6.3, *) {
-        #if !$Embedded
-        if let executor = Task.currentSchedulingExecutor {
-          executor.enqueue(ExecutorJob(context: job),
-                           after: .nanoseconds(duration),
-                           clock: .continuous)
-          return
-        }
-        #endif
+      #if !$Embedded
+      if let executor = Task.currentSchedulingExecutor {
+        executor.enqueue(ExecutorJob(context: job),
+                         after: .nanoseconds(duration),
+                         clock: .continuous)
+        return
       }
+      #endif
 
       // If there is no current scheduling executor, fall back to
       // _enqueueJobGlobalWithDelay()
@@ -272,16 +270,14 @@ extension Task where Success == Never, Failure == Never {
 
               let job = Builtin.convertTaskToJob(sleepTask)
 
-              if #available(StdlibDeploymentTarget 6.3, *) {
-                #if !$Embedded
-                if let executor = Task.currentSchedulingExecutor {
-                  executor.enqueue(ExecutorJob(context: job),
-                                   after: .nanoseconds(duration),
-                                   clock: .continuous)
-                  return
-                }
-                #endif
+              #if !$Embedded
+              if let executor = Task.currentSchedulingExecutor {
+                executor.enqueue(ExecutorJob(context: job),
+                                 after: .nanoseconds(duration),
+                                 clock: .continuous)
+                return
               }
+              #endif
 
               // If there is no current scheduling executor, fall back to
               // _enqueueJobGlobalWithDelay()

@@ -707,9 +707,6 @@ extension String {
   /// - Returns: The first word break strictly following `i` in the string.
   @available(StdlibDeploymentTarget 5.7, *)
   public func _wordIndex(after i: String.Index) -> String.Index {
-    guard #available(StdlibDeploymentTarget 6.3, *) else {
-      fatalError("Unreachable")
-    }
     let i = _guts.validateScalarIndex(i)
     if _slowPath(_guts.isForeign) {
       return _guts._nextForeignWordIndex(after: i)
