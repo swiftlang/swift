@@ -835,7 +835,7 @@ fileprivate func isEqual(
      */
     let chunkSize = Swift.min(64, remainingOtherByteCount)
     // nil = keep looping; .some(equal) = terminate with that equality result
-    let chunkResult: Bool? = unsafe withUnsafeTemporaryAllocation(
+    let chunkResult: Bool? = withUnsafeTemporaryAllocation(
       of: UInt8.self,
       capacity: chunkSize
     ) { tmpBuffer in
