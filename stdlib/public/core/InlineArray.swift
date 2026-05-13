@@ -583,6 +583,11 @@ extension InlineArray where Element: ~Copyable {
 
 @available(SwiftStdlib 6.2, *)
 extension InlineArray where Element: ~Copyable {
+  /// A span over the elements of this array.
+  ///
+  /// - Returns: A `Span` over the elements of this array.
+  ///
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
@@ -598,6 +603,11 @@ extension InlineArray where Element: ~Copyable {
     }
   }
 
+  /// A mutable span over the elements of this array.
+  ///
+  /// - Returns: A `MutableSpan` over the elements of this array.
+  ///
+  /// - Complexity: O(1)
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {

@@ -1196,6 +1196,21 @@ extension Unsafe${Mutable}RawBufferPointer {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension Unsafe${Mutable}RawBufferPointer {
+  /// A span over the bytes of this buffer.
+  ///
+  /// The lifetime of the returned span matches the lifetime of the binding
+  /// which returns it. This lifetime is a convenience, as there can be
+  /// no enforcement that there is no concurrent write to the underlying memory.
+  /// The programmer must ensure that the memory remains allocated, initialized
+  /// and immutable for the lifetime of the returned span.
+  ///
+  /// - Note: This property is unsafe because it cannot guarantee that the
+  ///   underlying memory remains valid and immutable for the lifetime of
+  ///   the returned span.
+  ///
+  /// - Returns: A `RawSpan` over the bytes of this buffer.
+  ///
+  /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
   public var bytes: RawSpan {
@@ -1207,6 +1222,21 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 %  if Mutable:
 
+  /// A mutable span over the bytes of this buffer.
+  ///
+  /// The lifetime of the returned span matches the lifetime of the binding
+  /// which returns it. This lifetime is a convenience, as there can be no
+  /// enforcement that there is no concurrent access to the underlying memory.
+  /// The programmer must ensure that the memory remains allocated, initialized
+  /// and exclusively accessed for the lifetime of the returned span.
+  ///
+  /// - Note: This property is unsafe because it cannot guarantee that the
+  ///   underlying memory remains valid and exclusively accessed for the
+  ///   lifetime of the returned span.
+  ///
+  /// - Returns: A `MutableRawSpan` over the bytes of this buffer.
+  ///
+  /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
   public var mutableBytes: MutableRawSpan {

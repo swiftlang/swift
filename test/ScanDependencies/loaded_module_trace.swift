@@ -3,6 +3,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/cache)
+// RUN: %empty-directory(%t/macro)
 // RUN: split-file %s %t
 // RUN: ln -s %t/C_real.swiftinterface %t/C.swiftinterface
 
@@ -11,7 +12,8 @@
 // RUN: %target-build-swift -emit-module -module-name Module2 %S/../Driver/Inputs/loaded_module_trace_imports_module.swift \
 // RUN:   -o %t/Module2.swiftmodule -I %t -module-cache-path %t/cache -strict-memory-safety
 // RUN: %target-build-swift -emit-library -module-name Plugin %S/../Driver/Inputs/loaded_module_trace_compiler_plugin.swift \
-// RUN:   -o %t/%target-library-name(Plugin) -module-cache-path %t/cache
+// RUN:   -o %t/macro/%target-library-name(PluginReal) -module-cache-path %t/cache
+// RUN: ln -s %t/macro/%target-library-name(PluginReal) %t/%target-library-name(Plugin)
 
 // RUN: %target-swift-frontend -scan-dependencies %t/test.swift -emit-loaded-module-trace -emit-loaded-module-trace-path %t/trace.json \
 // RUN:   -enable-upcoming-feature RegionBasedIsolation -strict-memory-safety -module-name Test -dependency-only-import B \
@@ -36,7 +38,7 @@
 // CHECK-DAG: {"name":"C","path":"{{[^"]*\\[/\\]}}C_real.swiftinterface","isImportedDirectly":true,"supportsLibraryEvolution":true,"strictMemorySafety":false}
 // CHECK: ],
 // CHECK: "swiftmacros":[
-// CHECK-DAG: {"name":"Plugin","path":"{{[^"]*\\[/\\]}}{{libPlugin.dylib|libPlugin.so|Plugin.dll}}"}
+// CHECK-DAG: {"name":"Plugin","path":"{{[^"]*\\[/\\]}}{{libPluginReal.dylib|libPluginReal.so|PluginReal.dll}}"}
 // CHECK: ]
 // CHECK: }
 // CHECK-NOT: "B"
