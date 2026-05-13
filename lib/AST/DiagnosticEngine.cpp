@@ -606,7 +606,7 @@ bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID grou
       sf->getExportedSourceFile()) {
     auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
     return swift_ASTGen_isWarningGroupEnabledInFile(
-        sf->getExportedSourceFile(),
+        sf->getExportedSourceFile(), sf->getASTContext(),
         BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
         StringRef(getDiagGroupInfoByID(groupID).name));
   }
@@ -1372,7 +1372,7 @@ DiagnosticState::determineUserControlledWarningBehavior(
         auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
         WarningGroupBehavior behavior =
             swift_ASTGen_warningGroupBehaviorAtPosition(
-                SF->getExportedSourceFile(),
+                SF->getExportedSourceFile(), SF->getASTContext(),
                 BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
                 StringRef(getDiagGroupInfoByID(diag.getGroupID()).name), loc);
         switch (behavior) {
