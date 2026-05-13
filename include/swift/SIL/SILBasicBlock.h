@@ -530,6 +530,13 @@ public:
   /// not part of the function's BlockList.
   bool isDebugOnly() const { return index == -2; }
 
+  /// Update the parent function of a debug-only block (e.g. when the owning
+  /// instruction is moved between functions).
+  void setParentFunction(SILFunction *F) {
+    assert(isDebugOnly() && "only debug blocks can be reparented");
+    Parent = F;
+  }
+
   /// Returns true if this block ends in an unreachable or an apply of a
   /// no-return apply or builtin.
   bool isNoReturn() const;
