@@ -3186,6 +3186,9 @@ function build_and_test_installable_package() {
           call ${PLISTBUDDY_BIN} -c "Add ReportProblemURL string '${DARWIN_TOOLCHAIN_REPORT_URL}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
           call ${PLISTBUDDY_BIN} -c "Add Aliases array" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
 
+          # Marker used to populate <allowed-os-versions> in the final toolchain .pkg distribution
+          call ${PLISTBUDDY_BIN} -c "Add MinimumSystemVersion '${DARWIN_DEPLOYMENT_VERSION_OSX}'" "${DARWIN_TOOLCHAIN_INFO_PLIST}"
+
           aliases_count=0
           local IFS=","
           for alias_name in ${DARWIN_TOOLCHAIN_ALIAS}
