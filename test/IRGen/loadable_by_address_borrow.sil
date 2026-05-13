@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -enable-sil-verify-all %s -loadable-address | %FileCheck %s
 
+import Builtin
 import Swift
 
 public struct BigArc { var a, b, c, d, e: AnyObject }
@@ -54,44 +55,19 @@ bb0:
 }
 
 
-// In test2ossa, `%4` is a `BigArc` that is `load_borrow`-ed from a memory location.
-// `make_borrow` of the load becomes `make_borrow_addr` of the loaded address.
-
-// CHECK-LABEL: sil [ossa] @test2ossa
-// CHECK:        apply {{%.*}}([[OUT:%[0-9]+]])
-// CHECK:        copy_addr [take] [[OUT]] to [init] [[LOCAL:%[0-9]+]]
-// CHECK:        make_addr_borrow [[LOCAL]]
-sil [ossa] @test2ossa : $@convention(thin) () -> () {
-bb0:
-  %0 = alloc_stack $BigArc
-  %1 = function_ref @makeBigArc : $@convention(thin) () -> BigArc
-  %2 = apply %1() : $@convention(thin) () -> BigArc
-  store %2 to [init] %0
-  %4 = load_borrow %0
-  %5 = make_borrow %4
-  %6 = struct $Ref<BigArc> (%5)
-  %7 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
-  %8 = apply %7(%6) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
-  end_borrow %4
-  destroy_addr %0
-  dealloc_stack %0
-  %12 = tuple ()
-  return %12
-}
-
 // In test3, `%5` is a `BigArc` that is formed locally and doesn't directly
 // pass through any function boundaries. `make_borrow` of the local value
 // becomes `make_addr_borrow` of a temporary allocation.
 
 // CHECK-LABEL: sil @test3
-// CHECK:         [[BIGARC:%.*]] = struct $BigArc
 // CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         [[BIGARC:%.*]] = struct $BigArc
 // CHECK:         store [[BIGARC]] to [[BUF]]
 // CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF]]
 // CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
 // CHECK:         apply {{.*}}([[S_BORROW]])
-// CHECK:         dealloc_stack [[BUF]]
 // CHECK:         release_value [[BIGARC]]
+// CHECK:         dealloc_stack [[BUF]]
 sil @test3 : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : $AnyObject):
   retain_value %0
@@ -105,33 +81,6 @@ bb0(%0 : $AnyObject):
   %8 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
   %9 = apply %8(%7) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
   release_value %5
-  %11 = tuple ()
-  return %11
-}
-
-// CHECK-LABEL: sil [ossa] @test3ossa
-// CHECK:         [[BIGARC:%.*]] = struct $BigArc
-// CHECK:         [[BUF:%.*]] = alloc_stack
-// CHECK:         [[BUF_BORROW:%.*]] = store_borrow [[BIGARC]] to [[BUF]]
-// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF_BORROW]]
-// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
-// CHECK:         apply {{.*}}([[S_BORROW]])
-// CHECK:         end_borrow [[BUF_BORROW]]
-// CHECK:         dealloc_stack [[BUF]]
-// CHECK:         destroy_value [[BIGARC]]
-sil [ossa] @test3ossa : $@convention(thin) (@owned AnyObject) -> () {
-bb0(%0 : @owned $AnyObject):
-  %1 = copy_value %0
-  %2 = copy_value %0
-  %3 = copy_value %0
-  %4 = copy_value %0
-
-  %5 = struct $BigArc(%0, %1, %2, %3, %4)
-  %6 = make_borrow %5
-  %7 = struct $Ref<BigArc> (%6)
-  %8 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
-  %9 = apply %8(%7) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
-  destroy_value %5
   %11 = tuple ()
   return %11
 }
@@ -159,14 +108,14 @@ bb0(%0 : $BiggerArc):
 // is formed locally.
 
 // CHECK-LABEL: sil @test5
-// CHECK:         [[BIGARC:%.*]] = struct_extract {{%.*}}, #BiggerArc.bigArc
 // CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         [[BIGARC:%.*]] = struct_extract {{%.*}}, #BiggerArc.bigArc
 // CHECK:         store [[BIGARC]] to [[BUF]]
 // CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF]]
 // CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
 // CHECK:         apply {{.*}}([[S_BORROW]])
-// CHECK:         dealloc_stack [[BUF]]
 // CHECK:         release_value [[BIGARC]]
+// CHECK:         dealloc_stack [[BUF]]
 sil @test5 : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : $AnyObject):
   retain_value %0
@@ -187,39 +136,103 @@ bb0(%0 : $AnyObject):
   return %13
 }
 
-// CHECK-LABEL: sil [ossa] @test5ossa
-// CHECK:         [[BIGGER_ARC:%.*]] = struct $BiggerArc
-// CHECK:         [[BIGGER_ARC_BORROW:%.*]] = begin_borrow [[BIGGER_ARC]]
-// CHECK:         [[BIGARC:%.*]] = struct_extract [[BIGGER_ARC_BORROW]], #BiggerArc.bigArc
-// CHECK:         [[BUF:%.*]] = alloc_stack
-// CHECK:         [[BUF_BORROW:%.*]] = store_borrow [[BIGARC]] to [[BUF]]
-// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF_BORROW]]
-// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArc> ([[B_BORROW]])
-// CHECK:         apply {{.*}}([[S_BORROW]])
-// CHECK:         end_borrow [[BUF_BORROW]]
-// CHECK:         dealloc_stack [[BUF]]
-// CHECK:         end_borrow [[BIGGER_ARC_BORROW]]
-// CHECK:         destroy_value [[BIGGER_ARC]]
-sil [ossa] @test5ossa : $@convention(thin) (@owned AnyObject) -> () {
-bb0(%0 : @owned $AnyObject):
-  %1 = copy_value %0
-  %2 = copy_value %0
-  %3 = copy_value %0
-  %4 = copy_value %0
+public struct OneArcGen<T> { var a: AnyObject }
+public struct BigArcGen<T> { var a, b, c, d, e: OneArcGen<T> }
 
-  %5 = struct $BigArc(%0, %1, %2, %3, %4)
-  %6 = struct $BiggerArc(%5)
+sil @takeBorrowBigArcGen : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
 
-  %7 = begin_borrow %6
-  %8 = struct_extract %7, #BiggerArc.bigArc
-  %9 = make_borrow %8
-  %10 = struct $Ref<BigArc> (%9)
-  %11 = function_ref @takeBorrowBigArc : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
-  %12 = apply %11(%10) : $@convention(thin) (@guaranteed Ref<BigArc>) -> ()
-  end_borrow %7
-  destroy_value %6
-  %15 = tuple ()
-  return %15
+protocol P {
+  static func makeBigArc() -> OneArcGen<Self>
 }
 
+// In test6, `%x` is a `BigArc<T>` that is formed dependent on an opened
+// existential which does not pass through any function boundaries.
+// `make_borrow` of the local value becomes `make_addr_borrow` of a temporary
+// allocation.
+
+// CHECK-LABEL: sil @test6
+// CHECK:         open_existential
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         [[BIGARC:%.*]] = struct $BigArc
+// CHECK:         store [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArcGen<{{.*}}>> ([[B_BORROW]])
+// CHECK:         apply {{.*}}([[S_BORROW]])
+// CHECK:         release_value [[BIGARC]]
+// CHECK:         dealloc_stack [[BUF]]
+sil @test6 : $@convention(thin) (@thick any P.Type) -> () {
+bb0(%0 : $@thick any P.Type):
+  %1 = open_existential_metatype %0 to $@thick (@opened("00000000-0000-0000-0000-000000000000", any P) Self).Type
+  %2 = witness_method $@opened("00000000-0000-0000-0000-000000000000", any P) Self, #P.makeBigArc : <Self: P> (Self.Type) -> () -> OneArcGen<Self> : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
+  %3 = apply %2<@opened("00000000-0000-0000-0000-000000000000", any P) Self>(%1) : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
+
+  retain_value %3
+  retain_value %3
+  retain_value %3
+  retain_value %3
+
+  %8 = struct $BigArcGen<@opened("00000000-0000-0000-0000-000000000000", any P) Self>(%3, %3, %3, %3, %3)
+  %9 = make_borrow %8
+  %10 = struct $Ref<BigArcGen<@opened("00000000-0000-0000-0000-000000000000", any P) Self>> (%9)
+  %11 = function_ref @takeBorrowBigArcGen : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
+  %12 = apply %11<@opened("00000000-0000-0000-0000-000000000000", any P) Self>(%10) : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
+  release_value %8
+  %14 = tuple ()
+  return %14
+}
+
+// In test7, `%x` is a `BigArc<T>` that is formed dependent on an opened
+// existential which does not pass through any function boundaries, and which
+// is only used on one branch of a divergent control flow.
+// `make_borrow` of the local value becomes `make_addr_borrow` of a temporary
+// allocation.
+
+// CHECK-LABEL: sil @test7
+// CHECK:         cond_br {{.*}}, [[YES:bb[0-9]+]], [[NO:bb[0-9]+]]
+// CHECK:       [[YES]]:
+// CHECK:         open_existential
+// CHECK:         [[BUF:%.*]] = alloc_stack
+// CHECK:         br [[YES2:bb[0-9]+]]
+// CHECK:       [[YES2]]:
+// CHECK:         [[BIGARC:%.*]] = struct $BigArcGen
+// CHECK:         store [[BIGARC]] to [[BUF]]
+// CHECK:         [[B_BORROW:%.*]] = make_addr_borrow [[BUF]]
+// CHECK:         [[S_BORROW:%.*]] = struct $Ref<BigArcGen<{{.*}}>> ([[B_BORROW]])
+// CHECK:         apply {{.*}}([[S_BORROW]])
+// CHECK:         release_value [[BIGARC]]
+// CHECK:         dealloc_stack [[BUF]]
+// CHECK:         br [[CONT:bb[0-9]+]]
+// CHECK:       [[NO]]:
+// CHECK:         br [[CONT]]
+sil @test7 : $@convention(thin) (@thick any P.Type, Builtin.Int1) -> () {
+bb0(%0 : $@thick any P.Type, %1 : $Builtin.Int1):
+  cond_br %1, bb1, bb3
+
+bb1:
+  %3 = open_existential_metatype %0 to $@thick (@opened("00000001-0000-0000-0000-000000010000", any P) Self).Type
+  %4 = witness_method $@opened("00000001-0000-0000-0000-000000010000", any P) Self, #P.makeBigArc : <Self: P> (Self.Type) -> () -> OneArcGen<Self> : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
+  %5 = apply %4<@opened("00000001-0000-0000-0000-000000010000", any P) Self>(%3) : $@convention(witness_method : P) <Self: P> (@thick Self.Type) -> @owned OneArcGen<Self>
+  br bb2
+
+bb2:
+  retain_value %5
+  retain_value %5
+  retain_value %5
+  retain_value %5
+
+  %10 = struct $BigArcGen<@opened("00000001-0000-0000-0000-000000010000", any P) Self>(%5, %5, %5, %5, %5)
+  %11 = make_borrow %10
+  %12 = struct $Ref<BigArcGen<@opened("00000001-0000-0000-0000-000000010000", any P) Self>> (%11)
+  %13 = function_ref @takeBorrowBigArcGen : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
+  %14 = apply %13<@opened("00000001-0000-0000-0000-000000010000", any P) Self>(%12) : $@convention(thin) <T> (@guaranteed Ref<BigArcGen<T>>) -> ()
+  release_value %10
+  br bb4
+
+bb3:
+  br bb4
+
+bb4:
+  %16 = tuple ()
+  return %16
+}
 
