@@ -1943,10 +1943,41 @@ public:
       }
     }
 
-    if (VerifyDebugValueExpr)
-      if (auto *DVI = dyn_cast<DebugValueInst>(inst))
+    // Verify debug basic block invariants and type chain.
+    if (auto *DVI = dyn_cast<DebugValueInst>(inst)) {
+      if (auto *DebugBB = DVI->getDebugBlock()) {
+        // Structural checks.
+        require(DebugBB->isDebugOnly(),
+                "debug block must be marked debug-only");
+        require(DebugBB->getParent() == DVI->getFunction(),
+                "debug block must belong to the same function");
+        require(!DebugBB->empty(),
+                "debug block must not be empty");
+        require(isa<ReturnInst>(DebugBB->getTerminator()),
+                "debug block must end with a return instruction");
+
+        // Self-containedness: all operands must be defined within the block.
+        for (auto &I : *DebugBB) {
+          for (auto &Op : I.getAllOperands()) {
+            auto *DefI = Op.get()->getDefiningInstruction();
+            if (DefI) {
+              require(DefI->getParent() == DebugBB,
+                      "debug block instruction operand must be defined "
+                      "within the debug block");
+            } else if (auto *Arg = dyn_cast<SILArgument>(Op.get())) {
+              require(Arg->getParent() == DebugBB,
+                      "debug block instruction operand must be a block "
+                      "argument of the debug block");
+            }
+          }
+        }
+      }
+
+      // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
+      if (VerifyDebugValueExpr)
         require(DVI->isExprTypeValid(),
                 "debug_value type chain should hold");
+    }
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {
