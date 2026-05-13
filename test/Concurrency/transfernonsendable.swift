@@ -2417,3 +2417,13 @@ enum rdar169803154_Seq {
     AsyncThrowingStream(Float.self) { $0.finish() }
   }
 }
+
+// Iterating over an existential sequence parameter in a nonisolated method on
+// an actor must not produce a false positive RBI error.
+actor ActorWithNonisolatedExistentialSequenceMethod {
+  nonisolated func process(sequence: any Sequence<Int>) {
+    for element in sequence {
+      _ = element
+    }
+  }
+}
