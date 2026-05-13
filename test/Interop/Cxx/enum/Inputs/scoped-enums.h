@@ -19,3 +19,16 @@ enum class ScopedEnumInt : int { x, y, z };
 enum class ScopedEnumNegativeElement : int { x = -1, y = 0, z = 2 };
 
 enum class MiddleDefinedScopedEnum { x, y = 42, z };
+
+enum class ScopedEnumChar32 : char32_t { x = 0, y = 42 };
+
+enum class ScopedEnumChar16 : char16_t { a = 0, b = 1 };
+
+enum class ScopedEnumWChar : wchar_t { x = 0, y = 7 };
+
+struct HasChar32Enum {
+  enum : char32_t {
+    ok = 0,
+    error = 1
+  } status;
+};
