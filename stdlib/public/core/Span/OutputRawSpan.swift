@@ -428,56 +428,6 @@ extension OutputRawSpan {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputRawSpan {
-  /// Appends to the span as elements of a specific type.
-  ///
-  /// There must be at least `n * MemoryLayout<T>.stride` bytes
-  /// available in the span. The address of the next uninitialized byte
-  /// must be well-aligned for instances of type `type`.
-  ///
-  /// Inside the closure, initialize elements by appending to `typedSpan`.
-  /// After the closure returns, the number of bytes initialized will be
-  /// correctly updated.
-  ///
-  /// If the closure throws an error, the bytes for the elements appended
-  /// until that point will remain initialized.
-  ///
-  /// - Parameters:
-  ///   - n: The number of `T` elements to initialize.
-  ///   - type: The type of the elements to store.
-  ///   - initializer: A closure that initializes new elements.
-  ///     - Parameters:
-  ///       - typedSpan: An `OutputSpan` over enough bytes to initialize
-  ///         the specified number of additional elements.
-  @_alwaysEmitIntoClient
-  @_lifetime(self: copy self)
-  public mutating func append<T, E: Error>(
-    upTo n: Int,
-    as type: T.Type,
-    initializingWith initializer:
-      (_ typedSpan: inout OutputSpan<T>) throws(E) -> Void
-  ) throws(E) where T: ConvertibleToBytes & BitwiseCopyable {
-    let total = n * MemoryLayout<T>.stride
-    _precondition(total <= freeCapacity, "OutputRawSpan capacity overflow")
-    let tail = unsafe _tail()
-    var initialized = 0
-    defer {
-      _count += initialized &* MemoryLayout<T>.stride
-    }
-    try unsafe tail.withMemoryRebound(to: T.self, capacity: n) { p throws(E) in
-      let buffer = unsafe UnsafeMutableBufferPointer<T>(start: p, count: n)
-      var typedSpan = unsafe OutputSpan<T>(buffer: buffer, initializedCount: 0)
-      defer {
-        initialized = unsafe typedSpan.finalize(for: buffer)
-        typedSpan = .init()
-      }
-      try initializer(&typedSpan)
-    }
-  }
-}
-
-@available(SwiftCompatibilitySpan 5.0, *)
-@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
-extension OutputRawSpan {
   /// Borrow the underlying initialized memory for read-only access.
   @_alwaysEmitIntoClient
   @_transparent
