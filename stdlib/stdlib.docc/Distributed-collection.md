@@ -43,17 +43,13 @@ You use three main parts when writing code with distributed actors:
 
 ## Topics
 
-
-### Articles
-
-- <doc:implementing-a-custom-distributed-actor-system>
-
 ### Distributed Actors
 
 - ``Distributed/DistributedActor``
 - ``Distributed/DistributedActorSystem``
 - ``Distributed/Resolvable()``
 - ``Distributed/buildDefaultDistributedRemoteActorExecutor(_:)``
+- <doc:implementing-a-custom-distributed-actor-system>
 
 ### Remote Calls
 
