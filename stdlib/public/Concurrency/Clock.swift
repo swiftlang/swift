@@ -67,7 +67,7 @@ extension Clock {
   ///       }
   @available(StdlibDeploymentTarget 5.7, *)
   @_alwaysEmitIntoClient
-  public func measure(
+  public nonisolated(nonsending) func measure(
     _ work: nonisolated(nonsending) () async throws -> Void
   ) async rethrows -> Instant.Duration {
     let start = now
