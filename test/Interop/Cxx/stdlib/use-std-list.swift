@@ -23,7 +23,7 @@ StdListTestSuite.test("ListOfInt conforms to CxxIterable") {
     var iterator : CxxIterableIterator<List> = lst.makeIterableIterator()
     var counter = 0
     while true {
-        var span = iterator.nextSpan()
+        let span = iterator.nextSpan()
         if (span.count == 0) { break }
         for i in 0..<span.count {
             expectEqual(span[i], arr[counter])

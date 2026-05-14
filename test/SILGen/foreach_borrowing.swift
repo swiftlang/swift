@@ -17,11 +17,11 @@ extension NoncopyableInt: Equatable {
   }
 }
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing32testNonCopyableIterable3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing23testNonCopyableIterable3seqys4SpanVyAA14NoncopyableIntVG_tF : $@convention(thin) (@guaranteed Span<NoncopyableInt>) -> () {
 @available(SwiftStdlib 6.4, *)
 func testNonCopyableIterable(seq: borrowing Span<NoncopyableInt>) {
   // With borrowing feature enabled, we expect makeIterableIterator and nextSpan to be called
-  // CHECK: = function_ref @$ss4SpanVsRi_zRi0_zrlE21makeIterableIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
+  // CHECK: = function_ref @$ss4SpanVsRi_zRi0_zrlE20makeIterableIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
   // CHECK: function_ref @$ss12SpanIteratorVsRi_zRi0_zrlE04nextA012maximumCounts0A0VyxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (Int, @lifetime(copy 1) @inout SpanIterator<τ_0_0>) -> @lifetime(borrow address_for_deps 1) @owned Span<τ_0_0>
   // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zRi0_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@guaranteed Span<τ_0_0>) -> Bool
   // CHECK: [[IS_EMPTY_CALL:%.*]] = apply [[IS_EMPTY_CHECK]]
@@ -39,11 +39,11 @@ func testNonCopyableIterable(seq: borrowing Span<NoncopyableInt>) {
 }
 
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing29testCopyableIterable3seqys4SpanVySiG_tF : $@convention(thin) (@guaranteed Span<Int>) -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing20testCopyableIterable3seqys4SpanVySiG_tF : $@convention(thin) (@guaranteed Span<Int>) -> () {
 @available(SwiftStdlib 6.4, *)
 func testCopyableIterable(seq: borrowing Span<Int>) {
   // With borrowing feature enabled, we expect makeIterableIterator and nextSpan to be called
-  // CHECK: function_ref @$ss4SpanVsRi_zRi0_zrlE21makeIterableIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
+  // CHECK: function_ref @$ss4SpanVsRi_zRi0_zrlE20makeIterableIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
   // CHECK: = function_ref @$ss12SpanIteratorVsRi_zRi0_zrlE04nextA012maximumCounts0A0VyxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (Int, @lifetime(copy 1) @inout SpanIterator<τ_0_0>) -> @lifetime(borrow address_for_deps 1) @owned Span<τ_0_0>
   // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zRi0_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@guaranteed Span<τ_0_0>) -> Bool
   // CHECK: [[IS_EMPTY_CALL:%.*]] = apply [[IS_EMPTY_CHECK]]
@@ -60,7 +60,7 @@ func testCopyableIterable(seq: borrowing Span<Int>) {
   }
 }
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing35testContinueTargetIterableyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing26testContinueTargetIterableyyF : $@convention(thin) () -> () {
 @available(SwiftStdlib 6.4, *)
 func testContinueTargetIterable() {
   let arr = [0, 1, 2, 3]
@@ -91,7 +91,7 @@ func testContinueTargetIterable() {
   }
 }
 
-// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing32testBreakTargetIterableyyF : $@convention(thin) () -> () {
+// CHECK-LABEL: sil hidden {{.*}}[ossa] @$s17foreach_borrowing23testBreakTargetIterableyyF : $@convention(thin) () -> () {
 @available(SwiftStdlib 6.4, *)
 func testBreakTargetIterable() {
   let arr = [0, 1, 2, 3]
@@ -113,7 +113,7 @@ func testBreakTargetIterable() {
   // CHECK: br [[INNER_LOOP_HEADER]]
   // CHECK: [[EXIT_OUTER_LOOP]]:
   // CHECK: return
-  // CHECK: } // end sil function '$s17foreach_borrowing32testBreakTargetIterableyyF'
+  // CHECK: } // end sil function '$s17foreach_borrowing23testBreakTargetIterableyyF'
 
   for element in seq {
     if (element == 2){
@@ -143,7 +143,7 @@ func testForEachLocations(seq: borrowing Span<Int>, val: Int) {
   //   }
 
   // makeIterableIterator() function_ref should be at "for" keyword location (172:3)
-  // CHECK: [[MAKE_BORROWING_IT:%.*]] = function_ref @$ss4SpanVsRi_zRi0_zrlE21makeIterableIterators0aD0VyxGyF {{.*}}, loc "{{.*}}":[[@LINE+31]]:3
+  // CHECK: [[MAKE_BORROWING_IT:%.*]] = function_ref @$ss4SpanVsRi_zRi0_zrlE20makeIterableIterators0aD0VyxGyF {{.*}}, loc "{{.*}}":[[@LINE+31]]:3
   // CHECK: apply [[MAKE_BORROWING_IT]]{{.*}}, loc "{{.*}}":[[@LINE+30]]:18
 
   // nextSpan() function_ref should be at "for" keyword location

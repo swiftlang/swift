@@ -57,6 +57,7 @@ public struct CxxIterableIterator<T>: IterableIteratorProtocol<T.Element, Never>
 extension CxxIterableIterator where T: ~Copyable & ~Escapable, T.Element: ~Copyable {
   @inlinable
   @_lifetime(&self)
+  @_lifetime(self: copy self)
   public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
     if self.current == self.end {
       return Span()
@@ -75,6 +76,7 @@ extension CxxIterableIterator where T: ~Copyable & ~Escapable, T.Element: ~Copya
 extension CxxIterableIterator where T: ~Copyable & ~Escapable, T.RawIterator: UnsafeCxxContiguousIterator, T.Element: ~Copyable {
   @inlinable
   @_lifetime(&self)
+  @_lifetime(self: copy self)
   public mutating func nextSpan() -> Span<Element> {
     nextSpan(maximumCount: Int.max)
   }
@@ -85,6 +87,7 @@ extension CxxIterableIterator where T: ~Copyable & ~Escapable, T.RawIterator: Un
 
   @inlinable
   @_lifetime(&self)
+  @_lifetime(self: copy self)
   public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
     if maximumCount < 1 || self.current == self.end {
       return Span()
