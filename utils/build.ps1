@@ -808,7 +808,6 @@ enum Project {
   EarlySwiftDriver
   EarlySwiftDriverSQLite
   Stage0Compilers
-  Stage0CDispatch
   Stage0XML2
   BootstrapRuntime
   BootstrapOverlay
@@ -832,7 +831,6 @@ enum Project {
 
   CDispatch
   Stage2Compilers
-  Stage2CDispatch
   Stage2XML2
   Compilers
   FoundationMacros
@@ -2818,7 +2816,8 @@ function Build-CDispatch([Hashtable] $Platform,
 function Get-CompilersDefines([Hashtable] $Platform,
                               [string]    $Variant,
                               [switch]    $Test,
-                              [string]    $SwiftSDK = (Get-PinnedToolchainSDK -OS $Platform.OS)) {
+                              [string]    $SwiftSDK = (Get-PinnedToolchainSDK -OS $Platform.OS),
+                              [string]    $DispatchPackage = $null) {
   $BuildTools = [IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform BuildTools), "bin")
   $PythonRoot = [IO.Path]::Combine((Get-PythonPath $Platform), "tools")
   $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
@@ -2853,7 +2852,13 @@ function Get-CompilersDefines([Hashtable] $Platform,
     @{}
   }
 
-  return $TestDefines + $DebugDefines + @{
+  $DispatchDefines = if ($DispatchPackage) {
+    @{ dispatch_DIR = $DispatchPackage }
+  } else {
+    @{}
+  }
+
+  return $TestDefines + $DebugDefines + $DispatchDefines + @{
     CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
     CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
     CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
@@ -2934,6 +2939,7 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $SwiftSDK         = (Get-PinnedToolchainSDK -OS $Platform.OS),
                          [string]    $ToolchainRoot    = "$(Get-InstallDir $Platform)\Toolchains\$ProductVersion+$Variant",
                          [string]    $RuntimeLocation  = $null,
+                         [string]    $DispatchPackage  = $null,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
   New-Item -ItemType SymbolicLink -Path "$BinaryCache\$($HostPlatform.Triple)\compilers" -Target "$BinaryCache\5" -ErrorAction Ignore | Out-Null
@@ -2954,7 +2960,7 @@ function Build-Compilers([Hashtable] $Platform,
       -SwiftSDK $SwiftSDK `
       -BuildTargets @("install-distribution") `
       -CacheScript $CacheScript `
-      -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK)
+      -Defines (Get-CompilersDefines $Platform $Variant -SwiftSDK $SwiftSDK -DispatchPackage $DispatchPackage)
   }
 
   Copy-CMarkRuntimeToToolchain $Platform $ToolchainRoot
@@ -3273,11 +3279,13 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
   Invoke-IsolatingEnvVars {
     $SwiftSDK = Get-SwiftSDK -OS $Platform.OS
     $SwiftRuntime = Resolve-SDKRuntimeBin $Platform $SwiftSDK
-    $env:Path = "$(Get-CMarkBinaryCache $Platform)\src;$(Get-ProjectBinaryCache $Platform Stage2Compilers)\tools\swift\libdispatch-windows-$($Platform.Architecture.LLVMName)-prefix\bin;$(Get-ProjectBinaryCache $Platform Stage2Compilers)\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
+    $Stage2BinDir = [IO.Path]::Combine((Get-ProjectBinaryCache $Platform Stage2Compilers), "bin")
+    $CDispatchBinaryCache = Get-ProjectBinaryCache $Platform DynamicCDispatch
+    $env:Path = "$Stage2BinDir;$CDispatchBinaryCache;$CDispatchBinaryCache\bin;$(Get-CMarkBinaryCache $Platform)\src;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostPlatform.Architecture.VSName);$UnixToolsBinDir"
     $env:PYTHONUTF8 = "1"
     $TestingDefines = Get-CompilersDefines $Platform $Variant -Test -SwiftSDK $SwiftSDK
     # Stage2 tests must use the freshly-built native tools, not Stage1.
-    $TestingDefines["SWIFT_NATIVE_SWIFT_TOOLS_PATH"] = ([IO.Path]::Combine((Get-ProjectBinaryCache $Platform Stage2Compilers), "bin"))
+    $TestingDefines["SWIFT_NATIVE_SWIFT_TOOLS_PATH"] = $Stage2BinDir
     # check-swift depends on swift-backtrace-${SDK}; build the libexec helpers
     # with the rest of the test targets.
     $TestingDefines["SWIFT_BUILD_LIBEXEC"] = "YES"
@@ -3357,7 +3365,6 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
 
     # Prefer the platform SDK runtime.  The pre-staged bundle fallback keeps
     # -SkipBuild usable when the install image is absent.
-    $Stage2BinDir          = [IO.Path]::Combine($BuildCMakeArgs.Bin, "bin")
     $Stage2LibexecSwiftDir = [IO.Path]::Combine($BuildCMakeArgs.Bin, "libexec", "swift")
     $RuntimeSourceCandidates = @(
       $SwiftRuntime,
@@ -5618,7 +5625,6 @@ if (-not $SkipBuild) {
 
   # ── Stage0 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-XML2 $BuildPlatform -CCompiler $Compilers.Host.C -CXXCompiler $Compilers.Host.CXX -Phase "Stage0"
-  Invoke-BuildStep Build-CDispatch $BuildPlatform -CCompiler $Compilers.Pinned.C -CXXCompiler $Compilers.Pinned.CXX -Phase "Stage0"
   Invoke-BuildStep Build-Compilers $BuildPlatform -Variant "Asserts" -Project Stage0Compilers @{
     CacheScript     = "$SourceCache\swift\cmake\caches\Windows-Bootstrap-Stage0-$($BuildPlatform.Architecture.LLVMName).cmake";
     CCompiler       = $Compilers.Host.C;
@@ -5675,12 +5681,12 @@ if (-not $SkipBuild) {
   # ── Stage2 Compiler ───────────────────────────────────────────────────────
   Invoke-BuildStep Build-CMark $HostPlatform
   Invoke-BuildStep Build-XML2 $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Stage2"
-  Invoke-BuildStep Build-CDispatch $HostPlatform -CCompiler $Compilers.Stage1.C -CXXCompiler $Compilers.Stage1.CXX -Phase "Stage2"
   Invoke-BuildStep Build-Compilers $HostPlatform -Variant "Asserts" -Project Stage2Compilers @{
-    CCompiler     = $Compilers.Stage1.C;
-    CXXCompiler   = $Compilers.Stage1.CXX;
-    SwiftCompiler = $Compilers.Stage1.Swift;
-    SwiftSDK      = Get-SwiftSDK -OS $HostPlatform.OS;
+    CCompiler       = $Compilers.Stage1.C;
+    CXXCompiler     = $Compilers.Stage1.CXX;
+    SwiftCompiler   = $Compilers.Stage1.Swift;
+    SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+    DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
   }
   Invoke-BuildStep Write-ToolchainInfo $HostPlatform -Variant "Asserts"
   Invoke-BuildStep Write-PlatformInfoPlist $HostPlatform
@@ -5796,10 +5802,11 @@ if (-not $SkipBuild) {
   # ── Stage2 NoAsserts Compiler ─────────────────────────────────────────────
   if ($IncludeNoAsserts) {
     Invoke-BuildStep Build-Compilers $HostPlatform -Variant "NoAsserts" -Project Stage2Compilers @{
-      CCompiler     = $Compilers.Stage1.C;
-      CXXCompiler   = $Compilers.Stage1.CXX;
-      SwiftCompiler = $Compilers.Stage1.Swift;
-      SwiftSDK      = Get-SwiftSDK -OS $HostPlatform.OS;
+      CCompiler       = $Compilers.Stage1.C;
+      CXXCompiler     = $Compilers.Stage1.CXX;
+      SwiftCompiler   = $Compilers.Stage1.Swift;
+      SwiftSDK        = Get-SwiftSDK -OS $HostPlatform.OS;
+      DispatchPackage = Get-ProjectCMakeModules $HostPlatform DynamicCDispatch;
     }
 
     Repair-Toolchain $HostPlatform.NoAssertsToolchainInstallRoot
