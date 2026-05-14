@@ -625,36 +625,36 @@ private:
 
   bool handleSourceOrModuleFile(SourceFileOrModule SFOrMod);
 
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override {
     // Do not handle unavailable decls from other modules.
     if (IsModuleFile && D->isUnavailable())
-      return false;
+      return Action::SkipNode();
 
     if (!handleCustomAttrInitRefs(D))
-      return false;
+      return Action::SkipNode();
 
     if (auto *AD = dyn_cast<AccessorDecl>(D)) {
       if (ManuallyVisitedAccessorStack.empty() ||
           ManuallyVisitedAccessorStack.back() != AD)
-        return false; // already handled as part of the var decl.
+        return Action::SkipNode(); // already handled as part of the var decl.
     }
     if (auto *VD = dyn_cast<ValueDecl>(D)) {
       if (!report(VD))
-        return false;
+        return Action::SkipNode();
     }
     if (auto *ED = dyn_cast<ExtensionDecl>(D))
-      return reportExtension(ED);
-    return true;
+      return Action::VisitNodeIf(reportExtension(ED));
+    return Action::Continue();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     if (Cancelled)
-      return false;
+      return Action::Stop();
 
     if (getParentDecl() == D)
-      return finishCurrentEntity();
+      return Action::StopIf(!finishCurrentEntity());
 
-    return true;
+    return Action::Continue();
   }
 
   /// Report calls to the initializers of property wrapper types on wrapped
@@ -773,9 +773,9 @@ private:
     }
   }
 
-  bool walkToExprPre(Expr *E) override {
+  PreWalkAction walkToExprPre(Expr *E) override {
     if (Cancelled)
-      return false;
+      return Action::SkipNode();
 
     // Record any same named captures/shorthand if let bindings so we can
     // treat their references as references to the original decl.
@@ -789,20 +789,20 @@ private:
     Containers.activateContainersFor(E);
     handleMemberwiseInitRefs(E);
     handleCollectionShortHandTypeInitRefs(E);
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToExprPost(Expr *E) override {
+  PostWalkAction walkToExprPost(Expr *E) override {
     if (Cancelled)
-      return false;
+      return Action::Stop();
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToStmtPre(Stmt *stmt) override {
+  PreWalkAction walkToStmtPre(Stmt *stmt) override {
     if (Cancelled)
-      return false;
+      return Action::SkipNode();
 
     // Record any same named captures/shorthand if let bindings so we can
     // treat their references as references to the original decl.
@@ -811,21 +811,21 @@ private:
         sameNamedCaptures[shadows.first] = shadows.second;
       }
     }
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToTypeReprPre(TypeRepr *T) override {
+  PreWalkAction walkToTypeReprPre(TypeRepr *T) override {
     if (Cancelled)
-      return false;
+      return Action::SkipNode();
     Containers.activateContainersFor(T);
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToPatternPre(Pattern *P) override {
+  PreWalkAction walkToPatternPre(Pattern *P) override {
     if (Cancelled)
-      return false;
+      return Action::SkipNode();
     Containers.activateContainersFor(P);
-    return true;
+    return Action::Continue();
   }
 
   void beginBalancedASTOrderDeclVisit(Decl *D) override {
@@ -887,13 +887,14 @@ private:
     llvm_unreachable("Can't find the generic parameter in the extended type");
   }
 
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type T,
-                          ReferenceMetaData Data) override {
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type T,
+                                    ReferenceMetaData Data) override {
     SourceLoc Loc = Range.Start;
 
     if (Loc.isInvalid() || isSuppressed(Loc))
-      return true;
+      return Action::Continue();
 
     IndexSymbol Info;
 
@@ -915,7 +916,7 @@ private:
       if (Data.isImplicitCtorType)
         CtorInfo.roles |= (unsigned)SymbolRole::Implicit;
       if (!reportRef(CtorTyRef, Loc, CtorInfo, Data.AccKind))
-        return false;
+        return Action::Stop();
     }
 
     if (auto *GenParam = dyn_cast<GenericTypeParamDecl>(D)) {
@@ -923,7 +924,7 @@ private:
     }
 
     if (!reportRef(D, Loc, Info, Data.AccKind))
-      return false;
+      return Action::Stop();
 
     // If this is a reference to a property wrapper backing property or
     // projected value, report a reference to the wrapped property too (i.e.
@@ -948,13 +949,14 @@ private:
       }
     }
 
-    return true;
+    return Action::Continue();
   }
 
-  bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range) override {
+  PostWalkAction visitModuleReference(ModuleEntity Mod,
+                                      CharSourceRange Range) override {
     auto MappedLoc = getMappedLocation(Range.getStart());
     if (!MappedLoc)
-      return true;
+      return Action::Continue();
 
     IndexSymbol Info;
     Info.line = MappedLoc->Line;
@@ -969,14 +971,14 @@ private:
 
     if (!IdxConsumer.startSourceEntity(Info)) {
       Cancelled = true;
-      return true;
+      return Action::Continue();
     }
 
-    return finishSourceEntity(Info.symInfo, Info.roles);
+    return Action::StopIf(!finishSourceEntity(Info.symInfo, Info.roles));
   }
 
-  bool visitCallAsFunctionReference(ValueDecl *D, SourceRange Range,
-                                    ReferenceMetaData Data) override {
+  PostWalkAction visitCallAsFunctionReference(ValueDecl *D, SourceRange Range,
+                                              ReferenceMetaData Data) override {
     // Index implicit callAsFunction reference.
     return visitDeclReference(D, Range, /*CtorTyRef*/ nullptr,
                               /*ExtTyRef*/ nullptr, Type(), Data);

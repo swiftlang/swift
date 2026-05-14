@@ -1201,26 +1201,26 @@ public:
     assert(EntitiesStack.empty());
   }
 
-  bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
+  PreWalkAction walkToDeclPre(Decl *D, CharSourceRange Range) override {
     if (!isa<ValueDecl>(D) && !isa<ExtensionDecl>(D))
-      return true;
+      return Action::Continue();
     if (isLocal(D))
-      return true;
+      return Action::Continue();
 
     // Ignore things that don't come from this buffer.
     if (!SM.getRangeForBuffer(BufferID).contains(D->getSourceRange().Start))
-      return false;
+      return Action::SkipNode();
 
     TextRange TR = getTextRange(D->getSourceRange());
     unsigned LocOffset = getOffset(Range.getStart());
     EntitiesStack.emplace_back(D, TypeOrExtensionDecl(), nullptr, TR, LocOffset,
                                false);
-    return true;
+    return Action::Continue();
   }
 
-  bool walkToDeclPost(Decl *D) override {
+  PostWalkAction walkToDeclPost(Decl *D) override {
     if (EntitiesStack.empty() || EntitiesStack.back().Dcl != D)
-      return true;
+      return Action::Continue();
 
     TextEntity Entity = std::move(EntitiesStack.back());
     EntitiesStack.pop_back();
@@ -1228,29 +1228,30 @@ public:
       TopEntities.push_back(Entity);
     else
       EntitiesStack.back().SubEntities.push_back(Entity);
-    return true;
+    return Action::Continue();
   }
 
-  bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
-                          ExtensionDecl *ExtTyRef, Type Ty,
-                          ReferenceMetaData Data) override {
+  PostWalkAction visitDeclReference(ValueDecl *D, SourceRange Range,
+                                    TypeDecl *CtorTyRef,
+                                    ExtensionDecl *ExtTyRef, Type Ty,
+                                    ReferenceMetaData Data) override {
     if (Data.isImplicit || !Range.isValid())
-      return true;
+      return Action::Continue();
     // Ignore things that don't come from this buffer.
     if (!SM.getRangeForBuffer(BufferID).contains(Range.Start))
-      return true;
+      return Action::Continue();
 
     CharSourceRange CharRange = Lexer::getCharSourceRangeFromSourceRange(
         D->getASTContext().SourceMgr, Range);
 
     unsigned StartOffset = getOffset(CharRange.getStart());
     References.emplace_back(D, StartOffset, CharRange.getByteLength(), Ty);
-    return true;
+    return Action::Continue();
   }
 
-  bool visitSubscriptReference(ValueDecl *D, SourceRange Range,
-                               ReferenceMetaData Data,
-                               bool IsOpenBracket) override {
+  PostWalkAction visitSubscriptReference(ValueDecl *D, SourceRange Range,
+                                         ReferenceMetaData Data,
+                                         bool IsOpenBracket) override {
     // Treat both open and close brackets equally
     return visitDeclReference(D, Range, nullptr, nullptr, Type(), Data);
   }
