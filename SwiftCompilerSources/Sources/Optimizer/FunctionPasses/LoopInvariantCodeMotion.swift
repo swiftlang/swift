@@ -1134,7 +1134,7 @@ private extension LoadInst {
 private extension FullApplySite {
   /// Returns `true` if this apply inst could be safely hoisted.
   func isSafeReadOnlyApply(_ calleeAnalysis: CalleeAnalysis) -> Bool {
-    guard functionConvention.results.allSatisfy({ $0.convention == .unowned }) else {
+    guard functionConvention.resultsWithError.allSatisfy({ $0.convention == .unowned }) else {
       return false
     }
 
