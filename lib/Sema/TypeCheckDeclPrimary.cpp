@@ -4208,16 +4208,30 @@ public:
     // Only check again for destructor decl outside of a struct/enum/class
     // if our destructor is not marked as invalid.
     if (!DD->isInvalid()) {
-      auto *nom = dyn_cast<NominalTypeDecl>(
-                             DD->getDeclContext()->getImplementedObjCContext());
+      auto *DC = DD->getDeclContext();
+      auto *nom = dyn_cast<NominalTypeDecl>(DC->getImplementedObjCContext());
       if (!nom || !isa<ClassDecl, StructDecl, EnumDecl>(nom)) {
-        DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
+        // Check if the deinit is in an extension of a noncopyable type
+        bool emittedSpecificDiag = false;
+        if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
+          if (!ED->isObjCImplementation()) {
+            if (auto *extNom = ED->getExtendedNominal()) {
+              if (!extNom->canBeCopyable()) {
+                DD->diagnose(diag::destructor_decl_in_noncopyable_extension,
+                             extNom->getDeclaredType());
+                emittedSpecificDiag = true;
+              }
+            }
+          }
+        }
+        if (!emittedSpecificDiag)
+          DD->diagnose(diag::destructor_decl_outside_class_or_noncopyable);
       }
 
       // Temporarily ban deinit on noncopyable enums, unless the experimental
       // feature flag is set.
       if (!Ctx.LangOpts.hasFeature(Feature::MoveOnlyEnumDeinits)
-          && isa<EnumDecl>(nom)
+          && isa_and_nonnull<EnumDecl>(nom)
           && !nom->canBeCopyable()) {
         DD->diagnose(diag::destructor_decl_on_noncopyable_enum);
       }

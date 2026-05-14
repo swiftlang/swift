@@ -541,6 +541,9 @@ NOTE(generic_argument_mismatch,none,
 
 ERROR(destructor_not_accessible,none,
       "deinitializers cannot be accessed", ())
+ERROR(destructor_decl_in_noncopyable_extension,none,
+      "deinitializer must be declared directly in noncopyable type %0 "
+      "(not in an extension)", (Type))
 
 // Array Element
 ERROR(cannot_convert_array_element,none,
