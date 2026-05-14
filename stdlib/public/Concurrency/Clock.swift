@@ -78,7 +78,6 @@ extension Clock {
 
   @available(StdlibDeploymentTarget 5.7, *)
   @_alwaysEmitIntoClient
-  @_disfavoredOverload
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public func measure(
     isolation: isolated (any Actor)? = #isolation,
