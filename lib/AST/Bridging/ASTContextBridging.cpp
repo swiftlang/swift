@@ -85,6 +85,38 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
       versionKind == CanImportUnderlyingVersion);
 }
 
+bool BridgedASTContext_testCanImport(BridgedASTContext cContext,
+                                     BridgedStringRef importPath,
+                                     BridgedCanImportVersion versionKind,
+                                     const SwiftInt *_Nullable versionComponents,
+                                     SwiftInt numVersionComponents) {
+  llvm::VersionTuple version;
+  switch (numVersionComponents) {
+  case 0:
+    break;
+  case 1:
+    version = llvm::VersionTuple(versionComponents[0]);
+    break;
+  case 2:
+    version = llvm::VersionTuple(versionComponents[0], versionComponents[1]);
+    break;
+  case 3:
+    version = llvm::VersionTuple(versionComponents[0], versionComponents[1],
+                                 versionComponents[2]);
+    break;
+  default:
+    version = llvm::VersionTuple(versionComponents[0], versionComponents[1],
+                                 versionComponents[2], versionComponents[3]);
+    break;
+  }
+
+  ImportPath::Module::Builder builder(cContext.unbridged(),
+                                      importPath.unbridged(), /*separator=*/'.',
+                                      SourceLoc());
+  return cContext.unbridged().testImportModule(
+      builder.get(), version, versionKind == CanImportUnderlyingVersion);
+}
+
 BridgedAvailabilityMacroMap BridgedASTContext::getAvailabilityMacroMap() const {
   return &unbridged().getAvailabilityMacroMap();
 }
