@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo %s | %FileCheck %s
 
 // https://github.com/apple/swift/issues/63682
 // Test that we adjust to abstraction differences when assigning in generated
@@ -14,11 +14,15 @@ func physicalFunctionValue() {
   let _ = \Foo<Bool>.closure
 } // CHECK: // end sil function '{{.+}}physicalFunctionValue
 
+// CHECK: sil_scope [[GETTER_SCOPE:[0-9]+]] { loc * "{{.*}}keypath_accessors_reabstraction.swift":8:7 parent @$s31keypath_accessors_reabstraction3FooV7closurexSgycvpACySbGTK : $@convention(keypath_accessor_getter) (@in_guaranteed Foo<Bool>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Optional<Bool>> }
+
 // CHECK: sil shared [thunk] [ossa] @$[[GETTER]] : $@convention(keypath_accessor_getter) (@in_guaranteed Foo<Bool>) -> @out @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Optional<Bool>> {
 // CHECK: bb0([[OUT_FN:%[0-9]+]] {{.+}}):
 // CHECK: [[SRC_REABSTR:%[0-9]+]] = convert_function %{{[0-9]+}} : $@callee_guaranteed () -> @out Optional<Bool> to $@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Optional<Bool>>
 // CHECK-NEXT: store [[SRC_REABSTR]] to [init] [[OUT_FN]] : $*@callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Optional<Bool>>
 // CHECK: } // end sil function '$[[GETTER]]'
+
+// CHECK: sil_scope [[SETTER_SCOPE:[0-9]+]]  { loc * "{{.*}}keypath_accessors_reabstraction.swift":8:7 parent @$s31keypath_accessors_reabstraction3FooV7closurexSgycvpACySbGTk : $@convention(keypath_accessor_setter) (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Optional<Bool>>, @inout Foo<Bool>) -> () }
 
 // CHECK: sil shared [thunk] [ossa] @$[[SETTER]] : $@convention(keypath_accessor_setter) (@in_guaranteed @callee_guaranteed @substituted <τ_0_0> () -> @out τ_0_0 for <Optional<Bool>>, @inout Foo<Bool>) -> () {
 // CHECK: bb0({{.+}}, [[FOO:%[0-9]+]] : $*Foo<Bool>):
