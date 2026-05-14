@@ -4074,6 +4074,11 @@ public:
     auto MetaTy = MI->getType().castTo<MetatypeType>();
     require(MetaTy->hasRepresentation(),
             "metatype instruction must have a metatype representation");
+
+    require(!MetaTy.getInstanceType()->mapTypeOutOfEnvironment()->isValueParameter()
+            && !MetaTy.getInstanceType()->is<IntegerType>(),
+            "metatype cannot be a value generic argument");
+
     verifyLocalArchetype(MI, MetaTy.getInstanceType());
   }
   void checkValueMetatypeInst(ValueMetatypeInst *MI) {
