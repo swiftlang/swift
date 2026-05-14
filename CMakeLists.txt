@@ -1730,6 +1730,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
           -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
+          -DSwiftCore_ENABLE_SOURCE_INFO=${SWIFT_STDLIB_ENABLE_SOURCE_INFO}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}-core" swift-frontend)

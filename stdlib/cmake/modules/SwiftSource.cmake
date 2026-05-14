@@ -1115,12 +1115,6 @@ function(_compile_swift_files
   # We only build these when we are not producing a main file. We could do this
   # with sib/sibgen, but it is useful for looking at the stdlib.
   if (NOT SWIFTFILE_IS_MAIN AND NOT SWIFTFILE_NO_SWIFTMODULE)
-    if(module_location_file)
-      set(emit_module_source_info "-emit-module-source-info-path" "${module_location_file}")
-    else()
-      set(emit_module_source_info "-avoid-emit-module-source-info")
-    endif()
-
     add_custom_command_target(
         module_dependency_target
         COMMAND
@@ -1134,7 +1128,9 @@ function(_compile_swift_files
           ${set_environment_args}
           "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
-          ${emit_module_source_info}
+          "$<$<BOOL:${SWIFT_STDLIB_ENABLE_SOURCE_INFO}>:-emit-module-source-info-path>"
+          "$<$<BOOL:${SWIFT_STDLIB_ENABLE_SOURCE_INFO}>:$<SHELL_PATH:${module_location_file}>>"
+          "$<$<NOT:$<BOOL:${SWIFT_STDLIB_ENABLE_SOURCE_INFO}>>:-avoid-emit-module-source-info>"
           ${swift_flags} ${swift_module_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
