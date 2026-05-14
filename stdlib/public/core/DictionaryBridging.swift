@@ -572,7 +572,7 @@ extension __CocoaDictionary {
     return result
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   internal func mapKeyedValues<Key: Hashable, Value, T, E>(
     _ transform: (Key, Value) throws(E) -> T
   ) throws(E) -> _NativeDictionary<Key, T> {

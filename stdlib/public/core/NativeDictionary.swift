@@ -773,7 +773,7 @@ extension _NativeDictionary { // High-level operations
     return result
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   internal func mapKeyedValues<T, E>(
     _ transform: (Key, Value) throws(E) -> T
   ) throws(E) -> _NativeDictionary<Key, T> {

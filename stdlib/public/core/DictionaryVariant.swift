@@ -464,7 +464,7 @@ extension Dictionary._Variant {
     return try asNative.mapValues(transform)
   }
 
-  @inlinable
+  @_alwaysEmitIntoClient
   internal func mapKeyedValues<T, E>(
     _ transform: (Key, Value) throws(E) -> T
   ) throws(E) -> _NativeDictionary<Key, T> {
