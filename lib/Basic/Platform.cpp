@@ -245,6 +245,7 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
   case llvm::Triple::CheriotRTOS:
   case llvm::Triple::ChipStar:
   case llvm::Triple::OpenCL:
+  case llvm::Triple::QURT:
     return "";
   case llvm::Triple::Darwin:
   case llvm::Triple::MacOSX:
