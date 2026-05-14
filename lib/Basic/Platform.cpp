@@ -289,6 +289,13 @@ StringRef swift::getPlatformNameForTriple(const llvm::Triple &triple) {
     return "haiku";
   case llvm::Triple::WASI:
     return "wasi";
+  case llvm::Triple::WASIp1:
+    // FIXME: Should be "wasip1", but that breaks the SwiftWASILibC build
+    return "wasi";
+  case llvm::Triple::WASIp2:
+    return "wasip2";
+  case llvm::Triple::WASIp3:
+    return "wasip3";
   case llvm::Triple::Emscripten:
     return "emscripten";
   case llvm::Triple::UnknownOS:
