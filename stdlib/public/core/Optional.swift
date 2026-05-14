@@ -172,7 +172,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
+extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Returns a borrowed reference to the payload within the optional, if there
   /// is one.
   @available(SwiftStdlib 6.4, *)
@@ -188,7 +188,9 @@ extension Optional where Wrapped: ~Copyable {
       return nil
     }
   }
+}
 
+extension Optional where Wrapped: ~Copyable {
   /// Returns the mutable reference to the payload within the optional, if there
   /// is one.
   @available(SwiftStdlib 6.4, *)
@@ -556,8 +558,7 @@ func _diagnoseUnexpectedNilOptional(
   }
 }
 
-@_preInverseGenerics
-extension Optional: Equatable where Wrapped: Equatable & ~Copyable & ~Escapable {
+extension Optional: Equatable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
@@ -602,50 +603,26 @@ extension Optional: Equatable where Wrapped: Equatable & ~Copyable & ~Escapable 
   /// - Parameters:
   ///   - lhs: An optional value to compare.
   ///   - rhs: Another optional value to compare.
-  @_preInverseGenerics
   @_transparent
-  public static func ==(
-    lhs: borrowing Wrapped?,
-    rhs: borrowing Wrapped?
-  ) -> Bool {
-    switch lhs {
-    case let l?:
-      switch rhs {
-      case let r?:
-        return l == r
-
-      case nil:
-        return false
-      }
-
-    case nil:
-      switch rhs {
-      case nil:
-        return true
-
-      default:
-        return false
-      }
+  public static func ==(lhs: Wrapped?, rhs: Wrapped?) -> Bool {
+    switch (lhs, rhs) {
+    case let (l?, r?):
+      return l == r
+    case (nil, nil):
+      return true
+    default:
+      return false
     }
   }
 }
 
-@_preInverseGenerics
-extension Optional: Hashable where Wrapped: Hashable & ~Copyable & ~Escapable {
-  // Note: This explicit `hashValue` applies @_preInverseGenerics to emulate the
-  // original compiler-synthesized version.
-  @_preInverseGenerics
-  public var hashValue: Int {
-    _hashValue(for: self)
-  }
-
+extension Optional: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
   /// - Parameter hasher: The hasher to use when combining the components
   ///   of this instance.
   @inlinable
-  @_preInverseGenerics
   public func hash(into hasher: inout Hasher) {
     switch self {
     case .none:
