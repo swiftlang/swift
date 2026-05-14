@@ -155,89 +155,6 @@ llvm::Regex swift::getSwiftInterfaceCompilerToolsVersionRegex() {
   return llvm::Regex("Swift version ([0-9\\.]+)", llvm::Regex::Newline);
 }
 
-// MARK(https://github.com/apple/swift/issues/43510): Module name shadowing warnings
-//
-// When swiftc emits a module interface, it qualifies most types with their
-// module name. This usually makes the interface less ambiguous, but if a type
-// exists with the same name as a module, then references to that module will
-// incorrectly look inside the type instead. This breakage is not obvious until
-// someone tries to load the module interface, and may sometimes only occur in
-// clients' module interfaces.
-//
-// Truly fixing this will require a new module-qualification syntax which
-// completely ignores shadowing. In lieu of that, we detect and warn about three
-// common examples which are relatively actionable:
-//
-// 1. An `import` statement written into the module interface will
-//    (transitively) import a type with the module interface's name.
-//
-// 2. The module interface declares a type with the same name as the module the
-//    interface is for.
-//
-// 3. The module interface declares a type with the same name as a module it has
-//     (transitively) imported without `@_implementationOnly`.
-//
-// We do not check for shadowing between imported module names and imported
-// declarations; this is both much rarer and much more difficult to solve.
-// We silence these warnings if you use the temporary workaround flag,
-// '-module-interface-preserve-types-as-written'.
-
-/// Emit a warning explaining that \p shadowingDecl will interfere with
-/// references to types in \p shadowedModule in the module interfaces of
-/// \p brokenModule and its clients.
-static void
-diagnoseDeclShadowsModule(ModuleInterfaceOptions const &Opts,
-                          TypeDecl *shadowingDecl, ModuleDecl *shadowedModule,
-                          ModuleDecl *brokenModule) {
-  if (Opts.PreserveTypesAsWritten || Opts.AliasModuleNames ||
-      shadowingDecl == shadowedModule)
-    return;
-
-  shadowingDecl->diagnose(
-      diag::warning_module_shadowing_may_break_module_interface,
-      shadowingDecl->getDescriptiveKind(),
-      FullyQualified<Type>(shadowingDecl->getDeclaredInterfaceType()),
-      shadowedModule, brokenModule);
-}
-
-/// Check whether importing \p importedModule will bring in any declarations
-/// that will shadow \p importingModule, and diagnose them if so.
-static void
-diagnoseIfModuleImportsShadowingDecl(ModuleInterfaceOptions const &Opts,
-                                     ModuleDecl *importedModule,
-                                     ModuleDecl *importingModule) {
-  using namespace namelookup;
-
-  SmallVector<ValueDecl *, 4> decls;
-  lookupInModule(importedModule, importingModule->getName(),
-                 /*hasModuleSelector=*/false, decls,
-                 NLKind::UnqualifiedLookup, ResolutionKind::TypesOnly,
-                 importedModule, SourceLoc(),
-                 NL_UnqualifiedDefault | NL_IncludeUsableFromInline);
-  for (auto decl : decls)
-    diagnoseDeclShadowsModule(Opts, cast<TypeDecl>(decl), importingModule,
-                              importingModule);
-}
-
-/// Check whether \p D will shadow any modules imported by \p M, and diagnose
-/// them if so.
-static void diagnoseIfDeclShadowsKnownModule(ModuleInterfaceOptions const &Opts,
-                                             Decl *D, ModuleDecl *M) {
-  ASTContext &ctx = M->getASTContext();
-
-  // We only care about types (and modules, which are a subclass of TypeDecl);
-  // when the grammar expects a type name, it ignores non-types during lookup.
-  TypeDecl *TD = dyn_cast<TypeDecl>(D);
-  if (!TD)
-    return;
-
-  ModuleDecl *shadowedModule = ctx.getLoadedModule(TD->getName());
-  if (!shadowedModule || M->isImportedImplementationOnly(shadowedModule))
-    return;
-
-  diagnoseDeclShadowsModule(Opts, TD, shadowedModule, M);
-}
-
 // MARK: Import statements
 
 /// Diagnose any scoped imports in \p imports, i.e. those with a non-empty
@@ -387,8 +304,6 @@ static void printImports(raw_ostream &out,
     }
 
     out << "\n";
-
-    diagnoseIfModuleImportsShadowingDecl(Opts, importedModule, M);
   }
 }
 
@@ -925,9 +840,6 @@ bool swift::emitSwiftInterface(raw_ostream &out,
 
     D->print(out, printOptions);
     out << "\n";
-
-    if (!useModuleSelectors)
-      diagnoseIfDeclShadowsKnownModule(Opts, const_cast<Decl *>(D), M);
   }
 
   // Print dummy extensions for any protocols that were indirectly conformed to.
