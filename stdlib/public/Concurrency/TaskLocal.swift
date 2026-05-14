@@ -262,7 +262,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
   @available(*, deprecated, message: "Prefer the 'nonisolated(nonsending)' overload with stricter execution on caller context semantics: withValue(_:operation:file:line:)")
-  @_disfavoredOverload
   public func withValue<R>( // for source compatibility
     _ valueDuringOperation: Value,
     operation: () async throws -> R,
