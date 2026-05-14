@@ -4648,7 +4648,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     // is nonisolated.
     if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
         repr->isAsync() && isolation.isNonIsolated()) {
-      isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      isolation = FunctionTypeIsolation::forNonisolatedNonsending();
     } else if (ctx.LangOpts
                    .getFeatureState(Feature::NonisolatedNonsendingByDefault)
                    .isEnabledForMigration()) {
@@ -5787,7 +5787,7 @@ TypeResolver::resolveNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr
   if (repr->isInvalid())
     return ErrorType::get(getASTContext());
 
-  return fnType->withIsolation(FunctionTypeIsolation::forNonIsolatedCaller());
+  return fnType->withIsolation(FunctionTypeIsolation::forNonisolatedNonsending());
 }
 
 NeverNullType

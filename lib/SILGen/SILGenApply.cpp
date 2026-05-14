@@ -1750,7 +1750,7 @@ public:
         // See if setting isolation of old type to nonisolated(nonsending)
         // yields the new type.
         auto addedNonIsolatedNonSending = oldFnTy->getExtInfo().withIsolation(
-            FunctionTypeIsolation::forNonIsolatedCaller());
+            FunctionTypeIsolation::forNonisolatedNonsending());
 
         return oldFnTy->withExtInfo(addedNonIsolatedNonSending) == newFnTy;
       }

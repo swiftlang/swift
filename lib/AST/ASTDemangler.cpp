@@ -585,7 +585,7 @@ Type ASTBuilder::createFunctionType(
   } else if (extFlags.isIsolatedAny()) {
     isolation = FunctionTypeIsolation::forErased();
   } else if (extFlags.isNonisolatedNonsending()) {
-    isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+    isolation = FunctionTypeIsolation::forNonisolatedNonsending();
   }
 
   auto noescape =

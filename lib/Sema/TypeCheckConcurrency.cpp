@@ -3238,7 +3238,7 @@ namespace {
               auto fnType = closure->getType()->castTo<AnyFunctionType>();
               if (!fnType->getIsolation().isNonisolatedNonsending()) {
                 fnType = fnType->withIsolation(
-                    FunctionTypeIsolation::forNonIsolatedCaller());
+                    FunctionTypeIsolation::forNonisolatedNonsending());
                 closure->setType(fnType);
               }
             }
@@ -8028,7 +8028,7 @@ AnyFunctionType *swift::adjustFunctionTypeForConcurrency(
 
     case ActorIsolation::NonisolatedNonsending:
       assert(fnType->getIsolation().isNonIsolated());
-      funcIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      funcIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
       break;
 
     case ActorIsolation::Nonisolated:

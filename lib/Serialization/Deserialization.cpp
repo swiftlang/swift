@@ -7434,7 +7434,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolated)) {
     // do nothing
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedNonsending)) {
-    isolation = swift::FunctionTypeIsolation::forNonIsolatedCaller();
+    isolation = swift::FunctionTypeIsolation::forNonisolatedNonsending();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Parameter)) {
     isolation = swift::FunctionTypeIsolation::forParameter();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Erased)) {
