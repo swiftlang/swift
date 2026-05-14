@@ -31,6 +31,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclExportabilityVisitor.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Effects.h"
@@ -49,6 +50,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -222,7 +224,7 @@ public:
   IGNORED_ATTR(AllowFeatureSuppression)
   IGNORED_ATTR(PreInverseGenerics)
   IGNORED_ATTR(Safe)
-  IGNORED_ATTR(Warn)
+  IGNORED_ATTR(Diagnose)
 #undef IGNORED_ATTR
 
   void visitABIAttr(ABIAttr *attr) {
@@ -331,6 +333,13 @@ public:
 
   void visitOwnedAttr(OwnedAttr *attr) {
     assert(!D->hasClangNode() && "@_owned on imported declaration?");
+
+    if (!Ctx.LangOpts.hasFeature(Feature::UnderscoreOwned) &&
+        !D->getDeclContext()->isInSwiftinterface()) {
+      Ctx.Diags.diagnose(attr->getLocation(),
+                         diag::attribute_requires_experimental_feature, attr,
+                         "UnderscoreOwned");
+    }
 
     auto *ASD = cast<AbstractStorageDecl>(D);
 
@@ -2098,215 +2107,113 @@ visitDynamicCallableAttr(DynamicCallableAttr *attr) {
   }
 }
 
-static bool hasSingleNonVariadicParam(SubscriptDecl *decl,
-                                      Identifier expectedLabel,
-                                      bool ignoreLabel = false) {
-  auto *indices = decl->getIndices();
-  if (decl->isInvalid() || indices->size() != 1)
-    return false;
-
-  auto *index = indices->get(0);
-  if (index->isVariadic() || !index->hasInterfaceType())
-    return false;
-
-  if (ignoreLabel) {
-    return true;
-  }
-
-  return index->getArgumentName() == expectedLabel;
-}
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)`.
-bool swift::isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                                bool ignoreLabel) {
-  // It could be
-  // - `subscript(dynamicMember: {Writable}KeyPath<...>)`; or
-  // - `subscript(dynamicMember: String*)`
-  return isValidKeyPathDynamicMemberLookup(decl, ignoreLabel) ||
-         isValidStringDynamicMemberLookup(decl, ignoreLabel);
-}
-
-bool swift::isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                             bool ignoreLabel) {
-  auto &ctx = decl->getASTContext();
-  // There are two requirements:
-  // - The subscript method has exactly one, non-variadic parameter.
-  // - The parameter type conforms to `ExpressibleByStringLiteral`.
-  if (!hasSingleNonVariadicParam(decl, ctx.Id_dynamicMember,
-                                 ignoreLabel))
-    return false;
-
-  const auto *param = decl->getIndices()->get(0);
-  auto paramType = param->getTypeInContext();
-
-  // If this is `subscript(dynamicMember: String*)`
-  return TypeChecker::conformsToKnownProtocol(
-      paramType, KnownProtocolKind::ExpressibleByStringLiteral);
-}
-
-BoundGenericType *
-swift::getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
-                                            bool ignoreLabel) {
-  auto &ctx = decl->getASTContext();
-  if (!hasSingleNonVariadicParam(decl, ctx.Id_dynamicMember,
-                                 ignoreLabel))
-    return nullptr;
-
-  auto paramTy = decl->getIndices()->get(0)->getInterfaceType();
-
-  // Allow to compose key path type with a `Sendable` protocol as
-  // a way to express sendability requirement.
-  if (auto *existential = paramTy->getAs<ExistentialType>()) {
-    auto layout = existential->getExistentialLayout();
-
-    auto protocols = layout.getProtocols();
-    if (!llvm::all_of(protocols,
-                      [&](ProtocolDecl *proto) {
-                        if (proto->isSpecificProtocol(KnownProtocolKind::Sendable))
-                          return true;
-
-                        if (proto->getInvertibleProtocolKind())
-                          return true;
-
-                        return false;
-                      })) {
-      return nullptr;
-    }
-
-    paramTy = layout.getSuperclass();
-    if (!paramTy)
-      return nullptr;
-  }
-
-  if (!paramTy->isKeyPath() &&
-      !paramTy->isWritableKeyPath() &&
-      !paramTy->isReferenceWritableKeyPath()) {
-    return nullptr;
-  }
-  return paramTy->getAs<BoundGenericType>();
-}
-
-bool swift::isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
-                                              bool ignoreLabel) {
-  return bool(getKeyPathTypeForDynamicMemberLookup(decl, ignoreLabel));
-}
-
 /// The @dynamicMemberLookup attribute is only allowed on types that have at
 /// least one subscript member declared like this:
 ///
-/// subscript<KeywordType: ExpressibleByStringLiteral, LookupValue>
-///   (dynamicMember name: KeywordType) -> LookupValue { get }
+/// subscript(dynamicMember name: T, ...) -> U
+///   (where T is a concrete type conforming to `ExpressibleByStringLiteral`)
+///
+///   or
+///
+/// subscript(dynamicMember name: {{Reference}Writable}KeyPath<T, U>, ...) -> V
 ///
 /// ... but doesn't care about the mutating'ness of the getter/setter.
 /// We just manually check the requirements here.
-void AttributeChecker::
-visitDynamicMemberLookupAttr(DynamicMemberLookupAttr *attr) {
+void AttributeChecker::visitDynamicMemberLookupAttr(
+    DynamicMemberLookupAttr *attr) {
   // This attribute is only allowed on nominal types.
   auto decl = cast<NominalTypeDecl>(D);
   auto type = decl->getDeclaredType();
   auto &ctx = decl->getASTContext();
 
-  auto emitInvalidTypeDiagnostic = [&](const SourceLoc loc) {
-    diagnose(loc, diag::invalid_dynamic_member_lookup_type, type);
-    attr->setInvalid();
-  };
-
-  // Look up `subscript(dynamicMember:)` candidates.
-  DeclNameRef subscriptName(
-      { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember } });
-  auto candidates = TypeChecker::lookupMember(decl, type, subscriptName);
-
-  if (!candidates.empty()) {
-    // If no candidates are valid, then reject one.
-    auto oneCandidate = candidates.front().getValueDecl();
-    candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
-      auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-      return isValidDynamicMemberLookupSubscript(cand);
-    });
-
-    if (candidates.empty()) {
-      emitInvalidTypeDiagnostic(oneCandidate->getLoc());
-      return;
-    }
-
-    // Diagnose if there are no candidates that are sufficiently accessible.
-    auto requiredAccessScope = decl->getFormalAccessScope(/*useDC=*/nullptr);
-    auto accessDC = requiredAccessScope.getDeclContext();
-    auto inaccessibleCandidate = candidates.front().getValueDecl();
-    candidates.filter([&](LookupResultEntry entry, bool isOuter) -> bool {
-      return entry.getValueDecl()->isAccessibleFrom(accessDC);
-    });
-
-    if (candidates.empty()) {
-      const auto languageModeForError = LanguageMode::future;
-      bool shouldError = ctx.isLanguageModeAtLeast(languageModeForError);
-
-      // Diagnose as an error in resilient modules regardless of language
-      // version since this will break the swiftinterface. Don't diagnose
-      // cases in existing swiftinterface files, though.
-      shouldError |= decl->getModuleContext()->isResilient() &&
-                     !decl->getDeclContext()->isInSwiftinterface();
-
-      auto diag = diagnose(inaccessibleCandidate->getLoc(),
-                            diag::dynamic_member_lookup_candidate_inaccessible,
-                            inaccessibleCandidate);
-      fixItAccess(diag, inaccessibleCandidate,
-                  requiredAccessScope.requiredAccessForDiagnostics(),
-                  /*isForSetter=*/false, /*useDefaultAccess=*/false,
-                  /*updateAttr=*/false);
-      diag.warnUntilLanguageModeIf(!shouldError, languageModeForError);
-
-      if (shouldError) {
-        attr->setInvalid();
-        return;
-      }
-    }
-
-    return;
-  }
-
-  // If we couldn't find any candidates, it's likely because:
-  //
-  // 1. We don't have a subscript with `dynamicMember` label.
-  // 2. We have a subscript with `dynamicMember` label, but no argument label.
-  //
-  // Let's do another lookup using just the base name.
-  auto newCandidates =
+  // Because dynamic member subscripts can take any number of parameters, we
+  // can't look them up by specific name: we'll find all subscript members on
+  // the type and filter for ones attempting to fulfill the
+  // `@dynamicMemberLookup` requirement.
+  auto candidates =
       TypeChecker::lookupMember(decl, type, DeclNameRef::createSubscript());
 
-  // Validate the candidates while ignoring the label.
-  newCandidates.filter([&](const LookupResultEntry entry, bool isOuter) {
-    auto cand = cast<SubscriptDecl>(entry.getValueDecl());
-    return isValidDynamicMemberLookupSubscript(cand, /*ignoreLabel*/ true);
-  });
+  // For validity and diagnostics, there are 4 kinds of subscripts we care
+  // about:
+  //
+  //   1. Subscripts which are both valid for fulfilling the requirement, and
+  //      are accessible from outside the type
+  //   2. Subscripts which are valid for fulfilling the requirement but which
+  //      are inaccessible from outside the type
+  //   3. Subscripts which have a `dynamicMember` argument/parameter label for
+  //      at least one parameter (so are considered for validation) but which
+  //      are invalid
+  //   4. Subscripts which _would_ be valid if a `dynamicMember` argument label
+  //      were inserted for their first argument (we can offer a fix-it)
+  //
+  // If we have any of (1), the attribute requirements will be considered
+  // fulfilled and we won't diagnose; if not, then we'll go through (2), (3),
+  // and (4) in order and produce diagnostics/fix-its for the first non-empty
+  // group. (2) produces warnings in the current language mode, which will be
+  // upgraded to errors in the next language mode (hence the separate diagnostic
+  // stages).
+  SubscriptDecl *validButInaccessible = nullptr;
+  SmallVector<std::pair<SubscriptDecl *, DynamicMemberLookupSubscriptEligibility>>
+      invalid;
 
-  // If there were no potentially valid candidates, then throw an error.
-  if (newCandidates.empty()) {
-    emitInvalidTypeDiagnostic(attr->getLocation());
+  auto requiredAccessScope = decl->getFormalAccessScope();
+  auto accessDC = requiredAccessScope.getDeclContext();
+  for (auto &candidate : candidates) {
+    auto *SD = dyn_cast<SubscriptDecl>(candidate.getValueDecl());
+    if (!SD) {
+      continue;
+    }
+
+    auto eligibility = evaluateOrFatal(
+        ctx.evaluator, DynamicMemberLookupSubscriptRequest{SD});
+    if (eligibility.isValid()) {
+      if (SD->isAccessibleFrom(accessDC)) {
+        return;
+      }
+
+      validButInaccessible = SD;
+      continue;
+    }
+
+    invalid.emplace_back(SD, eligibility);
+  }
+
+  bool diagnosed = false;
+
+  if (validButInaccessible != nullptr) {
+    const auto languageModeForError = LanguageMode::future;
+    bool shouldError = ctx.isLanguageModeAtLeast(languageModeForError);
+
+    // Diagnose as an error in resilient modules regardless of language version
+    // since this will break the swiftinterface. Don't diagnose cases in
+    // existing swiftinterface files, though.
+    shouldError |= decl->getModuleContext()->isResilient() &&
+                   !decl->getDeclContext()->isInSwiftinterface();
+
+    auto diag = diagnose(validButInaccessible->getLoc(),
+                         diag::dynamic_member_lookup_candidate_inaccessible,
+                         validButInaccessible);
+    fixItAccess(diag, validButInaccessible,
+                requiredAccessScope.requiredAccessForDiagnostics(),
+                /*isForSetter=*/false, /*useDefaultAccess=*/false,
+                /*updateAttr=*/false);
+    diag.warnUntilLanguageModeIf(!shouldError, languageModeForError);
+
+    if (shouldError)
+      attr->setInvalid();
+
     return;
   }
 
-  // For each candidate, emit a diagnostic. If we don't have an explicit
-  // argument label, then emit a fix-it to suggest the user to add one.
-  for (auto cand : newCandidates) {
-    auto SD = cast<SubscriptDecl>(cand.getValueDecl());
-    auto index = SD->getIndices()->get(0);
-    diagnose(SD, diag::invalid_dynamic_member_lookup_type, type);
-
-    // If we have something like `subscript(foo:)` then we want to insert
-    // `dynamicMember` before `foo`.
-    if (index->getParameterNameLoc().isValid() &&
-        index->getArgumentNameLoc().isInvalid()) {
-      diagnose(SD, diag::invalid_dynamic_member_subscript)
-          .highlight(index->getSourceRange())
-          .fixItInsert(index->getParameterNameLoc(), "dynamicMember ");
+  if (!invalid.empty()) {
+    for (const auto &pair : invalid) {
+      diagnosed |= pair.second.diagnose(pair.first);
     }
   }
 
   attr->setInvalid();
-  return;
+  if (!diagnosed)
+    diagnose(attr->getStartLoc(), diag::invalid_dynamic_member_lookup_type, type);
 }
 
 /// Get the innermost enclosing declaration for a declaration.
@@ -3684,7 +3591,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
       /*inferenceSources=*/{},
       attr->getLocation(),
       /*forExtension=*/nullptr,
-      /*allowInverses=*/true};
+      ExpandDefaults};
 
   auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
                                           GenericSignatureWithError())
@@ -3922,6 +3829,24 @@ void AttributeChecker::visitExportAttr(ExportAttr *attr) {
     diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
   if (auto other = D->getAttrs().getAttribute<ExternAttr>())
     diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
+
+  // In Embedded Swift, @export(interface) is not supported on generic types
+  // or on extensions of generic types: IRGen emits a unique strong definition
+  // of the type metadata / conformance witness tables, and per-specialization
+  // emission of those globals is not compatible with that.
+  if (attr->exportKind == ExportKind::Interface &&
+      Ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    bool isGeneric = false;
+    if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
+      isGeneric = nominal->isGenericContext();
+    else if (auto *ext = dyn_cast<ExtensionDecl>(D))
+      isGeneric = ext->isGenericContext();
+    if (isGeneric) {
+      diagnoseAndRemoveAttr(attr,
+                            diag::export_interface_on_generic_in_embedded_swift,
+                            D);
+    }
+  }
 }
 
 void AttributeChecker::visitNeverEmitIntoClientAttr(NeverEmitIntoClientAttr *attr) {
@@ -5121,8 +5046,12 @@ AttributeChecker::visitImplementationOnlyAttr(ImplementationOnlyAttr *attr) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  // @_implementationOnly on types only applies to non-public types.
-  if (isa<NominalTypeDecl>(D)) {
+  // @_implementationOnly on types only applies to non-public types and
+  // classes stored properties.
+  auto *varDecl = dyn_cast<VarDecl>(VD);
+  if (isa<NominalTypeDecl>(D) ||
+      (varDecl && varDecl->hasStorage() &&
+       isa<ClassDecl>(varDecl->getDeclContext()))) {
     auto access =
         VD->getFormalAccessScope(/*useDC=*/nullptr,
                                  /*treatUsableFromInlineAsPublic=*/true);
@@ -5315,6 +5244,12 @@ void suggestAnyAppleOSAvailability(const Decl *D,
   if (!sf)
     return;
 
+  // Skip implicit declarations. Availability for these declarations is
+  // typically derived from other declarations and those other declarations are
+  // the ones that should adopt anyAppleOS.
+  if (D->isImplicit())
+    return;
+
   if (!diags.isDiagnosticGroupEnabled(sf,
                                       DiagGroupID::UseAnyAppleOSAvailability))
     return;
@@ -5325,11 +5260,24 @@ void suggestAnyAppleOSAvailability(const Decl *D,
       attrsByIntroVersion;
 
   for (const AvailableAttr *attr : attrs) {
-    auto semAttr = D->getSemanticAvailableAttr(attr);
-    if (!semAttr || !semAttr->isPlatformSpecific())
+    // Only consider @available attributes that could indicate an introduction.
+    if (attr->getKind() != AvailableAttr::Kind::Default)
       continue;
 
-    if (attr->getKind() != AvailableAttr::Kind::Default)
+    // Check whether the attributes have any fields besides 'introduced:' and
+    // skip if they do since we don't attempt to judge whether those fields
+    // match and could be consolidated.
+    // FIXME: This is conservative; attrs with matching fields could be merged.
+    if (attr->getRawDeprecated() || attr->getRawObsoleted() ||
+        !attr->getMessage().empty() || !attr->getRename().empty())
+      continue;
+
+    // @_spi_available attributes should not be considered.
+    if (attr->isSPI())
+      continue;
+
+    auto semAttr = D->getSemanticAvailableAttr(attr);
+    if (!semAttr || !semAttr->isPlatformSpecific())
       continue;
 
     auto platform = semAttr->getPlatform();
@@ -5356,34 +5304,26 @@ void suggestAnyAppleOSAvailability(const Decl *D,
     return;
 
   llvm::VersionTuple commonVersion;
-  llvm::SmallVector<const AvailableAttr *, 6> attrsToReplace;
-  for (auto &[version, attrList] : attrsByIntroVersion) {
+  llvm::SmallVector<const AvailableAttr *, 6> attrsForCommonVersion;
+  for (auto &[version, attrsForVersion] : attrsByIntroVersion) {
     // Prefer replacing the longest list of attributes.
-    if (attrList.size() < attrsToReplace.size())
+    if (attrsForVersion.size() < attrsForCommonVersion.size())
       continue;
 
     // If the lists have the same length, prefer the earlier version.
-    if (attrList.size() == attrsToReplace.size()) {
+    if (attrsForVersion.size() == attrsForCommonVersion.size()) {
       if (version > commonVersion)
         continue;
     }
 
     commonVersion = version;
-    attrsToReplace = attrList;
+    attrsForCommonVersion = attrsForVersion;
   }
 
+  auto attrsToReplace = llvm::SmallSetVector<const AvailableAttr *, 6>(
+      attrsForCommonVersion.begin(), attrsForCommonVersion.end());
   if (attrsToReplace.size() < 2)
     return;
-
-  // Check whether the attributes have any fields besides 'introduced:' and skip
-  // if they do since we don't attempt to judge whether those fields match and
-  // could be consolidated.
-  // FIXME: This is conservative; attrs with matching fields could be merged.
-  for (auto *attr : attrsToReplace) {
-    if (attr->getRawDeprecated() || attr->getRawObsoleted() ||
-        !attr->getMessage().empty() || !attr->getRename().empty())
-      return;
-  }
 
   auto diag = diags.diagnose(D->getLoc(), diag::availability_use_any_apple_os,
                              commonVersion);
@@ -5400,64 +5340,148 @@ void suggestAnyAppleOSAvailability(const Decl *D,
   }
 
   auto attrGroups = getAvailableAttrGroups(attrs);
-  if (attrGroups.empty()) {
-    // The attributes are all written in long-form.
-    // FIXME: Generate fix-its for this pattern if it is common enough.
-    return;
+
+  // When all replaceable attrs live in a single short-form group, use an
+  // inner-replacement fix-it (that just replaces the specs inside the parens)
+  // so the source range is as narrow as possible.
+  if (attrGroups.size() == 1) {
+    llvm::SmallDenseSet<const AvailableAttr *> remainingAttrsToReplace(
+        attrsToReplace.begin(), attrsToReplace.end());
+
+    llvm::SmallString<128> replacement;
+    llvm::raw_svector_ostream os(replacement);
+    os << "anyAppleOS " << commonVersion;
+
+    auto groupHead = attrGroups.front();
+
+    // Get the location of the @available attr's right paren.
+    SourceLoc groupEndLoc = groupHead->getEndLoc();
+
+    // Build up the fix-it contents and find the starting source loc for the
+    // availability specs.
+    SourceLoc groupStartLoc = groupHead->getDomainLoc();
+    for (auto *member = groupHead; member != nullptr;
+         member = member->getNextGroupedAvailableAttr()) {
+      // The attributes are enumerated in reverse, so the group's starting loc
+      // is the last domain loc we see.
+      groupStartLoc = member->getDomainLoc();
+      if (remainingAttrsToReplace.erase(member))
+        continue;
+      if (auto semAttr = D->getSemanticAvailableAttr(member)) {
+        os << ", " << platformString(semAttr->getPlatform());
+        if (auto v = member->getRawIntroduced())
+          os << " " << *v;
+      }
+    }
+    os << ", *";
+
+    if (remainingAttrsToReplace.empty()) {
+      // Make sure we have a valid source range in a single buffer. We might
+      // not if some attributes were expanded from an availability macro.
+      if (groupStartLoc.isInvalid() || groupEndLoc.isInvalid())
+        return;
+
+      auto startBuffer = ctx.SourceMgr.findBufferContainingLoc(groupStartLoc);
+      auto endBuffer = ctx.SourceMgr.findBufferContainingLoc(groupEndLoc);
+      if (startBuffer != endBuffer)
+        return;
+
+      diag.fixItReplaceChars(groupStartLoc, groupEndLoc, replacement);
+      return;
+    }
+
+    // Some replaceable attrs are outside the single group (e.g. long-form
+    // attrs mixed with a short-form group). Fall through to the general
+    // multi-attr fix-it below.
   }
 
-  if (attrGroups.size() > 1) {
-    // The attributes are written in multiple short-form groups.
-    return;
-  }
+  // The replaceable attrs span multiple separate @available
+  // attributes which could be long-form (`@available(iOS, introduced: 26)`),
+  // separate single-platform short-form (`@available(iOS 26, *)`), multiple
+  // groups, or a mix of those patterns.
+  //
+  // Replace the first attr in source with the consolidated anyAppleOS
+  // attribute and then remove the remaining attrs. Any non-replaced members of
+  // a partially- covered group are folded into the replacement text.
 
-  // The attributes include a single short-form. If they all belong
-  // to the same group we can emit a fix-it to update it.
-  llvm::SmallSet<const AvailableAttr *, 8> remainingAttrsToSkip;
-  for (auto *attr : attrsToReplace)
-    remainingAttrsToSkip.insert(attr);
+  // Map each group member to its group head (the first attr in the chain).
+  llvm::SmallDenseMap<const AvailableAttr *, const AvailableAttr *>
+      memberToGroupHead;
+  for (auto *head : attrGroups)
+    for (auto *m = head; m; m = m->getNextGroupedAvailableAttr())
+      memberToGroupHead[m] = head;
 
-  llvm::SmallString<128> replacement;
-  llvm::raw_svector_ostream os(replacement);
-  os << "anyAppleOS " << commonVersion;
+  // For each replaceable attr, find its group and collect any non-replaced
+  // members of the same group that must survive.
+  llvm::SmallDenseSet<const AvailableAttr *> groupHeadsToReplace;
+  llvm::SmallVector<const AvailableAttr *> groupMembersToKeep;
 
-  auto groupHead = attrGroups.front();
-
-  // Get the location of the @available attr's right paren.
-  SourceLoc groupEndLoc = groupHead->getEndLoc();
-
-  // Build up the fix-it contents and find the starting source loc for the
-  // availability specs.
-  SourceLoc groupStartLoc = groupHead->getDomainLoc();
-  for (auto *member = groupHead; member != nullptr;
-       member = member->getNextGroupedAvailableAttr()) {
-    // The attributes are enumerated in reverse, so the group's starting loc
-    // is the last domain loc we see.
-    groupStartLoc = member->getDomainLoc();
-    if (remainingAttrsToSkip.erase(member))
+  for (auto *attr : attrsToReplace) {
+    const AvailableAttr *head =
+        attr->isGroupMember() ? memberToGroupHead.lookup(attr) : attr;
+    if (!head)
+      return;
+    if (!groupHeadsToReplace.insert(head).second)
       continue;
-    if (auto semAttr = D->getSemanticAvailableAttr(member)) {
-      os << ", " << platformString(semAttr->getPlatform());
-      if (auto v = member->getRawIntroduced())
-        os << " " << *v;
+
+    if (head->isGroupMember()) {
+      for (auto *m = head; m; m = m->getNextGroupedAvailableAttr()) {
+        if (!attrsToReplace.contains(m))
+          groupMembersToKeep.push_back(m);
+      }
     }
   }
-  os << ", *";
 
-  // Only emit the fix-it if all of the attributes to replace were found in
-  // the group.
-  if (remainingAttrsToSkip.empty()) {
-    // Make sure we have a valid source range in a single buffer. We might not
-    // if some attributes were expanded from an availability macro.
-    if (groupStartLoc.isInvalid() || groupEndLoc.isInvalid())
+  if (groupHeadsToReplace.empty())
+    return;
+
+  // Validate that all source attrs have valid locations in a single buffer
+  // before sorting (isBeforeInBuffer requires valid locs in the same buffer).
+  // An invalid or cross-buffer location indicates an availability macro
+  // expansion.
+  std::optional<unsigned> primaryBuf;
+  for (auto *head : groupHeadsToReplace) {
+    auto range = head->getRangeWithAt();
+    if (range.Start.isInvalid() || range.End.isInvalid())
       return;
 
-    auto startBuffer = ctx.SourceMgr.findBufferContainingLoc(groupStartLoc);
-    auto endBuffer = ctx.SourceMgr.findBufferContainingLoc(groupEndLoc);
-    if (startBuffer != endBuffer)
+    auto buf = ctx.SourceMgr.findBufferContainingLoc(range.Start);
+    if (!primaryBuf) {
+      primaryBuf = buf;
+    } else if (buf != *primaryBuf) {
       return;
+    }
+  }
 
-    diag.fixItReplaceChars(groupStartLoc, groupEndLoc, replacement);
+  // Sort by source location so the primary attr is first.
+  llvm::SmallVector<const AvailableAttr *> sortedGroupHeadsToReplace(
+      groupHeadsToReplace.begin(), groupHeadsToReplace.end());
+  llvm::sort(sortedGroupHeadsToReplace,
+             [&](const AvailableAttr *a, const AvailableAttr *b) {
+               return ctx.SourceMgr.isBeforeInBuffer(a->getRangeWithAt().Start,
+                                                     b->getRangeWithAt().Start);
+             });
+
+  // Build: @available(anyAppleOS N[, kept members from all groups...], *)
+  llvm::SmallString<128> fullReplacement;
+  llvm::raw_svector_ostream fos(fullReplacement);
+  fos << "@available(anyAppleOS " << commonVersion;
+  for (auto *kept : groupMembersToKeep) {
+    auto semAttr = D->getSemanticAvailableAttr(kept);
+    if (!semAttr)
+      continue;
+    fos << ", " << semAttr->getDomain().getNameForAttributePrinting();
+    if (auto v = kept->getRawIntroduced())
+      fos << " " << *v;
+  }
+  fos << ", *)";
+
+  // Replace the primary attr and remove the rest.
+  diag.fixItReplace(sortedGroupHeadsToReplace.front()->getRangeWithAt(),
+                    fullReplacement);
+
+  for (auto *head : llvm::drop_begin(sortedGroupHeadsToReplace)) {
+    diag.fixItRemove(head->getRangeWithAt());
   }
 }
 
@@ -6892,7 +6916,7 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
         /*inferenceSources=*/{},
         attr->getLocation(),
         /*forExtension=*/nullptr,
-        /*allowInverses=*/true};
+        ExpandDefaults};
 
     // Compute generic signature for derivative functions.
     derivativeGenSig = evaluateOrDefault(ctx.evaluator, request,

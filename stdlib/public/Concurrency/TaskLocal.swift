@@ -122,6 +122,11 @@ public macro TaskLocal() =
 ///
 /// In either cases listed above, the binding and reading of the task-local value works as expected.
 ///
+/// ### Task local values, without tasks
+/// If a task local value is bound in a context executing outside of a task (e.g. on a plain old Thread),
+/// the task local will fall-back to managing a thread-local value for the scope of the `withValue` function.
+/// In other words, this task locals work as expected even if used in a context without an active swift concurrency task.
+///
 /// ### Examples
 ///
 ///
@@ -172,14 +177,37 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     unsafe unsafeBitCast(self, to: Builtin.RawPointer.self)
   }
 
-  /// Gets the value currently bound to this task-local from the current task.
-  ///
-  /// If no current task is available in the context where this call is made,
-  /// or if the task-local has no value bound, this will return the `defaultValue`
-  /// of the task local.
-  public func get() -> Value {
+  // Old version which was not inlinable; the new overload is an elaborate way
+  // to allow inlining the call to _taskLocalValueGet; that we can't do otherwise
+  // due to defaultValue not being usableFromInline.
+  @usableFromInline
+  @abi(func get() -> Value)
+  internal func __abi_get() -> Value {
     guard let rawValue = unsafe _taskLocalValueGet(key: key) else {
       return self.defaultValue
+    }
+
+    // Take the value; The type should be correct by construction
+    let storagePtr =
+        unsafe rawValue.bindMemory(to: Value.self, capacity: 1)
+    return unsafe UnsafeMutablePointer<Value>(mutating: storagePtr).pointee
+  }
+
+  /// Gets the value currently bound to this task-local from the current task.
+  ///
+  /// If no current value binding is available in the context where this call is made,
+  /// or if the task-local has no value bound, this will return the `defaultValue`
+  /// of the task local.
+  ///
+  /// A task local value may still be bound and read even without a Swift concurrency
+  /// task present, as the underlying storage will fallback to using a managed thread-local value
+  /// when no task is available. From the perspective of task local APIs, the presented semantics
+  /// remain exactly the same as when a task is present.
+  @_alwaysEmitIntoClient
+  @abi(func get_aeic() -> Value)
+  public func get() -> Value {
+    guard let rawValue = unsafe _taskLocalValueGet(key: key) else {
+      return self.__abi_get()
     }
 
     // Take the value; The type should be correct by construction
@@ -200,6 +228,10 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
+  ///
+  /// If this method is called form a context where no current Swift concurrency task
+  /// is available, a fallback thread-local is used to manage the task locals and
+  /// all existing semantics of task-locals are upheld as-if a task was actually available.
   @inlinable
   @discardableResult
   @available(SwiftStdlib 5.1, *)
@@ -305,6 +337,10 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
+  ///
+  /// If this method is called form a context where no current Swift concurrency task
+  /// is available, a fallback thread-local is used to manage the task locals and
+  /// all existing semantics of task-locals are upheld as-if a task was actually available.
   @inlinable
   @discardableResult
   public func withValue<R>(_ valueDuringOperation: Value, operation: () throws -> R,
@@ -373,6 +409,7 @@ func _taskLocalValuePush<Value>(
 func _taskLocalValuePop()
 
 @available(SwiftStdlib 5.1, *)
+@usableFromInline
 @_silgen_name("swift_task_localValueGet")
 func _taskLocalValueGet(
   key: Builtin.RawPointer/*Key*/
@@ -391,7 +428,7 @@ func _taskLocalsCopy(
 @available(*, deprecated, message: "The situation diagnosed by this is not handled gracefully rather than by crashing")
 func _checkIllegalTaskLocalBindingWithinWithTaskGroup(file: String, line: UInt) {
   if _taskHasTaskGroupStatusRecord() {
-    unsafe file.withCString { _fileStart in
+    file.withCString { _fileStart in
       unsafe _reportIllegalTaskLocalBindingWithinWithTaskGroup(
           _fileStart, file.count, true, line)
     }

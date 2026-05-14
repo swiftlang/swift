@@ -101,12 +101,12 @@ struct TestStaticVar {
         _ = await global
       }
 
-      #if !os(WASI)
-      tests.test("precondition on actor (main): wrongly assume the main executor, from actor on other executor") {
+      tests.test("precondition on actor (main): wrongly assume the main executor, from actor on other executor")
+      .require(.crashTesting)
+      .code {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'MainActor' executor.")
         await Someone().callCheckMainActor()
       }
-      #endif
 
       // === Global actor -----------------------------------------------------
 

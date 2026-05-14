@@ -1591,8 +1591,8 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
   case BuiltinValueKind::TaskLocalValuePush: {
     auto *key = args.claimNext();
     auto *value = args.claimNext();
-    // Grab T from the builtin.
-    auto *valueMetatype = IGF.emitTypeMetadataRef(argTypes[1].getASTType());
+    auto valueTy = substitutions.getReplacementTypes()[0]->getCanonicalType();
+    auto *valueMetatype = IGF.emitTypeMetadataRef(valueTy);
     emitBuiltinTaskLocalValuePush(IGF, key, value, valueMetatype);
 
     // The output value is not used for anything, so we don't actually set

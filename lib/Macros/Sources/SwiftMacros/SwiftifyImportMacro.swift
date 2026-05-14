@@ -582,22 +582,28 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     var args = pointerArgs
     let typeName = getUnattributedType(oldType).description
+    let castName =
+      if typeMappings[typeName] == typeName {
+        ".init"  // std::span is not hidden behind any type alias, can't name it using Swift syntax
+      } else {
+        typeName // use the concrete type for readability, and to be polite to the typechecker
+      }
     assert(args[index] == nil)
 
     let (_, isConst) = dropCxxQualifiers(try genericArg)
     if isConst {
-      args[index] = ExprSyntax("\(raw: typeName)(\(raw: name))")
+      args[index] = ExprSyntax("\(raw: castName)(\(raw: name))")
       return try base.buildFunctionCall(args)
     } else {
       let unwrappedName = TokenSyntax("_\(name.withoutBackticks)Ptr")
-      args[index] = ExprSyntax("\(raw: typeName)(\(unwrappedName))")
+      args[index] = ExprSyntax("\(raw: castName)(\(unwrappedName))")
       let call = try base.buildFunctionCall(args)
 
       // MutableSpan - unlike Span - cannot be bitcast to std::span due to being ~Copyable,
       // so unwrap it to an UnsafeMutableBufferPointer that we can cast
       let unwrappedCall = ExprSyntax(
         """
-        unsafe \(name).withUnsafeMutableBufferPointer { \(unwrappedName) in
+        \(name).withUnsafeMutableBufferPointer { \(unwrappedName) in
           return \(call)
         }
         """)
@@ -916,7 +922,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
         }
       let unwrappedCall = ExprSyntax(
         """
-        unsafe \(raw: name)\(raw: questionMark).\(raw: funcName) { unsafe $0 }
+        \(raw: name)\(raw: questionMark).\(raw: funcName) { unsafe $0 }
         """)
       res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax("let \(unwrappedName) = \(unwrappedCall)")))
       let lifetimeFix = ExprSyntax("_fixLifetime(\(raw: name))")

@@ -1588,17 +1588,17 @@ std::pair<Type, Type> ConstraintSystem::getOpenedStorageType(
   // If the access is mutating, wrap the storage type in an lvalue type.
   Type refType;
   if (auto *subscript = dyn_cast<SubscriptDecl>(value)) {
-    auto elementTy = subscript->getElementInterfaceType();
+    auto *funcTy = subscript->getInterfaceType()->castTo<AnyFunctionType>();
 
+    auto indices = funcTy->getParams();
+
+    auto elementTy = funcTy->getResult();
     if (doesStorageProduceLValue(subscript, baseTy, useDC, *this, locator))
       elementTy = LValueType::get(elementTy);
 
-    auto indices = subscript->getInterfaceType()
-                            ->castTo<AnyFunctionType>()->getParams();
-
     // Transfer the thrown error type into the subscript reference type,
     // which will be used in the application.
-    FunctionType::ExtInfo info;
+    auto info = funcTy->getExtInfo();
     if (thrownErrorType) {
       info = info.withThrows(true, thrownErrorType);
       thrownErrorType = Type();
@@ -2234,12 +2234,14 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
     };
 
     if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
-      auto elementTy = subscript->getElementInterfaceType();
+      auto *funcTy = type->castTo<AnyFunctionType>();
+      auto indices = funcTy->getParams();
 
+      auto elementTy = funcTy->getResult();
       if (doesStorageProduceLValue(subscript, overload.getBaseType(),
-                                   useDC, *this, locator))
+                                   useDC, *this, locator)) {
         elementTy = LValueType::get(elementTy);
-      else if (elementTy->hasDynamicSelfType()) {
+      } else if (elementTy->hasDynamicSelfType()) {
         elementTy = withDynamicSelfResultReplaced(elementTy);
       }
 
@@ -2249,10 +2251,7 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
       if (subscript->getAttrs().hasAttribute<OptionalAttr>())
         elementTy = OptionalType::get(elementTy->getRValueType());
 
-      auto indices = subscript->getInterfaceType()
-                       ->castTo<AnyFunctionType>()->getParams();
-      // FIXME: Verify ExtInfo state is correct, not working by accident.
-      FunctionType::ExtInfo info;
+      auto info = funcTy->getExtInfo();
       type = adjustFunctionTypeForConcurrency(
           FunctionType::get(indices, elementTy, info), overload.getBaseType(),
           subscript, useDC, /*numApplies=*/1, /*isMainDispatchQueue=*/false,
@@ -2346,17 +2345,17 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
     }
   };
   auto addDynamicMemberSubscriptConstraints = [&](Type argTy, Type resultTy) {
-    // DynamicMemberLookup results are always a (dynamicMember: T1) -> T2
+    // DynamicMemberLookup results are always a `(dynamicMember: T1, ...) -> T2`
     // subscript.
     auto *fnTy = openedType->castTo<FunctionType>();
-    assert(fnTy->getParams().size() == 1 &&
-           "subscript always has one argument");
+    assert(fnTy->getParams().size() > 0 &&
+           "subscript always has at least one argument");
 
     auto *callLoc = getConstraintLocator(
         locator, LocatorPathElt::ImplicitDynamicMemberSubscript());
 
-    // Associate an argument list for the implicit x[dynamicMember:] subscript
-    // if we haven't already.
+    // Associate an argument list for the implicit `x[dynamicMember:...]`
+    // subscript if we haven't already.
     auto *argLoc = getArgumentInfoLocator(callLoc);
     if (ArgumentLists.find(argLoc) == ArgumentLists.end()) {
       auto *argList = ArgumentList::createImplicit(
@@ -2421,9 +2420,9 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
     if (!stringLiteral)
       return;
 
-    // Form constraints for a x[dynamicMember:] subscript with a string literal
-    // argument, where the overload type is bound to the result to model the
-    // fact that this a property access in the source.
+    // Form constraints for a `x[dynamicMember:...]` subscript with a string
+    // literal argument, where the overload type is bound to the result to model
+    // the fact that this a property access in the source.
     auto argTy = createTypeVariable(locator, /*options*/ 0);
     addConstraint(ConstraintKind::LiteralConformsTo, argTy,
                   stringLiteral->getDeclaredInterfaceType(), locator);
@@ -2432,8 +2431,8 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
   }
   case OverloadChoiceKind::KeyPathDynamicMemberLookup: {
     auto *fnType = openedType->castTo<FunctionType>();
-    assert(fnType->getParams().size() == 1 &&
-           "subscript always has one argument");
+    assert(fnType->getParams().size() > 0 &&
+           "subscript always has at least one argument");
     // Parameter type is KeyPath<T, U> where `T` is a root type
     // and U is a leaf type (aka member type).
     auto paramTy = fnType->getParams()[0].getPlainType();
@@ -2587,7 +2586,7 @@ void ConstraintSystem::bindOverloadType(const SelectedOverload &overload,
       // type into "leaf" directly.
       addConstraint(ConstraintKind::Equal, memberTy, leafTy, keyPathLoc);
 
-      // Form constraints for a x[dynamicMember:] subscript with a key path
+      // Form constraints for a `x[dynamicMember:...]` subscript with a key path
       // argument, where the overload type is bound to the result to model the
       // fact that this a property access in the source.
       addDynamicMemberSubscriptConstraints(/*argTy*/ paramTy, boundType);
@@ -2737,7 +2736,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto bodyParamIsolation = FunctionTypeIsolation::forNonIsolated();
     if (CS.getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      bodyParamIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      bodyParamIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
     auto bodyClosure = FunctionType::get(arg, result,
@@ -2755,7 +2754,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto withoutEscapingIsolation = FunctionTypeIsolation::forNonIsolated();
     if (CS.getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      withoutEscapingIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      withoutEscapingIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
     return FunctionType::get(args, result,
@@ -2789,7 +2788,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto bodyParamIsolation = FunctionTypeIsolation::forNonIsolated();
     if (CS.getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      bodyParamIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      bodyParamIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
     auto bodyClosure = FunctionType::get(bodyArgs, result,
@@ -2807,7 +2806,7 @@ static Type getTypeOfReferenceWithSpecialTypeCheckingSemantics(
     auto openExistentialIsolation = FunctionTypeIsolation::forNonIsolated();
     if (CS.getASTContext().LangOpts.hasFeature(
             Feature::NonisolatedNonsendingByDefault)) {
-      openExistentialIsolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      openExistentialIsolation = FunctionTypeIsolation::forNonisolatedNonsending();
     }
 
     return FunctionType::get(args, result,

@@ -354,7 +354,7 @@ func testPermanentlyUnavailable() { }
 @available(*, deprecated)
 extension PublicGenericStruct {
   @available(Aral)
-  // expected-warning@-1 {{'@available' has no effect because 'Aral' is always available}}{{3-19=}}
+  // expected-warning@-1 {{'@available' has no effect because 'Aral' is always available}}{{1-+1:1=}}
   func testPermanentlyAvailableInDeprecatedExtension() { }
 
   @available(Aral, deprecated)

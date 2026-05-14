@@ -696,7 +696,7 @@ header:
   %lifetime = begin_borrow %instance : $S
   %stack = alloc_stack $S
   %stack_borrow = store_borrow %lifetime to %stack : $*S
-  debug_value %stack_borrow : $*S
+  debug_value %stack_borrow : $*S, expr op_deref
   br body
 
 body:
@@ -730,7 +730,7 @@ header:
   %lifetime = begin_borrow %instance : $S
   %stack = alloc_stack $S
   %stack_borrow = store_borrow %lifetime to %stack : $*S
-  debug_value %stack_borrow : $*S
+  debug_value %stack_borrow : $*S, expr op_deref
   %field_addr = struct_element_addr %stack_borrow : $*S, #S.field
   %field = load [copy] %field_addr : $*C
   end_borrow %stack_borrow : $*S

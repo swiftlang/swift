@@ -496,6 +496,14 @@ extension AddressDefUseWalker {
   
   public mutating func walkDownDefault(address operand: Operand, path: Path) -> WalkResult {
     let instruction = operand.instruction
+
+    func handleEnumInst(_ ei: any SingleValueInstruction & EnumInstruction) -> WalkResult {
+      if let path = path.popIfMatches(.enumCase, index: ei.caseIndex) {
+        return walkDownUses(ofAddress: ei, path: path)
+      } else {
+        return unmatchedPath(address: operand, path: path)
+      }
+    }
     switch instruction {
     case let sea as StructElementAddrInst:
       if let path = path.popIfMatches(.structField, index: sea.fieldIndex) {
@@ -515,13 +523,10 @@ extension AddressDefUseWalker {
       } else {
         return unmatchedPath(address: operand, path: path)
       }
-    case is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst:
-      let ei = instruction as! SingleValueInstruction
-      if let path = path.popIfMatches(.enumCase, index: (instruction as! EnumInstruction).caseIndex) {
-        return walkDownUses(ofAddress: ei, path: path)
-      } else {
-        return unmatchedPath(address: operand, path: path)
-      }
+    case let ieda as InitEnumDataAddrInst:
+      return handleEnumInst(ieda)
+    case let ueda as UncheckedEnumDataAddrInstBase where ueda.enum == operand.value:
+      return handleEnumInst(ueda)
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       if let path = path.popIfMatches(.existential, index: 0) {
         return walkDownUses(ofAddress: instruction as! SingleValueInstruction, path: path)
@@ -828,8 +833,8 @@ extension AddressUseDefWalker {
       return walkUp(address: vba.vector, path: path.push(.vectorBase, index: 0))
     case let ida as InitEnumDataAddrInst:
       return walkUp(address: ida.operand.value, path: path.push(.enumCase, index: ida.caseIndex))
-    case let uteda as UncheckedTakeEnumDataAddrInst:
-      return walkUp(address: uteda.operand.value, path: path.push(.enumCase, index: uteda.caseIndex))
+    case let uteda as UncheckedEnumDataAddrInstBase:
+      return walkUp(address: uteda.enum, path: path.push(.enumCase, index: uteda.caseIndex))
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path.push(.existential, index: 0))
     case let ia as IndexAddrInst:

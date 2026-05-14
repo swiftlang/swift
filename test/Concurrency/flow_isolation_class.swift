@@ -97,7 +97,7 @@ class MainActorClassWithMixedFields {
 // requiresMainActor).
 @available(SwiftStdlib 5.5, *)
 @MainActor
-class GADTStructWithMixedDefaultRequirements {
+class GADTKlassWithMixedDefaultRequirements {
   var mainDefault: NonSendableType = requiresMainActor() // expected-note 4{{main actor-isolated default value of 'self.mainDefault' cannot be used in a global actor 'CustomActor'-isolated initializer}}
   nonisolated let nonisoNoDefault: SendableType
   @CustomActor var customDefault: NonSendableType = requiresCustomActor() // expected-note 2{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
@@ -207,7 +207,7 @@ class GADTStructWithMixedDefaultRequirements {
 
 @available(SwiftStdlib 5.5, *)
 @MainActor
-class GADTStructWithMixedDefaultRequirementsNonIsolatedInits {
+class GADTKlassWithMixedDefaultRequirementsNonIsolatedInits {
   var mainDefault = NonSendableType()
   nonisolated let nonisoNoDefault: SendableType
   @CustomActor var customDefault = NonSendableType()
@@ -278,137 +278,9 @@ class GADTStructWithMixedDefaultRequirementsNonIsolatedInits {
 // MARK: Address Only Struct Variants             //
 ////////////////////////////////////////////////////
 
-@available(SwiftStdlib 5.1, *)
-@MainActor
-struct MainActorStructWithMixedFields_AO<T> {
-  var _addressOnly: T
-  nonisolated let nonisoField: SendableType
-  nonisolated let nonisoSendableField: SendableType
-  @CustomActor var customField: NonSendableType
-  @CustomActor var customFieldAO: NonSendableAOStruct<T>
-  var mainField: NonSendableType
-  var mainFieldAO: NonSendableAOStruct<T>
-
-  nonisolated func trigger() {}
-
-  nonisolated init(v1: Void, t: sending T, t2: sending T, t3: sending T) {
-    self._addressOnly = t
-    self.nonisoField = SendableType()
-    self.nonisoSendableField = SendableType()
-    self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
-    self.mainField = NonSendableType()
-    self.mainFieldAO = NonSendableAOStruct(value: t)
-
-    trigger() // expected-note 4{{after this use of 'self', only nonisolated properties of 'self' can be accessed from this init}}
-
-    _ = self.nonisoField
-    _ = self.nonisoSendableField
-    self.customField = NonSendableType() // expected-warning {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t3) // expected-warning {{cannot access property 'customFieldAO' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.mainField = NonSendableType() // expected-warning {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{cannot access property 'mainFieldAO' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-  }
-
-  nonisolated init?(v1_failable: Void, t: sending T, t2: sending T) {
-    self._addressOnly = t
-    self.nonisoField = SendableType()
-    self.nonisoSendableField = SendableType()
-    self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
-    self.mainField = NonSendableType()
-    self.mainFieldAO = NonSendableAOStruct(value: t)
-
-    trigger() // expected-note 4{{after this use of 'self', only nonisolated properties of 'self' can be accessed from this init}}
-
-    _ = self.nonisoField
-    _ = self.nonisoSendableField
-    self.customField = NonSendableType() // expected-warning {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{cannot access property 'customFieldAO' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.mainField = NonSendableType() // expected-warning {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{cannot access property 'mainFieldAO' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-  }
-
-  @MainActor init(v2: Void, t: sending T, t2: sending T) {
-    self._addressOnly = t
-    self.nonisoField = SendableType()
-    self.nonisoSendableField = SendableType()
-    self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
-    self.mainField = NonSendableType()
-    self.mainFieldAO = NonSendableAOStruct(value: t)
-
-    trigger() // expected-note 2{{after this use of 'self', only main actor-isolated properties of 'self' can be accessed from this init}}
-
-    _ = self.nonisoField
-    _ = self.nonisoSendableField
-    self.customField = NonSendableType() // expected-warning {{cannot access property 'customField' here in main actor-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{cannot access property 'customFieldAO' here in main actor-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.mainField = NonSendableType()
-    self.mainFieldAO = NonSendableAOStruct(value: t)
-  }
-
-  @MainActor init?(v2_failable: Void, t: sending T, t2: sending T) {
-    self._addressOnly = t
-    self.nonisoField = SendableType()
-    self.nonisoSendableField = SendableType()
-    self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
-    self.mainField = NonSendableType()
-    self.mainFieldAO = NonSendableAOStruct(value: t)
-
-    trigger() // expected-note 2{{after this use of 'self', only main actor-isolated properties of 'self' can be accessed from this init}}
-
-    _ = self.nonisoField
-    _ = self.nonisoSendableField
-    self.customField = NonSendableType() // expected-warning {{cannot access property 'customField' here in main actor-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{cannot access property 'customFieldAO' here in main actor-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.mainField = NonSendableType()
-    self.mainFieldAO = NonSendableAOStruct(value: t)
-  }
-
-  @CustomActor init(v3: Void, t: sending T, t2: sending T) {
-    self._addressOnly = t
-    self.nonisoField = SendableType()
-    self.nonisoSendableField = SendableType()
-    self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
-    self.mainField = NonSendableType()
-    self.mainFieldAO = NonSendableAOStruct(value: t)
-
-    trigger() // expected-note 2{{after this use of 'self', only global actor 'CustomActor'-isolated properties of 'self' can be accessed from this init}}
-
-    _ = self.nonisoField
-    _ = self.nonisoSendableField
-    self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
-    self.mainField = NonSendableType() // expected-warning {{cannot access property 'mainField' here in global actor 'CustomActor'-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{cannot access property 'mainFieldAO' here in global actor 'CustomActor'-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-  }
-
-  @CustomActor init?(v3_failable: Void, t: sending T, t2: sending T) {
-    self._addressOnly = t
-    self.nonisoField = SendableType()
-    self.nonisoSendableField = SendableType()
-    self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
-    self.mainField = NonSendableType()
-    self.mainFieldAO = NonSendableAOStruct(value: t)
-
-    trigger() // expected-note 2{{after this use of 'self', only global actor 'CustomActor'-isolated properties of 'self' can be accessed from this init}}
-
-    _ = self.nonisoField
-    _ = self.nonisoSendableField
-    self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
-    self.mainField = NonSendableType() // expected-warning {{cannot access property 'mainField' here in global actor 'CustomActor'-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-    self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{cannot access property 'mainFieldAO' here in global actor 'CustomActor'-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
-  }
-}
-
 @available(SwiftStdlib 5.5, *)
 @MainActor
-class GADTStructWithMixedDefaultRequirements_AO<T> {
+class GADTKlassWithMixedDefaultRequirements_AO<T> {
   var _addressOnly: T
   var mainDefault: NonSendableType = requiresMainActor() // expected-note 4{{main actor-isolated default value of 'self.mainDefault' cannot be used in a global actor 'CustomActor'-isolated initializer}}
   var mainDefaultAO: NonSendableAOStruct<T> // expected-note 4{{'self.mainDefaultAO' not initialized}}
@@ -665,7 +537,7 @@ class GADTStructWithMixedDefaultRequirements_AO<T> {
 
 @available(SwiftStdlib 5.5, *)
 @MainActor
-class GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO<T> {
+class GADTKlassWithMixedDefaultRequirementsNonIsolatedInits_AO<T> {
   var _addressOnly: T
   var mainDefault = NonSendableType()
   var mainDefaultAO: NonSendableAOStruct<T>

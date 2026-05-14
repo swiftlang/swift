@@ -714,13 +714,18 @@ public:
   /// \c true if this module was built with strict memory safety.
   bool strictMemorySafety() const { return Core->strictMemorySafety(); }
 
-  /// \c true if this module uses deferred code generation.
-  bool deferredCodeGen() const { return Core->deferredCodeGen(); }
+  /// The code generation model used by this module.
+  CodeGenerationModel codeGenerationModel() const {
+    return Core->codeGenerationModel();
+  }
 
 
   /// \c true if this module was built with aggressive CMO
   /// (the flag -cross-module-optimization).
   bool isAggressiveCMOEnabled() const { return Core->isAggressiveCMOEnabled(); }
+
+  /// The library level of this module.
+  LibraryLevel getLibraryLevel() const { return Core->getLibraryLevel(); }
 
   /// Associates this module file with the AST node representing it.
   ///

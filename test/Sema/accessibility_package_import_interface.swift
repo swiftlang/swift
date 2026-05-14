@@ -16,7 +16,7 @@
 // CHECK-DEP-PRIVATE: -package-name myPkg
 
 // TEST Dep.swiftmodule should contain package name and package symbols
-// RUN: llvm-bcanalyzer --dump %t/Dep.swiftmodule | %FileCheck %s --check-prefix=CHECK-DEP-BC
+// RUN: %llvm-bcanalyzer --dump %t/Dep.swiftmodule | %FileCheck %s --check-prefix=CHECK-DEP-BC
 // CHECK-DEP-BC: <MODULE_PACKAGE_NAME abbrevid=6/> blob data = 'myPkg'
 
 // TEST Lib should load Dep.swiftmodule and access package decls if in the same package and error if not
@@ -40,7 +40,7 @@
 // RUN:   -o %t/Dep.swiftmodule
 
 // TEST Dep binary built from interface should contain package name but no package symbols
-// RUN: llvm-bcanalyzer --dump %t/Dep.swiftmodule | %FileCheck %s --check-prefix=CHECK-DEP-INTER-BC
+// RUN: %llvm-bcanalyzer --dump %t/Dep.swiftmodule | %FileCheck %s --check-prefix=CHECK-DEP-INTER-BC
 // CHECK-DEP-INTER-BC: <MODULE_PACKAGE_NAME abbrevid=7/> blob data = 'myPkg'
 
 // TEST Lib should error on loading Dep built from interface and accessing package symbols (unless usableFromInline or inlinable)

@@ -75,10 +75,10 @@ actor ActorTest {
   func callNonIsolatedWithParam() async {
     unspecifiedSyncUse(ns)
     await unspecifiedAsyncUse(ns) // expected-disabled-error {{sending 'self.ns' risks causing data races}}
-    // expected-disabled-note @-1 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'unspecifiedAsyncUse' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-disabled-note @-1 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'unspecifiedAsyncUse' risks causing data races between @concurrent and 'self'-isolated uses}}
     nonisolatedSyncUse(ns)
     await nonisolatedAsyncUse(ns) // expected-disabled-error {{sending 'self.ns' risks causing data races}}
-    // expected-disabled-note @-1 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'nonisolatedAsyncUse' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-disabled-note @-1 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'nonisolatedAsyncUse' risks causing data races between @concurrent and 'self'-isolated uses}}
   }
 
   func callNonIsolatedWithResult() async {
@@ -87,7 +87,7 @@ actor ActorTest {
     // expected-note @-1 {{sending 'self'-isolated 'x1' to main actor-isolated global function 'sendToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
 
     let x2 = await unspecifiedAsyncUseWithResult(ns) // expected-disabled-error {{sending 'self.ns' risks causing data races}}
-    // expected-disabled-note @-1 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'unspecifiedAsyncUseWithResult' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-disabled-note @-1 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'unspecifiedAsyncUseWithResult' risks causing data races between @concurrent and 'self'-isolated uses}}
     await sendToMain(x2) // expected-enabled-error {{sending 'x2' risks causing data races}}
     // expected-enabled-note @-1 {{sending 'self'-isolated 'x2' to main actor-isolated global function 'sendToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
 
@@ -96,7 +96,7 @@ actor ActorTest {
     // expected-note @-1 {{sending 'self'-isolated 'x3' to main actor-isolated global function 'sendToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
 
     let x4 = await nonisolatedAsyncUseWithResult(ns) // expected-disabled-error {{sending 'self.ns' risks causing data races}}
-    // expected-disabled-note @-1 {{sending 'self'-isolated 'self.ns' to nonisolated global function 'nonisolatedAsyncUseWithResult' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-disabled-note @-1 {{sending 'self'-isolated 'self.ns' to @concurrent global function 'nonisolatedAsyncUseWithResult' risks causing data races between @concurrent and 'self'-isolated uses}}
     await sendToMain(x4) // expected-enabled-error {{sending 'x4' risks causing data races}}
     // expected-enabled-note @-1 {{sending 'self'-isolated 'x4' to main actor-isolated global function 'sendToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
   }
@@ -120,11 +120,11 @@ extension MainActorKlass {
   func callNonIsolatedWithParam() async {
     unspecifiedSyncUse(ns)
     await unspecifiedAsyncUse(ns) // expected-disabled-error {{sending 'self.ns' risks causing data races}}
-    // expected-disabled-note @-1 {{sending main actor-isolated 'self.ns' to nonisolated global function 'unspecifiedAsyncUse' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-disabled-note @-1 {{sending main actor-isolated 'self.ns' to @concurrent global function 'unspecifiedAsyncUse' risks causing data races between @concurrent and main actor-isolated uses}}
 
     nonisolatedSyncUse(ns)
     await nonisolatedAsyncUse(ns) // expected-disabled-error {{sending 'self.ns' risks causing data races}}
-    // expected-disabled-note @-1 {{sending main actor-isolated 'self.ns' to nonisolated global function 'nonisolatedAsyncUse' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-disabled-note @-1 {{sending main actor-isolated 'self.ns' to @concurrent global function 'nonisolatedAsyncUse' risks causing data races between @concurrent and main actor-isolated uses}}
   }
 
   func callNonIsolatedWithResult() async {
@@ -133,7 +133,7 @@ extension MainActorKlass {
     // expected-note @-1 {{sending main actor-isolated 'x1' to global actor 'CustomActor'-isolated global function 'sendToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 
     let x2 = await unspecifiedAsyncUseWithResult(ns) // expected-disabled-error {{sending 'self.ns' risks causing data races}}
-    // expected-disabled-note @-1 {{sending main actor-isolated 'self.ns' to nonisolated global function 'unspecifiedAsyncUseWithResult' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-disabled-note @-1 {{sending main actor-isolated 'self.ns' to @concurrent global function 'unspecifiedAsyncUseWithResult' risks causing data races between @concurrent and main actor-isolated uses}}
     await sendToCustom(x2) // expected-enabled-error {{sending 'x2' risks causing data races}}
     // expected-enabled-note @-1 {{sending main actor-isolated 'x2' to global actor 'CustomActor'-isolated global function 'sendToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 
@@ -142,7 +142,7 @@ extension MainActorKlass {
     // expected-note @-1 {{sending main actor-isolated 'x3' to global actor 'CustomActor'-isolated global function 'sendToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 
     let x4 = await nonisolatedAsyncUseWithResult(ns) // expected-disabled-error {{sending 'self.ns' risks causing data races}}
-    // expected-disabled-note @-1 {{sending main actor-isolated 'self.ns' to nonisolated global function 'nonisolatedAsyncUseWithResult' risks causing data races between nonisolated and main actor-isolated uses}}
+    // expected-disabled-note @-1 {{sending main actor-isolated 'self.ns' to @concurrent global function 'nonisolatedAsyncUseWithResult' risks causing data races between @concurrent and main actor-isolated uses}}
     await sendToCustom(x4) // expected-enabled-error {{sending 'x4' risks causing data races}}
     // expected-enabled-note @-1 {{sending main actor-isolated 'x4' to global actor 'CustomActor'-isolated global function 'sendToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
   }
@@ -167,13 +167,13 @@ extension MainActorKlass {
 // isolation which is safe since they are type checked as something that cannot
 // access any state that is outside of the current actor that c is reachable from.
 @MainActor
-func validateNonisolatedOnClassMeansCallerIsolationInheritingOnFuncDecl(
+func validateNonisolatedOnClassMeansNonisolatedNonsendingOnFuncDecl(
   c: NonIsolatedNonSendableKlass
 ) async {
   await c.unspecifiedMethod() // expected-disabled-error {{sending 'c' risks causing data races}}
-  // expected-disabled-note @-1 {{sending main actor-isolated 'c' to nonisolated instance method 'unspecifiedMethod()' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-disabled-note @-1 {{sending main actor-isolated 'c' to @concurrent instance method 'unspecifiedMethod()' risks causing data races between @concurrent and main actor-isolated uses}}
   await c.nonisolatedMethod() // expected-disabled-error {{sending 'c' risks causing data races}}
-  // expected-disabled-note @-1 {{sending main actor-isolated 'c' to nonisolated instance method 'nonisolatedMethod()' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-disabled-note @-1 {{sending main actor-isolated 'c' to @concurrent instance method 'nonisolatedMethod()' risks causing data races between @concurrent and main actor-isolated uses}}
 }
 
 // Shouldn't get an error here since we are not using after we send to main.
@@ -230,7 +230,7 @@ func testUnrolledLoop(_ a: MainActorKlass) async {
   await unspecifiedAsyncUse(k)
   a.ns = k
   await unspecifiedAsyncUse(k) // expected-disabled-error {{sending 'k' risks causing data races}}
-  // expected-disabled-note @-1 {{sending main actor-isolated 'k' to nonisolated global function 'unspecifiedAsyncUse' risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-disabled-note @-1 {{sending main actor-isolated 'k' to @concurrent global function 'unspecifiedAsyncUse' risks causing data races between @concurrent and main actor-isolated uses}}
 }
 
 // We emit an error in both modes since we are now in an @MainActor isolated
@@ -314,21 +314,21 @@ nonisolated func nonisolatedCallingVariousNonisolated(_ x: NonSendableKlass) asy
 
 nonisolated(nonsending) func nonisolatedNonSendingCallingVariousNonisolated(_ x: NonSendableKlass) async {
   await x.unspecifiedCaller() // expected-disabled-error {{sending 'x' risks causing data races}}
-  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated instance method 'unspecifiedCaller()' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent instance method 'unspecifiedCaller()' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
   await x.nonisolatedCaller() // expected-disabled-error {{sending 'x' risks causing data races}}
-  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated instance method 'nonisolatedCaller()' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent instance method 'nonisolatedCaller()' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
   await x.nonisolatedNonSendingCaller()
   await x.concurrentCaller() // expected-error {{sending 'x' risks causing data races}}
-  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated instance method 'concurrentCaller()' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent instance method 'concurrentCaller()' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
   // expected-enabled-note @-2 {{sending task-isolated 'x' to @concurrent instance method 'concurrentCaller()' risks causing data races between @concurrent and task-isolated uses}}
 
   await unspecifiedAsyncUse(x) // expected-disabled-error {{sending 'x' risks causing data races}}
-  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'unspecifiedAsyncUse' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent global function 'unspecifiedAsyncUse' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
   await nonisolatedAsyncUse(x) // expected-disabled-error {{sending 'x' risks causing data races}}
-  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'nonisolatedAsyncUse' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent global function 'nonisolatedAsyncUse' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
   await nonisolatedNonSendingAsyncUse(x)
   await concurrentAsyncUse(x) // expected-error {{sending 'x' risks causing data races}}
-  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to nonisolated global function 'concurrentAsyncUse' risks causing data races between nonisolated and nonisolated(nonsending) task-isolated uses}}
+  // expected-disabled-note @-1 {{sending nonisolated(nonsending) task-isolated 'x' to @concurrent global function 'concurrentAsyncUse' risks causing data races between @concurrent and nonisolated(nonsending) task-isolated uses}}
   // expected-enabled-note @-2 {{sending task-isolated 'x' to @concurrent global function 'concurrentAsyncUse' risks causing data races between @concurrent and task-isolated uses}}
 }
 

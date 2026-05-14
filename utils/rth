@@ -48,8 +48,10 @@ class ResilienceTest(object):
         self.additional_compile_flags = shlex.split(additional_compile_flags)
         self.triple = triple
 
-        self.experimental_features = \
-          [item for s in experimental_features.split(',') for item in ["-enable-experimental-feature", s]]
+        self.experimental_features = []
+        if experimental_features:
+          self.experimental_features = \
+            [item for s in experimental_features.split(',') for item in ["-enable-experimental-feature", s]]
 
         self.before_dir = os.path.join(self.tmp_dir, 'before')
         self.after_dir = os.path.join(self.tmp_dir, 'after')

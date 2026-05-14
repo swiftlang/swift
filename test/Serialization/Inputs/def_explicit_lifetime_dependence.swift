@@ -114,3 +114,5 @@ public struct GCM {
     return message
   }
 }
+public func takeViewCallback(f: @_lifetime(captures) () -> BufferView) {
+}

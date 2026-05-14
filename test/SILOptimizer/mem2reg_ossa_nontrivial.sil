@@ -1252,7 +1252,7 @@ bb0:
   switch_enum_addr %3 : $*FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
-  %7 = unchecked_take_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %7 = unchecked_inplace_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
   %8 = load [take] %7 : $*Klass
   destroy_value %8 : $Klass
   dealloc_stack %3 : $*FakeOptional<Klass>
@@ -1285,7 +1285,7 @@ bb0:
   switch_enum_addr %3 : $*FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
-  %7 = unchecked_take_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  %7 = unchecked_inplace_enum_data_addr %3 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
   %8 = load [take] %7 : $*Klass
   destroy_value %8 : $Klass
   dealloc_stack %3 : $*FakeOptional<Klass>

@@ -412,6 +412,7 @@ namespace sil_block {
                      BCVBR<8>,    // number of trailing records
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // force weak linking
+                     BCFixed<2>,  // code generation model
                      BC_AVAIL_TUPLE, // availability for weak linking
                      BCFixed<1>,  // is dynamically replacable
                      BCFixed<1>,  // exact self class

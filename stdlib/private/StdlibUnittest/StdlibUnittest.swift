@@ -2137,8 +2137,14 @@ public final class TestSuite {
       return self
     }
 
-    public func require(_ stdlibVersion: StdLibVersion) -> _TestBuilder {
-      _data._skip.append(.minimumStdlib(stdlibVersion))
+    public func require(_ stdlibVersion: StdlibVersion) -> _TestBuilder {
+      require(TestRequirement.minimumStdlib(stdlibVersion))
+    }
+
+    public func require(
+      _ requirement: TestRequirement
+    ) -> _TestBuilder {
+      _data._skip.append(.missingRequirement(requirement))
       return self
     }
 
@@ -2233,7 +2239,7 @@ func _getSystemVersionPlistProperty(_ propertyName: String) -> String? {
 #endif
 #endif
 
-public enum StdLibVersion: String {
+public enum StdlibVersion: String {
   case stdlib_5_7  = "5.7"
   case stdlib_5_8  = "5.8"
   case stdlib_5_9  = "5.9"
@@ -2264,6 +2270,32 @@ public enum StdLibVersion: String {
       return if #available(SwiftStdlib 6.3, *)  { true } else { false }
     case .stdlib_6_4:
       return if #available(SwiftStdlib 6.4, *)  { true } else { false }
+    }
+  }
+}
+
+public enum TestRequirement: CustomStringConvertible {
+  case minimumStdlib(StdlibVersion)
+  case crashTesting
+
+  var isMissing: Bool {
+    switch self {
+    case .minimumStdlib(let version):
+      !version.isAvailable
+    case .crashTesting:
+      switch _getRunningOSVersion() {
+      case .wasi:
+        true
+      default:
+        false
+      }
+    }
+  }
+
+  public var description: String {
+    switch self {
+    case .crashTesting: "crash testing"
+    case .minimumStdlib(let version): "standard library version \(version)"
     }
   }
 }
@@ -2480,8 +2512,10 @@ public enum TestRunPredicate : CustomStringConvertible {
   case objCRuntime(/*reason:*/ String)
   case nativeRuntime(/*reason:*/ String)
 
-  case minimumStdlib(StdLibVersion)
-  
+  case minimumStdlib(StdlibVersion)
+
+  case missingRequirement(TestRequirement)
+
   public var description: String {
     switch self {
     case .custom(_, let reason):
@@ -2608,6 +2642,9 @@ public enum TestRunPredicate : CustomStringConvertible {
       
     case .minimumStdlib(let version):
       return "Requires Swift \(version.rawValue)'s standard library"
+
+    case .missingRequirement(let requirement):
+      return "Requires \(requirement)"
     }
   }
 
@@ -3007,6 +3044,9 @@ public enum TestRunPredicate : CustomStringConvertible {
       
     case .minimumStdlib(let version):
       return !version.isAvailable
+
+    case .missingRequirement(let requirement):
+      return requirement.isMissing
     }
   }
 }

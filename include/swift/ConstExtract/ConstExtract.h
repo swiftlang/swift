@@ -59,7 +59,13 @@ gatherConstValuesForModule(const std::unordered_set<std::string> &Protocols,
 /// Serialize a collection of \c ConstValueInfos to JSON at the
 /// provided output stream.
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
-                       llvm::raw_ostream &OS);
+                       llvm::raw_ostream &OS, bool Compact = false);
+
+/// Remap prefix-mapped paths in const values JSON output. Scans for
+/// Returns true on error.
+bool remapConstValuesJSON(
+    llvm::StringRef Input, llvm::raw_ostream &OS,
+    llvm::ArrayRef<std::pair<std::string, std::string>> PrefixMap);
 } // namespace swift
 
 #endif

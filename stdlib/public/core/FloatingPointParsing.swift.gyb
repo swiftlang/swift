@@ -180,10 +180,14 @@ extension ${Self}: LosslessStringConvertible {
     // unconditionally delegate to init(_:Substring)
     self.init(Substring(text))
   %else:
+    #if $Embedded
+      self.init(Substring(text))
+    #else
     if #available(macOS 11.0, iOS 14.0, watchOS 7.0, tvOS 14.0, *) {
       // On SwiftStdlib 5.3 and later, we can just delegate to the
       // init(_:Substring) initializer:
       self.init(Substring(text))
+      return
     } else {
       // When running on SwiftStdlib <5.3, we can't just delegate to
       // the init(_:Substring) initializer, so we have to inline the whole thing...
@@ -212,6 +216,7 @@ extension ${Self}: LosslessStringConvertible {
         return nil
       }
     }
+    #endif
   %end
   }
 
@@ -285,7 +290,7 @@ extension ${Self}: LosslessStringConvertible {
     let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
       // Make a copy of `text` to ensure we have a null-terminated C string
       // to pass to the libc API:
-      unsafe text.withCString { chars -> Bool in
+      text.withCString { chars -> Bool in
         switch unsafe chars[0] {
         case 9, 10, 11, 12, 13, 32:
           return false // Reject leading whitespace

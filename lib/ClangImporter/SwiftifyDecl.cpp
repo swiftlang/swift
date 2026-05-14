@@ -17,6 +17,7 @@
 #include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -81,6 +82,11 @@ ValueDecl *getKnownSingleDecl(ASTContext &SwiftContext, StringRef DeclName) {
   return decls[0];
 }
 
+static bool isStdSpanType(clang::QualType clangType) {
+  const auto *decl = clangType->getAsTagDecl();
+  return decl && decl->isInStdNamespace() && decl->getName() == "span";
+}
+
 struct SwiftifyInfoPrinter {
   static const ssize_t SELF_PARAM_INDEX = -2;
   static const ssize_t RETURN_VALUE_INDEX = -1;
@@ -116,9 +122,24 @@ public:
   void printAvailability() {
     if (!hasMacroParameter("spanAvailability"))
       return;
+
+    ValueDecl *D = getKnownSingleDecl(SwiftContext, "Span");
+    const SemanticAvailableAttributes availabilityAttrs =
+        D->getSemanticAvailableAttrs(/*includingInactive=*/true);
+    if (availabilityAttrs.empty())
+      return; // don't print availability when targeting embedded
+
     printSeparator();
     out << "spanAvailability: ";
-    printAvailabilityOfType("Span");
+    out << "\"";
+    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
+    for (auto attr : availabilityAttrs) {
+      auto introducedOpt = attr.getIntroduced();
+      if (!introducedOpt.has_value()) continue;
+      printSeparator();
+      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
+    }
+    out << "\"";
   }
 private:
   bool hasMacroParameter(StringRef ParamName) const {
@@ -126,19 +147,6 @@ private:
       if (Param->getArgumentName().str() == ParamName)
         return true;
     return false;
-  }
-
-  void printAvailabilityOfType(StringRef Name) {
-    ValueDecl *D = getKnownSingleDecl(SwiftContext, Name);
-    out << "\"";
-    llvm::SaveAndRestore<bool> hasAvailbilitySeparatorRestore(firstParam, true);
-    for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/true)) {
-      auto introducedOpt = attr.getIntroduced();
-      if (!introducedOpt.has_value()) continue;
-      printSeparator();
-      out << prettyPlatformString(attr.getPlatform()) << " " << introducedOpt.value();
-    }
-    out << "\"";
   }
 
 protected:
@@ -198,8 +206,7 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
   }
 
   bool registerStdSpanTypeMapping(Type swiftType, const clang::QualType clangType) {
-    const auto *decl = clangType->getAsTagDecl();
-    if (decl && decl->isInStdNamespace() && decl->getName() == "span") {
+    if (isStdSpanType(clangType)) {
       typeMapping.try_emplace(swiftType->getString(),
                               swiftType->getDesugaredType()->getString());
       return true;
@@ -341,6 +348,21 @@ struct UnaliasedInstantiationVisitor
     hasUnaliasedInstantiation = true;
     DLOG("Signature contains raw template, skipping\n");
     return false;
+  }
+
+  static bool checkTemplates(clang::QualType clangType, bool hasLifetime,
+                             bool isStdSpan) {
+    if (hasLifetime && isStdSpan) {
+      // std::span is transformed to Swift Span, so the std::span template
+      // instantiation won't show up in the macro expansion's signature. The
+      // element type still needs to be checked.
+      const auto *TST = clangType->getAs<clang::TemplateSpecializationType>();
+      ASSERT(TST && "std::span is not specialized?");
+      clangType = TST->template_arguments()[0].getAsType();
+    }
+    UnaliasedInstantiationVisitor checker;
+    checker.TraverseType(clangType);
+    return checker.hasUnaliasedInstantiation;
   }
 };
 
@@ -492,25 +514,13 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                          const T *ClangDecl) {
   DLOG_SCOPE("Checking '" << *ClangDecl << "' for bounds and lifetime info\n");
 
-  if (ClangDecl->hasAttrs()) {
-    for (auto *attr : ClangDecl->getAttrs()) {
-      if (auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
-          swiftAttr && swiftAttr->getAttribute() == "no_safe_wrapper") {
-        DLOG("skipping function with no_safe_wrapper\n");
-        return false;
-      }
-    }
+  if (hasSwiftAttribute(ClangDecl, {"no_safe_wrapper"})) {
+    DLOG("skipping function with no_safe_wrapper\n");
+    return false;
   }
 
   if (shouldSkipModule(MappedDecl->getParentModule()))
     return false;
-
-  {
-    UnaliasedInstantiationVisitor visitor;
-    visitor.TraverseType(ClangDecl->getType());
-    if (visitor.hasUnaliasedInstantiation)
-      return false;
-  }
 
   // FIXME: for private macro generated functions we do not serialize the
   // SILFunction's body anywhere triggering assertions.
@@ -541,17 +551,6 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
   // has lifetime information, since std::span already contains bounds info.
   bool attachMacro = false;
   {
-    Type swiftReturnTy;
-    if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
-      swiftReturnTy = funcDecl->getResultInterfaceType();
-    else if (const auto *ctorDecl = dyn_cast<ConstructorDecl>(MappedDecl))
-      swiftReturnTy = ctorDecl->getResultInterfaceType();
-    else
-      ABORT("Unexpected AbstractFunctionDecl subclass.");
-    clang::QualType clangReturnTy = ClangDecl->getReturnType();
-
-    if (CheckForwardDecls.IsIncompatibleImport(swiftReturnTy, clangReturnTy))
-      return false;
 
     auto isNonEscapable = [&Self](clang::QualType ty) {
       // We only care whether it's _known_ ~Escapable, because it affects
@@ -562,34 +561,36 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
              CxxEscapability::NonEscapable;
     };
 
-    bool returnIsStdSpan = printer.registerStdSpanTypeMapping(
-        swiftReturnTy, clangReturnTy);
-    bool returnHasBoundsInfo = returnIsStdSpan;
-    auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
-    if (SwiftifiableCAT(clangASTContext, CAT, swiftReturnTy)) {
-      printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
-      DLOG("Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
-      returnHasBoundsInfo = attachMacro = true;
-    }
     auto dependsOnClass = [](const ParamDecl *fromParam) {
       return fromParam->getInterfaceType()->isAnyClassReferenceType();
     };
+    clang::QualType clangReturnTy = ClangDecl->getReturnType();
+    bool returnIsStdSpan = isStdSpanType(clangReturnTy);
+    auto *CAT = clangReturnTy->getAs<clang::CountAttributedType>();
+    bool returnHasBoundsInfo = returnIsStdSpan || CAT != nullptr;
     bool returnValueIsNonEscapable = isNonEscapable(clangReturnTy);
     bool returnValueCanBeNonEscapable = returnValueIsNonEscapable || returnHasBoundsInfo;
     bool returnHasLifetimeInfo = false;
     if (getImplicitObjectParamAnnotation<clang::LifetimeBoundAttr>(ClangDecl)) {
       DLOG("Found lifetimebound attribute on implicit 'this'\n");
-      if (!dependsOnClass(
-              MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
-        if (returnValueCanBeNonEscapable) {
-          printer.printLifetimeboundReturn(SwiftifyInfoPrinter::SELF_PARAM_INDEX,
-                                           true);
-          returnHasLifetimeInfo = true;
+      if (Self.SwiftContext.LangOpts.hasFeature(Feature::SafeInteropWrappers)) {
+        if (!dependsOnClass(
+                MappedDecl->getImplicitSelfDecl(/*createIfNeeded*/ true))) {
+          if (returnValueCanBeNonEscapable) {
+            printer.printLifetimeboundReturn(
+                SwiftifyInfoPrinter::SELF_PARAM_INDEX, true);
+            returnHasLifetimeInfo = true;
+          } else {
+            DLOG("lifetimebound ignored because return value is escapable");
+          }
         } else {
-          DLOG("lifetimebound ignored because return value is escapable");
+          DLOG("lifetimebound ignored because it depends on class with "
+               "refcount\n");
         }
       } else {
-        DLOG("lifetimebound ignored because it depends on class with refcount\n");
+        DLOG("lifetimebound not yet supported by stable feature-set - "
+             "skipping\n");
+        return false;
       }
     }
 
@@ -690,6 +691,10 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
           return false;
         }
       }
+      if (UnaliasedInstantiationVisitor::checkTemplates(
+              clangParamTy, paramHasLifetimeInfo, paramIsStdSpan)) {
+        return false;
+      }
       if (paramIsStdSpan && paramHasLifetimeInfo) {
         DLOG("Found both std::span and lifetime info\n");
         attachMacro = true;
@@ -699,8 +704,36 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       DLOG("~Escapable return value without lifetime info\n");
       return false;
     }
+
+    if (UnaliasedInstantiationVisitor::checkTemplates(
+            clangReturnTy, returnHasLifetimeInfo, returnIsStdSpan)) {
+      return false;
+    }
     if (returnIsStdSpan && returnHasLifetimeInfo) {
       DLOG("Found both std::span and lifetime info for return value\n");
+      attachMacro = true;
+    }
+
+    if (!attachMacro && CAT == nullptr)
+      // The return type is not imported eagerly (unlike parameter types). Exit
+      // early to avoid unnecessarily importing types we might not need.
+      return false;
+
+    Type swiftReturnTy;
+    if (const auto *funcDecl = dyn_cast<FuncDecl>(MappedDecl))
+      swiftReturnTy = funcDecl->getResultInterfaceType();
+    else if (const auto *ctorDecl = dyn_cast<ConstructorDecl>(MappedDecl))
+      swiftReturnTy = ctorDecl->getResultInterfaceType();
+    else
+      ABORT("Unexpected AbstractFunctionDecl subclass.");
+
+    if (CheckForwardDecls.IsIncompatibleImport(swiftReturnTy, clangReturnTy))
+      return false;
+    (void)printer.registerStdSpanTypeMapping(
+        swiftReturnTy, clangReturnTy);
+    if (SwiftifiableCAT(clangASTContext, CAT, swiftReturnTy)) {
+      printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
+      DLOG("Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }
   }

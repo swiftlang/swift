@@ -76,6 +76,7 @@ namespace swift {
   class ASTPrinter;
   class ASTWalker;
   enum class BuiltinMacroKind: uint8_t;
+  enum class CodeGenerationModel: uint8_t;
   class ConstructorDecl;
   class DestructorDecl;
   class DiagnosticEngine;
@@ -778,7 +779,7 @@ protected:
     HasLazyUnderlyingSubstitutions : 1
   );
 
-  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8+1,
+  SWIFT_INLINE_BITFIELD(ModuleDecl, TypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+2+8+1+2,
     /// If the module is compiled as static library.
     StaticLibrary : 1,
 
@@ -849,12 +850,15 @@ protected:
     /// Whether this module has enabled strict memory safety checking.
     StrictMemorySafety : 1,
 
-    /// Whether this module uses deferred code generation in Embedded Swift.
-    DeferredCodeGen : 1,
+    /// The code generation model used by this module.
+    CodeGenModel : 2,
 
     /// Whether this module was compile with "aggressive" CMO i.e
     /// the flag: -cross-module-optimization.
-    AggressiveCMOEnabled : 1
+    AggressiveCMOEnabled : 1,
+
+    /// The stored library level from deserialized module data (LibraryLevel).
+    StoredLibraryLevel : 2
   );
 
   SWIFT_INLINE_BITFIELD(PrecedenceGroupDecl, Decl, 1+2,
@@ -1123,6 +1127,21 @@ public:
   /// This can be spelled with @export(interface) or the historical
   /// @_neverEmitIntoClient.
   bool isNeverEmittedIntoClient() const;
+
+  /// Compute the code generation model that was explicitly requested for
+  /// this declaration.
+  ///
+  /// This function queries attributes relevant to the code generation
+  /// model (@export, @inlinable, etc.) but does not apply defaults based
+  /// on Embedded Swift or feature flags.
+  std::optional<CodeGenerationModel>
+  getExplicitCodeGenerationModel() const;
+
+  /// Compute the code generation model for the declaration, combining the
+  /// explicitly-specified information from attributes with defaults
+  /// based on Embedded Swift or feature flags.
+  CodeGenerationModel
+  getEffectiveCodeGenerationModel() const;
 
   using AuxiliaryDeclCallback = llvm::function_ref<void(Decl *)>;
 
@@ -7578,6 +7597,7 @@ enum class ObjCSubscriptKind {
   Keyed
 };
 
+
 /// Declares a subscripting operator for a type.
 ///
 /// A subscript declaration is defined as a get/set pair that produces a
@@ -7607,6 +7627,19 @@ enum class ObjCSubscriptKind {
 /// signatures (indices and element type) are distinct.
 ///
 class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
+public:
+  /// Describes the kinds of supported types for `dynamicMember` parameters to a
+  /// subscript which can fulfill a `@dynamicMemberLookup` requirement.
+  enum class DynamicMemberLookupKind : uint8_t {
+    /// A `{{Reference}Writable}KeyPath`.
+    KeyPath,
+
+    /// A concrete type conforming to `ExpressibleByStringLiteral`.
+    String,
+  };
+
+private:
+  friend class DynamicMemberLookupSubscriptRequest;
   friend class ResultTypeRequest;
 
   SourceLoc StaticLoc;
@@ -7631,6 +7664,11 @@ class SubscriptDecl : public GenericContext, public AbstractStorageDecl {
     Bits.SubscriptDecl.StaticSpelling = static_cast<unsigned>(StaticSpelling);
     setIndices(Indices);
   }
+
+  /// Returns the given type as a `BoundGenericType` if it is a
+  /// `{{Reference}Writable}KeyPath` type which could be used to fulfill
+  /// `@dynamicMemberLookup` requirements; `nullptr` otherwise.
+  static BoundGenericType *getDynamicMemberParamTypeAsKeyPathType(Type paramTy);
 
 public:
   /// Factory function only for use by deserialization.
@@ -7692,6 +7730,20 @@ public:
   /// Determine the kind of Objective-C subscripting this declaration
   /// implies.
   ObjCSubscriptKind getObjCSubscriptKind() const;
+
+  /// If the decl can be used to satisfy an `@dynamicMemberLookup` requirement,
+  /// returns whether it satisfies the requirement using a key-path- or string-
+  /// based type.
+  std::optional<DynamicMemberLookupKind> getDynamicMemberLookupKind() const;
+
+  /// If the decl can be used to satisfy an `@dynamicMemberLookup` requirement
+  /// using a `{{Reference}Writable}KeyPath` dynamic member parameter, returns
+  /// the type of that parameter; `nullptr` otherwise.
+  ///
+  /// If `useDC` is provided (where the decl is being used), validates that
+  /// access control is being used consistently and that `decl` is appropriately
+  /// accessible, returning `nullptr` if inaccessible.
+  BoundGenericType *getDynamicMemberLookupKeyPathType() const;
 
   SubscriptDecl *getOverriddenDecl() const {
     return cast_or_null<SubscriptDecl>(
@@ -8073,6 +8125,12 @@ public:
   /// \return the synthesized thunk, or null if the base of the call has
   ///         diagnosed errors during type checking.
   FuncDecl *getDistributedThunk() const;
+
+  /// Detect whether this function declaration is an unstructured task
+  /// factory: a `Task` initializer or one of the `detached`,
+  /// `immediate`, or `immediateDetached` factory methods from the
+  /// `_Concurrency` module.
+  bool isUnstructuredTaskFactory() const;
 
   PolymorphicEffectKind getPolymorphicEffectKind(EffectKind kind) const;
 
@@ -10158,6 +10216,12 @@ const ParamDecl *getParameterAt(const ValueDecl *source, unsigned index);
 /// Retrieve parameter declaration from the given source at given index, or
 /// nullptr if the source does not have a parameter list.
 const ParamDecl *getParameterAt(const DeclContext *source, unsigned index);
+
+/// Whether the given \p loc is within a macro expansion relative to
+/// \p parentSF. If the file is itself in a macro expansion, the method
+/// returns \c true if the loc is in a different macro expansion buffer than
+/// the file. If \p parentSF is \c nullptr, \c false is returned.
+bool isMacroExpansionInContext(SourceLoc loc, SourceFile *parentSF);
 
 class ABIRole {
 public:

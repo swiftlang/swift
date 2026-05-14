@@ -145,3 +145,32 @@ bb0(%0 : $*Builtin.FixedArray<10, Int>, %1 : $Builtin.Word):
   %99 = tuple ()
   return %99 : $()
 }
+
+struct Container {
+  @_hasStorage var values: InlineArray<3, Int> { get set }
+}
+
+sil_global hidden @g : $Container
+
+// CHECK-LABEL: @testInlineArray
+// CHECK:       PAIR #9.
+// CHECK-NEXT:      %1 = global_addr @g : $*Container
+// CHECK-NEXT:      %4 = vector_base_addr %3 : $*Builtin.FixedArray<3, Int>
+// CHECK-NEXT:    MayAlias
+// CHECK:       PAIR #13.
+// CHECK-NEXT:      %2 = struct_element_addr %1 : $*Container, #Container.values
+// CHECK-NEXT:      %4 = vector_base_addr %3 : $*Builtin.FixedArray<3, Int>
+// CHECK-NEXT:    MayAlias
+sil [ossa] @testInlineArray : $@convention(thin) (Int) -> () {
+bb0(%0 : $Int):
+  specify_test "aliasing"
+  %1 = global_addr @g : $*Container
+  %3 = struct_element_addr %1, #Container.values
+  %4 = struct_element_addr %3, #InlineArray._storage
+  %5 = vector_base_addr %4
+  fix_lifetime %5
+  %10 = tuple ()
+  return %10
+}
+
+

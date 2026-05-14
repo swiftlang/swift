@@ -194,4 +194,17 @@ void * EMBEDDED_SWIFT_NULLABLE _swift_getExclusivityTLS(void);
  */
 void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
 
+/**
+ * Exit the program.
+ *
+ * Parameters:
+ * - `code`: the exit code, which is typically 0 for normal termination.
+ *
+ * This function must not return.
+ *
+ * This function can be implemented directly with a call to the POSIX exit()
+ * function.
+ */
+void _swift_exit(int code);
+
 #endif

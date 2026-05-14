@@ -657,6 +657,8 @@ public:
 
   bool isCXXMethodMutating(const clang::CXXMethodDecl *method) override;
 
+  bool isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) override;
+
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
@@ -736,7 +738,7 @@ bool isCompletionHandlerParamName(StringRef paramName);
 namespace importer {
 /// Returns true if the given C/C++ reference type uses "immortal"
 /// retain/release functions.
-bool hasImmortalAttrs(const clang::RecordDecl *decl);
+bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
 
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);
@@ -776,6 +778,12 @@ bool isCxxConstReferenceType(const clang::Type *type);
 /// Determine whether the given Clang record declaration has an attribute that
 /// makes it import as a reference types. Does not check its bases, if any.
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
+
+/// Determine whether the given Clang record declaration has the
+/// swift_attr("import_opaque_pointer") attribute, which causes any pointer
+/// to this type to be imported as OpaquePointer regardless of whether the
+/// struct definition is complete.
+bool hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);

@@ -9,11 +9,17 @@
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}function.h \
-// RUN:   %t%{fs-sep}ok.swift
+// RUN:   -typo-correction-limit 0 \
+// RUN:   %t%{fs-sep}ok.swift -verify-additional-prefix ok-swift-
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
 // RUN:   -enable-experimental-feature ImportCxxMembersLazily \
 // RUN:   -I %t%{fs-sep}Inputs -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}function.h \
+// RUN:   -typo-correction-limit 0 \
 // RUN:   %t%{fs-sep}err.swift -verify-additional-prefix swift-
+//
+// Note that we need -typo-correction-limit 0 because otherwise the compiler
+// will try to import other members anyway to suggest "did you mean" diagnostics
+// that unintentionally trigger even more instantiations and thus errors.
 //
 // Check module interface of function.h
 // RUN: %target-swift-ide-test -print-module -source-filename=x \
@@ -42,6 +48,10 @@ struct Bro {
 
 struct Ken {};
 
+struct __attribute__((swift_attr("import_reference")))
+       __attribute__((swift_attr("retain:immortal")))
+       __attribute__((swift_attr("release:immortal"))) FRT {};
+
 // None of GoodStruct's members should prevent it from being imported sans error
 struct GoodStruct {
   GoodStruct() = default;
@@ -61,9 +71,15 @@ struct GoodStruct {
   // expected-swift-note@+1 {{unavailable (cannot import)}}
   void badArg(Bro<Ken>) const;
 
+  // expected-swift-note@+1 * {{explicitly marked unavailable here}}
+  Bro<Ken> getBad() const;
+
   // expected-swift-note@+2 {{unavailable (cannot import)}}
   // expected-swift-note@+1 {{unavailable (cannot import)}}
   static Bro<Ken> badStatic(Bro<Ken>);
+
+  // expected-swift-note@+1 * {{unavailable (cannot import)}}
+  virtual Bro<Ken> badVirtual(Bro<Ken>);
 
   void overloadsSameNumArgs(int) const;
   void overloadsSameNumArgs(Bro<Ken>) const;
@@ -77,6 +93,12 @@ struct GoodStruct {
 
   Bro<Ken> begin() const;
   Bro<Ken> end() const;
+
+  // Return type templates are instantiated only if the function member is
+  // actually imported, e.g., not if the function member is deleted.
+  Bro<Ken> operator~() const = delete;
+  Bro<Ken> deleted() const = delete;
+  Bro<Ken> frtArgByValue(FRT) const; // expected-ok-swift-note {{uses foreign reference type 'FRT' as a value}}
 };
 // CHECK:      struct GoodStruct {
 // CHECK-NEXT:   init()
@@ -85,7 +107,11 @@ struct GoodStruct {
 //
 // NOTE-MISSING: func badArg(_: Never)
 //
+// CHECK-NEXT:   func getBad() -> Never
+//
 // NOTE-MISSING: func badStatic(_: Never) -> Never
+//
+// NOTE-MISSING: func badVirtual(_: Never) -> Never
 //
 // CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
 // NOTE-MISSING: func overloadsSameNumArgs(_: Never)
@@ -102,6 +128,8 @@ struct DerivedGoodStruct : GoodStruct {};
 // CHECK:      struct DerivedGoodStruct {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
+// CHECK-NEXT:   func getBad() -> Never
+// NOTE-MISSING: func badVirtual(_: Never) -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: Int32, _: Int32)
 // CHECK-NEXT:   func __beginUnsafe() -> Never
@@ -111,12 +139,14 @@ struct DerivedGoodStruct : GoodStruct {};
 struct UsingGoodStruct : GoodStruct {
   using GoodStruct::badReturn;
   using GoodStruct::badArg;
+  using GoodStruct::getBad;
   using GoodStruct::badStatic;
 };
 
 // CHECK:      struct UsingGoodStruct {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
+// CHECK-NEXT:   func getBad() -> Never
 // CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
 // CHECK-NEXT:   func overloadsDiffNumArgs(_: Int32, _: Int32)
 // CHECK-NEXT:   func __beginUnsafe() -> Never
@@ -166,17 +196,22 @@ void err(void) {
   // its following uses:
   auto inc = gs.badReturn();
   gs.badArg(inc);
-  GoodStruct::badStatic(inc);
+  auto inc2 = gs.getBad();
+  GoodStruct::badStatic(inc2);
+  gs.badVirtual(inc);
 
   DerivedGoodStruct dgs;
   auto dinc = dgs.badReturn();
   dgs.badArg(dinc);
-  DerivedGoodStruct::badStatic(dinc);
+  auto dinc2 = dgs.getBad();
+  DerivedGoodStruct::badStatic(dinc2);
+  dgs.badVirtual(dinc);
 
   UsingGoodStruct ugs;
   auto uinc = ugs.badReturn();
   ugs.badArg(uinc);
-  UsingGoodStruct::badStatic(uinc);
+  auto uinc2 = ugs.getBad();
+  UsingGoodStruct::badStatic(uinc2);
 }
 
 //--- ok.swift
@@ -189,12 +224,19 @@ func ok() {
   let _: UnsafePointer<UsingGoodStruct>
   let _: UnsafePointer<UsesGoodStruct>
 
-  let gs = GoodStruct() // expected-warning {{never used}}
+  let gs = GoodStruct()
   // TODO: calling overloadsDiffNumArgs(_:_) should work since we should never
   //       need to import the (invalid) single-argument overload. The following
   //       call is commented out so that ok.swift compiles without C++ errors,
   //       but should be added back when this behavior is fixed.
   // gs.overloadsDiffNumArgs(42, 24)
+
+  // NOTE: these function members have invalid return types but aren't imported,
+  // so attempting to use them should ONLY trigger missing member diagnostics
+  // and no template instantiation errors.
+  let _ = ~gs  // expected-error {{cannot be applied}}
+  gs.deleted() // expected-error {{has no member}}
+  gs.frtArgByValue() // expected-error {{has no member}}
 
   let _ = DerivedGoodStruct()
   let _ = UsingGoodStruct()
@@ -214,7 +256,12 @@ func err() {
                             // expected-swift-warning@-1 {{an enum with no cases}}
                             // expected-swift-note@-2 {{add an explicit type annotation}}
   gs.badArg(inc)            // expected-swift-error {{has no member}}
-  GoodStruct.badStatic(inc) // expected-swift-error {{has no member}}
+
+  let inc2 = gs.getBad()     // expected-swift-error {{is unavailable}}
+                             // expected-swift-warning@-1 {{an enum with no cases}}
+                             // expected-swift-note@-2 {{add an explicit type annotation}}
+  GoodStruct.badStatic(inc2) // expected-swift-error {{has no member}}
+  gs.badVirtual(inc)        // expected-swift-error {{has no member}}
 
   let _ = GoodStruct(inc) // expected-swift-error {{call that takes no arguments}}
 
@@ -234,9 +281,15 @@ func err() {
                               // expected-swift-note@-2 {{add an explicit type annotation}}
   dgs.badArg(dinc)            // expected-swift-error {{has no member}}
 
+  let _ = dgs.getBad()  // expected-swift-error {{is unavailable}}
+
+  dgs.badVirtual(dinc)        // expected-swift-error {{has no member}}
+
   let ugs = UsingGoodStruct()
   let uinc = ugs.badReturn() // expected-swift-error {{is unavailable}}
                              // expected-swift-warning@-1 {{an enum with no cases}}
                              // expected-swift-note@-2 {{add an explicit type annotation}}
   ugs.badArg(uinc)           // expected-swift-error {{has no member}}
+
+  let _ = ugs.getBad()  // expected-swift-error {{is unavailable}}
 }

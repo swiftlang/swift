@@ -599,10 +599,6 @@ bool BridgedInstruction::maySynchronize() const {
   return ::maySynchronize(unbridged());
 }
 
-bool BridgedInstruction::mayBeDeinitBarrierNotConsideringSideEffects() const {
-  return ::mayBeDeinitBarrierNotConsideringSideEffects(unbridged());
-}
-
 //===----------------------------------------------------------------------===//
 //                               BridgedBuilder
 //===----------------------------------------------------------------------===//

@@ -114,7 +114,7 @@ bb4:
 
 bb5(%0cC : @owned $C):
   destroy_value %0cC : $C
-  %25 = unchecked_take_enum_data_addr %21 : $*Optional<C>, #Optional.some!enumelt
+  %25 = unchecked_inplace_enum_data_addr %21 : $*Optional<C>, #Optional.some!enumelt
   %26 = load [take] %25 : $*C
   dealloc_stack %21 : $*Optional<C>
   %26a = begin_borrow %26 : $C

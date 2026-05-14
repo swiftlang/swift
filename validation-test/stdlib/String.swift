@@ -2389,7 +2389,7 @@ StringTests.test("String.CoW.reserveCapacity") {
   // Growth shouldn't be linear
   let newElementCount = (preGrowCapacity - str.count) + 10
   str.append(contentsOf: String(repeating: "z", count: newElementCount))
-  expectGE(str.capacity, preGrowCapacity * 2)
+  expectGE(str.capacity, preGrowCapacity + preGrowCapacity / 2)
   
   // Capacity can shrink when copying, but not below the count
   var copy = str

@@ -468,12 +468,12 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
   assert(!orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   auto *fn = functionBuilder.createFunction(
-      orig->getLinkage(), clonedName, clonedTy, orig->getGenericEnvironment(),
-      orig->getLocation(), orig->isBare(), IsNotTransparent, serialized,
-      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      orig->getEntryCount(), orig->isThunk(), orig->getClassSubclassScope(),
-      orig->getInlineStrategy(), orig->getEffectsKind(), orig,
-      orig->getDebugScope());
+      orig->getLinkage(), clonedName, clonedTy, orig->getActorIsolation(),
+      orig->getGenericEnvironment(), orig->getLocation(), orig->isBare(),
+      IsNotTransparent, serialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, orig->getEntryCount(), orig->isThunk(),
+      orig->getClassSubclassScope(), orig->getInlineStrategy(),
+      orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
     fn->addSemanticsAttr(attr);
   return fn;
@@ -592,6 +592,12 @@ void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
       auto varInfo = *inst->getVarInfo();
       if (varInfo.Scope)
         varInfo.Scope = getOpScope(inst->getDebugScope());
+      // The promoted value is now an object, strip the op_deref.
+      // If there is no op_deref, the variable is unsalvageable and dropped.
+      // This should never happen, as it is invalid debug info.
+      if (!varInfo.DIExpr.startsWithDeref())
+        return;
+      varInfo.DIExpr.eraseElement(varInfo.DIExpr.element_begin());
       getBuilder().createDebugValue(inst->getLoc(), value, varInfo);
       return;
     }
@@ -1135,6 +1141,8 @@ public:
   // because we will peek though it's uses to find the actual mutation.
   RECURSIVE_INST_VISITOR(IsNotMutating, BeginAccess)
   RECURSIVE_INST_VISITOR(IsMutating, UncheckedTakeEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsMutating, UncheckedBorrowEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsNotMutating, UncheckedInPlaceEnumDataAddr)
 #undef RECURSIVE_INST_VISITOR
 
   bool visitCopyAddrInst(CopyAddrInst *cai) {

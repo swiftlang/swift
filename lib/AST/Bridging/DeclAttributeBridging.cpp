@@ -500,8 +500,8 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
       SwiftNativeObjCRuntimeBaseAttr(name, atLoc, range, /*Implicit=*/false);
 }
 
-BridgedWarnAttr
-BridgedWarnAttr_createParsed(BridgedASTContext cContext,
+BridgedDiagnoseAttr
+BridgedDiagnoseAttr_createParsed(BridgedASTContext cContext,
                              SourceLoc atLoc,
                              SourceRange range,
                              Identifier diagGroupName,
@@ -509,7 +509,7 @@ BridgedWarnAttr_createParsed(BridgedASTContext cContext,
                              BridgedStringRef reason) {
   ASTContext &context = cContext.unbridged();
   auto diagGroupID = getDiagGroupIDByName(diagGroupName.str());
-  
+
   WarningGroupBehavior attrBehavior;
   switch (behavior) {
     case None:
@@ -523,12 +523,12 @@ BridgedWarnAttr_createParsed(BridgedASTContext cContext,
       attrBehavior = WarningGroupBehavior::Ignored;
       break;
   }
-  
+
   std::optional<StringRef> reasonText = std::nullopt;
   if (!reason.getIsEmpty())
     reasonText = context.AllocateCopy(reason.unbridged());
 
-  return new (context) WarnAttr(*diagGroupID, attrBehavior,
+  return new (context) DiagnoseAttr(*diagGroupID, attrBehavior,
                                 reasonText, atLoc, range,
                                 /*Implicit=*/false);
 }

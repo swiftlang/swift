@@ -70,6 +70,7 @@
 
 // CHECK:      public struct OperatorBasePrivateInheritance : CxxConvertibleToBool {
 // CHECK-NEXT:   public init()
+// CHECK-NEXT:   @available(*, unavailable, message: "use Bool(fromCxx:)")
 // CHECK-NEXT:   public func __convertToBool() -> Bool
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   public func __operatorStar() -> Int32
@@ -80,4 +81,25 @@
 // CHECK-NEXT:   prefix public static func ! (lhs: OperatorBasePrivateInheritance) -> OperatorBase
 // CHECK-NEXT:   public var pointee: Int32 { get }
 // CHECK-NEXT:   public subscript(x: Int32) -> Int32 { get }
+// CHECK-NEXT: }
+
+// CHECK:      public struct OperatorBaseProtectedInheritance {
+// CHECK-NEXT:   public init()
+// CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
+// CHECK-NEXT:   private func __operatorStar() -> Int32
+// CHECK-NEXT:   private func __operatorExclaim() -> OperatorBase
+// CHECK-NEXT:   @available(*, unavailable, message: "use subscript")
+// CHECK-NEXT:   private func __operatorSubscriptConst(_ x: Int32) -> Int32
+// CHECK-NEXT:   private var pointee: Int32 { get }
+// CHECK-NEXT:   private subscript(x: Int32) -> Int32 { get }
+// CHECK-NEXT: }
+
+// CHECK:      public struct ProtectedOperatorBoolBase {
+// CHECK-NEXT:   public init()
+// CHECK-NEXT: }
+
+// CHECK:      public struct ProtectedOperatorBoolMadePublic : CxxConvertibleToBool {
+// CHECK-NEXT:   public init()
+// CHECK-NEXT:   @available(*, unavailable, message: "use Bool(fromCxx:)")
+// CHECK-NEXT:   public func __convertToBool() -> Bool
 // CHECK-NEXT: }

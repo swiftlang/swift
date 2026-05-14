@@ -223,7 +223,7 @@ extension UTF8 {
     // TODO: Fixed size buffer for non-contig inputs
     // TODO: Lifetime-dependent result variant
     let cus = Array(s)
-    return unsafe cus.withUnsafeBytes {
+    return cus.withUnsafeBytes {
       var bufPtr = unsafe $0
       var start = 0
       var errors: Array<UTF8.ValidationError> = []

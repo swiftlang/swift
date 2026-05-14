@@ -346,7 +346,8 @@ unsigned DiagnosticSerializer::getFileIDFromBufferID(SourceManager &SM,
                          IsFileBacked ? "" : FileContent};
 
   // Add file to serializing source manager.
-  unsigned NewIdx = SrcMgr.addMemBufferCopy(Buf.Buffer.get());
+  unsigned NewIdx =
+      SrcMgr.addMemBufferCopy(Buf.Buffer->getBuffer(), remapFilePath(Filename));
   FileMapper[&SrcMgr].insert({CurrentFileID, NewIdx});
 
   Files.emplace_back(std::move(File));

@@ -100,7 +100,12 @@ extension MutatingContext {
   }
   
   func tryOptimizeKeypath(apply: FullApplySite) -> Bool {
-    return bridgedPassContext.tryOptimizeKeypath(apply.bridged)
+    if bridgedPassContext.tryOptimizeKeypath(apply.bridged) {
+      notifyBranchesChanged()
+      notifyInstructionsChanged()
+      return true
+    }
+    return false
   }
 
   func inlineFunction(apply: FullApplySite, mandatoryInline: Bool) {

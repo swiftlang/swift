@@ -360,6 +360,7 @@ namespace {
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
     IMPL(Integer, Trivial)
+    IMPL(Hidden, Trivial)
 
 #undef IMPL
 
@@ -4169,6 +4170,7 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
     CanType selfType = wrappedProperty->getDeclContext()
                            ->getSelfInterfaceType()
                            ->getCanonicalType();
+    selfType = sig.getReducedType(selfType);
     // Create the self param
     params.emplace_back(
         selfType, Identifier(),
@@ -5248,6 +5250,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   // have an error result.
   if (fnTy1->hasErrorResult() != fnTy2->hasErrorResult() &&
       (fnTy1->isAsync() || fnTy2->isAsync()))
+    return ABIDifference::NeedsThunk;
+
+  // A synchronous function requires a thunk to be treated as an asynchronous
+  // function. An async function cannot be called synchronously just by adding a
+  // thunk and hopefully doesn't get here.
+  if (!fnTy1->isAsync() && fnTy2->isAsync())
     return ABIDifference::NeedsThunk;
 
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {

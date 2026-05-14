@@ -142,6 +142,7 @@ internal final class _ContiguousArrayStorage<
 #if _runtime(_ObjC)
   
   @_effects(releasenone)
+  @safe
   internal final override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -165,7 +166,7 @@ internal final class _ContiguousArrayStorage<
       return 0
     }
     
-    return unsafe withUnsafeBufferOfObjects {
+    return withUnsafeBufferOfObjects {
       objects in
       unsafe enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       unsafe enumerationState.itemsPtr =
@@ -179,7 +180,7 @@ internal final class _ContiguousArrayStorage<
   @inline(__always)
   @_effects(readonly)
   @nonobjc private func _objectAt(_ index: Int) -> Unmanaged<AnyObject> {
-    return unsafe withUnsafeBufferOfObjects {
+    return withUnsafeBufferOfObjects {
       objects in
       _precondition(
         _isValidArraySubscript(index, count: objects.count),
@@ -202,7 +203,7 @@ internal final class _ContiguousArrayStorage<
   
   @objc internal override final var count: Int {
     @_effects(readonly) get {
-      return unsafe withUnsafeBufferOfObjects { $0.count }
+      return withUnsafeBufferOfObjects { $0.count }
     }
   }
 
@@ -210,7 +211,7 @@ internal final class _ContiguousArrayStorage<
   @objc internal override final func getObjects(
     _ aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
   ) {
-    return unsafe withUnsafeBufferOfObjects {
+    return withUnsafeBufferOfObjects {
       objects in
       _precondition(
         _isValidArrayIndex(range.location, count: objects.count),
@@ -461,6 +462,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
   /// underlying contiguous storage.
   @_alwaysEmitIntoClient
+  @safe
   internal func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -484,6 +486,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
   /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
   /// over the underlying contiguous storage.
   @_alwaysEmitIntoClient
+  @safe
   internal mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {

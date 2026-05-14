@@ -1171,9 +1171,9 @@ BridgedSwiftNativeObjCRuntimeBaseAttr_createParsed(BridgedASTContext cContext,
                                                    swift::SourceRange range,
                                                    swift::Identifier name);
 
-SWIFT_NAME("BridgedWarnAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
-BridgedWarnAttr
-BridgedWarnAttr_createParsed(BridgedASTContext cContext,
+SWIFT_NAME("BridgedDiagnoseAttr.createParsed(_:atLoc:range:diagGroupName:behavior:reason:)")
+BridgedDiagnoseAttr
+BridgedDiagnoseAttr_createParsed(BridgedASTContext cContext,
                              swift::SourceLoc atLoc,
                              swift::SourceRange range,
                              swift::Identifier diagGroupName,
@@ -2770,9 +2770,9 @@ BridgedSendingTypeRepr_createParsed(BridgedASTContext cContext,
                                     BridgedTypeRepr base,
                                     swift::SourceLoc specifierLoc);
 
-SWIFT_NAME("BridgedCallerIsolatedTypeRepr.createParsed(_:base:specifierLoc:)")
-BridgedCallerIsolatedTypeRepr
-BridgedCallerIsolatedTypeRepr_createParsed(BridgedASTContext cContext,
+SWIFT_NAME("BridgedNonisolatedNonsendingTypeRepr.createParsed(_:base:specifierLoc:)")
+BridgedNonisolatedNonsendingTypeRepr
+BridgedNonisolatedNonsendingTypeRepr_createParsed(BridgedASTContext cContext,
                                            BridgedTypeRepr base,
                                            swift::SourceLoc specifierLoc);
 

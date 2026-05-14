@@ -42,20 +42,51 @@ func yielding() async {
   }
 }
 
-@main struct Main {
-    static func main() async {
-        await yielding()
-        print("All done!")
-        // CHECK: One @ 0
-        // CHECK: Two @ 0
-        // CHECK: One @ 1
-        // CHECK: Two @ 1
-        // CHECK: One @ 2
-        // CHECK: Two @ 2
-        // CHECK: One @ 3
-        // CHECK: Two @ 3
-        // CHECK: One @ 4
-        // CHECK: Two @ 4
-        // CHECK: All done!
+enum HomeworkError: Error {
+case dogAteIt
+}
+
+func throwing() async throws {
+  print("Ready to throw")
+  let one = One()
+  let two = Two()
+  try await withThrowingTaskGroup(of: Int.self) { group in
+    group.addTask {
+      await one.go(times: 5)
     }
+    group.addTask {
+      throw HomeworkError.dogAteIt
+    }
+
+    _ = try await group.next()
+    _ = try await group.next()
+  }
+}
+
+@main struct Main {
+  static func main() async {
+    await yielding()
+    print("All done!")
+    // CHECK: One @ 0
+    // CHECK: Two @ 0
+    // CHECK: One @ 1
+    // CHECK: Two @ 1
+    // CHECK: One @ 2
+    // CHECK: Two @ 2
+    // CHECK: One @ 3
+    // CHECK: Two @ 3
+    // CHECK: One @ 4
+    // CHECK: Two @ 4
+    // CHECK: All done!
+
+    // CHECK: Ready to throw
+    do {
+      try await throwing()
+    } catch let error as HomeworkError {
+      // CHECK: Caught HomeworkError
+      print("Caught HomeworkError")
+    } catch {
+      fatalError("Couldn't match HomeworkError")
+    }
+  }
 }

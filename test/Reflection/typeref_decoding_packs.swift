@@ -18,7 +18,7 @@
 // RUN: %target-swift-reflection-dump %t/TypesToReflect | %FileCheck %s
 
 // Fails only with Android NDK 28 because of an lld issue
-// UNSUPPORTED: OS=linux-android
+// XFAIL: OS=linux-android
 
 // CHECK: FIELDS:
 // CHECK: =======

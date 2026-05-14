@@ -2578,7 +2578,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
     std::tie(Arg, std::ignore) = castValueToABICompatibleType(
         &Builder, PM, TAI->getLoc(), Arg,
         origConv.getSILArgumentType(i, context),
-        targetConv.getSILArgumentType(calleeArgIdx, context), {TAI});
+        targetConv.getSILArgumentType(calleeArgIdx, context));
     Args.push_back(Arg);
     calleeArgIdx += 1;
   }
@@ -2611,7 +2611,7 @@ bool SimplifyCFG::simplifyTryApplyBlock(TryApplyInst *TAI) {
   // Non-guaranteed values don't need use points when casting.
   SILValue CastedResult;
   std::tie(CastedResult, std::ignore) = castValueToABICompatibleType(
-      &Builder, PM, Loc, NewAI, ResultTy, OrigResultTy, /*usePoints*/ {});
+      &Builder, PM, Loc, NewAI, ResultTy, OrigResultTy);
 
   BranchInst *branch = Builder.createBranch(Loc, NormalBB, {CastedResult});
 

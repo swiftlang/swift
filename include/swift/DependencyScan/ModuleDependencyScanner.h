@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -197,6 +198,8 @@ private:
 
   // Worker-specific instance of CompilerInvocation
   std::unique_ptr<CompilerInvocation> workerCompilerInvocation;
+  // Worker-specific SourceManager
+  SourceManager workerSourceMgr;
   // Worker-specific diagnostic engine
   std::unique_ptr<DiagnosticEngine> workerDiagnosticEngine;
   // Worker-specific instance of ASTContext
@@ -315,8 +318,6 @@ private:
                           const SILOptions &SILOptions,
                           ASTContext &ScanASTContext,
                           DependencyTracker &DependencyTracker,
-                          std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                          std::shared_ptr<llvm::cas::ActionCache> ActionCache,
                           DiagnosticEngine &Diagnostics, bool ParallelScan,
                           bool EmitScanRemarks);
   llvm::Error initializeWorkerClangScanningTool();
@@ -465,6 +466,7 @@ private:
   std::shared_ptr<llvm::cas::ActionCache> ActionCache;
   /// File prefix mapper.
   std::unique_ptr<llvm::PrefixMapper> PrefixMapper;
+  std::unique_ptr<llvm::PrefixMapper> ReversePrefixMapping;
   /// CAS file system for loading file content.
   llvm::IntrusiveRefCntPtr<llvm::cas::CASBackedFileSystem> CacheFS;
   /// Protect worker access.

@@ -12,7 +12,7 @@
 // RUN: %target-swift-frontend -internal-import-bridging-header %t/headers/c-bridging-header.h -sdk %clang-importer-sdk -emit-module -o %t/modules/MyModule.swiftmodule %t/src/MyModule.swift
 
 // Check that there's no serialized bridging header in the module file.
-// RUN: llvm-bcanalyzer -dump %t/modules/MyModule.swiftmodule | %FileCheck -check-prefix MODULE-FILE %s
+// RUN: %llvm-bcanalyzer -dump %t/modules/MyModule.swiftmodule | %FileCheck -check-prefix MODULE-FILE %s
 
 // Use the module.
 // RUN: %target-swift-frontend -typecheck -sdk %clang-importer-sdk -I %t/modules %t/src/MyClient.swift

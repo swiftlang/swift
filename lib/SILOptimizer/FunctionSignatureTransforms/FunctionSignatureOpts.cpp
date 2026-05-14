@@ -548,10 +548,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // from a parent class, if one exists, thus the override of the
   // classSubclassScope.
   TransformDescriptor.OptimizedFunction = FunctionBuilder.createFunction(
-      linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->getSerializedKind(), IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible, F->getEntryCount(),
-      F->isThunk(),
+      linkage, Name, NewFTy, F->getActorIsolation(), NewFGenericEnv,
+      F->getLocation(), F->isBare(), F->isTransparent(), F->getSerializedKind(),
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+      F->getEntryCount(), F->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
   SILFunction *NewF = TransformDescriptor.OptimizedFunction.get();

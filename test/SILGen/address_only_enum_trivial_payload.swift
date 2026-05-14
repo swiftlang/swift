@@ -15,7 +15,7 @@ func consumeTheEnum(_ value: consuming AddressOnly) -> Int {
   // CHECK: switch_enum_addr {{.*}}AddressOnly.unloadableAndInt
   switch consume value {
   case .unloadableAndInt(_, let count):
-    // CHECK: [[ADDR:%[0-9]+]] = unchecked_take_enum_data_addr
+    // CHECK: [[ADDR:%[0-9]+]] = unchecked_inplace_enum_data_addr
     // CHECK: [[TRIVIAL_ADDR:%[0-9]+]] = tuple_element_addr [[ADDR]], 1
     // CHECK: load [trivial] [[TRIVIAL_ADDR]]
     return count

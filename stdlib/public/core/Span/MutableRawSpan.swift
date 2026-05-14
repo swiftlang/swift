@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,8 +14,8 @@
 import Swift
 #endif
 
-// A MutableRawSpan represents a span of memory which
-// contains initialized `Element` instances.
+/// `MutableRawSpan` represents a contiguous region of memory
+/// which contains initialized bytes.
 @safe
 @frozen
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -33,6 +33,7 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
     unsafe _pointer._unsafelyUnwrappedUnchecked
   }
 
+  /// Create an empty span.
   @_alwaysEmitIntoClient
   @inline(__always)
   @lifetime(immortal)
@@ -118,30 +119,87 @@ extension MutableRawSpan {
 
   @_alwaysEmitIntoClient
   @lifetime(&elements)
+  @unsafe
   public init<Element: BitwiseCopyable>(
     _elements elements: inout MutableSpan<Element>
   ) {
-    let (start, count) = unsafe (elements._pointer, elements._count)
-    let span = unsafe MutableRawSpan(
-      _unchecked: start,
-      byteCount: count == 1 ? MemoryLayout<Element>.size
-                 : count &* MemoryLayout<Element>.stride
-    )
+    var span = unsafe Self.init(unsafeElements: elements._reborrowed)
+    span = unsafe _overrideLifetime(span, copying: ())
     self = unsafe _overrideLifetime(span, mutating: &elements)
+  }
+
+  /// Mutate the elements of a typed span as bytes.
+  ///
+  /// The stride of `Element` must equal its size, and the starting
+  /// address of `elements` must be well-aligned for `Element`.
+  ///
+  /// - Parameter elements: A typed span to reinterpret as raw bytes.
+  @_alwaysEmitIntoClient
+  @_lifetime(&elements)
+  public init<Element: ConvertibleFromBytes & ConvertibleToBytes>(
+    mutating elements: inout MutableSpan<Element>
+  ) {
+    self = unsafe Self.init(_elements: &elements)
+  }
+
+  /// Unsafely convert a typed span to a raw span.
+  ///
+  /// Creates a `MutableRawSpan` over the memory represented
+  /// by a `MutableSpan<Element>`.
+  ///
+  /// - Parameters:
+  ///   - elements: An existing `MutableSpan<Element>`, from which this
+  ///     `MutableRawSpan` will inherit its lifetime.
+  @_alwaysEmitIntoClient
+  @unsafe
+  @_lifetime(copy elements)
+  public init<Element>(
+    unsafeElements elements: consuming MutableSpan<Element>
+  ) {
+    let (start, count) = unsafe (elements._pointer, elements._count)
+    unsafe self = _overrideLifetime(
+      Self.init(
+        _unchecked: start,
+        byteCount: (count == 1) ? MemoryLayout<Element>.size
+                   : (count &* MemoryLayout<Element>.stride)
+      ),
+      copying: elements
+    )
+  }
+
+  /// Convert a typed span to a raw span.
+  ///
+  /// Creates a `MutableRawSpan` over the memory represented
+  /// by a `MutableSpan<Element>`.
+  ///
+  /// - Parameters:
+  ///   - elements: An existing `MutableSpan<Element>`, from which this
+  ///     `MutableRawSpan` will inherit its lifetime.
+  @_alwaysEmitIntoClient
+  @_lifetime(copy elements)
+  public init<Element: ConvertibleToBytes & ConvertibleFromBytes>(
+    elements: consuming MutableSpan<Element>
+  ) {
+    self = unsafe Self.init(unsafeElements: elements)
   }
 }
 
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
+  /// The number of bytes in the span.
   @_alwaysEmitIntoClient
   @_semantics("fixed_storage.get_count")
   public var byteCount: Int { _assumeNonNegative(_count) }
 
+  /// A Boolean value indicating whether the span is empty.
   @_alwaysEmitIntoClient
   @_transparent
   public var isEmpty: Bool { byteCount == 0 }
 
+  /// The valid byte offsets for accessing this span, in ascending order.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var byteOffsets: Range<Int> {
     unsafe Range(_uncheckedBounds: (0, byteCount))
@@ -151,18 +209,96 @@ extension MutableRawSpan {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
+  // SILOptimizer looks for fixed_storage.check_index semantics
+  // for bounds checking optimizations.
+  @_semantics("fixed_storage.check_index")
+  @_alwaysEmitIntoClient @inline(__always)
+  internal func _checkIndex(_ position: Int) {
+    _precondition(byteOffsets.contains(position), "Index out of bounds")
+  }
 
+  /// Accesses the byte at the specified offset in the span.
+  ///
+  /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
+  ///     must be greater than or equal to zero, and less than `byteCount`.
+  @_alwaysEmitIntoClient @inline(__always)
+  public subscript(_ byteOffset: Int) -> UInt8 {
+    get {
+      _checkIndex(byteOffset)
+      return unsafe self[unchecked: byteOffset]
+    }
+    set {
+      _checkIndex(byteOffset)
+      unsafe self[unchecked: byteOffset] = newValue
+    }
+  }
+
+  /// Accesses the byte at the specified offset in the span.
+  ///
+  /// This subscript does not validate `byteOffset`. Using this subscript
+  /// with an invalid `byteOffset` results in undefined behaviour.
+  ///
+  /// - Parameter byteOffset: The offset of the byte to access. `byteOffset`
+  ///     must be greater than or equal to zero, and less than `byteCount`.
+  @_alwaysEmitIntoClient @inline(__always)
+  @unsafe
+  public subscript(unchecked byteOffset: Int) -> UInt8 {
+    get {
+      unsafe unsafeLoad(fromUncheckedByteOffset: byteOffset, as: UInt8.self)
+    }
+    set {
+      unsafe storeBytes(
+        of: newValue, toUncheckedByteOffset: byteOffset, as: UInt8.self
+      )
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension MutableRawSpan {
+
+  /// Calls the given closure with a pointer to the underlying bytes of
+  /// the viewed contiguous storage.
+  ///
+  /// The buffer pointer passed as an argument to `body` is valid only
+  /// during the execution of `withUnsafeBytes(_:)`.
+  /// Do not store or return the pointer for later use.
+  ///
+  /// - Parameter body: A closure with an `UnsafeRawBufferPointer`
+  ///   parameter that points to the viewed contiguous storage.
+  ///   If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeBytes(_:)` method.
+  ///   The closure's parameter is valid only for the duration of
+  ///   its execution.
+  /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
   @_transparent
+  @safe
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
     try unsafe body(.init(start: _pointer, count: _count))
   }
 
+  /// Calls the given closure with a mutable pointer to the underlying bytes
+  /// of the viewed contiguous storage.
+  ///
+  /// The buffer pointer passed as an argument to `body` is valid only
+  /// during the execution of `withUnsafeMutableBytes(_:)`.
+  /// Do not store or return the pointer for later use.
+  ///
+  /// - Parameter body: A closure with an `UnsafeMutableRawBufferPointer`
+  ///   parameter that points to the viewed contiguous storage.
+  ///   If `body` has a return value, that value is also
+  ///   used as the return value for the `withUnsafeMutableBytes(_:)` method.
+  ///   The closure's parameter is valid only for the duration of
+  ///   its execution.
+  /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
   @_transparent
   @lifetime(self: copy self)
+  @safe
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
@@ -187,6 +323,7 @@ extension RawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
+  /// Borrow the underlying initialized memory for read-only access.
   public var bytes: RawSpan {
     @_alwaysEmitIntoClient
     @_transparent
@@ -335,26 +472,231 @@ extension MutableRawSpan {
     unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
   }
 
+  /// Returns a value constructed from the raw memory at the specified offset.
+  ///
+  /// The range of bytes required to construct a value of type `T` starting at
+  /// `offset` must be completely within the span.
+  /// `offset` is not required to be aligned for `T`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset from the beginning of this span, in bytes.
+  ///     `offset` must be nonnegative.
+  ///   - type: The type of the instance to create.
+  /// - Returns: A new value of type `T`, read from `offset`.
+  @_alwaysEmitIntoClient
+  public func load<T: ConvertibleFromBytes>(
+    fromByteOffset offset: Int,
+    as type: T.Type
+  ) -> T {
+    unsafe unsafeLoadUnaligned(fromByteOffset: offset, as: T.self)
+  }
+
+  /// Returns a value constructed from the raw memory at the specified offset.
+  ///
+  /// The range of bytes required to construct a value of type `T` starting at
+  /// `offset` must be completely within the span.
+  /// `offset` is not required to be aligned for `T`.
+  ///
+  /// - Parameters:
+  ///   - offset: The offset from the beginning of this span, in bytes.
+  ///     `offset` must be nonnegative.
+  ///   - type: The type of the instance to create.
+  ///   - byteOrder: The order in which the bytes will be decoded.
+  /// - Returns: A new value of type `T`, read from `offset`.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 6.4, *)
+  public func load<T: ConvertibleFromBytes & FixedWidthInteger>(
+    fromByteOffset offset: Int,
+    as type: T.Type,
+    _ byteOrder: ByteOrder
+  ) -> T {
+    let rawValue = load(fromByteOffset: offset, as: T.self)
+    return switch byteOrder {
+    case .bigEndian: rawValue.bigEndian
+    case .littleEndian: rawValue.littleEndian
+    }
+  }
+
+  /// Stores the given value's bytes into the span's raw memory at the
+  /// specified byte offset.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - offset: The offset from the start of the span, in bytes.
+  ///     `offset` must be nonnegative. The default is zero.
+  ///   - type: The type of `value`.
+  @unsafe
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
+  ) {
+    unsafe _storeBytes(of: value, toByteOffset: offset, as: T.self)
+  }
+
+  @unsafe
+  @_alwaysEmitIntoClient @_transparent
+  @_lifetime(self: copy self)
+  internal mutating func _storeBytes<T: BitwiseCopyable>(
+    of value: T, toByteOffset offset: Int, as type: T.Type
   ) {
     _precondition(
       UInt(bitPattern: offset) <= UInt(bitPattern: _count) &&
       MemoryLayout<T>.size <= (_count &- offset),
       "Byte offset range out of bounds"
     )
-    unsafe storeBytes(of: value, toUncheckedByteOffset: offset, as: type)
+    unsafe storeBytes(of: value, toUncheckedByteOffset: offset, as: T.self)
   }
 
+  /// Stores the given value's bytes into the span's raw memory at the
+  /// specified byte offset.
+  ///
+  /// This function does not validate `offset`; this is an unsafe operation.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - offset: The offset from the start of the span, in bytes.
+  ///     `offset` must be nonnegative.
+  ///   - type: The type of `value`.
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func storeBytes<T: BitwiseCopyable>(
     of value: T, toUncheckedByteOffset offset: Int, as type: T.Type
   ) {
-    unsafe _start().storeBytes(of: value, toByteOffset: offset, as: type)
+    unsafe _start().storeBytes(of: value, toByteOffset: offset, as: T.self)
+  }
+
+  /// Stores the given value's bytes to the specified offset into
+  /// the span's memory.
+  ///
+  /// The range of bytes required to store a value of type `T` starting at
+  /// byte offset `offset` must be completely within the span.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - offset: The offset in bytes into the span's memory at which to begin
+  ///       writing the bytes from the value.
+  ///   - type: The type of the instance to store.
+  @_alwaysEmitIntoClient
+  @_lifetime(self: copy self)
+  public mutating func storeBytes<T: ConvertibleToBytes & BitwiseCopyable>(
+    of value: T, toByteOffset offset: Int, as type: T.Type
+  ) {
+    unsafe _storeBytes(of: value, toByteOffset: offset, as: T.self)
+  }
+
+  /// Stores the given value's bytes to the specified offset into
+  /// the span's memory.
+  ///
+  /// The range of bytes required to store a value of type `T` starting at
+  /// byte offset `offset` must be completely within the span.
+  /// `offset` is not required to be aligned for `T`.
+  ///
+  /// - Parameters:
+  ///   - value: The value to store as raw bytes.
+  ///   - offset: The offset in bytes into the span's memory at which to begin
+  ///       writing the bytes from the value.
+  ///   - type: The type of the instance to store.
+  ///   - byteOrder: The order in which the bytes will be encoded to the span.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  public mutating func storeBytes<
+    T: ConvertibleToBytes & BitwiseCopyable & FixedWidthInteger
+  >(
+    of value: T,
+    toByteOffset offset: Int,
+    as type: T.Type,
+    _ byteOrder: ByteOrder
+  ) {
+    switch byteOrder {
+    case .bigEndian:
+      storeBytes(of: value.bigEndian, toByteOffset: offset, as: T.self)
+    case .littleEndian:
+      storeBytes(of: value.littleEndian, toByteOffset: offset, as: T.self)
+    }
+  }
+
+  /// Stores the given value's bytes repeatedly into this span's memory.
+  ///
+  /// There must be at least `count * MemoryLayout<T>.stride` bytes
+  /// available in the span.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The value to store as raw bytes.
+  ///   - count: The number of copies of `repeatedValue` to store
+  ///      into this span.
+  ///   - type: The type of the instance to store repeatedly.
+  @unsafe
+  @_alwaysEmitIntoClient
+  @_lifetime(self: copy self)
+  public mutating func storeBytes<T: BitwiseCopyable>(
+    repeating repeatedValue: T, count: Int, as type: T.Type
+  ) {
+    unsafe _storeBytes(repeating: repeatedValue, count: count, as: T.self)
+  }
+
+  @unsafe
+  @_alwaysEmitIntoClient @_transparent
+  @_lifetime(self: copy self)
+  internal mutating func _storeBytes<T: BitwiseCopyable>(
+    repeating repeatedValue: T, count: Int, as type: T.Type
+  ) {
+    _precondition(
+      count * MemoryLayout<T>.stride <= _count,
+      "Span cannot contain every element"
+    )
+    unsafe _start().withMemoryRebound(to: T.self, capacity: count) {
+      unsafe $0.update(repeating: repeatedValue, count: count)
+    }
+  }
+
+  /// Stores the given value's bytes repeatedly into this span's memory.
+  ///
+  /// There must be at least `count * MemoryLayout<T>.stride` bytes
+  /// available in the span.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The value to store as raw bytes.
+  ///   - count: The number of copies of `repeatedValue` to store
+  ///      into this span.
+  ///   - type: The type of the instance to store repeatedly.
+  @_alwaysEmitIntoClient
+  @_lifetime(self: copy self)
+  public mutating func storeBytes<T: ConvertibleToBytes & BitwiseCopyable>(
+    repeating repeatedValue: T, count: Int, as type: T.Type
+  ) {
+    unsafe _storeBytes(repeating: repeatedValue, count: count, as: T.self)
+  }
+
+  /// Stores the given value's bytes repeatedly into this span's memory.
+  ///
+  /// There must be at least `count * MemoryLayout<T>.stride` bytes
+  /// available in the span.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The value to store as raw bytes.
+  ///   - count: The number of copies of `repeatedValue` to store
+  ///      into this span.
+  ///   - type: The type of the instance to store repeatedly.
+  ///   - byteOrder: The order in which the bytes will be encoded to the span.
+  @_alwaysEmitIntoClient
+  @available(SwiftStdlib 6.4, *)
+  @_lifetime(self: copy self)
+  public mutating func storeBytes<
+    T: ConvertibleToBytes & BitwiseCopyable & FixedWidthInteger
+  >(
+    repeating repeatedValue: T,
+    count: Int,
+    as type: T.Type,
+    _ byteOrder: ByteOrder
+  ) {
+    let value = switch byteOrder {
+    case .bigEndian: repeatedValue.bigEndian
+    case .littleEndian: repeatedValue.littleEndian
+    }
+    storeBytes(repeating: value, count: count, as: T.self)
   }
 }
 
@@ -363,17 +705,19 @@ extension MutableRawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
+  ///
+  /// The returned span represents a mutation of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableSpan`.
+  ///     this range must be within the bounds of this `MutableRawSpan`.
   ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
@@ -387,6 +731,21 @@ extension MutableRawSpan {
     return unsafe _mutatingExtracting(unchecked: bounds)
   }
 
+  /// Constructs a new span over the bytes within the supplied range of
+  /// positions within this span.
+  ///
+  /// The returned span represents a mutation of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter bounds: A valid range of positions. Every position in
+  ///     this range must be within the bounds of this `MutableRawSpan`.
+  ///
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
   @_alwaysEmitIntoClient
   @lifetime(&self)
@@ -394,6 +753,19 @@ extension MutableRawSpan {
     _mutatingExtracting(bounds)
   }
 
+  /// Constructs a new span over the bytes within the supplied range of
+  /// positions within this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter bounds: A valid range of positions. Every position in
+  ///     this range must be within the bounds of this `MutableRawSpan`.
+  ///
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   consuming public func _consumingExtracting(_ bounds: Range<Int>) -> Self {
@@ -405,8 +777,10 @@ extension MutableRawSpan {
     return unsafe _consumingExtracting(unchecked: bounds)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
+  ///
+  /// The returned span represents a mutation of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
@@ -415,9 +789,9 @@ extension MutableRawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableSpan`.
+  ///     this range must be within the bounds of this `MutableRawSpan`.
   ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
@@ -429,6 +803,23 @@ extension MutableRawSpan {
     return unsafe _overrideLifetime(newSpan, mutating: &self)
   }
 
+  /// Constructs a new span over the bytes within the supplied range of
+  /// positions within this span.
+  ///
+  /// The returned span represents a mutation of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// This function does not validate `bounds`; this is an unsafe operation.
+  ///
+  /// - Parameter bounds: A valid range of positions. Every position in
+  ///     this range must be within the bounds of this `MutableRawSpan`.
+  ///
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @unsafe
   @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
   @_alwaysEmitIntoClient
@@ -437,6 +828,21 @@ extension MutableRawSpan {
     unsafe _mutatingExtracting(unchecked: bounds)
   }
 
+  /// Constructs a new span over the bytes within the supplied range of
+  /// positions within this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// This function does not validate `bounds`; this is an unsafe operation.
+  ///
+  /// - Parameter bounds: A valid range of positions. Every position in
+  ///     this range must be within the bounds of this `MutableRawSpan`.
+  ///
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
@@ -446,17 +852,19 @@ extension MutableRawSpan {
     return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
+  ///
+  /// The returned span represents a mutation of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableSpan`.
+  ///     this range must be within the bounds of this `MutableRawSpan`.
   ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
@@ -467,6 +875,21 @@ extension MutableRawSpan {
     _mutatingExtracting(bounds.relative(to: byteOffsets))
   }
 
+  /// Constructs a new span over the bytes within the supplied range of
+  /// positions within this span.
+  ///
+  /// The returned span represents a mutation of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter bounds: A valid range of positions. Every position in
+  ///     this range must be within the bounds of this `MutableRawSpan`.
+  ///
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
   @_alwaysEmitIntoClient
   @lifetime(&self)
@@ -476,6 +899,19 @@ extension MutableRawSpan {
     _mutatingExtracting(bounds)
   }
 
+  /// Constructs a new span over the bytes within the supplied range of
+  /// positions within this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter bounds: A valid range of positions. Every position in
+  ///     this range must be within the bounds of this `MutableRawSpan`.
+  ///
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   consuming public func _consumingExtracting(
@@ -484,8 +920,10 @@ extension MutableRawSpan {
     _consumingExtracting(bounds.relative(to: byteOffsets))
   }
 
-  /// Constructs a new span over the items within the supplied range of
+  /// Constructs a new span over the bytes within the supplied range of
   /// positions within this span.
+  ///
+  /// The returned span represents a mutation of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
@@ -494,9 +932,9 @@ extension MutableRawSpan {
   /// This function does not validate `bounds`; this is an unsafe operation.
   ///
   /// - Parameter bounds: A valid range of positions. Every position in
-  ///     this range must be within the bounds of this `MutableSpan`.
+  ///     this range must be within the bounds of this `MutableRawSpan`.
   ///
-  /// - Returns: A `MutableSpan` over the items within `bounds`
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
   ///
   /// - Complexity: O(1)
   @unsafe
@@ -511,6 +949,23 @@ extension MutableRawSpan {
     return unsafe _mutatingExtracting(unchecked: range)
   }
 
+  /// Constructs a new span over the bytes within the supplied range of
+  /// positions within this span.
+  ///
+  /// The returned span represents a mutation of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// This function does not validate `bounds`; this is an unsafe operation.
+  ///
+  /// - Parameter bounds: A valid range of positions. Every position in
+  ///     this range must be within the bounds of this `MutableRawSpan`.
+  ///
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @unsafe
   @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
   @_alwaysEmitIntoClient
@@ -521,6 +976,21 @@ extension MutableRawSpan {
     unsafe _mutatingExtracting(unchecked: bounds)
   }
 
+  /// Constructs a new span over the bytes within the supplied range of
+  /// positions within this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// This function does not validate `bounds`; this is an unsafe operation.
+  ///
+  /// - Parameter bounds: A valid range of positions. Every position in
+  ///     this range must be within the bounds of this `MutableRawSpan`.
+  ///
+  /// - Returns: A `MutableRawSpan` over the bytes within `bounds`.
+  ///
+  /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
@@ -533,22 +1003,42 @@ extension MutableRawSpan {
     return unsafe _consumingExtracting(unchecked: range)
   }
 
-  /// Constructs a new span over all the items of this span.
+  /// Constructs a new span over all the bytes of this span.
+  ///
+  /// The returned span represents a mutation of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Returns: A `MutableSpan` over all the items of this span.
+  /// - Returns: A `MutableRawSpan` over all the bytes of this span.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func _mutatingExtracting(_: UnboundedRange) -> Self {
-    let newSpan = unsafe Self(_unchecked: _pointer, byteCount: _count)
-    return unsafe _overrideLifetime(newSpan, mutating: &self)
+    unsafe _overrideLifetime(
+      Self(_unchecked: _pointer, byteCount: _count), mutating: &self
+    )
   }
 
+  @_alwaysEmitIntoClient @inline(__always)
+  internal var _reborrowed: Self {
+    @_lifetime(&self)
+    mutating get { _mutatingExtracting(...) }
+  }
+
+  /// Constructs a new span over all the bytes of this span.
+  ///
+  /// The returned span represents a mutation of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Returns: A `MutableRawSpan` over all the bytes of this span.
+  ///
+  /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
   @_alwaysEmitIntoClient
   @lifetime(&self)
@@ -556,6 +1046,15 @@ extension MutableRawSpan {
     _mutatingExtracting(...)
   }
 
+  /// Constructs a new span over all the bytes of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Returns: A `MutableRawSpan` over all the bytes of this span.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   consuming public func _consumingExtracting(_: UnboundedRange) -> Self {
@@ -568,19 +1067,21 @@ extension MutableRawSpan {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension MutableRawSpan {
 
-  /// Returns a span containing the initial elements of this span,
+  /// Returns a span containing the initial bytes of this span,
   /// up to the specified maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
-  /// the result contains all the elements.
+  /// the result contains all the bytes.
+  ///
+  /// The returned span represents a mutation of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter maxLength: The maximum number of elements to return.
+  /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
-  /// - Returns: A span with at most `maxLength` elements.
+  /// - Returns: A span with at most `maxLength` bytes.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
@@ -596,6 +1097,23 @@ extension MutableRawSpan {
 #endif
   }
 
+  /// Returns a span containing the initial bytes of this span,
+  /// up to the specified maximum length.
+  ///
+  /// If the maximum length exceeds the length of this span,
+  /// the result contains all the bytes.
+  ///
+  /// The returned span represents a mutation of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter maxLength: The maximum number of bytes to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A span with at most `maxLength` bytes.
+  ///
+  /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(first:)")
   @_alwaysEmitIntoClient
   @lifetime(&self)
@@ -603,6 +1121,21 @@ extension MutableRawSpan {
     _mutatingExtracting(first: maxLength)
   }
 
+  /// Returns a span containing the initial bytes of this span,
+  /// up to the specified maximum length.
+  ///
+  /// If the maximum length exceeds the length of this span,
+  /// the result contains all the bytes.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter maxLength: The maximum number of bytes to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A span with at most `maxLength` bytes.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   consuming public func _consumingExtracting(first maxLength: Int) -> Self {
@@ -616,25 +1149,27 @@ extension MutableRawSpan {
 #endif
   }
 
-  /// Returns a span over all but the given number of trailing elements.
+  /// Returns a span over all but the given number of trailing bytes.
   ///
-  /// If the number of elements to drop exceeds the number of elements in
+  /// If the number of bytes to drop exceeds the number of bytes in
   /// the span, the result is an empty span.
+  ///
+  /// The returned span represents a mutation of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter k: The number of elements to drop off the end of
+  /// - Parameter k: The number of bytes to drop off the end of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span leaving off the specified number of elements at the end.
+  /// - Returns: A span leaving off the specified number of bytes at the end.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(&self)
   mutating public func _mutatingExtracting(droppingLast k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
-    _precondition(k >= 0, "Can't drop a negative number of elements")
+    _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let newCount = byteCount &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
@@ -644,6 +1179,22 @@ extension MutableRawSpan {
 #endif
   }
 
+  /// Returns a span over all but the given number of trailing bytes.
+  ///
+  /// If the number of bytes to drop exceeds the number of bytes in
+  /// the span, the result is an empty span.
+  ///
+  /// The returned span represents a mutation of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter k: The number of bytes to drop off the end of
+  ///   the span. `k` must be greater than or equal to zero.
+  /// - Returns: A span leaving off the specified number of bytes at the end.
+  ///
+  /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(droppingLast:)")
   @_alwaysEmitIntoClient
   @lifetime(&self)
@@ -651,11 +1202,25 @@ extension MutableRawSpan {
     _mutatingExtracting(droppingLast: k)
   }
 
+  /// Returns a span over all but the given number of trailing bytes.
+  ///
+  /// If the number of bytes to drop exceeds the number of bytes in
+  /// the span, the result is an empty span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter k: The number of bytes to drop off the end of
+  ///   the span. `k` must be greater than or equal to zero.
+  /// - Returns: A span leaving off the specified number of bytes at the end.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   consuming public func _consumingExtracting(droppingLast k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
-    _precondition(k >= 0, "Can't drop a negative number of elements")
+    _precondition(k >= 0, "Can't drop a negative number of bytes")
     let droppedCount = min(k, byteCount)
     let newCount = byteCount &- droppedCount
     let newSpan = unsafe Self(_unchecked: _pointer, byteCount: newCount)
@@ -665,19 +1230,21 @@ extension MutableRawSpan {
 #endif
   }
 
-  /// Returns a span containing the final elements of the span,
+  /// Returns a span containing the trailing bytes of the span,
   /// up to the given maximum length.
   ///
   /// If the maximum length exceeds the length of this span,
-  /// the result contains all the elements.
+  /// the result contains all the bytes.
+  ///
+  /// The returned span represents a mutation of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter maxLength: The maximum number of elements to return.
+  /// - Parameter maxLength: The maximum number of bytes to return.
   ///   `maxLength` must be greater than or equal to zero.
-  /// - Returns: A span with at most `maxLength` elements.
+  /// - Returns: A span with at most `maxLength` bytes.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
@@ -694,6 +1261,23 @@ extension MutableRawSpan {
 #endif
   }
 
+  /// Returns a span containing the trailing bytes of the span,
+  /// up to the given maximum length.
+  ///
+  /// If the maximum length exceeds the length of this span,
+  /// the result contains all the bytes.
+  ///
+  /// The returned span represents a mutation of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter maxLength: The maximum number of bytes to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A span with at most `maxLength` bytes.
+  ///
+  /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(last:)")
   @_alwaysEmitIntoClient
   @lifetime(&self)
@@ -701,6 +1285,21 @@ extension MutableRawSpan {
     _mutatingExtracting(last: maxLength)
   }
 
+  /// Returns a span containing the trailing bytes of the span,
+  /// up to the given maximum length.
+  ///
+  /// If the maximum length exceeds the length of this span,
+  /// the result contains all the bytes.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter maxLength: The maximum number of bytes to return.
+  ///   `maxLength` must be greater than or equal to zero.
+  /// - Returns: A span with at most `maxLength` bytes.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   consuming public func _consumingExtracting(last maxLength: Int) -> Self {
@@ -715,18 +1314,20 @@ extension MutableRawSpan {
 #endif
   }
 
-  /// Returns a span over all but the given number of initial elements.
+  /// Returns a span over all but the given number of initial bytes.
   ///
-  /// If the number of elements to drop exceeds the number of elements in
+  /// If the number of bytes to drop exceeds the number of bytes in
   /// the span, the result is an empty span.
+  ///
+  /// The returned span represents a mutation of this span.
   ///
   /// The returned span's first item is always at offset 0; unlike buffer
   /// slices, extracted spans do not share their indices with the
   /// span from which they are extracted.
   ///
-  /// - Parameter k: The number of elements to drop from the beginning of
+  /// - Parameter k: The number of bytes to drop from the beginning of
   ///   the span. `k` must be greater than or equal to zero.
-  /// - Returns: A span starting after the specified number of elements.
+  /// - Returns: A span starting after the specified number of bytes.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
@@ -744,6 +1345,22 @@ extension MutableRawSpan {
 #endif
   }
 
+  /// Returns a span over all but the given number of initial bytes.
+  ///
+  /// If the number of bytes to drop exceeds the number of bytes in
+  /// the span, the result is an empty span.
+  ///
+  /// The returned span represents a mutation of this span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter k: The number of bytes to drop from the beginning of
+  ///   the span. `k` must be greater than or equal to zero.
+  /// - Returns: A span starting after the specified number of bytes.
+  ///
+  /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(droppingFirst:)")
   @_alwaysEmitIntoClient
   @lifetime(&self)
@@ -751,6 +1368,20 @@ extension MutableRawSpan {
     _mutatingExtracting(droppingFirst: k)
   }
 
+  /// Returns a span over all but the given number of initial bytes.
+  ///
+  /// If the number of bytes to drop exceeds the number of bytes in
+  /// the span, the result is an empty span.
+  ///
+  /// The returned span's first item is always at offset 0; unlike buffer
+  /// slices, extracted spans do not share their indices with the
+  /// span from which they are extracted.
+  ///
+  /// - Parameter k: The number of bytes to drop from the beginning of
+  ///   the span. `k` must be greater than or equal to zero.
+  /// - Returns: A span starting after the specified number of bytes.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   @lifetime(copy self)
   consuming public func _consumingExtracting(droppingFirst k: Int) -> Self {
@@ -774,7 +1405,7 @@ extension MutableRawSpan: BorrowingSequence {
   @inlinable
   @lifetime(borrow self)
   public func makeBorrowingIterator() -> SpanIterator<UInt8> {
-    SpanIterator(self.bytes._span)
+    SpanIterator(Span(viewing: self.bytes))
   }
 }
 #endif

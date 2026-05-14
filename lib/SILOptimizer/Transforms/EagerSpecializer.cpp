@@ -470,26 +470,45 @@ void EagerDispatch::emitDispatchTo(SILFunction *NewFunc) {
 void EagerDispatch::
 emitTypeCheck(SILBasicBlock *FailedTypeCheckBB, SubstitutableType *ParamTy,
               Type SubTy) {
-  // Instantiate a thick metatype for T.Type
+  auto &Ctx = ParamTy->getASTContext();
   auto ContextTy = GenericFunc->mapTypeIntoEnvironment(ParamTy);
-  auto GenericMT = Builder.createMetatype(
-    Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
+  SILValue GenericWord, SpecializedWord;
+  // Collect the value of the generic parameter and the value we're specializing
+  // for.
+  if (ParamTy->isValueParameter()) {
+    auto valueTy = cast<GenericTypeParamType>(ParamTy)->getValueType()->getCanonicalType();
+    auto genericInt = Builder.createTypeValue(Loc,
+      SILType::getPrimitiveObjectType(valueTy), ContextTy->getCanonicalType());
 
-  // Instantiate a thick metatype for <Specialized>.Type
-  auto SpecializedMT = Builder.createMetatype(
-    Loc, getThickMetatypeType(SubTy->getCanonicalType()));
+    auto specializedInt = Builder.createTypeValue(Loc,
+      SILType::getPrimitiveObjectType(valueTy), SubTy->getCanonicalType());
 
-  auto &Ctx = Builder.getASTContext();
-  auto WordTy = SILType::getBuiltinWordType(Ctx);
-  auto GenericMTVal =
-    Builder.createUncheckedBitwiseCast(Loc, GenericMT, WordTy);
-  auto SpecializedMTVal =
-    Builder.createUncheckedBitwiseCast(Loc, SpecializedMT, WordTy);
+    // If we add non-Int value generic parameters in the future, the destructuring
+    // and equality checking logic below will also need to change.
+    GenericWord = Builder.createStructExtract(Loc, genericInt,
+      valueTy->getStructOrBoundGenericStruct()->getStoredProperties().front());
+    SpecializedWord = Builder.createStructExtract(Loc, specializedInt,
+      valueTy->getStructOrBoundGenericStruct()->getStoredProperties().front());
+  } else {
+    auto WordTy = SILType::getBuiltinWordType(Ctx);
+    auto GenericMT = Builder.createMetatype(
+      Loc, getThickMetatypeType(ContextTy->getCanonicalType()));
+
+    // Instantiate a thick metatype for <Specialized>.Type
+    auto SpecializedMT = Builder.createMetatype(
+      Loc, getThickMetatypeType(SubTy->getCanonicalType()));
+
+    GenericWord =
+      Builder.createUncheckedBitwiseCast(Loc, GenericMT, WordTy);
+    SpecializedWord =
+      Builder.createUncheckedBitwiseCast(Loc, SpecializedMT, WordTy);
+  }
+  
 
   auto Cmp =
-    Builder.createBuiltinBinaryFunction(Loc, "cmp_eq", WordTy,
+    Builder.createBuiltinBinaryFunction(Loc, "cmp_eq", GenericWord->getType(),
                                         SILType::getBuiltinIntegerType(1, Ctx),
-                                        {GenericMTVal, SpecializedMTVal});
+                                        {GenericWord, SpecializedWord});
 
   auto *SuccessBB = Builder.getFunction().createBasicBlock();
   auto *FailBB = createSplitBranchTarget(FailedTypeCheckBB, Builder, Loc);

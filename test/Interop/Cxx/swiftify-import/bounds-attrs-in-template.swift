@@ -1,7 +1,7 @@
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default %t/template.swift -dump-macro-expansions -emit-ir -o %t/out -verify -verify-ignore-unrelated
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default %t/template.swift -dump-macro-expansions -emit-ir -o %t/out -verify -verify-ignore-unrelated -eager-macro-checking
 // RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default -print-module -module-to-print=Template -source-filename=x | %FileCheck %s
 
 // CHECK: func cb_template<T>(_ p: UnsafePointer<T>!, _ size: Int{{.*}}) -> UnsafePointer<T>

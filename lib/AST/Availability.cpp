@@ -992,8 +992,13 @@ ExportedLevel swift::isExported(const Decl *D) {
 }
 
 ExportedLevel swift::isExported(const ValueDecl *VD) {
-  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    return ExportedLevel::None;
+  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+    // Special case stored properties of classes to avoid the short-circuit.
+    auto varDecl = dyn_cast<VarDecl>(VD);
+    if (!varDecl || !varDecl->hasStorage() ||
+        !isa<ClassDecl>(varDecl->getDeclContext()))
+      return ExportedLevel::None;
+  }
   if (VD->isObjCMemberImplementation())
     return ExportedLevel::None;
 

@@ -83,27 +83,45 @@ void SILGenModule::useConformance(SILInstruction *inst,
     conformance = specialized->getGenericConformance();
   }
 
-  // Get the normal conformance. If we don't have one, this is a self
-  // conformance, which we can ignore.
-  auto normal = dyn_cast<NormalProtocolConformance>(conformance);
-  if (normal == nullptr)
+  // At this point, we should have a root conformance.
+  auto rootConformance = dyn_cast<RootProtocolConformance>(conformance);
+  if (!rootConformance)
     return;
 
-  // If this conformance was not synthesized, we're not going to be emitting
-  // it lazily either, so we can avoid doing anything below.
-  if (!normal->isSynthesized())
+  // Builtin protocol conformances don't require anything to be emitted.
+  if (isa<BuiltinProtocolConformance>(rootConformance))
     return;
+
+  // If this is a normal conformance that needs to be synthesized, we'll want
+  // to emit it.
+  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
+    // If this conformance was not synthesized, we're not going to be emitting
+    // it lazily either, so we can avoid doing anything below.
+    if (!normal->isSynthesized())
+      return;
+  } else if (auto self = dyn_cast<SelfProtocolConformance>(conformance)) {
+    // Marker protocols don't need anything synthesized.
+    if (self->getProtocol()->isMarkerProtocol())
+      return;
+
+    // Only Embedded Swift defers the synthesis of this symbol.
+    if (!getASTContext().LangOpts.hasFeature(Feature::Embedded))
+      return;
+  } else {
+    // Nothing to synthesize.
+    return;
+  }
 
   // If we already emitted this witness table, we don't need to track the fact
   // we need it.
-  if (emittedWitnessTables.count(normal))
+  if (emittedWitnessTables.count(rootConformance))
     return;
 
   // Check if we already forced this witness table but haven't emitted it yet.
-  if (!forcedConformances.insert(normal).second)
+  if (!forcedConformances.insert(rootConformance).second)
     return;
 
-  pendingConformances.push_back(normal);
+  pendingConformances.push_back(rootConformance);
 }
 
 void SILGenModule::useConformancesFromSubstitutions(
@@ -349,8 +367,8 @@ public:
     SGM.useConformancesFromObjectiveCType(UCCAI, UCCAI->getTargetFormalType());
   }
 
-  void visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *UTEDAI) {
-    SGM.useConformancesFromType(UTEDAI, UTEDAI->getOperand()->getType().getASTType());
+  void visitUncheckedEnumDataAddrInstBase(UncheckedEnumDataAddrInstBase *UTEDAI) {
+    SGM.useConformancesFromType(UTEDAI, UTEDAI->getEnum()->getType().getASTType());
   }
 
   void visitWitnessMethodInst(WitnessMethodInst *WMI) {

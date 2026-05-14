@@ -735,6 +735,7 @@ Demangler::DemangleInitRAII::DemangleInitRAII(Demangler &Dem,
     NumWords(Dem.NumWords), Text(Dem.Text), Pos(Dem.Pos),
     SymbolicReferenceResolver(std::move(Dem.SymbolicReferenceResolver))
 {
+  std::copy(Dem.Words, Dem.Words + MaxNumWords, Words);
   // Reset the demangler state for a nested job.
   Dem.NodeStack.init(Dem, 16);
   Dem.Substitutions.init(Dem, 16);
@@ -749,6 +750,7 @@ Demangler::DemangleInitRAII::~DemangleInitRAII() {
   Dem.NodeStack = NodeStack;
   Dem.Substitutions = Substitutions;
   Dem.NumWords = NumWords;
+  std::copy(Words, Words + MaxNumWords, Dem.Words);
   Dem.Text = Text;
   Dem.Pos = Pos;
   Dem.SymbolicReferenceResolver = std::move(SymbolicReferenceResolver);
@@ -2422,6 +2424,10 @@ NodePointer Demangler::demangleImplFunctionType() {
 
   if (nextIf('A'))
     type->addChild(createNode(Node::Kind::ImplErasedIsolation), *this);
+
+  if (nextIf('N'))
+    type->addChild(createNode(Node::Kind::ImplNonisolatedNonsendingIsolation),
+                   *this);
 
   switch ((MangledDifferentiabilityKind)peekChar()) {
   case MangledDifferentiabilityKind::Normal:  // 'd'

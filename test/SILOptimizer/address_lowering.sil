@@ -602,7 +602,7 @@ bb0(%0 : @owned $T):
 
 // CHECK-LABEL: sil [ossa] @f081_unwrap : $@convention(thin) <T> (@in Optional<T>) -> () {
 // CHECK: bb0(%0 : $*Optional<T>):
-// CHECK:   [[A:%.*]] = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+// CHECK:   [[A:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
 // CHECK:   apply %{{.*}}<T>([[A]]) : $@convention(thin) <τ_0_0> (@in τ_0_0) -> ()
 // CHECK-LABEL: } // end sil function 'f081_unwrap'
 sil [ossa] @f081_unwrap : $@convention(thin) <T> (@in Optional<T>) -> () {
@@ -1009,7 +1009,7 @@ bb0(%0 : @owned $P):
 // CHECK:   [[INIT:%.*]] = init_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
 // CHECK:   copy_addr [[OPEN]] to [init] [[INIT]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   inject_enum_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
-// CHECK:   [[DATA:%.*]] = unchecked_take_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
+// CHECK:   [[DATA:%.*]] = unchecked_inplace_enum_data_addr [[OPTIONAL]] : $*Optional<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>, #Optional.some!enumelt
 // CHECK:   apply %{{.*}}<@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self>([[DATA]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> ()
 // CHECK:   destroy_addr [[DATA:%[^,]+]] : $*@opened("EF755EF2-B636-11E7-B7B4-A45E60ECC541", any P) Self
 // CHECK:   destroy_addr [[ALLOCP]] : $*any P
@@ -1235,7 +1235,7 @@ sil [ossa] @f171_subtract_overflow_callee : $@convention(method) (Int, Int) -> (
 // CHECK: [[NONEBB]]:
 // CHECK:   br [[RETBB:bb[0-9]+]]
 // CHECK: [[SOMEBB]]:
-// CHECK:   [[CAST:%.*]] = unchecked_take_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
+// CHECK:   [[CAST:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Optional<T>, #Optional.some!enumelt
 // CHECK:   copy_addr [take] [[CAST]] to [init] %1 : $*T
 // CHECK:   br [[RETBB]]
 // CHECK: [[RETBB]]:
@@ -1262,17 +1262,17 @@ bb3:
 // CHECK: bb0(%0 : $*Mixed<T>, %1 : $*Builtin.Int64, %2 : $*T):
 // CHECK:   switch_enum_addr %0 : $*Mixed<T>, case #Mixed.i!enumelt: [[IBB:bb[0-9]+]], case #Mixed.t!enumelt: [[TBB:bb[0-9]+]], default [[DBB:bb[0-9]+]]
 // CHECK: [[DBB]]:
-// CHECK:   [[OBJADDR:%.*]] = unchecked_take_enum_data_addr %0 : $*Mixed<T>, #Mixed.o!enumelt
+// CHECK:   [[OBJADDR:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.o!enumelt
 // CHECK:   [[LD:%.*]] = load [take] [[OBJADDR]] : $*AnyObject
 // CHECK:   destroy_value [[LD]] : $AnyObject 
 // CHECK:   br [[RBB:bb[0-9]+]]
 // CHECK: [[TBB]]:
-// CHECK:   [[CAST:%.*]] = unchecked_take_enum_data_addr %0 : $*Mixed<T>, #Mixed.t!enumelt
+// CHECK:   [[CAST:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.t!enumelt
 // CHECK:   destroy_addr %2 : $*T
 // CHECK:   copy_addr [take] [[CAST]] to [init] %2 : $*T
 // CHECK:   br [[RBB]]
 // CHECK: [[IBB]]:
-// CHECK:   [[CAST:%.*]] = unchecked_take_enum_data_addr %0 : $*Mixed<T>, #Mixed.i!enumelt
+// CHECK:   [[CAST:%.*]] = unchecked_inplace_enum_data_addr %0 : $*Mixed<T>, #Mixed.i!enumelt
 // CHECK:   [[VAL:%.*]] = load [trivial] [[CAST]] : $*Builtin.Int64
 // CHECK:   store [[VAL]] to [trivial] %1 : $*Builtin.Int64
 // CHECK:   br [[RBB]]
@@ -2522,7 +2522,7 @@ enum PairEnum<T> {
 }
 
 // CHECK-LABEL: sil [ossa] @test_destructure_tuple_1_guaranteed : {{.*}} {
-// CHECK:         [[INSTANCE:%[^,]+]] = unchecked_take_enum_data_addr
+// CHECK:         [[INSTANCE:%[^,]+]] = unchecked_inplace_enum_data_addr
 // CHECK:         [[KLASS_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 0
 // CHECK:         [[KLASS:%[^,]+]] = load_borrow [[KLASS_ADDR]]
 // CHECK:         [[ANY_ADDR:%[^,]+]] = tuple_element_addr [[INSTANCE]] {{.*}}, 1
@@ -2559,7 +2559,7 @@ exit:
 // CHECK:         copy_addr [[INOUT_ADDR]] to [init] [[ORIGINAL_ADDR]] : $*PairEnum<T>
 // CHECK:         switch_enum_addr [[ORIGINAL_ADDR]] : $*PairEnum<T>
 // CHECK:       bb1:
-// CHECK:         [[ORIGINAL_PAYLOAD_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[ORIGINAL_ADDR]]
+// CHECK:         [[ORIGINAL_PAYLOAD_ADDR:%[^,]+]] = unchecked_inplace_enum_data_addr [[ORIGINAL_ADDR]]
 // CHECK:         [[NEW_PAYLOAD_ADDR:%[^,]+]] = init_enum_data_addr [[NEW_ADDR]]
 // CHECK:         [[NEW_FIRST_ADDR:%[^,]+]] = tuple_element_addr [[NEW_PAYLOAD_ADDR]] {{.*}}, 0
 // CHECK:         [[ORIGINAL_FIRST_ADDR:%[^,]+]] = tuple_element_addr [[ORIGINAL_PAYLOAD_ADDR]] {{.*}}, 0
@@ -2915,7 +2915,7 @@ bb0(%c : @owned $Klass):
 // CHECK:         [[MAYBE_ADDR:%[^,]+]] = alloc_stack $Optional<Self>
 // CHECK:         [[LOAD_ADDR:%[^,]+]] = alloc_stack $Self
 // CHECK:         [[ADDR:%[^,]+]] = alloc_stack $Self, var, name "self"
-// CHECK:         [[INSTANCE_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[MAYBE_ADDR]] : $*Optional<Self>, #Optional.some!enumelt
+// CHECK:         [[INSTANCE_ADDR:%[^,]+]] = unchecked_inplace_enum_data_addr [[MAYBE_ADDR]] : $*Optional<Self>, #Optional.some!enumelt
 // CHECK:         debug_value [[INSTANCE_ADDR]] : $*Self, var, name "self", expr op_deref
 // CHECK:         copy_addr [take] [[INSTANCE_ADDR]] to [init] [[ADDR]]
 // CHECK:         copy_addr [[ADDR]] to [init] [[LOAD_ADDR]]

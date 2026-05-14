@@ -452,7 +452,8 @@ func testMutableCapture(arg: consuming NCE, action: @escaping (inout NCE) -> ())
 
 // Implicit dependence on a nonescaping closure context.
 //
-// TODO: remove the _overrideLifetime when context dependencies are tracked.
+// TODO: remove the _overrideLifetime when context dependencies are tracked and
+// non-escaping function types can be used as (copy) dependence sources (rdar://172511809).
 @_lifetime(borrow value)
 func testBasicClosureDependency(value: AnyObject, body: () -> NE) -> NE {
   return _overrideLifetime(body(), borrowing: value)
@@ -460,10 +461,9 @@ func testBasicClosureDependency(value: AnyObject, body: () -> NE) -> NE {
 
 // Implicit dependence on a nonescaping closure context. The result is escaping in the current generic context, so
 // should not be diagnosed as an escape.
-//
-// TODO: remove the _overrideLifetime when context dependencies are tracked.
+@_lifetime(copy f)
 func testIndirectClosureResult<T>(f: () -> CNE<T>) -> CNE<T> {
-  return _overrideLifetime(f(), copying: ())
+  return f()
 }
 
 // =============================================================================
@@ -525,4 +525,18 @@ class TestStaticClassProperty {
   static let staticArray = [0, 1]
 
   static let staticSpan = staticArray.span
+}
+
+// =============================================================================
+// Builtin.Borrow
+// =============================================================================
+
+// rdar://176564359 ([nonescapable] support Builtin.makeBorrow in lifetime diagnostics)
+struct TestBuiltinBorrowInit<T: ~Copyable & ~Escapable>: ~Escapable {
+  private let ref: Builtin.Borrow<T>
+
+  @_lifetime(borrow target)
+  init(_ target: borrowing T) {
+    self.ref = Builtin.makeBorrow(target)
+  }
 }

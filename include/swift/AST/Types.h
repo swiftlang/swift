@@ -407,7 +407,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 16 };
-  enum { NumSILExtInfoBits = 14 };
+  enum { NumSILExtInfoBits = 15 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -5488,6 +5488,9 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
+  bool hasNonisolatedNonsendingIsolation() const {
+    return getExtInfo().hasNonisolatedNonsendingIsolation();
+  }
   bool hasErasedIsolation() const { return getExtInfo().hasErasedIsolation(); }
   SILFunctionTypeIsolation getIsolation() const {
     return getExtInfo().getIsolation();
@@ -8372,6 +8375,41 @@ public:
   const ASTContext &getASTContext() { return Context; }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
+
+/// A placeholder type for a stored-property field whose real type has been
+/// elided from a serialized module because it was imported via an internal
+/// bridging header. The type carries the mangled name of the original type,
+/// which is used for deduplication and (eventually) for recovering the real
+/// type when the client has access to the defining header.
+///
+/// HiddenType is never produced by type-checking user code. It is synthesized
+/// only on the serialization path and consumed by deserialization and IRGen.
+class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  StringRef MangledName;
+
+  HiddenType(StringRef mangledName, const ASTContext &ctx)
+      : TypeBase(TypeKind::Hidden, &ctx, RecursiveTypeProperties()),
+        MangledName(mangledName) {}
+
+public:
+  static HiddenType *get(const ASTContext &ctx, StringRef mangledName);
+
+  StringRef getMangledName() const { return MangledName; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getMangledName());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName) {
+    ID.AddString(mangledName);
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Hidden;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(HiddenType, Type)
 
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {

@@ -651,6 +651,11 @@ public:
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
 
+  /// Whether to print homogeneous unlabeled tuples in compact form
+  /// (e.g. `(Int /* ... repeated 5 times ... */)` instead of 
+  /// `(Int, Int, Int, Int, Int)`).
+  bool PrintHomogeneousTuplesCompactly = false;
+
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
 
@@ -720,6 +725,7 @@ public:
   static PrintOptions forDiagnosticArguments() {
     PrintOptions result;
     result.PrintExplicitPackTypes = false;
+    result.PrintHomogeneousTuplesCompactly = true;
     return result;
   }
 
@@ -749,6 +755,7 @@ public:
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
     result.PrintDocumentationComments = false;
+    result.PrintHomogeneousTuplesCompactly = true;
     result.PrintCurrentMembersOnly = true;
     if (printFullConvention)
       result.PrintFunctionRepresentationAttrs =

@@ -1973,3 +1973,48 @@ bb1:
   %19 = tuple ()
   return %19 : $()
 }
+
+// rdar://175181392 - miscompile; incorrect address projection
+//
+// Avoid merging two accesses that have identical storage but are accessing different projections. This is a strange
+// situation for dynamic access scopes, which should normally only occur on the access base.
+
+struct Inner {
+  @_hasStorage var field: Int64
+}
+
+struct Outer {
+  @_hasStorage var padding: Int64
+  @_hasStorage var content: Inner
+}
+
+sil @use_addr : $@convention(thin) (@inout Int64) -> ()
+
+// CHECK-LABEL: sil @test_merge_different_type_access : $@convention(thin) () -> () {
+// CHECK:   [[ALLOC:%[0-9]+]] = alloc_stack $Outer
+// CHECK:   [[ACCESS1:%[0-9]+]] = begin_access [modify] [static] [no_nested_conflict] [[ALLOC]] : $*Outer
+// CHECK:   end_access [[ACCESS1]] : $*Outer
+// CHECK:   [[PROJ:%[0-9]+]] = struct_element_addr %0 : $*Outer, #Outer.content
+// CHECK:   [[ACCESS2:%[0-9]+]] = begin_access [modify] [static] [no_nested_conflict] [[PROJ]] : $*Inner
+// CHECK:   end_access [[ACCESS2]] : $*Inner
+// CHECK-LABEL: } // end sil function 'test_merge_different_type_access'
+sil @test_merge_different_type_access : $@convention(thin) () -> () {
+bb0:
+  %s = alloc_stack $Outer
+  %a1 = begin_access [modify] [dynamic] [no_nested_conflict] %s : $*Outer
+  %padding_addr = struct_element_addr %a1 : $*Outer, #Outer.padding
+  %zero = integer_literal $Builtin.Int64, 0
+  %int_zero = struct $Int64 (%zero : $Builtin.Int64)
+  store %int_zero to %padding_addr : $*Int64
+  end_access %a1 : $*Outer
+  %proj = struct_element_addr %s : $*Outer, #Outer.content
+  %a2 = begin_access [modify] [dynamic] %proj : $*Inner
+  %field_addr = struct_element_addr %a2 : $*Inner, #Inner.field
+  %one = integer_literal $Builtin.Int64, 1
+  %int_one = struct $Int64 (%one : $Builtin.Int64)
+  store %int_one to %field_addr : $*Int64
+  end_access %a2 : $*Inner
+  dealloc_stack %s : $*Outer
+  %r = tuple ()
+  return %r : $()
+}

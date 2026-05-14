@@ -1,0 +1,52 @@
+// RUN: %scale-test --invert-result --begin 10 --end 100 --step 10 --select NumHorizontalUpdateScans -Xfrontend=-strict-concurrency=complete %s
+// REQUIRES: asserts
+// REQUIRES: concurrency
+
+// Test that Partition::join() does not scale quadratically in the number of
+// tracked non-Sendable values.
+//
+// The pattern that triggers quadratic behavior:
+//   - N non-Sendable values, each in its own region (true-branch predecessor)
+//   - One branch merges all N values into a single region via a function call
+//   - At the CFG join point, Partition::join() must reconcile the two
+//     predecessors, calling merge() for each of the N-1 non-representative
+//     elements, and each merge() calls horizontalUpdate() which scans all N
+//     elements → O(N²) total.
+//
+// This test uses --invert-result to document the *known-bad* quadratic scaling.
+// Once the algorithm is fixed (e.g. by using a union-find structure instead of
+// the flat elementToRegionMap scan), remove --invert-result and tighten the
+// threshold.
+
+import _Concurrency
+
+class NonSendable {
+  var x: Int = 0
+}
+
+@inline(never)
+func sink(
+% for i in range(int(N)):
+  _ v${i}: NonSendable${',' if i < int(N)-1 else ''}
+% end
+) {}
+
+func test(cond: Bool) async {
+% for i in range(int(N)):
+  let v${i} = NonSendable()
+% end
+  if cond {
+    // Calling sink() with all N non-Sendable arguments causes the region
+    // isolation analysis to merge all N values into a single region
+    // (via translateSILMultiAssign in RegionAnalysis.cpp).
+    sink(
+% for i in range(int(N)):
+      v${i}${',' if i < int(N)-1 else ''}
+% end
+    )
+  }
+  // CFG join point: the true-branch exit partition has all N values in one
+  // region; the false-branch exit partition has N distinct single-element
+  // regions. Partition::join() must reconcile these, triggering O(N²) work.
+  _ = v0
+}

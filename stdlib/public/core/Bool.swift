@@ -337,3 +337,5 @@ extension Bool {
     self = !self
   }
 }
+
+extension Bool: ConvertibleToBytes {}

@@ -559,7 +559,7 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   100)
 
 DECL_ATTR(export, Export,
-    OnVar | OnSubscript | OnAbstractFunction,
+    OnVar | OnSubscript | OnAbstractFunction | OnStruct | OnEnum | OnClass | OnExtension,
     ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
     101)
 
@@ -917,12 +917,11 @@ SIMPLE_DECL_ATTR(_unsafeSelfDependentResult, UnsafeSelfDependentResult,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
   173)
 
-DECL_ATTR(warn, Warn,
+DECL_ATTR(diagnose, Diagnose,
   OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar | OnNominalType | OnExtension | OnEnumElement | OnAccessor | OnImport | OnTypeAlias | OnAssociatedType | OnMacro,
-  AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  AllowMultipleAttributes | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   174)
-
-LAST_DECL_ATTR(Warn)
+LAST_DECL_ATTR(Diagnose)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

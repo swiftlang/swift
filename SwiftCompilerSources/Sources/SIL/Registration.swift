@@ -185,6 +185,8 @@ private func registerSILClasses() {
   register(UncheckedEnumDataInst.self)
   register(InitEnumDataAddrInst.self)
   register(UncheckedTakeEnumDataAddrInst.self)
+  register(UncheckedInPlaceEnumDataAddrInst.self)
+  register(UncheckedBorrowEnumDataAddrInst.self)
   register(SelectEnumInst.self)
   register(RefElementAddrInst.self)
   register(RefTailAddrInst.self)

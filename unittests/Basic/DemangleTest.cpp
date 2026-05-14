@@ -58,3 +58,80 @@ TEST(Demangle, DeepEquals) {
     EXPECT_TRUE(tree1->isDeepEqualTo(tree2)) << "Failing symbol: " << Symbol;
   }
 }
+
+// Test that DemangleInitRAII correctly saves and restores the Words[] array
+// across nested demangle calls.
+//
+// When demangleType hits a symbolic reference, the resolver may call
+// demangleSymbol on the same Demangler. This is what MetadataReader does
+// when resolving context descriptors via buildContextManglingForSymbol.
+// The inner call processes identifiers that populate Words[] with StringRefs
+// into its own Text buffer. DemangleInitRAII must save and restore Words[]
+// so the outer demangling's word substitutions still reference the correct
+// strings.
+//
+// The mangled type encodes something like:
+//   SomeModule.SomeType<OtherModule.OtherType>
+// where the generic argument's context comes from a symbolic reference.
+// "SomeModule" and "SomeType" produce Words[0]="Some", [1]="Module",
+// [2]="Some", [3]="Type". The suffix "05OtherD0" reconstructs "OtherType"
+// using word substitution 'D' = Words[3] = "Type".
+TEST(Demangle, WordsArraySavedAcrossNestedDemangle) {
+  Demangler dem;
+
+  // Mangled type: 10SomeModule 8SomeType V y \x01<offset> 05OtherD0 V G
+  static const char mangledName[] =
+      "10SomeModule"         // module identifier
+      "8SomeType"            // type identifier
+      "V"                    // struct
+      "y"                    // begin generic args
+      "\x01\x00\x00\x00\x00" // symbolic reference (0x01) + int32 offset (unused)
+      "05OtherD0"            // identifier with word substitution 'D' = Words[3]
+      "V"                    // struct
+      "G";                   // end generic args
+
+  auto resolver = [&](SymbolicReferenceKind kind, Directness directness,
+                      int32_t offset,
+                      const void *base) -> NodePointer {
+    // Demangle a symbol on the same Demangler instance, triggering
+    // DemangleInitRAII. The symbol string is a local std::string whose
+    // buffer is freed when the lambda returns — if Words[] is not properly
+    // saved/restored, the outer demangling reads stale pointers.
+    std::string symbol("$s11OtherModule9OtherTypeVMn");
+    auto node = dem.demangleSymbol(symbol);
+    if (!node)
+      return nullptr;
+    // Unwrap Global → NominalTypeDescriptor → Type
+    if (node->getKind() == Node::Kind::Global)
+      node = node->getChild(0);
+    if (node->getKind() == Node::Kind::NominalTypeDescriptor)
+      node = node->getChild(0);
+    return node;
+  };
+
+  auto mangledStr = makeSymbolicMangledNameStringRef(mangledName);
+  auto result = dem.demangleType(mangledStr, resolver);
+
+  ASSERT_NE(result, nullptr);
+
+  // The word substitution 'D' in "05OtherD0" must resolve to Words[3]="Type"
+  // (from the outer "SomeType"), producing the identifier "OtherType".
+  ASSERT_EQ(result->getKind(), Node::Kind::Type);
+  auto boundGeneric = result->getChild(0);
+  ASSERT_EQ(boundGeneric->getKind(), Node::Kind::BoundGenericStructure);
+
+  auto someType = boundGeneric->getChild(0);
+  ASSERT_EQ(someType->getKind(), Node::Kind::Type);
+  auto structure = someType->getChild(0);
+  ASSERT_EQ(structure->getKind(), Node::Kind::Structure);
+  EXPECT_EQ(structure->getChild(0)->getText(), "SomeModule");
+  EXPECT_EQ(structure->getChild(1)->getText(), "SomeType");
+
+  auto typeList = boundGeneric->getChild(1);
+  ASSERT_EQ(typeList->getKind(), Node::Kind::TypeList);
+  auto argType = typeList->getChild(0);
+  ASSERT_EQ(argType->getKind(), Node::Kind::Type);
+  auto argStruct = argType->getChild(0);
+  ASSERT_EQ(argStruct->getKind(), Node::Kind::Structure);
+  EXPECT_EQ(argStruct->getChild(1)->getText(), "OtherType");
+}

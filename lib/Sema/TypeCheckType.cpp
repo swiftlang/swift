@@ -36,6 +36,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/ForeignErrorConvention.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/Module.h"
@@ -688,7 +689,7 @@ private:
                                         TypeResolutionOptions options);
   NeverNullType resolveSendingTypeRepr(SendingTypeRepr *repr,
                                        TypeResolutionOptions options);
-  NeverNullType resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
+  NeverNullType resolveNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *repr,
                                               TypeResolutionOptions options);
   NeverNullType
   resolveCompileTimeLiteralTypeRepr(CompileTimeLiteralTypeRepr *repr,
@@ -781,7 +782,7 @@ class TypeAttrSet {
   /// FIXME:
   ///  `nonisolated(nonsending)` is modeled as a separate `TypeRepr`, but
   ///  needs to be considered together with subsequent attributes.
-  CallerIsolatedTypeRepr *nonisolatedNonsendingAttr;
+  NonisolatedNonsendingTypeRepr *nonisolatedNonsendingAttr;
 
   llvm::TinyPtrVector<CustomAttr *> customAttrs;
   EnumMap<TypeAttrKind, llvm::TinyPtrVector<TypeAttribute *>> typeAttrs;
@@ -799,7 +800,7 @@ class TypeAttrSet {
 
 public:
   TypeAttrSet(const ASTContext &ctx,
-              CallerIsolatedTypeRepr *nonisolatedNonsendingAttr = nullptr)
+              NonisolatedNonsendingTypeRepr *nonisolatedNonsendingAttr = nullptr)
       : ctx(ctx), nonisolatedNonsendingAttr(nonisolatedNonsendingAttr) {}
 
   TypeAttrSet(const TypeAttrSet &) = delete;
@@ -817,7 +818,7 @@ public:
   /// will be diagnosed.
   void accumulate(ArrayRef<TypeOrCustomAttr> attrs);
 
-  CallerIsolatedTypeRepr *getNonisolatedNonsendingAttr() const {
+  NonisolatedNonsendingTypeRepr *getNonisolatedNonsendingAttr() const {
     return nonisolatedNonsendingAttr;
   }
 
@@ -961,7 +962,7 @@ auto getWithoutClaiming(TypeAttrSet *attrs) {
 }
 
 template <>
-auto getWithoutClaiming<CallerIsolatedTypeRepr>(TypeAttrSet *attrs) {
+auto getWithoutClaiming<NonisolatedNonsendingTypeRepr>(TypeAttrSet *attrs) {
   return attrs ? attrs->getNonisolatedNonsendingAttr() : nullptr;
 }
 } // end anonymous namespace
@@ -2272,32 +2273,6 @@ void TypeResolver::diagnoseGenericArgumentsOnSelf(
   }
 }
 
-/// Diagnose when this is one of the Borrow or Inout types, which currently require
-/// an experimental feature to use.
-static void diagnoseBorrowInoutType(TypeDecl *typeDecl, SourceLoc loc,
-                                    const DeclContext *dc) {
-  if (loc.isInvalid())
-    return;
-
-  if (!typeDecl->isStdlibDecl())
-    return;
-
-  ASTContext &ctx = typeDecl->getASTContext();
-  if (ctx.LangOpts.hasFeature(Feature::BorrowInout))
-    return;
-
-  auto nameString = typeDecl->getName().str();
-  if (nameString != "Borrow" && nameString != "Inout")
-    return;
-
-  // Don't require this in the standard library or _Concurrency library.
-  auto module = dc->getParentModule();
-  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
-    return;
-
-  ctx.Diags.diagnose(loc, diag::borrow_inout_experimental, nameString);
-}
-
 /// Diagnose when this is one of the BorrowingSequence types, which currently require
 /// an experimental feature to use.
 static void diagnoseBorrowingSequenceType(TypeDecl *typeDecl, SourceLoc loc,
@@ -2428,7 +2403,6 @@ TypeResolver::resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
       return ErrorType::get(ctx);
     }
 
-    diagnoseBorrowInoutType(currentDecl, repr->getLoc(), DC);
     diagnoseBorrowingSequenceType(currentDecl, repr->getLoc(), DC);
 
     repr->setValue(currentDecl, currentDC);
@@ -2926,7 +2900,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
       !isa<AttributedTypeRepr>(repr) && !isa<FunctionTypeRepr>(repr) &&
       !isa<DeclRefTypeRepr>(repr) && !isa<PackExpansionTypeRepr>(repr) &&
       !isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr) &&
-      !isa<CallerIsolatedTypeRepr>(repr)) {
+      !isa<NonisolatedNonsendingTypeRepr>(repr)) {
     options.setContext(std::nullopt);
   }
 
@@ -2948,8 +2922,8 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
   case TypeReprKind::Sending:
     return resolveSendingTypeRepr(cast<SendingTypeRepr>(repr), options);
-  case TypeReprKind::CallerIsolated:
-    return resolveCallerIsolatedTypeRepr(cast<CallerIsolatedTypeRepr>(repr),
+  case TypeReprKind::NonisolatedNonsending:
+    return resolveNonisolatedNonsendingTypeRepr(cast<NonisolatedNonsendingTypeRepr>(repr),
                                          options);
   case TypeReprKind::CompileTimeLiteral:
       return resolveCompileTimeLiteralTypeRepr(cast<CompileTimeLiteralTypeRepr>(repr),
@@ -4657,7 +4631,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
   if (auto concurrentAttr = claim<ConcurrentTypeAttr>(attrs)) {
     if (auto *nonisolatedNonsendingAttr =
-            getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
+            getWithoutClaiming<NonisolatedNonsendingTypeRepr>(attrs)) {
       diagnoseInvalid(
           nonisolatedNonsendingAttr, nonisolatedNonsendingAttr->getStartLoc(),
           diag::cannot_use_nonisolated_nonsending_together_with_concurrent,
@@ -4668,13 +4642,13 @@ NeverNullType TypeResolver::resolveASTFunctionType(
 
     if (!repr->isInvalid())
       isolation = FunctionTypeIsolation::forNonIsolated();
-  } else if (!getWithoutClaiming<CallerIsolatedTypeRepr>(attrs)) {
+  } else if (!getWithoutClaiming<NonisolatedNonsendingTypeRepr>(attrs)) {
     // Infer async function type as `nonisolated(nonsending)` if there is
     // no `@concurrent` or `nonisolated(nonsending)` attribute and isolation
     // is nonisolated.
     if (ctx.LangOpts.hasFeature(Feature::NonisolatedNonsendingByDefault) &&
         repr->isAsync() && isolation.isNonIsolated()) {
-      isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+      isolation = FunctionTypeIsolation::forNonisolatedNonsending();
     } else if (ctx.LangOpts
                    .getFeatureState(Feature::NonisolatedNonsendingByDefault)
                    .isEnabledForMigration()) {
@@ -4975,7 +4949,9 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   bool unimplementable = claim<UnimplementableTypeAttr>(attrs);
   auto isolation = SILFunctionTypeIsolation::forUnknown();
 
-  if (auto isolatedAttr = claim<IsolatedTypeAttr>(attrs)) {
+  if (claim<CallerIsolatedTypeAttr>(attrs)) {
+    isolation = SILFunctionTypeIsolation::forNonisolatedNonsending();
+  } else if (auto isolatedAttr = claim<IsolatedTypeAttr>(attrs)) {
     switch (isolatedAttr->getIsolationKind()) {
     case IsolatedTypeAttr::IsolationKind::Dynamic:
       if (representation != SILFunctionType::Representation::Thick) {
@@ -5748,7 +5724,7 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
 }
 
 NeverNullType
-TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
+TypeResolver::resolveNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *repr,
                                             TypeResolutionOptions options) {
   Type type;
   {
@@ -5811,7 +5787,7 @@ TypeResolver::resolveCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *repr,
   if (repr->isInvalid())
     return ErrorType::get(getASTContext());
 
-  return fnType->withIsolation(FunctionTypeIsolation::forNonIsolatedCaller());
+  return fnType->withIsolation(FunctionTypeIsolation::forNonisolatedNonsending());
 }
 
 NeverNullType
@@ -6583,12 +6559,12 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       auto kp = getKnownProtocolKind(ip);
 
       if (layout.requiresClass()) {
-        bool hasExplicitAnyObject = layout.hasExplicitAnyObject;
+        auto superclass = layout.getSuperclass();
         diagnose(repr->getStartLoc(),
                  diag::inverse_with_class_constraint,
-                 hasExplicitAnyObject,
+                 !superclass,
                  getProtocolName(kp),
-                 layout.getSuperclass());
+                 superclass);
         IsInvalid = true;
         break;
       }
@@ -7026,7 +7002,7 @@ private:
     case TypeReprKind::PackElement:
     case TypeReprKind::LifetimeDependent:
     case TypeReprKind::GenericArgumentExpr:
-    case TypeReprKind::CallerIsolated:
+    case TypeReprKind::NonisolatedNonsending:
       return false;
     }
   }

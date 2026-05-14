@@ -29,14 +29,24 @@
 namespace swift {
 
 SWIFT_RUNTIME_STDLIB_API _Unwind_Reason_Code
-swift_exceptionPersonality(int version,
-                           _Unwind_Action actions,
-                           uint64_t exceptionClass,
-                           struct _Unwind_Exception *exceptionObject,
-                           struct _Unwind_Context *context);
+_swift_exceptionPersonality(int version,
+                            _Unwind_Action actions,
+                            uint64_t exceptionClass,
+                            struct _Unwind_Exception *exceptionObject,
+                            struct _Unwind_Context *context);
+
+#if __has_attribute(__personality__)
+#define SWIFT_RUNTIME_EXCEPTION_PERSONALITY                                    \
+  __attribute__((__personality__(_swift_exceptionPersonality)))
+#endif
 
 } // end namespace swift
 
-#endif // defined(__ELF__) || defined(__APPLE__)
+#endif
+
+// Make SWIFT_RUNTIME_EXCEPTION_PERSONALITY a no-op when it's not available
+#ifndef SWIFT_RUNTIME_EXCEPTION_PERSONALITY
+#define SWIFT_RUNTIME_EXCEPTION_PERSONALITY
+#endif
 
 #endif // SWIFT_RUNTIME_EXCEPTION_H

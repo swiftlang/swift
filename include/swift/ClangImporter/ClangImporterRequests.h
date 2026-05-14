@@ -446,12 +446,11 @@ class ForeignReferenceTypeInfoRequest
     : public SimpleRequest<ForeignReferenceTypeInfoRequest,
                            ForeignReferenceTypeInfo(
                                ForeignReferenceTypeInfoDescriptor),
-                           RequestFlags::Cached> {
+                           RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
 
   SourceLoc getNearestLoc() const { return SourceLoc(); };
-  bool isCached() const { return true; }
 
 private:
   friend SimpleRequest;
@@ -614,6 +613,7 @@ struct CustomRefCountingOperationResult {
     immortal,
     notFound,
     tooManyFound,
+    unreachable,
     foundOperation
   };
 

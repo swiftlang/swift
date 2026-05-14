@@ -21,9 +21,47 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "clang/AST/DeclObjC.h"
+#include "swift/AST/TypeCheckRequests.h"
+
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
+
+/// Calls \p callback for each type in each requirement provided by
+/// \p source.
+///
+/// @returns true after short-circuiting if the callback returned true for
+///          any of the types
+static bool
+forAllRequirementTypes(WhereClauseOwner &&source,
+                       llvm::function_ref<bool(Type, TypeRepr *)> callback) {
+  return std::move(source).visitRequirements(
+      TypeResolutionStage::Interface,
+      [&](const Requirement &req, RequirementRepr *reqRepr) {
+        switch (req.getKind()) {
+        case RequirementKind::SameShape:
+        case RequirementKind::Conformance:
+        case RequirementKind::SameType:
+        case RequirementKind::Superclass:
+          if (callback(req.getFirstType(),
+                       RequirementRepr::getFirstTypeRepr(reqRepr)))
+            return true;
+
+          if (callback(req.getSecondType(),
+                       RequirementRepr::getSecondTypeRepr(reqRepr)))
+            return true;
+
+          break;
+
+        case RequirementKind::Layout:
+          if (callback(req.getFirstType(),
+                       RequirementRepr::getFirstTypeRepr(reqRepr)))
+            return true;
+          break;
+        }
+        return false;
+      });
+}
 
 /// Does the interface of this declaration use a type for which the
 /// given predicate returns true?
@@ -36,6 +74,14 @@ static bool usesTypeMatching(const Decl *decl,
   }
 
   return false;
+}
+
+// Does the where-clause use a type for which the given predicate returns true?
+static bool usesTypeMatching(WhereClauseOwner &&source,
+                             llvm::function_ref<bool(Type)> fn) {
+  return forAllRequirementTypes(
+      std::move(source),
+      [&](Type ty, TypeRepr *_unused_) { return ty.findIf(fn); });
 }
 
 // ----------------------------------------------------------------------------
@@ -123,13 +169,13 @@ UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypesWithDefaults)
+UNINTERESTING_FEATURE(SourceWarningControl)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
 UNINTERESTING_FEATURE(KeyPathWithMethodMembers)
 UNINTERESTING_FEATURE(ImportMacroAliases)
 UNINTERESTING_FEATURE(NoExplicitNonIsolated)
-UNINTERESTING_FEATURE(EmbeddedExistentials)
 UNINTERESTING_FEATURE(EmbeddedDynamicExclusivity)
 UNINTERESTING_FEATURE(TypedAllocation)
 
@@ -401,10 +447,6 @@ static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureSourceWarningControl(Decl *decl) {
-  return decl->getAttrs().hasAttribute<WarnAttr>();
-}
-
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>() ||
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
@@ -471,12 +513,12 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
       return true;
   }
 
-  auto hasCallerIsolatedAttr = [](TypeRepr *R) {
+  auto hasNonisolatedNonsendingAttr = [](TypeRepr *R) {
     if (!R)
       return false;
 
     return R->findIf([](TypeRepr *repr) {
-      if (isa<CallerIsolatedTypeRepr>(repr))
+      if (isa<NonisolatedNonsendingTypeRepr>(repr))
         return true;
 
       // We don't check for @concurrent here because it's
@@ -493,19 +535,19 @@ static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
 
   // The declaration is going to be printed with `nonisolated(nonsending)`
   // attribute.
-  if (getActorIsolation(VD).isCallerIsolationInheriting())
+  if (getActorIsolation(VD).isNonisolatedNonsending())
     return true;
 
   // Check if any parameters that have `nonisolated(nonsending)` attribute.
   if (auto *PL = VD->getParameterList()) {
     if (llvm::any_of(*PL, [&](const ParamDecl *P) {
-          return hasCallerIsolatedAttr(P->getTypeRepr());
+          return hasNonisolatedNonsendingAttr(P->getTypeRepr());
         }))
       return true;
   }
 
   // Check if result type has explicit `nonisolated(nonsending)` attribute.
-  if (hasCallerIsolatedAttr(VD->getResultTypeRepr()))
+  if (hasNonisolatedNonsendingAttr(VD->getResultTypeRepr()))
     return true;
 
   return false;
@@ -592,14 +634,47 @@ static bool usesFeatureTildeSendable(Decl *decl) {
 }
 
 static bool usesFeatureReparenting(Decl *decl) {
-  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
-    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
+  auto reparentableProto = [](Type ty) {
+    if (!ty)
+      return false;
+
+    if (auto protoTy = ty->getAs<ProtocolType>()) {
+      if (protoTy->getDecl()->getAttrs().hasAttribute<ReparentableAttr>())
+        return true;
+    }
+    return false;
+  };
+
+  // Search the decl or extension for mentions of a reparentable protocol.
+  if (isa<ValueDecl>(decl)) {
+    if (usesTypeMatching(decl, reparentableProto))
+      return true;
+  } else if (auto *gc = decl->getAsGenericContext()) {
+    bool foundInWhereClause = usesTypeMatching(
+        WhereClauseOwner(const_cast<GenericContext *>(gc)), reparentableProto);
+
+    if (foundInWhereClause)
       return true;
   }
 
+  // Check the inheritance clause for mentions of a reparentable protocol.
   InheritedTypes inherited(decl);
   for (auto const &entry : inherited.getEntries()) {
     if (entry.isReparented())
+      return true;
+
+    if (Type ty = entry.getType())
+      if (ty.findIf(reparentableProto))
+        return true;
+  }
+
+  // Check if this decl itself is a reparentable protocol (of extension of).
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    decl = ext->getExtendedNominal();
+  }
+
+  if (auto proto = dyn_cast<ProtocolDecl>(decl)) {
+    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
       return true;
   }
 
@@ -607,18 +682,8 @@ static bool usesFeatureReparenting(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(StrictAccessControl)
-
-static bool usesFeatureBorrowInout(Decl *decl) {
-  auto &ctx = decl->getASTContext();
-
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    decl = ext->getExtendedNominal();
-  }
-
-  return decl == ctx.getBorrowDecl() || decl == ctx.getInoutDecl();
-}
-
 UNINTERESTING_FEATURE(BorrowingSequence)
+UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

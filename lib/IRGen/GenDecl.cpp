@@ -29,6 +29,7 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1362,8 +1363,6 @@ void IRGenerator::emitLazyDefinitions() {
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
     // In embedded Swift, the compiler cannot emit any metadata, etc.
     // Other than to support existentials.
-    assert(LazyTypeMetadata.empty() ||
-           SIL.getASTContext().LangOpts.hasFeature(Feature::EmbeddedExistentials));
     assert(LazySpecializedTypeMetadataRecords.empty());
     assert(LazyTypeContextDescriptors.empty());
     assert(LazyOpaqueTypeDescriptors.empty());
@@ -1589,14 +1588,21 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   if (found != HasLazyMetadata.end())
     return found->second;
   auto &langOpts = SIL.getASTContext().LangOpts;
-  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
-    langOpts.hasFeature(Feature::EmbeddedExistentials);
-  if (isEmbeddedWithExistentials &&
+  if (langOpts.hasFeature(Feature::Embedded) &&
       (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
-    bool isGeneric = cast<NominalTypeDecl>(type)->isGenericContext();
-    HasLazyMetadata[type] = !isGeneric;
-
-    return !isGeneric;
+    auto *nominal = cast<NominalTypeDecl>(type);
+    bool isGeneric = nominal->isGenericContext();
+    // @export(interface) types have a unique definition in their defining
+    // module; importing modules reference them as external symbols rather than
+    // lazily emitting their own copy.
+    bool isExportInterface = false;
+    if (!isGeneric) {
+      if (auto model = nominal->getExplicitCodeGenerationModel())
+        isExportInterface = *model == CodeGenerationModel::Interface;
+    }
+    bool isLazy = !isGeneric && !isExportInterface;
+    HasLazyMetadata[type] = isLazy;
+    return isLazy;
   }
 
   auto canBeLazy = [&]() -> bool {
@@ -4110,6 +4116,26 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
     auto existing = cast<llvm::GlobalValue>(existingGlobal);
     auto castVar = llvm::ConstantExpr::getBitCast(var, existing->getType());
     existing->replaceAllUsesWith(castVar);
+
+    // Sometimes, two extension descriptors with different LinkEntity's
+    // may refer to the same llvm::Constant* within the GlobalVars map;
+    // their mangled names would be the same. It's suspected to have to
+    // do with `getAddrOfSharedContextDescriptor`'s shenanigans, but not proven.
+    // This is currently only ben observed for extension descriptors created for
+    // protocol-to-protocol conformances. In that case, we check for additional
+    // references in the GlobalVars map to prevent a dangling pointer.
+    if (entity.hasExtension()) {
+      for (auto otherExt : IRGen.AllConformanceOfProtocolExtensionDescriptors) {
+        auto otherEntity = LinkEntity::forExtensionDescriptor(otherExt);
+        auto &entry = GlobalVars[otherEntity];
+        if (entry == existing) {
+          assert(otherExt->getExtendedNominal() ==
+                 entity.getExtension()->getExtendedNominal());
+          entry = var;
+        }
+      }
+    }
+
     existing->eraseFromParent();
   }
 
@@ -5316,7 +5342,7 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
 
     return cast<llvm::GlobalValue>(addr);
   }
-  bool hasEmbeddedExistentials = isEmbeddedWithExistentials();
+  bool hasEmbeddedExistentials = Context.LangOpts.hasFeature(Feature::Embedded);
   auto entity =
       (isPrespecialized &&
        !irgen::isCanonicalInitializableTypeMetadataStaticallyAddressable(
@@ -5452,7 +5478,7 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   llvm::Type *defaultVarTy;
   unsigned adjustmentIndex;
-  auto hasEmbeddedExistentials = isEmbeddedWithExistentials();
+  auto hasEmbeddedExistentials = Context.LangOpts.hasFeature(Feature::Embedded);
   if (hasEmbeddedExistentials) {
     adjustmentIndex = 0;
     defaultVarTy = EmbeddedExistentialsMetadataStructTy;
@@ -5510,7 +5536,9 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
 
   if (hasEmbeddedExistentials &&
       (isa<TupleType>(concreteType) ||
-       isa<FunctionType>(concreteType))) {
+       isa<FunctionType>(concreteType) ||
+       concreteType->isAnyExistentialType() ||
+       isa<MetatypeType>(concreteType))) {
     IRGen.noteUseOfSpecializedValueMetadata(concreteType);
   }
 

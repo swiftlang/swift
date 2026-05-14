@@ -27,6 +27,8 @@ target_compile_options(SwiftWASILibc INTERFACE
 install(TARGETS SwiftWASILibc
   EXPORT SwiftOverlayTargets)
 install(FILES
-  SwiftWASILibc.apinotes
   wasi-libc.modulemap
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/${SwiftOverlay_PLATFORM_SUBDIR}/${SwiftOverlay_ARCH_SUBDIR})
+install(FILES
+  SwiftWASILibc.apinotes
+  DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/apinotes)

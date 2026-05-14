@@ -79,6 +79,27 @@ extension Pri_IIII {}
 func test2<X, Y, Z>(_ x: X, y: Y, z: Z) where
   X: Pri_CI, Y: Pri_II, Z: Pri_IIII {}
 
+// For testing opaque return types
+struct OpRet<A: ~Copyable>: Pri_CI, Pri_II {
+  init(_ a: A.Type) {}
+}
+
+// CHECK-LABEL: Opaque result type of {{.*}}.test_opaque1@
+// CHECK-NEXT: Opaque result signature: <X, τ_1_0 where X : Copyable, X == τ_1_0.[Pri_CI]A, τ_1_0 : Pri_CI>
+func test_opaque1<X>(_ x: X.Type) -> some Pri_CI<X> { return OpRet(x) }
+
+// CHECK-LABEL: Opaque result type of {{.*}}.test_opaque2@
+// CHECK-NEXT: Opaque result signature: <X, τ_1_0 where X == τ_1_0.[Pri_CI]A, τ_1_0 : Pri_CI>
+func test_opaque2<X: ~Copyable>(_ x: X.Type) -> some Pri_CI<X> { return OpRet(x) }
+
+// CHECK-LABEL: Opaque result type of {{.*}}.test_opaque3@
+// CHECK-NEXT: Opaque result signature: <X, τ_1_0 where X : Copyable, X == τ_1_0.[Pri_II]A, τ_1_0 : Copyable, τ_1_0 : Pri_II>
+func test_opaque3<X>(_ x: X.Type) -> some Pri_II<X> { return OpRet(x) }
+
+// CHECK-LABEL: Opaque result type of {{.*}}.test_opaque4@
+// CHECK-NEXT: Opaque result signature: <X, τ_1_0 where X == τ_1_0.[Pri_II]A, τ_1_0 : Copyable, τ_1_0 : Pri_II>
+func test_opaque4<X: ~Copyable>(_ x: X.Type) -> some Pri_II<X> { return OpRet(x) }
+
 struct RequireCopy<X: Copyable> {}
 
 // CHECK-LABEL: .ImplyP@

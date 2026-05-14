@@ -101,6 +101,14 @@ extension AddressUseVisitor {
     case let pai as PartialApplyInst where !pai.mayEscape:
       return dependentAddressUse(of: operand, dependentValue: pai)
 
+    case let iba as InitBorrowAddrInst where iba.borrow == operand.value:
+      // Initialize the Builtin.Borrow with operand.
+      return leafAddressUse(of: operand)
+
+    case let iba as InitBorrowAddrInst where iba.referent == operand.value:
+      // Store a new Builtin.Borrow value that depends on 'referent'.
+      return dependentAddressUse(of: operand, dependentAddress: iba.borrow)
+
     case let pai as PartialApplyInst where pai.mayEscape:
       return escapingAddressUse(of: operand)
 
@@ -109,7 +117,7 @@ extension AddressUseVisitor {
 
     case is StructElementAddrInst, is TupleElementAddrInst,
          is IndexAddrInst, is TailAddrInst, is TuplePackElementAddrInst, 
-         is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst,
+         is InitEnumDataAddrInst,
          is InitExistentialAddrInst, is OpenExistentialAddrInst,
          is ProjectBlockStorageInst, is UncheckedAddrCastInst,
          is MarkUninitializedInst, is DropDeinitInst,
@@ -119,6 +127,9 @@ extension AddressUseVisitor {
          is MarkUnresolvedNonCopyableValueInst:
       let svi = operand.instruction as! SingleValueInstruction
       return projectedAddressUse(of: operand, into: svi)
+
+    case let ueda as UncheckedEnumDataAddrInstBase where ueda.enum == operand.value:
+      return projectedAddressUse(of: operand, into: ueda)
 
     case let apply as FullApplySite:
       return appliedAddressUse(of: operand, by: apply)

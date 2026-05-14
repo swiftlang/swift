@@ -26,6 +26,7 @@ typealias FloatArrayTan = Array<Float>.TangentVector
 
 AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test1") {
   // CHECK1-LABEL: {{^}}// reverse-mode derivative of sumFirstThreeConcatenating1 #1 (_:_:)
+  // CHECK1-NEXT: {{^}}// Isolation: nonisolated
   // CHECK1-NEXT:  sil private @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
   // CHECK1:         %[[#E52:]] = function_ref @$s3outyycfU_27sumFirstThreeConcatenating1L_ySfSaySfG_ACtFTJpSSpSr0138$sSa16_DifferentiationAA14DifferentiableRzlE13_vjpSubscript5indexx5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAdCSi0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AdCSiAETf1nnccccc_n : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
   // CHECK1:         %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (Float, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
@@ -54,6 +55,7 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test1") {
 
 AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test2") {
   // CHECK2-LABEL: {{^}}// reverse-mode derivative of sumFirstThreeConcatenating2 #1 (_:_:)
+  // CHECK2-NEXT: {{^}}// Isolation: nonisolated
   // CHECK2-NEXT:  sil private @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, @guaranteed Array<Float>) -> (Float, @owned @callee_guaranteed (Float) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)) {
   // CHECK2:         %[[#E52:]] = function_ref @$s3outyycfU0_27sumFirstThreeConcatenating2L_ySfSaySfG_ACtFTJpSSpSr144$sSa16_DifferentiationAA14DifferentiableRzlE10_vjpAppendyyt5value_SaA2aBRzlE0B4ViewVy13TangentVectorQz_GAIzc8pullbacktSayxGz_AKtFZA2IzcfU_Sf_Tg5Si0fg1_hijk4E13_m23Subscript5indexx5value_opqrstuvwx29_GAIc8pullbacktSi_tFAKL_yAjiaQ7FSf_TG5ACSiAeCSi0f5Sf16_h3E7_M59Add3lhs3rhsSf5value_Sf_SftSfc8pullbacktSf_SftFZSf_SftSfcfU_AeCSiAFTf1ncccccc_n : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
   // CHECK2:         %[[#E53:]] = partial_apply [callee_guaranteed] %[[#E52]](%[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (Float, Int, @owned Array<Float>, Int, @owned Array<Float>, Int, @owned Array<Float>, Int) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView)
@@ -113,6 +115,7 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test3") {
   }
 
   // CHECK3:       {{^}}// reverse-mode derivative of multiply #1 (_:)
+  // CHECK3-NEXT: {{^}}// Isolation: nonisolated
   // CHECK3-NEXT:  sil private @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJrSpSr : $@convention(thin) (RealPropertyWrappers) -> (Float, @owned @callee_guaranteed (Float) -> RealPropertyWrappers.TangentVector) {
   // CHECK3:         %[[#A22:]] = function_ref @$s3outyycfU1_8multiplyL_ySfAAyycfU1_20RealPropertyWrappersL_VFTJpSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktm1_n5FZSf_N6SfcfU_S2fTf1nnc_n015$s3outyycfU1_20cdE16L_V1xSfvgTJpSpSrTf1ncnn_n : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector
   // CHECK3:         %[[#A23:]] = partial_apply [callee_guaranteed] %[[#A22]](%[[#]], %[[#]]) : $@convention(thin) (Float, Float, Float) -> RealPropertyWrappers.TangentVector
@@ -160,6 +163,7 @@ AutoDiffClosureSpecMultiBBNoBTETests.testWithLeakChecking("Test4") {
   }
 
   // CHECK4-LABEL: {{^}}// reverse-mode derivative of methodWrapper #1 (_:)
+  // CHECK4-NEXT: {{^}}// Isolation: nonisolated
   // CHECK4-NEXT:  sil private @$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJrSpSr : $@convention(thin) (Class) -> (Float, @owned @callee_guaranteed (Float) -> Class.TangentVector) {
   // CHECK4:         %[[#C39:]] = function_ref @$s3outyycfU2_13methodWrapperL_ySfAAyycfU2_5ClassL_VFTJpSpSr014$s3outyycfU2_5D21L_V6methodSfyFTJpSpSrAA05_AD__ef2_5d2L_gH24F_bb3__Pred__src_0_wrt_033_E588B908471A5F020CF23EC392ADD7D3LLOTf1nc_n : $@convention(thin) (Float, @owned _AD__$s3outyycfU2_5ClassL_V6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector 
   // CHECK4:         %[[#C40:]] = partial_apply [callee_guaranteed] %[[#C39]](%[[#]]) : $@convention(thin) (Float, @owned _AD__$s3outyycfU2_5ClassL_V6methodSfyF_bb3__Pred__src_0_wrt_0) -> Class.TangentVector

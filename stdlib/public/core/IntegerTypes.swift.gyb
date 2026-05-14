@@ -728,6 +728,8 @@ public func _assumeNonNegative(_ x: ${Self}) -> ${Self} {
 
 //===--- end of FIXME(integers) -------------------------------------------===//
 
+extension ${Self}: ConvertibleToBytes, ConvertibleFromBytes {}
+
 % end # end of concrete FixedWidthInteger section
 
 extension Int {

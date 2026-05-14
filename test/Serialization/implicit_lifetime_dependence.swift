@@ -3,7 +3,7 @@
 // RUN: -enable-experimental-feature Lifetimes \
 // RUN: -disable-lifetime-dependence-diagnostics
 
-// RUN: llvm-bcanalyzer %t/def_implicit_lifetime_dependence.swiftmodule 
+// RUN: %llvm-bcanalyzer %t/def_implicit_lifetime_dependence.swiftmodule 
 
 // RUN: %target-swift-frontend -module-name lifetime-dependence -emit-sil -I %t %s \
 // RUN: -enable-experimental-feature Lifetimes \
@@ -71,6 +71,10 @@ func testStaticMethod(
   message = propagatedMessage
 }
 
+func testViewCallback(view: BufferView) {
+  takeViewCallback { view }
+}
+
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence10BufferViewVyACSW_SitcfC : $@convention(method) (UnsafeRawBufferPointer, Int, @thin BufferView.Type) -> @lifetime(borrow 0) @owned BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(copy 0) @owned BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> @lifetime(copy 0) @owned BufferView
@@ -79,3 +83,4 @@ func testStaticMethod(
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvr : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed BufferView
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence3GCMV4open7inPlace3tagys14MutableRawSpanVz_s0kL0VtFZ : $@convention(method) (@lifetime(copy 0) @inout MutableRawSpan, @guaranteed RawSpan, @thin GCM.Type) -> ()
 // CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence3GCMV9propagate7messages14MutableRawSpanVAGn_tFZ : $@convention(method) (@owned MutableRawSpan, @thin GCM.Type) -> @lifetime(copy 0) @owned MutableRawSpan
+// CHECK-LABEL: sil @$s32def_implicit_lifetime_dependence16takeViewCallback1fyAA06BufferF0VyXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @lifetime(captures) @owned BufferView) -> ()

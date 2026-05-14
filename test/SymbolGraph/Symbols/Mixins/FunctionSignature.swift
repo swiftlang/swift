@@ -5,6 +5,7 @@
 // RUN: %FileCheck %s --input-file %t/FunctionSignature.symbols.json --check-prefix=INIT
 // RUN: %FileCheck %s --input-file %t/FunctionSignature.symbols.json --check-prefix=SUBSCRIPT
 // RUN: %FileCheck %s --input-file %t/FunctionSignature.symbols.json --check-prefix=FUNC2
+// RUN: %FileCheck %s --input-file %t/FunctionSignature.symbols.json --check-prefix=MACRO
 
 public struct MyStruct {
   public init(_ noext: Int, ext int: Int) {}
@@ -136,3 +137,36 @@ public struct MyStruct {
 // FUNC2-NEXT: "preciseIdentifier": "s:s4Voida"
     
 }
+
+@freestanding(expression)
+public macro foo(_ noext: Int, ext int: Int) -> String = #externalMacro(module: "MacroDefinition", type: "FooMacro")
+  
+// MACRO-LABEL: "precise": "s:17FunctionSignature3foo_3extSSSi_Sitcfm",
+// MACRO: "name": "noext"
+// MACRO-NOT: "internalName": "noext"
+// MACRO-NEXT: declarationFragments
+
+// MACRO: "kind": "identifier"
+// MACRO-NEXT: "spelling": "noext"
+// MACRO: "kind": "text"
+// MACRO-NEXT: "spelling": ": "
+// MACRO: "kind": "typeIdentifier"
+// MACRO-NEXT: "spelling": "Int"
+// MACRO-NEXT: "preciseIdentifier": "s:Si"
+
+// MACRO: "name": "ext"
+// MACRO-NEXT: "internalName": "int"
+// MACRO-NEXT: declarationFragments
+
+// MACRO: "kind": "identifier"
+// MACRO-NEXT: "spelling": "int"
+// MACRO: "kind": "text"
+// MACRO-NEXT: "spelling": ": "
+// MACRO: "kind": "typeIdentifier"
+// MACRO-NEXT: "spelling": "Int"
+// MACRO-NEXT: "preciseIdentifier": "s:Si"
+
+// MACRO: returns
+// MACRO: "kind": "typeIdentifier"
+// MACRO-NEXT: "spelling": "String"
+// MACRO-NEXT: "preciseIdentifier": "s:SS"

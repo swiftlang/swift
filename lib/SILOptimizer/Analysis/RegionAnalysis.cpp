@@ -293,7 +293,7 @@ struct AddressBaseComputingVisitor
         break;
       case ProjectionKind::Enum: {
         // NOTE: Preserves immutability prefix path.
-        auto op = cast<UncheckedTakeEnumDataAddrInst>(projInst)->getOperand();
+        auto op = cast<UncheckedEnumDataAddrInstBase>(projInst)->getEnum();
 
         // If our operand is Sendable and our field is non-Sendable and we have
         // not stashed a value yet, stash value.
@@ -433,6 +433,8 @@ static bool isLookThroughIfOperandAndResultNonSendable(SILInstruction *inst) {
   case SILInstructionKind::RawPointerToRefInst:
   case SILInstructionKind::StructElementAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::TupleElementAddrInst:
     return true;
   }
@@ -2727,7 +2729,7 @@ public:
     translateSILMultiAssign(
         directResults,
         ArrayRef<Operand *>(), // No indirect results for a partial_apply.
-        makeOperandRefRange(pai->getAllOperands()),
+        pai->getRealOperands(),
         RegionMergeReason::NonisolatedClosure);
   }
 
@@ -2983,7 +2985,7 @@ public:
         // locations (which is how we grab our AST information).
         !(applyExpr && applyExpr->getIsolationCrossing()
                            ->getCalleeIsolation()
-                           .isNonisolated());
+                           .isNonisolatedOrConcurrent());
 
     for (auto result : applyResults) {
       if (auto lookupResult = tryToTrackValue(result)) {
@@ -3737,8 +3739,6 @@ CONSTANT_TRANSLATION(CopyBlockInst, AssignDirect)
 CONSTANT_TRANSLATION(CopyBlockWithoutEscapingInst, AssignDirect)
 CONSTANT_TRANSLATION(IndexAddrInst, AssignDirect)
 CONSTANT_TRANSLATION(InitBlockStorageHeaderInst, AssignDirect)
-CONSTANT_TRANSLATION(InitExistentialAddrInst, AssignDirect)
-CONSTANT_TRANSLATION(InitExistentialRefInst, AssignDirect)
 CONSTANT_TRANSLATION(OpenExistentialBoxInst, AssignDirect)
 CONSTANT_TRANSLATION(OpenExistentialRefInst, AssignDirect)
 CONSTANT_TRANSLATION(TailAddrInst, AssignDirect)
@@ -4138,6 +4138,8 @@ PartitionOpTranslator::visitProjection(SingleValueInstruction *proj) {
 EMIT_PROJECTION(StructElementAddrInst)
 EMIT_PROJECTION(TupleElementAddrInst)
 EMIT_PROJECTION(UncheckedTakeEnumDataAddrInst)
+EMIT_PROJECTION(UncheckedBorrowEnumDataAddrInst)
+EMIT_PROJECTION(UncheckedInPlaceEnumDataAddrInst)
 
 #undef EMIT_PROJECTION
 
@@ -4511,10 +4513,56 @@ PartitionOpTranslator::visitPartialApplyInst(PartialApplyInst *pai) {
 }
 
 TranslationSemantics
+PartitionOpTranslator::visitInitExistentialAddrInst(
+    InitExistentialAddrInst *ieai) {
+  // If the formal concrete type involves an opened archetype, the conformance
+  // is abstract — derived from an existing existential that was already
+  // validated at its formation site. SE-0470's dependent conformance rule
+  // guarantees the associated conformance can never be more isolated than the
+  // parent, so no new isolated-conformance region should be introduced.
+  //
+  // Instead, merge the result into the region of the opened existential (the
+  // type-dependent operand) along with the primary operand (the existential
+  // buffer), without passing a conformance isolation override.
+  if (ieai->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(
+        ieai->getResults(),
+        ArrayRef<Operand *>(),
+        makeOperandRefRange(ieai->getAllOperands()),
+        RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
+  return TranslationSemantics::AssignDirect;
+}
+
+TranslationSemantics
 PartitionOpTranslator::visitInitExistentialValueInst(InitExistentialValueInst *ievi) {
   if (isStaticallyLookThroughInst(ievi))
     return TranslationSemantics::LookThrough;
 
+  if (ievi->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(
+        ievi->getResults(),
+        ArrayRef<Operand *>(),
+        makeOperandRefRange(ievi->getAllOperands()),
+        RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
+
+  return TranslationSemantics::AssignDirect;
+}
+
+TranslationSemantics
+PartitionOpTranslator::visitInitExistentialRefInst(
+    InitExistentialRefInst *ieri) {
+  if (ieri->getFormalConcreteType()->hasOpenedExistential()) {
+    translateSILMultiAssign(
+        ieri->getResults(),
+        ArrayRef<Operand *>(),
+        makeOperandRefRange(ieri->getAllOperands()),
+        RegionMergeReason::Assign);
+    return TranslationSemantics::Special;
+  }
   return TranslationSemantics::AssignDirect;
 }
 

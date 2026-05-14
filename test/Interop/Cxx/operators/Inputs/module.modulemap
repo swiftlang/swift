@@ -27,3 +27,13 @@ module PointeeOverloads {
   header "pointee-overloads.h"
   requires cplusplus
 }
+
+module Subscripts {
+  header "subscripts.h"
+  requires cplusplus
+}
+
+module SubscriptOverloads {
+  header "subscript-overloads.h"
+  requires cplusplus
+}

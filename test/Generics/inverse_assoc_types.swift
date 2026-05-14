@@ -1,6 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
-
-// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
+// RUN: %target-typecheck-verify-swift
 
 protocol P<Primary> {
   associatedtype Primary: ~Copyable
@@ -176,9 +174,120 @@ protocol Pushable<Element> {
 
 struct Stack<Scope: Pushable> {}
 
-func push<Val>(_ s: Stack<Val>, _ v: Val)
-  where Val.Element: ~Copyable {} // expected-error {{'Val.Element' required to be 'Copyable' but is marked with '~Copyable'}}
+func push<Scope>(_ s: Stack<Scope>)
+  where Scope.Element: ~Copyable {} // expected-error {{'Scope.Element' required to be 'Copyable' but is marked with '~Copyable'}}
+
+struct StackOfNC<Scope: Pushable> where Scope.Element: ~Copyable {}
+
+func pushOfNC<Scope, Val>(_ s: StackOfNC<Scope>, _ v: consuming Val)
+  where Val: ~Copyable, Val == Scope.Element {}
 
 protocol Stackable<Element>: Pushable {}
 
 extension Stackable where Element: ~Copyable {} // expected-error {{'Self.Element' required to be 'Copyable' but is marked with '~Copyable'}}
+
+protocol Recur<Assoc>: ~Copyable {
+    associatedtype Assoc: Recur, ~Copyable where Assoc.Assoc: ~Copyable
+}
+
+func doCopy<T>(_ t: T) {}
+
+func foo<T: Recur>(_ base: T,
+                   _ lvl1: T.Assoc,
+                   _ lvl2: T.Assoc.Assoc,  // expected-error {{parameter of noncopyable type 'T.Assoc.Assoc' must specify ownership}} // expected-note 3{{add}}
+                   _ lvl3: T.Assoc.Assoc.Assoc // expected-error {{parameter of noncopyable type 'T.Assoc.Assoc.Assoc' must specify ownership}} // expected-note 3{{add}}
+                   ) {}
+
+protocol Dog {
+    associatedtype A
+}
+protocol Hotdog: Dog where Self.A: ~Copyable {} // expected-error {{'Self.A' required to be 'Copyable' but is marked with '~Copyable'}}
+
+
+protocol Foo<Inner>: ~Copyable {
+  associatedtype Inner: ~Copyable
+  func getInner() -> Inner
+}
+
+struct NC: ~Copyable {}
+
+struct WitnessFoo<Inner: ~Copyable>: Foo {
+  func getInner() -> Inner { fatalError("todo") }
+}
+
+extension WitnessFoo where Inner: ~Copyable {
+  func asFoo() -> some Foo<Inner> {
+    return self
+  }
+}
+
+func createNCInner<Inner: ~Copyable>(_ t: Inner.Type) -> some Foo<Inner> {
+    return WitnessFoo<Inner>()
+}
+
+func createCopyableInner<Inner>(_ t: Inner.Type) -> some Foo<Inner> {  // expected-note {{'where Inner: Copyable' is implicit here}}
+  return WitnessFoo<Inner>()
+}
+
+func requireCopyableInnerMeta<X: Foo>(_ t: X.Type) -> some Foo<X.Inner> { // expected-note {{where 'X.Inner' = 'NC'}}
+  return WitnessFoo<X.Inner>()
+}
+
+func permitNCInnerMeta<X: Foo>(_ t: X.Type) -> some Foo<X.Inner> where X.Inner: ~Copyable {
+  return WitnessFoo<X.Inner>()
+}
+
+func expectC<T>(_ t: T) {} // expected-note {{'where T: Copyable' is implicit here}}
+func permitNC<T: ~Copyable>(_ t: borrowing T) {}
+
+func test() {
+  _ = createCopyableInner(Int.self)
+  _ = createCopyableInner(NC.self) // expected-error {{global function 'createCopyableInner' requires that 'NC' conform to 'Copyable'}}
+
+  expectC(createNCInner(Int.self).getInner())
+  expectC(createNCInner(NC.self).getInner()) // expected-error {{global function 'expectC' requires that 'NC' conform to 'Copyable'}}
+
+  permitNC(createNCInner(Int.self).getInner())
+  permitNC(createNCInner(NC.self).getInner())
+
+
+  requireCopyableInnerMeta(WitnessFoo<NC>.self) // expected-error {{global function 'requireCopyableInnerMeta' requires that 'NC' conform to 'Copyable'}}
+  permitNC(permitNCInnerMeta(WitnessFoo<NC>.self).getInner())
+}
+
+
+protocol Multi<A, B, C> {
+  associatedtype A: ~Copyable
+  associatedtype B: ~Copyable
+  associatedtype C
+}
+
+struct MultiTest<A: ~Copyable, B: ~Copyable, C>: Multi {}
+
+func testMulti1<T: ~Copyable>(_ t: T.Type) -> some Multi<T, T, Int> {
+  return MultiTest<T, T, Int>()
+}
+
+func testMulti2<T: ~Copyable, V>(_ t: T.Type, _ v: ReqC<V>) -> some Multi<T, V, V> {
+  return MultiTest<T, V, V>()
+}
+
+func testMulti3<T: ~Copyable, V>(_ t: T.Type, _ v: ReqC<V>) -> some Multi<T, V, T> { // expected-note {{opaque return type declared here}}
+  if 1 == 2 {
+    return MultiTest<T, V, T>()  // expected-error {{type 'T' does not conform to protocol 'Copyable'}}
+  } else {
+    return MultiTest<T, V, V>() // expected-error {{return type of global function 'testMulti3' requires the types 'T' and 'V' be equivalent}}
+  }
+}
+
+func testMulti4<X: Multi>(_ x: X) -> some Multi<X.A, X.B, X.C> {
+  return x
+}
+
+func testMulti5<X: Multi>(_ x: X) -> some Multi<X.C, X.B, X.A> {
+  return MultiTest<X.C, X.B, X.A>()
+}
+
+func testMulti6<X: Multi>(_ x: X) -> some Multi<X.C, X.B, X.A> where X.A: ~Copyable, X.B: ~Copyable {
+  return MultiTest<X.C, X.B, X.A>() // expected-error {{type 'X.A' does not conform to protocol 'Copyable'}}
+}

@@ -124,7 +124,7 @@ func equalTuples<each Element: Equatable>(lhs: (repeat each Element), rhs: (repe
 // CHECK:  br [[LATCH_BB:bb[0-9]+]]
 //
 // CHECK: [[ENUM_MATCH_BB]]:
-// CHECK: [[ENUM_DATA_ADDR:%.*]] = unchecked_take_enum_data_addr %13 : $*E<@pack_element("[[UUID]]") each Element>, #E.one!enumelt
+// CHECK: [[ENUM_DATA_ADDR:%.*]] = unchecked_inplace_enum_data_addr %13 : $*E<@pack_element("[[UUID]]") each Element>, #E.one!enumelt
 // CHECK: copy_addr [take] [[ENUM_DATA_ADDR]] to [init] [[STACK]]
 // CHECK: [[LOOP_END_FUNC:%.*]] = function_ref @loopBodyEnd : $@convention(thin) () -> ()
 // CHECK: apply [[LOOP_END_FUNC]]() : $@convention(thin) () -> ()

@@ -603,3 +603,6 @@ extension ClosedRange: Encodable where Bound: Encodable {
 
 extension ClosedRange: Sendable where Bound: Sendable { }
 extension ClosedRange.Index: Sendable where Bound: Sendable { }
+
+extension ClosedRange: ConvertibleToBytes
+  where Bound: ConvertibleToBytes {}

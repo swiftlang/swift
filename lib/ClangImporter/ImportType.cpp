@@ -519,6 +519,20 @@ namespace {
       // All other C pointers to concrete types map to
       // UnsafeMutablePointer<T> or OpaquePointer.
 
+      // If the pointee record is annotated with swift_attr("import_opaque_pointer"),
+      // import as OpaquePointer regardless of whether the struct definition is
+      // complete. This allows SDK overlays (e.g. Android NDK) to normalize a type
+      // like FILE* that is complete on some API levels and opaque on others.
+      if (const auto *recordType = pointeeQualType->getAs<clang::RecordType>()) {
+        if (importer::hasImportAsOpaquePointerAttr(recordType->getDecl())) {
+          auto opaquePointerDecl = Impl.SwiftContext.getOpaquePointerDecl();
+          if (!opaquePointerDecl)
+            return Type();
+          return {opaquePointerDecl->getDeclaredInterfaceType(),
+                  ImportHint::OtherPointer};
+        }
+      }
+
       // With pointer conversions enabled, map to the normal pointer types
       // without special hints.
       Type pointeeType = Impl.importTypeIgnoreIUO(
@@ -1073,7 +1087,13 @@ namespace {
           return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Int");
 
         // Import the underlying integer type.
-        return Visit(clangDecl->getIntegerType());
+        auto result = Visit(clangDecl->getIntegerType());
+        // Unicode.Scalar (from char32_t or wchar_t) doesn't conform to
+        // _ExpressibleByBuiltinIntegerLiteral, which is required for enum
+        // constant values. Use UInt32 instead.
+        if (result.AbstractType && result.AbstractType->isUnicodeScalar())
+          return Impl.SwiftContext.getUInt32Type();
+        return result;
       }
       case EnumKind::NonFrozenEnum:
       case EnumKind::FrozenEnum:
@@ -1708,6 +1728,12 @@ static ImportedType adjustTypeForConcreteImport(
 
   assert(importedType);
 
+  // When Unicode.Scalar (from char32_t or wchar_t) is used as an enum's
+  // underlying type, import as UInt32 instead. Unicode.Scalar doesn't conform
+  // to _ExpressibleByBuiltinIntegerLiteral, which is required for enum cases.
+  if (importKind == ImportTypeKind::Enum && importedType->isUnicodeScalar())
+    importedType = impl.SwiftContext.getUInt32Type();
+
   if (importKind == ImportTypeKind::RecordField &&
       !importedType->isForeignReferenceType()) {
     switch (objCLifetime) {
@@ -2085,6 +2111,7 @@ private:
   NEVER_VISIT(BuiltinType)
   NEVER_VISIT(BuiltinTupleType)
   NEVER_VISIT(IntegerType)
+  NEVER_VISIT(HiddenType)
 
   VISIT(TupleType, recurse)
 
@@ -2708,6 +2735,12 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
       !functionDecl->getTemplateInstantiationPattern(
           /*ForDefinition*/ false))
     // HACK: Clang will crash while trying to instantiate this default arg.
+    return false;
+
+  if (param->hasUninstantiatedDefaultArg() &&
+      isa<clang::CXXConstructorDecl>(functionDecl))
+    // HACK: Constructors of std::set have default arguments that rely on the
+    // comparator type being copyable.
     return false;
 
   clang::CXXDefaultArgExpr *defaultArgExpr = nullptr;

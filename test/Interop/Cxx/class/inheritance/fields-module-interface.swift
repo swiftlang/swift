@@ -54,6 +54,7 @@
 // CHECK-NEXT: }
 
 // CHECK-NEXT: struct NonTrivialHasThreeFields {
+// CHECK-NEXT:   init(a: Int32, b: Int32, c: Int32)
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   var a: Int32
 // CHECK-NEXT:   var b: Int32

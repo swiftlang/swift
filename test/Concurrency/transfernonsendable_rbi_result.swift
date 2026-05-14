@@ -102,7 +102,7 @@ actor A {
     // We do not error in ni-ns since we just merge pass non sendable.
     await passNonSendable(ns)
     // expected-ni-error @-1 {{sending 'ns' risks causing data races}}
-    // expected-ni-note @-2 {{sending 'self'-isolated 'ns' to nonisolated global function 'passNonSendable' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-ni-note @-2 {{sending 'self'-isolated 'ns' to @concurrent global function 'passNonSendable' risks causing data races between @concurrent and 'self'-isolated uses}}
 
     // We error here in both modes but in different places. In NI mode, we error
     // on passing ns to a nonisolated function. With ni-ns, we do not error
@@ -112,7 +112,7 @@ actor A {
     // ns2 into ns's region causing it to be self-isolated.
     let ns2 = NonSendable()
     await passTwoNonSendable(ns, ns2) // expected-ni-error {{sending 'ns' risks causing data races}}
-    // expected-ni-note @-1 {{sending 'self'-isolated 'ns' to nonisolated global function 'passTwoNonSendable' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-ni-note @-1 {{sending 'self'-isolated 'ns' to @concurrent global function 'passTwoNonSendable' risks causing data races between @concurrent and 'self'-isolated uses}}
     await sendToMain(ns2) // expected-ni-ns-error {{sending 'ns2' risks causing data races}}
     // expected-ni-ns-note @-1 {{sending 'self'-isolated 'ns2' to main actor-isolated global function 'sendToMain' risks causing data races between main actor-isolated and 'self'-isolated uses}}
 

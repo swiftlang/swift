@@ -1,0 +1,51 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend -enable-experimental-feature Embedded -parse-as-library %s -c -o %t/a.o
+// RUN: %target-clang %t/a.o %target-embedded-posix-shim -o %t/a.out -L%swift_obj_root/lib/swift/embedded/%module-target-triple %target-clang-resource-dir-opt -lswift_Concurrency %target-swift-default-executor-opt -dead_strip
+// RUN: %target-run %t/a.out | %FileCheck %s
+
+// REQUIRES: executable_test
+// REQUIRES: swift_in_compiler
+// REQUIRES: optimized_stdlib
+// REQUIRES: OS=macosx || OS=wasip1
+// REQUIRES: swift_feature_Embedded
+
+import _Concurrency
+
+enum StreamError: Error {
+case numberTooBig(Int)
+}
+
+@main struct Main {
+  static func main() async {
+    let (stream, continuation) = AsyncThrowingStream.makeStream(of: String.self, throwing: Error.self)
+    Task {
+      for i in 0 ..< 10 {
+        continuation.yield("\(i)")
+      }
+      
+      continuation.finish(throwing: StreamError.numberTooBig(10))
+    }
+
+    do {
+      for try await value in stream {
+        print(value)
+      }
+      fatalError("Didn't throw")
+      // CHECK: 0
+      // CHECK: 1
+      // CHECK: 2
+      // CHECK: 3
+      // CHECK: 4
+      // CHECK: 5
+      // CHECK: 6
+      // CHECK: 7
+      // CHECK: 8
+      // CHECK: 9
+    } catch is StreamError {
+      // CHECK: Caught error
+      print("Caught error")
+    } catch {
+      fatalError("Wrong error type")
+    }
+  }
+}

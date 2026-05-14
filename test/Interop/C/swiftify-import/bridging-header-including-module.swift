@@ -3,7 +3,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-bridging-header %t/bridging.h -strict-memory-safety %t/test.swift \
-// RUN:   -verify
+// RUN:   -verify -eager-macro-checking
 
 // RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -o %t/test.swiftmodule -I %t -import-bridging-header %t/bridging.h -strict-memory-safety %t/test.swift \
 // RUN:   -dump-macro-expansions 2>&1 | %FileCheck --dry-run > %t/macro-expansions.out

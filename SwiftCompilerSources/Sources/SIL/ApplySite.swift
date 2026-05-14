@@ -410,6 +410,30 @@ extension FullApplySite {
   }
 }
 
+extension Instruction {
+  /// To be used for fast type casting to `FullApplySite` in time critical code.
+  /// This is a workaround for the slow runtime type casts. After toolchain builders are
+  /// upgraded to a compiler version which includes the fix for this problem
+  /// (https://github.com/swiftlang/swift/pull/88270), we don't need this anymore and
+  /// the regular `as FullApplySite` casts can be used instead.
+  public var isFullApplySite: Bool {
+    switch self {
+    case is ApplyInst, is TryApplyInst, is BeginApplyInst:
+      return true
+    default:
+      return false
+    }
+  }
+}
+
+/// For pattern matching in switch statements.
+public struct IsFullApplySite {}
+public let isFullApplySite = IsFullApplySite()
+
+public func ~= (pattern: IsFullApplySite, value: Instruction) -> Bool {
+  return value.isFullApplySite
+}
+
 let addressableTest = Test("addressable_arguments") {
   function, arguments, context in
 

@@ -1359,6 +1359,7 @@ namespace {
       case ActorIsolation::Unspecified:
         printFlag(true, "unspecified_isolation", CapturesColor);
         break;
+
       case ActorIsolation::NonisolatedUnsafe:
         printFlag(true, "nonisolated(unsafe)", CapturesColor);
         break;
@@ -1367,12 +1368,16 @@ namespace {
         printFlag(true, "nonisolated", CapturesColor);
         break;
 
+      case ActorIsolation::NonisolatedConcurrent:
+        printFlag(true, "@concurrent", CapturesColor);
+        break;
+
       case ActorIsolation::Erased:
         printFlag(true, "dynamically_isolated", CapturesColor);
         break;
 
-      case ActorIsolation::CallerIsolationInheriting:
-        printFlag(true, "isolated_to_caller_isolation", CapturesColor);
+      case ActorIsolation::NonisolatedNonsending:
+        printFlag(true, "nonisolated_nonsending", CapturesColor);
         break;
 
       case ActorIsolation::ActorInstance:
@@ -4882,7 +4887,7 @@ public:
     printFoot();
   }
 
-  void visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T, Label label) {
+  void visitNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *T, Label label) {
     printCommon("caller_isolated", label);
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
@@ -5643,8 +5648,8 @@ public:
     printFoot();
   }
                          
-  void visitWarnAttr(WarnAttr *Attr, Label label) {
-    printCommon(Attr, "warn", label);
+  void visitDiagnoseAttr(DiagnoseAttr *Attr, Label label) {
+    printCommon(Attr, "diagnose", label);
     auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
     printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
                   Label::always("diagGroupID:"));
@@ -6196,6 +6201,7 @@ namespace {
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
       printFlag(paramFlags.isConstValue(), "constValue");
+      printFlag(paramFlags.isSending(), "sending");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 
@@ -6687,6 +6693,17 @@ namespace {
       if (auto sendableTy = T->getSendableDependentType())
         printRec(sendableTy, Label::always("sendable_dep"));
 
+      if (T->hasLifetimeDependencies()) {
+        for (auto &dep : T->getLifetimeDependencies()) {
+          std::string str;
+          llvm::raw_string_ostream os(str);
+          StreamPrinter sp(os);
+          sp.printLifetimeDependence(dep, T->getParams(),
+                                     PrintOptions::forDebugging());
+          printFieldQuoted(str, Label::always("lifetime"));
+        }
+      }
+
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));
       printAnyFunctionParamsRec(T->getParams(), Label::always("input"));
@@ -6872,6 +6889,13 @@ namespace {
       printFlag(T->isNegative(), "is_negative");
       printFieldQuoted(T->getValue(), Label::always("value"), LiteralValueColor);
       printFieldQuoted(T->getDigitsText(), Label::always("text"), IdentifierColor);
+      printFoot();
+    }
+
+    void visitHiddenType(HiddenType *T, Label label) {
+      printCommon("hidden_type", label);
+      printFieldQuoted(T->getMangledName(), Label::always("mangled_name"),
+                       IdentifierColor);
       printFoot();
     }
 

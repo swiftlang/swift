@@ -1024,9 +1024,9 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto *vjp = fb.createFunction(
       witness->getLinkage(),
       context.getASTContext().getIdentifier(vjpName).str(), vjpType,
-      vjpGenericEnv, original->getLocation(), original->isBare(),
-      IsNotTransparent, isSerialized, original->isDynamicallyReplaceable(),
-      original->isDistributed(),
+      original->getActorIsolation(), vjpGenericEnv, original->getLocation(),
+      original->isBare(), IsNotTransparent, isSerialized,
+      original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   vjp->setDebugScope(new (module) SILDebugScope(original->getLocation(), vjp));
 
@@ -1072,9 +1072,9 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto *jvp = fb.createFunction(
       witness->getLinkage(),
       context.getASTContext().getIdentifier(jvpName).str(), jvpType,
-      jvpGenericEnv, original->getLocation(), original->isBare(),
-      IsNotTransparent, isSerialized, original->isDynamicallyReplaceable(),
-      original->isDistributed(),
+      original->getActorIsolation(), jvpGenericEnv, original->getLocation(),
+      original->isBare(), IsNotTransparent, isSerialized,
+      original->isDynamicallyReplaceable(), original->isDistributed(),
       original->isRuntimeAccessible());
   jvp->setDebugScope(new (module) SILDebugScope(original->getLocation(), jvp));
 
@@ -1112,8 +1112,9 @@ static void emitFatalError(ADContext &context, SILFunction *f,
   auto fnBuilder = SILOptFunctionBuilder(context.getTransform());
   auto *fatalErrorFn = fnBuilder.getOrCreateFunction(
       loc, fatalErrorFuncName, SILLinkage::PublicExternal, fatalErrorFnType,
-      IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsNotThunk);
+      ActorIsolation::forUnspecified(), IsNotBare, IsNotTransparent,
+      IsNotSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
+      ProfileCounter(), IsNotThunk);
   auto *fatalErrorFnRef = builder.createFunctionRef(loc, fatalErrorFn);
   builder.createApply(loc, fatalErrorFnRef, SubstitutionMap(), {});
   builder.createUnreachable(loc);
@@ -1148,7 +1149,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
   // HiddenExternal if we only have declaration without definition), we want
   // derivatives to be serialized and do not patch `serializeFunctions`.
   if (orig->getLinkage() == SILLinkage::HiddenExternal &&
-      !orig->markedAsAlwaysEmitIntoClient())
+      !orig->isAlwaysEmitIntoClient())
     serializeFunctions = IsNotSerialized;
 
   // If the JVP doesn't exist, need to synthesize it.
@@ -1286,10 +1287,10 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   SILOptFunctionBuilder fb(dt.getTransform());
   auto *newThunk = fb.getOrCreateFunction(
       loc, newThunkName, getSpecializedLinkage(thunk, thunk->getLinkage()),
-      thunkType, thunk->isBare(), thunk->isTransparent(),
-      thunk->getSerializedKind(), thunk->isDynamicallyReplaceable(),
-      thunk->isDistributed(), thunk->isRuntimeAccessible(), ProfileCounter(),
-      thunk->isThunk());
+      thunkType, ActorIsolation::forUnspecified(), thunk->isBare(),
+      thunk->isTransparent(), thunk->getSerializedKind(),
+      thunk->isDynamicallyReplaceable(), thunk->isDistributed(),
+      thunk->isRuntimeAccessible(), ProfileCounter(), thunk->isThunk());
   // If new thunk is newly created: clone the old thunk body, wrap the
   // returned function value with an `differentiable_function`
   // instruction, and process the `differentiable_function` instruction.

@@ -180,7 +180,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
   @objc internal func getObjects(
     _ aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
   ) {
-    return unsafe contents.withContiguousStorageIfAvailable { objects in
+    return contents.withContiguousStorageIfAvailable { objects in
       //TODO: exceptions instead of preconditions, once that's possible
 
       _precondition(
@@ -214,7 +214,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
       return 0
     }
 
-    return unsafe contents.withContiguousStorageIfAvailable {
+    return contents.withContiguousStorageIfAvailable {
       objects in
       unsafe enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       unsafe enumerationState.itemsPtr =

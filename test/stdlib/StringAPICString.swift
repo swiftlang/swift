@@ -7,12 +7,6 @@
 
 import StdlibUnittest
 
-#if os(WASI)
-let enableCrashTests = false
-#else
-let enableCrashTests = true
-#endif
-
 var CStringTests = TestSuite("CStringTests")
 
 func getNullUTF8() -> UnsafeMutablePointer<UInt8>? {
@@ -245,8 +239,12 @@ CStringTests.test("String.cString.with.Array.UInt8.input") {
       }
     }
   }
-  guard enableCrashTests else { return }
-  // no need to test every case; that is covered in other tests
+}
+
+CStringTests.test("String.cString.with.Array.UInt8.input/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(cString:) must be null-terminated"
@@ -270,8 +268,12 @@ CStringTests.test("String.cString.with.Array.CChar.input") {
       }
     }
   }
-  guard enableCrashTests else { return }
-  // no need to test every case; that is covered in other tests
+}
+
+CStringTests.test("String.cString.with.Array.CChar.input/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(cString:) must be null-terminated"
@@ -299,13 +301,18 @@ CStringTests.test("String.cString.with.inout.UInt8.conversion") {
   var c = UInt8.zero
   var str = String(cString: &c)
   expectTrue(str.isEmpty)
-  c = 100
-  guard enableCrashTests else { return }
+}
+
+CStringTests.test("String.cString.with.inout.UInt8.conversion/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+  var c: UInt8 = 100
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(cString:) must be null-terminated"
   )
-  str = String(cString: &c)
+  let str = String(cString: &c)
   expectUnreachable()
 }
 
@@ -314,13 +321,18 @@ CStringTests.test("String.cString.with.inout.CChar.conversion") {
   var c = CChar.zero
   var str = String(cString: &c)
   expectTrue(str.isEmpty)
-  c = 100
-  guard enableCrashTests else { return }
+}
+
+CStringTests.test("String.cString.with.inout.CChar.conversion/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+  var c: CChar = 100
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(cString:) must be null-terminated"
   )
-  str = String(cString: &c)
+  let str = String(cString: &c)
   expectUnreachable()
 }
 
@@ -340,8 +352,12 @@ CStringTests.test("String.validatingCString.with.Array.input") {
       }
     }
   }
-  guard enableCrashTests else { return }
-  // no need to test every case; that is covered in other tests
+}
+
+CStringTests.test("String.validatingCString.with.Array.input/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(validatingCString:) must be null-terminated"
@@ -372,13 +388,18 @@ CStringTests.test("String.validatingCString.with.inout.conversion") {
   var str = String(validatingCString: &c)
   expectNotNil(str)
   expectEqual(str?.isEmpty, true)
-  c = 100
-  guard enableCrashTests else { return }
+}
+
+CStringTests.test("String.validatingCString.with.inout.conversion/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+  var c: CChar = 100
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(validatingCString:) must be null-terminated"
   )
-  str = String(validatingCString: &c)
+  let str = String(validatingCString: &c)
   expectUnreachable()
 }
 
@@ -399,8 +420,12 @@ CStringTests.test("String.decodeCString.with.Array.input") {
       }
     }
   }
-  guard enableCrashTests else { return }
-  // no need to test every case; that is covered in other tests
+}
+
+CStringTests.test("String.decodeCString.with.Array.input/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
@@ -438,13 +463,18 @@ CStringTests.test("String.decodeCString.with.inout.conversion") {
   expectNotNil(result)
   expectEqual(result?.result.isEmpty, true)
   expectEqual(result?.repairsMade, false)
-  c = 100
-  guard enableCrashTests else { return }
+}
+
+CStringTests.test("String.decodeCString.with.inout.conversion/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+  var c: Unicode.UTF8.CodeUnit = 100
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
   )
-  result = String.decodeCString(&c, as: Unicode.UTF8.self)
+  let result = String.decodeCString(&c, as: Unicode.UTF8.self)
   expectUnreachable()
 }
 
@@ -463,8 +493,12 @@ CStringTests.test("String.init.decodingCString.with.Array.input") {
       }
     }
   }
-  guard enableCrashTests else { return }
-  // no need to test every case; that is covered in other tests
+}
+
+CStringTests.test("String.init.decodingCString.with.Array.input/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of decodeCString(_:as:repairingInvalidCodeUnits:) must be null-terminated"
@@ -492,13 +526,18 @@ CStringTests.test("String.init.decodingCString.with.inout.conversion") {
   var c = Unicode.UTF8.CodeUnit.zero
   var str = String(decodingCString: &c, as: Unicode.UTF8.self)
   expectEqual(str.isEmpty, true)
-  c = 100
-  guard enableCrashTests else { return }
+}
+
+CStringTests.test("String.init.decodingCString.with.inout.conversion/trap")
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 5.7, *) else { return }
+  var c: Unicode.UTF8.CodeUnit = 100
   expectCrashLater(
     // Workaround for https://github.com/apple/swift/issues/58362 (rdar://91365967)
     // withMessage: "input of String.init(decodingCString:as:) must be null-terminated"
   )
-  str = String(decodingCString: &c, as: Unicode.UTF8.self)
+  let str = String(decodingCString: &c, as: Unicode.UTF8.self)
   expectUnreachable()
 }
 

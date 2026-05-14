@@ -53,6 +53,7 @@ namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
   class ASTWalker;
+  enum class CodeGenerationModel: uint8_t;
   class CustomAvailabilityDomain;
   class Decl;
   class DeclAttribute;
@@ -715,6 +716,15 @@ public:
   /// Distribution level of the module.
   LibraryLevel getLibraryLevel() const;
 
+  /// The stored library level from deserialized module data.
+  /// Returns LibraryLevel::Other if no level was stored.
+  LibraryLevel getStoredLibraryLevel() const {
+    return LibraryLevel(Bits.ModuleDecl.StoredLibraryLevel);
+  }
+  void setStoredLibraryLevel(LibraryLevel level) {
+    Bits.ModuleDecl.StoredLibraryLevel = unsigned(level);
+  }
+
   /// Returns true if this module was or is being compiled for testing.
   bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }
   void setHasIncrementalInfo(bool enabled = true) {
@@ -842,13 +852,13 @@ public:
     Bits.ModuleDecl.StrictMemorySafety = value;
   }
 
-  /// Whether this module uses deferred code generation.
-  bool deferredCodeGen() const {
-    return Bits.ModuleDecl.DeferredCodeGen;
+  /// The code generation model used by this module.
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.ModuleDecl.CodeGenModel);
   }
 
-  void setDeferredCodeGen(bool value = true) {
-    Bits.ModuleDecl.DeferredCodeGen = value;
+  void setCodeGenerationModel(CodeGenerationModel value) {
+    Bits.ModuleDecl.CodeGenModel = static_cast<unsigned>(value);
   }
 
   bool isObjCNameLookupCachePopulated() const {

@@ -270,6 +270,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:
@@ -1312,7 +1313,8 @@ bool TypeBase::isCGFloat() {
 
 bool TypeBase::isStdlibInteger() {
   return isInt() || isInt8() || isInt16() || isInt32() || isInt64() ||
-         isUInt() || isUInt8() || isUInt16() || isUInt32() || isUInt64();
+         isInt128() || isUInt() || isUInt8() || isUInt16() || isUInt32() ||
+         isUInt64() || isUInt128();
 }
 
 bool TypeBase::isStdlibFloat() {
@@ -4747,6 +4749,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:

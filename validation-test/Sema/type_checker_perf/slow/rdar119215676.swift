@@ -1,9 +1,10 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=100000
+// RUN: not %target-swift-frontend -typecheck %s -solver-scope-threshold=100000 -diagnostic-style llvm 2>&1 | %FileCheck %s
 // REQUIRES: OS=macosx
 
 import Foundation
 import RegexBuilder
 
+// CHECK: rdar119215676.swift:{{.*}}: error: the compiler is unable to type-check this expression in reasonable time
 internal enum DODRelativeDateRegexes {
     static let year = Reference<Int?>()
     static let month = Reference<Int?>()
@@ -30,7 +31,7 @@ internal enum DODRelativeDateRegexes {
         Capture(as: month) {
             Regex {
                 Capture {
-                    ChoiceOf {  // expected-error {{reasonable time}}
+                    ChoiceOf {
                         Regex {
                             "1"
                             ("0"..."2")

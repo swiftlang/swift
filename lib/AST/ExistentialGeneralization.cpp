@@ -58,7 +58,7 @@ public:
     auto sig = buildGenericSignature(ctx, GenericSignature(),
                                      addedParameters,
                                      addedRequirements,
-                                     /*allowInverses=*/false);
+                                     DefaultRequirementOptions());
 
     // TODO: minimize the signature by removing redundant generic
     // parameters.
@@ -163,6 +163,7 @@ private:
   NO_PRESERVABLE_STRUCTURE(PackExpansion)
   NO_PRESERVABLE_STRUCTURE(PackElement)
   NO_PRESERVABLE_STRUCTURE(Integer)
+  NO_PRESERVABLE_STRUCTURE(Hidden)
 #undef NO_PRESERVABLE_STRUCTURE
 
   // These types simply shouldn't appear in types that we generalize at all.

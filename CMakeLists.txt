@@ -1674,6 +1674,26 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
     COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Resync.cmake"
     COMMENT "Copying sources into new runtime build")
 
+  # Determine which Swift compiler to use for runtime builds.
+  if(CMAKE_CROSSCOMPILING OR SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER)
+    set(_stdlib_swift_compiler "${CMAKE_Swift_COMPILER}")
+    set(_stdlib_needs_swift_frontend FALSE)
+    if(SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER AND NOT CMAKE_CROSSCOMPILING)
+      message(STATUS "Building runtime with host Swift compiler: ${CMAKE_Swift_COMPILER}")
+    endif()
+  else()
+    set(_stdlib_swift_compiler "$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>")
+    set(_stdlib_needs_swift_frontend TRUE)
+  endif()
+
+  # Collect caching flags for runtime builds when using host compiler.
+  set(_stdlib_caching_swift_flags "")
+  if(SWIFT_CACHING_BUILD AND NOT _stdlib_needs_swift_frontend)
+    set(_stdlib_caching_swift_flags_list "")
+    swift_append_caching_compile_flags(_stdlib_caching_swift_flags_list)
+    list(JOIN _stdlib_caching_swift_flags_list " " _stdlib_caching_swift_flags)
+  endif()
+
   foreach(sdk ${SWIFT_SDKS})
     foreach(arch ${SWIFT_SDK_${sdk}_ARCHITECTURES})
       # Provide a mechanism to skip building one of these runtimes
@@ -1716,7 +1736,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           ${stdlib_deployment_version_flag}
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
           -DCMAKE_INSTALL_PREFIX:FILEPATH=<INSTALL_DIR>
-          -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
+          -DCMAKE_Swift_COMPILER:FILEPATH=${_stdlib_swift_compiler}
+          -DCMAKE_Swift_FLAGS:STRING=${_stdlib_caching_swift_flags}
           -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
           -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
           -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}
@@ -1727,7 +1748,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
           -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
-      if(NOT ${CMAKE_CROSSCOMPILING})
+      if(_stdlib_needs_swift_frontend)
         add_dependencies("${stdlib_target}-core" swift-frontend)
       endif()
 
@@ -1745,7 +1766,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
           -DCMAKE_INSTALL_PREFIX:FILEPATH=${INSTALL_DIR}
-          -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
+          -DCMAKE_Swift_COMPILER:FILEPATH=${_stdlib_swift_compiler}
+          -DCMAKE_Swift_FLAGS:STRING=${_stdlib_caching_swift_flags}
           -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
           -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
           -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}
@@ -1771,7 +1793,8 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
           -DCMAKE_INSTALL_PREFIX:FILEPATH=${INSTALL_DIR}
-          -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
+          -DCMAKE_Swift_COMPILER:FILEPATH=${_stdlib_swift_compiler}
+          -DCMAKE_Swift_FLAGS:STRING=${_stdlib_caching_swift_flags}
           -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
           -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
           -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}

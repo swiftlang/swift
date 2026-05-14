@@ -394,12 +394,6 @@ GROUPED_ERROR(embedded_cannot_specialize_witness_method,EmbeddedRestrictions,non
       "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
 GROUPED_ERROR(cannot_specialize_class,EmbeddedRestrictions,none,
       "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
-GROUPED_ERROR(embedded_swift_existential_type,EmbeddedRestrictions,none,
-      "cannot use a value of protocol type %0 in embedded Swift", (Type))
-GROUPED_ERROR(embedded_swift_existential_protocol,EmbeddedRestrictions,none,
-      "cannot use a value of protocol type 'any %0' in embedded Swift", (StringRef))
-GROUPED_ERROR(embedded_swift_existential,EmbeddedRestrictions,none,
-      "cannot use a value of protocol type in embedded Swift", ())
 GROUPED_ERROR(embedded_swift_value_deinit,EmbeddedRestrictions,none,
       "cannot de-virtualize deinit of type %0", (Type))
 GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,
@@ -1010,7 +1004,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 //===
 // Misc
 
-ERROR(regionbasedisolation_unknown_pattern, none,
+GROUPED_ERROR(regionbasedisolation_unknown_pattern, RegionIsolationUnknownPattern, none,
       "pattern that the region-based isolation checker does not understand how to check. Please file a bug",
       ())
 NOTE(regionbasedisolation_maybe_race, none,
@@ -1104,6 +1098,18 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_boxed_value_task_isolated, none,
      "closure captures reference to mutable %kind0 which remains modifiable by code in the current task",
      (const ValueDecl *))
+GROUPED_ERROR(regionbasedisolation_sent_closure_captures_mutable_var, SendingRisksDataRace, none,
+     "closure passed as an argument to a 'sending' parameter captures reference to mutable %kind0 which is accessed later by code in the current task",
+     (const ValueDecl *))
+GROUPED_ERROR(regionbasedisolation_sent_closure_captures_value, SendingRisksDataRace, none,
+     "closure passed as an argument to a 'sending' parameter captures %0 which is accessed later by code in the current task",
+     (DeclName))
+GROUPED_ERROR(regionbasedisolation_sent_autoclosure_captures_mutable_var, SendingRisksDataRace, none,
+     "mutable %kind0 cannot be captured by 'sending' @autoclosure parameter because %0 is accessed later in the current task",
+     (const ValueDecl *))
+GROUPED_ERROR(regionbasedisolation_sent_autoclosure_captures_value, SendingRisksDataRace, none,
+     "%0 cannot be captured by 'sending' @autoclosure parameter because %0 is accessed later in the current task",
+     (DeclName))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region, none,
      "closure captures %1 which is accessible to %0 code",
      (StringRef, DeclName))
@@ -1228,36 +1234,36 @@ NOTE(regionbasedisolation_inout_sending_in_same_region_note, none,
 // Merge Region Failure Error
 //
 
-ERROR(regionbasedisolation_merge_region_failure_error_unknown, none,
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_unknown, RegionIsolationCrossIsolationDataRace, none,
       "allowing references between %select{%0|%1 %0}4 and %3 %2 risks causing data races",
       (Identifier, StringRef, Identifier, StringRef, bool))
 NOTE(regionbasedisolation_merge_region_failure_error_unknown_note, none,
      "%0 could become accessible to %3 code despite remaining accessible to %select{code in the current task|%1 code}4",
      (Identifier, StringRef, Identifier, StringRef, bool))
-ERROR(regionbasedisolation_merge_region_failure_error_assign, none,
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_assign, RegionIsolationCrossIsolationDataRace, none,
       "assigning %select{%0|%1 %0}4 to %3 %2 risks causing data races",
       (Identifier, StringRef, Identifier, StringRef, bool))
 NOTE(regionbasedisolation_merge_region_failure_error_assign_note, none,
       "%0 could become accessible to %2 code despite remaining accessible to %select{code in the current task|%1 code}3",
       (Identifier, StringRef, StringRef, bool))
-ERROR(regionbasedisolation_merge_region_failure_error_functionisolation, none,
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation, RegionIsolationCrossIsolationDataRace, none,
       "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
       (Identifier, StringRef, const ValueDecl *, StringRef, bool))
-ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_type, none,
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_type, RegionIsolationCrossIsolationDataRace, none,
       "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
       (Type, StringRef, const ValueDecl *, StringRef, bool))
-ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_sil, none,
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_sil, RegionIsolationCrossIsolationDataRace, none,
       "passing %1 %0 to %3 %2 risks causing data races",
       (Identifier, StringRef, Identifier, StringRef))
 
 // We always put the potential task-isolated value first to simplify the note.
-ERROR(regionbasedisolation_merge_region_failure_error_nonisolatedfunction, none,
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_nonisolatedfunction, RegionIsolationCrossIsolationDataRace, none,
       "passing %select{%0|%1 %0}5 and %3 %2 as arguments to %kind4 risks causing data races",
       (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
 NOTE(regionbasedisolation_merge_region_failure_error_nonisolatedfunction_note, none,
      "%2 could begin referencing %0 allowing concurrent access to %0 by %3 code and %select{code in the current task|%1 code}5", (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
 
-ERROR(regionbasedisolation_merge_region_failure_error_cast, none,
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_cast, RegionIsolationCrossIsolationDataRace, none,
       "casting %select{%0|%1 %0}4 to %3 %2 risks causing data races",
       (Identifier, StringRef, Type, StringRef, bool))
 

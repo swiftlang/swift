@@ -11,6 +11,9 @@ func arc4random_buf(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 @_extern(c, "putchar")
 func putchar(_: CInt) -> CInt
 
+@_extern(c, "exit")
+func exit(_: CInt)
+
 // Implementations of the Embedded Swift Platform layer on top of the POSIX dependencies.
 @implementation @c
 public func _swift_alignedAllocate(_ pointer: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ alignment: Int, _ size: Int) -> CInt {
@@ -35,6 +38,11 @@ public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbyt
 @implementation @c
 public func _swift_writeCharToStandardOutput(_ c: CInt) -> CInt {
   putchar(c)
+}
+
+@implementation @c
+public func _swift_exit(_ code: CInt) {
+  exit(code)
 }
 
 @implementation @c

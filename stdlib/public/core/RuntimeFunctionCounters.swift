@@ -292,7 +292,7 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
           "0..<\(_RuntimeFunctionCounters.numRuntimeFunctionCounters)")
       }
       var tmpCounters = counters
-      let counter: UInt32 = unsafe withUnsafePointer(to: &tmpCounters) { ptr in
+      let counter: UInt32 = withUnsafePointer(to: &tmpCounters) { ptr in
         return unsafe ptr.withMemoryRebound(to: UInt32.self, capacity: 64) { buf in
           return unsafe buf[index]
         }
@@ -306,7 +306,7 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
         fatalError("Counter index should be in the range " +
           "0..<\(_RuntimeFunctionCounters.numRuntimeFunctionCounters)")
       }
-      unsafe withUnsafeMutablePointer(to: &counters) {
+      withUnsafeMutablePointer(to: &counters) {
         unsafe $0.withMemoryRebound(to: UInt32.self, capacity: 64) {
           unsafe $0[index] = newValue
         }

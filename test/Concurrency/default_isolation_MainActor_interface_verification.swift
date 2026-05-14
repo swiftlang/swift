@@ -1,0 +1,197 @@
+// RUN: %empty-directory(%t/src)
+// RUN: split-file %s %t/src
+
+/// Build the library A
+// RUN: %target-swift-frontend -emit-module %t/src/A.swift \
+// RUN:   -module-name A -swift-version 5 \
+// RUN:   -default-isolation MainActor \
+// RUN:   -enable-library-evolution \
+// RUN:     -emit-module-path %t/A.swiftmodule \
+// RUN:     -emit-module-interface-path %t/A.swiftinterface
+
+// RUN: %FileCheck %t/src/A.swift < %t/A.swiftinterface
+
+// Build the client using module
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t -primary-file %t/src/Client.swift
+
+// RUN: rm %t/A.swiftmodule
+
+// Re-build the client using interface
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t -primary-file %t/src/Client.swift
+
+// REQUIRES: concurrency
+
+//--- A.swift
+
+// CHECK-NOT: @_Concurrency::MainActor @preconcurrency public var x: Swift::Int
+// CHECK: {{^}}public var x: Swift::Int
+public var x: Int = 42
+
+// CHECK: @_Concurrency::MainActor @preconcurrency public protocol P
+public protocol P {
+}
+
+// CHECK: nonisolated public protocol Q : Swift::Sendable
+nonisolated public protocol Q: Sendable {
+}
+
+// CHECK: @_Concurrency::MainActor @preconcurrency public protocol IsolatedProto<T> {
+// CHECK: {{^}}  associatedtype T
+// CHECK: }
+public protocol IsolatedProto<T> {
+  associatedtype T
+}
+
+// CHECK: @_Concurrency::MainActor @preconcurrency public struct S : A::P {
+public struct S: P {
+  // CHECK: @_Concurrency::MainActor @preconcurrency public enum E : Swift::String {
+  // CHECK: {{^}}  case a
+  // CHECK: {{^}}  case b
+  // CHECK:   nonisolated public init?(rawValue: Swift::String)
+  // CHECK: {{^}}  public typealias RawValue = Swift::String
+  // CHECK:   nonisolated public var rawValue: Swift::String {
+  // CHECK:     get
+  // CHECK:   }
+  // CHECK: }
+  public enum E: String {
+    case a
+    case b
+  }
+
+  // CHECK:   @_Concurrency::MainActor @preconcurrency public func f()
+  public func f() {}
+
+  // CHECK: @_Concurrency::MainActor @preconcurrency public struct Inner {
+  public struct Inner {
+    // CHECK: @_Concurrency::MainActor @preconcurrency public init()
+    public init() {}
+  }
+  // CHECK: }
+
+  // CHECK: @_Concurrency::MainActor @preconcurrency public subscript(x: Swift::Int) -> Swift::Int {
+  public subscript(x: Int) -> Int {
+    // CHECK: get
+    // CHECK-NOT: @_Concurrency::MainActor get
+    get { x }
+    // CHECK: set
+    // CHECK-NOT: @_Concurrency::MainActor set
+    set { }
+  }
+  // CHECK: }
+}
+// CHECK: }
+
+// CHECK: @_Concurrency::MainActor @preconcurrency public func opaqueTest() -> some A::P
+public func opaqueTest() -> some P {
+  S()
+}
+
+// CHECK: public struct R : A::Q {
+public struct R: Q {
+  // CHECK: {{^}}  public struct Inner {
+  public struct Inner {
+    // CHECK: {{^}}    public init()
+    public init() {}
+  }
+  // CHECK: }
+
+  // CHECK: @_Concurrency::MainActor @preconcurrency public struct InnerIsolated : A::P {
+  // CHECK: }
+  public struct InnerIsolated: P {}
+}
+// CHECK: }
+
+// CHECK: @_Concurrency::MainActor @preconcurrency public func testGlobal()
+public func testGlobal() {}
+
+// CHECK: @_Concurrency::MainActor @preconcurrency public class C {
+public class C {
+  // CHECK: @_Concurrency::MainActor @preconcurrency public init()
+  public init() {}
+
+  // CHECK: @_Concurrency::MainActor @preconcurrency public static var value: Swift::Int
+  public static var value = 42
+
+  // CHECK: {{(@objc )?}} @_Concurrency::MainActor deinit
+}
+// CHECK: }
+
+// CHECK: {{^}}extension A::C {
+public extension C {
+  // CHECK: {{^}}  public enum E : Swift::Error {
+  enum E: Error {
+    // CHECK: {{^}}    case terminated
+    case terminated
+
+    // CHECK: {{^}}    public func test()
+    public func test() {}
+  }
+
+  // CHECK: @_Concurrency::MainActor @preconcurrency public func shouldBeMainIsolated()
+  func shouldBeMainIsolated() {}
+}
+// CHECK: }
+
+// CHECK: {{^}}extension A::C.A::E : Swift::Equatable {
+extension C.E : Equatable {
+  // CHECK: {{^}}  public static func == (lhs: A::C.A::E, rhs: A::C.A::E) -> Swift::Bool 
+  public static func == (lhs: Self, rhs: Self) -> Bool { false }
+}
+// CHECK: }
+
+// CHECK: @_Concurrency::MainActor @preconcurrency open class IsolatedDeinitTest {
+open class IsolatedDeinitTest {
+  // CHECK:   {{(@objc )?}} isolated deinit
+  isolated deinit {}
+}
+// CHECK: }
+
+// CHECK: @_Concurrency::MainActor @preconcurrency public struct TestAccessors {
+public struct TestAccessors {
+  // CHECK: @_Concurrency::MainActor @preconcurrency public var test: Swift::Int {
+  // CHECK: {{^}}  get
+  // CHECK: {{^}}  set
+  // CHECK: }
+  public var test: Int {
+    get { 42 }
+    set { }
+  }
+}
+// CHECK: }
+
+// The enum is nonisolated and so are it's members because it conforms to `Error` that inferits from `Sendable`.
+// CHECK: {{^}}public enum E : Swift::Error {
+public enum E: Error {
+  // CHECK: {{^}}  case aborted
+  case aborted
+
+  // CHECK: {{^}}  public static func == (lhs: A::E, rhs: A::E) -> Swift::Bool
+  public static func ==(lhs: E, rhs: E) -> Bool { false }
+}
+// CHECK: }
+
+// CHECK: extension Swift::Int {
+public extension Int {
+  // CHECK: @_Concurrency::MainActor @preconcurrency public func test()
+  func test() {}
+}
+// CHECK: }
+
+//--- Client.swift
+import A
+
+final class IsolatedDeinitChild: IsolatedDeinitTest {} // Ok
+
+nonisolated func testIsolation() {
+  testGlobal() // expected-warning {{call to main actor-isolated global function 'testGlobal()' in a synchronous nonisolated context}}
+
+  func test(s: S) {
+    s.f() // expected-warning {{call to main actor-isolated instance method 'f()' in a synchronous nonisolated context}}
+  }
+
+  _ = S.Inner() // expected-warning {{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
+  _ = R.Inner() // Ok
+  
+  _ = C() // expected-warning {{call to main actor-isolated initializer 'init()' in a synchronous nonisolated context}}
+  _ = C.value // expected-warning {{main actor-isolated class property 'value' can not be referenced from a nonisolated context}}
+}

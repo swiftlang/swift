@@ -23,6 +23,7 @@
 namespace llvm {
 class StringSaver;
 namespace cas {
+class ActionCache;
 class ObjectStore;
 } // namespace cas
 namespace vfs {
@@ -81,6 +82,7 @@ namespace incremental {
 void validateInterModuleDependenciesCache(
     const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
+    std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks = false);
 
@@ -91,6 +93,7 @@ void validateInterModuleDependenciesCache(
 void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
                          const ModuleDependenciesCache &cache,
                          std::shared_ptr<llvm::cas::ObjectStore> cas,
+                         std::shared_ptr<llvm::cas::ActionCache> actionCache,
                          const llvm::sys::TimePoint<> &cacheTimeStamp,
                          llvm::vfs::FileSystem &fs, DiagnosticEngine &diags,
                          bool emitRemarks, ModuleDependencyIDSet &visited,
@@ -101,6 +104,7 @@ void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
 bool verifyModuleDependencyUpToDate(
     const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
     std::shared_ptr<llvm::cas::ObjectStore> cas,
+    std::shared_ptr<llvm::cas::ActionCache> actionCache,
     const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
     DiagnosticEngine &diags, bool emitRemarks);
 } // end namespace incremental

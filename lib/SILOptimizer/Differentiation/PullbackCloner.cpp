@@ -2084,8 +2084,8 @@ public:
     assert(inserted && "expected single buffer");
 
     EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
-    UncheckedTakeEnumDataAddrInst *adjData =
-        builder.createUncheckedTakeEnumDataAddr(loc, adjOptCopy, someElemDecl);
+    UncheckedInPlaceEnumDataAddrInst *adjData =
+        builder.createUncheckedInPlaceEnumDataAddr(loc, adjOptCopy, someElemDecl);
 
     addToAdjointBuffer(bb, origData, adjData, loc);
   }
@@ -2155,10 +2155,10 @@ public:
   ///   Original: y = unchecked_take_enum_data_addr x : $*Enum, #Enum.Case
   ///    Adjoint: adj[x] += $Enum.TangentVector(adj[y])
   void
-  visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *utedai) {
+  visitUncheckedEnumDataAddrInstBase(UncheckedEnumDataAddrInstBase *utedai) {
     auto *bb = utedai->getParent();
     auto adjDest = getAdjointBuffer(bb, utedai);
-    auto enumTy = utedai->getOperand()->getType();
+    auto enumTy = utedai->getEnum()->getType();
     auto *optionalEnumDecl = getASTContext().getOptionalDecl();
     // Only `Optional`-typed operands are supported for now. Diagnose all other
     // enum operand types.
@@ -2171,7 +2171,7 @@ public:
       errorOccurred = true;
       return;
     }
-    accumulateAdjointForOptionalBuffer(bb, utedai->getOperand(), adjDest);
+    accumulateAdjointForOptionalBuffer(bb, utedai->getEnum(), adjDest);
     builder.emitZeroIntoBuffer(utedai->getLoc(), adjDest, IsNotInitialization);
   }
 

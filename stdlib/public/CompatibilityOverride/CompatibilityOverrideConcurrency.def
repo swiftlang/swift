@@ -352,11 +352,13 @@ OVERRIDE_TASK_GROUP(taskGroup_waitAll, void,
                     (resultPointer, callerContext, _group, bodyError,
                         resumeFn, callContext))
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 OVERRIDE_TASK_LOCAL(task_reportIllegalTaskLocalBindingWithinWithTaskGroup, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift), swift::,
                     (const unsigned char *file, uintptr_t fileLength,
                         bool fileIsASCII, uintptr_t line),
                     (file, fileLength, fileIsASCII, line))
+#endif
 
 OVERRIDE_TASK_LOCAL(task_localValuePush, void,
                     SWIFT_EXPORT_FROM(swift_Concurrency), SWIFT_CC(swift),

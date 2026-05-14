@@ -141,6 +141,23 @@ bool swift::canTriviallyDeleteOSSAEndScopeInst(SILInstruction *i) {
          !opValue->getType().isMoveOnly();
 }
 
+/// Return true if \p inst is a forwarding operation that destructures an owned
+/// move-only value. Such instructions must not be deleted because they end
+/// the lifetime of their operand.
+bool swift::canDeleteDeadMoveOnlyOwnedDestructureInst(SILInstruction *inst) {
+  auto forwardingOperation = ForwardingOperation(inst);
+  if (!forwardingOperation || !forwardingOperation.isOwnedValueDestructure()) {
+    return true;
+  }
+  auto *singleForwardingOp = forwardingOperation.getSingleForwardingOperand();
+  ASSERT(singleForwardingOp);
+  if (!singleForwardingOp->get()->getType().isMoveOnly()) {
+    return true;
+  }
+
+  return false;
+}
+
 /// Perform a fast local check to see if the instruction is dead.
 ///
 /// This routine only examines the state of the instruction at hand.
@@ -180,17 +197,15 @@ bool swift::isInstructionTriviallyDead(SILInstruction *inst) {
   if (isa<BorrowedFromInst>(inst))
     return false;
 
-  // A dead `destructure_struct` with an owned argument can appear for a non-copyable or
-  // non-escapable struct which has only trivial elements. The instruction is not trivially
-  // dead because it ends the lifetime of its operand.
-  if (isa<DestructureStructInst>(inst) &&
-      inst->getOperand(0)->getOwnershipKind() == OwnershipKind::Owned) {
+  if (!canDeleteDeadMoveOnlyOwnedDestructureInst(inst)) {
     return false;
   }
 
-  // These invalidate enums so "write" memory, but that is not an essential
+  // These invalidate enums, or use scratch space to avoid invalidating the
+  // original, so "write" memory, but that is not an essential
   // operation so we can remove these if they are trivially dead.
-  if (isa<UncheckedTakeEnumDataAddrInst>(inst))
+  if (isa<UncheckedTakeEnumDataAddrInst>(inst)
+      || isa<UncheckedBorrowEnumDataAddrInst>(inst))
     return true;
 
   // An ossa end scope instruction is trivially dead if its operand has
@@ -594,11 +609,6 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// to avoid any divergence between the check and the implementation in the
 /// future.
 ///
-/// \p usePoints are required when \p value has guaranteed ownership. It must be
-/// the last users of the returned, casted value. A usePoint cannot be a
-/// BranchInst (a phi is never the last guaranteed user). \p builder's current
-/// insertion point must dominate all \p usePoints. \p usePoints must
-/// collectively post-dominate \p builder's current insertion point.
 ///
 /// NOTE: The implementation of this function is very closely related to the
 /// rules checked by SILVerifier::requireABICompatibleFunctionTypes. It must
@@ -606,12 +616,8 @@ SILLinkage swift::getSpecializedLinkage(SILFunction *f, SILLinkage linkage) {
 /// areABICompatibleParamsOrReturns()).
 std::pair<SILValue, bool /* changedCFG */>
 swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
-                                    SILLocation loc,
-                                    SILValue value, SILType srcTy,
-                                    SILType destTy,
-                                    ArrayRef<SILInstruction *> usePoints) {
-  assert(value->getOwnershipKind() != OwnershipKind::Guaranteed ||
-         !usePoints.empty() && "guaranteed value must have use points");
+                                    SILLocation loc, SILValue value,
+                                    SILType srcTy, SILType destTy) {
 
   // No cast is required if types are the same.
   if (srcTy == destTy)
@@ -689,7 +695,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
     // Cast the unwrapped value.
     SILValue castedUnwrappedValue;
     std::tie(castedUnwrappedValue, std::ignore) = castValueToABICompatibleType(
-      builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy, usePoints);
+        builder, pm, loc, unwrappedValue, optionalSrcTy, optionalDestTy);
     // Wrap into optional. An owned value is forwarded through the cast and into
     // the Optional. A borrowed value will have a nested borrow for the
     // rewrapped Optional.
@@ -720,8 +726,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
         builder->createOptionalSome(loc, value, loweredOptionalSrcType);
     // Cast the wrapped value.
     return castValueToABICompatibleType(builder, pm, loc, wrappedValue,
-                                        wrappedValue->getType(), destTy,
-                                        usePoints);
+                                        wrappedValue->getType(), destTy);
   }
 
   // Handle tuple types.
@@ -734,7 +739,7 @@ swift::castValueToABICompatibleType(SILBuilder *builder, SILPassManager *pm,
       bool neededCFGChange;
       std::tie(element, neededCFGChange) = castValueToABICompatibleType(
           builder, pm, loc, element, srcTy.getTupleElementType(idx),
-          destTy.getTupleElementType(idx), usePoints);
+          destTy.getTupleElementType(idx));
       changedCFG |= neededCFGChange;
       expectedTuple.push_back(element);
     };
@@ -1918,12 +1923,19 @@ static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
   auto VarInfo = DefiningInst.getVarInfo();
   if (!VarInfo)
     return;
-  // Fix the op_deref.
-  if (!isa<CopyAddrInst>(SI) && VarInfo->DIExpr.startsWithDeref())
+  // The debug variable being stored to must describe an address, and have an
+  // op_deref. This creates a debug_value for the stored value itself:
+  // strip the leading op_deref.
+  if (VarInfo->DIExpr.startsWithDeref()) {
     VarInfo->DIExpr.eraseElement(VarInfo->DIExpr.element_begin());
-  else if (isa<CopyAddrInst>(SI) && !VarInfo->DIExpr.startsWithDeref())
-    VarInfo->DIExpr.prependElements({
-      SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+  } else if (isa<DebugValueInst>(*DefiningInst)) {
+    // If there is no op_deref, drop the debug_value as unsalvageable: the
+    // address is unknown, only the value remains.
+    // This would only happen if salvaging pointer types was supported, which
+    // is not the case. The verifier should catch invalid debug info,
+    // so this should be unreachable.
+    return;
+  }
   // Note: The instruction should logically be in the SI's scope.
   // However, LLVM does not support variables and stores in different scopes,
   // so we use the variable's scope.
@@ -1970,18 +1982,13 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       STI->getStructDecl()->getStoredProperties();
     for (Operand *U : getDebugUses(STVal)) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
-      auto VarInfo = DbgInst->getVarInfo();
-      if (!VarInfo)
-        continue;
+      auto VarInfo = DbgInst->getCompleteVarInfo();
       for (VarDecl *FD : FieldDecls) {
-        SILDebugVariable NewVarInfo = *VarInfo;
+        SILDebugVariable NewVarInfo = VarInfo;
         auto FieldVal = STI->getFieldValue(FD);
         // Build the corresponding fragment DIExpression
         auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
         NewVarInfo.DIExpr.append(FragDIExpr);
-
-        if (!NewVarInfo.Type)
-          NewVarInfo.Type = STI->getType();
 
         // Create a new debug_value
         SILBuilder(STI, DbgInst->getDebugScope())
@@ -1996,50 +2003,18 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     auto TTVal = TTI->getResult(0);
     for (Operand *U : getDebugUses(TTVal)) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
-      auto VarInfo = DbgInst->getVarInfo();
-      if (!VarInfo)
-        continue;
+      auto VarInfo = DbgInst->getCompleteVarInfo();
       TupleType *TT = TTI->getTupleType();
       for (auto i : indices(TT->getElements())) {
-        SILDebugVariable NewVarInfo = *VarInfo;
+        SILDebugVariable NewVarInfo = VarInfo;
         auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(TT, i);
         NewVarInfo.DIExpr.append(FragDIExpr);
-
-        if (!NewVarInfo.Type)
-          NewVarInfo.Type = TTI->getType();
 
         // Create a new debug_value
         SILBuilder(TTI, DbgInst->getDebugScope())
           .createDebugValue(DbgInst->getLoc(), TTI->getElement(i), NewVarInfo);
       }
     }
-  }
-
-  if (auto *IA = dyn_cast<IndexAddrInst>(I)) {
-    if (IA->getBase() && IA->getIndex())
-      // Only handle cases where offset is constant.
-      if (const auto *LiteralInst =
-            dyn_cast<IntegerLiteralInst>(IA->getIndex())) {
-        SILValue Base = IA->getBase();
-        SILValue ResultAddr = IA->getResult(0);
-        APInt OffsetVal = LiteralInst->getValue();
-        const SILDIExprElement ExprElements[3] = {
-          SILDIExprElement::createOperator(OffsetVal.isNegative() ?
-            SILDIExprOperator::ConstSInt : SILDIExprOperator::ConstUInt),
-          SILDIExprElement::createConstInt(OffsetVal.getLimitedValue()),
-          SILDIExprElement::createOperator(SILDIExprOperator::Plus)
-        };
-        for (Operand *U : getDebugUses(ResultAddr)) {
-          auto *DbgInst = cast<DebugValueInst>(U->getUser());
-          auto VarInfo = DbgInst->getVarInfo();
-          if (!VarInfo)
-            continue;
-          VarInfo->DIExpr.prependElements(ExprElements);
-          // Create a new debug_value
-          SILBuilder(IA, DbgInst->getDebugScope())
-            .createDebugValue(DbgInst->getLoc(), Base, *VarInfo);
-        }
-      }
   }
 
   if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
@@ -2076,35 +2051,6 @@ void swift::salvageLoadDebugInfo(LoadOperation load) {
     SILBuilder(load.getLoadInst(), debugInst->getDebugScope())
       .createDebugValueAddr(debugInst->getLoc(), load.getOperand(),
                             varInfo.value());
-  }
-}
-
-// TODO: this currently fails to notify the pass with notifyNewInstruction.
-void swift::createDebugFragments(SILValue oldValue, Projection proj,
-                                 SILValue newValue) {
-  if (proj.getKind() != ProjectionKind::Struct)
-    return;
-
-  for (auto *use : getDebugUses(oldValue)) {
-    auto debugVal = dyn_cast<DebugValueInst>(use->getUser());
-    if (!debugVal)
-      continue;
-
-    auto varInfo = debugVal->getVarInfo();
-
-    SILType baseType = oldValue->getType();
-
-    // Copy VarInfo and add the corresponding fragment DIExpression.
-    SILDebugVariable newVarInfo = *varInfo;
-    newVarInfo.DIExpr.append(
-        SILDebugInfoExpression::createFragment(proj.getVarDecl(baseType)));
-
-    if (!newVarInfo.Type)
-      newVarInfo.Type = baseType;
-
-    // Create a new debug_value
-    SILBuilder(debugVal, debugVal->getDebugScope())
-        .createDebugValue(debugVal->getLoc(), newValue, newVarInfo);
   }
 }
 
@@ -2168,20 +2114,29 @@ SILValue swift::createEmptyAndUndefValue(SILType ty,
   return SILUndef::get(insertionPoint->getFunction(), ty);
 }
 
+static bool findUnreferenceableStorageInType(SILType ty, SILFunction *func) {
+  if (auto *structDecl = ty.getStructOrBoundGenericStruct()) {
+    return swift::findUnreferenceableStorage(structDecl, ty, func);
+  }
+  if (auto tupleTy = ty.getAs<TupleType>()) {
+    for (unsigned i = 0, e = tupleTy->getNumElements(); i < e; ++i) {
+      if (findUnreferenceableStorageInType(ty.getTupleElementType(i), func))
+        return true;
+    }
+  }
+  return false;
+}
+
 bool swift::findUnreferenceableStorage(StructDecl *decl, SILType structType,
                                        SILFunction *func) {
   if (decl->hasUnreferenceableStorage()) {
     return true;
   }
-  // Check if any fields have unreferenceable stoage
   for (auto *field : decl->getStoredProperties()) {
     TypeExpansionContext tec = *func;
     auto fieldTy = structType.getFieldType(field, func->getModule(), tec);
-    if (auto *fieldStructDecl = fieldTy.getStructOrBoundGenericStruct()) {
-      if (findUnreferenceableStorage(fieldStructDecl, fieldTy, func)) {
-        return true;
-      }
-    }
+    if (findUnreferenceableStorageInType(fieldTy, func))
+      return true;
   }
   return false;
 }

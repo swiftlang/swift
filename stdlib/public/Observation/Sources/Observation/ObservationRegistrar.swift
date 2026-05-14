@@ -214,7 +214,7 @@ public struct ObservationRegistrar: Sendable {
 
     func clearTracking(_ tracking: UnsafeRawPointer) {
       state.withCriticalRegion { state in
-        state.trackingLists.remove(tracking)
+        _ = state.trackingLists.remove(tracking)
       }
     }
     

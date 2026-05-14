@@ -218,7 +218,7 @@ RequirementEnvironment::RequirementEnvironment(
   witnessThunkSig = buildGenericSignature(ctx, GenericSignature(),
                                           std::move(genericParamTypes),
                                           std::move(requirements),
-                                          /*allowInverses=*/false);
+                                          DefaultRequirementOptions());
   reqToWitnessThunkSigMap = reqToWitnessThunkSigMap.subst(
       witnessThunkSig.getGenericEnvironment()
           ->getForwardingSubstitutionMap());

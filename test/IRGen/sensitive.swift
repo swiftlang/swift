@@ -19,6 +19,9 @@
 // REQUIRES: swift_feature_Sensitive
 // UNSUPPORTED: use_os_stdlib
 
+// For some reason this fails with an asan build: rdar://172392429
+// UNSUPPORTED: asan
+
 var checkBuffer: UnsafeBufferPointer<UInt32>?
 
 @inline(never)

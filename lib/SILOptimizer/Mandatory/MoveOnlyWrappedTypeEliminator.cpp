@@ -243,6 +243,8 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(StructElementAddr)
   NO_UPDATE_NEEDED(TupleElementAddr)
   NO_UPDATE_NEEDED(UncheckedTakeEnumDataAddr)
+  NO_UPDATE_NEEDED(UncheckedBorrowEnumDataAddr)
+  NO_UPDATE_NEEDED(UncheckedInPlaceEnumDataAddr)
   NO_UPDATE_NEEDED(MakeBorrow)
   NO_UPDATE_NEEDED(MakeAddrBorrow)
   NO_UPDATE_NEEDED(InitBorrowAddr)

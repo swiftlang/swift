@@ -25,7 +25,7 @@ struct FunctionInfo {
   var rawName: String?
   var name: String
   var address: UInt32
-  var length: UInt32
-  var scope: Scope
-  var moduleIndex: Int
+  var length: UInt32?
+  var scope: Scope?
+  var moduleIndex: Int?
 }

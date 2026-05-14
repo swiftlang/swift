@@ -373,44 +373,44 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOption] 
     HelpText<"Disable requiring uses of @objc to require importing the "
              "Foundation module">;
 
-def enable_experimental_concurrency :
-  Flag<["-"], "enable-experimental-concurrency">,
-  HelpText<"Enable experimental concurrency model">;
+  def enable_experimental_concurrency :
+    Flag<["-"], "enable-experimental-concurrency">,
+    HelpText<"Enable experimental concurrency model">;
 
-def enable_experimental_move_only :
-  Flag<["-"], "enable-experimental-move-only">,
-  HelpText<"Enable experimental move only">;
+  def enable_experimental_move_only :
+    Flag<["-"], "enable-experimental-move-only">,
+    HelpText<"Enable experimental move only">;
 
-def enable_experimental_distributed :
-  Flag<["-"], "enable-experimental-distributed">,
-  HelpText<"Enable experimental 'distributed' actors and functions">;
+  def enable_experimental_distributed :
+    Flag<["-"], "enable-experimental-distributed">,
+    HelpText<"Enable experimental 'distributed' actors and functions">;
 
-def enable_experimental_flow_sensitive_concurrent_captures :
-  Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
-  HelpText<"Enable flow-sensitive concurrent captures">;
+  def enable_experimental_flow_sensitive_concurrent_captures :
+    Flag<["-"], "enable-experimental-flow-sensitive-concurrent-captures">,
+    HelpText<"Enable flow-sensitive concurrent captures">;
 
-def disable_experimental_clang_importer_diagnostics :
-  Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
-  HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
+  def disable_experimental_clang_importer_diagnostics :
+    Flag<["-"], "disable-experimental-clang-importer-diagnostics">,
+    HelpText<"Disable experimental diagnostics when importing C, C++, and Objective-C libraries">;
 
-def enable_experimental_eager_clang_module_diagnostics :
-  Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
-  HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
+  def enable_experimental_eager_clang_module_diagnostics :
+    Flag<["-"], "enable-experimental-eager-clang-module-diagnostics">,
+    HelpText<"Enable experimental eager diagnostics reporting on the importability of all referenced C, C++, and Objective-C libraries">;
 
-def enable_experimental_pairwise_build_block :
-  Flag<["-"], "enable-experimental-pairwise-build-block">,
-  HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
+  def enable_experimental_pairwise_build_block :
+    Flag<["-"], "enable-experimental-pairwise-build-block">,
+    HelpText<"Enable experimental pairwise 'buildBlock' for result builders">;
 
-def enable_resilience : Flag<["-"], "enable-resilience">,
-     HelpText<"Deprecated, use -enable-library-evolution instead">;
+  def enable_resilience : Flag<["-"], "enable-resilience">,
+       HelpText<"Deprecated, use -enable-library-evolution instead">;
 
-def enable_experimental_async_top_level :
-  Flag<["-"], "enable-experimental-async-top-level">,
-  HelpText<"Enable experimental concurrency in top-level code">;
+  def enable_experimental_async_top_level :
+    Flag<["-"], "enable-experimental-async-top-level">,
+    HelpText<"Enable experimental concurrency in top-level code">;
 
-def public_autolink_library :
-  Separate<["-"], "public-autolink-library">,
-  HelpText<"Add public dependent library">;
+  def public_autolink_library :
+    Separate<["-"], "public-autolink-library">,
+    HelpText<"Add public dependent library">;
 }
 
 // HIDDEN FLAGS
@@ -467,6 +467,9 @@ def dump_requirement_machine : Flag<["-"], "dump-requirement-machine">,
 
 def debug_requirement_machine : Joined<["-"], "debug-requirement-machine=">,
   HelpText<"Fine-grained debug output from the generics implementation">;
+
+def eager_macro_checking : Flag<["-"], "eager-macro-checking">,
+  HelpText<"Enable eager type-checking of declarations in macro expansions">;
 
 def dump_macro_expansions : Flag<["-"], "dump-macro-expansions">,
   HelpText<"Dumps the results of each macro expansion">;
@@ -722,6 +725,9 @@ def dump_clang_lookup_tables : Flag<["-"], "dump-clang-lookup-tables">,
   HelpText<"Dump the importer's Swift-name-to-Clang-name lookup tables to "
            "stderr">;
 
+def dump_abstract_layout : Flag<["-"], "dump-abstract-layout">,
+  HelpText<"Dump abstract layout information for Clang-backed types">;
+
 def dump_availability_scopes : Flag<["-"], "dump-availability-scopes">,
                                HelpText<"Dump availability scopes to stderr">;
 
@@ -910,6 +916,18 @@ def warn_long_expression_type_checking : Separate<["-"], "warn-long-expression-t
   HelpText<"Warns when type-checking an expression takes longer than <n> ms">;
 def warn_long_expression_type_checking_EQ : Joined<["-"], "warn-long-expression-type-checking=">,
   Alias<warn_long_expression_type_checking>;
+
+def warn_long_expression_type_checking_scopes : Separate<["-"], "warn-long-expression-type-checking-scopes">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking an expression uses more than <n> solver scopes">;
+def warn_long_expression_type_checking_scopes_EQ : Joined<["-"], "warn-long-expression-type-checking-scopes=">,
+  Alias<warn_long_expression_type_checking_scopes>;
+
+def warn_long_expression_type_checking_trail : Separate<["-"], "warn-long-expression-type-checking-trail">,
+  MetaVarName<"<n>">,
+  HelpText<"Warns when type-checking an expression uses more than <n> solver trail steps">;
+def warn_long_expression_type_checking_trail_EQ : Joined<["-"], "warn-long-expression-type-checking-trail=">,
+  Alias<warn_long_expression_type_checking_trail>;
 
 def Rmodule_interface_rebuild : Flag<["-"], "Rmodule-interface-rebuild">,
   HelpText<"Emits a remark if an imported module needs to be re-compiled from its module interface">;

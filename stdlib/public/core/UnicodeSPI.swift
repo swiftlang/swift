@@ -184,7 +184,7 @@ extension Unicode.Scalar.Properties {
   public var _caseFolded: String {
     var buffer: (UInt32, UInt32, UInt32) = (.max, .max, .max)
 
-    unsafe withUnsafeMutableBytes(of: &buffer) {
+    withUnsafeMutableBytes(of: &buffer) {
       // This is safe because the memory is already UInt32
       let ptr = unsafe $0.baseAddress!.assumingMemoryBound(to: UInt32.self)
       unsafe _swift_stdlib_getCaseMapping(_scalar.value, ptr)
@@ -194,7 +194,7 @@ extension Unicode.Scalar.Properties {
     // Max mapping is 3 scalars and the max UTF8 bytes of a scalar is 4.
     result.reserveCapacity(12)
 
-    unsafe withUnsafeBytes(of: &buffer) {
+    withUnsafeBytes(of: &buffer) {
       for unsafe scalar in unsafe $0.bindMemory(to: UInt32.self) {
         guard scalar != .max else {
           break

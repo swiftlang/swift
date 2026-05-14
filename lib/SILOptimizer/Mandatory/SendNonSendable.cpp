@@ -44,7 +44,13 @@
 #include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/Sema/Concurrency.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Debug.h"
+
+STATISTIC(NumRequireLivenessProcess,
+          "# of calls to RequireLiveness::process");
+STATISTIC(NumRequireLivenessInstScans,
+          "# of instructions scanned inside RequireLiveness block loops");
 
 using namespace swift;
 using namespace swift::siloptimizer;
@@ -526,6 +532,7 @@ void RequireLiveness::processNonDefBlock(SILBasicBlock *block) {
 
 template <typename Collection>
 void RequireLiveness::process(Collection requireInstList) {
+  ++NumRequireLivenessProcess;
   REGIONBASEDISOLATION_LOG(
       llvm::dbgs() << "==> Performing Require Liveness for: " << *sendingInst);
 
@@ -570,6 +577,7 @@ void RequireLiveness::process(Collection requireInstList) {
   while (auto *requireBlock = initializingWorklist.pop()) {
     auto blockState = blockLivenessInfo.get(requireBlock);
     for (auto &inst : *requireBlock) {
+      ++NumRequireLivenessInstScans;
       if (!allRequires.contains(&inst))
         continue;
       REGIONBASEDISOLATION_LOG(llvm::dbgs() << "        Mapping Block bb"
@@ -757,6 +765,19 @@ struct DiagnosticEvaluator final
     return {};
   }
 
+  /// If \p element's representative is an indirect out parameter, return
+  /// that parameter.
+  SILValue getSendingIndirectOutParameter(Element element) const {
+    auto rep = info->getValueMap().getRepresentativeValue(element);
+    if (!rep)
+      return {};
+    if (auto value = dyn_cast_or_null<SILFunctionArgument>(rep.maybeGetValue());
+        value && value->getArgumentConvention().isIndirectOutParameter() &&
+        value->isSending())
+      return value;
+    return {};
+  }
+  
   SILValue getInOutSendingParameter(Element elt) const {
     auto rep = info->getValueMap().getRepresentativeValue(elt);
     if (!rep)
@@ -1009,6 +1030,97 @@ public:
     emitRequireInstDiagnostics();
   }
 
+  /// Emit an error when a closure capturing a mutable variable (box) is sent
+  /// as a 'sending' argument and the variable is used afterwards.
+  void emitSendingClosureCapturesMutableVar(SILLocation errorLoc,
+                                            Type closureType,
+                                            Operand *actualUse,
+                                            SILArgument *fArg,
+                                            bool isAutoclosure) {
+    if (isAutoclosure) {
+      diagnoseError(
+          actualUse->getUser()->getLoc(),
+          diag::regionbasedisolation_sent_autoclosure_captures_mutable_var,
+          fArg->getDecl())
+          .limitBehaviorIf(getBehaviorLimit());
+    } else {
+      diagnoseError(
+          actualUse->getUser()->getLoc(),
+          diag::regionbasedisolation_sent_closure_captures_mutable_var,
+          fArg->getDecl())
+          .limitBehaviorIf(getBehaviorLimit());
+    }
+    emitRequireInstDiagnostics();
+  }
+
+  /// Emit an error when a closure capturing a non-Sendable value is sent as a
+  /// 'sending' argument and the value is used afterwards.
+  void emitSendingClosureCapturesValue(SILLocation errorLoc, Type closureType,
+                                       Operand *actualUse, SILArgument *fArg,
+                                       bool isAutoclosure) {
+    if (isAutoclosure) {
+      diagnoseError(
+          actualUse->getUser()->getLoc(),
+          diag::regionbasedisolation_sent_autoclosure_captures_value,
+          fArg->getDecl()->getName())
+          .limitBehaviorIf(getBehaviorLimit());
+    } else {
+      diagnoseError(actualUse->getUser()->getLoc(),
+                    diag::regionbasedisolation_sent_closure_captures_value,
+                    fArg->getDecl()->getName())
+          .limitBehaviorIf(getBehaviorLimit());
+    }
+    emitRequireInstDiagnostics();
+  }
+
+  /// Emit an error when a closure capturing multiple non-Sendable values is
+  /// sent as a 'sending' argument and the values are used afterwards.
+  void emitSendingClosureCapturesMultipleValues(
+      SILLocation errorLoc, Type closureType,
+      ArrayRef<std::pair<Operand *, SILArgument *>> capturedValues,
+      bool isAutoclosure) {
+    // Emit the rest of the capturedValues.
+    for (auto pair : capturedValues) {
+      auto &use = pair.first;
+      auto *arg = cast<SILFunctionArgument>(pair.second);
+
+      if (auto boxTy = arg->getType().getAs<SILBoxType>();
+          boxTy && boxTy->getNumFields() == 1 && boxTy->isFieldMutable(0) &&
+          SILIsolationInfo::boxTypeContainsOnlySendableFields(
+              boxTy, arg->getFunction())) {
+        if (isAutoclosure) {
+          diagnoseError(
+              use->getUser()->getLoc(),
+              diag::regionbasedisolation_sent_autoclosure_captures_mutable_var,
+              arg->getDecl())
+              .limitBehaviorIf(getBehaviorLimit());
+        } else {
+          diagnoseError(
+              use->getUser()->getLoc(),
+              diag::regionbasedisolation_sent_closure_captures_mutable_var,
+              arg->getDecl())
+              .limitBehaviorIf(getBehaviorLimit());
+        }
+        continue;
+      }
+
+      if (isAutoclosure) {
+        diagnoseError(
+            use->getUser()->getLoc(),
+            diag::regionbasedisolation_sent_autoclosure_captures_value,
+            arg->getDecl()->getName())
+            .limitBehaviorIf(getBehaviorLimit());
+      } else {
+        diagnoseError(use->getUser()->getLoc(),
+                      diag::regionbasedisolation_sent_closure_captures_value,
+                      arg->getDecl()->getName())
+            .limitBehaviorIf(getBehaviorLimit());
+      }
+    }
+
+    emitRequireInstDiagnostics();
+  }
+
   void emitNamedIsolationCrossingDueToCapture(
       SILLocation loc, Identifier name,
       SILIsolationInfo namedValuesIsolationInfo,
@@ -1145,6 +1257,7 @@ public:
 
 private:
   bool initForIsolatedPartialApply(Operand *op, AbstractClosureExpr *ace);
+  bool initForSendingPartialApply(FullApplySite fas, Operand *callsiteOp);
 
   void initForApply(Operand *op, ApplyExpr *expr);
   void initForAutoclosure(Operand *op, AutoClosureExpr *expr);
@@ -1162,8 +1275,8 @@ bool UseAfterSendDiagnosticInferrer::initForIsolatedPartialApply(
   auto *diagnosticOp = diagnosticPair->first;
 
   ApplyIsolationCrossing crossing(
-      *op->getFunction()->getActorIsolation(),
-      *diagnosticOp->getFunction()->getActorIsolation());
+      op->getFunction()->getActorIsolation(),
+      diagnosticOp->getFunction()->getActorIsolation());
 
   auto &state = sendingOpToStateMap.get(sendingOp);
   if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
@@ -1175,6 +1288,53 @@ bool UseAfterSendDiagnosticInferrer::initForIsolatedPartialApply(
 
   diagnosticEmitter.emitTypedIsolationCrossingDueToCapture(
       diagnosticOp->getUser()->getLoc(), baseInferredType, crossing);
+  return true;
+}
+
+bool UseAfterSendDiagnosticInferrer::initForSendingPartialApply(
+    FullApplySite fas, Operand *callsiteOp) {
+  // See if the sending operand is a partial_apply (closure literal or
+  // autoclosure expr).
+  auto *sendingPAI =
+      dyn_cast<PartialApplyInst>(stripFunctionConversions(callsiteOp->get()));
+  if (!sendingPAI || (!sendingPAI->getLoc().getAsASTNode<ClosureExpr>() &&
+                      !sendingPAI->getLoc().getAsASTNode<AutoClosureExpr>()))
+    return false;
+
+  bool isAutoclosure =
+      sendingPAI->getLoc().getAsASTNode<AutoClosureExpr>() != nullptr;
+
+  // Loop over captured parameters looking for non-sendable captured values.
+  SmallVector<Operand *, 8> nonSendableOps;
+  for (auto &sendingPAIOp : sendingPAI->getArgumentOperands()) {
+    auto trackableValue = valueMap.getTrackableValue(sendingPAIOp.get());
+    if (trackableValue.value.isSendable())
+      continue;
+    // Skip nonisolated(unsafe) captures -- the user has opted out of isolation
+    // checking for these values, so they should not be diagnosed as
+    // non-Sendable captures of a sending closure.
+    if (trackableValue.value.getIsolationRegionInfo().isUnsafeNonIsolated())
+      continue;
+    nonSendableOps.push_back(&sendingPAIOp);
+  }
+
+  // If we did not find any non-sendable captured values, bail.
+  if (nonSendableOps.empty())
+    return false;
+
+  // Find the closure use for each of our captures.
+  SmallVector<std::pair<Operand *, SILArgument *>, 4> capturedValues;
+  for (auto *captured : nonSendableOps) {
+    if (auto capturedValue = findClosureUse(captured))
+      capturedValues.push_back(*capturedValue);
+  }
+
+  if (capturedValues.empty())
+    return false;
+
+  // Then emit the closure capture diagnostic.
+  diagnosticEmitter.emitSendingClosureCapturesMultipleValues(
+      baseLoc, baseInferredType, capturedValues, isAutoclosure);
   return true;
 }
 
@@ -1331,6 +1491,12 @@ void UseAfterSendDiagnosticInferrer::infer() {
            "We should never send an indirect out parameter");
     if (fas.getArgumentParameterInfo(*sendingOp)
             .hasOption(SILParameterInfo::Sending)) {
+
+      // Before we try anything else, see if we are passing a closure literal
+      // that captures non-Sendable values. If so, emit a diagnostic that
+      // identifies the specific captured values.
+      if (initForSendingPartialApply(fas, sendingOp))
+        return;
 
       // First try to do the named diagnostic if we can find a name.
       if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
@@ -2043,6 +2209,8 @@ bool SentNeverSendableDiagnosticEmitter::initForSendingPartialApply(
     auto trackableValue = valueMap.getTrackableValue(sendingPAIOp.get());
     if (trackableValue.value.isSendable())
       continue;
+    if (trackableValue.value.getIsolationRegionInfo().isUnsafeNonIsolated())
+      continue;
 
     auto rep = trackableValue.value.getRepresentative().maybeGetValue();
     nonSendableOps.push_back(&sendingPAIOp);
@@ -2078,8 +2246,8 @@ bool SentNeverSendableDiagnosticEmitter::initForIsolatedPartialApply(
   auto *diagnosticOp = diagnosticPair->first;
 
   ApplyIsolationCrossing crossing(
-      *op->getFunction()->getActorIsolation(),
-      *diagnosticOp->getFunction()->getActorIsolation());
+      op->getFunction()->getActorIsolation(),
+      diagnosticOp->getFunction()->getActorIsolation());
 
   // We do not need to worry about failing to infer a name here since we are
   // going to be returning some form of a SILFunctionArgument which is always

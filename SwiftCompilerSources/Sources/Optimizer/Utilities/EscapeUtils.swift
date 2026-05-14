@@ -396,9 +396,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       if handleDestroy(of: operand.value, path: path) == .abortWalk {
         return .abortWalk
       }
-    case is ReturnInstruction:
+    case isReturnInstruction:
       return isEscaping
-    case is ApplyInst, is TryApplyInst, is BeginApplyInst:
+    case isFullApplySite:
       return walkDownCallee(argOp: operand, apply: instruction as! FullApplySite, path: path)
     case let pai as PartialApplyInst:
       // Check whether the partially applied argument can escape in the body.
@@ -543,9 +543,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       if handleDestroy(of: operand.value, path: path) == .abortWalk {
         return .abortWalk
       }
-    case is ReturnInstruction:
+    case isReturnInstruction:
       return isEscaping
-    case is ApplyInst, is TryApplyInst, is BeginApplyInst:
+    case isFullApplySite:
       return walkDownCallee(argOp: operand, apply: instruction as! FullApplySite, path: path)
     case let pai as PartialApplyInst:
       if walkDownCallee(argOp: operand, apply: pai, path: path.with(knownType: nil)) == .abortWalk {
@@ -571,6 +571,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       return walkDownUses(ofValue: atp, path: path.with(knownType: nil))
     case is DeallocStackInst, is InjectEnumAddrInst, is FixLifetimeInst, is EndBorrowInst, is EndAccessInst,
          is IsUniqueInst, is DebugValueInst:
+      return .continueWalk
+    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
       return .continueWalk
     case let uac as UncheckedAddrCastInst:
       if uac.type != uac.fromAddress.type {
@@ -655,7 +657,8 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
         if !indirectResultEscapes(of: beginApply, path: path) {
           return .continueWalk
         }
-      } else if !apply.isAddressable(operand: argOp) {
+      } else if !apply.isAddressable(operand: argOp) &&
+                !hasAddressResult(apply) {
         // The result does not depend on the argument's address.
         return .continueWalk
       }
@@ -697,6 +700,12 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       }
     }
     return .continueWalk
+  }
+
+  private func hasAddressResult(_ apply: ApplySite) -> Bool {
+    guard let fas = apply as? FullApplySite else { return false }
+    let convention = fas.functionConvention
+    return convention.hasAddressResult
   }
 
   private mutating func indirectResultEscapes(of beginApply: BeginApplyInst, path: Path) -> Bool {

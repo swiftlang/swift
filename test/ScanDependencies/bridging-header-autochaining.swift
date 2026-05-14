@@ -47,8 +47,7 @@
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t > %t/header1.h
 // RUN:   %FileCheck %s --check-prefix=HEADER1 --input-file=%t/header1.h
-// HEADER1: #if __has_include
-// HEADER1-NEXT: #import
+// HEADER1: #include
 // HEADER1-SAME: Bridging.h
 
 // RUN: %{python} %S/../../utils/swift-build-modules.py %swift_frontend_plain %t/deps2.json -o %t/User.cmd -b %t/header1.cmd
@@ -61,7 +60,7 @@
 // RUN:   -emit-module -o %t/User.swiftmodule -emit-module-interface-path %t/User.swiftinterface -enable-library-evolution
 
 /// Make sure the emitted content is compatible with original. The embedded header path needs to be original header and no bridging header module leaking into interface.
-// RUN: llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
 // CHECK-NO-HEADER-NOT: <IMPORTED_HEADER
 // RUN: %FileCheck %s --check-prefix NO-OBJC-LEAKING --input-file=%t/User.swiftinterface
 // NO-OBJC-LEAKING-NOT: import __ObjC
@@ -79,11 +78,9 @@
 // RUN:   %t/user.swift -auto-bridging-header-chaining -o %t/User.swiftmodule -import-objc-header %t/Bridging2.h \
 // RUN:   -Xcc -fmodule-map-file=%t/a.modulemap -Xcc -fmodule-map-file=%t/b.modulemap -I %t > %t/header2.h
 // RUN:   %FileCheck %s --check-prefix=HEADER2 --input-file=%t/header2.h
-// HEADER2: __has_include
-// HEADER2-NEXT: #import
+// HEADER2: #include
 // HEADER2-SAME: Bridging.h
-// HEADER2: __has_include
-// HEADER2-NEXT: #import
+// HEADER2: #include
 // HEADER2-SAME: Bridging2.h
 
 // RUN: %FileCheck %s --check-prefix DEPS_JSON --input-file=%t/deps3.json
@@ -156,7 +153,7 @@
 // RUN:   -emit-module -o %t/User3.swiftmodule
 
 /// Verify the encoded here is just the `-import-objc-header` option.
-// RUN: llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
 // CHECK-HEADER: <IMPORTED_HEADER
 // CHECK-HEADER-SAME: Bridging3.h
 

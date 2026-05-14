@@ -316,7 +316,7 @@ extension _Deque._UnsafeHandle {
 }
 
 extension _Deque._UnsafeHandle {
-  internal func withUnsafeSegment<R>(
+  @safe internal func withUnsafeSegment<R>(
     startingAt start: Int,
     maximumCount: Int?,
     _ body: (UnsafeBufferPointer<Element>) throws -> R

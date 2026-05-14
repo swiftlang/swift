@@ -643,6 +643,31 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
 /************************** TASK NAMING ***************************************/
 /******************************************************************************/
 
+#if SWIFT_CONCURRENCY_EMBEDDED
+// Disabling optimizations on this function prevents LLVM from translating it
+// into a strlen() call.
+__attribute__((noinline, optnone))
+static size_t swift_strlen(const char *text) {
+  size_t count = 0;
+  for (auto p = text; *p != 0; ++p) {
+    ++count;
+  }
+  return count;
+}
+
+static void swift_strcpy(char *dst, const char *src) {
+  while (*src != 0) {
+    *dst++ = *src++;
+  }
+  *dst = 0;
+}
+
+#else
+static size_t swift_strlen(const char *text) {
+  return strlen(text);
+}
+#endif
+
 void AsyncTask::pushInitialTaskName(const char* _taskName) {
   assert(_taskName && "Task name must not be null!");
   assert(hasInitialTaskNameRecord() && "Attempted pushing name but task has no initial task name flag!");
@@ -651,10 +676,12 @@ void AsyncTask::pushInitialTaskName(const char* _taskName) {
       this, sizeof(class TaskNameStatusRecord));
 
   // TODO: Copy the string maybe into the same allocation at an offset or retain the swift string?
-  auto taskNameLen = strlen(_taskName);
+  auto taskNameLen = swift_strlen(_taskName);
   char* taskNameCopy = reinterpret_cast<char*>(
       _swift_task_alloc_specific(this, taskNameLen + 1/*null terminator*/));
-#if defined(_WIN32)
+#if SWIFT_CONCURRENCY_EMBEDDED
+  swift_strcpy(taskNameCopy, _taskName);
+#elif defined(_WIN32)
   static_cast<void>(strncpy_s(taskNameCopy, taskNameLen + 1,
                               _taskName, _TRUNCATE));
 #else
@@ -733,12 +760,19 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
                                                   ActiveTaskStatus parentStatus,
                                                   TaskGroup *group) {
   // We can take the fast path of just modifying the ActiveTaskStatus in the
-  // child task since we know that it won't have any task status records and
-  // cannot be accessed by anyone else since it hasn't been linked in yet.
+  // child task since we know it cannot be accessed by anyone else yet -- it
+  // hasn't been linked in. The only record that may already be present is the
+  // initial task name (pushed first during task creation so it can outlive
+  // `complete()`); that's harmless here because we only mutate status flags,
+  // not the records list.
   // Avoids the extra logic in `swift_task_cancel` and `swift_task_escalate`
   auto oldChildTaskStatus =
       child->_private()._status().load(std::memory_order_relaxed);
-  assert(oldChildTaskStatus.getInnermostRecord() == NULL);
+  assert((oldChildTaskStatus.getInnermostRecord() == NULL ||
+          (oldChildTaskStatus.getInnermostRecord()->getKind() ==
+               TaskStatusRecordKind::TaskName &&
+           oldChildTaskStatus.getInnermostRecord()->getParent() == NULL)) &&
+         "child task should have no records, or only the initial task name");
 
   auto newChildTaskStatus = oldChildTaskStatus;
 

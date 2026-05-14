@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/has_nested_generic_extension.swift
-// RUN: llvm-bcanalyzer %t/has_nested_generic_extension.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer %t/has_nested_generic_extension.swiftmodule | %FileCheck %s
 // RUN: %target-swift-frontend -emit-ir -I %t %s -o /dev/null
 
 // CHECK-NOT: UnknownCode

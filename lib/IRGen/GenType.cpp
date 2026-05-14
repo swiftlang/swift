@@ -21,6 +21,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
@@ -897,7 +898,9 @@ void irgen::storeFixedTypeEnumTagSinglePayload(
   payloadIndex->addIncoming(payloadIndex0, payloadLT4BB);
 
   if (fixedSize > Size(0)) {
-    if (fixedSize.getValueInBits() <= llvm::IntegerType::MAX_INT_BITS / 4) {
+    // TODO: Setting the threshold at PointerSize causes stack clobbering in
+    // Windows validation tests. Investigate this before lowering the value further.
+    if (fixedSize <= IGM.getPointerSize() * 2) {
       // Write the value to the payload as a zero extended integer.
       auto *intType = Builder.getIntNTy(fixedSize.getValueInBits());
       Builder.CreateStore(Builder.CreateZExtOrTrunc(payloadIndex, intType),
@@ -2399,6 +2402,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
     llvm_unreachable("should not be asking for the type info an IntegerType");
+  case TypeKind::Hidden:
+    llvm_unreachable("HiddenType should be resolved before IRGen sees it");
   }
   }
   llvm_unreachable("bad type kind");

@@ -315,7 +315,7 @@ extension Task: Equatable {
 ///   to the priority of the enqueued task.
 ///   This priority elevation allows the new task
 ///   to be processed at the priority it was enqueued with.
-/// - If a higher-priority task calls the `get()` method,
+/// - If a higher-priority task accesses the `value` property,
 ///   then the priority of this task increases until the task completes.
 ///
 /// In both cases, priority elevation helps you prevent a low-priority task
@@ -630,6 +630,21 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
+@available(SwiftStdlib 5.1, *)
+extension Task {
+
+  /// Return the task's name, if it was set during its creation.
+  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  public var name: String? {
+    if let name = unsafe _getTaskName(self._task) {
+      unsafe String(cString: name)
+    } else {
+      nil
+    }
+  }
+}
+
 // ==== Voluntary Suspension -----------------------------------------------------
 
 @available(SwiftStdlib 5.1, *)
@@ -654,13 +669,9 @@ extension Task where Success == Never, Failure == Never {
           continuation: continuation)
 
       #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-      if #available(StdlibDeploymentTarget 6.3, *) {
-        let executor = Task.currentExecutor
+      let executor = Task.currentExecutor
 
-        executor.enqueue(ExecutorJob(context: job))
-      } else {
-        fatalError("we shouldn't get here; if we have, availability is broken")
-      }
+      executor.enqueue(ExecutorJob(context: job))
       #else
       _enqueueJobGlobal(job)
       #endif
@@ -771,11 +782,11 @@ public struct UnsafeCurrentTask {
   ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
   ///
-  /// Instance properties `task.isCancelled` and `unsafeCurrentTask.isCancelled`
-  /// are not contextual and therefore do not respect cancellation shields. If a task
+  /// The instance property `task.isCancelled`
+  /// is not contextual and therefore does not respect cancellation shields. If a task
   /// was cancelled and is executing
-  /// with an active cancellation shield, these properties will return the _actual_
-  /// cancellation status of the task.
+  /// with an active cancellation shield, this property will return the _actual_
+  /// cancellation status of the specific task.
   ///
   /// It is possible to determine if a shield is active and then actively determine
   /// that the cancelled status should be temporarily ignored by using this pair of APIs:
@@ -874,6 +885,17 @@ public struct UnsafeCurrentTask {
     @_alwaysEmitIntoClient
     get {
       unsafe _taskHasActiveCancellationShield(_task)
+    }
+  }
+
+  /// Return the task's name, if it was set during its creation.
+  @inlinable
+  @available(SwiftStdlib 6.4, *)
+  public var name: String? {
+    if let name = unsafe _getTaskName(self._task) {
+      unsafe String(cString: name)
+    } else {
+      nil
     }
   }
 }
@@ -988,11 +1010,7 @@ internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> (
   }
 
   let job = Builtin.convertTaskToJob(theTask)
-  if #available(StdlibDeploymentTarget 6.3, *) {
-    MainActor.executor.enqueue(ExecutorJob(context: job))
-  } else {
-    fatalError("we shouldn't get here; if we have, availability is broken")
-  }
+  MainActor.executor.enqueue(ExecutorJob(context: job))
 
   _asyncMainDrainQueue()
 }
@@ -1081,6 +1099,11 @@ func _getCurrentThreadPriority() -> Int
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getCurrentTaskName")
 internal func _getCurrentTaskName() -> UnsafePointer<UInt8>?
+
+@available(StdlibDeploymentTarget 6.4, *)
+@usableFromInline
+@_silgen_name("swift_task_getTaskName")
+internal func _getTaskName(_ job: Builtin.NativeObject) -> UnsafePointer<UInt8>?
 
 @available(SwiftStdlib 6.2, *)
 internal func _getCurrentTaskNameString() -> String? {

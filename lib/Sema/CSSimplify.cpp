@@ -997,6 +997,45 @@ static bool requiresBothTrailingClosureDirections(
   return false;
 }
 
+void MatchCallArgumentResult::dump(llvm::raw_ostream &out) {
+  switch (trailingClosureMatching) {
+  case TrailingClosureMatching::Forward:
+    out << "[forward]";
+    break;
+  case TrailingClosureMatching::Backward:
+    out << "[backward]";
+    break;
+  }
+
+  auto printBindings = [&](const SmallVector<ParamBinding, 4> &parameterBindings) {
+    for (unsigned i : indices(parameterBindings)) {
+      const auto &bindings = parameterBindings[i];
+      out << " [" << i << ": ";
+      bool first = true;
+      for (auto arg : bindings) {
+        if (!first) {
+          out << ", ";
+        }
+        out << arg;
+        first = false;
+      }
+      if (first) {
+        out << "<not present>";
+      }
+      out << "]";
+    }
+  };
+
+  printBindings(parameterBindings);
+
+  if (backwardParameterBindings.has_value()) {
+    out << " backward: ";
+    printBindings(*backwardParameterBindings);
+  }
+
+  out << "\n";
+}
+
 std::optional<MatchCallArgumentResult> constraints::matchCallArguments(
     SmallVectorImpl<AnyFunctionType::Param> &args,
     ArrayRef<AnyFunctionType::Param> params, const ParameterListInfo &paramInfo,
@@ -3294,7 +3333,7 @@ ConstraintSystem::matchFunctionTypes(FunctionType *func1, FunctionType *func2,
   // Support conversion from `nonisolated(nonsending)` to a function type
   // with an isolated parameter.
   if (subKind == ConstraintKind::Subtype &&
-      func1->getIsolation().isNonIsolatedCaller() &&
+      func1->getIsolation().isNonisolatedNonsending() &&
       func2->getIsolation().isParameter()) {
     // `nonisolated(nonsending)` function gets an implicit isolation parameter
     // introduced during SILGen and thunk is going to forward an isolation from
@@ -6880,7 +6919,13 @@ bool ConstraintSystem::repairFailures(
           auto *overloadTy =
               simplifyType(overload->boundType)->castTo<FunctionType>();
           auto *argList = getArgumentList(argLoc);
-          ASSERT(argList);
+          // If the argument was synthesized by the solver, let's fail. This can
+          // happen when a parameter type is optional and (currently) inference
+          // would try both optional and non-optional bindings for the new
+          // argument which cases a mismatch in one of the conversion cases.
+          if (!argList || argList->size() <= argIdx)
+            return false;
+
           conversionsOrFixes.push_back(AllowArgumentMismatch::create(
               *this, getType(argList->getExpr(argIdx)),
               overloadTy->getParams()[paramIdx].getPlainType(), argLoc));
@@ -7949,6 +7994,13 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
       // If we're asking if two integer types are the same, then we know they
       // aren't.
       return getTypeMatchFailure(locator);
+
+    case TypeKind::Hidden:
+      // Two HiddenTypes match only if they have the same mangled name.
+      if (cast<HiddenType>(desugar1)->getMangledName() ==
+          cast<HiddenType>(desugar2)->getMangledName())
+        break;
+      return getTypeMatchFailure(locator);
     }
   }
 
@@ -8503,6 +8555,7 @@ ConstraintSystem::simplifyConstructionConstraint(
   case TypeKind::GenericTypeParam:
   case TypeKind::UnboundGeneric:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::Join:
   case TypeKind::Meet:
     ABORT([&](llvm::raw_ostream &out) {
@@ -10518,7 +10571,10 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     // For code completion include the result because we can partially match
     // against function types that only have one parameter with error type.
     if (decl->isInvalid() && !isForCodeCompletion()) {
-      result.markErrorAlreadyDiagnosed();
+      // Clang import failures emit notes rather than errors, so the error
+      // hasn't actually been emitted yet.
+      if (!decl->hasClangNode())
+        result.markErrorAlreadyDiagnosed();
       return;
     }
 
@@ -10838,20 +10894,23 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
     }
 
     // While looking for subscript choices it's possible to find
-    // `subscript(dynamicMember: {Writable}KeyPath)` on types
-    // marked as `@dynamicMemberLookup`, let's mark this candidate
-    // as representing "dynamic lookup" unless it's a direct call
-    // to such subscript (in that case label is expected to match).
-    if (auto *subscript = dyn_cast<SubscriptDecl>(cand)) {
-      if (memberLocator && instanceTy->hasDynamicMemberLookupAttribute() &&
-          isValidKeyPathDynamicMemberLookup(subscript)) {
-        auto *args = getArgumentList(memberLocator);
-
-        if (!(args && args->isUnary() &&
-              args->getLabel(0) == getASTContext().Id_dynamicMember)) {
-          return OverloadChoice::getDynamicMemberLookup(
-              baseTy, subscript, ctx.getIdentifier("subscript"),
-              /*isKeyPathBased=*/true);
+    // `subscript(dynamicMember: {Reference{Writable}}KeyPath, ...)` on types
+    // marked as `@dynamicMemberLookup`; let's mark this candidate as
+    // representing "dynamic lookup" unless it's a direct call to such subscript
+    // (in that case label is expected to match).
+    if (auto *SD = dyn_cast<SubscriptDecl>(cand)) {
+      if (memberLocator && instanceTy->hasDynamicMemberLookupAttribute()) {
+        if (SD->getDynamicMemberLookupKind() ==
+            SubscriptDecl::DynamicMemberLookupKind::KeyPath) {
+          auto *args = getArgumentList(memberLocator);
+          auto isDirectCallToSubscript =
+              args && args->isUnary() &&
+              args->getLabel(0) == getASTContext().Id_dynamicMember;
+          if (!isDirectCallToSubscript) {
+            return OverloadChoice::getDynamicMemberLookup(
+                baseTy, SD, ctx.getIdentifier("subscript"),
+                /*isKeyPathBased=*/true);
+          }
         }
       }
     }
@@ -10961,7 +11020,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // or if all of the candidates come from conditional conformances (which
   // might not be applicable), and we are looking for members in a type with
   // the @dynamicMemberLookup attribute, then we resolve a reference to a
-  // `subscript(dynamicMember:)` method and pass the member name as a string
+  // `subscript(dynamicMember:...)` method and pass the member name as a string
   // parameter.
   if (constraintKind == ConstraintKind::ValueMember &&
       memberName.isSimpleName() && !memberName.isSpecial() &&
@@ -10972,33 +11031,40 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
          allFromConditionalConformances(*this, instanceTy, candidates)) &&
         !isSelfRecursiveKeyPathDynamicMemberLookup(*this, baseTy,
                                                    memberLocator)) {
-      auto &ctx = getASTContext();
 
-      // Recursively look up `subscript(dynamicMember:)` methods in this type.
-      DeclNameRef subscriptName(
-          { ctx, DeclBaseName::createSubscript(), { ctx.Id_dynamicMember } });
       auto subscripts = performMemberLookup(
-          constraintKind, subscriptName, baseTy, functionRefInfo, memberLocator,
-          includeInaccessibleMembers);
+          constraintKind, DeclNameRef::createSubscript(), baseTy,
+          functionRefInfo, memberLocator, includeInaccessibleMembers);
 
       // Reflect the candidates found as `DynamicMemberLookup` results.
       auto name = memberName.getBaseIdentifier();
       for (const auto &candidate : subscripts.ViableCandidates) {
         auto *SD = cast<SubscriptDecl>(candidate.getDecl());
-        bool isKeyPathBased = isValidKeyPathDynamicMemberLookup(SD);
+        auto kind = SD->getDynamicMemberLookupKind();
+        if (!kind) {
+          continue;
+        }
 
-        if (isValidStringDynamicMemberLookup(SD, DC->getParentModule()) ||
-            isKeyPathBased)
-          result.addViable(OverloadChoice::getDynamicMemberLookup(
-              baseTy, SD, name, isKeyPathBased));
+        result.addViable(OverloadChoice::getDynamicMemberLookup(
+            baseTy, SD, name,
+            /*isKeyPathBased=*/kind ==
+                SubscriptDecl::DynamicMemberLookupKind::KeyPath));
       }
 
       for (auto index : indices(subscripts.UnviableCandidates)) {
         auto *SD =
             cast<SubscriptDecl>(subscripts.UnviableCandidates[index].getDecl());
-        auto choice = OverloadChoice::getDynamicMemberLookup(
-            baseTy, SD, name, isValidKeyPathDynamicMemberLookup(SD));
-        result.addUnviable(choice, subscripts.UnviableReasons[index]);
+        auto kind = SD->getDynamicMemberLookupKind();
+        if (!kind) {
+          continue;
+        }
+
+        result.addUnviable(
+            OverloadChoice::getDynamicMemberLookup(
+                baseTy, SD, name,
+                /*isKeyPathBased=*/kind ==
+                    SubscriptDecl::DynamicMemberLookupKind::KeyPath),
+            subscripts.UnviableReasons[index]);
       }
     }
   }
@@ -11024,7 +11090,8 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
 
         // If the result is invalid, skip it.
         if (cand->isInvalid()) {
-          result.markErrorAlreadyDiagnosed();
+          if (!cand->hasClangNode())
+            result.markErrorAlreadyDiagnosed();
           break;
         }
 
@@ -11607,7 +11674,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                                  alreadyDiagnosed, locator);
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
-      auto impact = 2;
+      auto impact = 4;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
@@ -11619,7 +11686,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
         // Increasing the impact for missing member in any argument position
         // which may be less likely than other potential mistakes
         if (getArgumentLocator(anchorExpr))
-          impact += 1;
+          impact += 5;
       }
 
       if (recordFix(fix, impact))

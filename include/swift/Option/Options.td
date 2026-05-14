@@ -1939,6 +1939,12 @@ def block_availability_platforms: Separate<["-"], "block-availability-platforms"
   HelpText<"Remove the given platforms from symbol graph availability metadata, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
+def active_platform_availability_only
+    : Flag<["-"], "active-platform-availability-only">,
+      Flags<[SwiftSymbolGraphExtractOption]>,
+      HelpText<"Only emit availability metadata for platforms that are active "
+               "according to the target">;
+
 // swift-synthesize-interface-only options
 def include_submodules : Flag<["-"], "include-submodules">,
   Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
@@ -2048,7 +2054,7 @@ def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement
 
 def const_gather_protocols_list
   : Separate<["-"], "const-gather-protocols-list">, MetaVarName<"<path>">,
-    Flags<[NewDriverOnlyOption, ArgumentIsPath]>,
+    Flags<[NewDriverOnlyOption, ArgumentIsPath, FrontendOption]>,
     HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
 def input_paths: Separate<["-", "--"], "input-paths">,
@@ -2182,8 +2188,13 @@ def driver_print_graphviz:
 
 def driver_explicit_module_build:
   Flag<["-"], "explicit-module-build">,
-  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  Flags<[NewDriverOnlyOption]>,
   HelpText<"Prebuild module dependencies to make them explicit">;
+
+def driver_no_explicit_module_build:
+  Flag<["-"], "no-explicit-module-build">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Opt out of the default explicit-module-build behavior for swiftc">;
 
 def incremental_dependency_scan:
   Flag<["-"], "incremental-dependency-scan">,

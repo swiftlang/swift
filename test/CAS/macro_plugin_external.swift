@@ -72,9 +72,9 @@
 // REMARK: remark: loaded macro implementation module 'MacroDefinition' from compiler plugin server
 
 /// Encoded PLUGIN_SEARCH_OPTION is remapped.
-// RUN: llvm-bcanalyzer -dump %t/Macro.swiftmodule | %FileCheck %s --check-prefix=MOD -DLIB=%target-library-name(MacroDefinition)
+// RUN: %llvm-bcanalyzer -dump %t/Macro.swiftmodule | %FileCheck %s --check-prefix=MOD -DLIB=%target-library-name(MacroDefinition)
 
-// MOD: <PLUGIN_SEARCH_OPTION abbrevid=7 op0=4/> blob data = '/^test{{/|\\}}plugins{{/|\\}}[[LIB]]#/^bin{{/|\\}}swift-plugin-server{{(.exe)?}}#MacroDefinition'
+// MOD: <PLUGIN_SEARCH_OPTION abbrevid={{[0-9-]+}} op0=4/> blob data = '/^test{{/|\\}}plugins{{/|\\}}[[LIB]]#/^bin{{/|\\}}swift-plugin-server{{(.exe)?}}#MacroDefinition'
 
 /// Cache hit has no macro-loading remarks because no macro is actually loaded and the path might not be correct due to different mapping.
 // RUN: %target-swift-frontend-plain \

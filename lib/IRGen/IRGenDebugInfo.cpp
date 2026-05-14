@@ -267,7 +267,7 @@ public:
                                DebugTypeInfo Ty, const SILDebugScope *DS,
                                std::optional<SILLocation> VarLoc,
                                SILDebugVariable VarInfo,
-                               IndirectionKind = DirectValue,
+                               bool InCoroContext = false,
                                ArtificialKind = RealValue,
                                AddrDbgInstrKind = AddrDbgInstrKind::DbgDeclare);
 
@@ -1228,7 +1228,8 @@ private:
     llvm::DINodeArray BoundParams = collectGenericParams(Type);
     llvm::DICompositeType *DITy = createStruct(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
-        DBuilder.getOrCreateArray(Members), BoundParams, SpecificationOf);
+        DBuilder.getOrCreateArray(Members), BoundParams, SpecificationOf,
+        /*Annotations=*/nullptr);
     return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
   }
 
@@ -1693,8 +1694,12 @@ private:
       InnerTypeCache[UID] = llvm::TrackingMDNodeRef(UniqueType);
     }
 
+    // CodeView drops empty unnamed members, so we need to give the inner struct
+    // member a name so it survives.
+    StringRef MemberName = Opts.isDebugInfoCodeView() ? MangledName : "";
     llvm::Metadata *Elements[] = {DBuilder.createMemberType(
-        Scope, "", File, 0, SizeInBits, AlignInBits, 0, Flags, UniqueType)};
+        Scope, MemberName, File, 0, SizeInBits, AlignInBits, 0, Flags,
+        UniqueType)};
     // FIXME: It's a limitation of LLVM that a forward declaration cannot have a
     // specificationOf, so this attritbute is put on the sized container type
     // instead. This is confusing consumers, and LLDB has to go out of its way
@@ -1874,12 +1879,13 @@ private:
                unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
                llvm::DINode::DIFlags Flags, StringRef MangledName,
                llvm::DINodeArray Elements, llvm::DINodeArray BoundParams,
-               llvm::DIType *SpecificationOf) {
+               llvm::DIType *SpecificationOf, llvm::DINodeArray Annotations) {
 
     auto StructType = DBuilder.createStructType(
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
         /* DerivedFrom */ nullptr, Elements, llvm::dwarf::DW_LANG_Swift,
-        nullptr, MangledName, SpecificationOf);
+        nullptr, MangledName, SpecificationOf,
+        /*NumExtraInhabitants=*/0, Annotations);
 
     if (BoundParams)
       DBuilder.replaceArrays(StructType, nullptr, BoundParams);
@@ -1891,9 +1897,11 @@ private:
                      unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
                      llvm::DINode::DIFlags Flags, StringRef MangledName,
                      llvm::DINodeArray BoundParams = {},
-                     llvm::DIType *SpecificationOf = nullptr) {
+                     llvm::DIType *SpecificationOf = nullptr,
+                     llvm::DINodeArray Annotations = nullptr) {
     return createStruct(Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
-                        MangledName, {}, BoundParams, SpecificationOf);
+                        MangledName, {}, BoundParams, SpecificationOf,
+                        Annotations);
   }
 
   bool shouldCacheDIType(llvm::DIType *DITy, DebugTypeInfo &DbgTy) {
@@ -1966,6 +1974,7 @@ private:
     case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::BuiltinBorrow:
+    case TypeKind::Hidden:
       ABORT([&](llvm::raw_ostream &out) {
         out << "Don't know how to emit debug info for type:\n";
         BaseTy->dump(out);
@@ -2146,20 +2155,77 @@ private:
       }
       // If the existential is just a protocol type it shares its mangled name
       // with it, so we can just represent it directly as a protocol.
-      BaseTy = TyPtr;
+      auto ProtoDbgTy = DebugTypeInfo::getFromTypeInfo(
+          TyPtr, IGM.getTypeInfoForUnlowered(TyPtr), IGM);
+      return getOrCreateType(ProtoDbgTy);
     }
-      LLVM_FALLTHROUGH;
+
+    case TypeKind::ProtocolComposition: {
+      auto *CompTy = BaseTy->castTo<ProtocolCompositionType>();
+
+      // A composition's mangled name will always be that of the canonical
+      // composition type. This means that a composition can be canonicalized
+      // into a single protocol type. For example, given:
+      //
+      // protocol P {}
+      // typealias P2 = P
+      // func f(param: (any P & P2)) {}
+      //
+      // The canonical type of "param" is simply P. To make sure we don't have
+      // two conflicting types with the same mangled name (one being the
+      // protocol composition, the other being only the protocol), In that case,
+      // emit debug info as only the protocol type.
+      auto CanTy = BaseTy->getCanonicalType();
+      if (!isa<ProtocolCompositionType>(CanTy)) {
+        return getOrCreateDesugaredType(CanTy, DbgTy);
+      }
+
+      llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
+          llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, nullptr, 0,
+          llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags));
+
+      SmallVector<llvm::Metadata *, 4> Members;
+      for (const Type MemberTy : CompTy->getMembers()) {
+        auto MemberDbgTy = DebugTypeInfo::getFromTypeInfo(
+            MemberTy, IGM.getTypeInfoForUnlowered(MemberTy), IGM);
+        auto *MemberDITy = getOrCreateType(MemberDbgTy);
+        Members.push_back(
+            DBuilder.createInheritance(FwdDecl.get(), MemberDITy, 0, 0, Flags));
+      }
+
+      auto *DITy = DBuilder.createStructType(
+          Scope, MangledName, nullptr, 0, SizeInBits, AlignInBits, Flags,
+          nullptr, DBuilder.getOrCreateArray(Members),
+          llvm::dwarf::DW_LANG_Swift, /*VTableHolder=*/nullptr, MangledName);
+
+      return DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
+    }
 
     // FIXME: (LLVM branch) This should probably be a DW_TAG_interface_type.
     case TypeKind::Protocol:
-    case TypeKind::ProtocolComposition:
     case TypeKind::ParameterizedProtocol: {
       auto *Decl = DbgTy.getDecl();
       auto L = getFileAndLocation(Decl);
       unsigned FwdDeclLine = 0;
+
+      llvm::DINodeArray Annotations = nullptr;
+      if (auto *PD = dyn_cast_or_null<ProtocolDecl>(Decl)) {
+        if (PD->isMarkerProtocol()) {
+          llvm::Metadata *Ops[2] = {
+              llvm::MDString::get(IGM.getLLVMContext(),
+                                  StringRef("swift.MarkerProtocol")),
+              llvm::ConstantAsMetadata::get(llvm::ConstantInt::get(
+                  llvm::Type::getInt1Ty(IGM.getLLVMContext()), true))};
+          SmallVector<llvm::Metadata *, 1> Annots = {
+              llvm::MDNode::get(IGM.getLLVMContext(), Ops)};
+          Annotations = DBuilder.getOrCreateArray(Annots);
+        }
+      }
+
       return createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : MangledName,
                                 L.File, FwdDeclLine, SizeInBits, AlignInBits,
-                                Flags, MangledName);
+                                Flags, MangledName, /*BoundParams=*/{},
+                                /*SpecificationOf=*/nullptr, Annotations);
     }
 
     case TypeKind::UnboundGeneric: {
@@ -3662,7 +3728,7 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
 void IRGenDebugInfoImpl::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo DbgTy,
     const SILDebugScope *DS, std::optional<SILLocation> DbgInstLoc,
-    SILDebugVariable VarInfo, IndirectionKind Indirection,
+    SILDebugVariable VarInfo, bool InCoroContext,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstrKind) {
   assert(DS && "variable has no scope");
 
@@ -3798,9 +3864,6 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (DbgTy.getType()->isForeignReferenceType())
       Operands.push_back(llvm::dwarf::DW_OP_deref);
 
-    if (Indirection == IndirectValue || Indirection == CoroIndirectValue)
-      Operands.push_back(llvm::dwarf::DW_OP_deref);
-
     if (IsPiece) {
       // Advance the offset for the next piece.
       OffsetInBits += SizeInBits;
@@ -3834,8 +3897,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
     if (DIExpr)
       emitDbgIntrinsic(
           Builder, Piece, Var, DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
-          Indirection == CoroDirectValue || Indirection == CoroIndirectValue,
-          AddrDInstrKind);
+          InCoroContext, AddrDInstrKind);
   }
 
   // Emit locationless intrinsic for variables that were optimized away.
@@ -3845,13 +3907,22 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
             appendDIExpression(DBuilder.createExpression(), NoFragment, false))
       emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
                        DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
-                       Indirection == CoroDirectValue ||
-                           Indirection == CoroIndirectValue,
-                       AddrDInstrKind);
+                       InCoroContext, AddrDInstrKind);
   }
 }
 
 namespace {
+
+/// Strip the leading DW_OP_deref from the expression.
+/// dbg.declare implicitly provides one level of dereference, so the first
+/// DW_OP_deref is redundant.
+static llvm::DIExpression *stripLeadingDeref(llvm::DIExpression *Expr,
+                                             llvm::LLVMContext &Ctx) {
+  auto Elements = Expr->getElements();
+  if (!Elements.empty() && Elements[0] == llvm::dwarf::DW_OP_deref)
+    return llvm::DIExpression::get(Ctx, Elements.drop_front(1));
+  return Expr;
+}
 
 /// A helper struct that is used by emitDbgIntrinsic to factor redundant code.
 struct DbgIntrinsicEmitter {
@@ -3894,15 +3965,19 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::Instruction *InsertBefore) {
-    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare) {
+      Expr = stripLeadingDeref(Expr, InsertBefore->getContext());
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL,
                                      InsertBefore->getIterator());
+    }
 
-    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue) {
+      Expr = stripLeadingDeref(Expr, InsertBefore->getContext());
       return DIBuilder.insertDeclareValue(Addr, VarInfo, Expr, DL,
                                           InsertBefore->getIterator());
+    }
 
-    Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
+    // DbgValue: keep expression as-is (all derefs are explicit).
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL,
                                              InsertBefore->getIterator());
   }
@@ -3911,13 +3986,17 @@ struct DbgIntrinsicEmitter {
                           llvm::DIExpression *Expr,
                           const llvm::DILocation *DL,
                           llvm::BasicBlock *Block) {
-    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclare) {
+      Expr = stripLeadingDeref(Expr, Block->getContext());
       return DIBuilder.insertDeclare(Addr, VarInfo, Expr, DL, Block);
+    }
 
-    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue)
+    if (ForceDbgDeclareOrDeclareValue == AddrDbgInstrKind::DbgDeclareValue) {
+      Expr = stripLeadingDeref(Expr, Block->getContext());
       return DIBuilder.insertDeclareValue(Addr, VarInfo, Expr, DL, Block);
+    }
 
-    Expr = llvm::DIExpression::append(Expr, llvm::dwarf::DW_OP_deref);
+    // DbgValue: keep expression as-is (all derefs are explicit).
     return DIBuilder.insertDbgValueIntrinsic(Addr, VarInfo, Expr, DL, Block);
   }
 };
@@ -3974,9 +4053,9 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
 
   bool optimized = DS->getParentFunction()->shouldOptimize();
   if (optimized && (!InCoroContext || !Var->isParameter()))
-    AddrDInstKind = AddrDbgInstrKind::DbgValueDeref;
+    AddrDInstKind = AddrDbgInstrKind::DbgValue;
 
-  if (InCoroContext && AddrDInstKind != AddrDbgInstrKind::DbgValueDeref)
+  if (InCoroContext && AddrDInstKind != AddrDbgInstrKind::DbgValue)
     AddrDInstKind = AddrDbgInstrKind::DbgDeclareValue;
 
   DbgIntrinsicEmitter inserter{Builder, DBuilder, AddrDInstKind};
@@ -4135,10 +4214,7 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
       Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           {}, {OS.str().str(), 0, false},
-                          // swift.type is already a pointer type,
-                          // having a shadow copy doesn't add another
-                          // layer of indirection.
-                          IGF.isAsync() ? CoroDirectValue : DirectValue,
+                          /*InCoroContext=*/IGF.isAsync(),
                           ArtificialValue);
 }
 
@@ -4159,7 +4235,7 @@ void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
   auto DbgTy = *CompletedDebugTypeInfo::getFromTypeInfo(IntTy, TI, IGM);
   emitVariableDeclaration(
       IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(), {}, VarInfo,
-      IGF.isAsync() ? CoroDirectValue : DirectValue, ArtificialValue);
+      /*InCoroContext=*/IGF.isAsync(), ArtificialValue);
 }
 
 } // anonymous namespace
@@ -4251,10 +4327,10 @@ void IRGenDebugInfo::emitOutlinedFunction(IRBuilder &Builder,
 void IRGenDebugInfo::emitVariableDeclaration(
     IRBuilder &Builder, ArrayRef<llvm::Value *> Storage, DebugTypeInfo Ty,
     const SILDebugScope *DS, std::optional<SILLocation> VarLoc,
-    SILDebugVariable VarInfo, IndirectionKind Indirection,
+    SILDebugVariable VarInfo, bool InCoroContext,
     ArtificialKind Artificial, AddrDbgInstrKind AddrDInstKind) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitVariableDeclaration(
-      Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection, Artificial,
+      Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext, Artificial,
       AddrDInstKind);
 }
 

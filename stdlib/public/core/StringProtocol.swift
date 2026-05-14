@@ -229,7 +229,7 @@ extension String {
     _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> R
   ) throws(E) -> R {
     makeContiguousUTF8()
-    return try unsafe _guts.withFastUTF8(body)
+    return try _guts.withFastUTF8(body)
   }
 }
 
@@ -297,6 +297,6 @@ extension Substring {
     _ body: (UnsafeBufferPointer<UInt8>) throws(E) -> R
   ) throws(E) -> R {
     makeContiguousUTF8()
-    return try unsafe _wholeGuts.withFastUTF8(range: _offsetRange, body)
+    return try _wholeGuts.withFastUTF8(range: _offsetRange, body)
   }
 }

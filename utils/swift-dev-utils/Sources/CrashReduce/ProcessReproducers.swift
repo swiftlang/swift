@@ -22,24 +22,29 @@ public actor ProcessReproducers {
   let inputDir: AbsolutePath?
   let otherInputs: [AbsolutePath]
 
-  let outputDir: AbsolutePath
-  let ideOutputDir: AbsolutePath
+  let outputDirs: OutputDirs
 
   let executablePath: AbsolutePath
 
   let quickMode: Bool
   let deleteInputs: Bool
 
+  let reprocess: Bool
+  let ignoreExisting: Bool
+  let fileIssues: Bool
+  let frontendArgs: [Command.Argument]
+  let checkOnly: Bool
+
   public init(
-    from inputDir: AbsolutePath?, to outputDir: AbsolutePath,
-    otherInputs: [AbsolutePath], ideOutputDir: AbsolutePath?,
-    toolchain: Toolchain, quickMode: Bool, deleteInputs: Bool
+    from inputDir: AbsolutePath?, to outputDirs: OutputDirs,
+    otherInputs: [AbsolutePath], toolchain: Toolchain, quickMode: Bool,
+    deleteInputs: Bool, reprocess: Bool, ignoreExisting: Bool, fileIssues: Bool,
+    frontendArgs: [Command.Argument], checkOnly: Bool
   ) throws {
     self.toolchain = toolchain
     self.inputDir = inputDir
     self.otherInputs = otherInputs
-    self.outputDir = outputDir
-    self.ideOutputDir = ideOutputDir ?? outputDir
+    self.outputDirs = outputDirs
     guard let execPath = Bundle.main.executablePath else {
       struct CannotFindExecutableError: Error {}
       throw CannotFindExecutableError()
@@ -47,13 +52,17 @@ public actor ProcessReproducers {
     self.executablePath = AnyPath(execPath).absoluteInWorkingDir
     self.quickMode = quickMode
     self.deleteInputs = deleteInputs
+    self.reprocess = reprocess
+    self.ignoreExisting = ignoreExisting
+    self.fileIssues = fileIssues
+    self.frontendArgs = frontendArgs
+    self.checkOnly = checkOnly
   }
 
   func writeReproducer(_ reproducer: Reproducer) throws {
     guard firstNewSignature(reproducer.signatures) != nil else { return }
     let repoFile = ReproducerFile(
-      in: reproducer.kind == .complete ? ideOutputDir : outputDir,
-      reproducer: reproducer
+      in: outputDirs.outputDir(for: reproducer), reproducer: reproducer
     )
     recordReproducer(repoFile)
     try repoFile.write()
@@ -133,78 +142,85 @@ public actor ProcessReproducers {
     }
   }
 
-  public func process(
-    reprocess: Bool, ignoreExisting: Bool, fileIssues: Bool,
-    frontendArgs: [Command.Argument]
-  ) async throws {
-    // TODO: This function should be refactored...
-    let start = Date()
-    if !ignoreExisting {
-      var reproFiles: [ReproducerFile] = []
-      for outputPath in Set([self.outputDir, ideOutputDir]) {
-        for file in try outputPath.getDirContents() where file.hasExtension(.swift) {
-          let absPath = outputPath.appending(file)
-          guard let reproFile = try ReproducerFile(from: absPath) else { continue }
-          reproFiles.append(reproFile)
-        }
-      }
-      if reprocess {
-        log.info("re-processing reproducers...")
-        let worklist = TaskWorklist<Void>()
-        for repro in reproFiles {
-          worklist.addTask {
-            do {
-              guard let crash = try await self.getCrash(for: repro) else {
-                // FIXME: Workaround https://github.com/swiftlang/swift/issues/86623
-                let logMsg = "\(repro) did not re-reproduce"
-                log.warning(logMsg)
-                return
-              }
-              let oldSigs = repro.reproducer.signatures
-              let oldIsStackOverflow = repro.reproducer.isStackOverflow
-              repro.reproducer.signatures = crash.signatures
-              repro.reproducer.isStackOverflow = crash.primary.isStackOverflow
-              do {
-                // FIXME: Workaround https://github.com/swiftlang/swift/issues/86623
-                let logMsg = "found: \(repro)"
-                log.info(logMsg)
-              }
-              if oldSigs.primary != crash.signatures.primary ||
-                  oldSigs != crash.signatures ||
-                  oldIsStackOverflow != crash.primary.isStackOverflow {
-                repro.checkFilename(warn: false)
-                try repro.write()
-              }
-            } catch {
-              log.warning("\(error)")
-            }
+  private func reprocessReproducers(_ reproFiles: [ReproducerFile]) async {
+    log.info("re-processing reproducers...")
+    let worklist = TaskWorklist<Void>()
+    for repro in reproFiles {
+      worklist.addTask {
+        do {
+          guard let crash = try await self.getCrash(for: repro) else {
+            // FIXME: Workaround https://github.com/swiftlang/swift/issues/86623
+            let logMsg = "\(repro) did not re-reproduce"
+            log.warning(logMsg)
+            return
           }
+          let oldSigs = repro.reproducer.signatures
+          let oldIsStackOverflow = repro.reproducer.isStackOverflow
+          repro.reproducer.signatures = crash.signatures
+          repro.reproducer.isStackOverflow = crash.primary.isStackOverflow
+          do {
+            // FIXME: Workaround https://github.com/swiftlang/swift/issues/86623
+            let logMsg = "found: \(repro)"
+            log.info(logMsg)
+          }
+          if oldSigs.primary != crash.signatures.primary ||
+              oldSigs != crash.signatures ||
+              oldIsStackOverflow != crash.primary.isStackOverflow {
+            repro.checkFilename(warn: false)
+            try repro.write()
+          }
+        } catch {
+          log.warning("\(error)")
         }
-        for await _ in worklist.results {}
-      }
-      for repro in reproFiles {
-        recordReproducer(repro)
       }
     }
+    for await _ in worklist.results {}
+  }
 
+  private func importExistingReproducers() async throws {
+    var reproFiles: [ReproducerFile] = []
+    for outputPath in outputDirs.allPaths {
+      for file in try outputPath.getDirContents() where file.hasExtension(.swift) {
+        let absPath = outputPath.appending(file)
+        guard let reproFile = try ReproducerFile(from: absPath) else { continue }
+        reproFiles.append(reproFile)
+      }
+    }
+    if reprocess {
+      await reprocessReproducers(reproFiles)
+    }
+    for repro in reproFiles where !repro.reproducer.primarySig.isUnknown {
+      recordReproducer(repro)
+    }
+  }
+
+  private func getAllInputPaths() throws -> [AbsolutePath] {
     var inputPaths = otherInputs
     if let inputDir {
       inputPaths += try inputDir.getDirContents()
         .map { inputDir.appending($0) }
-        .filter { !$0.isDirectory && !$0.isSymlink }
+        .filter { !$0.isDirectory }
     }
+    return inputPaths
+  }
 
-    let count = inputPaths.count
+  private func getAllNewCrashers(
+    for inputs: [AbsolutePath]
+  ) async throws -> ([Crasher], Set<Signature>) {
+    let count = inputs.count
     let progress = Atomic(0)
 
     log.prefixFn = { output, useColor in
       let progress = progress.load(ordering: .acquiring)
       "[\(progress)/\(count)]".withColor(.gray).write(to: output, useColor: useColor)
     }
+    defer {
+      log.prefixFn = nil
+    }
 
     var seenSigs: Set<Signature> = []
 
-    let repros = await inputPaths.enumerated().parallelUnorderedMap { (idx, inputPath) -> [Crasher] in
+    let repros = await inputs.parallelUnorderedMap { inputPath -> [Crasher] in
       defer {
         progress.add(1, ordering: .releasing)
       }
@@ -212,9 +228,7 @@ public actor ProcessReproducers {
       var errors: [any Error] = []
       do {
         // Evaluate the batches.
-        let batch = try self.getPotentialCrashers(
-          for: inputPath, frontendArgs: frontendArgs
-        )
+        let batch = try self.getPotentialCrashers(for: inputPath)
         results = await batch.eval { input in
           do {
             guard let crasher = try await self.getCrasher(input) else {
@@ -246,7 +260,7 @@ public actor ProcessReproducers {
           log.warning("\(inputPath.fileName) didn't reproduce issue")
           if let noreproDir = self.noreproDir {
             let outPath = noreproDir.appending(inputPath.fileName)
-            if outPath.exists && self.deleteInputs {
+            if outPath.exists {
               inputPath.remove()
             } else {
               try? FileManager.default.moveItem(
@@ -258,7 +272,7 @@ public actor ProcessReproducers {
         }
         return []
       }
-      guard results.contains(where: { result in
+      let hasNewSig = results.contains(where: { result in
         let sigs = result.signatures
         if self.firstNewSignature(sigs) == nil {
           return false
@@ -267,7 +281,8 @@ public actor ProcessReproducers {
           return false
         }
         return true
-      }) else {
+      })
+      guard hasNewSig else {
         if self.deleteInputs {
           inputPath.remove()
         }
@@ -275,21 +290,25 @@ public actor ProcessReproducers {
       }
       return results
     }.flatMap { $0 }.sorted(by: \.path.rawPath)
+    return (repros, seenSigs)
+  }
 
-    log.prefixFn = nil
-
+  private func reduceAllCrashers(
+    _ repros: [Crasher]
+  ) async throws -> [Reproducer] {
     var groupedRepros: [Signature: [Crasher]] = [:]
     for crasher in repros {
-      let sigs = crasher.signatures
-      seenSigs.formUnion(sigs.sigs)
-      guard let sig = firstNewSignature(sigs) else {
+      guard let sig = firstNewSignature(crasher.signatures) else {
         continue
       }
       groupedRepros[sig, default: []].append(crasher)
     }
+    log.info("found \(groupedRepros.count) new crasher(s), reducing...")
 
     var processedPaths = Set(repros.map(\.path))
-    let worklist = TaskWorklist<[Reproducer]>()
+
+    // creduce already parallelizes so only do 3 in parallel.
+    let worklist = TaskWorklist<[Reproducer]>(maxParallel: 3)
     for reproGroup in groupedRepros.sorted(by: \.key).map(\.value) {
       worklist.addTask {
         // Take the first reproducer in the group that reduces successfully.
@@ -304,10 +323,13 @@ public actor ProcessReproducers {
         return []
       }
     }
+
+    var processed: [Reproducer] = []
     for await reproGroup in worklist.results {
       for reduced in reproGroup {
         do {
           try self.writeReproducer(reduced)
+          processed.append(reduced)
         } catch {
           log.warning("\(error)")
           processedPaths.remove(reduced.originalPath!)
@@ -320,192 +342,33 @@ public actor ProcessReproducers {
         path.remove()
       }
     }
+    return processed
+  }
 
+  public func process() async throws {
+    let start = Date()
+    if !ignoreExisting {
+      try await importExistingReproducers()
+    }
+    let inputPaths = try getAllInputPaths()
+    let (repros, seenSigs) = try await getAllNewCrashers(for: inputPaths)
+    let reduced = if !checkOnly && !repros.isEmpty {
+      try await reduceAllCrashers(repros)
+    } else {
+      []
+    }
     let delta = Int(Date().timeIntervalSince(start).rounded())
     log.info("""
       Finished processing \(inputPaths.count) files in \(delta)s, \
-      \(seenSigs.count) unique signatures, \(groupedRepros.count) new signatures
+      \(seenSigs.count) unique signatures, \(reduced.count) new reproducers
       """
     )
-
     if fileIssues {
       try await fileReproIssues()
     }
   }
 
-  private func withCReduceTest<T>(
-    _ options: Reproducer.Options, signatures: KnownSignatures?,
-    // FIXME: Shouldn't need @Sendable
-    _ body: @Sendable (AbsolutePath) async throws -> T
-  ) async throws -> T {
-    try await withTemporaryFile { scriptPath in
-      try await withTemporaryFile { jsonPath in
-        let args = CReduceStep.Args(
-          options: options, toolchain: toolchain, signatures: signatures
-        )
-        try jsonPath.write(JSONEncoder().encode(args))
-
-        let script = """
-          #!/bin/sh
-          exec \(executablePath.rawPath.escaped) creduce-step --args-json-path \
-          \(jsonPath.rawPath.escaped)
-          """
-
-        try scriptPath.write(script)
-        try scriptPath.chmod(.executable)
-        return try await body(scriptPath)
-      }
-    }
-  }
-
-  /// Run a cleanup action on a given crasher. This is done in a child process
-  /// since we may have a swift-syntax crasher.
-  private func cleanup(
-    _ crasher: PotentialCrasher, kind: CleanupKind
-  ) async throws -> PotentialCrasher {
-    var crasher = crasher
-    try await crasher.withInputFiles { inputs in
-      for (idx, input) in inputs.enumerated() {
-        let result = try await run(
-          .path(executablePath.storage), arguments: [
-            "cleanup", "--kind", kind.rawValue, input.rawPath
-          ],
-          environment: .custom([:]),
-          output: .string(limit: .max)
-        )
-        guard result.terminationStatus.isSuccess else {
-          throw ReproducerError("failed to cleanup \(input.fileName)")
-        }
-        crasher.buffers[idx].code = Code(
-          (result.standardOutput ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        )
-      }
-    }
-    return crasher
-  }
-
-  private func creduceCrasher(
-    _ crasher: PotentialCrasher, signatures: KnownSignatures?
-  ) async throws -> PotentialCrasher {
-    guard let creducePath = try? Executable.name("creduce")
-      .resolveExecutablePath(in: .inherit)
-    else {
-      log.warning("creduce not found, will not reduce crasher")
-      return crasher
-    }
-    return try await crasher.withInputFiles { inputs in
-      try await withCReduceTest(crasher.options, signatures: signatures) { testPath in
-        let result = try await run(
-          .path(creducePath), arguments: .init(
-            ["--tidy", "--not-c", testPath.rawPath] + inputs.map(\.rawPath)
-          ),
-          workingDirectory: testPath.parentDir!.storage,
-          output: .string(limit: .max),
-          error: .string(limit: .max),
-        )
-        guard result.terminationStatus.isSuccess else {
-          throw ReproducerError("""
-          \(result.standardOutput ?? "")
-          \(result.standardError ?? "")
-
-          creduce failed for \(crasher)
-
-          """)
-        }
-      }
-      // Write back the reduced buffers.
-      var crasher = crasher
-      for (idx, input) in inputs.enumerated() {
-        crasher.buffers[idx].code = try Code(from: input)
-      }
-      return crasher
-    }
-  }
-
-  private func reduceCrash(
-    of crasher: PotentialCrasher, signatures: KnownSignatures?
-  ) async throws -> Reproducer {
-    // First try run creduce.
-    var crasher = try await creduceCrasher(crasher, signatures: signatures)
-
-    // Make sure we've stripped trivia since e.g RUN lines can interfere
-    // with the resulting test case.
-    for idx in crasher.buffers.indices {
-      crasher.buffers[idx].code = crasher.buffers[idx].code
-        .cleanupTrivia(includingWhitespace: true)
-    }
-
-    // Try cleanup the reproducer.
-    for kind: CleanupKind in [.basicFormat, .fix, .swiftFormat] {
-      guard
-        let newCrasher = try? await cleanup(crasher, kind: kind),
-        let _ = try? await checkCrash(
-          of: newCrasher, matchingSignatures: signatures
-        )
-      else {
-        continue
-      }
-      crasher = newCrasher
-    }
-
-    // If we have a multi-file crasher, try join it into a single file.
-    if crasher.buffers.count > 1 {
-      var joinedCrasher = crasher
-      joinedCrasher.buffers = [
-        .init(
-          name: crasher.buffers[0].name,
-          code: Code(
-            crasher.buffers.map { $0.code.text }.joined(separator: "\n")
-          )
-        )
-      ]
-      if let _ = try? await checkCrash(
-        of: joinedCrasher, matchingSignatures: signatures
-      ) {
-        crasher = joinedCrasher
-      }
-    }
-
-    // Finally do one more trivia cleanup.
-    for idx in crasher.buffers.indices {
-      crasher.buffers[idx].code = crasher.buffers[idx].code
-        .cleanupTrivia(includingWhitespace: false)
-    }
-
-    // Now that we've reduced, double check the crasher is still deterministic.
-    var determResult: Crasher?
-    if crasher.options.isDeterministic {
-      determResult = try await checkDeterministicCrash(of: crasher)
-      if determResult == nil {
-        log.info("\(crasher) became non-deterministic")
-        crasher = crasher.withDeterministic(false)
-      }
-    }
-
-    // And double check it still actually crashes.
-    guard let result = try await checkCrash(
-      of: crasher, matchingSignatures: signatures
-    ) else {
-      guard let signatures,
-            let foundCrasher = try await checkCrash(of: crasher)
-      else {
-        throw ReproducerError(
-          "\(crasher) doesn't reproduce after reducing?"
-        )
-      }
-      throw ReproducerError(
-            """
-            reduced signature \(foundCrasher.primarySig) \
-            doesn't match \(signatures.primary)
-            """
-      )
-    }
-    // Prefer the deterministic result if we have it since it will likely
-    // include more signatures if there are multiple.
-    return Reproducer(determResult ?? result)
-  }
-
-  private func checkCrash(
+  func checkCrash(
     of input: PotentialCrasher,
     matchingSignatures signatures: KnownSignatures? = nil
   ) async throws -> Crasher? {
@@ -519,7 +382,7 @@ public actor ProcessReproducers {
     }
   }
 
-  private func checkDeterministicCrash(
+  func checkDeterministicCrash(
     of input: PotentialCrasher
   ) async throws -> Crasher? {
     try await input.withInputFiles { paths in
@@ -548,47 +411,6 @@ public actor ProcessReproducers {
     guard let crasher = try await checkCrash(of: input) else { return nil }
     log.info("found: \(crasher)")
     return crasher
-  }
-
-  /// Given a non-deterministic crasher, try some different options to see if
-  /// they can make it deterministic.
-  private func makeDeterministicIfNeeded(
-    _ crasher: Crasher
-  ) async throws -> Crasher {
-    if crasher.input.options.isDeterministic {
-      return crasher
-    }
-    log.info("checking determinism: \(crasher)".withColor(.gray))
-
-    let input = crasher.input
-    let options = input.options
-
-    // Double check that the reproducer is non-deterministic, if it's already
-    // deterministic then we're done.
-    if let crasher = try await checkDeterministicCrash(of: input) {
-      return crasher
-    }
-    // swift-ide-test runs a random permutation of the completion tokens when
-    // run, sometimes that can cause non-determinism. In that case, enforce
-    // source order completion.
-    // TODO: Ideally we'd use the exact seed expected.
-    if options.kind == .complete, !options.useSourceOrderCompletion {
-      log.info("\(input) is non-deterministic, trying source order...")
-      if let crasher = try await checkDeterministicCrash(
-        of: input.withSourceOrderCompletion(true)
-      ) {
-        return crasher
-      }
-    }
-    // Guard malloc can sometimes help a crasher become deterministic.
-    if !options.useGuardMalloc {
-      log.info("\(input) is non-deterministic, trying guard malloc...")
-      if let crasher = try await checkDeterministicCrash(of: input.withGuardMalloc) {
-        return crasher
-      }
-    }
-    log.info("\(input) is non-deterministic")
-    return crasher.withDeterministic(false)
   }
 
   private enum PotentialCrasherBatch {
@@ -704,14 +526,14 @@ public actor ProcessReproducers {
   /// For a given input crasher, produce a batch of potential crasher
   /// configurations to try.
   private func getPotentialCrashers(
-    for path: AbsolutePath, frontendArgs: [Command.Argument]
+    for path: AbsolutePath
   ) throws -> PotentialCrasherBatch {
     typealias Batch = PotentialCrasherBatch
 
     let input = try FuzzerInput(from: path)
 
     // If we have custom frontend args, then only try those.
-    let frontendArgs = input.header.frontendArgs ?? frontendArgs
+    let frontendArgs = input.header.frontendArgs ?? self.frontendArgs
     if !frontendArgs.isEmpty {
       return .one(.custom(input, frontendArgs: frontendArgs))
         .withNonDeterminismHandling
@@ -752,72 +574,6 @@ public actor ProcessReproducers {
       batch = .firstOf([batch, extendedBatch])
     }
 
-    // Default to Swift 6
-    return batch.map { $0.withLanguageMode(6) }
-  }
-
-  private func reduceImpl(_ crasher: Crasher) async throws -> [Reproducer] {
-    let signatures = crasher.signatures
-    let input = crasher.input
-
-    guard firstNewSignature(signatures) != nil else {
-      return []
-    }
-
-    log.info("reducing \(crasher)")
-
-    let reduced = try await reduceCrash(of: input, signatures: nil)
-
-    var reproducers: [Reproducer] = []
-    reproducers.append(reduced)
-
-    // Sometimes when reducing we go too far end up with a different signature,
-    // try again matching the exact signature. We do it this way to potentially
-    // get a free extra crasher from the reduction.
-    if !signatures.isSuperset(of: reduced.signatures) {
-      log.info(
-        """
-        reduced \(input) to \(reduced.primarySig.shortDescription), \
-        reducing preserving signature...
-        """
-      )
-      reproducers.append(try await reduceCrash(of: input, signatures: signatures))
-    }
-    return reproducers
-  }
-
-  private func reduce(_ crasher: Crasher) async throws -> [Reproducer] {
-    var reproducers: [Reproducer] = []
-    var crasher = crasher
-
-    // Check to see if we can drop the language mode and solver limits.
-    // FIXME: We shouldn't be doing this here
-    if crasher.input.options.languageMode != nil {
-      let newInput = crasher.input
-        .withLanguageMode(nil).withDeterministic(false)
-      if let newCrasher = try await checkCrash(of: newInput) {
-        crasher = newCrasher
-      }
-    }
-    if crasher.input.options.withSolverLimits {
-      let newInput = crasher.input
-        .withSolverLimits(false).withDeterministic(false)
-      if let newCrasher = try await checkCrash(of: newInput) {
-        crasher = newCrasher
-      }
-    }
-
-    let determCrasher = try await makeDeterministicIfNeeded(crasher)
-    if determCrasher.input.options != crasher.input.options,
-      !determCrasher.signatures.isSuperset(of: crasher.signatures) {
-      log.info("""
-        determinism changed signature for \(crasher.input) from \
-        \(crasher.primarySig.shortDescription) to \
-        \(determCrasher.primarySig.shortDescription)
-        """)
-      reproducers += try await reduceImpl(crasher)
-    }
-    reproducers += try await reduceImpl(determCrasher)
-    return reproducers
+    return batch
   }
 }

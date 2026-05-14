@@ -21,6 +21,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -43,6 +44,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
+#include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Strings.h"
 #include "clang/AST/ASTContext.h"
@@ -1890,6 +1892,20 @@ void ASTMangler::appendType(Type type, GenericSignature sig,
 
       return;
     }
+
+    case TypeKind::Hidden: {
+      // A HiddenType is a placeholder for a real type whose mangled name is
+      // carried in the HiddenType itself. Emit that mangled name so that the
+      // surrounding symbol mangles as if the real type had been used.
+      // The stored name is a complete symbol starting with "$s"; strip the
+      // prefix since we are already mangling inside a larger symbol.
+      auto hidden = cast<HiddenType>(tybase);
+      StringRef name = hidden->getMangledName();
+      if (name.starts_with(MANGLING_PREFIX_STR))
+        name = name.drop_front(StringRef(MANGLING_PREFIX_STR).size());
+      Buffer << name;
+      return;
+    }
   }
   llvm_unreachable("bad type kind");
 }
@@ -2316,6 +2332,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
 
   switch (fn->getIsolation().getKind()) {
   case SILFunctionTypeIsolation::Unknown:
+    break;
+  case SILFunctionTypeIsolation::NonisolatedNonsending:
+    OpArgs.push_back('N');
     break;
   case SILFunctionTypeIsolation::Erased:
     if (AllowIsolatedAny)

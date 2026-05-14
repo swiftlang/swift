@@ -208,10 +208,10 @@ extension Task {
   ///
   /// ### Instance property isCancelled ignores Task Cancellation Shields
   ///
-  /// Instance properties `task.isCancelled` and `unsafeCurrentTask.isCancelled`
-  /// are not contextual and therefore do not respect cancellation shields.
+  /// The instance property `task.isCancelled`
+  /// is not contextual and therefore does not respect cancellation shields.
   /// If a task was cancelled and is executing with an active cancellation shield,
-  /// these properties will return the _actual_ cancellation status of the task.
+  /// these properties will return the _actual_ cancellation status of the specific task.
   ///
   /// Prefer using `Task.isCancelled` (the static property) in most situations when checking
   /// the cancellation status from inside the task.
