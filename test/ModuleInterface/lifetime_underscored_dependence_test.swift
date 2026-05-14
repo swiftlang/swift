@@ -259,11 +259,11 @@ import lifetime_underscored_dependence
 // CHECK-NEXT: #endif
 
 // CHECK:      #if compiler(>=5.3) && $ClosureLifetimes
-// CHECK-NEXT: @inlinable public func takeTakeImplicitCopyClosure(f: @_lifetime(copy f) (_ f: () -> lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView) {
+// CHECK-NEXT: @inlinable public func takeTakeImplicitCopyClosure(g: @_lifetime(copy f) (_ f: () -> lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView) {
 // CHECK-NEXT: }
 // CHECK-NEXT: #endif
 
 // CHECK:      @inlinable public func callTTICC() {
-// CHECK-NEXT:   takeTakeImplicitCopyClosure(f: takeClosureImplicitDependenceKind)
-// CHECK-NEXT:   takeTakeImplicitCopyClosure(f: takeClosureImplicitDependence)
+// CHECK-NEXT:   takeTakeImplicitCopyClosure(g: takeClosureImplicitDependenceKind)
+// CHECK-NEXT:   takeTakeImplicitCopyClosure(g: takeClosureImplicitDependence)
 // CHECK-NEXT: }
