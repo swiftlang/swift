@@ -4037,6 +4037,21 @@ namespace {
       if (!dc)
         return nullptr;
 
+      // A non-static C++ method cannot be imported as a member of a different
+      // type via swift_name attribute.
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(decl)) {
+        if (auto nominal = dc->getSelfNominalTypeDecl()) {
+          if (!method->isStatic() && importedName.importAsMember() &&
+              nominal->getClangDecl() != method->getParent()) {
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::swift_name_method_different_context);
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::note_while_importing, decl->getName());
+            return nullptr;
+          }
+        }
+      }
+
       // We may have already imported this function decl while importing its
       // decl context. Check decl cache to make sure we don't import twice.
       auto known = Impl.ImportedDecls.find({decl, getVersion()});

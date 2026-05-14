@@ -66,6 +66,10 @@ ERROR(swift_name_protocol_static, none, "swift_name cannot be used to define "
       (bool))
 ERROR(swift_name_no_prototype, none,
       "swift_name cannot be used on a non-prototyped function declaration", ())
+WARNING(swift_name_method_different_context, none,
+        "swift_name cannot be used to import a non-static C++ method as a "
+        "member of a different type",
+        ())
 
 GROUPED_WARNING(inconsistent_swift_name, ClangDeclarationImport, none,
         "inconsistent Swift name for Objective-C %select{method|property}0 "
