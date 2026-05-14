@@ -1243,6 +1243,23 @@ public:
       TypeCache[TypeCacheKey] = BuiltForeign;
       return BuiltForeign;
     }
+    case MetadataKind::FixedArray: {
+      auto fixedArray = cast<TargetFixedArrayTypeMetadata<Runtime>>(Meta);
+      auto elementAddress = RemoteAddress(
+          fixedArray->Element, MetadataAddress.getAddressSpace());
+      auto Element =
+          readTypeFromMetadata(elementAddress, false, recursion_limit);
+      if (!Element) return BuiltType();
+
+      auto count = static_cast<intptr_t>(fixedArray->Count);
+      BuiltType Size = (count < 0) ? Builder.createNegativeIntegerType(count)
+                                   : Builder.createIntegerType(count);
+      if (!Size) return BuiltType();
+
+      auto BuiltFixedArray = Builder.createBuiltinFixedArrayType(Size, Element);
+      TypeCache[TypeCacheKey] = BuiltFixedArray;
+      return BuiltFixedArray;
+    }
     case MetadataKind::HeapLocalVariable:
     case MetadataKind::HeapGenericLocalVariable:
     case MetadataKind::ErrorObject:
