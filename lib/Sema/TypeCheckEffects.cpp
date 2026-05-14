@@ -792,7 +792,11 @@ public:
 
     /// The function accesses an unconditionally throws/async property.
     PropertyAccess,
-    SubscriptAccess
+    SubscriptAccess,
+
+    /// A 'for await' statement's underlying iterator can throw or
+    /// is async.
+    ForEachAwait
   };
 
   static StringRef kindToString(Kind k) {
@@ -811,6 +815,8 @@ public:
         return "ByConformance";
       case Kind::AsyncLet:
         return "AsyncLet";
+      case Kind::ForEachAwait:
+      return "ForEachAwait";
     }
   }
 
@@ -842,6 +848,9 @@ public:
   }
   static PotentialEffectReason forAsyncLet() {
     return PotentialEffectReason(Kind::AsyncLet);
+  }
+  static PotentialEffectReason forForEachAwait() {
+    return PotentialEffectReason(Kind::ForEachAwait);
   }
 
   Kind getKind() const { return TheKind; }
@@ -3143,6 +3152,7 @@ public:
     case PotentialEffectReason::Kind::PropertyAccess:
     case PotentialEffectReason::Kind::SubscriptAccess:
     case PotentialEffectReason::Kind::AsyncLet:
+    case PotentialEffectReason::Kind::ForEachAwait:
       // Already fully diagnosed.
       return;
     case PotentialEffectReason::Kind::ByClosure:
@@ -3173,6 +3183,9 @@ public:
       return "property access";
     case PotentialEffectReason::Kind::SubscriptAccess:
       return "subscript access";
+
+    case PotentialEffectReason::Kind::ForEachAwait:
+      return "for-in loop";
     }
   }
 
@@ -3278,9 +3291,53 @@ public:
   void diagnoseUnhandledThrowSite(DiagnosticEngine &Diags, ASTNode E,
                                   bool isTryCovered,
                                   const PotentialEffectReason &reason) {
+    bool isForEach =
+      reason.getKind() == PotentialEffectReason::Kind::ForEachAwait;
+
+    // Helper for emitting a for-each-statement-level diagnostic with
+    // the loop-tailored fix-it (insert ` try` after `for`).
+    auto emitForEach = [&](Diag<> diagID) {
+      auto *forStmt = cast<ForEachStmt>(cast<Stmt *>(E));
+      auto diag = Diags.diagnose(forStmt->getForLoc(), diagID);
+      if (!isTryCovered)
+        diag.fixItInsertAfter(forStmt->getForLoc(), " try");
+    };
+
     switch (getKind()) {
     case Kind::PotentiallyHandled:
+      if (isDeferBody()) {
+        if (isForEach) {
+          emitForEach(diag::for_each_throwing_in_defer_body);
+          return;
+        }
+        Diags.diagnose(E.getStartLoc(), diag::throwing_op_in_defer_body,
+                       getEffectSourceName(reason));
+        return;
+      }
+
+      // try is covered and the throw doesn't require special handling.
+      if (isTryCovered &&
+          !reason.hasPolymorphicEffect() &&
+          !hasPolymorphicEffect(EffectKind::Throws) &&
+          !isAutoClosure()) {
+        if (isForEach) {
+          auto *forStmt = cast<ForEachStmt>(cast<Stmt *>(E));
+          Diags.diagnose(forStmt->getTryLoc(),
+                        IsNonExhaustiveCatch
+                          ? diag::try_unhandled_in_nonexhaustive_catch
+                          : diag::try_unhandled);
+          return;
+        }
+        DiagnoseErrorOnTry = true;
+        return;
+      }
+
       if (IsNonExhaustiveCatch) {
+        if (isForEach) {
+          emitForEach(diag::for_each_throwing_in_nonexhaustive_catch);
+          maybeAddRethrowsNote(Diags, E.getStartLoc(), reason);
+          return;
+        }
         diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                     diag::throwing_call_in_nonexhaustive_catch,
                             diag::tryless_throwing_call_in_nonexhaustive_catch);
@@ -3294,19 +3351,22 @@ public:
         return;
       }
 
-      if (isDeferBody()) {
-        Diags.diagnose(E.getStartLoc(), diag::throwing_op_in_defer_body,
-                       getEffectSourceName(reason));
-        return;
-      }
-
       if (hasPolymorphicEffect(EffectKind::Throws)) {
+        if (isForEach) {
+          emitForEach(diag::for_each_throwing_in_rethrows_function);
+          maybeAddRethrowsNote(Diags, E.getStartLoc(), reason);
+          return;
+        }
         diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                     diag::throwing_call_in_rethrows_function,
                             diag::tryless_throwing_call_in_rethrows_function);
         return;
       }
 
+      if (isForEach) {
+        emitForEach(diag::for_each_throwing_unhandled);
+        return;
+      }
       diagnoseThrowInLegalContext(Diags, E, isTryCovered, reason,
                                   diag::throwing_call_unhandled,
                                   diag::tryless_throwing_call_unhandled);
@@ -3409,6 +3469,7 @@ public:
     case PotentialEffectReason::Kind::ByDefaultClosure:
     case PotentialEffectReason::Kind::ByConformance:
     case PotentialEffectReason::Kind::Apply:
+    case PotentialEffectReason::Kind::ForEachAwait:
       return 1;
 
     case PotentialEffectReason::Kind::AsyncLet:
@@ -3585,6 +3646,14 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
       /// Does an enclosing 'if' or 'switch' expr have an 'unsafe'?
       StmtExprCoversUnsafe = 0x4000,
+
+      /// Are we walking the desugared body of a `ForEachStmt`? When 
+      /// set, throwing diagnostics on synthesized iterator calls are 
+      /// suppressed. The for-each-statement-level diagnostic (emitted 
+      /// from `checkForEach()`) provides loop-tailored wording instead.
+      /// Async, unsafe, and try-coverage diagnostics on those 
+      /// synthesized calls continue to fire normally.
+      InForEachDesugar = 0x8000,
     };
   private:
     unsigned Bits;
@@ -3794,6 +3863,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       Self.Flags.set(ContextFlags::IsTryCovered);
       Self.Flags.set(ContextFlags::IsAsyncCovered);
       Self.Flags.set(ContextFlags::IsUnsafeCovered);
+      Self.Flags.set(ContextFlags::InForEachDesugar);
     }
 
     void refineLocalContext(Context newContext) {
@@ -4463,6 +4533,20 @@ private:
       bool isTryCovered =
         (!requiresTry || Flags.has(ContextFlags::IsTryCovered) ||
          Flags.has(ContextFlags::InAsyncLet));
+
+      // Inside the desugared body of a `for-in` loop, suppress throwing
+      // diagnostics on synthesized iterator calls. The for-each-statement-
+      // level diagnostic from `checkForEach` provides loop-tailored wording.
+      // We still compute and return the thrown error destination so SILGen
+      // and IRGen see the correct typed-throws bookkeeping.
+      if (Flags.has(ContextFlags::InForEachDesugar)) {
+        if (CurContext.handlesThrows(throwsKind) && isTryCovered) {
+          return checkThrownErrorType(
+              E.getStartLoc(), classification.getThrownError());
+        }
+        break;
+      }
+
       if (!CurContext.handlesThrows(throwsKind)) {
         CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, E, isTryCovered,
                                               classification.getThrowReason());
@@ -4651,15 +4735,12 @@ private:
       if (throwsKind != ConditionalEffectKind::None)
         Flags.set(ContextFlags::HasAnyThrowSite);
 
-      // TODO: We ought to have a custom throws reason for this and unify the
-      // diagnostic handling (https://github.com/swiftlang/swift/issues/89124).
       auto tryLoc = S->getTryLoc();
       if (!CurContext.handlesThrows(throwsKind)) {
-        CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, S, tryLoc.isValid(),
-                                              classification.getThrowReason());
-        CurContext.diagnoseUnhandledTry(Ctx.Diags, tryLoc);
-      } else if (!tryLoc) {
-        Ctx.Diags.diagnose(S->getForLoc(), diag::for_throw_without_try)
+        CurContext.diagnoseUnhandledThrowSite(
+            Ctx.Diags, S, tryLoc.isValid(), PotentialEffectReason::forForEachAwait());
+      } else if (!tryLoc.isValid()) {
+        Ctx.Diags.diagnose(S->getForLoc(), diag::for_each_throwing_without_try)
           .fixItInsertAfter(S->getForLoc(), " try");
       }
     }
@@ -4856,7 +4937,8 @@ private:
         case PotentialEffectReason::Kind::ByClosure:
         case PotentialEffectReason::Kind::ByDefaultClosure:
         case PotentialEffectReason::Kind::ByConformance:
-        case PotentialEffectReason::Kind::Apply: {
+        case PotentialEffectReason::Kind::Apply:
+        case PotentialEffectReason::Kind::ForEachAwait: {
          if (auto autoclosure = dyn_cast<AutoClosureExpr>(anchor)) {
            switch(autoclosure->getThunkKind()) {
              case AutoClosureExpr::Kind::None:
@@ -4972,6 +5054,7 @@ private:
     case PotentialEffectReason::Kind::ByClosure:
     case PotentialEffectReason::Kind::ByDefaultClosure:
     case PotentialEffectReason::Kind::ByConformance:
+    case PotentialEffectReason::Kind::ForEachAwait:
       break;
     }
 
