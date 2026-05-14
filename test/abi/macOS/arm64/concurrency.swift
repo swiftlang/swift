@@ -437,3 +437,30 @@ Added: _$ss12ContinuationVMn
 Added: _$ss12ContinuationVsRi_zrlE7contextBcvg
 Added: _$ss12ContinuationVsRi_zrlEfD
 Added: _$ss12ContinuationVsRi_zrlEyAByxq_GBccfC
+
+// Task.id / UnsafeCurrentTask.id / Task.currentID
+Added: _$sScT2ids6UInt64VvpMV
+Added: _$sSct2ids6UInt64VvpMV
+Added: _$sScTss5NeverORszABRs_rlE9currentIDs6UInt64VSgvpZMV
+
+// Task.identifier / UnsafeCurrentTask.identifier / Task.currentIdentifier
+Added: _swift_task_getCurrentTaskId
+Added: _$sScT10identifiers14TaskIdentifierVvpMV
+Added: _$sSct10identifiers14TaskIdentifierVvpMV
+Added: _$sScTss5NeverORszABRs_rlE17currentIdentifiers04TaskC0VSgvpZMV
+
+// TaskIdentifier struct (Sendable, Hashable)
+Added: _$ss14TaskIdentifierVMa
+Added: _$ss14TaskIdentifierVMn
+Added: _$ss14TaskIdentifierVN
+Added: _$ss14TaskIdentifierVSHsMc
+Added: _$ss14TaskIdentifierVSQsMc
+Added: _$ss14TaskIdentifierV2eeoiySbAB_ABtFZ
+Added: _$ss14TaskIdentifierV4hash4intoys6HasherVz_tF
+Added: _$ss14TaskIdentifierV8rawValues6UInt64VvpMV
+Added: _$ss14TaskIdentifierV9hashValueSivg
+Added: _$ss14TaskIdentifierV9hashValueSivpMV
+Added: _$ss14TaskIdentifierV9_rawValues6UInt64Vvg
+Added: _$ss14TaskIdentifierV9_rawValues6UInt64VvM
+Added: _$ss14TaskIdentifierV9_rawValues6UInt64VvpMV
+Added: _$ss14TaskIdentifierV9_rawValues6UInt64Vvs

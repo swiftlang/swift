@@ -216,6 +216,7 @@ import SubstringTest
 import Suffix
 import SuperChars
 import TaskGroups
+import TaskIdentifier
 import TaskLocalGet
 import ToddCoxeter
 import TwoSum
@@ -433,6 +434,7 @@ register(SubstringTest.benchmarks)
 register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
 register(TaskGroups.benchmarks)
+register(TaskIdentifier.benchmarks)
 register(TaskLocalGet.benchmarks)
 register(ToddCoxeter.benchmarks)
 register(TwoSum.benchmarks)

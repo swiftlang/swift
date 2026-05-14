@@ -151,6 +151,14 @@ uint64_t swift::swift_task_getJobTaskId(Job *job) {
   }
 }
 
+uint64_t swift::swift_task_getCurrentTaskId() {
+  if (auto task = swift_task_getCurrent()) {
+    return task->getTaskId();
+  }
+  // 0 is never a valid task ID (see AsyncTask::setTaskId).
+  return 0;
+}
+
 extern "C" void *swift_job_alloc(SwiftJob *job, size_t size) {
   auto task = cast<AsyncTask>(reinterpret_cast<Job *>(job));
   return _swift_task_alloc_specific(task, size);

@@ -290,6 +290,49 @@ extension Task: Equatable {
   }
 }
 
+// ==== -----------------------------------------------------------------------
+// MARK: Task Identifier
+
+/// An opaque, process-unique identifier for a Swift ``Task``.
+///
+/// A `TaskIdentifier` is assigned at task creation, never changes for the
+/// lifetime of the task, and is never reused once a task has completed.
+/// Identifiers are scoped to the current process and are not suitable for
+/// cross-process correlation.
+///
+/// Reading the identifier of the currently-executing task is fast.
+///
+/// - See: ``Task/currentIdentifier``
+/// - See: ``Task/identifier``
+/// - See: ``UnsafeCurrentTask/identifier``
+@available(StdlibDeploymentTarget 6.5, *)
+@frozen
+public struct TaskIdentifier: Sendable, Hashable {
+  @usableFromInline
+  internal var _rawValue: UInt64
+
+  @_alwaysEmitIntoClient
+  internal init(_rawValue: UInt64) {
+    self._rawValue = _rawValue
+  }
+
+  /// The raw 64-bit value of this identifier.
+  ///
+  /// This is the only escape hatch from the opaque type and is intended for
+  /// serialization, logging, or interop with tools that expect a numeric
+  /// task ID. The numeric value carries no semantic meaning beyond the
+  /// guarantees on `TaskIdentifier` itself.
+  @_alwaysEmitIntoClient
+  public var rawValue: UInt64 { _rawValue }
+}
+
+@available(StdlibDeploymentTarget 6.5, *)
+extension Task {
+  /// A type alias for ``TaskIdentifier``, providing the spelling
+  /// `Task.Identifier` at the use site.
+  public typealias Identifier = TaskIdentifier
+}
+
 // ==== Task Priority ----------------------------------------------------------
 
 /// The priority of a task.
@@ -437,6 +480,29 @@ extension Task where Success == Never, Failure == Never {
       }
       return nil
     }
+  }
+
+  /// The stable identifier of the currently-executing task.
+  ///
+  /// If you access this static property outside the execution context of a
+  /// task, it will return `nil`.
+  ///
+  /// This identifier is quick to obtain and can be used to reliably identify
+  /// a task, instead of its memory address which may be reused once the task
+  /// has been destroyed. No guarantees are made about its exact numeric
+  /// value.
+  ///
+  /// - SeeAlso: ``Task/identifier``
+  /// - SeeAlso: ``UnsafeCurrentTask/identifier``
+  @available(StdlibDeploymentTarget 6.5, *)
+  @_alwaysEmitIntoClient
+  public static var currentIdentifier: Task.Identifier? {
+    // Direct runtime call: reads the id on the current AsyncTask without
+    // ever surfacing the task reference to Swift, so there's no ARC dance.
+    // The runtime returns 0 when there is no current task; task IDs are
+    // guaranteed to be non-zero.
+    let id = _getCurrentTaskId()
+    return id == 0 ? nil : TaskIdentifier(_rawValue: id)
   }
 
 }
@@ -643,6 +709,26 @@ extension Task {
       nil
     }
   }
+
+  /// A stable identifier for this task.
+  ///
+  /// This identifier is quick to obtain and can be used to reliably identify
+  /// a task, instead of its memory address which may be reused once the task
+  /// has been destroyed. No guarantees are made about its exact numeric
+  /// value.
+  ///
+  /// The same identifier is visible in tools such as `swift-inspect` and
+  /// Instruments, which makes it a convenient correlation key for tracing
+  /// and logging.
+  ///
+  /// - SeeAlso: ``Task/currentIdentifier``
+  /// - SeeAlso: ``UnsafeCurrentTask/identifier``
+  @available(StdlibDeploymentTarget 6.5, *)
+  @_alwaysEmitIntoClient
+  public var identifier: Identifier {
+    unsafe .init(
+      _rawValue: _getJobTaskId(unsafeBitCast(_task, to: UnownedJob.self)))
+  }
 }
 
 // ==== Voluntary Suspension -----------------------------------------------------
@@ -719,9 +805,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
     return try body(nil)
   }
 
-  // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
-  //        with "destroying a task that never completed" in the task's destroy.
-  //        How do we solve this properly?
+  // This retain is here to counter the release that will happen when the task leaves scope.
   Builtin.retain(_task)
 
   return try unsafe body(UnsafeCurrentTask(_task))
@@ -901,6 +985,24 @@ public struct UnsafeCurrentTask {
     } else {
       nil
     }
+  }
+
+  /// A stable identifier for the current task.
+  ///
+  /// This identifier is quick to obtain and can be used to reliably identify
+  /// a task, instead of its memory address which may be reused once the task
+  /// has been destroyed. No guarantees are made about its exact numeric
+  /// value.
+  ///
+  /// Returns the same value as ``Task/identifier`` read on the owning task.
+  ///
+  /// - SeeAlso: ``Task/identifier``
+  /// - SeeAlso: ``Task/currentIdentifier``
+  @available(StdlibDeploymentTarget 6.5, *)
+  @_alwaysEmitIntoClient
+  public var identifier: Task.Identifier {
+    unsafe TaskIdentifier(
+      _rawValue: _getJobTaskId(unsafeBitCast(_task, to: UnownedJob.self)))
   }
 }
 

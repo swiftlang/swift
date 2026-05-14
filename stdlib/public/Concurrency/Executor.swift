@@ -941,8 +941,16 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
 ///
 /// - Returns: the Id stored in this ExecutorJob or Task, for purposes of debug printing
 @available(StdlibDeploymentTarget 5.9, *)
+@usableFromInline
 @_silgen_name("swift_task_getJobTaskId")
 internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
+
+/// Returns the 64-bit TaskID of the currently-executing task, or 0 if there
+/// is no current task.
+@available(StdlibDeploymentTarget 6.5, *)
+@usableFromInline
+@_silgen_name("swift_task_getCurrentTaskId")
+internal func _getCurrentTaskId() -> UInt64
 
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("_task_serialExecutor_isSameExclusiveExecutionContext")
