@@ -764,6 +764,11 @@ cacheCanonicalSpecializedMetadata(const TypeContextDescriptor *description,
       (void *)description);
 }
 
+SWIFT_CC(swift)
+static MetadataResponse
+_swift_getGenericMetadata(MetadataRequest request, const void *const *arguments,
+                          const TypeContextDescriptor *description);
+
 MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
     MetadataRequest request, const Metadata *candidate,
     const Metadata **cacheMetadataPtr) {
@@ -781,6 +786,23 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
                             MetadataState::Complete};
   }
 
+  const void *const *arguments =
+      reinterpret_cast<const void *const *>(candidate->getGenericArgs());
+
+  if (SWIFT_UNLIKELY(
+          runtime::environment::
+              SWIFT_DEBUG_DISABLE_NONCANONICAL_STATIC_SPECIALIZATIONS())) {
+    // Pretend the noncanonical static specialization isn't there. Route
+    // through the normal generic metadata instantiation path instead.
+    auto response = _swift_getGenericMetadata(request, arguments, description);
+
+    // Don't cache incomplete metadata, since code above assumes cached metadata
+    // is complete.
+    if (response.State == MetadataState::Complete)
+      cachedMetadataAddr->store(response.Value, std::memory_order_release);
+    return response;
+  }
+
   if (auto *token =
           description
               ->getCanonicalMetadataPrespecializationCachingOnceToken()) {
@@ -788,8 +810,6 @@ MetadataResponse swift::swift_getCanonicalSpecializedMetadata(
     // NOTE: If there is no token, then there are no canonical prespecialized
     //       metadata records, either.
   }
-  const void *const *arguments =
-      reinterpret_cast<const void *const *>(candidate->getGenericArgs());
   auto &cache = getCache(*description);
   auto key = MetadataCacheKey(cache.SigLayout, arguments);
   auto result = cache.getOrInsert(key, request, candidate);
