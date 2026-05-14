@@ -3433,8 +3433,13 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   // Determine the access level for the property.
   property->overwriteAccess(var->getFormalAccess());
 
-  // Determine setter access.
-  property->overwriteSetterAccess(var->getSetterFormalAccess());
+  // Determine setter access. `projectedValue` setter could be less
+  // accessible than the variable itself and vice versa, we need to
+  // account for that and take the less permitting access of the two.
+  property->overwriteSetterAccess(
+      wrapperVar ? std::min(var->getSetterFormalAccess(),
+                            wrapperVar->getSetterFormalAccess())
+                 : var->getSetterFormalAccess());
 
   // Add the accessors we need.
   if (var->hasImplicitPropertyWrapper()) {
