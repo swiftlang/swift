@@ -344,7 +344,7 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
     for (auto &Outs : OutputsForInput)
       Builder.addOutput(Outs.first, Outs.second);
 
-    if (auto Err = Builder.build(CAS).moveInto(Result))
+    if (auto Err = Builder.build(CAS, InputIndex).moveInto(Result))
       return Err;
   }
 
