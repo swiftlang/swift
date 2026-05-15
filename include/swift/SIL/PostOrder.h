@@ -31,7 +31,7 @@ class PostOrderFunctionInfo {
 
 public:
   PostOrderFunctionInfo(SILFunction *F) {
-    for (auto *BB : make_range(po_begin(F), po_end(F))) {
+    for (auto *BB : post_order(F)) {
       BBToPOMap[BB] = PostOrder.size();
       PostOrder.push_back(BB);
     }
