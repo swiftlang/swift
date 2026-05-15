@@ -1729,6 +1729,8 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     } else {
       llvm_unreachable("unhandled @_rawLayout form");
     }
+    if (attr->shouldMoveAsLikeType())
+      Printer << ", movesAsLike";
     Printer << ")";
     break;
   }
