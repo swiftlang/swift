@@ -418,6 +418,21 @@ public:
   uncurry(ASTContext &ctx, ArrayRef<LifetimeDependenceInfo> inner,
           unsigned numInnerParams, unsigned numOuterParams);
 
+  /// Compute the lifetime dependencies for the result of a partial application
+  /// of a SIL function with the given lifetimes and number of parameters,
+  /// binding the given number of arguments.
+  ///
+  /// Dependencies on parameters that are bound by the partial_apply are
+  /// replaced with 'captures' dependencies.
+  ///
+  /// Example: binding 1 argument of a 2-argument function.
+  /// %b = ... : B
+  /// %f = function_ref @closure : (A, B) -> @lifetime(borrow 1) C
+  /// %c = partial_apply %f(%b) : (A) -> @lifetime(captures) C
+  static ArrayRef<LifetimeDependenceInfo>
+  partialApply(ASTContext &ctx, ArrayRef<LifetimeDependenceInfo> lifetimes,
+               unsigned numFormalParams, unsigned numBoundParams);
+
   bool operator==(const LifetimeDependenceInfo &other) const {
     return this->hasImmortalSpecifier() == other.hasImmortalSpecifier() &&
            this->hasCaptures() == other.hasCaptures() &&
