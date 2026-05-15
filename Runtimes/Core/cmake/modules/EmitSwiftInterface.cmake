@@ -27,8 +27,7 @@ function(emit_swift_interface target)
   endif()
 
   target_compile_options(${target} PRIVATE
-    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule>"
-    $<IF:$<AND:$<BOOL:${SwiftCore_ENABLE_SOURCE_INFO}>,$<COMPILE_LANGUAGE:Swift>>,"-emit-module-source-info-path $<SHELL_PATH:${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo>","-avoid-emit-module-source-info">)
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule>")
   set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
     "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule"
     "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftdoc"
