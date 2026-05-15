@@ -212,6 +212,7 @@ set(SWIFT_BENCH_MODULES
     single-source/SuperChars
     single-source/TaskGroups
     single-source/TaskLocalGet
+    single-source/ToddCoxeter
     single-source/TwoSum
     single-source/TypeFlood
     single-source/UTF8Decode
