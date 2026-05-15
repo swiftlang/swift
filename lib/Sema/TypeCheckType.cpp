@@ -1698,7 +1698,7 @@ TypeResolver::applyGenericArguments(Type type, DeclRefTypeRepr *repr,
 /// Apply generic arguments to the given type.
 Type TypeResolution::applyUnboundGenericArguments(
     GenericTypeDecl *decl, Type parentTy, SourceLoc loc,
-    ArrayRef<Type> genericArgs) const {
+    ArrayRef<Type> genericArgs, bool *diagnosedRequirementFailure) const {
   assert(genericArgs.size() == decl->getGenericParams()->size() &&
          "invalid arguments, use applyGenericArguments to emit diagnostics "
          "and collect arguments to pack generic parameters");
@@ -1835,6 +1835,8 @@ Type TypeResolution::applyUnboundGenericArguments(
               result.getRequirementFailureInfo(), loc, noteLoc,
               UnboundGenericType::get(decl, parentTy, ctx),
               genericSig.getGenericParams(), substitutions);
+          if (diagnosedRequirementFailure)
+            *diagnosedRequirementFailure = true;
         }
 
         LLVM_FALLTHROUGH;
@@ -6018,11 +6020,11 @@ TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
     return ErrorType::get(getASTContext());
   }
 
-  if (!resolution.applyUnboundGenericArguments(
-          dictDecl, nullptr, repr->getStartLoc(), {keyTy, valueTy})) {
-    assert(getASTContext().Diags.hadAnyError());
+  auto substTy = resolution.applyUnboundGenericArguments(
+          dictDecl, nullptr, repr->getStartLoc(), {keyTy, valueTy});
+  if (substTy->hasError())
     return ErrorType::get(getASTContext());
-  }
+
   return DictionaryType::get(keyTy, valueTy);
 }
 
@@ -6192,17 +6194,28 @@ NeverNullType TypeResolver::resolveVarargType(VarargTypeRepr *repr,
       .highlight(repr->getSourceRange());
   }
 
-  // do not allow move-only types as the element of a vararg
-  // FIXME: This does not correctly handle type variables and unbound generics.
-  if (inStage(TypeResolutionStage::Interface)) {
-    auto contextTy = GenericEnvironment::mapTypeIntoEnvironment(
-        resolution.getGenericSignature().getGenericEnvironment(), element);
-    if (!contextTy->hasError() && contextTy->isNoncopyable()) {
-      diagnoseInvalid(repr, repr->getLoc(), diag::noncopyable_generics_variadic,
-                      element);
-      return ErrorType::get(getASTContext());
-    }
+  auto *const arrayDecl = getASTContext().getArrayDecl();
+  if (!arrayDecl) {
+    diagnose(repr->getStartLoc(), diag::sugar_type_not_found, 0);
+    return ErrorType::get(getASTContext());
   }
+
+  bool diagnosedRequirementFailure = false;
+  auto substTy = resolution.applyUnboundGenericArguments(
+          arrayDecl, nullptr, repr->getStartLoc(), {element},
+          &diagnosedRequirementFailure);
+  if (diagnosedRequirementFailure) {
+    ASSERT(getASTContext().Diags.hadAnyError());
+
+    // If we end up here, we have an element type that cannot be stored in
+    // an Array. Add an additional note to state exactly why this type must
+    // conform to Copyable or Escapable.
+    diagnose(repr->getLoc(), diag::noncopyable_or_nonescaping_variadic);
+    return ErrorType::get(getASTContext());
+  }
+
+  if (substTy->hasError())
+    return ErrorType::get(getASTContext());
 
   return element;
 }

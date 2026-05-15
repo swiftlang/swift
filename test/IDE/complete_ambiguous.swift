@@ -1,6 +1,6 @@
 // RUN: %batch-code-completion
 
-struct A {
+struct A: Hashable {
   func doAThings() -> A { return self }
 }
 
@@ -56,20 +56,24 @@ func testCallAsFunctionDeduplication() {
 
 givenErrorExpr(undefined).#^ERROR_IN_BASE?check=SIMPLE^#
 
-// SIMPLE: Begin completions, 4 items
+// SIMPLE: Begin completions, 6 items
 // SIMPLE-DAG: Keyword[self]/CurrNominal:          self[#A#]{{; name=.+$}}
 // SIMPLE-DAG: Decl[InstanceMethod]/CurrNominal:   doAThings()[#A#]{{; name=.+$}}
 // SIMPLE-DAG: Keyword[self]/CurrNominal:          self[#B#]{{; name=.+$}}
 // SIMPLE-DAG: Decl[InstanceMethod]/CurrNominal:   doBThings()[#Void#]{{; name=.+$}}
+// SIMPLE-DAG: Decl[InstanceMethod]/CurrNominal: hash({#into: &Hasher#})[#Void#]{{; name=.+$}}
+// SIMPLE-DAG: Decl[InstanceVar]/CurrNominal: hashValue[#Int#]{{; name=.+$}}
 
 let x2: A = overloadedReturn().#^RELATED^#
 let x3: A = overloadedReturn(1).#^RELATED_EXTRAARG?check=RELATED^#
 
-// RELATED: Begin completions, 4 items
+// RELATED: Begin completions, 6 items
 // RELATED-DAG: Keyword[self]/CurrNominal:          self[#A#]{{; name=.+$}}
 // RELATED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: doAThings()[#A#]{{; name=.+$}}
 // RELATED-DAG: Keyword[self]/CurrNominal:          self[#B#]{{; name=.+$}}
 // RELATED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings()[#Void#]{{; name=.+$}}
+// RELATED-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#into: &Hasher#})[#Void#]{{; name=.+$}}
+// RELATED-DAG: Decl[InstanceVar]/CurrNominal: hashValue[#Int#]{{; name=.+$}}
 
 func takesClosureGivingA(_ callback: () -> A) -> B {}
 func takesB(_ item: B) {}
@@ -81,11 +85,12 @@ func overloadedArg(_ arg: B) -> B {}
 
 overloadedArg(.#^UNRESOLVED_AMBIGUOUS^#)
 
-// UNRESOLVED_AMBIGUOUS: Begin completions, 4 items
+// UNRESOLVED_AMBIGUOUS: Begin completions, 5 items
 // UNRESOLVED_AMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal: doAThings({#(self): A#})[#() -> A#]{{; name=.+$}}
 // UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#A#]{{; name=.+$}}
 // UNRESOLVED_AMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: doBThings({#(self): B#})[#() -> Void#]{{; name=.+$}}
 // UNRESOLVED_AMBIGUOUS-DAG: Decl[Constructor]/CurrNominal/TypeRelation[Convertible]: init()[#B#]{{; name=.+$}}
+// UNRESOLVED_AMBIGUOUS-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): A#})[#(into: inout Hasher) -> Void#]{{; name=.+$}}
 
 // Make sure we still offer A and B members as the user may intend to add a member on the end of the overloadedArg call later that has type B.
 takesB(overloadedArg(.#^UNRESOLVED_STILLAMBIGUOUS?check=UNRESOLVED_AMBIGUOUS^#))
@@ -132,16 +137,20 @@ struct TestRelations {
 
 // test we consider both overloads as $0 or $1 may have just not been written yet
 takesAnonClosure { $1.#^UNAMBIGUOUSCLOSURE_ARG^# }
-// UNAMBIGUOUSCLOSURE_ARG: Begin completions, 2 items
+// UNAMBIGUOUSCLOSURE_ARG: Begin completions, 4 items
 // UNAMBIGUOUSCLOSURE_ARG-DAG: Keyword[self]/CurrNominal: self[#A#]{{; name=.+$}}
 // UNAMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal: doAThings()[#A#]{{; name=.+$}}
+// UNAMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal: hash({#into: &Hasher#})[#Void#]{{; name=.+$}}
+// UNAMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceVar]/CurrNominal: hashValue[#Int#]{{; name=.+$}}
 
 takesAnonClosure { $0.#^AMBIGUOUSCLOSURE_ARG^# }
-// AMBIGUOUSCLOSURE_ARG: Begin completions, 4 items
+// AMBIGUOUSCLOSURE_ARG: Begin completions, 6 items
 // AMBIGUOUSCLOSURE_ARG-DAG: Keyword[self]/CurrNominal: self[#A#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: doAThings()[#A#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG-DAG: Keyword[self]/CurrNominal: self[#B#]{{; name=.+$}}
 // AMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal: doBThings()[#Void#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceMethod]/CurrNominal: hash({#into: &Hasher#})[#Void#]{{; name=.+$}}
+// AMBIGUOUSCLOSURE_ARG-DAG: Decl[InstanceVar]/CurrNominal: hashValue[#Int#]{{; name=.+$}}
 
 takesAnonClosure { TestRelations.#^AMBIGUOUSCLOSURE_ARG_RETURN^# }
 // AMBIGUOUSCLOSURE_ARG_RETURN: Begin completions, 6 items
@@ -179,7 +188,6 @@ func arrayLiteralDictionaryMismatch<T>(a: inout T) where T: ExpressibleByDiction
 // PARSED_AS_ARRAY_KEY-DAG: Decl[StaticVar]/CurrNominal: ab[#(A, B)#]{{; name=.+$}}
 // PARSED_AS_ARRAY_KEY-DAG: Decl[Constructor]/CurrNominal: init()[#TestRelations#]{{; name=.+$}}
 
-let _: [(A, B) : B] = [TestRelations.#^PARSED_AS_ARRAY_TUPLE^#]
 let _: [(A, B)] = [TestRelations.#^PARSED_AS_ARRAY_ARRAY?check=PARSED_AS_ARRAY_TUPLE^#]
 // PARSED_AS_ARRAY_TUPLE: Begin completions, 6 items
 // PARSED_AS_ARRAY_TUPLE-DAG: Keyword[self]/CurrNominal: self[#TestRelations.Type#]{{; name=.+$}}
@@ -321,11 +329,13 @@ func genericReturn<T:D, U>(_ x: T) -> U where U == T.Item {
 
 genericReturn(CDStruct()).#^GENERIC^#
 
-// GENERIC: Begin completions, 4 items
+// GENERIC: Begin completions, 6 items
 // GENERIC-DAG: Keyword[self]/CurrNominal:          self[#B#]{{; name=.+$}}
 // GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   doBThings()[#Void#]{{; name=.+$}}
 // GENERIC-DAG: Keyword[self]/CurrNominal:          self[#A#]{{; name=.+$}}
 // GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   doAThings()[#A#]{{; name=.+$}}
+// GENERIC-DAG: Decl[InstanceMethod]/CurrNominal:   hash({#into: &Hasher#})[#Void#]{{; name=.+$}}
+// GENERIC-DAG: Decl[InstanceVar]/CurrNominal:      hashValue[#Int#]{{; name=.+$}}
 
 genericReturn().#^GENERIC_MISSINGARG?check=NORESULTS^#
 
