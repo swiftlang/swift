@@ -18,6 +18,19 @@ func missingThrows<T : AsyncSequence>(_ seq: T) async {
 }
 
 @available(SwiftStdlib 5.1, *)
+func missingTry<T : AsyncSequence>(_ seq: T) async throws {
+  for await _ in seq { }
+  // expected-error@-1 {{for-in loop can throw, but is not marked with 'try'}} {{6-6= try}}
+}
+
+@available(SwiftStdlib 5.1, *)
+func missingTryAndThrows<T : AsyncSequence>(_ seq: T) async {
+  // FIXME: Improve this diagnostic
+  for await _ in seq { }
+  // expected-error@-1 {{call can throw, but it is not marked with 'try' and the error is not handled}}
+}
+
+@available(SwiftStdlib 5.1, *)
 func executeAsync(_ work: () async -> Void) { }
 @available(SwiftStdlib 5.1, *)
 func execute(_ work: () -> Void) { }

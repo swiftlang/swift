@@ -4651,11 +4651,16 @@ private:
       if (throwsKind != ConditionalEffectKind::None)
         Flags.set(ContextFlags::HasAnyThrowSite);
 
+      // TODO: We ought to have a custom throws reason for this and unify the
+      // diagnostic handling (https://github.com/swiftlang/swift/issues/89124).
+      auto tryLoc = S->getTryLoc();
       if (!CurContext.handlesThrows(throwsKind)) {
-        auto tryLoc = S->getTryLoc();
         CurContext.diagnoseUnhandledThrowSite(Ctx.Diags, S, tryLoc.isValid(),
                                               classification.getThrowReason());
         CurContext.diagnoseUnhandledTry(Ctx.Diags, tryLoc);
+      } else if (!tryLoc) {
+        Ctx.Diags.diagnose(S->getForLoc(), diag::for_throw_without_try)
+          .fixItInsertAfter(S->getForLoc(), " try");
       }
     }
 
