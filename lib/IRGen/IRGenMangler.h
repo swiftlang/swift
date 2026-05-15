@@ -47,7 +47,7 @@ public:
   IRGenMangler(ASTContext &Ctx) : ASTMangler(Ctx) { }
 
   std::string mangleDispatchThunk(const FuncDecl *func) {
-    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
+    llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(func));
     beginMangling();
     appendEntity(func);
     appendOperator("Tj");
@@ -59,7 +59,7 @@ public:
   std::string mangleDerivativeDispatchThunk(
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
-    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
+    llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(func));
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
@@ -76,7 +76,7 @@ public:
 
   std::string mangleConstructorDispatchThunk(const ConstructorDecl *ctor,
                                              bool isAllocating) {
-    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(ctor));
+    llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(ctor));
     beginMangling();
     appendConstructorEntity(ctor, isAllocating);
     appendOperator("Tj");
@@ -84,7 +84,7 @@ public:
   }
 
   std::string mangleMethodDescriptor(const FuncDecl *func) {
-    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
+    llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(func));
     beginMangling();
     appendEntity(func);
     appendOperator("Tq");
@@ -96,7 +96,7 @@ public:
   std::string mangleDerivativeMethodDescriptor(
       const AbstractFunctionDecl *func,
       AutoDiffDerivativeFunctionIdentifier *derivativeId) {
-    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(func));
+    llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(func));
     beginManglingWithAutoDiffOriginalFunction(func);
     auto kind = Demangle::getAutoDiffFunctionKind(derivativeId->getKind());
     auto *resultIndices =
@@ -113,7 +113,7 @@ public:
 
   std::string mangleConstructorMethodDescriptor(const ConstructorDecl *ctor,
                                                 bool isAllocating) {
-    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(ctor));
+    llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(ctor));
     beginMangling();
     appendConstructorEntity(ctor, isAllocating);
     appendOperator("Tq");
@@ -401,7 +401,7 @@ public:
                                     const RootProtocolConformance *conformance);
 
   std::string manglePropertyDescriptor(const AbstractStorageDecl *storage) {
-    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(storage));
+    llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(storage));
     beginMangling();
     appendEntity(storage);
     appendOperator("MV");
@@ -409,7 +409,7 @@ public:
   }
 
   std::string mangleFieldOffset(const ValueDecl *Decl) {
-    llvm::SaveAndRestore X(AllowInverses, inversesAllowed(Decl));
+    llvm::SaveAndRestore X(AllowedInverses, inversesAllowed(Decl));
     beginMangling();
     appendEntity(Decl);
     appendOperator("Wvd");

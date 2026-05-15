@@ -3074,6 +3074,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   }
 #include "swift/AST/DeclAttr.def"
 
+    case DeclAttrKind::PreInverseGenerics: {
+      auto *attr = cast<PreInverseGenericsAttr>(DA);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[PreInverseGenericsDeclAttrLayout::Code];
+      auto exceptType = attr->getResolvedExceptType(D);
+      if (S.skipTypeIfInvalid(exceptType, attr->getExceptTypeRepr()))
+        return;
+
+      auto typeID = S.addTypeRef(exceptType);
+      PreInverseGenericsDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), typeID);
+      return;
+    }
+
     case DeclAttrKind::ABI: {
       auto *theAttr = cast<ABIAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ABIDeclAttrLayout::Code];

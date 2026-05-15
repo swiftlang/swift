@@ -16,6 +16,7 @@
 #ifndef SWIFT_TYPE_CHECK_REQUESTS_H
 #define SWIFT_TYPE_CHECK_REQUESTS_H
 
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/ActorIsolation.h"
@@ -66,6 +67,7 @@ struct PropertyWrapperMutability;
 class RequirementRepr;
 class ReturnStmt;
 class AbstractSpecializeAttr;
+class PreInverseGenericsAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
@@ -3842,6 +3844,26 @@ private:
 
 public:
   // Separate caching.
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+};
+
+class ResolvePreInverseGenericsRequest
+    : public SimpleRequest<ResolvePreInverseGenericsRequest,
+                           Type(Decl *, PreInverseGenericsAttr *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Type evaluate(Evaluator &evaluator,
+                Decl *decl,
+                PreInverseGenericsAttr *attr) const;
+
+public:
   bool isCached() const { return true; }
   std::optional<Type> getCachedResult() const;
   void cacheResult(Type value) const;

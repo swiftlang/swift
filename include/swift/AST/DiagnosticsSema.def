@@ -4462,6 +4462,16 @@ ERROR(attr_rawlayout_invalid_count_type,none,
       "'@_rawLayout' count must either be integer literal or a generic "
       "argument", ())
 
+ERROR(attr_pre_inverse_generics_invalid_except,none,
+      "'except' argument to '@_preInverseGenerics' must consist only of "
+      "inverse constraints such as '~Copyable' or '~Escapable'", ())
+WARNING(attr_pre_inverse_generics_except_all,none,
+      "'@_preInverseGenerics' that excepts all inverse constraints is "
+      "equivalent to not using the attribute", ())
+WARNING(attr_pre_inverse_generics_on_extension,none,
+      "'@_preInverseGenerics' has no effect on an extension; place it on "
+      "individual members instead", ())
+
 // lazy
 ERROR(lazy_not_on_let,none,
       "'lazy' cannot be used on a let", ())

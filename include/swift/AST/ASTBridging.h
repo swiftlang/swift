@@ -911,6 +911,12 @@ BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
                                                 bool inverted,
                                                 BridgedArrayRef cFeatures);
 
+SWIFT_NAME("BridgedPreInverseGenericsAttr.createParsed(_:atLoc:range:)")
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsed(BridgedASTContext cContext,
+                                           swift::SourceLoc atLoc,
+                                           swift::SourceRange range);
+
 SWIFT_NAME(
     "BridgedBackDeployedAttr.createParsed(_:atLoc:range:platform:version:)")
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
