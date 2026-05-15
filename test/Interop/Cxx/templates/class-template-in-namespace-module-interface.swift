@@ -18,3 +18,36 @@
 // CHECK:   }
 
 // CHECK: }
+
+// CHECK: enum NS1 {
+// CHECK:   struct Box<CInt> {
+// CHECK:   }
+// CHECK:   typealias BoxInt = NS1.Box<CInt>
+// CHECK: }
+
+// CHECK: enum NS2 {
+// CHECK:   struct Box<CInt> {
+// CHECK:   }
+// CHECK:   typealias BoxInt = NS2.Box<CInt>
+// CHECK: }
+
+// CHECK: enum A {
+// CHECK:   enum B {
+// CHECK:     enum C1 {
+// CHECK:       struct Box<CInt> {
+// CHECK:       }
+// CHECK:       typealias BoxInt = A.B.C1.Box<CInt>
+// CHECK:       typealias BoxOfBoxInt = A.B.C1.Box<A.B.C1.Box<CInt>>
+// CHECK:       typealias BoxOfBoxC1 = A.B.C1.Box<A.B.C1.Box<CInt>>
+// CHECK:     }
+// CHECK:     enum C2 {
+// CHECK:       struct Box<CInt> {
+// CHECK:       }
+// CHECK:       typealias BoxInt = A.B.C2.Box<CInt>
+// CHECK:     }
+// CHECK:     typealias BoxInt = A.B.Box<CInt>
+// CHECK:     typealias BoxOfBoxInt = A.B.Box<A.B.Box<CInt>>
+// CHECK:     typealias BoxOfBoxC1 = A.B.Box<A.B.C1.Box<CInt>>
+// CHECK:     typealias BoxOfBoxC2 = A.B.Box<A.B.C2.Box<CInt>>
+// CHECK:   }
+// CHECK: }
