@@ -1622,7 +1622,11 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
 
   // Otherwise, see if a layout has been emitted with these characteristics
   // already.
-  FixedLayoutKey key{size, numExtraInhabitants, align, pod, unsigned(bt)};
+  bool addressableForDependencies =
+      getTypeProperties(silTy, TypeExpansionContext::minimal())
+          .isAddressableForDependencies();
+  FixedLayoutKey key{size, numExtraInhabitants, align,
+                     pod,  unsigned(bt),        addressableForDependencies};
 
   auto found = PrivateFixedLayouts.find(key);
   if (found != PrivateFixedLayouts.end())
@@ -1657,7 +1661,8 @@ llvm::Constant *IRGenModule::emitFixedTypeLayout(CanType t,
         "type_layout_" + llvm::Twine(size)
                        + "_" + llvm::Twine(align)
                        + "_" + llvm::Twine::utohexstr(numExtraInhabitants)
-                       + pod_bt_string(pod, bt),
+                       + pod_bt_string(pod, bt)
+                       + (addressableForDependencies ? "_afd" : ""),
         getPointerAlignment(),
         /*constant*/ true,
         llvm::GlobalValue::PrivateLinkage);
