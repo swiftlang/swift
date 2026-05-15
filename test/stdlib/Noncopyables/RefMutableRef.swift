@@ -172,6 +172,30 @@ suite.test("MutableRef inside a Ref")
 
   expectEqual(a, 128)
 }
+
+suite.test("Sendability")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  func isSendable<T: ~Copyable & ~Escapable>(_: T.Type) -> Bool { false }
+  func isSendable<T: Sendable & ~Copyable & ~Escapable>(_: T.Type) -> Bool { true }
+
+  expectTrue(isSendable(Ref<MutableRawSpan>.self))
+  expectTrue(isSendable(MutableRef<Int>.self))
+
+  expectFalse(isSendable(Ref<UnsafeMutableRawPointer>.self))
+  expectFalse(isSendable(MutableRef<UnsafeRawPointer>.self))
+}
+
+suite.test("BitwiseCopyability")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  func isBitwiseCopyable<T: ~Copyable & ~Escapable>(_: T.Type) -> Bool { false }
+  func isBitwiseCopyable<T: BitwiseCopyable & ~Escapable>(_: T.Type) -> Bool { true }
+
+  expectTrue(isBitwiseCopyable(Ref<Int>.self))
+  expectFalse(isBitwiseCopyable(MutableRef<Int>.self))
 }
 
 runAllTests()
