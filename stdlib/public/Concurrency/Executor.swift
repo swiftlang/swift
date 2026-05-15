@@ -40,25 +40,25 @@ public protocol Executor: AnyObject, Sendable {
 /// Represents a job that is scheduled for future execution.
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 9999, *)
-public struct ScheduledJob: ~Copyable {
+public struct JobCancellationToken: ~Copyable {
   /// The executor that this job was scheduled on
   public let executor: any SchedulingExecutor
 
   /// The job ID for this job
-  public let jobId: UInt64
+  public let jobID: UInt64
 
   /// Opaque, executor-specific data
   public let opaqueData: InlineArray<2, UInt>
 
   /// Optional clean-up function
-  public let cleanUp: ((borrowing ScheduledJob) -> ())?
+  public let cleanUp: ((borrowing JobCancellationToken) -> ())?
 
   public init(executor: any SchedulingExecutor,
-              jobId: UInt64,
+              jobID: UInt64,
               opaqueData: InlineArray<2, UInt>,
-              cleanUp: ((borrowing ScheduledJob) -> ())? = nil) {
+              cleanUp: ((borrowing JobCancellationToken) -> ())? = nil) {
     self.executor = executor
-    self.jobId = jobId
+    self.jobID = jobID
     self.opaqueData = opaqueData
     self.cleanUp = cleanUp
   }
@@ -84,7 +84,7 @@ public struct ScheduledJob: ~Copyable {
   /// Users of this API should expect it to perform on a best-effort
   /// basis and should not rely on the job being cancelled.
   public consuming func cancel() {
-    executor.cancel(scheduledJob: self)
+    executor.cancel(jobWithToken: self)
   }
   #endif
 }
@@ -111,13 +111,13 @@ public protocol SchedulingExecutor: Executor {
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay.
   ///
-  /// Returns a ``ScheduledJobCancellationToken`` that can be used to
+  /// Returns a ``JobCancellationToken`` that can be used to
   /// cancel the job before it runs.
   @available(SwiftStdlib 9999, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          after delay: C.Duration,
                          tolerance: C.Duration?,
-                         clock: C) -> ScheduledJob
+                         clock: C) -> JobCancellationToken
 
   /// Enqueue a job to run at a specified time.
   ///
@@ -134,18 +134,18 @@ public protocol SchedulingExecutor: Executor {
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay.
   ///
-  /// Returns a ``ScheduledJobCancellationToken`` that can be used to
+  /// Returns a ``JobCancellationToken`` that can be used to
   /// cancel the job before it runs.
   @available(SwiftStdlib 9999, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                          at instant: C.Instant,
                          tolerance: C.Duration?,
-                         clock: C) -> ScheduledJob
+                         clock: C) -> JobCancellationToken
 
   /// Cancel a scheduled job.
   ///
   /// Requests that the executor cancel the job identified by the
-  /// `scheduledJob` argument.  Note: executors may not be able
+  /// `jobWithToken` argument.  Note: executors may not be able
   /// to cancel any given job, for various reasons including:
   ///
   /// - Where the job has already started executing.
@@ -158,11 +158,10 @@ public protocol SchedulingExecutor: Executor {
   ///
   /// Parameters:
   ///
-  /// - scheduledJob:  The scheduled job to cancel.
+  /// - jobWithToken:  The scheduled job to cancel.
   ///
   @available(SwiftStdlib 9999, *)
-  func cancel(scheduledJob: consuming ScheduledJob)
-
+  func cancel(jobWithToken: consuming JobCancellationToken)
 
   #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
@@ -184,7 +183,7 @@ extension SchedulingExecutor {
     at instant: C.Instant,
     tolerance: C.Duration?,
     clock: C,
-    enqueueingClock: E) -> ScheduledJob {
+    enqueueingClock: E) -> JobCancellationToken {
     return enqueueingClock.enqueue(
       job,
       on: executor,
@@ -280,7 +279,7 @@ extension SchedulingExecutor {
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
-                                clock: C) -> ScheduledJob {
+                                clock: C) -> JobCancellationToken {
     // If you crash here with a mutual recursion, it's because you didn't
     // implement one of these two functions
     return enqueue(job, at: clock.now.advanced(by: delay),
@@ -291,7 +290,7 @@ extension SchedulingExecutor {
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
-                                clock: C) -> ScheduledJob {
+                                clock: C) -> JobCancellationToken {
     // If you crash here with a mutual recursion, it's because you didn't
     // implement one of these two functions
     return enqueue(job, after: clock.now.duration(to: instant),
@@ -1046,7 +1045,7 @@ func _checkExpectedExecutor(_filenameStart: Builtin.RawPointer,
 /// - Returns: the Id stored in this ExecutorJob or Task, for purposes of debug printing
 @available(StdlibDeploymentTarget 5.9, *)
 @_silgen_name("swift_task_getJobTaskId")
-internal func _getJobTaskId(_ job: UnownedJob) -> UInt64
+public func _getJobTaskId(_ job: UnownedJob) -> UInt64
 
 @available(SwiftStdlib 5.9, *)
 @_silgen_name("_task_serialExecutor_isSameExclusiveExecutionContext")

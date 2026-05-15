@@ -220,9 +220,9 @@ extension ContinuousClock: EnqueueingClock {
 
   public func run(_ job: consuming ExecutorJob,
                   at instant: Instant,
-                  tolerance: Duration?) -> ScheduledJob {
+                  tolerance: Duration?) -> JobCancellationToken {
     guard let executor = Task<Never,Never>.currentSchedulingExecutor else {
-      fatalError("no scheduling executor is available")
+      fatalError("no scheduling executor is available for job \(job.id)")
     }
 
     return executor.enqueue(job, at: instant,
@@ -233,7 +233,7 @@ extension ContinuousClock: EnqueueingClock {
   public func enqueue(_ job: consuming ExecutorJob,
                       on executor: some Executor,
                       at instant: Instant,
-                      tolerance: Duration?) -> ScheduledJob {
+                      tolerance: Duration?) -> JobCancellationToken {
     if let schedulingExecutor = executor.asSchedulingExecutor {
       return schedulingExecutor.enqueue(job, at: instant,
                                         tolerance: tolerance,

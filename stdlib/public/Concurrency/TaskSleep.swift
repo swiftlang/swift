@@ -198,7 +198,7 @@ extension Task where Success == Never, Failure == Never {
   /// the sleep completed.
   @available(StdlibDeploymentTarget 9999, *)
   static func onSleepCancel(_ token: UnsafeSleepStateToken,
-                            wakeUpJob: consuming ScheduledJob?) {
+                            wakeUpJobToken: consuming JobCancellationToken?) {
     while true {
       let state = unsafe token.load()
       switch unsafe state {
@@ -218,8 +218,8 @@ extension Task where Success == Never, Failure == Never {
         if unsafe token.exchange(expected: state, desired: .cancelled) {
           #if !$Embedded
           // Cancel the wake-up job, if any
-          if let wakeUpJob {
-            wakeUpJob.cancel()
+          if let wakeUpJobToken {
+            wakeUpJobToken.cancel()
           }
           #endif
 
@@ -252,7 +252,7 @@ extension Task where Success == Never, Failure == Never {
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
     let token = unsafe UnsafeSleepStateToken()
-    var wakeUpJob: ScheduledJob? = nil
+    var wakeUpJobToken: JobCancellationToken? = nil
 
     do {
       // Install a cancellation handler to resume the continuation by
@@ -286,11 +286,12 @@ extension Task where Success == Never, Failure == Never {
 
               #if !$Embedded
               if let executor = Task.currentSchedulingExecutor {
-                wakeUpJob = executor.enqueue(ExecutorJob(context: job),
+                wakeUpJobToken = executor.enqueue(ExecutorJob(context: job),
                                              after: .nanoseconds(duration),
                                              clock: .continuous)
                 return
               }
+              #endif
 
               // If there is no current scheduling executor, fall back to
               // _enqueueJobGlobalWithDelay()
@@ -312,8 +313,8 @@ extension Task where Success == Never, Failure == Never {
         }
         }
       } onCancel: {
-        unsafe onSleepCancel(token, wakeUpJob: wakeUpJob)
-        wakeUpJob = nil
+        unsafe onSleepCancel(token, wakeUpJobToken: wakeUpJobToken)
+        wakeUpJobToken = nil
       }
 
       // Determine whether we got cancelled before we even started.
@@ -346,7 +347,7 @@ extension Task where Success == Never, Failure == Never {
     }
 
     } else {
-      fatalError("Availability is borked")
+      fatalError("This should never happen; we're using availability within the module to placate the compiler.")
     }
   }
 }

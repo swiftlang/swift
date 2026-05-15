@@ -142,8 +142,8 @@ struct WaitQueue {
     }
   }
 
-  mutating func cancel(jobId: UInt64) {
-    if let job = queue.removeFirst(where: { $0.id == jobId }) {
+  mutating func cancel(jobID: UInt64) {
+    if let job = queue.removeFirst(where: { $0.id == jobID }) {
       ExecutorJob(job).destroy()
     }
   }
@@ -266,20 +266,20 @@ extension CooperativeExecutor: SchedulingExecutor {
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 after delay: C.Duration,
                                 tolerance: C.Duration? = nil,
-                                clock: C) -> ScheduledJob {
-    let jobId = job.id
+                                clock: C) -> JobCancellationToken {
+    let jobID = job.id
 
     // If it's a clock we know, get the duration to wait
     if let _ = clock as? ContinuousClock {
       let continuousDuration = delay as! ContinuousClock.Duration
       let duration = Duration(from: continuousDuration)
       continuousWaitQueue.enqueue(job, after: duration)
-      return ScheduledJob(executor: self, jobId: jobId, opaqueData: [1, 0])
+      return JobCancellationToken(executor: self, jobID: jobID, opaqueData: [1, 0])
     } else if let _ = clock as? SuspendingClock {
       let suspendingDuration = delay as! SuspendingClock.Duration
       let duration = Duration(from: suspendingDuration)
       suspendingWaitQueue.enqueue(job, after: duration)
-      return ScheduledJob(executor: self, jobId: jobId, opaqueData: [2, 0])
+      return JobCancellationToken(executor: self, jobID: jobID, opaqueData: [2, 0])
     } else if let enqueueingClock = clock as? EnqueueingClock {
       return _openAndEnqueue(
         job,
@@ -294,11 +294,11 @@ extension CooperativeExecutor: SchedulingExecutor {
     }
   }
 
-  public func cancel(scheduledJob: consuming ScheduledJob) {
-    if scheduledJob.opaqueData[OpaqueDataClockId] == 1 {
-      continuousWaitQueue.cancel(jobId: scheduledJob.jobId)
-    } else if scheduledJob.opaqueData[OpaqueDataClockId] == 2 {
-      suspendingWaitQueue.cancel(jobId: scheduledJob.jobId)
+  public func cancel(jobWithToken token: consuming JobCancellationToken) {
+    if token.opaqueData[OpaqueDataClockId] == 1 {
+      continuousWaitQueue.cancel(jobID: token.jobID)
+    } else if token.opaqueData[OpaqueDataClockId] == 2 {
+      suspendingWaitQueue.cancel(jobID: token.jobID)
     }
   }
 

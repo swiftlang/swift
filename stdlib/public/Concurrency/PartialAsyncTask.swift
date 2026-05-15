@@ -186,7 +186,9 @@ public struct UnownedJob: Sendable {
 
   /// Retrieve the id of this job
   @_spi(ExperimentalScheduling)
-  @available(StdlibDeploymentTarget 9999, *)
+  @available(SwiftStdlib 5.9, *)
+  @_alwaysEmitIntoClient
+  @inlinable
   public var id: UInt64 {
     return _getJobTaskId(self)
   }
@@ -479,13 +481,13 @@ extension ExecutorJob {
   /// Destroy this job.
   ///
   /// This is an unsafe operation; it will simply release the job itself,
-  /// without allowing the job to run, which means that any clean-up that
-  /// the job normally does will not happen.
+  /// without allowing the job to run, which may result in your program
+  /// making no further progress.
   ///
   /// You should not use this function unless you know the job can be
   /// safely cancelled in this manner.
   ///
-  __consuming public func destroy() {
+  consuming public func destroy() {
     unsafe _swiftJobDestroy(UnownedJob(self))
   }
 

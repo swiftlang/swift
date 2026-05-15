@@ -49,22 +49,22 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
-                                clock: C) -> ScheduledJob {
-    let jobId = job.id
+                                clock: C) -> JobCancellationToken {
+    let jobID = job.id
     let source = _dispatchEnqueue(
       job, at: instant, tolerance: tolerance, clock: clock,
       executor: self, global: false
     )
-    return ScheduledJob(
-      executor: self, jobId: jobId, opaqueData: [0, source],
+    return JobCancellationToken(
+      executor: self, jobID: jobID, opaqueData: [0, source],
       cleanUp: {
         _dispatchReleaseSource($0.opaqueData[OpaqueDataDispatchSource])
       }
     )
   }
 
-  public func cancel(scheduledJob: consuming ScheduledJob) {
-    _dispatchCancel(scheduledJob.opaqueData[OpaqueDataDispatchSource])
+  public func cancel(jobWithToken token: consuming JobCancellationToken) {
+    _dispatchCancel(token.opaqueData[OpaqueDataDispatchSource])
   }
 }
 
@@ -98,22 +98,22 @@ class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
   public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
                                 at instant: C.Instant,
                                 tolerance: C.Duration? = nil,
-                                clock: C) -> ScheduledJob {
-    let jobId = job.id
+                                clock: C) -> JobCancellationToken {
+    let jobID = job.id
     let source = _dispatchEnqueue(
       job, at: instant, tolerance: tolerance, clock: clock,
       executor: self, global: true
     )
-    return ScheduledJob(
-      executor: self, jobId: jobId, opaqueData: [1, source],
+    return JobCancellationToken(
+      executor: self, jobID: jobID, opaqueData: [1, source],
       cleanUp: {
         _dispatchReleaseSource($0.opaqueData[OpaqueDataDispatchSource])
       }
     )
   }
 
-  public func cancel(scheduledJob: consuming ScheduledJob) {
-    _dispatchCancel(scheduledJob.opaqueData[OpaqueDataDispatchSource])
+  public func cancel(jobWithToken token: consuming JobCancellationToken) {
+    _dispatchCancel(token.opaqueData[OpaqueDataDispatchSource])
   }
 }
 

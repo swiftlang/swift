@@ -56,7 +56,7 @@ public protocol EnqueueingClock<Duration> : Clock<Duration> {
   /// - at instant:  The time at which we would like it to run.
   /// - tolerance:   The ideal maximum delay we are willing to tolerate.
   ///
-  /// Returns a ``ScheduledJobCancellationToken`` that can be used to
+  /// Returns a ``JobCancellationToken`` that can be used to
   /// cancel the job before it runs.
   #if !os(Windows)
   @_weakLinked
@@ -64,7 +64,7 @@ public protocol EnqueueingClock<Duration> : Clock<Duration> {
   @available(StdlibDeploymentTarget 9999, *)
   func run(_ job: consuming ExecutorJob,
            at instant: Instant, tolerance: Duration?)
-    -> ScheduledJob
+    -> JobCancellationToken
 
   /// Enqueue the given job on the specified executor at some point after the
   /// given instant.
@@ -82,7 +82,7 @@ public protocol EnqueueingClock<Duration> : Clock<Duration> {
   /// - at instant:  The time at which we would like it to run.
   /// - tolerance:   The ideal maximum delay we are willing to tolerate.
   ///
-  /// Returns a ``ScheduledJobCancellationToken`` that can be used to
+  /// Returns a ``JobCancellationTokenCancellationToken`` that can be used to
   /// cancel the job before it runs.
   #if !os(Windows)
   @_weakLinked
@@ -91,7 +91,7 @@ public protocol EnqueueingClock<Duration> : Clock<Duration> {
   func enqueue(_ job: consuming ExecutorJob,
                on executor: some Executor,
                at instant: Instant, tolerance: Duration?)
-    -> ScheduledJob
+    -> JobCancellationToken
 }
 
 @available(StdlibDeploymentTarget 9999, *)
@@ -105,7 +105,7 @@ extension EnqueueingClock {
   public func enqueue(_ job: consuming ExecutorJob,
                       on executor: some Executor,
                       at instant: Instant, tolerance: Duration?)
-  -> ScheduledJob {
+  -> JobCancellationToken {
     let trampoline = job.createTrampoline(to: executor)
     return run(trampoline, at: instant, tolerance: tolerance)
   }

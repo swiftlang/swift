@@ -87,7 +87,7 @@ extension Task where Success == Never, Failure == Never {
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
     let token = unsafe UnsafeSleepStateToken()
-    var wakeUpJob: ScheduledJob? = nil
+    var wakeUpJobToken: JobCancellationToken? = nil
 
     do {
       // Install a cancellation handler to resume the continuation by
@@ -121,12 +121,13 @@ extension Task where Success == Never, Failure == Never {
 
               #if !$Embedded
               if let executor = Task.currentSchedulingExecutor {
-                wakeUpJob = executor.enqueue(ExecutorJob(context: job),
+                wakeUpJobToken = executor.enqueue(ExecutorJob(context: job),
                                              at: instant,
                                              tolerance: tolerance,
                                              clock: clock)
                 return
               }
+              #endif
 
               // If there is no current scheduling executor, fall back to
               // calling _enqueueJobGlobalWithDeadline().
@@ -171,8 +172,8 @@ extension Task where Success == Never, Failure == Never {
         }
         }
       } onCancel: {
-        unsafe onSleepCancel(token, wakeUpJob: wakeUpJob)
-        wakeUpJob = nil
+        unsafe onSleepCancel(token, wakeUpJobToken: wakeUpJobToken)
+        wakeUpJobToken = nil
       }
 
       // Determine whether we got cancelled before we even started.
