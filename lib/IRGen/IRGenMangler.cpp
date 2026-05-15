@@ -218,7 +218,7 @@ IRGenMangler::mangleTypeForFlatUniqueTypeRef(CanGenericSignature sig,
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptor(
                                  const RootProtocolConformance *conformance) {
-  llvm::SaveAndRestore X(AllowInverses,
+  llvm::SaveAndRestore X(AllowedInverses,
                          inversesAllowedIn(conformance->getDeclContext()));
 
   beginMangling();
@@ -235,7 +235,7 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptor(
 
 std::string IRGenMangler::mangleProtocolConformanceDescriptorRecord(
                                  const RootProtocolConformance *conformance) {
-  llvm::SaveAndRestore X(AllowInverses,
+  llvm::SaveAndRestore X(AllowedInverses,
                          inversesAllowedIn(conformance->getDeclContext()));
 
   beginMangling();
@@ -246,7 +246,7 @@ std::string IRGenMangler::mangleProtocolConformanceDescriptorRecord(
 
 std::string IRGenMangler::mangleProtocolConformanceInstantiationCache(
                                  const RootProtocolConformance *conformance) {
-  llvm::SaveAndRestore X(AllowInverses,
+  llvm::SaveAndRestore X(AllowedInverses,
                          inversesAllowedIn(conformance->getDeclContext()));
 
   beginMangling();
@@ -556,7 +556,7 @@ IRGenMangler::appendExtendedExistentialTypeShape(CanGenericSignature genSig,
   // Append the generalization signature.
   if (genSig) {
     // Generalization signature never mangles inverses.
-    llvm::SaveAndRestore X(AllowInverses, false);
+    llvm::SaveAndRestore X(AllowedInverses, InvertibleProtocolSet());
     appendGenericSignature(genSig);
   }
 
@@ -571,7 +571,7 @@ std::string
 IRGenMangler::mangleConformanceSymbol(Type type,
                                       const ProtocolConformance *Conformance,
                                       const char *Op) {
-  llvm::SaveAndRestore X(AllowInverses,
+  llvm::SaveAndRestore X(AllowedInverses,
                          inversesAllowedIn(Conformance->getDeclContext()));
 
   beginMangling();

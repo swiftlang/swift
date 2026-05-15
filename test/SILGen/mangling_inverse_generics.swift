@@ -1,10 +1,17 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen %s -module-name test \
 // RUN:   -parse-as-library \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature PreInverseGenericsExcept \
 // RUN:   > %t/test.silgen
 
 // RUN: %FileCheck %s < %t/test.silgen
 // RUN: %swift-demangle < %t/test.silgen | %FileCheck %s --check-prefix=DEMANGLED
+
+// REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_PreInverseGenericsExcept
 
 
 protocol NoncopyableProto: ~Copyable {}
@@ -352,4 +359,81 @@ extension E where T: ~Copyable & NoncopyableProto {
   func dumb() {}
 }
 
+//===----------------------------------------------------------------------===//
+// @_preInverseGenerics(except:)
+//===----------------------------------------------------------------------===//
+
+// DEMANGLED: test.keepCopyable<A where A: ~Swift.Copyable>(A) -> ()
+// CHECK: sil [ossa] @$s4test12keepCopyableyyxRi_zlF : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> () {
+@_preInverseGenerics(except: ~Copyable)
+public func keepCopyable<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
+
+// DEMANGLED: test.keepEscapable<A where A: ~Swift.Escapable>(A) -> ()
+// CHECK: sil [ossa] @$s4test13keepEscapableyyxRi0_zlF : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> () {
+@_preInverseGenerics(except: ~Escapable)
+public func keepEscapable<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
+
+// DEMANGLED: test.stripBoth<A>(A) -> ()
+// CHECK: sil [ossa] @$s4test9stripBothyyxlF : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> () {
+@_preInverseGenerics
+public func stripBoth<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
+
+
+public struct F<T: ~Copyable>: ~Copyable {
+  // DEMANGLED: (extension in test):test.F< where A: ~Swift.Copyable>.memberKeepCopyable() -> ()
+  // CHECK: sil [ossa] @$s4test1FVAARi_zrlE18memberKeepCopyableyyF : $@convention(method) <T where T : ~Copyable> (@guaranteed F<T>) -> () {
+  @_preInverseGenerics(except: ~Copyable)
+  public func memberKeepCopyable() {}
+
+  // Strips ~Copyable from T but keeps ~Escapable from U
+  // DEMANGLED: test.F.withEscapable<A where A1: ~Swift.Escapable>(A1) -> ()
+  // CHECK: sil [ossa] @$s4test1FV13withEscapableyyqd__Ri0_d__lF : $@convention(method) <T where T : ~Copyable><U where U : ~Copyable, U : ~Escapable> (@in_guaranteed U, @guaranteed F<T>) -> () {
+  @_preInverseGenerics(except: ~Escapable)
+  public func withEscapable<U: ~Copyable & ~Escapable>(_ u: borrowing U) {}
+
+  // Keeps ~Copyable from both T and U, strips ~Escapable from U
+  // DEMANGLED: (extension in test):test.F< where A: ~Swift.Copyable>.withEscapable2<A where A1: ~Swift.Copyable>(A1) -> ()
+  // CHECK: sil [ossa] @$s4test1FVAARi_zrlE14withEscapable2yyqd__Ri_d__lF : $@convention(method) <T where T : ~Copyable><U where U : ~Copyable, U : ~Escapable> (@in_guaranteed U, @guaranteed F<T>) -> () {
+  @_preInverseGenerics(except: ~Copyable)
+  public func withEscapable2<U: ~Copyable & ~Escapable>(_ u: borrowing U) {}
+}
+
+// Simulates Span gaining ~Escapable. Only ~Copyable is mangled into its symbols.
+@frozen
+public struct MySpan<T: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
+  // DEMANGLED: (extension in test):test.MySpan< where A: ~Swift.Copyable>._count.getter : Swift.Int
+  // CHECK: sil [transparent] [serialized] [ossa] @$s4test6MySpanVAARi_zrlE6_countSivg : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@guaranteed MySpan<T>) -> Int {
+  @_preInverseGenerics(except: ~Copyable)
+  public var _count: Int
+
+  // DEMANGLED: (extension in test):test.MySpan< where A: ~Swift.Copyable>._pointer.getter : Swift.UnsafeRawPointer?
+  // CHECK: sil [transparent] [serialized] [ossa] @$s4test6MySpanVAARi_zrlE8_pointerSVSgvg : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@guaranteed MySpan<T>) -> Optional<UnsafeRawPointer> {
+  @_preInverseGenerics(except: ~Copyable)
+  public var _pointer: UnsafeRawPointer?
+
+  // DEMANGLED: (extension in test):test.MySpan< where A: ~Swift.Copyable>.oldMethod() -> ()
+  // CHECK: sil [ossa] @$s4test6MySpanVAARi_zrlE9oldMethodyyF : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@guaranteed MySpan<T>) -> () {
+  @_preInverseGenerics(except: ~Copyable)
+  public func oldMethod() {}
+
+  // DEMANGLED: (extension in test):test.MySpan< where A: ~Swift.Copyable>.oldComputed.getter : Swift.Int
+  // CHECK: sil [ossa] @$s4test6MySpanVAARi_zrlE11oldComputedSivg : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@guaranteed MySpan<T>) -> Int {
+  @_preInverseGenerics(except: ~Copyable)
+  public var oldComputed: Int { return _count }
+
+  @_lifetime(immortal)
+  public init() {
+    self._count = 0
+    self._pointer = nil
+  }
+}
+
+// @_preInverseGenerics on an extension was permitted but seems to have no effect on member mangling; warn about that.
+@_preInverseGenerics
+extension MySpan where T: ~Copyable & ~Escapable {
+  // Both inverses are still mangled.
+  // DEMANGLED: (extension in test):test.MySpan< where A: ~Swift.Copyable, A: ~Swift.Escapable>.extMethod() -> ()
+  // CHECK: sil [ossa] @$s4test6MySpanVAARi_zRi0_zrlE9extMethodyyF : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@guaranteed MySpan<T>) -> () {
+  public func extMethod() {}
+}
 
