@@ -263,3 +263,46 @@ public import IPISwift // expected-error {{Project internal module 'IPISwift' ca
 
 //--- IPIBareImportIIBD.swift
 import IPISwift
+
+/// Clang IPI: modules listed via -ipi-clang-module are diagnosed.
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/ClangIPIFromAPI.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -module-cache-path %t -library-level api -verify -module-name MainLib \
+// RUN:   -ipi-clang-module PublicClang -ipi-clang-module FullyPrivateClang
+
+/// Clang IPI: unlisted Clang modules use the existing path heuristic.
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/ClangIPIUnlisted.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -module-cache-path %t -library-level api -verify -module-name MainLib \
+// RUN:   -ipi-clang-module SomeOtherModule
+
+/// Clang IPI: import from an IPI module is allowed.
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/ClangIPIFromIPI.swift \
+// RUN:   -module-cache-path %t -library-level ipi -module-name MainLib \
+// RUN:   -ipi-clang-module PublicClang
+
+/// Clang IPI: non-public imports are allowed.
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/ClangIPINonPublic.swift \
+// RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ \
+// RUN:   -module-cache-path %t -library-level api -module-name MainLib \
+// RUN:   -ipi-clang-module PublicClang -ipi-clang-module FullyPrivateClang
+
+//--- ClangIPIFromAPI.swift
+import PublicClang // expected-error {{Project internal module 'PublicClang' cannot be imported publicly from non-internal module 'MainLib'}}
+import FullyPrivateClang // expected-error {{Project internal module 'FullyPrivateClang' cannot be imported publicly from non-internal module 'MainLib'}}
+
+//--- ClangIPIUnlisted.swift
+import PublicClang
+
+//--- ClangIPIFromIPI.swift
+import PublicClang
+
+//--- ClangIPINonPublic.swift
+@_implementationOnly import PublicClang
+internal import FullyPrivateClang
+
+//--- ClangIPIFromPath.swift
+import PublicClang // expected-error {{Project internal module 'PublicClang' cannot be imported publicly from non-internal module 'MainLib'}}
+
+//--- ClangIPIPathMiss.swift
+import PublicClang
