@@ -251,7 +251,7 @@ public:
     // FIXME: Audit all uses and enable this assertion.
     // assert(getCurrentDebugScope() && "no debug scope");
     auto Scope = getCurrentDebugScope();
-    if (!Scope && F)
+    if (!Scope && F && (!BB || !BB->isDebugReconstructionBlock()))
         Scope = F->getDebugScope();
     auto overriddenLoc = CurDebugLocOverride ? *CurDebugLocOverride : Loc;
     return SILDebugLocation(overriddenLoc, Scope);

@@ -1118,6 +1118,25 @@ public:
       ~VerifierErrorEmitterGuard() { getEmitter().value = {}; }
     };
 
+    class VerifierErrorEmitterUnguard {
+      SILVerifier *verifier;
+      decltype(value) restore;
+
+      VerifierErrorEmitter &getEmitter() const {
+        return verifier->ErrorEmitter;
+      }
+
+    public:
+      VerifierErrorEmitterUnguard(SILVerifier *verifier)
+          : verifier(verifier) {
+        assert(bool(getEmitter().value) && "Construct is already unset");
+        restore = getEmitter().value;
+        getEmitter().value = {};
+      }
+
+      ~VerifierErrorEmitterUnguard() { getEmitter().value = restore; }
+    };
+
     void emitError(const Twine &complaint,
                    llvm::function_ref<void(SILPrintContext &)> extraContext) {
       if (!value.has_value()) {
@@ -1606,9 +1625,9 @@ public:
         auto userI = cast<SILInstruction>(user);
         require(userI->getParent(),
                 "instruction used by unparented instruction");
-        if (I->isStaticInitializerInst()) {
+        if (I->isStaticInitializerInst() || BB->isDebugReconstructionBlock()) {
           require(userI->getParent() == BB,
-                "instruction used by instruction not in same static initializer");
+                  "instruction used by instruction in different basic block");
         } else {
           require(userI->getFunction() == &F,
                   "instruction used by instruction in different function");
@@ -1629,9 +1648,9 @@ public:
       if (auto *valueI = operand.get()->getDefiningInstruction()) {
         require(valueI->getParent(),
                 "instruction uses value of unparented instruction");
-        if (I->isStaticInitializerInst()) {
+        if (I->isStaticInitializerInst() || BB->isDebugReconstructionBlock()) {
           require(valueI->getParent() == BB,
-              "instruction uses value which is not in same static initializer");
+              "instruction uses value which is not in the same basic block");
         } else {
           require(valueI->getFunction() == &F,
                   "instruction uses value of instruction from another function");
@@ -1942,42 +1961,34 @@ public:
                   " in a di-expression");
       }
     }
+  }
 
-    // Verify debug basic block invariants and type chain.
-    if (auto *DVI = dyn_cast<DebugValueInst>(inst)) {
-      if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
-        // Structural checks.
-        require(DebugBB->isDebugReconstructionBlock(),
-                "debug block must be marked as such");
-        require(DebugBB->getParent() == DVI->getFunction(),
-                "debug block must belong to the same function");
-        require(!DebugBB->empty(),
-                "debug block must not be empty");
-        require(isa<ReturnInst>(DebugBB->getTerminator()),
-                "debug block must end with a return instruction");
+  void checkDebugValueInst(DebugValueInst *inst) {
+    // Verify debug basic block and type chain.
+    if (auto *DebugBB = inst->getDebugReconstructionBlock()) {
+      // Structural checks.
+      require(DebugBB->isDebugReconstructionBlock(),
+              "debug block must be marked as such");
+      require(DebugBB->getParent() == inst->getFunction(),
+              "debug block must belong to the same function");
+      require(!DebugBB->empty(),
+              "debug block must not be empty");
+      require(isa<ReturnInst>(DebugBB->getTerminator()),
+              "debug block must end with a return instruction");
 
-        // Self-containedness: all operands must be defined within the block.
+      // Verify basic block content.
+      {
+        VerifierErrorEmitter::VerifierErrorEmitterUnguard unguard(this);
         for (auto &I : *DebugBB) {
-          for (auto &Op : I.getAllOperands()) {
-            auto *DefI = Op.get()->getDefiningInstruction();
-            if (DefI) {
-              require(DefI->getParent() == DebugBB,
-                      "debug block instruction operand must be defined "
-                      "within the debug block");
-            } else if (auto *Arg = dyn_cast<SILArgument>(Op.get())) {
-              require(Arg->getParent() == DebugBB,
-                      "debug block instruction operand must be a block "
-                      "argument of the debug block");
-            }
-          }
+          visit(&I);
         }
       }
-
-      // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
-      if (VerifyDebugValueExpr)
-        require(DVI->isExprTypeValid(),
-                "debug_value type chain should hold");
     }
+
+    // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
+    if (VerifyDebugValueExpr)
+      require(inst->isExprTypeValid(),
+              "debug_value type chain should hold");
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {
@@ -5652,6 +5663,11 @@ public:
   }
 
   void checkReturnInst(ReturnInst *RI) {
+    // Return instruction has a different meaning in debug reconstruction
+    // blocks. This meaning is checked in checkDebugValueInst.
+    if (RI->getParent()->isDebugReconstructionBlock())
+      return;
+
     LLVM_DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =
