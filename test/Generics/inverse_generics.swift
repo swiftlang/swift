@@ -420,8 +420,10 @@ func checkExistentialAndClasses(
     _ b: any Soup & Copyable & ~Escapable & ~Copyable,
     // expected-error@-1 {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
     _ c: some (~Escapable & Removed) & Soup, // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
-    _ d: borrowing any AnyObjectRefining & ~Copyable
+    _ d: borrowing any AnyObjectRefining & ~Copyable,
     // expected-error@-1 {{composition involving 'AnyObject' cannot contain '~Copyable'}}
+    _ e: AnyObject & ~Escapable,
+    // expected-error@-1 {{composition involving 'AnyObject' cannot contain '~Escapable'}}
     ) {}
 
 protocol HasNCBuddy: ~Copyable {
