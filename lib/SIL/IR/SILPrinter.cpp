@@ -1053,7 +1053,7 @@ public:
   void print(const SILBasicBlock *BB) {
     markBlockAsPrinted(BB);
 
-    bool isDebug = BB->isDebugOnly();
+    bool isDebug = BB->isDebugReconstructionBlock();
 
     // Output uses for BB arguments. These are put into place as comments before
     // the block header.
@@ -2226,7 +2226,7 @@ public:
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo(false),
                   &DVI->getModule().getASTContext().SourceMgr);
-    if (auto *DebugBB = DVI->getDebugBlock()) {
+    if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
       if (!SILPrintTransformBlocks) {
         // If disabled, don't print the content of transform blocks, but
         // still indicate that one is present.
@@ -5114,7 +5114,7 @@ ID SILPrintContext::getID(SILNodePointer node) {
   if (SILFunction *F = BB->getParent()) {
     // Debug-only blocks use a locally-scoped numbering rather than the
     // function-wide numbering.
-    if (!BB->isDebugOnly()) {
+    if (!BB->isDebugReconstructionBlock()) {
       setContext(F);
       // Lazily initialize the instruction -> ID mapping.
       if (ValueToIDMap.empty())

@@ -3625,7 +3625,7 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                                    usesMoveableValueDebugInfo, hasTrace);
 
     if (DebugBB)
-      cast<DebugValueInst>(ResultVal)->setDebugBlock(DebugBB);
+      cast<DebugValueInst>(ResultVal)->setDebugReconstructionBlock(DebugBB);
 
     break;
   }

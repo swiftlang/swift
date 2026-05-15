@@ -1701,10 +1701,10 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
       Inst->poisonRefs(), Inst->usesMoveableValueDebugInfo(), Inst->hasTrace());
 
   // Clone the debug-only reconstruction block if present.
-  if (auto *SrcDebugBB = Inst->getDebugBlock()) {
+  if (auto *SrcDebugBB = Inst->getDebugReconstructionBlock()) {
     SILBasicBlock *NewDebugBB =
         NewInst->getFunction()->createDebugBasicBlock();
-    NewInst->setDebugBlock(NewDebugBB);
+    NewInst->setDebugReconstructionBlock(NewDebugBB);
     asImpl().cloneDebugBasicBlock(SrcDebugBB, NewDebugBB);
   }
 

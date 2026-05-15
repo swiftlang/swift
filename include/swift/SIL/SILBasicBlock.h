@@ -526,14 +526,15 @@ public:
   /// Returns true if this BB is the entry BB of its parent.
   bool isEntry() const;
 
-  /// Returns true if this block is a debug-only reconstruction block,
+  /// Returns true if this block is a debug_value's reconstruction block,
   /// not part of the function's BlockList.
-  bool isDebugOnly() const { return index == -2; }
+  bool isDebugReconstructionBlock() const { return index == -2; }
 
   /// Update the parent function of a debug-only block (e.g. when the owning
   /// instruction is moved between functions).
   void setParentFunction(SILFunction *F) {
-    assert(isDebugOnly() && "only debug blocks can be reparented");
+    ASSERT(isDebugReconstructionBlock() &&
+           "only debug reconstruction blocks can be reparented");
     Parent = F;
   }
 

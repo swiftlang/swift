@@ -1945,10 +1945,10 @@ public:
 
     // Verify debug basic block invariants and type chain.
     if (auto *DVI = dyn_cast<DebugValueInst>(inst)) {
-      if (auto *DebugBB = DVI->getDebugBlock()) {
+      if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
         // Structural checks.
-        require(DebugBB->isDebugOnly(),
-                "debug block must be marked debug-only");
+        require(DebugBB->isDebugReconstructionBlock(),
+                "debug block must be marked as such");
         require(DebugBB->getParent() == DVI->getFunction(),
                 "debug block must belong to the same function");
         require(!DebugBB->empty(),

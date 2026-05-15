@@ -491,8 +491,8 @@ bool DebugValueInst::exprStartsWithDeref() const {
           == SILDIExprOperator::Dereference;
 }
 
-void DebugValueInst::setDebugBlock(SILBasicBlock *BB) {
-  DebugBB = BB;
+void DebugValueInst::setDebugReconstructionBlock(SILBasicBlock *BB) {
+  ReconstructionBlock = BB;
 }
 
 bool DebugValueInst::isExprTypeValid() const {
@@ -509,7 +509,7 @@ bool DebugValueInst::isExprTypeValid() const {
   SILType valueType = getOperand()->getType();
 
   // Transform: debug BB transforms the SSA value to its return type.
-  if (auto *debugBB = getDebugBlock()) {
+  if (auto *debugBB = getDebugReconstructionBlock()) {
     if (debugBB->getNumArguments() > 0) {
       if (debugBB->getNumArguments() > 1)
         return false;

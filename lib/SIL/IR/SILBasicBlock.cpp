@@ -56,7 +56,7 @@ SILBasicBlock::~SILBasicBlock() {
 }
 
 int SILBasicBlock::getDebugID() const {
-  if (!getParent() || isDebugOnly())
+  if (!getParent() || isDebugReconstructionBlock())
     return -1;
   int idx = 0;
   for (const SILBasicBlock &B : *getParent()) {

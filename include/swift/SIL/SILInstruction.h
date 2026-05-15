@@ -5621,8 +5621,8 @@ class DebugValueInst final
   TailAllocatedDebugVariable VarInfo;
   USE_SHARED_UINT8;
 
-  /// Optional debug-only basic block holding reconstruction instructions.
-  SILBasicBlock *DebugBB = nullptr;
+  /// Optional debug basic block holding reconstruction instructions.
+  SILBasicBlock *ReconstructionBlock = nullptr;
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                  SILDebugVariable Var, PoisonRefs_t poisonRefs,
@@ -5749,10 +5749,12 @@ public:
 
   /// Returns the optional debug-only basic block attached to this instruction.
   /// The debug BB contains reconstruction instructions for the debug value.
-  SILBasicBlock *getDebugBlock() const { return DebugBB; }
+  SILBasicBlock *getDebugReconstructionBlock() const {
+    return ReconstructionBlock;
+  }
 
   /// Sets the debug-only basic block for this instruction.
-  void setDebugBlock(SILBasicBlock *BB);
+  void setDebugReconstructionBlock(SILBasicBlock *BB);
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds

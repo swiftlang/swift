@@ -6238,7 +6238,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Put the value into a shadow-copy stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
   llvm::SmallVector<llvm::Instruction *, 4> DebugBBInsts;
-  if (auto *DebugBB = i->getDebugBlock()) {
+  if (auto *DebugBB = i->getDebugReconstructionBlock()) {
     // Debug basic blocks should not exist at -Onone. They don't support
     // shadow copies or async lifetime extension.
     auto *BB = Builder.GetInsertBlock();

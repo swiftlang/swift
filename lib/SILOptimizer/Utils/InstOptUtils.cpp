@@ -2033,7 +2033,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       // Create a new debug_value with undef and attach the debug BB.
       auto *NewDVI = SILBuilder(DbgInst, DbgInst->getDebugScope())
           .createDebugValue(DbgInst->getLoc(), SILUndef::get(IL), *VarInfo);
-      NewDVI->setDebugBlock(DebugBB);
+      NewDVI->setDebugReconstructionBlock(DebugBB);
     }
   }
 }
