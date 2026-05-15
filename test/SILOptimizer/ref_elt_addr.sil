@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -common-subexpression-elimination | %FileCheck %s
 
 sil_stage canonical
 

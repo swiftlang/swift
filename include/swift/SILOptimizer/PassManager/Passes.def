@@ -67,6 +67,10 @@ PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
 PASS(BooleanLiteralFolding, "boolean-literal-folding",
      "Constant folds initializers of boolean literals")
+PASS(CommonSubexpressionElimination, "common-subexpression-elimination",
+     "Common Subexpression Elimination (Swift)")
+PASS(HighLevelCommonSubexpressionElimination, "high-level-common-subexpression-elimination",
+     "Common Subexpression Elimination on High-Level SIL (Swift)")
 PASS(DestroyHoisting, "destroy-hoisting",
      "Hoist destroy_value instructions")
 PASS(MandatoryDestroyHoisting, "mandatory-destroy-hoisting",
@@ -223,8 +227,6 @@ LEGACY_PASS(CFGPrinter, "view-cfg",
      "View Function CFGs")
 LEGACY_PASS(COWArrayOpts, "cowarray-opt",
      "COW Array Optimization")
-LEGACY_PASS(CSE, "cse",
-     "Common Subexpression Elimination")
 LEGACY_PASS(CallerAnalysisPrinter, "caller-analysis-printer",
      "Print Caller Analysis for Testing")
 LEGACY_PASS(CapturePromotion, "capture-promotion",
@@ -316,8 +318,6 @@ LEGACY_PASS(GlobalPropertyOpt, "global-property-opt",
      "Global Property Optimization")
 LEGACY_PASS(MandatoryARCOpts, "mandatory-arc-opts",
      "Mandatory ARC Optimization")
-LEGACY_PASS(HighLevelCSE, "high-level-cse",
-     "Common Subexpression Elimination on High-Level SIL")
 LEGACY_PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
 LEGACY_PASS(LowerHopToActor, "lower-hop-to-actor",

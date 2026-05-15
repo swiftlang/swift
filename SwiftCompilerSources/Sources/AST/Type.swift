@@ -448,4 +448,10 @@ extension CanonicalType: Equatable {
   }
 }
 
+extension CanonicalType: Hashable {
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(bridged.type)
+  }
+}
+
 public typealias GenericTypeParameterKind = swift.GenericTypeParamKind
