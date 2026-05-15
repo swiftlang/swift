@@ -116,19 +116,25 @@ using FieldRecord = TargetFieldRecord<InProcess>;
 
 template <typename Runtime>
 struct TargetFieldRecordIterator {
+  uint16_t RecordSize;
   const TargetFieldRecord<Runtime> *Cur;
   const TargetFieldRecord<Runtime> *const End;
 
-  TargetFieldRecordIterator(const TargetFieldRecord<Runtime> *Cur,
+  TargetFieldRecordIterator(uint16_t RecordSize,
+                            const TargetFieldRecord<Runtime> *Cur,
                             const TargetFieldRecord<Runtime> *const End)
-      : Cur(Cur), End(End) {}
+      : RecordSize(RecordSize), Cur(Cur), End(End) {}
 
   const TargetFieldRecord<Runtime> &operator*() const { return *Cur; }
 
   const TargetFieldRecord<Runtime> *operator->() const { return Cur; }
 
+  static const TargetFieldRecord<Runtime> *advanceRecordPointer(const TargetFieldRecord<Runtime> *Ptr, size_t bytes) {
+    return reinterpret_cast<const TargetFieldRecord<Runtime> *>(reinterpret_cast<const char *>(Ptr) + bytes);
+  }
+
   TargetFieldRecordIterator &operator++() {
-    ++Cur;
+    Cur = advanceRecordPointer(Cur, RecordSize);
     return *this;
   }
 
@@ -215,14 +221,15 @@ public:
 
   const_iterator begin() const {
     auto Begin = getFieldRecordBuffer();
-    auto End = Begin + NumFields;
-    return const_iterator { Begin, End };
+    auto End = FieldRecordIterator::advanceRecordPointer(Begin, NumFields * FieldRecordSize);
+    fprintf(stderr, "FieldRecordIterator begin %p end %p\n", Begin, End);
+    return const_iterator { FieldRecordSize, Begin, End };
   }
 
   const_iterator end() const {
     auto Begin = getFieldRecordBuffer();
-    auto End = Begin + NumFields;
-    return const_iterator { End, End };
+    auto End = FieldRecordIterator::advanceRecordPointer(Begin, NumFields * FieldRecordSize);
+    return const_iterator { FieldRecordSize, End, End };
   }
 
   llvm::ArrayRef<TargetFieldRecord<Runtime>> getFields() const {
