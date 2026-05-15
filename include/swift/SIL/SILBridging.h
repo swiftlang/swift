@@ -597,6 +597,7 @@ struct BridgedFunction {
   bool isTrapNoReturn() const;
   bool isConvertPointerToPointerArgument() const;
   bool isAddressor() const;
+  BRIDGED_INLINE bool isLazyPropertyGetter() const;
   bool isAutodiffVJP() const;
   bool isAutodiffSubsetParametersThunk() const;
   SwiftInt specializationLevel() const;
@@ -822,6 +823,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedGlobalVar AllocGlobalInst_getGlobal() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedFunction FunctionRefBaseInst_getReferencedFunction() const;
   BRIDGED_INLINE BridgedOptionalInt IntegerLiteralInst_getValue() const;
+  BRIDGED_INLINE BridgedOptionalInt FloatLiteralInst_getBits() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef StringLiteralInst_getValue() const;
   BRIDGED_INLINE int StringLiteralInst_getEncoding() const;
   BRIDGED_INLINE SwiftInt TupleExtractInst_fieldIndex() const;
@@ -864,6 +866,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType WitnessMethodInst_getLookupType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj WitnessMethodInst_getLookupProtocol() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance WitnessMethodInst_getConformance() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDeclObj ObjCProtocolInst_getProtocol() const;
   BRIDGED_INLINE SwiftInt ObjectInst_getNumBaseElements() const;
   BRIDGED_INLINE SwiftInt PartialApply_getCalleeArgIndexOfFirstAppliedArg() const;
   BRIDGED_INLINE bool PartialApplyInst_isOnStack() const;
@@ -1527,6 +1530,7 @@ struct BridgedContext {
 
   BRIDGED_INLINE bool isTransforming(BridgedFunction function) const;
   BRIDGED_INLINE void notifyChanges(NotificationKind changeKind) const;
+  BRIDGED_INLINE bool hasChangeNotification(NotificationKind changeKind) const;
 
   // Module
 

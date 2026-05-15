@@ -75,6 +75,8 @@ private func registerSwiftPasses() {
   registerPass(allocBoxToStack, { allocBoxToStack.run($0) })
   registerPass(asyncDemotion, { asyncDemotion.run($0) })
   registerPass(booleanLiteralFolding, { booleanLiteralFolding.run($0) })
+  registerPass(commonSubexpressionElimination, { commonSubexpressionElimination.run($0) })
+  registerPass(highLevelCSE, { highLevelCSE.run($0) })
   registerPass(embeddedWitnessCallSpecialization, { embeddedWitnessCallSpecialization.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })

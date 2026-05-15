@@ -339,7 +339,7 @@ public struct ArgumentConventions : Collection, CustomStringConvertible {
   public var firstParameterIndex: Int { indirectSILResultCount }
 
   /// The SIL argument index of the 'self' parameter.
-  var selfIndex: Int? {
+  public var selfIndex: Int? {
     guard convention.hasSelfParameter else { return nil }
     // self is the last parameter
     return endIndex - 1

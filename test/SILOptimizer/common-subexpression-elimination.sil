@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -common-subexpression-elimination | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=TEST-RUNNER
 
 import Builtin
 import Swift
@@ -194,58 +195,6 @@ bb2(%3 : $Builtin.Int1):
   return %3 : $Builtin.Int1
 }
 
-enum BoolLike { case true_, false_ }
-
-// CHECK-LABEL: sil @fold_enum
-// CHECK: bb
-// CHECK: switch_enum
-// CHECK: {{^bb}}
-// CHECK-NOT: enum
-// CHECK-NEXT: br bb
-// CHECK: {{^bb}}
-// CHECK-NOT: enum
-// CHECK-NEXT: br bb
-sil @fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
-bb0(%0 : $BoolLike):
-  switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
-
-bb1:
-  %1 = enum $BoolLike, #BoolLike.true_!enumelt
-  br bb3(%1 : $BoolLike)
-
-bb2:
-  %2 = enum $BoolLike, #BoolLike.false_!enumelt
-  br bb3(%2 : $BoolLike)
-
-bb3(%3 : $BoolLike):
-  return %3 : $BoolLike
-}
-
-// CHECK-LABEL: sil @do_not_fold_enum
-// CHECK: bb
-// CHECK: switch_enum
-// CHECK: {{^bb}}
-// CHECK-NEXT: enum
-// CHECK-NEXT: br bb
-// CHECK: {{^bb}}
-// CHECK-NEXT: enum
-// CHECK-NEXT: br bb
-sil @do_not_fold_enum : $@convention(thin) (BoolLike) -> BoolLike {
-bb0(%0 : $BoolLike):
-  switch_enum %0 : $BoolLike, case #BoolLike.true_!enumelt: bb1, case #BoolLike.false_!enumelt: bb2
-
-bb1:
-  %1 = enum $BoolLike, #BoolLike.false_!enumelt
-  br bb3(%1 : $BoolLike)
-
-bb2:
-  %2 = enum $BoolLike, #BoolLike.true_!enumelt
-  br bb3(%2 : $BoolLike)
-
-bb3(%3 : $BoolLike):
-  return %3 : $BoolLike
-}
-
 ///////////////
 // CSE Tests //
 ///////////////
@@ -350,7 +299,6 @@ sil @floatliteral : $@convention(thin) () -> (Builtin.FPIEEE32) {
 }
 
 sil @string_use : $@convention(thin) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type, Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> ()
-
 
 // CHECK-LABEL: stringliteral
 // CHECK: [[TARGET:%[0-9]+]] = string_literal utf8 "First"
@@ -531,7 +479,6 @@ sil @sil_string_different_encodings : $@convention(thin) () -> Builtin.Word {
 // CHECK:      [[T0:%.*]] = function_ref @helper
 // CHECK-NEXT: apply [[T0]](%0, %1)
 
-
 // CHECK-LABEL: raw_idx_cse
 // CHECK: integer_literal
 // CHECK-NEXT: index_raw_pointer
@@ -613,7 +560,6 @@ bb0(%0 : $FakeOptional):
   return %6 : $()
 }
 
-
 class C {}
 class D : C { }
 
@@ -681,25 +627,6 @@ bb0(%0 : $*D, %1 : $Builtin.Word):
   return %6 : $(Builtin.RawPointer, Builtin.RawPointer)
 }
 
-
-sil [readnone] @readnonefun : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
-
-// CHECK-LABEL: cse_readnone
-// CHECK: bb0
-// CHECK: function_ref @readnonefun
-// CHECK: apply
-// CHECK-NOT: function_ref @readnonefun
-// CHECK-NOT: apply
-// CHECK:return
-sil @cse_readnone : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64 {
-bb0(%0 : $*Builtin.Int8):
-  %1 = function_ref @readnonefun : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
-  %3 = apply %1(%0) : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
-  %2 = function_ref @readnonefun : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
-  %4 = apply %2(%0) : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
-  return %4 : $Builtin.Int64
-}
-
 // CHECK-LABEL: sil @cse_unchecked_ref_cast
 // CHECK: [[C:%[0-9]+]] = unchecked_ref_cast
 // CHECK-NOT: unchecked_ref_cast
@@ -749,7 +676,6 @@ bb0:
    dealloc_stack %1 : $*OpaquePointer
    return %8: $(Builtin.RawPointer, Builtin.RawPointer)
 }
-
 
 // CHECK-LABEL: sil @cse_ref_to_unowned
 // CHECK: ref_to_unowned
@@ -880,7 +806,6 @@ bb0(%0 : $Array<Int>):
   %r1 = tuple (%c1 : $Int, %c2 : $Int)
   return %r1 : $(Int, Int)
 }
-
 
 class Ping {
   func ping() -> Ping
@@ -1016,137 +941,6 @@ sil_witness_table hidden T: Reachable module p {
   method #Reachable.reach: @_TTWC1p1TS_9ReachableS_FS1_5reachuRq_S1__fq_FT_T_	// protocol witness for p.Reachable.reach <A where A: p.Reachable> (A)() -> () in conformance p.T : p.Reachable in p
 }
 
-protocol Flyable {
-  func fly()
-}
-
-struct Airplane : Flyable {
-  func fly()
-  init()
-}
-
-func trytofly(a: Flyable)
-
-// p2.Airplane.fly (p2.Airplane)() -> ()
-sil hidden @_TFV2p28Airplane3flyfS0_FT_T_ : $@convention(method) (Airplane) -> () {
-bb0(%0 : $Airplane):
-  debug_value %0 : $Airplane, let, name "self" // id: %1
-  %2 = tuple ()                                   // user: %3
-  return %2 : $()                                 // id: %3
-}
-
-// protocol witness for p2.Flyable.fly <A where A: p2.Flyable> (A)() -> () in conformance p2.Airplane : p2.Flyable in p2
-sil hidden [transparent] [thunk] @_TTWV2p28AirplaneS_7FlyableS_FS1_3flyuRq_S1__fq_FT_T_ : $@convention(witness_method: Flyable) (@in_guaranteed Airplane) -> () {
-bb0(%0 : $*Airplane):
-  %1 = alloc_stack $Airplane                      // users: %2, %6
-  copy_addr %0 to [init] %1 : $*Airplane // id: %2
-  %3 = struct $Airplane ()                        // user: %5
-  // function_ref p2.Airplane.fly (p2.Airplane)() -> ()
-  %4 = function_ref @_TFV2p28Airplane3flyfS0_FT_T_ : $@convention(method) (Airplane) -> () // user: %5
-  %5 = apply %4(%3) : $@convention(method) (Airplane) -> () // user: %7
-  dealloc_stack %1 : $*Airplane  // id: %6
-  return %5 : $()                                 // id: %7
-}
-
-// CHECK-LABEL: _TF2p28trytoflyFPS_7Flyable_T_
-// CHECK:           bb0(%0 : $*any Flyable):
-// CHECK-NEXT:      open_existential_addr
-// CHECK-NEXT:      witness_method
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      open_existential_addr
-// CHECK-NEXT:      witness_method
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      open_existential_addr
-// CHECK-NEXT:      witness_method
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      apply
-// CHECK-NEXT:      destroy_addr
-// CHECK-NEXT:      tuple
-// CHECK-NEXT:      return
-// p2.trytofly (p2.Flyable) -> ()
-sil hidden @_TF2p28trytoflyFPS_7Flyable_T_ : $@convention(thin) (@in Flyable) -> () {
-bb0(%0 : $*Flyable):
-  %2 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self // users: %3, %4
-  %3 = witness_method $@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self, #Flyable.fly, %2 : $*@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %4
-  %4 = apply %3<@opened("D8A4A5D8-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self>(%2) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %5 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self // users: %6, %7
-  %6 = witness_method $@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self, #Flyable.fly, %5 : $*@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %7
-  %7 = apply %6<@opened("D8A4B49C-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self>(%5) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %8 = open_existential_addr immutable_access %0 : $*Flyable to $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self // users: %9, %10
-  %9 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self, #Flyable.fly, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %10
-  %10 = apply %9<@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self>(%8) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  %11 = witness_method $@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self, #Flyable.fly, %8 : $*@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> () // user: %12
-  %12 = apply %9<@opened("D8A4BCB2-4C44-11E5-BA43-AC87A3294C0A", Flyable) Self>(%8) : $@convention(witness_method: Flyable) <τ_0_0 where τ_0_0 : Flyable> (@in_guaranteed τ_0_0) -> ()
-  destroy_addr %0 : $*Flyable                     // id: %11
-  %13 = tuple ()                                  // user: %13
-  return %13 : $()                                // id: %13
-}
-
-sil_witness_table hidden Airplane: Flyable module p2 {
-  method #Flyable.fly: @_TTWV2p28AirplaneS_7FlyableS_FS1_3flyuRq_S1__fq_FT_T_	// protocol witness for p2.Flyable.fly <A where A: p2.Flyable> (A)() -> () in conformance p2.Airplane : p2.Flyable in p2
-}
-
-
-protocol Pingable { func ping() }
-
-// CHECK-LABEL: CSE_Existential_Simple
-// CHECK: open_existential_addr immutable_access %0 : $*any Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable)
-// CHECK: witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self, #Pingable.ping : {{.*}}, %2
-// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self>(%2)
-// CHECK: open_existential_addr immutable_access 
-// CHECK: witness_method
-// CHECK: apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", any Pingable) Self>(%2)
-// CHECK: return
-sil hidden @CSE_Existential_Simple : $@convention(thin) (@in Pingable) -> () {
-bb0(%0 : $*Pingable):
-  debug_value %0 : $*Pingable, expr op_deref // let x      // id: %1
-  %2 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self // users: %3, %4
-  %3 = witness_method $@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self, #Pingable.ping, %2 : $*@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %4
-  %4 = apply %3<@opened("1E467EB8-D5C5-11E5-8C0E-A82066121073", Pingable) Self>(%2) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
-  %5 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073", Pingable) Self // users: %6, %7
-  %6 = witness_method $@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073", Pingable) Self, #Pingable.ping, %5 : $*@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %7
-  %7 = apply %6<@opened("1E4687DC-D5C5-11E5-8C0E-A82066121073", Pingable) Self>(%5) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
-  destroy_addr %0 : $*Pingable                    // id: %8
-  %9 = tuple ()                                   // user: %10
-  return %9 : $()                                 // id: %10
-}
-
-// CHECK-LABEL: CSE_Existential_Calls_With_Control_Flow
-sil hidden @CSE_Existential_Calls_With_Control_Flow : $@convention(thin) (@in Pingable, Int) -> () {
-bb0(%0 : $*Pingable, %1 : $Int):
-  debug_value %0 : $*Pingable, expr op_deref // let x      // id: %2
-  debug_value %1 : $Int  // let y                 // id: %3
-  %4 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self // users: %5, %6
-  %5 = witness_method $@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %4 : $*@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %6
-
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
-  %6 = apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", Pingable) Self>(%4) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
-  %7 = integer_literal $Builtin.Int64, 3          // user: %9
-  %8 = integer_literal $Builtin.Int64, 3          // user: %9
-  %9 = builtin "cmp_sgt_Int64"(%8 : $Builtin.Int64, %7 : $Builtin.Int64) : $Builtin.Int1 // user: %10
-  cond_br %9, bb1, bb2                            // id: %10
-
-bb1:                                              // Preds: bb0
-  %11 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self // users: %12, %13
-  %12 = witness_method $@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %11 : $*@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %13
-
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
-  %13 = apply %12<@opened("75F1F3AC-D6CB-11E5-9470-A82066121073", Pingable) Self>(%11) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
-  br bb2                                          // id: %14
-
-bb2:                                              // Preds: bb0 bb1
-  %15 = open_existential_addr immutable_access %0 : $*Pingable to $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self // users: %16, %17
-  %16 = witness_method $@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self, #Pingable.ping, %15 : $*@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> () // user: %17
-
-  // CHECK: apply %5<@opened("75F1B81A-D6CB-11E5-9470-A82066121073", any Pingable) Self>(%4)
-  %17 = apply %16<@opened("75F1F5C8-D6CB-11E5-9470-A82066121073", Pingable) Self>(%15) : $@convention(witness_method: Pingable) <τ_0_0 where τ_0_0 : Pingable> (@in_guaranteed τ_0_0) -> ()
-  destroy_addr %0 : $*Pingable                    // id: %18
-  %19 = tuple ()                                  // user: %20
-
-  // CHECK: return
-  return %19 : $()                                // id: %20
-}
-
 // CHECK-LABEL: sil @cse_mark_dependence
 // CHECK: mark_dependence
 // CHECK-NOT: mark_dependence
@@ -1159,133 +953,6 @@ bb0(%0 : $*Builtin.Int64, %1 : $Builtin.NativeObject):
   %5 = load %3 : $*Builtin.Int64
   %6 = tuple(%4 : $Builtin.Int64, %5 : $Builtin.Int64)
   return %6 : $(Builtin.Int64, Builtin.Int64)
-}
-
-protocol Proto : class {
-  func doThis()
-  func doThat()
-}
-
-// Check that all open_existential_ref instructions are CSEd
-// Any reference to the $@opened("1B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self should be replaced by
-// references to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self.
-// CHECK-LABEL: sil @cse_open_existential : $@convention(thin) (@guaranteed any Proto, Bool) -> ()
-// CHECK: bb0
-// CHECK: %[[OPENED_EXISTENTIAL:[0-9]+]] = open_existential_ref %{{[0-9]+}} : $any Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", any Proto) Self
-// CHECK: %[[WM1:[0-9]+]] = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", any Proto) Self, #Proto.doThis
-// CHECK: apply %[[WM1]]{{.*}}(%[[OPENED_EXISTENTIAL]])
-// CHECK: cond_br
-// CHECK: bb1:
-// CHECK-NEXT: %[[WM2:[0-9]+]] = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", any Proto) Self, #Proto.doThat
-// CHECK-NEXT: apply %[[WM2]]{{.*}}(%[[OPENED_EXISTENTIAL]])
-// CHECK-NOT: 1B6851A6-4796-11E6-B7DF-B8E856428C60
-// CHECK: br bb
-// CHECK: bb2:
-// CHECK-NEXT: apply %[[WM1]]{{.*}}(%[[OPENED_EXISTENTIAL]])
-// CHECK-NOT: 1B6851A6-4796-11E6-B7DF-B8E856428C60
-// CHECK: br bb
-// CHECK: bb3:
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-sil @cse_open_existential : $@convention(thin) (@guaranteed Proto, Bool) -> () {
-bb0(%0 : $Proto, %1 : $Bool):
-  %4 = open_existential_ref %0 : $Proto to $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  %5 = witness_method $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThis, %4 : $@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %6 = apply %5<@opened("1B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %7 = struct_extract %1 : $Bool, #Bool._value
-  cond_br %7, bb1, bb2
-
-bb1:
-  %9 = open_existential_ref %0 : $Proto to $@opened("1B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  %10 = witness_method $@opened("1B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThat, %9 : $@opened("1B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %11 = apply %10<@opened("1B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self>(%9) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  br bb3
-
-bb2:                                              // Preds: bb0
-  %13 = open_existential_ref %0 : $Proto to $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  %14 = witness_method $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThis, %13 : $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self>(%13) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %16 = alloc_stack $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  store %13 to %16 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  // This is to check that result types of instructions are updated by CSE as well.
-  %17 = load %16 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  strong_release %17 : $@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  dealloc_stack %16 : $*@opened("1B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  br bb3
-
-bb3:
-  %20 = tuple ()
-  return %20 : $()
-}
-
-// This test is not a repro but used to show why we need a local Cloner object in CSE::processOpenExistentialRef.
-// Discussion:
-// Since the CSE pass can delete instructions and allocate instructions whose state can be cached in the Cloner, we have to use local Cloner object so that we don't accidentally refer to stale state 
-// In this test users of %9 are all cloned and original instructions are deleted. Users of %13 are similarly cloned and original instructions are deleted so the types can be remapped.
-// Instructions can further get deleted in the main CSE pass as well as during SimplifyInstruction.
-// For some heap allocation patterns newly allocated instructions can get the same address of a previously allocated instruction, and can end up referring to a stale state in the Cloner.
-//
-// CHECK-LABEL: sil @cse_open_existential_ref_local_cloner :
-// CHECK: open_existential_ref
-// CHECK-NOT: open_existential_ref
-// CHECK-LABEL: } // end sil function 'cse_open_existential_ref_local_cloner'
-sil @cse_open_existential_ref_local_cloner : $@convention(thin) (@guaranteed Proto, Bool) -> () {
-bb0(%0 : $Proto, %1 : $Bool):
-  %4 = open_existential_ref %0 : $Proto to $@opened("2B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  %5 = witness_method $@opened("2B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThis, %4 : $@opened("2B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %6 = apply %5<@opened("2B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %9 = open_existential_ref %0 : $Proto to $@opened("2B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  %10 = witness_method $@opened("2B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThat, %9 : $@opened("2B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %11 = apply %10<@opened("2B685052-4796-11E6-B7DF-B8E856428C60", Proto) Self>(%9) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %13 = open_existential_ref %0 : $Proto to $@opened("2B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  %14 = witness_method $@opened("2B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThis, %13 : $@opened("2B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %15 = apply %14<@opened("2B6851A6-4796-11E6-B7DF-B8E856428C60", Proto) Self>(%13) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %res = tuple ()
-  return %res : $()
-}
-
-// Check that we don't CSE open_existential_ref if they are not completely equal.
-// CHECK-LABEL: sil @dont_cse_open_existential_ref
-// CHECK: open_existential_ref
-// CHECK: open_existential_ref
-// CHECK: return
-sil @dont_cse_open_existential_ref : $@convention(thin) (@guaranteed Proto & Ping) -> @owned Ping {
-bb0(%0 : $Proto & Ping):
-  %4 = open_existential_ref %0 : $Proto & Ping to $@opened("3B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self
-  %5 = witness_method $@opened("3B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self, #Proto.doThis, %4 : $@opened("3B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %6 = apply %5<@opened("3B68354A-4796-11E6-B7DF-B8E856428C60", Proto) Self>(%4) : $@convention(witness_method: Proto) <τ_0_0 where τ_0_0 : Proto> (@guaranteed τ_0_0) -> ()
-  %9 = open_existential_ref %0 : $Proto & Ping to $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83", Proto & Ping) Self
-  %10 = upcast %9 : $@opened("3C038746-BE69-11E7-A5C1-685B35C48C83", Proto & Ping) Self to $Ping
-  %11 = class_method %10 : $Ping, #Ping.ping : (Ping) -> () -> Ping, $@convention(method) (@guaranteed Ping) -> @owned Ping
-  %12 = apply %11(%10) : $@convention(method) (@guaranteed Ping) -> @owned Ping
-  return %12 : $Ping
-}
-
-sil [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
-
-// CHECK-LABEL: sil @cse_global_init
-// CHECK:   [[P:%[0-9]+]] = apply 
-// CHECK:   [[A:%[0-9]+]] = pointer_to_address [[P]] 
-// CHECK:   begin_access [modify] [dynamic] [no_nested_conflict] [[A]]
-// CHECK:   begin_access [read] [dynamic] [no_nested_conflict] [[A]]
-// CHECK: // end sil function 'cse_global_init'
-sil @cse_global_init : $@convention(thin) () -> Int64 {
-bb0:
-  %2 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
-  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
-  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int64
-  %5 = integer_literal $Builtin.Int64, 42
-  %6 = struct $Int64 (%5 : $Builtin.Int64)
-  %7 = begin_access [modify] [dynamic] [no_nested_conflict] %4 : $*Int64
-  store %6 to %7 : $*Int64
-  end_access %7 : $*Int64
-  %10 = function_ref @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
-  %11 = apply %10() : $@convention(thin) () -> Builtin.RawPointer
-  %12 = pointer_to_address %11 : $Builtin.RawPointer to [strict] $*Int64
-  %33 = begin_access [read] [dynamic] [no_nested_conflict] %12 : $*Int64
-  %35 = load %33 : $*Int64
-  end_access %33 : $*Int64
-  return %35 : $Int64
 }
 
 // Test init_existential_metatype combining.
@@ -1306,6 +973,208 @@ bb0(%0 : $@thick SpecialEnum.Type):
   %4 = struct $Bool (%3 : $Builtin.Int1)
   return %4 : $Bool
 }
+
+sil_global private @g_token : $Builtin.Word
+sil_global private @g2_token : $Builtin.Word
+
+sil @g_init : $@convention(c) () -> ()
+
+// CHECK-LABEL: sil @cse_builtin_once :
+// CHECK:         builtin
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'cse_builtin_once'
+sil @cse_builtin_once : $@convention(thin) () -> () {
+bb0:
+  %1 = global_addr @g_token : $*Builtin.Word
+  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = function_ref @g_init : $@convention(c) () -> ()
+  %4 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
+  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
+// CHECK-LABEL: sil @dont_cse_builtin_once_different_token :
+// CHECK:         builtin
+// CHECK:         builtin
+// CHECK:       } // end sil function 'dont_cse_builtin_once_different_token'
+sil @dont_cse_builtin_once_different_token : $@convention(thin) () -> () {
+bb0:
+  %1 = global_addr @g_token : $*Builtin.Word
+  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
+  %3 = global_addr @g2_token : $*Builtin.Word
+  %4 = address_to_pointer %3 : $*Builtin.Word to $Builtin.RawPointer
+  %5 = function_ref @g_init : $@convention(c) () -> ()
+  %6 = builtin "once"(%2 : $Builtin.RawPointer, %5 : $@convention(c) () -> ()) : $()
+  %7 = builtin "once"(%4 : $Builtin.RawPointer, %5 : $@convention(c) () -> ()) : $()
+  %r1 = tuple ()
+  return %r1 : $()
+}
+
+// -----------------------------------------------------------------------
+// is-optimizable-lazy-property-getter tests
+// -----------------------------------------------------------------------
+
+// Positive (non-OSSA): class self, switch_enum on Optional, .some dest has 1 arg.
+sil private [lazy_getter] [noinline] @lazy_class_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  %none = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+  switch_enum %none : $Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%val : $Builtin.Int64):
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// Positive (OSSA): same shape but [ossa].
+sil private [ossa] [lazy_getter] [noinline] @lazy_class_getter_ossa : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : @guaranteed $Builtin.NativeObject):
+  %none = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+  switch_enum %none : $Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%val : $Builtin.Int64):
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// Negative: struct self — first argument is an address (@inout).
+sil private [lazy_getter] [noinline] @lazy_struct_getter : $@convention(method) (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%self : $*Builtin.Int64):
+  %none = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+  switch_enum %none : $Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%val : $Builtin.Int64):
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// Negative: callee lacks [lazy_getter] attribute.
+sil private [noinline] @plain_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  %none = enum $Optional<Builtin.Int64>, #Optional.none!enumelt
+  switch_enum %none : $Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%val : $Builtin.Int64):
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// Negative: entry block ends with switch_enum_addr, not switch_enum.
+sil private [lazy_getter] [noinline] @lazy_switch_enum_addr_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  %storage = alloc_stack $Optional<Builtin.Int64>
+  switch_enum_addr %storage : $*Optional<Builtin.Int64>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1:
+  %val_addr = unchecked_take_enum_data_addr %storage : $*Optional<Builtin.Int64>, #Optional.some!enumelt
+  %val = load %val_addr : $*Builtin.Int64
+  dealloc_stack %storage : $*Optional<Builtin.Int64>
+  br bb3(%val : $Builtin.Int64)
+
+bb2:
+  %zero = integer_literal $Builtin.Int64, 0
+  dealloc_stack %storage : $*Optional<Builtin.Int64>
+  br bb3(%zero : $Builtin.Int64)
+
+bb3(%ret : $Builtin.Int64):
+  return %ret : $Builtin.Int64
+}
+
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_class
+// TEST-RUNNER:       true
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_class
+sil @is_lazy_property_getter_class : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_class_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_struct
+// TEST-RUNNER:       false
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_struct
+sil @is_lazy_property_getter_struct : $@convention(thin) (@inout Builtin.Int64) -> Builtin.Int64 {
+bb0(%self : $*Builtin.Int64):
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_struct_getter : $@convention(method) (@inout Builtin.Int64) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@inout Builtin.Int64) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_not_lazy
+// TEST-RUNNER:       false
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_not_lazy
+sil @is_lazy_property_getter_not_lazy : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @plain_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_switch_enum_addr
+// TEST-RUNNER:       false
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_switch_enum_addr
+sil @is_lazy_property_getter_switch_enum_addr : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : $Builtin.NativeObject):
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_switch_enum_addr_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// Positive: OSSA caller + OSSA callee → true.
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_ossa_ossa
+// TEST-RUNNER:       true
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_ossa_ossa
+sil [ossa] @is_lazy_property_getter_ossa_ossa : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : @guaranteed $Builtin.NativeObject):
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_class_getter_ossa : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// Negative: OSSA caller + non-OSSA callee → false (cannot inline non-OSSA into OSSA).
+// TEST-RUNNER-LABEL: begin running test {{.*}} on is_lazy_property_getter_ossa_nonossa
+// TEST-RUNNER:       false
+// TEST-RUNNER-LABEL: end running test {{.*}} on is_lazy_property_getter_ossa_nonossa
+sil [ossa] @is_lazy_property_getter_ossa_nonossa : $@convention(thin) (@guaranteed Builtin.NativeObject) -> Builtin.Int64 {
+bb0(%self : @guaranteed $Builtin.NativeObject):
+  specify_test "is-optimizable-lazy-property-getter @instruction[+1]"
+  %fn     = function_ref @lazy_class_getter : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  %result = apply %fn(%self) : $@convention(method) (@guaranteed Builtin.NativeObject) -> Builtin.Int64
+  return %result : $Builtin.Int64
+}
+
+// -----------------------------------------------------------------------
+// Lazy property getter CSE tests
+// -----------------------------------------------------------------------
 
 struct StructWithLazyProperty {
   var lazyProperty: Int64 { mutating get set }
@@ -1411,39 +1280,46 @@ entry(%instance : $FC):
     return %retval : $()
 }
 
-sil_global private @g_token : $Builtin.Word
-sil_global private @g2_token : $Builtin.Word
+sil [readnone] @readnonefun : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
 
-sil @g_init : $@convention(c) () -> ()
-
-// CHECK-LABEL: sil @cse_builtin_once :
-// CHECK:         builtin
-// CHECK-NOT:     builtin
-// CHECK:       } // end sil function 'cse_builtin_once'
-sil @cse_builtin_once : $@convention(thin) () -> () {
-bb0:
-  %1 = global_addr @g_token : $*Builtin.Word
-  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = function_ref @g_init : $@convention(c) () -> ()
-  %4 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
-  %5 = builtin "once"(%2 : $Builtin.RawPointer, %3 : $@convention(c) () -> ()) : $()
-  %r1 = tuple ()
-  return %r1 : $()
+// CHECK-LABEL: sil @cse_readnone
+// CHECK: bb0
+// CHECK: function_ref @readnonefun
+// CHECK: apply
+// CHECK-NOT: function_ref @readnonefun
+// CHECK-NOT: apply
+// CHECK: return
+sil @cse_readnone : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64 {
+bb0(%0 : $*Builtin.Int8):
+  %1 = function_ref @readnonefun : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
+  %3 = apply %1(%0) : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
+  %2 = function_ref @readnonefun : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
+  %4 = apply %2(%0) : $@convention(thin) (@inout Builtin.Int8) -> Builtin.Int64
+  return %4 : $Builtin.Int64
 }
 
-// CHECK-LABEL: sil @dont_cse_builtin_once_different_token :
-// CHECK:         builtin
-// CHECK:         builtin
-// CHECK:       } // end sil function 'dont_cse_builtin_once_different_token'
-sil @dont_cse_builtin_once_different_token : $@convention(thin) () -> () {
+sil [global_init] @globalInitFn : $@convention(thin) () -> Builtin.RawPointer
+
+// CHECK-LABEL: sil @cse_global_init
+// CHECK:   [[P:%[0-9]+]] = apply
+// CHECK:   pointer_to_address [[P]]
+// CHECK-NOT: apply
+// CHECK: } // end sil function 'cse_global_init'
+sil @cse_global_init : $@convention(thin) () -> Int64 {
 bb0:
-  %1 = global_addr @g_token : $*Builtin.Word
-  %2 = address_to_pointer %1 : $*Builtin.Word to $Builtin.RawPointer
-  %3 = global_addr @g2_token : $*Builtin.Word
-  %4 = address_to_pointer %3 : $*Builtin.Word to $Builtin.RawPointer
-  %5 = function_ref @g_init : $@convention(c) () -> ()
-  %6 = builtin "once"(%2 : $Builtin.RawPointer, %5 : $@convention(c) () -> ()) : $()
-  %7 = builtin "once"(%4 : $Builtin.RawPointer, %5 : $@convention(c) () -> ()) : $()
-  %r1 = tuple ()
-  return %r1 : $()
+  %2 = function_ref @globalInitFn : $@convention(thin) () -> Builtin.RawPointer
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer
+  %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int64
+  %5 = integer_literal $Builtin.Int64, 42
+  %6 = struct $Int64 (%5 : $Builtin.Int64)
+  %7 = begin_access [modify] [dynamic] [no_nested_conflict] %4 : $*Int64
+  store %6 to %7 : $*Int64
+  end_access %7 : $*Int64
+  %10 = function_ref @globalInitFn : $@convention(thin) () -> Builtin.RawPointer
+  %11 = apply %10() : $@convention(thin) () -> Builtin.RawPointer
+  %12 = pointer_to_address %11 : $Builtin.RawPointer to [strict] $*Int64
+  %33 = begin_access [read] [dynamic] [no_nested_conflict] %12 : $*Int64
+  %35 = load %33 : $*Int64
+  end_access %33 : $*Int64
+  return %35 : $Int64
 }
