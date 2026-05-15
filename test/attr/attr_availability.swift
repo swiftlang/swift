@@ -1217,9 +1217,17 @@ struct BadRename {
   init(range: Range<Int>, step: Int) { }
 }
 
+func log(message: String) { }
+
+@available(*, unavailable, renamed: "log(message:)")
+func log(format: String, _ args: Any...) { fatalError() } // expected-note {{'log(format:_:)' has been explicitly marked unavailable here}}
+
 func testBadRename() {
   _ = BadRename(from: 5, to: 17) // expected-warning{{'init(from:to:step:)' is deprecated: replaced by 'init(range:step:)'}}{{documentation-file=deprecated-declaration}}
   // expected-note@-1{{use 'init(range:step:)' instead}}
+
+  // Regression test for https://github.com/apple/swift/issues/64694
+  log(format: "") // expected-error{{'log(format:_:)' has been renamed to 'log(message:)'}}
 }
 
 struct AvailableGenericParam<@available(*, deprecated) T> {}
