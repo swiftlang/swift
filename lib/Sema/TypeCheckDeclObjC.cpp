@@ -3851,9 +3851,46 @@ private:
     return decl->getInterfaceType();
   }
 
+  /// If \p req is an imported ObjC property whose getter has a custom
+  /// selector name (e.g. `@property (getter=isEnabled) BOOL enabled`), the
+  /// imported Swift name is taken from that getter ("isEnabled"), but the
+  /// stored `@objc` name still reflects the property name ("enabled"). In
+  /// that case, also accept a candidate whose ObjC name matches the getter
+  /// selector, because that's the name a Swift author writing the impl would
+  /// naturally use. Returns std::nullopt if no such alias applies.
+  static std::optional<ObjCSelector>
+  getObjCNameAliasForCustomGetter(ValueDecl *req) {
+    auto *reqVar = dyn_cast<VarDecl>(req);
+    if (!reqVar)
+      return std::nullopt;
+    auto *clangProp =
+        dyn_cast_or_null<clang::ObjCPropertyDecl>(reqVar->getClangDecl());
+    if (!clangProp || !clangProp->hasExplicitGetterName())
+      return std::nullopt;
+    auto getterSel = clangProp->getGetterName();
+    if (getterSel.getNumArgs() != 0)
+      return std::nullopt;
+    auto *id = getterSel.getIdentifierInfoForSlot(0);
+    if (!id)
+      return std::nullopt;
+    auto &ctx = req->getASTContext();
+    return ObjCSelector(ctx, 0, { ctx.getIdentifier(id->getName()) });
+  }
+
   MatchOutcome matchesImpl(ValueDecl *req, ValueDecl *cand,
                            ObjCSelector explicitObjCName) const {
-    bool hasObjCNameMatch = getObjCName(req) == getObjCName(cand);
+    auto reqObjCName = getObjCName(req);
+    auto candObjCName = getObjCName(cand);
+    bool hasObjCNameMatch = reqObjCName == candObjCName;
+
+    // Allow the custom-getter alias to satisfy an implicit ObjC name match
+    // for imported properties.
+    if (!hasObjCNameMatch && !explicitObjCName) {
+      if (auto alias = getObjCNameAliasForCustomGetter(req))
+        if (*alias == candObjCName)
+          hasObjCNameMatch = true;
+    }
+
     bool hasSwiftNameMatch = areSwiftNamesEqual(req->getName(), cand->getName());
 
     // If neither the ObjC nor Swift names match, there's absolutely no reason
