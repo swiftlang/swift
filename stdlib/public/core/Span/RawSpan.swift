@@ -715,7 +715,7 @@ extension RawSpan {
   ///     with the value in the range of memory referenced by this pointer.
   @unsafe
   @_alwaysEmitIntoClient
-  @_lifetime(borrow self)
+  @_lifetime(copy self)
   public func unsafeLoadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
@@ -748,12 +748,12 @@ extension RawSpan {
   ///     with the value in the range of memory referenced by this pointer.
   @unsafe
   @_alwaysEmitIntoClient
-  @_lifetime(borrow self)
+  @_lifetime(copy self)
   public func unsafeLoadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
     let element = unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
-    return unsafe _overrideLifetime(element, borrowing: self)
+    return unsafe _overrideLifetime(element, copying: self)
   }
 
   /// Returns a value constructed from the raw memory at the specified offset.
