@@ -91,14 +91,6 @@ bool BridgedDomTree::dominates(BridgedBasicBlock dominating, BridgedBasicBlock d
   return di->dominates(dominating.unbridged(), dominated.unbridged());
 }
 
-SwiftInt BridgedDomTree::getNumberOfChildren(BridgedBasicBlock bb) const {
-  return getDomNode(bb, di)->getNumChildren();
-}
-
-BridgedBasicBlock BridgedDomTree::getChildAt(BridgedBasicBlock bb, SwiftInt index) const {
-  return {getDomNode(bb, di)->begin()[index]->getBlock()};
-}
-
 OptionalBridgedBasicBlock BridgedDomTree::getImmediateDominator(BridgedBasicBlock block) const {
   if (auto *parentNode = getDomNode(block, di)->getIDom()) {
     return {parentNode->getBlock()};
@@ -108,6 +100,24 @@ OptionalBridgedBasicBlock BridgedDomTree::getImmediateDominator(BridgedBasicBloc
 
 bool BridgedPostDomTree::postDominates(BridgedBasicBlock dominating, BridgedBasicBlock dominated) const {
   return pdi->dominates(dominating.unbridged(), dominated.unbridged());
+}
+
+BridgedDomChildrenIterator::BridgedDomChildrenIterator(BridgedDomTree tree,
+                                                       BridgedBasicBlock bb) {
+  this->node = *(getDomNode(bb, tree.di)->begin());
+}
+
+OptionalBridgedBasicBlock BridgedDomChildrenIterator::next() {
+  using DomTreeNodeBase = llvm::DomTreeNodeBase<swift::SILBasicBlock>;
+
+  auto node = static_cast<DomTreeNodeBase *>(this->node);
+  if (!node) {
+    return {nullptr};
+  }
+
+  this->node = *(++DomTreeNodeBase::iterator(node));
+
+  return {node->getBlock()};
 }
 
 //===----------------------------------------------------------------------===//
