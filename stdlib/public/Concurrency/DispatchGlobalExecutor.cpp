@@ -333,12 +333,14 @@ clock_and_value_to_time(int clock, long long sec, long long nsec) {
 }
 
 extern "C" SWIFT_CC(swift)
-void swift_dispatchEnqueueWithDeadline(bool global,
-                                       long long sec,
-                                       long long nsec,
-                                       long long tsec,
-                                       long long tnsec,
-                                       int clock, SwiftJob *job) {
+uintptr_t swift_dispatchEnqueueWithDeadline(
+  bool global,
+  long long sec,
+  long long nsec,
+  long long tsec,
+  long long tnsec,
+  int clock, SwiftJob *job
+) {
   assert(job && "no job provided");
 
   SwiftJobPriority priority = swift_job_getPriority(job);
@@ -358,35 +360,83 @@ void swift_dispatchEnqueueWithDeadline(bool global,
 
   dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
 
-  if (tnsec != -1) {
-    uint64_t leeway;
-    if (tsec < 0 || (tsec == 0 && tnsec < 0))
-      leeway = 0;
-    else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
-             || __builtin_add_overflow(tnsec, leeway, &leeway)) {
-      leeway = UINT64_MAX;
-    }
+  // If this isn't an AsyncTask, we *can't* use a Dispatch Source,
+  // so in that case it just won't be cancellable.
+  if (swift_job_getKind(job) != SwiftTaskJobKind) {
+    dispatch_after_f(when, queue, (void *)job, &__swift_run_job);
+    return 0;
+  }
 
-    dispatch_source_t source =
-      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
-    dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
+  uint64_t leeway;
+  if (tnsec == -1) {
+    // This means "no leeway specified"; we used to call dispatch_after() in
+    // this case, which (looking at the Dispatch code) sets the default leeway
+    // according to the priority.
+    //
+    // For interactive and above, Dispatch uses 5%; for default and above,
+    // 6.7% and for everything below that 10% of the requested delay.
+    //
+    // Right now, we have no way to get Dispatch's idea of the priority,
+    // so default to 6.7%.
+    int64_t seconds;
+    int64_t nanos;
+    swift_get_time(&seconds, &nanos, (swift_clock_id)clock);
 
-    size_t sz = sizeof(struct __swift_job_source);
+    uint64_t now;
+    if (__builtin_mul_overflow(seconds, NSEC_PER_SEC, &now)
+        || __builtin_add_overflow(nanos, now, &now))
+      now = UINT64_MAX;
 
-    struct __swift_job_source *jobSource =
-      (struct __swift_job_source *)swift_job_alloc(job, sz);
+    uint64_t deadline;
+    if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
+        || __builtin_add_overflow(nsec, deadline, &deadline))
+      now = UINT64_MAX;
 
-    jobSource->job = job;
-    jobSource->source = source;
+    uint64_t delta;
+    if (__builtin_sub_overflow(deadline, now, &delta))
+      delta = 0;
 
-    dispatch_set_context(source, jobSource);
-    dispatch_source_set_event_handler_f(source,
-      (dispatch_function_t)&_swift_run_job_leeway);
+    leeway = delta / 15;
+  } else if (tsec < 0 || (tsec == 0 && tnsec < 0))
+    leeway = 0;
+  else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
+           || __builtin_add_overflow(tnsec, leeway, &leeway)) {
+    leeway = UINT64_MAX;
+  }
 
-    dispatch_activate(source);
-  } else {
-    dispatch_after_f(when, queue, (void *)job,
-      (dispatch_function_t)&__swift_run_job);
+  dispatch_source_t source =
+    dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+  dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
+
+  size_t sz = sizeof(struct __swift_job_source);
+
+  struct __swift_job_source *jobSource =
+    (struct __swift_job_source *)swift_job_alloc(job, sz);
+
+  jobSource->job = job;
+  jobSource->source = source;
+
+  dispatch_set_context(source, jobSource);
+  dispatch_source_set_event_handler_f(source,
+    (dispatch_function_t)&_swift_run_job_leeway);
+
+  dispatch_retain(source);
+  dispatch_activate(source);
+
+  return (uintptr_t)source;
+}
+
+extern "C" SWIFT_CC(swift)
+void swift_dispatchCancel(uintptr_t source) {
+  if (source) {
+    dispatch_source_cancel((dispatch_source_t)source);
+  }
+}
+
+extern "C" SWIFT_CC(swift)
+void swift_dispatchReleaseSource(uintptr_t source) {
+  if (source) {
+    dispatch_release((dispatch_source_t)source);
   }
 }
 

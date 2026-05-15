@@ -40,7 +40,7 @@ public protocol Executor: AnyObject, Sendable {
 /// Represents a job that is scheduled for future execution.
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 9999, *)
-public struct ScheduledJob {
+public struct ScheduledJob: ~Copyable {
   /// The executor that this job was scheduled on
   public let executor: any SchedulingExecutor
 
@@ -48,14 +48,25 @@ public struct ScheduledJob {
   public let jobId: UInt64
 
   /// Opaque, executor-specific data
-  public let opaqueData: (UInt, UInt)
+  public let opaqueData: InlineArray<2, UInt>
+
+  /// Optional clean-up function
+  public let cleanUp: ((borrowing ScheduledJob) -> ())?
 
   public init(executor: any SchedulingExecutor,
               jobId: UInt64,
-              opaqueData: (UInt, UInt)) {
+              opaqueData: InlineArray<2, UInt>,
+              cleanUp: ((borrowing ScheduledJob) -> ())? = nil) {
     self.executor = executor
     self.jobId = jobId
     self.opaqueData = opaqueData
+    self.cleanUp = cleanUp
+  }
+
+  deinit {
+    if let cleanUp {
+      cleanUp(self)
+    }
   }
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -72,7 +83,7 @@ public struct ScheduledJob {
   ///
   /// Users of this API should expect it to perform on a best-effort
   /// basis and should not rely on the job being cancelled.
-  public func cancel() {
+  public consuming func cancel() {
     executor.cancel(scheduledJob: self)
   }
   #endif
@@ -150,7 +161,7 @@ public protocol SchedulingExecutor: Executor {
   /// - scheduledJob:  The scheduled job to cancel.
   ///
   @available(SwiftStdlib 9999, *)
-  func cancel(scheduledJob: ScheduledJob)
+  func cancel(scheduledJob: consuming ScheduledJob)
 
 
   #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

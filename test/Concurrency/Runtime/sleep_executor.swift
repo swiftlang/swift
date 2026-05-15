@@ -58,10 +58,10 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
       job.runSynchronously(on: self.asUnownedTaskExecutor())
     }
 
-    return ScheduledJob(executor: self, jobId: jobId, opaqueData: (0, 0))
+    return ScheduledJob(executor: self, jobId: jobId, opaqueData: [0, 0])
   }
 
-  public func cancel(scheduledJob: ScheduledJob) {
+  public func cancel(scheduledJob: consuming ScheduledJob) {
     // Do nothing
   }
 }

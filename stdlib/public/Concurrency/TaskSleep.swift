@@ -198,7 +198,7 @@ extension Task where Success == Never, Failure == Never {
   /// the sleep completed.
   @available(StdlibDeploymentTarget 9999, *)
   static func onSleepCancel(_ token: UnsafeSleepStateToken,
-                            wakeUpJob: ScheduledJob?) {
+                            wakeUpJob: consuming ScheduledJob?) {
     while true {
       let state = unsafe token.load()
       switch unsafe state {
@@ -313,6 +313,7 @@ extension Task where Success == Never, Failure == Never {
         }
       } onCancel: {
         unsafe onSleepCancel(token, wakeUpJob: wakeUpJob)
+        wakeUpJob = nil
       }
 
       // Determine whether we got cancelled before we even started.

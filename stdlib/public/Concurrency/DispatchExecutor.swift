@@ -19,6 +19,8 @@ import Swift
 
 // import Dispatch
 
+fileprivate let OpaqueDataDispatchSource = 1
+
 // .. Dispatch Interface .......................................................
 
 // .. Main Executor ............................................................
@@ -49,13 +51,20 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
                                 tolerance: C.Duration? = nil,
                                 clock: C) -> ScheduledJob {
     let jobId = job.id
-    _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
-                     executor: self, global: false)
-    return ScheduledJob(executor: self, jobId: jobId, opaqueData: (0, 0))
+    let source = _dispatchEnqueue(
+      job, at: instant, tolerance: tolerance, clock: clock,
+      executor: self, global: false
+    )
+    return ScheduledJob(
+      executor: self, jobId: jobId, opaqueData: [0, source],
+      cleanUp: {
+        _dispatchReleaseSource($0.opaqueData[OpaqueDataDispatchSource])
+      }
+    )
   }
 
-  public func cancel(scheduledJob: ScheduledJob) {
-    // ###FIXME: Dispatch can't do this
+  public func cancel(scheduledJob: consuming ScheduledJob) {
+    _dispatchCancel(scheduledJob.opaqueData[OpaqueDataDispatchSource])
   }
 }
 
@@ -91,13 +100,20 @@ class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
                                 tolerance: C.Duration? = nil,
                                 clock: C) -> ScheduledJob {
     let jobId = job.id
-    _dispatchEnqueue(job, at: instant, tolerance: tolerance, clock: clock,
-                     executor: self, global: true)
-    return ScheduledJob(executor: self, jobId: jobId, opaqueData: (1, 0))
+    let source = _dispatchEnqueue(
+      job, at: instant, tolerance: tolerance, clock: clock,
+      executor: self, global: true
+    )
+    return ScheduledJob(
+      executor: self, jobId: jobId, opaqueData: [1, source],
+      cleanUp: {
+        _dispatchReleaseSource($0.opaqueData[OpaqueDataDispatchSource])
+      }
+    )
   }
 
-  public func cancel(scheduledJob: ScheduledJob) {
-    // ###FIXME: Dispatch can't do this
+  public func cancel(scheduledJob: consuming ScheduledJob) {
+    _dispatchCancel(scheduledJob.opaqueData[OpaqueDataDispatchSource])
   }
 }
 
@@ -156,7 +172,7 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
   clock: C,
   executor: E,
   global: Bool
-) {
+) -> UInt {
   // If it's a clock we know, convert it to something we can use; otherwise,
   // call the clock's `enqueue` function to schedule the enqueue of the job.
 
@@ -174,11 +190,11 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
     tolNanosec = -1
   }
 
-  _dispatchEnqueueWithDeadline(CBool(global),
-                               CLongLong(seconds), CLongLong(nanoseconds),
-                               CLongLong(tolSec), CLongLong(tolNanosec),
-                               clockID.rawValue,
-                               UnownedJob(job))
+  return _dispatchEnqueueWithDeadline(CBool(global),
+                                      CLongLong(seconds), CLongLong(nanoseconds),
+                                      CLongLong(tolSec), CLongLong(tolNanosec),
+                                      clockID.rawValue,
+                                      UnownedJob(job))
 }
 
 #endif // !$Embedded && !os(WASI)

@@ -14,6 +14,8 @@
 
 import Swift
 
+fileprivate let OpaqueDataClockId = 0
+
 // Store the Timestamp in the executor private data, if it will fit; otherwise,
 // use the allocator to allocate space for it and stash a pointer in the private
 // data area.
@@ -272,12 +274,12 @@ extension CooperativeExecutor: SchedulingExecutor {
       let continuousDuration = delay as! ContinuousClock.Duration
       let duration = Duration(from: continuousDuration)
       continuousWaitQueue.enqueue(job, after: duration)
-      return ScheduledJob(executor: self, jobId: jobId, opaqueData: (1, 0))
+      return ScheduledJob(executor: self, jobId: jobId, opaqueData: [1, 0])
     } else if let _ = clock as? SuspendingClock {
       let suspendingDuration = delay as! SuspendingClock.Duration
       let duration = Duration(from: suspendingDuration)
       suspendingWaitQueue.enqueue(job, after: duration)
-      return ScheduledJob(executor: self, jobId: jobId, opaqueData: (2, 0))
+      return ScheduledJob(executor: self, jobId: jobId, opaqueData: [2, 0])
     } else if let enqueueingClock = clock as? EnqueueingClock {
       return _openAndEnqueue(
         job,
@@ -292,10 +294,10 @@ extension CooperativeExecutor: SchedulingExecutor {
     }
   }
 
-  public func cancel(scheduledJob: ScheduledJob) {
-    if scheduledJob.opaqueData.0 == 1 {
+  public func cancel(scheduledJob: consuming ScheduledJob) {
+    if scheduledJob.opaqueData[OpaqueDataClockId] == 1 {
       continuousWaitQueue.cancel(jobId: scheduledJob.jobId)
-    } else if scheduledJob.opaqueData.0 == 2 {
+    } else if scheduledJob.opaqueData[OpaqueDataClockId] == 2 {
       suspendingWaitQueue.cancel(jobId: scheduledJob.jobId)
     }
   }

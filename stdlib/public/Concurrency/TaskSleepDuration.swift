@@ -172,6 +172,7 @@ extension Task where Success == Never, Failure == Never {
         }
       } onCancel: {
         unsafe onSleepCancel(token, wakeUpJob: wakeUpJob)
+        wakeUpJob = nil
       }
 
       // Determine whether we got cancelled before we even started.
