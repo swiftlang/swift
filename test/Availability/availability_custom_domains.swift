@@ -64,7 +64,7 @@ func testDeployment() { // expected-note 3 {{add '@available' attribute to enclo
 
 // FIXME: [availability] Test @inlinable functions.
 
-func testIfAvailable(_ truthy: Bool) { // expected-note 9 {{add '@available' attribute to enclosing global function}}
+func testIfAvailable(_ truthy: Bool) { // expected-note 11 {{add '@available' attribute to enclosing global function}}
   if #available(EnabledDomain) { // expected-note {{enclosing scope here}}
     availableInEnabledDomain()
     availableInAlwaysEnabledDomain()
@@ -139,6 +139,18 @@ func testIfAvailable(_ truthy: Bool) { // expected-note 9 {{add '@available' att
     unavailableInEnabledDomain()
   } else {
     availableInEnabledDomain()
+    unavailableInEnabledDomain() // expected-error {{'unavailableInEnabledDomain()' is unavailable}}
+  }
+
+  if #unavailable(EnabledDomain), truthy {
+    availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
+    // expected-note@-1 {{add 'if #available' version check}}
+    unavailableInEnabledDomain()
+  } else {
+    // In this branch, the state of EnabledDomain remains unknown since
+    // execution will reach here if "truthy" is false.
+    availableInEnabledDomain() // expected-error {{'availableInEnabledDomain()' is only available in EnabledDomain}}
+    // expected-note@-1 {{add 'if #available' version check}}
     unavailableInEnabledDomain() // expected-error {{'unavailableInEnabledDomain()' is unavailable}}
   }
 
@@ -242,8 +254,8 @@ func testAlwaysEnabledDomainUnavailable() {
 
 @available(*, unavailable)
 func testUniversallyUnavailable() {
-  // expected-note@-1 {{add '@available' attribute to enclosing global function}}{{243:1-1=@available(EnabledDomain)\n}}
-  // expected-note@-2 {{add '@available' attribute to enclosing global function}}{{243:1-1=@available(DynamicDomain)\n}}
+  // expected-note@-1 {{add '@available' attribute to enclosing global function}}{{-1:1-1=@available(EnabledDomain)\n}}
+  // expected-note@-2 {{add '@available' attribute to enclosing global function}}{{-1:1-1=@available(DynamicDomain)\n}}
   alwaysAvailable()
   // FIXME: [availability] Diagnostic consistency: potentially unavailable declaration shouldn't be diagnosed
   // in contexts that are unavailable to broader domains

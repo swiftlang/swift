@@ -100,9 +100,11 @@ tuplify(true) { cond in
         globalFuncAvailableOn52() // expected-error{{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
         // expected-note@-1{{add 'if #available' version check}}
       } else if true {
-        globalFuncAvailableOn52()
+        globalFuncAvailableOn52() // expected-error{{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+        // expected-note@-1{{add 'if #available' version check}}
       } else if false {
-        globalFuncAvailableOn52()
+        globalFuncAvailableOn52() // expected-error{{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+        // expected-note@-1{{add 'if #available' version check}}
       }
     }
   }
@@ -162,7 +164,8 @@ tuplifyWithAvailabilityErasure(true) { cond in
   if cond, #unavailable(OSX 52) {
     cond
   } else {
-    globalFuncAvailableOn52()
+    globalFuncAvailableOn52() // expected-error{{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
+    // expected-note@-1{{add 'if #available' version check}}
   }
 
   // https://github.com/apple/swift/issues/63764
