@@ -280,6 +280,21 @@ static bool usesFeatureLifetimes(Decl *decl) {
   return false;
 }
 
+static PreInverseGenericsAttr *getPreInverseGenericsExcept(Decl *decl) {
+  if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (auto anchorVar = pbd->getAnchoringVarDecl(i))
+        return getPreInverseGenericsExcept(anchorVar);
+
+  return decl->getAttrs().getAttribute<PreInverseGenericsAttr>();
+}
+
+static bool usesFeaturePreInverseGenericsExcept(Decl *decl) {
+  if (auto *attr = getPreInverseGenericsExcept(decl))
+    return attr->hasExcept(decl);
+  return false;
+}
+
 static bool hasLifetimeDependencies(Type type) {
   if (auto *aft = type->getAs<AnyFunctionType>()) {
     return aft->hasExplicitLifetimeDependencies();

@@ -2743,6 +2743,39 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::SetterAccess:
     llvm_unreachable("handled by DeclAttrKind::AccessControl");
 
+  case DeclAttrKind::PreInverseGenerics: {
+    TypeRepr *exceptType = nullptr;
+    SourceLoc rParenLoc = Loc;
+
+    if (consumeIfAttributeLParen()) {
+      if (Tok.getText() != "except" || peekToken().isNot(tok::colon)) {
+        diagnose(Tok, diag::attr_pre_inverse_generics_expected_except);
+        skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+        return makeParserSuccess();
+      }
+      consumeToken(tok::identifier);
+      consumeToken(tok::colon);
+
+      auto type = parseType(diag::expected_type);
+      if (type.isNull())
+        return makeParserSuccess();
+      exceptType = type.get();
+
+      if (!consumeIf(tok::r_paren, rParenLoc)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_rparen,
+                 AttrName, /*isModifier=*/false);
+        return makeParserSuccess();
+      }
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) PreInverseGenericsAttr(
+          AtLoc, SourceRange(AtLoc.isValid() ? AtLoc : Loc, rParenLoc),
+          exceptType));
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(_, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     if (!DiscardAttribute)

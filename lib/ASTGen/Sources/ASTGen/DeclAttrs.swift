@@ -176,6 +176,8 @@ extension ASTGenVisitor {
         return handle(self.generateOptimizeAttr(attribute: node)?.asDeclAttribute)
       case .OriginallyDefinedIn:
         return self.generateOriginallyDefinedInAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
+      case .PreInverseGenerics:
+        return handle(self.generatePreInverseGenericsAttr(attribute: node)?.asDeclAttribute)
       case .PrivateImport:
         return handle(self.generatePrivateImportAttr(attribute: node)?.asDeclAttribute)
       case .ProjectedValueProperty:
@@ -296,7 +298,6 @@ extension ASTGenVisitor {
         .ObjCNonLazyRealization,
         .Owned,
         .Preconcurrency,
-        .PreInverseGenerics,
         .PropertyWrapper,
         .Reparentable,
         .RequiresStoredPropertyInits,
@@ -1730,6 +1731,23 @@ extension ASTGenVisitor {
       range: self.generateAttrSourceRange(node),
       name: name
     )
+  }
+
+  func generatePreInverseGenericsAttr(attribute node: AttributeSyntax) -> BridgedPreInverseGenericsAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      switch args.first?.label?.rawText {
+        case "except":
+          fatalError("ASTGen does not yet support the except: argument")
+        default:
+          // TODO: Diagnose.
+          fatalError("invalid argument for @_preInverseGenerics attribute")
+      }
+      return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node)
+      )
+    }
   }
 
   func generateRawLayoutAttr(attribute node: AttributeSyntax) -> BridgedRawLayoutAttr? {

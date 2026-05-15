@@ -1902,6 +1902,9 @@ ERROR(attr_rawlayout_expected_integer_alignment,none,
 ERROR(attr_rawlayout_expected_params,none,
       "expected %1 argument after %0 argument in '@_rawLayout'", (StringRef, StringRef))
 
+ERROR(attr_pre_inverse_generics_expected_except,none,
+      "expected 'except:' argument in '@_preInverseGenerics'", ())
+
 ERROR(attr_extern_expected_label,none,
       "expected %0 argument to '@_extern'", (StringRef))
 

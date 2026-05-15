@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/SILThunkKind.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
@@ -81,8 +82,8 @@ protected:
   /// If enabled, marker protocols can be encoded in the mangled name.
   bool AllowMarkerProtocols = true;
 
-  /// If enabled, inverses will not be mangled into generic signatures.
-  bool AllowInverses = true;
+  /// The set of inverses allowed to be mangled into generic signatures.
+  InvertibleProtocolSet AllowedInverses = InvertibleProtocolSet::allKnown();
 
   /// If enabled, @isolated(any) can be encoded in the mangled name.
   /// Suppressing type attributes this way is generally questionable ---
@@ -560,8 +561,8 @@ protected:
     BaseEntitySignature(const Decl *decl);
   };
 
-  static bool inversesAllowed(const Decl *decl);
-  static bool inversesAllowedIn(const DeclContext *ctx);
+  static InvertibleProtocolSet inversesAllowed(const Decl *decl);
+  static InvertibleProtocolSet inversesAllowedIn(const DeclContext *ctx);
 
   void appendContextOf(const ValueDecl *decl, BaseEntitySignature &base);
   void appendContextualInverses(const GenericTypeDecl *contextDecl,

@@ -832,7 +832,7 @@ DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   157)
 DECL_ATTR_ALIAS(_disallowFeatureSuppression, AllowFeatureSuppression)
 
-SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
+DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
   OnAbstractFunction | OnSubscript | OnVar | OnExtension,
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   158)

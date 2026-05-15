@@ -563,6 +563,9 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
+/// Enable @_preInverseGenerics(except:) attribute
+EXPERIMENTAL_FEATURE(PreInverseGenericsExcept, true)
+
 /// Deprecates the compatibility memberwise initializer introduced by SE-0502,
 /// and removes it in the next major language mode.
 EXPERIMENTAL_FEATURE(DeprecateCompatMemberwiseInit, false)
