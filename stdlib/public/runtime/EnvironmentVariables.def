@@ -22,78 +22,78 @@
 #error "Must define VARIABLE to include EnvironmentVariables.def"
 #endif
 
-VARIABLE(SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION, bool, false,
+VARIABLE(SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION, boolean, false,
          "Enable additional metadata allocation tracking for swift-inspect to "
          "use.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING, bool, false,
+VARIABLE(SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING, boolean, false,
          "Enable logging of backtraces for each metadata allocation. Requires "
          "SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION to be enabled.")
 
-VARIABLE(SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT, uint8_t, 2,
+VARIABLE(SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT, uint8, 2,
          "Print warnings when using implicit @objc entrypoints. Set to "
          "desired reporting level, 0-3.")
 
-VARIABLE(SWIFT_DETERMINISTIC_HASHING, bool, false,
+VARIABLE(SWIFT_DETERMINISTIC_HASHING, boolean, false,
          "Disable randomized hash seeding.")
 
-VARIABLE(SWIFT_ENABLE_MANGLED_NAME_VERIFICATION, bool, false,
+VARIABLE(SWIFT_ENABLE_MANGLED_NAME_VERIFICATION, boolean, false,
          "Enable verification that metadata can roundtrip through a mangled "
          "name each time metadata is instantiated.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE, bool, false,
+VARIABLE(SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE, boolean, false,
          "Scribble on runtime allocations such as metadata allocations.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_COW_CHECKS, bool, false,
+VARIABLE(SWIFT_DEBUG_ENABLE_COW_CHECKS, boolean, false,
          "Enable internal checks for copy-on-write operations.")
 
-VARIABLE(SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS, bool, false,
+VARIABLE(SWIFT_DEBUG_VALIDATE_UNCHECKED_CONTINUATIONS, boolean, false,
          "Check for and error on double-calls of unchecked continuations.")
 
 #if defined(__APPLE__) && defined(__MACH__)
 
-VARIABLE(SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, false,
+VARIABLE(SWIFT_DEBUG_VALIDATE_SHARED_CACHE_PROTOCOL_CONFORMANCES, boolean, false,
          "Validate shared cache protocol conformance results against the "
          "lists of conformances in the shared cache images.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES, bool, true,
+VARIABLE(SWIFT_DEBUG_ENABLE_SHARED_CACHE_PROTOCOL_CONFORMANCES, boolean, true,
          "Enable querying precomputed protocol conformances in the shared "
          "cache.")
 
 #endif
 
 VARIABLE(SWIFT_DEBUG_ENABLE_CACHE_PROTOCOL_CONFORMANCES_BY_TYPE_DESCRIPTOR,
-         bool, true,
+         boolean, true,
          "Enable caching protocol conformances by type descriptor in addition "
          "to the cache by metadata.")
 
-VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, bool, true,
+VARIABLE(SWIFT_DEBUG_CONCURRENCY_ENABLE_COOPERATIVE_QUEUES, boolean, true,
          "Enable dispatch cooperative queues in the global executor.")
 
 #ifndef NDEBUG
 
-VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, bool, false,
+VARIABLE(SWIFT_DEBUG_RUNTIME_EXCLUSIVITY_LOGGING, boolean, false,
          "Enable the an asserts runtime to emit logging as it works.")
 
 VARIABLE(SWIFT_DEBUG_ENABLE_PROTOCOL_CONFORMANCES_LOOKUP_LOG,
-         bool, false,
+         boolean, false,
          "Enable logs for the conformance lookup routine.")
 
 #endif
 
-VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32_t, 0,
+VARIABLE(SWIFT_BINARY_COMPATIBILITY_VERSION, uint32, 0,
         "Set the binary compatibility level of the Swift Standard Library")
 
-VARIABLE(SWIFT_DEBUG_FAILED_TYPE_LOOKUP, bool, false,
+VARIABLE(SWIFT_DEBUG_FAILED_TYPE_LOOKUP, boolean, false,
          "Enable warnings when we fail to look up a type by name.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_METADATA, bool, true,
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_METADATA, boolean, true,
          "Enable use of metadata in prespecializations library.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP, bool, true,
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP, boolean, true,
          "Enable use of descriptor map in prespecializations library.")
 
-VARIABLE(SWIFT_DEBUG_VALIDATE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP, bool, false,
+VARIABLE(SWIFT_DEBUG_VALIDATE_LIB_PRESPECIALIZED_DESCRIPTOR_LOOKUP, boolean, false,
          "Validate results from the prespecializations map descriptor map by "
          "comparing to a full scan.")
 
@@ -112,7 +112,7 @@ VARIABLE(SWIFT_DEBUG_LIB_PRESPECIALIZED_ENABLED_PROCESSES, string, "",
          "processes list in the prespecializations library, as well as the "
          "list in SWIFT_DEBUG_LIB_PRESPECIALIZED_DISABLED_PROCESSES.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING, bool, false,
+VARIABLE(SWIFT_DEBUG_ENABLE_LIB_PRESPECIALIZED_LOGGING, boolean, false,
          "Enable debug logging of prespecializations library use.")
 
 VARIABLE(SWIFT_ROOT, string, "",
@@ -125,7 +125,7 @@ VARIABLE(SWIFT_BACKTRACE, string, "",
          "crash catching and backtracing support in the runtime. "
          "See docs/Backtracing.rst in the Swift repository for details.")
 
-VARIABLE(SWIFT_IS_BACKTRACING, bool, false,
+VARIABLE(SWIFT_IS_BACKTRACING, boolean, false,
          "Set to `true` if we are running the backtracer.")
 
 VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
@@ -144,13 +144,13 @@ VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
          " 'swift6' (Swift 6.0-6.1 behavior)"
          " 'isIsolatingCurrentContext' (Swift 6.2 behavior)")
 
-VARIABLE(SWIFT_DUMP_ACCESSIBLE_FUNCTIONS, bool, false,
+VARIABLE(SWIFT_DUMP_ACCESSIBLE_FUNCTIONS, boolean, false,
          "Dump a listing of all 'AccessibleFunctionRecord's upon first access. "
          "These are used to obtain function pointers from accessible function "
          "record names, e.g. by the Distributed runtime to invoke distributed "
          "functions.")
 
-VARIABLE(SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR, bool, true,
+VARIABLE(SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR, boolean, true,
          "Use a slab allocator for the async stack. If not enabled, directly "
          "call malloc/free. Direct use of malloc/free enables use of memory "
          "debugging tools for async stack allocations.")
