@@ -3150,13 +3150,27 @@ private:
     
     auto numGenericArgs =
       generics->getGenericContextHeader().getNumArguments();
-    
+
     auto offsetToGenericArgs = readGenericArgsOffset(metadata, descriptor);
     if (!offsetToGenericArgs)
       return {};
 
-    auto genericArgsAddr = getAddress(metadata)
+    auto genericArgsBaseAddr = getAddress(metadata)
       + sizeof(StoredPointer) * *offsetToGenericArgs;
+
+    // The generic argument layout begins with one StoredSize "shape class"
+    // entry per same-shape equivalence class. These hold pack lengths for
+    // pack-typed key arguments. Skip past them to reach the metadata pointers.
+    auto packShapeHeader = generics->getGenericPackShapeHeader();
+    auto packShapeDescriptors = generics->getGenericPackShapeDescriptors();
+    if (numGenericArgs < packShapeHeader.NumShapeClasses)
+      return {};
+    numGenericArgs -= packShapeHeader.NumShapeClasses;
+
+    auto genericArgsAddr = genericArgsBaseAddr
+      + sizeof(StoredPointer) * packShapeHeader.NumShapeClasses;
+
+    unsigned packIndex = 0;
 
     std::vector<BuiltType> builtSubsts;
     for (auto param : generics->getGenericParams()) {
@@ -3187,10 +3201,65 @@ private:
           return {};
         }
         break;
-        
+
       case GenericParamKind::TypePack:
-        // assert(false && "Packs not supported here yet");
-        return {};
+        if (param.hasKeyArgument()) {
+          if (numGenericArgs == 0)
+            return {};
+          --numGenericArgs;
+
+          // Find the matching pack shape descriptor. By invariant the
+          // metadata pack descriptors come before any witness table pack
+          // descriptors, in the same order as the pack-typed parameters
+          // with key arguments, so the next descriptor is ours.
+          if (packIndex >= packShapeDescriptors.size())
+            return {};
+          const auto &packDescriptor = packShapeDescriptors[packIndex++];
+          if (packDescriptor.Kind != GenericPackKind::Metadata)
+            return {};
+
+          // The pack length is stored in the shape class slot at the
+          // start of the generic argument layout.
+          auto packLengthAddr = genericArgsBaseAddr
+            + sizeof(StoredPointer) * packDescriptor.ShapeClass;
+          StoredSize packLength;
+          if (!Reader->readInteger(packLengthAddr, &packLength))
+            return {};
+
+          // Read the pack pointer. Its low bit indicates heap vs. stack
+          // lifetime; the actual element array is at the address with the
+          // low bit cleared.
+          StoredPointer rawPackPtr;
+          if (!Reader->readInteger(genericArgsAddr, &rawPackPtr))
+            return {};
+          genericArgsAddr += sizeof(StoredPointer);
+
+          auto packElementsAddr = RemoteAddress(
+              rawPackPtr & ~StoredPointer(1),
+              genericArgsAddr.getAddressSpace());
+
+          std::vector<BuiltType> elements;
+          elements.reserve(packLength);
+          for (StoredSize i = 0; i < packLength; ++i) {
+            RemoteAddress elementMetadata;
+            if (!Reader->template readRemoteAddress<StoredPointer>(
+                    packElementsAddr, elementMetadata)) {
+              return {};
+            }
+            packElementsAddr += sizeof(StoredPointer);
+
+            auto builtElement = readTypeFromMetadata(
+                elementMetadata, false, recursion_limit);
+            if (!builtElement)
+              return {};
+            elements.push_back(builtElement);
+          }
+
+          builtSubsts.push_back(Builder.createPackType(elements));
+        } else {
+          return {};
+        }
+        break;
 
       default:
         // We don't know about this kind of parameter.
