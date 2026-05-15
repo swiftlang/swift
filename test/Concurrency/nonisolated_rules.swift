@@ -103,6 +103,10 @@ nonisolated struct StructRemovesGlobalActor: GloballyIsolated {
 // expected-note@+1 {{calls to global function 'requireMain()' from outside of its actor context are implicitly asynchronous}}
 @MainActor func requireMain() {}
 
+nonisolated struct NonisolatedStructWithLazyVar {
+  lazy var x = 0 // okay
+}
+
 nonisolated struct S1: GloballyIsolated {
   var x: NonSendable
   @P nonisolated var y = 0 // okay

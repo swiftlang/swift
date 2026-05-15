@@ -6527,8 +6527,7 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     case ActorIsolation::NonisolatedUnsafe:
       // Stored properties cannot be non-isolated, so don't infer it.
       if (auto var = dyn_cast<VarDecl>(value)) {
-        if (!var->isStatic() &&
-            (var->hasStorage() || var->getAttrs().hasAttribute<LazyAttr>()))
+        if (!var->isStatic() && var->hasStorage())
           return ActorIsolation::forUnspecified().withPreconcurrency(
               inferred.preconcurrency());
       }
@@ -6578,7 +6577,13 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     if (var->isLazyStorageProperty()) {
       if (auto originalVar = var->getOriginalVarForBackingStorage()) {
         auto inferred = getInferredActorIsolation(originalVar);
-        return {inferredIsolation(inferred.isolation), inferred.source};
+        auto isolation = inferred.isolation;
+        // Lazy backing storage should not inherit nonisolated-family isolation
+        // from the visible lazy property.
+        if (isolation.isNonisolatedOrConcurrent())
+          isolation = ActorIsolation::forUnspecified().withPreconcurrency(
+              isolation.preconcurrency());
+        return {inferredIsolation(isolation), inferred.source};
       }
     }
   }

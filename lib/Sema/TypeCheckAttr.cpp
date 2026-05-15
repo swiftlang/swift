@@ -8235,10 +8235,12 @@ void AttributeChecker::visitNonisolatedAttr(NonisolatedAttr *attr) {
                 .fixItInsertAfter(attr->getRange().End, "(unsafe)");
             return;
           } else if (var->getAttrs().hasAttribute<LazyAttr>()) {
-            diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
-                .warnUntilLanguageMode(LanguageMode::v6)
-                .fixItInsertAfter(attr->getRange().End, "(unsafe)");
-            return;
+            if (!attr->isImplicit()) {
+              diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
+                  .warnUntilLanguageMode(LanguageMode::v6)
+                  .fixItInsertAfter(attr->getRange().End, "(unsafe)");
+              return;
+            }
           } else {
             diagnoseAndRemoveAttr(attr, diag::nonisolated_mutable_storage)
               .fixItInsertAfter(attr->getRange().End, "(unsafe)");
