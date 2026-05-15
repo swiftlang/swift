@@ -636,6 +636,30 @@ class DemanglingForTypeRef
     return node;
   }
 
+  /// Produce the node to install as a nominal's context when swapping in the
+  /// richer parent stored on the TypeRef.
+  ///
+  /// Extensions are special because they're the only node that can appear
+  /// instead of the parent (and contain it). For an Extension, the richer
+  /// parent replaces the extended-type slot, preserving the module and any
+  /// generic signature. For every other context kind, the richer parent
+  /// replaces the context wholesale.
+  ///
+  /// Returns nullptr if originalContext is a malformed Extension.
+  Demangle::NodePointer
+  substituteParentIntoContext(Demangle::NodePointer originalContext,
+                              Demangle::NodePointer parentNode) {
+    if (originalContext->getKind() != Node::Kind::Extension)
+      return parentNode;
+    if (originalContext->getNumChildren() < 2 ||
+        originalContext->getNumChildren() > 3) {
+      assert(false && "Extension node should have 2 or 3 children.");
+      return nullptr;
+    }
+    originalContext->replaceChild(1, parentNode);
+    return originalContext;
+  }
+
 public:
   DemanglingForTypeRef(Demangle::Demangler &Dem) : Dem(Dem) {}
 
@@ -674,8 +698,13 @@ public:
         parentNode->getNumChildren())
       parentNode = parentNode->getFirstChild();
 
+    auto originalContext = node->getChild(0);
     auto contextualizedNode = Dem.createNode(node->getKind());
-    contextualizedNode->addChild(parentNode, Dem);
+    auto newContext = substituteParentIntoContext(originalContext, parentNode);
+    if (!newContext)
+      return nullptr;
+
+    contextualizedNode->addChild(newContext, Dem);
     contextualizedNode->addChild(node->getChild(1), Dem);
     return contextualizedNode;
   }
@@ -723,13 +752,16 @@ public:
     // Save identifier for reinsertion later, we have to remove it
     // so we can insert the parent node as the first child.
     auto identifierNode = nominalNode->getLastChild();
+    auto originalContext = nominalNode->getFirstChild();
 
     // Remove all children.
     nominalNode->removeChildAt(1);
     nominalNode->removeChildAt(0);
 
-    // Add the parent we just visited back in, followed by the identifier.
-    nominalNode->addChild(parentNode, Dem);
+    auto newContext = substituteParentIntoContext(originalContext, parentNode);
+    if (!newContext)
+      return nullptr;
+    nominalNode->addChild(newContext, Dem);
     nominalNode->addChild(identifierNode, Dem);
 
     return genericNode;
