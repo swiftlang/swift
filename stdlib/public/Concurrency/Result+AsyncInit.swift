@@ -10,8 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-public import Swift
-internal import SwiftConcurrencyInternalShims
+import Swift
+@_implementationOnly import SwiftConcurrencyInternalShims
 
 @available(SwiftStdlib 5.1, *)
 extension Result where Success: ~Copyable {
