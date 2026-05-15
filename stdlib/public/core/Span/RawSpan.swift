@@ -321,7 +321,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @unsafe
   @lifetime(copy span)
-  public init<Element>(_elements span: Span<Element>) {
+  public init<Element: ~Escapable>(_elements span: Span<Element>) {
     unsafe self = Self.init(unsafeElements: span)
   }
 
@@ -335,7 +335,7 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @unsafe
   @_lifetime(copy span)
-  public init<Element>(unsafeElements span: Span<Element>) {
+  public init<Element: ~Escapable>(unsafeElements span: Span<Element>) {
     let rawSpan = unsafe RawSpan(
       _unchecked: unsafe span._pointer,
       byteCount: span.count == 1 ? MemoryLayout<Element>.size
@@ -625,7 +625,7 @@ extension RawSpan {
   @unsafe
   @_alwaysEmitIntoClient
   @lifetime(copy self)
-  consuming public func _unsafeView<T: BitwiseCopyable>(
+  consuming public func _unsafeView<T: BitwiseCopyable & ~Escapable>(
     as type: T.Type
   ) -> Span<T> {
     let rawBuffer = unsafe UnsafeRawBufferPointer(start: _pointer, count: _count)
@@ -715,7 +715,8 @@ extension RawSpan {
   ///     with the value in the range of memory referenced by this pointer.
   @unsafe
   @_alwaysEmitIntoClient
-  public func unsafeLoadUnaligned<T: BitwiseCopyable>(
+  @_lifetime(borrow self)
+  public func unsafeLoadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0, as type: T.Type
   ) -> T {
     _precondition(
@@ -747,10 +748,12 @@ extension RawSpan {
   ///     with the value in the range of memory referenced by this pointer.
   @unsafe
   @_alwaysEmitIntoClient
-  public func unsafeLoadUnaligned<T: BitwiseCopyable>(
+  @_lifetime(borrow self)
+  public func unsafeLoadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromUncheckedByteOffset offset: Int, as type: T.Type
   ) -> T {
-    unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
+    let element = unsafe _start().loadUnaligned(fromByteOffset: offset, as: T.self)
+    return unsafe _overrideLifetime(element, borrowing: self)
   }
 
   /// Returns a value constructed from the raw memory at the specified offset.

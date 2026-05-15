@@ -13,7 +13,7 @@
 /// A type that provides borrowed access to the values of a borrowing sequence.
 @available(SwiftStdlib 6.4, *)
 public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
-  associatedtype Element: ~Copyable
+  associatedtype Element: ~Copyable & ~Escapable
 
   /// Returns a span over the next group of elements that are ready to by visited,
   /// up to the specifed maximum.
@@ -72,7 +72,7 @@ public protocol BorrowingIteratorProtocol<Element>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable {
+extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element: ~Copyable & ~Escapable {
   /// Returns a span over the next group of elements that are ready to by visited,
   /// up to the specifed maximum.
   @_alwaysEmitIntoClient
@@ -98,7 +98,7 @@ extension BorrowingIteratorProtocol where Self: ~Copyable & ~Escapable, Element:
 
 @available(SwiftStdlib 6.4, *)
 public struct SpanIterator<Element>: BorrowingIteratorProtocol, ~Copyable, ~Escapable
-  where Element: ~Copyable
+  where Element: ~Copyable & ~Escapable
 {
   @usableFromInline
   internal var _span: Span<Element>
@@ -144,7 +144,7 @@ public struct SpanIterator<Element>: BorrowingIteratorProtocol, ~Copyable, ~Esca
 @reparentable
 public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
   /// A type representing the sequence's elements.
-  associatedtype Element: ~Copyable
+  associatedtype Element: ~Copyable & ~Escapable
 
   /// A type that provides the sequence's iteration interface and
   /// encapsulates its iteration state.
@@ -163,7 +163,7 @@ public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable {
+extension BorrowingSequence where Self: ~Copyable & ~Escapable, Element: ~Copyable & ~Escapable {
   @inlinable
   public var underestimatedCount: Int { 0 }
   @inlinable
