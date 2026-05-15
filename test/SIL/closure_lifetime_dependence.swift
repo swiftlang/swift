@@ -113,3 +113,13 @@ func callContextAndArgDependentPicker() {
 func copyClosureNE(body: () -> NE) -> NE {
   body()
 }
+
+// CHECK-LABEL: sil hidden @$s27closure_lifetime_dependence23implicitDependClosureNE4bodyAA0G0VAEyXE_tF : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @lifetime(captures) @owned NE) -> @lifetime(copy 0) @owned NE {
+// CHECK: bb0(%0 : $@noescape @callee_guaranteed () -> @lifetime(captures) @owned NE):
+// CHECK: [[RESULT:%[0-9]+]] = apply %0() : $@noescape @callee_guaranteed () -> @lifetime(captures) @owned NE
+// CHECK-NEXT: return [[RESULT]]
+// CHECK-LABEL: } // end sil function '$s27closure_lifetime_dependence23implicitDependClosureNE4bodyAA0G0VAEyXE_tF'
+@_lifetime(body)
+func implicitDependClosureNE(body: () -> NE) -> NE {
+  body()
+}
