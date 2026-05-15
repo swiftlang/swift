@@ -145,6 +145,9 @@ typedef enum swift_layout_kind {
   SWIFT_CLOSURE_CONTEXT,
 
   // A contiguous list of N Ts, typically for Builtin.FixedArray<N, T>.
+  // NumFields will report the array count. All children are the same type, so
+  // users can make a single call to swift_reflection_childOfTypeRef regardless
+  // of the count.
   SWIFT_ARRAY,
 } swift_layout_kind_t;
 

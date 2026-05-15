@@ -586,6 +586,8 @@ static swift_typeinfo_t convertTypeInfo(const TypeInfo *TI) {
     NumFields = RecordTI->getNumCases();
   } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
     NumFields = RecordTI->getNumFields();
+  } else if (auto *ArrayTI = dyn_cast<ArrayTypeInfo>(TI)) {
+    NumFields = ArrayTI->getElementCount();
   }
 
   return {
@@ -601,13 +603,23 @@ static swift_childinfo_t convertChild(const TypeInfo *TI, unsigned Index) {
   if (!TI)
     return {};
 
+  if (auto *ArrayTI = dyn_cast<ArrayTypeInfo>(TI)) {
+    auto *ElementTI = ArrayTI->getElementTypeInfo();
+    return {
+      "element",
+      Index * ElementTI->getStride(),
+      getTypeInfoKind(*ElementTI),
+      reinterpret_cast<swift_typeref_t>(ArrayTI->getElementTypeRef()),
+    };
+  }
+
   const FieldInfo *FieldInfo = nullptr;
   if (auto *EnumTI = dyn_cast<EnumTypeInfo>(TI)) {
     FieldInfo = &(EnumTI->getCases()[Index]);
   } else if (auto *RecordTI = dyn_cast<RecordTypeInfo>(TI)) {
     FieldInfo = &(RecordTI->getFields()[Index]);
   } else {
-    assert(false && "convertChild(TI): TI must be record or enum typeinfo");
+    assert(false && "convertChild(TI): TI must be record, enum, or array typeinfo");
     return {
       "unknown TypeInfo kind",
       0,
