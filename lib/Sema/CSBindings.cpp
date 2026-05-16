@@ -1663,10 +1663,10 @@ void BindingSet::addBinding(PotentialBinding binding) {
     }
   }
 
-  for (const auto &binding : joined) {
-    DEBUG_ASSERT(std::find(Bindings.begin(), Bindings.end(), binding)
-                 == Bindings.end());
-    Bindings.push_back(binding);
+  for (const auto &joinedBinding : joined) {
+    if (std::find(Bindings.begin(), Bindings.end(), joinedBinding) == Bindings.end()) {
+      Bindings.push_back(joinedBinding);
+    }
   }
 
   // If new binding has been joined with at least one of existing
@@ -1677,9 +1677,9 @@ void BindingSet::addBinding(PotentialBinding binding) {
   for (auto *adjacentVar : referencedTypeVars)
     AdjacentVars.insert(adjacentVar);
 
-  DEBUG_ASSERT(std::find(Bindings.begin(), Bindings.end(), binding)
-               == Bindings.end());
-  Bindings.push_back(std::move(binding));
+  if (std::find(Bindings.begin(), Bindings.end(), binding) == Bindings.end()) {
+    Bindings.push_back(std::move(binding));
+  }
 }
 
 void BindingSet::determineLiteralCoverage() {
