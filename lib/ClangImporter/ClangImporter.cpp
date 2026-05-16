@@ -73,6 +73,8 @@
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/CodeGen/ObjectFilePCHContainerWriter.h"
+#include "clang/DependencyScanning/ModuleDepCollector.h"
+#include "clang/DependencyScanning/ScanAndUpdateArgs.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/CreateInvocationFromArgs.h"
 #include "clang/Driver/Driver.h"
@@ -94,8 +96,6 @@
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Serialization/ObjectFilePCHContainerReader.h"
-#include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
-#include "clang/Tooling/DependencyScanning/ScanAndUpdateArgs.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/PointerIntPair.h"
@@ -4557,7 +4557,7 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   PPOpts.Includes.clear();
 
   // Clear benign CodeGenOptions.
-  clang::tooling::dependencies::resetBenignCodeGenOptions(
+  clang::dependencies::resetBenignCodeGenOptions(
       clang::frontend::ActionKind::GenerateModule, instance.getLangOpts(),
       instance.getCodeGenOpts());
 
@@ -4568,9 +4568,9 @@ ClangImporter::getSwiftExplicitModuleDirectCC1Args() const {
   if (!Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper.empty()) {
     // Remap all the paths if requested.
     llvm::PrefixMapper Mapper;
-    clang::tooling::dependencies::DepscanPrefixMapping::configurePrefixMapper(
+    clang::dependencies::DepscanPrefixMapping::configurePrefixMapper(
         Impl.SwiftContext.SearchPathOpts.ScannerPrefixMapper, Mapper);
-    clang::tooling::dependencies::DepscanPrefixMapping::remapInvocationPaths(
+    clang::dependencies::DepscanPrefixMapping::remapInvocationPaths(
         instance, Mapper);
     instance.getFrontendOpts().PathPrefixMappings.clear();
   }

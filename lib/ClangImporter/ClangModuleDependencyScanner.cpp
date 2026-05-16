@@ -22,10 +22,10 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/CAS/CASOptions.h"
+#include "clang/DependencyScanning/DependencyScanningService.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendOptions.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
-#include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
+#include "clang/Tooling/DependencyScanningTool.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
@@ -36,7 +36,7 @@
 using namespace swift;
 
 using namespace clang::tooling;
-using namespace clang::tooling::dependencies;
+using namespace clang::dependencies;
 
 static void addScannerPrefixMapperInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx) {
@@ -83,7 +83,7 @@ std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
 
 void ClangImporter::getBridgingHeaderOptions(
     const ASTContext &ctx,
-    const clang::tooling::dependencies::TranslationUnitDeps &deps,
+    const clang::dependencies::TranslationUnitDeps &deps,
     std::vector<std::string> &swiftArgs) {
   auto addClangArg = [&](Twine arg) {
     swiftArgs.push_back("-Xcc");
