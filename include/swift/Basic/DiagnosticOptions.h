@@ -16,6 +16,7 @@
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/WarningGroupBehaviorRule.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/SmallSet.h"
 #include <vector>
 
 namespace swift {
@@ -61,6 +62,25 @@ public:
 
   /// Keep emitting subsequent diagnostics after a fatal error.
   bool ShowDiagnosticsAfterFatalError = false;
+
+  /// Trap when any error diagnostic is emitted. For compiler developers only.
+  ///
+  /// These flags are intentionally separate from the normal diagnostic
+  /// suppression and escalation machinery. That separation is deliberate:
+  /// they are useful precisely when *other* diagnostics are being emitted (e.g.
+  /// when debugging a miscompile by setting an lldb breakpoint on the trap), so
+  /// they must not be suppressed by -suppress-warnings or similar options.
+  bool AssertOnError = false;
+
+  /// Trap when any warning diagnostic is emitted. For compiler developers only.
+  /// See AssertOnError for why this is separate from the normal machinery.
+  bool AssertOnWarning = false;
+
+  /// Trap when any diagnostic belonging to one of these groups is emitted.
+  /// Allows targeting a single diagnostic group rather than all errors or all
+  /// warnings. For compiler developers only.
+  /// See AssertOnError for why this is separate from the normal machinery.
+  llvm::SmallSet<DiagGroupID, 1> AssertOnGroupIDs;
 
   /// When emitting fixits as code edits, apply all fixits from diagnostics
   /// without any filtering.

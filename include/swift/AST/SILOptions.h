@@ -330,6 +330,10 @@ public:
   /// CoroutineAccessors feature (i.e. yielding borrow/mutate).
   bool CoroutineAccessorsUseYieldOnce2 = false;
 
+  /// Abort if SIL region isolation detects an unknown pattern.
+  /// For compiler developers only.
+  bool AbortOnUnknownRegionIsolationPatternError = false;
+
   SILOptions() {}
 
   /// Return a hash code of any components from these options that should
