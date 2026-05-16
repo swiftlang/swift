@@ -491,8 +491,27 @@ bool DebugValueInst::exprStartsWithDeref() const {
           == SILDIExprOperator::Dereference;
 }
 
-void DebugValueInst::setDebugReconstructionBlock(SILBasicBlock *BB) {
-  ReconstructionBlock = BB;
+SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
+  if (ReconstructionBlock)
+    return ReconstructionBlock;
+
+  // Create a new no-op reconstruction block.
+  auto *block = getFunction()->createEmptyDebugReconstructionBlock();
+  SILBuilder builder(block);
+
+  SILValue operand = getOperand();
+  SILValue retVal;
+  if (isa<SILUndef>(operand)) {
+    // No arguments, return the same undef directly.
+    retVal = operand;
+  } else {
+    // Add a block argument matching the operand type.
+    retVal = block->createPhiArgument(operand->getType(), OwnershipKind::None);
+  }
+
+  builder.createReturn(getLoc(), retVal);
+  ReconstructionBlock = block;
+  return block;
 }
 
 bool DebugValueInst::isExprTypeValid() const {

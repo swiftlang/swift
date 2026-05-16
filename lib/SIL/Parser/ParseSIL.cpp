@@ -1828,7 +1828,7 @@ bool SILParser::parseSILDebugTransformBlock(SILBasicBlock *&DebugBB,
     return true;
 
   SILFunction *F = &B.getFunction();
-  DebugBB = F->createDebugBasicBlock();
+  DebugBB = F->createEmptyDebugReconstructionBlock();
 
   // Save the outer local-value scope so that %0, %1, … inside the
   // transform block don't collide with function values.

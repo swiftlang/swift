@@ -745,7 +745,7 @@ SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
   return newBlock;
 }
 
-SILBasicBlock *SILFunction::createDebugBasicBlock() {
+SILBasicBlock *SILFunction::createEmptyDebugReconstructionBlock() {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
   newBlock->index = -2;
   // Do NOT insert into BlockList - this is a standalone debug block.

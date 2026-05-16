@@ -250,7 +250,8 @@ public:
   void recordClonedInstruction(SILInstruction *Orig, SILInstruction *Cloned) {
     asImpl().postProcess(Orig, Cloned);
     ASSERT((!Orig->getDebugScope() || Cloned->getDebugScope() ||
-            Builder.isInsertingIntoGlobal())
+            Builder.isInsertingIntoGlobal() ||
+            Builder.isInsertingIntoDebugReconstructionBlock())
            && "cloned instruction dropped debug scope");
   }
 
@@ -782,7 +783,8 @@ void
 SILCloner<ImplClass>::postProcess(SILInstruction *orig,
                                   SILInstruction *cloned) {
   ASSERT((!orig->getDebugScope() || cloned->getDebugScope() ||
-          Builder.isInsertingIntoGlobal()) &&
+          Builder.isInsertingIntoGlobal() ||
+          Builder.isInsertingIntoDebugReconstructionBlock()) &&
          "cloned function dropped debug scope");
 
   // It sometimes happens that an instruction with no results gets mapped
@@ -1703,7 +1705,7 @@ SILCloner<ImplClass>::visitDebugValueInst(DebugValueInst *Inst) {
   // Clone the debug-only reconstruction block if present.
   if (auto *SrcDebugBB = Inst->getDebugReconstructionBlock()) {
     SILBasicBlock *NewDebugBB =
-        NewInst->getFunction()->createDebugBasicBlock();
+        NewInst->getFunction()->createEmptyDebugReconstructionBlock();
     NewInst->setDebugReconstructionBlock(NewDebugBB);
     asImpl().cloneDebugBasicBlock(SrcDebugBB, NewDebugBB);
   }

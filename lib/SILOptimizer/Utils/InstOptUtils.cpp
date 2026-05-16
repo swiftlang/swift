@@ -25,6 +25,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBridging.h"
 #include "swift/SIL/SILBuilder.h"
+#include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugInfoExpression.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILUndef.h"
@@ -2018,22 +2019,21 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   }
 
   if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
-    for (Operand *U : getDebugUses(IL)) {
+    // Rather than recreating new debug values, we update the existing ones.
+    // The use list is mutated during iteration.
+    SmallVector<Operand *, 4> debugUses(getDebugUses(IL));
+    for (Operand *U : debugUses) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
       auto VarInfo = DbgInst->getVarInfo();
       if (!VarInfo)
         continue;
-      // Create a debug BB containing just the integer literal.
-      SILFunction *F = DbgInst->getFunction();
-      SILBasicBlock *DebugBB = F->createDebugBasicBlock();
-      SILBuilder BBBuilder(DebugBB);
-      auto *NewIL = BBBuilder.createIntegerLiteral(
-          IL->getLoc(), IL->getType(), IL->getValue());
-      BBBuilder.createReturn(IL->getLoc(), NewIL);
-      // Create a new debug_value with undef and attach the debug BB.
-      auto *NewDVI = SILBuilder(DbgInst, DbgInst->getDebugScope())
-          .createDebugValue(DbgInst->getLoc(), SILUndef::get(IL), *VarInfo);
-      NewDVI->setDebugReconstructionBlock(DebugBB);
+      // Copy the integer literal into the reconstruction block, and set
+      // the operand to undef.
+      auto *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
+      auto *NewIL = IL->clone(&*debugBB->begin());
+      debugBB->getArgument(0)->replaceAllUsesWith(NewIL);
+      debugBB->eraseArgument(0);
+      DbgInst->setOperand(SILUndef::get(DbgInst->getOperand()));
     }
   }
 }
