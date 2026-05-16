@@ -16,7 +16,7 @@ anotherUndefinedFunc()
 // CHECK: [[@LINE+1]]:13: error: expected warning, not error
 // expected-warning@-2 {{cannot find 'anotherUndefinedFunc' in scope}}
 
-// CHECK: [[@LINE+1]]:20: error: expected {{{{}} in {{expected}}-{{warning}}
+// CHECK: [[@LINE+1]]:20: error: expected '{{[{][{]}}' or '{{\[}}' in {{expected}}-{{warning}}/{{note}}/{{error}}/{{expansion}} line
 // expected-warning
 
 func fn() {}

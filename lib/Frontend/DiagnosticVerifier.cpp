@@ -15,7 +15,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/DiagnosticList.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/SourceManager.h"
@@ -188,6 +190,49 @@ namespace {
 static constexpr StringLiteral fixitExpectationNoneString("none");
 static constexpr StringLiteral categoryDocFileSpecifier("documentation-file=");
 
+/// Build (lazily, once) a map from diagnostic ID strings (e.g.
+/// "expected_init_value") to their corresponding DiagID enum values.
+///
+/// The map is used by the verifier to validate '[diag_id]' specifiers 
+/// and to match captured diagnostics against ID-matched expectations.
+///
+/// DiagID(0) is intentionally excluded because it represents
+/// 'invalid_diagnostic', which is a sentinel and should never appear 
+/// in real expectations.
+static const llvm::StringMap<DiagID> &getDiagIDsByName() {
+  static const llvm::StringMap<DiagID> map = [] {
+    llvm::StringMap<DiagID> result;
+    for (uint32_t i = 1; i < NumDiagIDs; ++i) {
+      auto id = static_cast<DiagID>(i);
+      result.insert({DiagnosticEngine::diagnosticIDStringFor(id), id});
+    }
+    return result;
+  }();
+  return map;
+}
+
+/// Render a diagnostic ID in the verifier's bracket syntax, e.g. "[some_id]".
+static std::string renderDiagID(StringRef id) {
+  std::string result;
+  llvm::raw_string_ostream OS(result);
+  OS << "[" << id << "]";
+  return OS.str();
+}
+
+/// Check whether \p s is a valid diagnostic identifier shape:
+/// a non-empty [A-Za-z_][A-Za-z0-9_]* sequence.
+static bool isValidDiagIDShape(StringRef s) {
+  if (s.empty())
+    return false;
+  if (!isalpha(static_cast<unsigned char>(s[0])) && s[0] != '_')
+    return false;
+  for (char c : s.drop_front()) {
+    if (!isalnum(static_cast<unsigned char>(c)) && c != '_')
+      return false;
+  }
+  return true;
+}
+
 struct ExpectedDiagnosticInfo {
   // This specifies the full range of the "expected-foo {{}}" specifier.
   const char *ExpectedStart, *ExpectedEnd = nullptr;
@@ -211,6 +256,17 @@ struct ExpectedDiagnosticInfo {
 
   // This is the message string with escapes expanded.
   std::string MessageStr;
+
+  // If set, this expectation matches by diagnostic identifier (the 
+  // contents of [...]) rather than by message text. MessageRange and 
+  // MessageStr are empty when this is set.
+  std::optional<StringRef> ExpectedDiagID;
+
+  // The source locations of the '[' and one past the ']' of the diagnostic
+  // identifier specifier, used to render fix-its for ID near-misses.
+  const char *DiagIDStartLoc = nullptr;
+  const char *DiagIDEndLoc = nullptr;
+
   unsigned LineNo = ~0U;
   std::optional<unsigned> ColumnNo;
   std::optional<unsigned> TargetBufferID;
@@ -287,13 +343,20 @@ findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
     if (Expected.ColumnNo.has_value() && I->Column != *Expected.ColumnNo)
       continue;
 
-    // Verify the classification and string.
-    if (I->Message.find(Expected.MessageStr) == StringRef::npos)
-      continue;
+    // Verify the diagnostic identity, by ID or by message text.
+    if (Expected.ExpectedDiagID) {
+      if (DiagnosticEngine::diagnosticIDStringFor(I->ID) !=
+          *Expected.ExpectedDiagID)
+        continue;
+    } else {
+      if (I->Message.find(Expected.MessageStr) == StringRef::npos)
+        continue;
+    }
 
     // Verify the classification and, if incorrect, remember as a second choice.
     if (I->Classification != Expected.Classification) {
-      if (fallbackI == E && !Expected.MessageStr.empty())
+      if (fallbackI == E &&
+          (Expected.ExpectedDiagID.has_value() || !Expected.MessageStr.empty()))
         fallbackI = I;
       continue;
     }
@@ -750,16 +813,33 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
   assert(ClassificationStartLoc);
   assert(bool(ExpectedClassification));
 
-  // Skip any whitespace before the {{.
+  // Skip any whitespace before the {{ or [.
   MatchStart = MatchStart.substr(MatchStart.find_first_not_of(" \t"));
 
-  size_t TextStartIdx = MatchStart.find("{{");
-  if (TextStartIdx >=
-      MatchStart.find("\n")) { // Either not found, or found beyond next \n
+  // The body of an expected diagnostic begins with either '{{' (match 
+  // by message text) or '[' (match by diagnostic identifier). Whichever 
+  // opener appears first determines the match mode for this expectation.
+  size_t BraceIdx = MatchStart.find("{{");
+  size_t BracketIdx = MatchStart.find('[');
+  size_t NewlineIdx = MatchStart.find('\n');
+
+  bool MatchByID = false;
+  size_t TextStartIdx;
+  if (BracketIdx < BraceIdx && BracketIdx < NewlineIdx) {
+    MatchByID = true;
+    TextStartIdx = BracketIdx;
+  } else if (BraceIdx < NewlineIdx) {
+    TextStartIdx = BraceIdx;
+  } else {
     addError(MatchStart.data(),
-             "expected {{ in expected-warning/note/error/expansion line");
+             "expected '{{' or '[' in expected-warning/note/error/expansion "
+             "line");
     return 0;
   }
+
+  // The body opener for this expectation, used in error messages that
+  // reference what the user was expected to type next.
+  StringRef Opener = MatchByID ? "[" : "{{";
 
   Expected = ExpectedDiagnosticInfo(DiagnosticLoc, ClassificationStartLoc,
                                   /*ClassificationEndLoc=*/MatchStart.data(),
@@ -844,7 +924,8 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     if (!LineOffset && ColonIndex != 0) {
       StringRef LineOffs = Offs.slice(0, ColonIndex);
       if (LineOffs.getAsInteger(10, LineOffset)) {
-        addError(MatchStart.data(), "expected line offset before '{{'");
+        addError(MatchStart.data(),
+                 ("expected line offset before '" + Twine(Opener) + "'").str());
         return 0;
       }
     }
@@ -854,7 +935,8 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
       Offs = Offs.slice(ColonIndex + 1, Offs.size());
       int Column = 0;
       if (Offs.getAsInteger(10, Column)) {
-        addError(MatchStart.data(), "expected column before '{{'");
+        addError(MatchStart.data(),
+                 ("expected column before '" + Twine(Opener) + "'").str());
         return 0;
       }
       Expected.ColumnNo = Column;
@@ -866,6 +948,14 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     return 0;
   }
 
+  if (Expected.Classification == DiagnosticKindExpansion && MatchByID) {
+    addError(MatchStart.data() + TextStartIdx,
+             "expected-expansion does not support matching by diagnostic "
+             "identifier; use '[...]' on the nested diagnostics inside "
+             "the expansion block instead");
+    return 0;
+  }
+
   unsigned Count = 1;
   if (TextStartIdx > 0) {
     StringRef CountStr = MatchStart.substr(0, TextStartIdx).trim(" \t");
@@ -873,12 +963,14 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
       Expected.mayAppear = true;
     } else {
       if (CountStr.getAsInteger(10, Count)) {
-        addError(MatchStart.data(), "expected match count before '{{'");
+        addError(MatchStart.data(),
+                 ("expected match count before '" + Twine(Opener) + "'").str());
         return 0;
       }
       if (Count == 0) {
         addError(MatchStart.data(),
-                 "expected positive match count before '{{'");
+                 ("expected positive match count before '" + Twine(Opener) + "'")
+                     .str());
         return 0;
       }
     }
@@ -888,6 +980,9 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
   }
 
   size_t End = StringRef::npos;
+  // The byte length of the body's closing token (']' or '}}'), used to 
+  // advance past the body when scanning for extra-checks afterward.
+  size_t CloserLen = 0;
   if (Expected.Classification == DiagnosticKindExpansion) {
     size_t NestedMatch = MatchStart.find("expected-");
     // Scan the memory buffer looking for expected-note/warning/error.
@@ -932,6 +1027,16 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
       addError(DiagnosticLoc, "expected-expansion block is empty");
       // Keep going
     }
+    CloserLen = strlen("}}");
+  } else if (MatchByID) {
+    End = MatchStart.find(']');
+    if (End == StringRef::npos || End > MatchStart.find('\n')) {
+      addError(
+          MatchStart.data(),
+          "didn't find ']' to match '[' in expected-warning/note/error line");
+      return 0;
+    }
+    CloserLen = 1;
   } else {
     End = MatchStart.find("}}");
     if (End == StringRef::npos) {
@@ -940,12 +1045,40 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
           "didn't find '}}' to match '{{' in expected-warning/note/error line");
       return 0;
     }
+    CloserLen = strlen("}}");
   }
 
-  llvm::SmallString<256> Buf;
-  Expected.MessageRange = MatchStart.slice(2, End);
-  Expected.MessageStr =
-      Lexer::getEncodedStringSegment(Expected.MessageRange, Buf).str();
+  if (MatchByID) {
+    // The contents of the brackets are a diagnostic identifier. 
+    // Validate shape, then verify it names a known diagnostic.
+    StringRef IDText = MatchStart.slice(1, End);
+    if (!isValidDiagIDShape(IDText)) {
+      if (IDText.empty()) {
+        addError(MatchStart.data() + 1,
+                 "expected diagnostic identifier inside '[...]'");
+      } else {
+        addError(MatchStart.data() + 1,
+                 "invalid diagnostic identifier '" + IDText + "'; " +
+                     "identifiers must match [A-Za-z_][A-Za-z0-9_]*");
+      }
+      return 0;
+    }
+    const auto &idMap = getDiagIDsByName();
+    if (idMap.find(IDText) == idMap.end()) {
+      addError(MatchStart.data() + 1,
+               "unknown diagnostic identifier '" + IDText + "'");
+      return 0;
+    }
+    Expected.ExpectedDiagID = IDText;
+    Expected.DiagIDStartLoc = MatchStart.data();
+    Expected.DiagIDEndLoc = MatchStart.data() + End + 1;
+  } else {
+    llvm::SmallString<256> Buf;
+    Expected.MessageRange = MatchStart.slice(2, End);
+    Expected.MessageStr =
+        Lexer::getEncodedStringSegment(Expected.MessageRange, Buf).str();
+  }
+
   if (AbsoluteLine)
     Expected.LineNo = 0;
   else if (PrevExpectedContinuationLine)
@@ -959,7 +1092,7 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
   Expected.LineNo += LineOffset;
 
   // Check if the next expected diagnostic should be in the same line.
-  StringRef AfterEnd = MatchStart.substr(End + strlen("}}"));
+  StringRef AfterEnd = MatchStart.substr(End + CloserLen);
   AfterEnd = AfterEnd.substr(AfterEnd.find_first_not_of(" \t"));
   if (AfterEnd.starts_with("\\"))
     PrevExpectedContinuationLine = Expected.LineNo;
@@ -967,8 +1100,11 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     PrevExpectedContinuationLine = 0;
 
   // Scan for fix-its: {{10-14=replacement text}}
+  // In ID-match mode, the loop starts after ']' instead of '}}', 
+  // but the contents that follow have the same shape: fix-it specs, 
+  // {{none}}, or {{documentation-file=...}}.
   bool startNewAlternatives = true;
-  StringRef ExtraChecks = MatchStart.substr(End + 2).ltrim(" \t");
+  StringRef ExtraChecks = MatchStart.substr(End + CloserLen).ltrim(" \t");
   while (ExtraChecks.starts_with("{{")) {
     // First make sure we have a closing "}}".
     size_t EndIndex = ExtraChecks.find("}}");
@@ -993,6 +1129,23 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
       addError(ExtraChecks.data(), "didn't find '}}' to match '{{' in "
                                    "diagnostic verification");
       break;
+    }
+
+    // If this expectation matches by diagnostic identifier, the only legal 
+    // {{...}} extras are fix-its, {{none}}, and {{documentation-file=...}}.
+    // Anything else means the user tried to combine '[id]' with 
+    // '{{message}}' matching, which is not supported.
+    if (MatchByID && CheckStr != fixitExpectationNoneString &&
+        !CheckStr.starts_with(categoryDocFileSpecifier)) {
+      char first = CheckStr.empty() ? '\0' : CheckStr.front();
+      bool looksLikeFixIt = (first >= '0' && first <= '9') ||
+                            first == '+' || first == '-' || first == ':';
+      if (!looksLikeFixIt) {
+        addError(OpenLoc,
+                 "diagnostic ID matching with '[...]' cannot be combined "
+                 "with message text matching '{{...}}'");
+        break;
+      }
     }
 
     // Prepare for the next round of checks.
@@ -1330,8 +1483,11 @@ void DiagnosticVerifier::verifyRemaining(
       verifyRemaining(expected.NestedDiags, FileStart);
       continue;
     }
-    std::string message = "expected "+getDiagKindString(expected.Classification)
-      + " not produced";
+    std::string message =
+        "expected " + getDiagKindString(expected.Classification);
+    if (expected.ExpectedDiagID)
+      message += " " + renderDiagID(*expected.ExpectedDiagID);
+    message += " not produced";
 
     // Get the range of the expected-foo{{}} diagnostic specifier.
     auto StartLoc = expected.ExpectedStart;
@@ -1542,7 +1698,33 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       continue;
     }
 
-    if (I->Message.find(expectedDiagIter->MessageStr) == StringRef::npos) {
+    if (expectedDiagIter->ExpectedDiagID) {
+      // ID-match mode: a diagnostic was found at the right line and
+      // classification, but with a different identifier. Suggest 
+      // replacing the bracketed identifier with the actual one.
+      StringRef actualID = DiagnosticEngine::diagnosticIDStringFor(I->ID);
+      if (actualID != *expectedDiagIter->ExpectedDiagID) {
+        auto StartLoc =
+            SMLoc::getFromPointer(expectedDiagIter->DiagIDStartLoc);
+        auto EndLoc =
+            SMLoc::getFromPointer(expectedDiagIter->DiagIDEndLoc);
+        llvm::SMFixIt fixIt(llvm::SMRange{StartLoc, EndLoc},
+                            renderDiagID(actualID));
+        addError(expectedDiagIter->DiagIDStartLoc,
+                 "incorrect diagnostic identifier found; actual: " +
+                     renderDiagID(actualID),
+                 fixIt);
+      } else if (expectedDiagIter->ColumnNo.has_value() &&
+                 I->Column != *expectedDiagIter->ColumnNo) {
+        // The difference must be only in the column.
+        addError(expectedDiagIter->DiagIDStartLoc,
+                 llvm::formatv("diagnostic found at column {0} but was "
+                               "expected to appear at column {1}",
+                               I->Column, *expectedDiagIter->ColumnNo));
+      } else {
+        llvm_unreachable("unhandled difference from expected diagnostic");
+      }
+    } else if (I->Message.find(expectedDiagIter->MessageStr) == StringRef::npos) {
       auto StartLoc =
           SMLoc::getFromPointer(expectedDiagIter->MessageRange.begin());
       auto EndLoc = SMLoc::getFromPointer(expectedDiagIter->MessageRange.end());
@@ -1702,7 +1884,7 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
   }
 
   DiagLoc loc(SM, this->SM, Info.Loc);
-  CapturedDiagnostics.emplace_back(message, loc.bufferID, Info.Kind,
+  CapturedDiagnostics.emplace_back(message, Info.ID, loc.bufferID, Info.Kind,
                                    loc.sourceLoc, loc.line, loc.column, fixIts,
                                    llvm::sys::path::stem(
                                       Info.getCategoryDocumentationURL()).str());

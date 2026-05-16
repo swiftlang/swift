@@ -71,6 +71,7 @@ public:
 
 struct CapturedDiagnosticInfo {
   llvm::SmallString<128> Message;
+  DiagID ID;
   std::optional<unsigned> SourceBufferID;
   DiagnosticKind Classification;
   SourceLoc Loc;
@@ -80,12 +81,13 @@ struct CapturedDiagnosticInfo {
   std::string CategoryDocFile;
 
   CapturedDiagnosticInfo(llvm::SmallString<128> Message,
+                         DiagID ID,
                          std::optional<unsigned> SourceBufferID,
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
                          SmallVector<CapturedFixItInfo, 2> FixIts,
                          const std::string &categoryDocFile)
-      : Message(Message), SourceBufferID(SourceBufferID),
+      : Message(Message), ID(ID), SourceBufferID(SourceBufferID),
         Classification(Classification), Loc(Loc), Line(Line), Column(Column),
         FixIts(FixIts), CategoryDocFile(categoryDocFile) {
   }
