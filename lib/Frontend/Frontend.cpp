@@ -1968,6 +1968,41 @@ void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
       }
     }
   }
+
+  if (opts.DumpHiddenTypeLayouts) {
+    // Dump every hidden-type layout known to this compilation:
+    // both local and imported.
+    auto dumpHiddenLayouts = [](ModuleDecl *M) {
+      auto layouts = M->getSortedHiddenTypeLayouts();
+      if (layouts.empty())
+        return;
+      llvm::outs() << "Module: " << M->getName() << "\n";
+      for (auto &entry : layouts) {
+        const auto &layout = entry.second;
+        llvm::outs() << "  " << entry.first
+                     << ": size=" << layout.size
+                     << ", alignment=" << layout.alignment
+                     << ", stride=" << layout.stride
+                     << ", bitwiseCopyable="
+                     << (layout.bitwiseCopyable ? "true" : "false")
+                     << ", opaque=" << (layout.isOpaque ? "true" : "false")
+                     << "\n";
+      }
+    };
+
+    dumpHiddenLayouts(getMainModule());
+    SmallVector<ModuleDecl *, 8> sortedLoaded;
+    for (auto &entry : ctx.getLoadedModules())
+      sortedLoaded.push_back(entry.second);
+    llvm::sort(sortedLoaded, [](ModuleDecl *a, ModuleDecl *b) {
+      return a->getName().str() < b->getName().str();
+    });
+    for (ModuleDecl *M : sortedLoaded) {
+      if (M == getMainModule())
+        continue;
+      dumpHiddenLayouts(M);
+    }
+  }
 }
 
 bool CompilerInstance::isCancellationRequested() const {

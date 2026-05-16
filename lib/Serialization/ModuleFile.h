@@ -930,6 +930,17 @@ public:
     return Core->TargetTriple;
   }
 
+  /// Look up the layout of a hidden type by its mangled name. Returns
+  /// std::nullopt if this module does not define a layout for that mangled
+  /// name.
+  std::optional<AbstractTypeLayout>
+  lookupHiddenTypeLayout(StringRef mangledName) const {
+    auto it = Core->HiddenTypeLayouts.find(mangledName);
+    if (it == Core->HiddenTypeLayouts.end())
+      return std::nullopt;
+    return it->second;
+  }
+
   /// AST-verify imported decls.
   ///
   /// Has no effect in NDEBUG builds.
