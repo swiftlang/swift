@@ -244,6 +244,10 @@ option(SWIFT_STDLIB_ENABLE_UNICODE_DATA
     NOTE: Disabling this will cause many String methods to crash."
     TRUE)
 
+option(SWIFT_STDLIB_ENABLE_SOURCE_INFO
+    "Build .swiftsourceinfo files for the standard library to provide a link back to the standard library sources"
+    FALSE)
+
 option(SWIFT_BUILD_CLANG_OVERLAYS
   "Build Swift overlays for the clang builtin modules"
   TRUE)
@@ -1747,6 +1751,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
           -DSwiftCore_INSTALL_NESTED_SUBDIR=YES
           -DSwiftCore_ENABLE_CONCURRENCY=${build_concurrency}
+          -DSwiftCore_ENABLE_SOURCE_INFO=${SWIFT_STDLIB_ENABLE_SOURCE_INFO}
           -DCMAKE_OSX_SYSROOT:PATH=${SWIFT_SDK_${sdk}_ARCH_${arch}_PATH})
       if(_stdlib_needs_swift_frontend)
         add_dependencies("${stdlib_target}-core" swift-frontend)

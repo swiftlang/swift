@@ -732,11 +732,15 @@ function(_compile_swift_files
     set(module_base_static "${module_base_static}.swiftmodule/${module_triple}")
     set(module_file "${module_base}.swiftmodule")
     set(module_doc_file "${module_base}.swiftdoc")
-    set(module_location_file "${module_base}.swiftsourceinfo")
+
+    # If we want *.sourceinfo files, figure out their names.
+    if(SWIFT_STDLIB_ENABLE_SOURCE_INFO)
+      set(module_location_file "${module_base}.swiftsourceinfo")
+      set(module_location_file_static "${module_base_static}.swiftsourceinfo")
+    endif()
 
     set(module_file_static "${module_base_static}.swiftmodule")
     set(module_doc_file_static "${module_base_static}.swiftdoc")
-    set(module_location_file_static "${module_base_static}.swiftsourceinfo")
 
     # FIXME: These don't really belong inside the swiftmodule, but there's not
     # an obvious alternate place to put them.
@@ -767,7 +771,11 @@ function(_compile_swift_files
            "-Xfrontend" "-experimental-skip-non-inlinable-function-bodies")
     endif()
 
-    set(module_outputs "${module_file}" "${module_doc_file}" "${module_location_file}")
+    set(module_outputs "${module_file}" "${module_doc_file}")
+
+    if (module_location_file)
+      list(APPEND module_outputs "${module_location_file}")
+    endif()
 
     if(interface_file)
       list(APPEND module_outputs "${interface_file}" "${private_interface_file}")
@@ -863,8 +871,12 @@ function(_compile_swift_files
     endif()
   endif()
 
-  set(module_outputs "${module_file}" "${module_doc_file}" "${module_location_file}")
-  set(module_outputs_static "${module_file_static}" "${module_doc_file_static}" "${module_location_file_static}")
+  set(module_outputs "${module_file}" "${module_doc_file}")
+  set(module_outputs_static "${module_file_static}" "${module_doc_file_static}")
+  if(module_location_file)
+    list(APPEND module_outputs "${module_location_file}")
+    list(APPEND module_outputs_static "${module_location_file_static}")
+  endif()
   if(interface_file)
     list(APPEND module_outputs "${interface_file}" "${private_interface_file}")
     list(APPEND module_outputs_static "${interface_file_static}" "${private_interface_file_static}")
@@ -1100,9 +1112,10 @@ function(_compile_swift_files
   # 6. *.O.sib
   # 7. *.sibgen
   #
-  # Only 1,2,3,4 are built by default. 5,6,7 are utility targets for use by
+  # Only 1,2,3 are built by default. 5,6,7 are utility targets for use by
   # engineers and thus even though the targets are generated, the targets are
-  # not built by default.
+  # not built by default. 4 is optional, and enabled where one is expected
+  # to have the standard library sources around.
   #
   # We only build these when we are not producing a main file. We could do this
   # with sib/sibgen, but it is useful for looking at the stdlib.
@@ -1120,7 +1133,9 @@ function(_compile_swift_files
           ${set_environment_args}
           "$<TARGET_FILE:Python3::Interpreter>" "${line_directive_tool}" "@${file_path}" --
           "${swift_compiler_tool}" "-emit-module" "-o" "${module_file}"
-          "-emit-module-source-info-path" "${module_location_file}"
+          "$<$<BOOL:${SWIFT_STDLIB_ENABLE_SOURCE_INFO}>:-emit-module-source-info-path>"
+          "$<$<BOOL:${SWIFT_STDLIB_ENABLE_SOURCE_INFO}>:$<SHELL_PATH:${module_location_file}>>"
+          "$<$<NOT:$<BOOL:${SWIFT_STDLIB_ENABLE_SOURCE_INFO}>>:-avoid-emit-module-source-info>"
           ${swift_flags} ${swift_module_flags} "@${file_path}"
         ${command_touch_module_outputs}
         OUTPUT ${module_outputs}
@@ -1134,6 +1149,13 @@ function(_compile_swift_files
         COMMENT "Generating ${module_file}")
 
     if(SWIFTFILE_STATIC)
+      set(command_copy_location_file)
+      if(module_location_file_static)
+        set(command_copy_location_file
+          COMMAND
+            "${CMAKE_COMMAND}" "-E" "copy" ${module_location_file} ${module_location_file_static})
+      endif()
+
       set(command_copy_interface_file)
       if(interface_file)
         set(command_copy_interface_file
@@ -1150,8 +1172,7 @@ function(_compile_swift_files
           "${CMAKE_COMMAND}" "-E" "copy" ${module_file} ${module_file_static}
         COMMAND
           "${CMAKE_COMMAND}" "-E" "copy" ${module_doc_file} ${module_doc_file_static}
-        COMMAND
-          "${CMAKE_COMMAND}" "-E" "copy" ${module_location_file} ${module_location_file_static}
+        ${command_copy_location_file}
         ${command_copy_interface_file}
         OUTPUT ${module_outputs_static}
         DEPENDS
