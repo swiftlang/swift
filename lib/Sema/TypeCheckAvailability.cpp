@@ -22,6 +22,7 @@
 #include "TypeCheckType.h"
 #include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityDomain.h"
@@ -237,9 +238,15 @@ bool ExportContext::mustOnlyReferenceExportedDecls() const {
 }
 
 DiagnosticBehavior
-ExportContext::behaviorForReferenceToOrigin(DisallowedOriginKind originKind)
+ExportContext::behaviorForReferenceToOrigin(const ValueDecl *D,
+                                            DisallowedOriginKind originKind)
 const {
   if (originKind == DisallowedOriginKind::None)
+    return DiagnosticBehavior::Ignore;
+
+  // If we can capture the layouts of hidden types, suppress
+  // diagnostic.
+  if (encapsulatedAsHiddenStoredProperty(D, originKind))
     return DiagnosticBehavior::Ignore;
 
   // Exportability checks for non-library-evolution mode have less restrictions
@@ -262,18 +269,6 @@ const {
     case DisallowedOriginKind::ImplementationOnlyMemoryLayout:
       break;
     case DisallowedOriginKind::InternalBridgingHeaderImport:
-      if (getDeclContext()->getASTContext().LangOpts.hasFeature(
-              Feature::AbstractStoredPropertyLayout)) {
-        if (auto reason = getExportabilityReason()) {
-          switch (*reason) {
-          case ExportabilityReason::ImplicitlyPublicVarDecl:
-          case ExportabilityReason::ImplicitlyPublicVarDeclOpenClass:
-            return DiagnosticBehavior::Ignore;
-          default:
-            break;
-          }
-        }
-      }
       break;
     }
   }
@@ -314,6 +309,36 @@ ExportContext::getExportabilityReason() const {
   if (Exported)
     return ExportabilityReason(Reason);
   return std::nullopt;
+}
+
+bool ExportContext::encapsulatedAsHiddenStoredProperty(
+    const ValueDecl *D, DisallowedOriginKind originKind) const {
+  if (originKind != DisallowedOriginKind::InternalBridgingHeaderImport)
+    return false;
+  if (!getDeclContext()->getASTContext().LangOpts.hasFeature(
+          Feature::AbstractStoredPropertyLayout))
+    return false;
+  auto reason = getExportabilityReason();
+  if (!reason)
+    return false;
+  switch (*reason) {
+  case ExportabilityReason::ImplicitlyPublicVarDecl:
+  case ExportabilityReason::ImplicitlyPublicVarDeclOpenClass:
+    break;
+  default:
+    return false;
+  }
+
+  // Encapsulation applies. Record the hidden-type layout so it will be
+  // serialized into this module's hidden-type layouts block.
+  if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
+    if (auto layout = computeClangAbstractLayout(nominal)) {
+      getDeclContext()->getParentModule()->recordHiddenTypeLayout(
+          layout->mangledName, *layout);
+      return true;
+    }
+  }
+  return false;
 }
 
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(

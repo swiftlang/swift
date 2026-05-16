@@ -7447,6 +7447,25 @@ void SerializerBase::writeToStream(raw_ostream &os) {
   os.flush();
 }
 
+void Serializer::writeHiddenTypeLayoutsBlock() {
+  auto layouts = M->getSortedHiddenTypeLayouts();
+  if (layouts.empty())
+    return;
+
+  BCBlockRAII block(Out, HIDDEN_TYPE_LAYOUTS_BLOCK_ID, /*abbrev width=*/3);
+  hidden_type_layouts_block::HiddenTypeLayoutLayout HiddenTypeLayoutRecord(Out);
+  for (auto &entry : layouts) {
+    StringRef name = entry.first;
+    const AbstractTypeLayout &layout = entry.second;
+    HiddenTypeLayoutRecord.emit(
+        ScratchRecord,
+        layout.size, layout.alignment, layout.stride,
+        layout.bitwiseCopyable ? 1u : 0u,
+        layout.isOpaque ? 1u : 0u,
+        name);
+  }
+}
+
 SerializerBase::SerializerBase(ArrayRef<unsigned char> signature,
                                ModuleOrSourceFile DC) {
   for (unsigned char byte : signature)
@@ -7472,6 +7491,7 @@ void Serializer::writeToStream(
     S.writeInputBlock();
     S.writeSIL(SILMod);
     S.writeAST(DC);
+    S.writeHiddenTypeLayoutsBlock();
 
     if (S.hadError)
       S.getASTContext().Diags.diagnose(SourceLoc(), diag::serialization_failed,
