@@ -3819,6 +3819,39 @@ static bool isCxxBorrowingSequenceOrIterator(Decl *decl) {
   return false;
 }
 
+// Returns true if the given nominal type is Span or MutableSpan from the Swift
+// stdlib.
+static bool isStdlibSpanType(const NominalTypeDecl *nominal) {
+  if (!nominal)
+    return false;
+  if (!nominal->getParentModule()->isStdlibModule())
+    return false;
+  auto name = nominal->getNameStr();
+  return name == "Span" || name == "MutableSpan";
+}
+
+// Returns true if a declaration in the Cxx overlay module references Span or
+// MutableSpan from the Swift stdlib in its type signature, or is an extension
+// of Span/MutableSpan.
+static bool isCxxDeclReferencingSpan(const Decl *decl) {
+  if (decl->getModuleContext()->getNameStr() != "Cxx")
+    return false;
+
+  if (const auto *ext = dyn_cast<ExtensionDecl>(decl)) {
+    if (isStdlibSpanType(ext->getExtendedNominal()))
+      return true;
+  }
+
+  if (const auto *vd = dyn_cast<ValueDecl>(decl)) {
+    if (auto ty = vd->getInterfaceType()) {
+      return ty.findIf(
+          [](Type t) -> bool { return isStdlibSpanType(t->getAnyNominal()); });
+    }
+  }
+
+  return false;
+}
+
 /// Generate the appropriate #if block(s) necessary to protect the use
 /// of compiler-version-dependent features in the given function.
 ///
@@ -3861,9 +3894,22 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
     return;
   }
 
+  // Span and MutableSpan were introduced in Swift 6.2. When a newer toolchain
+  // is used with an older SDK whose stdlib predates 6.2, references to these
+  // types in the Cxx module interface will fail to resolve. Guard individual
+  // declarations that reference Span/MutableSpan behind a version check.
+  bool needsSpanGuard = isCxxDeclReferencingSpan(decl);
+  if (needsSpanGuard) {
+    printer << "#if canImport(Swift, _version: 6.2)\n";
+  }
+
   FeatureSet features = getUniqueFeaturesUsed(decl);
   if (features.empty()) {
     printBody();
+    if (needsSpanGuard) {
+      printer.printNewline();
+      printer << "#endif";
+    }
     return;
   }
 
@@ -3894,6 +3940,11 @@ void swift::printWithCompatibilityFeatureChecks(ASTPrinter &printer,
 
   // Close the `#if` for the required features.
   if (hasRequiredFeatures) {
+    printer.printNewline();
+    printer << "#endif";
+  }
+
+  if (needsSpanGuard) {
     printer.printNewline();
     printer << "#endif";
   }
