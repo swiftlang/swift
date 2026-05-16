@@ -515,6 +515,10 @@ static bool canDropMetatypeArg(ApplySite apply, SILFunction *callee,
   if (isUsedAsDynamicSelf(calleeArg))
     return false;
 
+  // TODO: Adjust LifetimeDependencInfo when dropping the argument.
+  if (apply.getOrigCalleeType()->hasLifetimeDependencies())
+    return false;
+
   if (calleeArg->getType().getASTType()->hasDynamicSelfType())
     return false;
 
