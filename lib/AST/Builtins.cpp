@@ -1656,7 +1656,8 @@ static ValueDecl *getCreateTask(ASTContext &ctx, Identifier id) {
       ctx.getProtocol(swift::KnownProtocolKind::TaskExecutor) != nullptr;
 
   return getBuiltinFunction(
-      ctx, id, _thin, _generics(_unrestricted, _conformsToDefaults(0)),
+      ctx, id, _thin,
+      _generics(_unrestricted, _conformsTo(_typeparam(0), _escapable)),
       _parameters(
           _label("flags", _swiftInt),
           _label("initialSerialExecutor",
@@ -1841,7 +1842,8 @@ static ValueDecl *getEndAsyncLet(ASTContext &ctx, Identifier id) {
 
 static ValueDecl *getCreateTaskGroup(ASTContext &ctx, Identifier id) {
   return getBuiltinFunction(ctx, id, _thin,
-                            _generics(_unrestricted, _conformsToDefaults(0)),
+                            _generics(_unrestricted,
+                                      _conformsTo(_typeparam(0), _escapable)),
                             _parameters(_metatype(_typeparam(0))),
                             _rawPointer);
 }
