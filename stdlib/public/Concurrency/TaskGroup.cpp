@@ -1204,11 +1204,20 @@ static void fillGroupNextResult(TaskFutureWaitAsyncContext *context,
 
   case PollStatus::Success: {
     // Initialize the result as an Optional<Success>.
+    //
+    // Group children are owned by the group machinery and never escape to
+    // the user, and a completed child's storage is observed exactly once
+    // via this fill. So we always take, even when the result is copyable —
+    // saving a retain/release for refcounted result types. Setting the
+    // moved-out flag makes the child's future destruction skip vw_destroy
+    // on the now-uninitialised storage.
     OpaqueValue *destPtr = context->successResultPointer;
-    // TODO: figure out a way to try to optimistically take the
-    // value out of the finished task's future, if there are no
-    // remaining references to it.
-    result.successType.vw_initializeWithCopy(destPtr, result.storage);
+    assert(result.retainedTask && "PollStatus::Success without a child task");
+    auto *future = result.retainedTask->futureFragment();
+    auto claimed = future->tryClaimResult();
+    assert(claimed && "TaskGroup child result polled twice");
+    (void)claimed;
+    result.successType.vw_initializeWithTake(destPtr, result.storage);
     result.successType.vw_storeEnumTagSinglePayload(destPtr, 0, 1);
     return;
   }

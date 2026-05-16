@@ -238,6 +238,9 @@ struct ResultTypeInfo {
   void vw_initializeWithCopy(OpaqueValue *result, OpaqueValue *src) {
     metadata->vw_initializeWithCopy(result, src);
   }
+  void vw_initializeWithTake(OpaqueValue *result, OpaqueValue *src) {
+    metadata->vw_initializeWithTake(result, src);
+  }
   void vw_storeEnumTagSinglePayload(OpaqueValue *v, unsigned whichCase,
                                     unsigned emptyCases) {
     metadata->vw_storeEnumTagSinglePayload(v, whichCase, emptyCases);
@@ -263,6 +266,11 @@ struct ResultTypeInfo {
     return alignMask + 1;
   }
   void vw_initializeWithCopy(OpaqueValue *result, OpaqueValue *src) {
+    initializeWithCopy(result, src, nullptr);
+  }
+  void vw_initializeWithTake(OpaqueValue *result, OpaqueValue *src) {
+    // Embedded concurrency does not yet support noncopyable futures, so this
+    // path is unused and falls through to the copy implementation.
     initializeWithCopy(result, src, nullptr);
   }
   void vw_storeEnumTagSinglePayload(OpaqueValue *v, unsigned whichCase,
@@ -723,6 +731,16 @@ public:
 
     SwiftError *error = nullptr;
 
+    /// Set when a take-style wait has moved the value out of storage.
+    /// Subsequent copy/take traps on this rather than reading moved-from
+    /// memory.
+    ///
+    /// FIXME: best-effort only. Concurrent copy+take across `Task` aliases
+    /// on different threads can race between this check and the
+    /// copy/take. Proper fix: reader-count + take-flag CAS so the two
+    /// paths serialise.
+    std::atomic<bool> resultMovedOut{false};
+
     // Trailing storage for the result itself. The storage will be
     // uninitialized, contain an instance of \c resultType.
 
@@ -738,6 +756,16 @@ public:
 
     ResultTypeInfo getResultType() const {
       return resultType;
+    }
+
+    /// Returns true on the first call (the take is admitted), false
+    /// thereafter. Callers should trap on false. See `resultMovedOut`.
+    bool tryClaimResult() {
+      return !resultMovedOut.exchange(true, std::memory_order_acq_rel);
+    }
+
+    bool wasResultMovedOut() const {
+      return resultMovedOut.load(std::memory_order_acquire);
     }
 
     /// Retrieve a pointer to the storage of the result.

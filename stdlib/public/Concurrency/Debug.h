@@ -50,6 +50,10 @@ SWIFT_EXPORT_FROM(swift_Concurrency)
 const void *const _swift_concurrency_debug_task_wait_throwing_resume_adapter;
 SWIFT_EXPORT_FROM(swift_Concurrency)
 const void *const _swift_concurrency_debug_task_future_wait_resume_adapter;
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const void *const _swift_concurrency_debug_task_future_wait_take_resume_adapter;
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const void *const _swift_concurrency_debug_task_wait_take_throwing_resume_adapter;
 
 /// Whether the runtime we are inspecting supports priority escalation
 SWIFT_EXPORT_FROM(swift_Concurrency)

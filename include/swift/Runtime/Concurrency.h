@@ -187,6 +187,24 @@ void swift_task_future_wait_throwing(
   ThrowingTaskFutureWaitContinuationFunction *,
   AsyncContext *);
 
+/// Take-flavored future-wait. Moves the result out instead of copying;
+/// any subsequent wait traps. Routed to via `_taskFutureTake[Throwing]`.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_task_future_wait_take(
+  OpaqueValue *,
+  SWIFT_ASYNC_CONTEXT AsyncContext *,
+  AsyncTask *,
+  TaskContinuationFunction *,
+  AsyncContext *);
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_task_future_wait_take_throwing(
+  OpaqueValue *,
+  SWIFT_ASYNC_CONTEXT AsyncContext *,
+  AsyncTask *,
+  ThrowingTaskFutureWaitContinuationFunction *,
+  AsyncContext *);
+
 /// Wait for a readyQueue of a Channel to become non empty.
 ///
 /// This can be called from any thread. Its Swift signature is

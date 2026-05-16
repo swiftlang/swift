@@ -98,7 +98,9 @@ void FutureFragment::destroy() {
     swift_unreachable("destroying a task that never completed");
 
   case Status::Success:
-    resultType.vw_destroy(getStoragePtr());
+    if (!wasResultMovedOut()) {
+      resultType.vw_destroy(getStoragePtr());
+    }
     break;
 
   case Status::Error:
@@ -235,6 +237,13 @@ void NullaryContinuationJob::process(Job *_job) {
   swift_continuation_resume(continuation);
 }
 
+// Forward decls; addresses are used as per-waiter take/copy tags in
+// `completeFuture`.
+SWIFT_CC(swiftasync)
+static void task_future_wait_take_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *);
+SWIFT_CC(swiftasync)
+static void task_wait_take_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *);
+
 void AsyncTask::completeFuture(AsyncContext *context) {
   using Status = FutureFragment::Status;
   using WaitQueueItem = FutureFragment::WaitQueueItem;
@@ -298,7 +307,10 @@ void AsyncTask::completeFuture(AsyncContext *context) {
     if (hadErrorResult) {
       waitingContext->fillWithError(fragment);
     } else {
-      waitingContext->fillWithSuccess(fragment);
+      bool wantsTake =
+        waitingTask->ResumeTask == task_future_wait_take_resume_adapter ||
+        waitingTask->ResumeTask == task_wait_take_throwing_resume_adapter;
+      waitingContext->fillWithSuccess(fragment, wantsTake);
     }
 
     _swift_tsan_acquire(static_cast<Job *>(waitingTask));
@@ -618,6 +630,30 @@ task_future_wait_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
   return _context->ResumeParent(_context->Parent);
 }
 
+// Take-flavored adapters. Bodies match the copy adapters; the distinct
+// symbols are tags read by `completeFuture`. The unique inline-asm in each
+// body keeps the linker from identical-code-folding them onto the copy
+// adapters, which would collapse the per-waiter tag.
+SWIFT_CC(swiftasync)
+static void
+task_future_wait_take_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+  asm volatile("# task_future_wait_take_resume_adapter");
+  return _context->ResumeParent(_context->Parent);
+}
+
+SWIFT_CC(swiftasync)
+static void
+task_wait_take_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
+  asm volatile("# task_wait_take_throwing_resume_adapter");
+  auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
+  auto resumeWithError =
+      reinterpret_cast<AsyncVoidClosureEntryPoint *>(context->ResumeParent);
+#pragma clang diagnostic pop
+  return resumeWithError(context->Parent, context->errorResult);
+}
+
 const void *const swift::_swift_concurrency_debug_non_future_adapter =
     reinterpret_cast<void *>(non_future_adapter);
 const void *const swift::_swift_concurrency_debug_future_adapter =
@@ -628,6 +664,12 @@ const void
 const void
     *const swift::_swift_concurrency_debug_task_future_wait_resume_adapter =
         reinterpret_cast<void *>(task_future_wait_resume_adapter);
+const void *const swift::
+    _swift_concurrency_debug_task_future_wait_take_resume_adapter =
+        reinterpret_cast<void *>(task_future_wait_take_resume_adapter);
+const void *const swift::
+    _swift_concurrency_debug_task_wait_take_throwing_resume_adapter =
+        reinterpret_cast<void *>(task_wait_take_throwing_resume_adapter);
 
 const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
   const void *result = reinterpret_cast<const void *>(ResumeTask);
@@ -647,10 +689,12 @@ const void *AsyncTask::getResumeFunctionForLogging(bool isStarting) {
 
   // Future contexts may not be valid if the task was already running before.
   if (isStarting) {
-    if (ResumeTask == task_wait_throwing_resume_adapter) {
+    if (ResumeTask == task_wait_throwing_resume_adapter ||
+        ResumeTask == task_wait_take_throwing_resume_adapter) {
       auto context = static_cast<TaskFutureWaitAsyncContext *>(ResumeContext);
       result = reinterpret_cast<const void *>(context->ResumeParent);
-    } else if (ResumeTask == task_future_wait_resume_adapter) {
+    } else if (ResumeTask == task_future_wait_resume_adapter ||
+               ResumeTask == task_future_wait_take_resume_adapter) {
       result = reinterpret_cast<const void *>(ResumeContext->ResumeParent);
     }
   }
@@ -1379,6 +1423,10 @@ static void swift_task_future_waitImpl(
   case FutureFragment::Status::Success: {
     // Run the task with a successful result.
     auto future = task->futureFragment();
+    if (SWIFT_UNLIKELY(future->wasResultMovedOut())) {
+      swift_Concurrency_fatalError(
+        0, "Task result was moved out by a prior take()");
+    }
     future->getResultType().vw_initializeWithCopy(result, future->getStoragePtr());
     return resumeFn(callerContext);
   }
@@ -1436,12 +1484,103 @@ void swift_task_future_wait_throwingImpl(
 
   case FutureFragment::Status::Success: {
     auto future = task->futureFragment();
+    if (SWIFT_UNLIKELY(future->wasResultMovedOut())) {
+      swift_Concurrency_fatalError(
+        0, "Task result was moved out by a prior take()");
+    }
     future->getResultType().vw_initializeWithCopy(result, future->getStoragePtr());
     return resumeFunction(callerContext, nullptr /*error*/);
   }
 
   case FutureFragment::Status::Error: {
     // Run the task with an error result.
+    auto future = task->futureFragment();
+    auto error = future->getError();
+    swift_errorRetain(error);
+    return resumeFunction(callerContext, error);
+  }
+  }
+}
+
+/// Take-flavored future-wait entry points. Move the result out and mark
+/// the fragment claimed; subsequent waits trap. The async fill in
+/// `completeFuture` routes here via the take-flavored resume adapter.
+SWIFT_CC(swiftasync)
+static void swift_task_future_wait_takeImpl(
+  OpaqueValue *result,
+  SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+  AsyncTask *task,
+  TaskContinuationFunction *resumeFn,
+  AsyncContext *callContext) {
+  auto waitingTask = swift_task_getCurrent();
+  waitingTask->ResumeTask = task_future_wait_take_resume_adapter;
+  waitingTask->ResumeContext = callContext;
+
+  assert(task->isFuture());
+
+  switch (task->waitFuture(waitingTask, callContext, resumeFn, callerContext,
+                           result)) {
+  case FutureFragment::Status::Executing:
+#ifdef __ARM_ARCH_7K__
+    return workaround_function_swift_task_future_waitImpl(
+        result, callerContext, task, resumeFn, callContext);
+#else
+    return;
+#endif
+
+  case FutureFragment::Status::Success: {
+    auto future = task->futureFragment();
+    if (!future->tryClaimResult()) {
+      swift_Concurrency_fatalError(
+        0, "Task result was moved out by a prior take()");
+    }
+    future->getResultType().vw_initializeWithTake(result, future->getStoragePtr());
+    return resumeFn(callerContext);
+  }
+
+  case FutureFragment::Status::Error:
+    swift_Concurrency_fatalError(0, "future reported an error, but wait cannot throw");
+  }
+}
+
+SWIFT_CC(swiftasync)
+void swift_task_future_wait_take_throwingImpl(
+    OpaqueValue *result, SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+    AsyncTask *task,
+    ThrowingTaskFutureWaitContinuationFunction *resumeFunction,
+    AsyncContext *callContext) {
+  auto waitingTask = swift_task_getCurrent();
+  waitingTask->ResumeTask = task_wait_take_throwing_resume_adapter;
+  waitingTask->ResumeContext = callContext;
+
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
+  auto resumeFn = reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
+#pragma clang diagnostic pop
+
+  assert(task->isFuture());
+
+  switch (task->waitFuture(waitingTask, callContext, resumeFn, callerContext,
+                           result)) {
+  case FutureFragment::Status::Executing:
+#ifdef __ARM_ARCH_7K__
+    return workaround_function_swift_task_future_wait_throwingImpl(
+        result, callerContext, task, resumeFunction, callContext);
+#else
+    return;
+#endif
+
+  case FutureFragment::Status::Success: {
+    auto future = task->futureFragment();
+    if (!future->tryClaimResult()) {
+      swift_Concurrency_fatalError(
+        0, "Task result was moved out by a prior take()");
+    }
+    future->getResultType().vw_initializeWithTake(result, future->getStoragePtr());
+    return resumeFunction(callerContext, nullptr /*error*/);
+  }
+
+  case FutureFragment::Status::Error: {
     auto future = task->futureFragment();
     auto error = future->getError();
     swift_errorRetain(error);

@@ -3107,6 +3107,10 @@ FunctionPointer::Kind irgen::classifyFunctionPointerKind(SILFunction *fn) {
       return SpecialKind::TaskFutureWait;
     if (name == "swift_task_future_wait_throwing")
       return SpecialKind::TaskFutureWaitThrowing;
+    if (name == "swift_task_future_wait_take")
+      return SpecialKind::TaskFutureWaitTake;
+    if (name == "swift_task_future_wait_take_throwing")
+      return SpecialKind::TaskFutureWaitTakeThrowing;
 
     if (name == "swift_asyncLet_get")
       return SpecialKind::AsyncLetGet;

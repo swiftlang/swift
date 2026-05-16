@@ -105,6 +105,27 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
   #endif
 }
 
+/// Starts a new scope that can contain a dynamic number of child tasks
+/// producing noncopyable results.
+@available(SwiftStdlib 6.5, *)
+@inlinable
+public func withTaskGroup<ChildTaskResult: Sendable & ~Copyable, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
+  returning returnType: GroupResult.Type = GroupResult.self,
+  isolation: isolated (any Actor)? = #isolation,
+  body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+) async -> GroupResult {
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
+  var group = TaskGroup<ChildTaskResult>(group: _group)
+
+  let result = await body(&group)
+
+  await group.awaitAllRemainingTasks()
+
+  Builtin.destroyTaskGroup(_group)
+  return result
+}
+
 /// Starts a new scope that can contain a dynamic number of throwing child tasks.
 ///
 /// A group *always* waits for all of its child tasks
@@ -203,6 +224,32 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   #else
   fatalError("Swift compiler is incompatible with this SDK version")
   #endif
+}
+
+/// Starts a new scope that can contain a dynamic number of throwing child
+/// tasks producing noncopyable results.
+@available(SwiftStdlib 6.5, *)
+@inlinable
+public func withThrowingTaskGroup<ChildTaskResult: Sendable & ~Copyable, GroupResult>(
+  of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
+  returning returnType: GroupResult.Type = GroupResult.self,
+  isolation: isolated (any Actor)? = #isolation,
+  body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+) async rethrows -> GroupResult {
+  let _group = Builtin.createTaskGroup(ChildTaskResult.self)
+  var group = ThrowingTaskGroup<ChildTaskResult, Error>(group: _group)
+
+  do {
+    let result = try await body(&group)
+    await group.awaitAllRemainingTasks()
+    Builtin.destroyTaskGroup(_group)
+    return result
+  } catch {
+    group.cancelAll()
+    await group.awaitAllRemainingTasks()
+    Builtin.destroyTaskGroup(_group)
+    throw error
+  }
 }
 
 // Note: hack to stage out @_unsafeInheritExecutor forms of various functions
@@ -358,7 +405,7 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 /// - SeeAlso: ``ThrowingDiscardingTaskGroup``
 @available(SwiftStdlib 5.1, *)
 @frozen
-public struct TaskGroup<ChildTaskResult: Sendable> {
+public struct TaskGroup<ChildTaskResult: Sendable & ~Copyable>: ~Copyable {
 
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
@@ -421,6 +468,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// - Returns: The value returned by the next child task that completes.
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
+  @_preInverseGenerics
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
@@ -429,6 +477,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
   @available(SwiftStdlib 5.1, *)
   @_disfavoredOverload
+  @_preInverseGenerics
   public mutating func next() async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
@@ -439,12 +488,14 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
+  @_preInverseGenerics
   internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while let _ = await next(isolation: isolation) {}
   }
 
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
+  @_preInverseGenerics
   internal mutating func awaitAllRemainingTasks() async {
     while let _ = await next(isolation: nil) {}
   }
@@ -458,6 +509,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// Wait for all of the group's remaining tasks to complete.
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+  @_preInverseGenerics
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async {
     await awaitAllRemainingTasks(isolation: isolation)
   }
@@ -470,6 +522,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// because a task group waits for all child tasks to complete before returning.
   ///
   /// - Returns: `true` if the group has no pending tasks; otherwise `false`.
+  @_preInverseGenerics
   public var isEmpty: Bool {
     _taskGroupIsEmpty(_group)
   }
@@ -490,6 +543,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `TaskGroup.isCancelled`
+  @_preInverseGenerics
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
   }
@@ -509,6 +563,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// to return `false` even though the task has been cancelled externally.
   ///
   /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  @_preInverseGenerics
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -517,6 +572,9 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable)
 extension TaskGroup: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension TaskGroup: Copyable where ChildTaskResult: Copyable {}
 
 // Implementation note:
 // We are unable to just™ abstract over Failure == Error / Never because of the
@@ -578,7 +636,7 @@ extension TaskGroup: Sendable { }
 /// - SeeAlso: ``ThrowingDiscardingTaskGroup``
 @available(SwiftStdlib 5.1, *)
 @frozen
-public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
+public struct ThrowingTaskGroup<ChildTaskResult: Sendable & ~Copyable, Failure: Error>: ~Copyable {
 
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
@@ -595,6 +653,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
+  @_preInverseGenerics
   internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while true {
       do {
@@ -607,11 +666,13 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
+  @_preInverseGenerics
   internal mutating func awaitAllRemainingTasks() async {
     await awaitAllRemainingTasks(isolation: nil)
   }
 
   @usableFromInline
+  @_preInverseGenerics
   internal mutating func _waitForAll() async throws {
     await self.awaitAllRemainingTasks()
   }
@@ -670,6 +731,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+  @_preInverseGenerics
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async throws {
     var firstError: Error? = nil
 
@@ -750,18 +812,21 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - SeeAlso: `nextResult()`
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
+  @_preInverseGenerics
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
   }
 
   @available(SwiftStdlib 5.1, *)
   @_disfavoredOverload
+  @_preInverseGenerics
   public mutating func next() async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
   }
 
   @_silgen_name("$sScg10nextResults0B0Oyxq_GSgyYaKF")
   @usableFromInline
+  @_preInverseGenerics
   mutating func nextResultForABI() async throws -> Result<ChildTaskResult, Failure>? {
     do {
       guard let success: ChildTaskResult = try await _taskGroupWaitNext(group: _group) else {
@@ -815,6 +880,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 
   @_alwaysEmitIntoClient
   @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+  @_preInverseGenerics
   public mutating func nextResult(isolation: isolated (any Actor)? = #isolation) async -> Result<ChildTaskResult, Failure>? {
     return try! await nextResultForABI()
   }
@@ -828,6 +894,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// because a task group waits for all child tasks to complete before returning.
   ///
   /// - Returns: `true` if the group has no pending tasks; otherwise `false`.
+  @_preInverseGenerics
   public var isEmpty: Bool {
     _taskGroupIsEmpty(_group)
   }
@@ -848,6 +915,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// - SeeAlso: `Task.isCancelled`
   /// - SeeAlso: `ThrowingTaskGroup.isCancelled`
+  @_preInverseGenerics
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
   }
@@ -867,6 +935,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// to return `false` even though the task has been cancelled externally.
   ///
   /// - SeeAlso: ``withTaskCancellationShield(operation:)``
+  @_preInverseGenerics
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -875,6 +944,9 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable)
 extension ThrowingTaskGroup: Sendable { }
+
+@available(SwiftStdlib 5.1, *)
+extension ThrowingTaskGroup: Copyable where ChildTaskResult: Copyable {}
 
 /// ==== TaskGroup: AsyncSequence ----------------------------------------------
 
@@ -1125,8 +1197,10 @@ func _taskGroupCancelAll(group: Builtin.RawPointer)
 func _taskGroupIsCancelled(group: Builtin.RawPointer) -> Bool
 
 @available(SwiftStdlib 5.1, *)
+@_preInverseGenerics
 @_silgen_name("swift_taskGroup_wait_next_throwing")
-public func _taskGroupWaitNext<T>(group: Builtin.RawPointer) async throws -> T?
+@usableFromInline
+internal func _taskGroupWaitNext<T: ~Copyable>(group: Builtin.RawPointer) async throws -> T?
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_hasTaskGroupStatusRecord")

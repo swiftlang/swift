@@ -184,7 +184,184 @@ if IS_INIT:
 else:
   ARROW_RETURN_TYPE = f'-> Task<Success, {FAILURE_TYPE}>'
 
+# Per-variant unique name for the internal helper. Both the Copyable-only
+# public wrapper (preserved ABI at the original availability) and the
+# noncopyable public wrapper (gated at SwiftStdlib 6.5) delegate to it.
+HELPER_NAME = (
+  '_createTaskImpl_'
+  + ('D' if IS_DETACHED else 'I')
+  + ('X' if HAS_TASK_EXECUTOR else '')
+  + ('T' if IS_THROWING else '')
+)
+
+# Helper-side params: drop caller-side closure-capture attributes and any
+# default values, since the helper is called with explicit arguments only.
+def helper_params():
+  res = []
+  for p in PARAMS:
+    np = p
+    np = np.replace('@_inheritActorContext ', '')
+    np = np.replace('@_implicitSelfCapture ', '')
+    np = np.split('=')[0].rstrip()
+    if not IS_THROWING:
+      np = np.replace("throws", "")
+    res.append(np)
+  return res
+
+# Comma-separated forwarding argument list passed from wrapper to helper.
+def helper_args():
+  names = []
+  for p in PARAMS:
+    head = p.split(':')[0]
+    # Skip parameter attributes (e.g. @_inheritActorContext) when locating
+    # the argument label and local name.
+    tokens = [t for t in head.strip().split() if not t.startswith('@')]
+    if len(tokens) >= 2:
+      label, local = tokens[-2], tokens[-1]
+    else:
+      label = local = tokens[-1]
+    names.append(f'{label}: {local}')
+  return ', '.join(names)
+
 }%
+
+% # ====================================================================================================================
+% # Internal helper carrying the shared create-task body. Both the Copyable-
+% # only public wrapper (preserved ABI at the original availability) and the
+% # noncopyable public wrapper (gated at SwiftStdlib 6.5, emitted at the end
+% # of this variant) delegate to this helper. Skipped for legacy deprecated
+% # APIs and for top-level free functions, which keep their own bodies.
+% if not IS_TOP_LEVEL_FUNC and not IS_DEPRECATED:
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+${"\n".join(adjust_availability(['@available(SwiftStdlib 5.1, *)']))}
+extension Task where Success: ~Copyable {
+  @_alwaysEmitIntoClient
+  internal static func ${HELPER_NAME}(
+    ${",\n    ".join(helper_params())}
+  ) -> Builtin.NativeObject {
+% if HAS_TASK_EXECUTOR:
+    // With-executor variants always go through Builtin.createTask below.
+% else:
+    #if $Embedded
+    let flags = taskCreateFlags(
+      priority: priority,
+      isChildTask: false,
+      copyTaskLocals: ${'true' if not IS_DETACHED else 'false /* detached */'},
+      inheritContext: ${'true' if not IS_DETACHED else 'false /* detached */'},
+      enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false)
+    let (task, _) = Builtin.createAsyncTask(flags, operation)
+    return task
+    #else
+% end
+
+    let flags = taskCreateFlags(
+      priority: ${'priority' if HAS_TASK_PRIORITY else 'nil'},
+      isChildTask: false,
+      copyTaskLocals: ${'true' if not IS_DETACHED else 'false /* detached */'},
+      inheritContext: ${'true' if not IS_DETACHED else 'false /* detached */'},
+      enqueueJob: true,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false,
+      isSynchronousStart: false)
+
+% if HAS_ISOLATED_ANY:
+    let builtinSerialExecutor =
+      unsafe Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+% end # HAS_ISOLATED_ANY
+
+    var task: Builtin.NativeObject?
+% if HAS_TASK_NAME:
+    #if $BuiltinCreateAsyncTaskName
+    if let name {
+      % if HAS_TASK_EXECUTOR:
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task =
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            % if HAS_ISOLATED_ANY:
+            initialSerialExecutor: builtinSerialExecutor,
+            % end
+            initialTaskExecutorConsuming: taskExecutor,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #else // no $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+      task =
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            % if HAS_ISOLATED_ANY:
+            initialSerialExecutor: builtinSerialExecutor,
+            % end
+            initialTaskExecutor: executorBuiltin,
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      #endif // $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      % else: # if no TASK_EXECUTOR
+      task =
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            % if HAS_ISOLATED_ANY:
+            initialSerialExecutor: builtinSerialExecutor,
+            % end
+            taskName: nameBytes.baseAddress!._rawValue,
+            operation: operation).0
+        }
+      % end # if no HAS_TASK_EXECUTOR
+    }
+    #endif // $BuiltinCreateAsyncTaskName
+% end # HAS_TASK_NAME
+
+% if HAS_TASK_EXECUTOR:
+    if task == nil {
+      assert(name == nil)
+      #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+      task = Builtin.createTask(
+        flags: flags,
+        % if HAS_ISOLATED_ANY:
+        initialSerialExecutor: builtinSerialExecutor,
+        % end
+        initialTaskExecutorConsuming: taskExecutor,
+        operation: operation).0
+      #else
+      let executorBuiltin: Builtin.Executor =
+        taskExecutor.asUnownedTaskExecutor().executor
+      task = Builtin.createTask(
+        flags: flags,
+        % if HAS_ISOLATED_ANY:
+        initialSerialExecutor: builtinSerialExecutor,
+        % end
+        initialTaskExecutor: executorBuiltin,
+        operation: operation).0
+      #endif
+    }
+% end # HAS_TASK_EXECUTOR
+
+    if task == nil {
+      task = Builtin.createTask(
+      flags: flags,
+      % if HAS_ISOLATED_ANY:
+      initialSerialExecutor: builtinSerialExecutor,
+      % end
+      operation: operation).0
+    }
+
+    return task!
+% if not HAS_TASK_EXECUTOR:
+    #endif // $Embedded
+% end
+  }
+}
+#endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+% end # not IS_TOP_LEVEL_FUNC and not IS_DEPRECATED
 
 % # ====================================================================================================================
 % if not IS_TOP_LEVEL_FUNC:
@@ -211,6 +388,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   public ${METHOD_VARIANT}(
       ${",\n    ".join(adjust_params_for_kind(PARAMS))}
     ) ${ARROW_RETURN_TYPE}{
+% if IS_DEPRECATED or IS_TOP_LEVEL_FUNC:
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority,
@@ -229,6 +407,13 @@ extension Task where Failure == ${FAILURE_TYPE} {
     % else:
     return Task(task)
     % end
+% else:
+    % if IS_INIT:
+    self.init(Self.${HELPER_NAME}(${helper_args()}))
+    % else:
+    return Task(Self.${HELPER_NAME}(${helper_args()}))
+    % end
+% end
   }
 % end # not HAS_TASK_EXECUTOR
 
@@ -293,6 +478,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
   public ${METHOD_VARIANT}(
     ${",\n    ".join(adjust_params_for_kind(PARAMS))}
   ) ${ARROW_RETURN_TYPE}{
+% if IS_DEPRECATED or IS_TOP_LEVEL_FUNC:
 
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
@@ -404,12 +590,43 @@ extension Task where Failure == ${FAILURE_TYPE} {
 % else:
     return Task(task!)
 % end
+% else: # non-deprecated, non-top-level: delegate to helper
+    % if IS_INIT:
+    self.init(Self.${HELPER_NAME}(${helper_args()}))
+    % else:
+    return Task(Self.${HELPER_NAME}(${helper_args()}))
+    % end
+% end
   }
 
 #endif
 
 % if not IS_TOP_LEVEL_FUNC:
 } // extension Task ...
+% end
+
+% # ====================================================================================================================
+% # Noncopyable overload, gated at SwiftStdlib 6.5. Source-level gate forces
+% # an `if #available` check at construction sites, keeping `Task<NC, ...>`
+% # off older runtimes (whose future-wait machinery cannot take noncopyable
+% # results).
+% if not IS_TOP_LEVEL_FUNC and not IS_DEPRECATED:
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@available(SwiftStdlib 6.5, *)
+extension Task where Failure == ${FAILURE_TYPE}, Success: ~Copyable {
+  @discardableResult
+  @inlinable
+  public ${METHOD_VARIANT}(
+    ${",\n    ".join(adjust_params_for_kind(PARAMS))}
+  ) ${ARROW_RETURN_TYPE}{
+    % if IS_INIT:
+    self.init(Self.${HELPER_NAME}(${helper_args()}))
+    % else:
+    return Task(Self.${HELPER_NAME}(${helper_args()}))
+    % end
+  }
+}
+#endif
 % end
 
 % end

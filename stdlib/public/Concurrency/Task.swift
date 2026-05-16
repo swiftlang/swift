@@ -140,7 +140,7 @@ import Swift
 /// ```
 @available(SwiftStdlib 5.1, *)
 @frozen
-public struct Task<Success: Sendable, Failure: Error>: Sendable {
+public struct Task<Success: Sendable & ~Copyable, Failure: Error>: Sendable, ~Copyable {
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
   internal let _task: Builtin.NativeObject
@@ -150,6 +150,9 @@ public struct Task<Success: Sendable, Failure: Error>: Sendable {
     self._task = task
   }
 }
+
+@available(SwiftStdlib 5.1, *)
+extension Task: Copyable where Success: Copyable {}
 
 @available(SwiftStdlib 5.1, *)
 extension Task {
@@ -210,7 +213,11 @@ extension Task {
       }
     }
   }
+}
 
+@available(SwiftStdlib 5.1, *)
+@_preInverseGenerics
+extension Task where Success: ~Copyable {
   /// Cancels this task.
   ///
   /// Cancelling a task has three primary effects:
@@ -249,6 +256,7 @@ extension Task {
   ///
   /// - SeeAlso: `Task.checkCancellation()`
   /// - SeeAlso: `withTaskCancellationHandler(operation:onCancel:isolation:)`
+  @_preInverseGenerics
   public func cancel() {
     _taskCancel(_task)
   }
@@ -275,16 +283,46 @@ extension Task where Failure == Never {
   }
 }
 
+@available(SwiftStdlib 6.5, *)
+extension Task where Success: ~Copyable {
+  /// Awaits the task's result, consuming this `Task` and moving the value
+  /// out of the future's storage. The only way to retrieve a noncopyable
+  /// `Success`.
+  ///
+  /// - Important: For copyable `Success`, the same future may be reachable
+  ///   through multiple aliased `Task` values. Reading `.value` (or calling
+  ///   `take()` again) on another alias after the first `take()` traps.
+  @_alwaysEmitIntoClient
+  public consuming func take() async throws -> Success {
+    return try await _taskFutureTakeThrowing(_task)
+  }
+}
+
+@available(SwiftStdlib 6.5, *)
+extension Task where Failure == Never, Success: ~Copyable {
+  /// Awaits the nonthrowing task's result, consuming this `Task` and moving
+  /// the value out of the future's storage. See the throwing overload for
+  /// the read-after-take trap behavior with copyable `Success`.
+  @_alwaysEmitIntoClient
+  public consuming func take() async -> Success {
+    return await _taskFutureTake(_task)
+  }
+}
+
 @available(SwiftStdlib 5.1, *)
-extension Task: Hashable {
+@_preInverseGenerics
+extension Task: Hashable where Success: ~Copyable {
+  @_preInverseGenerics
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)
   }
 }
 
 @available(SwiftStdlib 5.1, *)
-extension Task: Equatable {
-  public static func ==(lhs: Self, rhs: Self) -> Bool {
+@_preInverseGenerics
+extension Task: Equatable where Success: ~Copyable {
+  @_preInverseGenerics
+  public static func ==(lhs: borrowing Self, rhs: borrowing Self) -> Bool {
     unsafe UnsafeRawPointer(Builtin.bridgeToRawPointer(lhs._task)) ==
       UnsafeRawPointer(Builtin.bridgeToRawPointer(rhs._task))
   }
@@ -1074,11 +1112,26 @@ internal func _runAsyncMain(_ asyncFun: @Sendable @escaping () async throws -> (
 //        unreferenced
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_future_wait")
-public func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
+@usableFromInline
+internal func _taskFutureGet<T>(_ task: Builtin.NativeObject) async -> T
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_future_wait_throwing")
-public func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
+@usableFromInline
+internal func _taskFutureGetThrowing<T>(_ task: Builtin.NativeObject) async throws -> T
+
+/// Take-flavored future-wait hooks. `internal` so the SwiftStdlib 6.5
+/// availability gate on `Task.take()` and TaskGroup NC overloads can't
+/// be bypassed.
+@available(SwiftStdlib 6.5, *)
+@_silgen_name("swift_task_future_wait_take")
+@usableFromInline
+internal func _taskFutureTake<T: ~Copyable>(_ task: Builtin.NativeObject) async -> T
+
+@available(SwiftStdlib 6.5, *)
+@_silgen_name("swift_task_future_wait_take_throwing")
+@usableFromInline
+internal func _taskFutureTakeThrowing<T: ~Copyable>(_ task: Builtin.NativeObject) async throws -> T
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_cancel")
