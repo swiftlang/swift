@@ -396,9 +396,11 @@ static void
 emitUnknownPatternErrorHelper(const char *emitterName, SILInstruction *inst,
                               std::optional<DiagnosticBehavior> behaviorLimit,
                               const char *file, int line) {
-  if (shouldAbortOnUnknownPatternMatchError()) {
+  if (inst->getFunction()->getModule().getOptions()
+          .AbortOnUnknownRegionIsolationPatternError) {
     llvm::report_fatal_error(
-        "RegionIsolation: Aborting on unknown pattern match error");
+        "RegionIsolation: Found unknown SIL pattern in diagnostic emitter. "
+        "See -sil-region-isolation-assert-on-unknown-pattern");
   }
 
   REGIONBASEDISOLATION_LOG(llvm::dbgs()
@@ -3888,9 +3890,11 @@ public:
       : inst(error.op->getSourceInst()) {}
 
   void emit() {
-    if (shouldAbortOnUnknownPatternMatchError()) {
+    if (inst->getFunction()->getModule().getOptions()
+            .AbortOnUnknownRegionIsolationPatternError) {
       llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
+          "RegionIsolation: Found unknown SIL pattern in verbatim emitter. "
+          "See -sil-region-isolation-assert-on-unknown-pattern");
     }
 
     REGIONBASEDISOLATION_LOG(llvm::dbgs() << "Emitting Error. Verbatim Error: "

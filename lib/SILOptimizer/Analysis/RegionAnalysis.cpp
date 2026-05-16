@@ -39,16 +39,6 @@ using namespace swift::PartitionPrimitives;
 using namespace swift::PatternMatch;
 using namespace swift::regionanalysisimpl;
 
-bool swift::regionanalysisimpl::AbortOnUnknownPatternMatchError = false;
-
-static llvm::cl::opt<bool, true> AbortOnUnknownPatternMatchErrorCmdLine(
-    "sil-region-isolation-assert-on-unknown-pattern",
-    llvm::cl::desc("Abort if SIL region isolation detects an unknown pattern. "
-                   "Intended only to be used when debugging the compiler!"),
-    llvm::cl::Hidden,
-    llvm::cl::location(
-        swift::regionanalysisimpl::AbortOnUnknownPatternMatchError));
-
 //===----------------------------------------------------------------------===//
 //                              MARK: Utilities
 //===----------------------------------------------------------------------===//
@@ -1948,9 +1938,11 @@ public:
   }
 
   void addUnknownPatternError(SILValue value) {
-    if (shouldAbortOnUnknownPatternMatchError()) {
+    if (currentInst->getFunction()->getModule().getOptions()
+            .AbortOnUnknownRegionIsolationPatternError) {
       llvm::report_fatal_error(
-          "RegionIsolation: Aborting on unknown pattern match error");
+          "RegionIsolation: Found unknown SIL pattern in PartitionOpBuilder. "
+          "See -sil-region-isolation-assert-on-unknown-pattern");
     }
     currentInstPartitionOps->emplace_back(
         PartitionOp::UnknownPatternError(lookupValueID(value), currentInst));
