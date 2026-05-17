@@ -325,6 +325,26 @@ extension RawSpan {
     unsafe self = Self.init(unsafeElements: span)
   }
 
+#if hasFeature(PreInverseGenericsExcept)
+  /// Unsafely view a typed span as a raw span.
+  ///
+  /// Creates a `RawSpan` over the memory represented by a `Span<Element>`
+  ///
+  /// - Parameters:
+  ///   - unsafeElements: An existing `Span<Element>`, from which this
+  ///     `RawSpan` will inherit its lifetime.
+  @_alwaysEmitIntoClient
+  @unsafe
+  @_lifetime(copy span)
+  public init<Element: ~Escapable>(unsafeElements span: Span<Element>) {
+    let rawSpan = unsafe RawSpan(
+      _unchecked: unsafe span._pointer,
+      byteCount: span.count == 1 ? MemoryLayout<Element>.size
+                 : span.count &* MemoryLayout<Element>.stride
+    )
+    self = unsafe _overrideLifetime(rawSpan, copying: span)
+  }
+#else
   /// Unsafely view a typed span as a raw span.
   ///
   /// Creates a `RawSpan` over the memory represented by a `Span<Element>`
@@ -343,6 +363,7 @@ extension RawSpan {
     )
     self = unsafe _overrideLifetime(rawSpan, copying: span)
   }
+#endif
 
   /// View a typed span as a raw span.
   ///
