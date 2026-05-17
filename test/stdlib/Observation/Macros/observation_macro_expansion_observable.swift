@@ -67,3 +67,21 @@ final class CommentOnSameLineNoAnnotation {
 // CHECK-NEXT:  @ObservationIgnored
 // CHECK-NEXT:  private final /*2*/ var _it /*4*/ /*4*/ = 0
 _ = 0
+
+// `#sourceLocation` directives synthesized to forward the spelled location of
+// `didSet`/`willSet` bodies must use an absolute filesystem path (`.filePath`)
+// rather than `#fileID`-style `Module/file.swift` — the latter cannot be
+// resolved by SourceKit/Xcode when navigating remapped diagnostics.
+@available(macOS 14.0, iOS 17.0, watchOS 10.0, tvOS 17.0, *)
+@Observable
+final class DidSetSourceLocationUsesAbsolutePath {
+  var value = 0 {
+    didSet {
+      _ = value
+    }
+  }
+}
+
+// CHECK-LABEL: @__swiftmacro{{.*}}DidSetSourceLocationUsesAbsolutePath{{.*}}ObservationTracked{{.*}}.swift
+// CHECK:       #sourceLocation(file: "{{.*}}Macros{{.*}}observation_macro_expansion_observable.swift",
+_ = 0
