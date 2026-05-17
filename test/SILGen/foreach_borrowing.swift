@@ -23,7 +23,7 @@ func testNonCopyableBorrowingSequence(seq: borrowing Span<NoncopyableInt>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
   // CHECK: = function_ref @$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
   // CHECK: = function_ref @$ss12SpanIteratorVsRi_zrlE04nextA012maximumCounts0A0VyxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout SpanIterator<τ_0_0>) -> @lifetime(borrow address_for_deps 1) @owned Span<τ_0_0>
-  // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Bool
+  // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zRi0_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@guaranteed Span<τ_0_0>) -> Bool
   // CHECK: [[IS_EMPTY_CALL:%.*]] = apply [[IS_EMPTY_CHECK]]
   // CHECK: [[NOT_EMPTY:%.*]] = function_ref @$sSb1nopyS2bFZ : $@convention(method) (Bool, @thin Bool.Type) -> Bool
   // CHECK: [[NOT_EMPTY_CALL:%.*]] = apply [[NOT_EMPTY]]([[IS_EMPTY_CALL]]
@@ -45,7 +45,7 @@ func testCopyableBorrowingSequence(seq: borrowing Span<Int>) {
   // With borrowing feature enabled, we expect makeBorrowingIterator and nextSpan to be called
   // CHECK: = function_ref @$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> @lifetime(borrow 0) @out SpanIterator<τ_0_0>
   // CHECK: = function_ref @$ss12SpanIteratorVsRi_zrlE04nextA012maximumCounts0A0VyxGSi_tF : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (Int, @lifetime(copy 1) @inout SpanIterator<τ_0_0>) -> @lifetime(borrow address_for_deps 1) @owned Span<τ_0_0>
-  // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Bool
+  // CHECK: [[IS_EMPTY_CHECK:%.*]] = function_ref @$ss4SpanVsRi_zRi0_zrlE7isEmptySbvg : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable> (@guaranteed Span<τ_0_0>) -> Bool
   // CHECK: [[IS_EMPTY_CALL:%.*]] = apply [[IS_EMPTY_CHECK]]
   // CHECK: [[NOT_EMPTY:%.*]] = function_ref @$sSb1nopyS2bFZ : $@convention(method) (Bool, @thin Bool.Type) -> Bool
   // CHECK: [[NOT_EMPTY_CALL:%.*]] = apply [[NOT_EMPTY]]([[IS_EMPTY_CALL]]
