@@ -3246,6 +3246,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       llvm_unreachable("not a nominal type");
 
     case DeclKind::TypeAlias:
+    case DeclKind::SubtypeAlias:
       appendOperator("a");
       break;
     case DeclKind::Protocol:

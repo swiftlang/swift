@@ -2381,6 +2381,12 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   auto &existentialTL = SGF.getTypeLowering(E->getType());
   auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
 
+  // SubtypeAlias is transparent at the SIL level; use the underlying type
+  // as the formal concrete type so init_existential_addr gets Double, not Celsius.
+  // Walk recursively in case of chained subtypealiases (e.g. Celsius -> Kelvin -> Double).
+  while (auto subtypeAlias = dyn_cast<SubtypeAliasType>(concreteFormalType))
+    concreteFormalType = subtypeAlias->getDecl()->getUnderlyingType()->getCanonicalType();
+
   auto archetype = ExistentialArchetypeType::getAny(E->getType()->getCanonicalType());
   AbstractionPattern abstractionPattern(archetype);
   auto &concreteTL = SGF.getTypeLowering(abstractionPattern,

@@ -724,6 +724,19 @@ static void lookupVisibleMemberDeclsImpl(
     BaseTy = DS->getSelfType();
   }
 
+  // A SubtypeAlias also inherits members from its underlying type chain.
+  if (auto *STA = BaseTy->getAs<SubtypeAliasType>()) {
+    auto *NTD = STA->getDecl();
+    lookupTypeMembers(BaseTy, NTD, Consumer, CurrDC, LS, Reason);
+    lookupDeclsFromProtocolsBeingConformedTo(BaseTy, Consumer, LS, CurrDC,
+                                             Reason, Visited);
+    // Walk the underlying type chain recursively.
+    Type underlying = NTD->getUnderlyingType();
+    lookupVisibleMemberDeclsImpl(underlying, Consumer, CurrDC, LS,
+                                 getReasonForSuper(Reason), Visited);
+    return;
+  }
+
   auto *NTD = BaseTy->getAnyNominal();
   if (NTD == nullptr)
     return;

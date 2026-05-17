@@ -2820,6 +2820,12 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       }
     }
 
+    // Visit underlying type for SubtypeAlias (e.g. Celsius -> Kelvin -> Double).
+    if (auto *sta = dyn_cast<SubtypeAliasDecl>(current)) {
+      if (auto *underlyingNominal = sta->getUnderlyingType()->getAnyNominal())
+        addNominalType(underlyingNominal);
+    }
+
     // Qualified name lookup can find generic value parameters.
     auto gpList = current->getGenericParams();
 

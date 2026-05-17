@@ -1996,6 +1996,16 @@ namespace {
       return setLocal(type, response);
     }
     
+    MetadataResponse visitSubtypeAliasType(CanSubtypeAliasType type,
+                                           DynamicMetadataRequest request) {
+      // SubtypeAlias is backed by its underlying type; use that type's metadata.
+      // Walk recursively in case of chained subtypealiases (e.g. Celsius -> Kelvin -> Double).
+      CanType underlyingType = type->getDecl()->getUnderlyingType()->getCanonicalType();
+      while (auto subtypeAlias = dyn_cast<SubtypeAliasType>(underlyingType))
+        underlyingType = subtypeAlias->getDecl()->getUnderlyingType()->getCanonicalType();
+      return IGF.emitTypeMetadataRef(underlyingType, request);
+    }
+
     MetadataResponse visitNominalType(CanNominalType type,
                                       DynamicMetadataRequest request) {
       assert(!type->isExistentialType());

@@ -7079,6 +7079,9 @@ bool ConstraintSystem::repairFailures(
     if (hasConversionOrRestriction(ConversionRestrictionKind::Superclass))
       return false;
 
+    if (hasConversionOrRestriction(ConversionRestrictionKind::SubtypeAlias))
+      return false;
+
     // Let's check whether the sub-expression is an optional type which
     // is possible to unwrap (either by force or `??`) to satisfy the cast,
     // otherwise we'd have to fallback to force downcast.
@@ -8057,16 +8060,19 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   if (kind >= ConstraintKind::Subtype) {
-    // Subtypealias-to-underlying conversion.
+    // Subtypealias-to-underlying conversion (Celsius -> Double).
     if (isSubtypeAliasUpcast(type1, type2)) {
       conversionsOrFixes.push_back(ConversionRestrictionKind::SubtypeAlias);
     }
 
-    if (auto *expr = locator.trySimplifyToExpr()) {
-      if (isa<LiteralExpr>(expr) && isSubtypeAliasLiteralFormation(type1, type2))
+    // Underlying-to-subtypealias conversion (Double -> Celsius):
+    // only allowed in an explicit 'as' coercion, not implicitly.
+    if (isSubtypeAliasLiteralFormation(type1, type2)) {
+      auto *loc = getConstraintLocator(locator);
+      if (isa_and_nonnull<LiteralExpr>(locator.trySimplifyToExpr()) ||
+          loc->isForCoercion())
         conversionsOrFixes.push_back(ConversionRestrictionKind::SubtypeAlias);
     }
-
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass() &&
@@ -14673,8 +14679,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   case ConversionRestrictionKind::SubtypeAlias:
     addContextualScore();
     return (isSubtypeAliasUpcast(type1, type2) ||
-            (isa_and_nonnull<LiteralExpr>(locator.trySimplifyToExpr()) &&
-             isSubtypeAliasLiteralFormation(type1, type2)))
+            isSubtypeAliasLiteralFormation(type1, type2))
                ? getTypeMatchSuccess()
                : getTypeMatchFailure(locator);
 
