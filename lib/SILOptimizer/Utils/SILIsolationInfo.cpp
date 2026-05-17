@@ -330,6 +330,31 @@ static bool isPartialApplyNonisolatedUnsafe(PartialApplyInst *pai) {
   return foundOneNonIsolatedUnsafe;
 }
 
+static const SILFunctionArgument *
+getSelfFunctionArgumentForRefElementAddr(SILValue value) {
+  auto *reai = dyn_cast<RefElementAddrInst>(value);
+  if (!reai)
+    return {};
+
+  auto self = llvm::cast_or_null<SILFunctionArgument>(
+      reai->getFunction()->maybeGetSelfArgument());
+  if (!self || !self->getType().isAnyActor())
+    return {};
+
+  auto declRef = reai->getFunction()->getDeclRef();
+  if (!declRef || declRef.kind != SILDeclRef::Kind::Initializer)
+    return {};
+
+  auto *lbi = dyn_cast<LoadBorrowInst>(reai->getOperand());
+  if (!lbi)
+    return {};
+
+  auto *asi = dyn_cast<AllocStackInst>(lbi->getOperand());
+  if (!asi || !asi->getDecl()->isActorSelf())
+    return {};
+  return self;
+}
+
 /// Return the SILIsolationInfo for a class field for a ref_element_addr or
 /// class_method. Methods that are direct should get their isolation information
 /// from the static function rather than from this function.
@@ -371,6 +396,14 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
   if (varIsolation.isNonisolatedOrConcurrent())
     return SILIsolationInfo::getDisconnected(
         varIsolation.isNonisolatedUnsafe());
+
+  // See if we have a load from a box in an objc actor initializer where we need
+  // to identify our actor instance (which would be a box otherwise) with self.
+  if (auto newValue = getSelfFunctionArgumentForRefElementAddr(queriedValue)) {
+    if (auto info =
+            SILIsolationInfo::getActorInstanceIsolated(queriedValue, newValue))
+      return info;
+  }
 
   // Check if we actually have an actor as our class value. First see if we have
   // an actor instance value from an isolated SILFunctionArgument.
