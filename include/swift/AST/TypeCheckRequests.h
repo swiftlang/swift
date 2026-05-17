@@ -1649,7 +1649,7 @@ using CustomAttrNominalPair = std::pair<CustomAttr *, NominalTypeDecl *>;
 /// declaration.
 ///
 /// This is the "raw" global actor attribute as written directly on the
-/// declaration, with any inference rules applied.
+/// declaration, without any inference rules applied.
 class GlobalActorAttributeRequest
     : public SimpleRequest<GlobalActorAttributeRequest,
                            std::optional<CustomAttrNominalPair>(
