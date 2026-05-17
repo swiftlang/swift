@@ -2306,6 +2306,7 @@ static bool shouldSerializeMember(Decl *D) {
   case DeclKind::PatternBinding:
   case DeclKind::Subscript:
   case DeclKind::TypeAlias:
+  case DeclKind::SubtypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
   case DeclKind::Enum:
@@ -4591,6 +4592,43 @@ public:
                                 rawAccessLevel,
                                 dependencyIDs);
     writeGenericParams(typeAlias->getGenericParams());
+  }
+
+  void visitSubtypeAliasDecl(const SubtypeAliasDecl *subtypeAlias) {
+    using namespace decls_block;
+    verifyAttrSerializable(subtypeAlias);
+
+    auto contextID = S.addDeclContextRef(subtypeAlias->getDeclContext());
+
+    auto underlying = subtypeAlias->getUnderlyingType();
+
+    swift::SmallSetVector<Type, 4> dependencies;
+    collectDependenciesFromType(dependencies, underlying->getCanonicalType(),
+                                /*excluding*/nullptr);
+    for (Requirement req : subtypeAlias->getGenericRequirements()) {
+      collectDependenciesFromRequirement(dependencies, req,
+                                         /*excluding*/nullptr);
+    }
+
+    SmallVector<TypeID, 4> dependencyIDs;
+    for (Type dep : dependencies)
+      dependencyIDs.push_back(S.addTypeRef(dep));
+
+    uint8_t rawAccessLevel =
+      getRawStableAccessLevel(subtypeAlias->getFormalAccess());
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[TypeAliasLayout::Code];
+    TypeAliasLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                S.addDeclBaseNameRef(subtypeAlias->getName()),
+                                contextID.getOpaqueValue(),
+                                S.addTypeRef(underlying),
+                                /*no longer used*/TypeID(),
+                                subtypeAlias->isImplicit(),
+                                S.addGenericSignatureRef(
+                                           subtypeAlias->getGenericSignature()),
+                                rawAccessLevel,
+                                dependencyIDs);
+    writeGenericParams(subtypeAlias->getGenericParams());
   }
 
   void visitGenericTypeParamDecl(const GenericTypeParamDecl *genericParam) {

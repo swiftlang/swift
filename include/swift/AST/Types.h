@@ -91,6 +91,7 @@ class SILFunction;
 class SILType;
 class SourceLoc;
 class TypeAliasDecl;
+class SubtypeAliasDecl;
 class TypeDecl;
 class NominalTypeDecl;
 class GenericTypeDecl;
@@ -3190,6 +3191,28 @@ private:
              RecursiveTypeProperties properties);
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(StructType, NominalType)
+
+/// SubtypeAliasType - This represents the nominal type declared by a
+/// SubtypeAliasDecl.
+class SubtypeAliasType : public NominalType {
+public:
+  SubtypeAliasDecl *getDecl() const {
+    return reinterpret_cast<SubtypeAliasDecl *>(NominalType::getDecl());
+  }
+
+  static SubtypeAliasType *get(SubtypeAliasDecl *D, Type Parent,
+                               const ASTContext &C);
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::SubtypeAlias;
+  }
+
+private:
+  SubtypeAliasType(SubtypeAliasDecl *TheDecl, Type Parent,
+                   const ASTContext &Ctx,
+                   RecursiveTypeProperties properties);
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(SubtypeAliasType, NominalType)
 
 /// ClassType - This represents the type declared by a ClassDecl.
 class ClassType : public NominalType {

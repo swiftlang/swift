@@ -253,6 +253,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::Tuple:
   case TypeKind::Enum:
   case TypeKind::Struct:
+  case TypeKind::SubtypeAlias:
   case TypeKind::Metatype:
   case TypeKind::ExistentialMetatype:
   case TypeKind::Module:
@@ -1882,6 +1883,7 @@ CanType TypeBase::computeCanonicalType() {
 
   case TypeKind::Enum:
   case TypeKind::Struct:
+  case TypeKind::SubtypeAlias:
   case TypeKind::Class:
   case TypeKind::Protocol: {
     auto nominalTy = cast<NominalType>(this);
@@ -4729,6 +4731,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::Tuple:
   case TypeKind::Enum:
   case TypeKind::Struct:
+  case TypeKind::SubtypeAlias:
   case TypeKind::Metatype:
   case TypeKind::ExistentialMetatype:
   case TypeKind::Module:

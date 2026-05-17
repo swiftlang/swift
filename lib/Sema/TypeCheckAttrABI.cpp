@@ -663,6 +663,7 @@ public:
   UNSUPPORTED_DECL(BuiltinTuple)
   UNSUPPORTED_DECL(OpaqueType)
   UNSUPPORTED_DECL(TypeAlias)
+  UNSUPPORTED_DECL(SubtypeAlias)
   UNSUPPORTED_DECL(GenericTypeParam)
   UNSUPPORTED_DECL(AssociatedType)
   UNSUPPORTED_DECL(Module)

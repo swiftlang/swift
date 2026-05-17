@@ -247,6 +247,8 @@ enum class ConversionRestrictionKind {
   DeepEquality,
   /// Subclass-to-superclass conversion.
   Superclass,
+  /// Subtypealias-to-underlying-type conversion.
+  SubtypeAlias,
   /// Class metatype to AnyObject conversion.
   ClassMetatypeToAnyObject,
   /// Existential metatype to AnyObject conversion.

@@ -320,6 +320,7 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::Module:
     return CodeCompletionDeclKind::Module;
   case DeclKind::TypeAlias:
+  case DeclKind::SubtypeAlias:
     return CodeCompletionDeclKind::TypeAlias;
   case DeclKind::AssociatedType:
     return CodeCompletionDeclKind::AssociatedType;

@@ -982,6 +982,8 @@ public:
 
   ParserResult<TypeDecl> parseDeclTypeAlias(ParseDeclOptions Flags,
                                             DeclAttributes &Attributes);
+  ParserResult<TypeDecl> parseDeclSubtypeAlias(ParseDeclOptions Flags,
+                                               DeclAttributes &Attributes);
 
   ParserResult<TypeDecl> parseDeclAssociatedType(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);

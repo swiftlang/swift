@@ -8164,6 +8164,7 @@ void NonEphemeralConversionFailure::emitSuggestionNotes() const {
     break;
   case ConversionRestrictionKind::DeepEquality:
   case ConversionRestrictionKind::Superclass:
+  case ConversionRestrictionKind::SubtypeAlias:
   case ConversionRestrictionKind::Existential:
   case ConversionRestrictionKind::MetatypeToExistentialMetatype:
   case ConversionRestrictionKind::ExistentialMetatypeToMetatype:

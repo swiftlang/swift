@@ -893,6 +893,13 @@ namespace {
                                          isSensitive);
     }
 
+    RetTy visitSubtypeAliasType(CanSubtypeAliasType type,
+                                AbstractionPattern origType,
+                                IsTypeExpansionSensitive_t isSensitive) {
+      auto underlying = type->getDecl()->getUnderlyingType();
+      return visit(underlying->getCanonicalType(), origType, isSensitive);
+    }
+
     RetTy visitBuiltinTupleType(CanBuiltinTupleType type, AbstractionPattern origType,
                                 IsTypeExpansionSensitive_t isSensitive) {
       llvm_unreachable("BuiltinTupleType should not show up here");
@@ -3759,6 +3766,12 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
     CanType visitDynamicSelfType(CanDynamicSelfType selfType) {
       return TC.getLoweredRValueType(forExpansion, origType,
                                      selfType.getSelfType());
+    }
+
+    CanType visitSubtypeAliasType(CanSubtypeAliasType subtypeAlias) {
+      auto underlying = subtypeAlias->getDecl()->getUnderlyingType();
+      return TC.computeLoweredRValueType(forExpansion, origType,
+                                         underlying->getCanonicalType());
     }
 
     // Static metatypes are unitary and can optimized to a "thin" empty

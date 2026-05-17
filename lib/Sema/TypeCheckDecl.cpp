@@ -1836,6 +1836,34 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
   return result;
 }
 
+Type SubtypeAliasUnderlyingTypeRequest::evaluate(
+    Evaluator &evaluator, SubtypeAliasDecl *decl) const {
+  TypeResolutionOptions options(
+      decl->getGenericParams() ? TypeResolverContext::GenericTypeAliasDecl
+                               : TypeResolverContext::TypeAliasDecl);
+  if (decl->preconcurrency())
+    options |= TypeResolutionFlags::Preconcurrency;
+
+  auto *underlyingRepr = decl->getUnderlyingTypeRepr();
+  if (!underlyingRepr) {
+    decl->setInvalid();
+    return ErrorType::get(decl->getASTContext());
+  }
+
+  const auto result =
+      TypeResolution::forInterface(decl, options,
+                                   /*unboundTyOpener*/ nullptr,
+                                   /*placeholderHandler*/ nullptr,
+                                   /*packElementOpener*/ nullptr)
+          .resolveType(underlyingRepr);
+
+  if (result->hasError()) {
+    decl->setInvalid();
+    return ErrorType::get(decl->getASTContext());
+  }
+  return result;
+}
+
 /// Bind the given function declaration, which declares an operator, to the
 /// corresponding operator declaration.
 OperatorDecl *
@@ -2422,6 +2450,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
 
   case DeclKind::Enum:
   case DeclKind::Struct:
+  case DeclKind::SubtypeAlias:
   case DeclKind::Class:
   case DeclKind::Protocol:
   case DeclKind::BuiltinTuple: {

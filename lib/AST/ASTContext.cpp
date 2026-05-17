@@ -592,6 +592,8 @@ struct ASTContext::Implementation {
     llvm::DenseMap<Type, DynamicSelfType *> DynamicSelfTypes;
     llvm::DenseMap<std::pair<EnumDecl*, Type>, EnumType*> EnumTypes;
     llvm::DenseMap<std::pair<StructDecl*, Type>, StructType*> StructTypes;
+    llvm::DenseMap<std::pair<SubtypeAliasDecl*, Type>, SubtypeAliasType*>
+      SubtypeAliasTypes;
     llvm::DenseMap<std::pair<ClassDecl*, Type>, ClassType*> ClassTypes;
     llvm::DenseMap<std::pair<ProtocolDecl*, Type>, ProtocolType*> ProtocolTypes;
     llvm::DenseMap<Type, ExistentialType *> ExistentialTypes;
@@ -4535,6 +4537,8 @@ NominalType *NominalType::get(NominalTypeDecl *D, Type Parent, const ASTContext 
     return EnumType::get(cast<EnumDecl>(D), Parent, C);
   case DeclKind::Struct:
     return StructType::get(cast<StructDecl>(D), Parent, C);
+  case DeclKind::SubtypeAlias:
+    return SubtypeAliasType::get(cast<SubtypeAliasDecl>(D), Parent, C);
   case DeclKind::Class:
     return ClassType::get(cast<ClassDecl>(D), Parent, C);
   case DeclKind::Protocol: {
@@ -4581,6 +4585,25 @@ StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   if (!known) {
     known = new (C, arena) StructType(D, Parent, C, properties);
   }
+  return known;
+}
+
+SubtypeAliasType::SubtypeAliasType(SubtypeAliasDecl *TheDecl, Type Parent,
+                                   const ASTContext &C,
+                                   RecursiveTypeProperties properties)
+    : NominalType(TypeKind::SubtypeAlias, &C, TheDecl, Parent, properties) {}
+
+SubtypeAliasType *SubtypeAliasType::get(SubtypeAliasDecl *D, Type Parent,
+                                        const ASTContext &C) {
+  RecursiveTypeProperties properties;
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
+  properties |= getRecursivePropertiesAsParent(Parent);
+  auto arena = getArena(properties);
+
+  auto *&known = C.getImpl().getArena(arena).SubtypeAliasTypes[{D, Parent}];
+  if (!known)
+    known = new (C, arena) SubtypeAliasType(D, Parent, C, properties);
   return known;
 }
 

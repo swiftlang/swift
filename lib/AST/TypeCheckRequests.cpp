@@ -986,6 +986,25 @@ void UnderlyingTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   diags.diagnose(aliasDecl, diag::recursive_decl_reference, aliasDecl);
 }
 
+std::optional<Type>
+SubtypeAliasUnderlyingTypeRequest::getCachedResult() const {
+  auto *decl = std::get<0>(getStorage());
+  if (auto type = decl->UnderlyingTy.getType())
+    return type;
+  return std::nullopt;
+}
+
+void SubtypeAliasUnderlyingTypeRequest::cacheResult(Type value) const {
+  auto *decl = std::get<0>(getStorage());
+  decl->UnderlyingTy.setType(value);
+}
+
+void SubtypeAliasUnderlyingTypeRequest::diagnoseCycle(
+    DiagnosticEngine &diags) const {
+  auto decl = std::get<0>(getStorage());
+  diags.diagnose(decl, diag::recursive_decl_reference, decl);
+}
+
 //----------------------------------------------------------------------------//
 // PropertyWrapperAuxiliaryVariablesRequest computation.
 //----------------------------------------------------------------------------//

@@ -35,12 +35,12 @@ let _: String = news                // NewsURL -> String ✓ (through URLString)
 // MARK: - Contravariant direction: underlying -> subtype is a type error
 
  let _: Celsius = 100.0            // ✓ fine — subtypes should be expressable
- let _: Celsius = boiling + 1.0    // expected-error {{arithmetic on Celsius yields Double, not Celsius}}
- let _: FilePath = path + "/bin"   // expected-error {{String + String = String, not FilePath}}
+ let _: Celsius = boiling + 1.0    // expected-error {{cannot convert value of type 'Double' to specified type 'Celsius'}}
+ let _: FilePath = path + "/bin"   // expected-error {{cannot convert value of type 'String' to specified type 'FilePath'}}
 
 // MARK: - Two distinct subtypes of the same underlying are incompatible
 
- let _: Celsius = Fahrenheit(212.0)   // expected-error {{Fahrenheit is not Celsius}}
+ let _: Celsius = Fahrenheit(212.0)   // expected-error {{cannot convert value of type 'Fahrenheit' to specified type 'Celsius'}}
  let _ = takesDouble(boiling)         // ✓ fine — both go through Double
 
 // MARK: - Explicit cast always succeeds (same underlying layout)
@@ -75,7 +75,7 @@ assertEqual(f, 212.0)
 func takesCelsius(_ d: Celsius) -> Double { d }
 func takesFilePath(_ s: FilePath) -> String { s }
 
-_ = takesCelsius(boiling + 1.0)    // expected-error {{arithmetic on Celsius yields Double, not Celsius}}
-_ = takesFilePath(path + "/bin")   // expected-error {{String + String = String, not FilePath}}
+_ = takesCelsius(boiling + 1.0)    // expected-error {{cannot convert value of type 'Double' to expected argument type 'Celsius'}}
+_ = takesFilePath(path + "/bin")   // expected-error {{cannot convert value of type 'String' to expected argument type 'FilePath'}}
 
 print("All subtypealias tests passed.")

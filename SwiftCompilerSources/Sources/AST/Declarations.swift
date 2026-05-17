@@ -212,6 +212,8 @@ final public class OpaqueTypeDecl: GenericTypeDecl {}
 
 final public class TypeAliasDecl: GenericTypeDecl {}
 
+final public class SubtypeAliasDecl: NominalTypeDecl {}
+
 final public class GenericTypeParamDecl: TypeDecl {
   public static func create(
     declContext: DeclContext,

@@ -187,6 +187,7 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
 
   case DeclKind::Enum:
   case DeclKind::Struct:
+  case DeclKind::SubtypeAlias:
   case DeclKind::Class:
   case DeclKind::Protocol:
     // Nominal types are referenced by name.
@@ -302,7 +303,8 @@ public:
         select<PrecedenceGroupDecl, DeclKind::PrecedenceGroup>(
                                                                D, precedenceGroups) ||
         select<NominalTypeDecl, DeclKind::Enum, DeclKind::Struct,
-        DeclKind::Class, DeclKind::Protocol>(D, topNominals) ||
+        DeclKind::SubtypeAlias, DeclKind::Class, DeclKind::Protocol>(
+                                                                    D, topNominals) ||
         select<ValueDecl, DeclKind::TypeAlias, DeclKind::Var, DeclKind::Func,
         DeclKind::Accessor>(D, topValues);
       }

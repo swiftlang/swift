@@ -2785,6 +2785,12 @@ namespace {
       printCommonPost(SD);
     }
 
+    void visitSubtypeAliasDecl(SubtypeAliasDecl *SAD, Label label) {
+      printCommon(SAD, "subtypealias_decl", label);
+      printRec(SAD->getUnderlyingTypeRepr(), Label::optional("underlying_type"));
+      printCommonPost(SAD);
+    }
+
     void visitClassDecl(ClassDecl *CD, Label label) {
       printCommon(CD, "class_decl", label);
 
@@ -6434,6 +6440,7 @@ namespace {
 
     VISIT_BINDABLE_NOMINAL_TYPE(EnumType, enum_type)
     VISIT_BINDABLE_NOMINAL_TYPE(StructType, struct_type)
+    VISIT_NOMINAL_TYPE(SubtypeAliasType, subtypealias_type)
     VISIT_BINDABLE_NOMINAL_TYPE(ClassType, class_type)
     VISIT_NOMINAL_TYPE(ProtocolType, protocol_type)
 

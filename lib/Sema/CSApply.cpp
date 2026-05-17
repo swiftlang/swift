@@ -7218,6 +7218,9 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
     case ConversionRestrictionKind::ExistentialMetatypeToMetatype:
       return coerceSuperclass(expr, toType);
 
+    case ConversionRestrictionKind::SubtypeAlias:
+      return cs.cacheType(new (ctx) UnsafeCastExpr(expr, toType));
+
     case ConversionRestrictionKind::Existential:
     case ConversionRestrictionKind::MetatypeToExistentialMetatype: {
       auto coerced = coerceExistential(expr, toType, locator);
@@ -7927,6 +7930,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Module:
   case TypeKind::Enum:
   case TypeKind::Struct:
+  case TypeKind::SubtypeAlias:
   case TypeKind::Protocol:
   case TypeKind::ProtocolComposition:
   case TypeKind::ParameterizedProtocol:
@@ -7997,6 +8001,7 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   case TypeKind::Tuple:
   case TypeKind::Enum:
   case TypeKind::Struct:
+  case TypeKind::SubtypeAlias:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
   case TypeKind::Metatype:

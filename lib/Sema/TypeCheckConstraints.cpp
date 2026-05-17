@@ -52,6 +52,25 @@
 using namespace swift;
 using namespace constraints;
 
+static bool areRelatedBySubtypeAlias(Type first, Type second) {
+  auto isUpcast = [](Type fromType, Type toType) {
+    auto toCanonical = toType->getCanonicalType();
+    for (auto current = fromType; current;) {
+      auto *alias = current->getAs<SubtypeAliasType>();
+      if (!alias)
+        return false;
+
+      current = alias->getDecl()->getUnderlyingType();
+      if (current->getCanonicalType()->isEqual(toCanonical))
+        return true;
+    }
+
+    return false;
+  };
+
+  return isUpcast(first, second) || isUpcast(second, first);
+}
+
 bool constraints::computeTupleShuffle(TupleType *fromTuple,
                                       TupleType *toTuple,
                                       SmallVectorImpl<unsigned> &sources) {
@@ -1623,6 +1642,9 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
        !unwrappedIUO)) {
     return CheckedCastKind::Coercion;
   }
+
+  if (areRelatedBySubtypeAlias(fromType, toType))
+    return CheckedCastKind::ValueCast;
 
   // Since move-only types currently cannot conform to protocols, nor be a class
   // type, the subtyping hierarchy looks a bit like this:

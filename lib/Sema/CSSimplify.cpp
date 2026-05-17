@@ -52,6 +52,36 @@
 using namespace swift;
 using namespace constraints;
 
+static bool isSubtypeAliasUpcast(Type fromType, Type toType) {
+  auto toCanonical = toType->getCanonicalType();
+  for (auto current = fromType; current;) {
+    auto *alias = current->getAs<SubtypeAliasType>();
+    if (!alias)
+      return false;
+
+    current = alias->getDecl()->getUnderlyingType();
+    if (current->getCanonicalType()->isEqual(toCanonical))
+      return true;
+  }
+
+  return false;
+}
+
+static bool isSubtypeAliasLiteralFormation(Type fromType, Type toType) {
+  auto fromCanonical = fromType->getCanonicalType();
+  for (auto current = toType; current;) {
+    auto *alias = current->getAs<SubtypeAliasType>();
+    if (!alias)
+      return false;
+
+    current = alias->getDecl()->getUnderlyingType();
+    if (current->getCanonicalType()->isEqual(fromCanonical))
+      return true;
+  }
+
+  return false;
+}
+
 MatchCallArgumentListener::~MatchCallArgumentListener() { }
 
 bool MatchCallArgumentListener::extraArgument(unsigned argIdx) { return true; }
@@ -7704,6 +7734,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     case TypeKind::Enum:
     case TypeKind::Struct:
+    case TypeKind::SubtypeAlias:
     case TypeKind::Class: {
       auto nominal1 = cast<NominalType>(desugar1);
       auto nominal2 = cast<NominalType>(desugar2);
@@ -8026,6 +8057,16 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   }
 
   if (kind >= ConstraintKind::Subtype) {
+    // Subtypealias-to-underlying conversion.
+    if (isSubtypeAliasUpcast(type1, type2)) {
+      conversionsOrFixes.push_back(ConversionRestrictionKind::SubtypeAlias);
+    }
+
+    if (auto *expr = locator.trySimplifyToExpr()) {
+      if (isa<LiteralExpr>(expr) && isSubtypeAliasLiteralFormation(type1, type2))
+        conversionsOrFixes.push_back(ConversionRestrictionKind::SubtypeAlias);
+    }
+
     // Subclass-to-superclass conversion.
     if (type1->mayHaveSuperclass() &&
         type2->getClassOrBoundGenericClass() &&
@@ -8538,6 +8579,29 @@ ConstraintSystem::simplifyConstructionConstraint(
   // Desugar the value type.
   auto desugarValueType = valueType->getDesugaredType();
 
+  if (auto *subtypeAlias = desugarValueType->getAs<SubtypeAliasType>()) {
+    auto underlyingType = subtypeAlias->getDecl()->getUnderlyingType();
+    SmallVector<AnyFunctionType::Param, 4> args;
+    for (auto arg : fnType->getParams()) {
+      auto flags = arg.getParameterFlags().withCompileTimeLiteral(false);
+      if (flags.isInOut())
+        return SolutionKind::Error;
+      args.push_back(arg.withFlags(flags));
+    }
+
+    Type argType = AnyFunctionType::composeTuple(
+        getASTContext(), args, ParameterFlagHandling::AssertEmpty);
+
+    ConstraintLocatorBuilder builder(locator);
+    if (matchTypes(fnType->getResult(), valueType, ConstraintKind::Bind, flags,
+                   builder.withPathElement(ConstraintLocator::ApplyFunction))
+            .isFailure())
+      return SolutionKind::Error;
+
+    return matchTypes(argType, underlyingType, ConstraintKind::Conversion,
+                      getDefaultDecompositionOptions(flags), locator);
+  }
+
   switch (desugarValueType->getKind()) {
 #define SUGARED_TYPE(id, parent) case TypeKind::id:
 #define ARTIFICIAL_TYPE(id, parent) case TypeKind::id:
@@ -8623,6 +8687,7 @@ ConstraintSystem::simplifyConstructionConstraint(
 
   case TypeKind::Enum:
   case TypeKind::Struct:
+  case TypeKind::SubtypeAlias:
   case TypeKind::Class:
   case TypeKind::BoundGenericClass:
   case TypeKind::BoundGenericEnum:
@@ -14604,6 +14669,14 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
                ? getTypeMatchSuccess()
                : getTypeMatchFailure(locator);
   }
+
+  case ConversionRestrictionKind::SubtypeAlias:
+    addContextualScore();
+    return (isSubtypeAliasUpcast(type1, type2) ||
+            (isa_and_nonnull<LiteralExpr>(locator.trySimplifyToExpr()) &&
+             isSubtypeAliasLiteralFormation(type1, type2)))
+               ? getTypeMatchSuccess()
+               : getTypeMatchFailure(locator);
 
   // for $< in { <, <c, <oc }:
   //   T $< U, U : P_i ===> T $< protocol<P_i...>

@@ -2384,6 +2384,26 @@ public:
   void diagnoseCycle(DiagnosticEngine &diags) const;
 };
 
+/// Compute the underlying interface type of a subtypealias.
+class SubtypeAliasUnderlyingTypeRequest :
+    public SimpleRequest<SubtypeAliasUnderlyingTypeRequest,
+                         Type(SubtypeAliasDecl *),
+                         RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  Type evaluate(Evaluator &evaluator, SubtypeAliasDecl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<Type> getCachedResult() const;
+  void cacheResult(Type value) const;
+  void diagnoseCycle(DiagnosticEngine &diags) const;
+};
+
 /// Looks up the precedence group of an operator declaration.
 class OperatorPrecedenceGroupRequest
     : public SimpleRequest<OperatorPrecedenceGroupRequest,

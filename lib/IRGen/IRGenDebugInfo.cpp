@@ -2067,6 +2067,13 @@ private:
       return DBuilder.createTypedef(SelfTy, MangledName, File, 0, File);
     }
 
+    case TypeKind::SubtypeAlias: {
+      auto *SubtypeTy = BaseTy->castTo<SubtypeAliasType>();
+      auto UnderlyingTy = getOrCreateType(
+          SubtypeTy->getDecl()->getUnderlyingType()->getCanonicalType());
+      return DBuilder.createTypedef(UnderlyingTy, MangledName, File, 0, File);
+    }
+
     // Even builtin swift types usually come boxed in a struct.
     case TypeKind::Struct: {
       auto *StructTy = BaseTy->castTo<StructType>();

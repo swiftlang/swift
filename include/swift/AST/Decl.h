@@ -121,6 +121,7 @@ namespace swift {
   enum class PolymorphicEffectKind : uint8_t;
   class TrailingWhereClause;
   class TypeAliasDecl;
+  class SubtypeAliasDecl;
   class Stmt;
   class SubscriptDecl;
   class UnboundGenericType;
@@ -673,6 +674,8 @@ protected:
     /// Whether this nominal type is having its semantic members resolved.
     IsComputingSemanticMembers : 1
   );
+
+  SWIFT_INLINE_BITFIELD_EMPTY(SubtypeAliasDecl, NominalTypeDecl);
 
   SWIFT_INLINE_BITFIELD_FULL(ProtocolDecl, NominalTypeDecl, 1+1+1+1+1+1+1+1+1+1+1+1+1+1+1+8,
     /// Whether the \c RequiresClass bit is valid.
@@ -4842,6 +4845,63 @@ public:
   }
   static bool classof(const NominalTypeDecl *D) { return true; }
   static bool classof(const ExtensionDecl *D) { return false; }
+};
+
+/// SubtypeAliasDecl - This is a declaration of a lightweight nominal subtype
+/// backed by an underlying type, for example:
+///
+///    subtypealias Celsius = Double
+///
+/// Unlike TypeAliasDecl, this declaration has nominal identity and can own
+/// extensions and conformances.
+class SubtypeAliasDecl final : public NominalTypeDecl {
+  friend class SubtypeAliasUnderlyingTypeRequest;
+
+  /// The location of the 'subtypealias' keyword.
+  SourceLoc SubtypeAliasLoc;
+
+  /// The location of the equal '=' token.
+  SourceLoc EqualLoc;
+
+  /// The end of the type, valid even when the type cannot be parsed.
+  SourceLoc TypeEndLoc;
+
+  /// The location of the right-hand side of the subtypealias binding.
+  TypeLoc UnderlyingTy;
+
+public:
+  SubtypeAliasDecl(SourceLoc SubtypeAliasLoc, SourceLoc EqualLoc,
+                   Identifier Name, SourceLoc NameLoc,
+                   GenericParamList *GenericParams, DeclContext *DC);
+
+  SourceLoc getStartLoc() const { return SubtypeAliasLoc; }
+  SourceRange getSourceRange() const;
+
+  SourceLoc getEqualLoc() const { return EqualLoc; }
+  void setEqualLoc(SourceLoc loc) { EqualLoc = loc; }
+
+  void setTypeEndLoc(SourceLoc e) { TypeEndLoc = e; }
+
+  TypeRepr *getUnderlyingTypeRepr() const {
+    return UnderlyingTy.getTypeRepr();
+  }
+  void setUnderlyingTypeRepr(TypeRepr *repr) {
+    UnderlyingTy = repr;
+  }
+
+  Type getUnderlyingType() const;
+  void setUnderlyingType(Type type);
+  Type getCachedUnderlyingType() const { return UnderlyingTy.getType(); }
+
+  static bool classof(const Decl *D) {
+    return D->getKind() == DeclKind::SubtypeAlias;
+  }
+  static bool classof(const GenericTypeDecl *D) {
+    return D->getKind() == DeclKind::SubtypeAlias;
+  }
+  static bool classof(const NominalTypeDecl *D) {
+    return D->getKind() == DeclKind::SubtypeAlias;
+  }
 };
 
 /// This is the declaration of an enum.

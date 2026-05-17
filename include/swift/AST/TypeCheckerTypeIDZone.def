@@ -371,6 +371,8 @@ SWIFT_REQUEST(TypeChecker, TypeCheckASTNodeAtLocRequest,
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, UnderlyingTypeRequest, Type(TypeAliasDecl *),
               SeparatelyCached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SubtypeAliasUnderlyingTypeRequest,
+              Type(SubtypeAliasDecl *), SeparatelyCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ClangUSRGenerationRequest,
               std::optional<std::string>(const ValueDecl *),
               SeparatelyCached | SplitCached, NoLocationInfo)

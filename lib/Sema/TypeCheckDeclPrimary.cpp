@@ -3039,6 +3039,19 @@ public:
     checkAccessControl(TAD);
     checkGenericParams(TAD);
   }
+
+  void visitSubtypeAliasDecl(SubtypeAliasDecl *SAD) {
+    // Force creation of the generic signature.
+    (void) SAD->getGenericSignature();
+    dumpGenericSignature(Ctx, SAD);
+
+    // Force requests that can emit diagnostics.
+    (void) SAD->getUnderlyingType();
+
+    TypeChecker::checkDeclAttributes(SAD);
+    checkAccessControl(SAD);
+    checkGenericParams(SAD);
+  }
   
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
     // OpaqueTypeDecls don't appear as members of types or extensions, or

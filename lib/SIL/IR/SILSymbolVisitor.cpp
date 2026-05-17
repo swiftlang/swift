@@ -779,6 +779,7 @@ public:
   static bool isExpectedProtocolMember(const Decl *D) {
     switch (D->getKind()) {
     case DeclKind::TypeAlias:
+    case DeclKind::SubtypeAlias:
     case DeclKind::AssociatedType:
     case DeclKind::Var:
     case DeclKind::Subscript:

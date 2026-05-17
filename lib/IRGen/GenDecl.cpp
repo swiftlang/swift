@@ -2716,6 +2716,7 @@ void IRGenModule::emitGlobalDecl(Decl *D) {
     llvm_unreachable("BuiltinTupleType made it to IRGen");
 
   case DeclKind::TypeAlias:
+  case DeclKind::SubtypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
   case DeclKind::Macro:
@@ -6044,6 +6045,7 @@ void IRGenModule::emitNestedTypeDecls(DeclRange members) {
       continue;
 
     case DeclKind::TypeAlias:
+    case DeclKind::SubtypeAlias:
     case DeclKind::OpaqueType:
       // Do nothing.
       continue;

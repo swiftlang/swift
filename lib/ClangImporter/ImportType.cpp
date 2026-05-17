@@ -2106,6 +2106,7 @@ private:
 
   VISIT(EnumType, pass)
   VISIT(StructType, pass)
+  VISIT(SubtypeAliasType, pass)
   VISIT(ClassType, compose)
   VISIT(ProtocolType, compose)
 

@@ -205,6 +205,7 @@ case TypeKind::Id:
 
     case TypeKind::Enum:
     case TypeKind::Struct:
+    case TypeKind::SubtypeAlias:
     case TypeKind::Class:
     case TypeKind::Protocol: {
       auto nominalTy = cast<NominalType>(base);

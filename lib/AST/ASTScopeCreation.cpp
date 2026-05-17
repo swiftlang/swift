@@ -454,6 +454,7 @@ public:
   VISIT_AND_CREATE_WHOLE_PORTION(ClassDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(ProtocolDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(EnumDecl, NominalTypeScope)
+  VISIT_AND_CREATE_WHOLE_PORTION(SubtypeAliasDecl, NominalTypeScope)
   VISIT_AND_CREATE_WHOLE_PORTION(TypeAliasDecl, TypeAliasScope)
   VISIT_AND_CREATE_WHOLE_PORTION(OpaqueTypeDecl, OpaqueTypeScope)
 #undef VISIT_AND_CREATE_WHOLE_PORTION

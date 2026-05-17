@@ -345,6 +345,7 @@ static void doDynamicLookup(VisibleDeclConsumer &Consumer,
       case DeclKind::GenericTypeParam:
       case DeclKind::AssociatedType:
       case DeclKind::TypeAlias:
+      case DeclKind::SubtypeAlias:
       case DeclKind::Enum:
       case DeclKind::Class:
       case DeclKind::Struct:

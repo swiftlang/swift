@@ -4038,6 +4038,30 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   }
 }
 
+void PrintAST::visitSubtypeAliasDecl(SubtypeAliasDecl *decl) {
+  auto name = decl->getName();
+  printDocumentationComment(decl);
+  printAttributes(decl);
+  printAccess(decl);
+  Printer.printIntroducerKeyword("subtypealias", Options, " ");
+  printContextIfNeeded(decl);
+  recordDeclLoc(
+      decl,
+      [&] { Printer.printName(name, getTypeMemberPrintNameContext(decl)); },
+      [&] { printGenericDeclGenericParams(decl); });
+
+  bool shouldPrint = true;
+  Type ty = decl->getUnderlyingType();
+  if (Options.SkipPrivateSystemDecls && ty && ty.isPrivateSystemType())
+    shouldPrint = false;
+
+  if (shouldPrint) {
+    Printer << " = ";
+    printTypeLoc(TypeLoc(decl->getUnderlyingTypeRepr(), ty));
+    printDeclGenericRequirements(decl);
+  }
+}
+
 void PrintAST::visitGenericTypeParamDecl(GenericTypeParamDecl *decl) {
   recordDeclLoc(decl, [&] {
     if (decl->isParameterPack())
@@ -6976,6 +7000,11 @@ public:
   }
 
   void visitStructType(StructType *T, NonRecursivePrintOptions nrOptions) {
+    printQualifiedType(T);
+  }
+
+  void visitSubtypeAliasType(SubtypeAliasType *T,
+                             NonRecursivePrintOptions nrOptions) {
     printQualifiedType(T);
   }
 

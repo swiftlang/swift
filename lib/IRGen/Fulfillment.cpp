@@ -89,6 +89,7 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Enum:
   case TypeKind::Protocol:
   case TypeKind::Struct:
+  case TypeKind::SubtypeAlias:
     return !cast<NominalType>(type)->getDecl()->isGenericContext();
 
   // Bound generic types have type arguments.

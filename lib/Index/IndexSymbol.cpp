@@ -183,6 +183,8 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
         break;
       if (isa<StructDecl>(NTD))
         info.SubKind = SymbolSubKind::SwiftExtensionOfStruct;
+      else if (isa<SubtypeAliasDecl>(NTD))
+        info.SubKind = SymbolSubKind::SwiftExtensionOfStruct;
       else if (auto *CD = dyn_cast<ClassDecl>(NTD)) {
         info.SubKind = SymbolSubKind::SwiftExtensionOfClass;
         if (isUnitTestCase(CD))
@@ -194,6 +196,7 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
       assert(info.SubKind != SymbolSubKind::None);
       break;
     }
+    case DeclKind::SubtypeAlias:
     case DeclKind::TypeAlias:        info.Kind = SymbolKind::TypeAlias; break;
     case DeclKind::AssociatedType:
       info.Kind = SymbolKind::TypeAlias;

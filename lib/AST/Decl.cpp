@@ -198,6 +198,11 @@ DescriptiveDeclKind Decl::getDescriptiveKind() const {
              ? DescriptiveDeclKind::GenericTypeAlias
              : DescriptiveDeclKind::TypeAlias;
 
+  case DeclKind::SubtypeAlias:
+    return cast<SubtypeAliasDecl>(this)->getGenericParams()
+             ? DescriptiveDeclKind::GenericTypeAlias
+             : DescriptiveDeclKind::TypeAlias;
+
    case DeclKind::Enum:
      return cast<EnumDecl>(this)->getGenericParams()
               ? DescriptiveDeclKind::GenericEnum
@@ -828,6 +833,7 @@ bool Decl::isInvalid() const {
     LLVM_FALLTHROUGH;
   case DeclKind::Enum:
   case DeclKind::Struct:
+  case DeclKind::SubtypeAlias:
   case DeclKind::Class:
   case DeclKind::Protocol:
   case DeclKind::OpaqueType:
@@ -870,6 +876,7 @@ void Decl::setInvalid() {
     return;
   case DeclKind::Enum:
   case DeclKind::Struct:
+  case DeclKind::SubtypeAlias:
   case DeclKind::Class:
   case DeclKind::Protocol:
   case DeclKind::OpaqueType:
@@ -1756,6 +1763,9 @@ ImportKind ImportDecl::getBestImportKind(const ValueDecl *VD) {
     return ImportKind::Enum;
   case DeclKind::Struct:
     return ImportKind::Struct;
+
+  case DeclKind::SubtypeAlias:
+    return ImportKind::Type;
       
   case DeclKind::OpaqueType:
     return ImportKind::Type;
@@ -3949,6 +3959,7 @@ bool ValueDecl::isInstanceMember() const {
   case DeclKind::Enum:
   case DeclKind::Protocol:
   case DeclKind::Struct:
+  case DeclKind::SubtypeAlias:
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
@@ -5075,6 +5086,7 @@ SourceLoc Decl::getAttributeInsertionLoc(bool forModifier) const {
   case DeclKind::Class:
   case DeclKind::Protocol:
   case DeclKind::OpaqueType:
+  case DeclKind::SubtypeAlias:
   case DeclKind::TypeAlias:
   case DeclKind::GenericTypeParam:
   case DeclKind::AssociatedType:
@@ -6304,6 +6316,44 @@ Type TypeAliasDecl::getStructuralType() const {
       Type()))
     return type;
   return ErrorType::get(ctx);
+}
+
+SubtypeAliasDecl::SubtypeAliasDecl(SourceLoc SubtypeAliasLoc,
+                                   SourceLoc EqualLoc, Identifier Name,
+                                   SourceLoc NameLoc,
+                                   GenericParamList *GenericParams,
+                                   DeclContext *DC)
+    : NominalTypeDecl(DeclKind::SubtypeAlias, DC, Name, NameLoc, {},
+                      GenericParams),
+      SubtypeAliasLoc(SubtypeAliasLoc), EqualLoc(EqualLoc) {}
+
+SourceRange SubtypeAliasDecl::getSourceRange() const {
+  auto trailingWhereClauseSourceRange = getGenericTrailingWhereClauseSourceRange();
+  if (trailingWhereClauseSourceRange.isValid())
+    return {SubtypeAliasLoc, trailingWhereClauseSourceRange.End};
+  if (UnderlyingTy.hasLocation())
+    return {SubtypeAliasLoc, UnderlyingTy.getSourceRange().End};
+  if (TypeEndLoc.isValid())
+    return {SubtypeAliasLoc, TypeEndLoc};
+  return {SubtypeAliasLoc, getNameLoc()};
+}
+
+Type SubtypeAliasDecl::getUnderlyingType() const {
+  auto &ctx = getASTContext();
+  if (auto type = evaluateOrDefault(
+          ctx.evaluator,
+          SubtypeAliasUnderlyingTypeRequest{const_cast<SubtypeAliasDecl *>(this)},
+          Type()))
+    return type;
+  return ErrorType::get(ctx);
+}
+
+void SubtypeAliasDecl::setUnderlyingType(Type underlying) {
+  assert(!underlying->hasArchetype() || !isGenericContext());
+
+  getASTContext().evaluator.cacheOutput(
+      SubtypeAliasUnderlyingTypeRequest{const_cast<SubtypeAliasDecl *>(this)},
+      std::move(underlying));
 }
 
 GenericTypeParamDecl::GenericTypeParamDecl(DeclContext *dc, Identifier name,

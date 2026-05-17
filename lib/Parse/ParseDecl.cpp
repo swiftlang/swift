@@ -5757,6 +5757,7 @@ static unsigned skipUntilMatchingRBrace(Parser &P, bool &HasPoundDirective,
 
     HasNestedTypeDeclarations |= P.Tok.isAny(tok::kw_class, tok::kw_struct,
                                              tok::kw_enum, tok::kw_typealias,
+                                             tok::kw_subtypealias,
                                              tok::kw_protocol)
                               || P.Tok.isContextualKeyword("actor");
 
@@ -5843,6 +5844,7 @@ bool swift::isKeywordPossibleDeclStart(const LangOptions &options,
   case tok::kw_static:
   case tok::kw_struct:
   case tok::kw_subscript:
+  case tok::kw_subtypealias:
   case tok::kw_typealias:
   case tok::kw_var:
   case tok::pound:
@@ -6400,6 +6402,10 @@ ParserStatus Parser::parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
     DeclResult = parseDeclTypeAlias(Flags, Attributes);
     MayNeedOverrideCompletion = true;
     break;
+  case tok::kw_subtypealias:
+    DeclResult = parseDeclSubtypeAlias(Flags, Attributes);
+    MayNeedOverrideCompletion = true;
+    break;
   case tok::kw_associatedtype:
     DeclResult = parseDeclAssociatedType(Flags, Attributes);
     break;
@@ -6700,7 +6706,7 @@ Parser::parseDeclListDelayed(IterableDeclContext *IDC) {
   }
 
   if (BodyRange.isInvalid()) {
-    assert(D->isImplicit());
+    assert(D->isImplicit() || isa<SubtypeAliasDecl>(D));
     return {std::vector<Decl *>(), std::nullopt};
   }
 
@@ -7777,6 +7783,83 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   return DCC.fixupParserResult(Status, TAD);
+}
+
+/// Parse a subtypealias decl.
+///
+/// \verbatim
+///   decl-subtypealias:
+///     'subtypealias' identifier generic-params? '=' type requirement-clause?
+/// \endverbatim
+ParserResult<TypeDecl> Parser::parseDeclSubtypeAlias(
+    Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
+  SourceLoc SubtypeAliasLoc = consumeToken(tok::kw_subtypealias);
+  SourceLoc EqualLoc;
+  Identifier Id;
+  SourceLoc IdLoc;
+  ParserStatus Status;
+
+  Status |= parseIdentifierDeclName(
+      *this, Id, IdLoc, "subtypealias",
+      [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
+  if (Status.isErrorOrHasCompletion())
+    return Status;
+
+  DebuggerContextChange DCC(*this, Id, DeclKind::SubtypeAlias);
+
+  GenericParamList *genericParams = nullptr;
+  if (startsWithLess(Tok)) {
+    auto Result = parseGenericParameters();
+    if (Result.hasCodeCompletion() && !CodeCompletionCallbacks)
+      return makeParserCodeCompletionStatus();
+    genericParams = Result.getPtrOrNull();
+
+    if (genericParams && !genericParams->getRequirements().empty()) {
+      diagnose(genericParams->getWhereLoc(),
+               diag::associated_type_generic_parameter_list)
+          .highlight(genericParams->getWhereClauseSourceRange());
+    }
+  }
+
+  auto *SAD = new (Context) SubtypeAliasDecl(
+      SubtypeAliasLoc, EqualLoc, Id, IdLoc, genericParams, CurDeclContext);
+  ParserResult<TypeRepr> UnderlyingTy;
+
+  if (Tok.is(tok::colon) || Tok.is(tok::equal)) {
+    ContextChange CC(*this, SAD);
+
+    if (Tok.is(tok::colon)) {
+      diagnose(Tok, diag::expected_equal_in_typealias)
+          .fixItReplace(Tok.getLoc(), " = ");
+      EqualLoc = consumeToken(tok::colon);
+    } else {
+      EqualLoc = consumeToken(tok::equal);
+    }
+    SAD->setEqualLoc(EqualLoc);
+
+    UnderlyingTy = parseType(diag::expected_type_in_typealias);
+    SAD->setTypeEndLoc(PreviousLoc);
+    Status |= UnderlyingTy;
+  }
+
+  SAD->setUnderlyingTypeRepr(UnderlyingTy.getPtrOrNull());
+  SAD->attachParsedAttrs(Attributes);
+
+  if (Tok.is(tok::kw_where)) {
+    ContextChange CC(*this, SAD);
+    Status |= parseFreestandingGenericWhereClause(SAD);
+  }
+
+  if (UnderlyingTy.isNull()) {
+    if (EqualLoc.isInvalid()) {
+      diagnose(Tok, diag::expected_equal_in_typealias);
+      Status.setIsParseError();
+      return Status;
+    }
+    return Status;
+  }
+
+  return makeParserResult(Status, SAD);
 }
 
 /// Parse an associatedtype decl.

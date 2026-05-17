@@ -21,6 +21,7 @@ public func registerAST() {
   registerDecl(BuiltinTupleDecl.self)
   registerDecl(OpaqueTypeDecl.self)
   registerDecl(TypeAliasDecl.self)
+  registerDecl(SubtypeAliasDecl.self)
   registerDecl(GenericTypeParamDecl.self)
   registerDecl(AssociatedTypeDecl.self)
   registerDecl(ModuleDecl.self)

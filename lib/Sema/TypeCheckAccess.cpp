@@ -896,6 +896,32 @@ public:
     });
   }
 
+  void visitSubtypeAliasDecl(SubtypeAliasDecl *SAD) {
+    checkGenericParamAccess(SAD, SAD);
+
+    checkTypeAccess(SAD->getUnderlyingType(),
+                    SAD->getUnderlyingTypeRepr(), SAD, /*mayBeInferred*/false,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning,
+                        ImportAccessLevel importLimit) {
+      auto typeAccess = typeAccessScope.accessLevelForDiagnostics();
+      bool isExplicit =
+        SAD->getAttrs().hasAttribute<AccessControlAttr>() ||
+        isa<ProtocolDecl>(SAD->getDeclContext());
+      auto diagID = diag::type_alias_underlying_type_access;
+      if (downgradeToWarning == DowngradeToWarning::Yes)
+        diagID = diag::type_alias_underlying_type_access_warn;
+      auto aliasAccess = isExplicit
+        ? SAD->getFormalAccess()
+        : typeAccessScope.requiredAccessForDiagnostics();
+      auto diag = SAD->diagnose(diagID, isExplicit, aliasAccess, typeAccess,
+                                isa<FileUnit>(SAD->getDeclContext()));
+      highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(SAD, importLimit, complainRepr);
+    });
+  }
+
   void visitOpaqueTypeDecl(OpaqueTypeDecl *OTD) {
     // TODO(opaque): The constraint class/protocols on the opaque interface, as
     // well as the naming decl for the opaque type, need to be accessible.
@@ -1640,6 +1666,24 @@ public:
       auto diag = TAD->diagnose(diagID);
       highlightOffendingType(diag, complainRepr);
       noteLimitingImport(TAD, importLimit, complainRepr);
+    });
+  }
+
+  void visitSubtypeAliasDecl(SubtypeAliasDecl *SAD) {
+    checkGenericParamAccess(SAD, SAD);
+
+    checkTypeAccess(SAD->getUnderlyingType(),
+                    SAD->getUnderlyingTypeRepr(), SAD, /*mayBeInferred*/false,
+                    [&](AccessScope typeAccessScope,
+                        const TypeRepr *complainRepr,
+                        DowngradeToWarning downgradeToWarning,
+                        ImportAccessLevel importLimit) {
+      auto diagID = diag::type_alias_underlying_type_not_usable_from_inline;
+      if (!SAD->getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
+        diagID = diag::type_alias_underlying_type_not_usable_from_inline_warn;
+      auto diag = SAD->diagnose(diagID);
+      highlightOffendingType(diag, complainRepr);
+      noteLimitingImport(SAD, importLimit, complainRepr);
     });
   }
 
@@ -2504,6 +2548,12 @@ public:
     checkGenericParams(TAD, TAD);
     checkType(TAD->getUnderlyingType(),
               TAD->getUnderlyingTypeRepr(), TAD);
+  }
+
+  void visitSubtypeAliasDecl(SubtypeAliasDecl *SAD) {
+    checkGenericParams(SAD, SAD);
+    checkType(SAD->getUnderlyingType(),
+              SAD->getUnderlyingTypeRepr(), SAD);
   }
 
   void visitAssociatedTypeDecl(AssociatedTypeDecl *assocType) {

@@ -553,6 +553,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[deep equality]";
   case ConversionRestrictionKind::Superclass:
     return "[superclass]";
+  case ConversionRestrictionKind::SubtypeAlias:
+    return "[subtypealias]";
   case ConversionRestrictionKind::Existential:
     return "[existential]";
   case ConversionRestrictionKind::MetatypeToExistentialMetatype:
