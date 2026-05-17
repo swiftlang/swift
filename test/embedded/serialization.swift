@@ -16,7 +16,7 @@
 
 func internalFunc() { }
 
-// LIBRARY-SIL: sil [asmname "swift_dosomething"] @$e7Library17swift_dosomethingyyFTo : $@convention(c) () -> () {
+// LIBRARY-SIL: sil [export_implementation] [asmname "swift_dosomething"] @$e7Library17swift_dosomethingyyFTo : $@convention(c) () -> () {
 @c
 public func swift_dosomething() {
   internalFunc()

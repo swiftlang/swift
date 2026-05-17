@@ -1250,14 +1250,20 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   auto module = decl->getModuleContext();
   auto &ctx = module->getASTContext();
 
-  /// With deferred code generation, declarations are emitted as late as
-  /// possible, so they must have non-unique definitions.
-  if (module->codeGenerationModel() == CodeGenerationModel::Implementation)
+  switch (decl->getEffectiveCodeGenerationModel()) {
+  case CodeGenerationModel::Implementation:
+    /// When deferring all code generation, declarations are emitted as late
+    /// as possible, so they must have non-unique definitions.
     return true;
 
-  // If the declaration is not from the main module, treat its definition as
-  // non-unique.
-  return module != ctx.MainModule && ctx.MainModule;
+  case CodeGenerationModel::Inlinable:
+    // If the declaration is not from the main module, treat its definition as
+    // non-unique.
+    return module != ctx.MainModule && ctx.MainModule;
+
+  case CodeGenerationModel::Interface:
+    return false;
+  }
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {

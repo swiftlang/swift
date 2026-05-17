@@ -1591,16 +1591,12 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   if (langOpts.hasFeature(Feature::Embedded) &&
       (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
     auto *nominal = cast<NominalTypeDecl>(type);
-    bool isGeneric = nominal->isGenericContext();
     // @export(interface) types have a unique definition in their defining
     // module; importing modules reference them as external symbols rather than
     // lazily emitting their own copy.
-    bool isExportInterface = false;
-    if (!isGeneric) {
-      if (auto model = nominal->getExplicitCodeGenerationModel())
-        isExportInterface = *model == CodeGenerationModel::Interface;
-    }
-    bool isLazy = !isGeneric && !isExportInterface;
+    bool isExportInterface =
+      nominal->getEffectiveCodeGenerationModel() == CodeGenerationModel::Interface;
+    bool isLazy = !nominal->isGenericContext() && !isExportInterface;
     HasLazyMetadata[type] = isLazy;
     return isLazy;
   }

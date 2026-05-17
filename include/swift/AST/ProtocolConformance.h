@@ -817,6 +817,12 @@ public:
   std::optional<CodeGenerationModel>
   getExplicitCodeGenerationModel() const;
 
+  /// Compute the code generation model for the conformance, combining the
+  /// explicitly-specified information from attributes with defaults
+  /// based on Embedded Swift or feature flags.
+  CodeGenerationModel
+  getEffectiveCodeGenerationModel() const;
+
   /// Whether this conformance represents the conformance of one protocol's
   /// conforming types to another protocol.
   ///

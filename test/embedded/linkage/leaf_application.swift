@@ -92,8 +92,8 @@ public func createsExistential() -> any Reflectable {
 
 // LIBRARY-IR: define linkonce_odr hidden void @_swift_dead_method_stub
 
-// LIBRARY-SIL: sil @$e7Library5helloSaySiGyF
-// LIBRARY-SIL: sil @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
+// LIBRARY-SIL: sil [export_implementation] @$e7Library5helloSaySiGyF
+// LIBRARY-SIL: sil [export_implementation] @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
 
 //--- Application.swift
 import Library
@@ -105,10 +105,10 @@ public func testMe() {
 
 // APPLICATION-IR: define {{(protected |dllexport )?}}swiftcc void @"$e11Application6testMeyyF"()
 
-// APPLICATION-SIL: sil public_external @$e7Library5helloSaySiGyF : $@convention(thin) () -> @owned Array<Int> {
+// APPLICATION-SIL: sil public_external [export_implementation] @$e7Library5helloSaySiGyF : $@convention(thin) () -> @owned Array<Int> {
 // APPLICATION-IR: define linkonce_odr hidden swiftcc ptr @"$e7Library5helloSaySiGyF"()
 
-// APPLICATION-SIL: sil public_external @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
+// APPLICATION-SIL: sil public_external [export_implementation] @$e7Library8getArraySaySiGyF : $@convention(thin) () -> @owned Array<Int> {
 // APPLICATION-IR: define linkonce_odr hidden swiftcc ptr @"$e7Library8getArraySaySiGyF"()
 
 // APPLICATION-IR: define {{(protected |dllexport )?}}i32 @Application_main
