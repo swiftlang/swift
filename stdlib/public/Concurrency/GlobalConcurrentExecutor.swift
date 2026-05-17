@@ -34,7 +34,11 @@ import Swift
 @_unavailableInEmbedded
 public var globalConcurrentExecutor: any TaskExecutor {
   get {
-    Task.defaultExecutor
+    if #available(StdlibDeploymentTarget 6.3, *) {
+      return Task.defaultExecutor
+    } else {
+      fatalError("we shouldn't get here; if we have, availability is broken")
+    }
   }
 }
 
