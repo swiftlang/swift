@@ -87,7 +87,13 @@ public struct UnownedJob: Sendable {
   /// The priority of this job.
   @available(StdlibDeploymentTarget 5.9, *)
   public var priority: JobPriority {
-    JobPriority(rawValue: _jobGetPriority(context))
+    let raw: UInt8
+    if #available(StdlibDeploymentTarget 6.3, *) {
+      raw = _jobGetPriority(context)
+    } else {
+      fatalError("we shouldn't get here; if we have, availability is broken")
+    }
+    return JobPriority(rawValue: raw)
   }
 
   @available(StdlibDeploymentTarget 5.9, *)
@@ -220,7 +226,13 @@ public struct Job: Sendable, ~Copyable {
   }
 
   public var priority: JobPriority {
-    return JobPriority(rawValue: _jobGetPriority(self.context))
+    let raw: UInt8
+    if #available(StdlibDeploymentTarget 6.3, *) {
+      raw = _jobGetPriority(self.context)
+    } else {
+      fatalError("we shouldn't get here; if we have, availability is broken")
+    }
+    return JobPriority(rawValue: raw)
   }
 
   // TODO: move only types cannot conform to protocols, so we can't conform to CustomStringConvertible;
@@ -288,10 +300,20 @@ public struct ExecutorJob: Sendable, ~Copyable {
 
   internal(set) public var priority: JobPriority {
     get {
-      JobPriority(rawValue: _jobGetPriority(self.context))
+      let raw: UInt8
+      if #available(StdlibDeploymentTarget 6.3, *) {
+        raw = _jobGetPriority(self.context)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
+      return JobPriority(rawValue: raw)
     }
     set {
-      _jobSetPriority(self.context, newValue.rawValue)
+      if #available(StdlibDeploymentTarget 6.3, *) {
+        _jobSetPriority(self.context, newValue.rawValue)
+      } else {
+        fatalError("we shouldn't get here; if we have, availability is broken")
+      }
     }
   }
 
