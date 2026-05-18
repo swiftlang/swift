@@ -7410,7 +7410,8 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       auto *initType = decl.getDecl()->getInterfaceType()->castTo<FunctionType>();
 
-      auto *ctorRefExpr =  new (ctx) DeclRefExpr(decl, DeclNameLoc(), /*Implicit=*/true);
+      auto *ctorRefExpr = new (ctx)
+          DeclRefExpr(decl, DeclNameLoc(expr->getLoc()), /*Implicit=*/true);
       ctorRefExpr->setType(initType);
       auto *typeExpr = TypeExpr::createImplicit(toType, ctx);
       auto *innerCall = ConstructorRefCallExpr::create(ctx, ctorRefExpr, typeExpr,
