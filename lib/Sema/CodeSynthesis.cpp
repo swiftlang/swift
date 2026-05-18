@@ -393,7 +393,7 @@ createImplicitConstructor(NominalTypeDecl *decl, ImplicitConstructorKind ICK,
           initIsolation = var->getInitializerIsolation();
         }
 
-        auto type = var->getTypeInContext();
+        auto type = var->getInterfaceType();
 
         // If a property has a property wrapper, the memberwise initializer
         // could use a wrapped type instead of a backing storage type depending
@@ -405,6 +405,8 @@ createImplicitConstructor(NominalTypeDecl *decl, ImplicitConstructorKind ICK,
               type = property->getPropertyWrapperInitValueInterfaceType();
           }
         }
+
+        type = decl->mapTypeIntoEnvironment(type);
 
         auto isolation = getActorIsolation(var);
         if (isolation.isGlobalActor()) {
