@@ -917,6 +917,16 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
     }
   }
 
+  // Update parent of any debug-only reconstruction blocks.
+  if (auto *DVI = dyn_cast<DebugValueInst>(inst)) {
+    if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
+      DebugBB->setParentFunction(inst->getFunction());
+      for (auto &I : *DebugBB) {
+        notifyMovedInstruction(&I, fromFunction);
+      }
+    }
+  }
+
   inst->forEachDefinedLocalEnvironment([&](GenericEnvironment *genericEnv,
                                            SILValue dependency) {
     LocalArchetypeKey key = {genericEnv, fromFunction};

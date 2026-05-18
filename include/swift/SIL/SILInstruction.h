@@ -5621,6 +5621,9 @@ class DebugValueInst final
   TailAllocatedDebugVariable VarInfo;
   USE_SHARED_UINT8;
 
+  /// Optional debug basic block holding reconstruction instructions.
+  SILBasicBlock *ReconstructionBlock = nullptr;
+
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                  SILDebugVariable Var, PoisonRefs_t poisonRefs,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
@@ -5743,6 +5746,31 @@ public:
   /// is the right amount of op_deref.
   /// Returns false if the type chain is invalid, true otherwise.
   bool isExprTypeValid() const;
+
+  /// Returns the optional debug basic block attached to this instruction.
+  /// The debug BB contains reconstruction instructions for the debug value.
+  /// If this debug value does not have a reconstruction block, this returns
+  /// nullptr. Use getOrCreateDebugReconstructionBlock to create one.
+  SILBasicBlock *getDebugReconstructionBlock() const {
+    return ReconstructionBlock;
+  }
+
+  /// Sets the debug-only basic block for this instruction.
+  /// This should not be called by optimization passes. Optimization passes
+  /// and debug information salvage operations should append to existing
+  /// blocks using getOrCreateDebugReconstructionBlock.
+  void setDebugReconstructionBlock(SILBasicBlock *BB) {
+    ReconstructionBlock = BB;
+  }
+
+  /// Returns a variable reconstruction basic block for this debug value.
+  /// If this debug value has no debug reconstruction block, a new one is
+  /// created and attached to this instruction.
+  /// The newly created basic block will be well-formed, returning the SSA
+  /// value of this debug_value directly.
+  /// If this debug_value has an undef operand, the reconstruction block
+  /// has no arguments and returns undef directly.
+  SILBasicBlock *getOrCreateDebugReconstructionBlock();
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds

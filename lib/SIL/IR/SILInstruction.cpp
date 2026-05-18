@@ -182,6 +182,15 @@ void SILInstruction::dropNonOperandReferences() {
     KPI->dropReferencedPattern();
     return;
   }
+
+  // If we have a DebugValueInst with a debug reconstruction block, drop it.
+  if (auto *DVI = dyn_cast<DebugValueInst>(this)) {
+    if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
+      DebugBB->dropAllReferences();
+      DebugBB->eraseAllInstructions(getModule());
+      DVI->setDebugReconstructionBlock(nullptr);
+    }
+  }
 }
 
 namespace {

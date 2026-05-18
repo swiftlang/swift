@@ -205,6 +205,8 @@ public:
   /// constructed, creates a new Data with \p init and returns it.
   Data &get(SILBasicBlock *block, llvm::function_ref<Data()> init) {
     if (block->index < 0) {
+      ASSERT(block->index == -1 &&
+             "Debug reconstruction blocks cannot have data");
       assert(validForBlockOrder == function->BlockListChangeIdx &&
              "BasicBlockData invalid because the function's block list changed");
       validForBlockOrder = ++function->BlockListChangeIdx;
