@@ -17,24 +17,44 @@ sil @arithmetic : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $Builtin.Int64):
 // CHECK: #dbg_value(i64 %0, ![[CURRENT_VAR:[0-9]+]], !DIExpression()
 debug_value %0 : $Builtin.Int64, var, name "current", type $Int64, expr op_fragment:#Int64._value
-// FIXME: It should work with the fragment, as it should be noop.
-// CHECK: #dbg_value(i64 %0, ![[PREVIOUS_VAR:[0-9]+]], !DIExpression(DW_OP_consts, 1, DW_OP_minus, DW_OP_stack_value)
-debug_value %0 : $Builtin.Int64, var, name "previous", type $Int64, expr op_consts:1:op_minus //:op_fragment:#Int64._value
+// CHECK: #dbg_value(i64 %0, ![[PREVIOUS_VAR:[0-9]+]], !DIExpression(DW_OP_constu, 1, DW_OP_minus, DW_OP_stack_value)
+debug_value %0 : $Builtin.Int64, var, name "previous", type $Int64, expr op_fragment:#Int64._value, transform {
+bb0(%1 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int64, 1
+  %3 = builtin "sub_Int64"(%1 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  return %3 : $Builtin.Int64
+}
 // CHECK: #dbg_value(i64 %0, ![[NEXT_VAR:[0-9]+]], !DIExpression(DW_OP_plus_uconst, 12, DW_OP_stack_value)
-debug_value %0 : $Builtin.Int64, var, name "next", type $Int64, expr op_constu:12:op_plus //:op_fragment:#Int64._value
+debug_value %0 : $Builtin.Int64, var, name "next", type $Int64, expr op_fragment:#Int64._value, transform {
+bb0(%1 : $Builtin.Int64):
+  %2 = integer_literal $Builtin.Int64, 12
+  %3 = builtin "add_Int64"(%1 : $Builtin.Int64, %2 : $Builtin.Int64) : $Builtin.Int64
+  return %3 : $Builtin.Int64
+}
 return %0 : $Builtin.Int64
 }
 
 // CHECK-LABEL: define {{.*}} @constant
 sil @constant : $@convention(thin) (Builtin.Int64) -> (Builtin.Int64) {
 bb0(%0 : $Builtin.Int64):
-// CHECK: #dbg_value(i64 42, ![[CONST_VAR:[0-9]+]], !DIExpression(DW_OP_stack_value)
-debug_value undef : $Builtin.Int64, var, name "const", expr op_consts:42
-// CHECK: #dbg_value(i64 3645, ![[CONSTINT_VAR:[0-9]+]], !DIExpression(DW_OP_stack_value)
-debug_value undef : $Builtin.Int64, var, name "constint", type $Int64, expr op_constu:3645:op_fragment:#Int64._value
+// CHECK: #dbg_value(i64 42, ![[CONST_VAR:[0-9]+]], !DIExpression()
+debug_value undef : $Builtin.Int64, var, name "const", transform {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 42
+  return %1 : $Builtin.Int64
+}
+// CHECK: #dbg_value(i64 3645, ![[CONSTINT_VAR:[0-9]+]], !DIExpression()
+debug_value undef : $Builtin.Int64, var, name "constint", type $Int64, expr op_fragment:#Int64._value, transform {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 3645
+  return %1 : $Builtin.Int64
+}
 // CHECK: #dbg_value(i64 6, ![[CONSTUPLE_VAR:[0-9]+]], !DIExpression(DW_OP_LLVM_fragment, 0, 64)
-debug_value undef : $Builtin.Int64, var, name "constuple", type $(Int64, Int64), expr op_consts:6:op_tuple_fragment:$(Int64, Int64):0:op_fragment:#Int64._value
-
+debug_value undef : $Builtin.Int64, var, name "constuple", type $(Int64, Int64), expr op_tuple_fragment:$(Int64, Int64):0:op_fragment:#Int64._value, transform {
+bb0:
+  %1 = integer_literal $Builtin.Int64, 6
+  return %1 : $Builtin.Int64
+}
 return %0 : $Builtin.Int64
 }
 
