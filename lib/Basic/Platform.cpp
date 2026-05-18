@@ -762,6 +762,11 @@ findSwiftRuntimeVersionHelper(llvm::VersionTuple targetPlatformVersion,
                               ArrayRef<PlatformSwiftRelease> allReleases) {
   #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
+  // If the target release is at least the notional future-release version,
+  // return that we aren't deployment-limited.
+  if (targetPlatformVersion >= llvm::VersionTuple(99, 99))
+    return std::nullopt;
+
   // Scan forward in our filtered platform release array for the given
   // platform.
   for (auto &release : allReleases) {
@@ -774,12 +779,6 @@ findSwiftRuntimeVersionHelper(llvm::VersionTuple targetPlatformVersion,
       return std::max(release.swiftVersion, minimumSwiftVersion);
     }
   }
-
-  // If we didn't find anything, but the target release is at least the
-  // notional future-release version, return that we aren't
-  // deployment-limited.
-  if (targetPlatformVersion >= llvm::VersionTuple(99, 99))
-    return std::nullopt;
 
   // Otherwise, return the minimum Swift version.
   return minimumSwiftVersion;
