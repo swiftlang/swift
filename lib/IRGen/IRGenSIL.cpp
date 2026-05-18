@@ -50,6 +50,8 @@
 #include "swift/SIL/TerminatorUtils.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclCXX.h"
+#include "clang/AST/DeclObjC.h"
+#include "clang/Basic/CodeGenOptions.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/CodeGenABITypes.h"
 #include "llvm/ADT/MapVector.h"
@@ -3209,6 +3211,26 @@ void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
     value = fnPtr;
     secondaryValue = nullptr;
   }
+  // For ObjC direct methods with precondition thunks enabled, resolve to
+  // the thunk instead of the true implementation. The thunk performs nil
+  // receiver checks (and class realization for class methods) before
+  // tail-calling the implementation.
+  if (auto *clangDecl = fn->getClangDecl()) {
+    if (auto *objcMethodDecl = dyn_cast<clang::ObjCMethodDecl>(clangDecl)) {
+      if (objcMethodDecl->isDirectMethod() &&
+          IGM.getClangCGM().getCodeGenOpts().ObjCDirectPreconditionThunk) {
+        const auto *cd = objcMethodDecl->getClassInterface();
+        bool receiverCanBeNull = true;
+        bool classObjectCanBeUnrealized = objcMethodDecl->isClassMethod();
+        llvm::Function *thunkFn =
+            clang::CodeGen::getObjCDirectMethodCallee(
+                IGM.getClangCGM(), objcMethodDecl, cd, receiverCanBeNull,
+                classObjectCanBeUnrealized);
+        value = thunkFn;
+      }
+    }
+  }
+
   FunctionPointer fp =
       FunctionPointer::forDirect(fpKind, value, secondaryValue, sig, useSignature);
   // Update the foreign no-throw information if needed.
