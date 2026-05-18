@@ -7,7 +7,13 @@
 public func f() -> Int {
   let a = 2
   let b = 3
-  // CHECK: debug_value undef : $Builtin.Int{{32|64}}, let, name "a", type $Int, expr op_constu:2:op_fragment:#Int._value
-  // CHECK: debug_value undef : $Builtin.Int{{32|64}}, let, name "b", type $Int, expr op_constu:3:op_fragment:#Int._value
+  // CHECK: debug_value undef : $Builtin.Int{{32|64}}, let, name "a", type $Int, expr op_fragment:#Int._value, transform {
+  // CHECK:   %0 = integer_literal $Builtin.Int{{32|64}}, 2
+  // CHECK:   return %0
+  // CHECK: }
+  // CHECK: debug_value undef : $Builtin.Int{{32|64}}, let, name "b", type $Int, expr op_fragment:#Int._value, transform {
+  // CHECK:   %0 = integer_literal $Builtin.Int{{32|64}}, 3
+  // CHECK:   return %0
+  // CHECK: }
   return a + b
 }

@@ -491,6 +491,29 @@ bool DebugValueInst::exprStartsWithDeref() const {
           == SILDIExprOperator::Dereference;
 }
 
+SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
+  if (ReconstructionBlock)
+    return ReconstructionBlock;
+
+  // Create a new no-op reconstruction block.
+  auto *block = getFunction()->createEmptyDebugReconstructionBlock();
+  SILBuilder builder(block);
+
+  SILValue operand = getOperand();
+  SILValue retVal;
+  if (isa<SILUndef>(operand)) {
+    // No arguments, return the same undef directly.
+    retVal = operand;
+  } else {
+    // Add a block argument matching the operand type.
+    retVal = block->createPhiArgument(operand->getType(), OwnershipKind::None);
+  }
+
+  builder.createReturn(getLoc(), retVal);
+  ReconstructionBlock = block;
+  return block;
+}
+
 bool DebugValueInst::isExprTypeValid() const {
   auto varInfo = getCompleteVarInfo();
 
@@ -502,11 +525,22 @@ bool DebugValueInst::isExprTypeValid() const {
   if (!F)
     return false;
 
-  SILType SSAType = getOperand()->getType();
-  SILType TargetType = SSAType.getObjectType();
-  SILType VarType = *varInfo.Type;
-  SILType RunningType = VarType;
+  SILType valueType = getOperand()->getType();
 
+  // Transform: debug BB transforms the SSA value to its return type.
+  if (auto *debugBB = getDebugReconstructionBlock()) {
+    if (debugBB->getNumArguments() > 0) {
+      if (debugBB->getNumArguments() > 1)
+        return false;
+      if (debugBB->getArgument(0)->getType() != valueType)
+        return false;
+    }
+    auto *terminator = cast<ReturnInst>(debugBB->getTerminator());
+    valueType = terminator->getOperand()->getType();
+  }
+
+  // Fragments are in the opposite direction, process from right to left.
+  SILType RunningType = *varInfo.Type;
   unsigned derefCount = 0;
 
   for (const SILDIExprOperand &Operand : varInfo.DIExpr.operands()) {
@@ -531,11 +565,11 @@ bool DebugValueInst::isExprTypeValid() const {
 
   // There must be as many op_derefs as SIL type indirection levels.
   // SIL only supports one level of indirection, so op_deref too.
-  if (derefCount != SSAType.isAddress())
+  if (derefCount != valueType.isAddress())
     return false;
 
   return RunningType.removingMoveOnlyWrapper() ==
-         TargetType.removingMoveOnlyWrapper();
+         valueType.getObjectType().removingMoveOnlyWrapper();
 }
 
 VarDecl *DebugValueInst::getDecl() const {
