@@ -1157,13 +1157,6 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   }
 
   if (f.isPossiblyUsedExternally()) {
-    // Under the embedded linkage model, if it has a non-unique definition,
-    // treat it lazily.
-    if (f.hasNonUniqueDefinition() && !f.isSwiftRuntimeFunction()
-        && !f.markedAsUsed()) {
-      return true;
-    }
-
     return false;
   }
 
