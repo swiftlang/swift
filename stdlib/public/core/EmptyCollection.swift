@@ -164,9 +164,9 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
   }
 
   @_alwaysEmitIntoClient
-  public func withContiguousStorageIfAvailable<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R? {
+  public func withContiguousStorageIfAvailable<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
     return try body(UnsafeBufferPointer<Element>(start: nil, count: 0))
   }
 }
