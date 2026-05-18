@@ -192,3 +192,8 @@ module ClassTemplateWithFrt {
   header "class-template-with-frt.h"
   requires cplusplus
 }
+
+module FunctionTemplateWithOptionalFrt {
+  header "function-template-with-optional-frt.h"
+  requires cplusplus
+}
