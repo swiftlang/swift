@@ -3843,9 +3843,9 @@ function Test-Dispatch {
       -Src $SourceCache\swift-corelibs-libdispatch `
       -Bin (Get-ProjectBinaryCache $BuildPlatform DynamicDispatch) `
       -Platform $BuildPlatform `
-      -CCompiler $Compilers.Built.C `
-      -CXXCompiler $Compilers.Built.CXX `
-      -SwiftCompiler $Compilers.Built.Swift `
+      -CCompiler $Compilers.Stage1.C `
+      -CXXCompiler $Compilers.Stage1.CXX `
+      -SwiftCompiler $Compilers.Stage1.Swift `
       -SwiftSDK (Get-SwiftSDK -OS $BuildPlatform.OS) `
       -BuildTargets default,ExperimentalTest `
       -Defines @{
@@ -3943,9 +3943,9 @@ function Test-XCTest {
       -Src $SourceCache\swift-corelibs-xctest `
       -Bin (Get-ProjectBinaryCache $BuildPlatform XCTest) `
       -Platform $BuildPlatform `
-      -CCompiler $Compilers.Built.C `
-      -CXXCompiler $Compilers.Built.CXX `
-      -SwiftCompiler $Compilers.Built.Swift `
+      -CCompiler $Compilers.Stage1.C `
+      -CXXCompiler $Compilers.Stage1.CXX `
+      -SwiftCompiler $Compilers.Stage1.Swift `
       -SwiftSDK (Get-SwiftSDK -OS $Platform.OS) `
       -BuildTargets default,check-xctest `
       -Defines @{
@@ -4701,15 +4701,16 @@ function Test-LLBuild {
 
   Invoke-IsolatingEnvVars {
     $env:Path = "$env:Path;$UnixToolsBinDir"
-    $env:AR = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "llvm-ar.exe"))
-    $env:CLANG = ([IO.Path]::Combine((Get-ProjectBinaryCache $BuildPlatform Compilers), "bin", "clang.exe"))
+    $Stage1BinDir = Get-ProjectToolchainBin $BuildPlatform Stage1Compilers
+    $env:AR = [IO.Path]::Combine($Stage1BinDir, "llvm-ar.exe")
+    $env:CLANG = [IO.Path]::Combine($Stage1BinDir, "clang.exe")
 
     Build-CMakeProject `
       -Src $SourceCache\llbuild `
       -Bin (Get-ProjectBinaryCache $BuildPlatform LLBuild) `
       -Platform $Platform `
       -CXXCompiler $Compilers.Host.CXX `
-      -SwiftCompiler $Compilers.Built.Swift `
+      -SwiftCompiler $Compilers.Stage1.Swift `
       -SwiftSDK (Get-SwiftSDK -OS $BuildPlatform.OS) `
       -BuildTargets default,test-llbuild `
       -Defines @{
@@ -4956,10 +4957,17 @@ function Build-Format([Hashtable] $Platform,
 }
 
 function Test-Format {
+  $SwiftSyntaxHostLibraries = [IO.Path]::Combine(
+    (Get-ProjectBinaryCache $BuildPlatform Stage2Compilers),
+    "lib",
+    "swift",
+    "host"
+  )
+
   $SwiftPMArguments = @(
     # swift-syntax
-    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\swift\host",
-    "-Xswiftc", "-L$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\swift\host",
+    "-Xswiftc", "-I$SwiftSyntaxHostLibraries",
+    "-Xswiftc", "-L$SwiftSyntaxHostLibraries",
     # swift-argument-parser
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform ArgumentParser)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform ArgumentParser)\lib",
@@ -5054,13 +5062,20 @@ function Build-SourceKitLSP([Hashtable] $Platform,
 }
 
 function Test-SourceKitLSP {
+  $SwiftSyntaxHostLibraries = [IO.Path]::Combine(
+    (Get-ProjectBinaryCache $BuildPlatform Stage2Compilers),
+    "lib",
+    "swift",
+    "host"
+  )
+
   $SwiftPMArguments = @(
     # dispatch
     "-Xcc", "-I$SourceCache\swift-corelibs-libdispatch",
     "-Xcc", "-I$SourceCache\swift-corelibs-libdispatch\src\BlocksRuntime",
     # swift-syntax
-    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\swift\host",
-    "-Xswiftc", "-L$(Get-ProjectBinaryCache $BuildPlatform Compilers)\lib\swift\host",
+    "-Xswiftc", "-I$SwiftSyntaxHostLibraries",
+    "-Xswiftc", "-L$SwiftSyntaxHostLibraries",
     # swift-cmark
     "-Xswiftc", "-I$SourceCache\cmark\src\include",
     "-Xswiftc", "-I$SourceCache\cmark\extensions\include",
@@ -5092,7 +5107,7 @@ function Test-SourceKitLSP {
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\lib",
     # swift-markdown
-    "-Xswiftc", "-I$SourceCache\swift-markdown\Sources\CAtomic\inclde",
+    "-Xswiftc", "-I$SourceCache\swift-markdown\Sources\CAtomic\include",
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Markdown)\lib\CAtomic.lib",
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Markdown)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Markdown)\lib",
