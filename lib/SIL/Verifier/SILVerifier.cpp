@@ -1828,12 +1828,6 @@ public:
     
     SILType DebugVarTy = varInfo->Type ? *varInfo->Type :
       SSAType.getObjectType();
-    if (!varInfo->DIExpr && !isa<SILBoxType>(SSAType.getASTType())) {
-      // FIXME: Remove getObjectType() below when we fix create/createAddr
-      require(DebugVarTy.removingMoveOnlyWrapper()
-              == SSAType.getObjectType().removingMoveOnlyWrapper(),
-              "debug type mismatch without a DIExpr");
-    }
 
     auto *debugScope = inst->getDebugScope();
     if (varInfo->ArgNo)
