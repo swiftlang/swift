@@ -157,13 +157,15 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   public var count: Int {
     return 1
   }
+}
 
+extension CollectionOfOne {
   @_alwaysEmitIntoClient
   @available(SwiftCompatibilitySpan 5.0, *)
-  public func withContiguousStorageIfAvailable<R, E>(
+  public func withContiguousStorageIfAvailable<R: ~Copyable, E: Error>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
-    return try self.span.withUnsafeBufferPointer(body)
+    try self.span.withUnsafeBufferPointer(body)
   }
 }
 

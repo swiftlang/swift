@@ -162,12 +162,14 @@ extension EmptyCollection: RandomAccessCollection, MutableCollection {
     _debugPrecondition(range == indices, "invalid range for an empty collection")
     _debugPrecondition(bounds == indices, "invalid bounds for an empty collection")
   }
+}
 
+extension EmptyCollection {
   @_alwaysEmitIntoClient
-  public func withContiguousStorageIfAvailable<R, E>(
+  public func withContiguousStorageIfAvailable<R: ~Copyable, E: Error>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
-    return try body(UnsafeBufferPointer<Element>(start: nil, count: 0))
+    unsafe try body(UnsafeBufferPointer<Element>(start: nil, count: 0))
   }
 }
 
