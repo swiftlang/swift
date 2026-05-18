@@ -2,10 +2,12 @@
 // RUN:     -g -Xllvm -sil-print-debuginfo-verbose \
 // RUN:     -enable-experimental-feature BorrowingForLoop \
 // RUN:     -enable-experimental-feature BorrowingSequence \
+// RUN:     -enable-experimental-feature PreInverseGenericsExcept \
 // RUN:     %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BorrowingForLoop
 // REQUIRES: swift_feature_BorrowingSequence
+// REQUIRES: swift_feature_PreInverseGenericsExcept
 
 struct NoncopyableInt: ~Copyable {
   var value: Int

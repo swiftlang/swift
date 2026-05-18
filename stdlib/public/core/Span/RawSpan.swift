@@ -345,6 +345,8 @@ extension RawSpan {
     self = unsafe _overrideLifetime(rawSpan, copying: span)
   }
 #else
+  // TODO: Remove these duplicated symbols for `RawSpan` rdar://177362237
+
   /// Unsafely view a typed span as a raw span.
   ///
   /// Creates a `RawSpan` over the memory represented by a `Span<Element>`

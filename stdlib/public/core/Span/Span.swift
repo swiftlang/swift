@@ -998,6 +998,8 @@ extension Span where Element: ~Copyable & ~Escapable {
 #else  // hasFeature(PreInverseGenericsExcept)
 // MARK: Span<Non-escapable>
 
+// TODO: Remove this duplicated version of `Span` rdar://177362237
+
 /// `Span<Element>` represents a contiguous region of memory
 /// which contains initialized instances of `Element`.
 ///
