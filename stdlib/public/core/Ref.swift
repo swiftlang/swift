@@ -50,6 +50,13 @@ public struct Ref<Value: ~Copyable & ~Escapable>: Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.4, *)
+extension Ref: @unchecked Sendable
+  where Value: Sendable & ~Copyable & ~Escapable {}
+
+@available(SwiftStdlib 6.4, *)
+extension Ref: BitwiseCopyable {}
+
+@available(SwiftStdlib 6.4, *)
 extension Ref where Value: ~Copyable & ~Escapable {
   /// Dereferences the constant reference allowing for in-place reads to the
   /// underlying value.
