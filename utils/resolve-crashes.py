@@ -33,6 +33,11 @@ for line in sys.stdin:
         git_mv_cmd = 'git mv %s %s' % (from_filename, to_filename)
         execute_cmd(git_mv_cmd)
 
+        # Replace "not --crash %target-swift-ide-test" with "%target-swift-ide-test".
+        sed_replace_not_cmd = 'sed -e "s/not --crash %s/%s/" -i "" %s' % (
+            "%target-swift-ide-test", "%target-swift-ide-test", to_filename)
+        execute_cmd(sed_replace_not_cmd)
+
         # Replace "not --crash" with "not".
         sed_replace_not_cmd = 'sed -e "s/not --crash/not/" -i "" %s' % (
             to_filename)
