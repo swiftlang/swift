@@ -4926,8 +4926,10 @@ llvm::Expected<SILWitnessTable *>
   if (!maybeConformance)
     return maybeConformance.takeError();
 
-  auto theConformance = cast<RootProtocolConformance>(
-                          maybeConformance.get().getConcrete());
+  // Specialized witness tables can have a `SpecializedProtocolConformance`,
+  // not just a `RootProtocolConformance`. The downstream APIs accept any
+  // `ProtocolConformance *`.
+  auto *theConformance = maybeConformance.get().getConcrete();
 
   PrettyStackTraceConformance trace("deserializing SIL witness table for",
                                     theConformance);

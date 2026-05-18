@@ -29,8 +29,9 @@ namespace swift {
 /// explicitly chooses between "interface" and "implementation", while the
 /// inlinability attributes choose "inlinable".
 ///
-/// Globally, Embedded Swift defaults to "inlinable" but can be set to
-/// "implementation" with the experimental feature DeferredCodeGen.
+/// Globally, Embedded Swift defaults to "inlinable" but can be set to any
+/// model with the experimental feature CodeGenerationModel
+/// (e.g. `-enable-experimental-feature CodeGenerationModel=implementation`).
 /// Non-embedded Swift uses "interface" and doesn't currently allow
 /// customization.
 enum class CodeGenerationModel: uint8_t {
