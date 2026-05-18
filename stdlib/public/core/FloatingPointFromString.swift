@@ -1803,7 +1803,7 @@ fileprivate func mostSignificantBitsFrom(
 
   // Make sure fraction bits after the first are non-zero if they should be...
   fraction |= unsafe UInt64(unsafeBitCast(remainderNonZero, to: UInt8.self))
-  while i >= range.lowerBound {
+  while i > range.lowerBound {
     i &-= 1
     fraction |= unsafe UInt64(work[unchecked: i])
   }
