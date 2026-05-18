@@ -39,6 +39,39 @@ func notBridgedFunctions(_ r: RefCountedBase) {
     notBridgedFunction3(consuming: RefOfBase(r))
 }
 
+func bridgedFunctionsWithRefAndPtrCtor(_ r: RefCountedBase) {
+    print("withRefCtor")
+    bridgedFunctionR(r)
+    let returned = bridgedFunctionR_returns()
+    print(returned.method())
+}
+
+// A smart pointer with both a T* and a const T* ctor. The non-const
+// pointer ctor must be the one selected for implicit bridging.
+func bridgedFunctionsWithConstPtrCtor(_ r: RefCountedBase) {
+    print("withConstPtrCtor")
+    bridgedFunctionConstPtr(r)
+    let returned = bridgedFunctionConstPtr_returns()
+    print(returned.method())
+}
+
+func bridgedFunctionsRefOnly(_ r: RefCountedBase) {
+    print("refOnly")
+    bridgedFunctionRefOnly(r)
+    let returned = bridgedFunctionRefOnly_returns()
+    print(returned.method())
+}
+
+// An unannotated derived smart pointer (no SWIFT_REFCOUNTED_PTR of its
+// own) inheriting from the annotated Ref<T>. No implicit bridging but
+// the inherited `asReference` property still works.
+func unannotatedDerived() {
+    print("unannotatedDerived")
+    let smartPtr = makeUnannotatedRef()
+    let frt = smartPtr.asReference
+    print(frt.method())
+}
+
 conversions(RefCountedBase())
 // CHECK: created
 // CHECK: conversions
@@ -61,3 +94,34 @@ notBridgedFunctions(RefCountedBase())
 // CHECK: created
 // CHECK: noBridging
 // CHECK: destroyed
+
+bridgedFunctionsWithRefAndPtrCtor(RefCountedBase())
+// CHECK: created
+// CHECK: withRefCtor
+// The pointer ctor must be the one selected for implicit bridging,
+// even though a T& ctor is also available on RefR<T>.
+// CHECK-NOT: RefR ref ctor
+// CHECK: RefR ptr ctor
+// CHECK-NOT: RefR ref ctor
+// CHECK: RefR ptr ctor
+// CHECK-NOT: RefR ref ctor
+// CHECK: 42
+
+bridgedFunctionsWithConstPtrCtor(RefCountedBase())
+// CHECK: withConstPtrCtor
+// The non-const T* ctor must be the one selected, never the const T* ctor.
+// CHECK-NOT: RefConstPtr const-ptr ctor
+// CHECK: RefConstPtr ptr ctor
+// CHECK-NOT: RefConstPtr const-ptr ctor
+// CHECK: RefConstPtr ptr ctor
+// CHECK-NOT: RefConstPtr const-ptr ctor
+// CHECK: 42
+
+bridgedFunctionsRefOnly(RefCountedBase())
+// CHECK: refOnly
+// CHECK: RefRefOnly ref ctor
+// CHECK: 42
+
+unannotatedDerived()
+// CHECK: unannotatedDerived
+// CHECK: 42
