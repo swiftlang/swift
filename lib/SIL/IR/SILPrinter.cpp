@@ -78,6 +78,10 @@ SILPrintDebugInfo("sil-print-debuginfo", llvm::cl::init(false),
                 llvm::cl::desc("Include debug info in SIL output"));
 
 llvm::cl::opt<bool>
+SILPrintTransformBlocks("sil-print-transform-blocks", llvm::cl::init(true),
+                llvm::cl::desc("Print transform blocks in debug_value SIL output"));
+
+llvm::cl::opt<bool>
     SILPrintDebugInfoVerbose("sil-print-debuginfo-verbose",
                              llvm::cl::init(false),
                              llvm::cl::desc("Print verbose debug info output"));
@@ -1049,6 +1053,8 @@ public:
   void print(const SILBasicBlock *BB) {
     markBlockAsPrinted(BB);
 
+    bool isDebug = BB->isDebugReconstructionBlock();
+
     // Output uses for BB arguments. These are put into place as comments before
     // the block header.
     printBlockArgumentUses(BB);
@@ -1065,6 +1071,10 @@ public:
     }
 
     // Then print the name of our block, the arguments, and the block colon.
+    // Debug-only (transform) blocks are embedded inside a debug_value and get
+    // extra indentation so they visually nest inside the enclosing instruction.
+    if (isDebug)
+      *this << "  ";
     *this << Ctx.getID(BB);
     printBlockArguments(BB);
     *this << ":";
@@ -1124,6 +1134,8 @@ public:
                 PrintState.OS, "call-site", AI.getCalleeFunction()->getName(),
                 AI.getSpecializationInfo(), AI.getSubstitutionMap());
       }
+      if (isDebug)
+        *this << "  ";
       print(&I);
     }
   }
@@ -2214,6 +2226,27 @@ public:
     *this << getIDAndType(DVI->getOperand());
     printDebugVar(DVI->getVarInfo(false),
                   &DVI->getModule().getASTContext().SourceMgr);
+    if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
+      if (!SILPrintTransformBlocks) {
+        // If disabled, don't print the content of transform blocks, but
+        // still indicate that one is present.
+        *this << ", transform { ... }";
+        return;
+      }
+      // Create a new print context for the debug basic block to reset
+      // SILValue numbering.
+      // The print context has its own buffering output stream that can
+      // conflict with the parent one, so print it to a string first.
+      std::string blockStr;
+      {
+        llvm::raw_string_ostream blockOS(blockStr);
+        SILPrintContext DebugCtx(blockOS, Ctx.printVerbose(), Ctx.sortSIL(),
+                                 Ctx.printDebugInfo(), Ctx.printFullConvention());
+        SILPrinter DebugPrinter(DebugCtx);
+        DebugPrinter.print(DebugBB);
+      }
+      *this << ", transform {\n" << blockStr << "  }";
+    }
   }
 
   void visitDebugStepInst(DebugStepInst *dsi) {
@@ -5079,12 +5112,16 @@ ID SILPrintContext::getID(SILNodePointer node) {
     return { ID::Null, 0 };
   }
   if (SILFunction *F = BB->getParent()) {
-    setContext(F);
-    // Lazily initialize the instruction -> ID mapping.
-    if (ValueToIDMap.empty())
-      F->numberValues(ValueToIDMap);
-    ID R = {ID::SSAValue, ValueToIDMap[node]};
-    return R;
+    // Debug-only blocks use a locally-scoped numbering rather than the
+    // function-wide numbering.
+    if (!BB->isDebugReconstructionBlock()) {
+      setContext(F);
+      // Lazily initialize the instruction -> ID mapping.
+      if (ValueToIDMap.empty())
+        F->numberValues(ValueToIDMap);
+      ID R = {ID::SSAValue, ValueToIDMap[node]};
+      return R;
+    }
   }
 
   setContext(BB);
@@ -5098,6 +5135,9 @@ ID SILPrintContext::getID(SILNodePointer node) {
 
   // Otherwise, initialize the instruction -> ID mapping cache.
   unsigned idx = 0;
+  // Number block arguments first (used for debug-only blocks).
+  for (auto *arg : BB->getArguments())
+    ValueToIDMap[arg] = idx++;
   for (auto &I : *BB) {
     // Give the instruction itself the next ID.
     ValueToIDMap[I.asSILNode()] = idx;

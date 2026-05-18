@@ -111,6 +111,7 @@ private:
   /// Used by BasicBlockData to index the Data vector.
   ///
   /// A value of -1 means that the index is not initialized yet.
+  /// A value of -2 means this is a debug-only block (no data).
   int index = -1;
 
   /// Custom bits managed by BasicBlockBitfield.
@@ -524,6 +525,18 @@ public:
 
   /// Returns true if this BB is the entry BB of its parent.
   bool isEntry() const;
+
+  /// Returns true if this block is a debug_value's reconstruction block,
+  /// not part of the function's BlockList.
+  bool isDebugReconstructionBlock() const { return index == -2; }
+
+  /// Update the parent function of a debug-only block (e.g. when the owning
+  /// instruction is moved between functions).
+  void setParentFunction(SILFunction *F) {
+    ASSERT(isDebugReconstructionBlock() &&
+           "only debug reconstruction blocks can be reparented");
+    Parent = F;
+  }
 
   /// Returns true if this block ends in an unreachable or an apply of a
   /// no-return apply or builtin.
