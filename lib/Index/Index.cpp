@@ -889,26 +889,6 @@ private:
     llvm_unreachable("Can't find the generic parameter in the extended type");
   }
 
-  ValueDecl *resolveCompatibilityAlias(ValueDecl *D) {
-    // When Clang's indexing encounters a "@compatibility_alias", it emits
-    // references to the underlying type. ClangImporter synthesizes a typealias
-    // that is never emitted, so references to that typealias have no
-    // corresponding definition. Opting to match Clang's behavior and reach
-    // "through" the alias to the underlying type.
-    if (!D)
-      return D;
-    if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
-      if (ClangNode ClangN = swift::ide::getEffectiveClangNode(TAD)) {
-        if (isa<clang::ObjCCompatibleAliasDecl>(ClangN.getAsDecl())) {
-          if (auto *nominal = TAD->getUnderlyingType()->getAnyNominal()) {
-            return nominal;
-          }
-        }
-      }
-    }
-    return D;
-  }
-
   bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
                           ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
@@ -916,6 +896,29 @@ private:
 
     if (Loc.isInvalid() || isSuppressed(Loc))
       return true;
+
+    // When Clang's indexing encounters a "@compatibility_alias", it emits
+    // references to the underlying type. ClangImporter generates a typealias
+    // that is never emitted, so references to that typealias have no
+    // corresponding definition. Match Clang's behavior and reach through
+    // the alias to the underlying type.
+    auto resolveCompatibilityAlias = [](auto &decl) -> bool {
+      if (!decl)
+        return false;
+      if (auto *TAD = dyn_cast<TypeAliasDecl>(decl)) {
+        if (ClangNode ClangN = swift::ide::getEffectiveClangNode(TAD)) {
+          if (isa<clang::ObjCCompatibleAliasDecl>(ClangN.getAsDecl())) {
+            decl = TAD->getUnderlyingType()->getAnyNominal();
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    if (resolveCompatibilityAlias(D)) {
+      Data.isImplicit = true;
+    }
 
     IndexSymbol Info;
 
@@ -933,11 +936,10 @@ private:
       Info.roles |= (unsigned)SymbolRole::Implicit;
 
     if (CtorTyRef) {
-      if (auto *resolvedAlias =
-              dyn_cast<swift::TypeDecl>(resolveCompatibilityAlias(CtorTyRef))) {
-        CtorTyRef = resolvedAlias;
-      }
       IndexSymbol CtorInfo(Info);
+      if (resolveCompatibilityAlias(CtorTyRef)) {
+        CtorInfo.roles |= (unsigned)SymbolRole::Implicit;
+      }
       if (Data.isImplicitCtorType)
         CtorInfo.roles |= (unsigned)SymbolRole::Implicit;
       if (!reportRef(CtorTyRef, Loc, CtorInfo, Data.AccKind))
@@ -947,8 +949,6 @@ private:
     if (auto *GenParam = dyn_cast<GenericTypeParamDecl>(D)) {
       D = canonicalizeGenericTypeParamDeclForIndex(GenParam);
     }
-
-    D = resolveCompatibilityAlias(D);
 
     if (!reportRef(D, Loc, Info, Data.AccKind))
       return false;
@@ -1635,17 +1635,25 @@ bool IndexSwiftASTWalker::reportRelatedTypeRefImpl(const TypeLoc &TL,
   auto *VD = declRefTR->getBoundDecl();
   if (!VD)
     return true;
-  if (auto *resolvedAlias =
-          dyn_cast<swift::TypeDecl>(resolveCompatibilityAlias(VD))) {
-    VD = resolvedAlias;
-  }
 
   if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
-    IndexSymbol Info;
-    if (Implicit)
-      Info.roles |= (unsigned)SymbolRole::Implicit;
-    if (!reportRef(TAD, Loc, Info, std::nullopt))
-      return false;
+    bool isObjcCompAlias = false;
+    if (ClangNode ClangN = swift::ide::getEffectiveClangNode(TAD)) {
+      if (isa<clang::ObjCCompatibleAliasDecl>(ClangN.getAsDecl())) {
+        isObjcCompAlias = true;
+      }
+    }
+
+    // Skip the reference to the typealias for an Objective-C compatibility
+    // alias. Match Clang's behavior by only emitting references to the
+    // underlying type.
+    if (!isObjcCompAlias) {
+      IndexSymbol Info;
+      if (Implicit)
+        Info.roles |= (unsigned)SymbolRole::Implicit;
+      if (!reportRef(TAD, Loc, Info, std::nullopt))
+        return false;
+    }
 
     // Recurse into the underlying type and report any found references as
     // implicit references at the location of the typealias reference.

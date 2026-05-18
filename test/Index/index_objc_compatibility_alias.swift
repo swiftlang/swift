@@ -22,13 +22,17 @@ module objc_decls {
 
 //--- ObjcUser.swift
 import objc_decls
+// SWIFT-NOT: NEWTest
 func test() {
   let _: NEWTest? = nil
-  // SWIFT: 3:10 | class/Swift | Test | c:objc(cs)Test | Ref,RelCont | rel: 1
+  // SWIFT: 4:10 | class/Swift | Test | c:objc(cs)Test | Ref,Impl,RelCont | rel: 1
+  // SWIFT-NOT: NEWTest
 
   _ = NEWTest()
-  // SWIFT: 6:7 | class/Swift | Test | c:objc(cs)Test | Ref,RelCont | rel: 1
+  // SWIFT: 8:7 | class/Swift | Test | c:objc(cs)Test | Ref,Impl,RelCont | rel: 1
+  // SWIFT-NOT: NEWTest
 }
 
 class C: NEWTest {}
-// SWIFT: 10:10 | class/Swift | Test | c:objc(cs)Test | Ref,RelBase | rel: 1
+// SWIFT: 13:10 | class/Swift | Test | c:objc(cs)Test | Ref,Impl,RelBase | rel: 1
+// SWIFT-NOT: NEWTest
