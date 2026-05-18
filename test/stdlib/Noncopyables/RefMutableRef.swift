@@ -57,8 +57,10 @@ extension Optional where Wrapped: ~Copyable {
 
 let suite = TestSuite("RefMutableRef")
 
-if #available(SwiftStdlib 6.4, *) {
-suite.test("Ref") {
+suite.test("Ref")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
   var foo = Foo()
 
   do {
@@ -80,10 +82,11 @@ suite.test("Ref") {
 
   expectEqual(int, 321)
 }
-}
 
-if #available(SwiftStdlib 6.4, *) {
-suite.test("Ref inside a Ref") {
+suite.test("Ref inside a Ref")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
   var foo = Foo()
 
   do {
@@ -107,10 +110,11 @@ suite.test("Ref inside a Ref") {
 
   expectEqual(int, 321)
 }
-}
 
-if #available(SwiftStdlib 6.4, *) {
-suite.test("MutableRef") {
+suite.test("MutableRef")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
   var x: _? = 123
 
   var y = x.mutate()!
@@ -134,10 +138,10 @@ suite.test("MutableRef") {
 
   expectEqual(a, 64)
 }
-}
 
-if #available(SwiftStdlib 6.4, *) {
-suite.test("MutableRef inside a Ref") {
+suite.test("MutableRef inside a Ref")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
   var x: _? = 123
 
   var y = x.mutate()!
@@ -168,6 +172,30 @@ suite.test("MutableRef inside a Ref") {
 
   expectEqual(a, 128)
 }
+
+suite.test("Sendability")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  func isSendable<T: ~Copyable & ~Escapable>(_: T.Type) -> Bool { false }
+  func isSendable<T: Sendable & ~Copyable & ~Escapable>(_: T.Type) -> Bool { true }
+
+  expectTrue(isSendable(Ref<MutableRawSpan>.self))
+  expectTrue(isSendable(MutableRef<Int>.self))
+
+  expectFalse(isSendable(Ref<UnsafeMutableRawPointer>.self))
+  expectFalse(isSendable(MutableRef<UnsafeRawPointer>.self))
+}
+
+suite.test("BitwiseCopyability")
+.require(.stdlib_6_4).code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  func isBitwiseCopyable<T: ~Copyable & ~Escapable>(_: T.Type) -> Bool { false }
+  func isBitwiseCopyable<T: BitwiseCopyable & ~Escapable>(_: T.Type) -> Bool { true }
+
+  expectTrue(isBitwiseCopyable(Ref<Int>.self))
+  expectFalse(isBitwiseCopyable(MutableRef<Int>.self))
 }
 
 runAllTests()
