@@ -1025,11 +1025,12 @@ public:
   /// register allocator doesn't elide the dbg.value intrinsic when
   /// register pressure is high.  There is a trade-off to this: With
   /// shadow copies, we lose the precise lifetime.
-  llvm::Value *
-  emitShadowCopyIfNeeded(llvm::Value *Storage, llvm::Type *StorageType,
-                         const SILDebugScope *Scope, SILDebugVariable VarInfo,
-                         bool IsAnonymous, bool WasMoved,
-                         std::optional<Alignment> Align = std::nullopt) {
+  ///
+  /// Returns the shadow copy, or nullptr if no shadow copy was needed.
+  llvm::Value *emitShadowCopyIfNeededOrNull(
+      llvm::Value *Storage, llvm::Type *StorageType, const SILDebugScope *Scope,
+      SILDebugVariable VarInfo, bool IsAnonymous, bool WasMoved,
+      std::optional<Alignment> Align = std::nullopt) {
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
 
@@ -1047,7 +1048,7 @@ public:
     // generating extra shadow copies for debug_value [poison].
     if (!shouldShadowVariable(VarInfo, IsAnonymous)
         || !shouldShadowStorage(Storage, StorageType)) {
-      return Storage;
+      return nullptr;
     }
 
     // Emit a shadow copy.
@@ -1065,6 +1066,19 @@ public:
     }
 
     return shadow;
+  }
+
+  /// Like \c emitShadowCopyIfNeededOrNull() but returns the original storage
+  /// when no shadow copy is needed (never returns nullptr).
+  llvm::Value *
+  emitShadowCopyIfNeeded(llvm::Value *Storage, llvm::Type *StorageType,
+                         const SILDebugScope *Scope, SILDebugVariable VarInfo,
+                         bool IsAnonymous, bool WasMoved,
+                         std::optional<Alignment> Align = std::nullopt) {
+    if (auto *shadow = emitShadowCopyIfNeededOrNull(
+            Storage, StorageType, Scope, VarInfo, IsAnonymous, WasMoved, Align))
+      return shadow;
+    return Storage;
   }
 
   /// Like \c emitShadowCopyIfNeeded() but takes an \c Address instead of an
@@ -6225,11 +6239,26 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Put the value into a shadow-copy stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
   if (IsAddrVal) {
-    auto &ti = getTypeInfo(SILVal->getType());
-    Copy.emplace_back(emitShadowCopyIfNeeded(
-        getLoweredAddress(SILVal).getAddress(), ti.getStorageType(),
-        i->getDebugScope(), *VarInfo, IsAnonymous,
-        i->usesMoveableValueDebugInfo()));
+    auto &TI = getTypeInfo(SILVal->getType());
+    auto Addr = getLoweredAddress(SILVal);
+    auto *Storage = Addr.getAddress();
+
+    if (auto *ShadowCopy = emitShadowCopyIfNeededOrNull(
+            Storage, TI.getStorageType(), i->getDebugScope(), *VarInfo,
+            IsAnonymous, i->usesMoveableValueDebugInfo())) {
+      Copy.emplace_back(ShadowCopy);
+      // The shadow alloca stores a pointer to the original storage,
+      // adding a level of indirection. For non-moveable values this is
+      // fine because dbg_declare inherently treats its argument as an
+      // address. Moveable values use dbg_value instead, which doesn't
+      // imply that indirection, so we set IndirectValue.
+      if (!IsInCoro && i->usesMoveableValueDebugInfo()) {
+        assert(Indirection != IndirectValue && "IndirectValue already set!");
+        Indirection = IndirectValue;
+      }
+    } else {
+      Copy.emplace_back(Storage);
+    }
   } else {
     emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
                            i->usesMoveableValueDebugInfo(), Copy);
