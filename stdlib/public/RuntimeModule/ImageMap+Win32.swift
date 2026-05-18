@@ -244,7 +244,7 @@ extension ImageMap {
       print("path: \(modulePath)")
       #endif
 
-      guard GetModuleInformation(hProcess, hModule!, &moduleInfo,
+      guard GetModuleInformation(hProcess, hModule, &moduleInfo,
                                  DWORD(MemoryLayout<MODULEINFO>.size))
       else {
         #if DEBUG_WIN32_IMAGEMAP_CAPTURE
