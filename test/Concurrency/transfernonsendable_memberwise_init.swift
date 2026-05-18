@@ -29,3 +29,11 @@ struct TestView: MyView {
 func test() {
   _ = TestView(model: MyModel()) // Ok
 }
+
+@propertyWrapper struct Unobserved<T> {
+  var wrappedValue: T
+}
+
+@MainActor struct Generic<T> {
+  @Unobserved var model: T
+}
