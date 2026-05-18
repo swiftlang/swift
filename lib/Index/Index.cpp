@@ -889,6 +889,26 @@ private:
     llvm_unreachable("Can't find the generic parameter in the extended type");
   }
 
+  ValueDecl *resolveCompatibilityAlias(ValueDecl *D) {
+    // When Clang's indexing encounters a "@compatibility_alias", it emits
+    // references to the underlying type. ClangImporter synthesizes a typealias
+    // that is never emitted, so references to that typealias have no
+    // corresponding definition. Opting to match Clang's behavior and reach
+    // "through" the alias to the underlying type.
+    if (!D)
+      return D;
+    if (auto *TAD = dyn_cast<TypeAliasDecl>(D)) {
+      if (ClangNode ClangN = swift::ide::getEffectiveClangNode(TAD)) {
+        if (isa<clang::ObjCCompatibleAliasDecl>(ClangN.getAsDecl())) {
+          if (auto *nominal = TAD->getUnderlyingType()->getAnyNominal()) {
+            return nominal;
+          }
+        }
+      }
+    }
+    return D;
+  }
+
   bool visitDeclReference(ValueDecl *D, SourceRange Range, TypeDecl *CtorTyRef,
                           ExtensionDecl *ExtTyRef, Type T,
                           ReferenceMetaData Data) override {
@@ -912,28 +932,11 @@ private:
     if (Data.isImplicit)
       Info.roles |= (unsigned)SymbolRole::Implicit;
 
-    // When Clang's indexing encounters a "@compatibility_alias", it emits
-    // references to the underlying type. ClangImporter generates a typealias
-    // that is never emitted, so references to that typealias have no
-    // corresponding definition. Opting to match Clang's behavior and reach
-    // "through" the alias to the underlying type.
-    auto resolveCompatibilityAlias = [](auto &decl) {
-      if (!decl) return;
-      if (auto *TAD = dyn_cast<TypeAliasDecl>(decl)) {
-        if (auto *importer = decl->getASTContext().getClangModuleLoader()) {
-          if (ClangNode ClangN = importer->getEffectiveClangNode(TAD)) {
-            if (isa<clang::ObjCCompatibleAliasDecl>(ClangN.getAsDecl())) {
-              if (auto *nominal = TAD->getUnderlyingType()->getAnyNominal()) {
-                decl = nominal;
-              }
-            }
-          }
-        }
-      }
-    };
-
     if (CtorTyRef) {
-      resolveCompatibilityAlias(CtorTyRef);
+      if (auto *resolvedAlias =
+              dyn_cast<swift::TypeDecl>(resolveCompatibilityAlias(CtorTyRef))) {
+        CtorTyRef = resolvedAlias;
+      }
       IndexSymbol CtorInfo(Info);
       if (Data.isImplicitCtorType)
         CtorInfo.roles |= (unsigned)SymbolRole::Implicit;
@@ -945,7 +948,7 @@ private:
       D = canonicalizeGenericTypeParamDeclForIndex(GenParam);
     }
 
-    resolveCompatibilityAlias(D);
+    D = resolveCompatibilityAlias(D);
 
     if (!reportRef(D, Loc, Info, Data.AccKind))
       return false;
@@ -1632,6 +1635,10 @@ bool IndexSwiftASTWalker::reportRelatedTypeRefImpl(const TypeLoc &TL,
   auto *VD = declRefTR->getBoundDecl();
   if (!VD)
     return true;
+  if (auto *resolvedAlias =
+          dyn_cast<swift::TypeDecl>(resolveCompatibilityAlias(VD))) {
+    VD = resolvedAlias;
+  }
 
   if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
     IndexSymbol Info;

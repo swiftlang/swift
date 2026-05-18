@@ -29,3 +29,6 @@ func test() {
   _ = NEWTest()
   // SWIFT: 6:7 | class/Swift | Test | c:objc(cs)Test | Ref,RelCont | rel: 1
 }
+
+class C: NEWTest {}
+// SWIFT: 10:10 | class/Swift | Test | c:objc(cs)Test | Ref,RelBase | rel: 1
