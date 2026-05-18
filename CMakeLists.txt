@@ -517,6 +517,9 @@ set(SWIFT_NATIVE_SWIFT_TOOLS_PATH "" CACHE STRING
 set(SWIFT_WASI_SYSROOT_PATH "" CACHE PATH
   "Path to the directory that contains WASI Sysroot")
 
+set(SWIFT_EMSCRIPTEN_SYSROOT_PATH "" CACHE PATH
+  "Path to the directory that contains Emscripten Sysroot")
+
 option(SWIFT_STDLIB_ENABLE_SIB_TARGETS
        "Should we generate sib targets for the stdlib or not?"
        FALSE)
