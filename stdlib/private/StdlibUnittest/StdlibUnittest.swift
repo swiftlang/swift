@@ -803,6 +803,7 @@ public func expectCrash(withMessage message: String = "", executing: () -> Void)
 }
 
 func _defaultTestSuiteFailedCallback() {
+  fflush(nil)
   abort()
 }
 
@@ -813,6 +814,7 @@ public func _setTestSuiteFailedCallback(_ callback: @escaping () -> Void) {
 }
 
 func _defaultTrappingExpectationFailedCallback() {
+  fflush(nil)
   abort()
 }
 
