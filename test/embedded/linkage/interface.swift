@@ -38,7 +38,7 @@ public func enumerateByteOffsets<T>(_: T.Type) -> [Int] {
 }
 
 // Strong definition.
-// ROOT-IR-DAG: define swiftcc ptr @"$e4Root15getPointOffsetsSaySiGyF"(
+// ROOT-IR-DAG: define {{(protected )?}}swiftcc ptr @"$e4Root15getPointOffsetsSaySiGyF"(
 // ROOT-SIL: getPointOffsets
 // ROOT-SIL-NOT: sil{{.*}}@$e4Root15getPointOffsetsSaySiGyF : $@convention(thin) () -> @owned Array<Int> {
 #if EXPLICIT_EXPORT
