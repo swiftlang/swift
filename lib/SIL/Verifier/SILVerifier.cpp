@@ -3015,8 +3015,9 @@ public:
     switch (LI->getOwnershipQualifier()) {
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
-      // enabled.
-      require(!F.hasOwnership(),
+      // enabled, unless they are in a debug reconstruction block.
+      require(!F.hasOwnership() ||
+              LI->getParent()->isDebugReconstructionBlock(),
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:

@@ -59,6 +59,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
@@ -5812,6 +5813,11 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
 }
 
 static bool isInvariantAddress(SILValue v) {
+  // Debug reconstruction blocks have standalone block arguments with no
+  // predecessors, which confuses the access path walker.
+  if (v->getParentBlock()->isDebugReconstructionBlock())
+    return false;
+
   SILValue accessedAddress = getTypedAccessAddress(v);
   if (auto *ptrRoot = dyn_cast<PointerToAddressInst>(accessedAddress)) {
     return ptrRoot->isInvariant();
@@ -6166,6 +6172,39 @@ static bool InCoroContext(SILFunction &f, SILInstruction &i) {
   return f.isAsync() && !i.getDebugScope()->InlinedCallSite;
 }
 
+/// Salvage an LLVM instruction emitted within a debug reconstruction block.
+/// Most instructions are handled by llvm::salvageDebugInfo which encodes
+/// their effects into the DWARF expression, but some instructions, such as
+/// loads, need a special case.
+static void salvageDebugReconstructionInst(llvm::Instruction *I) {
+  if (auto *LI = dyn_cast<llvm::LoadInst>(I)) {
+    llvm::SmallVector<llvm::DbgVariableIntrinsic *, 1> DbgInsts;
+    llvm::SmallVector<llvm::DbgVariableRecord *, 2> DbgRecords;
+    llvm::findDbgUsers(DbgInsts, LI, &DbgRecords);
+    llvm::Value *Addr = LI->getPointerOperand();
+    for (llvm::DbgVariableRecord *DVR : DbgRecords) {
+      // Insert DW_OP_deref after each arg that references the load.
+      // This loop works the same way as llvm::salvageDebugInfoForDbgValues.
+      // It iterates over the inputs (`locations`) of the debug record (although
+      // there usually is only one), and when the input is this load instruction,
+      // the DIExpression is updated to add a deref to all uses.
+      auto locations = DVR->location_ops();
+      llvm::DIExpression *expr = DVR->getExpression();
+      auto locationIterator = find(locations, LI);
+      while (locationIterator != locations.end()) {
+        unsigned locationNo = std::distance(locations.begin(), locationIterator);
+        expr = llvm::DIExpression::appendOpsToArg(expr,
+                                                  {llvm::dwarf::DW_OP_deref}, locationNo);
+        locationIterator = std::find(std::next(locationIterator), locations.end(), LI);
+      }
+      DVR->replaceVariableLocationOp(LI, Addr);
+      DVR->setExpression(expr);
+    }
+    return;
+  }
+  llvm::salvageDebugInfo(*I);
+}
+
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   auto SILVal = i->getOperand();
   bool IsAddrVal = SILVal->getType().isAddress();
@@ -6307,7 +6346,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Erase any LLVM instructions emitted by the debug BB. They were only needed
   // to produce the dbg intrinsic; salvage converts references into DWARF exprs.
   for (auto *I : llvm::reverse(DebugBBInsts)) {
-    llvm::salvageDebugInfo(*I);
+    salvageDebugReconstructionInst(I);
     I->eraseFromParent();
   }
 }
