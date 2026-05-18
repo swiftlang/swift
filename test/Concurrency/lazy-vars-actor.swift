@@ -64,7 +64,7 @@ public struct MainActorHasLazyVars {
 // CHECK-NEXT:   mutating get
 // CHECK-NEXT:   set
 // CHECK-NEXT: }
-// NONRESILIENT: {{^}}@_hasInitialValue private var $__lazy_storage_$_foo: Swift::Int?
+// NONRESILIENT: {{^}} @_hasInitialValue private var $__lazy_storage_$_foo: Swift::Int?
 // CHECK-NEXT: }
 nonisolated public struct NonisolatedHasLazyVars {
   public lazy var foo: Int = 0
