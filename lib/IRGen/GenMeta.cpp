@@ -7911,8 +7911,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       if (auto invertible = protocol->getInvertibleProtocolKind()) {
         ++metadata.NumRequirements;
 
-        InvertibleProtocolSet mask(0xFFFF);
-        mask.remove(*invertible);
+        auto mask = InvertibleProtocolSet::allExcept(*invertible);
 
         auto flags = GenericRequirementFlags(
             GenericRequirementKind::InvertedProtocols,

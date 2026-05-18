@@ -11,8 +11,18 @@
 // RUN:   -target %target-cpu-apple-macosx14 \
 // RUN:   > %t/test_old.irgen
 
+// When targeting an OS new enough to ship the runtime with the noncopyable
+// Mirror guards, the accessor function is elided and the field's typeref is
+// referenced directly.
+// RUN: %swift-frontend -emit-ir -o - %s -module-name test \
+// RUN:   -parse-as-library \
+// RUN:   -enable-library-evolution \
+// RUN:   -target %target-future-triple \
+// RUN:   > %t/test_safe_runtime.irgen
+
 // RUN: %FileCheck --check-prefix=NEW %s < %t/test_new.irgen
 // RUN: %FileCheck --check-prefix=OLD %s < %t/test_old.irgen
+// RUN: %FileCheck --check-prefix=SAFE-RUNTIME %s < %t/test_safe_runtime.irgen
 
 // rdar://124401253
 // REQUIRES: OS=macosx
@@ -37,6 +47,8 @@ public struct NonCopyable: ~Copyable { }
 
 // HINT: when debugging this test, you can look for an `i32 2` field in the
 // 'MF' constant as a separator that precedes each field descriptor.
+
+// SAFE-RUNTIME-NOT: get_type_metadata{{.*}}noncopyable
 
 // NEW: @"$s4test8CC_TestsCMF" =
 // NEW-SAME: @"get_type_metadata Ri_zr0_l4test21ConditionallyCopyableOyxG noncopyable

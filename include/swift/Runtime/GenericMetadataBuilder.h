@@ -693,6 +693,7 @@ public:
     size_t size = layout.size;
     size_t alignMask = layout.flags.getAlignmentMask();
     bool isPOD = layout.flags.isPOD();
+    bool isCopyable = layout.flags.isCopyable();
     bool isBitwiseTakable = layout.flags.isBitwiseTakable();
 
     auto *fieldOffsetsStart = wordsOffset<StoredPointer>(
@@ -740,6 +741,8 @@ public:
       alignMask = std::max(alignMask, fieldLayout->flags.getAlignmentMask());
       if (!fieldLayout->flags.isPOD())
         isPOD = false;
+      if (!fieldLayout->flags.isCopyable())
+        isCopyable = false;
       if (!fieldLayout->flags.isBitwiseTakable())
         isBitwiseTakable = false;
 
@@ -750,6 +753,11 @@ public:
       }
     }
 
+    // If the struct is always noncopyable, we must honor that.
+    if (isCopyable && description->isUnconditionallySuppressing(
+                          InvertibleProtocolKind::Copyable))
+      isCopyable = false;
+
     bool isInline =
         ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
 
@@ -757,6 +765,7 @@ public:
     layout.flags = ValueWitnessFlags()
                        .withAlignmentMask(alignMask)
                        .withPOD(isPOD)
+                       .withCopyable(isCopyable)
                        .withBitwiseTakable(isBitwiseTakable)
                        .withInlineStorage(isInline);
     layout.extraInhabitantCount = extraInhabitantCount;
