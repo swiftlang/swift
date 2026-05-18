@@ -445,8 +445,9 @@ class MyObj {}
 
     init() {
       mergeValues(field!, customField!)
-      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
-      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+      mergeValues(field2!, customField!) // expected-warning {{passing arguments to local function 'mergeValues' could allow for references between values exposed to global actor 'CustomActor'-isolated code and main actor-isolated code risking data races}}
+      // expected-note @-1 {{'self.field2' is exposed to main actor-isolated code}}
+      // expected-note @-2 {{'self.customField' is exposed to global actor 'CustomActor'-isolated code}}
     }
 
     func testMultipleAccessesAreIndependent() async {
@@ -469,8 +470,9 @@ class MyObj {}
     @CustomActor var customField: NonSendableKlass? = nil
     init() {
       mergeValues(field!, customField!)
-      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
-      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+      mergeValues(field2!, customField!) // expected-warning {{passing arguments to local function 'mergeValues' could allow for references between values exposed to global actor 'CustomActor'-isolated code and main actor-isolated code risking data races}}
+      // expected-note @-1 {{'self.field2' is exposed to main actor-isolated code}}
+      // expected-note @-2 {{'self.customField' is exposed to global actor 'CustomActor'-isolated code}}
     }
 
     func testMultipleAccessesAreIndependent() async {
@@ -492,8 +494,9 @@ class MyObj {}
 
     init() {
       mergeValues(field!, customField!)
-      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
-      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+      mergeValues(field2!, customField!) // expected-warning {{passing arguments to local function 'mergeValues' could allow for references between values exposed to global actor 'CustomActor'-isolated code and main actor-isolated code risking data races}}
+      // expected-note @-1 {{'self.field2' is exposed to main actor-isolated code}}
+      // expected-note @-2 {{'self.customField' is exposed to global actor 'CustomActor'-isolated code}}
     }
 
     func testMultipleAccessesAreIndependent() async {
@@ -515,8 +518,9 @@ class MyObj {}
 
     init() {
       mergeValues(field!, customField!)
-      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
-      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+      mergeValues(field2!, customField!) // expected-warning {{passing arguments to local function 'mergeValues' could allow for references between values exposed to global actor 'CustomActor'-isolated code and main actor-isolated code risking data races}}
+      // expected-note @-1 {{'self.field2' is exposed to main actor-isolated code}}
+      // expected-note @-2 {{'self.customField' is exposed to global actor 'CustomActor'-isolated code}}
     }
 
     func testMultipleAccessesAreIndependent() async {
@@ -558,8 +562,9 @@ actor ActorWithNonisolatedUnsafeField {
 
   init() {
     mergeValues(field!, mainField!)
-    mergeValues(field2!, mainField!) // expected-warning {{passing main actor-isolated 'self.mainField' and 'self'-isolated 'self.field2' as arguments to global function 'mergeValues' risks causing data races}}
-    // expected-note @-1 {{'self.field2' could begin referencing 'self.mainField' allowing concurrent access to 'self.mainField' by 'self'-isolated code and main actor-isolated code}}
+    mergeValues(field2!, mainField!) // expected-warning {{passing arguments to global function 'mergeValues' could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races}}
+    // expected-note @-1 {{'self.field2' is exposed to 'self'-isolated code}}
+    // expected-note @-2 {{'self.mainField' is exposed to main actor-isolated code}}
   }
 
   func testMultipleAccessesAreIndependent() async {
