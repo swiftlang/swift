@@ -449,7 +449,7 @@ getRequiredCodeGenerationModel(const NormalProtocolConformance *conformance) {
   if (conformance->isSynthesized())
     return CodeGenerationModel::Implementation;
 
-  // Other onformances must be @export(interface) in non-Embedded Swift,
+  // Other conformances must be @export(interface) in non-Embedded Swift,
   // because the witness table symbols must be unique.
   if (!isEmbedded) {
     return CodeGenerationModel::Interface;
