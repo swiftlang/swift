@@ -2366,6 +2366,14 @@ Decl::getExplicitCodeGenerationModel() const {
   if (sawInlinable)
     return CodeGenerationModel::Inlinable;
 
+  // An accessor inherits its code generation model from the variable or
+  // subscript it implements, so that `@export(...)` on a var or subscript
+  // controls the linkage of its accessors as well as its storage.
+  if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+    if (auto storage = accessor->getStorage())
+      return storage->getExplicitCodeGenerationModel();
+  }
+
   return std::nullopt;
 }
 
