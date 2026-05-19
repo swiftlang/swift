@@ -24,6 +24,7 @@
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/ProfileCounter.h"
@@ -32,6 +33,7 @@
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILProfiler.h"
+#include "swift/SIL/SILUndef.h"
 #include "llvm/Support/SaveAndRestore.h"
 
 using namespace swift;
@@ -1752,31 +1754,73 @@ void SILGenFunction::emitThrow(SILLocation loc, ManagedValue exnMV,
         : exnType;
 
   // If the thrown error type differs from what the throw destination expects,
-  // perform the conversion.
-  // FIXME: Can the AST tell us what to do here?
+  // perform the conversion. The shape of the conversion depends on the
+  // destination type: existential erasure for `any P` (including `any Error`),
+  // a class upcast when the destination is a superclass of the in-flight
+  // error.
   if (exnType != destErrorType) {
-    assert(destErrorType == SILType::getExceptionType(getASTContext()));
+    CanType destASTType = destErrorType.getASTType();
+    auto &exnTL = getTypeLowering(exnType);
 
-    ProtocolConformanceRef conformances[1] = {
-      checkConformance(
-        exn->getType().getASTType(), getASTContext().getErrorDecl())
-    };
+    if (destASTType->isExistentialType()) {
+      // Erase to the destination existential. The conformances we look up
+      // are dictated by the existential's layout, not always `Error`: for
+      // `do throws(any P) { ... }` where `P` refines `Error`, the layout
+      // contains `P`, and the inner thrown value must be convertible to
+      // `any P`.
+      //
+      // FIXME: Parameterized protocols (`any P<X>`) and class-bound
+      // composition existentials (`any (BaseClass & P)`) are not handled
+      // here — the former drops the parameter constraint and the latter
+      // skips the implicit superclass upcast that would be needed before
+      // the erasure. Sema does not currently surface either shape as a
+      // typed-throws destination, but if it ever does this code will need
+      // to look at `getParameterizedProtocols()` and `explicitSuperclass`.
+      auto layout = destASTType->getExistentialLayout();
+      SmallVector<ProtocolConformanceRef, 4> conformances;
+      conformances.reserve(layout.getProtocols().size());
+      for (auto *proto : layout.getProtocols()) {
+        conformances.push_back(
+            checkConformance(exn->getType().getASTType(), proto));
+      }
 
-    exn = emitExistentialErasure(
-        loc,
-        exnType.getASTType(),
-        getTypeLowering(exnType),
-        getTypeLowering(destErrorType),
-        getASTContext().AllocateCopy(conformances),
-        SGFContext(),
-        [&](SGFContext C) -> ManagedValue {
-          if (exn->getType().isAddress()) {
-            return emitLoad(loc, exn, getTypeLowering(exnType), SGFContext(),
-                            IsTake);
-          }
+      // The lambda passed to `emitExistentialErasure` is invoked once,
+      // before the outer `exn` is reassigned with the erasure result.
+      exn = emitExistentialErasure(
+          loc,
+          exnType.getASTType(),
+          exnTL,
+          getTypeLowering(destErrorType),
+          getASTContext().AllocateCopy(llvm::ArrayRef<ProtocolConformanceRef>(
+              conformances)),
+          SGFContext(),
+          [&](SGFContext C) -> ManagedValue {
+            if (exn->getType().isAddress()) {
+              return emitLoad(loc, exn, exnTL, SGFContext(), IsTake);
+            }
 
-          return ManagedValue::forForwardedRValue(*this, exn);
-        }).forward(*this);
+            return ManagedValue::forForwardedRValue(*this, exn);
+          }).forward(*this);
+    } else if (destASTType->getClassOrBoundGenericClass()) {
+      // Class upcast: the in-flight error is a reference to a subclass of
+      // the destination. SIL's `upcast` instruction additionally verifies
+      // the subclass relationship in asserts builds; release builds rely
+      // on Sema having rejected unrelated classes upstream.
+      if (exn->getType().isAddress()) {
+        exn = emitLoad(loc, exn, exnTL, SGFContext(), IsTake).forward(*this);
+      }
+      exn = B.createUpcast(loc, exn, destErrorType);
+    } else {
+      // We don't have a SILGen lowering for this conversion shape today.
+      // Diagnose and substitute an undef of the destination type so the
+      // rest of the function can lower; the diagnostic ensures the
+      // compilation as a whole fails.
+      SGM.diagnose(loc, diag::not_implemented,
+                   "throw conversion from '" +
+                       exnType.getASTType()->getString() + "' to '" +
+                       destASTType->getString() + "'");
+      exn = SILUndef::get(F, destErrorType);
+    }
   }
   assert(exn->getType().getObjectType() == destErrorType);
 
