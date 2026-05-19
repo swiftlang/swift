@@ -1169,11 +1169,10 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
 // Eagerly emit global variables that are externally visible.
 static bool isLazilyEmittedGlobalVariable(SILGlobalVariable &v, SILModule &m) {
   if (v.isPossiblyUsedExternally()) {
-    // Under the embedded linkage model, if it has a non-unique definition,
-    // treat it lazily.
-    if (v.hasNonUniqueDefinition() && !v.markedAsUsed()) {
+    // Globals that come from a different module will be lazily emitted unless
+    // explicitly marked @used.
+    if (v.getParentModule() != m.getSwiftModule() && !v.markedAsUsed())
       return true;
-    }
 
     return false;
   }
