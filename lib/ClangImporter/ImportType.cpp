@@ -476,6 +476,16 @@ namespace {
     }
 
     ImportResult
+    VisitOverflowBehaviorType(const clang::OverflowBehaviorType *type) {
+      Impl.addImportDiagnostic(
+          type,
+          Diagnostic(diag::unsupported_builtin_type, type->getTypeClassName()),
+          clang::SourceLocation());
+      // FIXME: handle OverflowBehaviorType.
+      return Type();
+    }
+
+    ImportResult
     VisitCountAttributedType(const clang::CountAttributedType *type) {
       return Visit(type->desugar());
     }

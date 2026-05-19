@@ -1231,7 +1231,8 @@ namespace {
       case clang::Type::HLSLAttributedResource:
       case clang::Type::HLSLInlineSpirv:
         llvm_unreachable("HLSL type in ABI lowering");
-
+      case clang::Type::OverflowBehavior:
+        llvm_unreachable("OverflowBehavior type in ABI lowering");
 
       case clang::Type::ConstantArray: {
         auto array = Ctx.getAsConstantArrayType(type);
