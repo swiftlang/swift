@@ -37,6 +37,7 @@ target_link_libraries(swiftClangImporter PRIVATE
   swiftAST
   swiftParse
   clangOptions
+  clangDriver
   clangTooling)
 
 target_link_libraries(swiftClangImporter INTERFACE
