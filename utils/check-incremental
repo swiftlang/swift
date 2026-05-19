@@ -106,9 +106,6 @@ def main():
       '-Xllvm', '-print-no-uuids',
       '-Xllvm', '-sil-print-pass-md5']
 
-    new_args += [
-      '-Xllvm', '-print-cse-internals']
-
     if EMIT_IR:
       new_args += [
         '-Xllvm', '-save-sil', '-Xllvm', output_file + '.sil',
