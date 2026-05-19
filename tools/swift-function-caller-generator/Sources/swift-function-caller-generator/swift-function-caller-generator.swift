@@ -99,7 +99,7 @@ class SwiftMacroTestGen: SyntaxVisitor {
           \.modifiers,
           res.modifiers.filter { modifier in
             switch modifier.name.tokenKind {
-            case .keyword(.mutating), .keyword(.open), .keyword(.class):
+            case .keyword(.mutating), .keyword(.open), .keyword(.class), .keyword(.final):
               false
             default:
               true

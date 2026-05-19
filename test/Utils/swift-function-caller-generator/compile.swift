@@ -49,7 +49,7 @@ public class C {
   open func ope(_ x: Int) -> Int {
     return x
   }
-  public class func clas(x: Int) -> Int {
+  public final class func clas(x: Int) -> Int {
     return x
   }
   open class func clas2(x: Int) -> Int {
@@ -117,8 +117,7 @@ public func call_qux(_ func: inout Swift::MutableSpan<Swift::CInt>) {
 func call_ope(_ self: C, _ x: Swift::Int) -> Swift::Int {
   return self.ope(x)
 }
-
-  public func call_clas(x: Swift::Int) -> Swift::Int {
+public func call_clas(x: Swift::Int) -> Swift::Int {
   return C.clas(x: x)
 }
 func call_clas2(x: Swift::Int) -> Swift::Int {
