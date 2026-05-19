@@ -836,6 +836,7 @@ DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
   OnAbstractFunction | OnSubscript | OnVar | OnExtension,
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   158)
+DECL_ATTR_ALIAS(_preInverseGenericsExceptCopyable, PreInverseGenerics)
 
 // Declares that a struct contains "sensitive" data. It enforces that the contents of such a struct value
 // is zeroed out at the end of its lifetime. In other words: the content of such a value is not observable
