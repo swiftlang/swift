@@ -136,8 +136,8 @@ debug_value %0 : $*T, var, name "value", expr op_deref
 SILGen should always use `SILBuilder::emitDebugDescription` to create debug
 values, which will automatically add an op_deref depending on the type of the
 SSA value. As there are no pointers in Swift, this will always do the right
-thing. In SIL passes, use `SILBuilder::createDebugValue` to create debug values,
-or `SILBuilder::createDebugValueAddr` to prepend an op_deref.
+thing. In SIL passes, use `DebugValueInst::prependDeref` to prepend a deref
+to an existing debug_value instruction.
 
 For any computation more complex than a simple dereference, [Debug Reconstruction Basic Blocks](SIL/DebugBasicBlocks.md) should be used.
 

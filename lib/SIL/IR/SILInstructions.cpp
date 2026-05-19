@@ -471,16 +471,6 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
     DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace);
 }
 
-DebugValueInst *
-DebugValueInst::createAddr(SILDebugLocation DebugLoc, SILValue Operand,
-                           SILModule &M, SILDebugVariable Var,
-                           UsesMoveableValueDebugInfo_t wasMoved, bool trace) {
-  Var.DIExpr.prependElements(
-    {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
-  return DebugValueInst::create(DebugLoc, Operand, M, Var, DontPoisonRefs,
-                                wasMoved, trace);
-}
-
 void DebugValueInst::prependDeref() {
   ASSERT(!sharedUInt8().DebugValueInst.prependDeref &&
          "Debug value cannot have two derefs!");

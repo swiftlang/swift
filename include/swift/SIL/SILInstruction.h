@@ -5632,10 +5632,6 @@ class DebugValueInst final
                                 PoisonRefs_t poisonRefs,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
-  static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
-                                    SILModule &M, SILDebugVariable Var,
-                                    UsesMoveableValueDebugInfo_t wasMoved,
-                                    bool trace);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
