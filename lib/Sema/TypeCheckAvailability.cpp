@@ -333,8 +333,15 @@ bool ExportContext::encapsulatedAsHiddenStoredProperty(
   // serialized into this module's hidden-type layouts block.
   if (auto *nominal = dyn_cast<NominalTypeDecl>(D)) {
     if (auto layout = computeClangAbstractLayout(nominal)) {
-      getDeclContext()->getParentModule()->recordHiddenTypeLayout(
+      auto *DC = getDeclContext();
+      DC->getParentModule()->recordHiddenTypeLayout(
           layout->mangledName, *layout);
+      // Also record the canonical type so the serializer can substitute a
+      // HiddenType placeholder for stored-property references in the emitted
+      // .swiftmodule, without re-mangling at every VarDecl serialization site.
+      DC->getASTContext().recordTypeToHideWhenEmittingModule(
+          nominal->getDeclaredInterfaceType()->getCanonicalType(),
+          layout->mangledName);
       return true;
     }
   }
