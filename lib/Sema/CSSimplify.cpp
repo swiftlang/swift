@@ -2179,9 +2179,36 @@ ConstraintSystem::matchTupleTypes(TupleType *tuple1, TupleType *tuple2,
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
 
   for (auto pair : matcher.pairs) {
-    auto result = matchTypes(pair.lhs, pair.rhs, subkind, subflags,
-                             locator.withPathElement(
-                                    LocatorPathElt::TupleElement(pair.lhsIdx)));
+    auto elementLocator = getConstraintLocator(
+        locator.withPathElement(LocatorPathElt::TupleElement(pair.lhsIdx)));
+
+    bool alreadyExists = false;
+    for (auto &existing : InactiveConstraints) {
+      if (existing.getKind() == subkind &&
+          existing.getLocator() == elementLocator &&
+          existing.getFirstType()->isEqual(pair.lhs) &&
+          existing.getSecondType()->isEqual(pair.rhs)) {
+        alreadyExists = true;
+        break;
+      }
+    }
+
+    if (!alreadyExists) {
+      for (auto &existing : ActiveConstraints) {
+        if (existing.getKind() == subkind &&
+            existing.getLocator() == elementLocator &&
+            existing.getFirstType()->isEqual(pair.lhs) &&
+            existing.getSecondType()->isEqual(pair.rhs)) {
+          alreadyExists = true;
+          break;
+        }
+      }
+    }
+
+    if (alreadyExists)
+      continue;
+
+    auto result = matchTypes(pair.lhs, pair.rhs, subkind, subflags, elementLocator);
     if (result.isFailure())
       return result;
   }
