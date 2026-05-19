@@ -161,11 +161,12 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
 
 extension CollectionOfOne {
   @_alwaysEmitIntoClient
-  @available(SwiftCompatibilitySpan 5.0, *)
   public func withContiguousStorageIfAvailable<R: ~Copyable, E: Error>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R? {
-    try self.span.withUnsafeBufferPointer(body)
+    try withUnsafePointer(to: _element) { pointer throws(E) -> R in
+      try unsafe body(UnsafeBufferPointer(start: pointer, count: 1))
+    }
   }
 }
 
