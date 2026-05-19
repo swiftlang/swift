@@ -241,8 +241,7 @@ namespace {
       return std::make_unique<HeaderParsingASTConsumer>(Impl);
     }
     bool BeginSourceFileAction(clang::CompilerInstance &CI) override {
-      auto PCH =
-          Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash, /*Cached=*/true);
+      auto PCH = Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash);
       if (PCH.has_value()) {
         Impl.getClangInstance()->getPreprocessorOpts().ImplicitPCHInclude =
             PCH.value();
@@ -1117,7 +1116,6 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
       clang::DisableValidationForModuleKind::None;
   invocation->getHeaderSearchOpts().ModulesValidateSystemHeaders = true;
   invocation->getLangOpts().NeededByPCHOrCompilationUsesPCH = true;
-  invocation->getLangOpts().CacheGeneratedPCH = true;
 
   // ClangImporter::create adds a remapped MemoryBuffer that we don't need
   // here.  Moreover, it's a raw pointer owned by the preprocessor options; if
@@ -1225,7 +1223,7 @@ ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
 
 std::optional<std::string>
 ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
-                              StringRef SwiftPCHHash, bool Cached) {
+                              StringRef SwiftPCHHash) {
   bool isExplicit;
   auto PCHFilename = getPCHFilename(ImporterOptions, SwiftPCHHash,
                                     isExplicit);
@@ -1242,7 +1240,7 @@ ClangImporter::getOrCreatePCH(const ClangImporterOptions &ImporterOptions,
       return std::nullopt;
     }
     auto FailedToEmit = emitBridgingPCH(ImporterOptions.BridgingHeader,
-                                        PCHFilename.value(), Cached);
+                                        PCHFilename.value());
     if (FailedToEmit) {
       return std::nullopt;
     }
@@ -2307,13 +2305,12 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
 }
 
 bool ClangImporter::emitBridgingPCH(
-    StringRef headerPath, StringRef outputPCHPath, bool cached) {
+    StringRef headerPath, StringRef outputPCHPath) {
   auto emitInstance = cloneCompilerInstanceForPrecompiling();
   auto &invocation = emitInstance->getInvocation();
 
   auto &LangOpts = invocation.getLangOpts();
   LangOpts.NeededByPCHOrCompilationUsesPCH = true;
-  LangOpts.CacheGeneratedPCH = cached;
 
   auto language = getLanguageFromOptions(LangOpts);
   auto inputFile = clang::FrontendInputFile(headerPath, language);

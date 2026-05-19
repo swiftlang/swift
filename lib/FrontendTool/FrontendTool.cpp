@@ -407,13 +407,12 @@ static bool precompileBridgingHeader(const CompilerInstance &Instance) {
   if (!PCHOutDir.empty()) {
     // Create or validate a persistent PCH.
     auto SwiftPCHHash = Invocation.getPCHHash();
-    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash,
-                                             /*cached=*/false);
+    auto PCH = clangImporter->getOrCreatePCH(ImporterOpts, SwiftPCHHash);
     return !PCH.has_value();
   }
   return clangImporter->emitBridgingPCH(
       opts.InputsAndOutputs.getFilenameOfFirstInput(),
-      opts.InputsAndOutputs.getSingleOutputFilename(), /*cached=*/false);
+      opts.InputsAndOutputs.getSingleOutputFilename());
 }
 
 static bool precompileClangModule(const CompilerInstance &Instance) {
