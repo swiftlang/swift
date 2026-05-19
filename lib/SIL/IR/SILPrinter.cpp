@@ -4028,6 +4028,21 @@ void SILGlobalVariable::print(llvm::raw_ostream &OS, bool Verbose) const {
   if (markedAsUsed())
     OS << "[used] ";
 
+  if (auto cgModel = codeGenerationModel()) {
+    switch (*cgModel) {
+    case CodeGenerationModel::Interface:
+      OS << "[export_interface] ";
+      break;
+
+    case CodeGenerationModel::Implementation:
+      OS << "[export_implementation] ";
+      break;
+
+    case CodeGenerationModel::Inlinable:
+      break;
+    }
+  }
+
   if (!asmName().empty())
     OS << "[asmname \"" << asmName() << "\"] ";
 

@@ -2369,9 +2369,17 @@ Decl::getExplicitCodeGenerationModel() const {
   // An accessor inherits its code generation model from the variable or
   // subscript it implements, so that `@export(...)` on a var or subscript
   // controls the linkage of its accessors as well as its storage.
+  //
+  // We only inherit when the storage has effective public visibility.
   if (auto accessor = dyn_cast<AccessorDecl>(this)) {
-    if (auto storage = accessor->getStorage())
-      return storage->getExplicitCodeGenerationModel();
+    if (auto storage = accessor->getStorage()) {
+      AccessScope access =
+          storage->getFormalAccessScope(
+              nullptr, /*treatUsableFromInlineAsPublic*/false,
+              /*ignoreImportAccessLevel*/false);
+      if (access.isPublic())
+        return storage->getExplicitCodeGenerationModel();
+    }
   }
 
   return std::nullopt;

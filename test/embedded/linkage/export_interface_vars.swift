@@ -8,6 +8,19 @@
 // RUN: %target-swift-frontend -emit-ir -emit-module -o %t/Library.ll %t/Library.swift -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -parse-as-library
 // RUN: %FileCheck %s -check-prefix LIBRARY-IR < %t/Library.ll
 
+// SIL textual print: emit SIL and verify the codegen-model attribute is
+// printed on each `sil_global`. This is what carries the model after the AST
+// decl is gone.
+// RUN: %target-swift-frontend -emit-sil -o %t/Library.sil %t/Library.swift -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -parse-as-library -module-name Library
+// RUN: %FileCheck %s -check-prefix LIBRARY-SIL < %t/Library.sil
+
+// Serialization round-trip via .swiftmodule: emit module, then re-emit SIL
+// from the swiftmodule. The codegen-model field in the SIL_GLOBALVAR record
+// is what carries the model across serialization, so the re-printed SIL must
+// still carry the attribute.
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/LibSer.swiftmodule %t/Library.swift -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -parse-as-library -module-name LibSer
+// RUN: %target-swift-frontend -emit-sil %t/LibSer.swiftmodule -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -parse-as-library | %FileCheck %s -check-prefix LIBRARY-SERIALIZED
+
 // Client checking
 // RUN: %target-swift-frontend -emit-ir -o %t/Client.ll %t/Client.swift -I %t -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -parse-as-library
 // RUN: %FileCheck %s -check-prefix CLIENT-IR < %t/Client.ll
@@ -18,6 +31,11 @@
 // global and a strongly-defined unsafe-address accessor.
 // LIBRARY-IR-DAG: @"$e7Library15exportedStoredVSivp" = {{(protected )?}}global
 // LIBRARY-IR-DAG: define {{(protected |dllexport )?}}swiftcc ptr @"$e7Library15exportedStoredVSivau"()
+// LIBRARY-SIL-DAG: sil_global [export_interface] @$e7Library15exportedStoredVSivp
+// `@export(interface)` does not need to be serialized: it's a strong public
+// definition emitted into the library's object file, and the swiftmodule does
+// not need to carry its SIL.
+// LIBRARY-SERIALIZED-NOT: sil_global {{.*}}@$e6LibSer15exportedStoredVSivp
 @export(interface)
 public var exportedStoredV: Int = 42
 
@@ -25,6 +43,8 @@ public var exportedStoredV: Int = 42
 // constant and a strongly-defined unsafe-address accessor.
 // LIBRARY-IR-DAG: @"$e7Library15exportedStoredLSivp" = {{(protected )?}}constant
 // LIBRARY-IR-DAG: define {{(protected |dllexport )?}}swiftcc ptr @"$e7Library15exportedStoredLSivau"()
+// LIBRARY-SIL-DAG: sil_global {{.*}}[export_interface] {{.*}}@$e7Library15exportedStoredLSivp
+// LIBRARY-SERIALIZED-NOT: sil_global {{.*}}@$e6LibSer15exportedStoredLSivp
 @export(interface)
 public let exportedStoredL: Int = 7
 
@@ -49,6 +69,8 @@ public var exportedComputedRW: Int {
 // LIBRARY-IR-NOT: @"$e7Library11implStoredVSivp"
 // LIBRARY-IR-NOT: define{{.*}}@"$e7Library11implStoredVSivau"
 // LIBRARY-IR-NOT: define{{.*}}@"$e7Library12implComputedSivg"
+// LIBRARY-SIL-DAG: sil_global {{.*}}[export_implementation] {{.*}}@$e7Library11implStoredVSivp
+// LIBRARY-SERIALIZED-DAG: sil_global {{.*}}[export_implementation] {{.*}}@$e6LibSer11implStoredVSivp
 @export(implementation)
 public var implStoredV: Int = 99
 

@@ -35,6 +35,7 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("test/embedded/linkage/cxx.swift"),
     pathlib.Path("test/embedded/linkage/diamond.swift"),
     pathlib.Path("test/embedded/linkage/diamond_embedded_exist.swift"),
+    pathlib.Path("test/embedded/linkage/export_interface_vars.swift"),
     pathlib.Path("test/embedded/linkage/interface.swift"),
     pathlib.Path("test/embedded/linkage/leaf_application.swift"),
     pathlib.Path("test/embedded/serialization.swift"),
