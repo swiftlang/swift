@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt -enable-sil-verify-all %s -constant-capture-propagation | %FileCheck %s
+
+// When a generic closure is partially applied with a constant argument whose
+// callee parameter type involves archetypes, ConstantCapturePropagation must
+// skip the optimization. Injecting a concrete constant into a generic clone
+// (which preserves archetype types) would create ill-typed SIL.
+
+sil_stage raw
+
+import Builtin
+
+sil [ossa] @concrete_body : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  copy_addr %1 to [init] %0 : $*Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
+
+sil shared [ossa] @generic_with_func_arg : $@convention(thin) <T> (@in_guaranteed Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out T) -> @out T {
+bb0(%0 : $*T, %1 : $*Builtin.Int64, %2 : @guaranteed $@callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out T):
+  %r = apply %2(%0, %1) : $@callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out T
+  %result = tuple ()
+  return %result : $()
+}
+
+// The constant argument (concrete_body) has callee parameter type
+// @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out T, which involves
+// archetype T. The optimization must be skipped — the partial_apply should
+// remain unchanged.
+//
+// CHECK-LABEL: sil [ossa] @caller_with_generic_const_arg
+// CHECK:         function_ref @generic_with_func_arg
+// CHECK:         partial_apply
+// CHECK:       } // end sil function 'caller_with_generic_const_arg'
+sil [ossa] @caller_with_generic_const_arg : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64 {
+bb0(%0 : $*Builtin.Int64, %1 : $*Builtin.Int64):
+  %body_ref = function_ref @concrete_body : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64
+  %body = thin_to_thick_function %body_ref : $@convention(thin) (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64 to $@callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64
+  %f = function_ref @generic_with_func_arg : $@convention(thin) <T> (@in_guaranteed Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out T) -> @out T
+  %pa = partial_apply [callee_guaranteed] %f<Builtin.Int64>(%body) : $@convention(thin) <T> (@in_guaranteed Builtin.Int64, @guaranteed @callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out T) -> @out T
+  %borrow = begin_borrow %pa : $@callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64
+  %result = apply %borrow(%0, %1) : $@callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64
+  end_borrow %borrow : $@callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64
+  destroy_value %pa : $@callee_guaranteed (@in_guaranteed Builtin.Int64) -> @out Builtin.Int64
+  %r = tuple ()
+  return %r : $()
+}
