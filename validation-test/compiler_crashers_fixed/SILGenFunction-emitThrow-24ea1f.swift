@@ -1,5 +1,5 @@
 // {"kind":"emit-silgen","original":"6deeffa3","signature":"swift::Lowering::SILGenFunction::emitThrow(swift::SILLocation, swift::Lowering::ManagedValue, bool)","signatureAssert":"Assertion failed: (destErrorType == SILType::getExceptionType(getASTContext())), function emitThrow","signatureNext":"PatternMatchEmission::emitIsDispatch"}
-// RUN: not --crash %target-swift-frontend -emit-silgen %s
+// RUN: not %target-swift-frontend -emit-silgen %s
 protocol a: Error {
 }
 protocol b {
