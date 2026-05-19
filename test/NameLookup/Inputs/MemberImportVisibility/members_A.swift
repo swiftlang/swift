@@ -71,8 +71,10 @@ open class BaseClassInA {
   open func overriddenInBMethod() {}
 }
 
+public protocol EmptyProtocolInA { }
+
 public protocol ProtocolInA1 {
-  func defaultedRequirementInA()
+  func defaultedRequirementInA() // has an inherited default
 }
 
 extension ProtocolInA1 {
@@ -80,9 +82,9 @@ extension ProtocolInA1 {
 }
 
 public protocol ProtocolInA2 {
-  func defaultedRequirementInA()
-  func defaultedRequirementInB()
-  func defaultedRequirementInC()
+  func defaultedRequirementInA() // has an inherited default
+  func defaultedRequirementInB() // has a retroactive default (in B)
+  func defaultedRequirementInC() // has a retroactive default (in C)
 }
 
 extension ProtocolInA2 {
@@ -90,7 +92,17 @@ extension ProtocolInA2 {
 }
 
 public protocol ProtocolInA3 {
-  func defaultedRequirementInBAndC()
+  func defaultedRequirementInBAndC() // has retroactive defaults (in both B and C)
+}
+
+public protocol BaseProtocolInA4 {
+  func defaultedRequirementInRefinementInA() // has a retroactive default (in an extension on a refined protocol)
+}
+
+public protocol ProtocolInA4: BaseProtocolInA4 { }
+
+extension ProtocolInA4 {
+  public func defaultedRequirementInRefinementInA() { }
 }
 
 public protocol ProtocolWithAssociatedTypesInA {
