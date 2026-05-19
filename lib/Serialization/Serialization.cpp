@@ -4863,6 +4863,15 @@ public:
 
     unsigned numBackingProperties = 0;
     Type ty = var->getInterfaceType();
+    // If Sema marked this stored property's type as one to hide on emission
+    // swap in a HiddenType placeholder carrying just the mangled name. Clients of
+    // the emitted .swiftmodule will deserialize the HiddenType instead of the
+    // real type, breaking the link to the internal bridging-header dependency.
+    auto &ctx = var->getASTContext();
+    if (auto mangledName = ctx.lookupTypeToHideWhenEmittingModule(
+            ty->getCanonicalType())) {
+      ty = HiddenType::get(ctx, *mangledName);
+    }
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
