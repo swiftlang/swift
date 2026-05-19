@@ -920,14 +920,14 @@ internal func _float80ToStringImpl(
 // * `buffer`: Buffer to place the result
 // Returns: Range of bytes within `buffer` that contain the result
 //
-// Buffer must be at least 40 bytes long and must be pre-filled
+// Buffer must be at least 64 bytes long and must be pre-filled
 // with "0" characters, e.g., via
-// `InlineArray<40,UTF8.CodeUnit>(repeating:0x30)`
+// `InlineArray<64,UTF8.CodeUnit>(repeating:0x30)`
 internal func _Float80ToASCII(
   value f: Float80,
   buffer utf8Buffer: inout MutableSpan<UTF8.CodeUnit>
 ) -> Range<Int> {
-  assert(utf8Buffer.count >= 40)
+  assert(utf8Buffer.count >= 64)
   var buffer = utf8Buffer.mutableBytes
 
   // Step 1: Handle special cases, decompose the input
@@ -1090,6 +1090,7 @@ fileprivate func _Float128Backend(
   significand: _UInt128,
   sign: FloatingPointSign
 ) -> Range<Int> {
+  assert(utf8Buffer.count >= 56)
   var buffer = utf8Buffer.mutableBytes
 
   // Step 2: Compute the base 10 exponent to match the rounding interval
