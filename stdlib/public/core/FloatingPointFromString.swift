@@ -1711,10 +1711,12 @@ fileprivate func fiveToTheN(
   // then multiply to get the final exact value.
   let maxPower = powersOfFive_maxPower
   let clampedPower = power > maxPower ? maxPower : power
-  // We need to find the appropriate power of five from the table
-  // above.  This maps the power to the index of the largest power of 5
-  // in the table no greater than the desired power.
-  let index = (((clampedPower &* 4759) >> 16) - 2) / 4
+  // We need to find the appropriate power of five from the table above.  This
+  // maps the power to the index of the largest power of 5 in the table no
+  // greater than the desired power.  The constants 595 and 15894 were chosen by
+  // exhaustive search to keep the result correct (no overshoot) and optimal
+  // (picks the largest valid index) for every clampedPower in [28, 633].
+  let index = (clampedPower &* 595 &- 15894) >> 15
   // How many words in that item?
   let words = index * 4 + 2
   // The corresponding power of five
