@@ -36,9 +36,17 @@ public struct FunctionConvention : CustomStringConvertible {
     self.hasLoweredAddresses = hasLoweredAddresses
   }
 
-  /// All results including the error.
-  public var results: Results {
+  /// All results including the error. Most callers want `formalResults`;
+  /// reach for this only when the error result should be processed alongside
+  /// the formal ones.
+  public var resultsWithError: Results {
     Results(bridged: SILFunctionType_getResultsWithError(functionType.bridged),
+      hasLoweredAddresses: hasLoweredAddresses)
+  }
+
+  /// The formal results, excluding the error result.
+  public var formalResults: Results {
+    Results(bridged: SILFunctionType_getResults(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
@@ -59,7 +67,7 @@ public struct FunctionConvention : CustomStringConvertible {
 
   /// Returns the indirect result - including the error - at `index`.
   public func indirectSILResult(at index: Int) -> ResultInfo {
-    let indirectResults = results.lazy.filter {
+    let indirectResults = resultsWithError.lazy.filter {
       hasLoweredAddresses ? $0.isSILIndirect : $0.convention == .pack
     }
     // Note that subscripting a LazyFilterCollection (with the base index, e.g. `Int`) does not work
@@ -99,23 +107,23 @@ public struct FunctionConvention : CustomStringConvertible {
   }
 
   public var hasGuaranteedResult: Bool {
-    if results.count != 1 {
+    if resultsWithError.count != 1 {
       return false
     }
     if hasLoweredAddresses {
-      return results[0].convention == .guaranteed
+      return resultsWithError[0].convention == .guaranteed
     }
-    return results[0].convention == .guaranteed || results[0].convention == .guaranteedAddress
+    return resultsWithError[0].convention == .guaranteed || resultsWithError[0].convention == .guaranteedAddress
   }
 
   public var hasAddressResult: Bool {
-    if results.count != 1 {
+    if resultsWithError.count != 1 {
       return false
     }
     if hasLoweredAddresses {
-      return results[0].convention == .guaranteedAddress || results[0].convention == .inout
+      return resultsWithError[0].convention == .guaranteedAddress || resultsWithError[0].convention == .inout
     }
-    return results[0].convention == .inout
+    return resultsWithError[0].convention == .inout
   }
 
   public var description: String {
@@ -126,7 +134,7 @@ public struct FunctionConvention : CustomStringConvertible {
         str += "\n lifetime: \(deps)"
       }
     }
-    results.forEach { str += "\n   result: " + $0.description }
+    resultsWithError.forEach { str += "\n   result: " + $0.description }
     if let deps = resultDependencies {
       str += "\n lifetime: \(deps)"
     }
