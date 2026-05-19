@@ -2722,9 +2722,9 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   // instead, manually register all `.h` inputs of Clang module dependnecies.
   if (SwiftDependencyTracker &&
       !Instance->getInvocation().getLangOpts().ImplicitModules) {
-    if (auto moduleRef = clangModule->getASTFile()) {
+    if (auto *fileKey = clangModule->getASTFileKey()) {
       auto *moduleFile = Instance->getASTReader()->getModuleManager().lookup(
-          *moduleRef);
+          *fileKey);
       llvm::SmallString<0> pathBuf;
       pathBuf.reserve(256);
       Instance->getASTReader()->visitInputFileInfos(
@@ -4511,14 +4511,14 @@ StringRef ClangModuleUnit::getFilename() const {
       return "<imports>";
     return SinglePCH;
   }
-  if (auto F = clangModule->getASTFile())
-    return F->getName();
+  if (auto *FileName = clangModule->getASTFileName())
+    return FileName->str();
   return StringRef();
 }
 
 StringRef ClangModuleUnit::getLoadedFilename() const {
-  if (auto F = clangModule->getASTFile())
-    return F->getName();
+  if (auto *FileName = clangModule->getASTFileName())
+    return FileName->str();
   return StringRef();
 }
 
