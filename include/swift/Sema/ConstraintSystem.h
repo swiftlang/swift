@@ -2338,6 +2338,26 @@ public:
   /// Add a newly-generated constraint that is known not to be solvable
   /// right now.
   void addUnsolvedConstraint(Constraint *constraint) {
+    if (constraint->getLocator() &&
+        constraint->getLocator()->isLastElement<LocatorPathElt::TupleElement>()) {
+      for (auto &existing : InactiveConstraints) {
+        if (existing.getKind() == constraint->getKind() &&
+            existing.getLocator() == constraint->getLocator() &&
+            existing.getFirstType()->isEqual(constraint->getFirstType()) &&
+            existing.getSecondType()->isEqual(constraint->getSecondType())) {
+          return; 
+        }
+      }
+      for (auto &existing : ActiveConstraints) {
+        if (existing.getKind() == constraint->getKind() &&
+            existing.getLocator() == constraint->getLocator() &&
+            existing.getFirstType()->isEqual(constraint->getFirstType()) &&
+            existing.getSecondType()->isEqual(constraint->getSecondType())) {
+          return;
+        }
+      }
+    }
+
     // We couldn't solve this constraint; add it to the pile.
     InactiveConstraints.push_back(constraint);
 
