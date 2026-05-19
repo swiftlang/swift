@@ -646,10 +646,17 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
   }
 
   SILGenFunctionBuilder builder(*this);
-  return builder.getOrCreateSharedFunction(
+  auto *thunk = builder.getOrCreateSharedFunction(
       loc, name, thunkDeclType, IsBare, IsTransparent, serializable,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible);
+
+  if (auto isolatedParam = thunkType->maybeGetIsolatedParameter()) {
+    if (isolatedParam->hasOption(SILParameterInfo::ImplicitLeading))
+      thunk->setActorIsolation(ActorIsolation::forCallerIsolationInheriting());
+  }
+
+  return thunk;
 }
 
 SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(

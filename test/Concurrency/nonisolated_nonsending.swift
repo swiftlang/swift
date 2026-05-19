@@ -26,7 +26,8 @@ func testPartialApplication(p: [any P]) async {
 //   Reabstraction thunk from caller-isolated () -> () to caller-isolated () -> T
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @$sBAIeghHgIL_BAytIeghHgILr_TR : $@convention(thin) @Sendable @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()) -> @out () {
 // CHECK:       bb0(%0 : $*(), %1 : $Builtin.ImplicitActor, %2 : $@Sendable @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()):
-// CHECK-NEXT:    hop_to_executor %1
+// The hop is eliminated because the argument is `nonisolated(nonsending)`
+// CHECK-NOT:    hop_to_executor %1
 // CHECK-NEXT:    apply %2(%1) :
 
 func takesGenericAsyncFunction<T>(_ fn: nonisolated(nonsending) (T) async -> Void) {}
@@ -45,11 +46,50 @@ func testReabstractionPreservingCallerIsolation(fn: nonisolated(nonsending) (Int
 // CHECK-LABEL: sil shared [transparent] [reabstraction_thunk] @$sBASiIgHgILy_BASiIegHgILn_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed Int, @guaranteed @noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()) -> () {
 // CHECK:       bb0(%0 : $Builtin.ImplicitActor, %1 : $*Int, %2 : $@noescape @async @callee_guaranteed (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, Int) -> ()):
 // CHECK-NEXT:    %3 = load %1
-// CHECK-NEXT:    hop_to_executor %0
+// The hop is eliminated because the argument is `nonisolated(nonsending)`
+// CHECK-NOT:    hop_to_executor %0
 // CHECK-NEXT:    apply %2(%0, %3)
 
 func takesAsyncIsolatedAnyFunction(_ fn: @isolated(any) () async -> Void) {}
 func takesGenericAsyncIsolatedAnyFunction<T>(_ fn: @isolated(any) (T) async -> Void) {}
+
+func testReabstractionHopsBack() async throws {
+  func compute<T, R>(_ fn: nonisolated(nonsending) (T) async -> R?) async {
+  }
+
+  func computeThowing(_ fn: nonisolated(nonsending) () async throws -> Void) async throws {
+  }
+
+  // CHECK: // thunk for @callee_guaranteed @async (@unowned Int) -> (@unowned ()?)
+  // CHECK: // Isolation: caller_isolation_inheriting
+  // CHECK: sil shared [transparent] [reabstraction_thunk] @$sSiytSgIgHyd_BASiAAIegHgILnr_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed Int, @guaranteed @noescape @async @callee_guaranteed (Int) -> Optional<()>) -> @out Optional<()> {
+  // CHECK: bb0([[RESULT:%.*]] : $*Optional<()>, [[ISOLATION:%.*]] : $Builtin.ImplicitActor, [[X_REF:%.*]] : $*Int, [[CLOSURE:%.*]] : $@noescape @async @callee_guaranteed (Int) -> Optional<()>):
+  // CHECK:   [[X:%.*]] = load [[X_REF]]
+  // CHECK:   [[CLOSURE_RESULT:%.*]] = apply [[CLOSURE]]([[X]]) : $@noescape @async @callee_guaranteed (Int) -> Optional<()>
+  // CHECK:   store [[CLOSURE_RESULT]] to [[RESULT]]
+  // CHECK:   hop_to_executor [[ISOLATION]]
+  // CHECK: } // end sil function '$sSiytSgIgHyd_BASiAAIegHgILnr_TR'
+  await compute { @concurrent (x: Int) in
+      _ = x
+  }
+
+  struct MyError: Error {
+  }
+
+  // CHECK: // thunk for @callee_guaranteed @Sendable @async () -> (@error @owned Error)
+  // CHECK: // Isolation: caller_isolation_inheriting
+  // CHECK: sil shared [transparent] [reabstraction_thunk] @$ss5Error_pIghHzo_BAsAA_pIegHgILzo_TR : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed @noescape @Sendable @async @callee_guaranteed () -> @error any Error) -> @error any Error {
+  // CHECK: bb0([[ISOLATION:%.*]] : $Builtin.ImplicitActor, [[CLOSURE:%.*]] : $@noescape @Sendable @async @callee_guaranteed () -> @error any Error):
+  // CHECK:   try_apply [[CLOSURE]]() : $@noescape @Sendable @async @callee_guaranteed () -> @error any Error, normal bb1, error bb2
+  // CHECK: bb1({{.*}} : $()):
+  // CHECK:   hop_to_executor [[ISOLATION]]
+  // CHECK: bb2({{.*}} : $any Error):
+  // CHECK:   hop_to_executor [[ISOLATION]]
+  // CHECK: } // end sil function '$ss5Error_pIghHzo_BAsAA_pIegHgILzo_TR'
+  try await computeThowing { @MainActor in
+      throw MyError()
+  }
+}
 
 // These would be good to test, but we apparently reject this conversion.
 #if false
