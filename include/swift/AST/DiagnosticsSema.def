@@ -8528,9 +8528,8 @@ NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
-ERROR(noncopyable_generics_variadic, none,
-      "noncopyable type %0 cannot be used within a variadic type yet",
-      (Type))
+NOTE(noncopyable_or_nonescaping_variadic, none,
+     "required because variadic parameter type must be stored inside an 'Array'", ())
 NOTE(noncopyable_generics_implicit_conformance_req, none,
      "'where %noformat0: %noformat1' is implicit here",
      (Type, Type))

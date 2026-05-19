@@ -239,7 +239,7 @@ func checkStdlibTypes(_ mo: borrowing MO) {
   let _: [MO] = // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
       []
   let _: [String: MO] = // expected-error {{type 'MO' does not conform to protocol 'Copyable'}}
-      ["hello" : MO()]  // expected-error{{type '(String, MO)' containing noncopyable element is not supported}}
+      ["hello" : MO()]
 
   _ = [MO()] // expected-error {{generic struct 'Array' requires that 'MO' conform to 'Copyable'}}
 
