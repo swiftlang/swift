@@ -3,7 +3,7 @@
 // RUN: split-file %s %t
 
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/test.swiftmodule %t/test.swift -I %t -strict-memory-safety \
-// RUN:   -verify -verify-additional-file %t%{fs-sep}foo.h -verify-additional-file %t%{fs-sep}bar.h -verify-additional-file %t%{fs-sep}baz.h -verify-additional-file %t%{fs-sep}qux.h -Rmacro-expansions
+// RUN:   -verify -verify-additional-file %t%{fs-sep}foo.h -verify-additional-file %t%{fs-sep}bar.h -verify-additional-file %t%{fs-sep}baz.h -verify-additional-file %t%{fs-sep}qux.h -Rmacro-expansions -eager-macro-checking
 
 // Macro expansions in foo.h do not have access to the definition of `struct qux`,
 // so don't attach macro on functions that use contain that type in foo.h.
