@@ -673,9 +673,16 @@ bool importer::isInitMethod(const clang::ObjCMethodDecl *method) {
   if (method->getMethodFamily() != clang::OMF_init)
     return false;
 
-  // Swift restriction: init methods must start with the word "init".
-  auto selector = method->getSelector();
-  return camel_case::getFirstWord(selector.getNameForSlot(0)) == "init";
+  // The selector's first word must be "init", or "_init" for SPI-prefixed
+  // selectors like `-_initFoo:`. The prefix-stripping logic in the importer
+  // assumes the leading word is "init" (with an optional underscore); a
+  // method that has `OMF_init` via an explicit `objc_method_family(init)`
+  // attribute on a selector that doesn't start with `init`/`_init` would
+  // produce a malformed argument label, so we require the syntactic form.
+  auto firstSlot = method->getSelector().getNameForSlot(0);
+  StringRef afterUnderscore =
+      firstSlot.starts_with("_") ? firstSlot.drop_front(1) : firstSlot;
+  return camel_case::getFirstWord(afterUnderscore) == "init";
 }
 
 bool importer::isObjCId(const clang::Decl *decl) {
