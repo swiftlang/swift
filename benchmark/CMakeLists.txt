@@ -211,7 +211,7 @@ set(SWIFT_BENCH_MODULES
     single-source/Suffix
     single-source/SuperChars
     single-source/TaskGroups
-    single-source/TaskIdentifier
+    single-source/TaskID
     single-source/TaskLocalGet
     single-source/ToddCoxeter
     single-source/TwoSum

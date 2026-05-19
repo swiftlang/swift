@@ -1,4 +1,4 @@
-//===--- TaskIdentifier.swift ---------------------------------------------===//
+//===--- TaskID.swift -----------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// Measures the cost of reading the current Task's identity.
+// Measures the cost of reading the current Task's ID.
 
 import TestsUtils
 
@@ -20,18 +20,18 @@ public var benchmarks: [BenchmarkInfo] {
   }
   return [
     BenchmarkInfo(
-      name: "TaskIdentifier.currentIdentifier",
-      runFunction: run_TaskIdentifier_currentIdentifier,
+      name: "TaskID.currentID",
+      runFunction: run_TaskID_currentID,
       tags: [.concurrency]
     ),
     BenchmarkInfo(
-      name: "TaskIdentifier.withUnsafeCurrentTask.identifier",
-      runFunction: run_TaskIdentifier_withUnsafeCurrentTask,
+      name: "TaskID.withUnsafeCurrentTask.id",
+      runFunction: run_TaskID_withUnsafeCurrentTask,
       tags: [.concurrency]
     ),
     BenchmarkInfo(
-      name: "TaskIdentifier.directBuiltins",
-      runFunction: run_TaskIdentifier_directBuiltins,
+      name: "TaskID.directBuiltins",
+      runFunction: run_TaskID_directBuiltins,
       tags: [.concurrency]
     ),
   ]
@@ -39,21 +39,21 @@ public var benchmarks: [BenchmarkInfo] {
 
 // Direct accessor: single runtime call, no closure, no ARC on the task.
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-private func run_TaskIdentifier_currentIdentifier(_ n: Int) async {
+private func run_TaskID_currentID(_ n: Int) async {
   for _ in 0..<n {
     for _ in 0..<10_000 {
-      blackHole(Task.currentIdentifier)
+      blackHole(Task.currentID)
     }
   }
 }
 
 // Equivalent shape built on withUnsafeCurrentTask.
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-private func run_TaskIdentifier_withUnsafeCurrentTask(_ n: Int) async {
+private func run_TaskID_withUnsafeCurrentTask(_ n: Int) async {
   for _ in 0..<n {
     for _ in 0..<10_000 {
       withUnsafeCurrentTask { task in
-        blackHole(task?.identifier)
+        blackHole(task?.id)
       }
     }
   }
@@ -75,7 +75,7 @@ private let _bench_swift_task_getJobTaskId: _GetJobTaskIdFn = unsafeBitCast(
 )
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-private func run_TaskIdentifier_directBuiltins(_ n: Int) async {
+private func run_TaskID_directBuiltins(_ n: Int) async {
   for _ in 0..<n {
     for _ in 0..<10_000 {
       if let task = _bench_swift_task_getCurrent() {
@@ -88,5 +88,5 @@ private func run_TaskIdentifier_directBuiltins(_ n: Int) async {
 }
 #else
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-private func run_TaskIdentifier_directBuiltins(_ n: Int) async {}
+private func run_TaskID_directBuiltins(_ n: Int) async {}
 #endif

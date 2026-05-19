@@ -291,23 +291,23 @@ extension Task: Equatable {
 }
 
 // ==== -----------------------------------------------------------------------
-// MARK: Task Identifier
+// MARK: Task ID
 
 /// An opaque, process-unique identifier for a Swift ``Task``.
 ///
-/// A `TaskIdentifier` is assigned at task creation, never changes for the
-/// lifetime of the task, and is never reused once a task has completed.
-/// Identifiers are scoped to the current process and are not suitable for
-/// cross-process correlation.
+/// A `TaskID` is assigned at task creation, never changes for the lifetime
+/// of the task, and is never reused once a task has completed. IDs are
+/// scoped to the current process and are not suitable for cross-process
+/// correlation.
 ///
-/// Reading the identifier of the currently-executing task is fast.
+/// Reading the ID of the currently-executing task is fast.
 ///
-/// - See: ``Task/currentIdentifier``
-/// - See: ``Task/identifier``
-/// - See: ``UnsafeCurrentTask/identifier``
+/// - SeeAlso: ``Task/currentID``
+/// - SeeAlso: ``Task/id``
+/// - SeeAlso: ``UnsafeCurrentTask/id``
 @available(StdlibDeploymentTarget 6.5, *)
 @frozen
-public struct TaskIdentifier: Sendable, Hashable {
+public struct TaskID: Sendable, Hashable {
   @usableFromInline
   internal var _rawValue: UInt64
 
@@ -316,21 +316,21 @@ public struct TaskIdentifier: Sendable, Hashable {
     self._rawValue = _rawValue
   }
 
-  /// The raw 64-bit value of this identifier.
+  /// The raw 64-bit value of this ID.
   ///
   /// This is the only escape hatch from the opaque type and is intended for
   /// serialization, logging, or interop with tools that expect a numeric
   /// task ID. The numeric value carries no semantic meaning beyond the
-  /// guarantees on `TaskIdentifier` itself.
+  /// guarantees on `TaskID` itself.
   @_alwaysEmitIntoClient
   public var rawValue: UInt64 { _rawValue }
 }
 
 @available(StdlibDeploymentTarget 6.5, *)
 extension Task {
-  /// A type alias for ``TaskIdentifier``, providing the spelling
-  /// `Task.Identifier` at the use site.
-  public typealias Identifier = TaskIdentifier
+  /// A type alias for ``TaskID``, providing the spelling
+  /// `Task.ID` at the use site.
+  public typealias ID = TaskID
 }
 
 // ==== Task Priority ----------------------------------------------------------
@@ -482,27 +482,23 @@ extension Task where Success == Never, Failure == Never {
     }
   }
 
-  /// The stable identifier of the currently-executing task.
+  /// The stable ID of the currently-executing task.
   ///
   /// If you access this static property outside the execution context of a
   /// task, it will return `nil`.
   ///
-  /// This identifier is quick to obtain and can be used to reliably identify
-  /// a task, instead of its memory address which may be reused once the task
+  /// This ID is quick to obtain and can be used to reliably identify a
+  /// task, instead of its memory address which may be reused once the task
   /// has been destroyed. No guarantees are made about its exact numeric
   /// value.
   ///
-  /// - SeeAlso: ``Task/identifier``
-  /// - SeeAlso: ``UnsafeCurrentTask/identifier``
+  /// - SeeAlso: ``Task/id``
+  /// - SeeAlso: ``UnsafeCurrentTask/id``
   @available(StdlibDeploymentTarget 6.5, *)
   @_alwaysEmitIntoClient
-  public static var currentIdentifier: Task.Identifier? {
-    // Direct runtime call: reads the id on the current AsyncTask without
-    // ever surfacing the task reference to Swift, so there's no ARC dance.
-    // The runtime returns 0 when there is no current task; task IDs are
-    // guaranteed to be non-zero.
+  public static var currentID: Task.ID? {
     let id = _getCurrentTaskId()
-    return id == 0 ? nil : TaskIdentifier(_rawValue: id)
+    return id == 0 ? nil : TaskID(_rawValue: id)
   }
 
 }
@@ -710,22 +706,22 @@ extension Task {
     }
   }
 
-  /// A stable identifier for this task.
+  /// A stable ID for this task.
   ///
-  /// This identifier is quick to obtain and can be used to reliably identify
-  /// a task, instead of its memory address which may be reused once the task
+  /// This ID is quick to obtain and can be used to reliably identify a
+  /// task, instead of its memory address which may be reused once the task
   /// has been destroyed. No guarantees are made about its exact numeric
   /// value.
   ///
-  /// The same identifier is visible in tools such as `swift-inspect` and
+  /// The same ID is visible in tools such as `swift-inspect` and
   /// Instruments, which makes it a convenient correlation key for tracing
   /// and logging.
   ///
-  /// - SeeAlso: ``Task/currentIdentifier``
-  /// - SeeAlso: ``UnsafeCurrentTask/identifier``
+  /// - SeeAlso: ``Task/currentID``
+  /// - SeeAlso: ``UnsafeCurrentTask/id``
   @available(StdlibDeploymentTarget 6.5, *)
   @_alwaysEmitIntoClient
-  public var identifier: Identifier {
+  public var id: ID {
     unsafe .init(
       _rawValue: _getJobTaskId(unsafeBitCast(_task, to: UnownedJob.self)))
   }
@@ -987,21 +983,21 @@ public struct UnsafeCurrentTask {
     }
   }
 
-  /// A stable identifier for the current task.
+  /// A stable ID for the current task.
   ///
-  /// This identifier is quick to obtain and can be used to reliably identify
-  /// a task, instead of its memory address which may be reused once the task
+  /// This ID is quick to obtain and can be used to reliably identify a
+  /// task, instead of its memory address which may be reused once the task
   /// has been destroyed. No guarantees are made about its exact numeric
   /// value.
   ///
-  /// Returns the same value as ``Task/identifier`` read on the owning task.
+  /// Returns the same value as ``Task/id`` read on the owning task.
   ///
-  /// - SeeAlso: ``Task/identifier``
-  /// - SeeAlso: ``Task/currentIdentifier``
+  /// - SeeAlso: ``Task/id``
+  /// - SeeAlso: ``Task/currentID``
   @available(StdlibDeploymentTarget 6.5, *)
   @_alwaysEmitIntoClient
-  public var identifier: Task.Identifier {
-    unsafe TaskIdentifier(
+  public var id: Task.ID {
+    unsafe TaskID(
       _rawValue: _getJobTaskId(unsafeBitCast(_task, to: UnownedJob.self)))
   }
 }
