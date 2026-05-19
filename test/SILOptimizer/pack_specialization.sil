@@ -995,3 +995,32 @@ bb0(%0 : $*Pack{Box<T>}, %1 : $*Pack{Box<T>}):
   return %4
 
 }
+
+// THROWING PACK FUNCTION TESTS:
+
+// The specialized function should have a single direct result plus the
+// preserved @error result — not the error type duplicated as a direct result.
+//
+// CHECK-LABEL: sil shared [ossa] @$s28throwing_pack_id_error_neverTf8xx_n : $@convention(thin) (Int) -> (Int, @error Never) {
+// CHECK-NOT:   Never, @error Never
+// CHECK-LABEL: } // end sil function '$s28throwing_pack_id_error_neverTf8xx_n'
+sil [ossa] @throwing_pack_id_error_never : $@convention(thin) (@pack_guaranteed Pack{Int}) -> (@pack_out Pack{Int}, @error Never) {
+bb0(%0 : $*Pack{Int}, %1 : $*Pack{Int}):
+  copy_addr %1 to [init] %0
+  %9 = tuple ()
+  return %9
+}
+
+// The apply at the call site must preserve the original `[nothrow]` flag, or
+// SIL verification rejects a plain apply of a function with an error result.
+//
+// CHECK-LABEL: sil [ossa] @call_throwing_pack_id_error_never : $@convention(thin) (@pack_guaranteed Pack{Int}) -> (@pack_out Pack{Int}, @error Never) {
+// CHECK:         [[FN_REF:%[0-9]+]] = function_ref @$s28throwing_pack_id_error_neverTf8xx_n : $@convention(thin) (Int) -> (Int, @error Never)
+// CHECK:         apply [nothrow] [[FN_REF]]
+// CHECK-LABEL: } // end sil function 'call_throwing_pack_id_error_never'
+sil [ossa] @call_throwing_pack_id_error_never : $@convention(thin) (@pack_guaranteed Pack{Int}) -> (@pack_out Pack{Int}, @error Never) {
+bb0(%0 : $*Pack{Int}, %1 : $*Pack{Int}):
+  %10 = function_ref @throwing_pack_id_error_never : $@convention(thin) (@pack_guaranteed Pack{Int}) -> (@pack_out Pack{Int}, @error Never)
+  %11 = apply [nothrow] %10(%0, %1) : $@convention(thin) (@pack_guaranteed Pack{Int}) -> (@pack_out Pack{Int}, @error Never)
+  return %11
+}

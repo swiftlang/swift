@@ -571,7 +571,7 @@ private func getHash(
 
   case let x as ApplyInst:
     if !x.parentFunction.hasOwnership {
-      if x.functionConvention.results.contains(where: { $0.convention != .unowned }) {
+      if x.functionConvention.resultsWithError.contains(where: { $0.convention != .unowned }) {
         return nil
       }
     }

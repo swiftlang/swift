@@ -95,7 +95,7 @@ private func tryRemoveArrayCast(apply: ApplyInst, _ context: SimplifyContext) ->
           // Check if the cast function has the expected calling convention
         apply.arguments.count == 1,
         apply.convention(of: apply.argumentOperands[0]) == .directGuaranteed,
-        apply.functionConvention.results[0].convention == .owned,
+        apply.functionConvention.resultsWithError[0].convention == .owned,
         apply.type.isOptional,
 
         // Check if the source and target type of the cast is identical.
