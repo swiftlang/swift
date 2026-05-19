@@ -556,7 +556,7 @@ public:
   clang::TargetInfo &getTargetInfo() const;
   clang::CodeGenOptions &getCodeGenOpts() const;
 
-  std::string getClangModuleHash() const;
+  std::string computeClangContextHash() const;
 
   /// Get clang file mapping.
   const ClangInvocationFileMapping &getClangFileMapping() const {
