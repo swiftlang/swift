@@ -253,6 +253,10 @@ BridgedOwnedString BridgedLifetimeDependenceInfo::getDebugDescription() const {
 //                               SILFunctionType
 //===----------------------------------------------------------------------===//
 
+BridgedResultInfoArray SILFunctionType_getResults(BridgedCanType funcTy) {
+  return {funcTy.unbridged()->castTo<swift::SILFunctionType>()->getResults()};
+}
+
 BridgedResultInfoArray
 SILFunctionType_getResultsWithError(BridgedCanType funcTy) {
   return {funcTy.unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError()};
