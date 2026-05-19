@@ -12,6 +12,10 @@ struct Foo {
   func unsafeMethod(p: UnsafeMutablePointer<Int>)
 }
 
+class Bar {
+  class func classFunction(x: Int) -> Int
+}
+
 //--- out.swift.expected
 import Test
 
@@ -25,4 +29,7 @@ func call_mutatingMethod(_ self: inout Foo, x: Int) {
 
 func call_unsafeMethod(_ self: Foo, p: UnsafeMutablePointer<Int>) {
   return unsafe self.unsafeMethod(p: p)
+}
+func call_classFunction(x: Int) -> Int {
+  return Bar.classFunction(x: x)
 }
