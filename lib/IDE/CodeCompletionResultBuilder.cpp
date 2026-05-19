@@ -23,7 +23,7 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Comment.h"
 #include "clang/Basic/Module.h"
-#include "clang/Index/USRGeneration.h"
+#include "clang/UnifiedSymbolResolution/USRGeneration.h"
 
 using namespace swift;
 using namespace swift::ide;
