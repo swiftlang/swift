@@ -11,4 +11,3 @@
 # UNSUPPORTED: OS=windows-msvc
 
 #--- unused.expected
-borrow_inout_experimental
