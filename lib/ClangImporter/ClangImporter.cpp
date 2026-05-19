@@ -1169,7 +1169,8 @@ bool ClangImporter::canReadPCH(StringRef PCHFilename) {
   // there. For now, just treat PCH with errors as out of date.
   failureCapabilities |= clang::ASTReader::ARR_TreatModuleWithErrorsAsOutOfDate;
 
-  auto result = Reader.ReadAST(PCHFilename, clang::serialization::MK_PCH,
+  auto result = Reader.ReadAST(clang::ModuleFileName::makeExplicit(PCHFilename),
+                               clang::serialization::MK_PCH,
                                clang::SourceLocation(), failureCapabilities);
   switch (result) {
   case clang::ASTReader::Success:
@@ -2573,7 +2574,8 @@ ClangImporter::Implementation::lookupModule(StringRef moduleName) {
   }
 
   clang::serialization::ModuleFile *Loaded = nullptr;
-  if (!Instance->loadModuleFile(moduleFile->second, Loaded))
+  if (!Instance->loadModuleFile(
+          clang::ModuleFileName::makeExplicit(moduleFile->second), Loaded))
     return nullptr; // error loading, return not found.
   return loadFromMM();
 }

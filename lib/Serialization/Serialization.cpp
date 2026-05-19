@@ -1557,7 +1557,8 @@ void Serializer::writeInputBlock() {
         auto *pch = clangImporter->getClangInstance()
                         .getASTReader()
                         ->getModuleManager()
-                        .lookupByFileName(Options.ImportedPCHPath);
+                        .lookupByFileName(clang::ModuleFileName::makeExplicit(
+                            Options.ImportedPCHPath));
         if (importedHeaderPath.empty())
           importedHeaderPath = pch->OriginalSourceFileName;
         pchIncludeTree = pch->IncludeTreeID;
