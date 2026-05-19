@@ -1339,6 +1339,8 @@ fileprivate func multiplyMPBy96(
   range: inout Range<Int>,
   multiplier: _UInt128
 ) {
+  // Multiplier must be <= 96 bits so the efficient multiply loop works.
+  _internalInvariant(multiplier._high.leadingZeroBitCount >= 32)
   let bitsPerMPWord = MPWord.bitWidth
   var i = range.lowerBound
   var t = _UInt128(0)
@@ -1616,57 +1618,62 @@ fileprivate let powersOfFive : _InlineArray<_, UInt32> = [
   0xa3041a5c, 0xdb7be437, 0x192edcb6, 0xba7ea880, 0xba4f93c8, 0x7e3766d,
   0x4d642a92, 0x983ee842,
 
-  // Values beyond this point are only used for Float80/Float128.
-  // Trimming them would save 760 bytes...
-
+  // The values below are only needed by Float80/Float128 and have been
+  // commented out to save 760 bytes.  Float80 still works correctly
+  // without them — `multiplyByFiveToTheN` just has more work to do for
+  // very large exponents.  If Float128 is ever supported and its
+  // performance becomes important, restore these (and bump
+  // `powersOfFive_maxPower` below from 358 to 633).
+  //
   // Alternatively, we could speed things up by breaking here and having a
   // second triangular table starting with 5^413 (30 words) and increasing by 30
   // words for each successive value.  That would cost 6600 bytes and limit
   // calls to multiplyByFiveToTheN to at most 5^412.
 
   // 5 ** 413    120 bytes
-  0xc7418055, 0xe0fd09d8, 0x1f6fef06, 0xe0aa919a, 0x3a932696, 0xeefa64b7,
-  0x4ad4b5c1, 0xc7b36de4, 0x46739345, 0x4842174f, 0x18b983bc, 0xa98ab9ff,
-  0x97d0164c, 0xd7c61ef2, 0x1e75294b, 0xb45d0246, 0x9ad20a7d, 0x7d2b6dfa,
-  0xadf139f0, 0xa50a7cc6, 0x6f8b9285, 0xff5ca1c0, 0xab0bcbe, 0x32501df6,
-  0xed5227ea, 0x74628fef, 0x2c471432, 0xa2c33b1b, 0x29d341b6, 0x7c2e645e,
+  // 0xc7418055, 0xe0fd09d8, 0x1f6fef06, 0xe0aa919a, 0x3a932696, 0xeefa64b7,
+  // 0x4ad4b5c1, 0xc7b36de4, 0x46739345, 0x4842174f, 0x18b983bc, 0xa98ab9ff,
+  // 0x97d0164c, 0xd7c61ef2, 0x1e75294b, 0xb45d0246, 0x9ad20a7d, 0x7d2b6dfa,
+  // 0xadf139f0, 0xa50a7cc6, 0x6f8b9285, 0xff5ca1c0, 0xab0bcbe, 0x32501df6,
+  // 0xed5227ea, 0x74628fef, 0x2c471432, 0xa2c33b1b, 0x29d341b6, 0x7c2e645e,
 
   // 5 ** 468    136 bytes
-  0x663d5f31, 0xc852d43d, 0x628adfb8, 0x7532907f, 0x519a9fcf, 0xff6d61c3,
-  0xee47a4fb, 0x5364a40, 0x8307a5e7, 0xc51a19b6, 0x152115bd, 0xd64160ca,
-  0x5a7fc303, 0x4420c114, 0xb0472914, 0x4701c038, 0xa75d51fb, 0x9329af1e,
-  0xfd726810, 0x95a1fec8, 0x433b921e, 0xac637005, 0x4b769501, 0x97b6965a,
-  0x5c15ca6c, 0x2e3a3781, 0xa1c3722f, 0x9cee9acc, 0x243794ea, 0x98d384d2,
-  0x8f51a4f3, 0xfb591b83, 0x74dd9297, 0x654a3f98,
+  // 0x663d5f31, 0xc852d43d, 0x628adfb8, 0x7532907f, 0x519a9fcf, 0xff6d61c3,
+  // 0xee47a4fb, 0x5364a40, 0x8307a5e7, 0xc51a19b6, 0x152115bd, 0xd64160ca,
+  // 0x5a7fc303, 0x4420c114, 0xb0472914, 0x4701c038, 0xa75d51fb, 0x9329af1e,
+  // 0xfd726810, 0x95a1fec8, 0x433b921e, 0xac637005, 0x4b769501, 0x97b6965a,
+  // 0x5c15ca6c, 0x2e3a3781, 0xa1c3722f, 0x9cee9acc, 0x243794ea, 0x98d384d2,
+  // 0x8f51a4f3, 0xfb591b83, 0x74dd9297, 0x654a3f98,
 
   // 5 ** 523    152 bytes
-  0x9a8b26dd, 0xbf2c0cb0, 0x55574b71, 0xbaf1ae94, 0x909d4708, 0x3a0e3864,
-  0x96024957, 0x220c2ed9, 0x3c846d96, 0xa8f2eb24, 0x4c42f275, 0x2fbb514b,
-  0xc2c02b99, 0x2943f65a, 0x59784a24, 0x966b340, 0x8aa1aecc, 0x12c6b3ee,
-  0x694ef465, 0xde3eaa92, 0x232dffbe, 0xce590fe4, 0xacdaed02, 0xdb515c72,
-  0xed4346e1, 0x80a57e71, 0x62e788b1, 0xafbcf17e, 0x71c9d096, 0x71bf4008,
-  0x77961314, 0x3cc04087, 0xd031224e, 0x37315310, 0x24aba8bc, 0x42b158b6,
-  0x550880c, 0x529e5882,
+  // 0x9a8b26dd, 0xbf2c0cb0, 0x55574b71, 0xbaf1ae94, 0x909d4708, 0x3a0e3864,
+  // 0x96024957, 0x220c2ed9, 0x3c846d96, 0xa8f2eb24, 0x4c42f275, 0x2fbb514b,
+  // 0xc2c02b99, 0x2943f65a, 0x59784a24, 0x966b340, 0x8aa1aecc, 0x12c6b3ee,
+  // 0x694ef465, 0xde3eaa92, 0x232dffbe, 0xce590fe4, 0xacdaed02, 0xdb515c72,
+  // 0xed4346e1, 0x80a57e71, 0x62e788b1, 0xafbcf17e, 0x71c9d096, 0x71bf4008,
+  // 0x77961314, 0x3cc04087, 0xd031224e, 0x37315310, 0x24aba8bc, 0x42b158b6,
+  // 0x550880c, 0x529e5882,
 
   // 5 ** 578    168 bytes
-  0x6ac93f19, 0xb0528df3, 0x1bd0d93b, 0x6887cf42, 0x16c95762, 0xe06cf811,
-  0xef6a19f0, 0xc9642ada, 0xd0281f3b, 0x95048fea, 0x8a90381, 0x8e351ad1,
-  0x57cfc253, 0x4c526792, 0xd12ead90, 0x22519d79, 0x886cfbcc, 0x492e7dd2,
-  0x62cd8fad, 0xc3a19bf6, 0x63cb573d, 0x96988013, 0x6f26d941, 0xe0e8f38b,
-  0xd543d024, 0x4312f15, 0xaec520f3, 0x29c4a0e0, 0xc8330daf, 0x9194ca21,
-  0x3f122fb9, 0xc39177e7, 0xeec85730, 0x966c77b2, 0xfb50bc61, 0x650a689e,
-  0x69260814, 0x3a4513bd, 0x9e62b35d, 0xbdb41cdb, 0xadf47696, 0x43638e41,
+  // 0x6ac93f19, 0xb0528df3, 0x1bd0d93b, 0x6887cf42, 0x16c95762, 0xe06cf811,
+  // 0xef6a19f0, 0xc9642ada, 0xd0281f3b, 0x95048fea, 0x8a90381, 0x8e351ad1,
+  // 0x57cfc253, 0x4c526792, 0xd12ead90, 0x22519d79, 0x886cfbcc, 0x492e7dd2,
+  // 0x62cd8fad, 0xc3a19bf6, 0x63cb573d, 0x96988013, 0x6f26d941, 0xe0e8f38b,
+  // 0xd543d024, 0x4312f15, 0xaec520f3, 0x29c4a0e0, 0xc8330daf, 0x9194ca21,
+  // 0x3f122fb9, 0xc39177e7, 0xeec85730, 0x966c77b2, 0xfb50bc61, 0x650a689e,
+  // 0x69260814, 0x3a4513bd, 0x9e62b35d, 0xbdb41cdb, 0xadf47696, 0x43638e41,
 
   // 5 ** 633    184 bytes
-  0x560e14a5, 0xf6691422, 0x2c70055c, 0x5fc5dab3, 0xc8ad71e0, 0xa2bc1b0d,
-  0xc651c583, 0x7aa7847b, 0x2daed74b, 0xfe54e5a6, 0xa295aa36, 0x64026c31,
-  0x8712dcba, 0x9cca8c7d, 0x2be239e4, 0xd549bd5, 0xb48d5fa8, 0xaf5e76ed,
-  0x46811a6e, 0x78e4dec4, 0xad6da29a, 0x616c4a6e, 0x15a1974, 0x96f6c825,
-  0x1cd852b4, 0x6ab56842, 0xe45a6968, 0x75631650, 0xe5fc1f10, 0x2bca9511,
-  0x21c5300c, 0xab7e2dcf, 0xb61dde63, 0x6fd760e0, 0xe8c710c1, 0xde5ba724,
-  0xc57e501c, 0x497c1f1a, 0xee6cd3, 0xdd0175f2, 0xa199ce9f, 0x5a4b5d2,
-  0xbd6fa764, 0x9d58b359, 0xd4f4fb60, 0x36f774e8, 
+  // 0x560e14a5, 0xf6691422, 0x2c70055c, 0x5fc5dab3, 0xc8ad71e0, 0xa2bc1b0d,
+  // 0xc651c583, 0x7aa7847b, 0x2daed74b, 0xfe54e5a6, 0xa295aa36, 0x64026c31,
+  // 0x8712dcba, 0x9cca8c7d, 0x2be239e4, 0xd549bd5, 0xb48d5fa8, 0xaf5e76ed,
+  // 0x46811a6e, 0x78e4dec4, 0xad6da29a, 0x616c4a6e, 0x15a1974, 0x96f6c825,
+  // 0x1cd852b4, 0x6ab56842, 0xe45a6968, 0x75631650, 0xe5fc1f10, 0x2bca9511,
+  // 0x21c5300c, 0xab7e2dcf, 0xb61dde63, 0x6fd760e0, 0xe8c710c1, 0xde5ba724,
+  // 0xc57e501c, 0x497c1f1a, 0xee6cd3, 0xdd0175f2, 0xa199ce9f, 0x5a4b5d2,
+  // 0xbd6fa764, 0x9d58b359, 0xd4f4fb60, 0x36f774e8,
 ]
+fileprivate let powersOfFive_maxPower = 358
 
 // Build a multi-precision integer 5^n
 
@@ -1702,7 +1709,7 @@ fileprivate func fiveToTheN(
 
   // Otherwise, initialize with a multi-word value from the table above,
   // then multiply to get the final exact value.
-  let maxPower = 633 // Largest power supported by the table above
+  let maxPower = powersOfFive_maxPower
   let clampedPower = power > maxPower ? maxPower : power
   // We need to find the appropriate power of five from the table
   // above.  This maps the power to the index of the largest power of 5
@@ -1802,6 +1809,12 @@ fileprivate func mostSignificantBitsFrom(
   fraction &<<= 64 - fractionBits
 
   // Make sure fraction bits after the first are non-zero if they should be...
+  // Bit 63 of `fraction` is the round-half bit; the rounding decision below
+  // only distinguishes `fraction > 0x8000…`, `fraction == 0x8000…`, and
+  // `fraction < 0x8000…`.  Any non-zero bit below position 63 will tip
+  // `fraction` strictly above 0x8000…, regardless of where it lands.
+  // That lets us fold trailing words and the remainder-non-zero flag in
+  // with a plain OR — we don't need to track their bit positions.
   fraction |= unsafe UInt64(unsafeBitCast(remainderNonZero, to: UInt8.self))
   while i > range.lowerBound {
     i &-= 1
@@ -2724,6 +2737,12 @@ internal func parse_float80(_ span: Span<UInt8>) -> Optional<Float80> {
   // Verify the text format and parse the key pieces
   var parsed = fastParse64(targetFormat: targetFormat, input: span)
 
+  // Note: Unlike Float32/Float64, we don't bother with the
+  // single-FP-operation or fixed-precision-interval fast paths here.
+  // Float80 is rarely used in performance-sensitive parsing, so the
+  // extra code size and maintenance cost isn't justified; every
+  // decimal input goes straight to the arbitrary-precision fallback.
+
   // If we parsed a decimal, we need to convert it to binary
   if case .decimal(digits: let digits,
                    base10Exponent: let base10Exponent,
@@ -2830,6 +2849,12 @@ internal func parse_float128(_ span: Span<UInt8>) -> Optional<Float128> {
 
   // Verify the text format and parse the key pieces
   var parsed = fastParse64(targetFormat: targetFormat, input: span)
+
+  // TODO: Add fast paths analogous to Float32/Float64 (single-FP-operation
+  // and fixed-precision-interval arithmetic).  Float128 will need 128-bit
+  // (or wider) fixed-precision arithmetic for the interval path; for the
+  // single-FP path, consider whether the existing exact-power-of-10 table
+  // can produce exact Float128 inputs over a useful range.
 
   // If we parsed a decimal, we need to convert it to binary
   if case .decimal(digits: let digits,
