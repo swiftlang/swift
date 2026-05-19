@@ -1518,6 +1518,11 @@ void recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 
+/// Returns true if a diagnostic ought to be emitted for any explicit reference
+/// to decl made from within the given DeclContext.
+bool shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                          const DeclContext *dc);
+
 /// Emit or delay a diagnostic that suggests adding a missing import that is
 /// necessary to bring \p decl into scope in the containing source file. If
 /// delayed, the diagnostic will instead be emitted after type checking the

@@ -25,10 +25,7 @@ func testQualifiedMembers() {
   takesEnumInC(EnumInC.caseInC) // expected-error{{cannot find 'EnumInC' in scope; did you mean 'EnumInB'?}}
 }
 
-// FIXME: Should diagnose import needed for defaultedRequirementInC().
 struct ConformsToRefinesProtocolInA1: RefinesProtocolInA1 {}
-// expected-member-visibility-error@-1 {{type 'ConformsToRefinesProtocolInA1' does not conform to protocol 'ProtocolInA1'}}
-// expected-member-visibility-note@-2 {{add stubs for conformance}}
 
 // FIXME: Should diagnose import needed for defaultedRequirementInA()/defaultedRequirementInC().
 struct ConformsToRefinesProtocolInA2: RefinesProtocolInA2 {}
@@ -36,6 +33,11 @@ struct ConformsToRefinesProtocolInA2: RefinesProtocolInA2 {}
 // expected-member-visibility-note@-2 {{add stubs for conformance}}
 
 struct ConformsToRefinesProtocolInA3: RefinesProtocolInA3 {}
+
+struct ConformsToRefinesProtocolInA4: RefinesProtocolInA4 {}
+// expected-member-visibility-error@-1 {{type 'ConformsToRefinesProtocolInA4' does not conform to protocol 'BaseProtocolInA4'}}
+// expected-member-visibility-note@-2 {{add stubs for conformance}}
+
 struct ConformsToRefinesProtocolInC1: RefinesProtocolInC1 {}
 
 // FIXME: Should diagnose import needed for defaultedRequirementInC().
@@ -43,15 +45,20 @@ struct ConformsToRefinesProtocolInC2: RefinesProtocolInC2 {}
 // expected-member-visibility-error@-1 {{type 'ConformsToRefinesProtocolInC2' does not conform to protocol 'ProtocolInB2'}}
 // expected-member-visibility-note@-2 {{add stubs for conformance}}
 
+struct ConformsToRefinesProtocolInC3: RefinesProtocolInC3, RefinesEmptyProtocolInA {}
+
 //--- A.swift
 
 @_implementationOnly import members_A
 
 func takesEnumInA(_ e: EnumInA) {}
 
+protocol RefinesEmptyProtocolInA: EmptyProtocolInA {}
+
 protocol RefinesProtocolInA1: ProtocolInA1 {}
 protocol RefinesProtocolInA2: ProtocolInA2 {}
 protocol RefinesProtocolInA3: ProtocolInA3 {}
+protocol RefinesProtocolInA4: ProtocolInA4 {}
 
 //--- B.swift
 
@@ -67,3 +74,4 @@ func takesEnumInC(_ e: EnumInC) {}
 
 protocol RefinesProtocolInC1: ProtocolInC1 {}
 protocol RefinesProtocolInC2: ProtocolInC2 {}
+protocol RefinesProtocolInC3: ProtocolInC3 {}
