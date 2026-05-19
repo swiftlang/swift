@@ -537,18 +537,14 @@ void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
 
 SwiftDependencyScanningService::SwiftDependencyScanningService()
     : Alloc(), Saver(Alloc) {
-  ClangScanningService.emplace(
-      clang::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::dependencies::ScanningOutputFormat::Full,
-      clang::CASOptions(),
-      /* CAS (llvm::cas::ObjectStore) */ nullptr,
-      /* Cache (llvm::cas::ActionCache) */ nullptr,
-      // ScanningOptimizations::Default excludes the current working
-      // directory optimization. Clang needs to communicate with
-      // the build system to handle the optimization safely.
-      // Swift can handle the working directory optimizaiton
-      // already so it is safe to turn on all optimizations.
-      clang::dependencies::ScanningOptimizations::All);
+  clang::dependencies::DependencyScanningServiceOptions opts;
+  // ScanningOptimizations::Default excludes the current working directory
+  // optimization. Clang needs to communicate with the build system to handle
+  // the optimization safely. Swift can handle the working directory
+  // optimizaiton already so it is safe to turn on all optimizations.
+  opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
+
+  ClangScanningService.emplace(opts);
 }
 
 bool
@@ -676,15 +672,19 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   CASOpts.PluginPath = CASConfig->PluginPath;
   CASOpts.PluginOptions = CASConfig->PluginOptions;
 
-  ClangScanningService.emplace(
-      clang::dependencies::ScanningMode::DependencyDirectivesScan,
-      clang::dependencies::ScanningOutputFormat::FullIncludeTree,
-      CASOpts, Instance.getSharedCASInstance(),
-      Instance.getSharedCacheInstance(),
-      // The current working directory optimization (off by default)
-      // should not impact CAS. We set the optization to all to be
-      // consistent with the non-CAS case.
-      clang::dependencies::ScanningOptimizations::All);
+  {
+    clang::dependencies::DependencyScanningServiceOptions opts;
+    opts.Format = clang::dependencies::ScanningOutputFormat::FullIncludeTree;
+    // The current working directory optimization (off by default) should not
+    // impact CAS. We set the optization to all to be consistent with the
+    // non-CAS case.
+    opts.OptimizeArgs = clang::dependencies::ScanningOptimizations::All;
+    opts.Compilation = clang::dependencies::IncludeTreeCompilation{
+        CASOpts, Instance.getSharedCASInstance(),
+        Instance.getSharedCacheInstance()};
+
+    ClangScanningService.emplace(opts);
+  }
 
   return false;
 }
