@@ -5705,6 +5705,16 @@ public:
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
 
+    // Make a temporary copy to prepend a deref. This is safe as
+    // SILDebugVariable contains a copy of the expression.
+    llvm::SmallVector<SILDIExprElement, 4> DIExprCopy;
+    if (sharedUInt8().DebugValueInst.prependDeref) {
+      DIExprCopy.push_back(SILDIExprElement::createOperator(
+          SILDIExprOperator::Dereference));
+      DIExprCopy.append(DIExprElements.begin(), DIExprElements.end());
+      DIExprElements = DIExprCopy;
+    }
+
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
                        VarDeclLoc, VarDeclScope, DIExprElements);
   }
@@ -5736,9 +5746,12 @@ public:
     return DVI && DVI->hasAddrVal()? DVI : nullptr;
   }
 
-  /// Whether the attached di-expression (if there is any) starts
-  /// with `op_deref`.
-  bool exprStartsWithDeref() const;
+  /// Prepends a deref operator to this debug_value in place.
+  /// This must be called when the operand is changed from an object type to
+  /// an address type (when moved to the stack, for example).
+  /// If a reconstruction block exists, a load is added at the beginning.
+  /// Otherwise, it will be prepended to the DIExpr.
+  void prependDeref();
 
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)
