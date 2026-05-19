@@ -3562,7 +3562,9 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
     return;
   }
 
-  (void)attr->getSpecializedSignature(FD);
+  auto specializedSig = attr->getSpecializedSignature(FD);
+  if (!specializedSig || attr->isInvalid())
+    return;
 
   // Force resolution of interface types written in requirements here to check
   // that generic types satisfy generic requirements, and so on.
@@ -3593,9 +3595,27 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
       /*forExtension=*/nullptr,
       ExpandDefaults};
 
-  auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
-                                          GenericSignatureWithError())
-      .getPointer();
+  auto specializedSigWithError = evaluateOrDefault(
+      Ctx.evaluator, request, GenericSignatureWithError());
+  auto specializedSig = specializedSigWithError.getPointer();
+  if (!specializedSig) {
+    attr->setInvalid();
+    return nullptr;
+  }
+
+  auto errors = specializedSigWithError.getInt();
+  if (errors.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
+      errors.contains(GenericSignatureErrorFlags::CompletionFailed) ||
+      errors.contains(GenericSignatureErrorFlags::CircularReference)) {
+    attr->setInvalid();
+    return nullptr;
+  }
+
+  if (llvm::any_of(specializedSig.getRequirements(),
+                   [](Requirement req) { return req.hasError(); })) {
+    attr->setInvalid();
+    return nullptr;
+  }
 
   // Check the validity of provided requirements.
   checkSpecializeAttrRequirements(attr, genericSig, specializedSig, Ctx);

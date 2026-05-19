@@ -1395,6 +1395,20 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     if (Options.printPublicInterface() && !attr->getSPIGroups().empty())
       return false;
 
+    SmallVector<Requirement, 4> requirementsScratch;
+    auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
+    auto specializedSig = attr->getSpecializedSignature(FnDecl);
+    if (!specializedSig)
+      return false;
+
+    auto requirements = specializedSig.getRequirements();
+    if (FnDecl && FnDecl->getGenericSignature()) {
+      auto genericSig = FnDecl->getGenericSignature();
+
+      requirementsScratch = specializedSig.requirementsNotSatisfiedBy(genericSig);
+      requirements = requirementsScratch;
+    }
+
     Printer << "@" << getAttrName() << "(";
 
     // The non-underscored @specialize attribute currently does not support
@@ -1426,18 +1440,6 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
                                   true /*forAtSpecialize*/);
           Printer << "; ";
         }
-      }
-    }
-    SmallVector<Requirement, 4> requirementsScratch;
-    auto *FnDecl = dyn_cast_or_null<AbstractFunctionDecl>(D);
-    auto specializedSig = attr->getSpecializedSignature(FnDecl);
-    auto requirements = specializedSig.getRequirements();
-    if (FnDecl && FnDecl->getGenericSignature()) {
-      auto genericSig = FnDecl->getGenericSignature();
-
-      if (auto sig = specializedSig) {
-        requirementsScratch = sig.requirementsNotSatisfiedBy(genericSig);
-        requirements = requirementsScratch;
       }
     }
 
