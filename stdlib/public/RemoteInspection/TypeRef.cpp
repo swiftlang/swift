@@ -638,26 +638,63 @@ class DemanglingForTypeRef
 
   /// Produce the node to install as a nominal's context when swapping in the
   /// richer parent stored on the TypeRef.
-  ///
-  /// Extensions are special because they're the only node that can appear
-  /// instead of the parent (and contain it). For an Extension, the richer
-  /// parent replaces the extended-type slot, preserving the module and any
-  /// generic signature. For every other context kind, the richer parent
-  /// replaces the context wholesale.
-  ///
-  /// Returns nullptr if originalContext is a malformed Extension.
   Demangle::NodePointer
   substituteParentIntoContext(Demangle::NodePointer originalContext,
                               Demangle::NodePointer parentNode) {
-    if (originalContext->getKind() != Node::Kind::Extension)
-      return parentNode;
-    if (originalContext->getNumChildren() < 2 ||
-        originalContext->getNumChildren() > 3) {
-      assert(false && "Extension node should have 2 or 3 children.");
-      return nullptr;
+    switch (originalContext->getKind()) {
+    case Node::Kind::Extension: {
+      // For a type nested in an extension vs a type nested in a parent type
+      // directly, the mangling trees looks like this:
+      //
+      //   Class                                    Class
+      //     Extension                                Structure
+      //       Module: ModExt           vs.             Module: ModBase
+      //       Structure                                Identifier: Outer
+      //         Module: ModBase                      Identifier: Inner
+      //         Identifier: Outer
+      //     Identifier: Inner
+      //
+      if (originalContext->getNumChildren() < 2 ||
+          originalContext->getNumChildren() > 3) {
+        assert(false && "Extension node should have 2 or 3 children.");
+        return nullptr;
+      }
+      originalContext->replaceChild(1, parentNode);
+      return originalContext;
     }
-    originalContext->replaceChild(1, parentNode);
-    return originalContext;
+    case Node::Kind::Protocol: {
+      // Nominal members of a protocol are mangled with a BoundGenericProtocol
+      // wrapping the protocol, where the generic argument slot holds the
+      // relevant Self type (see the matching comment in TypeDecoder's
+      // BoundGenericProtocol case). For example, accessing the typealias A from
+      // protocol P through a conforming type S produces:
+      //
+      //   protocol P { typealias A = ... }
+      //   struct S : P {}
+      //   let x: S.A = ...
+      //
+      //   BoundGenericProtocol
+      //   |
+      //   --> Protocol: P
+      //   |
+      //   --> TypeList:
+      //       |
+      //       --> Structure: S
+      auto bgp = Dem.createNode(Node::Kind::BoundGenericProtocol);
+      auto typeProto = Dem.createNode(Node::Kind::Type);
+      typeProto->addChild(originalContext, Dem);
+      bgp->addChild(typeProto, Dem);
+
+      auto typeList = Dem.createNode(Node::Kind::TypeList);
+      auto typeSelf = Dem.createNode(Node::Kind::Type);
+      typeSelf->addChild(parentNode, Dem);
+      typeList->addChild(typeSelf, Dem);
+      bgp->addChild(typeList, Dem);
+      return bgp;
+    }
+    default:
+      return parentNode;
+    }
   }
 
 public:
