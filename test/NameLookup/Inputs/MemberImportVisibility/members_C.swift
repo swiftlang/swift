@@ -69,6 +69,8 @@ extension ProtocolInC2 {
   public func defaultedRequirementInC() { }
 }
 
+public protocol ProtocolInC3: ProtocolInB3 { }
+
 public struct EquatableInC: Equatable {
   public static func ==(_: EquatableInC, _: EquatableInC) -> Bool {
     false
