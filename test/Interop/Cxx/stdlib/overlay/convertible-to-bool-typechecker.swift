@@ -22,3 +22,4 @@ let _ = Bool(fromCxx: ProtectedInheritedBoolBox()) // expected-error {{initializ
 let _ = Bool(fromCxx: PublicUsingBoolBox())
 let _ = Bool(fromCxx: ProtectedUsingBoolBox()) // expected-error {{initializer 'init(fromCxx:)' requires that 'ProtectedUsingBoolBox' conform to 'CxxConvertibleToBool'}}
 
+let _: Bool = BoolBox().__convertToBool() // expected-warning {{use Bool(fromCxx:)}}
