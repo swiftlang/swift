@@ -3,6 +3,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
+// UNSUPPORTED: CPU=wasm32
 
 // Library checking
 // RUN: %target-swift-frontend -emit-ir -emit-module -o %t/Library.ll %t/Library.swift -enable-experimental-feature Embedded -enable-experimental-feature CodeGenerationModel=implementation -parse-as-library
