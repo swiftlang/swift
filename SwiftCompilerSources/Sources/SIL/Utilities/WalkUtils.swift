@@ -361,7 +361,7 @@ extension ValueDefUseWalker {
         return unmatchedPath(value: operand, path: path)
       }
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
-         is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
+         is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst, is UncheckedOwnershipConversionInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkDownUses(ofValue: (instruction as! SingleValueInstruction), path: path)
     case let urc as UncheckedRefCastInst:
@@ -745,7 +745,7 @@ extension ValueUseDefWalker {
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
          is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
-         is BeginDeallocRefInst, is MarkDependenceInst,
+         is BeginDeallocRefInst, is MarkDependenceInst, is UncheckedOwnershipConversionInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
     case let urc as UncheckedRefCastInst:
