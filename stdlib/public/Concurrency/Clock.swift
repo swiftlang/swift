@@ -67,6 +67,18 @@ extension Clock {
   ///       }
   @available(StdlibDeploymentTarget 5.7, *)
   @_alwaysEmitIntoClient
+  public nonisolated(nonsending) func measure(
+    _ work: nonisolated(nonsending) () async throws -> Void
+  ) async rethrows -> Instant.Duration {
+    let start = now
+    try await work()
+    let end = now
+    return start.duration(to: end)
+  }
+
+  @available(StdlibDeploymentTarget 5.7, *)
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public func measure(
     isolation: isolated (any Actor)? = #isolation,
     _ work: () async throws -> Void
