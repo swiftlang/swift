@@ -1712,8 +1712,19 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
 
   case DeclAttrKind::PreInverseGenerics: {
     auto *attr = cast<PreInverseGenericsAttr>(this);
-    Printer.printAttrName("@_preInverseGenerics");
     Type exceptTy = attr->getResolvedExceptType(D);
+    auto *pct = exceptTy->castTo<ProtocolCompositionType>();
+
+    // To avoid condfails during Span<~Escapable> adoption, emit
+    // `@_preInverseGenericsExceptCopyable` instead of
+    // `@_preInverseGenerics(except: ~Copyable)`.
+    if (pct->getInverses() ==
+        InvertibleProtocolSet({InvertibleProtocolKind::Copyable})) {
+      Printer.printAttrName("@_preInverseGenericsExceptCopyable");
+      break;
+    }
+
+    Printer.printAttrName("@_preInverseGenerics");
     // Avoid printing `@_preInverseGenerics(except: Any)` despite that being the
     // meaning of the no-arg version. It's rejected as it can confuse people.
     if (exceptTy->getCanonicalType() != D->getASTContext().TheAnyType) {

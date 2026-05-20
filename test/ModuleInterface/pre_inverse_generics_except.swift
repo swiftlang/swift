@@ -5,6 +5,8 @@
 
 // RUN: %FileCheck --implicit-check-not '#if' %s < %t/Test.swiftinterface
 
+// RUN: %target-swift-typecheck-module-from-interface(%t/Test.swiftinterface)
+
 // REQUIRES: swift_feature_PreInverseGenericsExcept
 
 // The bare @_preInverseGenerics needs no feature guard.
@@ -16,10 +18,16 @@ public func bare<T: ~Copyable>(_ t: borrowing T) {}
 // Older compilers that don't support the feature will not see the declaration.
 
 // CHECK:      #if compiler(>=5.3) && $PreInverseGenericsExcept
-// CHECK-NEXT: @_preInverseGenerics(except: ~Copyable) public func exceptCopyable<T>(_ t: borrowing T) where T : ~Copyable, T : ~Escapable
+// CHECK-NEXT: @_preInverseGenericsExceptCopyable public func exceptCopyable<T>(_ t: borrowing T) where T : ~Copyable, T : ~Escapable
 // CHECK-NEXT: #endif
 @_preInverseGenerics(except: ~Copyable)
 public func exceptCopyable<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
+
+// CHECK:      #if compiler(>=5.3) && $PreInverseGenericsExcept
+// CHECK-NEXT: @_preInverseGenericsExceptCopyable public func exceptCopyable2<T>(_ t: borrowing T) where T : ~Copyable, T : ~Escapable
+// CHECK-NEXT: #endif
+@_preInverseGenericsExceptCopyable
+public func exceptCopyable2<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 
 // CHECK:      #if compiler(>=5.3) && $PreInverseGenericsExcept
 // CHECK-NEXT: @_preInverseGenerics(except: ~Escapable) public func exceptEscapable<T>(_ t: borrowing T) where T : ~Copyable, T : ~Escapable
@@ -36,7 +44,7 @@ public func exceptBoth<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 @frozen
 public struct MySpan<T: ~Copyable & ~Escapable>: ~Copyable {
 // CHECK:      #if compiler(>=5.3) && $PreInverseGenericsExcept
-// CHECK-NEXT: @_preInverseGenerics(except: ~Copyable) public var _count: Swift::Int
+// CHECK-NEXT: @_preInverseGenericsExceptCopyable public var _count: Swift::Int
 // CHECK-NEXT: #endif
   @_preInverseGenerics(except: ~Copyable)
   public var _count: Int
