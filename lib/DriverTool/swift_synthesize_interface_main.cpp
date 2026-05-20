@@ -207,19 +207,50 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     llvm::errs() << "Couldn't load module '" << ModuleName << '\''
                  << " in the current SDK and search paths.\n";
 
+    bool Verbose = ParsedArgs.hasArg(OPT_v);
+
     SmallVector<Identifier, 32> VisibleModuleNames;
     CI.getASTContext().getVisibleTopLevelModuleNames(VisibleModuleNames);
 
     if (VisibleModuleNames.empty()) {
-      llvm::errs() << "Could not find any modules.\n";
+      if (Verbose)
+        llvm::errs() << "Could not find any modules.\n";
     } else {
-      std::sort(VisibleModuleNames.begin(), VisibleModuleNames.end(),
-                [](const Identifier &A, const Identifier &B) -> bool {
-                  return A.str() < B.str();
+      const unsigned Threshold = 3;
+      SmallVector<std::pair<unsigned, StringRef>, 4> Suggestions;
+      for (const auto &Name : VisibleModuleNames) {
+        unsigned D = StringRef(ModuleName)
+                         .edit_distance_insensitive(
+                             Name.str(), /*AllowReplacements=*/true,
+                             /*MaxEditDistance=*/Threshold);
+        if (D <= Threshold)
+          Suggestions.push_back({D, Name.str()});
+      }
+      std::sort(Suggestions.begin(), Suggestions.end(),
+                [](const auto &A, const auto &B) {
+                  if (A.first != B.first)
+                    return A.first < B.first;
+                  return A.second < B.second;
                 });
-      llvm::errs() << "Current visible modules:\n";
-      for (const auto &ModuleName : VisibleModuleNames) {
-        llvm::errs() << ModuleName.str() << "\n";
+      const unsigned MaxSuggestions = 5;
+      if (Suggestions.size() > MaxSuggestions)
+        Suggestions.resize(MaxSuggestions);
+
+      if (!Suggestions.empty()) {
+        llvm::errs() << "Did you mean:\n";
+        for (const auto &S : Suggestions)
+          llvm::errs() << "  " << S.second << "\n";
+      }
+
+      if (Verbose) {
+        std::sort(VisibleModuleNames.begin(), VisibleModuleNames.end(),
+                  [](const Identifier &A, const Identifier &B) -> bool {
+                    return A.str() < B.str();
+                  });
+        llvm::errs() << "Current visible modules:\n";
+        for (const auto &Name : VisibleModuleNames) {
+          llvm::errs() << "  " << Name.str() << "\n";
+        }
       }
     }
     return EXIT_FAILURE;
