@@ -4195,7 +4195,11 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto argPath = path.drop_back(iter - path.rbegin());
   auto *argLocator = getConstraintLocator(anchor, argPath);
 
-  auto *argExpr = castToExpr(simplifyLocatorToAnchor(argLocator));
+  auto simplifiedAnchor = simplifyLocatorToAnchor(argLocator);
+  if (!simplifiedAnchor)
+    return std::nullopt;
+
+  auto *argExpr = getAsExpr(simplifiedAnchor);
 
   // If we were unable to simplify down to the argument expression, we don't
   // know what this is.
