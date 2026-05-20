@@ -324,3 +324,12 @@ public struct AlmostBig {
 public struct Big {
   var a, b, c, d, e: Int
 }
+
+public class ClassBox<T>: P1 {
+  public let v: T
+  public init(_ v: T) { self.v = v }
+}
+
+public struct ClassBoundCompositionHolder<T> {
+  public let field: (ClassBox<T> & P1)?
+}
