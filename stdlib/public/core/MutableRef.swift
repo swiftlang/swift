@@ -10,6 +10,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if $BorrowInout
+
 /// A safe mutable reference allowing in-place mutation to an exclusive value.
 @available(SwiftStdlib 6.4, *)
 @frozen
@@ -72,3 +74,5 @@ extension MutableRef where Value: ~Copyable {
     }
   }
 }
+
+#endif
