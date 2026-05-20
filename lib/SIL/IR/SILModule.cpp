@@ -231,6 +231,12 @@ void SILModule::scheduleForDeletion(SILInstruction *I) {
 
 void SILModule::flushDeletedInsts() {
   for (SILInstruction *instToDelete : scheduledForDeletion) {
+    for (SILValue result: instToDelete->getResults()) {
+      ASSERT(result->use_empty() && "deleted instruction is still used");
+    }
+    for (Operand &op : instToDelete->getAllOperands()) {
+      ASSERT(!op.get() && "deleted instruction is using a value");
+    }
     SILInstruction::destroy(instToDelete);
     AlignedFree(instToDelete);
   }
