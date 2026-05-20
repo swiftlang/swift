@@ -5662,8 +5662,7 @@ bool IRGenFunction::emitBranchToReturnBB() {
     // it into its predecessor.
   } else if (ReturnBB->hasOneUse()) {
     // return statements are never emitted as conditional branches.
-    llvm::BranchInst *Br = cast<llvm::BranchInst>(*ReturnBB->use_begin());
-    assert(Br->isUnconditional());
+    auto *Br = cast<llvm::UncondBrInst>(*ReturnBB->use_begin());
     Builder.SetInsertPoint(Br->getParent());
     Br->eraseFromParent();
     ReturnBB->eraseFromParent();
