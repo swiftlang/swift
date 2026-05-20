@@ -1447,3 +1447,13 @@ SpySiGXu
 // CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))
 // CHECK-32-NEXT: (field name=wtable offset=4
 // CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)))
+
+// Protocol composition with class component.
+12TypeLowering27ClassBoundCompositionHolderVySiG
+// CHECK:      (bound_generic_struct TypeLowering.ClassBoundCompositionHolder
+// CHECK-NEXT:   (struct Swift.Int))
+// CHECK-NEXT: (struct size={{[0-9]+}} {{.*}}
+// CHECK-NEXT:   (field name=field offset=0
+// CHECK:          (class_existential {{.*}}
+// CHECK:            (field name=object {{.*}}
+// CHECK:              (reference kind=strong {{.*}}))

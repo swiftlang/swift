@@ -1668,6 +1668,14 @@ public:
 
   const TypeRef *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    // The "superclass" of a protocol composition is its class bound
+    // (the `C` in `(C & P)`), not a parent class in an inheritance chain.
+    if (auto *Superclass = PC->getSuperclass()) {
+      auto *NewSuperclass = visit(Superclass);
+      return ProtocolCompositionTypeRef::create(Builder, PC->getProtocols(),
+                                                NewSuperclass,
+                                                PC->hasExplicitAnyObject());
+    }
     return PC;
   }
 
