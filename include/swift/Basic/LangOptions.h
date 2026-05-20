@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/CXXStdlibKind.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
@@ -661,6 +662,11 @@ namespace swift {
     /// List of top level modules to be considered as if they had require ObjC
     /// in their module map.
     llvm::SmallVector<StringRef> ModulesRequiringObjC;
+
+    /// User override for the main module's code generation model, set by
+    /// `-enable-experimental-feature CodeGenerationModel=<value>`. Only
+    /// honored in Embedded Swift; rejected at parse time outside Embedded.
+    std::optional<CodeGenerationModel> CodeGenerationModelOverride;
 
     /// Whether to ignore checks that a module is resilient during
     /// type-checking, SIL verification, and IR emission,

@@ -391,7 +391,10 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       F->setAvailabilityForLinkage(*availability);
 
     F->setIsAlwaysWeakImported(decl->isAlwaysWeakImported());
-    if (auto cgModel = decl->getExplicitCodeGenerationModel()) {
+    auto cgModel = decl->getExplicitCodeGenerationModel();
+    if (!cgModel && mod.getOptions().EmbeddedSwift)
+      cgModel = decl->getEffectiveCodeGenerationModel();
+    if (cgModel) {
       switch (*cgModel) {
       case CodeGenerationModel::Interface:
       case CodeGenerationModel::Implementation:

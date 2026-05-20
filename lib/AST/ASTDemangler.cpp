@@ -598,7 +598,11 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
-  // TODO: Handle LifetimeDependenceInfo here.
+  // TODO: Handle LifetimeDependenceInfo here. Until this is implemented,
+  // IRGen's debug-info round-trip check excludes types containing
+  // function types with lifetime dependencies; remove the
+  // containsFunctionTypeWithLifetimeDependencies workaround in
+  // lib/IRGen/IRGenDebugInfo.cpp when this lands.
   auto einfo = FunctionType::ExtInfoBuilder(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
@@ -842,6 +846,9 @@ Type ASTBuilder::createImplFunctionType(
     clangFnType = getASTContext().getCanonicalClangFunctionType(
         funcParams, result, representation);
   }
+  // TODO: Handle LifetimeDependenceInfo here. Sibling of the AST-level TODO
+  // at the top of `createFunctionType` above; both must be implemented before
+  // the IRGen workaround in lib/IRGen/IRGenDebugInfo.cpp can be removed.
   auto einfo =
       SILFunctionType::ExtInfoBuilder(
           representation, flags.isPseudogeneric(), !flags.isEscaping(),

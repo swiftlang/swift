@@ -18,6 +18,7 @@
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
@@ -831,6 +832,15 @@ parseStrictConcurrency(StringRef value) {
       .Default(std::nullopt);
 }
 
+static std::optional<swift::CodeGenerationModel>
+parseCodeGenerationModel(StringRef value) {
+  return llvm::StringSwitch<std::optional<swift::CodeGenerationModel>>(value)
+      .Case("interface", swift::CodeGenerationModel::Interface)
+      .Case("implementation", swift::CodeGenerationModel::Implementation)
+      .Case("inlinable", swift::CodeGenerationModel::Inlinable)
+      .Default(std::nullopt);
+}
+
 static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
                          DiagnosticEngine &Diags,
                          const FrontendOptions &FrontendOpts) {
@@ -902,7 +912,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     // separately.
     if (argValue.starts_with("StrictConcurrency") ||
         argValue.starts_with("AvailabilityMacro=") ||
-        argValue.starts_with("RequiresObjC=")) {
+        argValue.starts_with("RequiresObjC=") ||
+        argValue.starts_with("CodeGenerationModel=")) {
       if (isEnableFeatureFlag)
         psuedoFeatures.push_back(argValue);
       continue;
@@ -1054,6 +1065,26 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (featureName->starts_with("RequiresObjC")) {
       auto modules = featureName->split("=").second;
       modules.split(Opts.ModulesRequiringObjC, ",");
+    }
+
+    if (featureName->starts_with("CodeGenerationModel=")) {
+      auto value = featureName->split("=").second;
+
+      if (!Opts.hasFeature(Feature::Embedded)) {
+        Diags.diagnose(SourceLoc(),
+                       diag::code_generation_model_requires_embedded);
+        HadError = true;
+        continue;
+      }
+
+      if (auto model = parseCodeGenerationModel(value)) {
+        Opts.CodeGenerationModelOverride = *model;
+      } else {
+        Diags.diagnose(SourceLoc(), diag::invalid_code_generation_model,
+                       value);
+        HadError = true;
+      }
+      continue;
     }
   }
 

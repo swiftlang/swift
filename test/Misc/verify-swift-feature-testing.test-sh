@@ -29,6 +29,16 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("test/IDE/complete_decl_attribute_feature_requirement.swift"),
     # Uses the pseudo-feature ApproachableConcurrency
     pathlib.Path("test/Concurrency/approachable_concurrency.swift"),
+    # Uses the pseudo-feature CodeGenerationModel=
+    pathlib.Path("test/Frontend/code-generation-model-feature.swift"),
+    pathlib.Path("test/embedded/linkage/c.swift"),
+    pathlib.Path("test/embedded/linkage/cxx.swift"),
+    pathlib.Path("test/embedded/linkage/diamond.swift"),
+    pathlib.Path("test/embedded/linkage/diamond_embedded_exist.swift"),
+    pathlib.Path("test/embedded/linkage/export_interface_vars.swift"),
+    pathlib.Path("test/embedded/linkage/interface.swift"),
+    pathlib.Path("test/embedded/linkage/leaf_application.swift"),
+    pathlib.Path("test/embedded/serialization.swift"),
     # Uses a script that hides usage of the CoroutineAccessor feature.
     pathlib.Path("validation-test/Evolution/test_coroutine_accessors.swift"),
     # Uses a special -experimental-features flag for the rth utility
