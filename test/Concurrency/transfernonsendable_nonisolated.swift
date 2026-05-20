@@ -134,16 +134,24 @@ func callMainActorIsolatedFunction() async {
 }
 
 public final class LoggingScope {
-  fileprivate static let _subsystem: TaskLocal<String?>! = nil
-  fileprivate static let _scope: TaskLocal<String?>! = nil
+  static let _subsystem: TaskLocal<String?>! = nil
 }
 
-public func withLoggingSubsystemAndScope<Result>(
-  subsystem: String,
-  scope: String?,
-  @_inheritActorContext _ operation: @Sendable @concurrent () async throws -> Result
-) async rethrows -> Result {
-  return try await LoggingScope._subsystem.withValue(subsystem) {
-    return try await LoggingScope._scope.withValue(scope, operation: operation)
+func withCancellationHandling<R>(_ body: () async throws -> R) async rethrows -> R {
+  try await body()
+}
+
+func withLoggingSubsystemAndScope<R>(
+    perform body: () async throws -> R
+) async rethrows -> R {
+  return try await LoggingScope._subsystem.withValue(nil) {
+    try await withCancellationHandling(body)
+  }
+}
+func withLoggingSubsystemAndScopeNonsending<R>(
+  perform body: nonisolated(nonsending) () async throws -> R
+) async rethrows -> R {
+  return try await LoggingScope._subsystem.withValue(nil) {
+    try await withCancellationHandling(body)
   }
 }
