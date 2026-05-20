@@ -2379,7 +2379,7 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
       }
     }
   }
-  
+
   // If this is a copy_addr into the 'self' argument, and the memory object is a
   // rootself struct/enum or a non-delegating initializer, then we're looking at
   // the implicit "return self" in an address-only initializer.  Emit a specific
@@ -2393,6 +2393,24 @@ void LifetimeChecker::handleLoadUseFailure(const DIMemoryUse &Use,
                                                             Use)) {
         return;
       }
+    }
+  }
+
+  // Check if the superclass initializer is called
+  // in an failable initializer of a class that inherits from another class.
+  if (auto *EI = dyn_cast<EnumInst>(Inst)) {
+    if (isFailableInitReturnUseOfEnum(EI) && TheMemory.isNonRootClassSelf()) {
+      if (!shouldEmitError(Inst)) return;
+      if (!SuperInitDone) {
+        diagnose(Module, Inst->getLoc(),
+                 diag::superselfinit_not_called_before_return,
+                 (unsigned)TheMemory.isDelegatingInit());
+      } else {
+        diagnose(Module, Inst->getLoc(),
+                 diag::return_from_init_without_initing_stored_properties);
+        noteUninitializedMembers(Use);
+      }
+      return;
     }
   }
 

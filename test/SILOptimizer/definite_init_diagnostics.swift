@@ -1716,3 +1716,12 @@ extension P_74478 where A == (Int, (Bool, Never)) {
     switch x {} // expected-error {{constant 'x.0' used before being initialized}}
   }
 }
+
+// failable init override that not call super.init should report missing error
+class BaseForFailableOverrideInit {
+  init?(fail: String) {}
+}
+
+class DerivedFailableOverrideInit: BaseForFailableOverrideInit {
+  override init?(fail: String) {} // expected-error {{'super.init' isn't called on all paths before returning from initializer}}
+}
