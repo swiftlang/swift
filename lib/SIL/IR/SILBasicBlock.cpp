@@ -103,7 +103,7 @@ void SILBasicBlock::erase(SILInstruction *I) {
 }
 
 void SILBasicBlock::erase(SILInstruction *I, SILModule &module) {
-  assert(!I->isDeleted() && "double delete of instruction");
+  ASSERT(!I->isDeleted() && "double delete of instruction");
   module.willDeleteInstruction(I);
   InstList.remove(I);
   I->asSILNode()->markAsDeleted();
