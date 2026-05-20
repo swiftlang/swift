@@ -67,8 +67,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   auto MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
 
   if (ParsedArgs.getLastArg(OPT_help) || Args.empty()) {
-    std::string ExecutableName =
-        llvm::sys::path::stem(MainExecutablePath).str();
+    std::string ExecutableName = llvm::sys::path::stem(Argv0).str();
     Table->printHelp(llvm::outs(), ExecutableName.c_str(),
                      "Swift Interface Synthesizer",
                      SwiftSynthesizeInterfaceOption, 0,
@@ -197,7 +196,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
 
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {
-    llvm::outs() << InstanceSetupError << '\n';
+    llvm::errs() << InstanceSetupError << '\n';
     return EXIT_FAILURE;
   }
 
