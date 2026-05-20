@@ -21,7 +21,10 @@ import Dispatch
   // Duration for testing a sleep that will be cancelled. This should not run to
   // completion, so we make it longer in order to minimize the chance of some
   // delay making the test fail spuriously.
-  static let cancelledPause = 15_000_000_000 // 15s
+  //
+  // 15 billion is too big to fit into an Int on 32-bit targets, so we'll make
+  // this a UInt64 and play some games in the time arithmetic.
+  static let cancelledPause = 15_000_000_000 as UInt64 // 15s
 
   static func main() async {
     // CHECK: Starting!
@@ -64,7 +67,7 @@ import Dispatch
     // CHECK-NEXT: Testing sleep that gets cancelled before it starts
     print("Testing sleep that gets cancelled before it starts")
     let sleepyTask = Task {
-      try await Task.sleep(nanoseconds: UInt64(cancelledPause))
+      try await Task.sleep(nanoseconds: cancelledPause)
     }
 
     do {
@@ -88,7 +91,7 @@ import Dispatch
     let start = DispatchTime.now()
 
     let sleepyTask = Task {
-      try await Task.sleep(nanoseconds: UInt64(cancelledPause))
+      try await Task.sleep(nanoseconds: cancelledPause)
     }
 
     do {
@@ -110,8 +113,10 @@ import Dispatch
 
       let stop = DispatchTime.now()
 
-      // assert that we stopped early.
-      assert(stop < (start + .nanoseconds(cancelledPause)))
+      // Assert that we stopped early. cancelledPause is too big to fit into an
+      // Int on 32-bit systems, so we'll check in microseconds instead of
+      // nanoseconds to make that work.
+      assert(stop < (start + .microseconds(Int(cancelledPause / 1000))))
     } catch {
       fatalError("sleep(nanoseconds:) threw some other error: \(error)")
     }
