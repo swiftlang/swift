@@ -1231,10 +1231,47 @@ static bool canOptimize(FixedStorageSemanticsCall call) {
   return true;
 }
 
+/// Whether a fixed-storage semantic call kind participates in
+/// `hoistFixedStorageBoundsChecksInBlock`'s clustering.
+static bool isMergeableCheckKind(FixedStorageSemanticsCallKind kind) {
+  switch (kind) {
+  case FixedStorageSemanticsCallKind::CheckIndex:
+  case FixedStorageSemanticsCallKind::CheckCapacity:
+    return true;
+  case FixedStorageSemanticsCallKind::None:
+  case FixedStorageSemanticsCallKind::GetCount:
+    return false;
+  }
+}
+
+/// Compute a merge-group key for a fixed-storage bounds check.
+///
+/// `CheckIndex` calls validate the index against `count`, which may be mutated
+/// in place (e.g. `OutputSpan`). For those, the key must be the literal SSA
+/// self value, so checks separated by mutations stay in distinct groups.
+///
+/// `CheckCapacity` calls validate against `capacity`, which is invariant. When
+/// self is loaded from an addressable location (an inout, a stack slot), reach
+/// through the load to the underlying address so successive loads of the same
+/// storage merge.
+static SILValue
+getFixedStorageMergeKey(const FixedStorageSemanticsCall &call) {
+  auto self = call.getSelf();
+  if (call.getKind() == FixedStorageSemanticsCallKind::CheckCapacity) {
+    if (auto *inst = self->getDefiningInstruction()) {
+      LoadOperation load{inst};
+      if (load)
+        return load.getOperand();
+    }
+  }
+  return self;
+}
+
 bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block) {
   bool changed = false;
 
-  // Map to track fixed storage checks grouped by self value.
+  // Map to track fixed storage checks grouped by self value (or, for
+  // CheckCapacity, the underlying address self is loaded from).
   llvm::MapVector<SILValue, SmallVector<FixedStorageSemanticsCall, 4>>
       checksToMerge;
 
@@ -1245,8 +1282,7 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
   for (auto &inst : block) {
     FixedStorageSemanticsCall fixedStorageCall(&inst);
     if (!fixedStorageCall ||
-        fixedStorageCall.getKind() !=
-            FixedStorageSemanticsCallKind::CheckIndex ||
+        !isMergeableCheckKind(fixedStorageCall.getKind()) ||
         fixedStorageCall->getNumArguments() < 2) {
       continue;
     }
@@ -1255,14 +1291,14 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
       continue;
     }
 
-    auto selfValue = fixedStorageCall.getSelf();
+    auto mergeKey = getFixedStorageMergeKey(fixedStorageCall);
     auto indexValue = fixedStorageCall.getIndex();
 
-    // Add this check to the list for the self value
-    checksToMerge[selfValue].push_back(fixedStorageCall);
+    // Add this check to the list for the merge key
+    checksToMerge[mergeKey].push_back(fixedStorageCall);
 
     LLVM_DEBUG(llvm::dbgs() << "  Found fixed storage check: " << inst
-                            << " with self: " << *selfValue
+                            << " with merge key: " << *mergeKey
                             << " and index: " << *indexValue);
   }
 
@@ -1278,15 +1314,56 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
   // Second pass: process each self group to place checks with same self next to
   // each other, preserving their original relative order.
   for (auto &entry : checksToMerge) {
+    auto mergeKey = entry.first;
     auto &checks = entry.second;
     if (checks.size() <= 1) {
       continue;
     }
 
     SILInstruction *insertAfter = *checks[0];
+    SILValue firstSelf = checks[0].getSelf();
+
+    // For CheckCapacity, two checks with different SSA selves were grouped
+    // because they share an underlying address (mergeKey). Substituting
+    // `firstSelf` for the moved check is sound only if nothing between
+    // the previous clustered check and `check[i]` could have replaced the
+    // storage at that address — a whole-storage write changes invariant
+    // fields the substitution depends on (`capacity`).
+    auto canReplaceStorage = [&](SILInstruction *inst) {
+      // Any opaque call may replace storage reachable through its arguments.
+      // Recognized fixed-storage semantic calls are read-only by contract.
+      if (FullApplySite::isa(inst)) {
+        return !static_cast<bool>(FixedStorageSemanticsCall(inst));
+      }
+      // Whole-storage stores; field stores go through `struct_element_addr`
+      // and have a different destination SSA value.
+      if (auto *store = dyn_cast<StoreInst>(inst))
+        return store->getDest() == mergeKey;
+      if (auto *copy = dyn_cast<CopyAddrInst>(inst))
+        return copy->getDest() == mergeKey;
+      return false;
+    };
 
     for (unsigned i = 1, e = checks.size(); i < e; ++i) {
       auto check = checks[i];
+
+      if (check.getKind() == FixedStorageSemanticsCallKind::CheckCapacity) {
+        bool storageReplaced = false;
+        for (auto it = std::next(insertAfter->getIterator()),
+                  end = check->getIterator();
+             it != end; ++it) {
+          if (canReplaceStorage(&*it)) {
+            storageReplaced = true;
+            break;
+          }
+        }
+        if (storageReplaced) {
+          LLVM_DEBUG(llvm::dbgs()
+                     << "      Skipping merge across storage replacement: "
+                     << *check.apply);
+          continue;
+        }
+      }
 
       auto indexValue = check.getIndex();
       auto clonedValue =
@@ -1296,6 +1373,14 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
       }
       check.getIndexOperand().set(*clonedValue);
       check->getCalleeOperand()->set(checks[0]->getCallee());
+      // For CheckCapacity, self may be a fresh load following intervening
+      // stores; replace it with the first check's self so the moved apply
+      // does not reference a value defined later in the block. This is sound
+      // because capacity is invariant.
+      if (check.getKind() == FixedStorageSemanticsCallKind::CheckCapacity &&
+          check.getSelf() != firstSelf) {
+        check->getSelfArgumentOperand().set(firstSelf);
+      }
       check->moveAfter(insertAfter);
       insertAfter = *check;
 

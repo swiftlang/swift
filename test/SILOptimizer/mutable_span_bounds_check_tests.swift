@@ -180,3 +180,43 @@ public func outputspan_get_element(_ v: borrowing OutputSpan<Int>, _ i: Int) -> 
   return v[i]
 }
 
+// Sequential `append`s on the same `inout OutputSpan` should fold into a
+// single merged capacity check covering all four indices, instead of one
+// check per `append`. Mirrors the `span_4_sum` test for `Span` subscripts.
+//
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests19outputspan_4_appendyys10OutputSpanVys5UInt8VGz_A4FtF :
+// CHECK-SIL: cond_fail {{.*}}, "OutputSpan capacity overflow"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "OutputSpan capacity overflow"
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests19outputspan_4_appendyys10OutputSpanVys5UInt8VGz_A4FtF'
+@_lifetime(output: copy output)
+public func outputspan_4_append(
+  _ output: inout OutputSpan<UInt8>,
+  _ a: UInt8, _ b: UInt8, _ c: UInt8, _ d: UInt8
+) {
+  output.append(a); output.append(b); output.append(c); output.append(d)
+}
+
+@inline(never)
+@_lifetime(output: copy output)
+internal func _mutateOutputSpan(_ output: inout OutputSpan<UInt8>) {}
+
+// An opaque `@inout` callee between two `append`s could replace the storage,
+// so the second capacity check must NOT be merged with the first. Both
+// checks must remain.
+//
+// CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests31outputspan_append_across_mutateyys10OutputSpanVys5UInt8VGz_A3FtF :
+// CHECK-SIL: cond_fail {{.*}}, "OutputSpan capacity overflow"
+// CHECK-SIL: function_ref{{.*}}_mutateOutputSpan
+// CHECK-SIL: cond_fail {{.*}}, "OutputSpan capacity overflow"
+// CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests31outputspan_append_across_mutateyys10OutputSpanVys5UInt8VGz_A3FtF'
+@_lifetime(output: copy output)
+public func outputspan_append_across_mutate(
+  _ output: inout OutputSpan<UInt8>,
+  _ a: UInt8, _ b: UInt8, _ c: UInt8
+) {
+  output.append(a)
+  _mutateOutputSpan(&output)
+  output.append(b)
+  output.append(c)
+}
+
