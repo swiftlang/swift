@@ -683,6 +683,7 @@ static bool usesFeatureReparenting(Decl *decl) {
 
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
+UNINTERESTING_FEATURE(BorrowInout)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
