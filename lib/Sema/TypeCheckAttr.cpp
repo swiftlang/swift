@@ -3562,15 +3562,18 @@ void AttributeChecker::visitAbstractSpecializeAttr(AbstractSpecializeAttr *attr)
     return;
   }
 
-  auto specializedSig = attr->getSpecializedSignature(FD);
-  if (!specializedSig || attr->isInvalid())
-    return;
-
   // Force resolution of interface types written in requirements here to check
   // that generic types satisfy generic requirements, and so on.
   WhereClauseOwner(FD, attr)
       .visitRequirements(TypeResolutionStage::Interface,
                          [](Requirement, RequirementRepr *) { return false; });
+
+  if (FD->getASTContext().hadError())
+    return;
+
+  auto specializedSig = attr->getSpecializedSignature(FD);
+  if (!specializedSig)
+    return;
 }
 
 GenericSignature
@@ -3583,6 +3586,9 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
   auto &Ctx = FD->getASTContext();
   auto genericSig = FD->getGenericSignature();
   if (!genericSig)
+    return nullptr;
+
+  if (Ctx.hadError())
     return nullptr;
 
   InferredGenericSignatureRequest request{
@@ -3598,24 +3604,18 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
   auto specializedSigWithError = evaluateOrDefault(
       Ctx.evaluator, request, GenericSignatureWithError());
   auto specializedSig = specializedSigWithError.getPointer();
-  if (!specializedSig) {
-    attr->setInvalid();
+  if (!specializedSig)
     return nullptr;
-  }
 
   auto errors = specializedSigWithError.getInt();
   if (errors.contains(GenericSignatureErrorFlags::HasInvalidRequirements) ||
       errors.contains(GenericSignatureErrorFlags::CompletionFailed) ||
-      errors.contains(GenericSignatureErrorFlags::CircularReference)) {
-    attr->setInvalid();
+      errors.contains(GenericSignatureErrorFlags::CircularReference))
     return nullptr;
-  }
 
   if (llvm::any_of(specializedSig.getRequirements(),
-                   [](Requirement req) { return req.hasError(); })) {
-    attr->setInvalid();
+                   [](Requirement req) { return req.hasError(); }))
     return nullptr;
-  }
 
   // Check the validity of provided requirements.
   checkSpecializeAttrRequirements(attr, genericSig, specializedSig, Ctx);

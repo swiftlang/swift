@@ -181,6 +181,15 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       continue;
     }
 
+    if (conformance.isConcrete() && conformance.getConcrete()->isInvalid()) {
+      if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
+        llvm::dbgs() << "^^ " << concreteType << " has an invalid conformance "
+                     << "to " << proto->getName() << "\n";
+      }
+
+      continue;
+    }
+
     auto concreteConformanceSymbol = Symbol::forConcreteConformance(
         concreteType, substitutions, proto, Context);
 
@@ -201,18 +210,11 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
       continue;
     }
 
-    bool invalidTypeWitness = false;
     for (auto *assocType : proto->getAssociatedTypeMembers()) {
-      if (!concretizeTypeWitnessInConformance(key, requirementKind,
-                                              concreteConformanceSymbol,
-                                              concreteRuleID, conformanceRuleID,
-                                              conformance, assocType)) {
-        invalidTypeWitness = true;
-        break;
-      }
+      concretizeTypeWitnessInConformance(key, requirementKind,
+                                         concreteConformanceSymbol,
+                                         conformance, assocType);
     }
-    if (invalidTypeWitness)
-      continue;
 
     // We only infer conditional requirements in top-level generic signatures,
     // not in protocol requirement signatures.
@@ -222,11 +224,9 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
   }
 }
 
-bool PropertyMap::concretizeTypeWitnessInConformance(
+void PropertyMap::concretizeTypeWitnessInConformance(
     Term key, RequirementKind requirementKind,
     Symbol concreteConformanceSymbol,
-    unsigned concreteRuleID,
-    unsigned conformanceRuleID,
     ProtocolConformanceRef conformance,
     AssociatedTypeDecl *assocType) const {
   auto concreteType = concreteConformanceSymbol.getConcreteType();
@@ -241,11 +241,6 @@ bool PropertyMap::concretizeTypeWitnessInConformance(
                  << " on " << concreteType << "\n";
   }
 
-  auto recordInvalidTypeWitness = [&] {
-    if (requirementKind == RequirementKind::SameType)
-      System.recordConflict(conformanceRuleID, concreteRuleID);
-  };
-
   CanType typeWitness;
   if (conformance.isConcrete()) {
     auto t = conformance.getConcrete()->getTypeWitness(assocType);
@@ -256,8 +251,7 @@ bool PropertyMap::concretizeTypeWitnessInConformance(
                      << " of " << concreteType << " could not be inferred\n";
       }
 
-      recordInvalidTypeWitness();
-      return false;
+      return;
     }
 
     typeWitness = t->getCanonicalType();
@@ -275,8 +269,7 @@ bool PropertyMap::concretizeTypeWitnessInConformance(
 
     typeWitness = archetype->getNestedType(assocType)->getCanonicalType();
   } else if (conformance.isInvalid()) {
-    recordInvalidTypeWitness();
-    return false;
+    return;
   }
 
   if (typeWitness->hasError()) {
@@ -285,8 +278,7 @@ bool PropertyMap::concretizeTypeWitnessInConformance(
                    << " of " << concreteType << " is invalid\n";
     }
 
-    recordInvalidTypeWitness();
-    return false;
+    return;
   }
 
   if (Debug.contains(DebugFlags::ConcretizeNestedTypes)) {
@@ -314,8 +306,6 @@ bool PropertyMap::concretizeTypeWitnessInConformance(
     llvm::dbgs() << "^^ Induced rule " << constraintType
                  << " => " << subjectType << "\n";
   }
-
-  return true;
 }
 
 /// Given the key of a property bag known to have \p concreteType,

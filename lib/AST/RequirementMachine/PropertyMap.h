@@ -279,11 +279,9 @@ private:
                    ArrayRef<unsigned> conformsToRules,
                    ArrayRef<const ProtocolDecl *> conformsTo);
 
-  bool concretizeTypeWitnessInConformance(
+  void concretizeTypeWitnessInConformance(
                    Term key, RequirementKind requirementKind,
                    Symbol concreteConformanceSymbol,
-                   unsigned concreteRuleID,
-                   unsigned conformanceRuleID,
                    ProtocolConformanceRef conformance,
                    AssociatedTypeDecl *assocType) const;
 
