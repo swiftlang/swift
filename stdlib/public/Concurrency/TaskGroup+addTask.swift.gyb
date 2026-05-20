@@ -334,7 +334,7 @@ extension ${TYPE} where ChildTaskResult: ~Copyable {
 
     assert(task != nil, "Expected task to be created!")
     % if IS_ADD_UNLESS_CANCELLED:
-    return true
+    return true // task successfully enqueued
     % end
   }
 }
@@ -485,7 +485,7 @@ extension ${TYPE} {
 
     assert(task != nil, "Expected task to be created!")
     % if IS_ADD_UNLESS_CANCELLED:
-    return true
+    return true // task successfully enqueued
     % end
     % else: # non-discarding, non-unavailable: delegate to helper
     % if IS_ADD_UNLESS_CANCELLED:

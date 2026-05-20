@@ -703,6 +703,14 @@ public:
       /// Mask used for the low status bits in a wait queue item.
       static const uintptr_t statusMask = 0x03;
 
+      /// Bit set when a take-style wait has moved the result out of the
+      /// future's storage. Stolen from spare low bits of the task pointer
+      /// (which is at least 8-byte aligned), alongside the status bits.
+      static const uintptr_t movedOutFlag = 0x04;
+
+      /// Mask covering the bits used for the task pointer.
+      static const uintptr_t taskMask = ~(statusMask | movedOutFlag);
+
       uintptr_t storage;
 
       Status getStatus() const {
@@ -710,7 +718,11 @@ public:
       }
 
       AsyncTask *getTask() const {
-        return reinterpret_cast<AsyncTask *>(storage & ~statusMask);
+        return reinterpret_cast<AsyncTask *>(storage & taskMask);
+      }
+
+      bool wasResultMovedOut() const {
+        return (storage & movedOutFlag) != 0;
       }
 
       static WaitQueueItem get(Status status, AsyncTask *task) {
@@ -722,24 +734,14 @@ public:
   private:
     /// Queue containing all of the tasks that are waiting in `get()`.
     ///
-    /// The low bits contain the status, the rest of the pointer is the
-    /// AsyncTask.
+    /// The low bits contain the status and a `movedOutFlag`; the rest of
+    /// the pointer is the AsyncTask.
     std::atomic<WaitQueueItem> waitQueue;
 
     /// The type of the result that will be produced by the future.
     ResultTypeInfo resultType;
 
     SwiftError *error = nullptr;
-
-    /// Set when a take-style wait has moved the value out of storage.
-    /// Subsequent copy/take traps on this rather than reading moved-from
-    /// memory.
-    ///
-    /// FIXME: best-effort only. Concurrent copy+take across `Task` aliases
-    /// on different threads can race between this check and the
-    /// copy/take. Proper fix: reader-count + take-flag CAS so the two
-    /// paths serialise.
-    std::atomic<bool> resultMovedOut{false};
 
     // Trailing storage for the result itself. The storage will be
     // uninitialized, contain an instance of \c resultType.
@@ -758,14 +760,30 @@ public:
       return resultType;
     }
 
-    /// Returns true on the first call (the take is admitted), false
-    /// thereafter. Callers should trap on false. See `resultMovedOut`.
+    /// Atomically set the moved-out flag in `waitQueue`. Returns true on
+    /// the first call (the take is admitted), false thereafter. Callers
+    /// should trap on false.
+    ///
+    /// FIXME: best-effort only. Concurrent copy+take across `Task`
+    /// aliases on different threads can race between this check and the
+    /// subsequent copy/take. Proper fix: reader-count + take-flag CAS so
+    /// the two paths serialise.
     bool tryClaimResult() {
-      return !resultMovedOut.exchange(true, std::memory_order_acq_rel);
+      auto expected = waitQueue.load(std::memory_order_acquire);
+      while (true) {
+        if (expected.storage & WaitQueueItem::movedOutFlag)
+          return false;
+        WaitQueueItem desired{expected.storage | WaitQueueItem::movedOutFlag};
+        if (waitQueue.compare_exchange_weak(
+                expected, desired,
+                std::memory_order_acq_rel,
+                std::memory_order_acquire))
+          return true;
+      }
     }
 
     bool wasResultMovedOut() const {
-      return resultMovedOut.load(std::memory_order_acquire);
+      return waitQueue.load(std::memory_order_acquire).wasResultMovedOut();
     }
 
     /// Retrieve a pointer to the storage of the result.
