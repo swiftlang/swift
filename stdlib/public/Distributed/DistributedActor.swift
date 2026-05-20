@@ -246,7 +246,8 @@ public protocol DistributedActor: AnyObject, Sendable, Identifiable, Hashable
   /// unowned reference. This API is equivalent to ``Actor/unownedExecutor``,
   /// however, by default, it intentionally returns `nil` if this actor is a reference
   /// to a remote distributed actor, because the executor for remote references
-  /// is effectively never g
+  /// is effectively never going to execute any code "on" this actor's isolated state 
+  /// (because it is located on a remote).
   ///
   /// ## Custom implementation requirements
   ///
