@@ -47,7 +47,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
 
   @inlinable
   init(_ context: Builtin.RawUnsafeContinuation) {
-    unsafe self.context = context
+    self.context = context
   }
 
   deinit {
@@ -58,9 +58,9 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// without firing the deinit trap
   @_alwaysEmitIntoClient
   consuming func _takeContext() -> Builtin.RawUnsafeContinuation {
-    let ctx = unsafe self.context
+    let ctx = self.context
     discard self
-    return unsafe ctx
+    return ctx
   }
 
   /// Resume the task awaiting the continuation by having it return
@@ -69,7 +69,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// - Parameter value: The value to return from the continuation
   @_alwaysEmitIntoClient
   public consuming func resume(returning value: consuming sending Success) where Failure == Never {
-    unsafe Builtin.resumeNonThrowingContinuationReturning(context, value)
+    Builtin.resumeNonThrowingContinuationReturning(context, value)
     discard self // prevent deinit from firing
   }
 
@@ -79,7 +79,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// - Parameter value: The value to return from the continuation
   @_alwaysEmitIntoClient
   public consuming func resume(returning value: consuming sending Success) {
-    unsafe Builtin.resumeThrowingContinuationReturning(context, value)
+    Builtin.resumeThrowingContinuationReturning(context, value)
     discard self // prevent deinit from firing
   }
 
@@ -89,7 +89,7 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   /// - Parameter error: The error to throw from the continuation
   @_alwaysEmitIntoClient
   public consuming func resume(throwing error: __owned Failure) {
-    unsafe Builtin.resumeThrowingContinuationThrowing(context, error)
+    Builtin.resumeThrowingContinuationThrowing(context, error)
     discard self // prevent deinit from firing
   }
 
@@ -105,9 +105,9 @@ public struct Continuation<Success: ~Copyable, Failure: Error>: ~Copyable, @unch
   ) {
     switch consume result {
     case .success(let val):
-      unsafe Builtin.resumeThrowingContinuationReturning(context, val)
+      Builtin.resumeThrowingContinuationReturning(context, val)
     case .failure(let err):
-      unsafe Builtin.resumeThrowingContinuationThrowing(context, err)
+      Builtin.resumeThrowingContinuationThrowing(context, err)
     }
     discard self // prevent deinit from firing
   }
@@ -151,7 +151,7 @@ public nonisolated(nonsending) func withContinuation<Success: ~Copyable, Failure
 ) async throws(Failure) -> sending Success {
   do {
     return try await Builtin.withUnsafeThrowingContinuation {
-      body(unsafe Continuation($0))
+      body(Continuation($0))
     }
   } catch {
     throw error as! Failure
@@ -182,7 +182,7 @@ public nonisolated(nonsending) func withContinuation<Success: ~Copyable>(
   _ body: (consuming Continuation<Success, Never>) -> Void
 ) async -> sending Success {
   return await Builtin.withUnsafeContinuation {
-    body(unsafe Continuation($0))
+    body(Continuation($0))
   }
 }
 
