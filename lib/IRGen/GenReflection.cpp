@@ -391,7 +391,7 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
             // updated.
             if (IGM.getSwiftModule()->isStdlibModule()) {
               runtimeSupportsNoncopyableTypesSymbol
-                  = llvm::ConstantInt::get(IGM.Int8Ty, 0);
+                  = llvm::ConstantInt::get(IGM.Int8Ty, 1);
             } else {
               runtimeSupportsNoncopyableTypesSymbol
                   = IGM.Module.getOrInsertGlobal(
