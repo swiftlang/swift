@@ -89,14 +89,16 @@
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -114,14 +116,16 @@
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -141,14 +145,16 @@
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -237,35 +243,40 @@
             "name": "BitwiseCopyable",
             "printedName": "BitwiseCopyable",
             "usr": "s:s15BitwiseCopyableP",
-            "mangledName": "$ss15BitwiseCopyableP"
+            "mangledName": "$ss15BitwiseCopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Sendable",
             "printedName": "Sendable",
             "usr": "s:s8SendableP",
-            "mangledName": "$ss8SendableP"
+            "mangledName": "$ss8SendableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "SendableMetatype",
             "printedName": "SendableMetatype",
             "usr": "s:s16SendableMetatypeP",
-            "mangledName": "$ss16SendableMetatypeP"
+            "mangledName": "$ss16SendableMetatypeP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -342,14 +353,16 @@
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -601,14 +614,16 @@
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -806,7 +821,8 @@
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -820,7 +836,8 @@
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -1052,35 +1069,40 @@
             "name": "BitwiseCopyable",
             "printedName": "BitwiseCopyable",
             "usr": "s:s15BitwiseCopyableP",
-            "mangledName": "$ss15BitwiseCopyableP"
+            "mangledName": "$ss15BitwiseCopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Sendable",
             "printedName": "Sendable",
             "usr": "s:s8SendableP",
-            "mangledName": "$ss8SendableP"
+            "mangledName": "$ss8SendableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "SendableMetatype",
             "printedName": "SendableMetatype",
             "usr": "s:s16SendableMetatypeP",
-            "mangledName": "$ss16SendableMetatypeP"
+            "mangledName": "$ss16SendableMetatypeP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1189,14 +1211,16 @@
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1389,14 +1413,16 @@
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1467,14 +1493,16 @@
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1531,14 +1559,16 @@
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -1627,14 +1657,16 @@
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1703,14 +1735,16 @@
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -1753,14 +1787,16 @@
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1783,14 +1819,16 @@
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1854,14 +1892,16 @@
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -1934,14 +1974,16 @@
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           }
         ]
       },
@@ -2074,7 +2116,8 @@
             "name": "BitwiseCopyable",
             "printedName": "BitwiseCopyable",
             "usr": "s:s15BitwiseCopyableP",
-            "mangledName": "$ss15BitwiseCopyableP"
+            "mangledName": "$ss15BitwiseCopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -2102,21 +2145,24 @@
             "name": "ConvertibleFromBytes",
             "printedName": "ConvertibleFromBytes",
             "usr": "s:s20ConvertibleFromBytesP",
-            "mangledName": "$ss20ConvertibleFromBytesP"
+            "mangledName": "$ss20ConvertibleFromBytesP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "ConvertibleToBytes",
             "printedName": "ConvertibleToBytes",
             "usr": "s:s18ConvertibleToBytesP",
-            "mangledName": "$ss18ConvertibleToBytesP"
+            "mangledName": "$ss18ConvertibleToBytesP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "Copyable",
             "printedName": "Copyable",
             "usr": "s:s8CopyableP",
-            "mangledName": "$ss8CopyableP"
+            "mangledName": "$ss8CopyableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -2158,7 +2204,8 @@
             "name": "Escapable",
             "printedName": "Escapable",
             "usr": "s:s9EscapableP",
-            "mangledName": "$ss9EscapableP"
+            "mangledName": "$ss9EscapableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -2337,14 +2384,16 @@
             "name": "Sendable",
             "printedName": "Sendable",
             "usr": "s:s8SendableP",
-            "mangledName": "$ss8SendableP"
+            "mangledName": "$ss8SendableP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
             "name": "SendableMetatype",
             "printedName": "SendableMetatype",
             "usr": "s:s16SendableMetatypeP",
-            "mangledName": "$ss16SendableMetatypeP"
+            "mangledName": "$ss16SendableMetatypeP",
+            "isMarkerProtocol": true
           },
           {
             "kind": "Conformance",
@@ -2413,6 +2462,6 @@
         ]
       }
     ],
-    "json_format_version": 8
+    "json_format_version": 9
   }
 }
