@@ -34,47 +34,47 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
         }
       }
     }
-    var id = 0
+    var nextIteratorID = 0
     var continuations: [Int: Continuation] = [:]
-    var dirty = false
-    
-    // create a generation id for the unique identification of the continuations
-    // this allows the shared awaiting of the willSets.
-    // Most likely, there wont be more than a handful of active iterations
-    // so this only needs to be unique for those active iterations
-    // that are in the process of calling next.
-    static func generation(_ state: _ManagedCriticalState<State>) -> Int {
+    var dirty: Set<Int> = []
+    var activeIterators: Set<Int> = []
+
+    static func makeIteratorID(_ state: _ManagedCriticalState<State>) -> Int {
       state.withCriticalRegion { state in
-        defer { state.id &+= 1 }
-        return state.id
+        defer { state.nextIteratorID &+= 1 }
+        state.activeIterators.insert(state.nextIteratorID)
+        return state.nextIteratorID
       }
     }
-    
+
     // the cancellation of awaiting on willSet only ferries in resuming early
     // it is the responsibility of the caller to check if the task is actually
     // cancelled after awaiting the willSet to act accordingly.
-    static func cancel(_ state: _ManagedCriticalState<State>, id: Int) {
+    static func cancel(_ state: _ManagedCriticalState<State>, iteratorID: Int) {
       state.withCriticalRegion { state in
-        guard let continuation = state.continuations.removeValue(forKey: id) else {
+        guard let continuation = state.continuations.removeValue(forKey: iteratorID) else {
           // if there was no continuation yet active (e.g. it was cancelled at
           // the start of the invocation, then put a tombstone in to gate that
           // resuming later
-          state.continuations[id] = .cancelled
+          state.continuations[iteratorID] = .cancelled
           return nil as Continuation?
         }
         return continuation
       }?.resume()
     }
-    
+
     // fire off ALL awaiting willChange continuations such that they are no
     // longer pending.
     static func emitWillChange(_ state: _ManagedCriticalState<State>) {
       let continuations = state.withCriticalRegion { state in
-        // if there are no continuations present then we have to set the state as dirty
-        // else if this is unconditionally set the state might produce duplicate events
-        // one for the dirty and one for the continuation.
-        if state.continuations.count == 0 {
-          state.dirty = true
+        // mark active iterators that don't have a continuation as dirty
+        // only those specific iterators need to be woken on their next
+        // willChange call — this avoids a shared dirty flag leaking across
+        // iterator lifetimes.
+        for iteratorID in state.activeIterators {
+          if state.continuations[iteratorID] == nil {
+            state.dirty.insert(iteratorID)
+          }
         }
         defer {
           state.continuations.removeAll()
@@ -85,14 +85,12 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
         continuation.resume()
       }
     }
-    
-    // install a willChange continuation into the set of continuations
-    // this must take a locally unique id (to the active calls of next)
-    static func willChange(isolation iterationIsolation: isolated (any Actor)? = #isolation, state: _ManagedCriticalState<State>, id: Int) async {
+
+    // install a willChange continuation for a specific iterator
+    static func willChange(isolation iterationIsolation: isolated (any Actor)? = #isolation, state: _ManagedCriticalState<State>, iteratorID: Int) async {
       return await withUnsafeContinuation { continuation in
         state.withCriticalRegion { state in
-          defer { state.dirty = false }
-          switch state.continuations[id] {
+          switch state.continuations[iteratorID] {
           case .cancelled:
             return continuation as UnsafeContinuation<Void, Never>?
           case .active:
@@ -100,15 +98,23 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
             // or an internal book-keeping failure
             fatalError("Iterator incorrectly shared across task isolations")
           case .none:
-            if state.dirty {
+            if state.dirty.remove(iteratorID) != nil {
               return continuation
             } else {
-              state.continuations[id] = .active(continuation)
+              state.continuations[iteratorID] = .active(continuation)
               return nil
             }
           }
         }?.resume()
       }
+    }
+
+    static func terminate(_ state: _ManagedCriticalState<State>, iteratorID: Int) {
+      state.withCriticalRegion { state in
+        state.activeIterators.remove(iteratorID)
+        state.dirty.remove(iteratorID)
+        return state.continuations.removeValue(forKey: iteratorID)
+      }?.resume()
     }
   }
   
@@ -164,19 +170,33 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
   }
   
   public struct Iterator: AsyncIteratorProtocol {
-    // the state ivar serves two purposes:
-    // 1) to store a critical region of state of the mutations
-    // 2) to identify the termination of _this_ sequence
-    var state: _ManagedCriticalState<State>?
+    let extent: Extent
     let emit: Emit
-    var started = false
     
-    // this is the primary implementation of the tracking
-    // it is bound to be called on the specified isolation of the construction
+    var started = false
+
+    final class Extent {
+      var state: _ManagedCriticalState<State>?
+      let iteratorID: Int
+
+      init(state: _ManagedCriticalState<State>, iteratorID: Int) {
+        self.state = state
+        self.iteratorID = iteratorID
+      }
+
+      deinit {
+        if let state {
+          State.terminate(state, iteratorID: iteratorID)
+        }
+      }
+    }
+
+    init(state: _ManagedCriticalState<State>, emit: Emit, iteratorID: Int) {
+      self.extent = Extent(state: state, iteratorID: iteratorID)
+      self.emit = emit
+    }
+
     fileprivate static func trackEmission(isolation trackingIsolation: isolated (any Actor)?, state: _ManagedCriticalState<State>, emit: Emit) throws(Failure) -> Iteration {
-      // this ferries in an intermediate form with Result to skip over `withObservationTracking` not handling errors being thrown
-      // particularly this case is that the error is also an iteration state transition data point (it terminates the sequence)
-      // so we need to hold that to get a chance to catch and clean-up
       if #available(SwiftStdlib 6.4, *) {
         return try withObservationTracking(options: [.willSet, .deinit]) { () throws(Failure) -> Observations<Element, Failure>.Iteration in
           switch emit {
@@ -216,67 +236,55 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
         }
       }
     }
-    
-    fileprivate mutating func terminate(throwing failure: Failure? = nil, id: Int) throws(Failure) -> Element? {
-      // this is purely defensive to any leaking out of iteration generation ids
-      state?.withCriticalRegion { state in
-        state.continuations.removeValue(forKey: id)
-      }?.resume()
+
+    fileprivate mutating func terminate(throwing failure: Failure? = nil) throws(Failure) -> Element? {
+      if let state = extent.state {
+        State.terminate(state, iteratorID: extent.iteratorID)
+      }
       // flag the sequence as terminal by nil'ing out the state
-      state = nil
+      extent.state = nil
       if let failure {
         throw failure
       } else {
         return nil
       }
     }
-    
-    fileprivate mutating func trackEmission(isolation iterationIsolation: isolated (any Actor)?, state: _ManagedCriticalState<State>, id: Int) async throws(Failure) -> Element? {
+
+    fileprivate mutating func trackEmission(isolation iterationIsolation: isolated (any Actor)?, state: _ManagedCriticalState<State>) async throws(Failure) -> Element? {
       guard !Task.isCancelled else {
-        // the task was cancelled while awaiting a willChange so ensure a proper termination
-        return try terminate(id: id)
+        return try terminate()
       }
-      // start by directly tracking the emission via a withObservation tracking on the isolation specified from the init
       switch try await Iterator.trackEmission(isolation: emit.isolation, state: state, emit: emit) {
-      case .finish: return try terminate(id: id)
+      case .finish: return try terminate()
       case .next(let element): return element
       }
     }
-    
+
     public mutating func next(isolation iterationIsolation: isolated (any Actor)? = #isolation) async throws(Failure) -> Element? {
-      // early exit if the sequence is terminal already
-      guard let state else { return nil }
-      // set up an id for this generation
-      let id = State.generation(state)
+      guard let state = extent.state else { return nil }
+      let iteratorID = extent.iteratorID
       do {
         // there are two versions;
         // either the tracking has never yet started at all and we need to prime the pump for this specific iterator
         // or the tracking has already started and we are going to await a change
         if !started {
           started = true
-          return try await trackEmission(isolation: iterationIsolation, state: state, id: id)
+          return try await trackEmission(isolation: iterationIsolation, state: state)
         } else {
-          // wait for the willChange (and NOT the value itself)
-          // since this is going to be on the isolation of the object (e.g. the isolation specified in the initialization)
-          // this will mean our next await for the emission will ensure the suspension return of the willChange context
-          // back to the trailing edges of the mutations. In short, this enables the transactionality bounded by the
-          // isolation of the mutation.
           await withTaskCancellationHandler(operation: {
-            await State.willChange(isolation: iterationIsolation, state: state, id: id)
-          }, onCancel: {
-            // ensure to clean out our continuation upon cancellation
-            State.cancel(state, id: id)
+            await State.willChange(isolation: iterationIsolation, state: state, iteratorID: iteratorID)
+          }, onCancel: { [iteratorID] in
+            State.cancel(state, iteratorID: iteratorID)
           })
-          return try await trackEmission(isolation: iterationIsolation, state: state, id: id)
+          return try await trackEmission(isolation: iterationIsolation, state: state)
         }
       } catch {
-        // the user threw a failure in the closure so propagate that outwards and terminate the sequence
-        return try terminate(throwing: error, id: id)
+        return try terminate(throwing: error)
       }
     }
   }
   
   public func makeAsyncIterator() -> Iterator {
-    Iterator(state: state, emit: emit)
+    Iterator(state: state, emit: emit, iteratorID: State.makeIteratorID(state))
   }
 }
