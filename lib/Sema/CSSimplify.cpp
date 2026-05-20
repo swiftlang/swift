@@ -1224,14 +1224,11 @@ public:
         return false;
       }
 
-      // Validate argument indices are within bounds before creating fix
-      if (argIdx >= Arguments.size() || prevArgIdx >= Arguments.size())
-        return false;
-
-      // Validate all binding indices are within bounds
+      // Validate bindings don't reference out-of-bounds indices
+      // This prevents crashes in MoveOutOfOrderArgument::diagnose()
       for (const auto &paramBinding : bindings) {
-        for (auto bindingArgIdx : paramBinding) {
-          if (bindingArgIdx >= Arguments.size())
+        for (auto idx : paramBinding) {
+          if (idx >= Arguments.size())
             return false;
         }
       }

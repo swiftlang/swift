@@ -6060,7 +6060,7 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
   // Build a mapping from arguments to parameters.
   SmallVector<unsigned, 4> argBindings(args->size());
   for (unsigned paramIdx = 0; paramIdx != Bindings.size(); ++paramIdx) {
-    for (auto argIdx : Bindings[paramIdx])
+    for (auto argIdx : Bindings[paramIdx]) {
       argBindings[argIdx] = paramIdx;
   }
 
