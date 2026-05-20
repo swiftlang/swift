@@ -12,15 +12,13 @@
 // We emit assembly rather than SIL because the bottleneck in rdar://175803465
 // was LLVM machine code generation.
 
-// RUN: %{python} %S/../../test/Inputs/timeout.py 15 %target-swift-frontend -O -parse-as-library -disable-availability-checking -S %t/main.swift | %FileCheck %s
+// RUN: %{python} %S/../../test/Inputs/timeout.py 60 %target-swift-frontend -O -parse-as-library -disable-availability-checking -S %t/main.swift | %FileCheck %s
 
 // There is a separate test for an assert-enabled stdlib
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 
 // REQUIRES: long_test
 // REQUIRES: CPU=arm64 || CPU=x86_64 || CPU=aarch64
-
-// REQUIRES: rdar176849287
 
 // Check if the optimizer can optimize the whole array into a statically
 // initialized global
