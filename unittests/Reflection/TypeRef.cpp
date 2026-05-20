@@ -10,8 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/RemoteInspection/TypeRefBuilder.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/Remote/MetadataReader.h"
+#include "swift/RemoteInspection/TypeRefBuilder.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
@@ -570,4 +571,27 @@ TEST(TypeRefTest, DeriveSubstitutions) {
   auto ResultTwo = DerivedSubs[{0,1}];
   EXPECT_EQ(SubstOne, ResultOne);
   EXPECT_EQ(SubstTwo, ResultTwo);
+}
+
+// Round-trips a constrained existential carrying an inverse `~Copyable`
+// requirement through TypeRef::mangle.
+TEST(TypeRefTest, ConstrainedExistentialInverseRequirementMangle) {
+  TypeRefBuilder Builder(TypeRefBuilder::ForTesting);
+  Demangle::Demangler Dem;
+
+  static const std::string MangledProtocol = "5Tests1PP";
+  TypeRefBuilder::BuiltProtocolDecl P =
+      std::make_pair(MangledProtocol, /*isObjC=*/false);
+  auto *base = Builder.createProtocolCompositionType(
+      {P}, /*superclass=*/nullptr, /*isClassBound=*/false);
+  auto *self = Builder.createGenericTypeParameterType(0, 0);
+  TypeRefInverseRequirement inv(self, InvertibleProtocolKind::Copyable);
+
+  auto *cet = Builder.createConstrainedExistentialType(
+      base, /*requirements=*/{}, {inv});
+  ASSERT_NE(cet, nullptr);
+
+  auto mangled = cet->mangle(Dem);
+  ASSERT_TRUE(mangled.has_value());
+  EXPECT_FALSE(mangled->empty());
 }

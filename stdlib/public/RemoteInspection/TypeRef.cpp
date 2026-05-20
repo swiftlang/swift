@@ -286,6 +286,8 @@ public:
     printRec(CET->getBase());
     for (auto req : CET->getRequirements())
       visitTypeRefRequirement(req);
+    for (auto inverse : CET->getInverseRequirements())
+      visitTypeRefInverseRequirement(inverse);
     stream << ")";
   }
 
@@ -387,6 +389,14 @@ public:
       stream << "layout requirement";
       break;
     }
+    stream << ")";
+  }
+
+  void
+  visitTypeRefInverseRequirement(const TypeRefInverseRequirement &inverse) {
+    printHeader("inverse_requirement ");
+    printRec(inverse.getFirstType());
+    stream << " : ~" << getInvertibleProtocolKindName(inverse.getKind());
     stream << ")";
   }
 
@@ -1045,6 +1055,8 @@ public:
         Dem.createNode(Node::Kind::ConstrainedExistentialRequirementList);
     for (auto req : CET->getRequirements())
       constraintList->addChild(visitTypeRefRequirement(req), Dem);
+    for (auto inverse : CET->getInverseRequirements())
+      constraintList->addChild(visitTypeRefInverseRequirement(inverse), Dem);
     node->addChild(constraintList, Dem);
     return node;
   }
@@ -1178,6 +1190,22 @@ public:
       // Not implemented.
       return nullptr;
     }
+  }
+
+  Demangle::NodePointer
+  visitTypeRefInverseRequirement(const TypeRefInverseRequirement &inverse) {
+    auto subjectType = Dem.createNode(Node::Kind::Type);
+    // The only possible child of an inverse conformance requirement
+    // is ConstrainedExistentialSelf.
+    subjectType->addChild(
+        Dem.createNode(Node::Kind::ConstrainedExistentialSelf), Dem);
+    auto r = Dem.createNode(
+        Node::Kind::DependentGenericInverseConformanceRequirement);
+    r->addChild(subjectType, Dem);
+    r->addChild(Dem.createNode(Node::Kind::Number,
+                               static_cast<Node::IndexType>(inverse.getKind())),
+                Dem);
+    return r;
   }
 
   Demangle::NodePointer
@@ -1468,7 +1496,8 @@ public:
   const TypeRef *
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
     return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
-                                                 CET->getRequirements());
+                                                 CET->getRequirements(),
+                                                 CET->getInverseRequirements());
   }
 
   const TypeRef *visitSymbolicExtendedExistentialTypeRef(
@@ -1763,8 +1792,8 @@ public:
         continue;
       constraints.emplace_back(*substReq);
     }
-    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
-                                                 constraints);
+    return ConstrainedExistentialTypeRef::create(
+        Builder, CET->getBase(), constraints, CET->getInverseRequirements());
   }
 
   const TypeRef *visitSymbolicExtendedExistentialTypeRef(

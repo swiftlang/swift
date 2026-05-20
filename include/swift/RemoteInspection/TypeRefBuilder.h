@@ -1303,12 +1303,12 @@ public:
 
   const ConstrainedExistentialTypeRef *createConstrainedExistentialType(
       const TypeRef *base, llvm::ArrayRef<BuiltRequirement> constraints,
-      llvm::ArrayRef<BuiltInverseRequirement> InverseRequirements) {
-    // FIXME: Handle inverse requirements.
+      llvm::ArrayRef<BuiltInverseRequirement> inverseRequirements) {
     auto *baseProto = llvm::dyn_cast<ProtocolCompositionTypeRef>(base);
     if (!baseProto)
       return nullptr;
-    return ConstrainedExistentialTypeRef::create(*this, baseProto, constraints);
+    return ConstrainedExistentialTypeRef::create(*this, baseProto, constraints,
+                                                 inverseRequirements);
   }
 
   const TypeRef *

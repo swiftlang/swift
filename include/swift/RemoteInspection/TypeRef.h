@@ -689,9 +689,12 @@ public:
 class ConstrainedExistentialTypeRef final : public TypeRef {
   const ProtocolCompositionTypeRef *Base;
   std::vector<TypeRefRequirement> Requirements;
+  std::vector<TypeRefInverseRequirement> InverseRequirements;
 
-  static TypeRefID Profile(const ProtocolCompositionTypeRef *Protocol,
-                           std::vector<TypeRefRequirement> Requirements) {
+  static TypeRefID
+  Profile(const ProtocolCompositionTypeRef *Protocol,
+          std::vector<TypeRefRequirement> Requirements,
+          std::vector<TypeRefInverseRequirement> InverseRequirements) {
     TypeRefID ID;
     ID.addPointer(Protocol);
     for (auto reqt : Requirements) {
@@ -703,27 +706,38 @@ class ConstrainedExistentialTypeRef final : public TypeRef {
             unsigned(0)); // FIXME: Layout constraints aren't implemented yet
       ID.addInteger(unsigned(reqt.getKind()));
     }
+    for (auto inverse : InverseRequirements) {
+      ID.addPointer(inverse.getFirstType());
+      ID.addInteger(unsigned(inverse.getKind()));
+    }
     return ID;
   }
 
 public:
-  ConstrainedExistentialTypeRef(const ProtocolCompositionTypeRef *Protocol,
-                                std::vector<TypeRefRequirement> Requirements)
+  ConstrainedExistentialTypeRef(
+      const ProtocolCompositionTypeRef *Protocol,
+      std::vector<TypeRefRequirement> Requirements,
+      std::vector<TypeRefInverseRequirement> InverseRequirements)
       : TypeRef(TypeRefKind::ConstrainedExistential), Base(Protocol),
-        Requirements(Requirements) {}
+        Requirements(Requirements), InverseRequirements(InverseRequirements) {}
 
   template <typename Allocator>
   static const ConstrainedExistentialTypeRef *
   create(Allocator &A, const ProtocolCompositionTypeRef *Protocol,
-         std::vector<TypeRefRequirement> Requirements) {
+         std::vector<TypeRefRequirement> Requirements,
+         std::vector<TypeRefInverseRequirement> InverseRequirements) {
     FIND_OR_CREATE_TYPEREF(A, ConstrainedExistentialTypeRef, Protocol,
-                           Requirements);
+                           Requirements, InverseRequirements);
   }
 
   const ProtocolCompositionTypeRef *getBase() const { return Base; }
 
   const std::vector<TypeRefRequirement> &getRequirements() const {
     return Requirements;
+  }
+
+  const std::vector<TypeRefInverseRequirement> &getInverseRequirements() const {
+    return InverseRequirements;
   }
 
   static bool classof(const TypeRef *TR) {
