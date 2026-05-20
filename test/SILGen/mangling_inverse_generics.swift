@@ -378,6 +378,12 @@ public func keepEscapable<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 @_preInverseGenerics
 public func stripBoth<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 
+// The shorthand alias mangles identically to `(except: ~Copyable)`.
+// DEMANGLED: test.keepCopyableShorthand<A where A: ~Swift.Copyable>(A) -> ()
+// CHECK: sil [ossa] @$s4test21keepCopyableShorthandyyxRi_zlF : $@convention(thin) <T where T : ~Copyable, T : ~Escapable> (@in_guaranteed T) -> () {
+@_preInverseGenericsExceptCopyable
+public func keepCopyableShorthand<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
+
 
 public struct F<T: ~Copyable>: ~Copyable {
   // DEMANGLED: (extension in test):test.F< where A: ~Swift.Copyable>.memberKeepCopyable() -> ()
@@ -405,6 +411,11 @@ public struct MySpan<T: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
   // CHECK: sil [transparent] [serialized] [ossa] @$s4test6MySpanVAARi_zrlE6_countSivg : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@guaranteed MySpan<T>) -> Int {
   @_preInverseGenerics(except: ~Copyable)
   public var _count: Int
+
+  // DEMANGLED: (extension in test):test.MySpan< where A: ~Swift.Copyable>._count2.getter : Swift.Int
+  // CHECK: sil [transparent] [serialized] [ossa] @$s4test6MySpanVAARi_zrlE7_count2Sivg : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@guaranteed MySpan<T>) -> Int {
+  @_preInverseGenericsExceptCopyable
+  public var _count2: Int
 
   // DEMANGLED: (extension in test):test.MySpan< where A: ~Swift.Copyable>._pointer.getter : Swift.UnsafeRawPointer?
   // CHECK: sil [transparent] [serialized] [ossa] @$s4test6MySpanVAARi_zrlE8_pointerSVSgvg : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@guaranteed MySpan<T>) -> Optional<UnsafeRawPointer> {
@@ -436,4 +447,3 @@ extension MySpan where T: ~Copyable & ~Escapable {
   // CHECK: sil [ossa] @$s4test6MySpanVAARi_zRi0_zrlE9extMethodyyF : $@convention(method) <T where T : ~Copyable, T : ~Escapable> (@guaranteed MySpan<T>) -> () {
   public func extMethod() {}
 }
-
