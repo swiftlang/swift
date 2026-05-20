@@ -98,11 +98,10 @@ llvm::StructType *IRGenModule::createTransientStructType(
   return createStructType(*this, name, types, packed);
 }
 
-static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
-                                                      llvm::LLVMContext &LLVMContext,
-                                                      const IRGenOptions &Opts,
-                                                      StringRef ModuleName,
-                                                      StringRef PD) {
+static std::unique_ptr<clang::CodeGenerator>
+createClangCodeGenerator(ASTContext &Context, llvm::LLVMContext &LLVMContext,
+                         const IRGenOptions &Opts, StringRef ModuleName,
+                         StringRef PD) {
   auto Loader = Context.getClangModuleLoader();
   auto *Importer = static_cast<ClangImporter*>(&*Loader);
   assert(Importer && "No clang module loader!");
@@ -130,9 +129,9 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
                   .getHeaderSearchInfo()
                   .getHeaderSearchOpts();
   auto &PPO = Importer->getClangPreprocessor().getPreprocessorOpts();
-  auto *ClangCodeGen = clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(),
-                                                ModuleName, &VFS, HSI, PPO, CGO,
-                                                LLVMContext);
+  auto ClangCodeGen =
+      clang::CreateLLVMCodeGen(ClangContext.getDiagnostics(), ModuleName, &VFS,
+                               HSI, PPO, CGO, LLVMContext);
   ClangCodeGen->Initialize(ClangContext, CGTI);
   return ClangCodeGen;
 }
@@ -2439,9 +2438,9 @@ bool swift::writeEmptyOutputFilesFor(
       continue;
 
     std::unique_ptr<llvm::LLVMContext> llvmContext(new llvm::LLVMContext());
-    std::unique_ptr<clang::CodeGenerator> clangCodeGen(
-      createClangCodeGenerator(const_cast<ASTContext&>(Context),
-                               *llvmContext, IRGenOpts, fileName, ""));
+    auto clangCodeGen =
+        createClangCodeGenerator(const_cast<ASTContext &>(Context),
+                                 *llvmContext, IRGenOpts, fileName, "");
     auto *llvmModule = clangCodeGen->GetModule();
 
     auto *clangImporter = static_cast<ClangImporter *>(
