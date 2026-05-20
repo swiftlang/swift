@@ -636,6 +636,10 @@ static size_t getNumParams(const clang::FunctionDecl* D) {
     return D->getNumParams();
 }
 
+static size_t getNumParams(const clang::ObjCMethodDecl* D) {
+    return D->param_size();
+}
+
 static bool shouldSkipModule(ModuleDecl *M) {
   if (M->isClangBridgingHeaderImportModule()) {
     DLOG("is from bridging header (or C++ namespace)\n");
@@ -911,8 +915,14 @@ static bool diagnoseMissingMacroPlugin(ASTContext &SwiftContext,
 void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
   if (SwiftContext.LangOpts.DisableSafeInteropWrappers)
     return;
-  auto ClangDecl = dyn_cast_or_null<clang::FunctionDecl>(MappedDecl->getClangDecl());
-  if (!ClangDecl)
+  auto ClangDecl = MappedDecl->getClangDecl();
+  auto ClangFuncDecl = dyn_cast_or_null<clang::FunctionDecl>(ClangDecl);
+  auto ClangObjCMethodDecl = dyn_cast_or_null<clang::ObjCMethodDecl>(ClangDecl);
+  if (!ClangFuncDecl && !ClangObjCMethodDecl)
+    return;
+  ASSERT(!ClangFuncDecl || !ClangObjCMethodDecl);
+
+  if (isa<ProtocolDecl>(MappedDecl->getParent()))
     return;
 
   MacroDecl *SwiftifyImportDecl = dyn_cast_or_null<MacroDecl>(getKnownSingleDecl(SwiftContext, "_SwiftifyImport"));
@@ -984,9 +994,16 @@ void ClangImporter::Implementation::swiftify(AbstractFunctionDecl *MappedDecl) {
     SwiftifyInfoFunctionPrinter printer(
         getClangASTContext(), SwiftContext, out, *SwiftifyImportDecl,
         typeMapping, DiagnosedMissingNullableAsEmptySpanParam);
-    if (!swiftifyImpl(*this, printer, MappedDecl, ClangDecl)) {
-      DLOG("No relevant bounds or lifetime info found\n");
-      return;
+    if (ClangFuncDecl) {
+      if (!swiftifyImpl(*this, printer, MappedDecl, ClangFuncDecl)) {
+        DLOG("No relevant bounds or lifetime info found\n");
+        return;
+      }
+    } else {
+      if (!swiftifyImpl(*this, printer, MappedDecl, ClangObjCMethodDecl)) {
+        DLOG("No relevant bounds or lifetime info found\n");
+        return;
+      }
     }
     printer.printAvailability();
     printer.printTypeMapping();
