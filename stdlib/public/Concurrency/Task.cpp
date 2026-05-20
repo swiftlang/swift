@@ -1001,13 +1001,23 @@ void AsyncTask::completeFuture(AsyncContext *context) {
   }
 
   // Update the status to signal completion.
-  auto newQueueHead =
-      WaitQueueItem::get(hadErrorResult ? Status::Error : Status::Success,
-                         nullptr, &fragment->waitQueue);
+  //
+  // The group offer() above may already have taken the result and set the
+  // moved-out flag in the wait queue, so carry that bit over rather than
+  // overwriting it; otherwise destroy() would destroy moved-from storage.
+  auto queueHead = fragment->waitQueue.load(std::memory_order_acquire);
+  while (true) {
+    auto newQueueHead =
+        WaitQueueItem::get(hadErrorResult ? Status::Error : Status::Success,
+                           nullptr, &fragment->waitQueue);
+    newQueueHead.storage |= queueHead.storage & WaitQueueItem::movedOutFlag;
 
-  // NOTE: this acquire-release synchronizes with `waitFuture`.
-  auto queueHead = fragment->waitQueue.exchange(
-      newQueueHead, std::memory_order_acq_rel);
+    // NOTE: this acquire-release synchronizes with `waitFuture`.
+    if (fragment->waitQueue.compare_exchange_weak(
+            queueHead, newQueueHead, std::memory_order_acq_rel,
+            std::memory_order_acquire))
+      break;
+  }
   assert(queueHead.getStatus() == Status::Executing);
 
   // Once we signal completion, an async let task may be destroyed. We must not

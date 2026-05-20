@@ -2184,13 +2184,15 @@ private:
       auto FutureFragmentObj =
           readObj<FutureFragment<Runtime>>(FutureFragmentAddr);
       if (FutureFragmentObj) {
-        // The low 2 bits of WaitQueue are the status; the rest is the first
-        // waiting task pointer.
+        // The low 2 bits of WaitQueue are the status and bit 2 is the
+        // moved-out flag; the rest is the first waiting task pointer.
         // See FutureFragment::WaitQueueItem in include/swift/ABI/Task.h.
         const StoredPointer statusMask = 0x03;
+        const StoredPointer movedOutFlag = 0x04;
         StoredPointer WaitingTaskPtr =
             stripSignedPointer(
-                RemoteAddress(FutureFragmentObj->WaitQueue & ~statusMask,
+                RemoteAddress(FutureFragmentObj->WaitQueue &
+                                  ~(statusMask | movedOutFlag),
                               RemoteAddress::DefaultAddressSpace))
                 .getRawAddress();
 
