@@ -5256,13 +5256,9 @@ static bool repairOutOfOrderArgumentsInBinaryFunction(
 
     result = matchArgToParam(argType, paramType, otherArgIdx);
     if (result.isSuccess()) {
-      // Validate indices are within bounds (defensive check)
-      // For binary operators, we have at most 2 arguments (0 and 1)
-      if (otherArgIdx < 2 && currArgIdx < 2) {
-        conversionsOrFixes.push_back(MoveOutOfOrderArgument::create(
-            cs, otherArgIdx, currArgIdx, {{0}, {1}}, parentLoc));
-        return true;
-      }
+      conversionsOrFixes.push_back(MoveOutOfOrderArgument::create(
+          cs, otherArgIdx, currArgIdx, {{0}, {1}}, parentLoc));
+      return true;
     }
   }
 

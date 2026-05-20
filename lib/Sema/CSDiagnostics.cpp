@@ -6070,7 +6070,7 @@ bool OutOfOrderArgumentFailure::diagnoseAsError() {
       range.Start = args->getLabelLoc(argIdx);
 
     unsigned paramIdx = argBindings[argIdx];
-    if (paramIdx < Bindings.size() && Bindings[paramIdx].size() > 1)
+    if (Bindings[paramIdx].size() > 1)
       range.End = args->getExpr(Bindings[paramIdx].back())->getEndLoc();
 
     return range;
