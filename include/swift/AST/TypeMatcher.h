@@ -114,6 +114,7 @@ private:
     TRIVIAL_CASE(BuiltinUnboundGenericType)
     TRIVIAL_CASE(BuiltinGenericType)
     TRIVIAL_CASE(IntegerType)
+    TRIVIAL_CASE(HiddenType)
 #define SINGLETON_TYPE(SHORT_ID, ID) TRIVIAL_CASE(ID##Type)
 #include "swift/AST/TypeNodes.def"
 

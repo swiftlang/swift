@@ -832,7 +832,7 @@ DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   157)
 DECL_ATTR_ALIAS(_disallowFeatureSuppression, AllowFeatureSuppression)
 
-SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
+DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
   OnAbstractFunction | OnSubscript | OnVar | OnExtension,
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   158)
@@ -919,7 +919,7 @@ SIMPLE_DECL_ATTR(_unsafeSelfDependentResult, UnsafeSelfDependentResult,
 
 DECL_ATTR(diagnose, Diagnose,
   OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar | OnNominalType | OnExtension | OnEnumElement | OnAccessor | OnImport | OnTypeAlias | OnAssociatedType | OnMacro,
-  AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  AllowMultipleAttributes | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   174)
 LAST_DECL_ATTR(Diagnose)
 

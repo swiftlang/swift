@@ -3460,9 +3460,19 @@ namespace {
 
       // The constraint solver may not have chosen legal casts.
       if (auto funcConv = dyn_cast<FunctionConversionExpr>(expr)) {
-        checkFunctionConversion(funcConv,
-                                funcConv->getSubExpr()->getType(),
+        auto *subExpr = funcConv->getSubExpr();
+
+        checkFunctionConversion(funcConv, subExpr->getType(),
                                 funcConv->getType());
+
+        // Closures are allowed to assume isolation from function conversion in
+        // some circumstances (currently only when it's
+        // `nonisolated(nonsending)`). If this happens, we can drop the
+        // conversion.
+        if (auto *closure = dyn_cast<AbstractClosureExpr>(subExpr)) {
+          if (funcConv->getType()->isEqual(closure->getType()))
+            return Action::Continue(closure);
+        }
       }
 
       if (auto *isolationErasure = dyn_cast<ActorIsolationErasureExpr>(expr)) {
@@ -4810,28 +4820,36 @@ namespace {
 } // end anonymous namespace
 
 /// Compute the isolation of a closure or local function from its parent
-/// isolation.
+/// isolation. The result indicates whether the isolation was inherited
+/// or not.
 ///
 /// Doesn't apply preconcurrency because it's generally easier for the
 /// caller to do so.
-static ActorIsolation
+static std::pair<ActorIsolation, /*inherited=*/bool>
 computeClosureIsolationFromParent(DeclContext *closure,
                                   ActorIsolation parentIsolation,
                                   bool checkIsolatedCapture) {
+  auto getNonisolatedIsolation =
+      [&](bool inherited) -> std::pair<ActorIsolation, bool> {
+    auto closureFn = AnyFunctionRef::fromFunctionDeclContext(closure);
+    if (closureFn.isAsync())
+      return {ActorIsolation::forNonisolatedConcurrent(), inherited};
+
+    return {ActorIsolation::forNonisolated(parentIsolation ==
+                                           ActorIsolation::NonisolatedUnsafe),
+            inherited};
+  };
+
   // We must have parent isolation determined to get here.
   switch (parentIsolation) {
   case ActorIsolation::NonisolatedNonsending:
+    return getNonisolatedIsolation(/*inferred=*/false);
+
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedConcurrent:
   case ActorIsolation::NonisolatedUnsafe:
-  case ActorIsolation::Unspecified: {
-    auto closureFn = AnyFunctionRef::fromFunctionDeclContext(closure);
-    if (closureFn.isAsync())
-      return ActorIsolation::forNonisolatedConcurrent();
-
-    return ActorIsolation::forNonisolated(parentIsolation ==
-                                          ActorIsolation::NonisolatedUnsafe);
-  }
+  case ActorIsolation::Unspecified:
+    return getNonisolatedIsolation(/*inferred=*/true);
 
   case ActorIsolation::Erased:
     llvm_unreachable("context cannot have erased isolation");
@@ -4839,7 +4857,8 @@ computeClosureIsolationFromParent(DeclContext *closure,
   case ActorIsolation::GlobalActor:
     // This should already be an interface type, so we don't need to remap
     // it between the contexts.
-    return ActorIsolation::forGlobalActor(parentIsolation.getGlobalActor());
+    return {ActorIsolation::forGlobalActor(parentIsolation.getGlobalActor()),
+            /*inherited=*/true};
 
   case ActorIsolation::ActorInstance: {
     // In non-@Sendable local functions, we always inherit the enclosing
@@ -4850,34 +4869,34 @@ computeClosureIsolationFromParent(DeclContext *closure,
       // locally within isolation checking.
       auto actor = parentIsolation.getActorInstance();
       assert(actor);
-      return ActorIsolation::forActorInstanceCapture(actor);
+      return {ActorIsolation::forActorInstanceCapture(actor),
+              /*inherited=*/true};
     }
 
     if (checkIsolatedCapture) {
       auto closureAsFn = AnyFunctionRef::fromFunctionDeclContext(closure);
       if (auto param = closureAsFn.getCaptureInfo().getIsolatedParamCapture())
-        return ActorIsolation::forActorInstanceCapture(param);
+        return {ActorIsolation::forActorInstanceCapture(param),
+                /*inherited=*/true};
 
       auto *explicitClosure = dyn_cast<ClosureExpr>(closure);
       // @_inheritActorContext(always) forces the isolation capture.
       if (explicitClosure && explicitClosure->alwaysInheritsActorContext()) {
         if (parentIsolation.isActorInstanceIsolated()) {
           if (auto *param = parentIsolation.getActorInstance())
-            return ActorIsolation::forActorInstanceCapture(param);
+            return {ActorIsolation::forActorInstanceCapture(param),
+                    /*inherited=*/true};
         }
-        return parentIsolation;
+        return {parentIsolation, /*inherited=*/true};
       }
     } else {
       // If we don't have capture information during code completion, assume
       // that the closure captures the `isolated` parameter from the parent
       // context.
-      return parentIsolation;
+      return {parentIsolation, /*inherited=*/true};
     }
 
-    if (AnyFunctionRef::fromFunctionDeclContext(closure).isAsync())
-      return ActorIsolation::forNonisolatedConcurrent();
-
-    return ActorIsolation::forNonisolated(/*unsafe=*/false);
+    return getNonisolatedIsolation(/*inherited=*/false);
   }
   }
 }
@@ -4931,12 +4950,60 @@ ActorIsolationChecker::determineClosureIsolation(AbstractClosureExpr *closure,
         closure->getParent(), getClosureActorIsolation);
     preconcurrency |= parentIsolation.preconcurrency();
 
-    auto normalIsolation = computeClosureIsolationFromParent(
-        closure, parentIsolation, checkIsolatedCapture);
+    ActorIsolation normalIsolation;
+    bool inheritsParentIsolation;
+    std::tie(normalIsolation, inheritsParentIsolation) =
+        computeClosureIsolationFromParent(closure, parentIsolation,
+                                          checkIsolatedCapture);
 
     bool isIsolationBoundary =
         isIsolationInferenceBoundaryClosure(closure,
                                             /*canInheritActorContext=*/true);
+
+    bool isArgumentOfNonisolatedNonsendingApply = false;
+    if (auto *apply = dyn_cast_or_null<CallExpr>(getImmediateApply())) {
+      auto type = apply->getFn()->getType();
+      if (auto *fnType = type->getAs<AnyFunctionType>()) {
+        isArgumentOfNonisolatedNonsendingApply =
+            fnType->getIsolation().isNonisolatedNonsending();
+      }
+    }
+
+    auto canAssumeNonisolatedNonsending = [&]() {
+      // Boundary closures cannot infer isolation from the parent context and
+      // so are always allowed to assume `nonisolated(nonsending)` isolation.
+      if (isIsolationBoundary)
+        return true;
+
+      // If a closure is used as an argument in `nonisolated(nonsending)` call
+      // and it assumes isolation of the parent it doesn't have to assume
+      // `nonisolated(nonsending)` isolation of the parameter because the
+      // `nonisolated(nonsending)` in this case matches isolation of the
+      // context.
+      if (isArgumentOfNonisolatedNonsendingApply)
+        return !inheritsParentIsolation;
+
+      // Since this is not a call to `nonisolated(nonsending)` declaration, the
+      // closure can assume `nonisolated(nonsending)` when it's `@concurrent`,
+      // otherwise it would hop to the generic executor which is unexpected
+      // when isolation is not explicitly specified or inferred to be a
+      // specific actor.
+      if (normalIsolation.isNonisolatedConcurrent())
+        return true;
+
+      // Otherwise closure has to assume isolation inherited from the parent
+      // context.
+      return !inheritsParentIsolation;
+    };
+
+    auto isConvertedToNonisolatedNonsending = [&context]() {
+      if (auto *fce = dyn_cast_or_null<FunctionConversionExpr>(context)) {
+        auto expectedIsolation =
+            fce->getType()->castTo<FunctionType>()->getIsolation();
+        return expectedIsolation.isNonisolatedNonsending();
+      }
+      return false;
+    };
 
     // The solver has to be conservative and produce a conversion to
     // `nonisolated(nonsending)` because at solution application time
@@ -4945,14 +5012,18 @@ ActorIsolationChecker::determineClosureIsolation(AbstractClosureExpr *closure,
     //
     // At this point we know that closure is not explicitly annotated with
     // global actor, nonisolated/@concurrent attributes and doesn't have
-    // isolated parameters. If our closure is nonisolated and we have a
-    // conversion to nonisolated(nonsending), then we should respect that.
-    if (isIsolationBoundary || normalIsolation.isNonisolatedOrConcurrent()) {
-      if (auto *fce = dyn_cast_or_null<FunctionConversionExpr>(context)) {
-        auto expectedIsolation =
-            fce->getType()->castTo<FunctionType>()->getIsolation();
-        if (expectedIsolation.isNonisolatedNonsending())
-          return ActorIsolation::forNonisolatedNonsending();
+    // isolated parameters.
+    if (isConvertedToNonisolatedNonsending()) {
+      if (canAssumeNonisolatedNonsending())
+        return ActorIsolation::forNonisolatedNonsending();
+
+      // If `nonisolated(nonsending)` cannot be assumed, let's see if it's
+      // because closure doesn't leave parent isolation and we prefer statically
+      // known isolation over dynamic one.
+      if (auto *explicitClosure = dyn_cast<ClosureExpr>(closure)) {
+        if (isArgumentOfNonisolatedNonsendingApply &&
+            inheritsParentIsolation)
+          explicitClosure->setBehavesLikeNonisolatedNonsending();
       }
     }
 
@@ -6595,14 +6666,13 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       }
 
       auto enclosingIsolation = getActorIsolationOfContext(dc);
-      auto isolation =
-        computeClosureIsolationFromParent(func, enclosingIsolation,
-                                          /*checkIsolatedCapture*/true)
-          .withPreconcurrency(enclosingIsolation.preconcurrency());
+      auto [isolation, _] =
+          computeClosureIsolationFromParent(func, enclosingIsolation,
+                                            /*checkIsolatedCapture*/ true);
       return {
-        inferredIsolation(isolation),
-        IsolationSource(inferenceSource, IsolationSource::LexicalContext)
-      };
+          inferredIsolation(isolation).withPreconcurrency(
+              enclosingIsolation.preconcurrency()),
+          IsolationSource(inferenceSource, IsolationSource::LexicalContext)};
     }
   }
 

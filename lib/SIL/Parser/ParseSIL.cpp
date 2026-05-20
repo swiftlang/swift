@@ -1718,7 +1718,7 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
 
 static bool peekSILDebugLocation(Parser &P) {
   auto T = P.peekToken().getText();
-  return P.Tok.is(tok::comma) && (T == "loc" || T == "scope");
+  return P.Tok.is(tok::comma) && (T == "loc" || T == "scope" || T == "transform");
 }
 
 bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
@@ -1812,6 +1812,50 @@ bool SILParser::parseSILDebugVar(SILDebugVariable &Var) {
     if (!NoConsume)
       P.consumeToken();
   }
+  return false;
+}
+
+bool SILParser::parseSILDebugTransformBlock(SILBasicBlock *&DebugBB,
+                                         SILBuilder &B) {
+  // Nothing to do if the next tokens aren't ", transform".
+  if (!P.Tok.is(tok::comma) || P.peekToken().getText() != "transform")
+    return false;
+
+  P.consumeToken(tok::comma);
+  P.consumeToken(); // consume "transform"
+
+  if (P.parseToken(tok::l_brace, diag::expected_sil_rbrace))
+    return true;
+
+  SILFunction *F = &B.getFunction();
+  DebugBB = F->createEmptyDebugReconstructionBlock();
+
+  // Save the outer local-value scope so that %0, %1, … inside the
+  // transform block don't collide with function values.
+  llvm::StringMap<ValueBase *> SavedLocalValues;
+  llvm::StringMap<SourceLoc> SavedForwardRefs;
+  std::swap(LocalValues, SavedLocalValues);
+  std::swap(ForwardRefLocalValues, SavedForwardRefs);
+
+  // Parse the block header: "bb0(%name : $Type, ...): "
+  if (P.Tok.getText().starts_with("bb"))
+    P.consumeToken(); // consume "bb0" label
+  if (parseSILBasicBlockArgList(DebugBB, /*isEntry=*/false))
+    return true;
+
+  // Parse instructions until the closing '}'.
+  SILBuilder DebugBuilder(DebugBB, F->getDebugScope());
+  DebugBuilder.setCurrentDebugScope(B.getCurrentDebugScope());
+  while (!P.Tok.is(tok::r_brace)) {
+    if (parseSILInstruction(DebugBuilder))
+      return true;
+  }
+  P.consumeToken(tok::r_brace);
+
+  // Restore outer scope.
+  std::swap(LocalValues, SavedLocalValues);
+  std::swap(ForwardRefLocalValues, SavedForwardRefs);
+
   return false;
 }
 
@@ -3566,7 +3610,9 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
       }
     }
 
+    SILBasicBlock *DebugBB = nullptr;
     if (parseTypedValueRef(Val, B) || parseSILDebugVar(VarInfo) ||
+        parseSILDebugTransformBlock(DebugBB, B) ||
         parseSILDebugLocation(InstLoc, B))
       return true;
     if (Val->getType().isAddress())
@@ -3577,6 +3623,10 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
 
     ResultVal = B.createDebugValue(InstLoc, Val, VarInfo, poisonRefs,
                                    usesMoveableValueDebugInfo, hasTrace);
+
+    if (DebugBB)
+      cast<DebugValueInst>(ResultVal)->setDebugReconstructionBlock(DebugBB);
+
     break;
   }
 
@@ -7297,9 +7347,7 @@ bool SILParser::isStartOfSILInstruction() {
 
 ///   sil-basic-block:
 ///     sil-instruction+
-///     identifier sil-bb-argument-list? ':' sil-instruction+
-///   sil-bb-argument-list:
-///     '(' sil-typed-valueref (',' sil-typed-valueref)+ ')'
+///     identifier sil-basic-block-arg-list sil-instruction+
 bool SILParser::parseSILBasicBlock(SILBuilder &B) {
   SILBasicBlock *BB;
 
@@ -7313,112 +7361,7 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
       return true;
 
     BB = getBBForDefinition(BBName, NameLoc);
-    // For now, since we always assume that PhiArguments have
-    // OwnershipKind::None, do not parse or do anything special. Eventually
-    // we will parse the convention.
-    bool IsEntry = BB->isEntry();
-
-    // If there is a basic block argument list, process it.
-    if (P.consumeIf(tok::l_paren)) {
-      do {
-        SILType Ty;
-        ValueOwnershipKind OwnershipKind = OwnershipKind::None;
-        SourceLoc NameLoc;
-        StringRef Name = P.Tok.getText();
-        if (P.parseToken(tok::sil_local_name, NameLoc,
-                         diag::expected_sil_value_name) ||
-            P.parseToken(tok::colon, diag::expected_sil_colon_value_ref))
-          return true;
-
-        bool foundNoImplicitCopy = false;
-        bool foundClosureCapture = false;
-        bool foundLexical = false;
-        bool foundEagerMove = false;
-        bool foundReborrow = false;
-        bool hasPointerEscape = false;
-        bool foundInferredImmutable = false;
-        while (
-            auto attributeName = parseOptionalAttribute(
-                {"noImplicitCopy", "_lexical", "_eagerMove", "closureCapture",
-                 "reborrow", "pointer_escape", "inferredImmutable"})) {
-          if (*attributeName == "noImplicitCopy")
-            foundNoImplicitCopy = true;
-          else if (*attributeName == "_lexical")
-            foundLexical = true;
-          else if (*attributeName == "_eagerMove")
-            foundEagerMove = true;
-          else if (*attributeName == "closureCapture")
-            foundClosureCapture = true;
-          else if (*attributeName == "reborrow")
-            foundReborrow = true;
-          else if (*attributeName == "pointer_escape")
-            hasPointerEscape = true;
-          else if (*attributeName == "inferredImmutable")
-            foundInferredImmutable = true;
-          else {
-            llvm_unreachable("Unexpected attribute!");
-          }
-        }
-
-        LifetimeAnnotation lifetime = LifetimeAnnotation::None;
-        if (foundEagerMove && foundLexical) {
-          P.diagnose(NameLoc, diag::sil_arg_both_lexical_and_eagerMove);
-          return true;
-        } else if (foundEagerMove) {
-          lifetime = LifetimeAnnotation::EagerMove;
-        } else if (foundLexical) {
-          lifetime = LifetimeAnnotation::Lexical;
-        }
-
-        // If SILOwnership is enabled and we are not assuming that we are
-        // parsing unqualified SIL, look for printed value ownership kinds.
-        if (F->hasOwnership()) {
-          if (P.Tok.is(tok::at_sign)) {
-            if (parseSILOwnership(OwnershipKind))
-              return true;
-          } else if (foundReborrow) {
-            OwnershipKind = OwnershipKind::Guaranteed;
-          }
-        }
-
-        if (parseSILType(Ty))
-          return true;
-
-        SILArgument *Arg;
-        if (IsEntry) {
-          auto *fArg = BB->createFunctionArgument(Ty);
-          fArg->setNoImplicitCopy(foundNoImplicitCopy);
-          fArg->setClosureCapture(foundClosureCapture);
-          fArg->setLifetimeAnnotation(lifetime);
-          fArg->setReborrow(foundReborrow);
-          fArg->setHasPointerEscape(hasPointerEscape);
-          fArg->setInferredImmutable(foundInferredImmutable);
-          Arg = fArg;
-
-          // Today, we construct the ownership kind straight from the function
-          // type. Make sure they are in sync, otherwise bail. We want this to
-          // be an exact check rather than a compatibility check since we do not
-          // want incompatibilities in between @any and other types of ownership
-          // to be ignored.
-          if (F->hasOwnership() && Arg->getOwnershipKind() != OwnershipKind) {
-            auto diagID =
-                diag::silfunc_and_silarg_have_incompatible_sil_value_ownership;
-            P.diagnose(NameLoc, diagID, Arg->getOwnershipKind().asString(),
-                       OwnershipKind.asString());
-            return true;
-          }
-        } else {
-          Arg = BB->createPhiArgument(Ty, OwnershipKind, /*decl*/ nullptr,
-                                      foundReborrow, hasPointerEscape);
-        }
-        setLocalValue(Arg, Name, NameLoc);
-      } while (P.consumeIf(tok::comma));
-      
-      if (P.parseToken(tok::r_paren, diag::sil_basicblock_arg_rparen))
-        return true;
-    }
-    
-    if (P.parseToken(tok::colon, diag::expected_sil_block_colon))
+    if (parseSILBasicBlockArgList(BB, BB->isEntry()))
       return true;
   }
   
@@ -7432,6 +7375,116 @@ bool SILParser::parseSILBasicBlock(SILBuilder &B) {
       return true;
   } while (isStartOfSILInstruction());
 
+  return false;
+}
+
+///   sil-basic-block-arg-list:
+///     sil-bb-argument-list? ':'
+///   sil-bb-argument-list:
+///     '(' sil-typed-valueref (',' sil-typed-valueref)+ ')'
+bool SILParser::parseSILBasicBlockArgList(SILBasicBlock *BB, bool isEntry) {
+  // If there is a basic block argument list, process it.
+  if (P.consumeIf(tok::l_paren)) {
+    do {
+      SILType Ty;
+      ValueOwnershipKind OwnershipKind = OwnershipKind::None;
+      SourceLoc NameLoc;
+      StringRef Name = P.Tok.getText();
+      if (P.parseToken(tok::sil_local_name, NameLoc,
+                       diag::expected_sil_value_name) ||
+          P.parseToken(tok::colon, diag::expected_sil_colon_value_ref))
+        return true;
+
+      bool foundNoImplicitCopy = false;
+      bool foundClosureCapture = false;
+      bool foundLexical = false;
+      bool foundEagerMove = false;
+      bool foundReborrow = false;
+      bool hasPointerEscape = false;
+      bool foundInferredImmutable = false;
+      while (
+          auto attributeName = parseOptionalAttribute(
+              {"noImplicitCopy", "_lexical", "_eagerMove", "closureCapture",
+               "reborrow", "pointer_escape", "inferredImmutable"})) {
+        if (*attributeName == "noImplicitCopy")
+          foundNoImplicitCopy = true;
+        else if (*attributeName == "_lexical")
+          foundLexical = true;
+        else if (*attributeName == "_eagerMove")
+          foundEagerMove = true;
+        else if (*attributeName == "closureCapture")
+          foundClosureCapture = true;
+        else if (*attributeName == "reborrow")
+          foundReborrow = true;
+        else if (*attributeName == "pointer_escape")
+          hasPointerEscape = true;
+        else if (*attributeName == "inferredImmutable")
+          foundInferredImmutable = true;
+        else {
+          llvm_unreachable("Unexpected attribute!");
+        }
+      }
+
+      LifetimeAnnotation lifetime = LifetimeAnnotation::None;
+      if (foundEagerMove && foundLexical) {
+        P.diagnose(NameLoc, diag::sil_arg_both_lexical_and_eagerMove);
+        return true;
+      } else if (foundEagerMove) {
+        lifetime = LifetimeAnnotation::EagerMove;
+      } else if (foundLexical) {
+        lifetime = LifetimeAnnotation::Lexical;
+      }
+
+      // If SILOwnership is enabled and we are not assuming that we are
+      // parsing unqualified SIL, look for printed value ownership kinds.
+      if (F->hasOwnership()) {
+        if (P.Tok.is(tok::at_sign)) {
+          if (parseSILOwnership(OwnershipKind))
+            return true;
+        } else if (foundReborrow) {
+          OwnershipKind = OwnershipKind::Guaranteed;
+        }
+      }
+
+      if (parseSILType(Ty))
+        return true;
+
+      SILArgument *Arg;
+      if (isEntry) {
+        auto *fArg = BB->createFunctionArgument(Ty);
+        fArg->setNoImplicitCopy(foundNoImplicitCopy);
+        fArg->setClosureCapture(foundClosureCapture);
+        fArg->setLifetimeAnnotation(lifetime);
+        fArg->setReborrow(foundReborrow);
+        fArg->setHasPointerEscape(hasPointerEscape);
+        fArg->setInferredImmutable(foundInferredImmutable);
+        Arg = fArg;
+
+        // Today, we construct the ownership kind straight from the function
+        // type. Make sure they are in sync, otherwise bail. We want this to
+        // be an exact check rather than a compatibility check since we do not
+        // want incompatibilities in between @any and other types of ownership
+        // to be ignored.
+        if (F->hasOwnership() && Arg->getOwnershipKind() != OwnershipKind) {
+          auto diagID =
+              diag::silfunc_and_silarg_have_incompatible_sil_value_ownership;
+          P.diagnose(NameLoc, diagID, Arg->getOwnershipKind().asString(),
+                     OwnershipKind.asString());
+          return true;
+        }
+      } else {
+        Arg = BB->createPhiArgument(Ty, OwnershipKind, /*decl*/ nullptr,
+                                    foundReborrow, hasPointerEscape);
+      }
+      setLocalValue(Arg, Name, NameLoc);
+    } while (P.consumeIf(tok::comma));
+    
+    if (P.parseToken(tok::r_paren, diag::sil_basicblock_arg_rparen))
+      return true;
+  }
+  
+  if (P.parseToken(tok::colon, diag::expected_sil_block_colon))
+    return true;
   return false;
 }
 

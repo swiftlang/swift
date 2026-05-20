@@ -253,6 +253,10 @@ BridgedOwnedString BridgedLifetimeDependenceInfo::getDebugDescription() const {
 //                               SILFunctionType
 //===----------------------------------------------------------------------===//
 
+BridgedResultInfoArray SILFunctionType_getResults(BridgedCanType funcTy) {
+  return {funcTy.unbridged()->castTo<swift::SILFunctionType>()->getResults()};
+}
+
 BridgedResultInfoArray
 SILFunctionType_getResultsWithError(BridgedCanType funcTy) {
   return {funcTy.unbridged()->castTo<swift::SILFunctionType>()->getResultsWithError()};
@@ -885,6 +889,10 @@ bool BridgedFunction::isGlobalInitFunction() const {
   return getFunction()->isGlobalInit();
 }
 
+bool BridgedFunction::isLazyPropertyGetter() const {
+  return getFunction()->isLazyPropertyGetter();
+}
+
 bool BridgedFunction::isGlobalInitOnceFunction() const {
   return getFunction()->isGlobalInitOnceFunction();
 }
@@ -1342,6 +1350,11 @@ BridgedOptionalInt BridgedInstruction::IntegerLiteralInst_getValue() const {
   return getFromAPInt(result);
 }
 
+BridgedOptionalInt BridgedInstruction::FloatLiteralInst_getBits() const {
+  llvm::APInt result = getAs<swift::FloatLiteralInst>()->getBits();
+  return getFromAPInt(result);
+}
+
 BridgedStringRef BridgedInstruction::StringLiteralInst_getValue() const {
   return getAs<swift::StringLiteralInst>()->getValue();
 }
@@ -1504,6 +1517,10 @@ BridgedDeclObj BridgedInstruction::WitnessMethodInst_getLookupProtocol() const {
 
 BridgedConformance BridgedInstruction::WitnessMethodInst_getConformance() const {
   return getAs<swift::WitnessMethodInst>()->getConformance();
+}
+
+BridgedDeclObj BridgedInstruction::ObjCProtocolInst_getProtocol() const {
+  return {getAs<swift::ObjCProtocolInst>()->getProtocol()};
 }
 
 SwiftInt BridgedInstruction::ObjectInst_getNumBaseElements() const {
@@ -3162,6 +3179,10 @@ bool BridgedContext::isTransforming(BridgedFunction function) const {
 
 void BridgedContext::notifyChanges(NotificationKind changeKind) const {
   context->notifyChanges((swift::SILContext::NotificationKind)changeKind);
+}
+
+bool BridgedContext::hasChangeNotification(NotificationKind changeKind) const {
+  return (context->getChangeNotifications() & (swift::SILContext::NotificationKind)changeKind) != 0;
 }
 
 BridgedContext::SILStage BridgedContext::getSILStage() const {

@@ -2923,25 +2923,6 @@ namespace {
           // the clang decl during lazy member lookup.
           result->addMember(p);
         }
-
-        auto it = Impl.cxxSubscripts.find(result);
-        if (it != Impl.cxxSubscripts.end()) {
-          for (const auto &subscriptInfo : it->second) {
-            auto getterAndSetter = subscriptInfo.second;
-            auto subscript = synthesizer.makeSubscript(getterAndSetter.first,
-                                                       getterAndSetter.second);
-            // Also add subscripts directly because they won't be found from the
-            // clang decl.
-            result->addMember(subscript);
-
-            // Add the subscript as an alternative for the getter so that it
-            // gets carried into derived classes.
-            auto *subscriptImpl = getterAndSetter.first
-                                      ? getterAndSetter.first
-                                      : getterAndSetter.second;
-            Impl.addAlternateDecl(subscriptImpl, subscript);
-          }
-        }
       }
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
@@ -3873,42 +3854,10 @@ namespace {
       if (!typeDecl)
         return true;
 
-      if (importedName.isSubscriptAccessor()) {
-        SmallVector<TypeBase *> params;
-        for (auto parameter : *(func->getParameters())) {
-          auto parameterType = parameter->getTypeInContext();
-          if (!parameterType)
-            return false;
-          if (parameter->isInOut())
-            // Subscripts with inout parameters are not allowed in Swift.
-            return false;
-          params.push_back(parameterType.getPointer());
-        }
-        // Subscript setter is marked as mutating in Swift even if the
-        // C++ `operator []` is `const`.
-        if (importedName.getAccessorKind() ==
-                ImportedAccessorKind::SubscriptSetter &&
-            !dc->isModuleScopeContext() &&
-            !typeDecl->getDeclaredType()->isForeignReferenceType())
-          func->setSelfAccessKind(SelfAccessKind::Mutating);
-
-        auto &getterAndSetterMap = Impl.cxxSubscripts[typeDecl];
-        auto &getterAndSetter = getterAndSetterMap[params];
-
-        switch (importedName.getAccessorKind()) {
-        case ImportedAccessorKind::SubscriptGetter:
-          getterAndSetter.first = func;
-          break;
-        case ImportedAccessorKind::SubscriptSetter:
-          getterAndSetter.second = func;
-          break;
-        default:
-          llvm_unreachable("invalid subscript kind");
-        }
-
-        Impl.markUnavailable(func, "use subscript");
+      if (importedName.isSubscriptAccessor())
+        // Subscript accessors do not need any special handling applied here.
+        // They are fixed up in lookupAndImportSubscripts().
         return true;
-      }
 
       // Check if this method _is_ an overloaded operator but is not a
       // call / subscript / dereference / increment. Those
@@ -4087,6 +4036,21 @@ namespace {
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
+
+      // A non-static C++ method cannot be imported as a member of a different
+      // type via swift_name attribute.
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(decl)) {
+        if (auto nominal = dc->getSelfNominalTypeDecl()) {
+          if (!method->isStatic() && importedName.importAsMember() &&
+              nominal->getClangDecl() != method->getParent()) {
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::swift_name_method_different_context);
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::note_while_importing, decl->getName());
+            return nullptr;
+          }
+        }
+      }
 
       // We may have already imported this function decl while importing its
       // decl context. Check decl cache to make sure we don't import twice.
@@ -10757,6 +10721,11 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
       assert(swiftDecl->getClangDecl() != clangRecord);
       auto baseMember = cast<ValueDecl>(member);
 
+      // Do not clone members that are separately synthesized for each type,
+      // otherwise we will get duplicates.
+      if (Impl.isMemberSynthesizedPerType(baseMember))
+        continue;
+
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
       // name and arity.
@@ -10820,8 +10789,10 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
 
   if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !storage &&
       !inheritance) {
-    Impl.lookupAndImportPointee(swiftDecl);
-    Impl.lookupAndImportSuccessor(swiftDecl);
+    (void)Impl.lookupAndImportPointee(swiftDecl);
+    (void)Impl.lookupAndImportSuccessor(swiftDecl);
+    (void)Impl.lookupAndImportOperatorBool(swiftDecl);
+    (void)Impl.lookupAndImportSubscripts(swiftDecl);
   }
 }
 } // namespace

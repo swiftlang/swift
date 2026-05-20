@@ -40,26 +40,26 @@
 
 
 // CHECK: struct ReadWriteIntArray {
-// CHECK:   subscript(x: Int32) -> Int32
 
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>
 
+// CHECK:   subscript(x: Int32) -> Int32
+
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<Int32>
 
-// CHECK:   struct NestedIntArray {
-// CHECK:     subscript(x: Int32) -> Int32 { get }
-
-// CHECK:     @available(*, unavailable, message: "use subscript")
-// CHECK:     func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>
-// CHECK:   }
+// CHECK:      struct NestedIntArray {
+// CHECK:        @available(*, unavailable, message: "use subscript")
+// CHECK-NEXT:   func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>
+// CHECK-NEXT:   subscript(x: Int32) -> Int32 { get }
+// CHECK:      }
 // CHECK: }
 
 // CHECK: struct NullarySubscript {
-// CHECK:   subscript() -> Int32
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst() -> Int32
+// CHECK:   subscript() -> Int32
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript() -> UnsafeMutablePointer<Int32>
 // CHECK: }
@@ -67,34 +67,32 @@
 // CHECK: struct BinarySubscript {
 // CHECK:   init(field: Int32)
 // CHECK:   init()
-// CHECK:   subscript(x: Int32, y: Int32) -> Int32
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Int32, _ y: Int32) -> Int32
+// CHECK:   subscript(x: Int32, y: Int32) -> Int32
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript(_: Int32, _: Int32) -> UnsafeMutablePointer<Int32>
 // CHECK:   var field: Int32
 // CHECK: }
 
 // CHECK: struct ReadOnlyIntArray {
-// CHECK:   subscript(x: Int32) -> Int32 { get }
-
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>
+// CHECK:   subscript(x: Int32) -> Int32 { get }
 // CHECK: }
 
 
 // CHECK: struct WriteOnlyIntArray {
-// CHECK:   subscript(x: Int32) -> Int32 { mutating get set }
-
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<Int32>
+// CHECK:   subscript(x: Int32) -> Int32 { mutating get set }
 // CHECK: }
 
 
 // CHECK: struct DifferentTypesArray {
-// CHECK:   subscript(x: Int32) -> Int32
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>
+// CHECK:   subscript(x: Int32) -> Int32
 
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<Int32>
@@ -102,13 +100,13 @@
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript(_ x: Bool) -> UnsafeMutablePointer<Bool>
 
-// CHECK:   subscript(x: Bool) -> Bool
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Bool) -> UnsafePointer<Bool>
+// CHECK:   subscript(x: Bool) -> Bool
 
-// CHECK:   subscript(x: Double) -> Double { get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Double) -> UnsafePointer<Double>
+// CHECK:   subscript(x: Double) -> Double { get }
 
 // CHECK: }
 
@@ -116,13 +114,13 @@
 // CHECK: struct TemplatedArray<T> {
 // CHECK: }
 // CHECK: struct TemplatedArray<CDouble> {
-// CHECK:   subscript(i: Int32) -> Double
 
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript(_ i: Int32) -> UnsafeMutablePointer<Double>
 
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ i: Int32) -> UnsafePointer<Double>
+// CHECK:   subscript(i: Int32) -> Double
 // CHECK: }
 // CHECK: typealias TemplatedDoubleArray = TemplatedArray<CDouble>
 
@@ -132,36 +130,38 @@
 
 
 // CHECK: struct IntArrayByVal {
-// CHECK:   subscript(x: Int32) -> Int32 { get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Int32) -> Int32
+// CHECK:   subscript(x: Int32) -> Int32 { get }
 // CHECK: }
 
 // CHECK: struct NonTrivialIntArrayByVal {
-// CHECK:   subscript(x: Int32) -> Int32 { get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Int32) -> Int32
+// CHECK:   subscript(x: Int32) -> Int32 { get }
 // CHECK: }
 
 // CHECK: struct DifferentTypesArrayByVal {
-// CHECK:   subscript(x: Int32) -> Int32 { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> Int32
-// CHECK:   subscript(x: Bool) -> Bool { mutating get }
+// CHECK:   subscript(x: Int32) -> Int32 { mutating get }
+
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Bool) -> Bool
-// CHECK:   subscript(x: Double) -> Double { get }
+// CHECK:   subscript(x: Bool) -> Bool { mutating get }
+
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Double) -> Double
+// CHECK:   subscript(x: Double) -> Double { get }
 // CHECK: }
 
 
 // CHECK: struct TemplatedArrayByVal<T> {
 // CHECK: }
 // CHECK: struct TemplatedArrayByVal<CDouble> {
-// CHECK:   subscript(i: Int32) -> Double { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst(_ i: Int32) -> Double
+// CHECK:   subscript(i: Int32) -> Double { mutating get }
 // CHECK: }
 // CHECK: typealias TemplatedDoubleArrayByVal = TemplatedArrayByVal<CDouble>
 
@@ -169,41 +169,41 @@
 // CHECK-NEXT: }
 
 // CHECK: struct TemplatedOperatorArrayByVal {
-// CHECK:   subscript<T>(i: T) -> T { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst<T>(_ i: T) -> T
+// CHECK:   subscript<T>(i: T) -> T { mutating get }
 // CHECK-NOT: mutating func __operatorPlus<T>(_ i: T) -> UnsafeMutablePointer<T>
 // CHECK: }
 
 // CHECK: struct NonTrivialArrayByVal {
-// CHECK:   subscript(x: Int32) -> NonTrivial { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> NonTrivial
+// CHECK:   subscript(x: Int32) -> NonTrivial { mutating get }
 // CHECK: }
 // CHECK: struct PtrByVal {
-// CHECK:   subscript(x: Int32) -> UnsafeMutablePointer<Int32>! { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<Int32>!
+// CHECK:   subscript(x: Int32) -> UnsafeMutablePointer<Int32>! { mutating get set }
 // CHECK: }
 // CHECK: struct RefToPtr {
-// CHECK:   subscript(x: Int32) -> UnsafeMutablePointer<Int32>? { mutating get set }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<UnsafeMutablePointer<Int32>?>
+// CHECK:   subscript(x: Int32) -> UnsafeMutablePointer<Int32>? { mutating get set }
 // CHECK: }
 // CHECK: struct PtrToPtr {
-// CHECK:   subscript(x: Int32) -> UnsafeMutablePointer<UnsafeMutablePointer<Int32>?>! { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<UnsafeMutablePointer<Int32>?>!
+// CHECK:   subscript(x: Int32) -> UnsafeMutablePointer<UnsafeMutablePointer<Int32>?>! { mutating get set }
 // CHECK: }
 // CHECK: struct ConstOpPtrByVal {
-// CHECK:   subscript(x: Int32) -> UnsafePointer<Int32>! { get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>!
+// CHECK:   subscript(x: Int32) -> UnsafePointer<Int32>! { get }
 // CHECK: }
 // CHECK: struct ConstPtrByVal {
-// CHECK:   subscript(x: Int32) -> UnsafePointer<Int32>! { mutating get }
 // CHECK:   @available(*, unavailable, message: "use subscript")
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>!
+// CHECK:   subscript(x: Int32) -> UnsafePointer<Int32>! { mutating get }
 // CHECK: }
 
 // CHECK: struct DerivedFromAddressOnlyIntWrapper {
@@ -213,14 +213,14 @@
 // CHECK: }
 
 // CHECK: struct DerivedFromReadWriteIntArray {
-// CHECK:   subscript(x: Int32) -> Int32
 // CHECK:   func __operatorSubscriptConst(_ x: Int32) -> UnsafePointer<Int32>
 // CHECK:   mutating func __operatorSubscript(_ x: Int32) -> UnsafeMutablePointer<Int32>
+// CHECK:   subscript(x: Int32) -> Int32
 // CHECK: }
 
 // CHECK: struct DerivedFromNonTrivialArrayByVal {
-// CHECK:   subscript(x: Int32) -> NonTrivial { get }
 // CHECK:   mutating func __operatorSubscriptConst(_ x: Int32) -> NonTrivial
+// CHECK:   subscript(x: Int32) -> NonTrivial { mutating get }
 // CHECK: }
 
 // CHECK: struct SubscriptUnnamedParameter {

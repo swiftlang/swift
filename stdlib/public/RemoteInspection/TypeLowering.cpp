@@ -222,6 +222,9 @@ public:
     case TypeInfoKind::Array: {
       printHeader("array");
       printBasic(TI);
+      auto &ArrayTI = cast<ArrayTypeInfo>(TI);
+      printField("count", std::to_string(ArrayTI.getElementCount()));
+      printRec(*ArrayTI.getElementTypeInfo());
       stream << ")";
       return;
     }
@@ -493,7 +496,8 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
   return mask;
 }
 
-ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI)
+ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeRef *elementTR,
+                             const TypeInfo *elementTI)
     : TypeInfo(TypeInfoKind::Array,
                /* size */ elementTI->getStride() * size,
                /* alignment */ elementTI->getAlignment(),
@@ -501,7 +505,7 @@ ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI)
                /* numExtraInhabitants */ elementTI->getNumExtraInhabitants(),
                /* borrowability */ elementTI->getBorrowability(),
                /* FixedArray is always afd */ true),
-      ElementTI(elementTI) {}
+      ElementTR(elementTR), ElementTI(elementTI), ElementCount(size) {}
 
 bool ArrayTypeInfo::readExtraInhabitantIndex(
     remote::MemoryReader &reader, remote::RemoteAddress address,
@@ -2771,7 +2775,8 @@ public:
       return nullptr;
     }
 
-    return TC.makeTypeInfo<ArrayTypeInfo>(sizeInt->getValue(), elementTI);
+    return TC.makeTypeInfo<ArrayTypeInfo>(sizeInt->getValue(),
+                                          BA->getElementType(), elementTI);
   }
 
   const TypeInfo *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {

@@ -145,13 +145,13 @@ struct ConformsToProtocolInA2: ProtocolInA2 {}
 // expected-member-visibility-note@-2{{add stubs for conformance}}
 
 struct ConformsToProtocolInA3: ProtocolInA3 {}
-
-// FIXME: Should diagnose import needed for defaultedRequirementInB().
+struct ConformsToProtocolInA4: ProtocolInA4 {}
 struct ConformsToProtocolInC1: ProtocolInC1 {}
-// expected-member-visibility-error@-1{{type 'ConformsToProtocolInC1' does not conform to protocol 'ProtocolInB1'}}
-// expected-member-visibility-note@-2{{add stubs for conformance}}
-
 struct ConformsToProtocolInC2: ProtocolInC2 {}
+
+struct ConformsToProtocolInC3: ProtocolInC3, EmptyProtocolInA {}
+// expected-member-visibility-error@-1{{type 'ConformsToProtocolInC3' does not conform to protocol 'ProtocolInB3'}}
+// expected-member-visibility-note@-2{{add stubs for conformance}}
 
 // FIXME: The missing import for WitnessedInB should be diagnosed (rdar://154237873)
 extension StructInA1: ProtocolWithAssociatedTypesInA {}

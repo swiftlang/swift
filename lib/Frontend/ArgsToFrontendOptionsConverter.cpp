@@ -207,6 +207,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.CompilerDebuggingOpts.DumpAbstractLayout |=
       Args.hasArg(OPT_dump_abstract_layout);
 
+  Opts.CompilerDebuggingOpts.DumpHiddenTypeLayouts |=
+      Args.hasArg(OPT_dump_hidden_type_layouts);
+
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);

@@ -209,7 +209,15 @@ public:
   /// Level of restriction to references from the context to an \p originKind.
   /// This check is shared by different diagnostics.
   DiagnosticBehavior
-  behaviorForReferenceToOrigin(DisallowedOriginKind originKind) const;
+  behaviorForReferenceToOrigin(const ValueDecl *D,
+                               DisallowedOriginKind originKind) const;
+
+  /// Returns true if a reference to \p D under the given \p originKind from
+  /// this context is being encapsulated as a hidden stored property. When this
+  /// returns true, the abstract layout for the hidden type has been recorded on
+  /// the current module.
+  bool encapsulatedAsHiddenStoredProperty(
+      const ValueDecl *D, DisallowedOriginKind originKind) const;
 
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.

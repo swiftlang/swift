@@ -75,6 +75,10 @@ public struct ImageMap: Collection, Sendable, Hashable {
     #if os(Windows)
     @_spi(Testing)
     var exceptionTable: ExceptionTable?
+    @_spi(Testing)
+    public var timeDateStamp: UInt32 = 0
+    @_spi(Testing)
+    public var sizeOfImage: UInt32 = 0
     #endif
   }
 

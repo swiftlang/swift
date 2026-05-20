@@ -129,8 +129,7 @@ public func copyableArgTest(_ k: __owned Klass) {
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo15copyableVarTestyyF"()
 // CHECK: #dbg_declare(ptr %m.debug,
 // CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
-// CHECK: #dbg_value(ptr undef, ![[K_COPYABLE_VAR_METADATA]], !DIExpression(), ![[ADDR_LOC]]
-// TODO: Should this be a deref like the original?
+// CHECK: #dbg_value(ptr undef, ![[K_COPYABLE_VAR_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
@@ -171,10 +170,10 @@ public func copyableVarTest() {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo18copyableVarArgTestyyAA5KlassCzF"(
 // CHECK: #dbg_declare(ptr %m.debug,
-// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 // CHECK: #dbg_value(ptr undef, ![[K_COPYABLE_VAR_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
-// CHECK: #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 //
@@ -212,7 +211,7 @@ public func copyableVarArgTest(_ k: inout Klass) {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo20addressOnlyValueTestyyxAA1PRzlF"(ptr noalias %0, ptr %T, ptr %T.P)
 // CHECK: #dbg_value(ptr %{{.*}}, ![[K_ADDR_LET_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
-// CHECK: #dbg_value(ptr undef, ![[K_ADDR_LET_METADATA]], !DIExpression(), ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr undef, ![[K_ADDR_LET_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 //
@@ -260,7 +259,7 @@ public func addressOnlyValueTest<T : P>(_ x: T) {
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo23addressOnlyValueArgTestyyxnAA1PRzlF"(
 // CHECK: #dbg_declare(ptr %T1,
 // CHECK: #dbg_declare(ptr %m.debug,
-// CHECK: #dbg_value(ptr %k.debug, ![[K_ADDR_LET_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr %k.debug, ![[K_ADDR_LET_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 // CHECK: #dbg_value(ptr undef, ![[K_ADDR_LET_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
@@ -301,7 +300,7 @@ public func addressOnlyValueArgTest<T : P>(_ k: __owned T) {
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo18addressOnlyVarTestyyxAA1PRzlF"(ptr noalias %0, ptr %T, ptr %T.P)
 // CHECK: #dbg_value(ptr %{{.*}}, ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 // CHECK-NEXT: br
-// CHECK: #dbg_value(ptr undef, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(), ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr undef, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: #dbg_value(ptr %{{.*}}, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
@@ -345,9 +344,9 @@ public func addressOnlyVarTest<T : P>(_ x: T) {
 }
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo21addressOnlyVarArgTestyyxz_xtAA1PRzlF"(
-// CHECK: #dbg_value(ptr %k.debug, ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr %k.debug, ![[K_ADDRONLY_VAR_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 // CHECK: #dbg_value(ptr undef, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
-// CHECK: #dbg_value(ptr %k.debug, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr %k.debug, ![[K_ADDRONLY_VAR_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 //
@@ -429,7 +428,7 @@ public func copyableValueArgCCFlowTest(_ k: __owned Klass) {
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      #dbg_value(ptr undef, ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(), ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK:      br label %[[CONT_BB:[0-9]+]],
 //
 // CHECK: [[RHS]]:
@@ -453,7 +452,7 @@ public func copyableVarTestCCFlowReinitOutOfBlockTest() {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo040copyableVarArgTestCCFlowReinitOutOfBlockG0yyAA5KlassCzF"(
 // CHECK: #dbg_declare(ptr %m.debug,
-// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
@@ -465,7 +464,7 @@ public func copyableVarTestCCFlowReinitOutOfBlockTest() {
 // CHECK:      br label %[[CONT_BB]],
 //
 // CHECK: [[CONT_BB]]:
-// CHECK: #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
@@ -486,8 +485,7 @@ public func copyableVarArgTestCCFlowReinitOutOfBlockTest(_ k: inout Klass) {
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      #dbg_value(ptr undef, ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(), ![[ADDR_LOC]]
-// TODO: Should this be a deref like the original?
+// CHECK:      #dbg_value(ptr undef, ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK:      #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 //
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
@@ -512,14 +510,14 @@ public func copyableVarTestCCFlowReinitInBlockTest() {
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo037copyableVarArgTestCCFlowReinitInBlockG0yyAA5KlassCzF"(
 // CHECK: entry:
 // CHECK: #dbg_declare(ptr %m.debug,
-// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
 // CHECK:      #dbg_value(ptr undef, ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
-// CHECK:      #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr [[VAR]], ![[K_COPYABLE_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 //
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
@@ -546,7 +544,7 @@ public func copyableVarArgTestCCFlowReinitInBlockTest(_ k: inout Klass) {
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      #dbg_value(ptr undef, ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(), ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr undef, ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //
 // CHECK: [[RHS]]:
@@ -570,7 +568,7 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo043addressOnlyVarArgTestCCFlowReinitOutOfBlockH0yyAA1P_pz_xmtAaCRzlF"(
 // CHECK: entry:
-// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
@@ -583,7 +581,7 @@ public func addressOnlyVarTestCCFlowReinitOutOfBlockTest<T : P>(_ x: T.Type) {
 //
 // CHECK: [[CONT_BB]]:
 // TODO: Should this be a deref like the original?
-// CHECK: #dbg_value(ptr [[VAR]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
+// CHECK: #dbg_value(ptr [[VAR]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_OUT_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 // CHECK: ret void
 // CHECK-NEXT: }
 public func addressOnlyVarArgTestCCFlowReinitOutOfBlockTest<T : P>(_ k: inout (any P), _ x: T.Type) {
@@ -603,8 +601,7 @@ public func addressOnlyVarArgTestCCFlowReinitOutOfBlockTest<T : P>(_ k: inout (a
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
-// CHECK:      #dbg_value(ptr undef, ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(), ![[ADDR_LOC]]
-// TODO: Should this be a deref like the original?
+// CHECK:      #dbg_value(ptr undef, ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // CHECK:      #dbg_value(ptr [[VAR]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 //
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
@@ -628,14 +625,14 @@ public func addressOnlyVarTestCCFlowReinitInBlockTest<T : P>(_ x: T.Type) {
 
 // CHECK-LABEL: define swiftcc void @"$s21move_function_dbginfo040addressOnlyVarArgTestCCFlowReinitInBlockH0yyAA1P_pz_xmtAaCRzlF"(
 // CHECK: entry:
-// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
+// CHECK: #dbg_value(ptr [[VAR:%.*]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA:[0-9]+]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC:[0-9]*]]
 //
 // CHECK:      br i1 %{{[0-9]+}}, label %[[LHS:[0-9]+]], label %[[RHS:[0-9]+]],
 //
 // CHECK: [[LHS]]:
 // CHECK:      #dbg_value(ptr undef, ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref), ![[ADDR_LOC]]
 // TODO: Should this be a deref like the original?
-// CHECK:      #dbg_value(ptr [[VAR]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
+// CHECK:      #dbg_value(ptr [[VAR]], ![[K_ADDRESSONLY_VAR_CCFLOW_REINIT_IN_BLOCK_METADATA]], !DIExpression(DW_OP_deref, DW_OP_deref), ![[ADDR_LOC]]
 //
 // CHECK:      br label %[[CONT_BB:[a-z\.0-9]+]],
 //

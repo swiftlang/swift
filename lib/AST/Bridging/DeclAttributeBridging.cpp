@@ -184,6 +184,13 @@ BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
                                              features);
 }
 
+BridgedPreInverseGenericsAttr
+BridgedPreInverseGenericsAttr_createParsed(BridgedASTContext cContext,
+                                           SourceLoc atLoc,
+                                           SourceRange range) {
+  return new (cContext.unbridged()) PreInverseGenericsAttr(atLoc, range);
+}
+
 BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
     BridgedASTContext cContext, SourceLoc atLoc, SourceRange range,
     swift::PlatformKind platform, BridgedVersionTuple cVersion) {

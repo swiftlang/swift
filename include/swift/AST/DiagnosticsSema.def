@@ -822,6 +822,10 @@ ERROR(const_unsupported_keypath,none,
       "keypaths not supported in a literal expression", ())
 ERROR(const_opaque_decl_ref,none,
       "unable to resolve variable reference in a literal expression", ())
+ERROR(const_public_let_ref,none,
+      "reference to a %select{%error|%error|%error|package|public|open}0 "
+      "'let' binding is not permitted in a literal expression",
+      (AccessLevel))
 ERROR(const_opaque_func_decl_ref,none,
       "unable to resolve function reference in a literal expression", ())
 ERROR(const_non_convention_c_conversion,none,
@@ -834,6 +838,12 @@ ERROR(const_integer_overflow,none,
       "operation results in integer overflow", ())
 ERROR(const_divide_by_zero,none,
       "division by zero", ())
+ERROR(const_shift_negative,none,
+      "negative shift amount is not permitted in a literal expression", ())
+ERROR(const_shift_out_of_range,none,
+      "shift amount %0 is greater than or equal to the %1-bit width of "
+      "the operand in a literal expression",
+      (unsigned, unsigned))
 ERROR(const_unknown_default,none,
       "not supported in a literal expression", ())
 NOTE(const_failed_fold_declref_init,none,
@@ -1737,10 +1747,25 @@ ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
       "'subscript(dynamicMember:)' method that accepts either "
       "'ExpressibleByStringLiteral' or a key path", (Type))
-NOTE(invalid_dynamic_member_subscript, none,
-     "add an explicit argument label to this subscript to satisfy "
-     "the '@dynamicMemberLookup' requirement", ())
-ERROR(dynamic_member_lookup_candidate_inaccessible,none,
+ERROR(invalid_dynamic_member_subscript_missing_param_label, none,
+      "'@dynamicMemberLookup' requires %0 to have an explicit parameter label",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_arg_label, none,
+      "'@dynamicMemberLookup' requires %0 to have an explicit 'dynamicMember' "
+      "argument label",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_order, none,
+      "'@dynamicMemberLookup' requires %0 to appear first in the parameter "
+      "list",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_type, none,
+      "'@dynamicMemberLookup' requires %0 to be either "
+      "'ExpressibleByStringLiteral' or a key path",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_missing_default, none,
+      "'@dynamicMemberLookup' requires %0 to have a default value",
+      (ParamDecl *))
+ERROR(dynamic_member_lookup_candidate_inaccessible, none,
       "'@dynamicMemberLookup' requires %0 to be as accessible as its "
       "enclosing type",
       (ValueDecl *))
@@ -4437,6 +4462,16 @@ ERROR(attr_rawlayout_invalid_count_type,none,
       "'@_rawLayout' count must either be integer literal or a generic "
       "argument", ())
 
+ERROR(attr_pre_inverse_generics_invalid_except,none,
+      "'except' argument to '@_preInverseGenerics' must consist only of "
+      "inverse constraints such as '~Copyable' or '~Escapable'", ())
+WARNING(attr_pre_inverse_generics_except_all,none,
+      "'@_preInverseGenerics' that excepts all inverse constraints is "
+      "equivalent to not using the attribute", ())
+WARNING(attr_pre_inverse_generics_on_extension,none,
+      "'@_preInverseGenerics' has no effect on an extension; place it on "
+      "individual members instead", ())
+
 // lazy
 ERROR(lazy_not_on_let,none,
       "'lazy' cannot be used on a let", ())
@@ -5656,6 +5691,9 @@ NOTE(because_rethrows_default_argument_throws,none,
 NOTE(because_rethrows_conformance_throws,none,
      "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
+ERROR(for_throw_without_try,none,
+      "for-in loop can throw, but is not marked with 'try'", ())
+
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
       "%0 can throw, but it is executed in a non-throwing "
       "autoclosure",(StringRef))
@@ -5719,7 +5757,7 @@ NOTE(note_error_to_optional,none,
 NOTE(note_disable_error_propagation,none,
       "did you mean to disable error propagation?", ())
 
-WARNING(no_throw_in_try,none,
+GROUPED_WARNING(no_throw_in_try,UnnecessaryEffectMarker,none,
         "no calls to throwing functions occur within 'try' expression", ())
 
 WARNING(no_throw_in_do_with_catch,none,
@@ -5746,7 +5784,7 @@ NOTE(async_call_without_await_in_autoclosure,none,
 NOTE(async_call_without_await_in_async_let,none,
       "call is 'async' in an 'async let' initializer", ())
 
-WARNING(no_async_in_await,none,
+GROUPED_WARNING(no_async_in_await,UnnecessaryEffectMarker,none,
         "no 'async' operations occur within 'await' expression", ())
 ERROR(async_in_nonasync_function,none,
       "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
@@ -8490,9 +8528,8 @@ NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
-ERROR(noncopyable_generics_variadic, none,
-      "noncopyable type %0 cannot be used within a variadic type yet",
-      (Type))
+NOTE(noncopyable_or_nonescaping_variadic, none,
+     "required because variadic parameter type must be stored inside an 'Array'", ())
 NOTE(noncopyable_generics_implicit_conformance_req, none,
      "'where %noformat0: %noformat1' is implicit here",
      (Type, Type))
@@ -8837,9 +8874,9 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
-WARNING(no_unsafe_in_unsafe,none,
+GROUPED_WARNING(no_unsafe_in_unsafe,UnnecessaryEffectMarker,none,
         "no unsafe operations occur within 'unsafe' expression", ())
-WARNING(no_unsafe_in_unsafe_for,none,
+GROUPED_WARNING(no_unsafe_in_unsafe_for,UnnecessaryEffectMarker,none,
         "no unsafe operations occur within 'unsafe' for-in loop", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 '@unsafe' to allow unsafe overrides of safe superclass "

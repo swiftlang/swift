@@ -1125,6 +1125,11 @@ protected:
 
     switch (parsedLifetimeKind) {
     case ParsedLifetimeDependenceKind::Default: {
+      // Infer copy dependence on @noescape function types by default.
+      if (type->isNoEscape()) {
+        return LifetimeDependenceKind::Inherit;
+      }
+
       if (type->isEscapable()) {
         if (loweredOwnership == ValueOwnership::Shared ||
             loweredOwnership == ValueOwnership::InOut) {
@@ -1823,13 +1828,19 @@ protected:
       // The usual diagnostic check is sufficient.
       return;
     }
-    // Do not infer non-escapable dependence kind -- it is ambiguous.
+    // Do not infer non-escapable dependence kind -- it is ambiguous, except for
+    // noescape function types, for which we should always infer a copy dependence.
     auto const &paramInfo = parameterInfos[0];
     Type paramTypeInContext = paramInfo.typeInContext;
     if (paramTypeInContext->hasError()) {
       return;
     }
     if (!paramTypeInContext->isEscapable()) {
+      if (paramTypeInContext->isNoEscape()) {
+        resultDeps->addIfNew(/*paramIndex*/ 0, LifetimeDependenceKind::Inherit);
+        return;
+      }
+      
       diagnose(returnLoc, diag::lifetime_dependence_cannot_infer_kind,
                diagnosticQualifier(), paramInfo.name());
       return;
@@ -2062,6 +2073,90 @@ ArrayRef<LifetimeDependenceInfo> LifetimeDependenceInfo::uncurry(
   }
 
   return ctx.AllocateCopy(uncurried);
+}
+
+ArrayRef<LifetimeDependenceInfo> LifetimeDependenceInfo::partialApply(
+    ASTContext &ctx, ArrayRef<LifetimeDependenceInfo> lifetimes,
+    unsigned numFormalParams, unsigned numBoundParams) {
+
+  if (numBoundParams == 0)
+    return lifetimes;
+
+  ASSERT(numBoundParams <= numFormalParams &&
+         "A partial application can only bind as many parameters as the "
+         "function has.");
+
+  // How many parameters the resulting closure will have.
+  const unsigned numClosureParams = numFormalParams - numBoundParams;
+
+  SmallVector<LifetimeDependenceInfo, 2> curried;
+
+  for (const auto &dep : lifetimes) {
+    // Determine the new target index.
+    unsigned targetIndex;
+    if (dep.getTargetIndex() == numFormalParams) {
+      // The target is the result.
+      // Its index is the number of parameters.
+      targetIndex = numClosureParams;
+    } else if (dep.getTargetIndex() >= numClosureParams) {
+      // The target is a captured parameter.
+      // The resulting closure does not need a lifetime dependence entry for it.
+      continue;
+    } else {
+      // The target is an uncaptured parameter.
+      // Its index remains the same.
+      targetIndex = dep.getTargetIndex();
+    }
+
+    auto flags = dep.flags;
+
+    const auto captureBoundParams = [&](IndexSubset *indices) -> IndexSubset * {
+      if (!indices)
+        return nullptr;
+
+      ASSERT(indices->getCapacity() <= numFormalParams &&
+             "There should be at most 1 index per parameter. SIL functions "
+             "cannot have "
+             "an implicit self parameter.");
+
+      auto bits = indices->getBitVector();
+
+      if (bits.find_last() >= int(numClosureParams)) {
+        // One of the lifetime source parameters is bound by the partial_apply.
+        // This becomes a captures dependence in the resulting closure.
+        flags.setCaptures(true);
+      }
+
+      // Remove the indices of the captured parameters, leaving only those of
+      // the closure parameters.
+
+      if (bits.find_first() >= int(numClosureParams)) {
+        // All lifetime sources are captured. The resulting empty list of
+        // indices should be represented with a nullptr.
+        return nullptr;
+      }
+
+      if (bits.size() > numClosureParams)
+        bits.resize(numClosureParams);
+
+      return IndexSubset::get(ctx, bits);
+    };
+
+    auto inherit = captureBoundParams(dep.getInheritIndices());
+    auto scope = captureBoundParams(dep.getScopeIndices());
+    auto addressable = captureBoundParams(dep.getAddressableIndices());
+    auto conditionallyAddressable =
+        captureBoundParams(dep.getConditionallyAddressableIndices());
+
+    curried.push_back(LifetimeDependenceInfo(inherit, scope, targetIndex,
+                                             addressable,
+                                             conditionallyAddressable, flags));
+  }
+
+  // FIXME: Avoid allocating context memory for every partial apply. Instead,
+  // cache a single uniqueLifetimeDependenceInfo array for each combination
+  // of FunctionType + numBoundParams.
+  return ctx.AllocateCopy(curried);
 }
 
 void LifetimeDependenceInfo::dump() const {

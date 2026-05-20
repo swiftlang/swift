@@ -755,10 +755,10 @@
             }
         },
         "rebranch": {
-            "aliases": ["rebranch", "llvm.org/main"],
+            "aliases": ["rebranch", "stable/20260427"],
             "repos": {
-                "llvm-project": "stable/21.x",
-                "swift-llvm-bindings": "stable/21.x",
+                "llvm-project": "stable/20260427",
+                "swift-llvm-bindings": "stable/20260427",
                 "swift": "rebranch",
                 "cmark": "gfm",
                 "llbuild": "main",
@@ -810,7 +810,8 @@
                 "zlib": "v1.3.1",
                 "brotli": "v1.2.0",
                 "mimalloc": "v3.0.3",
-                "swift-subprocess": "0.4"
+                "swift-subprocess": "0.4",
+                "boringssl": "817ab07ebb53da35afea409ab9328f578492832d"
             }
         },
         "next" : {

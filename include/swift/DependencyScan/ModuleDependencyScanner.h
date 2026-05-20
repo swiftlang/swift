@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -197,6 +198,8 @@ private:
 
   // Worker-specific instance of CompilerInvocation
   std::unique_ptr<CompilerInvocation> workerCompilerInvocation;
+  // Worker-specific SourceManager
+  SourceManager workerSourceMgr;
   // Worker-specific diagnostic engine
   std::unique_ptr<DiagnosticEngine> workerDiagnosticEngine;
   // Worker-specific instance of ASTContext

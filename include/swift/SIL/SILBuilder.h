@@ -207,6 +207,9 @@ public:
   SILFunction *maybeGetFunction() const { return F; }
 
   bool isInsertingIntoGlobal() const { return F == nullptr; }
+  bool isInsertingIntoDebugReconstructionBlock() const {
+    return BB && BB->isDebugReconstructionBlock();
+  }
 
   TypeExpansionContext getTypeExpansionContext() const {
     if (!F)
@@ -251,8 +254,11 @@ public:
     // FIXME: Audit all uses and enable this assertion.
     // assert(getCurrentDebugScope() && "no debug scope");
     auto Scope = getCurrentDebugScope();
-    if (!Scope && F)
-        Scope = F->getDebugScope();
+    // The content of debug reconstruction block is always scopeless.
+    if (BB && BB->isDebugReconstructionBlock())
+      Scope = nullptr;
+    else if (!Scope && F)
+      Scope = F->getDebugScope();
     auto overriddenLoc = CurDebugLocOverride ? *CurDebugLocOverride : Loc;
     return SILDebugLocation(overriddenLoc, Scope);
   }

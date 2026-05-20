@@ -46,6 +46,7 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/ilist.h"
@@ -2052,8 +2053,7 @@ class AllocStackInst final
                              AllocationInst>,
       private SILDebugVariableSupplement,
       private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    Operand, char> {
+                                    const SILDebugScope *, Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -2203,11 +2203,16 @@ public:
     else if (complete)
       VarDeclScope = getDebugScope();
 
-    llvm::ArrayRef<SILDIExprElement> DIExprElements(
-        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+    // An alloc_stack always has a single implicit op_deref.
+    // It is not returned with complete = false, so that it isn't printed.
+    static const SILDIExprElement SingleDeref[] = {
+        SILDIExprElement::createOperator(SILDIExprOperator::Dereference)};
+    llvm::ArrayRef<SILDIExprElement> VarDIExpr = {};
+    if (complete)
+      VarDIExpr = SingleDeref;
 
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DIExprElements);
+                       VarDeclLoc, VarDeclScope, VarDIExpr);
   }
 
   /// True if this AllocStack has var info that a pass purposely invalidated.
@@ -5616,6 +5621,9 @@ class DebugValueInst final
   TailAllocatedDebugVariable VarInfo;
   USE_SHARED_UINT8;
 
+  /// Optional debug basic block holding reconstruction instructions.
+  SILBasicBlock *ReconstructionBlock = nullptr;
+
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                  SILDebugVariable Var, PoisonRefs_t poisonRefs,
                  UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
@@ -5731,6 +5739,38 @@ public:
   /// Whether the attached di-expression (if there is any) starts
   /// with `op_deref`.
   bool exprStartsWithDeref() const;
+
+  /// Validates the type chain of the DIExpr.
+  /// Starting from VarType, narrows through fragments (outermost first)
+  /// and checks that the result matches the SSA operand type, and that there
+  /// is the right amount of op_deref.
+  /// Returns false if the type chain is invalid, true otherwise.
+  bool isExprTypeValid() const;
+
+  /// Returns the optional debug basic block attached to this instruction.
+  /// The debug BB contains reconstruction instructions for the debug value.
+  /// If this debug value does not have a reconstruction block, this returns
+  /// nullptr. Use getOrCreateDebugReconstructionBlock to create one.
+  SILBasicBlock *getDebugReconstructionBlock() const {
+    return ReconstructionBlock;
+  }
+
+  /// Sets the debug-only basic block for this instruction.
+  /// This should not be called by optimization passes. Optimization passes
+  /// and debug information salvage operations should append to existing
+  /// blocks using getOrCreateDebugReconstructionBlock.
+  void setDebugReconstructionBlock(SILBasicBlock *BB) {
+    ReconstructionBlock = BB;
+  }
+
+  /// Returns a variable reconstruction basic block for this debug value.
+  /// If this debug value has no debug reconstruction block, a new one is
+  /// created and attached to this instruction.
+  /// The newly created basic block will be well-formed, returning the SSA
+  /// value of this debug_value directly.
+  /// If this debug_value has an undef operand, the reconstruction block
+  /// has no arguments and returns undef directly.
+  SILBasicBlock *getOrCreateDebugReconstructionBlock();
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds

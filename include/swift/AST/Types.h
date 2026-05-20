@@ -8376,6 +8376,41 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
 
+/// A placeholder type for a stored-property field whose real type has been
+/// elided from a serialized module because it was imported via an internal
+/// bridging header. The type carries the mangled name of the original type,
+/// which is used for deduplication and (eventually) for recovering the real
+/// type when the client has access to the defining header.
+///
+/// HiddenType is never produced by type-checking user code. It is synthesized
+/// only on the serialization path and consumed by deserialization and IRGen.
+class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  StringRef MangledName;
+
+  HiddenType(StringRef mangledName, const ASTContext &ctx)
+      : TypeBase(TypeKind::Hidden, &ctx, RecursiveTypeProperties()),
+        MangledName(mangledName) {}
+
+public:
+  static HiddenType *get(const ASTContext &ctx, StringRef mangledName);
+
+  StringRef getMangledName() const { return MangledName; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getMangledName());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName) {
+    ID.AddString(mangledName);
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Hidden;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(HiddenType, Type)
+
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {
   // If this type is canonical, it has the ASTContext in it.

@@ -17,6 +17,7 @@
 #ifndef SWIFT_MODULE_H
 #define SWIFT_MODULE_H
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityDomain.h"
@@ -887,6 +888,9 @@ public:
 private:
   std::string CacheKey;
 
+  /// Storage for hidden-type layouts recorded via recordHiddenTypeLayout.
+  llvm::StringMap<AbstractTypeLayout> HiddenTypeLayouts;
+
 public:
   void setCacheKey(const std::string &key) { CacheKey = key; }
   StringRef getCacheKey() const { return CacheKey; }
@@ -1285,6 +1289,20 @@ public:
   void setAvailabilityDomains(const AvailabilityDomainMap &&map) {
     AvailabilityDomains = std::move(map);
   }
+
+  /// Record layout information for a hidden type used by this module in
+  /// some of its stored properties.
+  void recordHiddenTypeLayout(StringRef mangledName,
+                              const AbstractTypeLayout &layout);
+
+  /// Look up a previously-recorded hidden-type layout by mangled name.
+  std::optional<AbstractTypeLayout>
+  lookupHiddenTypeLayout(StringRef mangledName) const;
+
+  /// Return the recorded hidden-type layouts sorted by mangled name, for
+  /// reproducible serialization output.
+  SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4>
+  getSortedHiddenTypeLayouts() const;
 
   static bool classof(const DeclContext *DC) {
     if (auto D = DC->getAsDecl())

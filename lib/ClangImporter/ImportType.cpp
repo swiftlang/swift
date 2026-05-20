@@ -1087,7 +1087,13 @@ namespace {
           return Impl.getNamedSwiftType(Impl.getStdlibModule(), "Int");
 
         // Import the underlying integer type.
-        return Visit(clangDecl->getIntegerType());
+        auto result = Visit(clangDecl->getIntegerType());
+        // Unicode.Scalar (from char32_t or wchar_t) doesn't conform to
+        // _ExpressibleByBuiltinIntegerLiteral, which is required for enum
+        // constant values. Use UInt32 instead.
+        if (result.AbstractType && result.AbstractType->isUnicodeScalar())
+          return Impl.SwiftContext.getUInt32Type();
+        return result;
       }
       case EnumKind::NonFrozenEnum:
       case EnumKind::FrozenEnum:
@@ -1722,6 +1728,12 @@ static ImportedType adjustTypeForConcreteImport(
 
   assert(importedType);
 
+  // When Unicode.Scalar (from char32_t or wchar_t) is used as an enum's
+  // underlying type, import as UInt32 instead. Unicode.Scalar doesn't conform
+  // to _ExpressibleByBuiltinIntegerLiteral, which is required for enum cases.
+  if (importKind == ImportTypeKind::Enum && importedType->isUnicodeScalar())
+    importedType = impl.SwiftContext.getUInt32Type();
+
   if (importKind == ImportTypeKind::RecordField &&
       !importedType->isForeignReferenceType()) {
     switch (objCLifetime) {
@@ -2099,6 +2111,7 @@ private:
   NEVER_VISIT(BuiltinType)
   NEVER_VISIT(BuiltinTupleType)
   NEVER_VISIT(IntegerType)
+  NEVER_VISIT(HiddenType)
 
   VISIT(TupleType, recurse)
 

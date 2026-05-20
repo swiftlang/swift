@@ -1542,7 +1542,7 @@ sil [ossa] @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.
 bb0(%0 : $*Builtin.NativeObject):
   %1 = unchecked_addr_cast %0 : $*Builtin.NativeObject to $*Builtin.RawPointer
   %2 = unchecked_addr_cast %1 : $*Builtin.RawPointer to $*Builtin.Word
-  debug_value %2 : $*Builtin.Word // should not prevent the optimization
+  debug_value %2 : $*Builtin.Word, expr op_deref // should not prevent the optimization
   %3 = load [trivial] %2 : $*Builtin.Word
   return %3 : $Builtin.Word
 }
@@ -1647,7 +1647,7 @@ bb0(%0 : $*FakeOptional<B>):
 
 bb1:
   %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
-  debug_value %2 : $*B  // should not prevent the optimization
+  debug_value %2 : $*B, expr op_deref  // should not prevent the optimization
   %3 = load [copy] %2 : $*B
   return %3 : $B
 

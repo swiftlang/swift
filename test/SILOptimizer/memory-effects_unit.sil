@@ -1321,8 +1321,8 @@ bb0:
   specify_test "memory_effects"
   %0 = alloc_stack $Int
   %1 = alloc_stack $Int
-  debug_value %0 : $*Int, let, name "x"
-  debug_value undef : $*Int, let, name "y"
+  debug_value %0 : $*Int, let, name "x", expr op_deref
+  debug_value undef : $*Int, let, name "y", expr op_deref
   dealloc_stack %1 : $*Int
   dealloc_stack %0 : $*Int
   %r = tuple ()

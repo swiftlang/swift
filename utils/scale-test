@@ -637,6 +637,8 @@ def report(args, rng, runs):
         print("No data found")
         if len(args.select) != 0:
             "(perhaps try a different --select?)"
+        if args.ignore_no_data:
+            return False
         return True
     rows = []
     for k in keys:
@@ -749,6 +751,9 @@ def main():
     parser.add_argument(
         '--trace', action='store_true',
         default=False, help='trace compiler invocations')
+    parser.add_argument(
+        '--ignore-no-data', action='store_true',
+        default=False, help='do not exit with a failure if there is no data')
     parser.add_argument(
         '--quiet', action='store_true',
         default=False, help='only print superlinear stats')

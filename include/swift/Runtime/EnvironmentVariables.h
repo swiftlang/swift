@@ -28,13 +28,17 @@ void initialize(void *);
 
 extern swift::once_t initializeToken;
 
-// Define a typedef "string" in swift::runtime::environment to make string
-// environment variables work
+// Types that can be used for environment variables.
+namespace types {
+using boolean = bool;
 using string = const char *;
+using uint8 = uint8_t;
+using uint32 = uint32_t;
+} // namespace types
 
 // Declare backing variables.
 #define VARIABLE(name, type, defaultValue, help)                               \
-  extern type name##_variable;                                                 \
+  extern swift::runtime::environment::types::type name##_variable;             \
   extern bool name##_isSet_variable;
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
 
@@ -44,7 +48,7 @@ using string = const char *;
 // set at all, to allow detecting when the variable was explicitly set to the
 // same value as the default.
 #define VARIABLE(name, type, defaultValue, help)                               \
-  inline type name() {                                                         \
+  inline swift::runtime::environment::types::type name() {                     \
     swift::once(initializeToken, initialize, nullptr);                         \
     return name##_variable;                                                    \
   }                                                                            \

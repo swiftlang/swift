@@ -7363,19 +7363,17 @@ ClangImporter::instantiateCXXClassTemplate(
 // "long long" and then back into Swift as "Int64" not "Int."
 static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
                                       AbstractFunctionDecl *newDecl) {
-  auto originalFnSubst = cast<AbstractFunctionDecl>(oldDecl)
-                             ->getInterfaceType()
+  auto originalFnSubst = oldDecl->getInterfaceType()
                              ->getAs<GenericFunctionType>()
                              ->substGenericArgs(subst);
-  // The constructor type is a function type as follows:
-  //   (CType.Type) -> (Generic) -> CType
-  // And a method's function type is as follows:
-  //   (inout CType) -> (Generic) -> Void
-  // In either case, we only want the result of that function type because that
-  // is the function type with the generic params that need to be substituted:
-  //   (Generic) -> CType
-  if (isa<ConstructorDecl>(oldDecl) || oldDecl->isInstanceMember() ||
-      oldDecl->isStatic())
+  // AbstractFunctionDecl interface types with an implicit self are curried as:
+  //   (Self[.Type]) -> (Generic) -> Result
+  // Strip the outer self arrow to get the (Generic) -> Result layer, which is
+  // what the rest of this function compares against newDecl's parameters.
+  // SubscriptDecl interface types are not curried this way (they are already
+  // (Generic) -> Element; see InterfaceTypeRequest::evaluate).
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(oldDecl);
+      afd && afd->hasImplicitSelfDecl())
     originalFnSubst = cast<FunctionType>(originalFnSubst->getResult().getPointer());
 
   SmallVector<ParamDecl *, 4> fixedParameters;
@@ -8880,6 +8878,10 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   return ExplicitSafety::Safe;
 }
 
+bool ClangDeclExplicitSafety::isCached() const {
+  return isa<clang::RecordDecl>(std::get<0>(getStorage()).decl);
+}
+
 void swift::simple_display(llvm::raw_ostream &out,
                            ClangRefCountedSmartPointerDescriptor desc) {
   out << "Validating SWIFT_REFCOUNTED_PTR for '";
@@ -8931,25 +8933,52 @@ RefCountedPtrRequestResult ClangRefCountedSmartPointer::evaluate(
 
       auto ctors =
           desc.smartPtr->lookupDirect(DeclBaseName::createConstructor());
-      // We should have a single constructor taking a foreign reference
-      // types. This is relied on during SILGen to introduce implicit
-      // bridging.
+      // We accept a constructor whose parameter imports as the foreign
+      // reference type. In C++ that means a raw pointer (T*, possibly
+      // const-qualified) or an lvalue reference (T&, possibly
+      // const-qualified). We rank candidates so that more-specific
+      // forms win when several are available:
+      //   T*  >  const T*  >  T&  >  const T&
+      // Per-rank duplicates are still ambiguous. Rvalue-reference and
+      // deleted ctors aren't bridgeable. The selected constructor is
+      // relied on during SILGen to introduce implicit bridging.
       ConstructorDecl *selected = nullptr;
-      Type selectedCtorParamType = nullptr;
+      std::optional<int> selectedRank;
       for (auto result : ctors) {
         auto ctor = cast<ConstructorDecl>(result);
         if (ctor->getParameters()->size() != 1)
           continue;
         Type ctorParamType = ctor->getParameters()->get(0)->getInterfaceType();
-        if (ctorParamType->isForeignReferenceType()) {
-          if (selected != nullptr)
-            return {RefCountedPtrError::CtorLookupAmbiguity, toRawPtrFunc};
+        if (!ctorParamType->isForeignReferenceType())
+          continue;
+
+        auto *clangCtor =
+            dyn_cast_or_null<clang::CXXConstructorDecl>(ctor->getClangDecl());
+        if (!clangCtor || clangCtor->isDeleted())
+          continue;
+
+        clang::QualType paramTy = clangCtor->getParamDecl(0)->getType();
+        int rank;
+        if (paramTy->isLValueReferenceType()) {
+          rank = paramTy->getPointeeType().isConstQualified() ? 3 : 2;
+        } else if (paramTy->isPointerType()) {
+          rank = paramTy->getPointeeType().isConstQualified() ? 1 : 0;
+        } else {
+          // Not a pointer or lvalue reference (e.g., rvalue ref).
+          continue;
+        }
+
+        if (!selectedRank || rank < *selectedRank) {
           selected = ctor;
-          selectedCtorParamType = ctorParamType;
+          selectedRank = rank;
+        } else if (rank == *selectedRank) {
+          return {RefCountedPtrError::CtorLookupAmbiguity, toRawPtrFunc};
         }
       }
       if (!selected)
         return {RefCountedPtrError::CtorLookupFailure, toRawPtrFunc};
+      Type selectedCtorParamType =
+          selected->getParameters()->get(0)->getInterfaceType();
       if (!selectedCtorParamType->lookThroughSingleOptionalType()->isEqual(
               pointeeType))
         return {RefCountedPtrError::CtorWrongParamType, toRawPtrFunc};

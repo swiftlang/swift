@@ -213,6 +213,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     llvm::PrefixMapper *Mapper)
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
+      workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()),
       clangScanningTool(
           *globalScanningService.ClangScanningService,
           getClangScanningFS(globalScanningService, CAS, ScanASTContext)),
@@ -226,7 +227,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
 
   // Instantiate a worker-specific diagnostic engine and copy over
   // the scanner's diagnostic consumers (expected to be thread-safe).
-  workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
+  workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(workerSourceMgr);
   for (auto &scannerDiagConsumer : DiagnosticReporter.Diagnostics.getConsumers())
     workerDiagnosticEngine->addConsumer(*scannerDiagConsumer);
 
@@ -239,7 +240,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                       workerCompilerInvocation->getSymbolGraphOptions(),
                       workerCompilerInvocation->getCASOptions(),
                       workerCompilerInvocation->getSerializationOptions(),
-                      ScanASTContext.SourceMgr, *workerDiagnosticEngine));
+                      workerSourceMgr, *workerDiagnosticEngine));
 
   scanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
       workerASTContext->SourceMgr, workerDiagnosticEngine.get(),

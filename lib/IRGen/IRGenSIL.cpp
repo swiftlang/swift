@@ -67,6 +67,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
@@ -1025,12 +1026,12 @@ public:
   /// register allocator doesn't elide the dbg.value intrinsic when
   /// register pressure is high.  There is a trade-off to this: With
   /// shadow copies, we lose the precise lifetime.
-  ///
-  /// Returns the shadow copy, or nullptr if no shadow copy was needed.
-  llvm::Value *emitShadowCopyIfNeededOrNull(
-      llvm::Value *Storage, llvm::Type *StorageType, const SILDebugScope *Scope,
-      SILDebugVariable VarInfo, bool IsAnonymous, bool WasMoved,
-      std::optional<Alignment> Align = std::nullopt) {
+  llvm::Value *
+  emitShadowCopyIfNeeded(llvm::Value *Storage, llvm::Type *StorageType,
+                         const SILDebugScope *Scope, SILDebugVariable VarInfo,
+                         bool IsAnonymous, bool WasMoved,
+                         SILDebugInfoExpression *ExprToExtend = nullptr,
+                         std::optional<Alignment> Align = std::nullopt) {
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
 
@@ -1048,12 +1049,17 @@ public:
     // generating extra shadow copies for debug_value [poison].
     if (!shouldShadowVariable(VarInfo, IsAnonymous)
         || !shouldShadowStorage(Storage, StorageType)) {
-      return nullptr;
+      return Storage;
     }
 
     // Emit a shadow copy.
     auto shadow = emitShadowCopy(Storage, Scope, VarInfo, Align, true, WasMoved)
                       .getAddress();
+
+    // The shadow copy adds an extra layer of indirection.
+    if (ExprToExtend)
+      ExprToExtend->prependElements(
+          {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
 
     // Mark variables in async functions for lifetime extension, so they get
     // spilled into the async context.
@@ -1068,36 +1074,25 @@ public:
     return shadow;
   }
 
-  /// Like \c emitShadowCopyIfNeededOrNull() but returns the original storage
-  /// when no shadow copy is needed (never returns nullptr).
-  llvm::Value *
-  emitShadowCopyIfNeeded(llvm::Value *Storage, llvm::Type *StorageType,
-                         const SILDebugScope *Scope, SILDebugVariable VarInfo,
-                         bool IsAnonymous, bool WasMoved,
-                         std::optional<Alignment> Align = std::nullopt) {
-    if (auto *shadow = emitShadowCopyIfNeededOrNull(
-            Storage, StorageType, Scope, VarInfo, IsAnonymous, WasMoved, Align))
-      return shadow;
-    return Storage;
-  }
-
   /// Like \c emitShadowCopyIfNeeded() but takes an \c Address instead of an
   /// \c llvm::Value.
   llvm::Value *emitShadowCopyIfNeeded(Address Storage,
                                       llvm::Type *StorageType,
                                       const SILDebugScope *Scope,
                                       SILDebugVariable VarInfo,
-                                      bool IsAnonymous, bool WasMoved) {
+                                      bool IsAnonymous, bool WasMoved,
+                                      SILDebugInfoExpression *ExprToExtend = nullptr) {
     return emitShadowCopyIfNeeded(Storage.getAddress(), StorageType, Scope,
                                   VarInfo, IsAnonymous, WasMoved,
-                                  Storage.getAlignment());
+                                  ExprToExtend, Storage.getAlignment());
   }
 
   /// Like \c emitShadowCopyIfNeeded() but takes an exploded value.
   void emitShadowCopyIfNeeded(SILValue &SILVal, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo, bool IsAnonymous,
                               bool WasMoved,
-                              llvm::SmallVectorImpl<llvm::Value *> &copy) {
+                              llvm::SmallVectorImpl<llvm::Value *> &copy,
+                              SILDebugInfoExpression *ExprToExtend = nullptr) {
     Explosion e = getLoweredExplosion(SILVal);
 
     // Only do this at -O0.
@@ -1127,7 +1122,8 @@ public:
       auto &ti = getTypeInfo(SILVal->getType());
       copy.push_back(emitShadowCopyIfNeeded(e.claimNext(), ti.getStorageType(),
                                             Scope, VarInfo,
-                                            IsAnonymous, WasMoved));
+                                            IsAnonymous, WasMoved,
+                                            ExprToExtend));
       return;
     }
 
@@ -1205,20 +1201,20 @@ public:
   void emitDebugVariableDeclaration(
       StorageType Storage, DebugTypeInfo Ty, SILType SILTy,
       const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
-      IndirectionKind Indirection,
+      bool InCoroContext = false,
       AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
     assert(IGM.DebugInfo && "debug info not enabled");
 
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(
-          Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection,
+          Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
           ArtificialKind::RealValue, DbgInstrKind);
       return;
     }
 
     IGM.DebugInfo->emitVariableDeclaration(
-        Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection,
+        Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
         ArtificialKind::RealValue, DbgInstrKind);
   }
 
@@ -6043,15 +6039,22 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
   assert(Var && "error result without debug info");
   auto Storage =
       emitShadowCopyIfNeeded(ErrorResultSlot.getAddress(), nullptr, getDebugScope(),
-                             *Var, false, false /*was move*/);
+                             *Var, false, false /*was move*/, &Var->DIExpr);
   if (!IGM.DebugInfo)
     return;
+  // The error result slot is an alloca storing a pointer to the error.
+  // We need two layers of indirection.
+  // The VarInfo initially has an empty DIExpr and undef value, so we need
+  // to recreate the whole DIExpr.
+  Var->DIExpr.prependElements(
+      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference),
+       SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
   auto DbgTy = DebugTypeInfo::getErrorResult(
       ErrorInfo.getReturnValueType(IGM.getSILModule(), FnTy,
                                    IGM.getMaximalTypeExpansionContext()),IGM);
   IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
                                          getDebugScope(), {}, *Var,
-                                         IndirectValue, ArtificialValue);
+                                         /*InCoroContext=*/false, ArtificialValue);
 }
 
 void IRGenSILFunction::emitPoisonDebugValueInst(DebugValueInst *i) {
@@ -6232,36 +6235,65 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   } else
     return;
 
-  // Since debug_value is expressing indirection explicitly via op_deref,
-  // we're not using either IndirectValue or CoroIndirectValue here.
-  IndirectionKind Indirection = IsInCoro? CoroDirectValue : DirectValue;
-
   // Put the value into a shadow-copy stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
-  if (IsAddrVal) {
+  llvm::SmallVector<llvm::Instruction *, 4> DebugBBInsts;
+  if (auto *DebugBB = i->getDebugReconstructionBlock()) {
+    // Debug basic blocks should not exist at -Onone. They don't support
+    // shadow copies or async lifetime extension.
+    auto *BB = Builder.GetInsertBlock();
+    auto InsertPt = Builder.GetInsertPoint();
+    // Record the state of the builder, to cleanup later.
+    llvm::Instruction *LastBefore =
+        (InsertPt == BB->begin()) ? nullptr : &*std::prev(InsertPt);
+
+    if (!DebugBB->args_empty()) {
+      // Bind the block argument to the operand.
+      SILValue operand = i->getOperand();
+      SILArgument *blockArg = DebugBB->getArgument(0);
+      if (operand->getType().isAddress()) {
+        setLoweredAddress(blockArg, getLoweredAddress(operand));
+      } else {
+        Explosion e = getLoweredExplosion(operand);
+        setLoweredExplosion(blockArg, e);
+      }
+    }
+    // Emit all instructions inline, except the return.
+    for (auto &BBInst : *DebugBB) {
+      if (isa<TermInst>(&BBInst))
+        break;
+      this->visit(&BBInst);
+    }
+    auto *RI = cast<ReturnInst>(DebugBB->getTerminator());
+    SILValue ResultVal = RI->getOperand();
+    // Set Copy to the value being returned by the debug block.
+    if (ResultVal->getType().isAddress()) {
+      Copy.emplace_back(getLoweredAddress(ResultVal).getAddress());
+    } else {
+      Explosion e = getLoweredExplosion(ResultVal);
+      auto vals = e.claimAll();
+      Copy.append(vals.begin(), vals.end());
+    }
+
+    // Collect LLVM instructions emitted by the debug BB so we can salvage and
+    // erase them after the debug record is emitted.
+    assert(BB == Builder.GetInsertBlock() && InsertPt == Builder.GetInsertPoint() && "DebugBB content must not affect control flow!");
+    auto Start = LastBefore ? std::next(LastBefore->getIterator()) : BB->begin();
+    for (auto It = Start; It != InsertPt; ++It)
+      DebugBBInsts.push_back(&*It);
+  } else if (IsAddrVal) {
     auto &TI = getTypeInfo(SILVal->getType());
     auto Addr = getLoweredAddress(SILVal);
     auto *Storage = Addr.getAddress();
 
-    if (auto *ShadowCopy = emitShadowCopyIfNeededOrNull(
-            Storage, TI.getStorageType(), i->getDebugScope(), *VarInfo,
-            IsAnonymous, i->usesMoveableValueDebugInfo())) {
-      Copy.emplace_back(ShadowCopy);
-      // The shadow alloca stores a pointer to the original storage,
-      // adding a level of indirection. For non-moveable values this is
-      // fine because dbg_declare inherently treats its argument as an
-      // address. Moveable values use dbg_value instead, which doesn't
-      // imply that indirection, so we set IndirectValue.
-      if (!IsInCoro && i->usesMoveableValueDebugInfo()) {
-        assert(Indirection != IndirectValue && "IndirectValue already set!");
-        Indirection = IndirectValue;
-      }
-    } else {
-      Copy.emplace_back(Storage);
-    }
+    Copy.emplace_back(emitShadowCopyIfNeeded(
+        Storage, TI.getStorageType(),
+        i->getDebugScope(), *VarInfo, IsAnonymous,
+        i->usesMoveableValueDebugInfo(), &VarInfo->DIExpr));
   } else {
     emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
-                           i->usesMoveableValueDebugInfo(), Copy);
+                           i->usesMoveableValueDebugInfo(), Copy,
+                           &VarInfo->DIExpr);
   }
 
   bindArchetypes(DbgTy.getType());
@@ -6270,7 +6302,14 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   emitDebugVariableDeclaration(
       Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), *VarInfo,
-      Indirection, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
+      IsInCoro, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
+
+  // Erase any LLVM instructions emitted by the debug BB. They were only needed
+  // to produce the dbg intrinsic; salvage converts references into DWARF exprs.
+  for (auto *I : llvm::reverse(DebugBBInsts)) {
+    llvm::salvageDebugInfo(*I);
+    I->eraseFromParent();
+  }
 }
 
 void IRGenSILFunction::visitDebugStepInst(DebugStepInst *i) {
@@ -6713,10 +6752,13 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
          isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr) ||
          isCallToMalloc(addr));
 
-  auto Indirection = DirectValue;
-  if (InCoroContext(*CurSILFn, *i))
-    Indirection =
-        isCallToSwiftTaskAlloc(addr) ? CoroIndirectValue : CoroDirectValue;
+  bool IsInCoro = InCoroContext(*CurSILFn, *i);
+
+  // For task alloc (swift_task_alloc), the address is itself behind a pointer,
+  // so prepend an extra op_deref.
+  if (isCallToSwiftTaskAlloc(addr))
+    VarInfo->DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
 
   if (!IGM.IRGen.Opts.DisableDebuggerShadowCopies &&
       !IGM.IRGen.Opts.shouldOptimize())
@@ -6726,8 +6768,9 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
         addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment(),
                               /*init*/ true, i->usesMoveableValueDebugInfo())
                    .getAddress();
-        Indirection =
-            InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue;
+        // This adds a layer of indirection to the debug variable.
+        VarInfo->DIExpr.prependElements(
+            {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
       }
 
   // Ignore compiler-generated patterns but not optional bindings.
@@ -6749,7 +6792,7 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
     }
 
     emitDebugVariableDeclaration(
-        addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, Indirection,
+        addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, IsInCoro,
         AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
   }
 }
@@ -7028,16 +7071,21 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
     return;
   auto &ti = getTypeInfo(SILTy);
   auto Storage =
-      emitShadowCopyIfNeeded(boxWithAddr.getAddress(), ti.getStorageType(),
+      emitShadowCopyIfNeeded(boxWithAddr.getAddressPointer(), ti.getStorageType(),
                              i->getDebugScope(),
-                             *VarInfo, IsAnonymous, false /*was moved*/);
+                             *VarInfo, IsAnonymous, false /*was moved*/,
+                             &VarInfo->DIExpr);
 
   if (!IGM.DebugInfo)
     return;
 
+  // The box content address points to the variable — one level of indirection.
+  VarInfo->DIExpr.prependElements(
+      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+
   IGM.DebugInfo->emitVariableDeclaration(
       Builder, Storage, DbgTy, i->getDebugScope(), i->getLoc(), *VarInfo,
-      InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue);
+      InCoroContext(*CurSILFn, *i));
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {

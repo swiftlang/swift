@@ -661,6 +661,8 @@ struct ASTContext::Implementation {
   llvm::DenseMap<CanType, SILMoveOnlyWrappedType *> SILMoveOnlyWrappedTypes;
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::FoldingSet<IntegerType> IntegerTypes;
+  llvm::FoldingSet<HiddenType> HiddenTypes;
+  llvm::DenseMap<CanType, StringRef> TypesToHideWhenEmittingModule;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -3879,6 +3881,47 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
 
   ctx.getImpl().IntegerTypes.InsertNode(intType, insertPos);
   return intType;
+}
+
+HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName) {
+  llvm::FoldingSetNodeID id;
+  HiddenType::Profile(id, mangledName);
+
+  void *insertPos;
+  if (auto *hidden =
+          ctx.getImpl().HiddenTypes.FindNodeOrInsertPos(id, insertPos)) {
+    return hidden;
+  }
+
+  auto nameCopy = ctx.AllocateCopy(mangledName);
+
+  auto *hidden = new (ctx, AllocationArena::Permanent)
+      HiddenType(nameCopy, ctx);
+
+  ctx.getImpl().HiddenTypes.InsertNode(hidden, insertPos);
+  return hidden;
+}
+
+void ASTContext::recordTypeToHideWhenEmittingModule(CanType type,
+                                                    StringRef mangledName) {
+  // Allocate a stable copy so the StringRef survives even if the caller's
+  // storage for the mangled name is later moved or freed.
+  auto nameCopy = AllocateCopy(mangledName);
+  auto result =
+      getImpl().TypesToHideWhenEmittingModule.try_emplace(type, nameCopy);
+  if (!result.second) {
+    ASSERT(result.first->second == nameCopy &&
+           "conflicting hide-on-emit mangled names for the same type");
+  }
+}
+
+std::optional<StringRef>
+ASTContext::lookupTypeToHideWhenEmittingModule(CanType type) const {
+  auto &map = getImpl().TypesToHideWhenEmittingModule;
+  auto it = map.find(type);
+  if (it == map.end())
+    return std::nullopt;
+  return it->second;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,

@@ -42,26 +42,6 @@ bb0:
   return %r : $()
 }
 
-sil_scope 2 { loc "file.swift":14:6 parent @test_alloc_stack : $@convention(thin) () -> () }
-
-// Testing di-expression w/ alloc_stack
-sil hidden @test_alloc_stack : $@convention(thin) () -> () {
-bb0:
-  %my_struct = alloc_stack $MyStruct, var, name "my_struct", loc "file.swift":15:9, scope 2
-  // CHECK: %[[MY_STRUCT:.+]] = alloca %{{.*}}MyStruct
-  // CHECK: #dbg_declare(ptr %[[MY_STRUCT]], ![[VAR_DECL_MD:[0-9]+]]
-  // CHECK-SIL: alloc_stack $Int, var
-  // CHECK-SIL-SAME:        (name "my_struct", loc "file.swift":15:9)
-  // CHECK-SIL-SAME:        type $MyStruct, expr op_fragment:#MyStruct.x
-  %field_x = alloc_stack $Int, var, (name "my_struct", loc "file.swift":15:9, scope 2), type $MyStruct, expr op_fragment:#MyStruct.x, loc "file.swift":16:17, scope 2
-  // CHECK: %[[FIELD_X:.+]] = alloca %TSi
-  // CHECK: #dbg_declare(ptr %[[FIELD_X]], ![[VAR_DECL_MD]]
-  // CHECK-SAME:             !DIExpression(DW_OP_LLVM_fragment, 0, 64)
-  dealloc_stack %field_x : $*Int
-  dealloc_stack %my_struct: $*MyStruct
-  %r = tuple()
-  return %r : $()
-}
 
 sil_scope 3 { loc "file.swift":16:7 parent @test_op_const : $@convention(thin) (Int64, Int64) -> () }
 

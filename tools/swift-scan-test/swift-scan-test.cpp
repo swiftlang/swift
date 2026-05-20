@@ -44,6 +44,11 @@ enum Actions {
 llvm::cl::OptionCategory Category("swift-scan-test Options");
 llvm::cl::opt<std::string> CASPath("cas-path", llvm::cl::desc("<path>"),
                                    llvm::cl::cat(Category));
+llvm::cl::opt<std::string> CASPluginPath("cas-plugin-path",
+                                         llvm::cl::desc("<path>"),
+                                         llvm::cl::cat(Category));
+llvm::cl::list<std::string> CASPluginOpts("cas-plugin-option",
+                                          cl::desc("Plugin CAS Options"));
 llvm::cl::opt<std::string> CASID("id", llvm::cl::desc("<casid>"),
                                  llvm::cl::cat(Category));
 llvm::cl::opt<std::string> Input("input", llvm::cl::desc("<file|index>"),
@@ -150,7 +155,7 @@ static int print_cached_compilation(swiftscan_cached_compilation_t comp,
 static int action_cache_query(swiftscan_cas_t cas, const char *key,
                               llvm::raw_ostream &os) {
   swiftscan_string_ref_t err_msg;
-  auto comp = swiftscan_cache_query(cas, key, /*globally=*/false, &err_msg);
+  auto comp = swiftscan_cache_query(cas, key, /*globally=*/true, &err_msg);
   if (err_msg.length != 0)
     return printError(err_msg);
 
@@ -167,7 +172,7 @@ static int action_replay_result(swiftscan_cas_t cas, const char *key,
                                 std::vector<const char *> &Args,
                                 raw_ostream &os) {
   swiftscan_string_ref_t err_msg;
-  auto comp = swiftscan_cache_query(cas, key, /*globally=*/false, &err_msg);
+  auto comp = swiftscan_cache_query(cas, key, /*globally=*/true, &err_msg);
   if (!comp) {
     if (err_msg.length != 0)
       return printError(err_msg);
@@ -338,6 +343,15 @@ int main(int argc, char *argv[]) {
   auto option = swiftscan_cas_options_create();
   SWIFT_DEFER { swiftscan_cas_options_dispose(option); };
   swiftscan_cas_options_set_ondisk_path(option, CASPath.c_str());
+  if (!CASPluginPath.empty())
+    swiftscan_cas_options_set_plugin_path(option, CASPluginPath.c_str());
+  for (const auto &PluginOpt : CASPluginOpts) {
+    auto [Name, Val] = StringRef(PluginOpt).split('=');
+    swiftscan_string_ref_t err_msg;
+    if (swiftscan_cas_options_set_plugin_option(option, Name.str().c_str(),
+                                                Val.str().c_str(), &err_msg))
+      return printError(err_msg);
+  }
 
   swiftscan_string_ref_t err_msg;
   auto cas = swiftscan_cas_create_from_options(option, &err_msg);

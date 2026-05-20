@@ -16,6 +16,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
+#include "swift/SIL/Dominance.h"
 #include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "loadable-address"
 #include "Explosion.h"
@@ -2135,7 +2137,11 @@ static void createStructElementAddrInstrAndLoad(LoadableStorageAllocation &alloc
 
 static SILValue getMakeAddrBorrowOperand(SILBuilder &builder,
                                          MakeBorrowInst *orig) {
+  // This doesn't support OSSA yet. That isn't typically a problem since this
+  // pass currently only runs during IRGen preparation.
   auto &fn = builder.getFunction();
+  assert(!fn.hasOwnership());
+
   auto loc = orig->getLoc();
   auto operand = orig->getOperand();
   
@@ -2156,37 +2162,54 @@ static SILValue getMakeAddrBorrowOperand(SILBuilder &builder,
 
   // Otherwise, this value is local, and can be spilled to a local stack
   // allocation.
-  AllocStackInst *stack = builder.createAllocStack(loc, operand->getType());
-  StoreBorrowInst *borrow = nullptr;
-  SILValue result = stack;
-  bool hasOwnership = fn.hasOwnership()
-                      && !operand->getType().isTrivial(fn);
-  if (hasOwnership) {
-    borrow = builder.createStoreBorrow(loc, operand, stack);
-    result = borrow;
-  } else {
-    builder.createStore(loc, operand, stack, StoreOwnershipQualifier::Unqualified);
-  }
-
-  // End the new stack slot and borrow after the borrow is no longer used.
-  SmallVector<SILInstruction *, 16> transitiveUsers;
-  getTransitiveUsers(orig, transitiveUsers);
-  ValueLifetimeAnalysis lifetimeAnalysis(orig, transitiveUsers);
-  ValueLifetimeBoundary boundary;
-  lifetimeAnalysis.computeLifetimeBoundary(boundary);
-  for (auto *boundaryInst : boundary.lastUsers) {
+  AllocStackInst *stack;
+  {
     SavedInsertionPointRAII save(builder);
-    builder.setInsertionPoint(boundaryInst->getNextInstruction());
 
-    if (borrow) {
-      builder.createEndBorrow(loc, borrow);
+    SmallVector<SILValue, 4> typeDependentOperands;
+    if (operand->getType().hasLocalArchetype()) {
+      operand->getType().getASTType().visit([&](CanType t) {
+          if (auto localArchetype = dyn_cast<LocalArchetypeType>(t)) {
+            typeDependentOperands.push_back(
+                  fn.getModule().getRootLocalArchetypeDef(localArchetype, &fn));
+          }
+        });
     }
+
+    // If the operand is not type-dependent at all, then we can insert the stack
+    // allocation in the entry block.
+    if (typeDependentOperands.empty()) {
+      builder.setInsertionPoint(&*fn.begin()->begin());
+    }
+    // Otherwise, find the earliest block dominated by all of the dependent
+    // operands.
+    else {
+      auto insertPoint = typeDependentOperands.front()->getNextInstruction();
+
+      // TODO: If there are multiple type dependencies, find the point at
+      // which all of the type dependent operands join together.
+      builder.setInsertionPoint(insertPoint);
+    }
+    stack = builder.createAllocStack(loc, operand->getType());
+  }
+  
+  builder.createStore(loc, operand, stack, StoreOwnershipQualifier::Unqualified);
+
+  // Insert balancing dealloc_stacks.
+  DominanceInfo domTree(&fn);
+  SmallVector<SILBasicBlock *, 4> domBoundary;
+  computeDominatedBoundaryBlocks(stack->getParentBlock(), &domTree, domBoundary);
+
+  for (auto *boundBlock : domBoundary) {
+    SavedInsertionPointRAII save(builder);
+
+    builder.setInsertionPoint(boundBlock->getTerminator());
     builder.createDeallocStack(loc, stack);
   }
 
   StackNesting::fixNesting(&fn);
   
-  return result;
+  return stack;
 }
 
 static void createMakeAddrBorrow(LoadableStorageAllocation &allocator,

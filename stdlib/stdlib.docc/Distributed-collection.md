@@ -14,7 +14,7 @@ that runs across multiple computers.
 
 You use three main parts when writing code with distributed actors:
 
-- Swift language support for actors and distributed actors.
+- Swift language support for distributed actors, and building Distributed/RPC systems integrated into the language. 
   For more information,
   see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
 
@@ -32,10 +32,10 @@ You use three main parts when writing code with distributed actors:
   necessary to perform remote method calls.
   For local testing, you can use ``Distributed/LocalTestingDistributedActorSystem``.
   For production,
-  you can use the distributed actor system
-  from the [Swift Distributed Actors][runtime] library,
+  you can use `ClusterSystem` offered by
+  the [Swift Distributed Actors][cluster] library,
   use another library,
-  or write your own distributed actor system.
+  or [write your own distributed actor system](<doc:implementing-a-custom-distributed-actor-system>).
 
 [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
 [tspl]: https://docs.swift.org/swift-book/
@@ -43,6 +43,10 @@ You use three main parts when writing code with distributed actors:
 
 ## Topics
 
+
+### Articles
+
+- <doc:implementing-a-custom-distributed-actor-system>
 
 ### Distributed Actors
 

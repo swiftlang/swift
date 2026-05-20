@@ -316,11 +316,12 @@ open class DefaultSymbolLocator: SymbolLocator {
         result = pdbFile
       }
 
-      if result == nil,
-         let sourcePath = image.path,
-         let imagePath = realPath(sourcePath) {
+      for sourcePath in findPeCoffSymbolPaths(image: image) {
+        if result != nil { break }
+
         // Break apart the image name
-        let (imageDir, imageName) = splitpath(imagePath)
+        let (rawDir, imageName) = splitpath(sourcePath)
+        let imageDir = realPath(String(rawDir)) ?? String(rawDir)
         let pdbName: String
         let ext: Substring?
         if let dotNdx = imageName.lastIndex(of: ".") {

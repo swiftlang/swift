@@ -887,33 +887,11 @@ conformToCxxIteratorIfNeeded(ClangImporter::Implementation &impl,
 
 static void
 conformToCxxConvertibleToBoolIfNeeded(ClangImporter::Implementation &impl,
-                                      swift::NominalTypeDecl *decl,
-                                      const clang::CXXRecordDecl *clangDecl) {
+                                      swift::NominalTypeDecl *decl) {
   PrettyStackTraceDecl trace("trying to conform to CxxConvertibleToBool", decl);
-  ASTContext &ctx = decl->getASTContext();
-
-  auto conversionId = ctx.getIdentifier("__convertToBool");
-  auto conversions = lookupDirectWithoutExtensions(decl, conversionId);
-
-  // Find a non-mutating overload of `__convertToBool`.
-  FuncDecl *conversion = nullptr;
-  for (auto c : conversions) {
-    auto candidate = dyn_cast<FuncDecl>(c);
-    if (!candidate || candidate->isMutating())
-      continue;
-    if (conversion)
-      // Overload ambiguity?
-      return;
-    conversion = candidate;
-  }
-  if (!conversion)
-    return;
-  auto conversionTy = conversion->getResultInterfaceType();
-  if (!conversionTy->isBool())
-    return;
-
-  impl.addSynthesizedProtocolAttrs(decl,
-                                   {KnownProtocolKind::CxxConvertibleToBool});
+  if (impl.lookupAndImportOperatorBool(decl))
+    impl.addSynthesizedProtocolAttrs(decl,
+                                     {KnownProtocolKind::CxxConvertibleToBool});
 }
 
 static void conformToCxxOptional(ClangImporter::Implementation &impl,
@@ -1481,17 +1459,10 @@ static void conformToCxxDictionary(ClangImporter::Implementation &impl,
                                Insert->getResultInterfaceType());
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxDictionary});
 
-  // Make the original subscript that returns a non-optional value unavailable.
+  // Prevent subscript (returning non-optional) from being synthesized.
   // CxxDictionary adds another subscript that returns an optional value,
   // similarly to Swift.Dictionary.
-  //
-  // NOTE: this relies on the SubscriptDecl member being imported eagerly.
-  for (auto member : decl->getCurrentMembersWithoutLoading()) {
-    if (auto subscript = dyn_cast<SubscriptDecl>(member)) {
-      impl.markUnavailable(subscript,
-                           "use subscript with optional return value");
-    }
-  }
+  (void)impl.lookupAndImportSubscripts(decl, /*noSynthesize=*/true);
 }
 
 static void conformToCxxVector(ClangImporter::Implementation &impl,
@@ -1639,7 +1610,7 @@ void swift::deriveAutomaticCxxConformances(
   // requirements.
   conformToCxxIteratorIfNeeded(Impl, result, clangDecl);
   conformToCxxSequenceIfNeeded(Impl, result, clangDecl);
-  conformToCxxConvertibleToBoolIfNeeded(Impl, result, clangDecl);
+  conformToCxxConvertibleToBoolIfNeeded(Impl, result);
 
   // CxxStdlib conformances: these should only apply to known C++ stdlib types,
   // which we determine by name and membership in the std namespace.

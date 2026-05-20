@@ -1,0 +1,47 @@
+// RUN: %target-sil-opt -sil-print-types -verify-debug-value-expr %s | %FileCheck %s
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { parent @test_transform_const : $@convention(thin) () -> () }
+
+// CHECK-LABEL: sil @test_transform_const :
+sil @test_transform_const : $@convention(thin) () -> () {
+bb0:
+  // CHECK: debug_value undef : $Builtin.Int64, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  // CHECK:   bb0:
+  // CHECK:     %0 = integer_literal $Builtin.Int64, 42
+  // CHECK:     return %0 : $Builtin.Int64
+  // CHECK:   }
+  debug_value undef : $Builtin.Int64, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int64, 42
+    return %0 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+// CHECK: } // end sil function 'test_transform_const'
+
+sil_scope 2 { parent @test_transform_with_arg : $@convention(thin) (Builtin.Int64) -> () }
+
+// CHECK-LABEL: sil @test_transform_with_arg :
+sil @test_transform_with_arg : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%arg : $Builtin.Int64):
+  // CHECK: debug_value %0 : $Builtin.Int64, let, name "y", type $Int64, expr op_fragment:#Int64._value, transform {
+  // CHECK:   bb0(%0 : $Builtin.Int64):
+  // CHECK:     %1 = integer_literal $Builtin.Int64, 10
+  // CHECK:     %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+  // CHECK:     return %2 : $Builtin.Int64
+  // CHECK:   }
+  debug_value %arg : $Builtin.Int64, let, name "y", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0(%0 : $Builtin.Int64):
+    %1 = integer_literal $Builtin.Int64, 10
+    %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+    return %2 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+// CHECK: } // end sil function 'test_transform_with_arg'

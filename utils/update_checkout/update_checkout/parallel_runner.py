@@ -89,6 +89,9 @@ class ParallelRunner:
         self._n_threads = n_threads
         self._monitor_polling_period = 0.1
         self._terminal_width = shutil.get_terminal_size().columns
+        if sys.platform == "win32":
+            # 1 column of padding to account for Windows using CRLF by default.
+            self._terminal_width -= 1
         self._pool_args = pool_args
         self._fn_name = fn.__name__
         self._fn = run_safely

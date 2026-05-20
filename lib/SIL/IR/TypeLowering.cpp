@@ -360,6 +360,7 @@ namespace {
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
     IMPL(Integer, Trivial)
+    IMPL(Hidden, Trivial)
 
 #undef IMPL
 

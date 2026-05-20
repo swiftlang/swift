@@ -270,6 +270,7 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:
@@ -439,14 +440,14 @@ Type ExistentialLayout::getSuperclass() const {
   return Type();
 }
 
-bool ExistentialLayout::needsExtendedShape(bool allowInverses) const {
+bool ExistentialLayout::needsExtendedShape(
+    InvertibleProtocolSet allowedInverses) const {
   if (!getParameterizedProtocols().empty())
     return true;
 
-  if (allowInverses && hasInverses())
-    return true;
-
-  return false;
+  // Would any inverses in this layout would be considered by the mangler?
+  allowedInverses.intersect(inverses);
+  return !allowedInverses.empty();
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -1312,7 +1313,8 @@ bool TypeBase::isCGFloat() {
 
 bool TypeBase::isStdlibInteger() {
   return isInt() || isInt8() || isInt16() || isInt32() || isInt64() ||
-         isUInt() || isUInt8() || isUInt16() || isUInt32() || isUInt64();
+         isInt128() || isUInt() || isUInt8() || isUInt16() || isUInt32() ||
+         isUInt64() || isUInt128();
 }
 
 bool TypeBase::isStdlibFloat() {
@@ -4747,6 +4749,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:

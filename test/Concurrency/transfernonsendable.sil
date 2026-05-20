@@ -233,7 +233,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedStruct):
 
 sil [ossa] @synchronous_returns_transferring_globalactor_struct_structelementaddr : $@convention(method) (@in_guaranteed MainActorIsolatedStruct) -> @sil_sending @owned NonSendableKlass {
 bb0(%0 : $*MainActorIsolatedStruct):
-  debug_value %0 : $*MainActorIsolatedStruct, var, name "myname"
+  debug_value %0 : $*MainActorIsolatedStruct, var, name "myname", expr op_deref
   %2 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   %3 = load [copy] %2 : $*NonSendableKlass
   return %3 : $NonSendableKlass // expected-warning {{sending 'myname.ns' risks causing data races}}
@@ -251,7 +251,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedEnum):
 
 sil [ossa] @synchronous_returns_transferring_globalactor_enum_uncheckedtakeenumdataaddr : $@convention(method) (@in MainActorIsolatedEnum) -> @sil_sending @owned NonSendableKlass {
 bb0(%0 : $*MainActorIsolatedEnum):
-  debug_value %0 : $*MainActorIsolatedEnum, var, name "myname"
+  debug_value %0 : $*MainActorIsolatedEnum, var, name "myname", expr op_deref
   %2 = unchecked_take_enum_data_addr %0 : $*MainActorIsolatedEnum, #MainActorIsolatedEnum.second!enumelt
   %3 = load [take] %2 : $*NonSendableKlass
   return %3 : $NonSendableKlass // expected-warning {{sending 'myname.second' risks causing data races}}

@@ -224,12 +224,19 @@ extension ImageMap {
     // Turn that into a list of Images
     var images: [Image] = []
     for hModule in hModules {
+      guard let hModule else {
+        #if DEBUG_WIN32_IMAGEMAP_CAPTURE
+        print("Windows backtracing - Null module should not be possible.")
+        #endif
+        continue
+      }
+
       #if DEBUG_WIN32_IMAGEMAP_CAPTURE
       print("hModule: \(String(describing: hModule))")
       #endif
 
-      let moduleName = GetModuleBaseName(hProcess, hModule!)
-      let modulePath = GetModuleFileNameEx(hProcess, hModule!)
+      let moduleName = GetModuleBaseName(hProcess, hModule)
+      let modulePath = GetModuleFileNameEx(hProcess, hModule)
       var moduleInfo = MODULEINFO()
 
       #if DEBUG_WIN32_IMAGEMAP_CAPTURE
@@ -237,11 +244,11 @@ extension ImageMap {
       print("path: \(modulePath)")
       #endif
 
-      guard GetModuleInformation(hProcess, hModule!, &moduleInfo,
+      guard GetModuleInformation(hProcess, hModule, &moduleInfo,
                                  DWORD(MemoryLayout<MODULEINFO>.size))
       else {
         #if DEBUG_WIN32_IMAGEMAP_CAPTURE
-        print("GetModuleInformation() failed for \(hModule!)")
+        print("GetModuleInformation() failed for \(hModule)")
         #endif
         continue
       }
@@ -255,6 +262,7 @@ extension ImageMap {
       let endOfText: Address
       var debugEntry = IMAGE_DATA_DIRECTORY()
       var exceptionEntry = IMAGE_DATA_DIRECTORY()
+      var sizeOfImage: DWORD = 0
 
       var wMagic: WORD = 0
       var dwOffset: DWORD = 0
@@ -322,8 +330,10 @@ extension ImageMap {
         continue
       }
 
+      let timeDateStamp = header.TimeDateStamp
+
       if (header.Characteristics & WORD(IMAGE_FILE_32BIT_MACHINE)) != 0 {
-        // 32-bit
+        // 32-bit (from winnt.h see typedef struct _IMAGE_OPTIONAL_HEADER)
         var optionalHeader = IMAGE_OPTIONAL_HEADER32()
 
         #if DEBUG_WIN32_IMAGEMAP_CAPTURE
@@ -346,14 +356,16 @@ extension ImageMap {
 
         endOfText = baseAddress + Address(optionalHeader.BaseOfCode
                                           + optionalHeader.SizeOfCode)
+        sizeOfImage = optionalHeader.SizeOfImage
 
+        // from winnt.h see typedef struct _IMAGE_DATA_DIRECTORY
         // 3 is IMAGE_DIRECTORY_ENTRY_EXCEPTION
         exceptionEntry = optionalHeader.DataDirectory.3
 
         // 6 is IMAGE_DIRECTORY_ENTRY_DEBUG
         debugEntry = optionalHeader.DataDirectory.6
       } else {
-        // 64-bit
+        // 64-bit (from winnt.h - see typedef struct _IMAGE_OPTIONAL_HEADER64)
         var optionalHeader = IMAGE_OPTIONAL_HEADER64()
 
         #if DEBUG_WIN32_IMAGEMAP_CAPTURE
@@ -376,6 +388,7 @@ extension ImageMap {
 
         endOfText = baseAddress + Address(optionalHeader.BaseOfCode
                                           + optionalHeader.SizeOfCode)
+        sizeOfImage = optionalHeader.SizeOfImage
 
         // 3 is IMAGE_DIRECTORY_ENTRY_EXCEPTION
         exceptionEntry = optionalHeader.DataDirectory.3
@@ -435,6 +448,9 @@ extension ImageMap {
                   }
                   withUnsafeBytes(of: pdbInfo.dwAge) {
                     theUUID!.append(contentsOf: $0)
+                  }
+                  if theUUID!.allSatisfy({ $0 == 0 }) {
+                    theUUID = nil
                   }
                 }
               }
@@ -504,7 +520,9 @@ extension ImageMap {
                           uniqueID: theUUID,
                           baseAddress: baseAddress,
                           endOfText: endOfText,
-                          exceptionTable: exceptionTable))
+                          exceptionTable: exceptionTable,
+                          timeDateStamp: UInt32(timeDateStamp),
+                          sizeOfImage: UInt32(sizeOfImage)))
     }
 
     images.sort(by: { $0.baseAddress < $1.baseAddress })

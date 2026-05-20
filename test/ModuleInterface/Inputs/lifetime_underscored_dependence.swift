@@ -159,3 +159,28 @@ public func takeReadBorrower(f: @_lifetime(borrow a) (_ a: AnotherView) -> Anoth
 
 @inlinable
 public func takeWriteBorrower(f: @_lifetime(&a) (_ a: inout AnotherView) -> AnotherView) {}
+
+// Infer @_lifetime(copy f)
+@inlinable
+public func takeClosureImplicitDependence(f: () -> AnotherView) -> AnotherView {
+  f()
+}
+
+@_lifetime(f) // Infer @_lifetime(copy f)
+@inlinable
+public func takeClosureImplicitDependenceKind(f: () -> AnotherView) -> AnotherView {
+  f()
+}
+
+@inlinable
+public func takeTakeImplicitCopyClosure(g: @_lifetime(copy f) (_ f: () -> AnotherView) -> AnotherView) {
+}
+
+// Verify that takeClosureImplicitDependenceKind and takeClosureImplicitDependence
+// are both inferred as @_lifetime(copy f). It is illegal to pass a function that
+// borrows its context into a function-type parameter that copies its context.
+@inlinable
+public func callTTICC() {
+  takeTakeImplicitCopyClosure(g: takeClosureImplicitDependenceKind)
+  takeTakeImplicitCopyClosure(g: takeClosureImplicitDependence)
+}

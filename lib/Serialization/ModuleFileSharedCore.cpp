@@ -1125,6 +1125,74 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
   return false;
 }
 
+bool ModuleFileSharedCore::readHiddenTypeLayoutsBlock(
+    llvm::BitstreamCursor &cursor) {
+  if (llvm::Error Err = cursor.EnterSubBlock(HIDDEN_TYPE_LAYOUTS_BLOCK_ID)) {
+    consumeError(std::move(Err));
+    return false;
+  }
+
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  while (!cursor.AtEndOfStream()) {
+    Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
+    if (!maybeEntry) {
+      consumeError(maybeEntry.takeError());
+      return false;
+    }
+    llvm::BitstreamEntry entry = maybeEntry.get();
+    switch (entry.Kind) {
+    case llvm::BitstreamEntry::EndBlock:
+      return true;
+
+    case llvm::BitstreamEntry::Error:
+      return false;
+
+    case llvm::BitstreamEntry::SubBlock:
+      // Unexpected sub-block; skip for forward compatibility.
+      if (cursor.SkipBlock())
+        return false;
+      break;
+
+    case llvm::BitstreamEntry::Record: {
+      scratch.clear();
+      blobData = {};
+      Expected<unsigned> maybeKind =
+          cursor.readRecord(entry.ID, scratch, &blobData);
+      if (!maybeKind) {
+        consumeError(maybeKind.takeError());
+        return false;
+      }
+      unsigned kind = maybeKind.get();
+      if (kind != hidden_type_layouts_block::HIDDEN_TYPE_LAYOUT) {
+        // Unknown record kind, ignore for forward compatibility.
+        break;
+      }
+      if (scratch.size() < 5)
+        return false;
+
+      AbstractTypeLayout layout;
+      layout.size = scratch[0];
+      layout.alignment = scratch[1];
+      layout.stride = scratch[2];
+      layout.bitwiseCopyable = scratch[3] != 0;
+      layout.isOpaque = scratch[4] != 0;
+      layout.mangledName = blobData.str();
+
+      // StringMap owns its keys (copies blobData). If a duplicate entry
+      // appears the module is malformed.
+      auto result = HiddenTypeLayouts.try_emplace(blobData, std::move(layout));
+      if (!result.second)
+        return false;
+      break;
+    }
+    }
+  }
+
+  return false;
+}
+
 std::unique_ptr<ModuleFileSharedCore::SerializedDeclCommentTable>
 ModuleFileSharedCore::readDeclCommentTable(ArrayRef<uint64_t> fields,
                                  StringRef blobData) const {
@@ -1895,6 +1963,14 @@ ModuleFileSharedCore::ModuleFileSharedCore(
 
     case INDEX_BLOCK_ID: {
       if (!hasValidControlBlock || !readIndexBlock(cursor)) {
+        info.status = error(Status::Malformed);
+        return;
+      }
+      break;
+    }
+
+    case HIDDEN_TYPE_LAYOUTS_BLOCK_ID: {
+      if (!readHiddenTypeLayoutsBlock(cursor)) {
         info.status = error(Status::Malformed);
         return;
       }
