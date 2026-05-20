@@ -350,7 +350,7 @@ bb0:
   %2 = integer_literal $Builtin.Int32, 10
   %3 = struct $Int32 (%2 : $Builtin.Int32)
   debug_step
-  debug_value %1 : $*Int32
+  debug_value %1 : $*Int32, expr op_deref
   %6 = tuple ()
   return %6 : $()
 }

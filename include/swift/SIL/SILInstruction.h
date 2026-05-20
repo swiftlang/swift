@@ -46,6 +46,7 @@
 #include "swift/Strings.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/ilist.h"
@@ -2052,8 +2053,7 @@ class AllocStackInst final
                              AllocationInst>,
       private SILDebugVariableSupplement,
       private llvm::TrailingObjects<AllocStackInst, SILType, SILLocation,
-                                    const SILDebugScope *, SILDIExprElement,
-                                    Operand, char> {
+                                    const SILDebugScope *, Operand, char> {
   friend TrailingObjects;
   friend SILBuilder;
 
@@ -2203,11 +2203,16 @@ public:
     else if (complete)
       VarDeclScope = getDebugScope();
 
-    llvm::ArrayRef<SILDIExprElement> DIExprElements(
-        getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
+    // An alloc_stack always has a single implicit op_deref.
+    // It is not returned with complete = false, so that it isn't printed.
+    static const SILDIExprElement SingleDeref[] = {
+        SILDIExprElement::createOperator(SILDIExprOperator::Dereference)};
+    llvm::ArrayRef<SILDIExprElement> VarDIExpr = {};
+    if (complete)
+      VarDIExpr = SingleDeref;
 
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
-                       VarDeclLoc, VarDeclScope, DIExprElements);
+                       VarDeclLoc, VarDeclScope, VarDIExpr);
   }
 
   /// True if this AllocStack has var info that a pass purposely invalidated.
