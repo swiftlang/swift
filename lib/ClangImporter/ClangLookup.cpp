@@ -335,13 +335,35 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     // For inherited members, add members that are synthesized eagerly, such as
     // operators. This is not necessary for non-inherited members because those
     // should already be in the lookup table.
+
+    // If the derived class already has its own directly-synthesized
+    // property with the looked-up name, don't clone a same-named
+    // synthesized property from the base on top of it. This is the case
+    // e.g. when SWIFT_REFCOUNTED_PTR is applied to both a base and a
+    // derived smart pointer: each gets its own `asReference` and
+    // surfacing the base's clone too would leave the derived with two
+    // copies.
+    bool derivedHasOwnSynthesizedVar = false;
+    for (auto m : inheritingDecl->getCurrentMembersWithoutLoading()) {
+      auto ownVD = dyn_cast<VarDecl>(m);
+      if (ownVD && ownVD->hasName() && ownVD->getBaseName() == name &&
+          !ownVD->hasClangNode() &&
+          !clangModuleLoader->getOriginalForClonedMember(ownVD)) {
+        derivedHasOwnSynthesizedVar = true;
+        break;
+      }
+    }
+
     for (auto member :
          cast<NominalTypeDecl>(recordDecl)->getCurrentMembersWithoutLoading()) {
       auto namedMember = dyn_cast<ValueDecl>(member);
       if (!namedMember || !namedMember->hasName() ||
-          namedMember->getName().getBaseName() != name ||
+          namedMember->getBaseName() != name ||
           clangModuleLoader->isMemberSynthesizedPerType(namedMember) ||
           clangModuleLoader->getOriginalForClonedMember(namedMember))
+        continue;
+
+      if (derivedHasOwnSynthesizedVar && isa<VarDecl>(namedMember))
         continue;
 
       auto *imported = clangModuleLoader->importBaseMemberDecl(

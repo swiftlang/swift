@@ -8935,25 +8935,52 @@ RefCountedPtrRequestResult ClangRefCountedSmartPointer::evaluate(
 
       auto ctors =
           desc.smartPtr->lookupDirect(DeclBaseName::createConstructor());
-      // We should have a single constructor taking a foreign reference
-      // types. This is relied on during SILGen to introduce implicit
-      // bridging.
+      // We accept a constructor whose parameter imports as the foreign
+      // reference type. In C++ that means a raw pointer (T*, possibly
+      // const-qualified) or an lvalue reference (T&, possibly
+      // const-qualified). We rank candidates so that more-specific
+      // forms win when several are available:
+      //   T*  >  const T*  >  T&  >  const T&
+      // Per-rank duplicates are still ambiguous. Rvalue-reference and
+      // deleted ctors aren't bridgeable. The selected constructor is
+      // relied on during SILGen to introduce implicit bridging.
       ConstructorDecl *selected = nullptr;
-      Type selectedCtorParamType = nullptr;
+      std::optional<int> selectedRank;
       for (auto result : ctors) {
         auto ctor = cast<ConstructorDecl>(result);
         if (ctor->getParameters()->size() != 1)
           continue;
         Type ctorParamType = ctor->getParameters()->get(0)->getInterfaceType();
-        if (ctorParamType->isForeignReferenceType()) {
-          if (selected != nullptr)
-            return {RefCountedPtrError::CtorLookupAmbiguity, toRawPtrFunc};
+        if (!ctorParamType->isForeignReferenceType())
+          continue;
+
+        auto *clangCtor =
+            dyn_cast_or_null<clang::CXXConstructorDecl>(ctor->getClangDecl());
+        if (!clangCtor || clangCtor->isDeleted())
+          continue;
+
+        clang::QualType paramTy = clangCtor->getParamDecl(0)->getType();
+        int rank;
+        if (paramTy->isLValueReferenceType()) {
+          rank = paramTy->getPointeeType().isConstQualified() ? 3 : 2;
+        } else if (paramTy->isPointerType()) {
+          rank = paramTy->getPointeeType().isConstQualified() ? 1 : 0;
+        } else {
+          // Not a pointer or lvalue reference (e.g., rvalue ref).
+          continue;
+        }
+
+        if (!selectedRank || rank < *selectedRank) {
           selected = ctor;
-          selectedCtorParamType = ctorParamType;
+          selectedRank = rank;
+        } else if (rank == *selectedRank) {
+          return {RefCountedPtrError::CtorLookupAmbiguity, toRawPtrFunc};
         }
       }
       if (!selected)
         return {RefCountedPtrError::CtorLookupFailure, toRawPtrFunc};
+      Type selectedCtorParamType =
+          selected->getParameters()->get(0)->getInterfaceType();
       if (!selectedCtorParamType->lookThroughSingleOptionalType()->isEqual(
               pointeeType))
         return {RefCountedPtrError::CtorWrongParamType, toRawPtrFunc};
