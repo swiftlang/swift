@@ -1631,10 +1631,6 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
   static const SILDIExprOperator AllOps[] = {
     SILDIExprOperator::Dereference,
     SILDIExprOperator::Fragment,
-    SILDIExprOperator::Plus,
-    SILDIExprOperator::Minus,
-    SILDIExprOperator::ConstUInt,
-    SILDIExprOperator::ConstSInt,
     SILDIExprOperator::TupleFragment
   };
 
