@@ -417,6 +417,10 @@ extension Value {
 }
 
 extension Instruction {
+  func endsLifetime(of value: Value) -> Bool {
+    return operands.contains { $0.value == value && $0.endsLifetime }
+  }
+
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
       return false
