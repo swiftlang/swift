@@ -8,6 +8,10 @@ func bare<T: ~Copyable>(_ t: borrowing T) {}
 @_preInverseGenerics(except: ~Copyable)
 func exceptCopyable<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 
+// Shorthand alias for `@_preInverseGenerics(except: ~Copyable)`.
+@_preInverseGenericsExceptCopyable
+func exceptCopyableShorthand<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
+
 @_preInverseGenerics(except: ~Escapable)
 func exceptEscapable<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 
