@@ -2,6 +2,7 @@
 // imported via an internal bridging header when AbstractStoredPropertyLayout is enabled.
 
 // REQUIRES: swift_feature_AbstractStoredPropertyLayout
+// REQUIRES: PTRSIZE=64
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
