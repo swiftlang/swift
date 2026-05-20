@@ -1086,9 +1086,16 @@ private:
 
     bool IsTypeOriginallyDefinedIn = containsOriginallyDefinedIn(DbgTy.getType());
     bool IsCxxType = containsCxxType(DbgTy.getType());
+    // TODO: ASTDemangler drops LifetimeDependenceInfo (see ASTDemangler.cpp's
+    // "Handle LifetimeDependenceInfo here" TODO); until that TODO is closed,
+    // types containing function types with lifetime dependencies cannot
+    // round-trip. This exclusion is intentionally transitive.
+    bool ContainsLifetimeDependencies =
+        containsFunctionTypeWithLifetimeDependencies(DbgTy.getType());
     // There's no way to round trip when respecting @_originallyDefinedIn for a type.
     // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
-    if (!Opts.DisableRoundTripDebugTypes && !IsTypeOriginallyDefinedIn && !IsCxxType) {
+    if (!Opts.DisableRoundTripDebugTypes && !IsTypeOriginallyDefinedIn &&
+        !IsCxxType && !ContainsLifetimeDependencies) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);
@@ -2677,6 +2684,23 @@ private:
         }
       }
 
+      return false;
+    });
+  }
+
+  /// Returns true if the type contains a function type with lifetime
+  /// dependencies. ASTDemangler drops LifetimeDependenceInfo (see the
+  /// "Handle LifetimeDependenceInfo here" TODO in ASTDemangler.cpp), so
+  /// such types cannot round-trip through the demangler. Covers both
+  /// inferred and explicit dependencies via hasLifetimeDependencies(),
+  /// and both AST-level (AnyFunctionType) and SIL-level (SILFunctionType)
+  /// function type hierarchies.
+  bool containsFunctionTypeWithLifetimeDependencies(Type T) {
+    return T.findIf([](Type t) -> bool {
+      if (auto *fn = t->getAs<AnyFunctionType>())
+        return fn->hasLifetimeDependencies();
+      if (auto *silFn = t->getAs<SILFunctionType>())
+        return silFn->hasLifetimeDependencies();
       return false;
     });
   }
