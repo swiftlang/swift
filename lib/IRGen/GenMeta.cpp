@@ -5727,9 +5727,9 @@ void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
   // lazily emitting their own copy.
   if (IGM.isEmbeddedWithExistentials()) {
     if (auto *classDecl = classTy->getClassOrBoundGenericClass()) {
-      if (auto model = classDecl->getExplicitCodeGenerationModel())
-        if (*model == CodeGenerationModel::Interface)
-          return;
+      if (classDecl->getEffectiveCodeGenerationModel()
+              == CodeGenerationModel::Interface)
+        return;
     }
   }
 

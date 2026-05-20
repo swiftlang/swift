@@ -1443,10 +1443,16 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   // @export(interface) conformances, which have a unique strong definition
   // in the owning module.
   if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    if (auto *normal = dyn_cast<NormalProtocolConformance>(wt->getConformance()))
-      if (auto model = normal->getExplicitCodeGenerationModel())
-        if (*model == CodeGenerationModel::Interface)
+    if (auto *normal = dyn_cast<NormalProtocolConformance>(wt->getConformance())) {
+      switch (normal->getEffectiveCodeGenerationModel()) {
+        case CodeGenerationModel::Interface:
           return false;
+        case CodeGenerationModel::Implementation:
+        case CodeGenerationModel::Inlinable:
+          return true;
+      }
+    }
+
     return true;
   }
 

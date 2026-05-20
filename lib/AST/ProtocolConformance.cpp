@@ -32,6 +32,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "llvm/ADT/Statistic.h"
@@ -430,6 +431,43 @@ NormalProtocolConformance::getExplicitCodeGenerationModel() const {
   if (auto *nominal = dyn_cast<NominalTypeDecl>(getDeclContext()))
     return nominal->getExplicitCodeGenerationModel();
   return std::nullopt;
+}
+
+static std::optional<CodeGenerationModel>
+getRequiredCodeGenerationModel(const NormalProtocolConformance *conformance) {
+  auto dc = conformance->getDeclContext();
+  bool isEmbedded = dc->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+
+  // A conformance in a generic context must be @export(implementation) in
+  // Embedded Swift.
+  if (auto sig = dc->getGenericSignatureOfContext()) {
+    if (!sig->areAllParamsConcrete() && isEmbedded)
+      return CodeGenerationModel::Implementation;
+  }
+
+  // Synthesized conformances are always @export(implementation).
+  if (conformance->isSynthesized())
+    return CodeGenerationModel::Implementation;
+
+  // Other conformances must be @export(interface) in non-Embedded Swift,
+  // because the witness table symbols must be unique.
+  if (!isEmbedded) {
+    return CodeGenerationModel::Interface;
+  }
+
+  return std::nullopt;
+}
+
+CodeGenerationModel
+NormalProtocolConformance::getEffectiveCodeGenerationModel() const {
+  if (auto explicitModel = getExplicitCodeGenerationModel())
+    return *explicitModel;
+
+  if (auto required = getRequiredCodeGenerationModel(this))
+    return *required;
+
+  // Otherwise, apply the module-level default.
+  return getDeclContext()->getParentModule()->codeGenerationModel();
 }
 
 bool NormalProtocolConformance::isConformanceOfProtocol() const {

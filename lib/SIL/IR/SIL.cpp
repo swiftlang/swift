@@ -104,9 +104,14 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
     // externally.
     if (auto *normal = dyn_cast<NormalProtocolConformance>(
             C->getRootConformance())) {
-      if (auto model = normal->getExplicitCodeGenerationModel())
-        if (*model == CodeGenerationModel::Interface)
+      switch (normal->getEffectiveCodeGenerationModel()) {
+        case CodeGenerationModel::Interface:
           return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
+
+        case CodeGenerationModel::Implementation:
+        case CodeGenerationModel::Inlinable:
+          return SILLinkage::Shared;
+      }
     }
 
     // Other embedded conformances are emitted lazily with shared linkage,

@@ -4299,10 +4299,12 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
   TypeID TyID;
   DeclID dID;
   ModuleID parentModuleID;
-  unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed;
+  unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed,
+      codeGenerationModel;
   unsigned numTrailingRecords;
   SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
                                  IsDeclaration, IsLet, IsUsed,
+                                 codeGenerationModel,
                                  numTrailingRecords, TyID, dID,
                                  parentModuleID);
   if (TyID == 0) {
@@ -4336,6 +4338,12 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
       std::nullopt, globalDecl);
   v->setLet(IsLet);
   v->setMarkedAsUsed(IsUsed);
+  if (codeGenerationModel) {
+    v->setCodeGenerationModel(
+        static_cast<CodeGenerationModel>(codeGenerationModel - 1));
+  } else {
+    v->setCodeGenerationModel(std::nullopt);
+  }
   globalVarOrOffset.set(v, true /*isFullyDeserialized*/);
   v->setDeclaration(IsDeclaration);
 
@@ -4926,8 +4934,10 @@ llvm::Expected<SILWitnessTable *>
   if (!maybeConformance)
     return maybeConformance.takeError();
 
-  auto theConformance = cast<RootProtocolConformance>(
-                          maybeConformance.get().getConcrete());
+  // Specialized witness tables can have a `SpecializedProtocolConformance`,
+  // not just a `RootProtocolConformance`. The downstream APIs accept any
+  // `ProtocolConformance *`.
+  auto *theConformance = maybeConformance.get().getConcrete();
 
   PrettyStackTraceConformance trace("deserializing SIL witness table for",
                                     theConformance);
