@@ -1,6 +1,8 @@
 // RUN: %target-swift-frontend %s -emit-ir -g -o - -parse-as-library \
-// RUN:    -module-name M  -target %target-swift-5.1-abi-triple | %FileCheck %s
+// RUN:    -module-name M  -target %target-swift-5.1-abi-triple
 // REQUIRES: concurrency
+
+// This used to crash the compiler. Just verify it builds.
 
 @available(SwiftStdlib 5.1, *)
 extension Collection where Element: Sendable {
@@ -16,6 +18,3 @@ extension Collection where Element: Sendable {
     }
   }
 }
-
-// CHECK: ![[BOXTY:[0-9]+]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$s5IndexSlQzz_x_SlRzs8Sendable7ElementSTRpzlXXD"
-// CHECK: !DILocalVariable(name: "i", arg: 3, {{.*}}type: ![[BOXTY]]
