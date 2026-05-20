@@ -266,6 +266,8 @@ extension ${TYPE} where ChildTaskResult: ~Copyable {
       enqueueJob: true,
       % end
       % if IS_ADD_UNLESS_CANCELLED:
+      % # In this case, we already added the pending task count before we create the task
+      % # so we must not add to the pending counter again.
       addPendingGroupTaskUnconditionally: false,
       % else:
       addPendingGroupTaskUnconditionally: true,
@@ -279,6 +281,8 @@ extension ${TYPE} where ChildTaskResult: ~Copyable {
 
     var task: Builtin.NativeObject?
 
+    % # These #if conditionals are in specific order because if we have the "latest one",
+    % # we definitely have the prior ones, as we always keep adding parameters.
     % if HAS_TASK_NAME:
     #if $BuiltinCreateAsyncTaskName
     if let name {
@@ -412,6 +416,8 @@ extension ${TYPE} {
       enqueueJob: true,
       % end
       % if IS_ADD_UNLESS_CANCELLED:
+      % # In this case, we already added the pending task count before we create the task
+      % # so we must not add to the pending counter again.
       addPendingGroupTaskUnconditionally: false,
       % else:
       addPendingGroupTaskUnconditionally: true,
@@ -425,6 +431,8 @@ extension ${TYPE} {
 
     var task: Builtin.NativeObject?
 
+    % # These #if conditionals are in specific order because if we have the "latest one",
+    % # we definitely have the prior ones, as we always keep adding parameters.
     % if HAS_TASK_NAME:
     #if $BuiltinCreateAsyncTaskName
     if let name {

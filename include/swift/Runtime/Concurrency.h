@@ -187,8 +187,15 @@ void swift_task_future_wait_throwing(
   ThrowingTaskFutureWaitContinuationFunction *,
   AsyncContext *);
 
-/// Take-flavored future-wait. Moves the result out instead of copying;
-/// any subsequent wait traps. Routed to via `_taskFutureTake[Throwing]`.
+/// Wait for a non-throwing future task to complete, taking the result
+/// out of the future's storage. Any subsequent wait traps.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_future_wait_take(on task: _owned Builtin.NativeObject)
+///     async -> Success
+/// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_task_future_wait_take(
   OpaqueValue *,
@@ -197,6 +204,15 @@ void swift_task_future_wait_take(
   TaskContinuationFunction *,
   AsyncContext *);
 
+/// Wait for a potentially-throwing future task to complete, taking the
+/// result out of the future's storage. Any subsequent wait traps.
+///
+/// This can be called from any thread. Its Swift signature is
+///
+/// \code
+/// func swift_task_future_wait_take_throwing(on task: _owned Builtin.NativeObject)
+///    async throws -> Success
+/// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_task_future_wait_take_throwing(
   OpaqueValue *,

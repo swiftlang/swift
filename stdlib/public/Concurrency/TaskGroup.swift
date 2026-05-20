@@ -109,11 +109,11 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// producing noncopyable results.
 @available(SwiftStdlib 6.5, *)
 @inlinable
-public func withTaskGroup<ChildTaskResult: Sendable & ~Copyable, GroupResult>(
+public nonisolated(nonsending)
+func withTaskGroup<ChildTaskResult: Sendable & ~Copyable, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
-  isolation: isolated (any Actor)? = #isolation,
-  body: (inout TaskGroup<ChildTaskResult>) async -> GroupResult
+  body: nonisolated(nonsending) (inout TaskGroup<ChildTaskResult>) async -> GroupResult
 ) async -> GroupResult {
   let _group = Builtin.createTaskGroup(ChildTaskResult.self)
   var group = TaskGroup<ChildTaskResult>(group: _group)
@@ -230,11 +230,11 @@ public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
 /// tasks producing noncopyable results.
 @available(SwiftStdlib 6.5, *)
 @inlinable
-public func withThrowingTaskGroup<ChildTaskResult: Sendable & ~Copyable, GroupResult>(
+public nonisolated(nonsending)
+func withThrowingTaskGroup<ChildTaskResult: Sendable & ~Copyable, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
   returning returnType: GroupResult.Type = GroupResult.self,
-  isolation: isolated (any Actor)? = #isolation,
-  body: (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
+  body: nonisolated(nonsending) (inout ThrowingTaskGroup<ChildTaskResult, Error>) async throws -> GroupResult
 ) async rethrows -> GroupResult {
   let _group = Builtin.createTaskGroup(ChildTaskResult.self)
   var group = ThrowingTaskGroup<ChildTaskResult, Error>(group: _group)
