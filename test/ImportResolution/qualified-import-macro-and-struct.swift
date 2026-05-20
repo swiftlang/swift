@@ -33,6 +33,12 @@ struct Bar {
   @Foo var x: Int // expected-error {{struct 'Foo' cannot be used as an attribute}}
 }
 
+// Module-qualified attribute does resolve to the macro: scoped imports
+// only restrict unqualified lookup, not fully-qualified references.
+struct BarQualified {
+  @StructAndMacro.Foo var x: Int // expected-error {{external macro implementation type 'NonExistent.NonExistent' could not be found for macro 'Foo()'}}
+}
+
 //--- ClientUnscoped.swift
 
 // With an unscoped import, both the struct and the macro are accessible.
