@@ -88,7 +88,7 @@ using namespace metadataimpl;
 // zero, then the metadata is not exposed to the runtime. Binaries weak-import
 // this symbol so they will resolve it to a zero address on older runtimes too.
 __asm__("  .globl _swift_runtimeSupportsNoncopyableTypes\n");
-__asm__(".set _swift_runtimeSupportsNoncopyableTypes, 0\n");
+__asm__(".set _swift_runtimeSupportsNoncopyableTypes, 1\n");
 #endif
 
 // GenericParamDescriptor is a single byte, so while it's difficult to
