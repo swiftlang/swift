@@ -44,6 +44,11 @@ struct Baz {
   @Foo var x: Int // expected-error {{external macro implementation type 'NonExistent.NonExistent' could not be found for macro 'Foo()'}}
 }
 
+// Module-qualified attribute also resolves to the macro.
+struct BazQualified {
+  @StructAndMacro.Foo var x: Int // expected-error {{external macro implementation type 'NonExistent.NonExistent' could not be found for macro 'Foo()'}}
+}
+
 //--- ClientBoth.swift
 
 // When both scoped and unscoped imports are present, the macro is still

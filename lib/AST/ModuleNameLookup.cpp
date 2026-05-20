@@ -121,20 +121,7 @@ private:
     // then filter out any lookups that don't match.
     if (!path.matches(name))
       return;
-    if (path.empty()) {
-      module->lookupValue(name, lookupKind, flags, localDecls);
-    } else {
-      // Scoped import: look up into a temporary, then append non-macros.
-      // Macros cannot be scoped-imported (there is no `import macro` syntax),
-      // so filter them out to prevent `import struct M.Foo` from bringing a
-      // macro named `Foo` into scope.
-      SmallVector<ValueDecl *, 4> tmpDecls;
-      module->lookupValue(name, lookupKind, flags, tmpDecls);
-      for (auto *VD : tmpDecls) {
-        if (!isa<MacroDecl>(VD))
-          localDecls.push_back(VD);
-      }
-    }
+    module->lookupValue(name, lookupKind, flags, localDecls);
   }
 };
 
@@ -162,20 +149,8 @@ private:
   void doLocalLookup(ModuleDecl *module, ImportPath::Access path,
                      OptionSet<ModuleLookupFlags> flags,
                      SmallVectorImpl<ValueDecl *> &localDecls) {
-    if (path.empty()) {
-      VectorDeclConsumer consumer(localDecls);
-      module->lookupVisibleDecls(path, consumer, lookupKind);
-    } else {
-      // Scoped import: collect into a temporary, then append non-macros.
-      // Macros cannot be scoped-imported (there is no `import macro` syntax).
-      SmallVector<ValueDecl *, 4> tmpDecls;
-      VectorDeclConsumer consumer(tmpDecls);
-      module->lookupVisibleDecls(path, consumer, lookupKind);
-      for (auto *VD : tmpDecls) {
-        if (!isa<MacroDecl>(VD))
-          localDecls.push_back(VD);
-      }
-    }
+    VectorDeclConsumer consumer(localDecls);
+    module->lookupVisibleDecls(path, consumer, lookupKind);
   }
 };
 
@@ -231,7 +206,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   const size_t initialCount = decls.size();
   size_t currentCount = decls.size();
 
-  auto updateNewDecls = [&](const DeclContext *moduleScopeContext) {
+  auto updateNewDecls = [&](const DeclContext *moduleScopeContext,
+                            bool fromScopedImport) {
     if (decls.size() == currentCount)
       return;
 
@@ -241,6 +217,11 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
         if (resolutionKind == ResolutionKind::TypesOnly && !isa<TypeDecl>(VD))
           return true;
         if (resolutionKind == ResolutionKind::MacrosOnly && !isa<MacroDecl>(VD))
+          return true;
+        // Macros cannot be scoped-imported (there is no `import macro`
+        // syntax), so filter them out to prevent `import struct M.Foo` from
+        // bringing a macro named `Foo` into scope.
+        if (fromScopedImport && isa<MacroDecl>(VD))
           return true;
         if (respectAccessControl &&
             !declIsVisibleToNameLookup(VD, moduleScopeContext, options))
@@ -266,7 +247,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   auto *module = moduleOrFile->getParentModule();
   getDerived()->doLocalLookup(
       module, accessPath, currentModuleLookupFlags, decls);
-  updateNewDecls(moduleScopeContext);
+  updateNewDecls(moduleScopeContext, /*fromScopedImport=*/!accessPath.empty());
 
   bool canReturnEarly = (initialCount != decls.size() &&
                          getDerived()->canReturnEarly());
@@ -300,7 +281,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
 
       getDerived()->doLocalLookup(import.importedModule, import.accessPath,
                                   importedModuleLookupFlags, decls);
-      updateNewDecls(moduleScopeContext);
+      updateNewDecls(moduleScopeContext,
+                     /*fromScopedImport=*/!import.accessPath.empty());
     };
 
     // If the ClangImporter's special header import module appears in the
