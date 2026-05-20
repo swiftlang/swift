@@ -106,8 +106,10 @@ import Library
 // CLIENT-IR-DAG: declare swiftcc i64 @"$e7Library9ContainerVyS2icig"
 
 // For @export(implementation), the client emits its own linkonce_odr copy of
-// the storage and accessors.
-// CLIENT-IR-DAG: @"$e7Library11implStoredVSivp" = linkonce_odr global
+// the storage and accessors. (On ELF the storage takes `protected`
+// visibility; the accessor functions stay `hidden` because they aren't
+// exported by the client.)
+// CLIENT-IR-DAG: @"$e7Library11implStoredVSivp" = linkonce_odr {{(protected )?}}global
 // CLIENT-IR-DAG: define linkonce_odr hidden swiftcc ptr @"$e7Library11implStoredVSivau"()
 // CLIENT-IR-DAG: define linkonce_odr hidden swiftcc i64 @"$e7Library12implComputedSivg"()
 
