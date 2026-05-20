@@ -585,7 +585,7 @@ private:
 
     swift::cas::CompileJobCacheResult::Builder Builder;
     Builder.addOutput(file_types::ID::TY_SwiftModuleFile, *Ref);
-    auto Result = Builder.build(CAS);
+    auto Result = Builder.build(CAS, 0);
     if (!Result) {
       instance.getDiags().diagnose(SourceLoc(), diag::error_cas,
                                    "adding binary module dependencies",
