@@ -37,18 +37,32 @@ bb0(%0 : $*Int):
   return %3 : $Bool
 }
 
-// CHECK-LABEL: sil @no_strict :
+// CHECK-LABEL: sil @matching_type_no_strict :
+// CHECK-NOT:     address_to_pointer
+// CHECK-NOT:     pointer_to_address
+// CHECK:         [[L:%.*]] = load %0
+// CHECK:         return [[L]]
+// CHECK:       } // end sil function 'matching_type_no_strict'
+sil @matching_type_no_strict : $@convention(thin) (@in Int) -> Int {
+bb0(%0 : $*Int):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to $*Int
+  %3 = load %2
+  return %3
+}
+
+// CHECK-LABEL: sil @mismatching_type_no_strict :
 // CHECK:         address_to_pointer
 // CHECK:         [[A:%.*]] = pointer_to_address
 // CHECK:         [[L:%.*]] = load [[A]]
 // CHECK:         return [[L]]
-// CHECK:       } // end sil function 'no_strict'
-sil @no_strict : $@convention(thin) (@in Int) -> Int {
+// CHECK:       } // end sil function 'mismatching_type_no_strict'
+sil @mismatching_type_no_strict : $@convention(thin) (@in Int) -> Bool {
 bb0(%0 : $*Int):
-  %1 = address_to_pointer %0 : $*Int to $Builtin.RawPointer
-  %2 = pointer_to_address %1 : $Builtin.RawPointer to $*Int
-  %3 = load %2 : $*Int
-  return %3 : $Int
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to $*Bool
+  %3 = load %2
+  return %3
 }
 
 // CHECK-LABEL: sil [ossa] @borrow_escape :
