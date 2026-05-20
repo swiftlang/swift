@@ -1629,10 +1629,7 @@ public:
         }
         case SILDIExprElement::ConstIntKind: {
           uint64_t V = *Arg.getAsConstInt();
-          if (Op == SILDIExprOperator::ConstSInt)
-            *this << static_cast<int64_t>(V);
-          else
-            *this << V;
+          *this << V;
           break;
         }
         case SILDIExprElement::TypeKind: {
