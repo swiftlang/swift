@@ -23,6 +23,7 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/PluginPaths.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "clang/Basic/Version.h"
@@ -1562,8 +1563,9 @@ void ToolChain::addLinkRuntimeLib(const ArgList &Args, ArgStringList &Arguments,
   Arguments.push_back(Args.MakeArgString(P));
 }
 
-static void appendInProcPluginServerPath(StringRef PluginPathRoot,
-                                         llvm::SmallVectorImpl<char> &InProcPluginServerPath) {
+void swift::driver::appendInProcPluginServerPath(
+    StringRef PluginPathRoot,
+    llvm::SmallVectorImpl<char> &InProcPluginServerPath) {
   InProcPluginServerPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
 #if defined(_WIN32)
   llvm::sys::path::append(InProcPluginServerPath, "bin", "SwiftInProcPluginServer.dll");
@@ -1576,8 +1578,8 @@ static void appendInProcPluginServerPath(StringRef PluginPathRoot,
 #endif
 }
 
-static void appendPluginsPath(StringRef PluginPathRoot,
-                              llvm::SmallVectorImpl<char> &PluginsPath) {
+void swift::driver::appendPluginsPath(
+    StringRef PluginPathRoot, llvm::SmallVectorImpl<char> &PluginsPath) {
   PluginsPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
 #if defined(_WIN32)
   llvm::sys::path::append(PluginsPath, "bin");
@@ -1589,11 +1591,11 @@ static void appendPluginsPath(StringRef PluginPathRoot,
 }
 
 #if defined(__APPLE__) || defined(__unix__)
-static void appendLocalPluginsPath(StringRef PluginPathRoot,
-                                   llvm::SmallVectorImpl<char> &LocalPluginsPath) {
+void swift::driver::appendLocalPluginsPath(
+    StringRef PluginPathRoot, llvm::SmallVectorImpl<char> &LocalPluginsPath) {
   SmallString<261> localPluginPathRoot = PluginPathRoot;
   llvm::sys::path::append(localPluginPathRoot, "local");
-  appendPluginsPath(localPluginPathRoot, LocalPluginsPath);
+  swift::driver::appendPluginsPath(localPluginPathRoot, LocalPluginsPath);
 }
 #endif
 
