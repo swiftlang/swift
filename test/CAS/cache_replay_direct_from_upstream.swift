@@ -26,8 +26,12 @@
 // RUN: diff %t/Test.swiftmodule %t/Test2.swiftmodule
 
 func testFunc() {}
+#warning("some warning")
 
 // CACHE-MISS: remark: cache miss for input
 // CACHE-MISS-NOT: remark: replay output file
+// CACHE-MISS: some warning
+
+// CACHE-HIT: some warning
 // CACHE-HIT: remark: replay output file
 // CACHE-HIT-NOT: remark: cache miss for input
