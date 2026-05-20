@@ -817,33 +817,33 @@ private extension MovableInstructions {
     var changed = false
     var currentBlock: BasicBlock?
     var currentVal: Value?
-    
+
     // Remove all stores and replace the loads with the current value.
     //
     // This loop depends on loadsAndStores being in order the instructions appear in blocks.
     for inst in loadsAndStores {
       let block = inst.parentBlock
-      
+
       if block != currentBlock {
         currentBlock = block
         currentVal = nil
       }
-      
+
       if let storeInst = inst as? StoreInst, storeInst.storesTo(accessPath) {
         currentVal = storeInst.source
         context.erase(instruction: storeInst)
         changed = true
         continue
       }
-      
+
       guard let loadInst = inst as? LoadInst,
             loadInst.loadsFrom(accessPath) else {
         continue
       }
-      
+
       // If we didn't see a store in this block yet, get the current value from the ssaUpdater.
       let rootVal = currentVal ?? ssaUpdater.getValue(inMiddleOf: block)
-      
+
       if loadInst.operand.value.accessPath == accessPath {
         if loadInst.loadOwnership == .copy {
           let builder = Builder(before: loadInst, context)
@@ -855,30 +855,30 @@ private extension MovableInstructions {
         changed = true
         continue
       }
-      
+
       guard let projectionPath = accessPath.getProjection(to: loadInst.operand.value.accessPath) else {
         continue
       }
-    
+
       let builder = Builder(before: loadInst, context)
-      let projection = if loadInst.loadOwnership == .copy {
+      let projection = if loadInst.loadOwnership != .take {
         rootVal.createProjectionAndCopy(path: projectionPath, builder: builder)
       } else {
         rootVal.createProjection(path: projectionPath, builder: builder)
       }
       loadInst.replace(with: projection, context)
-      
+
       changed = true
     }
-    
+
     loadsAndStores.removeAll(where: { $0.isDeleted })
-    
+
     // Store back the value at all loop exits.
     for exitBlock in loop.exitBlocks {
       assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
-      
+
       let builder = Builder(before: exitBlock.instructions.first!, context)
-      
+
       builder.createStore(
         source: ssaUpdater.getValue(inMiddleOf: exitBlock),
         destination: initialAddr,
@@ -886,7 +886,7 @@ private extension MovableInstructions {
       )
       changed = true
     }
-    
+
     // In case the value is only stored but never loaded in the loop.
     if initialLoad.uses.isEmpty {
       context.erase(instruction: initialLoad)

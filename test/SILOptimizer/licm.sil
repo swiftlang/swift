@@ -29,6 +29,12 @@ struct S2 {
   var s2: String
 }
 
+struct S3 {
+  var i: Int
+  var j: Int
+  var s: String
+}
+
 struct Pair  {
   var t: (a: Int, b: Int)
 }
@@ -2260,5 +2266,76 @@ bb4:
 
 bb5:
   return %0
+}
+
+// Sub-projection `load [trivial]` co-occurring with a whole-value `load [take]`
+// on an owned access path. LICM emits a borrow + extract + end_borrow for the
+// sub-projection and consumes rootVal via the whole-value path's destroy_value.
+// CHECK-LABEL: sil [ossa] @licm_subproj_trivial_plus_whole_take_owned :
+// CHECK:       bb1([[V:%.*]] : @owned $S2):
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:    [[SE:%.*]] = struct_extract [[B]] : $S2, #S2.i
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_value [[V]]
+// CHECK-NOT:   destructure_struct
+// CHECK-LABEL: } // end sil function 'licm_subproj_trivial_plus_whole_take_owned'
+sil [ossa] @licm_subproj_trivial_plus_whole_take_owned : $@convention(thin) (@inout S2, @owned S2) -> () {
+bb0(%0 : $*S2, %1 : @owned $S2):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0, #S2.i
+  %3 = load [trivial] %2
+  %4 = load [take] %0
+  destroy_value %4
+  %5 = copy_value %1
+  store %5 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// Two distinct trivial sub-projection loads of an owned access path in one
+// block. LICM emits a borrow + extract + end_borrow per load and one
+// destroy_value of the source rootVal.
+// CHECK-LABEL: sil [ossa] @licm_multi_trivial_subproj_owned :
+// CHECK:       bb1([[V:%.*]] : @owned $S3):
+// CHECK-NEXT:    [[B1:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:    [[SE1:%.*]] = struct_extract [[B1]] : $S3, #S3.i
+// CHECK-NEXT:    end_borrow [[B1]]
+// CHECK-NEXT:    [[B2:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:    [[SE2:%.*]] = struct_extract [[B2]] : $S3, #S3.j
+// CHECK-NEXT:    end_borrow [[B2]]
+// CHECK-NEXT:    destroy_value [[V]]
+// CHECK-NOT:   destructure_struct
+// CHECK-LABEL: } // end sil function 'licm_multi_trivial_subproj_owned'
+sil [ossa] @licm_multi_trivial_subproj_owned : $@convention(thin) (@inout S3, @owned S3) -> () {
+bb0(%0 : $*S3, %1 : @owned $S3):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0, #S3.i
+  %3 = load [trivial] %2
+  %4 = struct_element_addr %0, #S3.j
+  %5 = load [trivial] %4
+  %6 = load [take] %0
+  destroy_value %6
+  %7 = copy_value %1
+  store %7 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value %1
+  %r = tuple ()
+  return %r
 }
 
