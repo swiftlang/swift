@@ -172,6 +172,60 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   }
 }
 
+extension Optional where Wrapped: ~Copyable & ~Escapable {
+  /// Returns a borrowed reference to the payload within the optional, if there
+  /// is one.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_lifetime(borrow self)
+  @_transparent
+  public func borrow() -> Ref<Wrapped>? {
+    switch self {
+    case .some(let wrapped):
+      return Ref(wrapped)
+
+    case .none:
+      return nil
+    }
+  }
+}
+
+extension Optional where Wrapped: ~Copyable {
+  /// Returns the mutable reference to the payload within the optional, if there
+  /// is one.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_lifetime(&self)
+  @_transparent
+  public mutating func mutate() -> MutableRef<Wrapped>? {
+    if self == nil {
+      return nil
+    }
+
+    let ptr = unsafe UnsafeMutablePointer<Wrapped>(
+      Builtin.unprotectedAddressOf(&self)
+    )
+    return unsafe MutableRef(unsafeAddress: ptr, mutating: &self)
+  }
+
+  /// Sets the value of the optional to the passed in new value while returning
+  /// a mutable reference to that value inside the optional.
+  ///
+  /// If there's already a value within the optional, that value is destroyed.
+  ///
+  /// - Parameter new: The new payload value to put into the optional.
+  /// - Returns: A mutable reference inside the optional to its newly inserted
+  ///   payload.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  @_lifetime(&self)
+  @_transparent
+  public mutating func insert(_ new: consuming Wrapped) -> MutableRef<Wrapped> {
+    self = .some(new)
+    return unsafe mutate().unsafelyUnwrapped
+  }
+}
+
 extension Optional {
   /// Evaluates the given closure when this `Optional` instance is not `nil`,
   /// passing the unwrapped value as a parameter.
@@ -220,26 +274,33 @@ extension Optional {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
-  // FIXME(NCG): Make this public.
+extension Optional where Wrapped: ~Copyable & ~Escapable {
+  /// Evaluates the given closure when this `Optional` instance is not `nil`,
+  /// passing the unwrapped value as a parameter.
+  ///
+  /// Use the `map` method with a closure that returns a non-optional value.
+  /// This example performs an arithmetic operation on an
+  /// optional integer.
+  ///
+  ///     let possibleNumber: Int? = Int("42")
+  ///     let possibleSquare = possibleNumber.map { $0 * $0 }
+  ///     print(possibleSquare)
+  ///     // Prints "Optional(1764)"
+  ///
+  ///     let noNumber: Int? = nil
+  ///     let noSquare = noNumber.map { $0 * $0 }
+  ///     print(noSquare)
+  ///     // Prints "nil"
+  ///
+  /// - Parameter transform: A closure that takes the unwrapped value
+  ///   of the instance.
+  /// - Returns: The result of the given closure. If this instance is `nil`,
+  ///   returns `nil`.
   @_alwaysEmitIntoClient
-  public consuming func _consumingMap<U: ~Copyable, E: Error>(
+  public consuming func map<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U
   ) throws(E) -> U? {
     switch consume self {
-    case .some(let y):
-      return .some(try transform(y))
-    case .none:
-      return .none
-    }
-  }
-
-  // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
-  public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
-    _ transform: (borrowing Wrapped) throws(E) -> U
-  ) throws(E) -> U? {
-    switch self {
     case .some(let y):
       return .some(try transform(y))
     case .none:
@@ -294,28 +355,33 @@ extension Optional {
   }
 }
 
-extension Optional where Wrapped: ~Copyable {
-  // FIXME(NCG): Make this public.
+extension Optional where Wrapped: ~Copyable & ~Escapable {
+  /// Evaluates the given closure when this `Optional` instance is not `nil`,
+  /// passing the unwrapped value as a parameter.
+  ///
+  /// Use the `flatMap` method with a closure that returns an optional value.
+  /// This example performs an arithmetic operation with an optional result on
+  /// an optional integer.
+  ///
+  ///     let possibleNumber: Int? = Int("42")
+  ///     let nonOverflowingSquare = possibleNumber.flatMap { x -> Int? in
+  ///         let (result, overflowed) = x.multipliedReportingOverflow(by: x)
+  ///         return overflowed ? nil : result
+  ///     }
+  ///     print(nonOverflowingSquare)
+  ///     // Prints "Optional(1764)"
+  ///
+  /// - Parameter transform: A closure that takes the unwrapped value
+  ///   of the instance.
+  /// - Returns: The result of the given closure. If this instance is `nil`,
+  ///   returns `nil`.
   @_alwaysEmitIntoClient
-  public consuming func _consumingFlatMap<U: ~Copyable, E: Error>(
+  public consuming func flatMap<U: ~Copyable, E: Error>(
     _ transform: (consuming Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch consume self {
     case .some(let y):
       return try transform(consume y)
-    case .none:
-      return .none
-    }
-  }
-
-  // FIXME(NCG): Make this public.
-  @_alwaysEmitIntoClient
-  public func _borrowingFlatMap<U: ~Copyable, E: Error>(
-    _ transform: (borrowing Wrapped) throws(E) -> U?
-  ) throws(E) -> U? {
-    switch self {
-    case .some(let y):
-      return try transform(y)
     case .none:
       return .none
     }
@@ -347,33 +413,16 @@ extension Optional where Wrapped: ~Escapable {
   ///   will never be equal to `nil` and only after you've tried using the
   ///   postfix `!` operator.
   @inlinable
-  @_preInverseGenerics
   @unsafe
+  @_preInverseGenerics
   public var unsafelyUnwrapped: Wrapped {
-    // FIXME: Generalize this for ~Copyable wrapped types. Note that the current
-    // implementation is copying the value, so that generalization will need to
-    // be emitted into clients -- `@_preInverseGenerics` will not cut it.
     @inline(__always)
     @lifetime(copy self)
-    get {
+    consuming get {
       if let x = self {
         return x
       }
       _debugPreconditionFailure("unsafelyUnwrapped of nil optional")
-    }
-  }
-}
-
-extension Optional where Wrapped: ~Copyable & ~Escapable {
-  // FIXME(NCG): Do we want this? It seems like we do. Make this public.
-  @_alwaysEmitIntoClient
-  @lifetime(copy self)
-  public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
-    switch consume self {
-    case .some(let x):
-      return x
-    case .none:
-      _debugPreconditionFailure("consumingUsafelyUnwrap of nil optional")
     }
   }
 }
@@ -384,31 +433,17 @@ extension Optional where Wrapped: ~Escapable {
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
   @inlinable
+  @unsafe
   @_preInverseGenerics
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
     @lifetime(copy self)
-    get {
+    consuming get {
       if let x = self {
         return x
       }
       _internalInvariantFailure("_unsafelyUnwrappedUnchecked of nil optional")
     }
-  }
-}
-
-extension Optional where Wrapped: ~Copyable & ~Escapable {
-  /// - Returns: `unsafelyUnwrapped`.
-  ///
-  /// This version is for internal stdlib use; it avoids any checking
-  /// overhead for users, even in Debug builds.
-  @_alwaysEmitIntoClient
-  @lifetime(copy self)
-  internal consuming func _consumingUncheckedUnwrapped() -> Wrapped {
-    if let x = self {
-      return x
-    }
-    _internalInvariantFailure("_uncheckedUnwrapped of nil optional")
   }
 }
 
@@ -523,7 +558,7 @@ func _diagnoseUnexpectedNilOptional(
   }
 }
 
-extension Optional: Equatable where Wrapped: Equatable {
+extension Optional: Equatable {
   /// Returns a Boolean value indicating whether two optional instances are
   /// equal.
   ///
@@ -581,7 +616,7 @@ extension Optional: Equatable where Wrapped: Equatable {
   }
 }
 
-extension Optional: Hashable where Wrapped: Hashable {
+extension Optional: Hashable {
   /// Hashes the essential components of this value by feeding them into the
   /// given hasher.
   ///
