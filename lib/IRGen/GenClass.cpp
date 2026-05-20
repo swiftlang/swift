@@ -1067,8 +1067,8 @@ void IRGenModule::emitClassDecl(ClassDecl *D) {
     emitClassMetadata(*this, D, fragileLayout, resilientLayout);
     emitFieldDescriptor(D);
   } else {
-    bool isExportInterface = !D->isGenericContext() &&
-        D->getExplicitCodeGenerationModel() == CodeGenerationModel::Interface;
+    bool isExportInterface =
+      D->getEffectiveCodeGenerationModel() == CodeGenerationModel::Interface;
     if (isExportInterface) {
       emitEmbeddedClassMetadata(*this, D);
     } else {

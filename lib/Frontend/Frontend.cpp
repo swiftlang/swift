@@ -1554,12 +1554,12 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
     if (Invocation.getLangOptions().hasFeature(Feature::Embedded)) {
-      bool isImplementation =
-          Invocation.getLangOptions().hasFeature(Feature::DeferredCodeGen);
-      MainModule->setCodeGenerationModel(
-          isImplementation ? CodeGenerationModel::Implementation
-                           : CodeGenerationModel::Inlinable);
+      CodeGenerationModel model =
+          Invocation.getLangOptions().CodeGenerationModelOverride
+              .value_or(CodeGenerationModel::Inlinable);
+      MainModule->setCodeGenerationModel(model);
     } else {
+      // CodeGenerationModelOverride is rejected at parse time outside Embedded.
       MainModule->setCodeGenerationModel(CodeGenerationModel::Interface);
     }
     if (Invocation.getSILOptions().CMOMode ==

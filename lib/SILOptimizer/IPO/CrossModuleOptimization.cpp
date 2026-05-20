@@ -768,6 +768,10 @@ bool CrossModuleOptimization::canSerializeDecl(NominalTypeDecl *decl) {
 }
 
 bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
+  // If we are prevented from serializing this global, don't.
+  if (global->codeGenerationModel() == CodeGenerationModel::Interface)
+    return false;
+
   // Check for referenced functions in the initializer.
   for (const SILInstruction &initInst : *global) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(&initInst)) {

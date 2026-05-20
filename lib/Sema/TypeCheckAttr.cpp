@@ -8712,12 +8712,6 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
 
 void AttributeChecker::visitPreInverseGenericsAttr(
     PreInverseGenericsAttr *attr) {
-  if (isa<ExtensionDecl>(D)) {
-    diagnose(attr->getLocation(),
-             diag::attr_pre_inverse_generics_on_extension);
-    return;
-  }
-
   if (attr->hasExcept(D) &&
       !Ctx.LangOpts.hasFeature(Feature::PreInverseGenericsExcept)) {
     Ctx.Diags
