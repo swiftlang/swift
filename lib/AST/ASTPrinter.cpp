@@ -3685,6 +3685,14 @@ suppressingFeatureABIAttributeSE0479(PrintOptions &options,
 }
 
 static void
+suppressingFeaturePreInverseGenericsExcept(PrintOptions &options,
+                                           llvm::function_ref<void()> action) {
+  ExcludeAttrRAII scope(options.ExcludeAttrList,
+                        DeclAttrKind::PreInverseGenerics);
+  action();
+}
+
+static void
 suppressingFeatureAddressableTypes(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList,
