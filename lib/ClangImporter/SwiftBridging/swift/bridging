@@ -137,18 +137,21 @@
 /// type as long as the concrete instantiations used in your C++ interface
 /// all have determinable underlying reference types.)
 ///
-/// The smart pointer type is required to have a constructor that takes a raw
-/// pointer. This constructor is expected to perform a retain of the object.
-/// (In the +0 / +1 language of Objective-C reference counting, it would be
-/// said to take the object at +0: it does not take responsibility for a retain
-/// performed by its caller.) Generally, this kind of constructor matches with
-/// object models where the object constructor initializes the reference
-/// count to 0.
+/// The smart pointer type is required to have a constructor that takes
+/// either a raw pointer (`T*`) or an lvalue reference (`T&`) to the
+/// underlying reference type. If both forms are provided, the
+/// pointer-taking constructor is preferred. This constructor is
+/// expected to perform a retain of the object. (In the +0 / +1 language
+/// of Objective-C reference counting, it would be said to take the
+/// object at +0: it does not take responsibility for a retain
+/// performed by its caller.) Generally, this kind of constructor matches
+/// with object models where the object constructor initializes the
+/// reference count to 0.
 ///
 /// The argument of this annotation is required to be the name of an
-/// "accessor" method that returns a raw-pointer to the object. This method
-/// is required to return a raw pointer to the object without changing the
-/// reference count.
+/// "accessor" method that returns either a raw pointer or an lvalue
+/// reference to the object. This method is required to return without
+/// changing the reference count.
 ///
 /// Swift will define conversion operations using these functions to
 /// convert between the raw pointer and the smart pointer representations.
