@@ -51,6 +51,9 @@ public struct MutableRef<Value: ~Copyable>: ~Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.4, *)
+extension MutableRef: @unchecked Sendable where Value: Sendable & ~Copyable {}
+
+@available(SwiftStdlib 6.4, *)
 extension MutableRef where Value: ~Copyable {
   /// Dereferences the mutable reference allowing for in-place reads and writes
   /// to the underlying value.
