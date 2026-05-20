@@ -19,7 +19,7 @@ public macro Foo() = #externalMacro(module: "NonExistent", type: "NonExistent")
 
 //--- ClientStruct.swift
 
-// The struct is accessible.
+// Struct is accessible.
 import struct StructAndMacro.Foo // no-error
 func testStruct() {
   _ = Foo()
@@ -27,21 +27,20 @@ func testStruct() {
 
 //--- ClientMacro.swift
 
-// Scoped imports do not bring macros into scope.
+// Scoped import does not expose the macro.
 import struct StructAndMacro.Foo
 struct Bar {
   @Foo var x: Int // expected-error {{struct 'Foo' cannot be used as an attribute}}
 }
 
-// Module-qualified attribute does resolve to the macro: scoped imports
-// only restrict unqualified lookup, not fully-qualified references.
+// Module-qualified attribute also does not.
 struct BarQualified {
-  @StructAndMacro.Foo var x: Int // expected-error {{external macro implementation type 'NonExistent.NonExistent' could not be found for macro 'Foo()'}}
+  @StructAndMacro.Foo var x: Int // expected-error {{struct 'Foo' cannot be used as an attribute}}
 }
 
 //--- ClientUnscoped.swift
 
-// With an unscoped import, both the struct and the macro are accessible.
+// Unscoped import exposes both struct and macro.
 import StructAndMacro
 func testStruct() {
   _ = Foo()
@@ -50,15 +49,14 @@ struct Baz {
   @Foo var x: Int // expected-error {{external macro implementation type 'NonExistent.NonExistent' could not be found for macro 'Foo()'}}
 }
 
-// Module-qualified attribute also resolves to the macro.
+// Module-qualified attribute resolves to the macro.
 struct BazQualified {
   @StructAndMacro.Foo var x: Int // expected-error {{external macro implementation type 'NonExistent.NonExistent' could not be found for macro 'Foo()'}}
 }
 
 //--- ClientBoth.swift
 
-// When both scoped and unscoped imports are present, the macro is still
-// accessible through the unscoped import.
+// Unscoped import still exposes the macro alongside the scoped struct.
 import StructAndMacro
 import struct StructAndMacro.Foo
 func testStruct() {

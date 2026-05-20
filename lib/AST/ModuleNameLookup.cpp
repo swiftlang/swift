@@ -218,9 +218,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
           return true;
         if (resolutionKind == ResolutionKind::MacrosOnly && !isa<MacroDecl>(VD))
           return true;
-        // Macros cannot be scoped-imported (there is no `import macro`
-        // syntax), so filter them out to prevent `import struct M.Foo` from
-        // bringing a macro named `Foo` into scope.
+        // Macros are not scoped-importable.
         if (fromScopedImport && isa<MacroDecl>(VD))
           return true;
         if (respectAccessControl &&
@@ -247,7 +245,19 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   auto *module = moduleOrFile->getParentModule();
   getDerived()->doLocalLookup(
       module, accessPath, currentModuleLookupFlags, decls);
-  updateNewDecls(moduleScopeContext, /*fromScopedImport=*/!accessPath.empty());
+  // Treat as scoped if the access path is scoped, or the target module is
+  // only visible via scoped imports (e.g. `@StructAndMacro.Foo` referenced
+  // through `import struct StructAndMacro.Foo`).
+  bool fromScopedImport = !accessPath.empty();
+  if (!fromScopedImport && module != moduleScopeContext->getParentModule()) {
+    auto visiblePaths =
+        ctx.getImportCache().getAllVisibleAccessPaths(module, moduleScopeContext);
+    if (!visiblePaths.empty() &&
+        llvm::all_of(visiblePaths,
+                     [](ImportPath::Access p) { return !p.empty(); }))
+      fromScopedImport = true;
+  }
+  updateNewDecls(moduleScopeContext, fromScopedImport);
 
   bool canReturnEarly = (initialCount != decls.size() &&
                          getDerived()->canReturnEarly());
