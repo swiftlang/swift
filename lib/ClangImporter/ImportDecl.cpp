@@ -5688,6 +5688,7 @@ namespace {
         }
       }
 
+      Impl.swiftify(result);
       return result;
     }
 
