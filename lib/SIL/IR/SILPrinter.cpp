@@ -1307,6 +1307,11 @@ public:
           *this << ", isHiddenFromDebugInfo: " << "true";
         else
           *this << ", isHiddenFromDebugInfo: " << "false";
+
+        if (Loc.isInPrologue())
+          *this << ", isInPrologue: " << "true";
+        else
+          *this << ", isInPrologue: " << "false";
       }
     }
   }
