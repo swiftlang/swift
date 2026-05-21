@@ -70,7 +70,7 @@
 
 // CHECK:      public struct OperatorBasePrivateInheritance : CxxConvertibleToBool {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   @available(*, unavailable, message: "use Bool(fromCxx:)")
+// CHECK-NEXT:   @available(*, deprecated, message: "use Bool(fromCxx:)")
 // CHECK-NEXT:   public func __convertToBool() -> Bool
 // CHECK-NEXT:   @available(*, unavailable, message: "use .pointee property")
 // CHECK-NEXT:   public func __operatorStar() -> Int32
@@ -100,6 +100,6 @@
 
 // CHECK:      public struct ProtectedOperatorBoolMadePublic : CxxConvertibleToBool {
 // CHECK-NEXT:   public init()
-// CHECK-NEXT:   @available(*, unavailable, message: "use Bool(fromCxx:)")
+// CHECK-NEXT:   @available(*, deprecated, message: "use Bool(fromCxx:)")
 // CHECK-NEXT:   public func __convertToBool() -> Bool
 // CHECK-NEXT: }

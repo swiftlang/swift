@@ -588,13 +588,12 @@ static auto filterMethodOverloads(clang::LookupResult &R,
 
 /// Imports a C++ \a method to a Swift \a struct as a non-inherited member when
 /// \a access is AS_none, or an inherited member with effective \a access
-/// otherwise. Marks the method as unavailable with \a unavailabilityMsg.
+/// otherwise.
 ///
 /// Helper for the lookupAndImport* functions.
-static FuncDecl *importUnavailableMethod(ClangImporter::Implementation &Impl,
-                                         CXXOverload overload,
-                                         NominalTypeDecl *Struct,
-                                         StringRef unavailabilityMsg) {
+static FuncDecl *importUnderlyingFunction(ClangImporter::Implementation &Impl,
+                                          CXXOverload overload,
+                                          NominalTypeDecl *Struct) {
   Decl *imported;
   if (auto *ftd = overload.method->getDescribedFunctionTemplate())
     imported = Impl.importDecl(ftd, Impl.CurrentVersion);
@@ -608,7 +607,6 @@ static FuncDecl *importUnavailableMethod(ClangImporter::Implementation &Impl,
         Impl.importBaseMemberDecl(func, Struct, inheritance));
   if (!func)
     return nullptr;
-  Impl.markUnavailable(func, unavailabilityMsg);
   return func;
 }
 
@@ -669,19 +667,19 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
   FuncDecl *getter = nullptr, *setter = nullptr;
 
   if (CXXSetter) {
-    setter = importUnavailableMethod(*this, CXXSetter, Struct,
-                                     "use .pointee property");
+    setter = importUnderlyingFunction(*this, CXXSetter, Struct);
     if (!setter)
       return {};
+    markUnavailable(setter, "use .pointee property");
   }
 
   if (CXXGetter == CXXSetter) {
     getter = setter;
   } else if (CXXGetter) {
-    getter = importUnavailableMethod(*this, CXXGetter, Struct,
-                                     "use .pointee property");
+    getter = importUnderlyingFunction(*this, CXXGetter, Struct);
     if (!getter)
       return {};
+    markUnavailable(getter, "use .pointee property");
   }
 
   SwiftDeclSynthesizer synth{*this};
@@ -755,10 +753,10 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportSuccessor(
   if (!CXXMethod)
     return nullptr;
 
-  auto *incr = importUnavailableMethod(*this, CXXMethod, Struct,
-                                       "use .pointee property");
+  auto *incr = importUnderlyingFunction(*this, CXXMethod, Struct);
   if (!incr)
     return nullptr;
+  markUnavailable(incr, "use .successor()");
 
   SwiftDeclSynthesizer synth{*this};
   auto *succ = synth.makeSuccessorFunc(incr);
@@ -865,10 +863,10 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
       if (!overload)
         return nullptr;
 
-      auto *swiftFunc =
-          importUnavailableMethod(*this, overload, Struct, "use subscript");
+      auto *swiftFunc = importUnderlyingFunction(*this, overload, Struct);
       if (!swiftFunc)
         return nullptr;
+      markUnavailable(swiftFunc, "use subscript");
 
       auto name = swiftFunc->getBaseName();
       ASSERT(!name.isSpecial() &&
@@ -1025,8 +1023,13 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
   }
   CXXRecord->addDecl(Method);
 
-  auto *func = importUnavailableMethod(*this, {Method, clang::AS_none}, Struct,
-                                       "use Bool(fromCxx:)");
+  auto *func =
+      importUnderlyingFunction(*this, {Method, clang::AS_none}, Struct);
+  if (!func)
+    return nullptr;
+  auto *depr = AvailableAttr::createUniversallyDeprecated(SwiftContext,
+                                                          "use Bool(fromCxx:)");
+  func->addAttribute(depr);
   markMemberSynthesizedPerType(func);
   importAttributes(OpBool, func);
 
