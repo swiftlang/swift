@@ -31,9 +31,9 @@ extension Task where Success == Never, Failure == Never {
       if #available(StdlibDeploymentTarget 9999, *) {
         #if !$Embedded
         if let executor = Task.currentSchedulingExecutor {
-          executor.enqueue(ExecutorJob(context: job),
-                           after: .nanoseconds(duration),
-                           clock: .continuous)
+          _ = executor.enqueue(ExecutorJob(context: job),
+                               run: .after(.nanoseconds(duration)),
+                               clock: .continuous)
           return
         }
         #endif
@@ -286,9 +286,13 @@ extension Task where Success == Never, Failure == Never {
 
               #if !$Embedded
               if let executor = Task.currentSchedulingExecutor {
-                wakeUpJobToken = executor.enqueue(ExecutorJob(context: job),
-                                             after: .nanoseconds(duration),
-                                             clock: .continuous)
+                wakeUpJobToken = executor.enqueue(
+                  ExecutorJob(context: job),
+                  run: .after(.nanoseconds(duration)),
+                  clock: .continuous,
+                  tolerance: nil,
+                  onCancellation: .executeImmediately
+                )
                 return
               }
               #endif

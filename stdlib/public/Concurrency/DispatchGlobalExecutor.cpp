@@ -28,11 +28,13 @@
 ///
 ///===------------------------------------------------------------------===///
 
+#include <atomic>
 #include <cstddef>
 
 #include "swift/Basic/Casting.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Threading/Mutex.h"
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include "swift/Runtime/HeapObject.h"
@@ -60,6 +62,95 @@
 #endif
 
 using namespace swift;
+
+/// A simple caching allocator for __swift_job_source blobs; we keep a cache of
+/// blobs ready to go.
+struct __swift_job_source {
+  std::atomic<uint32_t> refcount;
+  uint32_t reserved;
+  dispatch_source_t source;
+  std::atomic<SwiftJob *> job;
+};
+
+union __swift_job_source_blob {
+  __swift_job_source_blob *next;
+  __swift_job_source source;
+};
+
+class JobSourceCache {
+  Mutex lock;
+  __swift_job_source_blob *cache_head;
+
+public:
+
+  JobSourceCache(): lock(), cache_head(nullptr) {}
+
+  struct __swift_job_source *allocate(dispatch_source_t source, SwiftJob *job) {
+    __swift_job_source_blob *blob;
+
+    lock.lock();
+    blob = cache_head;
+    if (blob)
+      cache_head = blob->next;
+    lock.unlock();
+
+    if (!blob) {
+      blob = (__swift_job_source_blob *)swift_slowAlloc(
+        sizeof(__swift_job_source_blob), 0
+      );
+    }
+
+    blob->source.refcount.store(1, std::memory_order_release);
+    blob->source.reserved = 0;
+    blob->source.source = source;
+    blob->source.job.store(job, std::memory_order_release);
+    return &blob->source;
+  }
+
+  void put_back(struct __swift_job_source *source) {
+    dispatch_release(source->source);
+
+    __swift_job_source_blob *blob
+      = (__swift_job_source_blob *)source;
+
+    lock.lock();
+    blob->next = cache_head;
+    cache_head = blob;
+    lock.unlock();
+  }
+};
+
+#define JOB_CACHE_SHARDS 16
+
+// ###TODO: Shard on thread ID, not a random integer
+
+static std::atomic<uint32_t> jobSourceShard;
+static JobSourceCache jobSourceCaches[JOB_CACHE_SHARDS];
+
+static struct __swift_job_source *
+job_source_create(dispatch_source_t source, SwiftJob *job) {
+  uint32_t shard = jobSourceShard.fetch_add(1, std::memory_order_relaxed)
+    % JOB_CACHE_SHARDS;
+  return jobSourceCaches[shard].allocate(source, job);
+}
+
+static void
+job_source_release(struct __swift_job_source *source) {
+  uint32_t refs = source->refcount.fetch_sub(1, std::memory_order_acq_rel);
+
+  assert(refs != 0);
+
+  if (refs == 1) {
+    uint32_t shard = jobSourceShard.fetch_add(1, std::memory_order_relaxed)
+      % JOB_CACHE_SHARDS;
+    jobSourceCaches[shard].put_back(source);
+  }
+}
+
+static void
+job_source_retain(struct __swift_job_source *source) {
+  source->refcount.fetch_add(1, std::memory_order_acq_rel);
+}
 
 /// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
@@ -254,17 +345,11 @@ void swift_dispatchEnqueueGlobal(SwiftJob *job) {
 #define DISPATCH_WALLTIME_MASK  (1ULL << 62)
 #define DISPATCH_TIME_MAX_VALUE (DISPATCH_WALLTIME_MASK - 1)
 
-struct __swift_job_source {
-  dispatch_source_t source;
-  SwiftJob *job;
-};
-
 static void _swift_run_job_leeway(struct __swift_job_source *jobSource) {
-  dispatch_source_t source = jobSource->source;
-  dispatch_release(source);
-  SwiftJob *job = jobSource->job;
-  swift_job_dealloc(job, jobSource);
-  __swift_run_job(job);
+  SwiftJob *job = jobSource->job.exchange(nullptr, std::memory_order_acq_rel);
+  job_source_release(jobSource);
+  if (job)
+    __swift_run_job(job);
 }
 
 #if defined(__i386__) || defined(__x86_64__) || !defined(__APPLE__)
@@ -408,35 +493,38 @@ uintptr_t swift_dispatchEnqueueWithDeadline(
     dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
   dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
 
-  size_t sz = sizeof(struct __swift_job_source);
-
-  struct __swift_job_source *jobSource =
-    (struct __swift_job_source *)swift_job_alloc(job, sz);
-
-  jobSource->job = job;
-  jobSource->source = source;
+  struct __swift_job_source *jobSource = job_source_create(source, job);
 
   dispatch_set_context(source, jobSource);
   dispatch_source_set_event_handler_f(source,
     (dispatch_function_t)&_swift_run_job_leeway);
 
-  dispatch_retain(source);
+  job_source_retain(jobSource);
   dispatch_activate(source);
 
-  return (uintptr_t)source;
+  return (uintptr_t)jobSource;
 }
 
 extern "C" SWIFT_CC(swift)
-void swift_dispatchCancel(uintptr_t source) {
+SwiftJob *swift_dispatchCancel(uintptr_t source) {
   if (source) {
-    dispatch_source_cancel((dispatch_source_t)source);
+    struct __swift_job_source *jobSource = (struct __swift_job_source *)source;
+    SwiftJob *job = jobSource->job.exchange(nullptr, std::memory_order_acq_rel);
+
+    dispatch_source_cancel(jobSource->source);
+
+    return job;
   }
+
+  return nullptr;
 }
 
 extern "C" SWIFT_CC(swift)
 void swift_dispatchReleaseSource(uintptr_t source) {
   if (source) {
-    dispatch_release((dispatch_source_t)source);
+    struct __swift_job_source *jobSource = (struct __swift_job_source *)source;
+
+    job_source_release(jobSource);
   }
 }
 

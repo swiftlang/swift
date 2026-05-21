@@ -142,10 +142,11 @@ struct WaitQueue {
     }
   }
 
-  mutating func cancel(jobID: UInt64) {
+  mutating func cancel(jobID: UInt64) -> ExecutorJob? {
     if let job = queue.removeFirst(where: { $0.id == jobID }) {
-      ExecutorJob(job).destroy()
+      return ExecutorJob(job)
     }
+    return nil
   }
 
   var timeToNextJob: CooperativeExecutor.Duration? {
@@ -251,6 +252,9 @@ final class CooperativeExecutor: Executor, @unchecked Sendable {
   public var isMainExecutor: Bool { true }
 }
 
+fileprivate let enqueuedOnContinuousClock = 1
+fileprivate let enqueuedOnSuspendingClock = 2
+
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 9999, *)
 extension CooperativeExecutor: SchedulingExecutor {
@@ -263,30 +267,45 @@ extension CooperativeExecutor: SchedulingExecutor {
     return now
   }
 
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) -> JobCancellationToken {
+  public func enqueue<C: Clock>(
+    _ job: consuming ExecutorJob,
+    run at: FireTime<C>,
+    clock: C,
+    tolerance: C.Duration?,
+    onCancellation behavior: CancellationBehavior
+  ) -> JobCancellationToken {
     let jobID = job.id
 
     // If it's a clock we know, get the duration to wait
     if let _ = clock as? ContinuousClock {
-      let continuousDuration = delay as! ContinuousClock.Duration
+      let continuousDuration =
+        at.asDuration(clock: clock) as! ContinuousClock.Duration
       let duration = Duration(from: continuousDuration)
       continuousWaitQueue.enqueue(job, after: duration)
-      return JobCancellationToken(executor: self, jobID: jobID, opaqueData: [1, 0])
+      return JobCancellationToken(
+        executor: self,
+        jobID: jobID,
+        opaqueData: [enqueuedOnContinuousClock, 0],
+        onCancellation: behavior
+      )
     } else if let _ = clock as? SuspendingClock {
-      let suspendingDuration = delay as! SuspendingClock.Duration
+      let suspendingDuration = 
+        at.asDuration(clock: clock) as! SuspendingClock.Duration
       let duration = Duration(from: suspendingDuration)
       suspendingWaitQueue.enqueue(job, after: duration)
-      return JobCancellationToken(executor: self, jobID: jobID, opaqueData: [2, 0])
-    } else if let enqueueingClock = clock as? EnqueueingClock {
+      return JobCancellationToken(
+        executor: self,
+        jobID: jobID,
+        opaqueData: [enqueuedOnSuspendingClock, 0],
+        onCancellation: behavior
+      )
+    } else if let enqueueingClock = clock as? any EnqueueingClock {
       return _openAndEnqueue(
         job,
-        on: self,
-        at: clock.now.advanced(by: delay),
+        run: at,
         tolerance: tolerance,
         clock: clock,
+        onCancellation: behavior,
         enqueueingClock: enqueueingClock
       )
     } else {
@@ -295,10 +314,24 @@ extension CooperativeExecutor: SchedulingExecutor {
   }
 
   public func cancel(jobWithToken token: consuming JobCancellationToken) {
-    if token.opaqueData[OpaqueDataClockId] == 1 {
-      continuousWaitQueue.cancel(jobID: token.jobID)
-    } else if token.opaqueData[OpaqueDataClockId] == 2 {
-      suspendingWaitQueue.cancel(jobID: token.jobID)
+    let job: ExecutorJob?
+    if token.opaqueData[OpaqueDataClockId] == enqueuedOnContinuousClock {
+      job = continuousWaitQueue.cancel(jobID: token.jobID)
+    } else if token.opaqueData[OpaqueDataClockId] == enqueuedOnSuspendingClock {
+      job = suspendingWaitQueue.cancel(jobID: token.jobID)
+    } else {
+      job = nil
+    }
+
+    guard let job else {
+      return
+    }
+
+    switch token.cancellationBehavior {
+      case .drop:
+        job.destroy()
+      case .executeImmediately:
+        runQueue.push(UnownedJob(job))
     }
   }
 

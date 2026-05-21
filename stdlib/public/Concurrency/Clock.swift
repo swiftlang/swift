@@ -55,6 +55,8 @@ public protocol EnqueueingClock<Duration> : Clock<Duration> {
   /// - job:         The job we wish to run
   /// - at instant:  The time at which we would like it to run.
   /// - tolerance:   The ideal maximum delay we are willing to tolerate.
+  /// - onCancellation:
+  ///                The selected cancellation behavior.
   ///
   /// Returns a ``JobCancellationToken`` that can be used to
   /// cancel the job before it runs.
@@ -63,7 +65,8 @@ public protocol EnqueueingClock<Duration> : Clock<Duration> {
   #endif
   @available(StdlibDeploymentTarget 9999, *)
   func run(_ job: consuming ExecutorJob,
-           at instant: Instant, tolerance: Duration?)
+           run: FireTime<Self>, tolerance: Duration?,
+           onCancellation: CancellationBehavior)
     -> JobCancellationToken
 
   /// Enqueue the given job on the specified executor at some point after the
@@ -79,10 +82,12 @@ public protocol EnqueueingClock<Duration> : Clock<Duration> {
   ///
   /// - job:         The job we wish to run
   /// - on executor: The executor on which we would like it to run.
-  /// - at instant:  The time at which we would like it to run.
+  /// - run:         The time at which we would like it to run.
   /// - tolerance:   The ideal maximum delay we are willing to tolerate.
+  /// - onCancellation:
+  ///                The selected cancellation behavior.
   ///
-  /// Returns a ``JobCancellationTokenCancellationToken`` that can be used to
+  /// Returns a ``JobCancellationToken`` that can be used to
   /// cancel the job before it runs.
   #if !os(Windows)
   @_weakLinked
@@ -90,7 +95,8 @@ public protocol EnqueueingClock<Duration> : Clock<Duration> {
   @available(StdlibDeploymentTarget 9999, *)
   func enqueue(_ job: consuming ExecutorJob,
                on executor: some Executor,
-               at instant: Instant, tolerance: Duration?)
+               run: FireTime<Self>, tolerance: Duration?,
+               onCancellation: CancellationBehavior)
     -> JobCancellationToken
 }
 
@@ -104,10 +110,12 @@ extension EnqueueingClock {
   @available(StdlibDeploymentTarget 9999, *)
   public func enqueue(_ job: consuming ExecutorJob,
                       on executor: some Executor,
-                      at instant: Instant, tolerance: Duration?)
+                      run at: FireTime<Self>, tolerance: Duration?,
+                      onCancellation behavior: CancellationBehavior)
   -> JobCancellationToken {
     let trampoline = job.createTrampoline(to: executor)
-    return run(trampoline, at: instant, tolerance: tolerance)
+    return run(trampoline, run: at, tolerance: tolerance,
+               onCancellation: behavior)
   }
 }
 #endif // !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY

@@ -48,18 +48,23 @@ public struct JobCancellationToken: ~Copyable {
   public let jobID: UInt64
 
   /// Opaque, executor-specific data
-  public let opaqueData: InlineArray<2, UInt>
+  public let opaqueData: InlineArray<2, Int>
+
+  /// Cancellation behavior
+  public let cancellationBehavior: CancellationBehavior
 
   /// Optional clean-up function
   public let cleanUp: ((borrowing JobCancellationToken) -> ())?
 
   public init(executor: any SchedulingExecutor,
               jobID: UInt64,
-              opaqueData: InlineArray<2, UInt>,
+              opaqueData: InlineArray<2, Int>,
+              onCancellation behavior: CancellationBehavior,
               cleanUp: ((borrowing JobCancellationToken) -> ())? = nil) {
     self.executor = executor
     self.jobID = jobID
     self.opaqueData = opaqueData
+    self.cancellationBehavior = behavior
     self.cleanUp = cleanUp
   }
 
@@ -91,61 +96,75 @@ public struct JobCancellationToken: ~Copyable {
 
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 9999, *)
+public enum CancellationBehavior {
+  case drop
+  case executeImmediately
+}
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 9999, *)
+public enum FireTime<C: Clock> {
+  case after(C.Duration)
+  case at(C.Instant)
+
+  public func asDuration(clock: C) -> C.Duration {
+    switch self {
+      case let .after(someDuration):
+        return someDuration
+
+      case let .at(instant):
+        return clock.now.duration(to: instant)
+    }
+  }
+
+  public func asInstant(clock: C) -> C.Instant {
+    switch self {
+      case let .after(someDuration):
+        return clock.now.advanced(by: someDuration)
+
+      case let .at(instant):
+        return instant
+    }
+  }
+}
+
+@_spi(ExperimentalScheduling)
+@available(StdlibDeploymentTarget 9999, *)
 public protocol SchedulingExecutor: Executor {
 
   #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 
   /// Enqueue a job to run after a specified delay.
   ///
-  /// You need only implement one of the two enqueue functions here;
-  /// the default implementation for the other will then call the one
-  /// you have implemented.
-  ///
   /// Parameters:
   ///
   /// - job:       The job to schedule.
-  /// - after:     A `Duration` specifying the time after which the job
-  ///              is to run.  The job will not be executed before this
-  ///              time has elapsed.
+  /// - run:       A ``FireTime`` specifying when the job should execute.
+  ///              The job will not execute before the specified time.
   /// - tolerance: The maximum additional delay permissible before the
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay.
+  /// - onCancellation:
+  ///              Specify what to do when the job is cancelled.  The
+  ///              default, ``.drop``, means to simply drop the job if
+  ///              it has not already started.  The other option,
+  ///              ``.executeImmediately``, causes the job to run
+  ///              immediately on cancellation.
   ///
   /// Returns a ``JobCancellationToken`` that can be used to
   /// cancel the job before it runs.
   @available(SwiftStdlib 9999, *)
   func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                         after delay: C.Duration,
+                         run: FireTime<C>,
+                         clock: C,
                          tolerance: C.Duration?,
-                         clock: C) -> JobCancellationToken
-
-  /// Enqueue a job to run at a specified time.
-  ///
-  /// You need only implement one of the two enqueue functions here;
-  /// the default implementation for the other will then call the one
-  /// you have implemented.
-  ///
-  /// Parameters:
-  ///
-  /// - job:       The job to schedule.
-  /// - at:        The `Instant` at which the job should run.  The job
-  ///              will not be executed before this time.
-  /// - tolerance: The maximum additional delay permissible before the
-  ///              job is executed.  `nil` means no limit.
-  /// - clock:     The clock used for the delay.
-  ///
-  /// Returns a ``JobCancellationToken`` that can be used to
-  /// cancel the job before it runs.
-  @available(SwiftStdlib 9999, *)
-  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                         at instant: C.Instant,
-                         tolerance: C.Duration?,
-                         clock: C) -> JobCancellationToken
+                         onCancellation: CancellationBehavior)
+    -> JobCancellationToken
 
   /// Cancel a scheduled job.
   ///
   /// Requests that the executor cancel the job identified by the
-  /// `jobWithToken` argument.  Note: executors may not be able
+  /// ``jobWithToken`` argument.  Note: executors may not be able
   /// to cancel any given job, for various reasons including:
   ///
   /// - Where the job has already started executing.
@@ -171,26 +190,52 @@ public protocol SchedulingExecutor: Executor {
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 9999, *)
 extension SchedulingExecutor {
+
+  @available(SwiftStdlib 9999, *)
+  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                         run at: FireTime<C>,
+                         clock: C)
+    -> JobCancellationToken {
+    return enqueue(job, run: at, clock: clock, tolerance: nil, onCancellation: .drop)
+  }
+
+  @available(SwiftStdlib 9999, *)
+  func enqueue<C: Clock>(_ job: consuming ExecutorJob,
+                         run at: FireTime<C>,
+                         clock: C,
+                         tolerance: C.Duration?)
+    -> JobCancellationToken {
+    return enqueue(job, run: at, clock: clock, tolerance: tolerance, onCancellation: .drop)
+  }
+
   // This is an implementation detail and is only needed because the
   // methods on EnqueueingClock are not on Clock.  Once SE-0505 is
   // accepted, we can move them to Clock and get rid of this.
 
   public func _openAndEnqueue<E: EnqueueingClock,
-                              C: Clock,
-                              S: SchedulingExecutor>(
+                              C: Clock>(
     _ job: consuming ExecutorJob,
-    on executor: S,
-    at instant: C.Instant,
+    run at: FireTime<C>,
     tolerance: C.Duration?,
     clock: C,
+    onCancellation behavior: CancellationBehavior,
     enqueueingClock: E) -> JobCancellationToken {
+    var fireTime: FireTime<E>
+    switch at {
+      case let .after(delay):
+        fireTime = .after(delay as! E.Duration)
+      case let .at(instant):
+        fireTime = .at(instant as! E.Instant)
+    }
     return enqueueingClock.enqueue(
       job,
-      on: executor,
-      at: instant as! E.Instant,
-      tolerance: tolerance as! E.Duration
+      on: self,
+      run: fireTime,
+      tolerance: tolerance as? E.Duration,
+      onCancellation: behavior
     )
   }
+
 }
 #endif
 
@@ -266,38 +311,6 @@ extension Executor {
   }
   #endif // os(WASI) || !$Embedded
 
-}
-
-// Delay support
-@_spi(ExperimentalScheduling)
-@available(StdlibDeploymentTarget 9999, *)
-extension SchedulingExecutor {
-
-  #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-
-  @available(StdlibDeploymentTarget 9999, *)
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                after delay: C.Duration,
-                                tolerance: C.Duration? = nil,
-                                clock: C) -> JobCancellationToken {
-    // If you crash here with a mutual recursion, it's because you didn't
-    // implement one of these two functions
-    return enqueue(job, at: clock.now.advanced(by: delay),
-                   tolerance: tolerance, clock: clock)
-  }
-
-  @available(StdlibDeploymentTarget 9999, *)
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) -> JobCancellationToken {
-    // If you crash here with a mutual recursion, it's because you didn't
-    // implement one of these two functions
-    return enqueue(job, after: clock.now.duration(to: instant),
-                   tolerance: tolerance, clock: clock)
-  }
-
-  #endif // !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 }
 
 /// A service that executes jobs.

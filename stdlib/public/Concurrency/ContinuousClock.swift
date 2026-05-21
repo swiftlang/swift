@@ -218,29 +218,38 @@ extension ContinuousClock.Instant: InstantProtocol {
 @available(StdlibDeploymentTarget 9999, *)
 extension ContinuousClock: EnqueueingClock {
 
-  public func run(_ job: consuming ExecutorJob,
-                  at instant: Instant,
-                  tolerance: Duration?) -> JobCancellationToken {
+  public func run(
+    _ job: consuming ExecutorJob,
+    run at: FireTime<Self>,
+    tolerance: Duration?,
+    onCancellation behavior: CancellationBehavior
+  ) -> JobCancellationToken {
     guard let executor = Task<Never,Never>.currentSchedulingExecutor else {
       fatalError("no scheduling executor is available for job \(job.id)")
     }
 
-    return executor.enqueue(job, at: instant,
+    return executor.enqueue(job, run: at,
+                            clock: self,
                             tolerance: tolerance,
-                            clock: self)
+                            onCancellation: behavior)
   }
 
-  public func enqueue(_ job: consuming ExecutorJob,
-                      on executor: some Executor,
-                      at instant: Instant,
-                      tolerance: Duration?) -> JobCancellationToken {
+  public func enqueue(
+    _ job: consuming ExecutorJob,
+    on executor: some Executor,
+    run at: FireTime<Self>,
+    tolerance: Duration?,
+    onCancellation behavior: CancellationBehavior
+  ) -> JobCancellationToken {
     if let schedulingExecutor = executor.asSchedulingExecutor {
-      return schedulingExecutor.enqueue(job, at: instant,
+      return schedulingExecutor.enqueue(job, run: at,
+                                        clock: self,
                                         tolerance: tolerance,
-                                        clock: self)
+                                        onCancellation: behavior)
     } else {
       let trampoline = job.createTrampoline(to: executor)
-      return run(trampoline, at: instant, tolerance: tolerance)
+      return run(trampoline, run: at, tolerance: tolerance,
+                 onCancellation: behavior)
     }
   }
 

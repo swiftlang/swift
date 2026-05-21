@@ -19,7 +19,7 @@ import Swift
 
 // import Dispatch
 
-fileprivate let OpaqueDataDispatchSource = 1
+fileprivate let opaqueDataDispatchSource = 0
 
 // .. Dispatch Interface .......................................................
 
@@ -46,25 +46,31 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
     fatalError("DispatchMainExecutor cannot be stopped")
   }
 
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) -> JobCancellationToken {
-    let jobID = job.id
-    let source = _dispatchEnqueue(
-      job, at: instant, tolerance: tolerance, clock: clock,
-      executor: self, global: false
-    )
-    return JobCancellationToken(
-      executor: self, jobID: jobID, opaqueData: [0, source],
-      cleanUp: {
-        _dispatchReleaseSource($0.opaqueData[OpaqueDataDispatchSource])
-      }
+  public func enqueue<C: Clock>(
+    _ job: consuming ExecutorJob,
+    run at: FireTime<C>,
+    clock: C,
+    tolerance: C.Duration?,
+    onCancellation behavior: CancellationBehavior
+  ) -> JobCancellationToken {
+    return _dispatchEnqueue(
+      job, run: at, tolerance: tolerance, clock: clock,
+      executor: self, onCancellation: behavior, global: false
     )
   }
 
   public func cancel(jobWithToken token: consuming JobCancellationToken) {
-    _dispatchCancel(token.opaqueData[OpaqueDataDispatchSource])
+    if let job = _dispatchCancel(token.opaqueData[opaqueDataDispatchSource]) {
+      switch token.cancellationBehavior {
+        case .drop:
+          // Destroy the job
+          job.destroy()
+
+        case .executeImmediately:
+          // Need to immediately enqueue the job
+          enqueue(job)
+      }
+    }
   }
 }
 
@@ -95,25 +101,31 @@ class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
     _dispatchEnqueueGlobal(UnownedJob(job))
   }
 
-  public func enqueue<C: Clock>(_ job: consuming ExecutorJob,
-                                at instant: C.Instant,
-                                tolerance: C.Duration? = nil,
-                                clock: C) -> JobCancellationToken {
-    let jobID = job.id
-    let source = _dispatchEnqueue(
-      job, at: instant, tolerance: tolerance, clock: clock,
-      executor: self, global: true
-    )
-    return JobCancellationToken(
-      executor: self, jobID: jobID, opaqueData: [1, source],
-      cleanUp: {
-        _dispatchReleaseSource($0.opaqueData[OpaqueDataDispatchSource])
-      }
+  public func enqueue<C: Clock>(
+    _ job: consuming ExecutorJob,
+    run at: FireTime<C>,
+    clock: C,
+    tolerance: C.Duration?,
+    onCancellation behavior: CancellationBehavior
+  ) -> JobCancellationToken {
+    return _dispatchEnqueue(
+      job, run: at, tolerance: tolerance, clock: clock,
+      executor: self, onCancellation: behavior, global: true
     )
   }
 
   public func cancel(jobWithToken token: consuming JobCancellationToken) {
-    _dispatchCancel(token.opaqueData[OpaqueDataDispatchSource])
+    if let job = _dispatchCancel(token.opaqueData[opaqueDataDispatchSource]) {
+      switch token.cancellationBehavior {
+        case .drop:
+          // Destroy the job
+          job.destroy()
+
+        case .executeImmediately:
+          // Need to immediately enqueue the job
+          enqueue(job)
+      }
+    }
   }
 }
 
@@ -165,20 +177,33 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
 }
 
 @available(StdlibDeploymentTarget 9999, *)
-fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
+fileprivate func _dispatchEnqueue<C: Clock, E: SchedulingExecutor>(
   _ job: consuming ExecutorJob,
-  at instant: C.Instant,
+  run at: FireTime<C>,
   tolerance: C.Duration?,
   clock: C,
   executor: E,
+  onCancellation behavior: CancellationBehavior,
   global: Bool
-) -> UInt {
+) -> JobCancellationToken {
   // If it's a clock we know, convert it to something we can use; otherwise,
   // call the clock's `enqueue` function to schedule the enqueue of the job.
+  let instant = at.asInstant(clock: clock)
 
   guard let (clockID, seconds, nanoseconds) = timestamp(for: instant,
                                                         clock: clock) else {
-    fatalError("Sorry, cannot schedule on an unknown clock")
+    if let enqueueingClock = clock as? any EnqueueingClock {
+      return executor._openAndEnqueue(
+        job,
+        run: at,
+        tolerance: tolerance,
+        clock: clock,
+        onCancellation: behavior,
+        enqueueingClock: enqueueingClock
+      )
+    } else {
+      fatalError("Sorry, cannot schedule on an unknown clock")
+    }
   }
 
   let tolSec: Int64, tolNanosec: Int64
@@ -190,11 +215,22 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
     tolNanosec = -1
   }
 
-  return _dispatchEnqueueWithDeadline(CBool(global),
-                                      CLongLong(seconds), CLongLong(nanoseconds),
-                                      CLongLong(tolSec), CLongLong(tolNanosec),
-                                      clockID.rawValue,
-                                      UnownedJob(job))
+  let jobID = job.id
+  let source = _dispatchEnqueueWithDeadline(CBool(global),
+                                            CLongLong(seconds),
+                                            CLongLong(nanoseconds),
+                                            CLongLong(tolSec),
+                                            CLongLong(tolNanosec),
+                                            clockID.rawValue,
+                                            UnownedJob(job))
+  return JobCancellationToken(
+    executor: executor, jobID: jobID,
+    opaqueData: [source, 0],
+    onCancellation: behavior,
+    cleanUp: {
+      _dispatchReleaseSource($0.opaqueData[opaqueDataDispatchSource])
+    }
+  )
 }
 
 #endif // !$Embedded && !os(WASI)

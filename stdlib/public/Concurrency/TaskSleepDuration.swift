@@ -121,10 +121,12 @@ extension Task where Success == Never, Failure == Never {
 
               #if !$Embedded
               if let executor = Task.currentSchedulingExecutor {
-                wakeUpJobToken = executor.enqueue(ExecutorJob(context: job),
-                                             at: instant,
-                                             tolerance: tolerance,
-                                             clock: clock)
+                wakeUpJobToken = executor.enqueue(
+                  ExecutorJob(context: job),
+                  run: .at(instant),
+                  clock: clock,
+                  tolerance: tolerance,
+                  onCancellation: .executeImmediately)
                 return
               }
               #endif
