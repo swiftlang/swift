@@ -972,6 +972,10 @@ static Operand *getProjectedDefOperand(SILValue value) {
   case ValueKind::MarkUnresolvedNonCopyableValueInst:
     return &cast<MarkUnresolvedNonCopyableValueInst>(value)->getOperandRef();
 
+  case ValueKind::MarkDependenceInst:
+    return &cast<MarkDependenceInst>(value)
+                ->getAllOperands()[MarkDependenceInst::Dependent];
+
   case ValueKind::MoveValueInst:
     return &cast<MoveValueInst>(value)->getOperandRef();
 
@@ -3559,6 +3563,29 @@ protected:
     SILValue address = pass.valueStorageMap.getStorage(value).storageAddress;
     builder.createFixLifetime(fli->getLoc(), address);
     pass.deleter.forceDelete(fli);
+  }
+
+  void visitMarkDependenceInst(MarkDependenceInst *mdi) {
+    if (use->getOperandNumber() == MarkDependenceInst::Base) {
+      SILValue baseAddr = addrMat.materializeAddress(use->get());
+      mdi->setBase(baseAddr);
+      return;
+    }
+    assert(use->getOperandNumber() == MarkDependenceInst::Dependent);
+    SILValue valueAddr =
+        pass.valueStorageMap.getStorage(use->get()).storageAddress;
+    builder.createMarkDependenceAddr(mdi->getLoc(), valueAddr, mdi->getBase(),
+                                     mdi->dependenceKind());
+    markRewritten(mdi, valueAddr);
+  }
+
+  void visitMarkDependenceAddrInst(MarkDependenceAddrInst *mdai) {
+    if (use->getOperandNumber() != MarkDependenceAddrInst::Base) {
+      visitSILInstruction(mdai);
+      return;
+    }
+    SILValue baseAddr = addrMat.materializeAddress(use->get());
+    mdai->setBase(baseAddr);
   }
 
   void visitBranchInst(BranchInst *) {

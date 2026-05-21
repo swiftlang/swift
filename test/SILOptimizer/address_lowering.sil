@@ -2724,6 +2724,36 @@ bb0:
   return %5
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_mark_dependence_addr_dep_opaque_base :
+// CHECK:       bb0(%0 : $*U):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         mark_dependence [unresolved] [[STK]] : $*T on %0 : $*U
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_addr_dep_opaque_base'
+sil hidden [ossa] @test_mark_dependence_addr_dep_opaque_base : $@convention(thin) <T, U> (@in_guaranteed U) -> () {
+bb0(%0 : @guaranteed $U):
+  %1 = alloc_stack $T
+  %2 = mark_dependence [unresolved] %1 : $*T on %0 : $U
+  dealloc_stack %1 : $*T
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_mark_dependence_opaque_dep_opaque_base :
+// CHECK:       bb0(%0 : $*T, %1 : $*T, %2 : $*U):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr %1 to [init] [[STK]] : $*T
+// CHECK:         mark_dependence_addr [unresolved] [[STK]] : $*T on %2 : $*U
+// CHECK:         copy_addr [take] [[STK]] to [init] %0 : $*T
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_opaque_dep_opaque_base'
+sil hidden [ossa] @test_mark_dependence_opaque_dep_opaque_base : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $U):
+  %2 = copy_value %0 : $T
+  %3 = mark_dependence [unresolved] %2 : $T on %1 : $U
+  return %3 : $T
+}
+
 // CHECK-LABEL: sil [ossa] @test_mark_unresolved_non_copyable_value_1_consumable_and_assignable : {{.*}} {
 // CHECK:       bb0([[T:%[^,]+]] :
 // CHECK:         [[TP:%[^,]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T]]
