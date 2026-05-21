@@ -74,7 +74,7 @@ class SwiftMacroTestGen: SyntaxVisitor {
     let isMutating = res.modifiers.contains(where: {
       $0.name.tokenKind == .keyword(.mutating)
     })
-    let selfParam = surroundingType.map { _ in TokenSyntax("self") }
+    let selfParam = surroundingType.map { type in res.isClassMethod ? type.with(\.trailingTrivia, "") : TokenSyntax("self") }
     res = createFunctionSignature(res)
     res =
       res
@@ -82,23 +82,27 @@ class SwiftMacroTestGen: SyntaxVisitor {
       .with(\.name, "call_\(res.name.withoutBackticks)")
       .with(\.leadingTrivia, res.leadingTrivia.withoutComments)
     if let surroundingType {
+      if !res.isClassMethod {
+        res =
+          res
+          .with(
+            \.signature.parameterClause.parameters,
+            addSelfParam(
+              res.signature.parameterClause.parameters, surroundingType, selfParam!,
+              isMutating: isMutating)
+          )
+      }
       res =
         res
-        .with(
-          \.signature.parameterClause.parameters,
-          addSelfParam(
-            res.signature.parameterClause.parameters, surroundingType, selfParam!,
-            isMutating: isMutating)
-        )
         .with(\.leadingTrivia, "\n")
         .with(
           \.modifiers,
           res.modifiers.filter { modifier in
             switch modifier.name.tokenKind {
-              case .keyword(.mutating), .keyword(.open):
-                false
-              default:
-                true
+            case .keyword(.mutating), .keyword(.open), .keyword(.class), .keyword(.final):
+              false
+            default:
+              true
             }
           }
         )
@@ -248,6 +252,12 @@ extension TypeSyntax {
       }
       return simpleSpec.specifier.text == "inout"
     })
+  }
+}
+
+extension FunctionDeclSyntax {
+  var isClassMethod: Bool {
+    return self.modifiers.contains(where: { mod in mod.name.tokenKind == .keyword(.class) })
   }
 }
 
