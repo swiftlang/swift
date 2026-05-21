@@ -50,6 +50,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/TypeSubstCloner.h"
@@ -1661,6 +1662,7 @@ class CapturePromotionPass : public SILModuleTransform {
 
 void CapturePromotionPass::processFunction(
     SILFunction *func, SmallVectorImpl<SILFunction *> &worklist) {
+  PrettyStackTraceSILFunction stackTrace("running capture promotion on", func);
   assert(func->hasOwnership() &&
          "Only can perform capture promotion on functions with ownership. All "
          "functions in raw SIL should have OSSA now out of SILGen");

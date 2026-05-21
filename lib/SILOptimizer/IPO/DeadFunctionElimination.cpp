@@ -15,6 +15,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
+#include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILVisitor.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -346,6 +347,8 @@ class DeadFunctionAndGlobalElimination {
 
   /// Scans all references inside a function.
   void scanFunction(SILFunction *F) {
+    PrettyStackTraceSILFunction stackTrace(
+        "running dead function elimination scan on", F);
 
     LLVM_DEBUG(llvm::dbgs() << "    scan function " << F->getName() << '\n');
 
