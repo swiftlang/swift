@@ -4141,37 +4141,6 @@ Solution::getConversionRestriction(CanType type1, CanType type2) const {
   return std::nullopt;
 }
 
-#ifndef NDEBUG
-/// Given an apply expr, returns true if it is expected to have a direct callee
-/// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
-static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
-  auto *fnExpr = callExpr->getDirectCallee();
-
-  // An apply of an apply/subscript doesn't have a direct callee.
-  if (isa<ApplyExpr>(fnExpr) || isa<SubscriptExpr>(fnExpr))
-    return false;
-
-  // Applies of closures don't have callee overloads.
-  if (isa<ClosureExpr>(fnExpr))
-    return false;
-
-  // No direct callee for a try!/try?.
-  if (isa<ForceTryExpr>(fnExpr) || isa<OptionalTryExpr>(fnExpr))
-    return false;
-
-  // If we have an intermediate cast, there's no direct callee.
-  if (isa<ExplicitCastExpr>(fnExpr))
-    return false;
-
-  // No direct callee for a ternary expr.
-  if (isa<TernaryExpr>(fnExpr))
-    return false;
-
-  // Assume that anything else would have a direct callee.
-  return true;
-}
-#endif
-
 ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
   if (auto *expr = getAsExpr(node)) {
     if (auto apply = getAsExpr<ApplyExpr>(getParentExpr(expr))) {
@@ -4263,9 +4232,6 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
       if (metaTy->getInstanceType()->is<TupleType>())
         return std::nullopt;
     }
-
-    assert(!shouldHaveDirectCalleeOverload(call) &&
-             "Should we have resolved a callee for this?");
   }
 
   // Try to resolve the function type by loading lvalues and looking through
