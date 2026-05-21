@@ -8713,12 +8713,11 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
 void AttributeChecker::visitPreInverseGenericsAttr(
     PreInverseGenericsAttr *attr) {
   if (attr->hasExcept(D) &&
-      !Ctx.LangOpts.hasFeature(Feature::PreInverseGenericsExcept)) {
-    Ctx.Diags
-        .diagnose(attr->getLocation(),
-                  diag::attribute_requires_experimental_feature, attr,
-                  "PreInverseGenericsExcept")
-        .warnInSwiftInterface(D->getDeclContext());
+      !Ctx.LangOpts.hasFeature(Feature::PreInverseGenericsExcept) &&
+      !D->getDeclContext()->isInSwiftinterface()) {
+    Ctx.Diags.diagnose(attr->getLocation(),
+                       diag::attribute_requires_experimental_feature, attr,
+                       "PreInverseGenericsExcept");
   }
 
   // Trigger the request to resolve and validate the optional 'except:' argument.
