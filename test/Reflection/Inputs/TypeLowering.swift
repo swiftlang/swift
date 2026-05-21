@@ -333,3 +333,17 @@ public class ClassBox<T>: P1 {
 public struct ClassBoundCompositionHolder<T> {
   public let field: (ClassBox<T> & P1)?
 }
+
+public class PPClassBox<X>: P1, PP {
+  public typealias T = X
+  public let v: X
+  public init(_ v: X) { self.v = v }
+}
+
+public struct ParameterizedProtocolHolder<T> {
+  public let field: (any PP<T> & P1)?
+}
+
+public struct ClassBoundParameterizedProtocolHolder<T> {
+  public let field: (PPClassBox<T> & PP<T> & P1)?
+}

@@ -1727,6 +1727,7 @@ public:
 
   const TypeRef *
   visitConstrainedExistentialTypeRef(const ConstrainedExistentialTypeRef *CET) {
+    auto *Base = cast<ProtocolCompositionTypeRef>(visit(CET->getBase()));
     std::vector<TypeRefRequirement> constraints;
     for (auto Req : CET->getRequirements()) {
       auto substReq = visitTypeRefRequirement(Req);
@@ -1734,8 +1735,7 @@ public:
         continue;
       constraints.emplace_back(*substReq);
     }
-    return ConstrainedExistentialTypeRef::create(Builder, CET->getBase(),
-                                                 constraints);
+    return ConstrainedExistentialTypeRef::create(Builder, Base, constraints);
   }
 
   const TypeRef *visitSymbolicExtendedExistentialTypeRef(
