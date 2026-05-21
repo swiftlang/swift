@@ -2844,22 +2844,21 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
     return swift_actor_escalate(asImpl(executor.getDefaultActor()), task, newPriority);
   }
 
-  // TODO: Temporarily disable for testing the check for global
-  // executors only. All dispatch custom executors and every custom
-  // executor implementation I've seen so far would support (or at
-  // least not break) with adding stealers with the current semantics.
-  // if (executor.isGeneric() && !task->hasTaskExecutorPreferenceRecord()) {
-  SWIFT_TASK_DEBUG_LOG("Enqueuing stealer for %p on %p", (void *)task,
-                       (void *)executor.getIdentity());
+  // All dispatch custom executors and every custom executor
+  // implementation I've seen so far would support (or at least
+  // not break) with adding stealers with the current semantics.
+  if (executor.isGeneric() && !task->hasTaskExecutorPreferenceRecord()) {
+    SWIFT_TASK_DEBUG_LOG("Enqueuing stealer for %p on %p", (void *)task,
+                         (void *)executor.getIdentity());
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
-  // Even though we are in the "enqueue stealer" path, this could
-  // enqueue the original Task if another stealer had previously
-  // been enqueued and still is but the original Task did manage to
-  // run at some point (while rare, this wouldn't be unexpected)
-  swift_task_enqueueSelfOrStealer(task, executor, EnqueueFlagsForEscalation);
+    // Even though we are in the "enqueue stealer" path, this could
+    // enqueue the original Task if another stealer had previously
+    // been enqueued and still is but the original Task did manage to
+    // run at some point (while rare, this wouldn't be unexpected)
+    swift_task_enqueueSelfOrStealer(task, executor, EnqueueFlagsForEscalation);
 #endif
-  return;
-  //}
+    return;
+  }
 
   // TODO (rokhinip): This is either the main actor or an actor with a custom
   // executor. We need to let the executor know that the job has been escalated.
