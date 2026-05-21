@@ -280,6 +280,10 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     printOpts.FullyQualifiedTypes = true;
   }
 
+  // Show user-facing synthesized members but do not show other implicit decls
+  printOpts.SkipImplicit = true;
+  printOpts.AlwaysPrintSynthesized = true;
+
   swift::OptionSet<swift::ide::ModuleTraversal> traversalOpts = std::nullopt;
   if (ParsedArgs.hasArg(OPT_include_submodules)) {
     traversalOpts = swift::ide::ModuleTraversal::VisitSubmodules;
