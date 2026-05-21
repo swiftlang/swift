@@ -5,49 +5,50 @@ for distributed actors.
 
 ## Overview
 
-A ``Distributed/DistributedActor`` is always associated with a *distributed actor system*
+A ``Distributed/DistributedActor`` is always associated with a *distributed actor system*,
 which determines how `distributed func` calls on a *remote* actor are executed.
 
 To declare a distributed actor, use the `distributed actor` keywords and choose
 the actor system it belongs to. The actor system effectively acts as a "transport" —
 for example, a network or interprocess channel — for your actor.
 
-Various actor system implementations exist in the Swift ecosystem, but you can also
-implement your own if you need to make remote procedure calls over a transport that
-no existing library supports.
+Various actor system implementations exist in the Swift ecosystem,
+and this article provides a guide for you
+to implement your own to make remote procedure calls over a transport.
 
 You don't need in-depth knowledge of an actor system's implementation to use distributed
 actors — abstracting and hiding the transport details is the point. When you need a new
 transport, you can implement the ``Distributed/DistributedActorSystem`` protocol yourself
 and provide a new way for distributed actors to communicate.
 
-Most code that *uses* distributed actors never interacts with this protocol
-directly. You only need to implement a `DistributedActorSystem` when you're
+Code that *uses* distributed actors doesn't need to interact with this protocol
+directly. You implement a `DistributedActorSystem` when you're
 building a transport — for example, a cluster, a WebSocket client or server, or
 some other interprocess communication (IPC) system.
 
-> TIP: In other words, ``Distributed/DistributedActorSystem`` lets you write your
-> own RPC frameworks that integrate deeply with the Swift runtime and concurrency model.
+> Tip: In other words, ``Distributed/DistributedActorSystem`` provides the expected interface for your
+> own RPC frameworks that integrate with the Swift runtime and concurrency model.
 
 An actor system manages the lifecycle and remote interactions of distributed actors.
 These responsibilities map to specific methods on the `DistributedActorSystem` protocol:
 
+- **Define** the actor system and its associated types.
 - **Assign**, track, and release actor identities.
 - **Resolve** an actor identity to either a local instance or a remote reference.
-- **Call** a remote distributed actor.
+- **Call** a remote method on a distributed actor.
 - **Encode** an outgoing invocation, send it to the remote peer, and await a reply.
-- **Decode** an incoming invocation, dispatch it to the target actor, and send
-  the result back.
+- **Decode** an incoming invocation and dispatch it to the target actor.
+- **Report** the results and errors.
 
-The rest of this article walks through each responsibility and ends with a
-minimal in-memory transport. For the deeper language
+The rest of this article walks through each responsibility, providing examples
+that build to a minimal in-memory transport. For the deeper language
 and runtime semantics, see [SE-0336: Distributed Actor Isolation][SE-0336] and
 [SE-0344: Distributed Actor Runtime][SE-0344].
 
 [SE-0336]: https://github.com/apple/swift-evolution/blob/main/proposals/0336-distributed-actor-isolation.md
 [SE-0344]: https://github.com/apple/swift-evolution/blob/main/proposals/0344-distributed-actor-runtime.md
 
-### The distributed actor system and associated types
+### Define the actor system and associated types
 
 A `DistributedActorSystem` is typically a final class — or a struct that wraps a class —
 because it holds internal state such as the mapping from identifiers to actors, and other
@@ -71,7 +72,7 @@ public final class SampleActorSystem: DistributedActorSystem {
 }
 ```
 
-### Manage actor identity
+### Assign, track, and release actor identities
 
 An `ActorID` identifies a distributed actor from the moment it's created. The actor system
 serializes and sends this identifier to remote peers during network calls.
@@ -105,7 +106,8 @@ let charlie: Worker = Worker(actorSystem: ...) // A worker located in this proce
 try await remoteWorker.introduce(another: charlie)
 ```
 
-Three methods drive the lifecycle of every distributed actor that your system manages.
+Three methods drive the lifecycle (`assignID`, `actorReady`, and `resignID`)
+of every distributed actor that your system manages.
 
 The Swift runtime calls these methods whenever a local distributed actor is initialized
 or deinitialized. Implement these methods so the actor system can find actors by their
@@ -126,7 +128,7 @@ extension SampleActorSystem {
     }
 
     public func resignID(_ id: ActorID) {
-        // Called when the actor is deinitialized or failed to initialize.
+        // Called when the actor is deinitialized or fails to initialize.
         activeActors.withLock { $0.removeValue(forKey: id) }
     }
 }
@@ -193,7 +195,7 @@ and first call, so a pre-flight check provides no real safety guarantee.
 You can use `resolve` to initiate a remote connection, but don't block and wait for the
 connection to fully establish before returning the reference.
 
-### Encode a remote invocation
+### Encode an outgoing invocation
 
 When you call a `distributed func` on a remote actor reference, the Swift runtime
 creates a new `InvocationEncoder` by calling the system's
@@ -249,7 +251,7 @@ in the `record...` methods — whichever fits your serialization mechanism best.
 If a later step needs the encoded arguments — for example, to compute a length prefix —
 produce them in `doneRecording`.
 
-### Perform a remote call
+### Call a remote method
 
 After encoding the invocation, the runtime passes it to
 ``Distributed/DistributedActorSystem/remoteCall(on:target:invocation:throwing:returning:)``
@@ -355,8 +357,9 @@ public enum SampleTransportError: DistributedActorSystemError {
 }
 ```
 
-### Receive and execute a remote invocation
+### Decode and execute a remote invocation
 
+Assemble a `receive` flow that dispatches incoming invocations to local actors.
 On the receiving "remote" side of a call, decode the envelope into a matching
 ``Distributed/DistributedTargetInvocationDecoder``, locate the local actor, and hand both
 to the runtime's ``Distributed/DistributedActorSystem/executeDistributedTarget(on:target:invocationDecoder:handler:)`` method.
@@ -402,7 +405,7 @@ extension SampleActorSystem {
 ```
 
 The Swift distributed runtime calls the decoder with the appropriate generic type for
-each argument. A `distributed` method with a `String` and an `Int` parameter causes the
+each argument. A `distributed` method with `String` and `Int` parameters causes the
 runtime to invoke `decodeNextArgument` twice — once with `Argument` bound to `String`,
 and once with `Argument` bound to `Int`. This lets the implementation rely on `Codable`
 for decoding without any unsafe casting or guessing types.
@@ -440,7 +443,8 @@ the recipient.
 
 ### Report results and errors
 
-The final step of a remote call chain is the ``Distributed/DistributedTargetInvocationResultHandler``.
+The final step of a remote call chain is the ``Distributed/DistributedTargetInvocationResultHandler``
+that you use to return results and errors.
 
 This works similarly to the encoder and decoder, and gives you a type-safe way to obtain
 the result with its correct `Success` type, as declared by the distributed method.
@@ -475,13 +479,11 @@ public struct SampleResultHandler: DistributedTargetInvocationResultHandler {
 }
 ```
 
-### Putting it all together
-
-Once everything's wired together, you can make your first remote call using your new
-actor system.
+### Use the actor system
 
 The actor system hides serialization and networking details so the use-site code can
-focus on its business domain:
+focus on its business domain. Define the typealias `ActorSystem` of a distributed actor
+to assign the system it uses.
 
 ```swift
 distributed actor Greeter {
@@ -493,28 +495,20 @@ distributed actor Greeter {
 }
 ```
 
+Initialize the system and distributed actor, use `resolve` to get a reference, and
+make asynchronous calls that you defined on the distributed actor:
+
 ```swift
 let system = SampleActorSystem(localNode: "node-a")
 let local = Greeter(actorSystem: system)
 
-// In a real deployment, resolving an ID owned by a remote node returns a remote
-// reference. Here, both sides share one in-process system, so this returns the
-// local instance.
+// In a remote deployment, resolving an ID owned by a remote node returns a remote
+// reference. Here, both sides share one in-process system, so this example returns
+// a local instance.
 let remote = try Greeter.resolve(id: local.id, using: system)
 let reply = try await remote.hello(name: "world")
 print(reply) // "Hello, world!"
 ```
-
-You've now built the parts of a custom distributed actor system:
-
-- An `ActorID` type and lifecycle methods (`assignID`, `actorReady`, `resignID`) that
-  manage actor identity.
-- A `resolve` implementation that distinguishes local actors from remote references.
-- A `DistributedTargetInvocationEncoder` and matching `remoteCall` and `remoteCallVoid`
-  methods for sending invocations.
-- A `DistributedTargetInvocationDecoder` and `receive` flow that dispatches incoming
-  invocations to local actors.
-- A `DistributedTargetInvocationResultHandler` for returning results and errors.
 
 For more information, see ``Distributed/DistributedActorSystem`` and
 ``Distributed/LocalTestingDistributedActorSystem``.
