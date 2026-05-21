@@ -10,8 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if $BorrowInout
-
 /// A safe reference allowing in-place reads to a shared value.
 @available(SwiftStdlib 6.4, *)
 @frozen
@@ -72,5 +70,3 @@ extension Ref where Value: ~Copyable & ~Escapable {
     }
   }
 }
-
-#endif
