@@ -84,6 +84,15 @@ extension DifferentiableFunctionInst : SILCombineSimplifiable {
             break
           case is DifferentiableFunctionExtractInst:
             hasExtract = true
+          case let convert as ConvertFunctionInst:
+            for convertUse in convert.uses.ignoreDebugUses {
+              switch convertUse.instruction {
+              case is DifferentiableFunctionExtractInst:
+                hasExtract = true
+              default:
+                return false
+              }
+            }
           default:
             return false
           }
@@ -97,58 +106,78 @@ extension DifferentiableFunctionInst : SILCombineSimplifiable {
     return hasExtract
   }
 
+  private func processExtract(differentiableFunctionExtract: DifferentiableFunctionExtractInst, beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
+    guard let extractee = self.getExtractee(extractee: differentiableFunctionExtract.extractee)
+    else {
+      return
+    }
+
+    // If the extractee has non-trivial ownership, it is consumed by the differentiable_function instruction.
+    // We must copy it before the consumption point so the copy remains live afterward.
+    let effectiveExtractee: Value
+    let needsDestroy: Bool
+    if extractee.ownership != .none {
+      let copyBuilder = Builder(before: self, context)
+      effectiveExtractee = copyBuilder.createCopyValue(operand: extractee)
+      needsDestroy = true
+    } else {
+      effectiveExtractee = extractee
+      needsDestroy = false
+    }
+
+    switch differentiableFunctionExtract.ownership {
+    case .none:
+      if differentiableFunctionExtract.type != effectiveExtractee.type {
+        let convertBuilder = Builder(before: differentiableFunctionExtract, context)
+        let newField = convertBuilder.createConvertFunction(
+          originalFunction: effectiveExtractee, resultType: differentiableFunctionExtract.type,
+          withoutActuallyEscaping: false)
+        differentiableFunctionExtract.replace(with: newField, context)
+      } else {
+        differentiableFunctionExtract.replace(with: effectiveExtractee, context)
+      }
+
+    case .guaranteed:
+      let beginBuilder = Builder(before: beginBorrow, context)
+      let borrowedField = beginBuilder.createBeginBorrow(
+        of: effectiveExtractee,
+        isLexical: beginBorrow.isLexical,
+        hasPointerEscape: beginBorrow.hasPointerEscape)
+
+      if differentiableFunctionExtract.type != effectiveExtractee.type {
+        let convertBuilder = Builder(before: differentiableFunctionExtract, context)
+        let newField = convertBuilder.createConvertFunction(
+          originalFunction: borrowedField, resultType: differentiableFunctionExtract.type,
+          withoutActuallyEscaping: false)
+        differentiableFunctionExtract.replace(with: newField, context)
+      } else {
+        differentiableFunctionExtract.replace(with: borrowedField, context)
+      }
+      for endBorrow in beginBorrow.endInstructions {
+        let endBuilder = Builder(before: endBorrow, context)
+        endBuilder.createEndBorrow(of: borrowedField)
+        if needsDestroy {
+          endBuilder.createDestroyValue(operand: effectiveExtractee)
+        }
+      }
+
+    case .owned, .unowned:
+      fatalError("wrong ownership of differentiable_function_extract")
+    }
+  }
+
   private func splitAndRemoveExtracts(beginBorrow: BeginBorrowInst, _ context: SimplifyContext) {
     for differentiableFunctionExtract in beginBorrow.uses.users(ofType: DifferentiableFunctionExtractInst.self) {
-      guard let extractee = self.getExtractee(extractee: differentiableFunctionExtract.extractee) else {
-        continue
-      }
+      processExtract(
+        differentiableFunctionExtract: differentiableFunctionExtract,
+        beginBorrow: beginBorrow, context)
+    }
 
-      // If the extractee has non-trivial ownership, it is consumed by the differentiable_function instruction.
-      // We must copy it before the consumption point so the copy remains live afterward.
-      let effectiveExtractee: Value
-      let needsDestroy: Bool
-      if extractee.ownership != .none {
-        let copyBuilder = Builder(before: self, context)
-        effectiveExtractee = copyBuilder.createCopyValue(operand: extractee)
-        needsDestroy = true
-      } else {
-        effectiveExtractee = extractee
-        needsDestroy = false
-      }
-
-      switch differentiableFunctionExtract.ownership {
-      case .none:
-        if differentiableFunctionExtract.type != effectiveExtractee.type {
-          let convertBuilder = Builder(before: differentiableFunctionExtract, context)
-          let newField = convertBuilder.createConvertFunction(originalFunction: effectiveExtractee, resultType: differentiableFunctionExtract.type, withoutActuallyEscaping: false)
-          differentiableFunctionExtract.replace(with: newField, context)
-        } else {
-          differentiableFunctionExtract.replace(with: effectiveExtractee, context)
-        }
-
-      case .guaranteed:
-        let beginBuilder = Builder(before: beginBorrow, context)
-        let borrowedField = beginBuilder.createBeginBorrow(of: effectiveExtractee,
-                                                           isLexical: beginBorrow.isLexical,
-                                                           hasPointerEscape: beginBorrow.hasPointerEscape)
-
-        if differentiableFunctionExtract.type != effectiveExtractee.type {
-          let convertBuilder = Builder(before: differentiableFunctionExtract, context)
-          let newField = convertBuilder.createConvertFunction(originalFunction: borrowedField, resultType: differentiableFunctionExtract.type, withoutActuallyEscaping: false)
-          differentiableFunctionExtract.replace(with: newField, context)
-        } else {
-          differentiableFunctionExtract.replace(with: borrowedField, context)
-        }
-        for endBorrow in beginBorrow.endInstructions {
-          let endBuilder = Builder(before: endBorrow, context)
-          endBuilder.createEndBorrow(of: borrowedField)
-          if needsDestroy {
-            endBuilder.createDestroyValue(operand: effectiveExtractee)
-          }
-        }
-
-      case .owned, .unowned:
-        fatalError("wrong ownership of differentiable_function_extract")
+    for convertFunction in beginBorrow.uses.users(ofType: ConvertFunctionInst.self) {
+      for differentiableFunctionExtract in convertFunction.uses.users(ofType: DifferentiableFunctionExtractInst.self) {
+        processExtract(
+          differentiableFunctionExtract: differentiableFunctionExtract,
+          beginBorrow: beginBorrow, context)
       }
     }
   }
