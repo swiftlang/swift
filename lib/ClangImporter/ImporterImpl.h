@@ -2281,8 +2281,8 @@ ImportedType findOptionSetEnum(clang::QualType type,
 /// and with the given name.
 ///
 /// The name we're looking for is the Swift name.
-llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
+TinyPtrVector<ValueDecl *> getValueDeclsForName(NominalTypeDecl *decl,
+                                                StringRef name);
 
 template <typename T>
 const T *

@@ -8188,17 +8188,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     // Special implicit nominal conversions.
     if (!type1->is<LValueType>()) {
-      // Array -> Array.
       if (desugar1->isArray() && desugar2->isArray()) {
-        conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
-      // Dictionary -> Dictionary.
+        // Array -> Array.
+        auto elementType = type1->getArrayElementType();
+        if (!elementType->isForeignReferenceType())
+          conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
       } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::DictionaryUpcast);
-      // Set -> Set.
+        // Dictionary -> Dictionary.
+        auto keyValueTypes = *isDictionaryType(desugar1);
+        if (!keyValueTypes.first->isForeignReferenceType() &&
+            !keyValueTypes.second->isForeignReferenceType())
+          conversionsOrFixes.push_back(
+              ConversionRestrictionKind::DictionaryUpcast);
       } else if (isSetType(desugar1) && isSetType(desugar2)) {
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::SetUpcast);
+        // Set -> Set.
+        auto elementType = *isSetType(desugar1);
+        if (!elementType->isForeignReferenceType())
+          conversionsOrFixes.push_back(ConversionRestrictionKind::SetUpcast);
       }
     }
   }

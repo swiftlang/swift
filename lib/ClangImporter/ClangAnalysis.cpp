@@ -5,6 +5,7 @@
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
+#include "clang/AST/RecordLayout.h"
 #include "clang/AST/Type.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallPtrSet.h"
@@ -24,6 +25,80 @@ bool importer::hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl) {
          });
 }
 
+static ForeignReferenceTypeInfo
+checkForeignReferenceType(const clang::CXXRecordDecl *decl,
+                          ClangImporter::Implementation *Impl);
+
+static std::pair<std::optional<StringRef>, std::optional<StringRef>>
+getRetainReleaseOperations(const clang::RecordDecl *decl) {
+  if (!decl->hasAttrs())
+    return {std::nullopt, std::nullopt};
+
+  std::optional<StringRef> retain, release;
+  for (auto attr : decl->getAttrs()) {
+    auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
+    if (!swiftAttr)
+      continue;
+    auto attrStr = swiftAttr->getAttribute();
+
+    if (attrStr.consume_front("retain:"))
+      retain = attrStr;
+    else if (attrStr.consume_front("release:"))
+      release = attrStr;
+  }
+  return {retain, release};
+}
+
+/// If \p decl has exactly one direct FRT base and it is at offset 0 in the
+/// C++ layout, return it. Being at offset 0 means a pointer bitcast suffices
+/// for upcasting in IRGen. This is the case when the FRT base is the first
+/// base, or when all bases before it are empty (empty base optimization).
+static const clang::CXXRecordDecl *
+findPrimarySuperclassBase(const clang::CXXRecordDecl *decl,
+                          const clang::CXXRecordDecl *baseWithLifetimeOps) {
+  if (!decl->hasDefinition())
+    return nullptr;
+
+  const clang::CXXRecordDecl *singleFRTBase = nullptr;
+  ForeignReferenceTypeInfo singleFRTBaseInfo;
+
+  for (auto base : decl->bases()) {
+    if (auto baseRecordDecl = base.getType()->getAsCXXRecordDecl()) {
+      auto baseFRTInfo =
+          checkForeignReferenceType(baseRecordDecl, /*Impl=*/nullptr);
+      if (!baseFRTInfo.isReference() || base.isVirtual() ||
+          base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+        continue;
+
+      if (singleFRTBase)
+        // Bail if we found multiple FRT bases.
+        return nullptr;
+
+      singleFRTBase = baseRecordDecl;
+      singleFRTBaseInfo = baseFRTInfo;
+    }
+  }
+
+  if (!singleFRTBase)
+    return nullptr;
+
+  auto &clangCtx = decl->getASTContext();
+  auto &layout = clangCtx.getASTRecordLayout(decl);
+  if (!layout.getBaseClassOffset(singleFRTBase).isZero())
+    return nullptr;
+
+  // If decl has attributes with lifetime operations, check that they match.
+  auto [overriddenRetain, overriddenRelease] =
+      getRetainReleaseOperations(baseWithLifetimeOps);
+  auto [baseRetain, baseRelease] =
+      getRetainReleaseOperations(singleFRTBaseInfo.getDecl());
+  if ((overriddenRelease && overriddenRelease != baseRelease) ||
+      (overriddenRetain && overriddenRetain != baseRetain))
+    return nullptr;
+
+  return singleFRTBase;
+}
+
 /// This routine determines whether \a decl is a foreign reference type, and
 /// whether its foreign reference type attributes are valid. This determinition
 /// considers attributes annotated on both \a decl itself as well as its
@@ -39,7 +114,8 @@ checkForeignReferenceType(const clang::CXXRecordDecl *decl,
                           ClangImporter::Implementation *Impl) {
   // This was explicitly annotated. Just trust the annotation.
   if (importer::hasImportReferenceAttr(decl))
-    return ForeignReferenceTypeInfo::Shared(decl);
+    return ForeignReferenceTypeInfo::Shared(decl,
+                                            findPrimarySuperclassBase(decl, decl));
 
   if (!decl->hasDefinition())
     // If this doesn't have a definition, there's no inheritance info to check.
@@ -165,7 +241,8 @@ checkForeignReferenceType(const clang::CXXRecordDecl *decl,
     return ForeignReferenceTypeInfo::Value(/*isValid=*/false);
   }
 
-  return ForeignReferenceTypeInfo::Shared(baseFRT);
+  return ForeignReferenceTypeInfo::Shared(
+      baseFRT, findPrimarySuperclassBase(decl, baseFRT));
 }
 
 void swift::simple_display(llvm::raw_ostream &out,
