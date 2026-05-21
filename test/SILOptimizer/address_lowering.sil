@@ -3586,3 +3586,14 @@ bb2:
   unwind
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_zero_initializer_opaque :
+// CHECK:       bb0(%0 : $*T):
+// CHECK:         builtin "zeroInitializer"(%0 : $*T) : $()
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_zero_initializer_opaque'
+sil hidden [ossa] @test_zero_initializer_opaque : $@convention(thin) <T> () -> @out T {
+bb0:
+  %0 = builtin "zeroInitializer"() : $T
+  return %0 : $T
+}
+

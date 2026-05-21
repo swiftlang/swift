@@ -4293,6 +4293,16 @@ protected:
 
   void visitBuiltinInst(BuiltinInst *bi) {
     switch (bi->getBuiltinKind().value_or(BuiltinValueKind::None)) {
+    case BuiltinValueKind::ZeroInitializer: {
+      // Value-form `builtin "zeroInitializer"() : $T` with an opaque T.
+      assert(bi->getNumOperands() == 0 &&
+             "address-form zeroInitializer should not appear as an opaque def");
+      addrMat.materializeAddress(bi);
+      SILValue destAddr = storage.storageAddress;
+      builder.createZeroInitAddr(bi->getLoc(), destAddr);
+      storage.markRewritten();
+      break;
+    }
     default:
       bi->dump();
       llvm::report_fatal_error("^^^ Unimplemented builtin opaque value def.");
