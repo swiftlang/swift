@@ -9,22 +9,13 @@ A ``Distributed/DistributedActor`` is always associated with a *distributed acto
 which determines how `distributed func` calls on a *remote* actor are executed.
 
 To declare a distributed actor, use the `distributed actor` keywords and choose
-the actor system it belongs to. The actor system effectively acts as a "transport" —
-for example, a network or interprocess channel — for your actor.
+the actor system it belongs to. The actor system provides the "transport" —
+such as a network or interprocess channel — to an actor, regardless of where that actor runs.
 
-Various actor system implementations exist in the Swift ecosystem,
-and this article provides a guide for you
-to implement your own to make remote procedure calls over a transport.
-
-You don't need in-depth knowledge of an actor system's implementation to use distributed
-actors — abstracting and hiding the transport details is the point. When you need a new
-transport, you can implement the ``Distributed/DistributedActorSystem`` protocol yourself
-and provide a new way for distributed actors to communicate.
-
-Code that *uses* distributed actors doesn't need to interact with this protocol
-directly. You implement a `DistributedActorSystem` when you're
-building a transport — for example, a cluster, a WebSocket client or server, or
-some other interprocess communication (IPC) system.
+Code that *uses* distributed actors doesn't need to interact with this protocol directly —
+that abstraction is the point. Implement a `DistributedActorSystem` when you're
+providing a new transport implementation, such as a cluster, a WebSocket client or server,
+or an interprocess communication (IPC) system.
 
 > Tip: In other words, ``Distributed/DistributedActorSystem`` provides the expected interface for your
 > own RPC frameworks that integrate with the Swift runtime and concurrency model.
@@ -41,7 +32,7 @@ These responsibilities map to specific methods on the `DistributedActorSystem` p
 - **Report** the results and errors.
 
 The rest of this article walks through each responsibility, providing examples
-that build to a minimal in-memory transport. For the deeper language
+that build to a minimal in-memory transport. For deeper coverage of the language
 and runtime semantics, see [SE-0336: Distributed Actor Isolation][SE-0336] and
 [SE-0344: Distributed Actor Runtime][SE-0344].
 
@@ -56,7 +47,7 @@ components reference it by identity.
 
 To implement a distributed actor system, declare a new type that conforms to the
 ``Distributed/DistributedActorSystem`` protocol. Then provide witnesses for the five
-required associated types, described in the sections that follow.
+required associated types, shown below and explored in the sections that follow.
 
 ```swift
 import Distributed
@@ -102,7 +93,7 @@ distributed actor Worker {
 let remoteWorker: Worker = ... // A worker located in a different process.
 let charlie: Worker = Worker(actorSystem: ...) // A worker located in this process.
 
-// Remote call forwarding a reference to a local worker, to a different process.
+// Remote call forwarding a reference to a local worker to a different process.
 try await remoteWorker.introduce(another: charlie)
 ```
 
@@ -117,7 +108,7 @@ identity later:
 extension SampleActorSystem {
     public func assignID<Act>(_ actorType: Act.Type) -> ActorID
       where Act: DistributedActor, Act.ID == ActorID {
-        // Produce a unique ID for a freshly-initializing actor.
+        // Produce a unique ID for a freshly initializing actor.
         SampleActorID(node: self.node, instance: UUID())
     }
 
@@ -151,14 +142,14 @@ into a distributed actor of a specific type you can call distributed methods on.
 runtime resolves actors transparently when you pass distributed actor references as
 parameters in distributed function calls, but you can also resolve them manually.
 
-When you call `try Worker.resolve(id:using:)`, the runtime calls into
-``Distributed/DistributedActorSystem/resolve(id:as:)`` of the actor system associated
-with the `Worker` type.
+When you call `try Worker.resolve(id:using:)`, the runtime calls the
+``Distributed/DistributedActorSystem/resolve(id:as:)`` method on the actor system
+associated with the `Worker` type.
 
 The user-facing `DistributedActor.resolve` function returns a local actor instance if
 the identifier refers to an actor in the same process, or a remote proxy object if the
-identifier points to a remote process. It can also throw an error if the identifier is
-expired, invalid, or otherwise illegal.
+identifier points to a remote process. It can also throw an error if the identifier has
+expired, is invalid, or is otherwise illegal.
 
 The actor system's `resolve` implementation should return one of:
 
@@ -190,7 +181,7 @@ The `resolve` function is synchronous; don't perform long blocking operations su
 communicating with a remote node to confirm the actor exists. Instead, return a reference
 (or `nil`) quickly. If the remote target doesn't exist, the caller's first remote call
 fails. This approach is preferable because the remote node could terminate between lookup
-and first call, so a pre-flight check provides no real safety guarantee.
+and first call, so a preflight check provides no real safety guarantee.
 
 You can use `resolve` to initiate a remote connection, but don't block and wait for the
 connection to fully establish before returning the reference.
@@ -228,7 +219,7 @@ public struct SampleInvocationEncoder: DistributedTargetInvocationEncoder {
     public mutating func recordArgument<Value: Codable>(
         _ argument: RemoteCallArgument<Value>
     ) throws {
-        // Naive implementation, just encode every parameter independently.
+        // Naive implementation — just encode every parameter independently.
         argumentData.append(try JSONEncoder().encode(argument.value))
     }
 
@@ -241,7 +232,7 @@ public struct SampleInvocationEncoder: DistributedTargetInvocationEncoder {
     }
 
     public mutating func doneRecording() throws {
-        // Finalize the envelope, for example, compute a checksum or sign the payload.
+        // Finalize the envelope — for example, compute a checksum or sign the payload.
     }
 }
 ```
@@ -289,8 +280,8 @@ extension SampleActorSystem {
             substitutions: invocation.genericSubstitutions
         )
 
-        // Here you can do any additional tasks, such as timeouts,
-        // task-local or distributed-trace propagation.
+        // Here you can do additional work, such as enforcing timeouts or
+        // propagating task-local values and distributed traces.
 
         return try await withCheckedThrowingContinuation { cc in
             // Your networking code here:
@@ -307,7 +298,7 @@ extension SampleActorSystem {
         }
     }
 
-    // Invoked when the called 'distributed func' returns 'Void'.
+    // Invoked when the target 'distributed func' returns 'Void'.
     public func remoteCallVoid<Act, Err>(
         on actor: Act,
         target: RemoteCallTarget,
@@ -322,8 +313,8 @@ extension SampleActorSystem {
             substitutions: invocation.genericSubstitutions
         )
 
-        // Here you can do any additional tasks, such as timeouts,
-        // task-local or distributed-trace propagation.
+        // Here you can do additional work, such as enforcing timeouts or
+        // propagating task-local values and distributed traces.
 
         return try await withCheckedThrowingContinuation { cc in
             // Your networking code here:
@@ -348,7 +339,7 @@ protocol lets developers distinguish transport-level failures from errors that a
 distributed method throws itself, and the protocol documentation requires this
 conformance for failures outside the caller's control.
 
-> Tip: Typed throws aren't supported in distributed function calls.
+> Note: Typed throws aren't supported in distributed function calls.
 
 ```swift
 public enum SampleTransportError: DistributedActorSystemError {
@@ -370,7 +361,7 @@ Prepare a few simple types to make the call on the local distributed actor:
   method on your managed actors.
 - Prepare an instance of your `DistributedTargetInvocationDecoder` type. Swift calls it
   when decoding the call's parameters.
-- Prepare a callback wrapper `ResultHandler` that the runtime invokes when the call
+- Prepare a callback wrapper `ResultHandler` that the runtime calls when the call
   completes.
   - The runtime calls this handler with the appropriate generic type.
 
@@ -381,7 +372,7 @@ extension SampleActorSystem {
             // Resolve the local target actor for which the invocation was intended.
             let actor: any DistributedActor = try self.myResolveLocal(id: envelope.actorID)
 
-            // Prepare a decoder from the network format into a Decoder the Swift runtime will invoke.
+            // Prepare a decoder over the network format that the Swift runtime calls.
             var decoder = SampleInvocationDecoder(envelope: envelope)
 
             // Prepare a handler that the runtime calls when the remote call completes.
@@ -408,7 +399,7 @@ The Swift distributed runtime calls the decoder with the appropriate generic typ
 each argument. A `distributed` method with `String` and `Int` parameters causes the
 runtime to invoke `decodeNextArgument` twice — once with `Argument` bound to `String`,
 and once with `Argument` bound to `Int`. This lets the implementation rely on `Codable`
-for decoding without any unsafe casting or guessing types.
+for decoding without unsafe casting or type guessing.
 You can also use any other serialization scheme here, as long as it matches how the
 values were originally encoded on the sending side.
 
@@ -481,9 +472,8 @@ public struct SampleResultHandler: DistributedTargetInvocationResultHandler {
 
 ### Use the actor system
 
-The actor system hides serialization and networking details so the use-site code can
-focus on its business domain. Define the typealias `ActorSystem` of a distributed actor
-to assign the system it uses.
+The actor system abstracts the serialization and networking details so the use-site code can
+focus on its business domain. Specify the `ActorSystem` typealias inside a distributed actor.
 
 ```swift
 distributed actor Greeter {
