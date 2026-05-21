@@ -70,16 +70,14 @@ static bool parse_boolean(const char *name, const char *value,
   }
 }
 
-static uint8_t parse_uint8(const char *name, const char *value,
-                           uint8_t defaultValue) {
+static std::optional<uint8_t>
+parse_optional_uint8(const char *name, const char *value,
+                     std::optional<uint8_t> defaultValue) {
   if (!value)
     return defaultValue;
   char *end;
   long n = strtol(value, &end, 0);
   if (*end != '\0') {
-    swift::warning(RuntimeErrorFlagNone,
-                   "Warning: cannot parse value %s=%s, defaulting to %u.\n",
-                   name, value, defaultValue);
     return defaultValue;
   }
 
@@ -97,6 +95,16 @@ static uint8_t parse_uint8(const char *name, const char *value,
   }
 
   return n;
+}
+
+static uint8_t parse_uint8(const char *name, const char *value,
+                           uint8_t defaultValue) {
+  auto result = parse_optional_uint8(name, value, std::nullopt);
+  if (!result)
+    swift::warning(RuntimeErrorFlagNone,
+                   "Warning: cannot parse value %s=%s, defaulting to %u.\n",
+                   name, value, defaultValue);
+  return result.value_or(defaultValue);
 }
 
 static uint32_t parse_uint32(const char *name, const char *value,
