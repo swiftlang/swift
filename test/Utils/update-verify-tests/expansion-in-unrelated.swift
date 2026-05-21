@@ -3,10 +3,10 @@
 
 // RUN: not %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t %t/test.swift \
 // RUN:   -verify -verify-ignore-unrelated -Rmacro-expansions 2> %t/output.txt
-// RUN: not %update-verify-tests < %t/output.txt 2>&1 | %FileCheck %s
-
-// CHECK: Error in update-verify-tests while parsing tool output: unhandled note found
-// CHECK-SAME: in expansion from here
+// RUN: %update-verify-tests < %t/output.txt
+// RUN: %target-swift-frontend -typecheck -plugin-path %swift-plugin-dir -I %t %t/test.swift \
+// RUN:   -verify -verify-ignore-unrelated -Rmacro-expansions
+// RUN: %diff %t/test.swift %t/test.swift.expected
 
 //--- module.modulemap
 module Unrelated {
@@ -23,5 +23,12 @@ void foo(const int * __counted_by(len) p, int len);
 import Unrelated
 
 func bar(_ s: Span<CInt>) {
+  foo(s)
+}
+//--- test.swift.expected
+import Unrelated
+
+func bar(_ s: Span<CInt>) {
+  // expected-error@+1{{cannot convert value of type 'Span<CInt>' (aka 'Span<Int32>') to expected argument type 'UnsafeBufferPointer<Int32>'}}
   foo(s)
 }

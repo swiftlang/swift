@@ -759,7 +759,15 @@ def check_expectations(tool_output, prefix):
                 dprint(
                     f"diagnostic produced elsewhere (ignored): {line.strip()}"
                 )
-                extra_lines = tool_output[i + 1 : i + 3]
+                n_extra_lines = 3
+                if i + n_extra_lines < len(tool_output):
+                    next_line = tool_output[i + n_extra_lines]
+                    if diag_expansion_note_re.match(next_line.strip()):
+                        dprint(
+                            f"expansion note (ignored): {next_line.strip()}"
+                        )
+                        n_extra_lines += 1
+                extra_lines = tool_output[i + 1 : i + n_extra_lines]
             elif not "error:" in line:
                 if "note:" in line:
                     if m := diag_not_parsed_note_re.match(line.strip()):
