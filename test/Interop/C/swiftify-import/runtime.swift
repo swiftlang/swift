@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -target arm64-apple-macosx26.0 -enable-experimental-feature Lifetimes -g -Onone -enable-experimental-feature SafeInteropWrappers)
+// RUN: %target-run-simple-swift-split-file(test.swift -I %t%{fs-sep}Inputs -target %target-swift-6.2-abi-triple -g -Onone -enable-experimental-feature SafeInteropWrappers)
 //
 // REQUIRES: executable_test
 
