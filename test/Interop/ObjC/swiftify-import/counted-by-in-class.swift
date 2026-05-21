@@ -28,10 +28,10 @@ module Method {
 // }}
 -(void)bar:(float *)p count:(int)len __attribute__((swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(1), count: \"len\"))")));
 
-// expected-expansion@+10:2{{
+// expected-expansion@+10:1{{
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on instance method 'simple' here}}
 // }}
-// expected-expansion@+7:54{{
+// expected-expansion@+7:53{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public final func simple(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
@@ -40,10 +40,10 @@ module Method {
 // }}
 - (void) simple:(int)len :(int * __counted_by(len))p;
 
-// expected-expansion@+13:2{{
+// expected-expansion@+13:1{{
 //   expected-note@1 8{{in expansion of macro '_SwiftifyImport' on instance method 'shared' here}}
 // }}
-// expected-expansion@+10:84{{
+// expected-expansion@+10:83{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public final func shared(_ p1: UnsafeMutableBufferPointer<Int32>, _ p2: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p1.count)!|}}
@@ -55,7 +55,10 @@ module Method {
 // }}
 - (void) shared:(int)len :(int * __counted_by(len))p1 :(int * __counted_by(len))p2;
 
-// expected-expansion@+13:82{{
+// expected-expansion@+13:1{{
+//   expected-note@1 8{{in expansion of macro '_SwiftifyImport' on instance method 'complexExpr' here}}
+// }}
+// expected-expansion@+10:81{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public final func complexExpr(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let _pCount = p.count|}}
@@ -65,15 +68,12 @@ module Method {
 //   expected-remark@7{{macro content: |    return unsafe complexExpr(len, offset, p.baseAddress!)|}}
 //   expected-remark@8{{macro content: |}|}}
 // }}
-// expected-expansion@+3:2{{
-//   expected-note@1 8{{in expansion of macro '_SwiftifyImport' on instance method 'complexExpr' here}}
-// }}
 - (void) complexExpr:(int)len :(int) offset :(int * __counted_by(len - offset))p;
 
-// expected-expansion@+10:2{{
+// expected-expansion@+10:1{{
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on instance method 'nullUnspecified' here}}
 // }}
-// expected-expansion@+7:81{{
+// expected-expansion@+7:80{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public final func nullUnspecified(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
@@ -82,10 +82,10 @@ module Method {
 // }}
 - (void) nullUnspecified:(int)len :(int * __counted_by(len) _Null_unspecified)p;
 
-// expected-expansion@+10:2{{
+// expected-expansion@+10:1{{
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on instance method 'nonnull' here}}
 // }}
-// expected-expansion@+7:64{{
+// expected-expansion@+7:63{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public final func nonnull(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
@@ -94,10 +94,10 @@ module Method {
 // }}
 - (void) nonnull:(int)len :(int * __counted_by(len) _Nonnull)p;
 
-// expected-expansion@+10:2{{
+// expected-expansion@+10:1{{
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on instance method 'nullable' here}}
 // }}
-// expected-expansion@+7:66{{
+// expected-expansion@+7:65{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public final func nullable(_ p: UnsafeMutableBufferPointer<Int32>?) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: unsafe p?.count ?? 0)!|}}
@@ -106,10 +106,10 @@ module Method {
 // }}
 - (void) nullable:(int)len :(int * __counted_by(len) _Nullable)p;
 
-// expected-expansion@+9:2{{
+// expected-expansion@+9:1{{
 //   expected-note@1 4{{in expansion of macro '_SwiftifyImport' on instance method 'returnPointer' here}}
 // }}
-// expected-expansion@+6:52{{
+// expected-expansion@+6:51{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public final func returnPointer(_ len: Int32) -> UnsafeMutableBufferPointer<Int32> {|}}
 //   expected-remark@3{{macro content: |    return unsafe UnsafeMutableBufferPointer<Int32>(start: unsafe returnPointer(len), count: Int(len))|}}
@@ -117,10 +117,10 @@ module Method {
 // }}
 - (int * __counted_by(len)) returnPointer:(int)len;
 
-// expected-expansion@+10:2{{
+// expected-expansion@+10:1{{
 //   expected-note@1 5{{in expansion of macro '_SwiftifyImport' on class method 'staticMethod' here}}
 // }}
-// expected-expansion@+7:60{{
+// expected-expansion@+7:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public class final func staticMethod(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
