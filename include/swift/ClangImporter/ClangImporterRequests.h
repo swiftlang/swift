@@ -366,9 +366,12 @@ class ForeignReferenceTypeInfo {
 
   llvm::PointerIntPair<const clang::RecordDecl *, 2> BaseAndFlags;
 
-  ForeignReferenceTypeInfo(const clang::RecordDecl *decl, bool isValid,
-                           bool isRef)
-      : BaseAndFlags{decl} {
+  const clang::CXXRecordDecl *primarySuperclass = nullptr;
+
+  ForeignReferenceTypeInfo(const clang::RecordDecl *decl,
+                           const clang::CXXRecordDecl *primarySuperclass,
+                           bool isValid, bool isRef)
+      : BaseAndFlags{decl}, primarySuperclass(primarySuperclass) {
     unsigned int flags = 0;
     flags |= isValid ? FlagIsValid : 0;
     flags |= isRef ? FlagIsRef : 0;
@@ -381,14 +384,16 @@ public:
 
   /// Not a reference type
   static ForeignReferenceTypeInfo Value(bool isValid = true) {
-    return {nullptr, isValid, /*isRef=*/false};
+    return {nullptr, nullptr, isValid, /*isRef=*/false};
   }
 
   /// A shared reference type using the retain/release functions from \a decl.
-  static ForeignReferenceTypeInfo Shared(const clang::RecordDecl *decl,
-                                         bool isValid = true) {
+  static ForeignReferenceTypeInfo
+  Shared(const clang::RecordDecl *decl,
+         const clang::CXXRecordDecl *primarySuperclass = nullptr,
+         bool isValid = true) {
     ASSERT(decl && "shared reference must have a non-null base decl");
-    return {decl, isValid, /*isRef=*/true};
+    return {decl, primarySuperclass, isValid, /*isRef=*/true};
   }
 
   /// The base decl that is annotated with the retain/release functions that
@@ -413,6 +418,14 @@ public:
   ///
   /// This is independent of whether those attributes are actually valid.
   bool isReference() const { return BaseAndFlags.getInt() & FlagIsRef; }
+
+  /// The single FRT base that is the primary (first) direct base of this
+  /// type, suitable for use as the Swift superclass. Returns nullptr if there
+  /// is no single primary FRT base (e.g., multiple FRT bases, or the FRT
+  /// base is not the first direct base).
+  const clang::CXXRecordDecl *getPrimarySuperclass() const {
+    return primarySuperclass;
+  }
 };
 
 struct ForeignReferenceTypeInfoDescriptor {

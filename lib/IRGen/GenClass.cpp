@@ -235,7 +235,8 @@ namespace {
 
       if (theClass->isNativeNSObjectSubclass()) {
         // For layout purposes, we don't have ObjC ancestry.
-      } else if (theClass->hasSuperclass()) {
+      } else if (theClass->hasSuperclass() &&
+                 !theClass->isForeignReferenceType()) {
         SILType superclassType = classType.getSuperclass();
         auto superclassDecl = superclassType.getClassOrBoundGenericClass();
         assert(superclassType && superclassDecl);
