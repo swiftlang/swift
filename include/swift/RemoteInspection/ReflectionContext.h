@@ -1683,6 +1683,10 @@ public:
     return Descriptor->getTypeContextDescriptorFlags().class_isActor();
   }
 
+  size_t metadataSize(RemoteAddress MetadataAddress) {
+    return this->readMetadataAndSize(MetadataAddress).second;
+  }
+
   /// Iterate the protocol conformance cache tree rooted at NodePtr, calling
   /// Call with the type and protocol in each node.
   void iterateConformanceTree(

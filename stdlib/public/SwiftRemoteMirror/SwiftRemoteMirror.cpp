@@ -398,6 +398,15 @@ int swift_reflection_metadataIsActor(SwiftReflectionContextRef ContextRef,
   });
 }
 
+size_t
+swift_reflection_metadataSize(SwiftReflectionContextRef ContextRef,
+                              swift_reflection_ptr_t Metadata) {
+  return ContextRef->withContext([&](auto *Context) -> size_t {
+    return Context->metadataSize(
+        RemoteAddress(Metadata, RemoteAddress::DefaultAddressSpace));
+  });
+}
+
 swift_typeref_t
 swift_reflection_typeRefForInstance(SwiftReflectionContextRef ContextRef,
                                     uintptr_t Object) {
