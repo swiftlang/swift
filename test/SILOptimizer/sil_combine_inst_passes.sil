@@ -167,7 +167,7 @@ bb2:
   br bb3(%1 : $Buffer)
 
 bb3(%9 : @guaranteed $Buffer):
-  %10 = borrowed %9 : $Buffer from (%1 : $Buffer)
+  %10 = borrowed %9 : $Buffer from (%0, %1)
   %r = tuple ()
   return %r : $()
 }
