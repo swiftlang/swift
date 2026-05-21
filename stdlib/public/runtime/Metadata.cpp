@@ -8211,43 +8211,43 @@ static void recordBacktrace(void *allocation) {
   });
 }
 
-static inline bool scribbleEnabled() {
-#ifndef NDEBUG
-  // When DEBUG is defined, always scribble.
-  return true;
-#else
-  // When DEBUG is not defined, only scribble when the
-  // SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE environment variable is set.
-  return SWIFT_UNLIKELY(
-          runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE());
-#endif
-}
-
-static constexpr char scribbleByte = 0xAA;
+static std::optional<uint8_t> ScribbleByte;
 
 template <typename Pointee>
 static inline void memsetScribble(Pointee *bytes, size_t totalSize) {
-  if (scribbleEnabled())
-    memset(bytes, scribbleByte, totalSize);
+  if (SWIFT_LIKELY(!ScribbleByte))
+    return;
+
+  memset(bytes, ScribbleByte.value(), totalSize);
 }
 
 /// When scribbling is enabled, check the specified region for the scribble
 /// values to detect overflows. When scribbling is disabled, this is a no-op.
 static inline void checkScribble(char *bytes, size_t totalSize) {
-  if (scribbleEnabled())
-    for (size_t i = 0; i < totalSize; i++)
-      if (bytes[i] != scribbleByte) {
-        const size_t maxToPrint = 16;
-        size_t remaining = totalSize - i;
-        size_t toPrint = std::min(remaining, maxToPrint);
-        std::string hex = toHex(llvm::StringRef{&bytes[i], toPrint});
-        swift::fatalError(
-            0, "corrupt metadata allocation arena detected at %p: %s%s",
-            &bytes[i], hex.c_str(), toPrint < remaining ? "..." : "");
-      }
+  if (SWIFT_LIKELY(!ScribbleByte))
+    return;
+
+  // scribbleByte is unsigned, so do an unsigned comparison here.
+  auto ptr = reinterpret_cast<uint8_t *>(bytes);
+  for (size_t i = 0; i < totalSize; i++)
+    if (ptr[i] != ScribbleByte.value()) {
+      const size_t maxToPrint = 16;
+      size_t remaining = totalSize - i;
+      size_t toPrint = std::min(remaining, maxToPrint);
+      std::string hex = toHex(llvm::StringRef{&bytes[i], toPrint});
+      swift::fatalError(
+          0, "corrupt metadata allocation arena detected at %p: %s%s",
+          &bytes[i], hex.c_str(), toPrint < remaining ? "..." : "");
+    }
 }
 
 static void checkAllocatorDebugEnvironmentVariables(void *context) {
+  // Set our ScribbleByte from the environment variable. If it's not set but
+  // SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE is set, then set the byte to 0xaa.
+  ScribbleByte = runtime::environment::SWIFT_DEBUG_RUNTIME_ALLOC_SCRIBBLE_BYTE();
+  if (!ScribbleByte && runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE())
+    ScribbleByte = 0xaa;
+
   memsetScribble(InitialAllocationPool.Pool, InitialPoolSize);
 
   _swift_debug_metadataAllocationIterationEnabled =

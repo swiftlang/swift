@@ -41,8 +41,19 @@ VARIABLE(SWIFT_ENABLE_MANGLED_NAME_VERIFICATION, boolean, false,
          "Enable verification that metadata can roundtrip through a mangled "
          "name each time metadata is instantiated.")
 
+// This environment variable was the way to perform scribbling with older
+// runtimes and is kept for compatibility.
 VARIABLE(SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE, boolean, false,
+         "Scribble on runtime allocations with 0xaa. Equivalent to "
+         "SWIFT_DEBUG_RUNTIME_ALLOC_SCRIBBLE_BYTE=0xaa.")
+
+#ifndef NDEBUG
+VARIABLE(SWIFT_DEBUG_RUNTIME_ALLOC_SCRIBBLE_BYTE, optional_uint8, 0xaa,
          "Scribble on runtime allocations such as metadata allocations.")
+#else
+VARIABLE(SWIFT_DEBUG_RUNTIME_ALLOC_SCRIBBLE_BYTE, optional_uint8, std::nullopt,
+         "Scribble on runtime allocations such as metadata allocations.")
+#endif
 
 VARIABLE(SWIFT_DEBUG_ENABLE_COW_CHECKS, boolean, false,
          "Enable internal checks for copy-on-write operations.")
