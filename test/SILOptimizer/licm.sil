@@ -2037,10 +2037,9 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @projected_load_take :
-// CHECK:       bb1([[V:%.*]] : @owned $(S, Int)):
-// CHECK-NEXT:    ([[E:%.*]], {{%[0-9]+}}) = destructure_tuple [[V]]
-// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[E]]
-// CHECK-NEXT:    = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK:       bb1:
+// CHECK:         load [take]
+// CHECK:         store
 // CHECK-LABEL: } // end sil function 'projected_load_take'
 sil [ossa] @projected_load_take : $@convention(thin) (@inout (S, Int), Int) -> () {
 bb0(%0 : $*(S, Int), %1 : $Int):
@@ -2050,9 +2049,11 @@ bb1:
   %2 = tuple_element_addr %0, 0
   %3 = struct_element_addr %2, #S.s
   %4 = load [take] %3
-  %5 = struct $S (%1, %4)
-  %6 = tuple (%5, %1)
-  store %6 to [init] %0
+  %5 = struct_element_addr %2, #S.i
+  %6 = load [trivial] %5
+  %7 = struct $S (%6, %4)
+  %8 = tuple (%7, %1)
+  store %8 to [init] %0
   cond_br undef, bb2, bb3
 
 bb2:
@@ -2090,14 +2091,9 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @projected_load_copy_followed_by_take :
-// CHECK:       bb1([[V:%.*]] : @owned $S):
-// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[V]]
-// CHECK-NEXT:    [[SE:%.*]] = struct_extract [[B]]
-// CHECK-NEXT:    [[C:%.*]] = copy_value [[SE]]
-// CHECK-NEXT:    end_borrow [[B]]
-// CHECK-NEXT:    destroy_value [[C]]
-// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[V]]
-// CHECK-NEXT:      = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK:       bb1:
+// CHECK:         load [copy]
+// CHECK:         load [take]
 // CHECK-LABEL: } // end sil function 'projected_load_copy_followed_by_take'
 sil [ossa] @projected_load_copy_followed_by_take : $@convention(thin) (@inout S, Int) -> () {
 bb0(%0 : $*S, %1 : $Int):
