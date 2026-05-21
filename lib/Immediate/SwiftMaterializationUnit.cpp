@@ -77,8 +77,14 @@ SwiftJIT::Create(CompilerInstance &CI) {
 
   // Create generator to resolve symbols defined in current process
   auto &ES = (*J)->getExecutionSession();
-  auto EPCIU =
-      llvm::orc::EPCIndirectionUtils::Create(ES.getExecutorProcessControl());
+
+  auto MemAccess = ES.getExecutorProcessControl().createDefaultMemoryAccess();
+  if (!MemAccess)
+    return MemAccess.takeError();
+
+  auto EPCIU = llvm::orc::EPCIndirectionUtils::Create(
+      ES.getExecutorProcessControl(), **MemAccess);
+
   if (!EPCIU)
     return EPCIU.takeError();
 
@@ -88,7 +94,7 @@ SwiftJIT::Create(CompilerInstance &CI) {
   if (auto Err = setUpInProcessLCTMReentryViaEPCIU(**EPCIU))
     return std::move(Err);
   return std::unique_ptr<SwiftJIT>(
-      new SwiftJIT(std::move(*J), std::move(*EPCIU)));
+      new SwiftJIT(std::move(*J), std::move(*MemAccess), std::move(*EPCIU)));
 }
 
 SwiftJIT::~SwiftJIT() {
@@ -237,8 +243,9 @@ void SwiftJIT::handleLazyCompilationFailure() {
 }
 
 SwiftJIT::SwiftJIT(std::unique_ptr<llvm::orc::LLJIT> J,
+                   std::unique_ptr<llvm::orc::MemoryAccess> MemAccess,
                    std::unique_ptr<llvm::orc::EPCIndirectionUtils> EPCIU)
-    : J(std::move(J)), EPCIU(std::move(EPCIU)),
+    : J(std::move(J)), MemAccess(std::move(MemAccess)), EPCIU(std::move(EPCIU)),
       LCTM(this->EPCIU->getLazyCallThroughManager()),
       ISM(this->EPCIU->createIndirectStubsManager()) {}
 
