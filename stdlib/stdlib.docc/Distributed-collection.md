@@ -46,18 +46,19 @@ You use three main parts when writing code with distributed actors:
 ### Distributed actors
 
 - ``Distributed/DistributedActor``
-- ``Distributed/DistributedActorSystem``
 - ``Distributed/Resolvable()``
 - ``Distributed/buildDefaultDistributedRemoteActorExecutor(_:)``
+
+### Distributed actor system
+
 - <doc:implementing-a-custom-distributed-actor-system>
-
-### Remote calls
-
+- ``Distributed/DistributedActorSystem``
 - ``Distributed/RemoteCallTarget``
 - ``Distributed/RemoteCallArgument``
 - ``Distributed/DistributedTargetInvocationEncoder``
 - ``Distributed/DistributedTargetInvocationDecoder``
 - ``Distributed/DistributedTargetInvocationResultHandler``
+
 
 ### Local testing
 
