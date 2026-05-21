@@ -1231,7 +1231,8 @@ namespace {
       case clang::Type::HLSLAttributedResource:
       case clang::Type::HLSLInlineSpirv:
         llvm_unreachable("HLSL type in ABI lowering");
-
+      case clang::Type::OverflowBehavior:
+        llvm_unreachable("OverflowBehavior type in ABI lowering");
 
       case clang::Type::ConstantArray: {
         auto array = Ctx.getAsConstantArrayType(type);
@@ -5627,8 +5628,7 @@ bool IRGenFunction::emitBranchToReturnBB() {
     // it into its predecessor.
   } else if (ReturnBB->hasOneUse()) {
     // return statements are never emitted as conditional branches.
-    llvm::BranchInst *Br = cast<llvm::BranchInst>(*ReturnBB->use_begin());
-    assert(Br->isUnconditional());
+    auto *Br = cast<llvm::UncondBrInst>(*ReturnBB->use_begin());
     Builder.SetInsertPoint(Br->getParent());
     Br->eraseFromParent();
     ReturnBB->eraseFromParent();
