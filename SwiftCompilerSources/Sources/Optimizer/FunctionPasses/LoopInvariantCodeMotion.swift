@@ -857,7 +857,7 @@ private extension MovableInstructions {
       }
     
       let builder = Builder(before: loadInst, context)
-      let projection = if loadInst.loadOwnership == .copy {
+      let projection = if loadInst.loadOwnership == .copy || loadInst.loadOwnership == .trivial {
         rootVal.createProjectionAndCopy(path: projectionPath, builder: builder)
       } else {
         rootVal.createProjection(path: projectionPath, builder: builder)
