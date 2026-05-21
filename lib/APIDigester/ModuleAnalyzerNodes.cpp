@@ -157,7 +157,8 @@ SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
 
 SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info)
     : SDKNode(Info, SDKNodeKind::Conformance), Usr(Info.Usr),
-      MangledName(Info.MangledName) {}
+      MangledName(Info.MangledName),
+      IsMarkerProtocol(Info.IsMarkerProtocol) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -1474,6 +1475,7 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform):
     SDKNodeInitInfo(Ctx, Conform.getProtocol()) {
+  IsMarkerProtocol = Conform.getProtocol()->isMarkerProtocol();
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
   if (Conform.isConcrete()) {
@@ -2104,6 +2106,7 @@ void SDKNodeConformance::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   output(out, KeyKind::KK_usr, Usr);
   output(out, KeyKind::KK_mangledName, MangledName);
+  output(out, KeyKind::KK_isMarkerProtocol, IsMarkerProtocol);
 }
 
 void SDKNodeDecl::jsonize(json::Output &out) {
