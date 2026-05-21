@@ -393,10 +393,10 @@ extension String {
 }
 
 extension PluginMessage.Syntax {
-  init?(syntax: Syntax, in sourceFilePtr: UnsafePointer<ExportedSourceFile>) {
+  init?(syntax: Syntax, in sourceFilePtr: UnsafePointer<ExportedSourceFile>, pluginProtocolVersion: Int = PluginMessage.PROTOCOL_VERSION_NUMBER) {
     let kind: PluginMessage.Syntax.Kind
     switch true {
-    case syntax.is(AccessorDeclSyntax.self): kind = .accessor
+    case syntax.is(AccessorDeclSyntax.self): kind = pluginProtocolVersion >= 8 ? .accessor : .declaration
     case syntax.is(DeclSyntax.self): kind = .declaration
     case syntax.is(ExprSyntax.self): kind = .expression
     case syntax.is(StmtSyntax.self): kind = .statement
@@ -424,10 +424,10 @@ extension PluginMessage.Syntax {
     )
   }
 
-  init?(syntax: Syntax) {
+  init?(syntax: Syntax, pluginProtocolVersion: Int = PluginMessage.PROTOCOL_VERSION_NUMBER) {
     let kind: PluginMessage.Syntax.Kind
     switch true {
-    case syntax.is(AccessorDeclSyntax.self): kind = .accessor
+    case syntax.is(AccessorDeclSyntax.self): kind = pluginProtocolVersion >= 8 ? .accessor : .declaration
     case syntax.is(DeclSyntax.self): kind = .declaration
     case syntax.is(ExprSyntax.self): kind = .expression
     case syntax.is(StmtSyntax.self): kind = .statement
