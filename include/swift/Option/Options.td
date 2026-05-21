@@ -196,7 +196,7 @@ def validate_clang_modules_once :
   HelpText<"Don't verify input files for Clang modules if the module has been successfully validated or loaded during this build session">;
 
 def clang_build_session_file : Separate<["-"], "clang-build-session-file">,
-  Flags<[FrontendOption, ArgumentIsPath]>,
+  Flags<[FrontendOption, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Use the last modification time of <file> as the underlying Clang build session timestamp">;
 
 def disallow_forwarding_driver :
@@ -556,7 +556,7 @@ def localization_path : Separate<["-"], "localization-path">,
 def module_cache_path : Separate<["-"], "module-cache-path">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath,
          SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
-         SwiftSynthesizeInterfaceOption]>,
+         SwiftSynthesizeInterfaceOption, CacheInvariant]>,
   HelpText<"Specifies the module cache path">;
 
 def enable_library_evolution : Flag<["-"], "enable-library-evolution">,
@@ -2376,11 +2376,11 @@ def cas_plugin_option: Separate<["-"], "cas-plugin-option">,
   HelpText<"Option pass to CAS Plugin">, MetaVarName<"<name>=<option>">;
 
 def clang_scanner_module_cache_path : Separate<["-"], "clang-scanner-module-cache-path">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Specifies the Clang dependency scanner module cache path">;
 
 def sdk_module_cache_path : Separate<["-"], "sdk-module-cache-path">,
-  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath]>,
+  Flags<[FrontendOption, DoesNotAffectIncrementalBuild, ArgumentIsPath, CacheInvariant]>,
   HelpText<"Specifies the module cache path for explicitly-built SDK modules">;
 
 def scanner_prefix_map_paths : MultiArg<["-"], "scanner-prefix-map-paths", 2>,
