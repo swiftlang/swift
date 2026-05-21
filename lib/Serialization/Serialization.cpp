@@ -1198,7 +1198,7 @@ void Serializer::writeHeader() {
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
 
-      if (M->getName().is("OSLog")) {
+      if (M->getName().is("os")) {
         options_block::OSLogStringSectionNameLayout OSLogStringSectionName(Out);
         OSLogStringSectionName.emit(ScratchRecord,
                                     M->getASTContext().LangOpts.OSLogStringSectionName);
