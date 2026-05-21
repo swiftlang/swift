@@ -16,5 +16,3 @@ func exceptInt<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 // The shorthand alias also requires the experimental feature.
 @_preInverseGenericsExceptCopyable // expected-error {{'@_preInverseGenerics' is an experimental feature; use '-enable-experimental-feature PreInverseGenericsExcept'}}
 func exceptCopyableShorthand<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
-
-
