@@ -463,7 +463,7 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
   return maybeKind;
 }
 
-std::optional<SILLocation>
+llvm::Expected<std::optional<SILLocation>>
 SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
   unsigned LocationKind, Implicit = 0;
   SILLocation::FilenameAndLocation *FNameLoc = nullptr;
@@ -475,6 +475,8 @@ SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
     SourceLocRefLayout::readRecord(scratch, LocID, LocationKind, Implicit);
     if (LocID == 0)
       return std::optional<SILLocation>();
+    if (LocID > ParsedLocs.size())
+      return llvm::createStringError("Source location reference out of range\n");
     FNameLoc = ParsedLocs[LocID - 1];
   } else {
     ValueID Row = 0, Col = 0, FNameID = 0;
@@ -512,8 +514,10 @@ SILDeserializer::readDebugScopes(SILFunction *F,
   if (kind == SIL_DEBUG_SCOPE_REF) {
     ValueID ScopeID;
     SILDebugScopeRefLayout::readRecord(scratch, ScopeID);
-    assert(ParsedScopes.find(ScopeID) != ParsedScopes.end());
-    return ParsedScopes[ScopeID];
+    auto it = ParsedScopes.find(ScopeID);
+    if (it == ParsedScopes.end())
+      return llvm::createStringError("Referenced debug scope not found\n");
+    return it->second;
   }
 
   BCOffsetRAII restoreOffset(SILCursor);
@@ -1253,7 +1257,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       Builder.setCurrentDebugScope(Scope);
     } else if (kind == SIL_SOURCE_LOC || kind == SIL_SOURCE_LOC_REF) {
       auto Loc = readLoc(kind, scratch);
-      Builder.applyDebugLocOverride(Loc);
+      if (!Loc)
+        return Loc.takeError();
+      Builder.applyDebugLocOverride(Loc.get());
     } else {
       // If CurrentBB is empty, just return fn. The code in readSILInstruction
       // assumes that such a situation means that fn is a declaration. Thus it
