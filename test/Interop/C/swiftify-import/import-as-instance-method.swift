@@ -245,7 +245,7 @@ public func lifetimeBoundSelf(_ a: A, _ len: Int32) -> MutableSpan<Int32> {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-public func refSelf(_ p: inout MutableSpan<Int32>) {
+public final func refSelf(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
@@ -275,7 +275,7 @@ public func refSelf(_ c: C!, _ p: inout MutableSpan<Int32>) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-public func refSelf(_ p: inout MutableSpan<Int32>) {
+public final func refSelf(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
     let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
@@ -376,7 +376,7 @@ public func createA2(_ p: inout MutableSpan<Int32>) -> UnsafeMutablePointer<A>! 
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public /*not inherited*/ convenience init!(pointerC p: UnsafeMutableBufferPointer<Int32>) {
+public /*not inherited*/ final convenience init!(pointerC p: UnsafeMutableBufferPointer<Int32>) {
     let len = Int32(exactly: p.count)!
     unsafe self.init(countC: len, pointerC: p.baseAddress!)
 }

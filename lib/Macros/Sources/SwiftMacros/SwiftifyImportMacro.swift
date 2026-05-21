@@ -1783,16 +1783,24 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
     + disfavoredOverload)
   let trivia =
     leadingTrivia + .docLineComment("/// This is an auto-generated wrapper for safer interop\n")
+  var modifiers = funcComponents.modifiers
+  if parentNode?.as(ClassDeclSyntax.self) != nil {
+    if let openIdx = modifiers.firstIndex(where: { mod in mod.name.tokenKind == .keyword(.open)}) {
+      // "open final" is not allowed in Swift
+      modifiers[openIdx] = DeclModifierSyntax(name: .keyword(.public))
+    }
+    modifiers.append(DeclModifierSyntax(name: .keyword(.final)))
+  }
   if let origFuncDecl = declaration.as(FunctionDeclSyntax.self) {
     return DeclSyntax(
       origFuncDecl
         .with(\.signature, newSignature)
         .with(\.body, body)
         .with(\.attributes, attributes)
+        .with(\.modifiers, modifiers)
         .with(\.leadingTrivia, trivia))
   }
   if let origInitDecl = declaration.as(InitializerDeclSyntax.self) {
-    var modifiers = funcComponents.modifiers
     if parentNode?.as(ClassDeclSyntax.self) != nil { // convenience inits are forbidden in structs
       let alreadyConvenienceInit = modifiers.contains(where: { mod in
         mod.name.text == "convenience"
