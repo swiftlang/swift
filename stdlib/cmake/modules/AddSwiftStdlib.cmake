@@ -277,6 +277,13 @@ function(_add_target_variant_c_compile_flags)
     else()
       list(APPEND result "-g0")
     endif()
+
+    # Split DWARF is incompatible with RISC-V linker relaxation (-mrelax),
+    # which clang enables by default for RISC-V targets. Override any
+    # inherited -gsplit-dwarf from the parent (LLVM) build.
+    if("${CFLAGS_ARCH}" MATCHES "^riscv")
+      list(APPEND result "-gno-split-dwarf")
+    endif()
   endif()
 
   if("${CFLAGS_SDK}" STREQUAL "WINDOWS")
