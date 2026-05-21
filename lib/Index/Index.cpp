@@ -28,6 +28,8 @@
 #include "swift/AST/Types.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
+#include "clang/AST/DeclObjC.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -895,6 +897,29 @@ private:
     if (Loc.isInvalid() || isSuppressed(Loc))
       return true;
 
+    // When Clang's indexing encounters a "@compatibility_alias", it emits
+    // references to the underlying type. ClangImporter generates a typealias
+    // that is never emitted, so references to that typealias have no
+    // corresponding definition. Match Clang's behavior and reach through
+    // the alias to the underlying type.
+    auto resolveCompatibilityAlias = [](auto &decl) -> bool {
+      if (!decl)
+        return false;
+      if (auto *TAD = dyn_cast<TypeAliasDecl>(decl)) {
+        if (ClangNode ClangN = swift::ide::getEffectiveClangNode(TAD)) {
+          if (isa<clang::ObjCCompatibleAliasDecl>(ClangN.getAsDecl())) {
+            decl = TAD->getUnderlyingType()->getAnyNominal();
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    if (resolveCompatibilityAlias(D)) {
+      Data.isImplicit = true;
+    }
+
     IndexSymbol Info;
 
     // Dig back to the original captured variable
@@ -912,6 +937,9 @@ private:
 
     if (CtorTyRef) {
       IndexSymbol CtorInfo(Info);
+      if (resolveCompatibilityAlias(CtorTyRef)) {
+        CtorInfo.roles |= (unsigned)SymbolRole::Implicit;
+      }
       if (Data.isImplicitCtorType)
         CtorInfo.roles |= (unsigned)SymbolRole::Implicit;
       if (!reportRef(CtorTyRef, Loc, CtorInfo, Data.AccKind))
@@ -1609,11 +1637,23 @@ bool IndexSwiftASTWalker::reportRelatedTypeRefImpl(const TypeLoc &TL,
     return true;
 
   if (auto *TAD = dyn_cast<TypeAliasDecl>(VD)) {
-    IndexSymbol Info;
-    if (Implicit)
-      Info.roles |= (unsigned)SymbolRole::Implicit;
-    if (!reportRef(TAD, Loc, Info, std::nullopt))
-      return false;
+    bool isObjcCompAlias = false;
+    if (ClangNode ClangN = swift::ide::getEffectiveClangNode(TAD)) {
+      if (isa<clang::ObjCCompatibleAliasDecl>(ClangN.getAsDecl())) {
+        isObjcCompAlias = true;
+      }
+    }
+
+    // Skip the reference to the typealias for an Objective-C compatibility
+    // alias. Match Clang's behavior by only emitting references to the
+    // underlying type.
+    if (!isObjcCompAlias) {
+      IndexSymbol Info;
+      if (Implicit)
+        Info.roles |= (unsigned)SymbolRole::Implicit;
+      if (!reportRef(TAD, Loc, Info, std::nullopt))
+        return false;
+    }
 
     // Recurse into the underlying type and report any found references as
     // implicit references at the location of the typealias reference.
