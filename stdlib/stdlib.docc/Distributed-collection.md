@@ -43,7 +43,7 @@ You use three main parts when writing code with distributed actors:
 
 ## Topics
 
-### Distributed Actors
+### Distributed actors
 
 - ``Distributed/DistributedActor``
 - ``Distributed/DistributedActorSystem``
@@ -51,7 +51,7 @@ You use three main parts when writing code with distributed actors:
 - ``Distributed/buildDefaultDistributedRemoteActorExecutor(_:)``
 - <doc:implementing-a-custom-distributed-actor-system>
 
-### Remote Calls
+### Remote calls
 
 - ``Distributed/RemoteCallTarget``
 - ``Distributed/RemoteCallArgument``
@@ -59,7 +59,7 @@ You use three main parts when writing code with distributed actors:
 - ``Distributed/DistributedTargetInvocationDecoder``
 - ``Distributed/DistributedTargetInvocationResultHandler``
 
-### Local Testing
+### Local testing
 
 - ``Distributed/LocalTestingDistributedActorSystem``
 - ``Distributed/LocalTestingActorID``
