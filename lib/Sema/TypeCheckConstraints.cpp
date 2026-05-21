@@ -2089,8 +2089,12 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
         return CheckedCastKind::ValueCast;
 
       // Compare superclass bounds.
-      if (fromSuperclass->isBindableToSuperclassOf(toSuperclass))
+      if (fromSuperclass->isBindableToSuperclassOf(toSuperclass)) {
+        if (toType->isForeignReferenceType() ||
+            fromType->isForeignReferenceType())
+          return failed();
         return CheckedCastKind::ValueCast;
+      }
 
       // An upcast is also OK.
       if (toSuperclass->isBindableToSuperclassOf(fromSuperclass))

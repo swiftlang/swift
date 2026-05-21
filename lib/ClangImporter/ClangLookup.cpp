@@ -387,6 +387,17 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     for (const auto *valueDecl : result)
       foundMethodNames.insert(valueDecl->getName());
 
+    // If this FRT class has a single FRT superclass, skip looking up members
+    // from that base: they are reachable via the Swift superclass chain
+    // instead.
+    const clang::RecordDecl *superclassClangDecl = nullptr;
+    if (!inheritance) {
+      auto derivedInfo = evaluateOrDefault(
+          ctx.evaluator, ForeignReferenceTypeInfoRequest({cxxRecord}), {});
+      if (auto primaryBase = derivedInfo.getPrimarySuperclass())
+        superclassClangDecl = primaryBase;
+    }
+
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
         continue;
@@ -399,6 +410,10 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         continue;
 
       auto *baseRecord = baseType->getAs<clang::RecordType>()->getDecl();
+
+      if (superclassClangDecl && baseRecord->getCanonicalDecl() ==
+                                     superclassClangDecl->getCanonicalDecl())
+        continue;
 
       if (importer::isSymbolicCircularBase(cxxRecord, baseRecord))
         // Skip circular bases to avoid unbounded recursion
@@ -804,6 +819,13 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
   if (!R.has_value())
     return {};
 
+  // If this FRT class has a single FRT superclass, inherited overloads whose
+  // declaring class is that superclass (or a Clang base of it) are reachable
+  // via the Swift superclass chain and should not be synthesized here again.
+  auto frtInfo = evaluateOrDefault(
+      SwiftContext.evaluator, ForeignReferenceTypeInfoRequest({CXXRecord}), {});
+  auto superclassClangDecl = frtInfo.getPrimarySuperclass();
+
   llvm::SmallDenseMap<CXXOverloadArgTypes, std::pair<CXXOverload, CXXOverload>,
                       1>
       CXXSubscripts;
@@ -814,6 +836,14 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
     if (overload.method->isVolatile() ||
         overload.method->getRefQualifier() == clang::RQ_RValue)
       continue;
+
+    if (superclassClangDecl) {
+      auto methodParent = overload.method->getParent();
+      if (methodParent != CXXRecord &&
+          (methodParent == superclassClangDecl ||
+           superclassClangDecl->isDerivedFrom(methodParent)))
+        continue;
+    }
 
     auto retTy = overload.method->getReturnType();
     auto isSetter = (retTy->isAnyPointerType() || retTy->isReferenceType()) &&

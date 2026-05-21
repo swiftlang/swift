@@ -8091,7 +8091,7 @@ ClangImporter::createEmbeddedBridgingHeaderCacheKey(
                    "ChainedHeaderIncludeTree -> EmbeddedHeaderIncludeTree");
 }
 
-llvm::SmallVector<ValueDecl *, 1>
+TinyPtrVector<ValueDecl *>
 importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
   // If the name is empty, don't try to find any decls.
   if (name.empty())
@@ -8099,21 +8099,31 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
 
   auto &ctx = decl->getASTContext();
   auto clangDecl = decl->getClangDecl();
-  llvm::SmallVector<ValueDecl *, 1> results;
 
   if (name.consume_front(".")) {
     // Look for a member of decl instead of a global.
     if (name.empty())
       return {};
+
     auto declName = DeclName(ctx.getIdentifier(name));
-    auto swiftLookupResults = decl->lookupDirect(declName);
-    if (!swiftLookupResults.empty())
-      return SmallVector<ValueDecl *, 1>(swiftLookupResults.begin(),
-                                         swiftLookupResults.end());
-    auto allResults = evaluateOrDefault(
-        ctx.evaluator, ClangRecordMemberLookup({decl, declName}), {});
-    return SmallVector<ValueDecl *, 1>(allResults.begin(), allResults.end());
+    NominalTypeDecl *searchDecl = decl;
+    while (searchDecl) {
+      auto swiftLookupResults = searchDecl->lookupDirect(declName);
+      if (!swiftLookupResults.empty())
+        return swiftLookupResults;
+
+      auto allResults = evaluateOrDefault(
+          ctx.evaluator, ClangRecordMemberLookup({searchDecl, declName}), {});
+      if (!allResults.empty())
+        return allResults;
+
+      auto classDecl = dyn_cast<ClassDecl>(searchDecl);
+      searchDecl = classDecl ? classDecl->getSuperclassDecl() : nullptr;
+    }
+    return {};
   }
+
+  SmallVector<ValueDecl *, 1> results;
 
   auto *clangMod = clangDecl->getOwningModule();
   if (clangMod && clangMod->isSubModule())
@@ -8137,7 +8147,7 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
                        [&](ValueDecl *decl) { return !decl->getClangDecl(); });
     results.erase(newEnd, results.end());
   }
-  return results;
+  return TinyPtrVector<ValueDecl *>(ArrayRef(results));
 }
 
 /// Is this a pointer or a reference to a foreign reference type.
@@ -8737,8 +8747,7 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   if (name == "immortal")
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
-  llvm::SmallVector<ValueDecl *, 1> results =
-      getValueDeclsForName(const_cast<ClassDecl*>(swiftDecl), name);
+  auto results = getValueDeclsForName(const_cast<ClassDecl *>(swiftDecl), name);
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),
             name};

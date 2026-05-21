@@ -112,3 +112,8 @@ module RefKit {
   header "refkit.hpp"
   requires cplusplus
 }
+
+module Upcast {
+  header "upcast.h"
+  requires cplusplus
+}
