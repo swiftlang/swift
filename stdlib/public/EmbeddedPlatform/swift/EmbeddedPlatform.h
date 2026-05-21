@@ -130,6 +130,25 @@ void _swift_typedAllocate(
 int _swift_writeCharToStandardOutput(int c);
 
 /**
+ * Writes a sequence of UTF-8 code points to standard output.
+ *
+ * Parameters:
+ *   - `chars`: the UTF-8 code points to standard output. It is not
+ *     NULL-terminated.
+ *   - `count`: the number of UTF-8 code points.
+ *
+ * Returns the number of characters that were written.
+ *
+ * This function is required when using the Embedded Swift print() facilities.
+ *
+ * This function can be implemented as a call to fwrite or printf with the
+ * specified number of code points.
+ */
+int _swift_writeToStandardOutput(
+    const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(count) chars,
+    __swift_size_t count);
+
+/**
  * Generates random bytes into the given buffer.
  *
  * Parameters:

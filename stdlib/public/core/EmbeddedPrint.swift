@@ -17,80 +17,68 @@ import SwiftShims
 // printing to not need to heap allocate).
 
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-private func writeSingleChar(_ c: CInt) {
-  _ = _swift_writeCharToStandardOutput(c)
+private func _swift_writeToStandardOutput(_ pointer: UnsafePointer<UInt8>?, _ count: Int) -> CInt {
+  // TODO: Use _swift_writeCharToStandardOutput until clients provide their
+  // own C _swift_writeToStandardOutput.
+  for unsafe char in unsafe UnsafeBufferPointer(start: pointer, count: count) {
+    _ = unsafe _swift_writeCharToStandardOutput(CInt(char))
+  }
+  return CInt(count)
 }
 #else
 @_extern(c, "putchar")
 func putchar(_: CInt) -> CInt
-
-private func writeSingleChar(_ c: CInt) {
-  _ = putchar(c)
-}
 #endif
 
+
+private func writeChars(_ chars: UnsafeBufferPointer<UInt8>) {
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  _ = unsafe _swift_writeToStandardOutput(chars.baseAddress, chars.count)
+#else
+  for unsafe char in unsafe chars {
+    putchar(CInt(char))
+  }
+#endif
+}
+
+extension StaticString {
+  fileprivate func writeToStandardOutput() {
+    withUTF8Buffer {
+      unsafe writeChars($0)
+    }
+  }
+}
+
+extension String {
+  fileprivate mutating func writeToStandardOutput() {
+    withUTF8 {
+      unsafe writeChars($0)
+    }
+  }
+}
+
 public func print(_ string: StaticString, terminator: StaticString = "\n") {
-  var p = unsafe string.utf8Start
-  while unsafe p.pointee != 0 {
-    writeSingleChar(CInt(unsafe p.pointee))
-    unsafe p += 1
-  }
-  unsafe p = terminator.utf8Start
-  while unsafe p.pointee != 0 {
-    writeSingleChar(CInt(unsafe p.pointee))
-    unsafe p += 1
-  }
+  string.writeToStandardOutput()
+  terminator.writeToStandardOutput()
 }
 
 @_disfavoredOverload
 public func print(_ string: String, terminator: StaticString = "\n") {
   var string = string
-  string.withUTF8 { buf in
-    for unsafe c in unsafe buf {
-      writeSingleChar(CInt(c))
-    }
-  }
-  var p = unsafe terminator.utf8Start
-  while unsafe p.pointee != 0 {
-    writeSingleChar(CInt(unsafe p.pointee))
-    unsafe p += 1
-  }
+  string.writeToStandardOutput()
+  terminator.writeToStandardOutput()
 }
 
 @_disfavoredOverload
 public func print(_ object: some CustomStringConvertible, terminator: StaticString = "\n") {
   var string = object.description
-  string.withUTF8 { buf in
-    for unsafe c in unsafe buf {
-      writeSingleChar(CInt(c))
-    }
-  }
-  var p = unsafe terminator.utf8Start
-  while unsafe p.pointee != 0 {
-    writeSingleChar(CInt(unsafe p.pointee))
-    unsafe p += 1
-  }
+  string.writeToStandardOutput()
+  terminator.writeToStandardOutput()
 }
 
 func print(_ buf: UnsafeBufferPointer<UInt8>, terminator: StaticString = "\n") {
-  for unsafe c in unsafe buf {
-    writeSingleChar(CInt(c))
-  }
-  var p = unsafe terminator.utf8Start
-  while unsafe p.pointee != 0 {
-    unsafe writeSingleChar(CInt(p.pointee))
-    unsafe p += 1
-  }
-}
-
-func printCharacters(_ buf: UnsafeRawBufferPointer) {
-  for unsafe c in unsafe buf {
-    writeSingleChar(CInt(c))
-  }
-}
-
-func printCharacters(_ buf: UnsafeBufferPointer<UInt8>) {
-  unsafe printCharacters(UnsafeRawBufferPointer(buf))
+  unsafe writeChars(buf)
+  terminator.writeToStandardOutput()
 }
 
 extension BinaryInteger {
@@ -147,7 +135,7 @@ extension BinaryInteger {
 
     let count = unsafe _toStringImpl(buffer, 64, radix, false)
 
-    unsafe printCharacters(UnsafeBufferPointer(start: buffer, count: count))
+    unsafe writeChars(UnsafeBufferPointer(start: buffer, count: count))
 
     Builtin.stackDealloc(stackBuffer)
   }
@@ -178,11 +166,14 @@ public func _swift_fatalError(_ message: UnsafePointer<UInt8>) -> Never {
   if _isDebugAssertConfiguration() {
     print("fatal error", terminator: ": ")
 
+    var count = 0
     var pointer = unsafe message
     while unsafe pointer.pointee != 0 {
-      unsafe writeSingleChar(CInt(pointer.pointee))
+      count += 1
       unsafe pointer += 1
     }
+
+    unsafe writeChars(UnsafeBufferPointer(start: message, count: count))
   } else {
     Builtin.condfail_message(true._value, message._rawValue)
   }

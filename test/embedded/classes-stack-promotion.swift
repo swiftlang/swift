@@ -72,28 +72,36 @@ struct Main {
 
 // CHECK-IR:      define {{.*}}@"$e4main8MyStructVyAcA0B10FinalClassCcfC"
 // CHECK-IR-NEXT: entry:
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
 // CHECK-IR-NEXT:   call {{.*}}@swift_release
 // CHECK-IR-NEXT:   ret void
 // CHECK-IR-NEXT: }
 
-// CHECK-IR:      define {{.*}}@{{_*}}main
+// CHECK-IR:      define {{.*}}@"$e4main4MainVAAyyFZ"()
 // CHECK-IR-NEXT: entry:
 // CHECK-IR-NEXT:   alloca %T4main10MySubClassC
 // CHECK-IR-NEXT:   alloca %T4main12MyFinalClassC
 // CHECK-IR-NEXT:   call {{.*}}@swift_initStackObject
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
 // CHECK-IR-NEXT:   call {{.*}}@"$e4main3bar1oyAA7MyClassC_tF"
 // CHECK-IR-NEXT:   call {{.*}}@swift_setDeallocating
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
 // CHECK-IR-NEXT:   call {{.*}}@llvm.lifetime.end.p0
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
 // CHECK-IR-NEXT:   call {{.*}}@swift_initStackObject
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
+// CHECK-IR-NEXT:   call {{.*}}@"$es12StaticStringV21writeToStandardOutput
 // CHECK-IR-NEXT:   call {{.*}}@"$e4main8MyStructVyAcA0B10FinalClassCcfC"
 // CHECK-IR-NEXT:   call {{.*}}@llvm.lifetime.end.p0
-// CHECK-IR-NEXT:   ret {{.*}}0
+// CHECK-IR-NEXT:   ret
 // CHECK-IR-NEXT: }
