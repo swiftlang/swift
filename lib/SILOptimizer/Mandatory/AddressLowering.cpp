@@ -1022,7 +1022,12 @@ static Operand *getProjectedDefOperand(SILValue value) {
 /// is address-only, then the operand must be address-only and therefore must
 /// mapped to ValueStorage.
 ///
-/// If \p value is an unchecked_bitwise_cast, then return the cast operand.
+/// If \p value is an unchecked_bitwise_cast or unchecked_value_cast with an
+/// address-only source operand, then return the cast operand. When the source
+/// operand is loadable, return nullptr instead: the cast result needs its own
+/// storage so the loadable source value can be stored into an
+/// unchecked_addr_cast view of that storage. The DefRewriter handles this
+/// case.
 ///
 /// open_existential_value must reuse storage because the boxed value is shared
 /// with other instances of the existential. An explicit copy is needed to
@@ -1042,7 +1047,12 @@ static Operand *getReusedStorageOperand(SILValue value) {
   case ValueKind::UncheckedEnumDataInst:
     return &cast<SingleValueInstruction>(value)->getOperandRef(0);
 
+  case ValueKind::UncheckedValueCastInst:
   case ValueKind::UncheckedBitwiseCastInst: {
+    // Only share storage when the source is address-only. A loadable source
+    // has no ValueStorage to share; the DefRewriter materializes fresh storage
+    // for the cast result and stores the loadable source through an
+    // unchecked_addr_cast view.
     auto *castInst = cast<SingleValueInstruction>(value);
     if (!castInst->getOperand(0)->getType().isAddressOnly(
             *castInst->getFunction()))
@@ -3771,9 +3781,8 @@ protected:
   // Extract from an opaque pack tuple.
   void visitTuplePackExtractInst(TuplePackExtractInst *extractInst);
 
-  void
-  visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCastInst) {
-    SILValue srcVal = uncheckedCastInst->getOperand();
+  void rewriteOpaqueUncheckedCastUse(SingleValueInstruction *uncheckedCastInst) {
+    SILValue srcVal = uncheckedCastInst->getOperand(0);
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
 
     auto destAddr = builder.createUncheckedAddrCast(
@@ -3800,6 +3809,15 @@ protected:
     uncheckedCastInst->replaceAllUsesWith(load);
     pass.deleter.forceDelete(uncheckedCastInst);
     emitEndBorrows(load, pass);
+  }
+
+  void
+  visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCastInst) {
+    rewriteOpaqueUncheckedCastUse(uncheckedCastInst);
+  }
+
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *uncheckedCastInst) {
+    rewriteOpaqueUncheckedCastUse(uncheckedCastInst);
   }
 
   void visitUnconditionalCheckedCastInst(

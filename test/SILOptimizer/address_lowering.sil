@@ -3146,6 +3146,21 @@ bb0(%0 : @owned $Klass):
   return %1 : $T
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_value_cast_opaque :
+// CHECK:       bb0(%0 : $*U, %1 : $*T):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr %1 to [init] [[STK]] : $*T
+// CHECK:         [[CAST:%[^,]+]] = unchecked_addr_cast [[STK]] : $*T to $*U
+// CHECK:         copy_addr [take] [[CAST]] to [init] %0 : $*U
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_unchecked_value_cast_opaque'
+sil hidden [ossa] @test_unchecked_value_cast_opaque : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = unchecked_value_cast %1 : $T to $U
+  return %2 : $U
+}
+
 // CHECK-LABEL: sil hidden [ossa] @test_unconditional_checked_cast1 : $@convention(thin) <T> (Builtin.Int64) -> @out T {
 // CHECK: bb0(%0 : $*T, %1 : $Builtin.Int64):
 // CHECK:   [[INT:%.*]] = alloc_stack $Builtin.Int64
