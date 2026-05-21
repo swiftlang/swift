@@ -1214,6 +1214,23 @@ bool BoundsCheckOpts::removeRedundantArrayChecksInBlock(SILBasicBlock &BB) {
   return Changed;
 }
 
+static bool canOptimize(FixedStorageSemanticsCall call) {
+  if (!call.hasSelf()) {
+    return false;
+  }
+  auto selfValue = call.getSelf();
+  if (!selfValue->getType().isAddress()) {
+    return true;
+  }
+  auto rootAddr = lookThroughAddressAndValueProjections(selfValue);
+  auto *funcArg = dyn_cast<SILFunctionArgument>(rootAddr);
+  if (!funcArg || funcArg->getArgumentConvention() !=
+                      SILArgumentConvention::Indirect_In_Guaranteed) {
+    return false;
+  }
+  return true;
+}
+
 bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block) {
   bool changed = false;
 
@@ -1231,6 +1248,10 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInBlock(SILBasicBlock &block)
         fixedStorageCall.getKind() !=
             FixedStorageSemanticsCallKind::CheckIndex ||
         fixedStorageCall->getNumArguments() < 2) {
+      continue;
+    }
+
+    if (!canOptimize(fixedStorageCall)) {
       continue;
     }
 
@@ -1700,13 +1721,11 @@ bool BoundsCheckOpts::hoistFixedStorageBoundsChecksInLoop(
             FixedStorageSemanticsCallKind::CheckIndex) {
       continue;
     }
-
-    if (!fixedStorageSemantics->hasSelfArgument()) {
+    if (!canOptimize(fixedStorageSemantics)) {
       continue;
     }
 
-    auto selfValue = fixedStorageSemantics->getSelfArgument();
-
+    auto selfValue = fixedStorageSemantics.getSelf();
     if (!DT->dominates(selfValue->getParentBlock(), preheader)) {
       LLVM_DEBUG(llvm::dbgs()
                  << "  " << *selfValue << " does not dominate preheader\n");
@@ -1798,7 +1817,7 @@ bool BoundsCheckOpts::removeRedundantFixedStorageBoundsChecksInLoop(
       continue;
     }
 
-    if (!fixedStorageSemantics->hasSelfArgument()) {
+    if (!canOptimize(fixedStorageSemantics)) {
       continue;
     }
 
