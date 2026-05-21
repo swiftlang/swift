@@ -189,7 +189,7 @@ extension UniqueArray {
     copying newElements: UnsafeBufferPointer<Element>
   ) {
     // FIXME: Avoid moving the subsequent elements twice.
-    _ensureFreeCapacity(newElements.count)
+    _ensureFreeCapacity(newElements.count - subrange.count)
     unsafe _storage.replace(removing: subrange, copying: newElements)
   }
 
@@ -267,7 +267,7 @@ extension UniqueArray {
     copying newElements: Span<Element>
   ) {
     // FIXME: Avoid moving the subsequent elements twice.
-    _ensureFreeCapacity(newElements.count)
+    _ensureFreeCapacity(newElements.count - subrange.count)
     _storage.replace(removing: subrange, copying: newElements)
   }
 
@@ -307,7 +307,7 @@ extension UniqueArray {
   ) {
     // FIXME: Avoid moving the subsequent elements twice.
     let c = newElements.count
-    _ensureFreeCapacity(c)
+    _ensureFreeCapacity(c - subrange.count)
     _storage._replace(
       removing: subrange,
       copyingCollection: newElements,
