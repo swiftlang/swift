@@ -1060,21 +1060,21 @@ def default_isolation_EQ :  Joined<["-"], "default-isolation=">,
 
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enable an experimental feature">;
 
 def disable_experimental_feature :
   Separate<["-"], "disable-experimental-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Disable an experimental feature">;
 
 def enable_upcoming_feature : Separate<["-"], "enable-upcoming-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enable a feature that will be introduced in an upcoming language "
            "version">;
 
 def disable_upcoming_feature : Separate<["-"], "disable-upcoming-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Disable a feature that will be introduced in an upcoming language "
            "version">;
 

@@ -167,6 +167,9 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   if (ParsedArgs.hasArg(OPT_disable_safe_interop_wrappers))
     Invocation.getLangOptions().DisableSafeInteropWrappers = true;
 
+  if (parseFeatureArgs(Invocation.getLangOptions(), ParsedArgs, Diags))
+    return EXIT_FAILURE;
+
   std::string ModuleCachePath = "";
   if (auto *A = ParsedArgs.getLastArg(OPT_module_cache_path)) {
     ModuleCachePath = A->getValue();

@@ -857,9 +857,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   return false;
 }
 
-static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
-                                    DiagnosticEngine &Diags,
-                                    const FrontendOptions &FrontendOpts) {
+bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
+                             DiagnosticEngine &Diags) {
   using namespace options;
 
   bool HadError = false;
@@ -1369,7 +1368,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalStringProcessing = true;
   }
 
-  if (ParseEnabledFeatureArgs(Opts, Args, Diags, FrontendOpts))
+  if (parseFeatureArgs(Opts, Args, Diags))
     HadError = true;
 
   // SuppressedAssociatedTypesWithDefaults is now always-on by default.
