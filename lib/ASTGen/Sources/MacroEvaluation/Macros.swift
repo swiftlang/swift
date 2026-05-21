@@ -634,16 +634,36 @@ func expandAttachedMacro(
 
 /// Produce the full lexical context of the given node to pass along to
 /// macro expansion.
-private func lexicalContext(of node: some SyntaxProtocol) -> [Syntax] {
+private func lexicalContext(
+  of node: some SyntaxProtocol,
+  parentDeclNode: DeclSyntax? = nil
+) -> [Syntax] {
   // FIXME: Should we query the source manager to get the macro expansion
   // information?
-  node.allMacroLexicalContexts()
+  guard let parentDeclNode else {
+    return node.allMacroLexicalContexts()
+  }
+
+  var didInjectParentDecl = false
+  return node.allMacroLexicalContexts { _ in
+    guard !didInjectParentDecl else {
+      return nil
+    }
+
+    didInjectParentDecl = true
+    return Syntax(parentDeclNode)
+  }
 }
 
 /// Produce the full lexical context of the given node to pass along to
 /// macro expansion.
-private func pluginLexicalContext(of node: some SyntaxProtocol) -> [PluginMessage.Syntax] {
-  lexicalContext(of: node).compactMap { .init(syntax: $0) }
+private func pluginLexicalContext(
+  of node: some SyntaxProtocol,
+  parentDeclNode: DeclSyntax? = nil
+) -> [PluginMessage.Syntax] {
+  lexicalContext(of: node, parentDeclNode: parentDeclNode).compactMap {
+    .init(syntax: $0)
+  }
 }
 
 func expandAttachedMacroImpl(
@@ -730,7 +750,10 @@ func expandAttachedMacroImpl(
       parentDeclSyntax: parentDeclSyntax,
       extendedTypeSyntax: extendedTypeSyntax,
       conformanceListSyntax: conformanceListSyntax,
-      lexicalContext: pluginLexicalContext(of: declarationNode),
+      lexicalContext: pluginLexicalContext(
+        of: declarationNode,
+        parentDeclNode: parentDeclNode
+      ),
       staticBuildConfiguration: try cContext.staticBuildConfiguration.asJSON
     )
     let expandedSource: String?
