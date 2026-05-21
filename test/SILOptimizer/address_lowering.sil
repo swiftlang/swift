@@ -3073,6 +3073,21 @@ bb0(%0 : @guaranteed $T, %1 : $@thick U.Type):
   return %6 : $U
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast_from_loadable_trivial :
+// CHECK:       bb0(%0 : $*T, %1 : $Builtin.Int64):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         [[CAST:%[^,]+]] = unchecked_addr_cast [[STK]] : $*T to $*Builtin.Int64
+// CHECK:         store %1 to [trivial] [[CAST]] : $*Builtin.Int64
+// CHECK:         copy_addr [[STK]] to [init] %0 : $*T
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_unchecked_bitwise_cast_from_loadable_trivial'
+sil hidden [ossa] @test_unchecked_bitwise_cast_from_loadable_trivial : $@convention(thin) <T> (Builtin.Int64) -> @out T {
+bb0(%0 : $Builtin.Int64):
+  %1 = unchecked_bitwise_cast %0 : $Builtin.Int64 to $T
+  %2 = copy_value %1 : $T
+  return %2 : $T
+}
+
 // There's only one use and it's a copy, just rewrite it as a load [copy].
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast_to_loadable :
 // CHECK:       {{bb[0-9]+}}([[ADDR_IN:%[^,]+]] : $*T):
@@ -3118,6 +3133,17 @@ bb0(%instance : @guaranteed $T):
   destroy_value %klass2 : $Klass
   destroy_value %copy : $T
   return %klass : $Klass
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_value_cast_from_loadable :
+// CHECK:       bb0(%0 : $*T, %1 : @owned $Klass):
+// CHECK:         [[CAST:%[^,]+]] = unchecked_addr_cast %0 : $*T to $*Klass
+// CHECK:         store %1 to [init] [[CAST]] : $*Klass
+// CHECK-LABEL: } // end sil function 'test_unchecked_value_cast_from_loadable'
+sil hidden [ossa] @test_unchecked_value_cast_from_loadable : $@convention(thin) <T> (@owned Klass) -> @out T {
+bb0(%0 : @owned $Klass):
+  %1 = unchecked_value_cast %0 : $Klass to $T
+  return %1 : $T
 }
 
 // CHECK-LABEL: sil hidden [ossa] @test_unconditional_checked_cast1 : $@convention(thin) <T> (Builtin.Int64) -> @out T {

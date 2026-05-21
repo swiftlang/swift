@@ -1040,8 +1040,15 @@ static Operand *getReusedStorageOperand(SILValue value) {
   case ValueKind::OpenExistentialValueInst:
   case ValueKind::OpenExistentialBoxValueInst:
   case ValueKind::UncheckedEnumDataInst:
-  case ValueKind::UncheckedBitwiseCastInst:
     return &cast<SingleValueInstruction>(value)->getOperandRef(0);
+
+  case ValueKind::UncheckedBitwiseCastInst: {
+    auto *castInst = cast<SingleValueInstruction>(value);
+    if (!castInst->getOperand(0)->getType().isAddressOnly(
+            *castInst->getFunction()))
+      return nullptr;
+    return &castInst->getOperandRef(0);
+  }
 
   case ValueKind::SILPhiArgument: {
     if (auto *term = cast<SILPhiArgument>(value)->getTerminatorForResult()) {
@@ -4234,6 +4241,31 @@ protected:
     // results, and generating a new apply instruction.
     CallArgRewriter(applyInst, pass).rewriteArguments();
     ApplyRewriter(applyInst, pass).convertApplyWithIndirectResults();
+  }
+
+  void rewriteOpaqueUncheckedCastDef(SingleValueInstruction *uncheckedCast) {
+    SILValue srcVal = uncheckedCast->getOperand(0);
+    assert(!srcVal->getType().isAddressOnly(*pass.function) &&
+           "opaque operand should share storage via getReusedStorageOperand");
+
+    addrMat.materializeAddress(uncheckedCast);
+    SILValue destAddr = storage.storageAddress;
+    auto loc = uncheckedCast->getLoc();
+    SILValue srcView = builder.createUncheckedAddrCast(
+        loc, destAddr, srcVal->getType().getAddressType());
+    auto qual = srcVal->getType().isTrivial(*pass.function)
+                    ? StoreOwnershipQualifier::Trivial
+                    : StoreOwnershipQualifier::Init;
+    builder.createStore(loc, srcVal, srcView, qual);
+    storage.markRewritten();
+  }
+
+  void visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *uncheckedCast) {
+    rewriteOpaqueUncheckedCastDef(uncheckedCast);
+  }
+
+  void visitUncheckedValueCastInst(UncheckedValueCastInst *uncheckedCast) {
+    rewriteOpaqueUncheckedCastDef(uncheckedCast);
   }
 
   void visitBeginApplyInst(BeginApplyInst *bai) {
