@@ -34,6 +34,15 @@ struct AO {
   let a: AnyObject
 }
 
+struct Pair {
+  let c: C
+  let i: Int
+}
+
+struct GenStruct<T> {
+  let t: T
+}
+
 sil_global hidden [let] @gb : $B
 sil_global hidden [let] @gb2 : $(B, Int64)
 
@@ -586,5 +595,53 @@ bb0(%0 : $*AnyObject):
   destroy_value %2
   %6 = tuple ()
   return %6
+}
+
+// CHECK-LABEL: sil [ossa] @load_trivial_from_store_borrow :
+// CHECK-NOT:     load
+// CHECK:         return %0
+// CHECK:       } // end sil function 'load_trivial_from_store_borrow'
+sil [ossa] @load_trivial_from_store_borrow : $@convention(thin) (Int) -> Int {
+bb0(%0 : $Int):
+  %1 = alloc_stack $Int
+  %2 = store_borrow %0 to %1
+  %3 = load [trivial] %2
+  end_borrow %2
+  dealloc_stack %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @load_copy_from_store_borrow :
+// CHECK-NOT:     load
+// CHECK:         [[C:%.*]] = copy_value %0
+// CHECK:         return [[C]]
+// CHECK:       } // end sil function 'load_copy_from_store_borrow'
+sil [ossa] @load_copy_from_store_borrow : $@convention(thin) (@guaranteed C) -> @owned C {
+bb0(%0 : @guaranteed $C):
+  %1 = alloc_stack $C
+  %2 = store_borrow %0 to %1
+  %3 = load [copy] %2
+  end_borrow %2
+  dealloc_stack %1
+  return %3
+}
+
+// CHECK-LABEL: sil [ossa] @load_projected_copy_from_store_borrow :
+// CHECK-NOT:     load
+// CHECK:         [[B:%.*]] = begin_borrow %0
+// CHECK:         [[S:%.*]] = struct_extract [[B]]
+// CHECK:         [[C:%.*]] = copy_value [[S]]
+// CHECK:         return [[C]]
+// CHECK:       } // end sil function 'load_projected_copy_from_store_borrow'
+sil [ossa] @load_projected_copy_from_store_borrow : $@convention(thin) (@owned AO) -> @owned AnyObject {
+bb0(%0 : @owned $AO):
+  %1 = alloc_stack $AO
+  %2 = store_borrow %0 to %1
+  %3 = struct_element_addr %2, #AO.a
+  %4 = load [copy] %3
+  end_borrow %2
+  dealloc_stack %1
+  destroy_value %0
+  return %4
 }
 

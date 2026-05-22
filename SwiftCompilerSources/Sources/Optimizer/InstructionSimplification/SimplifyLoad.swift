@@ -23,6 +23,9 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     if optimizeLoadFromEmptyCollection(context) {
       return
     }
+    if optimizeLoadFromStoreBorrow(context) {
+      return
+    }
     if replaceLoadOfGlobalLet(context) {
       return
     }
@@ -102,6 +105,32 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
       return true
     }
     return false
+  }
+
+  /// Replaces a `load` of a `store_borrow`:
+  /// ```
+  ///   %1 = alloc_stack $T
+  ///   %2 = store_borrow %0 to %1
+  ///   %3 = load [copy] %2
+  /// ```
+  /// ->
+  /// ```
+  ///   %1 = alloc_stack $T
+  ///   %2 = store_borrow %0 to %1
+  ///   %3 = copy_value %0
+  /// ```
+  private func optimizeLoadFromStoreBorrow(_ context: SimplifyContext) -> Bool {
+    let accessPath = address.accessPath
+    guard case .storeBorrow(let storeBorrow) = accessPath.base,
+          accessPath.projectionPath.isMaterializable
+    else {
+      return false
+    }
+
+    let builder = Builder(before: self, context)
+    let v = storeBorrow.source.createProjectionAndCopy(path: accessPath.projectionPath, builder: builder)
+    replace(with: v, context)
+    return true
   }
 
   /// The load of a global let variable is replaced by its static initializer value.
