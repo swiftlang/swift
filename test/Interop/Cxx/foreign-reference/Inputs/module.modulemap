@@ -117,3 +117,8 @@ module Upcast {
   header "upcast.h"
   requires cplusplus
 }
+
+module ImmortalFRTHashable {
+  header "immortal-frt-hashable.h"
+  requires cplusplus
+}

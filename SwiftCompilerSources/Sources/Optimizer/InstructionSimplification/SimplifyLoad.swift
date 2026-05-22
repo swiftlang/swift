@@ -44,7 +44,12 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
   private func optimizeLoadOfAddrUpcast(_ context: SimplifyContext) -> Bool {
     if let uac = address as? UncheckedAddrCastInst,
        uac.type.isExactSuperclass(of: uac.fromAddress.type),
-       uac.type != uac.fromAddress.type {
+       uac.type != uac.fromAddress.type,
+       // Skip if triviality differs (e.g. archetype bound by a trivial C++
+       // foreign reference type): the load's ownership wouldn't match the
+       // source type.
+       uac.fromAddress.type.isTrivial(in: parentFunction) ==
+         uac.type.isTrivial(in: parentFunction) {
 
       operand.set(to: uac.fromAddress, context)
       let builder = Builder(before: self, context)
@@ -131,6 +136,13 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
   /// ```
   private func tryRemoveAddressCast(_ context: SimplifyContext) -> Bool {
     guard let addrCast = address.isAddressCastOfHeapObjects else {
+      return false
+    }
+    // Skip if triviality differs (e.g. archetype bound by a trivial C++
+    // foreign reference type): the load's ownership wouldn't match the
+    // source type.
+    if addrCast.fromAddress.type.isTrivial(in: parentFunction) !=
+       addrCast.type.isTrivial(in: parentFunction) {
       return false
     }
     let builder = Builder(before: self, context)
