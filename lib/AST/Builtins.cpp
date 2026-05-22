@@ -2683,13 +2683,13 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Quad:
     return Context.TheIEEE128Type;
   case IITDescriptor::Integer:
-    return BuiltinIntegerType::get(D.Integer_Width, Context);
+    return BuiltinIntegerType::get(D.IntegerWidth, Context);
 
   // A vector of an immediate type.
   case IITDescriptor::Vector: {
     Type eltType = decodeImmediate();
     if (!eltType) return Type();
-    return makeVector(eltType, D.Vector_Width.getKnownMinValue());
+    return makeVector(eltType, D.VectorWidth.getKnownMinValue());
   }
   
   // The element type of a vector type.
@@ -2705,7 +2705,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   case IITDescriptor::Pointer: {
     Type pointeeType = decodeImmediate();
     if (!pointeeType) return Type();
-    return makePointer(pointeeType, D.Pointer_AddressSpace);
+    return makePointer(pointeeType, D.PointerAddressSpace);
   }
 
   // A type argument.
@@ -2725,7 +2725,7 @@ Type IntrinsicTypeDecoder::decodeImmediate() {
   // A struct, which we translate as a tuple.
   case IITDescriptor::Struct: {
     SmallVector<TupleTypeElt, 5> Elts;
-    for (unsigned i = 0; i != D.Struct_NumElements; ++i) {
+    for (unsigned i = 0; i != D.StructNumElements; ++i) {
       Type T = decodeImmediate();
       if (!T) return Type();
       
