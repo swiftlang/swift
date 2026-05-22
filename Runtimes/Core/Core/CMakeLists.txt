@@ -400,6 +400,15 @@ install_swift_interface(swiftCore)
 generate_plist(swiftCore "${CMAKE_PROJECT_VERSION}" swiftCore)
 embed_manifest(swiftCore)
 
+if(APPLE AND SwiftCore_CREATE_COMPATIBILITY_SPAN_SYMLINK)
+  add_custom_command(TARGET swiftCore POST_BUILD
+    COMMAND ${CMAKE_COMMAND} "-E" "create_symlink" "$<TARGET_FILE_NAME:swiftCore>" "libswiftCompatibilitySpan.dylib")
+
+  install(FILES "${CMAKE_CURRENT_BINARY_DIR}/libswiftCompatibilitySpan.dylib"
+    DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
+    COMPONENT SwiftCore_runtime)
+endif()
+
 include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)
 
 # TODO: Embedded SwiftCore builds
