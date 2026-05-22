@@ -929,8 +929,6 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     return attr->isUnsafe();
   }();
 
-  auto *func = fArg->getFunction();
-
   // If we have a closure capture that is not an indirect result or indirect
   // result error, we want to treat it as sending so that we properly handle
   // async lets.
@@ -940,7 +938,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // sync with that code.
   if (!fArg->isIndirectResult() && !fArg->isIndirectErrorResult() &&
       fArg->isClosureCapture()) {
-    if (auto declRef = func->getDeclRef();
+    if (auto declRef = arg->getFunction()->getDeclRef();
         declRef && declRef.isAsyncLetClosure) {
       return SILIsolationInfo::getDisconnected(
           isClosureCapturedNonisolatedUnsafe);
@@ -950,7 +948,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // Before we do anything further, see if we have an isolated parameter. This
   // handles isolated self and specifically marked isolated.
   if (auto *isolatedArg = llvm::cast_or_null<SILFunctionArgument>(
-          func->maybeGetIsolatedArgument())) {
+          fArg->getFunction()->maybeGetIsolatedArgument())) {
     // See if the function is nonisolated(nonsending). In such a case, return
     // task isolated.
     if (func->getActorIsolation().isNonisolatedNonsending()) {
@@ -974,51 +972,40 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
 
   // Otherwise, see if we need to handle this isolation computation specially
   // due to information from the decl ref if we have one.
-  if (auto declRef = func->getDeclRef()) {
-    auto funcIsolation = func->getActorIsolation();
+  if (auto declRef = fArg->getFunction()->getDeclRef()) {
     // First check if we have an allocator decl ref. If we do and we have an
-    // actor instance isolation, then we know that we are actively just
-    // calling the initializer. To just make region isolation work, treat this
-    // as disconnected so we can construct the actor value. Users cannot write
+    // actor instance isolation, then we know that we are actively just calling
+    // the initializer. To just make region isolation work, treat this as
+    // disconnected so we can construct the actor value. Users cannot write
     // allocator functions so we just need to worry about compiler generated
     // code. In the case of a non-actor, we can only have an allocator that is
     // global-actor isolated, so we will never hit this code path.
-    if (declRef.kind == SILDeclRef::Kind::Allocator &&
-        funcIsolation.isActorInstanceIsolated()) {
-      return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
-    }
-
-    // Then see if we have an init accessor that is isolated to an actor
-    // instance, but for which we have not actually passed self. In such a
-    // case, we need to pass in a "fake" ActorInstance that users know is a
-    // sentinel for the self value.
-    if (funcIsolation.isActorInstanceIsolated() && declRef.getDecl()) {
-      if (auto *accessor =
-              dyn_cast_or_null<AccessorDecl>(declRef.getFuncDecl())) {
-        if (accessor->isInitAccessor()) {
-          return SILIsolationInfo::getActorInstanceIsolated(
-              fArg, ActorInstance::getForActorAccessorInit(),
-              funcIsolation.getActor());
+    if (declRef.kind == SILDeclRef::Kind::Allocator) {
+      if (auto isolation = fArg->getFunction()->getActorIsolation()) {
+        if (isolation->isActorInstanceIsolated()) {
+          return SILIsolationInfo::getDisconnected(
+              false /*nonisolated(unsafe)*/);
         }
       }
     }
 
-    // Check if we have a nonisolated synchronous initializer for an actor. In
-    // such a case, we want to treat the non-Sendable parameters as being in
-    // the actor's isolation domain. This is a special case from the region
-    // isolation proposal and ensures that nonisolated async and sync
-    // initializers act the same way.
-    if (funcIsolation.isNonisolated() &&
-        declRef.kind == SILDeclRef::Kind::Initializer &&
-        !func->getLoweredFunctionType()->isAsync()) {
-      // Just performing some defensive checks here.
-      if (auto *self =
-              cast_or_null<SILFunctionArgument>(func->getSelfArgument());
-          self && self->getType().isAnyActor()) {
-        return SILIsolationInfo::getActorInstanceIsolated(fArg, self);
+
+    // Then see if we have an init accessor that is isolated to an actor
+    // instance, but for which we have not actually passed self. In such a case,
+    // we need to pass in a "fake" ActorInstance that users know is a sentinel
+    // for the self value.
+    auto functionIsolation = fArg->getFunction()->getActorIsolation();
+    if (functionIsolation.isActorInstanceIsolated() && declRef.getDecl()) {
+      if (auto *accessor =
+          dyn_cast_or_null<AccessorDecl>(declRef.getFuncDecl())) {
+        if (accessor->isInitAccessor()) {
+          return SILIsolationInfo::getActorInstanceIsolated(
+              fArg, ActorInstance::getForActorAccessorInit(),
+              functionIsolation.getActor());
+        }
       }
     }
-  }
+  }    
 
   // Otherwise, if we do not have an isolated argument and are not in an
   // allocator, then we might be isolated via global isolation or in a global
