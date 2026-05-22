@@ -213,14 +213,16 @@ extension OutputSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ index: Index) -> Element {
-    unsafeAddress {
+    @_transparent
+    borrow {
       _checkIndex(index)
-      return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: index))
+      return unsafe self[unchecked: index]
     }
+    @_transparent
     @lifetime(self: copy self)
-    unsafeMutableAddress {
+    mutate {
       _checkIndex(index)
-      return unsafe _unsafeAddressOfElement(unchecked: index)
+      return unsafe &(self[unchecked: index])
     }
   }
 
@@ -234,12 +236,15 @@ extension OutputSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked index: Index) -> Element {
-    unsafeAddress {
-      unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: index))
+    @_unsafeSelfDependentResult
+    borrow {
+      Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: index))
     }
+    @_unsafeSelfDependentResult
     @lifetime(self: copy self)
-    unsafeMutableAddress {
-      unsafe _unsafeAddressOfElement(unchecked: index)
+    mutate {
+      let address = unsafe _unsafeAddressOfElement(unchecked: index)
+      return unsafe &(UnsafeMutablePointer(address).pointee)
     }
   }
 
@@ -247,10 +252,9 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal func _unsafeAddressOfElement(
     unchecked index: Index
-  ) -> UnsafeMutablePointer<Element> {
+  ) -> Builtin.RawPointer {
     let elementOffset = index &* MemoryLayout<Element>.stride
-    let address = unsafe _start().advanced(by: elementOffset)
-    return unsafe address.assumingMemoryBound(to: Element.self)
+    return unsafe _start().advanced(by: elementOffset)._rawValue
   }
 
   /// Exchange the elements at the two given indices.
@@ -275,8 +279,10 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func swapAt(unchecked i: Index, unchecked j: Index) {
-    let pi = unsafe _unsafeAddressOfElement(unchecked: i)
-    let pj = unsafe _unsafeAddressOfElement(unchecked: j)
+    let ri = unsafe _unsafeAddressOfElement(unchecked: i)
+    let pi = unsafe UnsafeMutablePointer<Element>(ri)
+    let rj = unsafe _unsafeAddressOfElement(unchecked: j)
+    let pj = unsafe UnsafeMutablePointer<Element>(rj)
     let temporary = unsafe pi.move()
     unsafe pi.initialize(to: pj.move())
     unsafe pj.initialize(to: consume temporary)
