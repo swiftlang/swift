@@ -29,6 +29,12 @@ struct S2 {
   var s2: String
 }
 
+struct S3 {
+  var i: Int
+  var j: Int
+  var s: String
+}
+
 struct Pair  {
   var t: (a: Int, b: Int)
 }
@@ -2037,10 +2043,9 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @projected_load_take :
-// CHECK:       bb1([[V:%.*]] : @owned $(S, Int)):
-// CHECK-NEXT:    ([[E:%.*]], {{%[0-9]+}}) = destructure_tuple [[V]]
-// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[E]]
-// CHECK-NEXT:    = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK:       bb1:
+// CHECK:         load [take]
+// CHECK:         store
 // CHECK-LABEL: } // end sil function 'projected_load_take'
 sil [ossa] @projected_load_take : $@convention(thin) (@inout (S, Int), Int) -> () {
 bb0(%0 : $*(S, Int), %1 : $Int):
@@ -2050,9 +2055,11 @@ bb1:
   %2 = tuple_element_addr %0, 0
   %3 = struct_element_addr %2, #S.s
   %4 = load [take] %3
-  %5 = struct $S (%1, %4)
-  %6 = tuple (%5, %1)
-  store %6 to [init] %0
+  %5 = struct_element_addr %2, #S.i
+  %6 = load [trivial] %5
+  %7 = struct $S (%6, %4)
+  %8 = tuple (%7, %1)
+  store %8 to [init] %0
   cond_br undef, bb2, bb3
 
 bb2:
@@ -2090,14 +2097,9 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @projected_load_copy_followed_by_take :
-// CHECK:       bb1([[V:%.*]] : @owned $S):
-// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[V]]
-// CHECK-NEXT:    [[SE:%.*]] = struct_extract [[B]]
-// CHECK-NEXT:    [[C:%.*]] = copy_value [[SE]]
-// CHECK-NEXT:    end_borrow [[B]]
-// CHECK-NEXT:    destroy_value [[C]]
-// CHECK-NEXT:    ({{%[0-9]+}}, [[S:%.*]]) = destructure_struct [[V]]
-// CHECK-NEXT:      = struct $S (%1 : $Int, [[S]] : $String)
+// CHECK:       bb1:
+// CHECK:         load [copy]
+// CHECK:         load [take]
 // CHECK-LABEL: } // end sil function 'projected_load_copy_followed_by_take'
 sil [ossa] @projected_load_copy_followed_by_take : $@convention(thin) (@inout S, Int) -> () {
 bb0(%0 : $*S, %1 : $Int):
@@ -2260,5 +2262,102 @@ bb4:
 
 bb5:
   return %0
+}
+
+// Sub-projection `load [trivial]` co-occurring with a whole-value `load [take]`
+// on an owned access path. LICM emits a borrow + extract + end_borrow for the
+// sub-projection and consumes rootVal via the whole-value path's destroy_value.
+// CHECK-LABEL: sil [ossa] @subproj_trivial_plus_whole_take_owned :
+// CHECK:       bb1([[V:%.*]] : @owned $S2):
+// CHECK-NEXT:    [[B:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:    [[SE:%.*]] = struct_extract [[B]] : $S2, #S2.i
+// CHECK-NEXT:    end_borrow [[B]]
+// CHECK-NEXT:    destroy_value [[V]]
+// CHECK-NOT:   destructure_struct
+// CHECK-LABEL: } // end sil function 'subproj_trivial_plus_whole_take_owned'
+sil [ossa] @subproj_trivial_plus_whole_take_owned : $@convention(thin) (@inout S2, @owned S2) -> () {
+bb0(%0 : $*S2, %1 : @owned $S2):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0, #S2.i
+  %3 = load [trivial] %2
+  %4 = load [take] %0
+  destroy_value %4
+  %5 = copy_value %1
+  store %5 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil @subproj_non_trivial_non_ossa :
+// CHECK:       bb1([[V:%.*]] : $S2):
+// CHECK-NEXT:    [[SE:%.*]] = struct_extract [[V]] : $S2, #S2.s1
+// CHECK-NEXT:    release_value [[SE]]
+// CHECK-LABEL: } // end sil function 'subproj_non_trivial_non_ossa'
+sil @subproj_non_trivial_non_ossa : $@convention(thin) (@inout S2, @owned S2) -> () {
+bb0(%0 : $*S2, %1 : $S2):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0, #S2.s1
+  %3 = load %2
+  release_value %3
+  retain_value %1
+  store %1 to %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  release_value %1
+  %r = tuple ()
+  return %r
+}
+
+// Two distinct trivial sub-projection loads of an owned access path in one
+// block. LICM emits a borrow + extract + end_borrow per load and one
+// destroy_value of the source rootVal.
+// CHECK-LABEL: sil [ossa] @multi_trivial_subproj_owned :
+// CHECK:       bb1([[V:%.*]] : @owned $S3):
+// CHECK-NEXT:    [[B1:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:    [[SE1:%.*]] = struct_extract [[B1]] : $S3, #S3.i
+// CHECK-NEXT:    end_borrow [[B1]]
+// CHECK-NEXT:    [[B2:%.*]] = begin_borrow [[V]]
+// CHECK-NEXT:    [[SE2:%.*]] = struct_extract [[B2]] : $S3, #S3.j
+// CHECK-NEXT:    end_borrow [[B2]]
+// CHECK-NEXT:    destroy_value [[V]]
+// CHECK-NOT:   destructure_struct
+// CHECK-LABEL: } // end sil function 'multi_trivial_subproj_owned'
+sil [ossa] @multi_trivial_subproj_owned : $@convention(thin) (@inout S3, @owned S3) -> () {
+bb0(%0 : $*S3, %1 : @owned $S3):
+  br bb1
+
+bb1:
+  %2 = struct_element_addr %0, #S3.i
+  %3 = load [trivial] %2
+  %4 = struct_element_addr %0, #S3.j
+  %5 = load [trivial] %4
+  %6 = load [take] %0
+  destroy_value %6
+  %7 = copy_value %1
+  store %7 to [init] %0
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  destroy_value %1
+  %r = tuple ()
+  return %r
 }
 
