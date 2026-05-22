@@ -67,11 +67,15 @@
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/MacroBuilder.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/Sanitizers.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/CodeGen/ObjectFilePCHContainerWriter.h"
+#include "clang/Driver/Compilation.h"
+#include "clang/Driver/Driver.h"
+#include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/FrontendOptions.h"
@@ -494,6 +498,27 @@ static inline bool isPCHFilenameExtension(StringRef path) {
     .ends_with(file_types::getExtension(file_types::TY_PCH));
 }
 
+/// Returns the set of sanitizers Clang's driver considers supported for
+/// \p triple.
+static clang::SanitizerMask
+getClangSupportedSanitizers(const llvm::Triple &triple) {
+  clang::DiagnosticOptions diagOpts;
+  auto diagIDs = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
+  clang::DiagnosticsEngine clangDiags(diagIDs, diagOpts,
+                                      new clang::IgnoringDiagConsumer(),
+                                      /*ShouldOwnClient=*/true);
+  clang::driver::Driver driver("clang", triple.str(), clangDiags);
+  driver.setCheckInputsExist(false);
+  std::string targetArg = "--target=" + triple.str();
+  llvm::SmallVector<const char *, 8> argv = {
+      "clang", targetArg.c_str(), "-fsyntax-only", "-x", "c", "swift.c"};
+  std::unique_ptr<clang::driver::Compilation> compilation(
+      driver.BuildCompilation(argv));
+  if (!compilation)
+    return {};
+  return compilation->getDefaultToolChain().getSupportedSanitizers();
+}
+
 void importer::getNormalInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx,
     bool ignoreClangTarget) {
@@ -825,18 +850,30 @@ void importer::getNormalInvocationArguments(
   if (!LangOpts.DisableSafeInteropWrappers)
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 
-  if (ctx.SILOpts.Sanitizers & SanitizerKind::Address)
-    invocationArgStrs.push_back("-fsanitize=address");
-  if (ctx.SILOpts.Sanitizers & SanitizerKind::Thread)
-    invocationArgStrs.push_back("-fsanitize=thread");
-  if (ctx.SILOpts.Sanitizers & SanitizerKind::Undefined)
-    invocationArgStrs.push_back("-fsanitize=undefined");
-  if (ctx.SILOpts.Sanitizers & SanitizerKind::MemTagStack) {
-    invocationArgStrs.push_back("-fsanitize=memtag-stack");
-    invocationArgStrs.push_back("-Xclang");
-    invocationArgStrs.push_back("-target-feature");
-    invocationArgStrs.push_back("-Xclang");
-    invocationArgStrs.push_back("+mte");
+  // Forward sanitizer flags to the Clang importer so C++ code imported by it
+  // gets the same instrumentation as the Swift code. Only forward sanitizers
+  // that Clang's driver considers supported for this triple; otherwise Clang
+  // would error out with "unsupported option '-fsanitize=...' for target ...".
+  auto &enabledSanitizers = ctx.SILOpts.Sanitizers;
+  if (enabledSanitizers) {
+    clang::SanitizerMask clangSupported = getClangSupportedSanitizers(triple);
+    if ((enabledSanitizers & SanitizerKind::Address) &&
+        (clangSupported & clang::SanitizerKind::Address))
+      invocationArgStrs.push_back("-fsanitize=address");
+    if ((enabledSanitizers & SanitizerKind::Thread) &&
+        (clangSupported & clang::SanitizerKind::Thread))
+      invocationArgStrs.push_back("-fsanitize=thread");
+    if ((enabledSanitizers & SanitizerKind::Undefined) &&
+        (clangSupported & clang::SanitizerKind::Undefined))
+      invocationArgStrs.push_back("-fsanitize=undefined");
+    if ((enabledSanitizers & SanitizerKind::MemTagStack) &&
+        (clangSupported & clang::SanitizerKind::MemtagStack)) {
+      invocationArgStrs.push_back("-fsanitize=memtag-stack");
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back("-target-feature");
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back("+mte");
+    }
   }
 }
 
