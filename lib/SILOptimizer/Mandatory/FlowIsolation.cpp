@@ -227,7 +227,7 @@ class IsolationInfoCache {
           .maybeGetValue();
     }
 
-    SILDynamicMergedIsolationInfo getIsolation(Region reg) {
+    SILDynamicMergedIsolationInfo getIsolation(Region reg) const {
       return PartitionOpEvaluator<ComputeEvaluator>::getIsolationRegionInfo(
           reg);
     }
