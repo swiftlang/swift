@@ -874,25 +874,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  /// Consider non-Sendable metatypes to be isolated to the context in which it
-  /// is initialized so they cannot into another isolation domain.
+  /// Consider non-Sendable metatypes to be task-isolated, so they cannot cross
+  /// into another isolation domain.
   if (auto *mi = dyn_cast<MetatypeInst>(inst)) {
-    auto funcIsolation = mi->getFunction()->getActorIsolation();
-    if (funcIsolation.isNonisolatedNonsending()) {
+    if (mi->getFunction()->getActorIsolation()->isCallerIsolationInheriting()) {
       return SILIsolationInfo::getTaskIsolated(mi)
           .withNonisolatedNonsendingTaskIsolated(true);
-    }
-
-    if (funcIsolation.isGlobalActor()) {
-      return SILIsolationInfo::getGlobalActorIsolated(
-          mi, funcIsolation.getGlobalActor());
-    }
-
-    if (funcIsolation.isActorInstanceIsolated()) {
-      if (auto *iso = llvm::cast_or_null<SILFunctionArgument>(
-              mi->getFunction()->maybeGetIsolatedArgument())) {
-        return SILIsolationInfo::getActorInstanceIsolated(mi, iso);
-      }
     }
 
     return SILIsolationInfo::getTaskIsolated(mi);
