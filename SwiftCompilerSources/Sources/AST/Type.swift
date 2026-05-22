@@ -330,6 +330,10 @@ extension TypeProperties {
       bridged: rawType.canonical.bridged.SILFunctionType_getSubstGenericSignature())
   }
 
+  public var tupleContainsPackExpansionType: Bool {
+    return rawType.bridged.Tuple_containsPackExpansionType()
+  }
+
   public var containsSILPackExpansionType: Bool {
     return rawType.bridged.containsSILPackExpansionType()
   }
