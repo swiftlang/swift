@@ -113,6 +113,9 @@ steps.
 .PARAMETER SkipPackaging
 Skip building the MSI installers and packaging. Useful for development builds.
 
+.PARAMETER SkipDocc
+Skip building and packaging DocC.
+
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
 Available tests: lld, lldb, lldb-swift, swift, dispatch, foundation, xctest, swift-format, sourcekit-lsp
@@ -203,6 +206,7 @@ param
   [switch] $Clean,
   [switch] $SkipBuild = $false,
   [switch] $SkipPackaging = $false,
+  [switch] $SkipDocc = $false,
   [string[]] $Test = @(),
 
   [switch] $IncludeDS2 = $false,
@@ -4224,7 +4228,7 @@ function Test-PackageManager() {
 function Build-Installer([Hashtable] $Platform) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
-  $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "False" } else { "True" }
+  $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling -or $SkipDocc) { "False" } else { "True" }
 
   $Properties = @{
     BundleFlavor = "offline";
@@ -4502,7 +4506,7 @@ if (-not $SkipBuild) {
 Install-HostToolchain $HostPlatform.ToolchainInstallRoot
 Install-EmbeddablePython
 
-if (-not $SkipBuild -and -not $IsCrossCompiling) {
+if (-not $SkipBuild -and -not $IsCrossCompiling -and -not $SkipDocc) {
   Invoke-BuildStep Build-DocC $HostPlatform
 }
 
