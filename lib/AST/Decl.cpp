@@ -11536,13 +11536,14 @@ FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
                                    bool Throws, Type ThrownType,
                                    GenericParamList *GenericParams,
                                    ParameterList *BodyParams, Type FnRetType,
-                                   DeclContext *Parent) {
+                                   DeclContext *Parent, bool isSynthesized) {
   assert(FnRetType);
   auto *const FD = FuncDecl::createImpl(
       Context, SourceLoc(), StaticSpelling, SourceLoc(), Name, NameLoc, Async,
       SourceLoc(), Throws, SourceLoc(), TypeLoc::withoutLoc(ThrownType),
       GenericParams, Parent, ClangNode());
   FD->setImplicit();
+  FD->setSynthesized(isSynthesized);
   FD->setParameters(BodyParams);
   FD->setResultInterfaceType(FnRetType);
   return FD;
