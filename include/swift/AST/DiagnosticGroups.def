@@ -106,6 +106,7 @@ GROUP(UnusedImportAccess,none,"unused-import-access")
 GROUP(UntypedThrows,DefaultIgnoreWarnings,"untyped-throws")
 GROUP(NoUseUnstructuredThrowingTask,none,"no-use-throwing-unstructured-task")
 GROUP(UseAnyAppleOSAvailability,DefaultIgnoreWarnings,"use-any-apple-os-availability")
+GROUP(UselessAvailabilityCheck,none,"useless-availability-check")
 GROUP(WeakMutability,none,"weak-mutability")
 GROUP(OldSuppressedAssociatedTypes,none,"old-suppressed-associatedtypes")
 
