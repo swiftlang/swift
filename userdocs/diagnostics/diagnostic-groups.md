@@ -76,6 +76,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:sendable-closure-captures>
 - <doc:compilation-caching>
 - <doc:string-interpolation-conformance>
+- <doc:conversion-from-isolated-any-to-synchronous>
 - <doc:region-isolation-cross-isolation-data-race>
 - <doc:deprecated-declaration>
 - <doc:implementation-only-deprecated>
