@@ -31,6 +31,8 @@
 #include <algorithm>
 #include <variant>
 
+#define DEBUG_TYPE "send-non-sendable"
+
 namespace swift {
 
 namespace PartitionPrimitives {
