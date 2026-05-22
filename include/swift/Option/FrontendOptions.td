@@ -186,6 +186,8 @@ def verify_ignore_unrelated: Flag<["-"], "verify-ignore-unrelated">,
   HelpText<"Allow diagnostics in files outside those with expected diagnostics in verify mode">;
 def verify_ignore_macro_note: Flag<["-"], "verify-ignore-macro-note">,
   HelpText<"Skip verifying notes about macro location">;
+def verify_child_notes: Flag<["-"], "verify-child-notes">,
+  HelpText<"Verify child notes in child diagnostics blocks">;
 def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;

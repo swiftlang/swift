@@ -213,3 +213,32 @@ An expected diagnostic is denoted by a comment which begins with `expected-error
   * If two (or more) expected fix-its are juxtaposed with nothing (or whitespace) between them, then both must be present for the verifier to match. If two (or more) expected fix-its have `||` between them, then one of them must be present for the verifier to match. `||` binds more tightly than juxtaposition: `{{1-1=a}} {{2-2=b}} || {{2-2=c}} {{3-3=d}} {{none}}` will only match if there is either a set of three fix-its that insert `a`, `b`, and `d`, or a set of three fix-its that insert `a`, `c`, and `d`. (Without the `{{none}}`, it would also permit all four fix-its, but only because one of the four would be unmatched and ignored.)
 
 - (Optional) Expected documentation file. These is the name of the documentation file, enclosed in double curly braces and prefixed by 'documentation-file='. For example, `{{documentation-file=some-file}}` will verify the documentation group with filename `some-note` appears. Do not include the file extension when specifying the name.
+
+- (Optional) Expected child notes. When `-verify-child-notes` is passed, notes that are attached to a parent diagnostic (child notes) must be matched inside a `{{children:}}` block on the parent's expectation comment. This makes it explicit which note belongs to which diagnostic.
+
+  The `{{children:}}` block appears after any fix-it or documentation-file matchers and contains one or more `expected-note` entries. Only notes are allowed inside a `{{children:}}` block.
+
+  ```swift
+  struct A {}
+  struct A {} // expected-error {{invalid redeclaration of 'A'}} {{children:
+              //   expected-note@-2 {{'A' previously declared here}}
+              // }}
+  ```
+
+  Child notes can also use line markers to reference notes far from the parent:
+
+  ```swift
+  struct B {} // #b-orig
+  struct B {} // expected-error {{invalid redeclaration of 'B'}} {{children:
+              //   expected-note@#b-orig {{'B' previously declared here}}
+              // }}
+  ```
+
+  Single-line syntax is also supported:
+
+  ```swift
+  struct C {}
+  struct C {} // expected-error {{invalid redeclaration of 'C'}} {{children: expected-note@-1 {{'C' previously declared here}} }}
+  ```
+
+  Without `-verify-child-notes`, child notes are matched as ordinary notes and `{{children:}}` blocks are not allowed.
