@@ -467,7 +467,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       auto actualIsolatedValue =
           ActorInstance::lookThroughInsts(isolatedOp->get());
 
-      // See if we have a .none enum inst. In such a case, we are actually
+      // First see if we have a .none enum inst. In such a case, we are actually
       // on the nonisolated global queue.
       if (auto *ei = dyn_cast<EnumInst>(actualIsolatedValue)) {
         if (ei->getElement()->getParentEnum()->isOptionalDecl() &&
@@ -478,20 +478,6 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
           // nonisolated.
           return SILIsolationInfo::getDisconnected(false);
         }
-      }
-
-      // Then check if we are passing the implicit builtin actor to this. In
-      // such a case, this is nonisolated(nonsending).
-      if (auto *fArg = dyn_cast<SILFunctionArgument>(actualIsolatedValue);
-          fArg && fArg->isImplicitBuiltinActor()) {
-        // TODO: We probably should split this API so that the user in the case
-        // where we are asking for a specific value, we use that value and if we
-        // are asking for the instruction generally (for instance if we are
-        // generating an actor introducing value), we set a bit on the
-        // SILIsolationInfo saying that the isolation was introduced by the
-        // instruction. This is important for isolation history eventually.
-        return SILIsolationInfo::getTaskIsolated(SILValue())
-            .withNonisolatedNonsendingTaskIsolated(true);
       }
 
       // Then using that value, grab the AST type from the actual isolated
@@ -1708,8 +1694,7 @@ SILValue ActorInstance::lookThroughInsts(SILValue value) {
         isa<CopyableToMoveOnlyWrapperValueInst>(svi) ||
         isa<MoveOnlyWrapperToCopyableValueInst>(svi) ||
         isa<InitExistentialRefInst>(svi) || isa<UncheckedRefCastInst>(svi) ||
-        isa<UnconditionalCheckedCastInst>(svi) ||
-        isa<ImplicitActorToOpaqueIsolationCastInst>(svi)) {
+        isa<UnconditionalCheckedCastInst>(svi)) {
       value = lookThroughInsts(svi->getOperand(0));
       continue;
     }
@@ -1824,22 +1809,6 @@ SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
           .withMergedIsolatedConformance(rhs.getIsolatedConformance());
     return {rhs};
   case CombinedKind::TaskActor:
-    // If we have a nonisolated(nonsending) task isolated value and an unapplied
-    // isolated any parameter, allow for it to merge by just taking the isolated
-    // any parameter.
-    //
-    // TODO: Should we model unapplied isolated any parameter as a separate
-    // lattice element?
-    //
-    // TODO: Should we model NonisolatedNonsendingTaskIsolated as a separate
-    // kind. It is sort of an Actor, but we do not want to treat it like an
-    // actor when emitting diagnostics and the like.
-    if (lhs.isNonisolatedNonsendingTaskIsolated() &&
-        rhs.isUnappliedIsolatedAnyParameter()) {
-      return {lhs};
-    }
-
-    // Otherwise, fail.
     return {SILIsolationInfo()};
   case CombinedKind::TaskInvalid:
     return {rhs};

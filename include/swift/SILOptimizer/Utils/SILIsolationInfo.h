@@ -203,8 +203,7 @@ public:
     UnsafeNonIsolated = 0x1,
 
     /// If set, this means that this actor isolation is from an isolated
-    /// parameter and should be allowed to merge into a self parameter or an
-    /// implicit builtin actor.
+    /// parameter and should be allowed to merge into a self parameter.
     UnappliedIsolatedAnyParameter = 0x2,
 
     /// If set, this was a TaskIsolated value from a nonisolated(nonsending)
