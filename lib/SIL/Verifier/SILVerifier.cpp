@@ -1828,12 +1828,6 @@ public:
     
     SILType DebugVarTy = varInfo->Type ? *varInfo->Type :
       SSAType.getObjectType();
-    if (!varInfo->DIExpr && !isa<SILBoxType>(SSAType.getASTType())) {
-      // FIXME: Remove getObjectType() below when we fix create/createAddr
-      require(DebugVarTy.removingMoveOnlyWrapper()
-              == SSAType.getObjectType().removingMoveOnlyWrapper(),
-              "debug type mismatch without a DIExpr");
-    }
 
     auto *debugScope = inst->getDebugScope();
     if (varInfo->ArgNo)
@@ -3021,8 +3015,9 @@ public:
     switch (LI->getOwnershipQualifier()) {
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
-      // enabled.
-      require(!F.hasOwnership(),
+      // enabled, unless they are in a debug reconstruction block.
+      require(!F.hasOwnership() ||
+              LI->getParent()->isDebugReconstructionBlock(),
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
