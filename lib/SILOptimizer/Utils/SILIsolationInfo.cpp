@@ -1150,28 +1150,11 @@ SILIsolationInfo SILIsolationInfo::getForCastConformances(
 
     // The cast can produce a conformance with the same isolation as this
     // function is dynamically executing. If that's known (i.e., because we're
-    // on a global actor or in a an actor instance method), the value could be
-    // isolated to that actor. Otherwise, if we are nonisolated, it's
-    // task-isolated.
-    //
-    // DISCUSSION: We assume that if it were not possible to get a conformance
-    // that is isolated to the current context, then we would emit an error in
-    // the type checker. The fact that we were let through means that the
-    // runtime will return nil or produce a value that is isolated to the
-    // current isolation domain.
+    // on a global actor), the value is isolated to that global actor.
+    // Otherwise, it's task-isolated.
     if (functionIsolation.isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
-          value, functionIsolation.getGlobalActor(), proto);
-    }
-
-    if (functionIsolation.isActorInstanceIsolated()) {
-      if (auto isolatedParam = cast_or_null<SILFunctionArgument>(
-              value->getFunction()->maybeGetIsolatedArgument())) {
-        if (auto result = SILIsolationInfo::getActorInstanceIsolated(
-                value, isolatedParam, proto)) {
-          return result;
-        }
-      }
+          value, functionIsolation->getGlobalActor(), proto);
     }
 
     // Consider the cast to be task-isolated, because the runtime could find
