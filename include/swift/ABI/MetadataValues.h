@@ -264,6 +264,8 @@ public:
   }
   
   /// True if values of this type can be copied.
+  /// NOTE: This is NOT accurate for types that are conditionally Copyable.
+  /// You may need to use `checkInvertibleRequirements`.
   bool isCopyable() const { return !(Data & IsNonCopyable); }
   constexpr TargetValueWitnessFlags withCopyable(bool isCopyable) const {
     return TargetValueWitnessFlags((Data & ~IsNonCopyable) |

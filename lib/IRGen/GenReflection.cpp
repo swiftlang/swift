@@ -384,16 +384,14 @@ getTypeRefByFunction(IRGenModule &IGM, CanGenericSignature sig, CanType t,
             // This is weird. When building the stdlib, we don't have access to
             // the swift_runtimeSupportsNoncopyableTypes symbol in the Swift.o,
             // so we'll emit an adrp + ldr to resolve the GOT address. However,
-            // this symbol is defined as an abolsute in the runtime object files
-            // to address 0x0 right now and ld doesn't quite understand how to
-            // fixup this GOT address when merging the runtime and stdlib. Just
-            // unconditionally fail the branch.
-            //
+            // this symbol is defined as an absolute in the runtime object files
+            // and ld doesn't quite understand how to fixup this GOT address
+            // when merging the runtime and stdlib. Just hardcode the value.
             // Note: When the value of this symbol changes, this MUST be
             // updated.
             if (IGM.getSwiftModule()->isStdlibModule()) {
               runtimeSupportsNoncopyableTypesSymbol
-                  = llvm::ConstantInt::get(IGM.Int8Ty, 0);
+                  = llvm::ConstantInt::get(IGM.Int8Ty, 1);
             } else {
               runtimeSupportsNoncopyableTypesSymbol
                   = IGM.Module.getOrInsertGlobal(
@@ -487,49 +485,57 @@ getTypeRefImpl(IRGenModule &IGM,
     break;
     
   case MangledTypeRefRole::FieldMetadata: {
-    // We want to keep fields of noncopyable type from being exposed to
-    // in-process runtime reflection libraries in older Swift runtimes, since
-    // they more than likely assume they can copy field values, and the language
-    // support for noncopyable types as dynamic or generic types isn't yet
-    // implemented as of the writing of this comment. If the type is
-    // noncopyable, use a function to emit the type ref which will look for a
-    // signal from future runtimes whether they support noncopyable types before
-    // exposing their metadata to them.
-    Type contextualTy = type;
-    if (sig) {
-      contextualTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(type);
+    // If the deployment target's runtime doesn't have the isCopyable guards
+    // for Mirror, we need to hide unconditionally noncopyable fields behind
+    // an accessor function that checks swift_runtimeSupportsNoncopyableTypes
+    // at runtime, to prevent old Mirror implementations from crashing when
+    // they try to copy noncopyable field values.
+    bool needsNoncopyableGuard = false;
+    auto reflectionSafety =
+        IGM.Context.getNoncopyableReflectionSafetyAvailability();
+    if (!AvailabilityRange::forDeploymentTarget(IGM.Context)
+             .isContainedIn(reflectionSafety)) {
+      needsNoncopyableGuard = true;
     }
 
-    bool isAlwaysNoncopyable = false;
-    if (contextualTy->isNoncopyable()) {
-      isAlwaysNoncopyable = true;
+    if (needsNoncopyableGuard) {
+      Type contextualTy = type;
+      if (sig) {
+        contextualTy =
+            sig.getGenericEnvironment()->mapTypeIntoEnvironment(type);
+      }
 
-      // If the contextual type has any archetypes in it, it's plausible that
-      // we could end up with a copyable type in some instances. Look for those
-      // so we can permit unsafe reflection of the field, by assuming it could
-      // be Copyable.
-      if (contextualTy->hasArchetype()) {
-        // If this is a nominal type, check whether it can ever be copyable.
-        if (auto nominal = contextualTy->getAnyNominal()) {
-          // If it's a nominal that can ever be Copyable _and_ it's defined in
-          // the stdlib, assume that we could end up with a Copyable type.
-          if (nominal->canBeCopyable()
-              && nominal->getModuleContext()->isStdlibModule())
+      bool isAlwaysNoncopyable = false;
+      if (contextualTy->isNoncopyable()) {
+        isAlwaysNoncopyable = true;
+
+        // If the contextual type has any archetypes in it, it's plausible that
+        // we could end up with a copyable type in some instances. Look for
+        // those so we can permit unsafe reflection of the field, by assuming it
+        // could be Copyable.
+        if (contextualTy->hasArchetype()) {
+          // If this is a nominal type, check whether it can ever be copyable.
+          if (auto nominal = contextualTy->getAnyNominal()) {
+            // If it's a nominal that can ever be Copyable _and_ it's defined in
+            // the stdlib, assume that we could end up with a Copyable type.
+            if (nominal->canBeCopyable()
+                && nominal->getModuleContext()->isStdlibModule())
+              isAlwaysNoncopyable = false;
+          } else {
+            // Assume that we could end up with a Copyable type somehow.
+            // This allows you to reflect a 'T: ~Copyable' stored in a type.
             isAlwaysNoncopyable = false;
-        } else {
-          // Assume that we could end up with a Copyable type somehow.
-          // This allows you to reflect a 'T: ~Copyable' stored in a type.
-          isAlwaysNoncopyable = false;
+          }
         }
       }
-    }
 
-    // The getTypeRefByFunction strategy will emit a forward-compatible runtime
-    // check to see if the runtime can safely reflect such fields. Otherwise,
-    // the field will be artificially hidden to reflectors.
-    if (isAlwaysNoncopyable) {
-      IGM.IRGen.noteUseOfTypeMetadata(type);
-      return getTypeRefByFunction(IGM, sig, type, role);
+      // The getTypeRefByFunction strategy will emit a forward-compatible
+      // runtime check to see if the runtime can safely reflect such fields.
+      // Otherwise, the field will be artificially hidden to reflectors.
+      if (isAlwaysNoncopyable) {
+        IGM.IRGen.noteUseOfTypeMetadata(type);
+        return getTypeRefByFunction(IGM, sig, type, role);
+      }
     }
   }
   LLVM_FALLTHROUGH;
