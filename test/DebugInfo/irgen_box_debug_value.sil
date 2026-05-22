@@ -1,0 +1,34 @@
+// RUN: %target-swift-frontend -Xllvm -verify-debug-value-expr -disable-debugger-shadow-copies -g -emit-irgen %s | %FileCheck %s
+sil_stage canonical
+
+import Swift
+import Builtin
+
+sil_scope 1 { parent @test_box_debug : $@convention(thin) @async (Builtin.Int64) -> () }
+
+// Verify that an alloc_box gets duplicated after a hop_to_executor, and that it generates
+// correctly, as a debug_value on the projection.
+
+// CHECK-LABEL: define {{.*}} @test_box_debug
+sil @test_box_debug : $@convention(thin) @async (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  // The alloc_box emits a #dbg_declare_value in the entry block (hoisted).
+  // CHECK: #dbg_declare_value(ptr [[PROJ:%.+]], ![[KVAR:[0-9]+]], !DIExpression()
+
+  // CHECK: [[BOX:%[0-9]+]] = call {{.*}} @swift_allocObject
+  // CHECK: [[PROJ]] = getelementptr inbounds {{.*}} [[BOX]], i32 0, i32 1
+  %1 = alloc_box [moveable_value_debuginfo] ${ var Builtin.Int64 }, var, name "k", scope 1
+  %2 = project_box %1 : ${ var Builtin.Int64 }, 0, scope 1
+  store %0 to %2 : $*Builtin.Int64, scope 1
+
+  %3 = enum $Optional<Builtin.Executor>, #Optional.none!enumelt, scope 1
+  hop_to_executor %3 : $Optional<Builtin.Executor>, scope 1
+
+  // CHECK: #dbg_value(ptr [[PROJ]], ![[KVAR]], !DIExpression(DW_OP_deref)
+
+  strong_release %1 : ${ var Builtin.Int64 }, scope 1
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK: ![[KVAR]] = !DILocalVariable(name: "k"

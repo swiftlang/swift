@@ -6316,10 +6316,27 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
     // Collect LLVM instructions emitted by the debug BB so we can salvage and
     // erase them after the debug record is emitted.
-    assert(BB == Builder.GetInsertBlock() && InsertPt == Builder.GetInsertPoint() && "DebugBB content must not affect control flow!");
-    auto Start = LastBefore ? std::next(LastBefore->getIterator()) : BB->begin();
+    assert(BB == Builder.GetInsertBlock() &&
+           InsertPt == Builder.GetInsertPoint() &&
+           "DebugBB content must not affect control flow!");
+    auto Start =
+        LastBefore ? std::next(LastBefore->getIterator()) : BB->begin();
     for (auto It = Start; It != InsertPt; ++It)
       DebugBBInsts.push_back(&*It);
+  } else if (getLoweredValue(SILVal).isBoxWithAddress()) {
+    // Special case for debug_values cloned from an alloc_box: Use the
+    // project_box address rather than the actual box.
+    auto &TI = getTypeInfo(SILVal->getType());
+    auto Addr = getLoweredValue(SILVal).getAddressOfBox();
+    auto *Storage = Addr.getAddress();
+
+    VarInfo->DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+
+    Copy.emplace_back(emitShadowCopyIfNeeded(
+        Storage, TI.getStorageType(),
+        i->getDebugScope(), *VarInfo, IsAnonymous,
+        i->usesMoveableValueDebugInfo(), &VarInfo->DIExpr));
   } else if (IsAddrVal) {
     auto &TI = getTypeInfo(SILVal->getType());
     auto Addr = getLoweredAddress(SILVal);
