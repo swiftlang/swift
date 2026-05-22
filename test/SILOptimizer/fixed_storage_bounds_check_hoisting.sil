@@ -229,3 +229,115 @@ bb3:
   %ret = struct $Bool (%true_val : $Builtin.Int1)
   return %ret : $Bool
 }
+
+sil [_semantics "fixed_storage.check_index"] @checkIndex_addr : $@convention(method) (Int, @in_guaranteed Span<Int>) -> ()
+
+sil @replace_span : $@convention(thin) (@inout Span<Int>) -> ()
+
+// CHECK-LABEL: sil @test_checkindex_address_self_across_inout :
+// CHECK: function_ref @checkIndex_addr
+// CHECK: apply {{%[0-9]+}}({{%[0-9]+}}, %0)
+// CHECK: function_ref @replace_span
+// CHECK: apply
+// CHECK: apply {{%[0-9]+}}({{%[0-9]+}}, %0)
+// CHECK-LABEL: } // end sil function 'test_checkindex_address_self_across_inout'
+sil @test_checkindex_address_self_across_inout : $@convention(thin) (@inout Span<Int>) -> () {
+bb0(%0 : $*Span<Int>):
+  %idx1_raw = integer_literal $Builtin.Int64, 0
+  %idx1 = struct $Int (%idx1_raw : $Builtin.Int64)
+  %check_fn = function_ref @checkIndex_addr : $@convention(method) (Int, @in_guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%idx1, %0) : $@convention(method) (Int, @in_guaranteed Span<Int>) -> ()
+
+  %replace_fn = function_ref @replace_span : $@convention(thin) (@inout Span<Int>) -> ()
+  %r = apply %replace_fn(%0) : $@convention(thin) (@inout Span<Int>) -> ()
+
+  %idx2_raw = integer_literal $Builtin.Int64, 5
+  %idx2 = struct $Int (%idx2_raw : $Builtin.Int64)
+  %c2 = apply %check_fn(%idx2, %0) : $@convention(method) (Int, @in_guaranteed Span<Int>) -> ()
+
+  %t = tuple ()
+  return %t : $()
+}
+
+sil [_semantics "fixed_storage.get_count"] @getCount_addr : $@convention(method) (@in_guaranteed Span<Int>) -> Int
+
+// CHECK-LABEL: sil @test_checkindex_address_self_loop_hoist :
+// CHECK: bb2({{%[0-9]+}} : $Builtin.Int64):
+// CHECK:   function_ref @checkIndex_addr
+// CHECK:   apply
+// CHECK:   function_ref @replace_span
+// CHECK:   apply
+// CHECK-LABEL: } // end sil function 'test_checkindex_address_self_loop_hoist'
+sil @test_checkindex_address_self_loop_hoist : $@convention(thin) (@inout Span<Int>) -> () {
+bb0(%0 : $*Span<Int>):
+  %zero = integer_literal $Builtin.Int64, 0
+  %get_count_fn = function_ref @getCount_addr : $@convention(method) (@in_guaranteed Span<Int>) -> Int
+  %count_struct = apply %get_count_fn(%0) : $@convention(method) (@in_guaranteed Span<Int>) -> Int
+  %count = struct_extract %count_struct, #Int._value
+  %is_zero = builtin "cmp_eq_Int64"(%zero : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
+  cond_br %is_zero, bb3, bb1
+
+bb1:
+  br bb2(%zero : $Builtin.Int64)
+
+bb2(%i : $Builtin.Int64):
+  %idx = struct $Int (%i : $Builtin.Int64)
+  %check_fn = function_ref @checkIndex_addr : $@convention(method) (Int, @in_guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%idx, %0) : $@convention(method) (Int, @in_guaranteed Span<Int>) -> ()
+
+  %replace_fn = function_ref @replace_span : $@convention(thin) (@inout Span<Int>) -> ()
+  %r = apply %replace_fn(%0) : $@convention(thin) (@inout Span<Int>) -> ()
+
+  %one = integer_literal $Builtin.Int64, 1
+  %no_trap = integer_literal $Builtin.Int1, 0
+  %inc = builtin "sadd_with_overflow_Int64"(%i : $Builtin.Int64, %one : $Builtin.Int64, %no_trap : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %next = tuple_extract %inc : $(Builtin.Int64, Builtin.Int1), 0
+  %done = builtin "cmp_eq_Int64"(%next : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
+  cond_br %done, bb3, bb2(%next : $Builtin.Int64)
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil @test_checkindex_address_self_loop_redundant :
+// CHECK: bb2({{%[0-9]+}} : $Builtin.Int64):
+// CHECK:   function_ref @checkIndex_addr
+// CHECK:   apply {{%[0-9]+}}({{%[0-9]+}}, %0)
+// CHECK:   function_ref @replace_span
+// CHECK:   apply
+// CHECK:   apply {{%[0-9]+}}({{%[0-9]+}}, %0)
+// CHECK-LABEL: } // end sil function 'test_checkindex_address_self_loop_redundant'
+sil @test_checkindex_address_self_loop_redundant : $@convention(thin) (@inout Span<Int>) -> () {
+bb0(%0 : $*Span<Int>):
+  %zero = integer_literal $Builtin.Int64, 0
+  %get_count_fn = function_ref @getCount_addr : $@convention(method) (@in_guaranteed Span<Int>) -> Int
+  %count_struct = apply %get_count_fn(%0) : $@convention(method) (@in_guaranteed Span<Int>) -> Int
+  %count = struct_extract %count_struct, #Int._value
+  %is_zero = builtin "cmp_eq_Int64"(%zero : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
+  cond_br %is_zero, bb3, bb1
+
+bb1:
+  br bb2(%zero : $Builtin.Int64)
+
+bb2(%i : $Builtin.Int64):
+  %idx = struct $Int (%i : $Builtin.Int64)
+  %check_fn = function_ref @checkIndex_addr : $@convention(method) (Int, @in_guaranteed Span<Int>) -> ()
+  %c1 = apply %check_fn(%idx, %0) : $@convention(method) (Int, @in_guaranteed Span<Int>) -> ()
+
+  %replace_fn = function_ref @replace_span : $@convention(thin) (@inout Span<Int>) -> ()
+  %r = apply %replace_fn(%0) : $@convention(thin) (@inout Span<Int>) -> ()
+
+  %c2 = apply %check_fn(%idx, %0) : $@convention(method) (Int, @in_guaranteed Span<Int>) -> ()
+
+  %one = integer_literal $Builtin.Int64, 1
+  %no_trap = integer_literal $Builtin.Int1, 0
+  %inc = builtin "sadd_with_overflow_Int64"(%i : $Builtin.Int64, %one : $Builtin.Int64, %no_trap : $Builtin.Int1) : $(Builtin.Int64, Builtin.Int1)
+  %next = tuple_extract %inc : $(Builtin.Int64, Builtin.Int1), 0
+  %done = builtin "cmp_eq_Int64"(%next : $Builtin.Int64, %count : $Builtin.Int64) : $Builtin.Int1
+  cond_br %done, bb3, bb2(%next : $Builtin.Int64)
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
