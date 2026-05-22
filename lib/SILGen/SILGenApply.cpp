@@ -8092,17 +8092,6 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
   return ManagedValue::forObjectRValueWithoutOwnership(apply);
 }
 
-ManagedValue SILGenFunction::emitCancelAsyncTask(
-    SILLocation loc, SILValue task) {
-  ASTContext &ctx = getASTContext();
-  auto apply = B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
-      getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
-      { task });
-  return ManagedValue::forObjectRValueWithoutOwnership(apply);
-}
-
 ManagedValue SILGenFunction::emitReadAsyncLetBinding(SILLocation loc,
                                                      VarDecl *var) {
   auto patternBinding = var->getParentPatternBinding();

@@ -2082,8 +2082,6 @@ public:
   void emitFinishAsyncLet(SILLocation loc, SILValue asyncLet, SILValue resultBuf);
 
   ManagedValue emitReadAsyncLetBinding(SILLocation loc, VarDecl *var);
-  
-  ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
 
   ManagedValue emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
                                        ManagedValue flags,
@@ -3104,9 +3102,6 @@ public:
                                               SILValue addr,
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
-
-  /// Enter a cleanup to cancel the given task.
-  CleanupHandle enterCancelAsyncTaskCleanup(SILValue task);
 
   // Enter a cleanup to cancel and destroy an AsyncLet as it leaves the scope.
   CleanupHandle enterAsyncLetCleanup(SILValue alet, SILValue resultBuf);
