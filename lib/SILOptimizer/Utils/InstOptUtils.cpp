@@ -2018,20 +2018,21 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     }
   }
 
-  if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
+  if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)) {
+    auto *literal = cast<SingleValueInstruction>(I);
     // Rather than recreating new debug values, we update the existing ones.
     // The use list is mutated during iteration.
-    SmallVector<Operand *, 4> debugUses(getDebugUses(IL));
+    SmallVector<Operand *, 4> debugUses(getDebugUses(literal));
     for (Operand *U : debugUses) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
       auto VarInfo = DbgInst->getVarInfo();
       if (!VarInfo)
         continue;
-      // Copy the integer literal into the reconstruction block, and set
-      // the operand to undef.
-      auto *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
-      auto *NewIL = IL->clone(&*debugBB->begin());
-      debugBB->getArgument(0)->replaceAllUsesWith(NewIL);
+      // Copy the literal into the reconstruction block, and set the operand
+      // of the reconstruction block to undef.
+      SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
+      SILValue newLiteral = literal->clone(&*debugBB->begin());
+      debugBB->getArgument(0)->replaceAllUsesWith(newLiteral);
       debugBB->eraseArgument(0);
       DbgInst->setOperand(SILUndef::get(DbgInst->getOperand()));
     }
