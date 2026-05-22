@@ -906,14 +906,10 @@ private:
   /// multi map here. The implication of this is that when we are performing
   /// dataflow we use a union operation to combine CFG elements and just take
   /// the first instruction that we see.
-  ///
-  /// NOTE: This should never be touched directly without canonicalizing!
   llvm::SmallMapVector<Region, SendingOperandSet *, 2> regionToSendingOpMap;
 
   /// Label each index with a non-negative (unsigned) label if it is associated
   /// with a valid region.
-  ///
-  /// NOTE: This should never be touched directly without canonicalizing!
   std::map<Element, Region> elementToRegionMap;
 
   /// Track a label that is guaranteed to be strictly larger than all in use,
@@ -968,7 +964,6 @@ public:
   }
 
   bool isTrackingElement(Element val) const {
-    // This is safe to perform without canonicalizing.
     return elementToRegionMap.count(val);
   }
 
@@ -989,34 +984,16 @@ public:
   /// Assigns \p oldElt to the region associated with \p newElt.
   void assignElement(Element oldElt, Element newElt, bool updateHistory = true);
 
-  bool areElementsInSameRegion(Element firstElt, Element secondElt) {
-    canonicalize();
+  bool areElementsInSameRegion(Element firstElt, Element secondElt) const {
     return elementToRegionMap.at(firstElt) == elementToRegionMap.at(secondElt);
   }
 
-  Region getRegion(Element elt) {
-    canonicalize();
-    return elementToRegionMap.at(elt);
-  }
+  Region getRegion(Element elt) const { return elementToRegionMap.at(elt); }
 
   using iterator = std::map<Element, Region>::iterator;
-
-private:
   iterator begin() { return elementToRegionMap.begin(); }
   iterator end() { return elementToRegionMap.end(); }
-
-public:
-  /// Return an iterator over the element/range in this partition. Will
-  /// canonicalize the region if necessary to ensure that elements are matched
-  /// to their canonical region.
-  ///
-  /// NOTE: To work with iterators without canonicalizing, please use begin/end
-  /// directly. This should only be done internally to the Partition
-  /// implementation. We never want to expose
-  llvm::iterator_range<iterator> range() {
-    canonicalize();
-    return {begin(), end()};
-  }
+  llvm::iterator_range<iterator> range() { return {begin(), end()}; }
 
   void clearSendingOperandState() { regionToSendingOpMap.clear(); }
 
@@ -1075,6 +1052,33 @@ public:
   /// Runs in quadratic time.
   static Partition join(const Partition &fst, Partition &snd);
 
+  /// Return a vector of the sent values in this partition.
+  std::vector<Element> getSentValues() const {
+    // For effeciency, this could return an iterator not a vector.
+    std::vector<Element> sentVals;
+    for (auto [i, _] : elementToRegionMap)
+      if (isSent(i))
+        sentVals.push_back(i);
+    return sentVals;
+  }
+
+  /// Return a vector of the non-sent regions in this partition, each
+  /// represented as a vector of values.
+  std::vector<std::vector<Element>> getNonSentRegions() const {
+    // For effeciency, this could return an iterator not a vector.
+    std::map<Region, std::vector<Element>> buckets;
+
+    for (auto [i, label] : elementToRegionMap)
+      buckets[label].push_back(i);
+
+    std::vector<std::vector<Element>> doubleVec;
+
+    for (auto [_, bucket] : buckets)
+      doubleVec.push_back(bucket);
+
+    return doubleVec;
+  }
+
   void dump_labels() const LLVM_ATTRIBUTE_USED {
     llvm::dbgs() << "Partition";
     if (canonical)
@@ -1087,16 +1091,7 @@ public:
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
-  /// Print out this partition.
-  ///
-  /// If passed in printRegionIsolation is expected to print to the passed in
-  /// stream a representation of the region and return true if it actually
-  /// printed anything. If it returns true, we will emit a ' :' afterwards. If
-  /// false, we will not emit anything. The suggestion would be to just print
-  /// for non-disconnected isolations.
-  void print(llvm::raw_ostream &os,
-             std::function<bool(llvm::raw_ostream &, Region)>
-                 printRegionIsolation = nullptr) const;
+  void print(llvm::raw_ostream &os) const;
 
   SWIFT_DEBUG_DUMPER(dumpVerbose()) { printVerbose(llvm::dbgs()); }
 
@@ -1110,30 +1105,20 @@ public:
     return history.pushHistorySequenceBoundary(loc);
   }
 
-private:
-  /// Return region if we have it. Will canonicalize the partition b
-  std::optional<Region> maybeGetRegion(Element elt) {
-    canonicalize();
-    auto iter = elementToRegionMap.find(elt);
+  bool isSent(Element val) const {
+    auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
-      return {};
-    return iter->second;
-  }
-
-public:
-  bool isSent(Element val) {
-    if (auto r = maybeGetRegion(val))
-      return regionToSendingOpMap.count(*r);
-    return false;
+      return false;
+    return regionToSendingOpMap.count(iter->second);
   }
 
   /// Return the instruction that sent \p val's region or nullptr
   /// otherwise.
-  SendingOperandSet *getSentOperandSet(Element val) {
-    auto region = maybeGetRegion(val);
-    if (!region)
+  SendingOperandSet *getSentOperandSet(Element val) const {
+    auto iter = elementToRegionMap.find(val);
+    if (iter == elementToRegionMap.end())
       return nullptr;
-    auto iter2 = regionToSendingOpMap.find(*region);
+    auto iter2 = regionToSendingOpMap.find(iter->second);
     if (iter2 == regionToSendingOpMap.end())
       return nullptr;
     auto *set = iter2->second;
@@ -1145,9 +1130,8 @@ public:
   /// elementToRegionMap.
   ///
   /// Asserts when NDEBUG is set. Does nothing otherwise.
-  void validateRegionToSendingOpMapRegions() {
+  void validateRegionToSendingOpMapRegions() const {
 #ifndef NDEBUG
-    canonicalize();
     llvm::SmallSet<Region, 8> regions;
     for (auto [eltNo, regionNo] : elementToRegionMap) {
       regions.insert(regionNo);
@@ -1160,7 +1144,7 @@ public:
 
   /// Used only in assertions, check that Partitions promised to be canonical
   /// are actually canonical
-  bool is_canonical_correct();
+  bool is_canonical_correct() const;
 
   /// Merge the regions of two indices while maintaining canonicality. Returns
   /// the final region used.
@@ -1637,7 +1621,7 @@ public:
   /// The bool result is if it is captured by a closure element. That only is
   /// computed if \p sourceOp is non-null.
   std::optional<std::pair<SILDynamicMergedIsolationInfo, bool>>
-  getIsolationRegionInfo(Region region, Operand *sourceOp) {
+  getIsolationRegionInfo(Region region, Operand *sourceOp) const {
     bool isClosureCapturedElt = false;
     std::optional<SILDynamicMergedIsolationInfo> isolationRegionInfo;
 
@@ -1684,7 +1668,7 @@ public:
   }
 
   /// Overload of \p getIsolationRegionInfo without an Operand.
-  SILDynamicMergedIsolationInfo getIsolationRegionInfo(Region region) {
+  SILDynamicMergedIsolationInfo getIsolationRegionInfo(Region region) const {
     if (auto opt = getIsolationRegionInfo(region, nullptr))
       return opt->first;
     return SILDynamicMergedIsolationInfo();
@@ -1846,28 +1830,13 @@ public:
     if (shouldEmitVerboseLogging()) {
       REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
                                        op.print(llvm::dbgs()));
-      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: "; p.print(
-          llvm::dbgs(), [&](llvm::raw_ostream &os, Region region) -> bool {
-            auto regionInfo = getIsolationRegionInfo(region);
-            if (regionInfo.isDisconnected())
-              return false;
-            regionInfo.printForOneLineLogging(op.getSourceInst()->getFunction(),
-                                              os);
-            return true;
-          }));
+      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: ";
+                                       p.print(llvm::dbgs()));
     }
     SWIFT_DEFER {
       if (shouldEmitVerboseLogging()) {
-        REGIONBASEDISOLATION_VERBOSE_LOG(
-            llvm::dbgs() << "    After:  ";
-            p.print(llvm::dbgs(), [&](llvm::raw_ostream &os, Region region) {
-              auto regionInfo = getIsolationRegionInfo(region);
-              if (regionInfo.isDisconnected())
-                return false;
-              regionInfo.printForOneLineLogging(
-                  op.getSourceInst()->getFunction(), os);
-              return true;
-            }));
+        REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    After:  ";
+                                         p.print(llvm::dbgs()));
       }
       assert(p.is_canonical_correct());
     };

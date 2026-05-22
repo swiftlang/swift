@@ -304,9 +304,6 @@ void Partition::markSent(Element val, SendingOperandSet *sendingOperandSet) {
     return;
   }
 
-  // Canonicalize so that our elementToRegionMap.
-  canonicalize();
-
   // Otherwise, we already have this value in the map. Try to insert it.
   auto iter1 = elementToRegionMap.find(val);
   assert(iter1 != elementToRegionMap.end());
@@ -321,8 +318,6 @@ void Partition::markSent(Element val, SendingOperandSet *sendingOperandSet) {
 }
 
 bool Partition::undoSend(Element val) {
-  canonicalize();
-
   // First see if our val is tracked. If it is not tracked, insert it.
   if (!isTrackingElement(val)) {
     elementToRegionMap.insert_or_assign(val, nextAvailableRegionNum);
@@ -593,23 +588,7 @@ bool Partition::popHistory(
   return history.getHead();
 }
 
-void Partition::print(llvm::raw_ostream &os,
-                      std::function<bool(llvm::raw_ostream &, Region)>
-                          printRegionIsolation) const {
-  // If we are asked to printRegionIsolation, we need to canonicalize before we
-  // can get the correct regions. So, check if we are canonicalized. If we are
-  // not then we can continue printing below. Otherwise, we copy ourselves,
-  // canonicalize the copy, and then print that. We do this since the whole
-  // point of printing this type of information is to help us understand how the
-  // program flowed normally and if we canonicalize this partition to print, we
-  // would change the compiler state.
-  if (printRegionIsolation && !canonical) {
-    auto other = *this;
-    other.canonicalize();
-    other.print(os, printRegionIsolation);
-    return;
-  }
-
+void Partition::print(llvm::raw_ostream &os) const {
   SmallFrozenMultiMap<Region, Element, 8> multimap;
 
   for (auto [eltNo, regionNo] : elementToRegionMap)
@@ -625,10 +604,6 @@ void Partition::print(llvm::raw_ostream &os,
       os << '{';
     } else {
       os << '(';
-    }
-
-    if (printRegionIsolation && printRegionIsolation(os, regionNo)) {
-      os << ": ";
     }
 
     int j = 0;
@@ -729,7 +704,7 @@ void Partition::printHistory(llvm::raw_ostream &os) const {
   } while ((head = head->getParent()));
 }
 
-bool Partition::is_canonical_correct() {
+bool Partition::is_canonical_correct() const {
 #ifdef NDEBUG
   return true;
 #else
@@ -768,8 +743,6 @@ bool Partition::is_canonical_correct() {
 }
 
 Region Partition::merge(Element fst, Element snd, bool updateHistory) {
-  canonicalize();
-
   assert(elementToRegionMap.count(fst) && elementToRegionMap.count(snd));
 
   // Remember: fstRegion and sndRegion are actually elements in
