@@ -334,10 +334,14 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
         clangModuleDependencies.takeError(),
         [this, &moduleName](const llvm::StringError &E) {
           auto &message = E.getMessage();
-          if (message.find("fatal error: module '" + moduleName.str().str() +
-                           "' not found") == std::string::npos)
-            workerDiagnosticEngine->diagnose(
-                SourceLoc(), diag::clang_dependency_scan_error, message);
+          // Empty messages are cached clang loadModule failures whose
+          // diagnostic was already reported on the first lookup.
+          if (message.empty() ||
+              message.find("fatal error: module '" + moduleName.str().str() +
+                           "' not found") != std::string::npos)
+            return;
+          workerDiagnosticEngine->diagnose(
+              SourceLoc(), diag::clang_dependency_scan_error, message);
         });
     return std::nullopt;
   }
