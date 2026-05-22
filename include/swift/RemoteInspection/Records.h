@@ -222,7 +222,6 @@ public:
   const_iterator begin() const {
     auto Begin = getFieldRecordBuffer();
     auto End = FieldRecordIterator::advanceRecordPointer(Begin, NumFields * FieldRecordSize);
-    fprintf(stderr, "FieldRecordIterator begin %p end %p\n", Begin, End);
     return const_iterator { FieldRecordSize, Begin, End };
   }
 
