@@ -694,11 +694,9 @@ extension Task where Success == Never, Failure == Never {
 /// and that function isn't executing in the context of any task,
 /// the unsafe task handle is `nil`.
 ///
-/// Don't store an unsafe task reference
-/// for use outside this method's closure.
-/// Storing an unsafe reference doesn't affect the task's actual life cycle,
+/// Storing an unsafe reference to a task doesn't affect the task's actual life cycle,
 /// and the behavior of accessing an unsafe task reference
-/// outside of the `withUnsafeCurrentTask(body:)` method's closure isn't defined.
+/// outside of the `withUnsafeCurrentTask(body:)` method's closure is unsafe and undefined behavior.
 /// There's no safe way to retrieve a reference to the current task
 /// and save it for long-term use.
 /// To query the current task without saving a reference to it,
@@ -727,18 +725,63 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) throws -> T) ret
   return try unsafe body(UnsafeCurrentTask(_task))
 }
 
+/// Calls a closure with an unsafe reference to the current task.
+///
+/// If you call this function from the body of an asynchronous function,
+/// the unsafe task handle passed to the closure is always non-`nil`
+/// because an asynchronous function always runs in the context of a task.
+///
+/// The operation is guaranteed to execute on the caller's isolation.
+///
+/// Storing an unsafe reference to a task doesn't affect the task's actual life cycle,
+/// and the behavior of accessing an unsafe task reference
+/// outside of the `withUnsafeCurrentTask(body:)` method's closure is unsafe and undefined behavior.
+/// There's no safe way to retrieve a reference to the current task
+/// and save it for long-term use.
+/// To query the current task without saving a reference to it,
+/// use properties like `currentPriority`.
+/// If you need to store a reference to a task,
+/// create an unstructured task using `Task.detached(priority:operation:)` instead.
+///
+/// - Parameters:
+///   - body: A closure that takes an `UnsafeCurrentTask` parameter.
+///     If `body` has a return value,
+///     that value is also used as the return value
+///     for the `withUnsafeCurrentTask(body:)` function.
+///
+/// - Returns: The return value, if any, of the `body` closure.
 @available(SwiftStdlib 6.0, *)
-public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T {
+// Note: Could not be always-emit-into client since the UnsafeCurrentTask initializer was not usableFromInline
+// in 6.0, so we can't make this symbol more available than the availability of UnsafeCurrentTask.init.
+@abi(
+  // abi only necessary to avoid redeclaration clash with previous declaration (__abi_withUnsafeCurrentTask)
+  nonisolated(nonsending) func withUnsafeCurrentTaskNonsending<T>(
+    body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
+  ) async rethrows -> T
+)
+public nonisolated(nonsending) func withUnsafeCurrentTask<T>(
+  body: nonisolated(nonsending) (UnsafeCurrentTask?) async throws -> T
+) async rethrows -> T {
   guard let _task = _getCurrentAsyncTask() else {
     return try await body(nil)
   }
 
-  // FIXME: This retain seems pretty wrong, however if we don't we WILL crash
-  //        with "destroying a task that never completed" in the task's destroy.
-  //        How do we solve this properly?
+  // FIXME: This will be unnecessary once we avoid the release of the task builtin
   Builtin.retain(_task)
 
   return try unsafe await body(UnsafeCurrentTask(_task))
+}
+
+// Old version for ABI compatibility
+@available(SwiftStdlib 6.0, *)
+@usableFromInline
+@abi(
+  func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> T) async rethrows -> T
+)
+internal func __abi_withUnsafeCurrentTask<T>(
+  body: (UnsafeCurrentTask?) async throws -> T
+) async rethrows -> T {
+  unsafe try await withUnsafeCurrentTask(body: body)
 }
 
 /// An unsafe reference to the current task.
@@ -771,6 +814,8 @@ public struct UnsafeCurrentTask {
   internal let _task: Builtin.NativeObject
 
   // May only be created by the standard library.
+  @usableFromInline // Since 6.4
+  @available(SwiftStdlib 5.1, *)
   internal init(_ task: Builtin.NativeObject) {
     unsafe self._task = task
   }
