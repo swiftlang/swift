@@ -4,7 +4,6 @@
 // RUN: %target-swift-frontend -emit-sil -swift-version 6 -I %t %s -verify -verify-additional-prefix swift6- -enable-upcoming-feature InferIsolatedConformances -o /dev/null
 
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_InferIsolatedConformances
 
 @preconcurrency import ExternalTypes
 
