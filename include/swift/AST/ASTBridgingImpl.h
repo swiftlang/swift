@@ -838,6 +838,10 @@ BridgedASTType::GenericTypeParam_getParamKind() const {
   return llvm::cast<swift::GenericTypeParamType>(type)->getParamKind();
 }
 
+bool BridgedASTType::Tuple_containsPackExpansionType() const {
+  return llvm::cast<swift::TupleType>(type)->containsPackExpansionType();
+}
+
 BridgedASTTypeArray BridgedASTType::BoundGenericType_getGenericArgs() const {
   return {llvm::cast<swift::BoundGenericType>(type)->getGenericArgs()};
 }
