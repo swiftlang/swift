@@ -55,6 +55,14 @@ public:
       insert(element);
   }
 
+  /// A set containing every invertible protocol the runtime knows about,
+  /// minus the given one.
+  static InvertibleProtocolSet allExcept(InvertibleProtocolKind kind) {
+    InvertibleProtocolSet result(static_cast<StorageType>(~StorageType{0}));
+    result.remove(kind);
+    return result;
+  }
+
   /// Retrieve the raw bits that describe this set.
   constexpr StorageType rawBits() const { return bits; }
 

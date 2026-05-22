@@ -82,19 +82,13 @@ using namespace swift;
 using namespace metadataimpl;
 
 #if defined(__APPLE__)
-// Binaries using noncopyable types check the address of the symbol
-// `swift_runtimeSupportsNoncopyableTypes` before exposing any noncopyable
-// type metadata through in-process reflection, to prevent existing code
-// that expects all types to be copyable from crashing or causing bad behavior
-// by copying noncopyable types. The runtime does not yet support noncopyable
-// types, so we explicitly define this symbol to be zero for now. Binaries
-// weak-import this symbol so they will resolve it to a zero address on older
-// runtimes as well.
-//
-// Note: If this symbol's value ever gets updated, the corresponding condition
-// handled by IRGen MUST be updated in tandem.
+// Binaries compiled with older deployment targets check the address of the
+// symbol `swift_runtimeSupportsNoncopyableTypes` before exposing any
+// noncopyable type metadata through in-process reflection. If the address is
+// zero, then the metadata is not exposed to the runtime. Binaries weak-import
+// this symbol so they will resolve it to a zero address on older runtimes too.
 __asm__("  .globl _swift_runtimeSupportsNoncopyableTypes\n");
-__asm__(".set _swift_runtimeSupportsNoncopyableTypes, 0\n");
+__asm__(".set _swift_runtimeSupportsNoncopyableTypes, 1\n");
 #endif
 
 // GenericParamDescriptor is a single byte, so while it's difficult to
@@ -2608,6 +2602,7 @@ static void performBasicLayout(TypeLayout &layout,
   size_t size = layout.size;
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
+  bool isCopyable = layout.flags.isCopyable();
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
   bool isBitwiseBorrowable = layout.flags.isBitwiseBorrowable();
   bool isAddressableForDependencies = layout.flags.isAddressableForDependencies();
@@ -2625,6 +2620,7 @@ static void performBasicLayout(TypeLayout &layout,
     size += eltLayout->size;
     alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
     if (!eltLayout->flags.isPOD()) isPOD = false;
+    if (!eltLayout->flags.isCopyable()) isCopyable = false;
     if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
     if (!eltLayout->flags.isBitwiseBorrowable()) isBitwiseBorrowable = false;
     if (eltLayout->flags.isAddressableForDependencies())
@@ -2637,6 +2633,7 @@ static void performBasicLayout(TypeLayout &layout,
   layout.flags = ValueWitnessFlags()
                      .withAlignmentMask(alignMask)
                      .withPOD(isPOD)
+                     .withCopyable(isCopyable)
                      .withBitwiseTakable(isBitwiseTakable)
                      .withBitwiseBorrowable(isBitwiseBorrowable)
                      .withAddressableForDependencies(isAddressableForDependencies)
@@ -3220,6 +3217,12 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
         assignUnlessEqual(fieldOffsets[i], offset);
       });
 
+  // If the struct is always noncopyable, we must honor that.
+  if (layout.flags.isCopyable() &&
+      structType->getDescription()->isUnconditionallySuppressing(
+          InvertibleProtocolKind::Copyable))
+    layout.flags = layout.flags.withCopyable(false);
+
   // We have extra inhabitants if any element does. Use the field with the most.
   unsigned extraInhabitantCount = 0;
   for (unsigned i = 0; i < numFields; ++i) {
@@ -3258,6 +3261,12 @@ static void swift_cvw_initStructMetadataWithLayoutStringImpl(
       [&](size_t i, const uint8_t *fieldType, uint32_t offset) {
         assignUnlessEqual(fieldOffsets[i], offset);
       });
+
+  // If the struct is always noncopyable, we must honor that.
+  if (layout.flags.isCopyable() &&
+        structType->getDescription()->isUnconditionallySuppressing(
+            InvertibleProtocolKind::Copyable))
+    layout.flags = layout.flags.withCopyable(false);
 
   // We have extra inhabitants if any element does. Use the field with the most.
   unsigned extraInhabitantCount = 0;
