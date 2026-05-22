@@ -1842,11 +1842,11 @@ public:
       return "failed to read value of " + AllocationPoolPointerName;
 
     struct PoolRange {
-      RemoteAddress Begin;
+      StoredPointer Begin;
       StoredSize Remaining;
     };
     struct PoolTrailer {
-      RemoteAddress PrevTrailer;
+      StoredPointer PrevTrailer;
       StoredSize PoolSize;
     };
     struct alignas(RemoteAddress) AllocationHeader {
@@ -1867,7 +1867,9 @@ public:
     unsigned LoopCount = 0;
     unsigned LoopLimit = 1000000;
 
-    auto TrailerPtr = Pool->Begin + Pool->Remaining;
+    auto PoolAddressSpace = AllocationPoolAddr->getResolvedAddress().getAddressSpace();
+
+    auto TrailerPtr = RemoteAddress(Pool->Begin + Pool->Remaining, PoolAddressSpace);
     while (TrailerPtr && LoopCount++ < LoopLimit) {
       auto TrailerBytes =
           getReader().readBytes(TrailerPtr, sizeof(PoolTrailer));
@@ -1899,7 +1901,7 @@ public:
         Offset += sizeof(AllocationHeader) + Header->Size;
       }
 
-      TrailerPtr = Trailer->PrevTrailer;
+      TrailerPtr = RemoteAddress(Trailer->PrevTrailer, PoolAddressSpace);
     }
     return std::nullopt;
   }
