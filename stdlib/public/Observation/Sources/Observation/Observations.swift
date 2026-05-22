@@ -173,6 +173,11 @@ public struct Observations<Element: Sendable, Failure: Error>: AsyncSequence, Se
     
     // this is the primary implementation of the tracking
     // it is bound to be called on the specified isolation of the construction
+    @diagnose(
+      ConversionFromIsolatedAnyToSynchronous,
+      as: ignored,
+      reason: "https://github.com/swiftlang/swift/issues/89361"
+    )
     fileprivate static func trackEmission(isolation trackingIsolation: isolated (any Actor)?, state: _ManagedCriticalState<State>, emit: Emit) throws(Failure) -> Iteration {
       // this ferries in an intermediate form with Result to skip over `withObservationTracking` not handling errors being thrown
       // particularly this case is that the error is also an iteration state transition data point (it terminates the sequence)
