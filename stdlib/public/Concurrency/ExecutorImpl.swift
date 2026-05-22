@@ -22,6 +22,7 @@ import Swift
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_asyncMainDrainQueueImpl")
+@diagnose(UselessAvailabilityCheck, as: ignored)
 internal func drainMainQueue() {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   if #available(StdlibDeploymentTarget 6.3, *) {
@@ -37,6 +38,7 @@ internal func drainMainQueue() {
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_donateThreadToGlobalExecutorUntilImpl")
+@diagnose(UselessAvailabilityCheck, as: ignored)
 internal func donateToGlobalExecutor(
   condition: @convention(c) (_ ctx: UnsafeMutableRawPointer) -> CBool,
   context: UnsafeMutableRawPointer
@@ -54,6 +56,7 @@ internal func donateToGlobalExecutor(
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getMainExecutorImpl")
+@diagnose(UselessAvailabilityCheck, as: ignored)
 internal func getMainExecutor() -> UnownedSerialExecutor {
   if #available(StdlibDeploymentTarget 6.3, *) {
     return unsafe _getMainExecutorAsSerialExecutor()
@@ -64,6 +67,7 @@ internal func getMainExecutor() -> UnownedSerialExecutor {
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueMainExecutorImpl")
+@diagnose(UselessAvailabilityCheck, as: ignored)
 internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   if #available(StdlibDeploymentTarget 6.3, *) {
@@ -78,6 +82,7 @@ internal func enqueueOnMainExecutor(job unownedJob: UnownedJob) {
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalImpl")
+@diagnose(UselessAvailabilityCheck, as: ignored)
 internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
   if #available(StdlibDeploymentTarget 6.3, *) {
     Task.defaultExecutor.enqueue(unownedJob)
@@ -89,6 +94,7 @@ internal func enqueueOnGlobalExecutor(job unownedJob: UnownedJob) {
 #if !$Embedded
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalWithDelayImpl")
+@diagnose(UselessAvailabilityCheck, as: ignored)
 internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
                                       job unownedJob: UnownedJob) {
   #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -106,6 +112,7 @@ internal func enqueueOnGlobalExecutor(delay: CUnsignedLongLong,
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_enqueueGlobalWithDeadlineImpl")
+@diagnose(UselessAvailabilityCheck, as: ignored)
 internal func enqueueOnGlobalExecutor(seconds: CLongLong,
                                       nanoseconds: CLongLong,
                                       leewaySeconds: CLongLong,

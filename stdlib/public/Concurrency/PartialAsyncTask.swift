@@ -86,6 +86,7 @@ public struct UnownedJob: Sendable {
 
   /// The priority of this job.
   @available(StdlibDeploymentTarget 5.9, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   public var priority: JobPriority {
     let raw: UInt8
     if #available(StdlibDeploymentTarget 6.3, *) {
