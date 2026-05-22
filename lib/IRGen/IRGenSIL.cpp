@@ -6246,17 +6246,6 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   }
 
   auto RealTy = SILTy.getASTType();
-  if (IsAddrVal && IsInCoro)
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(i->getOperand())) {
-      // Usually debug info only ever describes the *result* of a projectBox
-      // call. To allow the debugger to display a boxed parameter of an async
-      // continuation object, however, the debug info can only describe the box
-      // itself and thus also needs to emit a box type for it so the debugger
-      // knows to call into Remote Mirrors to unbox the value.
-      RealTy = PBI->getOperand()->getType().getASTType();
-      assert(isa<SILBoxType>(RealTy));
-    }
-
   VarDecl *VD = i->getDecl();
   if (!VD) {
     // The source location of a DebugValueInst inserted by the SIL optimizer is
