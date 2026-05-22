@@ -895,7 +895,8 @@ func closureTests() async {
 
   func testLetOneNSVariableError() async {
     let x = NonSendableKlass()
-    sendingClosure { _ = x } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+    sendingClosure { _ = x } // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+    // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
     sendingClosure { _ = x } // expected-note {{access can happen concurrently}}
   }
 
@@ -908,8 +909,9 @@ func closureTests() async {
   func testLetOneNSVariableSVariableError() async {
     let x = NonSendableKlass()
     let y = CustomActorInstance()
-    sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
       _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
@@ -934,9 +936,10 @@ func closureTests() async {
   func testLetTwoNSVariableError() async {
     let x = NonSendableKlass()
     let y = NonSendableKlass()
-    sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
-      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -947,9 +950,10 @@ func closureTests() async {
   func testLetTwoNSVariableError2() async {
     nonisolated(unsafe) let x = NonSendableKlass()
     let y = NonSendableKlass()
-    sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
-      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -974,7 +978,8 @@ func closureTests() async {
     var x = NonSendableKlass()
     x = NonSendableKlass()
 
-    sendingClosure { _ = x } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+    sendingClosure { _ = x } // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+    // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
     sendingClosure { _ = x } // expected-note {{access can happen concurrently}}
   }
 
@@ -991,8 +996,9 @@ func closureTests() async {
     x = NonSendableKlass()
     var y = CustomActorInstance()
     y = CustomActorInstance()
-    sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
       _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
@@ -1021,9 +1027,10 @@ func closureTests() async {
     x = NonSendableKlass()
     var y = NonSendableKlass()
     y = NonSendableKlass()
-    sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
-      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -1036,9 +1043,10 @@ func closureTests() async {
     x = NonSendableKlass()
     var y = NonSendableKlass()
     y = NonSendableKlass()
-    sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
-      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
+    sendingClosure { // expected-warning {{sending value of non-Sendable type '() -> ()' risks causing data races}}
+      // expected-note @-1 {{Passing value of non-Sendable type '() -> ()' as a 'sending' argument to local function 'sendingClosure' risks causing races in between local and caller code}}
+      _ = x
+      _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -1063,7 +1071,12 @@ func closureTests() async {
 
   func testWithTaskDetached() async {
     let x1 = NonSendableKlass()
-    Task.detached { _ = x1 } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x1' which is accessed later by code in the current task}}
+    Task.detached { _ = x1 }
+    // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+    // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+    // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+    // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+
     Task.detached { _ = x1 } // expected-note {{access can happen concurrently}}
 
     nonisolated(unsafe) let x2 = NonSendableKlass()
@@ -1077,15 +1090,13 @@ func closureTests() async {
 
     nonisolated(unsafe) let x4a = NonSendableKlass()
     let x4b = NonSendableKlass()
-    Task.detached {
-      _ = x4a; // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x4a' which is accessed later by code in the current task}}
-      _ = x4b // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x4b' which is accessed later by code in the current task}}
-    }
+    Task.detached { _ = x4a; _ = x4b }
+    // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+    // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+    // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+    // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
 
-    Task.detached { // expected-note {{access can happen concurrently}}
-      _ = x4a
-      _ = x4b
-    }
+    Task.detached { _ = x4a; _ = x4b } // expected-note {{access can happen concurrently}}
   }
 
   // The reason why this works is that we do not infer nonisolated(unsafe)
