@@ -518,7 +518,9 @@ Type SILGenModule::getConfiguredExecutorFactory() {
   auto &ctx = getASTContext();
 
   // First look in the @main struct, if any
-  NominalTypeDecl *mainType = ctx.MainModule->getMainTypeDecl();
+  ModuleDecl *mainModule = ctx.MainModule;
+  NominalTypeDecl *mainType
+    = mainModule ? mainModule->getMainTypeDecl() : nullptr;
   if (mainType) {
     SmallVector<ValueDecl *, 1> decls;
     auto identifier = ctx.getIdentifier("DefaultExecutorFactory");
