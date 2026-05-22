@@ -112,3 +112,8 @@ module RefKit {
   header "refkit.hpp"
   requires cplusplus
 }
+
+module ImmortalFRTHashable {
+  header "immortal-frt-hashable.h"
+  requires cplusplus
+}
