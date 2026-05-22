@@ -1107,22 +1107,6 @@ SILIsolationInfo SILIsolationInfo::getFromConformances(
       if (sendableMetatype &&
           lookupConformance(conformance.getType(), sendableMetatype,
                             /*allowMissing=*/false).isInvalid()) {
-        auto functionIsolation = value->getFunction()->getActorIsolation();
-        if (functionIsolation.isGlobalActor()) {
-          return SILIsolationInfo::getGlobalActorIsolated(
-              value, functionIsolation.getGlobalActor(),
-              conformance.getProtocol());
-        }
-        if (functionIsolation.isActorInstanceIsolated()) {
-          if (auto isolatedParam = cast_or_null<SILFunctionArgument>(
-                  value->getFunction()->maybeGetIsolatedArgument())) {
-            if (auto result = SILIsolationInfo::getActorInstanceIsolated(
-                    value, isolatedParam, conformance.getProtocol())) {
-              return result;
-            }
-          }
-        }
-
         return SILIsolationInfo::getTaskIsolated(value,
                                                  conformance.getProtocol());
       }
@@ -1241,7 +1225,7 @@ SILIsolationInfo SILIsolationInfo::getConformanceIsolation(SILInstruction *inst)
 
 void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
   if (isolatedConformance) {
-    os << " isolated-conformance-to(" << isolatedConformance->getName() << ")";
+    os << "isolated-conformance-to(" << isolatedConformance->getName() << ")";
   }
 
   auto opts = getOptions();
@@ -2025,24 +2009,5 @@ static FunctionTest IsolationMergeTest(
       }
       llvm::outs() << "\n";
     });
-
-// Arguments:
-// - SILValue: value to look up isolation for.
-// Dumps:
-// - The inferred isolation.
-static FunctionTest
-    GetConformanceIsolationInferrence("sil_isolation_info_get_conformance_isolation_inferrence",
-                            [](auto &function, auto &arguments, auto &test) {
-                              auto value = arguments.takeValue();
-
-                              SILIsolationInfo info =
-                                SILIsolationInfo::getConformanceIsolation(cast<SingleValueInstruction>(value));
-                              llvm::outs() << "Input Value: " << *value;
-                              llvm::outs() << "Isolation: ";
-                              info.printForOneLineLogging(&function,
-                                                          llvm::outs());
-                              llvm::outs() << "\n";
-                            });
-
 
 } // namespace swift::test
