@@ -606,6 +606,10 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           TopLevelModule->lookupQualified(
               TopLevelModule, DeclNameRef(ScopeID),
               SourceLoc(), NL_QualifiedDefault, Decls);
+          // Skip macro until `import macro` is implemented.
+          llvm::erase_if(Decls, [](ValueDecl *VD) {
+            return isa<MacroDecl>(VD);
+          });
           std::optional<ImportKind> FoundKind =
               ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.has_value() &&
