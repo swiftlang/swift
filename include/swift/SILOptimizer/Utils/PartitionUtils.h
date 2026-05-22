@@ -914,7 +914,7 @@ private:
 
   /// Track a label that is guaranteed to be strictly larger than all in use,
   /// and therefore safe for use as a fresh label.
-  Region nextAvailableRegionNum = Region(0);
+  Region freshLabel = Region(0);
 
   /// An immutable data structure that we use to push/pop isolation history.
   IsolationHistory history;
@@ -1083,7 +1083,7 @@ public:
     llvm::dbgs() << "Partition";
     if (canonical)
       llvm::dbgs() << "(canonical)";
-    llvm::dbgs() << "(fresh=" << nextAvailableRegionNum << "){";
+    llvm::dbgs() << "(fresh=" << freshLabel << "){";
     for (const auto &[i, label] : elementToRegionMap)
       llvm::dbgs() << "[" << i << ": " << label << "] ";
     llvm::dbgs() << "}\n";
