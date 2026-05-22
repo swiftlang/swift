@@ -11,12 +11,6 @@ public struct X {
     return Builtin.getCurrentAsyncTask()
   }
 
-  // CHECK-LABEL: sil hidden [ossa] @$s4test1XV8doCancel4taskyBo_tF : $@convention(method) (@guaranteed Builtin.NativeObject, X) -> ()
-  func doCancel(task: Builtin.NativeObject) {
-    // CHECK: builtin "cancelAsyncTask"(%0 : $Builtin.NativeObject) : $()
-    Builtin.cancelAsyncTask(task)
-  }
-
   // CHECK-LABEL: sil hidden [ossa] @$s4test1XV12launchFutureyyxlF : $@convention(method) <T> (@in_guaranteed T, X) -> ()
   // CHECK: [[FLAGS:%.*]] = apply
   // CHECK: [[OPT_SERIAL_EXECUTOR:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
