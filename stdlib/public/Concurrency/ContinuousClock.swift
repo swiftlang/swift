@@ -110,6 +110,7 @@ extension ContinuousClock: Clock {
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   public func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {

@@ -63,6 +63,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:no-use-throwing-unstructured-task>
 - <doc:no-usage>
 - <doc:use-any-apple-os-availability>
+- <doc:useless-availability-check>
 
 
 ## Topics
@@ -126,4 +127,5 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:no-use-throwing-unstructured-task>
 - <doc:no-usage>
 - <doc:use-any-apple-os-availability>
+- <doc:useless-availability-check>
 - <doc:existential-member-access-limitations>
