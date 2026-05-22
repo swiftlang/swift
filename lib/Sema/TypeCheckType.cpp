@@ -1735,14 +1735,24 @@ Type TypeResolution::applyUnboundGenericArguments(
         return BoundGenericType::get(nominalDecl, parentTy, genericArgs);
       }
 
+      // We have a generic type alias referenced with an unbound generic
+      // base, which is only valid if all of the unbound generic type's
+      // generic parameters are fixed to concrete types by the generic
+      // signature of the type alias, eg:
+      //
+      // struct G<T> {
+      //   typealias A<U> = Int where T == String
+      // }
       if (!resultType->hasTypeParameter())
         return resultType;
 
       auto genericSig = decl->getGenericSignature();
       auto parentSig = decl->getDeclContext()->getGenericSignatureOfContext();
-      for (auto gp : parentSig.getGenericParams())
+      for (auto gp : parentSig.getGenericParams()) {
+        ASSERT(genericSig->isConcreteType(gp));
         subs[gp->getCanonicalType()->castTo<GenericTypeParamType>()] =
             genericSig->getConcreteType(gp);
+      }
     } else {
       subs = parentTy->getContextSubstitutions(decl->getDeclContext());
     }
