@@ -453,10 +453,10 @@ extension Span where Element: ~Copyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
-    //FIXME: change to unsafeRawAddress when ready
-    unsafeAddress {
+    @_transparent
+    borrow {
       _checkIndex(position)
-      return unsafe _unsafeAddressOfElement(unchecked: position)
+      return unsafe self[unchecked: position]
     }
   }
 
@@ -472,9 +472,9 @@ extension Span where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
-    //FIXME: change to unsafeRawAddress when ready
-    unsafeAddress {
-      unsafe _unsafeAddressOfElement(unchecked: position)
+    @_unsafeSelfDependentResult
+    borrow {
+      Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: position))
     }
   }
 
@@ -482,10 +482,9 @@ extension Span where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal func _unsafeAddressOfElement(
     unchecked position: Index
-  ) -> UnsafePointer<Element> {
+  ) -> Builtin.RawPointer {
     let elementOffset = position &* MemoryLayout<Element>.stride
-    let address = unsafe _start().advanced(by: elementOffset)
-    return unsafe address.assumingMemoryBound(to: Element.self)
+    return unsafe _start().advanced(by: elementOffset)._rawValue
   }
 }
 
@@ -500,6 +499,7 @@ extension Span where Element: BitwiseCopyable {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
+    @_transparent
     get {
       _checkIndex(position)
       return unsafe self[unchecked: position]
@@ -519,9 +519,8 @@ extension Span where Element: BitwiseCopyable {
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
     get {
-      let elementOffset = position &* MemoryLayout<Element>.stride
-      let address = unsafe _start().advanced(by: elementOffset)
-      return unsafe address.loadUnaligned(as: Element.self)
+      let address = unsafe _unsafeAddressOfElement(unchecked: position)
+      return unsafe UnsafeRawPointer(address).loadUnaligned(as: Element.self)
     }
   }
 }
