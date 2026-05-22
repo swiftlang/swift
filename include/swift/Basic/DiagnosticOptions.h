@@ -53,6 +53,9 @@ public:
   /// kind are not printed by \c PrintingDiagnosticConsumer.
   bool VerifyIgnoreMacroLocationNote = false;
 
+  /// If true, enforce that child notes are listed in {{children:}} blocks.
+  bool VerifyChildNotes = false;
+
   /// Indicates whether diagnostic passes should be skipped.
   bool SkipDiagnosticPasses = false;
 

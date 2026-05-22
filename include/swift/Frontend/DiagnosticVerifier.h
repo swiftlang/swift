@@ -21,6 +21,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringMap.h"
+#include "llvm/Support/SourceMgr.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/Basic/LLVM.h"
 
@@ -78,18 +79,34 @@ struct CapturedDiagnosticInfo {
   unsigned Column;
   SmallVector<CapturedFixItInfo, 2> FixIts;
   std::string CategoryDocFile;
+  // Original index into CapturedDiagnostics. Allows identifying it even as
+  // elements get erased.
+  size_t ID;
+  // ID of the parent CapturedDiagnosticInfo, set for child notes when
+  // VerifyChildNotes is enabled.
+  std::optional<size_t> ParentID;
+  bool HasChildren;
 
   CapturedDiagnosticInfo(llvm::SmallString<128> Message,
                          std::optional<unsigned> SourceBufferID,
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
                          SmallVector<CapturedFixItInfo, 2> FixIts,
-                         const std::string &categoryDocFile)
+                         const std::string &categoryDocFile, size_t ID,
+                         std::optional<size_t> ParentIdx, bool HasChildren)
       : Message(Message), SourceBufferID(SourceBufferID),
         Classification(Classification), Loc(Loc), Line(Line), Column(Column),
-        FixIts(FixIts), CategoryDocFile(categoryDocFile) {
-  }
+        FixIts(FixIts), CategoryDocFile(categoryDocFile), ID(ID),
+        ParentID(ParentIdx), HasChildren(HasChildren) {}
 };
+
+struct SMDiagnosticWithNotes {
+  llvm::SMDiagnostic Diag;
+  llvm::SmallVector<llvm::SMDiagnostic, 1> Notes;
+  SMDiagnosticWithNotes(llvm::SMDiagnostic &&Diag) : Diag(Diag) {}
+  SMDiagnosticWithNotes(llvm::SMDiagnostic &Diag) : Diag(std::move(Diag)) {}
+};
+
 /// This class implements support for -verify mode in the compiler.  It
 /// buffers up diagnostics produced during compilation, then checks them
 /// against expected-error markers in the source file.
@@ -102,6 +119,7 @@ class DiagnosticVerifier : public DiagnosticConsumer {
   bool IgnoreUnknown;
   bool IgnoreUnrelated;
   bool IgnoreMacroLocationNote;
+  bool VerifyChildNotes;
   bool UseColor;
   ArrayRef<std::string> AdditionalExpectedPrefixes;
 
@@ -110,12 +128,14 @@ public:
                               ArrayRef<std::string> AdditionalFilePaths,
                               bool AutoApplyFixes, bool IgnoreUnknown,
                               bool IgnoreUnrelated,
-                              bool IgnoreMacroLocationNote, bool UseColor,
+                              bool IgnoreMacroLocationNote,
+                              bool VerifyChildNotes, bool UseColor,
                               ArrayRef<std::string> AdditionalExpectedPrefixes)
       : SM(SM), BufferIDs(BufferIDs), AdditionalFilePaths(AdditionalFilePaths),
         AutoApplyFixes(AutoApplyFixes), IgnoreUnknown(IgnoreUnknown),
         IgnoreUnrelated(IgnoreUnrelated),
-        IgnoreMacroLocationNote(IgnoreMacroLocationNote), UseColor(UseColor),
+        IgnoreMacroLocationNote(IgnoreMacroLocationNote),
+        VerifyChildNotes(VerifyChildNotes), UseColor(UseColor),
         AdditionalExpectedPrefixes(AdditionalExpectedPrefixes) {}
 
   virtual void handleDiagnostic(SourceManager &SM,
@@ -135,6 +155,7 @@ private:
   };
 
   void printDiagnostic(const llvm::SMDiagnostic &Diag) const;
+  void printDiagnostic(const SMDiagnosticWithNotes &Diag) const;
 
   /// Check whether there were any diagnostics in files without expected
   /// diagnostics
@@ -144,7 +165,7 @@ private:
   bool
   verifyUnknown(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics) const;
 
-  std::vector<llvm::SMDiagnostic> Errors;
+  std::vector<SMDiagnosticWithNotes> Errors;
 
   /// verifyFile - After the file has been processed, check to see if we
   /// got all of the expected diagnostics and check to see if there were any
@@ -154,13 +175,26 @@ private:
   unsigned parseExpectedDiagInfo(unsigned BufferID, StringRef MatchStart,
                                  unsigned &PrevExpectedContinuationLine,
                                  ExpectedDiagnosticInfo &Expected);
+  void parseNestedExpectedDiagInfoBlock(
+      unsigned BufferID, StringRef MatchStartIn,
+      unsigned &PrevExpectedContinuationLine,
+      std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End);
   void
   verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
-                    unsigned BufferID);
+                    unsigned BufferID, std::optional<size_t> ParentID);
   void verifyRemaining(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics,
                        const char *FileStart);
   void addError(const char *Loc, const Twine &message,
                 ArrayRef<llvm::SMFixIt> FixIts = {});
+  /// Add a note to the last error added.
+  void addNote(const char *Loc, const Twine &message);
+
+  /// Emit an "unexpected diagnostic produced" error for \p DiagIter, erase
+  /// its child notes (if \c VerifyChildNotes), and erase the diagnostic
+  /// itself. Returns the iterator past the erased element.
+  std::vector<CapturedDiagnosticInfo>::iterator
+  reportAndEraseUnexpected(
+      std::vector<CapturedDiagnosticInfo>::iterator DiagIter);
 
   std::optional<LineColumnRange>
   parseExpectedFixItRange(StringRef &Str, unsigned DiagnosticLineNo);

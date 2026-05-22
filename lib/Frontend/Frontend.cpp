@@ -442,7 +442,8 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
         SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
         diagOpts.VerifyIgnoreUnknown, diagOpts.VerifyIgnoreUnrelated,
-        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.UseColor,
+        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.VerifyChildNotes,
+        diagOpts.UseColor,
         diagOpts.AdditionalDiagnosticVerifierPrefixes);
 
     addDiagnosticConsumer(DiagVerifier.get());
