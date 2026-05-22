@@ -1889,33 +1889,6 @@ public:
       // a sending result.
       handleAssignNonDisconnectedIntoSendingResult(op);
 
-      // Check if our actual destElement is directly actor isolated in a way
-      // that does not match our srcElement's region. In that case, the memory
-      // itself is actor isolated and we have to emit an incompatible merge
-      // error.
-      auto destIsolation = getIsolationRegionInfo(destElement);
-      auto srcRegIsolation = getIsolationRegionInfo(p.getRegion(srcElement));
-      if (!srcRegIsolation.merge(destIsolation)) {
-        // If we are not tracking dest yet, we need to start tracking it. We do
-        // not need to do this in the general case since the assign will handle
-        // it. But since we are not assigning, we need to do this now.
-        if (!p.isTrackingElement(destElement)) {
-          p.trackNewElement(destElement);
-        }
-
-        // See if either of our elements are nonisolated(unsafe). In such a
-        // case, we need to avoid emitting the error. We still do not merge
-        // since regions can only have one isolation and we would break that
-        // invariant when looking at other values in the region that are not
-        // marked as nonisolated(unsafe).
-        if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
-          return;
-        return handleError(IncompatibleRegionMergeError(
-            op, srcElement, srcRegIsolation, destElement, destIsolation,
-            RegionMergeReason::Assign));
-      }
-
       // Then perform the actual assignment.
       //
       // NOTE: This does not emit any errors on purpose. We rely on requires and
