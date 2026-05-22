@@ -1,19 +1,25 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module %S/Inputs/isolated_conformance_other.swift -module-name ExternalTypes -o %t/ExternalTypes.swiftmodule
-// RUN: %target-swift-frontend -emit-sil -swift-version 5 -strict-concurrency=complete -I %t %s -verify -verify-additional-prefix swift5- -enable-upcoming-feature InferIsolatedConformances -o /dev/null
-// RUN: %target-swift-frontend -emit-sil -swift-version 6 -I %t %s -verify -verify-additional-prefix swift6- -enable-upcoming-feature InferIsolatedConformances -o /dev/null
+// RUN: split-file %s %t
+
+// RUN: %target-swift-frontend -emit-module %t/ExternalTypes.swift -module-name ExternalTypes -o %t/ExternalTypes.swiftmodule
+// RUN: %target-swift-frontend -emit-sil -swift-version 6 -I %t %t/test.swift
 
 // REQUIRES: concurrency
 
+//--- ExternalTypes.swift
+
+// ExternalTypes module - simulates non-Sendable ObjC-like protocols
+// from a framework imported with @preconcurrency
+
+public protocol MyObject: AnyObject {}
+public protocol MyCommand: AnyObject {}
+public protocol ClientBoundCommand: AnyObject {}
+public protocol ServerBoundCommand: AnyObject {}
+public protocol BaseCommand: AnyObject {}
+
+//--- test.swift
+
 @preconcurrency import ExternalTypes
-
-////////////////////////
-// MARK: Declarations //
-////////////////////////
-
-protocol NonSendableProtocol {}
-protocol NonSendableKlassProtocol : AnyObject {}
-class NonSendableKlass {} // expected-note 4{{class 'NonSendableKlass' does not conform to the 'Sendable' protocol}}
 
 protocol Command: Sendable {}
 
@@ -38,9 +44,7 @@ protocol Connection: Actor, ServiceItemProvider, CommandPerformer {
     func deactivate() async
 }
 
-/////////////////
-// MARK: Tests //
-/////////////////
+// MARK: - Crashing actor
 
 actor MyConnection: Connection {
     var isActive: Bool { false }
@@ -80,108 +84,4 @@ actor MyConnection: Connection {
     }
 
     private func send(_ command: ServerBound) {}
-}
-
-actor CastTest<T, U : NonSendableProtocol, V : AnyObject, V2 : NonSendableKlassProtocol> { // expected-note 8{{}}
-  @MainActor var cnx: NonSendableKlass?
-  @MainActor var cnx2: T?
-  @MainActor var cnx3: U?
-  @MainActor var cnx4: V?
-  @MainActor var cnx5: V2?
-
-  func f() async -> NonSendableProtocol {
-    guard let c = await cnx else { fatalError() } // expected-swift5-warning {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
-    guard let q = c as? NonSendableProtocol else { fatalError() } // expected-swift5-warning {{casting main actor-isolated 'c' to 'self'-isolated 'any NonSendableProtocol' risks causing data races; this is an error in the Swift 6 language mode}}
-    return q // expected-swift5-warning {{assigning main actor-isolated 'q' to 'self'-isolated '$return_value' risks causing data races}}
-    // expected-swift5-note @-1 {{'q' could become accessible to 'self'-isolated code despite remaining accessible to main actor-isolated code}}
-  }
-
-  func f2() async -> NonSendableProtocol {
-    guard let c = await cnx2 else { fatalError() } // expected-swift5-warning {{non-Sendable type 'T?' of property 'cnx2' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'T?' of property 'cnx2' cannot exit main actor-isolated context}}
-    guard let q = c as? NonSendableProtocol else { fatalError() } // expected-swift5-warning {{casting main actor-isolated 'c' to 'self'-isolated 'any NonSendableProtocol' risks causing data races; this is an error in the Swift 6 language mode}}
-    return q // expected-swift5-warning {{assigning main actor-isolated 'q' to 'self'-isolated '$return_value' risks causing data races}}
-    // expected-swift5-note @-1 {{'q' could become accessible to 'self'-isolated code despite remaining accessible to main actor-isolated code}}
-  }
-
-  func f3() async -> NonSendableProtocol {
-    guard let c = await cnx3 else { fatalError() } // expected-swift5-warning {{non-Sendable type 'U?' of property 'cnx3' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'U?' of property 'cnx3' cannot exit main actor-isolated context}}
-    guard let q = c as? NonSendableProtocol else { fatalError() } // expected-warning {{conditional cast from 'U' to 'any NonSendableProtocol' always succeeds}}
-    return q // expected-swift5-warning {{assigning main actor-isolated 'q' to 'self'-isolated '$return_value' risks causing data races; this is an error in the Swift 6 language mode}}
-    // expected-swift5-note @-1 {{'q' could become accessible to 'self'-isolated code despite remaining accessible to main actor-isolated code}}
-  }
-
-  func g() async -> NonSendableProtocol {
-    guard let c = await cnx else { fatalError() } // expected-swift5-warning {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
-    let q = c as! NonSendableProtocol // expected-swift5-warning {{assigning main actor-isolated 'c' to 'self'-isolated 'q' risks causing data races}}
-    // expected-swift5-note @-1 {{'c' could become accessible to 'self'-isolated code despite remaining accessible to main actor-isolated code}}
-    return q
-  }
-
-  func g2() async -> NonSendableProtocol {
-    guard let c = await cnx2 else { fatalError() } // expected-swift5-warning {{non-Sendable type 'T?' of property 'cnx2' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'T?' of property 'cnx2' cannot exit main actor-isolated context}}
-    let q = c as! NonSendableProtocol // expected-swift5-warning {{assigning main actor-isolated 'c' to 'self'-isolated 'q' risks causing data races}}
-    // expected-swift5-note @-1 {{'c' could become accessible to 'self'-isolated code despite remaining accessible to main actor-isolated code}}
-    return q
-  }
-
-  func g3() async -> NonSendableProtocol {
-    guard let c = await cnx3 else { fatalError() } // expected-swift5-warning {{non-Sendable type 'U?' of property 'cnx3' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'U?' of property 'cnx3' cannot exit main actor-isolated context}}
-    let q = c as! NonSendableProtocol // expected-warning {{forced cast from 'U' to 'any NonSendableProtocol' always succeeds; did you mean to use 'as'}}
-    return q // expected-swift5-warning {{assigning main actor-isolated 'q' to 'self'-isolated '$return_value' risks causing data races; this is an error in the Swift 6 language mode}}
-    // expected-swift5-note @-1 {{'q' could become accessible to 'self'-isolated code despite remaining accessible to main actor-isolated code}}
-  }
-
-
-  func h() async -> NonSendableKlassProtocol {
-    guard let c = await cnx else { fatalError() } // expected-swift5-warning {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
-    guard let q = c as? NonSendableKlassProtocol else { fatalError() } // expected-swift5-warning {{casting main actor-isolated 'c' to 'self'-isolated 'any NonSendableKlassProtocol' risks causing data races}}
-    return q
-  }
-
-  func h2() async -> NonSendableKlassProtocol {
-    guard let c = await cnx4 else { fatalError() } // expected-swift5-warning {{non-Sendable type 'V?' of property 'cnx4' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'V?' of property 'cnx4' cannot exit main actor-isolated context}}
-    guard let q = c as? NonSendableKlassProtocol else { fatalError() } // expected-swift5-warning {{casting main actor-isolated 'c' to 'self'-isolated 'any NonSendableKlassProtocol' risks causing data races}}
-    return q
-  }
-
-  func h3() async -> NonSendableKlassProtocol {
-    guard let c = await cnx5 else { fatalError() } // expected-swift5-warning {{non-Sendable type 'V2?' of property 'cnx5' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'V2?' of property 'cnx5' cannot exit main actor-isolated context}}
-    guard let q = c as? NonSendableKlassProtocol else { fatalError() } // expected-warning {{conditional cast from 'V2' to 'any NonSendableKlassProtocol' always succeeds}}
-    return q
-  }
-
-  func k() async -> NonSendableKlassProtocol {
-    guard let c = await cnx else { fatalError() } // expected-swift5-warning {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
-    let q = c as! NonSendableKlassProtocol // expected-swift5-warning {{assigning main actor-isolated 'c' to 'self'-isolated 'q' risks causing data races}}
-    // expected-swift5-note @-1 {{'c' could become accessible to 'self'-isolated code despite remaining accessible to main actor-isolated code}}
-    // expected-swift5-warning @-2 {{casting main actor-isolated 'c' to 'self'-isolated 'any NonSendableKlassProtocol' risks causing data races}}
-    return q
-  }
-
-  func k2() async -> NonSendableKlassProtocol {
-    guard let c = await cnx4 else { fatalError() } // expected-swift5-warning {{non-Sendable type 'V?' of property 'cnx4' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'V?' of property 'cnx4' cannot exit main actor-isolated context}}
-    let q = c as! NonSendableKlassProtocol // expected-swift5-warning {{assigning main actor-isolated 'c' to 'self'-isolated 'q' risks causing data races}}
-    // expected-swift5-note @-1 {{'c' could become accessible to 'self'-isolated code despite remaining accessible to main actor-isolated code}}
-    // expected-swift5-warning @-2 {{casting main actor-isolated 'c' to 'self'-isolated 'any NonSendableKlassProtocol' risks causing data races}}
-    return q
-  }
-
-  func k3() async -> NonSendableKlassProtocol {
-    guard let c = await cnx5 else { fatalError() } // expected-swift5-warning {{non-Sendable type 'V2?' of property 'cnx5' cannot exit main actor-isolated context}}
-    // expected-swift6-error @-1 {{non-Sendable type 'V2?' of property 'cnx5' cannot exit main actor-isolated context}}
-    let q = c as! NonSendableKlassProtocol // expected-warning {{forced cast from 'V2' to 'any NonSendableKlassProtocol' always succeeds}}
-    return q
-  }
-
 }

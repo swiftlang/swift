@@ -923,27 +923,16 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (!SILIsolationInfo::isNonSendable(arg))
     return {};
 
+  // Handle a switch_enum from a global-actor-isolated type.
   if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
     if (auto *singleTerm = phiArg->getSingleTerminator()) {
-      // Handle a switch_enum from a global-actor-isolated type.
       if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
         auto enumDecl =
             swi->getOperand()->getType().getEnumOrBoundGenericEnum();
         return SILIsolationInfo::getGlobalActorIsolated(arg, enumDecl);
       }
-
-      // Handle a checked_cast_br argument that involves an isolated
-      // conformance. The conformance only changes for the first element.
-      if (auto *ccbi = dyn_cast<CheckedCastBranchInst>(singleTerm);
-          ccbi && ccbi->getSuccessBB() == phiArg->getParent()) {
-        if (auto isolation = SILIsolationInfo::getConformanceIsolation(ccbi)) {
-          return isolation;
-        }
-      }
     }
-
-    // Otherwise assume that we are disconnected. We will rely on merging.
-    return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
+    return SILIsolationInfo();
   }
 
   auto *fArg = cast<SILFunctionArgument>(arg);

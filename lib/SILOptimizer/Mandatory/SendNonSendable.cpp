@@ -3783,7 +3783,6 @@ private:
   void emitAssign();
   void emitNonisolatedFunction();
   void emitIsolatedFunction();
-  void emitCast();
 };
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitUnknown() {
@@ -3920,20 +3919,26 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitIsolatedFunction() {
-  // The dstRegionValue is always going to be the actor introducing inst.
+
   auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
   assert(dstRegionValue.hasRegionIntroducingInst());
+
+  auto declRef = ApplySite::isa(dstRegionValue.getActorRegionIntroducingInst())
+                     .getCalleeDeclRef();
+  if (!declRef)
+    return emitUnknownPatternError();
 
   auto srcRegionValue = valueMap.getRepresentativeValue(srcRegionValueElt);
   auto srcIsolation = srcIsolationInfo;
   auto dstIsolation = dstIsolationInfo;
 
-  auto as = ApplySite::isa(dstRegionValue.getActorRegionIntroducingInst());
-  if (!as)
-    return emitUnknownPatternError();
-  auto declRef = as.getCalleeDeclRef();
-  if (!declRef)
-    return emitUnknownPatternError();
+  // Canonicalize so that srcRegionValue is always the task-isolated value. We
+  // do this only here since in this case, we can get away with doing this to
+  // implement a simpler diagnostic. E.x.: This doesn't work for assign.
+  if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
+    std::swap(srcIsolation, dstIsolation);
+    std::swap(srcRegionValue, dstRegionValue);
+  }
 
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
   auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
@@ -3975,49 +3980,6 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitIsolatedFunction() {
       .limitBehaviorIf(getBehaviorLimit());
 }
 
-void IncompatibleRegionMergeDiagnosticEmitter::emitCast() {
-  // The dstRegionValue is always going to be the actor introducing inst.
-  auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
-
-  auto cast = [&]() {
-    // Check if we have a region introducing inst.
-    if (dstRegionValue.hasRegionIntroducingInst())
-      return SILDynamicCastInst::getAs(
-          dstRegionValue.getActorRegionIntroducingInst());
-
-    // Then see if we have a phi argument.
-    if (auto *phiArg =
-            dyn_cast_or_null<SILPhiArgument>(dstRegionValue.maybeGetValue())) {
-      if (auto *termInst = dyn_cast_or_null<CheckedCastBranchInst>(
-              phiArg->getSingleTerminator());
-          termInst && termInst->getSuccessBB() == phiArg->getParent()) {
-        return SILDynamicCastInst::getAs(termInst);
-      }
-    }
-
-    return SILDynamicCastInst();
-  }();
-  if (!cast)
-    return emitUnknownPatternError();
-
-  auto srcRegionValue = valueMap.getRepresentativeValue(srcRegionValueElt);
-  auto srcIsolation = srcIsolationInfo;
-  auto dstIsolation = dstIsolationInfo;
-  auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
-  auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
-
-  // We should always be able to find a name for an inout sending param. If we
-  // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName)
-    return emitUnknownPatternError();
-  diagnoseError(op->getUser(),
-                diag::regionbasedisolation_merge_region_failure_error_cast,
-                *srcName, srcIsolationStr, cast.getTargetFormalType(),
-                dstIsolationStr, !srcIsolation->isTaskIsolated())
-      .limitBehaviorIf(getBehaviorLimit());
-}
-
 void IncompatibleRegionMergeDiagnosticEmitter::emit() {
   switch (reason) {
   case RegionMergeReason::NonisolatedFunction:
@@ -4028,16 +3990,8 @@ void IncompatibleRegionMergeDiagnosticEmitter::emit() {
     return emitUnknown();
   case RegionMergeReason::Assign:
     return emitAssign();
-  case RegionMergeReason::ActorIntroducingInst: {
-    auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
-    assert(dstRegionValue.hasRegionIntroducingInst());
-    if (ApplySite::isa(dstRegionValue.getActorRegionIntroducingInst()))
-      return emitIsolatedFunction();
-    return emitCast();
-  }
-  case RegionMergeReason::Cast: {
-    return emitCast();
-  }
+  case RegionMergeReason::IsolatedFunction:
+    return emitIsolatedFunction();
   }
   llvm_unreachable("Unhandled case");
 }

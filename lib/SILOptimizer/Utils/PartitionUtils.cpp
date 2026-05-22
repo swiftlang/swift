@@ -138,7 +138,7 @@ void PartitionOpError::IncompatibleRegionMergeError::print(
   case Reason::Assign:
     os << "assign\n";
     return;
-  case Reason::ActorIntroducingInst:
+  case Reason::IsolatedFunction:
     os << "isolated_function\n";
     return;
   case Reason::NonisolatedClosure:
@@ -149,9 +149,6 @@ void PartitionOpError::IncompatibleRegionMergeError::print(
     return;
   case Reason::NonisolatedFunction:
     os << "nonisolated_function\n";
-    return;
-  case Reason::Cast:
-    os << "cast\n";
     return;
   }
   llvm_unreachable("Unhandled case");

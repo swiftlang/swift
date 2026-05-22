@@ -146,9 +146,6 @@ sil [isolation "actor_instance"] @unappliedIsolatedAnyParameter : $@convention(m
 protocol MyProtocol {
 }
 
-protocol MyKlassProtocol : AnyObject {
-}
-
 ///////////////////////
 // MARK: Basic Tests //
 ///////////////////////
@@ -2310,88 +2307,4 @@ bb0(%0 : $*Self):
   dealloc_stack %alloc
   %8 = tuple ()
   return %8
-}
-
-// CHECK-LABEL: begin running test 1 of 1 on checked_cast_br_phi_arg_test: sil_isolation_info_inference with: @trace[0]
-// CHECK-NEXT: Input Value: %2 = argument of bb1 : $any MyKlassProtocol
-// CHECK-NEXT: Isolation: global actor 'CustomActor'-isolated isolated-conformance-to(MyKlassProtocol)
-// CHECK-NEXT: end running test 1 of 1 on checked_cast_br_phi_arg_test: sil_isolation_info_inference with: @trace[0]
-sil [isolation "global_actor(CustomActor)"] [ossa] @checked_cast_br_phi_arg_test : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
-bb0(%0 : @guaranteed $NonSendableKlass):
-  specify_test "sil_isolation_info_inference @trace[0]"
-  checked_cast_br NonSendableKlass in %0 to MyKlassProtocol, bb1, bb2
-
-bb1(%casted : @guaranteed $MyKlassProtocol):
-  debug_value [trace] %casted
-  br bb3
-
-bb2(%original : @guaranteed $NonSendableKlass):
-  br bb3
-
-bb3:
-  %9999 = tuple ()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: begin running test 1 of 1 on checked_cast_br_phi_arg_test_2: sil_isolation_info_inference with: @trace[0]
-// CHECK-NEXT: Input Value: %4 = argument of bb2 : $NonSendableKlass
-// CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on checked_cast_br_phi_arg_test_2: sil_isolation_info_inference with: @trace[0]
-sil [isolation "global_actor(CustomActor)"] [ossa] @checked_cast_br_phi_arg_test_2 : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
-bb0(%0 : @guaranteed $NonSendableKlass):
-  specify_test "sil_isolation_info_inference @trace[0]"
-  checked_cast_br NonSendableKlass in %0 to MyKlassProtocol, bb1, bb2
-
-bb1(%casted : @guaranteed $MyKlassProtocol):
-  br bb3
-
-bb2(%original : @guaranteed $NonSendableKlass):
-  debug_value [trace] %original
-  br bb3
-
-bb3:
-  %9999 = tuple ()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: begin running test 1 of 1 on checked_cast_br_phi_arg_test_3: sil_isolation_info_inference with: @trace[0]
-// CHECK-NEXT: Input Value: %2 = argument of bb1 : $any MyKlassProtocol
-// CHECK-NEXT: Isolation: task-isolated isolated-conformance-to(MyKlassProtocol)
-// CHECK-NEXT: end running test 1 of 1 on checked_cast_br_phi_arg_test_3: sil_isolation_info_inference with: @trace[0]
-sil [ossa] @checked_cast_br_phi_arg_test_3 : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
-bb0(%0 : @guaranteed $NonSendableKlass):
-  specify_test "sil_isolation_info_inference @trace[0]"
-  checked_cast_br NonSendableKlass in %0 to MyKlassProtocol, bb1, bb2
-
-bb1(%casted : @guaranteed $MyKlassProtocol):
-  debug_value [trace] %casted
-  br bb3
-
-bb2(%original : @guaranteed $NonSendableKlass):
-  br bb3
-
-bb3:
-  %9999 = tuple ()
-  return %9999 : $()
-}
-
-// CHECK-LABEL: begin running test 1 of 1 on checked_cast_br_phi_arg_test_4: sil_isolation_info_inference with: @trace[0]
-// CHECK-NEXT: Input Value: %4 = argument of bb2 : $NonSendableKlass
-// CHECK-NEXT: Isolation: disconnected
-// CHECK-NEXT: end running test 1 of 1 on checked_cast_br_phi_arg_test_4: sil_isolation_info_inference with: @trace[0]
-sil [ossa] @checked_cast_br_phi_arg_test_4 : $@convention(thin) (@guaranteed NonSendableKlass) -> () {
-bb0(%0 : @guaranteed $NonSendableKlass):
-  specify_test "sil_isolation_info_inference @trace[0]"
-  checked_cast_br NonSendableKlass in %0 to MyKlassProtocol, bb1, bb2
-
-bb1(%casted : @guaranteed $MyKlassProtocol):
-  br bb3
-
-bb2(%original : @guaranteed $NonSendableKlass):
-  debug_value [trace] %original
-  br bb3
-
-bb3:
-  %9999 = tuple ()
-  return %9999 : $()
 }
