@@ -451,8 +451,8 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
 }
 
 void swift::handleOSLogStringSectionName(ModuleDecl &module) {
-  /// We only care about the OSLog module.
-  if (!module.getName().is("OSLog"))
+  /// We only care about the os module.
+  if (!module.getName().is("os"))
     return;
 
   /// The name of the variable that defines the section name.
