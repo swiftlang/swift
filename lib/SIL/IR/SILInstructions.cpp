@@ -527,6 +527,14 @@ bool DebugValueInst::isExprTypeValid() const {
 
   SILType valueType = getOperand()->getType();
 
+  // Special case: a DebugValueInst with an alloc_box operand is equivalent to
+  // the alloc_box.
+  if (auto *box = dyn_cast<AllocBoxInst>(getOperand()))
+    if (varInfo.DIExpr.elements().empty() &&
+        getDebugReconstructionBlock() == nullptr &&
+        varInfo.Type == box->getAddressType().getObjectType())
+      return true;
+
   // Transform: debug BB transforms the SSA value to its return type.
   if (auto *debugBB = getDebugReconstructionBlock()) {
     if (debugBB->getNumArguments() > 0) {
