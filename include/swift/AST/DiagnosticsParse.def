@@ -329,9 +329,6 @@ ERROR(accessor_requires_coroutine_accessors,none,
       (StringRef))
 WARNING(old_coroutine_accessor,none,
       "'%1' is deprecated; please use 'yielding %0' instead", (StringRef, StringRef))
-ERROR(accessor_requires_borrow_and_mutate_accessors,none,
-      "%0 requires '-enable-experimental-feature BorrowAndMutateAccessors'",
-      (StringRef))
 ERROR(borrow_mutate_pair_restrict,none,
       "A '%0' accessor can only be defined along with a '%1' accessor",
       (StringRef, StringRef))
@@ -635,9 +632,6 @@ ERROR(sil_operand_not_ref_storage_address,none,
       (StringRef, StringRef, ReferenceOwnership))
 ERROR(sil_operand_has_wrong_ownership_kind,none,
       "operand has ownership kind %0 but ownership kind %1 was expected",
-      (StringRef, StringRef))
-ERROR(sil_operand_has_incompatible_ownership_kind,none,
-      "operand has ownership kind %0 but ownership kind compatible with %1 was expected",
       (StringRef, StringRef))
 ERROR(sil_integer_literal_not_integer_type,none,
       "integer_literal instruction requires a 'Builtin.Int<n>' type", ())
@@ -2192,11 +2186,6 @@ ERROR(expected_rparen_after_lifetime_dependence, PointsToFirstBadToken,
 
 ERROR(expected_param_index_lifetime_dependence, PointsToFirstBadToken,
       "expected unsigned parameter index in lifetime dependence specifier", ())
-
-ERROR(lifetime_dependence_invalid_init_return, PointsToFirstBadToken,
-      "expected Self return type for initializers with lifetime dependence "
-      "specifiers",
-      ())
 
 ERROR(sending_before_parameter_specifier,none,
       "'sending' must be placed after specifier '%0'", (StringRef))

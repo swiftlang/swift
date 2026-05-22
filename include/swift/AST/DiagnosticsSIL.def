@@ -394,12 +394,8 @@ GROUPED_ERROR(embedded_cannot_specialize_witness_method,EmbeddedRestrictions,non
       "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
 GROUPED_ERROR(cannot_specialize_class,EmbeddedRestrictions,none,
       "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
-GROUPED_ERROR(embedded_swift_value_deinit,EmbeddedRestrictions,none,
-      "cannot de-virtualize deinit of type %0", (Type))
 GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
-GROUPED_ERROR(embedded_swift_metatype,EmbeddedRestrictions,none,
-      "cannot use metatype in embedded Swift", ())
 GROUPED_ERROR(embedded_swift_keypath,EmbeddedRestrictions,none,
       "cannot use key path in embedded Swift", ())
 GROUPED_ERROR(embedded_swift_dynamic_cast,EmbeddedRestrictions,none,
@@ -1117,9 +1113,6 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_multiple_value, none,
      "closure captures non-Sendable %0",
      (DeclName))
-NOTE(regionbasedisolation_closure_captures, none,
-     "closure captures %0",
-     (DeclName))
 NOTE(regionbasedisolation_closure_captures_actor, none,
      "closure captures %0 allowing access to %1 state within the closure",
      (DeclName, StringRef))
@@ -1252,9 +1245,6 @@ GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation,
 GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_type, RegionIsolationCrossIsolationDataRace, none,
       "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
       (Type, StringRef, const ValueDecl *, StringRef, bool))
-GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_sil, RegionIsolationCrossIsolationDataRace, none,
-      "passing %1 %0 to %3 %2 risks causing data races",
-      (Identifier, StringRef, Identifier, StringRef))
 
 // We always put the potential task-isolated value first to simplify the note.
 GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_nonisolatedfunction, RegionIsolationCrossIsolationDataRace, none,
@@ -1268,8 +1258,6 @@ GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_cast, RegionIsolat
       (Identifier, StringRef, Type, StringRef, bool))
 
 // Concurrency related diagnostics
-ERROR(cannot_find_executor_factory_type, none,
-      "the DefaultExecutorFactory type could not be found", ())
 ERROR(executor_factory_must_conform, none,
       "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
 
