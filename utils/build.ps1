@@ -2940,6 +2940,9 @@ function Build-Compilers([Hashtable] $Platform,
                          [string]    $DispatchPackage  = $null,
                          [string]    $CacheScript      = "$SourceCache\swift\cmake\caches\Windows-$($Platform.Architecture.LLVMName).cmake") {
   New-Item -ItemType Directory -Path $BinaryCache\$($HostPlatform.Triple) -ErrorAction Ignore | Out-Null
+  Copy-Item -Force `
+    -Path "$SourceCache\swift\__mbstate_t.h" `
+    -Destination "$(Get-AndroidNDKPath)\toolchains\llvm\prebuilt\$($BuildPlatform.OS.ToString().ToLowerInvariant())-$($BuildPlatform.Architecture.LLVMName)\sysroot\usr\include\c++\v1\"
 
   Invoke-IsolatingEnvVars {
     if ($SwiftCompiler -and $SwiftCompiler.Executable -eq $Compilers.Pinned.Swift.Executable) {
