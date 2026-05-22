@@ -171,28 +171,24 @@ public:
   /// This forms a lattice of semantics. The lattice progresses from left ->
   /// right below:
   ///
-  ///                 ---> Task ----
-  ///                /              \
-  /// Disconnected --                --> Invalid
-  ///                \              /
-  ///                 ---> Actor ---
+  /// Unknown -> Disconnected -> Task -> Actor.
   ///
   enum Kind : uint8_t {
+    /// Unknown means no information. We error when merging on it.
+    Unknown,
+
     /// An entity with disconnected isolation can be freely sent into another
     /// isolation domain. These are associated with "use after send"
     /// diagnostics.
-    Disconnected = 0,
+    Disconnected,
 
     /// An entity that is in the same region as a task-isolated value. Cannot be
     /// sent into another isolation domain.
-    Task = 1,
+    Task,
 
     /// An entity that is in the same region as an actor-isolated value. Cannot
     /// be sent into another isolation domain.
-    Actor = 2,
-
-    /// Invalid means that we had information that did not work.
-    Invalid = 3,
+    Actor,
   };
 
   enum class Flag : uint8_t {
@@ -284,9 +280,9 @@ private:
       SILValue value, CanType sourceType, CanType destType);
 
 public:
-  SILIsolationInfo() : actorIsolation(), kind(Kind::Invalid), options(0) {}
+  SILIsolationInfo() : actorIsolation(), kind(Kind::Unknown), options(0) {}
 
-  operator bool() const { return kind != Kind::Invalid; }
+  operator bool() const { return kind != Kind::Unknown; }
 
   operator Kind() const { return getKind(); }
 
@@ -669,12 +665,12 @@ public:
   SILDynamicMergedIsolationInfo(SILIsolationInfo innerInfo)
       : innerInfo(innerInfo) {}
 
-  /// Returns invalid only if both this isolation info and \p other are actor
+  /// Returns nullptr only if both this isolation info and \p other are actor
   /// isolated to incompatible actors.
-  [[nodiscard]] SILDynamicMergedIsolationInfo
+  [[nodiscard]] std::optional<SILDynamicMergedIsolationInfo>
   merge(SILIsolationInfo other) const;
 
-  [[nodiscard]] SILDynamicMergedIsolationInfo
+  [[nodiscard]] std::optional<SILDynamicMergedIsolationInfo>
   merge(SILDynamicMergedIsolationInfo other) const {
     return merge(other.getIsolationInfo());
   }

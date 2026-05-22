@@ -422,7 +422,7 @@ struct SendingOperandState {
   /// The dynamic isolation info of the region of value when we sent.
   ///
   /// This will contain the isolated value if we found one.
-  std::optional<SILDynamicMergedIsolationInfo> isolationInfo;
+  SILDynamicMergedIsolationInfo isolationInfo;
 
   /// The dynamic isolation history at this point.
   IsolationHistory isolationHistory;
@@ -435,22 +435,6 @@ struct SendingOperandState {
 
   SendingOperandState(IsolationHistory history)
       : isolationInfo(), isolationHistory(history), isClosureCaptured(false) {}
-
-  bool merge(SILDynamicMergedIsolationInfo newIsolationInfo) {
-    if (!isolationInfo) {
-      isolationInfo = newIsolationInfo;
-      return true;
-    }
-    auto newIsolation = isolationInfo->merge(newIsolationInfo);
-    if (!newIsolation)
-      return false;
-    isolationInfo = newIsolation;
-    return true;
-  }
-
-  SILIsolationInfo getIsolationInfo() const {
-    return isolationInfo.value().getIsolationInfo();
-  }
 };
 
 class SendingOperandToStateMap {
@@ -1472,47 +1456,21 @@ public:
   std::optional<std::pair<SILDynamicMergedIsolationInfo, bool>>
   getIsolationRegionInfo(Region region, Operand *sourceOp) const {
     bool isClosureCapturedElt = false;
-    std::optional<SILDynamicMergedIsolationInfo> isolationRegionInfo;
+    std::optional<SILDynamicMergedIsolationInfo> isolationRegionInfo =
+        SILDynamicMergedIsolationInfo();
 
     for (const auto &pair : p.range()) {
       if (pair.second == region) {
-        auto other = getIsolationRegionInfo(pair.first);
-        // If other is invalid, just return nil.
-        if (!bool(other))
+        isolationRegionInfo =
+            isolationRegionInfo->merge(getIsolationRegionInfo(pair.first));
+        if (!isolationRegionInfo)
           return {};
-
-        // Otherwise, if we haven't tracked any isolation region info
-        // yet... just assign our optional to that and continue.
-        if (!isolationRegionInfo.has_value()) {
-          isolationRegionInfo = other;
-          continue;
-        }
-
-        // If we have an isolation region info that is not invalid at this point
-        // in our accumulator and other should not be invalid either. Perform
-        // the merge.
-        assert(isolationRegionInfo.has_value() && bool(*isolationRegionInfo) &&
-               "Should have a valid, non-invalid isolation");
-        isolationRegionInfo = isolationRegionInfo->merge(other);
-
-        // Then check if as a result of merging, we now have an invalid value,
-        // return nil in such a case.
-        if (!bool(isolationRegionInfo.value()))
-          return {};
-
-        // Otherwise, gather if we have a closure capture.
         if (sourceOp) {
           isClosureCapturedElt |= isClosureCaptured(pair.first, sourceOp);
         }
       }
     }
 
-    // If we found any element in our region, we should have a value in our
-    // accumulator. This signals some sort of error. Return nil in such a case.
-    if (!isolationRegionInfo.has_value())
-      return {};
-
-    // Otherwise, return the value that we computed.
     return {{isolationRegionInfo.value(), isClosureCapturedElt}};
   }
 
@@ -1800,7 +1758,9 @@ public:
       // Mark op.getOpArg1() as sent.
       SendingOperandState &state = operandToStateMap.get(op.getSourceOp());
       state.isClosureCaptured |= regionHasClosureCapturedElt;
-      if (!state.merge(sentRegionIsolation)) {
+      if (auto newInfo = state.isolationInfo.merge(sentRegionIsolation)) {
+        state.isolationInfo = *newInfo;
+      } else {
         handleError(UnknownCodePatternError(op));
       }
       assert(state.isolationInfo && "Cannot have unknown");

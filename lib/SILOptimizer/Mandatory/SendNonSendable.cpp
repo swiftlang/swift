@@ -1171,7 +1171,7 @@ bool UseAfterSendDiagnosticInferrer::initForIsolatedPartialApply(
   if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
     diagnosticEmitter.emitNamedIsolationCrossingDueToCapture(
         diagnosticOp->getUser()->getLoc(), rootValueAndName->first,
-        state.getIsolationInfo(), crossing);
+        state.isolationInfo.getIsolationInfo(), crossing);
     return true;
   }
 
@@ -1372,7 +1372,8 @@ void UseAfterSendDiagnosticInferrer::infer() {
     if (auto rootValueAndName = inferNameAndRootHelper(sendingOp->get())) {
       auto &state = sendingOpToStateMap.get(sendingOp);
       return diagnosticEmitter.emitNamedIsolationCrossingError(
-          baseLoc, rootValueAndName->first, state.getIsolationInfo(),
+          baseLoc, rootValueAndName->first,
+          state.isolationInfo.getIsolationInfo(),
           *sourceApply->getIsolationCrossing());
     }
 
@@ -1400,7 +1401,8 @@ void UseAfterSendDiagnosticInferrer::infer() {
   auto captureInfo =
       autoClosureExpr->getCaptureInfo().getCaptures()[captureIndex];
   auto *captureDecl = captureInfo.getDecl();
-  AutoClosureWalker walker(*this, captureDecl, state.getIsolationInfo());
+  AutoClosureWalker walker(*this, captureDecl,
+                           state.isolationInfo.getIsolationInfo());
   autoClosureExpr->walk(walker);
 }
 

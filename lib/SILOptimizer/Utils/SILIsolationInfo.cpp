@@ -1247,8 +1247,8 @@ void SILIsolationInfo::printActorIsolationForDiagnostics(
 
 void SILIsolationInfo::print(SILFunction *fn, llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
-  case Invalid:
-    os << "invalid";
+  case Unknown:
+    os << "unknown";
     return;
   case Disconnected:
     os << "disconnected";
@@ -1321,7 +1321,7 @@ bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
     return false;
 
   switch (getKind()) {
-  case Invalid:
+  case Unknown:
   case Disconnected:
     return true;
   case Task:
@@ -1371,7 +1371,7 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
   id.AddInteger(getKind());
   id.AddInteger(getOptions().toRaw());
   switch (getKind()) {
-  case Invalid:
+  case Unknown:
   case Disconnected:
     return;
   case Task:
@@ -1399,8 +1399,8 @@ StringRef SILIsolationInfo::printForDiagnostics(SILFunction *fn) const {
 void SILIsolationInfo::printForDiagnostics(SILFunction *fn,
                                            llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
-  case Invalid:
-    llvm::report_fatal_error("Printing invalid for diagnostics?!");
+  case Unknown:
+    llvm::report_fatal_error("Printing unknown for diagnostics?!");
     return;
   case Disconnected:
     os << "disconnected";
@@ -1467,8 +1467,8 @@ StringRef SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn) const {
 void SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn,
                                               llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
-  case Invalid:
-    llvm::report_fatal_error("Printing invalid for code diagnostic?!");
+  case Unknown:
+    llvm::report_fatal_error("Printing unknown for code diagnostic?!");
     return;
   case Disconnected:
     llvm::report_fatal_error("Printing disconnected for code diagnostic?!");
@@ -1511,8 +1511,8 @@ void SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn,
 void SILIsolationInfo::printForOneLineLogging(SILFunction *fn,
                                               llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
-  case Invalid:
-    os << "invalid";
+  case Unknown:
+    os << "unknown";
     return;
   case Disconnected:
     os << "disconnected";
@@ -1753,92 +1753,69 @@ SILValue ActorInstance::lookThroughInsts(SILValue value) {
 //                    MARK: SILDynamicMergedIsolationInfo
 //===----------------------------------------------------------------------===//
 
-SILDynamicMergedIsolationInfo
+std::optional<SILDynamicMergedIsolationInfo>
 SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
-  auto lhs = innerInfo;
-  auto rhs = other;
+  // If we are greater than the other kind, then we are further along the
+  // lattice. We ignore the change.
+  //
+  // NOTE: If we are further along, then we both cannot be task isolated. In
+  // such a case, we are the only potential thing that can be
+  // nonisolated(unsafe)... so we do not need to try to propagate.
+  if (unsigned(innerInfo.getKind() > unsigned(other.getKind()))) {
+    return {*this};
+  }
 
-  if (lhs.getKind() > rhs.getKind())
-    std::swap(lhs, rhs);
+  // If we are both actor isolated...
+  if (innerInfo.isActorIsolated() && other.isActorIsolated()) {
+    // If both innerInfo and other have the same isolation, we are obviously
+    // done. Just return innerInfo since we could return either.
+    if (innerInfo.hasSameIsolation(other))
+      return {innerInfo.withMergedIsolatedConformance(other.getIsolatedConformance())};
 
-#ifdef KIND_COMBINE
-#error "KIND_COMBINE already defined?!"
-#endif
-
-#ifdef KIND_COMBINE_DECL
-#error "KIND_COMBINE_DECL already defined?!"
-#endif
-
-#define KIND_COMBINE(X, Y) (uint8_t(X) | (uint8_t(Y) << 2))
-  enum class CombinedKind : uint8_t {
-#define KIND_COMBINE_DECL(X, Y)                                                \
-  X##Y = KIND_COMBINE(SILIsolationInfo::Kind::X, SILIsolationInfo::Kind::Y)
-    KIND_COMBINE_DECL(Disconnected, Disconnected),
-    KIND_COMBINE_DECL(Disconnected, Task),
-    KIND_COMBINE_DECL(Disconnected, Actor),
-    KIND_COMBINE_DECL(Disconnected, Invalid),
-    KIND_COMBINE_DECL(Task, Task),
-    KIND_COMBINE_DECL(Task, Actor),
-    KIND_COMBINE_DECL(Task, Invalid),
-    KIND_COMBINE_DECL(Actor, Actor),
-    KIND_COMBINE_DECL(Actor, Invalid),
-    KIND_COMBINE_DECL(Invalid, Invalid)
-  };
-
-  switch (CombinedKind(KIND_COMBINE(lhs.getKind(), rhs.getKind()))) {
-  case CombinedKind::DisconnectedDisconnected:
-    // If we are both disconnected and rhs has the unsafeNonIsolated bit set,
-    // drop that bit and return that.
-    //
-    // DISCUSSION: We do not want to preserve the unsafe non isolated bit after
-    // merging. These bits should not propagate through merging and should
-    // instead always be associated with non-merged infos.
-    if (rhs.isDisconnected() && rhs.isUnsafeNonIsolated()) {
-      return {rhs.withUnsafeNonIsolated(false)};
-    }
-    return {lhs};
-
-  case CombinedKind::DisconnectedTask:
-  case CombinedKind::DisconnectedActor:
-  case CombinedKind::DisconnectedInvalid:
-    return {rhs};
-  case CombinedKind::TaskTask:
-    if (lhs.isNonisolatedNonsendingTaskIsolated() ||
-        rhs.isNonisolatedNonsendingTaskIsolated())
-      return lhs.withNonisolatedNonsendingTaskIsolated(true)
-          .withMergedIsolatedConformance(rhs.getIsolatedConformance());
-    return {rhs};
-  case CombinedKind::TaskActor:
-    return {SILIsolationInfo()};
-  case CombinedKind::TaskInvalid:
-    return {rhs};
-  case CombinedKind::ActorActor: {
-    // If both lhs and rhs have the same isolation, we are obviously
-    // done. Just return lhs since we could return either.
-    if (lhs.hasSameIsolation(rhs))
-      return {lhs.withMergedIsolatedConformance(rhs.getIsolatedConformance())};
-
-    // Ok, there is some difference in between lhs and rhs. Lets see if
+    // Ok, there is some difference in between innerInfo and other. Lets see if
     // they are both actor instance isolated and if either are unapplied
     // isolated any parameter. In such a case, take the one that is further
     // along.
-    if (lhs.getActorIsolation().isActorInstanceIsolated() &&
-        rhs.getActorIsolation().isActorInstanceIsolated()) {
-      if (lhs.isUnappliedIsolatedAnyParameter())
-        return rhs.withMergedIsolatedConformance(lhs.getIsolatedConformance());
-      if (rhs.isUnappliedIsolatedAnyParameter())
-        return lhs.withMergedIsolatedConformance(rhs.getIsolatedConformance());
+    if (innerInfo.getActorIsolation().isActorInstanceIsolated() &&
+        other.getActorIsolation().isActorInstanceIsolated()) {
+      if (innerInfo.isUnappliedIsolatedAnyParameter())
+        return other.withMergedIsolatedConformance(innerInfo.getIsolatedConformance());
+      if (other.isUnappliedIsolatedAnyParameter())
+        return innerInfo.withMergedIsolatedConformance(other.getIsolatedConformance());
     }
 
-    return {SILIsolationInfo()};
+    // Otherwise, they do not match... so return None to signal merge failure.
+    return {};
   }
-  case CombinedKind::ActorInvalid:
-  case CombinedKind::InvalidInvalid:
-    return {rhs};
+
+  // If we are both disconnected and other has the unsafeNonIsolated bit set,
+  // drop that bit and return that.
+  //
+  // DISCUSSION: We do not want to preserve the unsafe non isolated bit after
+  // merging. These bits should not propagate through merging and should instead
+  // always be associated with non-merged infos.
+  if (other.isDisconnected() && other.isUnsafeNonIsolated()) {
+    return {other.withUnsafeNonIsolated(false)};
   }
-  llvm_unreachable("Unhandled case?!");
-#undef KIND_COMBINE_DECL
-#undef KIND_COMBINE
+
+  // We know that we are either the same as other or other is further along. If
+  // other is further along, it is the only thing that can propagate the task
+  // isolated bit. So we do not need to do anything. If we are equal though, we
+  // may need to propagate the bit. This ensures that when we emit a diagnostic
+  // we appropriately say potentially actor isolated code instead of code in the
+  // current task.
+  //
+  // TODO: We should really represent this as a separate isolation info
+  // kind... but that would be a larger change than we want for 6.2.
+  if (innerInfo.isTaskIsolated() && other.isTaskIsolated()) {
+    if (innerInfo.isNonisolatedNonsendingTaskIsolated() ||
+        other.isNonisolatedNonsendingTaskIsolated())
+      return other.withNonisolatedNonsendingTaskIsolated(true)
+        .withMergedIsolatedConformance(innerInfo.getIsolatedConformance());
+  }
+
+  // Otherwise, just return other.
+  return {other};
 }
 
 void ActorInstance::print(llvm::raw_ostream &os) const {
@@ -1932,8 +1909,8 @@ static FunctionTest IsolationMergeTest(
       auto secondValue = arguments.takeValue();
       SILIsolationInfo firstValueInfo = SILIsolationInfo::get(firstValue);
       SILIsolationInfo secondValueInfo = SILIsolationInfo::get(secondValue);
-      SILDynamicMergedIsolationInfo mergedInfo(firstValueInfo);
-      mergedInfo = mergedInfo.merge(secondValueInfo);
+      std::optional<SILDynamicMergedIsolationInfo> mergedInfo(firstValueInfo);
+      mergedInfo = mergedInfo->merge(secondValueInfo);
       llvm::outs() << "First Value: " << *firstValue;
       llvm::outs() << "First Isolation: ";
       firstValueInfo.printForOneLineLogging(&function, llvm::outs());
