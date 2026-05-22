@@ -610,10 +610,103 @@ func testLocalVarsFromDeclarationMacros() {
 
 // Variadic macro
 @freestanding(declaration, names: arbitrary) macro emptyDecl(_: String...) = #externalMacro(module: "MacroDefinition", type: "EmptyDeclarationMacro")
+@freestanding(declaration, names: named(macroRequirement())) macro protocolRequirement() = #externalMacro(module: "MacroDefinition", type: "ProtocolRequirementMacro")
+@freestanding(declaration, names: named(MacroAssociatedType), named(makeMacroAssociatedValue())) macro protocolAssociatedType() = #externalMacro(module: "MacroDefinition", type: "ProtocolAssociatedTypeMacro")
+@attached(peer, names: named(peerRequirement)) macro PeerProtocolRequirement() = #externalMacro(module: "MacroDefinition", type: "PeerProtocolRequirementMacro")
+@attached(member, names: named(memberRequirement)) macro MemberProtocolRequirement() = #externalMacro(module: "MacroDefinition", type: "MemberProtocolRequirementMacro")
 
 struct TakesVariadic {
   #emptyDecl("foo", "bar")
 }
+
+protocol HasEmptyDeclarationMacro {
+  #emptyDecl("protocol")
+}
+
+protocol HasMacroRequirement {
+  #protocolRequirement() // expected-note {{in expansion of macro 'protocolRequirement' here}}
+  /*
+  expected-expansion@-2:3 {{
+    expected-note@1:6 {{protocol requires function 'macroRequirement()' with type '() -> Int'}}
+  }}
+  */
+}
+
+struct SatisfiesMacroRequirement: HasMacroRequirement {
+  func macroRequirement() -> Int { 88791 }
+}
+
+#if TEST_DIAGNOSTICS
+struct MissingMacroRequirement: HasMacroRequirement {}
+// expected-error@-1 {{type 'MissingMacroRequirement' does not conform to protocol 'HasMacroRequirement'}}
+// expected-note@-2 {{add stubs for conformance}}
+#endif
+
+func callMacroRequirement(_ value: any HasMacroRequirement) -> Int {
+  value.macroRequirement()
+}
+
+// CHECK: 88791
+print(callMacroRequirement(SatisfiesMacroRequirement()))
+
+protocol HasMacroAssociatedType {
+  #protocolAssociatedType() // expected-note {{in expansion of macro 'protocolAssociatedType' here}}
+  /*
+  expected-expansion@-2:3 {{
+    expected-note@1:16 {{protocol requires nested type 'MacroAssociatedType'}}
+  }}
+  */
+}
+
+struct InfersMacroAssociatedType: HasMacroAssociatedType {
+  func makeMacroAssociatedValue() -> String { "macro-associated" }
+}
+
+#if TEST_DIAGNOSTICS
+struct MissingMacroAssociatedType: HasMacroAssociatedType {}
+// expected-error@-1 {{type 'MissingMacroAssociatedType' does not conform to protocol 'HasMacroAssociatedType'}}
+// expected-note@-2 {{add stubs for conformance}}
+#endif
+
+func callMacroAssociatedType<T: HasMacroAssociatedType>(
+  _ value: T
+) -> T.MacroAssociatedType {
+  value.makeMacroAssociatedValue()
+}
+
+// CHECK: macro-associated
+print(callMacroAssociatedType(InfersMacroAssociatedType()))
+
+protocol HasPeerMacroRequirement {
+  @PeerProtocolRequirement func peerBaseRequirement() -> Int
+}
+
+struct SatisfiesPeerMacroRequirement: HasPeerMacroRequirement {
+  func peerBaseRequirement() -> Int { 88792 }
+  func peerRequirement() -> Int { 88793 }
+}
+
+func callPeerMacroRequirement(_ value: any HasPeerMacroRequirement) -> Int {
+  value.peerRequirement()
+}
+
+// CHECK: 88793
+print(callPeerMacroRequirement(SatisfiesPeerMacroRequirement()))
+
+@MemberProtocolRequirement
+protocol HasMemberMacroRequirement {
+}
+
+struct SatisfiesMemberMacroRequirement: HasMemberMacroRequirement {
+  func memberRequirement() -> Int { 88794 }
+}
+
+func callMemberMacroRequirement(_ value: any HasMemberMacroRequirement) -> Int {
+  value.memberRequirement()
+}
+
+// CHECK: 88794
+print(callMemberMacroRequirement(SatisfiesMemberMacroRequirement()))
 
 // Funkiness with static functions introduced via macro expansions.
 @freestanding(declaration, names: named(foo())) public macro staticFooFunc() = #externalMacro(module: "MacroDefinition", type: "StaticFooFuncMacro")
