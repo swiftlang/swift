@@ -7060,9 +7060,6 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   assert(i->getBoxType()->getLayout()->getFields().size() == 1
          && "multi field boxes not implemented yet");
-  const TypeInfo &type = getTypeInfo(
-      getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(), i->getBoxType(),
-                         IGM.getSILModule().Types, 0));
 
   // Derive name from SIL location.
   bool IsAnonymous = false;
@@ -7085,9 +7082,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
-  if (!Decl)
-    return;
-
   // FIXME: This is a workaround to not produce local variables for
   // capture list arguments like "[weak self]". The better solution
   // would be to require all variables to be described with a
@@ -7102,8 +7096,16 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       IGM.getMaximalTypeExpansionContext(),
       i->getBoxType(), IGM.getSILModule().Types, 0);
   auto RealType = SILTy.getASTType();
-  auto DbgTy =
-      DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
+  DebugTypeInfo DbgTy;
+  if (Decl) {
+    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, getTypeInfo(SILTy),
+                                            IGM);
+  } else if (!SILTy.hasArchetype() && !Name.empty()) {
+    // Handle the cases that read from a SIL file.
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
+  } else {
+    return;
+  }
 
   auto VarInfo = i->getVarInfo();
   if (!VarInfo)
