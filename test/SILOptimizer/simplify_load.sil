@@ -43,6 +43,9 @@ struct GenStruct<T> {
   let t: T
 }
 
+struct EmptyNC : ~Copyable {
+}
+
 sil_global hidden [let] @gb : $B
 sil_global hidden [let] @gb2 : $(B, Int64)
 
@@ -643,5 +646,29 @@ bb0(%0 : @owned $AO):
   dealloc_stack %1
   destroy_value %0
   return %4
+}
+
+// CHECK-LABEL: sil [ossa] @load_empty :
+// CHECK:         %1 = tuple ()
+// CHECK:         %2 = tuple ()
+// CHECK:         %3 = struct $GenStruct<()> (%2 : $())
+// CHECK:         %4 = tuple (%1 : $(), %3 : $GenStruct<()>)
+// CHECK:         %5 = struct $GenStruct<((), GenStruct<()>)> (%4 : $((), GenStruct<()>))
+// CHECK:         return %5
+// CHECK:       } // end sil function 'load_empty'
+sil [ossa] @load_empty : $@convention(thin) (@inout GenStruct<((), GenStruct<()>)>) -> GenStruct<((), GenStruct<()>)> {
+bb0(%0 : $*GenStruct<((), GenStruct<()>)>):
+  %1 = load [trivial] %0
+  return %1
+}
+
+// CHECK-LABEL: sil [ossa] @load_empty_nc :
+// CHECK:         %1 = load [take] %0
+// CHECK:         return %1
+// CHECK:       } // end sil function 'load_empty_nc'
+sil [ossa] @load_empty_nc : $@convention(thin) (@in EmptyNC) -> @owned EmptyNC {
+bb0(%0 : $*EmptyNC):
+  %1 = load [take] %0
+  return %1
 }
 
