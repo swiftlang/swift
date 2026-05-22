@@ -590,3 +590,28 @@ func noWarningForWait(for task: Task<Never, any Error>) async throws -> Never {
     try await task.value
 }
 
+class NoWarningClassDeinit {
+  deinit {
+    fatalError() // no-warning
+  }
+}
+
+struct NoWarningNoncopyableDeinit: ~Copyable {
+  deinit {
+    fatalError() // no-warning
+  }
+}
+
+struct NoWarningNoncopyableDeinitWithFields: ~Copyable {
+  var x: Int
+  deinit {
+    fatalError() // no-warning
+  }
+}
+
+struct NoWarningGenericNoncopyableDeinit<T: ~Copyable>: ~Copyable {
+  var value: T
+  deinit {
+    fatalError() // no-warning
+  }
+}
