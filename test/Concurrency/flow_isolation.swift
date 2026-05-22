@@ -1,8 +1,4 @@
-// RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s -o /dev/null
-
-////////////////////////
-// MARK: Declarations //
-////////////////////////
+// RUN: %target-swift-frontend -strict-concurrency=complete -swift-version 5 -parse-as-library -emit-sil -verify %s
 
 @globalActor
 actor CustomActor {
@@ -26,7 +22,7 @@ func takeNonSendable<T>(_ ns: T) {}
 @available(SwiftStdlib 5.1, *)
 func takeSendable<T : Sendable>(_ s: T) {}
 
-class NonSendableType {
+class NonSendableType { // expected-note 8{{class 'NonSendableType' does not conform to the 'Sendable' protocol}}
   var x: Int = 0
   func f() {}
 }
@@ -38,9 +34,822 @@ struct NonSendableAOStruct<T> {
   var value: T
 }
 
-/////////////////
-// MARK: Tests //
-/////////////////
+struct Money {
+  var dollars: Int
+  var euros: Int {
+    return dollars * 2
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+func takeBob(_ b: Bob) {}
+
+@available(SwiftStdlib 5.1, *)
+actor Bob {
+  var x: Int
+
+  nonisolated func speak() { }
+  nonisolated var cherry : String {
+        get { "black cherry" }
+    }
+
+  init(v0 initial: Int) {
+    self.x = 0
+    speak() // expected-note {{after calling instance method 'speak()', only nonisolated properties of 'self' can be accessed from this init}}
+    speak()
+    self.x = 1 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    speak()
+  }
+
+  init(v1 _: Void) {
+    self.x = 0
+    _ = cherry // expected-note {{after accessing property 'cherry', only nonisolated properties of 'self' can be accessed from this init}}
+    self.x = 1 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  init(v2 callBack: (Bob) -> Void) {
+    self.x = 0
+    callBack(self) // expected-note {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
+    self.x = 1 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  init(v3 _: Void) {
+    self.x = 1
+    takeBob(self) // expected-note {{after calling global function 'takeBob', only nonisolated properties of 'self' can be accessed from this init}}
+    self.x = 1 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+
+
+  // ensure noniso does not flow out of a defer's unreachable block
+  init(spice doesNotFlow: Int) {
+    if true {
+      defer {
+        if randomBool() {
+          speak()
+          fatalError("oops")
+        }
+      }
+      self.x = 0
+    }
+    self.x = 20
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor Casey {
+  var money: Money
+
+  nonisolated func speak(_ msg: String) { print("Casey: \(msg)") }
+  nonisolated func cashUnderMattress() -> Int { return 0 }
+
+  init() {
+    money = Money(dollars: 100)
+    defer { logTransaction(money.euros) } // expected-warning {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.speak("Yay, I have $\(money.dollars)!") // expected-note {{after calling instance method 'speak', only nonisolated properties of 'self' can be accessed from this init}}
+  }
+
+  init(with start: Int) {
+    money = Money(dollars: start)
+
+    if (money.dollars < 0) {
+      self.speak("Oh no, I'm in debt!") // expected-note 3{{after calling instance method 'speak', only nonisolated properties of 'self' can be accessed from this init}}
+    }
+    logTransaction(money.euros) // expected-warning {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+
+    money.dollars = money.dollars + 1 // expected-warning 2{{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+
+    if randomBool() {
+      money.dollars += cashUnderMattress() // expected-warning {{cannot access property 'money' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+      // expected-note @-1 {{after calling instance method 'cashUnderMattress()', only nonisolated properties of 'self' can be accessed from this init}}
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor Demons {
+  let ns: NonSendableType
+
+  init(_ x: NonSendableType) {
+    self.ns = x
+  }
+
+  deinit { // expected-note {{add 'isolated' to run isolated to 'Demons', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
+    let _ = self.ns // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+  }
+}
+
+func pass<T>(_ t: T) {}
+
+@available(SwiftStdlib 5.1, *)
+actor ExampleFromProposal {
+  let immutableSendable = SendableType()
+  var mutableSendable = SendableType()
+  let nonSendable = NonSendableType()
+  nonisolated(unsafe) let unsafeNonSendable = NonSendableType()
+  var nsItems: [NonSendableType] = []
+  var sItems: [SendableType] = []
+
+  init() {
+    _ = self.immutableSendable  // ok
+    _ = self.mutableSendable    // ok
+    _ = self.nonSendable        // ok
+    _ = self.unsafeNonSendable
+
+    f() // expected-note 2{{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.immutableSendable  // ok
+    _ = self.mutableSendable // expected-warning {{cannot access property 'mutableSendable' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonSendable // expected-warning {{cannot access property 'nonSendable' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.unsafeNonSendable // ok
+  }
+
+
+  deinit { // expected-note 2 {{add 'isolated' to run isolated to 'ExampleFromProposal', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
+    _ = self.immutableSendable  // ok
+    _ = self.mutableSendable    // ok
+    _ = self.nonSendable // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+
+    f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from a deinit}}
+
+    _ = self.immutableSendable  // ok
+    _ = self.mutableSendable // expected-warning {{cannot access property 'mutableSendable' here in deinitializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonSendable // expected-warning {{cannot access property 'nonSendable' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+  }
+
+  nonisolated func f() {}
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class CheckGAIT1 {
+  var silly = 10
+  var ns = NonSendableType()
+
+  nonisolated func f() {}
+
+  nonisolated init(_ c: Color) {
+    silly += 0
+    repeat {
+      switch c {
+        case .red:
+          continue
+        case .yellow:
+          silly += 1
+          continue
+        case .blue:
+          f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
+      }
+      break
+    } while true
+    silly += 2 // expected-warning {{cannot access property 'silly' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  deinit { // expected-note {{add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
+    _ = ns // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from a deinit}}
+    _ = silly // expected-warning {{cannot access property 'silly' here in deinitializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor ControlFlowTester {
+  let ns: NonSendableType = NonSendableType()
+  let s: SendableType = SendableType()
+  var count: Int = 0
+
+  nonisolated func noniso() {}
+
+  init(v1: Void) {
+    noniso() // expected-note {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+    takeNonSendable(self.ns) // expected-warning {{cannot access property 'ns' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    takeSendable(self.s)
+  }
+
+  init(v2 c: Color) throws {
+    if c == .red {
+      noniso()
+      throw c
+    } else if c == .blue {
+      noniso()
+      fatalError("soul")
+    }
+    count += 1
+  }
+
+  init(v3 c: Color) {
+    do {
+      defer { noniso() } // expected-note 3{{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+      switch c {
+      case .red:
+        throw Color.red
+      case .blue:
+        throw Color.blue
+      case .yellow:
+        count = 0
+        throw Color.yellow
+      }
+    } catch Color.blue {
+      count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    } catch {
+      count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    }
+    count = 42 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+
+  init(v4 c: Color) {
+    defer { count += 1 } // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    noniso() // expected-note {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+  }
+
+  init?(v5 c: Color) throws {
+    if c != .red {
+      noniso()
+      return nil
+    }
+    count += 1
+    noniso() // expected-note {{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+    if c == .blue {
+      throw c
+    }
+    count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  init(v5 c: Color?) {
+    if let c = c {
+      switch c {
+      case .red:
+        defer { noniso() } // expected-note 5{{after calling instance method 'noniso()', only nonisolated properties of 'self' can be accessed from this init}}
+        count = 0 // OK
+        fallthrough
+      case .blue:
+        count = 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+        fallthrough
+      case .yellow:
+        count = 2 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+        break
+      }
+    }
+    switch c {
+    case .some(.red):
+      count += 1 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    case .some(.blue):
+      count += 2 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    case .some(.yellow):
+      count += 3 // expected-warning {{cannot access property 'count' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    case .none:
+      break
+    }
+  }
+}
+
+enum BogusError: Error {
+    case blah
+}
+
+@available(SwiftStdlib 5.1, *)
+actor Convenient {
+    var x: Int
+    var y: Convenient?
+
+    init(val: Int) {
+        self.x = val
+    }
+
+    init(bigVal: Int) {
+        if bigVal < 0 {
+            self.init(val: 0)
+            say(msg: "hello from actor!")
+        }
+        say(msg: "said this too early!") // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+        self.init(val: bigVal)
+
+        Task { await self.mutateIsolatedState() }
+    }
+
+    init!(biggerVal1 biggerVal: Int) {
+        guard biggerVal < 1234567 else { return nil }
+        self.init(bigVal: biggerVal)
+        say(msg: "hello?")
+    }
+
+    @MainActor
+    init?(biggerVal2 biggerVal: Int) async {
+        guard biggerVal < 1234567 else { return nil }
+        self.init(bigVal: biggerVal)
+        say(msg: "hello?")
+        await mutateIsolatedState()
+    }
+
+    init() async {
+        self.init(val: 10)
+        self.x += 1
+        mutateIsolatedState()
+    }
+
+    init(throwyDesignated val: Int) throws {
+        guard val > 0 else { throw BogusError.blah }
+        self.x = 10
+        say(msg: "hello?")
+
+        Task { self }
+    }
+
+    init(asyncThrowyDesignated val: Int) async throws {
+        guard val > 0 else { throw BogusError.blah }
+        self.x = 10
+        say(msg: "hello?")
+        Task { self }
+    }
+
+    init(throwyConvenient val: Int) throws {
+        try self.init(throwyDesignated: val)
+        say(msg: "hello?")
+        Task { self }
+    }
+
+    func mutateIsolatedState() {
+        self.y = self
+    }
+
+    nonisolated func say(msg: String) {
+        print(msg)
+    }
+}
+
+func randomInt() -> Int { return 4 }
+
+@available(SwiftStdlib 5.1, *)
+func callMethod(_ a: MyActor) {}
+
+@available(SwiftStdlib 5.1, *)
+func passInout<T>(_ a: inout T) {}
+
+@available(SwiftStdlib 5.1, *)
+actor MyActor {
+    var x: Int
+    var y: Int
+    var hax: MyActor?
+
+    var computedProp : Int {
+        get { 0 }
+        set { }
+    }
+
+    func helloWorld() {}
+
+    init(ci1 c: Bool) {
+        self.init(i1: c)
+        Task { self }
+        callMethod(self)
+    }
+
+    init(ci2 c: Bool) async {
+      self.init(i1: c)
+      self.x = 1
+      callMethod(self)
+      self.x = 0
+    }
+
+    init(i1 c:  Bool) {
+        self.x = 0
+        _ = self.x
+        self.y = self.x
+
+        Task { self } // expected-note 2{{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+
+        self.x = randomInt() // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+
+        callMethod(self) // expected-note 5{{after calling global function 'callMethod', only nonisolated properties of 'self' can be accessed from this init}}
+
+        passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+
+        if c {
+          self.x = self.y // expected-warning {{cannot access property 'y' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+          // expected-warning @-1 {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+        }
+
+        (_, _) = (self.x, self.y) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+        // expected-warning @-1 {{cannot access property 'y' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+        _ = self.x == 0 // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+
+        while c {
+          self.hax = self // expected-warning {{cannot access property 'hax' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+          // expected-note @-1 2{{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+          _ = self.hax // expected-warning {{cannot access property 'hax' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+        }
+
+        Task {
+            _ = await self.hax
+            await self.helloWorld()
+        }
+
+        { _ = self }()
+    }
+
+    @MainActor
+    init(i2 c:  Bool) {
+        self.x = 0
+        self.y = self.x
+
+        Task { self } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+
+        callMethod(self)
+
+        passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    }
+
+    init(i3 c:  Bool) async {
+        self.x = 0
+        self.y = self.x
+
+        Task { self }
+
+        self.helloWorld()
+        callMethod(self)
+        passInout(&self.x)
+
+        self.x = self.y
+
+        self.hax = self
+        _ = Optional.some(self)
+
+        _ = computedProp
+        computedProp = 1
+
+        Task {
+            _ = self.hax
+            self.helloWorld()
+        }
+
+      { _ = self }()
+    }
+
+    @MainActor
+    init(i4 c:  Bool) async {
+      self.x = 0
+      self.y = self.x
+
+      Task { self } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+
+      callMethod(self)
+
+      passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    }
+}
+
+
+@available(SwiftStdlib 5.1, *)
+actor X {
+    var counter: Int
+
+    init(v1 start: Int) {
+        self.counter = start
+        Task { await self.setCounter(start + 1) } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+
+        if self.counter != start { // expected-warning {{cannot access property 'counter' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+            fatalError("where's my protection?")
+        }
+    }
+
+    func setCounter(_ x : Int) {
+        self.counter = x
+    }
+}
+
+struct CardboardBox<T> {
+    public let item: T
+}
+
+
+@available(SwiftStdlib 5.1, *)
+var globalVar: EscapeArtist? // expected-warning {{var 'globalVar' is not concurrency-safe because it is nonisolated global shared mutable state; this is an error in the Swift 6 language mode}}
+// expected-note @-1 {{convert 'globalVar' to a 'let' constant to make 'Sendable' shared state immutable}}
+// expected-note @-2 {{disable concurrency-safety checks if accesses are protected by an external synchronization mechanism}}
+// expected-note @-3 {{add '@MainActor' to make var 'globalVar' part of global actor 'MainActor'}}
+
+@available(SwiftStdlib 5.1, *)
+actor EscapeArtist {
+    var x: Int
+
+    init(attempt1: Bool) {
+        self.x = 0
+
+        globalVar = self // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+
+        Task { await globalVar!.isolatedMethod() }
+
+        if self.x == 0 { // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+            fatalError("race detected.")
+        }
+    }
+
+    init(attempt2: Bool) {
+        self.x = 0
+
+        let wrapped: EscapeArtist? = .some(self) // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+        let selfUnchained = wrapped!
+
+        Task { await selfUnchained.isolatedMethod() }
+        if self.x == 0 { // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+            fatalError("race detected.")
+        }
+    }
+
+    init(attempt3: Bool) {
+        self.x = 0
+
+        let unchainedSelf = self
+
+        unchainedSelf.nonisolated()
+    }
+
+    init(attempt4: Bool) {
+        self.x = 0
+
+        let unchainedSelf = self
+
+        unchainedSelf.nonisolated()
+
+        let _ = { unchainedSelf.nonisolated() }()
+    }
+
+    init(attempt5: Bool) {
+        self.x = 0
+
+        let box = CardboardBox(item: self)
+        box.item.nonisolated()
+    }
+
+    init(attempt6: Bool) {
+        self.x = 0
+        func fn() {
+            self.nonisolated()
+        }
+        fn()
+    }
+
+    func isolatedMethod() { x += 1 }
+    nonisolated func nonisolated() {}
+}
+
+@available(SwiftStdlib 5.5, *)
+actor Ahmad {
+  nonisolated func f() {}
+  var prop: Int = 0
+  var computedProp: Int { 10 } // expected-note {{property declared here}}
+
+  init(v1: Void) {
+    Task.detached { self.f() } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+    f()
+    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  nonisolated init(v2: Void) async {
+    Task.detached { self.f() } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
+    f()
+    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  nonisolated init(v3: Void) async {
+    prop = 10
+    f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  @MainActor init(v4: Void) async {
+    prop = 10
+    f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  deinit { // expected-note {{add 'isolated' to run isolated to 'Ahmad', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
+    let x = computedProp // expected-warning {{actor-isolated property 'computedProp' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-note @-1 {{after accessing property 'computedProp', only nonisolated properties of 'self' can be accessed from a deinit}}
+
+    prop = x // expected-warning {{cannot access property 'prop' here in deinitializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+actor Rain {
+  var x: Int = 0
+  nonisolated func f() {}
+
+  init(_ hollerBack: (Rain) -> () -> Void) {
+    defer { self.f() }
+
+    defer { _ = self.x } // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+
+    defer { Task { self.f() } }
+
+    defer { _ = hollerBack(self) } // expected-note {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
+  }
+
+  init(_ hollerBack: (Rain) -> () -> Void) async {
+    defer { self.f() }
+
+    defer { _ = self.x }
+
+    defer { Task { self.f() } }
+
+    defer { _ = hollerBack(self) }
+  }
+
+  deinit {
+    x = 1
+  }
+}
+
+@available(SwiftStdlib 5.5, *)
+actor NonIsolatedDeinitExceptionForSwift5 {
+  var x: Int = 0
+
+  func cleanup() { // expected-note {{calls to instance method 'cleanup()' from outside of its actor context are implicitly asynchronous}}
+    x = 0
+  }
+
+  deinit { // expected-note {{add 'isolated' to run isolated to 'NonIsolatedDeinitExceptionForSwift5', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
+    // expected-warning@+2 {{actor-isolated instance method 'cleanup()' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-note@+1 {{after calling instance method 'cleanup()', only nonisolated properties of 'self' can be accessed from a deinit}}
+    cleanup()
+
+    x = 1 // expected-warning {{cannot access property 'x' here in deinitializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+}
+
+@available(SwiftStdlib 6.1, *)
+actor IsolatedDeinitExceptionForSwift5 {
+  var x: Int = 0
+
+  func cleanup() {
+    x = 0
+  }
+
+  isolated deinit {
+    cleanup() // ok
+
+    x = 1 // ok
+  }
+}
+
+
+@available(SwiftStdlib 5.5, *)
+actor OhBrother {
+  private var giver: (OhBrother) -> Int
+  private var whatever: Int = 0
+
+  static var DefaultResult: Int { 10 }
+
+  init() {
+    // this is OK: we're using DynamicSelfType but that doesn't access protected state.
+    self.giver = { (x: OhBrother) -> Int in Self.DefaultResult }
+  }
+
+  init(v2: Void) {
+    giver = { (x: OhBrother) -> Int in 0 }
+
+    // make sure we don't call this a closure, which is the more common situation.
+
+    _ = giver(self) // expected-note {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
+
+    whatever = 1 // expected-warning {{cannot access property 'whatever' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  init(v3: Void) {
+    let blah = { (x: OhBrother) -> Int in 0 }
+    giver = blah
+
+    _ = blah(self) // expected-note {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
+
+    whatever = 2 // expected-warning {{cannot access property 'whatever' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@MainActor class AwesomeUIView {}
+
+@available(SwiftStdlib 5.1, *)
+class CheckDeinitFromClass: AwesomeUIView {
+  var ns: NonSendableType?
+  deinit { // expected-note 2 {{add 'isolated' to run isolated to 'MainActor', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor CheckDeinitFromActor {
+  var ns: NonSendableType?
+  deinit { // expected-note 2 {{add 'isolated' to run isolated to 'CheckDeinitFromActor', which may be later than 'nonisolated deinit'}} {{3-3=isolated }}
+    ns?.f() // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+    ns = nil // expected-warning {{cannot access property 'ns' with a non-Sendable type 'NonSendableType?' from nonisolated deinit; this is an error in the Swift 6 language mode}}
+  }
+}
+
+// https://github.com/apple/swift/issues/70550
+func testActorWithInitAccessorInit() {
+  @available(SwiftStdlib 5.1, *)
+  actor Angle {
+    var degrees: Double
+    var radians: Double = 0 {
+      @storageRestrictions(initializes: degrees)
+      init(initialValue)  {
+        degrees = initialValue * 180 / .pi
+      }
+
+      get { degrees * .pi / 180 }
+      set { degrees = newValue * 180 / .pi }
+    }
+
+    init(degrees: Double) {
+      self.degrees = degrees // Ok
+    }
+
+    init(radians: Double) {
+      self.radians = radians // Ok
+    }
+
+    init(value: Double) {
+      let escapingSelf: (Angle) -> Void = { _ in }
+
+      // degrees are initialized here via default value associated with radians
+
+      escapingSelf(self)
+
+      self.radians = 0 // expected-warning {{actor-isolated property 'radians' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    }
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  actor EscapeBeforeFullInit {
+    var _a: Int // expected-note {{'self._a' not initialized}}
+
+    var a: Int {
+      @storageRestrictions(initializes: _a)
+      init {
+        _a = newValue
+      }
+
+      get { _a }
+      set { _a = newValue }
+    }
+
+    init(v: Int) {
+      let escapingSelf: (EscapeBeforeFullInit) -> Void = { _ in }
+
+      escapingSelf(self) // expected-error {{'self' used before all stored properties are initialized}}
+      // expected-note @-1 {{after a call involving 'self', only nonisolated properties of 'self' can be accessed from this init}}
+
+      self.a = v // expected-warning {{cannot access property '_a' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    }
+  }
+
+  @available(SwiftStdlib 5.1, *)
+  actor NonisolatedAccessors {
+    nonisolated var a: Int = 0 {
+      init {
+      }
+
+      get { 0 }
+      set {}
+    }
+
+    init(value: Int) {
+      let escapingSelf: (NonisolatedAccessors) -> Void = { _ in }
+
+      // a is initialized here via default value
+
+      escapingSelf(self)
+
+      self.a = value // Ok (nonisolated)
+      print(a) // Ok (nonisolated)
+    }
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor TestNonisolatedUnsafe {
+  private nonisolated(unsafe) var child: OtherActor!
+  init() {
+    child = OtherActor(parent: self)
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor OtherActor {
+  unowned nonisolated let parent: any Actor
+
+  init(parent: any Actor) {
+    self.parent = parent
+  }
+}
+
+////////////////////////////
+// MARK: Mixed Isolations //
+////////////////////////////
 
 @available(SwiftStdlib 5.1, *)
 @MainActor
@@ -88,10 +897,123 @@ struct MainActorStructWithMixedFields {
   }
 }
 
-//////////////////////////////////////////////////////////////////////////////////
-// MARK: Mixed Default Requirements with Different Default Value Initialization //
-// Isolation                                                                    //
-//////////////////////////////////////////////////////////////////////////////////
+@available(SwiftStdlib 5.1, *)
+@MainActor
+class MainActorClassWithMixedFields {
+  nonisolated let nonisoField: SendableType
+  @CustomActor var customField: NonSendableType // expected-note 4{{mutation of this property is only permitted within the actor}}
+  var mainField: NonSendableType // expected-note 4{{mutation of this property is only permitted within the actor}}
+
+  nonisolated func trigger() {}
+
+  nonisolated init(v1: Void) {
+    self.nonisoField = SendableType()
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 2{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.nonisoField  // OK - explicitly nonisolated
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  @MainActor init(v2: Void) {
+    self.nonisoField = SendableType()
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType()
+
+    trigger()
+
+    _ = self.nonisoField  // OK - explicitly nonisolated
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType()
+  }
+
+  @CustomActor init(v3: Void) {
+    self.nonisoField = SendableType()
+    self.customField = NonSendableType()
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 2{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.nonisoField  // OK - explicitly nonisolated
+    self.customField = NonSendableType() // expected-warning {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+actor ActorWithMixedIsolationFields {
+  @MainActor var mainField: NonSendableType
+  @MainActor var mainField_trivial: Int
+  @CustomActor var customField: NonSendableType // expected-note 2{{mutation of this property is only permitted within the actor}}
+  @CustomActor var customField_trivial: Int
+  nonisolated let nonisoField: SendableType
+  var actorField: NonSendableType // expected-note 2{{mutation of this property is only permitted within the actor}}
+  var actorField_trivial: Int
+
+  nonisolated func trigger() {}
+
+  init(v1: Void) {
+    // Before decay: can assign all fields
+    self.mainField = NonSendableType()
+    self.mainField_trivial = 0
+    self.customField = NonSendableType()
+    self.customField_trivial = 0
+    self.nonisoField = SendableType()
+    self.actorField = NonSendableType()
+    self.actorField_trivial = 0
+
+    trigger() // expected-note 9{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    // After decay: nonisolated field is accessible, others are not
+    _ = self.nonisoField // OK
+    self.mainField = NonSendableType() // expected-warning {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.mainField_trivial = 0 // expected-warning {{cannot access property 'mainField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    logTransaction(self.mainField_trivial) // expected-warning {{cannot access property 'mainField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.customField = NonSendableType() // expected-warning {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.customField_trivial = 0 // expected-warning {{cannot access property 'customField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    logTransaction(self.customField_trivial) // expected-warning {{cannot access property 'customField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.actorField = NonSendableType() // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.actorField_trivial = 0 // expected-warning {{cannot access property 'actorField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    logTransaction(self.actorField_trivial) // expected-warning {{cannot access property 'actorField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  @MainActor init(v2: Void) {
+    // Before decay: can assign all fields
+    self.mainField = NonSendableType()
+    self.mainField_trivial = 0
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customField_trivial = 0
+    self.nonisoField = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.actorField_trivial = 0
+
+    trigger() // expected-note 9{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    // After decay: nonisolated field is accessible, others are not
+    _ = self.nonisoField // OK
+    self.mainField = NonSendableType() // expected-warning {{cannot access property 'mainField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.mainField_trivial = 0 // expected-warning {{cannot access property 'mainField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    logTransaction(self.mainField_trivial) // expected-warning {{cannot access property 'mainField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'customField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.customField_trivial = 0 // expected-warning {{cannot access property 'customField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    logTransaction(self.customField_trivial) // expected-warning {{cannot access property 'customField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    self.actorField_trivial = 0 // expected-warning {{cannot access property 'actorField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    logTransaction(self.actorField_trivial) // expected-warning {{cannot access property 'actorField_trivial' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+}
+
+// MARK: Mixed Default Requirements with Different Default Value Initialization
+// Isolation
 
 // This test has fields that have an explicitly isolated initializer (e.x.:
 // requiresMainActor).
@@ -99,12 +1021,12 @@ struct MainActorStructWithMixedFields {
 @MainActor
 struct GADTStructWithMixedDefaultRequirements {
   var mainDefault: NonSendableType = requiresMainActor() // expected-note 6{{property declared here}}
-  // expected-note @-1 3{{mutation of this property is only permitted within the actor}}
-  // expected-note @-2 7{{main actor-isolated default value of 'self.mainDefault' cannot be used in a global actor 'CustomActor'-isolated initializer}}
+  // expected-note @-1 7{{main actor-isolated default value of 'self.mainDefault' cannot be used in a global actor 'CustomActor'-isolated initializer}}
+  // expected-note @-2 3{{mutation of this property is only permitted within the actor}}
   nonisolated let nonisoNoDefault: SendableType
   @CustomActor var customDefault: NonSendableType = requiresCustomActor() // expected-note 4{{property declared here}}
-  // expected-note @-1 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a nonisolated initializer}}
-  // expected-note @-2 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
+  // expected-note @-1 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
+  // expected-note @-2 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a nonisolated initializer}}
   // expected-note @-3 2{{mutation of this property is only permitted within the actor}}
 
   nonisolated func trigger() {}
@@ -277,6 +1199,162 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits {
   }
 }
 
+@available(SwiftStdlib 5.5, *)
+actor ActorWithMixedDefaultRequirements {
+  @MainActor var mainDefault: NonSendableType = requiresMainActor() // expected-note 3{{property declared here}}
+  // expected-note @-1 2{{main actor-isolated default value of 'self.mainDefault' cannot be used in a nonisolated initializer}}
+  // expected-note @-2 2{{main actor-isolated default value of 'self.mainDefault' cannot be used in a global actor 'CustomActor'-isolated initializer}}
+  // expected-note @-3 2{{mutation of this property is only permitted within the actor}}
+  var actorField: NonSendableType // expected-note 6{{mutation of this property is only permitted within the actor}}
+  // expected-note @-1 6{{property declared here}}
+  nonisolated let nonisoNoDefault: SendableType
+  @CustomActor var customDefault: NonSendableType = requiresCustomActor() // expected-note {{mutation of this property is only permitted within the actor}}
+  // expected-note @-1 3{{property declared here}}
+  // expected-note @-2 4{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a nonisolated initializer}}
+  // expected-note @-3 4{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
+
+  nonisolated func trigger() {}
+
+  init(v1: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType()
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-error {{variable 'self.mainDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-error {{variable 'self.customDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  init(v1a: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType()
+    self.mainDefault = NonSendableType()
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-error {{variable 'self.customDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  init(v1b: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType()
+    self.mainDefault = NonSendableType()
+    self.customDefault = NonSendableType()
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  @MainActor init(v2: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-error {{variable 'self.customDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-2 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  @MainActor init(v2a: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainDefault = NonSendableType()
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-error {{variable 'self.customDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-2 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  @MainActor init(v2b: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.mainDefault = NonSendableType()
+    self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+  }
+
+  @CustomActor init(v3: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-error {{'self' used in method call 'trigger' before all stored properties are initialized}}
+    // expected-note @-1 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-error {{variable 'self.mainDefault' used before being initialized}}
+    // expected-warning @-1 {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-2 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  } // expected-error {{return from initializer without initializing all stored properties}}
+
+  @CustomActor init(v3a: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+
+  @CustomActor init(v3b: Void) {
+    self.nonisoNoDefault = SendableType()
+    self.actorField = NonSendableType() // expected-warning {{actor-isolated property 'actorField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.customDefault = NonSendableType()
+
+    trigger() // expected-note 3{{after calling instance method 'trigger()', only nonisolated properties of 'self' can be accessed from this init}}
+
+    _ = self.mainDefault // expected-warning {{cannot access property 'mainDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.actorField // expected-warning {{cannot access property 'actorField' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{actor-isolated property 'actorField' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.nonisoNoDefault
+    _ = self.customDefault // expected-warning {{cannot access property 'customDefault' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+  }
+}
 
 ////////////////////////////////////////////////////
 // MARK: Address Only Struct Variants             //
@@ -295,12 +1373,13 @@ struct MainActorStructWithMixedFields_AO<T> {
 
   nonisolated func trigger() {}
 
-  nonisolated init(v1: Void, t: sending T, t2: sending T) {
+  nonisolated init(v1: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
 
@@ -309,17 +1388,19 @@ struct MainActorStructWithMixedFields_AO<T> {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  nonisolated init?(v1_failable: Void, t: sending T, t2: sending T) {
+  nonisolated init?(v1_failable: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
 
@@ -328,17 +1409,19 @@ struct MainActorStructWithMixedFields_AO<T> {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  @MainActor init(v2: Void, t: sending T, t2: sending T) {
+  @MainActor init(v2: Void, t: sending T) {
     self._addressOnly = t
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType()
     self.mainFieldAO = NonSendableAOStruct(value: t)
 
@@ -347,17 +1430,19 @@ struct MainActorStructWithMixedFields_AO<T> {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType()
     self.mainFieldAO = NonSendableAOStruct(value: t)
   }
 
-  @MainActor init?(v2_failable: Void, t: sending T, t2: sending T) {
+  @MainActor init?(v2_failable: Void, t: sending T) {
     self._addressOnly = t
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType()
     self.mainFieldAO = NonSendableAOStruct(value: t)
 
@@ -366,17 +1451,18 @@ struct MainActorStructWithMixedFields_AO<T> {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType()
     self.mainFieldAO = NonSendableAOStruct(value: t)
   }
 
-  @CustomActor init(v3: Void, t: sending T, t2: sending T) {
+  @CustomActor init(v3: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
 
@@ -385,17 +1471,17 @@ struct MainActorStructWithMixedFields_AO<T> {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
   }
 
-  @CustomActor init?(v3_failable: Void, t: sending T, t2: sending T) {
+  @CustomActor init?(v3_failable: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
 
@@ -404,7 +1490,7 @@ struct MainActorStructWithMixedFields_AO<T> {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
   }
@@ -414,21 +1500,21 @@ struct MainActorStructWithMixedFields_AO<T> {
 @MainActor
 struct GADTStructWithMixedDefaultRequirements_AO<T> {
   var _addressOnly: T // expected-note 7{{mutation of this property is only permitted within the actor}}
-  var mainDefault: NonSendableType = requiresMainActor() // expected-note 8{{property declared here}}
-  // expected-note @-1 5{{mutation of this property is only permitted within the actor}}
-  // expected-note @-2 5{{main actor-isolated default value of 'self.mainDefault' cannot be used in a global actor 'CustomActor'-isolated initializer}}
+  var mainDefault: NonSendableType = requiresMainActor() // expected-note 5{{main actor-isolated default value of 'self.mainDefault' cannot be used in a global actor 'CustomActor'-isolated initializer}}
+  // expected-note @-1 8{{property declared here}}
+  // expected-note @-2 5{{mutation of this property is only permitted within the actor}}
   var mainDefaultAO: NonSendableAOStruct<T> // expected-note 5{{mutation of this property is only permitted within the actor}}
   // expected-note @-1 8{{property declared here}}
   // expected-note @-2 2{{'self.mainDefaultAO' not initialized}}
   nonisolated let nonisoNoDefault: SendableType
   nonisolated let nonisoSendableField: SendableType
   @CustomActor var customDefault: NonSendableType = requiresCustomActor() // expected-note 7{{property declared here}}
-  // expected-note @-1 4{{mutation of this property is only permitted within the actor}}
+  // expected-note @-1 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
   // expected-note @-2 2{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a nonisolated initializer}}
-  // expected-note @-3 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
+  // expected-note @-3 4{{mutation of this property is only permitted within the actor}}
 
-  @CustomActor var customDefaultAO: NonSendableAOStruct<T> // expected-note 4{{mutation of this property is only permitted within the actor}}
-  // expected-note @-1 7{{property declared here}}
+  @CustomActor var customDefaultAO: NonSendableAOStruct<T> // expected-note 7{{property declared here}}
+  // expected-note @-1 4{{mutation of this property is only permitted within the actor}}
   // expected-note @-2 2{{'self.customDefaultAO' not initialized}}
 
   nonisolated func trigger() {}
@@ -481,14 +1567,15 @@ struct GADTStructWithMixedDefaultRequirements_AO<T> {
 
   // We do completely initialize. With future changes, we should be able to do
   // this.
-  @MainActor init(v1a: NonSendableType, t: sending T, t2: sending T) {
+  @MainActor init(v1a: NonSendableType, t: sending T) {
     self._addressOnly = t
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t)
     _ = self.mainDefault
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -500,14 +1587,15 @@ struct GADTStructWithMixedDefaultRequirements_AO<T> {
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
   }
 
-  @MainActor init?(v1a_failable: NonSendableType, t: sending T, t2: sending T) {
+  @MainActor init?(v1a_failable: NonSendableType, t: sending T) {
     self._addressOnly = t
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t)
     _ = self.mainDefault
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -521,11 +1609,11 @@ struct GADTStructWithMixedDefaultRequirements_AO<T> {
 
   // We do not completely initialize since we cannot run the default init of
   // mainDefault its initializer actually requires us to be on MainDefault.
-  @CustomActor init(v1b: NonSendableType, t: sending T, t2: sending T) {
+  @CustomActor init(v1b: NonSendableType, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
 
     trigger() // expected-error {{variable 'self.mainDefault' used before being initialized}}
@@ -545,11 +1633,11 @@ struct GADTStructWithMixedDefaultRequirements_AO<T> {
 
   // We do not completely initialize since we cannot run the default init of
   // mainDefault its initializer actually requires us to be on MainDefault.
-  @CustomActor init(v1bb: NonSendableType, t: sending T, t2: sending T) {
+  @CustomActor init(v1bb: NonSendableType, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
     _ = self.mainDefault // expected-error {{'self' used before all stored properties are initialized}}
     // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
@@ -573,13 +1661,13 @@ struct GADTStructWithMixedDefaultRequirements_AO<T> {
 
   // We do completely initialize. With future changes, we should be able to do
   // this.
-  @CustomActor init(v1c: NonSendableType, t: sending T, t2: sending T) {
+  @CustomActor init(v1c: NonSendableType, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
 
     trigger()
@@ -592,13 +1680,13 @@ struct GADTStructWithMixedDefaultRequirements_AO<T> {
     _ = self.customDefaultAO
   }
 
-  @CustomActor init?(v1c_failable: NonSendableType, t: sending T, t2: sending T) {
+  @CustomActor init?(v1c_failable: NonSendableType, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
 
     trigger()
@@ -633,12 +1721,13 @@ struct GADTStructWithMixedDefaultRequirements_AO<T> {
 
   } // expected-error {{return from initializer without initializing all stored properties}}
 
-  nonisolated init(v3: Void, t: sending T, t2: sending T) {
+  nonisolated init(v3: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
 
@@ -652,12 +1741,13 @@ struct GADTStructWithMixedDefaultRequirements_AO<T> {
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  nonisolated init?(v3_failable: Void, t: sending T, t2: sending T) {
+  nonisolated init?(v3_failable: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
 
@@ -676,25 +1766,26 @@ struct GADTStructWithMixedDefaultRequirements_AO<T> {
 @MainActor
 struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO<T> {
   var _addressOnly: T // expected-note 6{{mutation of this property is only permitted within the actor}}
-  var mainDefault = NonSendableType() // expected-note 7{{property declared here}}
-  // expected-note @-1 3{{mutation of this property is only permitted within the actor}}
-  var mainDefaultAO: NonSendableAOStruct<T> // expected-note 6{{mutation of this property is only permitted within the actor}}
-  // expected-note @-1 6{{property declared here}}
+  var mainDefault = NonSendableType() // expected-note 3{{mutation of this property is only permitted within the actor}}
+  // expected-note @-1 7{{property declared here}}
+  var mainDefaultAO: NonSendableAOStruct<T> // expected-note 6{{property declared here}}
+  // expected-note @-1 6{{mutation of this property is only permitted within the actor}}
   nonisolated let nonisoNoDefault: SendableType
   nonisolated let nonisoSendableField: SendableType
   @CustomActor var customDefault = NonSendableType() // expected-note 7{{property declared here}}
   // expected-note @-1 {{mutation of this property is only permitted within the actor}}
-  @CustomActor var customDefaultAO: NonSendableAOStruct<T> // expected-note 5{{property declared here}}
-  // expected-note @-1 5{{mutation of this property is only permitted within the actor}}
+  @CustomActor var customDefaultAO: NonSendableAOStruct<T> // expected-note 5{{mutation of this property is only permitted within the actor}}
+  // expected-note @-1 5{{property declared here}}
 
   nonisolated func trigger() {}
 
-  @MainActor init(v1: Void, t: sending T, t2: sending T) {
+  @MainActor init(v1: Void, t: sending T) {
     self._addressOnly = t
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t)
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.mainDefault
     _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
 
@@ -708,12 +1799,13 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO<T> {
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
   }
 
-  @MainActor init?(v1_failable: Void, t: sending T, t2: sending T) {
+  @MainActor init?(v1_failable: Void, t: sending T) {
     self._addressOnly = t
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t)
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.mainDefault
     _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
 
@@ -728,12 +1820,12 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO<T> {
   }
 
   // OK: explicitly initializes all fields
-  @CustomActor init(v1a: Void, t: sending T, t2: sending T) {
+  @CustomActor init(v1a: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
 
@@ -747,33 +1839,14 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO<T> {
     _ = self.customDefaultAO
   }
 
-  @CustomActor init(v1b: Void, t: sending T, t2: sending T) {
-    self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.nonisoNoDefault = SendableType()
-    self.nonisoSendableField = SendableType()
-    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.customDefault = NonSendableType()
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
-
-    trigger()
-
-    _ = self.nonisoNoDefault
-    _ = self.nonisoSendableField
-    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    _ = self.mainDefaultAO // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    _ = self.customDefault
-    _ = self.customDefaultAO
-  }
-
-  @CustomActor init?(v1b_failable: Void, t: sending T, t2: sending T) {
+  @CustomActor init(v1b: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.customDefault = NonSendableType()
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -785,12 +1858,32 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO<T> {
     _ = self.customDefaultAO
   }
 
-  nonisolated init(v2: Void, t: sending T, t2: sending T) {
+  @CustomActor init?(v1b_failable: Void, t: sending T) {
+    self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.nonisoNoDefault = SendableType()
+    self.nonisoSendableField = SendableType()
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.customDefault = NonSendableType()
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.nonisoSendableField
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.mainDefaultAO // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault
+    _ = self.customDefaultAO
+  }
+
+  nonisolated init(v2: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -802,12 +1895,13 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO<T> {
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  nonisolated init?(v2_failable: Void, t: sending T, t2: sending T) {
+  nonisolated init?(v2_failable: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -819,14 +1913,15 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO<T> {
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  nonisolated init(v2a: Void, t: sending T, t2: sending T) {
+  nonisolated init(v2a: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -898,10 +1993,10 @@ struct GADTStructWithMixedDefaultRequirements_NC: ~Copyable {
 
 
   nonisolated let nonisoNoDefault: SendableType
-  @CustomActor var customDefault: NonSendableType = requiresCustomActor() // expected-note 4{{property declared here}}
-  // expected-note @-1 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
-  // expected-note @-2 2{{mutation of this property is only permitted within the actor}}
-  // expected-note @-3 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a nonisolated initializer}}
+  @CustomActor var customDefault: NonSendableType = requiresCustomActor() // expected-note 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a nonisolated initializer}}
+  // expected-note @-1 4{{property declared here}}
+  // expected-note @-2 3{{global actor 'CustomActor'-isolated default value of 'self.customDefault' cannot be used in a main actor-isolated initializer}}
+  // expected-note @-3 2{{mutation of this property is only permitted within the actor}}
 
 
 
@@ -1013,8 +2108,8 @@ struct GADTStructWithMixedDefaultRequirements_NC: ~Copyable {
 @available(SwiftStdlib 5.5, *)
 @MainActor
 struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_NC: ~Copyable {
-  var mainDefault = NonSendableType() // expected-note 2{{mutation of this property is only permitted within the actor}}
-  // expected-note @-1 5{{property declared here}}
+  var mainDefault = NonSendableType() // expected-note 5{{property declared here}}
+  // expected-note @-1 2{{mutation of this property is only permitted within the actor}}
 
   nonisolated let nonisoNoDefault: SendableType
   @CustomActor var customDefault = NonSendableType() // expected-note 4{{property declared here}}
@@ -1100,12 +2195,13 @@ struct MainActorStructWithMixedFields_AO_NC<T>: ~Copyable {
 
   nonisolated func trigger() {}
 
-  nonisolated init(v1: Void, t: sending T, t2: sending T) {
+  nonisolated init(v1: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
 
@@ -1114,17 +2210,19 @@ struct MainActorStructWithMixedFields_AO_NC<T>: ~Copyable {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  nonisolated init?(v1_failable: Void, t: sending T, t2: sending T) {
+  nonisolated init?(v1_failable: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
 
@@ -1133,17 +2231,19 @@ struct MainActorStructWithMixedFields_AO_NC<T>: ~Copyable {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  @MainActor init(v2: Void, t: sending T, t2: sending T) {
+  @MainActor init(v2: Void, t: sending T) {
     self._addressOnly = t
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType()
     self.mainFieldAO = NonSendableAOStruct(value: t)
 
@@ -1152,17 +2252,19 @@ struct MainActorStructWithMixedFields_AO_NC<T>: ~Copyable {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType()
     self.mainFieldAO = NonSendableAOStruct(value: t)
   }
 
-  @MainActor init?(v2_failable: Void, t: sending T, t2: sending T) {
+  @MainActor init?(v2_failable: Void, t: sending T) {
     self._addressOnly = t
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType()
     self.mainFieldAO = NonSendableAOStruct(value: t)
 
@@ -1171,17 +2273,18 @@ struct MainActorStructWithMixedFields_AO_NC<T>: ~Copyable {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customFieldAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customFieldAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType()
     self.mainFieldAO = NonSendableAOStruct(value: t)
   }
 
-  @CustomActor init(v3: Void, t: sending T, t2: sending T) {
+  @CustomActor init(v3: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
 
@@ -1190,17 +2293,17 @@ struct MainActorStructWithMixedFields_AO_NC<T>: ~Copyable {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
   }
 
-  @CustomActor init?(v3_failable: Void, t: sending T, t2: sending T) {
+  @CustomActor init?(v3_failable: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoField = SendableType()
     self.nonisoSendableField = SendableType()
     self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
 
@@ -1209,7 +2312,7 @@ struct MainActorStructWithMixedFields_AO_NC<T>: ~Copyable {
     _ = self.nonisoField
     _ = self.nonisoSendableField
     self.customField = NonSendableType()
-    self.customFieldAO = NonSendableAOStruct(value: t2)
+    self.customFieldAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.mainField = NonSendableType() // expected-warning {{main actor-isolated property 'mainField' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainFieldAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainFieldAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
   }
@@ -1229,8 +2332,8 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
   @CustomActor var customDefault: NonSendableType = requiresCustomActor() // expected-note 4{{mutation of this property is only permitted within the actor}}
   // expected-note @-1 7{{property declared here}}
 
-  @CustomActor var customDefaultAO: NonSendableAOStruct<T> // expected-note 7{{property declared here}}
-  // expected-note @-1 4{{mutation of this property is only permitted within the actor}}
+  @CustomActor var customDefaultAO: NonSendableAOStruct<T> // expected-note 4{{mutation of this property is only permitted within the actor}}
+  // expected-note @-1 7{{property declared here}}
 
   nonisolated func trigger() {}
 
@@ -1278,14 +2381,15 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
 
   // We do completely initialize. With future changes, we should be able to do
   // this.
-  @MainActor init(v1a: NonSendableType, t: sending T, t2: sending T) {
+  @MainActor init(v1a: NonSendableType, t: sending T) {
     self._addressOnly = t
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t)
     _ = self.mainDefault
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -1297,14 +2401,15 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
   }
 
-  @MainActor init?(v1a_failable: NonSendableType, t: sending T, t2: sending T) {
+  @MainActor init?(v1a_failable: NonSendableType, t: sending T) {
     self._addressOnly = t
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t)
     _ = self.mainDefault
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -1318,11 +2423,11 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
 
   // We do not completely initialize since we cannot run the default init of
   // mainDefault its initializer actually requires us to be on MainDefault.
-  @CustomActor init(v1b: NonSendableType, t: sending T, t2: sending T) {
+  @CustomActor init(v1b: NonSendableType, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
 
     trigger() // expected-error {{variable 'self.mainDefault' used before being initialized}}
@@ -1340,11 +2445,11 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
 
   // We do not completely initialize since we cannot run the default init of
   // mainDefault its initializer actually requires us to be on MainDefault.
-  @CustomActor init(v1bb: NonSendableType, t: sending T, t2: sending T) {
+  @CustomActor init(v1bb: NonSendableType, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
     _ = self.mainDefault // expected-error {{'self' used before all stored properties are initialized}}
     // expected-warning @-1 {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
@@ -1366,13 +2471,13 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
 
   // We do completely initialize. With future changes, we should be able to do
   // this.
-  @CustomActor init(v1c: NonSendableType, t: sending T, t2: sending T) {
+  @CustomActor init(v1c: NonSendableType, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
 
     trigger()
@@ -1385,13 +2490,13 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
     _ = self.customDefaultAO
   }
 
-  @CustomActor init?(v1c_failable: NonSendableType, t: sending T, t2: sending T) {
+  @CustomActor init?(v1c_failable: NonSendableType, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
 
     trigger()
@@ -1424,12 +2529,13 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
 
   }
 
-  nonisolated init(v3: Void, t: sending T, t2: sending T) {
+  nonisolated init(v3: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
 
@@ -1443,12 +2549,13 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  nonisolated init?(v3_failable: Void, t: sending T, t2: sending T) {
+  nonisolated init?(v3_failable: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
 
@@ -1467,25 +2574,26 @@ struct GADTStructWithMixedDefaultRequirements_AO_NC<T>: ~Copyable {
 @MainActor
 struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO_NC<T>: ~Copyable {
   var _addressOnly: T // expected-note 6{{mutation of this property is only permitted within the actor}}
-  var mainDefault = NonSendableType() // expected-note 3{{mutation of this property is only permitted within the actor}}
-  // expected-note @-1 7{{property declared here}}
+  var mainDefault = NonSendableType() // expected-note 7{{property declared here}}
+  // expected-note @-1 3{{mutation of this property is only permitted within the actor}}
   var mainDefaultAO: NonSendableAOStruct<T> // expected-note 6{{property declared here}}
   // expected-note @-1 6{{mutation of this property is only permitted within the actor}}
   nonisolated let nonisoNoDefault: SendableType
   nonisolated let nonisoSendableField: SendableType
   @CustomActor var customDefault = NonSendableType() // expected-note 7{{property declared here}}
   // expected-note @-1 {{mutation of this property is only permitted within the actor}}
-  @CustomActor var customDefaultAO: NonSendableAOStruct<T> // expected-note 5{{mutation of this property is only permitted within the actor}}
-  // expected-note @-1 5{{property declared here}}
+  @CustomActor var customDefaultAO: NonSendableAOStruct<T> // expected-note 5{{property declared here}}
+  // expected-note @-1 5{{mutation of this property is only permitted within the actor}}
 
   nonisolated func trigger() {}
 
-  @MainActor init(v1: Void, t: sending T, t2: sending T) {
+  @MainActor init(v1: Void, t: sending T) {
     self._addressOnly = t
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t)
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.mainDefault
     _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
 
@@ -1499,12 +2607,13 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO_NC<T>: ~Copyabl
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
   }
 
-  @MainActor init?(v1_failable: Void, t: sending T, t2: sending T) {
+  @MainActor init?(v1_failable: Void, t: sending T) {
     self._addressOnly = t
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t)
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from the main actor; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.mainDefault
     _ = self.customDefault // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
 
@@ -1519,12 +2628,12 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO_NC<T>: ~Copyabl
   }
 
   // OK: explicitly initializes all fields
-  @CustomActor init(v1a: Void, t: sending T, t2: sending T) {
+  @CustomActor init(v1a: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
     _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     _ = self.customDefault
 
@@ -1538,33 +2647,14 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO_NC<T>: ~Copyabl
     _ = self.customDefaultAO
   }
 
-  @CustomActor init(v1b: Void, t: sending T, t2: sending T) {
-    self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.nonisoNoDefault = SendableType()
-    self.nonisoSendableField = SendableType()
-    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    self.customDefault = NonSendableType()
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
-
-    trigger()
-
-    _ = self.nonisoNoDefault
-    _ = self.nonisoSendableField
-    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    _ = self.mainDefaultAO // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
-    _ = self.customDefault
-    _ = self.customDefaultAO
-  }
-
-  @CustomActor init?(v1b_failable: Void, t: sending T, t2: sending T) {
+  @CustomActor init(v1b: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
     self.customDefault = NonSendableType()
-    self.customDefaultAO = NonSendableAOStruct(value: t2)
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -1576,12 +2666,32 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO_NC<T>: ~Copyabl
     _ = self.customDefaultAO
   }
 
-  nonisolated init(v2: Void, t: sending T, t2: sending T) {
+  @CustomActor init?(v1b_failable: Void, t: sending T) {
+    self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.nonisoNoDefault = SendableType()
+    self.nonisoSendableField = SendableType()
+    self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    self.customDefault = NonSendableType()
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
+
+    trigger()
+
+    _ = self.nonisoNoDefault
+    _ = self.nonisoSendableField
+    _ = self.mainDefault // expected-warning {{main actor-isolated property 'mainDefault' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.mainDefaultAO // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be referenced from global actor 'CustomActor'; this is an error in the Swift 6 language mode}}
+    _ = self.customDefault
+    _ = self.customDefaultAO
+  }
+
+  nonisolated init(v2: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -1593,12 +2703,13 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO_NC<T>: ~Copyabl
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  nonisolated init?(v2_failable: Void, t: sending T, t2: sending T) {
+  nonisolated init?(v2_failable: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -1610,14 +2721,15 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO_NC<T>: ~Copyabl
     _ = self.customDefaultAO // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
-  nonisolated init(v2a: Void, t: sending T, t2: sending T) {
+  nonisolated init(v2a: Void, t: sending T) {
     self._addressOnly = t // expected-warning {{main actor-isolated property '_addressOnly' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.nonisoNoDefault = SendableType()
     self.nonisoSendableField = SendableType()
     self.mainDefault = NonSendableType() // expected-warning {{main actor-isolated property 'mainDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.mainDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{main actor-isolated property 'mainDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
     self.customDefault = NonSendableType() // expected-warning {{global actor 'CustomActor'-isolated property 'customDefault' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
-    self.customDefaultAO = NonSendableAOStruct(value: t2) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    self.customDefaultAO = NonSendableAOStruct(value: t) // expected-warning {{global actor 'CustomActor'-isolated property 'customDefaultAO' can not be mutated from a nonisolated context; this is an error in the Swift 6 language mode}}
+    // expected-warning @-1 {{pattern that the region-based isolation checker does not understand how to check. Please file a bug; this is an error in the Swift 6 language mode}}
 
     trigger()
 
@@ -1630,3 +2742,223 @@ struct GADTStructWithMixedDefaultRequirementsNonIsolatedInits_AO_NC<T>: ~Copyabl
   }
 }
 
+
+////////////////////////////////////////////////////
+// MARK: Enum Variants                            //
+////////////////////////////////////////////////////
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+enum MainActorEnumWithPayloads {
+  case sendable(SendableType)
+  case nonSendable(NonSendableType)
+
+  nonisolated func trigger() {}
+  nonisolated var nonisoComputed: Int { 0 }
+
+  nonisolated init(v1: Void) {
+    self = .nonSendable(NonSendableType())
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @MainActor init(v2: Void) {
+    self = .nonSendable(NonSendableType())
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @CustomActor init(v3: Void) {
+    self = .nonSendable(NonSendableType())
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+}
+
+////////////////////////////////////////////////////
+// MARK: Noncopyable Enum Variants                //
+////////////////////////////////////////////////////
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+enum MainActorEnumWithPayloads_NC: ~Copyable {
+  case sendable(SendableType)
+  case nonSendable(NonSendableType)
+
+  nonisolated func trigger() {}
+  nonisolated var nonisoComputed: Int { 0 }
+
+  nonisolated init(v1: Void) {
+    self = .nonSendable(NonSendableType())
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @MainActor init(v2: Void) {
+    self = .nonSendable(NonSendableType())
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @CustomActor init(v3: Void) {
+    self = .nonSendable(NonSendableType())
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+}
+
+////////////////////////////////////////////////////
+// MARK: Address Only Enum Variants               //
+////////////////////////////////////////////////////
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+enum MainActorEnumWithPayloads_AO<T> {
+  case sendable(SendableType)
+  case nonSendable(NonSendableType)
+  case addressOnly(NonSendableAOStruct<T>)
+
+  nonisolated func trigger() {}
+  nonisolated var nonisoComputed: Int { 0 }
+
+  nonisolated init(v1: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  nonisolated init?(v1_failable: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @MainActor init(v2: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @MainActor init?(v2_failable: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @CustomActor init(v3: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @CustomActor init?(v3_failable: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+}
+
+////////////////////////////////////////////////////
+// MARK: Address Only Noncopyable Enum Variants   //
+////////////////////////////////////////////////////
+
+@available(SwiftStdlib 5.1, *)
+@MainActor
+enum MainActorEnumWithPayloads_AO_NC<T>: ~Copyable {
+  case sendable(SendableType)
+  case nonSendable(NonSendableType)
+  case addressOnly(NonSendableAOStruct<T>)
+
+  nonisolated func trigger() {}
+  nonisolated var nonisoComputed: Int { 0 }
+
+  nonisolated init(v1: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  nonisolated init?(v1_failable: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @MainActor init(v2: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @MainActor init?(v2_failable: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @CustomActor init(v3: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+
+  @CustomActor init?(v3_failable: Void, t: sending T) {
+    self = .addressOnly(NonSendableAOStruct(value: t))
+
+    trigger()
+
+    _ = self.nonisoComputed
+    self = .nonSendable(NonSendableType())
+  }
+}
