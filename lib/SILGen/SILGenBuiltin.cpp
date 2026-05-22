@@ -1497,13 +1497,6 @@ static ManagedValue emitBuiltinGetCurrentAsyncTask(
   return SGF.emitManagedRValueWithEndLifetimeCleanup(apply);
 }
 
-// Emit SIL for the named builtin: cancelAsyncTask.
-static ManagedValue emitBuiltinCancelAsyncTask(
-    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
-    ArrayRef<ManagedValue> args, SGFContext C) {
-  return SGF.emitCancelAsyncTask(loc, args[0].borrow(SGF, loc).forward(SGF));
-}
-
 // Emit SIL for the named builtin: getCurrentExecutor.
 static ManagedValue emitBuiltinGetCurrentExecutor(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,

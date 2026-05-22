@@ -250,7 +250,7 @@ extension Task {
   /// - SeeAlso: `Task.checkCancellation()`
   /// - SeeAlso: `withTaskCancellationHandler(operation:onCancel:isolation:)`
   public func cancel() {
-    Builtin.cancelAsyncTask(_task)
+    unsafe _taskCancel(_task)
   }
 }
 
