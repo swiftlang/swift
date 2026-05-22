@@ -1568,7 +1568,6 @@ public:
   }
 
   void emitUnknownPatternError() {
-    emittedErrorDiagnostic = true;
     EMIT_UNKNOWN_PATTERN_ERROR(SendNeverSentDiagnosticEmitter,
                                getOperand()->getUser(), getBehaviorLimit());
   }
@@ -2397,7 +2396,6 @@ public:
   }
 
   void emitUnknownPatternError() {
-    emittedErrorDiagnostic = true;
     EMIT_UNKNOWN_PATTERN_ERROR(InOutSendingReturnedDiagnosticEmitter,
                                functionExitingInst, getBehaviorLimit());
   }
@@ -3450,7 +3448,6 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
   }
 
   void emitUnknownPatternError() {
-    emittedErrorDiagnostic = true;
     EMIT_UNKNOWN_PATTERN_ERROR(
         NonSendableIsolationCrossingResultDiagnosticEmitter,
         error.op->getSourceInst(), getBehaviorLimit());
