@@ -11,6 +11,7 @@ install(FILES
   LibcShims.h
   MetadataSections.h
   ObjCShims.h
+  OSOverlayShims.h
   Random.h
   RefCount.h
   Reflection.h
@@ -23,6 +24,7 @@ install(FILES
   Target.h
   ThreadLocalStorage.h
   Visibility.h
+  XPCOverlayShims.h
   _SwiftConcurrency.h
   _SwiftDistributed.h
   _SynchronizationShims.h
