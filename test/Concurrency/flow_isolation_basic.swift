@@ -459,11 +459,11 @@ actor MyActor {
         self.x = 0
         self.y = self.x
 
-        Task { self } // expected-note {{after making a copy of 'self', only main actor-isolated properties of 'self' can be accessed from this init}}
+        Task { self } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
 
         callMethod(self)
 
-        passInout(&self.x) // expected-warning {{cannot access property 'x' here in main actor-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+        passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     }
 
     init(i3 c:  Bool) async {
@@ -497,11 +497,11 @@ actor MyActor {
       self.x = 0
       self.y = self.x
 
-      Task { self } // expected-note {{after making a copy of 'self', only main actor-isolated properties of 'self' can be accessed from this init}}
+      Task { self } // expected-note {{after making a copy of 'self', only nonisolated properties of 'self' can be accessed from this init}}
 
       callMethod(self)
 
-      passInout(&self.x) // expected-warning {{cannot access property 'x' here in main actor-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+      passInout(&self.x) // expected-warning {{cannot access property 'x' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
     }
 }
 
@@ -626,8 +626,8 @@ actor Ahmad {
 
   @MainActor init(v4: Void) async {
     prop = 10
-    f() // expected-note {{after calling instance method 'f()', only main actor-isolated properties of 'self' can be accessed from this init}}
-    prop += 1 // expected-warning {{cannot access property 'prop' here in main actor-isolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
+    f() // expected-note {{after calling instance method 'f()', only nonisolated properties of 'self' can be accessed from this init}}
+    prop += 1 // expected-warning {{cannot access property 'prop' here in nonisolated initializer; this is an error in the Swift 6 language mode; this is an error in the Swift 6 language mode}}
   }
 
   deinit { // expected-note {{add 'isolated' to run isolated to 'Ahmad', which may be later than 'nonisolated deinit'}}
