@@ -800,7 +800,8 @@ public:
   LoadInst *createLoad(SILLocation Loc, SILValue LV,
                        LoadOwnershipQualifier Qualifier) {
     ASSERT((Qualifier != LoadOwnershipQualifier::Unqualified) ||
-           !hasOwnership() && "Unqualified inst in qualified function");
+           !hasOwnership() || (BB && BB->isDebugReconstructionBlock()) &&
+           "Unqualified inst in qualified function");
     ASSERT((Qualifier == LoadOwnershipQualifier::Unqualified) ||
            hasOwnership() && "Qualified inst in unqualified function");
     ASSERT(isLoadableOrOpaque(LV->getType()));
@@ -3347,7 +3348,7 @@ private:
 #ifndef NDEBUG
     // A vector instruction can only be in a global initializer. Therefore there
     // is no point in verifying debug info or ownership.
-    if (!isa<VectorInst>(TheInst)) {
+    if (!isa<VectorInst>(TheInst) && !BB->isDebugReconstructionBlock()) {
       // If we are inserting into a specific function (rather than a block for a
       // global_addr), verify that our instruction/the associated location are in
       // sync. We don't care if an instruction is used in global_addr.
