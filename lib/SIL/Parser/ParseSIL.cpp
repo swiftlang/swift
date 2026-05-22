@@ -824,7 +824,7 @@ static bool parseDeclSILOptional(
       // representation of an actor that can be parsed back. For now this is
       // just a quick hack so we can write tests.
       auto optIsolation = ActorIsolation::forSILString(
-          M, SP.P.Context.getIdentifier(rawString).str());
+          SP.P.Context.getIdentifier(rawString).str());
       if (!optIsolation) {
         SP.P.diagnose(SP.P.Tok, diag::expected_in_attribute_list);
         return true;
@@ -7031,8 +7031,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     if (AttrName == "callee_isolation") {
-      auto applyIsolation = ActorIsolation::forSILString(
-          B.getModule(), std::get<StringRef>(*AttrValue));
+      auto applyIsolation =
+          ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
         P.diagnose(AttrValueLoc, diag::expected_in_attribute_list);
         return true;
@@ -7044,8 +7044,8 @@ bool SILParser::parseCallInstruction(SILLocation InstLoc,
     }
 
     if (AttrName == "caller_isolation") {
-      auto applyIsolation = ActorIsolation::forSILString(
-          B.getModule(), std::get<StringRef>(*AttrValue));
+      auto applyIsolation =
+          ActorIsolation::forSILString(std::get<StringRef>(*AttrValue));
       if (!applyIsolation) {
         P.diagnose(AttrValueLoc, diag::expected_in_attribute_list);
         return true;
