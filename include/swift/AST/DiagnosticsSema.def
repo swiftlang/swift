@@ -8364,9 +8364,6 @@ ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
 
-ERROR(experimental_macro,none,
-      "macro %0 is experimental",
-      (DeclName))
 ERROR(experimental_closure_body_macro,none,
       "function body macros on closures is experimental",
       ())
@@ -8512,12 +8509,6 @@ ERROR(inverse_conditional_must_be_fully_explicit,none,
         "conditional conformance to %0 must explicitly "
         "state whether %1 is required to conform to %2 or not",
         (const ProtocolDecl *, Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_non_requirement_explicit,none,
-     "specify that the conformance does not require %0 to conform to %1",
-     (Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_requirement_explicit,none,
-     "specify that the conformance requires %0 to conform to %1",
-     (Type, const ProtocolDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
@@ -8665,16 +8656,9 @@ ERROR(lifetime_dependence_duplicate_param_id, none,
 ERROR(lifetime_dependence_cannot_use_kind, none,
       "invalid use of %0 lifetime dependence for %1 ownership",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_use_parsed_scoped_consuming, none,
-      "invalid use of scoped lifetime dependence with consuming ownership",
-      ())
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
-ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
-      "expected 'nil' or 'self' as return values in an initializer with "
-      "lifetime dependent specifiers",
-       ())
 ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
       "lifetime dependence specifiers cannot be applied to tuple elements", ())
 ERROR(lifetime_dependence_contextual_keyword_conflict_name, none,
@@ -8708,10 +8692,6 @@ NOTE(lifetime_escapable_source_requires_escapable_note, none,
      "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
 ERROR(lifetime_dependence_unknown_type, none,
       "lifetime dependence checking failed due to unknown %0 type", (StringRef))
-
-ERROR(borrow_inout_experimental,none,
-      "'%0' is an experimental feature",
-      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements
@@ -9282,10 +9262,6 @@ GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,none,
                 "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
                 "Consider using an 'inout' parameter instead.", (bool))
 
-GROUPED_WARNING(perf_hint_param_expects_existential,ExistentialType,none,
-                "Performance: %0 expects an existential, leading to heap allocation, reference counting, "
-                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
-                (const ParamDecl*))
 GROUPED_WARNING(perf_hint_func_returns_existential,ExistentialType,none,
                 "Performance: %0 returns an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
