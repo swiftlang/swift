@@ -706,6 +706,7 @@ extension String {
   ///     string.
   /// - Returns: The first word break strictly following `i` in the string.
   @available(StdlibDeploymentTarget 5.7, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   public func _wordIndex(after i: String.Index) -> String.Index {
     guard #available(StdlibDeploymentTarget 6.3, *) else {
       fatalError("Unreachable")
