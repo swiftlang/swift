@@ -197,7 +197,7 @@ public func optReturn() -> UnsafeBufferPointer<CInt>? {
     if unsafe _resultValue == nil {
       return nil
     }
-    return unsafe _swiftifyOverrideLifetime(UnsafeBufferPointer<CInt>(start: _resultValue!, count: Int(37)), copying: ())
+    return unsafe UnsafeBufferPointer<CInt>(start: _resultValue!, count: Int(37))
 }
 ------------------------------
 @__swiftmacro_4test9mutReturn15_SwiftifyImportfMp_.swift
@@ -217,7 +217,7 @@ public func mutOptReturn() -> UnsafeMutableBufferPointer<CInt>? {
     if unsafe _resultValue == nil {
       return nil
     }
-    return unsafe _swiftifyOverrideLifetime(UnsafeMutableBufferPointer<CInt>(start: _resultValue!, count: Int(37)), copying: ())
+    return unsafe UnsafeMutableBufferPointer<CInt>(start: _resultValue!, count: Int(37))
 }
 ------------------------------
 @__swiftmacro_4test6escape15_SwiftifyImportfMp_.swift

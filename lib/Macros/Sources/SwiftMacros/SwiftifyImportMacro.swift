@@ -863,7 +863,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
       }
       expr =
         """
-        _swiftifyOverrideLifetime(\(raw: cast)(\(raw: startLabel): \(raw: castOpaquePointerToRawPointer("_resultValue!")), \(raw: countLabel): Int(\(countExpr))), copying: ())
+        \(raw: cast)(\(raw: startLabel): \(raw: castOpaquePointerToRawPointer("_resultValue!")), \(raw: countLabel): Int(\(countExpr)))
         """
     } else {
       let call = try base.buildFunctionCall(pointerArgs)
@@ -871,9 +871,9 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
         """
         \(raw: cast)(\(raw: startLabel): \(castOpaquePointerToRawPointer(call)), \(raw: countLabel): Int(\(countExpr)))
         """
-      if generateSpan {
-        expr = "_swiftifyOverrideLifetime(\(expr), copying: ())"
-      }
+    }
+    if generateSpan {
+      expr = "_swiftifyOverrideLifetime(\(expr), copying: ())"
     }
     return "unsafe \(expr)"
   }

@@ -44,7 +44,7 @@ public func nullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPoint
     if unsafe _resultValue == nil {
       return nil
     }
-    return unsafe _swiftifyOverrideLifetime(UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(_resultValue!), count: Int(size)), copying: ())
+    return unsafe UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(_resultValue!), count: Int(size))
 }
 ------------------------------
 @__swiftmacro_4test33impNullableUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
