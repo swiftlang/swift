@@ -176,6 +176,8 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
       out << "sizedBy";
     else
       out << "countedBy";
+    if (CAT->isOrNull())
+      out << "OrNull";
     out << "(pointer: ";
     printParamOrReturn(pointerIndex);
     out << ", ";
