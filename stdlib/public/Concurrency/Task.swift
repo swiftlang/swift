@@ -143,9 +143,11 @@ import Swift
 public struct Task<Success: Sendable & ~Copyable, Failure: Error>: Sendable, ~Copyable {
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
+  @_preInverseGenerics
   internal let _task: Builtin.NativeObject
 
   @_alwaysEmitIntoClient
+  @_preInverseGenerics
   internal init(_ task: Builtin.NativeObject) {
     self._task = task
   }
@@ -312,6 +314,13 @@ extension Task where Failure == Never, Success: ~Copyable {
 @available(SwiftStdlib 5.1, *)
 @_preInverseGenerics
 extension Task: Hashable where Success: ~Copyable {
+  @_preInverseGenerics
+  public var hashValue: Int {
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
+
   @_preInverseGenerics
   public func hash(into hasher: inout Hasher) {
     UnsafeRawPointer(Builtin.bridgeToRawPointer(_task)).hash(into: &hasher)

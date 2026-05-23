@@ -410,10 +410,12 @@ public struct TaskGroup<ChildTaskResult: Sendable & ~Copyable>: ~Copyable {
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
   @usableFromInline
+  @_preInverseGenerics
   internal let _group: Builtin.RawPointer
 
   // No public initializers
   @inlinable
+  @_preInverseGenerics
   init(group: Builtin.RawPointer) {
     self._group = group
   }
@@ -641,10 +643,12 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable & ~Copyable, Failure: 
   /// Group task into which child tasks offer their results,
   /// and the `next()` function polls those results from.
   @usableFromInline
+  @_preInverseGenerics
   internal let _group: Builtin.RawPointer
 
   // No public initializers
   @inlinable
+  @_preInverseGenerics
   init(group: Builtin.RawPointer) {
     self._group = group
   }
