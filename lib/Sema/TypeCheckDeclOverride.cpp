@@ -1613,6 +1613,7 @@ namespace  {
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
     UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
+    UNINTERESTING_ATTR(HasHiddenStoredProperties)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
