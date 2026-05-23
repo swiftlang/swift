@@ -5265,7 +5265,7 @@ ERROR(capture_across_type_decl,none,
       "scope",
       (const NominalTypeDecl *, const ValueDecl *))
 
-ERROR(isolated_any_conversion_to_synchronous_func,none,
+GROUPED_ERROR(isolated_any_conversion_to_synchronous_func,ConversionFromIsolatedAnyToSynchronous,none,
       "converting @isolated(any) function of type %0 to synchronous function type %1 is not allowed",
       (Type, Type))
 
