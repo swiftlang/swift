@@ -464,7 +464,7 @@ public:
     //
     auto funcIsolation = rafi->getFunction()->getActorIsolation();
     if (funcIsolation.isActorIsolated()) {
-      // If our use is Non-Sendable, then we can rely on region isolation.
+      // If our value is Non-Sendable, then we can rely on region isolation.
       if (SILIsolationInfo::isNonSendable(i->get())) {
         if (auto iso = isolationInfoCache.getIsolationInfoAtInst(i->getUser(),
                                                                  i->get())) {
@@ -495,6 +495,22 @@ public:
                          << ". User: " << *i->getUser());
               return;
             }
+          }
+        }
+
+        // If we are passing self to a partial_apply or a function, we could end
+        // up here. In that case, we want to look at the use in terms of whether
+        // or not the partial_apply or function has a callee that is isolated to
+        // our function.
+        if (ApplySite as = ApplySite::isa(i->getUser())) {
+          if (auto *calleeFunction = as.getCalleeFunction(); calleeFunction &&
+              (calleeFunction->getActorIsolation().isNonisolatedNonsending() ||
+               calleeFunction->getActorIsolation() == funcIsolation)) {
+            LLVM_DEBUG(llvm::dbgs()
+                       << "isolated use that is safe b/c user is "
+                          "isolated to same as constructor. Op Num: "
+                       << i->getOperandNumber() << ". User: " << *i->getUser());
+            return;
           }
         }
       }

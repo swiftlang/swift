@@ -386,15 +386,15 @@ extension _InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal subscript(_ i: Index) -> Element {
     @_transparent
-    unsafeAddress {
+    borrow {
       _checkIndex(i)
-      return unsafe _address + i
+      return unsafe self[unchecked: i]
     }
 
     @_transparent
-    unsafeMutableAddress {
+    mutate {
       _checkIndex(i)
-      return unsafe _mutableAddress + i
+      return unsafe &self[unchecked: i]
     }
   }
 
@@ -412,13 +412,15 @@ extension _InlineArray where Element: ~Copyable {
   @unsafe
   internal subscript(unchecked i: Index) -> Element {
     @_transparent
-    unsafeAddress {
-      unsafe _protectedAddress + i
+    @_unsafeSelfDependentResult
+    borrow {
+      Builtin.borrowAt(unsafe (_protectedAddress + i)._rawValue)
     }
 
     @_transparent
-    unsafeMutableAddress {
-      unsafe _protectedMutableAddress + i
+    @_unsafeSelfDependentResult
+    mutate {
+      unsafe &(_protectedMutableAddress + i).pointee
     }
   }
 }

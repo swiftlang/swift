@@ -841,6 +841,148 @@ actor TestNonisolatedUnsafe {
   }
 }
 
+// In a global-actor isolated init, after self has been captured by a @Sendable
+// closure that escapes to a nonisolated context, a subsequent setter call on a
+// property with an init accessor is lowered as `assign_or_init` with a
+// partial_apply binding self to the setter. The partial_apply's callee shares
+// the same global-actor isolation as the init, so this is not a flow-isolation
+// violation.
+@available(SwiftStdlib 5.1, *)
+func testGlobalActorClassWithInitAccessorAndSendableEscape() {
+  nonisolated func makeObserver(handler: @Sendable (Int) -> Void) -> Int { 0 }
+
+  @MainActor
+  class Foo {
+    private var _token: Int?
+    var token: Int? {
+      @storageRestrictions(initializes: _token)
+      init(initialValue) {
+        _token = initialValue
+      }
+      get { _token }
+      set { _token = newValue }
+    }
+
+    init() {
+      token = makeObserver { [weak self] _ in
+        _ = self
+      }
+    }
+  }
+}
+
+// Same scenario as above, but using a `nonisolated` trigger method instead of
+// a @Sendable closure escape to push self to a nonisolated state.
+@available(SwiftStdlib 5.1, *)
+func testGlobalActorClassWithInitAccessorAndNonisolatedTrigger() {
+  @MainActor
+  class Foo {
+    nonisolated func trigger() {}
+    private var _x: Int?
+    var x: Int? {
+      @storageRestrictions(initializes: _x)
+      init(initialValue) {
+        _x = initialValue
+      }
+      get { _x }
+      set { _x = newValue }
+    }
+    init() {
+      trigger()
+      x = 1
+    }
+  }
+}
+
+// Same scenario as above, but using a custom global actor instead of MainActor
+// to confirm the same-isolation match isn't MainActor-specific.
+@available(SwiftStdlib 5.1, *)
+@globalActor actor MyActorForFlowIsolation {
+  static let shared = MyActorForFlowIsolation()
+}
+
+@available(SwiftStdlib 5.1, *)
+func testCustomGlobalActorClassWithInitAccessorAndSendableEscape() {
+  nonisolated func makeObserver(handler: @Sendable (Int) -> Void) -> Int { 0 }
+
+  @MyActorForFlowIsolation
+  class Foo {
+    private var _token: Int?
+    var token: Int? {
+      @storageRestrictions(initializes: _token)
+      init(initialValue) {
+        _token = initialValue
+      }
+      get { _token }
+      set { _token = newValue }
+    }
+
+    init() {
+      token = makeObserver { [weak self] _ in
+        _ = self
+      }
+    }
+  }
+}
+
+// Multiple sequential init-accessor setters in a single init: each
+// `assign_or_init` binds self to a same-actor-isolated setter via a
+// partial_apply, and each must be accepted independently.
+@available(SwiftStdlib 5.1, *)
+func testGlobalActorClassWithMultipleInitAccessorSetters() {
+  nonisolated func makeObserver(handler: @Sendable (Int) -> Void) -> Int { 0 }
+
+  @MainActor
+  class Foo {
+    private var _a: Int?
+    private var _b: Int?
+    var a: Int? {
+      @storageRestrictions(initializes: _a)
+      init(initialValue) {
+        _a = initialValue
+      }
+      get { _a }
+      set { _a = newValue }
+    }
+    var b: Int? {
+      @storageRestrictions(initializes: _b)
+      init(initialValue) {
+        _b = initialValue
+      }
+      get { _b }
+      set { _b = newValue }
+    }
+
+    init() {
+      a = makeObserver { [weak self] _ in
+        _ = self
+      }
+      b = makeObserver { [weak self] _ in
+        _ = self
+      }
+    }
+  }
+}
+
+// After self is pushed to a nonisolated state by a @Sendable closure escape,
+// passing self to a nonisolated(nonsending) function should not be a
+// flow-isolation violation.
+@available(SwiftStdlib 5.1, *)
+func testMainActorInitWithNonisolatedNonsendingCallee() {
+  nonisolated func makeObserver(handler: @Sendable (Int) -> Void) -> Int { 0 }
+  nonisolated(nonsending) func process(_ foo: Foo) async {}
+
+  @MainActor
+  class Foo {
+    private var _token: Int?
+
+    init() async {
+      _token = makeObserver { [weak self] _ in _ = self }
+      await process(self)
+    }
+  }
+}
+
 @available(SwiftStdlib 5.1, *)
 actor OtherActor {
   unowned nonisolated let parent: any Actor
