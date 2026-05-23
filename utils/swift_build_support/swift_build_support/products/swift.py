@@ -95,6 +95,9 @@ class Swift(product.Product):
 
         self.cmake_options.extend(self._enable_stdlib_symbol_graphs)
 
+        # Add pedantic diagnostics flag.
+        self.cmake_options.extend(self._swift_pedantic_diagnostics)
+
         self.cmake_options.extend(
             self._swift_tools_ld64_lto_codegen_only_for_supporting_targets)
 
@@ -311,6 +314,11 @@ updated without updating swift.py?")
     def _enable_new_runtime_build(self):
         return [('SWIFT_ENABLE_NEW_RUNTIME_BUILD:BOOL',
                  self.args.enable_new_runtime_build)]
+
+    @property
+    def _swift_pedantic_diagnostics(self):
+        return [('SWIFT_PEDANTIC_DIAGNOSTICS:BOOL',
+                  self.args.swift_pedantic_diagnostics)]
 
     @property
     def _darwin_test_deployment_versions(self):
