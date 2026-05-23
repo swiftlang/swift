@@ -303,6 +303,7 @@ EXPECTED_DEFAULTS = {
     'stdlib_docs_static_hosting': False,
     'stdlib_docs_hosting_base_path': '/',
     'symbols_package': None,
+    'swift_pedantic_diagnostics': True,
     'clean_libdispatch': True,
     'clean_foundation': True,
     'clean_xctest': True,
@@ -581,6 +582,10 @@ EXPECTED_OPTIONS = [
     SetOption('--swift-stdlib-strict-availability', value=True),
     SetOption('--no-swift-stdlib-strict-availability',
               dest='swift_stdlib_strict_availability', value=False),
+
+    SetOption('--swift-pedantic-diagnostics', value=True),
+    SetOption('--no-swift-pedantic-diagnostics',
+              dest='swift_pedantic_diagnostics', value=False),
 
     DisableOption('--no-llvm-include-tests', dest='llvm_include_tests'),
     EnableOption('--llvm-include-tests', dest='llvm_include_tests'),
