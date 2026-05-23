@@ -99,7 +99,7 @@ const void * __sized_by_or_null(len) _Null_unspecified nullUnspecified(int len, 
 // }}
 const void * __sized_by_or_null(len) _Nonnull nonnull(int len, int len2, const void * _Nonnull p __sized_by_or_null(len2) __lifetimebound);
 
-// expected-experimental-expansion@+20:100{{
+// expected-experimental-expansion@+17:100{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nullable(_ len: Int32, _ p: RawSpan?) -> RawSpan? {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p?.byteCount ?? 0)!|}}
@@ -109,15 +109,12 @@ const void * __sized_by_or_null(len) _Nonnull nonnull(int len, int len2, const v
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime({ () in|}}
-//   expected-experimental-remark@11{{macro content: |      let _resultValue = unsafe nullable(len, len2, _pPtr?.baseAddress)|}}
-//   expected-experimental-remark@12{{macro content: |      if unsafe _resultValue == nil {|}}
-//   expected-experimental-remark@13{{macro content: |        return nil|}}
-//   expected-experimental-remark@14{{macro content: |      } else {|}}
-//   expected-experimental-remark@15{{macro content: |        return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: _resultValue!, byteCount: Int(len)), copying: ())|}}
-//   expected-experimental-remark@16{{macro content: |      }|}}
-//   expected-experimental-remark@17{{macro content: |        }(), copying: ())|}}
-//   expected-experimental-remark@18{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue = unsafe nullable(len, len2, _pPtr?.baseAddress)|}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      return nil|}}
+//   expected-experimental-remark@13{{macro content: |    }|}}
+//   expected-experimental-remark@14{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: _resultValue!, byteCount: Int(len)), copying: ())|}}
+//   expected-experimental-remark@15{{macro content: |}|}}
 // }}
 const void * __sized_by_or_null(len) _Nullable nullable(int len, int len2, const void * _Nullable p __sized_by_or_null(len2) __lifetimebound);
 

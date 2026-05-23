@@ -95,7 +95,7 @@ int * __counted_by_or_null(len) _Null_unspecified nullUnspecified(int len, int l
 // }}
 int * __counted_by_or_null(len) _Nonnull nonnull(int len, int len2, int * _Nonnull p __counted_by_or_null(len2) __lifetimebound);
 
-// expected-experimental-expansion@+20:88{{
+// expected-experimental-expansion@+17:88{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nullable(_ len: Int32, _ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p?.count ?? 0)!|}}
@@ -105,15 +105,12 @@ int * __counted_by_or_null(len) _Nonnull nonnull(int len, int len2, int * _Nonnu
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime({ () in|}}
-//   expected-experimental-remark@11{{macro content: |      let _resultValue = unsafe nullable(len, len2, _pPtr?.baseAddress)|}}
-//   expected-experimental-remark@12{{macro content: |      if unsafe _resultValue == nil {|}}
-//   expected-experimental-remark@13{{macro content: |        return nil|}}
-//   expected-experimental-remark@14{{macro content: |      } else {|}}
-//   expected-experimental-remark@15{{macro content: |        return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())|}}
-//   expected-experimental-remark@16{{macro content: |      }|}}
-//   expected-experimental-remark@17{{macro content: |        }(), copying: ())|}}
-//   expected-experimental-remark@18{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue = unsafe nullable(len, len2, _pPtr?.baseAddress)|}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      return nil|}}
+//   expected-experimental-remark@13{{macro content: |    }|}}
+//   expected-experimental-remark@14{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())|}}
+//   expected-experimental-remark@15{{macro content: |}|}}
 // }}
 int * __counted_by_or_null(len) _Nullable nullable(int len, int len2, int * _Nullable p __counted_by_or_null(len2) __lifetimebound);
 
@@ -128,7 +125,7 @@ opaque_t * __counted_by_or_null(len) opaque(int len, int len2, opaque_t * p __co
 // }}
 int * __counted_by_or_null(len) noncountedLifetime(int len, int * p __lifetimebound);
 
-// expected-experimental-expansion@+23:68{{
+// expected-experimental-expansion@+20:68{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func constant(_ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {|}}
 //   expected-experimental-remark@3{{macro content: |    let _pCount = p?.count ?? 0|}}
@@ -141,15 +138,12 @@ int * __counted_by_or_null(len) noncountedLifetime(int len, int * p __lifetimebo
 //   expected-experimental-remark@10{{macro content: |    defer {|}}
 //   expected-experimental-remark@11{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@12{{macro content: |    }|}}
-//   expected-experimental-remark@13{{macro content: |    return unsafe _swiftifyOverrideLifetime({ () in|}}
-//   expected-experimental-remark@14{{macro content: |      let _resultValue = unsafe constant(_pPtr?.baseAddress)|}}
-//   expected-experimental-remark@15{{macro content: |      if unsafe _resultValue == nil {|}}
-//   expected-experimental-remark@16{{macro content: |        return nil|}}
-//   expected-experimental-remark@17{{macro content: |      } else {|}}
-//   expected-experimental-remark@18{{macro content: |        return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(13)), copying: ())|}}
-//   expected-experimental-remark@19{{macro content: |      }|}}
-//   expected-experimental-remark@20{{macro content: |        }(), copying: ())|}}
-//   expected-experimental-remark@21{{macro content: |}|}}
+//   expected-experimental-remark@13{{macro content: |    let _resultValue = unsafe constant(_pPtr?.baseAddress)|}}
+//   expected-experimental-remark@14{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@15{{macro content: |      return nil|}}
+//   expected-experimental-remark@16{{macro content: |    }|}}
+//   expected-experimental-remark@17{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(13)), copying: ())|}}
+//   expected-experimental-remark@18{{macro content: |}|}}
 // }}
 int * __counted_by_or_null(13) _Nullable constant(int * _Nullable p __counted_by_or_null(13) __lifetimebound);
 

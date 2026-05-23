@@ -439,10 +439,18 @@ protocol BoundsCheckedThunkBuilder {
   // Extracts the inner bufferpointer from spans, so that the rest of the code is not nested in
   // closures, which is not allowed for calls to delegated initializers.
   func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item]
+  // Statements emitted between the span unwraps and the return statement. Used to bind
+  // intermediate values (e.g. the underlying call result) and to emit early returns. The
+  // expression returned by `buildFunctionCall` may reference identifiers introduced here.
+  func buildPreReturnStatements() throws -> [CodeBlockItemSyntax.Item]
   // The second component of the return value is true when only the return type of the
   // function signature was changed.
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax
+}
+
+extension BoundsCheckedThunkBuilder {
+  func buildPreReturnStatements() throws -> [CodeBlockItemSyntax.Item] { [] }
 }
 
 func getParam(_ signature: FunctionSignatureSyntax, _ paramIndex: Int) -> FunctionParameterSyntax {
@@ -470,6 +478,9 @@ struct NonescapableReturnThunkBuilder: BoundsCheckedThunkBuilder {
   }
   func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildSpanUnwraps()
+  }
+  func buildPreReturnStatements() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildPreReturnStatements()
   }
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax {
@@ -582,6 +593,9 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildSpanUnwraps()
   }
+  func buildPreReturnStatements() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildPreReturnStatements()
+  }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax
@@ -643,6 +657,9 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
   }
   func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildSpanUnwraps()
+  }
+  func buildPreReturnStatements() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildPreReturnStatements()
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -808,9 +825,26 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildSpanUnwraps()
   }
+  func buildPreReturnStatements() throws -> [CodeBlockItemSyntax.Item] {
+    var res = try base.buildPreReturnStatements()
+    // For a nullable underlying return, bind the call result to `_resultValue`
+    // and emit an early `return nil` so the actual return expression below
+    // can be a single, unconditional Span/UBP construction.
+    if nullable {
+      let call = try base.buildFunctionCall([:])
+      res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax(
+        "let _resultValue = \(call)")))
+      res.append(CodeBlockItemSyntax.Item(StmtSyntax(
+        """
+        if unsafe _resultValue == nil {
+          return nil
+        }
+        """)))
+    }
+    return res
+  }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
-    let call = try base.buildFunctionCall(pointerArgs)
     let startLabel =
       if generateSpan {
         "_unsafeStart"
@@ -820,28 +854,26 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
     var cast = try newType
     var expr: ExprSyntax
     if nullable {
+      // The call has already been bound to `_resultValue` (and the nil case
+      // handled with an early `return nil`) by `buildPreReturnStatements`,
+      // so here we only need to construct the buffer from the unwrapped
+      // result.
       if let optType = cast.as(OptionalTypeSyntax.self) {
         cast = optType.wrappedType
       }
       expr =
         """
-        { () in
-          let _resultValue = \(call)
-          if unsafe _resultValue == nil {
-            return nil
-          } else {
-            return unsafe _swiftifyOverrideLifetime(\(raw: cast)(\(raw: startLabel): \(raw: castOpaquePointerToRawPointer("_resultValue!")), \(raw: countLabel): Int(\(countExpr))), copying: ())
-          }
-        }()
+        _swiftifyOverrideLifetime(\(raw: cast)(\(raw: startLabel): \(raw: castOpaquePointerToRawPointer("_resultValue!")), \(raw: countLabel): Int(\(countExpr))), copying: ())
         """
     } else {
+      let call = try base.buildFunctionCall(pointerArgs)
       expr =
         """
         \(raw: cast)(\(raw: startLabel): \(castOpaquePointerToRawPointer(call)), \(raw: countLabel): Int(\(countExpr)))
         """
-    }
-    if generateSpan {
-      expr = "_swiftifyOverrideLifetime(\(expr), copying: ())"
+      if generateSpan {
+        expr = "_swiftifyOverrideLifetime(\(expr), copying: ())"
+      }
     }
     return "unsafe \(expr)"
   }
@@ -943,6 +975,10 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     }
 
     return res
+  }
+
+  func buildPreReturnStatements() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildPreReturnStatements()
   }
 
   func unwrapIfNonnullable(_ expr: ExprSyntax) -> ExprSyntax {
@@ -1746,7 +1782,8 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
   let basicChecks = try builder.buildBasicBoundsChecks(&eliminatedArgs)
   let compoundChecks = try builder.buildCompoundBoundsChecks()
   let unwraps = try builder.buildSpanUnwraps()
-  let checks = (basicChecks + compoundChecks + unwraps).map { e in
+  let preReturn = try builder.buildPreReturnStatements()
+  let checks = (basicChecks + compoundChecks + unwraps + preReturn).map { e in
     CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
   }
   let call: CodeBlockItemSyntax =

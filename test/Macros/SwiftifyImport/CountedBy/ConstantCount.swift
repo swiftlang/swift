@@ -193,14 +193,11 @@ public func plainReturn() -> UnsafeBufferPointer<CInt> {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func optReturn() -> UnsafeBufferPointer<CInt>? {
-    return unsafe { () in
-      let _resultValue = unsafe optReturn()
-      if unsafe _resultValue == nil {
-        return nil
-      } else {
-        return unsafe _swiftifyOverrideLifetime(UnsafeBufferPointer<CInt>(start: _resultValue!, count: Int(37)), copying: ())
-      }
-    }()
+    let _resultValue = unsafe optReturn()
+    if unsafe _resultValue == nil {
+      return nil
+    }
+    return unsafe _swiftifyOverrideLifetime(UnsafeBufferPointer<CInt>(start: _resultValue!, count: Int(37)), copying: ())
 }
 ------------------------------
 @__swiftmacro_4test9mutReturn15_SwiftifyImportfMp_.swift
@@ -216,14 +213,11 @@ public func mutReturn() -> UnsafeMutableBufferPointer<CInt> {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func mutOptReturn() -> UnsafeMutableBufferPointer<CInt>? {
-    return unsafe { () in
-      let _resultValue = unsafe mutOptReturn()
-      if unsafe _resultValue == nil {
-        return nil
-      } else {
-        return unsafe _swiftifyOverrideLifetime(UnsafeMutableBufferPointer<CInt>(start: _resultValue!, count: Int(37)), copying: ())
-      }
-    }()
+    let _resultValue = unsafe mutOptReturn()
+    if unsafe _resultValue == nil {
+      return nil
+    }
+    return unsafe _swiftifyOverrideLifetime(UnsafeMutableBufferPointer<CInt>(start: _resultValue!, count: Int(37)), copying: ())
 }
 ------------------------------
 @__swiftmacro_4test6escape15_SwiftifyImportfMp_.swift

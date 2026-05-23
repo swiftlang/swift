@@ -84,13 +84,10 @@ public func myFunc4(_ ptr: inout MutableRawSpan?) -> MutableRawSpan? {
     defer {
         _fixLifetime(ptr)
     }
-    return unsafe _swiftifyOverrideLifetime({ () in
-      let _resultValue = unsafe myFunc4(_ptrPtr?.baseAddress, len)
-      if unsafe _resultValue == nil {
-        return nil
-      } else {
-        return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: _resultValue!, byteCount: Int(len)), copying: ())
-      }
-        }(), copying: ())
+    let _resultValue = unsafe myFunc4(_ptrPtr?.baseAddress, len)
+    if unsafe _resultValue == nil {
+      return nil
+    }
+    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: _resultValue!, byteCount: Int(len)), copying: ())
 }
 ------------------------------

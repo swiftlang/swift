@@ -33,13 +33,10 @@ public func myFunc(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CI
     defer {
         _fixLifetime(ptr2)
     }
-    return unsafe _swiftifyOverrideLifetime({ () in
-      let _resultValue = unsafe myFunc(_ptrPtr?.baseAddress, len, _ptr2Ptr?.baseAddress, len2)
-      if unsafe _resultValue == nil {
-        return nil
-      } else {
-        return unsafe _swiftifyOverrideLifetime(MutableSpan<CInt>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())
-      }
-        }(), copying: ())
+    let _resultValue = unsafe myFunc(_ptrPtr?.baseAddress, len, _ptr2Ptr?.baseAddress, len2)
+    if unsafe _resultValue == nil {
+      return nil
+    }
+    return unsafe _swiftifyOverrideLifetime(MutableSpan<CInt>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())
 }
 ------------------------------
