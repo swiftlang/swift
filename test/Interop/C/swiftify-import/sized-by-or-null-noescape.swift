@@ -47,7 +47,7 @@ void simple(int len, const void * __sized_by_or_null(len) __noescape p);
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void swiftAttr(int len, const void *p) __attribute__((swift_attr(
-    "@_SwiftifyImport(.sizedBy(pointer: .param(2), size: \"len\"), .nonescaping(pointer: .param(2)), spanAvailability: \"visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4\")")));
+    "@_SwiftifyImport(.sizedByOrNull(pointer: .param(2), size: \"len\"), .nonescaping(pointer: .param(2)), spanAvailability: \"visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4\")")));
 
 // expected-expansion@+22:124{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}

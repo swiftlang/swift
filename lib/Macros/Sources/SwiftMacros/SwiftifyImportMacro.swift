@@ -1314,8 +1314,10 @@ func parseMacroParam(
   }
   let enumName = try parseEnumName(paramExpr)
   switch enumName {
-  case "countedBy": return try parseCountedByEnum(enumConstructorExpr, signature, rewriter)
-  case "sizedBy": return try parseSizedByEnum(enumConstructorExpr, rewriter)
+  case "countedBy", "countedByOrNull":
+    return try parseCountedByEnum(enumConstructorExpr, signature, rewriter)
+  case "sizedBy", "sizedByOrNull":
+    return try parseSizedByEnum(enumConstructorExpr, rewriter)
   case "endedBy": return try parseEndedByEnum(enumConstructorExpr)
   case "nonescaping":
     let index = try parseNonEscaping(enumConstructorExpr)
@@ -1338,7 +1340,7 @@ func parseMacroParam(
     return nil
   default:
     throw DiagnosticError(
-      "expected 'countedBy', 'sizedBy', 'endedBy', 'nonescaping' or 'lifetimeDependence', got '\(enumName)'",
+      "expected 'countedBy', 'countedByOrNull', 'sizedBy', 'sizedByOrNull', 'endedBy', 'nonescaping' or 'lifetimeDependence', got '\(enumName)'",
       node: enumConstructorExpr)
   }
 }

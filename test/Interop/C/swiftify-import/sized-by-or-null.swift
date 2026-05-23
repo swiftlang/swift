@@ -32,7 +32,7 @@ void simple(int len, void * __sized_by_or_null(len) p);
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void swiftAttr(int len, void *p) __attribute__((swift_attr(
-    "@_SwiftifyImport(.sizedBy(pointer: .param(2), size: \"len\"))")));
+    "@_SwiftifyImport(.sizedByOrNull(pointer: .param(2), size: \"len\"))")));
 
 // expected-expansion@+10:90{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}

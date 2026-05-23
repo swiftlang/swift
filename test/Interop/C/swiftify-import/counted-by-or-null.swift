@@ -35,7 +35,7 @@ void simpleFlipped(int * __counted_by_or_null(len) p, int len);
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void swiftAttr(int len, int *p) __attribute__((
-    swift_attr("@_SwiftifyImport(.countedBy(pointer: .param(2), count: \"len\"))")));
+    swift_attr("@_SwiftifyImport(.countedByOrNull(pointer: .param(2), count: \"len\"))")));
 
 // expected-expansion@+10:92{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
