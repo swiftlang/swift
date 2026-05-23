@@ -17,14 +17,11 @@ import SwiftShims
 // printing to not need to heap allocate).
 
 #if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
-private func _swift_writeToStandardOutput(_ pointer: UnsafePointer<UInt8>?, _ count: Int) -> CInt {
-  // TODO: Use _swift_writeCharToStandardOutput until clients provide their
-  // own C _swift_writeToStandardOutput.
-  for unsafe char in unsafe UnsafeBufferPointer(start: pointer, count: count) {
-    _ = unsafe _swift_writeCharToStandardOutput(CInt(char))
-  }
-  return CInt(count)
-}
+@_extern(c, "_swift_writeToStandardOutput")
+private func _swift_writeToStandardOutput(
+  _ pointer: UnsafePointer<UInt8>?,
+  _ count: Int
+) -> CInt
 #else
 @_extern(c, "putchar")
 func putchar(_: CInt) -> CInt
@@ -36,7 +33,7 @@ private func writeChars(_ chars: UnsafeBufferPointer<UInt8>) {
   _ = unsafe _swift_writeToStandardOutput(chars.baseAddress, chars.count)
 #else
   for unsafe char in unsafe chars {
-    putchar(CInt(char))
+    _ = putchar(CInt(char))
   }
 #endif
 }

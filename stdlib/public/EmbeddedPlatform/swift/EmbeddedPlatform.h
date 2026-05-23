@@ -115,21 +115,6 @@ void _swift_typedAllocate(
     __swift_size_t size, __swift_size_t alignment, unsigned long long typeId);
 
 /**
- * Writes a single character to standard output.
- *
- * Parameters:
- *   - `c`: the character to write, which will be converted to an
- *     `unsigned char`.
- *
- * Returns the character that was written.
- *
- * This function is required when using the Embedded Swift print() facilities.
- *
- * This function can be implemented as a direct call to `putchar`.
- */
-int _swift_writeCharToStandardOutput(int c);
-
-/**
  * Writes a sequence of UTF-8 code points to standard output.
  *
  * Parameters:
