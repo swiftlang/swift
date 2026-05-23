@@ -173,6 +173,13 @@ def _apply_default_arguments(args):
     if not args.android or not args.build_android:
         args.build_android = False
 
+    # By default, pedantic diagnostics are enabled only when assertions in
+    # the Swift project are also enabled. Otherwise we risk breaking
+    # no-assertions builds, which are not among the required pull request
+    # checks.
+    if args.swift_pedantic_diagnostics is None:
+        args.swift_pedantic_diagnostics = args.swift_assertions
+
     # By default use the same number of lit workers as build jobs.
     if not args.lit_jobs:
         args.lit_jobs = args.build_jobs
@@ -1116,6 +1123,18 @@ def create_argument_parser():
            store('swift_stdlib_strict_availability'),
            const=False,
            help='disable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+
+    # -------------------------------------------------------------------------
+    in_group('Diagnostics')
+
+    option('--swift-pedantic-diagnostics', store,
+           const=True,
+           help='Enable and escalate certain compiler warnings for code health '
+                '(e.g. unused code) to errors when building the Swift project '
+                '(default: enabled when assertions in the Swift project are '
+                'enabled)')
+    option('--no-swift-pedantic-diagnostics', store('swift_pedantic_diagnostics'),
+           const=False)
 
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')
