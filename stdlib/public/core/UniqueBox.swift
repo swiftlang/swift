@@ -84,7 +84,7 @@ extension UniqueBox where Value: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public var span: Span<Value> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_transparent
     get {
       unsafe Span(_unsafeStart: pointer, count: 1)
@@ -99,7 +99,7 @@ extension UniqueBox where Value: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Value> {
-    @lifetime(&self)
+    @_lifetime(&self)
     @_transparent
     mutating get {
       unsafe MutableSpan(_unsafeStart: pointer, count: 1)

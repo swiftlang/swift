@@ -36,7 +36,7 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
   /// Create an empty span.
   @_alwaysEmitIntoClient
   @inline(__always)
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init() {
     unsafe _pointer = nil
     _count = 0
@@ -44,7 +44,7 @@ public struct MutableRawSpan: ~Copyable & ~Escapable {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   internal init(
     _unchecked pointer: UnsafeMutableRawPointer?,
     byteCount: Int
@@ -64,7 +64,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow bytes)
+  @_lifetime(borrow bytes)
   public init(
     _unsafeBytes bytes: UnsafeMutableRawBufferPointer
   ) {
@@ -75,7 +75,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow bytes)
+  @_lifetime(borrow bytes)
   public init(
     _unsafeBytes bytes: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
@@ -86,7 +86,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   public init(
     _unsafeStart pointer: UnsafeMutableRawPointer,
     byteCount: Int
@@ -97,7 +97,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow elements)
+  @_lifetime(borrow elements)
   public init<Element: BitwiseCopyable>(
     _unsafeElements elements: UnsafeMutableBufferPointer<Element>
   ) {
@@ -108,7 +108,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow elements)
+  @_lifetime(borrow elements)
   public init<Element: BitwiseCopyable>(
     _unsafeElements elements: borrowing Slice<UnsafeMutableBufferPointer<Element>>
   ) {
@@ -118,7 +118,7 @@ extension MutableRawSpan {
   }
 
   @_alwaysEmitIntoClient
-  @lifetime(&elements)
+  @_lifetime(&elements)
   @unsafe
   public init<Element: BitwiseCopyable>(
     _elements elements: inout MutableSpan<Element>
@@ -297,7 +297,7 @@ extension MutableRawSpan {
   /// - Returns: The return value of the `body` closure parameter.
   @_alwaysEmitIntoClient
   @_transparent
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   @safe
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (UnsafeMutableRawBufferPointer) throws(E) -> Result
@@ -311,7 +311,7 @@ extension MutableRawSpan {
 extension RawSpan {
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow mutableRawSpan)
+  @_lifetime(borrow mutableRawSpan)
   public init(_mutableRawSpan mutableRawSpan: borrowing MutableRawSpan) {
     let (start, count) = unsafe (mutableRawSpan._pointer, mutableRawSpan._count)
     let span = unsafe RawSpan(_unchecked: start, byteCount: count)
@@ -327,7 +327,7 @@ extension MutableRawSpan {
   public var bytes: RawSpan {
     @_alwaysEmitIntoClient
     @_transparent
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       return RawSpan(_mutableRawSpan: self)
     }
@@ -335,7 +335,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public borrowing func _unsafeView<T: BitwiseCopyable>(
     as type: T.Type
   ) -> Span<T> {
@@ -346,7 +346,7 @@ extension MutableRawSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   public mutating func _unsafeMutableView<T: BitwiseCopyable>(
     as type: T.Type
   ) -> MutableSpan<T> {
@@ -527,7 +527,7 @@ extension MutableRawSpan {
   ///   - type: The type of `value`.
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
@@ -560,7 +560,7 @@ extension MutableRawSpan {
   ///   - type: The type of `value`.
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func storeBytes<T: BitwiseCopyable>(
     of value: T, toUncheckedByteOffset offset: Int, as type: T.Type
   ) {
@@ -721,7 +721,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(_ bounds: Range<Int>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
@@ -748,7 +748,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(_ bounds: Range<Int>) -> Self {
     _mutatingExtracting(bounds)
   }
@@ -767,7 +767,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(_ bounds: Range<Int>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
@@ -796,7 +796,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe _pointer?.advanced(by: bounds.lowerBound)
     let newSpan = unsafe Self(_unchecked: newStart, byteCount: bounds.count)
@@ -823,7 +823,7 @@ extension MutableRawSpan {
   @unsafe
   @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(unchecked bounds: Range<Int>) -> Self {
     unsafe _mutatingExtracting(unchecked: bounds)
   }
@@ -845,7 +845,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(unchecked bounds: Range<Int>) -> Self {
     let newStart = unsafe _pointer?.advanced(by: bounds.lowerBound)
     let newSpan = unsafe Self(_unchecked: newStart, byteCount: bounds.count)
@@ -868,7 +868,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(
     _ bounds: some RangeExpression<Int>
   ) -> Self {
@@ -892,7 +892,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(
     _ bounds: some RangeExpression<Int>
   ) -> Self {
@@ -913,7 +913,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(
     _ bounds: some RangeExpression<Int>
   ) -> Self {
@@ -939,7 +939,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(
     unchecked bounds: ClosedRange<Int>
   ) -> Self {
@@ -969,7 +969,7 @@ extension MutableRawSpan {
   @unsafe
   @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(
     unchecked bounds: ClosedRange<Int>
   ) -> Self {
@@ -993,7 +993,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(
     unchecked bounds: ClosedRange<Int>
   ) -> Self {
@@ -1015,7 +1015,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(_: UnboundedRange) -> Self {
     unsafe _overrideLifetime(
       Self(_unchecked: _pointer, byteCount: _count), mutating: &self
@@ -1041,7 +1041,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(_: UnboundedRange) -> Self {
     _mutatingExtracting(...)
   }
@@ -1056,7 +1056,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(_: UnboundedRange) -> Self {
     self
   }
@@ -1085,7 +1085,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(first maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
@@ -1116,7 +1116,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(first:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(first maxLength: Int) -> Self {
     _mutatingExtracting(first: maxLength)
   }
@@ -1137,7 +1137,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(first maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
@@ -1166,7 +1166,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingLast k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of bytes")
@@ -1197,7 +1197,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(droppingLast:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(droppingLast k: Int) -> Self {
     _mutatingExtracting(droppingLast: k)
   }
@@ -1217,7 +1217,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingLast k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of bytes")
@@ -1248,7 +1248,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(last maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
@@ -1280,7 +1280,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(last:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(last maxLength: Int) -> Self {
     _mutatingExtracting(last: maxLength)
   }
@@ -1301,7 +1301,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(last maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
@@ -1331,7 +1331,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingFirst k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of bytes")
@@ -1363,7 +1363,7 @@ extension MutableRawSpan {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(droppingFirst:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(droppingFirst k: Int) -> Self {
     _mutatingExtracting(droppingFirst: k)
   }
@@ -1383,7 +1383,7 @@ extension MutableRawSpan {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingFirst k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of bytes")
@@ -1403,7 +1403,7 @@ extension MutableRawSpan {
 extension MutableRawSpan: BorrowingSequence {
   @available(SwiftStdlib 6.4, *)
   @inlinable
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public func makeBorrowingIterator() -> SpanIterator<UInt8> {
     SpanIterator(Span(viewing: self.bytes))
   }
