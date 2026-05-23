@@ -496,6 +496,7 @@ protected:
     Vector<NodePointer> NodeStack;
     Vector<NodePointer> Substitutions;
     int NumWords;
+    StringRef Words[MaxNumWords];
     StringRef Text;
     size_t Pos;
     std::function<SymbolicReferenceResolver_t> SymbolicReferenceResolver;
@@ -592,6 +593,7 @@ protected:
 
   NodePointer popAssocTypeName();
   NodePointer popAssocTypePath();
+  NodePointer popAssociatedConformanceWitnessAccessorSubject();
   NodePointer getDependentGenericParamType(int depth, int index);
   NodePointer demangleGenericParamIndex();
   NodePointer popProtocolConformance();

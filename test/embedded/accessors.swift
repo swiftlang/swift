@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -Onone -parse-as-library -enable-experimental-feature Embedded -c -o %t/main.o
-// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip
+// RUN: %target-clang %target-clang-resource-dir-opt %t/main.o -o %t/a.out -dead_strip %target-embedded-posix-shim
 // RUN: %target-run %t/a.out | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
@@ -9,7 +9,7 @@
 // REQUIRES: swift_feature_Embedded
 
 // For some reason integer hashing results in an undefined symbol "arc4random_buf" linker error on linux
-// REQUIRES: OS=macosx
+// REQUIRES: OS=macosx || OS=wasip1
 
 public class C {
   public var x: Int {
@@ -60,6 +60,6 @@ struct Main {
     handler.d[27] = WrappedBool(b: false)
     handler.set(key: 27)
     // CHECK: true
-    print(handler.d[27]!.b ? "true" : "false") 
+    print(handler.d[27]!.b ? "true" : "false")
   }
 }

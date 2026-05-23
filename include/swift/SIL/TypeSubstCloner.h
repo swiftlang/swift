@@ -222,7 +222,7 @@ protected:
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(),
         Inst->getCalleeConvention(), Inst->getResultIsolation(),
-        Inst->isOnStack(),
+        Inst->isOnStack(), Inst->isStackAllocationNested(),
         GenericSpecializationInformation::create(Inst, getBuilder()));
     recordClonedInstruction(Inst, N);
   }
@@ -449,7 +449,8 @@ protected:
       // but the symbol will be referred to by the debug info metadata.
       ParentFunction = FuncBuilder.getOrCreateFunction(
           ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
-          ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
+          ParentFunction->getLoweredFunctionType(),
+          ParentFunction->getActorIsolation(), ParentFunction->isBare(),
           ParentFunction->isTransparent(), ParentFunction->getSerializedKind(),
           IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, 0,
           ParentFunction->isThunk(), ParentFunction->getClassSubclassScope());

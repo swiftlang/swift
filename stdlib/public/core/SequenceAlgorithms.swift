@@ -664,11 +664,11 @@ extension Sequence {
   ///   the result is `initialResult`.
   ///
   /// - Complexity: O(*n*), where *n* is the length of the sequence.
-  @inlinable
-  public func reduce<Result>(
-    _ initialResult: Result,
+  @_alwaysEmitIntoClient
+  public func reduce<Result: ~Copyable>(
+    _ initialResult: consuming Result,
     _ nextPartialResult:
-      (_ partialResult: Result, Element) throws -> Result
+      (_ partialResult: consuming Result, Element) throws -> Result
   ) rethrows -> Result {
     var accumulator = initialResult
     for element in self {
@@ -676,6 +676,25 @@ extension Sequence {
     }
     return accumulator
   }
+
+#if !hasFeature(Embedded)
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @abi(
+    func reduce<Result>(
+      _ initialResult: Result,
+      _ nextPartialResult:
+        (_ partialResult: Result, Element) throws -> Result
+    ) throws -> Result
+  )
+  @usableFromInline
+  internal func __rethrows_reduce<Result>(
+    _ initialResult: Result,
+    _ nextPartialResult:
+      (_ partialResult: Result, Element) throws -> Result
+  ) throws -> Result {
+    return try self.reduce(initialResult, nextPartialResult)
+  }
+#endif // !hasFeature(Embedded)
 
   /// Returns the result of combining the elements of the sequence using the
   /// given closure.

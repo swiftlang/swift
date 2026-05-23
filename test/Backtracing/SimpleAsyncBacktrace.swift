@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %s -g -parse-as-library -Onone -o %t/SimpleAsyncBacktrace
+// RUN: %target-build-swift %s -g -parse-as-library -Xfrontend -disable-availability-checking -Onone -o %t/SimpleAsyncBacktrace
 // RUN: %target-codesign %t/SimpleAsyncBacktrace
 // RUN: %target-run %t/SimpleAsyncBacktrace | %FileCheck %s
 

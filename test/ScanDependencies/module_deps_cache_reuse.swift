@@ -28,9 +28,7 @@ import SubE
 // CHECK-REMARK-SAVE: remark: Incremental module scan: Serializing module scanning dependency cache to:
 
 // CHECK-REMARK-LOAD: remark: Incremental module scan: Re-using serialized module scanning dependency cache from:
-// FIXME: Today, we do not serialize dependencies of the main source module which results in a lookup for 'C' even though
-// it is fully redundant.
-// CHECK-REMARK-LOAD: remark: Number of named Clang module queries: '1'
+// CHECK-REMARK-LOAD: remark: Number of named Clang module queries: '0'
 // CHECK-REMARK-LOAD: remark: Number of recorded Clang module dependencies queried by-name from a Swift client: '0'
 // CHECK-REMARK-LOAD: remark: Number of recorded Swift module dependencies: '8'
 // CHECK-REMARK-LOAD: remark: Number of recorded Clang module dependencies: '7'
@@ -39,6 +37,7 @@ import SubE
 
 /// --------Main module
 // CHECK-LABEL: "modulePath": "FooReuse.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: module_deps_cache_reuse.swift
 // CHECK-NEXT: ],
@@ -98,6 +97,7 @@ import SubE
 /// --------Clang module B
 // CHECK-LABEL: "modulePath": "{{.*}}/B-{{.*}}.pcm",
 
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-DAG: module.modulemap
 // CHECK-DAG: B.h
@@ -109,6 +109,7 @@ import SubE
 
 /// --------Swift module F
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}F-{{.*}}.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: "sourceFiles": [
 // CHECK-NEXT: ],
 // CHECK-NEXT: "directDependencies": [
@@ -138,7 +139,7 @@ import SubE
 // CHECK: "-target"
 // CHECK: "-module-name"
 // CHECK: "G"
-// CHECK: "-swift-version"
+// CHECK: {{"-language-mode"|"-swift-version"}}
 // CHECK: "5"
 // CHECK: ],
 // CHECK: "contextHash": "{{.*}}",

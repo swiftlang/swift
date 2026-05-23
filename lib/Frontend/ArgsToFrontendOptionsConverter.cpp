@@ -204,6 +204,12 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
       Args.hasArg(OPT_dump_clang_lookup_tables);
 
+  Opts.CompilerDebuggingOpts.DumpAbstractLayout |=
+      Args.hasArg(OPT_dump_abstract_layout);
+
+  Opts.CompilerDebuggingOpts.DumpHiddenTypeLayouts |=
+      Args.hasArg(OPT_dump_hidden_type_layouts);
+
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
   Opts.ParseStdlib |= Args.hasArg(OPT_parse_stdlib);
@@ -709,6 +715,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
   if (Opt.matches(OPT_emit_supported_arguments))
     return FrontendOptions::ActionType::PrintArguments;
+  if (Opt.matches(OPT_emit_polyglot_ast))
+    return FrontendOptions::ActionType::EmitPolyglotAST;
   llvm_unreachable("Unhandled mode option");
 }
 

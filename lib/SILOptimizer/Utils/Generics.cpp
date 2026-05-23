@@ -455,12 +455,26 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
   return false;
 }
 
-// Addressable parameters cannot be dropped because the address may
-// escape. They also can't be promoted to direct convention, so there
-// is no danger in preserving them.
 static bool canConvertArg(CanSILFunctionType substType, unsigned paramIdx,
                           SILFunction *caller) {
+  // The `self` parameter of a borrow accessor with an indirect return
+  // cannot be promoted, since the returned address might point into the
+  // parameter.
+  //
+  // TODO: It may be possible to promote `self` and the result if and only
+  // if both the parameter and result do or do not get promoted in unison.
+  if (substType->getNumResults() == 1
+      && substType->getSingleResult().getConvention()
+           == ResultConvention::GuaranteedAddress
+      && substType->getSelfParameterIndex() == paramIdx) {
+    return false;
+  }
+  
+  // Addressable parameters cannot be dropped because the address may
+  // escape. They also can't be promoted to direct convention, so there
+  // is no danger in preserving them.
   return !substType->isAddressable(paramIdx, caller);
+
 }
 
 // If there is no read from an indirect argument, this argument has to be
@@ -499,6 +513,10 @@ static bool canDropMetatypeArg(ApplySite apply, SILFunction *callee,
   SILArgument *calleeArg = callee->getArguments()[calleeArgIdx];
 
   if (isUsedAsDynamicSelf(calleeArg))
+    return false;
+
+  // TODO: Adjust LifetimeDependencInfo when dropping the argument.
+  if (apply.getOrigCalleeType()->hasLifetimeDependencies())
     return false;
 
   if (calleeArg->getType().getASTType()->hasDynamicSelfType())
@@ -1125,7 +1143,7 @@ getGenericEnvironmentAndSignatureWithRequirements(
   auto NewGenSig = buildGenericSignature(M.getASTContext(),
                                          OrigGenSig, { },
                                          std::move(RequirementsCopy),
-                                         /*allowInverses=*/false);
+                                         DefaultRequirementOptions());
   auto NewGenEnv = NewGenSig.getGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
@@ -1803,7 +1821,7 @@ FunctionSignaturePartialSpecializer::
   // Finalize the archetype builder.
   auto GenSig = buildGenericSignature(Ctx, GenericSignature(),
                                       AllGenericParams, AllRequirements,
-                                      /*allowInverses=*/false);
+                                      DefaultRequirementOptions());
   auto *GenEnv = GenSig.getGenericEnvironment();
   return { GenEnv, GenSig };
 }
@@ -2651,7 +2669,7 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     auto *newPAI = builder.createPartialApply(
         loc, callee, subs, arguments,
         pai->getCalleeConvention(), pai->getResultIsolation(),
-        pai->isOnStack());
+        pai->isOnStack(), pai->isStackAllocationNested());
     pai->replaceAllUsesWith(newPAI);
     return newPAI;
   }
@@ -2742,9 +2760,9 @@ protected:
 SILFunction *ReabstractionThunkGenerator::createThunk() {
   CanSILFunctionType thunkType = ReInfo.createThunkType(OrigPAI);
   SILFunction *Thunk = FunctionBuilder.getOrCreateSharedFunction(
-      Loc, ThunkName, thunkType, IsBare, IsTransparent,
-      ReInfo.getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible);
+      Loc, ThunkName, thunkType, ActorIsolation::forUnspecified(), IsBare,
+      IsTransparent, ReInfo.getSerializedKind(), ProfileCounter(), IsThunk,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
@@ -3513,7 +3531,7 @@ void swift::trySpecializeApplyOfGeneric(
     SingleValueInstruction *newPAI = Builder.createPartialApply(
       PAI->getLoc(), FRI, Subs, Arguments,
       PAI->getCalleeConvention(), PAI->getResultIsolation(),
-      PAI->isOnStack());
+      PAI->isOnStack(), PAI->isStackAllocationNested());
     PAI->replaceAllUsesWith(newPAI);
     DeadApplies.insert(PAI);
     return;

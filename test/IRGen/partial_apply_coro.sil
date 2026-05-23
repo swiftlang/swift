@@ -55,7 +55,7 @@ bb2:
 // CHECK-NEXT:   %[[RESUME:.*]] = extractvalue { ptr, float } %[[YIELD_PAIR]], 0
 // CHECK-NEXT:   %[[YIELD:.*]] = extractvalue { ptr, float } %[[YIELD_PAIR]], 1
 // CHECK-arm64e: %[[CTXVAL:.*]] = ptrtoint ptr %[[CTXPTR]] to i64
-// CHECK-arm64e-NEXT: %[[DISCR:.*]] call i64 @llvm.ptrauth.blend(i64 %[[CTXVAL]], i64 36124)
+// CHECK-arm64e-NEXT: %[[DISCR:.*]] call i64 @llvm.ptrauth.blend(i64 %[[CTXVAL]], i64 27838)
 // CHECK-NEXT:   call swiftcc void %[[RESUME]](ptr noalias dereferenceable([[BUFFER_SIZE]]) %[[CTXPTR]], i1 false)
 // CHECK-NEXT:   call void @llvm.lifetime.end.p0(i64 [[BUFFER_SIZE]], ptr %[[CTXPTR]])
 // CHECK-NEXT:   call void @swift_release(ptr %[[PA_CTX_BOX]])
@@ -2203,8 +2203,8 @@ sil public_external @use_closure2 : $@yield_once @convention(thin) (@noescape @y
 // CHECK-LABEL: define {{.*}} @partial_apply_stack_callee_guaranteed_indirect_guaranteed_class_pair_param
 // CHECK-SAME: (ptr noalias captures(none) dereferenceable([[ARG_SIZE:(8|16)]]) %[[ARG:.*]])
 // CHECK: entry:
+// CHECK:   %[[BOX:.*]] = alloca i8,
 // CHECK:   %[[CTX:.*]] = alloca [[[BUFFER_SIZE]] x i8]
-// CHECK:   %[[BOX:.*]] = alloca i8
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr }>, ptr %[[BOX]], i32 0, i32 1
 // CHECK:   store ptr %[[ARG]], ptr %[[BOXPTR]]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
@@ -2286,8 +2286,8 @@ entry(%i : $Int, %p : $*SwiftClassPair):
 // CHECK-LABEL: define {{.*}} void @partial_apply_stack_callee_guaranteed_indirect_in_class_pair_param
 // CHECK-SAME: (ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
 // CHECK: entry:
+// CHECK:   %[[BOX:.*]] = alloca i8,
 // CHECK:   %[[CTX:.*]] = alloca [[[BUFFER_SIZE]] x i8],
-// CHECK:   %[[BOX:.*]] = alloca i8
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr }>, ptr %[[BOX]], i32 0, i32 1
 // CHECK:   store ptr %[[ARG]], ptr %[[BOXPTR]]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0
@@ -2487,8 +2487,8 @@ entry(%i : $Int, %ic : $*SwiftClassPair):
 // CHECK-LABEL: define {{.*}} void @partial_apply_stack_callee_guaranteed_indirect_in_constant_class_pair_param
 // CHECK-SAME: (ptr noalias captures(none) dereferenceable([[PAIR_SIZE]]) %[[ARG:.*]])
 // CHECK: entry:
+// CHECK:   %[[BOX:.*]] = alloca i8,
 // CHECK:   %[[CTX:.*]] = alloca [[[BUFFER_SIZE]] x i8]
-// CHECK:   %[[BOX:.*]] = alloca i8
 // CHECK:   %[[BOXPTR:.*]] = getelementptr inbounds{{.*}} <{ %swift.refcounted, ptr }>, ptr %[[BOX]], i32 0, i32 1
 // CHECK:   store ptr %[[ARG]], ptr %[[BOXPTR]]
 // CHECK:   %[[CTXPTR:.*]] = getelementptr inbounds{{.*}} [[[BUFFER_SIZE]] x i8], ptr %[[CTX]], i32 0, i32 0

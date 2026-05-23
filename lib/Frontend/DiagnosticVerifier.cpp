@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Frontend/DiagnosticVerifier.h"
+#include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/ColorUtils.h"
@@ -27,6 +28,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
+#include <optional>
 
 using namespace swift;
 
@@ -234,6 +236,13 @@ struct ExpectedDiagnosticInfo {
 
   std::vector<ExpectedDiagnosticInfo> NestedDiags = {};
 
+  std::vector<ExpectedDiagnosticInfo> ExpectedChildNotes = {};
+  // Locs of {{children: and }}
+  const char *ChildrenMarkerStartLoc = nullptr;
+  const char *ChildrenMarkerEndLoc = nullptr;
+  // This diagnostic has been matched, but contains unmatched child notes
+  bool HasBeenFound = false;
+
   ExpectedDiagnosticInfo(const char *ExpectedStart,
                          const char *ClassificationStart,
                          const char *ClassificationEnd,
@@ -259,6 +268,23 @@ static std::string getDiagKindString(DiagnosticKind Kind) {
   llvm_unreachable("Unhandled DiagKind in switch.");
 }
 
+[[deprecated("only for use in the debugger")]] LLVM_ATTRIBUTE_USED
+static llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
+                                     const CapturedDiagnosticInfo &D) {
+      OS << "[id=" << D.ID;
+  if (D.ParentID)
+    OS << " parent=" << *D.ParentID;
+  OS << " " << getDiagKindString(D.Classification);
+  OS << " " << D.Line << ":" << D.Column;
+  OS << " \"" << D.Message << "\"";
+  if (!D.FixIts.empty())
+    OS << " fixit-count=" << D.FixIts.size();
+  if (!D.CategoryDocFile.empty())
+    OS << " doc=" << D.CategoryDocFile;
+  OS << "]";
+  return OS;
+}
+
 /// Render the verifier syntax for a given documentation file.
 static std::string
 renderDocumentationFile(const std::string &documentationFile) {
@@ -274,7 +300,8 @@ renderDocumentationFile(const std::string &documentationFile) {
 /// Otherwise return \c CapturedDiagnostics.end() with \c false.
 static std::tuple<std::vector<CapturedDiagnosticInfo>::iterator, bool>
 findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
-               const ExpectedDiagnosticInfo &Expected, unsigned BufferID, SourceManager &SM) {
+               const ExpectedDiagnosticInfo &Expected, unsigned BufferID,
+               SourceManager &SM, std::optional<size_t> ParentID) {
   auto fallbackI = CapturedDiagnostics.end();
 
   for (auto I = CapturedDiagnostics.begin(), E = CapturedDiagnostics.end();
@@ -290,6 +317,11 @@ findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
     // Verify the classification and string.
     if (I->Message.find(Expected.MessageStr) == StringRef::npos)
       continue;
+
+    // Verify the parent.
+    if (ParentID && I->ParentID != ParentID) {
+      continue;
+    }
 
     // Verify the classification and, if incorrect, remember as a second choice.
     if (I->Classification != Expected.Classification) {
@@ -310,12 +342,12 @@ findDiagnostic(std::vector<CapturedDiagnosticInfo> &CapturedDiagnostics,
 /// and actual diagnostics produced), apply fixits to the original source
 /// file and drop it back in place.
 static void autoApplyFixes(SourceManager &SM, unsigned BufferID,
-                           ArrayRef<llvm::SMDiagnostic> diags) {
+                           ArrayRef<SMDiagnosticWithNotes> diags) {
   // Walk the list of diagnostics, pulling out any fixits into an array of just
   // them.
   SmallVector<llvm::SMFixIt, 4> FixIts;
   for (auto &diag : diags)
-    FixIts.append(diag.getFixIts().begin(), diag.getFixIts().end());
+    FixIts.append(diag.Diag.getFixIts().begin(), diag.Diag.getFixIts().end());
 
   // If we have no fixits to apply, avoid touching the file.
   if (FixIts.empty())
@@ -487,6 +519,12 @@ bool DiagnosticVerifier::checkForFixIt(
   }
 
   return false;
+}
+
+void DiagnosticVerifier::printDiagnostic(const SMDiagnosticWithNotes &Diag) const {
+  printDiagnostic(Diag.Diag);
+  for (const auto &Note : Diag.Notes)
+    printDiagnostic(Note);
 }
 
 void DiagnosticVerifier::printDiagnostic(const llvm::SMDiagnostic &Diag) const {
@@ -689,8 +727,31 @@ static void validatePrefixList(ArrayRef<std::string> prefixes) {
   }
 }
 
-static bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t &TextStartIdx) {
+bool DiagnosticVerifier::parseTargetBufferName(StringRef &MatchStart,
+                                               StringRef &Out,
+                                               size_t &TextStartIdx) {
   StringRef Offs = MatchStart.slice(0, TextStartIdx);
+
+  if (Offs.starts_with("@'")) {
+    // Windows paths may start with something like T:\, so they need to be quoted
+    // to prevent the colon from seeming like the end of the path.
+    Offs = Offs.substr(2);
+    size_t QuoteEndIndex = Offs.find("'");
+    if (QuoteEndIndex == StringRef::npos) {
+      addError(
+          MatchStart.data(),
+          "no closing \"'\" found to match opening \"'\" for file path here");
+      return false;
+    }
+    if (!Offs.substr(QuoteEndIndex + 1).starts_with(":")) {
+      addError(MatchStart.data(), "expected ':' after buffer name");
+      return false;
+    }
+    Out = Offs.slice(0, QuoteEndIndex);
+    MatchStart = MatchStart.substr(QuoteEndIndex + 3);
+    TextStartIdx -= (QuoteEndIndex + 3);
+    return true;
+  }
 
   size_t LineIndex = Offs.find(':');
   if (LineIndex == 0 || LineIndex == StringRef::npos)
@@ -699,6 +760,44 @@ static bool parseTargetBufferName(StringRef &MatchStart, StringRef &Out, size_t 
   MatchStart = MatchStart.substr(LineIndex);
   TextStartIdx -= LineIndex;
   return true;
+}
+
+void DiagnosticVerifier::parseNestedExpectedDiagInfoBlock(
+    unsigned BufferID, StringRef MatchStartIn,
+    unsigned &PrevExpectedContinuationLine,
+    std::vector<ExpectedDiagnosticInfo> &NestedDiagsOut, size_t &End) {
+  size_t NestedMatch = MatchStartIn.find("expected-");
+  // Scan the memory buffer looking for expected-note/warning/error.
+  while (NestedMatch != StringRef::npos) {
+    StringRef NestedMatchStartIn = MatchStartIn.substr(NestedMatch);
+    ExpectedDiagnosticInfo NestedExpected(nullptr, nullptr, nullptr,
+                                          DiagnosticKind(-1));
+    unsigned NestedCount =
+        parseExpectedDiagInfo(BufferID, NestedMatchStartIn,
+                              PrevExpectedContinuationLine, NestedExpected);
+
+    size_t PrevMatchEnd = NestedMatch + 1;
+    if (NestedCount > 0) {
+      // Add the diagnostic the expected number of times.
+      for (; NestedCount; --NestedCount)
+        NestedDiagsOut.push_back(NestedExpected);
+      size_t NestedMatchEnd =
+          NestedExpected.ExpectedEnd - NestedMatchStartIn.data();
+      assert(NestedMatchEnd > 0);
+      PrevMatchEnd = NestedMatch + NestedMatchEnd;
+    } else {
+      // Skip line if this an expected diagnostic with a prefix this invocation
+      // ignores, otherwise its }} will close the expansion.
+      PrevMatchEnd = MatchStartIn.find("\n", PrevMatchEnd);
+    }
+
+    size_t NextEnd = MatchStartIn.find("}}", PrevMatchEnd);
+    NestedMatch = MatchStartIn.find("expected-", PrevMatchEnd);
+    if (NextEnd < NestedMatch) {
+      End = NextEnd;
+      break;
+    }
+  }
 }
 
 unsigned DiagnosticVerifier::parseExpectedDiagInfo(
@@ -745,7 +844,7 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
   bool AbsoluteLine = false;
 
   if (TextStartIdx > 0 && MatchStart[0] == '@') {
-    if (MatchStart[1] != '+' && MatchStart[1] != '-' && MatchStart[1] != ':' && (MatchStart[1] < '0' || MatchStart[1] > '9')) {
+    if (MatchStart[1] != '#' && MatchStart[1] != '+' && MatchStart[1] != '-' && MatchStart[1] != ':' && (MatchStart[1] < '0' || MatchStart[1] > '9')) {
       StringRef TargetBufferName;
       if (!parseTargetBufferName(MatchStart, TargetBufferName, TextStartIdx)) {
         addError(MatchStart.data(), "expected '+'/'-' for line offset, ':' "
@@ -764,10 +863,42 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
         return 0;
       }
     }
+
+    // Location marker reference: @#markerName or @#markerName:col
     StringRef Offs;
-    if (MatchStart[1] == '+')
+    if (MatchStart[0] == '@' && MatchStart[1] == '#') {
+      size_t NameStart = 2;
+      size_t NameEnd = NameStart;
+      while (NameEnd < TextStartIdx &&
+             (isalnum(MatchStart[NameEnd]) ||
+              MatchStart[NameEnd] == '_' || MatchStart[NameEnd] == '-'))
+        ++NameEnd;
+
+      if (NameEnd == NameStart) {
+        addError(MatchStart.data() + 1,
+                 "expected marker name after '#'");
+        return 0;
+      }
+
+      StringRef MarkerName = MatchStart.slice(NameStart, NameEnd);
+      auto It = LocationMarkers.find(MarkerName);
+      if (It == LocationMarkers.end()) {
+        addError(MatchStart.data() + 1,
+                 "use of undefined location marker '#" + MarkerName + "'");
+        return 0;
+      }
+
+      LineOffset = It->second.Line;
+      AbsoluteLine = true;
+      if (It->second.BufferID != BufferID)
+        Expected.TargetBufferID = It->second.BufferID;
+
+      // Extract the remainder after the marker name (e.g. ":col" or empty)
+      // and let the shared column-parsing code below handle it.
+      Offs = MatchStart.slice(NameEnd, TextStartIdx).rtrim();
+    } else if (MatchStart[1] == '+') {
       Offs = MatchStart.slice(2, TextStartIdx).rtrim();
-    else {
+    } else {
       Offs = MatchStart.slice(1, TextStartIdx).rtrim();
       if (Offs[0] >= '0' && Offs[0] <= '9')
         AbsoluteLine = true;
@@ -785,8 +916,8 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     }
 
     size_t ColonIndex = Offs.find(':');
-    // Check whether a line offset was provided
-    if (ColonIndex != 0) {
+    // Check whether a line offset was provided (not applicable for markers).
+    if (!LineOffset && ColonIndex != 0) {
       StringRef LineOffs = Offs.slice(0, ColonIndex);
       if (LineOffs.getAsInteger(10, LineOffset)) {
         addError(MatchStart.data(), "expected line offset before '{{'");
@@ -834,39 +965,13 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
 
   size_t End = StringRef::npos;
   if (Expected.Classification == DiagnosticKindExpansion) {
-    size_t NestedMatch = MatchStart.find("expected-");
-    // Scan the memory buffer looking for expected-note/warning/error.
-    while (NestedMatch != StringRef::npos) {
-      StringRef NestedMatchStart = MatchStart.substr(NestedMatch);
-      ExpectedDiagnosticInfo NestedExpected(nullptr, nullptr, nullptr,
-                                      DiagnosticKind(-1));
-      unsigned NestedCount =
-          parseExpectedDiagInfo(BufferID, NestedMatchStart,
-                                PrevExpectedContinuationLine, NestedExpected);
-
-      size_t PrevMatchEnd = NestedMatch + 1;
-      if (NestedCount > 0) {
-        // Add the diagnostic the expected number of times.
-        for (; NestedCount; --NestedCount)
-          Expected.NestedDiags.push_back(NestedExpected);
-        size_t NestedMatchEnd =
-            NestedExpected.ExpectedEnd - NestedMatchStart.data();
-        assert(NestedMatchEnd > 0);
-        PrevMatchEnd = NestedMatch + NestedMatchEnd;
-      }
-
-      size_t NextEnd = MatchStart.find("}}", PrevMatchEnd);
-      NestedMatch = MatchStart.find("expected-", PrevMatchEnd);
-      if (NextEnd < NestedMatch) {
-        End = NextEnd;
-        break;
-      }
-    }
+    parseNestedExpectedDiagInfoBlock(BufferID, MatchStart,
+                                     PrevExpectedContinuationLine,
+                                     Expected.NestedDiags, End);
 
     if (End == StringRef::npos) {
-      addError(
-          DiagnosticLoc,
-          "didn't find '}}' to match '{{' in expected-expansion");
+      addError(DiagnosticLoc,
+               "didn't find '}}' to match '{{' in expected-expansion");
       return 0;
     }
     if (Expected.NestedDiags.size() == 0) {
@@ -910,7 +1015,8 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
   // Scan for fix-its: {{10-14=replacement text}}
   bool startNewAlternatives = true;
   StringRef ExtraChecks = MatchStart.substr(End + 2).ltrim(" \t");
-  while (ExtraChecks.starts_with("{{")) {
+  while (ExtraChecks.starts_with("{{") &&
+         !ExtraChecks.starts_with("{{children:")) {
     // First make sure we have a closing "}}".
     size_t EndIndex = ExtraChecks.find("}}");
     if (EndIndex == StringRef::npos) {
@@ -1044,6 +1150,45 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
     Expected.Fixits.back().push_back(FixIt);
   }
 
+  if (ExtraChecks.starts_with("{{children:")) {
+    Expected.ChildrenMarkerStartLoc = ExtraChecks.data();
+    ExtraChecks = ExtraChecks.substr(StringRef("{{children:").size());
+    parseNestedExpectedDiagInfoBlock(
+        BufferID, ExtraChecks, PrevExpectedContinuationLine, Expected.ExpectedChildNotes, End);
+
+    if (End == StringRef::npos) {
+      addError(Expected.ChildrenMarkerStartLoc,
+               "didn't find '}}' to match '{{children:'");
+      return 0;
+    }
+    Expected.ChildrenMarkerEndLoc = ExtraChecks.substr(End).data();
+
+    if (!VerifyChildNotes) {
+      addError(Expected.ChildrenMarkerStartLoc,
+               "child diagnostics block requires -verify-child-notes");
+      Expected.ExpectedChildNotes.clear();
+    } else if (Expected.ExpectedChildNotes.size() == 0) {
+      addError(DiagnosticLoc, "child diagnostics block is empty");
+    }
+
+    auto ChildNote = Expected.ExpectedChildNotes.begin();
+    while (ChildNote != Expected.ExpectedChildNotes.end()) {
+      if (ChildNote->Classification != DiagnosticKind::Note) {
+        addError(ChildNote->ClassificationStart,
+                 "only notes allowed in child diagnostics block");
+        ChildNote = Expected.ExpectedChildNotes.erase(ChildNote);
+      } else {
+        ++ChildNote;
+      }
+    }
+    ExtraChecks = ExtraChecks.substr(End + 2).ltrim(" \t");
+
+    if (ExtraChecks.starts_with("{{")) {
+      addError(ExtraChecks.data(),
+               "fix-it and documentation matchers must come before child notes");
+    }
+  }
+
   // If there's a trailing empty alternation, remove it.
   if (!Expected.Fixits.empty() && Expected.Fixits.back().empty())
     Expected.Fixits.pop_back();
@@ -1057,7 +1202,9 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
   return Count;
 }
 
-void DiagnosticVerifier::verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics, unsigned BufferID) {
+void DiagnosticVerifier::verifyDiagnostics(
+    std::vector<ExpectedDiagnosticInfo> &ExpectedDiagnostics, unsigned BufferID,
+    std::optional<size_t> ParentID) {
   // Make sure all the expected diagnostics appeared.
   std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
 
@@ -1076,13 +1223,14 @@ void DiagnosticVerifier::verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &
         continue;
       }
       unsigned ExpansionBufferID = Expansions[Loc];
-      verifyDiagnostics(expected.NestedDiags, ExpansionBufferID);
+      verifyDiagnostics(expected.NestedDiags, ExpansionBufferID,
+                        /*ParentDiagnostic=*/std::nullopt);
       if (expected.NestedDiags.empty())
         ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
       continue;
     }
     auto FoundDiagnosticInfo =
-        findDiagnostic(CapturedDiagnostics, expected, ID, SM);
+        findDiagnostic(CapturedDiagnostics, expected, ID, SM, ParentID);
     auto FoundDiagnosticIter = std::get<0>(FoundDiagnosticInfo);
     if (FoundDiagnosticIter == CapturedDiagnostics.end()) {
       // Diagnostic didn't exist.  If this is a 'mayAppear' diagnostic, then
@@ -1105,14 +1253,22 @@ void DiagnosticVerifier::verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &
 
     if (!std::get<1>(FoundDiagnosticInfo)) {
       // Found a diagnostic with the right location and text but the wrong
-      // classification. We'll emit an error about the mismatch and
+      // classification or parent. We'll emit an error about the mismatch and
       // thereafter pretend that the diagnostic fully matched.
       auto expectedKind = getDiagKindString(expected.Classification);
       auto actualKind = getDiagKindString(FoundDiagnostic.Classification);
-      emitFixItsError(expected.ClassificationStart,
-          llvm::Twine("expected ") + expectedKind + ", not " + actualKind,
-          expected.ClassificationStart, expected.ClassificationEnd,
-          actualKind);
+      if (expectedKind != actualKind)
+        emitFixItsError(expected.ClassificationStart,
+                        llvm::Twine("expected ") + expectedKind + ", not " +
+                            actualKind,
+                        expected.ClassificationStart,
+                        expected.ClassificationEnd, actualKind);
+      else {
+        ASSERT(ParentID &&
+               "fallback that matches kind but is not child note");
+        addError(expected.ExpectedStart,
+                 "matched child note with different parent");
+      }
     }
 
     const char *missedFixitLoc = nullptr;
@@ -1248,6 +1404,23 @@ void DiagnosticVerifier::verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &
       }
     }
 
+    if (VerifyChildNotes && !expected.ExpectedChildNotes.empty()) {
+      verifyDiagnostics(expected.ExpectedChildNotes, BufferID,
+                        FoundDiagnostic.ID);
+    }
+
+    if (FoundDiagnostic.HasChildren) {
+      auto ChildNoteIter = FoundDiagnosticIter + 1;
+      while (ChildNoteIter != CapturedDiagnostics.end() &&
+             ChildNoteIter->ParentID == FoundDiagnostic.ID) {
+        addError(getRawLoc(ChildNoteIter->Loc).getPointer(),
+                 ("unexpected child note produced: " +
+                  ChildNoteIter->Message).str());
+        addNote(expected.ExpectedStart, "for parent matched here");
+        ChildNoteIter = CapturedDiagnostics.erase(ChildNoteIter);
+      }
+    }
+
     // Actually remove the diagnostic from the list, so we don't match it
     // again. We do have to do this after checking fix-its, though, because
     // the diagnostic owns its fix-its.
@@ -1257,8 +1430,10 @@ void DiagnosticVerifier::verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &
     // number of diagnostics, in which case we want to reprocess this.
     if (expected.mayAppear)
       ++i;
+    else if (expected.ExpectedChildNotes.empty())
+      ExpectedDiagnostics.erase(ExpectedDiagnostics.begin() + i);
     else
-      ExpectedDiagnostics.erase(ExpectedDiagnostics.begin()+i);
+      expected.HasBeenFound = true;
   }
 }
 
@@ -1267,6 +1442,11 @@ void DiagnosticVerifier::verifyRemaining(
     const char *FileStart) {
   std::reverse(ExpectedDiagnostics.begin(), ExpectedDiagnostics.end());
   for (auto &expected : ExpectedDiagnostics) {
+    if (expected.HasBeenFound) {
+      // Only emit errors for unmatched child notes if the parent matched.
+      verifyRemaining(expected.ExpectedChildNotes, FileStart);
+      continue;
+    }
     if (expected.Classification == DiagnosticKindExpansion) {
       verifyRemaining(expected.NestedDiags, FileStart);
       continue;
@@ -1322,9 +1502,125 @@ void DiagnosticVerifier::verifyRemaining(
 void DiagnosticVerifier::addError(const char *Loc, const Twine &message,
                                   ArrayRef<llvm::SMFixIt> FixIts) {
   auto loc = SourceLoc::getFromPointer(Loc);
-  auto diag =
-      SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts);
-  Errors.push_back(diag);
+  Errors.emplace_back(
+      SM.GetMessage(loc, llvm::SourceMgr::DK_Error, message, {}, FixIts));
+}
+
+void DiagnosticVerifier::addNote(const char *Loc, const Twine &message) {
+  ASSERT(!Errors.empty() && "addNote requires a preceding addError");
+  auto loc = SourceLoc::getFromPointer(Loc);
+  Errors.back().Notes.emplace_back(
+      SM.GetMessage(loc, llvm::SourceMgr::DK_Note, message, {}, {}));
+}
+
+std::vector<CapturedDiagnosticInfo>::iterator
+DiagnosticVerifier::reportAndEraseUnexpected(
+    std::vector<CapturedDiagnosticInfo>::iterator DiagIter) {
+  addError(getRawLoc(DiagIter->Loc).getPointer(),
+           ("unexpected " + getDiagKindString(DiagIter->Classification) +
+            " produced: " + DiagIter->Message)
+               .str());
+
+  if (VerifyChildNotes) {
+    auto ChildIter = DiagIter + 1;
+    // All child notes occur immediately after their parent so we only need to
+    // look forward in the list for as long as we keep seeing child notes. This
+    // also lets us erase the child notes without invalidating DiagIter.
+    while (ChildIter != CapturedDiagnostics.end() &&
+           ChildIter->ParentID == DiagIter->ID) {
+      addNote(getRawLoc(ChildIter->Loc).getPointer(),
+              ("with child note: " + ChildIter->Message).str());
+      ChildIter = CapturedDiagnostics.erase(ChildIter);
+    }
+  }
+
+  return CapturedDiagnostics.erase(DiagIter);
+}
+
+/// Scan the buffer for location marker definitions of the form "// #name".
+/// A marker definition is a comment whose only content is "#name", e.g.:
+///   code // #marker1
+///   // #marker2
+/// The marker name consists of alphanumeric characters, hyphens, or
+/// underscores. Nothing else may appear in the comment after the marker name
+/// (except trailing whitespace). This prevents false positives from comments
+/// like "// #available(...)" or stack traces containing "// #10 0x...".
+void DiagnosticVerifier::scanForMarkers(unsigned BufferID) {
+  StringRef InputFile = SM.getEntireTextForBuffer(BufferID);
+  const SourceLoc BufferStartLoc = SM.getLocForBufferStart(BufferID);
+
+  for (size_t Pos = InputFile.find("//"); Pos != StringRef::npos;
+       Pos = InputFile.find("//", Pos + 2)) {
+    size_t Cur = Pos + 2;
+    while (Cur < InputFile.size() && (InputFile[Cur] == ' ' ||
+                                       InputFile[Cur] == '\t'))
+      ++Cur;
+
+    if (Cur >= InputFile.size() || InputFile[Cur] != '#')
+      continue;
+
+    size_t HashPos = Cur;
+    size_t NameStart = HashPos + 1;
+    size_t NameEnd = NameStart;
+    while (NameEnd < InputFile.size() &&
+           (isalnum(InputFile[NameEnd]) || InputFile[NameEnd] == '_' ||
+            InputFile[NameEnd] == '-'))
+      ++NameEnd;
+
+    if (NameEnd == NameStart)
+      continue;
+
+    // Only trailing whitespace is allowed after the marker name until EOL.
+    size_t Rest = NameEnd;
+    while (Rest < InputFile.size() && (InputFile[Rest] == ' ' ||
+                                        InputFile[Rest] == '\t'))
+      ++Rest;
+    if (Rest < InputFile.size() && InputFile[Rest] != '\n' &&
+        InputFile[Rest] != '\r' && InputFile[Rest] != '\0')
+      continue;
+
+    StringRef MarkerName = InputFile.slice(NameStart, NameEnd);
+    unsigned Line =
+        SM.getLineAndColumnInBuffer(
+              BufferStartLoc.getAdvancedLoc(HashPos), BufferID)
+            .first;
+
+    auto Result =
+        LocationMarkers.try_emplace(MarkerName, MarkerLocation{BufferID, Line});
+    if (!Result.second) {
+      addError(InputFile.data() + HashPos,
+               "location marker '#" + MarkerName + "' already defined");
+    }
+  }
+}
+
+bool DiagnosticVerifier::hasMarkerAtLine(unsigned BufferID,
+                                         unsigned Line) const {
+  for (const auto &Entry : LocationMarkers) {
+    if (Entry.second.BufferID == BufferID && Entry.second.Line == Line)
+      return true;
+  }
+  return false;
+}
+
+bool DiagnosticVerifier::verifyDeferredMarkerDiagnostics() {
+  Errors.clear();
+  bool HadError = false;
+  auto CapturedDiagIter = CapturedDiagnostics.begin();
+  while (CapturedDiagIter != CapturedDiagnostics.end()) {
+    if (!CapturedDiagIter->SourceBufferID ||
+        !hasMarkerAtLine(*CapturedDiagIter->SourceBufferID,
+                         CapturedDiagIter->Line)) {
+      ++CapturedDiagIter;
+      continue;
+    }
+    HadError = true;
+    CapturedDiagIter = reportAndEraseUnexpected(CapturedDiagIter);
+  }
+  for (auto &Err : Errors)
+    printDiagnostic(Err);
+  Errors.clear();
+  return HadError;
 }
 
 /// After the file has been processed, check to see if we got all of
@@ -1367,12 +1663,19 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
     PrevMatchEnd = Expected.ExpectedEnd;
   }
 
-  verifyDiagnostics(ExpectedDiagnostics, BufferID);
+  verifyDiagnostics(ExpectedDiagnostics, BufferID,
+                    /*ParentDiagnostic=*/std::nullopt);
 
   // Check to see if we have any incorrect diagnostics.  If so, diagnose them as
   // such.
   auto expectedDiagIter = ExpectedDiagnostics.begin();
   while (expectedDiagIter != ExpectedDiagnostics.end()) {
+    if (expectedDiagIter->HasBeenFound) {
+      // FIXME: extract this "near miss" pass and recurse
+      // over child notes and expansion contents
+      ++expectedDiagIter;
+      continue;
+    }
     // Check to see if any found diagnostics have the right line and
     // classification, but the wrong text.
     auto I = CapturedDiagnostics.begin();
@@ -1435,26 +1738,36 @@ DiagnosticVerifier::Result DiagnosticVerifier::verifyFile(unsigned BufferID) {
       }
     }
 
+    // Defer reporting unexpected diagnostics on lines with location markers,
+    // because another file may have an expected-error@#marker for this line.
+    if (hasMarkerAtLine(BufferID, CapturedDiagIter->Line)) {
+      ++CapturedDiagIter;
+      continue;
+    }
+
     HadUnexpectedDiag = true;
-    std::string Message =
-        ("unexpected " + getDiagKindString(CapturedDiagIter->Classification) +
-         " produced: " + CapturedDiagIter->Message)
-            .str();
-    addError(getRawLoc(CapturedDiagIter->Loc).getPointer(), Message);
-    CapturedDiagIter = CapturedDiagnostics.erase(CapturedDiagIter);
+    CapturedDiagIter = reportAndEraseUnexpected(CapturedDiagIter);
   }
 
-  // Sort the diagnostics by their address in the memory buffer as the primary
-  // key.  This ensures that an "unexpected diagnostic" and
-  // "expected diagnostic" in the same place are emitted next to each other.
+  // Sort the diagnostics with buffer ID as the primary key and address within
+  // the buffer as the secondary key. This ensures that an "unexpected
+  // diagnostic" and "expected diagnostic" in the same place are emitted next
+  // to each other, and that the order is stable across source files.
   std::sort(Errors.begin(), Errors.end(),
-            [&](const llvm::SMDiagnostic &lhs,
-                const llvm::SMDiagnostic &rhs) -> bool {
-              return lhs.getLoc().getPointer() < rhs.getLoc().getPointer();
+            [&](const SMDiagnosticWithNotes &lhs,
+                const SMDiagnosticWithNotes &rhs) -> bool {
+              auto lhsLoc = SourceLoc::getFromPointer(lhs.Diag.getLoc().getPointer());
+              auto rhsLoc = SourceLoc::getFromPointer(rhs.Diag.getLoc().getPointer());
+              unsigned lhsBuf = SM.findBufferContainingLoc(lhsLoc);
+              unsigned rhsBuf = SM.findBufferContainingLoc(rhsLoc);
+              if (lhsBuf != rhsBuf)
+                return lhsBuf < rhsBuf;
+              return lhs.Diag.getLoc().getPointer() <
+                     rhs.Diag.getLoc().getPointer();
             });
 
   // Emit all of the queue'd up errors.
-  for (auto Err : Errors)
+  for (const auto &Err : Errors)
     printDiagnostic(Err);
 
   // If auto-apply fixits is on, rewrite the original source file.
@@ -1507,10 +1820,46 @@ processExpansions(SourceManager &SM, llvm::DenseMap<SourceLoc, unsigned> &Expans
     if (ExpansionStart.isInvalid())
       continue;
     if (Expansions.count(ExpansionStart)) {
-      ASSERT(Expansions[ExpansionStart] == diag.SourceBufferID.value());
+      ASSERT(Expansions[ExpansionStart] == diag.SourceBufferID.value() &&
+             "diagnostics in multiple expansions for the same decl not "
+             "supported by -verify");
       continue;
     }
     Expansions.insert(std::make_pair(ExpansionStart, diag.SourceBufferID.value()));
+  }
+}
+
+static void createDiagnosticInfo(const DiagnosticInfo &Info,
+                                 SourceManager &DiagSM,
+                                 SourceManager &VerifierSM,
+                                 bool VerifyChildNotes,
+                                 std::optional<size_t> ParentID,
+                                 std::vector<CapturedDiagnosticInfo> &Out) {
+  ASSERT(!Info.IsChildNote ||
+         Info.ChildDiagnosticInfo.empty() && "child note of child note??");
+  SmallVector<CapturedFixItInfo, 2> fixIts;
+  for (const auto &fixIt : Info.FixIts) {
+    fixIts.emplace_back(DiagSM, fixIt);
+  }
+
+  llvm::SmallString<128> message;
+  {
+    llvm::raw_svector_ostream Out(message);
+    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
+                                           Info.FormatArgs);
+  }
+
+  DiagLoc loc(DiagSM, VerifierSM, Info.Loc);
+  const size_t Idx = Out.size();
+  Out.emplace_back(
+      message, loc.bufferID, Info.Kind, loc.sourceLoc, loc.line, loc.column,
+      fixIts, llvm::sys::path::stem(Info.getCategoryDocumentationURL()).str(),
+      Idx, ParentID, VerifyChildNotes && !Info.ChildDiagnosticInfo.empty());
+
+  if (VerifyChildNotes) {
+    for (const DiagnosticInfo *ChildInfo : Info.ChildDiagnosticInfo)
+      createDiagnosticInfo(*ChildInfo, DiagSM, VerifierSM, VerifyChildNotes,
+                           Idx, Out);
   }
 }
 
@@ -1529,23 +1878,12 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
     return;
   if (IgnoreMacroLocationNote && Info.ID == diag::in_macro_expansion.ID)
     return;
-  SmallVector<CapturedFixItInfo, 2> fixIts;
-  for (const auto &fixIt : Info.FixIts) {
-    fixIts.emplace_back(SM, fixIt);
-  }
+  if (VerifyChildNotes && Info.IsChildNote)
+    // Already added with parent diagnostic
+    return;
 
-  llvm::SmallString<128> message;
-  {
-    llvm::raw_svector_ostream Out(message);
-    DiagnosticEngine::formatDiagnosticText(Out, Info.FormatString,
-                                           Info.FormatArgs);
-  }
-
-  DiagLoc loc(SM, this->SM, Info.Loc);
-  CapturedDiagnostics.emplace_back(message, loc.bufferID, Info.Kind,
-                                   loc.sourceLoc, loc.line, loc.column, fixIts,
-                                   llvm::sys::path::stem(
-                                      Info.CategoryDocumentationURL).str());
+  createDiagnosticInfo(Info, SM, this->SM, VerifyChildNotes, std::nullopt,
+                       CapturedDiagnostics);
 }
 
 /// Once all diagnostics have been captured, perform verification.
@@ -1576,13 +1914,35 @@ bool DiagnosticVerifier::finishProcessing() {
 
   processExpansions(SM, Expansions, CapturedDiagnostics);
 
+  // Scan all buffers for location marker definitions before verifying, so
+  // that markers defined in one file can be referenced from another.
   ArrayRef<unsigned> BufferIDLists[2] = { BufferIDs, additionalBufferIDs };
+  for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
+    for (auto &BufferID : BufferIDList)
+      scanForMarkers(BufferID);
+
+  // Emit any errors from marker scanning (e.g. duplicate marker definitions)
+  // before verifyFile() clears the Errors vector.
+  for (auto &Err : Errors)
+    printDiagnostic(Err);
+  if (!Errors.empty())
+    Result.HadError = true;
+  Errors.clear();
+
   for (ArrayRef<unsigned> BufferIDList : BufferIDLists)
     for (auto &BufferID : BufferIDList) {
       DiagnosticVerifier::Result FileResult = verifyFile(BufferID);
       Result.HadError |= FileResult.HadError;
       Result.HadUnexpectedDiag |= FileResult.HadUnexpectedDiag;
     }
+
+  // Now that all files have been verified, check for any remaining diagnostics
+  // on lines with markers that were deferred during per-file verification.
+  if (verifyDeferredMarkerDiagnostics()) {
+    Result.HadError = true;
+    Result.HadUnexpectedDiag = true;
+  }
+
   if (!IgnoreUnknown) {
     bool HadError = verifyUnknown(CapturedDiagnostics);
     Result.HadError |= HadError;

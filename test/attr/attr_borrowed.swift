@@ -27,4 +27,21 @@ public class Holder {
   @_borrowed var two: String {
     get throws { "" } // expected-error {{getter cannot be '@_borrowed' if it is 'async' or 'throws'}}
   }
+
+  // expected-error@+1 {{'@_owned' is an experimental feature; use '-enable-experimental-feature UnderscoreOwned'}}
+  @_borrowed @_owned var three: String { // expected-error {{property cannot be '@_borrowed' and '@_owned' at the same time}}
+    get { "" }
+  }
+  // expected-error@+1 {{'@_owned' is an experimental feature; use '-enable-experimental-feature UnderscoreOwned'}}
+  @_owned var four: String { // expected-error {{property must define a 'get' to support '@_owned'}}
+    _read {
+      let x = ""
+      yield x
+    }
+  }
 }
+
+#if hasAttribute(_owned)
+#else
+#error("hasAttribute should be true!")
+#endif

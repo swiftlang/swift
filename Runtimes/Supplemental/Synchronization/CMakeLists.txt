@@ -23,6 +23,14 @@ project(SwiftSynchronization
 # with a pure Swift project.
 enable_language(C)
 
+# FIXME(compnerd) this is a compatibility shim for CMake <3.31.
+if(CMAKE_VERSION VERSION_LESS 3.31)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Generic" AND CMAKE_SYSTEM_PROCESSOR MATCHES "wasm32")
+    set(CMAKE_SYSTEM_NAME WASI)
+    set(WASI 1)
+  endif()
+endif()
+
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Synchronization must build as a standalone project")
 endif()
@@ -65,9 +73,6 @@ option(${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION "Generate ABI resilient runtime 
 option(${PROJECT_NAME}_ENABLE_PRESPECIALIZATION "Enable generic metadata prespecialization"
   ${SwiftCore_ENABLE_PRESPECIALIZATION})
 
-option(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE "Use direct retain release"
-  ${SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE})
-
 option(${PROJECT_NAME}_SINGLE_THREADED_MODE "Build Synchronization assuming it will be used in an environment with only a single thread" OFF)
 
 add_compile_options(
@@ -75,9 +80,8 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-enable-builtin-module>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
@@ -98,10 +102,7 @@ add_compile_options(
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
-if(${PROJECT_NAME}_ENABLE_DIRECT_RETAIN_RELEASE)
-  find_package(SwiftSwiftDirectRuntime REQUIRED)
-  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-direct-retain-release>")
-endif()
+find_package(SwiftSwiftDirectRuntime)
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'

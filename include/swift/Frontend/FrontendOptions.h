@@ -49,6 +49,13 @@ struct CompilerDebuggingOptions {
   /// Indicates whether or not the Clang importer should dump lookup tables
   /// upon termination.
   bool DumpClangLookupTables = false;
+
+  bool DumpAbstractLayout = false;
+
+  /// Dump every hidden-type layout known to this compilation: those recorded
+  /// during the local module's compilation plus those deserialized from any
+  /// imported Swift modules.
+  bool DumpHiddenTypeLayouts = false;
 };
 
 /// Options for controlling the behavior of the frontend.
@@ -218,6 +225,8 @@ public:
 
     EmitPCM, ///< Emit precompiled Clang module from a module map
     DumpPCM, ///< Dump information about a precompiled Clang module
+
+    EmitPolyglotAST, ///< Emit polyglot AST as JSON
 
     ScanDependencies, ///< Scan dependencies of Swift source files
     PrintVersion,     ///< Print version information.
@@ -544,12 +553,12 @@ public:
   /// Return a hash code of any components from these options that should
   /// contribute to a Swift Dependency Scanning hash.
   llvm::hash_code getModuleScanningHashComponents() const {
-    return hash_combine(ModuleName,
-                        ModuleABIName,
-                        ModuleLinkName,
-                        ImplicitObjCHeaderPath,
-                        PrebuiltModuleCachePath,
-                        UserModuleVersion);
+    return hash_combine(
+        ModuleName, ModuleABIName, ModuleLinkName, ImplicitObjCHeaderPath,
+        PrebuiltModuleCachePath,
+        llvm::hash_combine_range(ImplicitImportModuleNames.begin(),
+                                 ImplicitImportModuleNames.end()),
+        UserModuleVersion);
   }
 
   StringRef determineFallbackModuleName() const;

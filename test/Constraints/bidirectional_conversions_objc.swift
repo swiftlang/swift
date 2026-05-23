@@ -77,3 +77,17 @@ func baz6(x: CGFloat?) {
   func f(_: Double) {}
   f(unwrap(x))
 }
+
+/////////////
+
+func g(_: AnyObject?, _: AnyObject?) -> Bool {}
+func g(_: AnyClass, _: AnyClass) -> Bool {}
+func g(_: NSNull, _: NSNull) -> Bool {}
+
+func f1(x: AnyObject, y: CGImage) -> Bool {
+  return g(x, y)
+}
+
+func f2(x: AnyObject, y: CFString) -> Bool {
+  return g(x, y)
+}

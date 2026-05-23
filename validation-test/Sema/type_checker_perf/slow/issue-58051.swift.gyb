@@ -1,7 +1,7 @@
 // RUN: %scale-test --invert-result --begin 1 --end 7 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
-// REQUIRES: asserts, no_asan
+// REQUIRES: asserts,no_asan
 
-// https://github.com/swiftlang/swift/issues/58051
+// https://github.com/swiftlang/swift/issues/49221 and https://github.com/swiftlang/swift/issues/58051
 
 struct Date {}
 

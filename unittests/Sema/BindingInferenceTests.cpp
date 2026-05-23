@@ -12,7 +12,9 @@
 
 #include "SemaFixture.h"
 #include "swift/AST/Expr.h"
+#include "swift/Sema/BindingProducer.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 
@@ -350,7 +352,11 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
   ConstraintSystemOptions options;
   ConstraintSystem cs(DC, options);
 
+  unsigned round = 0;
+
   auto verifyInference = [&](TypeVariableType *typeVar, unsigned numExpected) {
+    llvm::errs() << "Round " << ++round << "\n";
+
     auto bindings = cs.getBindingsFor(typeVar);
     TypeVarBindingProducer producer(cs, typeVar, bindings);
 
@@ -370,6 +376,8 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
 
   auto *closureResult = cs.createTypeVariable(closureResultLoc, /*options=*/0);
 
+  // Int subtype $T0
+  // $T0 subtype Void
   cs.addConstraint(ConstraintKind::Subtype, getStdlibType("Int"), closureResult,
                    closureResultLoc);
   cs.addConstraint(ConstraintKind::Subtype, closureResult, getStdlibType("Void"),
@@ -382,6 +390,9 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
 
   auto contextualVar = cs.createTypeVariable({}, /*options=*/0);
 
+  // Void subtype $T0
+  // $T0 subtype $T1
+  // Int subtype $T1
   cs.addConstraint(ConstraintKind::Subtype, getStdlibType("Void"),
                    contextualVar, cs.getConstraintLocator({}));
 
@@ -396,13 +407,15 @@ TEST_F(SemaTest, TestNoDoubleVoidClosureResultInference) {
   auto closureResultWithoutVoid =
       cs.createTypeVariable(closureResultLoc, /*options=*/0);
 
-  // Supertype triggers `Void` inference
+  // Int subtype $T0
+  // $T0 subtype String
+  // => conflict
   cs.addConstraint(ConstraintKind::Subtype, getStdlibType("Int"),
                    closureResultWithoutVoid, closureResultLoc);
   cs.addConstraint(ConstraintKind::Subtype, closureResultWithoutVoid,
                    getStdlibType("String"), closureResultLoc);
 
-  verifyInference(closureResultWithoutVoid, 3);
+  verifyInference(closureResultWithoutVoid, 1);
 }
 
 TEST_F(SemaTest, TestSupertypeInferenceWithDefaults) {

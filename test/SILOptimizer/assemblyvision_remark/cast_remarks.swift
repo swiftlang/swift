@@ -17,21 +17,18 @@ public func forcedCast<NS, T>(_ ns: NS) -> T {
 public func forcedCast2<NS, T>(_ ns: NS) -> T {
   // Make sure the colon info is right so that the arrow is under the a.
   //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
-  let x = ns
+  let x = ns      // expected-note        {{of 'x'}}
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-7:34 {{of 'ns'}}
+                  // expected-note @-5:34 {{of 'ns'}}
 }
 
 public func forcedCast3<NS, T>(_ ns: NS) -> T {
   // Make sure the colon info is right so that the arrow is under the a.
   //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
   var x = ns // expected-warning {{variable 'x' was never mutated}}
+             // expected-note @-1 {{of 'x'}}
   return x as! T  // expected-remark @:12 {{unconditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-7:34 {{of 'ns'}}
+                  // expected-note @-6:34 {{of 'ns'}}
 }
 
 public func forcedCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T {
@@ -50,21 +47,18 @@ public func condCast<NS, T>(_ ns: NS) -> T? {
 public func condCast2<NS, T>(_ ns: NS) -> T? {
   // Make sure the colon info is right so that the arrow is under the a.
   //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
-  let x = ns
+  let x = ns      // expected-note        {{of 'x'}}
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-7:32 {{of 'ns'}}
+                  // expected-note @-5:32 {{of 'ns'}}
 }
 
 public func condCast3<NS, T>(_ ns: NS) -> T? {
   // Make sure the colon info is right so that the arrow is under the a.
   //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
   var x = ns // expected-warning {{variable 'x' was never mutated}}
+             // expected-note @-1 {{of 'x'}}
   return x as? T  // expected-remark @:12 {{conditional runtime cast of value with type 'NS' to 'T'}}
-                  // expected-note @-7:32 {{of 'ns'}}
+                  // expected-note @-6:32 {{of 'ns'}}
 }
 
 public func condCast4<NS, T>(_ ns: NS, _ ns2: NS) -> T? {
@@ -219,21 +213,18 @@ public func forcedCast(_ ns: Existential1) -> Existential2 {
 public func forcedCast2(_ ns: Existential1) -> Existential2 {
   // Make sure the colon info is right so that the arrow is under the a.
   //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow. We should also note the retain as being on 'ns'
-  let x = ns
+  let x = ns      // expected-note        {{of 'x'}}
   return x as! Existential2  // expected-remark @:12 {{unconditional runtime cast of value with type 'any Existential1' to 'any Existential2'}}
-                  // expected-note @-7:27 {{of 'ns'}}
+                  // expected-note @-5:27 {{of 'ns'}}
 }
 
 public func forcedCast3(_ ns: Existential1) -> Existential2 {
   // Make sure the colon info is right so that the arrow is under the a.
   //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
   var x = ns // expected-warning {{variable 'x' was never mutated}}
+             // expected-note @-1 {{of 'x'}}
   return x as! Existential2  // expected-remark @:12 {{unconditional runtime cast of value with type 'any Existential1' to 'any Existential2'}}
-                  // expected-note @-7:27 {{of 'ns'}}
+                  // expected-note @-6:27 {{of 'ns'}}
 }
 
 // TODO: We should be able to identify NS2 in this case with opaque values.
@@ -253,21 +244,18 @@ public func condCast(_ ns: Existential1) -> Existential2? {
 public func condCast2(_ ns: Existential1) -> Existential2? {
   // Make sure the colon info is right so that the arrow is under the a.
   //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
-  let x = ns
+  let x = ns      // expected-note        {{of 'x'}}
   return x as? Existential2  // expected-remark @:12 {{conditional runtime cast of value with type 'any Existential1' to 'any Existential2'}}
-                  // expected-note @-7:25 {{of 'ns'}}
+                  // expected-note @-5:25 {{of 'ns'}}
 }
 
 public func condCast3(_ ns: Existential1) -> Existential2? {
   // Make sure the colon info is right so that the arrow is under the a.
   //
-  // Today, we seem to completely eliminate 'x' here in the debug info. TODO:
-  // Maybe we can recover this info somehow.
   var x = ns // expected-warning {{variable 'x' was never mutated}}
+             // expected-note @-1 {{of 'x'}}
   return x as? Existential2  // expected-remark @:12 {{conditional runtime cast of value with type 'any Existential1' to 'any Existential2'}}
-                  // expected-note @-7:25 {{of 'ns'}}
+                  // expected-note @-6:25 {{of 'ns'}}
 }
 
 // TODO: We should be able to identify NS2 here!

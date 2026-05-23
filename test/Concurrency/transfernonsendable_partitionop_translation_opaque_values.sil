@@ -1,0 +1,45 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -module-name partop_translation --test-runner %s 2>&1 | %FileCheck %s
+
+// REQUIRES: concurrency
+// REQUIRES: asserts
+
+// Test partition op translation for init_existential_value under the
+// opaque-values SIL lowering. When the formal concrete type involves an opened
+// archetype, init_existential_value must not create a spurious
+// isolated-conformance region. The result must merge into the region of its
+// operand (which is LookThrough of the original existential argument).
+
+sil_stage raw
+
+import Builtin
+import Swift
+
+////////////////////////
+// MARK: Declarations //
+////////////////////////
+
+protocol NonSendableProtocol {}
+
+/////////////////////////////////////////////////////
+// MARK: init_existential_value opened archetype  //
+/////////////////////////////////////////////////////
+
+// CHECK-LABEL: begin running test {{.*}} on test_init_existential_value_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
+// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $any NonSendableProtocol
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value:   %3 = init_existential_value %2 : $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $any NonSendableProtocol
+// CHECK-NEXT: require %%0:   %3 = init_existential_value %2 : $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $any NonSendableProtocol
+// CHECK-NEXT: require %%0:   %3 = init_existential_value %2 : $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $any NonSendableProtocol
+// CHECK-NEXT: assign_direct %%1 = %%0:   %3 = init_existential_value %2 : $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $any NonSendableProtocol
+// CHECK-NEXT: end running test {{.*}} on test_init_existential_value_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
+sil [ossa] @test_init_existential_value_opened_archetype : $@convention(thin) (@in_guaranteed any NonSendableProtocol) -> () {
+bb0(%0 : @guaranteed $any NonSendableProtocol):
+  %1 = open_existential_value %0 : $any NonSendableProtocol to $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self
+  %2 = copy_value %1 : $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self
+  %3 = init_existential_value %2 : $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $@opened("00000000-0000-0000-0000-000000000023", any NonSendableProtocol) Self, $any NonSendableProtocol
+  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
+  destroy_value %3 : $any NonSendableProtocol
+  %r = tuple ()
+  return %r : $()
+}

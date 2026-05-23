@@ -97,7 +97,8 @@ public func spiAvailableFunc() {}
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTj",
-// CHECK-NEXT:       "access": "private",
+// API-NEXT:         "access": "public",
+// NON-API-NEXT:     "access": "private",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/library-level.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "10.10",
@@ -105,7 +106,8 @@ public func spiAvailableFunc() {}
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTq",
-// CHECK-NEXT:       "access": "private",
+// API-NEXT:         "access": "public",
+// NON-API-NEXT:     "access": "private",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/library-level.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "10.10",
@@ -187,7 +189,8 @@ public func spiAvailableFunc() {}
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule16spiAvailableFuncyyF",
-// CHECK-NEXT:       "access": "private",
+// API-NEXT:         "access": "public",
+// NON-API-NEXT:     "access": "private",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/library-level.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "10.10",
@@ -230,7 +233,8 @@ public func spiAvailableFunc() {}
 // CHECK-NEXT:         },
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "name": "spiAvailableMethod",
-// CHECK-NEXT:           "access": "private",
+// API-NEXT:             "access": "public",
+// NON-API-NEXT:         "access": "private",
 // CHECK-NEXT:           "file": "SOURCE_DIR/test/APIJSON/library-level.swift",
 // CHECK-NEXT:           "introduced": "10.10",
 // CHECK-NEXT:           "SPIAvailable": true

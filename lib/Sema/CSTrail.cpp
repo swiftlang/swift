@@ -15,21 +15,20 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Defer.h"
-#include "swift/Basic/Statistic.h"
+
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/CSTrail.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Support/SaveAndRestore.h"
 #include <algorithm>
-#include <memory>
-#include <numeric>
 
 using namespace swift;
 using namespace constraints;
+using namespace inference;
 
 #define DEBUG_TYPE "SolverTrail"
 
@@ -44,8 +43,14 @@ SolverTrail::~SolverTrail() {
   // If constraint system is in an invalid state, it's
   // possible that constraint graph is corrupted as well
   // so let's not attempt to check change log.
-  if (!CS.inInvalidState())
-    ASSERT(Changes.empty() && "Trail corrupted");
+  if (!CS.inInvalidState()) {
+    if (!Changes.empty()) {
+      ABORT([&](llvm::raw_ostream &out) {
+        out << "Trail corrupted; all changes should have been undone by now:\n";
+        dump(out);
+      });
+    }
+  }
 }
 
 #define LOCATOR_CHANGE(Name, _) \
@@ -90,17 +95,16 @@ SolverTrail::~SolverTrail() {
     result.TheConstraint.Constraint = constraint; \
     return result; \
   }
-#define BINDING_RELATION_CHANGE(Name) \
-  SolverTrail::Change \
-  SolverTrail::Change::Name(TypeVariableType *typeVar, \
-                            TypeVariableType *otherTypeVar, \
-                            Constraint *constraint) { \
-    Change result; \
-    result.Kind = ChangeKind::Name; \
-    result.BindingRelation.TypeVar = typeVar; \
-    result.BindingRelation.OtherTypeVar = otherTypeVar; \
-    result.BindingRelation.Constraint = constraint; \
-    return result; \
+#define BINDING_RELATION_CHANGE(Name)                                          \
+  SolverTrail::Change SolverTrail::Change::Name(                               \
+      TypeVariableType *typeVar, TypeVariableType *otherTypeVar,               \
+      Constraint *constraint) {                                                \
+    Change result;                                                             \
+    result.Kind = ChangeKind::Name;                                            \
+    result.BindingRelation.TypeVar = typeVar;                                  \
+    result.BindingRelation.OtherTypeVar = otherTypeVar;                        \
+    result.BindingRelation.Constraint = constraint;                            \
+    return result;                                                             \
   }
 #define SCORE_CHANGE(Name) \
   SolverTrail::Change \
@@ -327,8 +331,22 @@ SolverTrail::Change::RetiredConstraint(ConstraintList::iterator where,
 }
 
 SolverTrail::Change
+SolverTrail::Change::AddedBinding(TypeVariableType *typeVar,
+                                  PotentialBinding binding) {
+  Change result;
+  result.Kind = ChangeKind::AddedBinding;
+  result.Binding.TypeVar = typeVar;
+  result.Binding.BindingType = binding.BindingType;
+  result.Binding.BindingSource = binding.BindingSource;
+  result.Binding.Originator = binding.Originator;
+  result.Options = unsigned(binding.Kind);
+
+  return result;
+}
+
+SolverTrail::Change
 SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
-                                      inference::PotentialBinding binding) {
+                                      PotentialBinding binding) {
   Change result;
   result.Kind = ChangeKind::RetractedBinding;
   result.Binding.TypeVar = typeVar;
@@ -336,6 +354,17 @@ SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
   result.Binding.BindingSource = binding.BindingSource;
   result.Binding.Originator = binding.Originator;
   result.Options = unsigned(binding.Kind);
+
+  return result;
+}
+
+SolverTrail::Change
+SolverTrail::Change::PrunedDisjunction(Constraint *disjunction,
+                                       FunctionType *argFuncType) {
+  Change result;
+  result.Kind = ChangeKind::PrunedDisjunction;
+  result.Disjunction.Disjunction = disjunction;
+  result.Disjunction.ArgFuncType = argFuncType;
 
   return result;
 }
@@ -379,6 +408,48 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     ASSERT(erased); \
     break; \
   }
+#define COMMON_BINDING_INFORMATION_ADDITION(PropertyName, Storage)             \
+  case ChangeKind::Added##PropertyName: {                                      \
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();         \
+    bindings.Storage.erase(llvm::remove_if(bindings.Storage,                   \
+                                           [&](Constraint *constraint) {       \
+                                             return constraint ==              \
+                                                    TheConstraint.Constraint;  \
+                                           }),                                 \
+                           bindings.Storage.end());                            \
+    ++bindings.GenerationNumber;                                               \
+    break;                                                                     \
+  }
+#define COMMON_BINDING_INFORMATION_RETRACTION(PropertyName, Storage)           \
+  case ChangeKind::Retracted##PropertyName: {                                  \
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();         \
+    bindings.Storage.push_back(TheConstraint.Constraint);                      \
+    ++bindings.GenerationNumber;                                               \
+    break;                                                                     \
+  }
+#define BINDING_RELATION_ADDITION(RelationName, Storage)                       \
+  case ChangeKind::Added##RelationName: {                                      \
+    auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();       \
+    bindings.Storage.erase(                                                    \
+        llvm::remove_if(bindings.Storage,                                      \
+                        [&](const auto &relation) {                            \
+                          return relation.first ==                             \
+                                     BindingRelation.OtherTypeVar &&           \
+                                 relation.second ==                            \
+                                     BindingRelation.Constraint;               \
+                        }),                                                    \
+        bindings.Storage.end());                                               \
+    ++bindings.GenerationNumber;                                               \
+    break;                                                                     \
+  }
+#define BINDING_RELATION_RETRACTION(RelationName, Storage)                     \
+  case ChangeKind::Retracted##RelationName: {                                  \
+    auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();       \
+    bindings.Storage.emplace_back(BindingRelation.OtherTypeVar,                \
+                                  BindingRelation.Constraint);                 \
+    ++bindings.GenerationNumber;                                               \
+    break;                                                                     \
+  }
 #include "swift/Sema/CSTrail.def"
 
   case ChangeKind::AddedTypeVariable:
@@ -401,14 +472,19 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cg.unrelateTypeVariables(Relation.TypeVar, Relation.OtherTypeVar);
     break;
 
-  case ChangeKind::InferredBindings:
-    cg.retractBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
+  case ChangeKind::AddedConstraintToInference: {
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
+    bool removed = bindings.Constraints.remove(TheConstraint.Constraint);
+    ASSERT(removed);
+    ++bindings.GenerationNumber;
     break;
+  }
 
-  case ChangeKind::RetractedBindings: {
+  case ChangeKind::RetractedConstraintFromInference: {
     auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
     bool inserted = bindings.Constraints.insert(TheConstraint.Constraint);
     ASSERT(inserted);
+    ++bindings.GenerationNumber;
     break;
   }
 
@@ -534,50 +610,44 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
                                   Retiree.Constraint);
     break;
 
-  case ChangeKind::RetractedDelayedBy:
-    cg[TheConstraint.TypeVar].getPotentialBindings()
-        .DelayedBy.push_back(TheConstraint.Constraint);
+  case ChangeKind::AddedLiteral: {
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
+    bindings.Literals.erase(
+        llvm::remove_if(bindings.Literals,
+                        [&](const LiteralRequirement &literal) {
+                          return literal.getSource() ==
+                                 TheConstraint.Constraint;
+                        }),
+        bindings.Literals.end());
+    ++bindings.GenerationNumber;
     break;
+  }
 
-  case ChangeKind::RetractedProtocol:
-    cg[TheConstraint.TypeVar].getPotentialBindings()
-        .Protocols.push_back(TheConstraint.Constraint);
+  case ChangeKind::RetractedLiteral: {
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
+    bindings.inferFromLiteral(TheConstraint.Constraint, /*recordChange=*/false);
+    ++bindings.GenerationNumber;
     break;
+  }
 
-  case ChangeKind::RetractedDefault:
-    cg[TheConstraint.TypeVar].getPotentialBindings()
-        .Defaults.push_back(TheConstraint.Constraint);
-    break;
+  case ChangeKind::AddedBinding: {
+    PotentialBinding binding(Binding.BindingType, AllowedBindingKind(Options),
+                             Binding.BindingSource, Binding.Originator);
 
-  case ChangeKind::RetractedLiteral:
-    cg[TheConstraint.TypeVar].getPotentialBindings()
-        .inferFromLiteral(cs, TheConstraint.TypeVar,
-                          TheConstraint.Constraint);
+    auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();
+    bindings.Bindings.erase(
+        llvm::remove_if(
+            bindings.Bindings,
+            [&binding](const auto &existing) {
+              return existing.BindingType->isEqual(binding.BindingType) &&
+                     existing.Kind == binding.Kind &&
+                     existing.BindingSource == binding.BindingSource &&
+                     existing.Originator == binding.Originator;
+            }),
+        bindings.Bindings.end());
+    ++bindings.GenerationNumber;
     break;
-
-  case ChangeKind::RetractedAdjacentVar:
-    cg[BindingRelation.TypeVar].getPotentialBindings()
-        .AdjacentVars.emplace_back(BindingRelation.OtherTypeVar,
-                                   BindingRelation.Constraint);
-    break;
-
-  case ChangeKind::RetractedSubtypeOf:
-    cg[BindingRelation.TypeVar].getPotentialBindings()
-        .SubtypeOf.emplace_back(BindingRelation.OtherTypeVar,
-                                BindingRelation.Constraint);
-    break;
-
-  case ChangeKind::RetractedSupertypeOf:
-    cg[BindingRelation.TypeVar].getPotentialBindings()
-        .SupertypeOf.emplace_back(BindingRelation.OtherTypeVar,
-                                  BindingRelation.Constraint);
-    break;
-
-  case ChangeKind::RetractedEquivalentTo:
-    cg[BindingRelation.TypeVar].getPotentialBindings()
-        .EquivalentTo.emplace_back(BindingRelation.OtherTypeVar,
-                                   BindingRelation.Constraint);
-    break;
+  }
 
   case ChangeKind::RetractedBinding: {
     PotentialBinding binding(Binding.BindingType, AllowedBindingKind(Options),
@@ -585,9 +655,16 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
     auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();
     bindings.Bindings.push_back(binding);
+    ++bindings.GenerationNumber;
     break;
   }
+
+  case ChangeKind::PrunedDisjunction: {
+    cs.getRemainingDisjunction(Disjunction.Disjunction)
+        .undoArgFuncTypeChange(Disjunction.ArgFuncType);
+    break;
   }
+}
 }
 
 void SolverTrail::Change::dump(llvm::raw_ostream &out,
@@ -805,6 +882,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << ")\n";
     break;
 
+  case ChangeKind::AddedBinding:
+    out << "(AddedBinding ";
+    Binding.TypeVar->print(out, PO);
+    out << " with type ";
+    Binding.BindingType->print(out, PO);
+    out << " and kind " << Options << ")\n";
+    break;
+
   case ChangeKind::RetractedBinding:
     out << "(RetractedBinding ";
     Binding.TypeVar->print(out, PO);
@@ -812,12 +897,20 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     Binding.BindingType->print(out, PO);
     out << " and kind " << Options << ")\n";
     break;
+
+  case ChangeKind::PrunedDisjunction:
+    out << "(PrunedDisjunction ";
+    Disjunction.Disjunction->print(out, &cs.getASTContext().SourceMgr, indent + 2);
+    out << " with type ";
+    Disjunction.ArgFuncType->print(out, PO);
+    out << ")\n";
+    break;
   }
 }
 
 void SolverTrail::recordChange(Change change) {
   LLVM_DEBUG(llvm::dbgs() << "+ "; change.dump(llvm::dbgs(), CS, 0););
-  ASSERT(!UndoActive);
+  ASSERT(!Closed);
 
   Changes.push_back(change);
 
@@ -828,6 +921,8 @@ void SolverTrail::recordChange(Change change) {
 }
 
 void SolverTrail::undo(unsigned toIndex) {
+  ASSERT(!Closed);
+
   // Don't attempt to rollback if constraint system ended up
   // in an invalid state.
   if (CS.inInvalidState())
@@ -847,8 +942,7 @@ void SolverTrail::undo(unsigned toIndex) {
              llvm::dbgs() << "\n");
 
   ASSERT(Changes.size() >= toIndex && "Trail corrupted");
-  ASSERT(!UndoActive);
-  UndoActive = true;
+  close();
 
   for (unsigned i = Changes.size(); i > toIndex; i--) {
     auto change = Changes[i - 1];
@@ -857,7 +951,7 @@ void SolverTrail::undo(unsigned toIndex) {
   }
 
   Changes.resize(toIndex);
-  UndoActive = false;
+  open();
 }
 
 void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
@@ -913,6 +1007,10 @@ void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
     for (const auto &typeVar : addedTypeVars) {
       out.indent(indent + 4);
       out << "> $T" << typeVar->getImpl().getID();
+      if (auto *locator = typeVar->getImpl().getLocator()) {
+        out << " @ ";
+        locator->dump(&CS.getASTContext().SourceMgr, out);
+      }
       out << '\n';
     }
     out.indent(indent + 2);

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-emit-sil -enable-copy-propagation=requested-passes-only -primary-file %s -o /dev/null -verify
 
 import Swift
 
@@ -1666,4 +1666,62 @@ final class HasInitAccessors {
   init() {
     ints.append(0)
   }
+}
+
+// https://github.com/swiftlang/swift/issues/74478
+
+func structurallyUninhabitedLvalueSwitch() {
+
+  enum NeverEver {}
+
+  func gh_74478() {
+    let x: Never // expected-note {{constant defined here}}
+    switch x {} // expected-error {{constant 'x' used before being initialized}}
+  }
+
+  func nested_switch() {
+    let x: Never // expected-note {{constant defined here}}
+    let y: Never = switch () {
+      default:
+        switch x { // expected-error {{constant 'x' used before being initialized}}
+          default: x
+        }
+    }
+    _ = y
+  }
+
+  func customNever() {
+    let x: NeverEver // expected-note {{constant defined here}}
+    switch x {} // expected-error {{constant 'x' used before being initialized}}
+  }
+
+  func structurallyUninhabited() {
+    let x: (Int, Never, Bool) // expected-note {{constant defined here}}
+    switch x {} // expected-error {{constant 'x.0' used before being initialized}}
+  }
+
+  func structurallyUninhabited_variant1() {
+    let x: (Int, NeverEver, Bool) // expected-note {{constant defined here}}
+    switch x.2 { default: fatalError() } // expected-error {{constant 'x.2' used before being initialized}}
+  }
+}
+
+protocol P_74478 {
+  associatedtype A
+}
+
+extension P_74478 where A == (Int, (Bool, Never)) {
+  func structurallyUninhabitedGenericIndirection() {
+    let x: A // expected-note {{constant defined here}}
+    switch x {} // expected-error {{constant 'x.0' used before being initialized}}
+  }
+}
+
+// failable init override that not call super.init should report missing error
+class BaseForFailableOverrideInit {
+  init?(fail: String) {}
+}
+
+class DerivedFailableOverrideInit: BaseForFailableOverrideInit {
+  override init?(fail: String) {} // expected-error {{'super.init' isn't called on all paths before returning from initializer}}
 }

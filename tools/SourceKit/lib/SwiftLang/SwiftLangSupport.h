@@ -653,6 +653,13 @@ public:
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
                      Receiver) override;
 
+  void
+  getPolyglotAST(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+                 std::optional<VFSOptions> VfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<std::string> &)>
+                     Receiver) override;
+
   void getSemanticTokens(
       StringRef PrimaryFilePath, StringRef InputBufferName,
       ArrayRef<const char *> Args, std::optional<VFSOptions> VfsOptions,
@@ -795,18 +802,6 @@ namespace trace {
                      StringRef InputFile,
                      ArrayRef<std::string> Args);
 }
-
-/// When we cannot build any more clang modules, close the .pcm / files to
-/// prevent fd leaks in clients that cache the AST.
-// FIXME: Remove this once rdar://problem/19720334 is complete.
-class CloseClangModuleFiles {
-  swift::ClangModuleLoader &loader;
-
-public:
-  CloseClangModuleFiles(swift::ClangModuleLoader &loader) : loader(loader) {}
-  ~CloseClangModuleFiles();
-};
-
 
 /// Disable expensive SIL options which do not affect indexing or diagnostics.
 void disableExpensiveSILOptions(swift::SILOptions &Opts);

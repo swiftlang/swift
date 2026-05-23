@@ -481,18 +481,6 @@ bool swift::maySynchronize(SILInstruction *instruction) {
   return isa<HopToExecutorInst>(instruction);
 }
 
-bool swift::mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction) {
-  if (FullApplySite::isa(instruction) || isa<EndApplyInst>(instruction) ||
-      isa<AbortApplyInst>(instruction)) {
-    return true;
-  }
-  bool retval = mayAccessPointer(instruction)
-             || mayLoadWeakOrUnowned(instruction)
-             || maySynchronize(instruction);
-  assert(!retval || !isa<BranchInst>(instruction) && "br as deinit barrier!?");
-  return retval;
-}
-
 //===----------------------------------------------------------------------===//
 //                         MARK: AccessRepresentation
 //===----------------------------------------------------------------------===//
@@ -1417,7 +1405,7 @@ public:
       // projection with no effect on the access path.
       assert(isa<OpenExistentialAddrInst>(projectedAddr) ||
              isa<InitEnumDataAddrInst>(projectedAddr) ||
-             isa<UncheckedTakeEnumDataAddrInst>(projectedAddr)
+             isa<UncheckedEnumDataAddrInstBase>(projectedAddr)
              // project_box is not normally an access projection but we treat it
              // as such when it operates on unchecked_take_enum_data_addr.
              || isa<ProjectBoxInst>(projectedAddr)
@@ -1429,7 +1417,7 @@ public:
              // we see it
              || isa<MoveOnlyWrapperToCopyableAddrInst>(projectedAddr) ||
              isa<CopyableToMoveOnlyWrapperAddrInst>(projectedAddr) ||
-             isGuaranteedAddressReturn(projectedAddr));
+             isAddressReturn(projectedAddr));
     }
     return sourceAddr->get();
   }
@@ -1999,6 +1987,8 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
   // also report them as uses.
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
     pushUsers(svi, dfs);
     return LeafUse;
 
@@ -2021,7 +2011,7 @@ AccessPathDefUseTraversal::visitSingleValueUser(SingleValueInstruction *svi,
     // for load+project_box.
     if (svi->getType().is<SILBoxType>()) {
       Operand *addrOper = &cast<LoadInst>(svi)->getOperandRef();
-      assert(isa<UncheckedTakeEnumDataAddrInst>(addrOper->get()));
+      assert(isa<UncheckedEnumDataAddrInstBase>(addrOper->get()));
       // Push the project_box uses
       for (auto *use : svi->getUses()) {
         if (auto *projectBox = dyn_cast<ProjectBoxInst>(use->getUser())) {
@@ -2042,7 +2032,7 @@ bool AccessPathDefUseTraversal::visitUser(DFSEntry dfs) {
         && visitSingleValueUser(svi, dfs) == IgnoredUse) {
       return true;
     }
-    if (isGuaranteedAddressReturn(svi)) {
+    if (isAddressReturn(svi)) {
       pushUsers(svi, dfs);
     }
   }
@@ -2199,7 +2189,19 @@ visitApplyOperand(Operand *use, UniqueStorageUseVisitor &visitor,
     }
     return true;
   }
-  return (visitor.*visit)(use);
+  if (!(visitor.*visit)(use))
+    return false;
+
+  if (auto *applyInst = dyn_cast<ApplyInst>(user)) {
+    if (applyInst->hasGuaranteedResult()) {
+      for (auto *resultUse : applyInst->getUses()) {
+        if (!(visitor.*visit)(resultUse)) {
+          return false;
+        }
+      }
+    }
+  }
+  return true;
 }
 
 bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
@@ -2317,6 +2319,9 @@ bool swift::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InitEnumDataAddrInst:
   case SILInstructionKind::InjectEnumAddrInst:
     return true;
+
+  case SILInstructionKind::InitBorrowAddrInst:
+    return cast<InitBorrowAddrInst>(memInst)->getDest() == address;
 
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst:
@@ -2652,7 +2657,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DestroyArray:
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::TSanInoutAccess:
-    case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::AutoDiffCreateLinearMapContextWithType:
     case BuiltinValueKind::AutoDiffAllocateSubcontextWithType:
@@ -2783,6 +2787,18 @@ void swift::visitAccessedAddress(SILInstruction *I,
     visitor(&I->getAllOperands()[MarkUnresolvedMoveAddrInst::Dest]);
     return;
 
+  case SILInstructionKind::InitBorrowAddrInst:
+    visitor(&I->getAllOperands()[InitBorrowAddrInst::Referent]);
+    visitor(&I->getAllOperands()[InitBorrowAddrInst::Dest]);
+    return;
+
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
+    visitor(&I->getAllOperands()[0]);
+    return;
+    
+
 #define NEVER_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
   case SILInstructionKind::Store##Name##Inst:
 #include "swift/AST/ReferenceStorage.def"
@@ -2806,6 +2822,8 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::OpenExistentialAddrInst:
   case SILInstructionKind::SwitchEnumAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::PackElementGetInst: {
     // Assuming all the above have only a single address operand.

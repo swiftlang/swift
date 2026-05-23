@@ -84,6 +84,12 @@ nonisolated func passMetaSmuggledAnyFromExistential(_ pqT: (P & Q).Type) {
   }
 }
 
+@MainActor func passMetaSmuggledAnyFromExistential2(_ pqT: (P & Q).Type) {
+  let x: P.Type = pqT
+  Task.detached { // expected-warning{{passing closure as a 'sending' parameter risks causing data races between main actor-isolated code and concurrent execution of the closure}}
+    acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to main actor-isolated code}}
+  }
+}
 
 func testSendableMetatypeDowngrades() {
   @preconcurrency
@@ -130,10 +136,10 @@ func acceptSendingAnyObjectR(_ s: sending AnyObject & R) { }
   // expected-note@-1{{Passing main actor-isolated value of non-Sendable type 'SC' as a 'sending' parameter to global function 'acceptSendingAnyObjectP' risks causing races}}' risks causing data races}}
   // expected-note@-2{{isolated conformance to protocol 'P' can be introduced here}}
   acceptSendingP(t) // expected-warning{{sending 't' risks causing data races}}
-  // expected-note@-1{{task-isolated 't' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note@-1{{main actor-isolated 't' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
   // expected-note@-2{{isolated conformance to protocol 'P' can be introduced he}}
   acceptSendingAnyObjectP(u) // expected-warning{{sending value of non-Sendable type 'U' risks causing data races}}
-  // expected-note@-1{{task-isolated value of non-Sendable type 'U'}}
+  // expected-note@-1{{Passing main actor-isolated value of non-Sendable type 'U' as a 'sending' parameter to global function 'acceptSendingAnyObjectP' risks causing races inbetween main actor-isolated uses and uses reachable from 'acceptSendingAnyObjectP'}}
   // expected-note@-2{{isolated conformance to protocol 'P' can be introduced here}}
   // All of these are okay, because there are no isolated conformances to R.
   acceptSendingR(S())

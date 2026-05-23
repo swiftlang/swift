@@ -40,12 +40,14 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SourceFileExtras.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -781,7 +783,9 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
   Bits.ModuleDecl.AllowNonResilientAccess = 0;
   Bits.ModuleDecl.SerializePackageEnabled = 0;
   Bits.ModuleDecl.StrictMemorySafety = 0;
-  Bits.ModuleDecl.DeferredCodeGen = 0;
+  Bits.ModuleDecl.CodeGenModel =
+      static_cast<unsigned>(CodeGenerationModel::Interface);
+  Bits.ModuleDecl.AggressiveCMOEnabled = 0;
 
   // Populate the module's files.
   SmallVector<FileUnit *, 2> files;
@@ -2302,6 +2306,43 @@ bool ModuleDecl::isExternallyConsumed() const {
 }
 
 //===----------------------------------------------------------------------===//
+// Hidden-Type Layouts
+//===----------------------------------------------------------------------===//
+
+void ModuleDecl::recordHiddenTypeLayout(StringRef mangledName,
+                                        const AbstractTypeLayout &layout) {
+  auto result = HiddenTypeLayouts.try_emplace(mangledName, layout);
+  if (!result.second) {
+    ASSERT(result.first->second.size == layout.size &&
+           result.first->second.alignment == layout.alignment &&
+           result.first->second.stride == layout.stride &&
+           result.first->second.bitwiseCopyable == layout.bitwiseCopyable &&
+           result.first->second.isOpaque == layout.isOpaque &&
+           "conflicting hidden-type layouts for the same mangled name");
+  }
+}
+
+std::optional<AbstractTypeLayout>
+ModuleDecl::lookupHiddenTypeLayout(StringRef mangledName) const {
+  auto it = HiddenTypeLayouts.find(mangledName);
+  if (it == HiddenTypeLayouts.end())
+    return std::nullopt;
+  return it->second;
+}
+
+SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4>
+ModuleDecl::getSortedHiddenTypeLayouts() const {
+  SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4> result;
+  result.reserve(HiddenTypeLayouts.size());
+  for (auto &entry : HiddenTypeLayouts)
+    result.emplace_back(entry.getKey(), entry.getValue());
+  llvm::sort(result, [](const auto &a, const auto &b) {
+    return a.first < b.first;
+  });
+  return result;
+}
+
+//===----------------------------------------------------------------------===//
 // Cross-Import Overlays
 //===----------------------------------------------------------------------===//
 
@@ -3285,6 +3326,13 @@ LibraryLevel
 ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
                                     const ModuleDecl *module) const {
   auto &ctx = module->getASTContext();
+
+  // Check if the library level was explicitly provided via the explicit
+  // module map (e.g. from the dependency scanner).
+  if (auto level = ctx.getExplicitModuleLibraryLevel(
+          module->getName().str(), module->isNonSwiftModule()))
+    return *level;
+
   namespace path = llvm::sys::path;
   SmallString<128> scratch;
 
@@ -3323,8 +3371,13 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
     return ctx.LangOpts.LibraryLevel;
 
   } else {
-    // Other Swift modules are SPI if they are from the PrivateFrameworks
-    // folder in the SDK.
+    // IPI is never returned by the path heuristic, so the stored value
+    // is the only way to detect it.
+    auto stored = module->getStoredLibraryLevel();
+    if (stored == LibraryLevel::IPI)
+      return stored;
+
+    // For API/SPI, use the path heuristic as before.
     auto modulePath = module->getModuleFilename();
     return fromPrivateFrameworks(modulePath) ?
       LibraryLevel::SPI : LibraryLevel::API;

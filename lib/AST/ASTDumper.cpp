@@ -339,8 +339,8 @@ static StringRef getDumpString(ReadImplKind kind) {
     return "addressor";
   case ReadImplKind::Read:
     return "read_coroutine";
-  case ReadImplKind::Read2:
-    return "read2_coroutine";
+  case ReadImplKind::YieldingBorrow:
+    return "yielding_borrow";
   case ReadImplKind::Borrow:
     return "borrow";
   }
@@ -363,8 +363,8 @@ static StringRef getDumpString(WriteImplKind kind) {
     return "mutable_addressor";
   case WriteImplKind::Modify:
     return "modify_coroutine";
-  case WriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case WriteImplKind::YieldingMutate:
+    return "yielding_mutate";
   case WriteImplKind::Mutate:
     return "mutate";
   }
@@ -383,8 +383,8 @@ static StringRef getDumpString(ReadWriteImplKind kind) {
     return "materialize_to_temporary";
   case ReadWriteImplKind::Modify:
     return "modify_coroutine";
-  case ReadWriteImplKind::Modify2:
-    return "modify2_coroutine";
+  case ReadWriteImplKind::YieldingMutate:
+    return "yielding_mutate";
   case ReadWriteImplKind::StoredWithDidSet:
     return "stored_with_didset";
   case ReadWriteImplKind::InheritedWithDidSet:
@@ -1357,19 +1357,27 @@ namespace {
     void printIsolation(const ActorIsolation &isolation) {
       switch (isolation) {
       case ActorIsolation::Unspecified:
+        printFlag(true, "unspecified_isolation", CapturesColor);
+        break;
+
       case ActorIsolation::NonisolatedUnsafe:
+        printFlag(true, "nonisolated(unsafe)", CapturesColor);
         break;
 
       case ActorIsolation::Nonisolated:
         printFlag(true, "nonisolated", CapturesColor);
         break;
 
+      case ActorIsolation::NonisolatedConcurrent:
+        printFlag(true, "@concurrent", CapturesColor);
+        break;
+
       case ActorIsolation::Erased:
         printFlag(true, "dynamically_isolated", CapturesColor);
         break;
 
-      case ActorIsolation::CallerIsolationInheriting:
-        printFlag(true, "isolated_to_caller_isolation", CapturesColor);
+      case ActorIsolation::NonisolatedNonsending:
+        printFlag(true, "nonisolated_nonsending", CapturesColor);
         break;
 
       case ActorIsolation::ActorInstance:
@@ -2001,7 +2009,10 @@ namespace {
       printField(P->getValue(), Label::always("value"));
       printFoot();
     }
-
+    void visitOpaquePattern(OpaquePattern *P, Label label) {
+      printCommon(P, "pattern_opaque", label);
+      printFoot();
+    }
   };
 
   /// PrintDecl - Visitor implementation of Decl::print.
@@ -2742,6 +2753,29 @@ namespace {
       if (auto *paramList = EED->getParameterList()) {
         printRec(paramList, Label::optional("params"));
       }
+
+      // Use `getRawValueUnchecked()` for non-type-checked printing to avoid
+      // triggering EnumRawValuesRequest which requres type-checking.
+      if (isTypeChecked()) {
+        if (auto *rawValueExpr = EED->getRawValueExpr()) {
+          if (EED->getASTContext().LangOpts.hasFeature(
+                  Feature::LiteralExpressions)) {
+            auto origRawValueExpr = EED->getOriginalRawValueExpr();
+            if (isa<LiteralExpr>(origRawValueExpr))
+              printRec(origRawValueExpr, Label::always("raw_value_expr"));
+            else {
+              printRec(EED->getOriginalRawValueExpr(),
+                       Label::always("original_raw_value_expr"));
+              printRec(EED->getRawValueExpr(),
+                       Label::always("folded_raw_value_expr"));
+            }
+          } else {
+            printRec(rawValueExpr, Label::always("raw_value_expr"));
+          }
+        }
+      } else if (auto *rawValueExpr = EED->getRawValueUnchecked())
+        printRec(rawValueExpr, Label::always("raw_value_expr"));
+
       printAttributes(EED);
       printFoot();
     }
@@ -2787,9 +2821,12 @@ namespace {
                     printRec(PBD->getOriginalInit(idx),
                              Label::always("original_init"));
                   }
-                  if (PBD->getInit(idx)) {
+                  if (auto initExpr = PBD->getInit(idx)) {
                     printRec(PBD->getInit(idx),
                              Label::always("processed_init"));
+                    if (PBD->hasSingleVarConstantFoldedInit())
+                      printRec(PBD->getExecutableInit(idx),
+                               Label::always("processed_constant_folded_init"));
                   }
 
                   printFoot();
@@ -3167,8 +3204,7 @@ void ValueDecl::dumpRef(raw_ostream &os) const {
       getName().printPretty(os);
     }
   } else {
-    auto moduleName = cast<ModuleDecl>(this)->getRealName();
-    os << moduleName;
+    cast<ModuleDecl>(this)->getReverseFullModuleName().printForward(os);
   }
 
   if (getAttrs().hasAttribute<KnownToBeLocalAttr>()) {
@@ -3252,6 +3288,8 @@ public:
     printFlag(S->TrailingSemiLoc.isValid(), "trailing_semi");
   }
 
+  void visitOpaqueStmt(OpaqueStmt *S, Label label) {}
+
   void visitBraceStmt(BraceStmt *S, Label label) {
     printCommon(S, "brace_stmt", label);
     printList(S->getElements(), [&](auto &Elt, Label label) {
@@ -3331,21 +3369,12 @@ public:
     if (S->getWhere()) {
       printRec(S->getWhere(), Label::always("where"));
     }
-    printRec(S->getParsedSequence(), Label::optional("parsed_sequence"));
-    if (S->getIteratorVar()) {
-      printRec(S->getIteratorVar(), Label::optional("iterator_var"));
-    }
-    if (S->getNextCall()) {
-      printRec(S->getNextCall(), Label::optional("next_call"));
-    }
-    if (S->getConvertElementExpr()) {
-      printRec(S->getConvertElementExpr(),
-               Label::optional("convert_element_expr"));
-    }
-    if (S->getElementExpr()) {
-      printRec(S->getElementExpr(), Label::optional("element_expr"));
-    }
+    printRec(S->getSequence(), Label::optional("parsed_sequence"));
+
     printRec(S->getBody(), Label::optional("body"));
+
+    printRec(S->getCachedDesugaredStmt(), Label::always("desugared_loop"));
+
     printFoot();
   }
   void visitBreakStmt(BreakStmt *S, Label label) {
@@ -3496,6 +3525,7 @@ public:
       printRecArbitrary([&](Label label) {
         printHead("function_ref_info", ExprModifierColor, label);
         printFlag(info.isCompoundName(), "is_compound_name");
+        printFlag(info.hasModuleSelector(), "has_module_selector");
         printField(info.getApplyLevel(), Label::always("apply_level"));
         printFoot();
       }, label);
@@ -4190,8 +4220,14 @@ public:
       if (auto fType = Ty->getAs<AnyFunctionType>()) {
         printFlag(!fType->getExtInfo().isNoEscape(), "escaping",
                   ClosureModifierColor);
-        printFlag(fType->getExtInfo().isSendable(), "sendable",
-                  ClosureModifierColor);
+        if (auto sendableTy = fType->getSendableDependentType()) {
+          printFieldQuoted(sendableTy.getString(),
+                           Label::always("sendable_dep"),
+                           ClosureModifierColor);
+        } else {
+          printFlag(fType->getExtInfo().isSendable(), "sendable",
+                    ClosureModifierColor);
+        }
       }
     }
   }
@@ -4851,7 +4887,7 @@ public:
     printFoot();
   }
 
-  void visitCallerIsolatedTypeRepr(CallerIsolatedTypeRepr *T, Label label) {
+  void visitNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *T, Label label) {
     printCommon("caller_isolated", label);
     printRec(T->getBase(), Label::optional("base"));
     printFoot();
@@ -4966,14 +5002,13 @@ public:
     printFoot();
   }
 
-  void visitIntegerTypeRepr(IntegerTypeRepr *T, Label label) {
-    printCommon("type_integer", label);
-
-    if (T->getMinusLoc()) {
-      printCommon("is_negative", label);
-    }
-
-    printFieldQuoted(T->getValue(), Label::always("value"), IdentifierColor);
+  void visitGenericArgumentExprTypeRepr(GenericArgumentExprTypeRepr *T,
+                                        Label label) {
+    printCommon("generic_argument_expr", label);
+    auto *argExpr = T->getArgExpr();
+    if (!argExpr)
+      argExpr = T->getOriginalArgExpr();
+    printRec(argExpr, Label::optional("arg_expr"));
     printFoot();
   }
 };
@@ -5106,8 +5141,8 @@ public:
   TRIVIAL_ATTR_PRINTER(ObjCNonLazyRealization, objc_non_lazy_realization)
   TRIVIAL_ATTR_PRINTER(Optional, optional)
   TRIVIAL_ATTR_PRINTER(Override, override)
+  TRIVIAL_ATTR_PRINTER(Owned, owned)
   TRIVIAL_ATTR_PRINTER(Postfix, postfix)
-  TRIVIAL_ATTR_PRINTER(PreInverseGenerics, pre_inverse_generics)
   TRIVIAL_ATTR_PRINTER(Preconcurrency, preconcurrency)
   TRIVIAL_ATTR_PRINTER(Prefix, prefix)
   TRIVIAL_ATTR_PRINTER(PropertyWrapper, property_wrapper)
@@ -5117,6 +5152,7 @@ public:
                        requires_stored_property_inits)
   TRIVIAL_ATTR_PRINTER(ResultBuilder, result_builder)
   TRIVIAL_ATTR_PRINTER(Rethrows, rethrows)
+  TRIVIAL_ATTR_PRINTER(Reparentable, reparentable)
   TRIVIAL_ATTR_PRINTER(Safe, safe)
   TRIVIAL_ATTR_PRINTER(SPIOnly, spi_only)
   TRIVIAL_ATTR_PRINTER(Sendable, sendable)
@@ -5466,6 +5502,12 @@ public:
         Label::always("comment_range"));
     printFoot();
   }
+  void visitPreInverseGenericsAttr(PreInverseGenericsAttr *Attr, Label label) {
+    printCommon(Attr, "pre_inverse_generics_attr", label);
+    if (auto *tyR = Attr->getExceptTypeRepr())
+      printRec(tyR, Label::optional("except_repr"));
+    printFoot();
+  }
   void visitRawLayoutAttr(RawLayoutAttr *Attr, Label label) {
     printCommon(Attr, "raw_layout_attr", label);
     if (auto *tyR = Attr->getScalarLikeType()) {
@@ -5611,8 +5653,8 @@ public:
     printFoot();
   }
                          
-  void visitWarnAttr(WarnAttr *Attr, Label label) {
-    printCommon(Attr, "warn", label);
+  void visitDiagnoseAttr(DiagnoseAttr *Attr, Label label) {
+    printCommon(Attr, "diagnose", label);
     auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
     printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
                   Label::always("diagGroupID:"));
@@ -5811,8 +5853,26 @@ public:
       printField(conformance->getSourceKind(), Label::optional("source_kind"));
       printFlag(conformance->isRetroactive(), "retroactive");
       printIsolation(conformance->getIsolation());
-      if (!Writer.isParsable())
+
+      if (Writer.isParsable() && isTypeChecked()) {
+        // Print the decl context that declares the conformance, which should
+        // always be a type or extension declaration. Print the module as well,
+        // since an extension decl USR won't actually contain this if the
+        // module containing the conformance is different than the modules
+        // containing the type and the protocol.
+        printRecArbitrary([&](Label label) {
+          printHead("conformance_context", ASTNodeColor, label);
+          DeclContext *DC = conformance->getDeclContext();
+          if (auto *D = DC->getAsDecl()) {
+            printField(declUSR(D), Label::always("decl"));
+          }
+          printField(DC->getParentModule()->getRealName(),
+                     Label::always("module"));
+          printFoot();
+        }, Label::always("context"));
+      } else {
         printFlag(!shouldPrintDetails, "<details printed above>");
+      }
     };
 
     switch (conformance->getKind()) {
@@ -5825,7 +5885,6 @@ public:
           printFlag(normal->isPreconcurrencyEffectful(),
                     "effectful_preconcurrency");
         }
-        printFlag(normal->isRetroactive(), "retroactive");
         printFlag(normal->isUnchecked(), "unchecked");
         if (normal->getExplicitSafety() != ExplicitSafety::Unspecified)
           printField(normal->getExplicitSafety(), Label::always("safety"));
@@ -5833,7 +5892,6 @@ public:
         if (!shouldPrintDetails)
           break;
 
-        // Maybe print information about the conforming context?
         if (normal->isLazilyLoaded()) {
           printFlag("lazy");
         } else {
@@ -6148,6 +6206,7 @@ namespace {
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
       printFlag(paramFlags.isConstValue(), "constValue");
+      printFlag(paramFlags.isSending(), "sending");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 
@@ -6218,6 +6277,8 @@ namespace {
     TRIVIAL_TYPE_PRINTER(BuiltinImplicitActor, builtin_implicit_isolated_actor)
     TRIVIAL_TYPE_PRINTER(BuiltinUnsafeValueBuffer, builtin_unsafe_value_buffer)
     TRIVIAL_TYPE_PRINTER(SILToken, sil_token)
+    TRIVIAL_TYPE_PRINTER(Join, join)
+    TRIVIAL_TYPE_PRINTER(Meet, meet)
 
     void visitBuiltinVectorType(BuiltinVectorType *T, Label label) {
       printCommon("builtin_vector_type", label);
@@ -6238,6 +6299,13 @@ namespace {
       printCommon("builtin_fixed_array_type", label);
       printRec(T->getSize(), Label::optional("size"));
       printRec(T->getElementType(), Label::optional("element_type"));
+      printFoot();
+    }
+
+    void visitBuiltinBorrowType(BuiltinBorrowType *T,
+                                    Label label) {
+      printCommon("builtin_borrow_type", label);
+      printRec(T->getReferentType(), Label::optional("referent"));
       printFoot();
     }
 
@@ -6583,7 +6651,8 @@ namespace {
           printField(representation, Label::always("representation"));
         }
         printFlag(!T->isNoEscape(), "escaping");
-        printFlag(T->isSendable(), "Sendable");
+        if (!T->getSendableDependentType())
+          printFlag(T->isSendable(), "Sendable");
         printFlag(T->isAsync(), "async");
         printFlag(T->isThrowing(), "throws");
         printFlag(T->hasSendingResult(), "sending_result");
@@ -6624,6 +6693,20 @@ namespace {
       }
       if (Type globalActor = T->getGlobalActor()) {
         printFieldQuoted(globalActor.getString(), Label::always("global_actor"));
+      }
+
+      if (auto sendableTy = T->getSendableDependentType())
+        printRec(sendableTy, Label::always("sendable_dep"));
+
+      if (T->hasLifetimeDependencies()) {
+        for (auto &dep : T->getLifetimeDependencies()) {
+          std::string str;
+          llvm::raw_string_ostream os(str);
+          StreamPrinter sp(os);
+          sp.printLifetimeDependence(dep, T->getParams(),
+                                     PrintOptions::forDebugging());
+          printFieldQuoted(str, Label::always("lifetime"));
+        }
       }
 
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
@@ -6811,6 +6894,13 @@ namespace {
       printFlag(T->isNegative(), "is_negative");
       printFieldQuoted(T->getValue(), Label::always("value"), LiteralValueColor);
       printFieldQuoted(T->getDigitsText(), Label::always("text"), IdentifierColor);
+      printFoot();
+    }
+
+    void visitHiddenType(HiddenType *T, Label label) {
+      printCommon("hidden_type", label);
+      printFieldQuoted(T->getMangledName(), Label::always("mangled_name"),
+                       IdentifierColor);
       printFoot();
     }
 

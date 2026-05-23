@@ -4,6 +4,12 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s \
 // RUN:    -disable-objc-interop
 
+#if hasAttribute(c)
+// good
+#else
+#error("missing the attribute we're using???")
+#endif
+
 @c(cdecl_foo) func foo(x: Int) -> Int { return x }
 
 @c(not an identifier) func invalidName() {}
@@ -203,3 +209,6 @@ func anyParam(e:Any) {}
 
 @c func swift_allocBox() {} // expected-warning {{symbol name 'swift_allocBox' is reserved for the Swift runtime and cannot be directly referenced without causing unpredictable behavior; this will become an error}}
 @c(swift_allocObject) func swift_allocObject_renamed() {} // expected-warning {{symbol name 'swift_allocObject' is reserved for the Swift runtime and cannot be directly referenced without causing unpredictable behavior; this will become an error}}
+
+// No warning
+@c func free(_: UnsafeMutableRawPointer?) { }

@@ -205,6 +205,9 @@ bool noncopyable::memInstMustInitialize(Operand *memOper) {
   case SILInstructionKind::InjectEnumAddrInst:
     return true;
 
+  case SILInstructionKind::InitBorrowAddrInst:
+    return cast<InitBorrowAddrInst>(memInst)->getDest() == address;
+
   case SILInstructionKind::BeginApplyInst:
   case SILInstructionKind::TryApplyInst:
   case SILInstructionKind::ApplyInst: {
@@ -324,10 +327,8 @@ bool noncopyable::memInstMustConsume(Operand *memOper) {
     auto convention = applySite.getArgumentConvention(*memOper);
     return !convention.isInoutConvention();
   }
-  case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-    auto *utedai = cast<UncheckedTakeEnumDataAddrInst>(memInst);
-    return utedai->isDestructive();
-  }
+  case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+    return true;
   }
 }
 

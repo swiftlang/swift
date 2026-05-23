@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/Basic/SourceManager.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -36,6 +37,14 @@ using RemapPathCallback = llvm::function_ref<std::string(StringRef)>;
 using ImportStatementInfoMap =
     std::unordered_map<ModuleDependencyID,
                        std::vector<ScannerImportStatementInfo>>;
+
+/// A map from a module ID to a collection of module IDs.
+using ModuleIDToModuleIDSetVectorMap =
+    std::unordered_map<ModuleDependencyID,
+                       ModuleDependencyIDSetVector>;
+
+using ModuleIDImportInfoPair =
+    std::pair<ModuleDependencyID, ScannerImportStatementInfo>;
 
 struct ScannerMetrics {
   /// Number of performed queries for a Swift dependency with a given name
@@ -114,6 +123,19 @@ public:
       llvm::PrefixMapper *mapper);
 
 private:
+  /// Initialize/finalize the clang compiler scanning tool.
+  /// Behind the scenes, the clang scanning tool maintains
+  /// a single clang compiler instance to perform all by-name
+  /// dependency scans. initializeClangScanningTool() initializes
+  /// the clang compiler instance, and returns an error if the
+  /// initialization fails. Once successfully initialized,
+  /// the same clang compiler instance is reused whenever
+  /// scanFilesystemForClangModuleDependency is called,
+  /// throughout the lifetime of the ModuleDependencyScanningWorker
+  /// instance.
+  llvm::Error initializeClangScanningTool();
+  llvm::Error finalizeClangScanningTool();
+
   /// Query dependency information for a named Clang module
   ///
   /// \param moduleName moduel identifier for the query
@@ -176,6 +198,8 @@ private:
 
   // Worker-specific instance of CompilerInvocation
   std::unique_ptr<CompilerInvocation> workerCompilerInvocation;
+  // Worker-specific SourceManager
+  SourceManager workerSourceMgr;
   // Worker-specific diagnostic engine
   std::unique_ptr<DiagnosticEngine> workerDiagnosticEngine;
   // Worker-specific instance of ASTContext
@@ -241,16 +265,11 @@ private:
 
 class ModuleDependencyScanner {
 public:
-  ModuleDependencyScanner(SwiftDependencyScanningService &ScanningService,
-                          ModuleDependenciesCache &Cache,
-                          const CompilerInvocation &ScanCompilerInvocation,
-                          const SILOptions &SILOptions,
-                          ASTContext &ScanASTContext,
-                          DependencyTracker &DependencyTracker,
-                          std::shared_ptr<llvm::cas::ObjectStore> CAS,
-                          std::shared_ptr<llvm::cas::ActionCache> ActionCache,
-                          DiagnosticEngine &Diagnostics, bool ParallelScan,
-                          bool EmitScanRemarks);
+  static llvm::ErrorOr<std::unique_ptr<ModuleDependencyScanner>>
+  create(SwiftDependencyScanningService &service, CompilerInstance *instance,
+         ModuleDependenciesCache &cache);
+
+  ~ModuleDependencyScanner();
 
   /// Identify the scanner invocation's main module's dependencies
   llvm::ErrorOr<ModuleDependencyInfo>
@@ -292,6 +311,18 @@ public:
   }
 
 private:
+  // Private methods that create, initialize and finalize the scanner.
+  ModuleDependencyScanner(SwiftDependencyScanningService &ScanningService,
+                          ModuleDependenciesCache &Cache,
+                          const CompilerInvocation &ScanCompilerInvocation,
+                          const SILOptions &SILOptions,
+                          ASTContext &ScanASTContext,
+                          DependencyTracker &DependencyTracker,
+                          DiagnosticEngine &Diagnostics, bool ParallelScan,
+                          bool EmitScanRemarks);
+  llvm::Error initializeWorkerClangScanningTool();
+  llvm::Error finalizeWorkerClangScanningTool();
+
   /// Main routine that computes imported module dependency transitive
   /// closure for the given module.
   /// 1. Swift modules imported directly or via another Swift dependency
@@ -306,7 +337,7 @@ private:
   void resolveSwiftModuleDependencies(
       const ModuleDependencyID &rootModuleID,
       ModuleDependencyIDSetVector &discoveredSwiftModules);
-  void resolveAllClangModuleDependencies(
+  void resolveClangModuleDependencies(
       ArrayRef<ModuleDependencyID> swiftModules,
       ModuleDependencyIDSetVector &discoveredClangModules);
   void resolveHeaderDependencies(
@@ -390,25 +421,19 @@ private:
   ///    in \c failedToResolveImports.
   /// 4. Update the set of resolved Clang dependencies for each Swift
   ///    module dependency in \c resolvedClangDependenciesMap.
-  void cacheComputedClangModuleLookupResults(
+  void processBatchClangModuleQueryResult(
       const BatchClangModuleLookupResult &lookupResult,
       const ImportStatementInfoMap &unresolvedImportsMap,
       const ImportStatementInfoMap &unresolvedOptionalImportsMap,
-      ArrayRef<ModuleDependencyID> swiftModuleDependents,
       ModuleDependencyIDSetVector &allDiscoveredClangModules,
-      std::vector<std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
-          &failedToResolveImports,
-      std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
-          &resolvedClangDependenciesMap);
+      std::vector<ModuleIDImportInfoPair> &failedToResolveImports,
+      ModuleIDToModuleIDSetVectorMap &resolvedClangDependenciesMap);
 
   /// Re-query some failed-to-resolve Clang imports from cache
   /// in chance they were brought in as transitive dependencies.
   void reQueryMissedModulesFromCache(
-      const std::vector<
-          std::pair<ModuleDependencyID, ScannerImportStatementInfo>>
-          &failedToResolveImports,
-      std::unordered_map<ModuleDependencyID, ModuleDependencyIDSetVector>
-          &resolvedClangDependenciesMap);
+      const std::vector<ModuleIDImportInfoPair> &failedToResolveImports,
+      ModuleIDToModuleIDSetVectorMap &resolvedClangDependenciesMap);
 
   /// Assuming the \c `moduleImport` failed to resolve,
   /// iterate over all binary Swift module dependencies with serialized
@@ -441,6 +466,7 @@ private:
   std::shared_ptr<llvm::cas::ActionCache> ActionCache;
   /// File prefix mapper.
   std::unique_ptr<llvm::PrefixMapper> PrefixMapper;
+  std::unique_ptr<llvm::PrefixMapper> ReversePrefixMapping;
   /// CAS file system for loading file content.
   llvm::IntrusiveRefCntPtr<llvm::cas::CASBackedFileSystem> CacheFS;
   /// Protect worker access.
@@ -448,5 +474,11 @@ private:
   /// Count of filesystem queries performed
   std::atomic<unsigned> NumLookups = 0;
 };
+
+/// Check if a module path is under one of the known SDK private framework
+/// directories, indicating the module is SPI. Returns the appropriate
+/// LibraryLevel (SPI or API) for a module at the given path.
+LibraryLevel libraryLevelFromPath(StringRef modulePath, StringRef sdkPath,
+                                  const llvm::Triple &target);
 
 } // namespace swift

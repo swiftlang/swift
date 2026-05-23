@@ -192,10 +192,12 @@ void IRGenThunk::prepareArguments() {
 
   // Prepare indirect results, if any.
   SILType directResultType = conv.getSILResultType(expansionContext);
-  auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
-  auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
-  if (schema.requiresIndirect()) {
-    indirectReturnSlot = original.claimNext();
+  if (!conv.hasAddressResult()) {
+    auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
+    auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
+    if (schema.requiresIndirect()) {
+      indirectReturnSlot = original.claimNext();
+    }
   }
 
   original.transferInto(params, conv.getNumIndirectSILResults());
@@ -344,7 +346,7 @@ void IRGenThunk::emit() {
   SILType directResultType = conv.getSILResultType(expansionContext);
   auto &directResultTL = IGF.IGM.getTypeInfo(directResultType);
   auto &schema = directResultTL.nativeReturnValueSchema(IGF.IGM);
-  if (schema.requiresIndirect()) {
+  if (!conv.hasAddressResult() && schema.requiresIndirect()) {
     Address indirectReturnAddr(indirectReturnSlot,
                                IGF.IGM.getStorageType(directResultType),
                                directResultTL.getBestKnownAlignment());
@@ -493,8 +495,10 @@ void IRGenThunk::emit() {
         if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
           llvm::Value *expandedResult =
               llvm::UndefValue::get(combined.combinedTy);
-          for (size_t i = 0, count = result.size(); i < count; i++) {
-            llvm::Value *elt = result.claimNext();
+          auto nativeResult =
+              schema.mapIntoNative(IGM, IGF, result, directResultType, false);
+          for (size_t i = 0, count = nativeResult.size(); i < count; i++) {
+            llvm::Value *elt = nativeResult.claimNext();
             auto *nativeTy = structTy->getElementType(i);
             elt = convertForDirectError(IGF, elt, nativeTy,
                                         /*forExtraction*/ false);
@@ -539,15 +543,25 @@ void IRGenThunk::emit() {
   } else {
     if (isAsync) {
       Explosion error;
-      if (errorValue)
+      SILType directErrorType;
+      if (errorValue) {
         error.add(errorValue);
+        directErrorType = conv.getSILErrorType(expansionContext);
+      }
       emitAsyncReturn(IGF, *asyncLayout, directResultType, origTy, result,
-                      error);
+                      error, directErrorType);
       return;
     }
   }
 
   // Return the result.
+  if (conv.hasAddressResult()) {
+    // Address results return a pointer directly.
+    assert(!result.empty() && "address result should produce a value");
+    IGF.Builder.CreateRet(result.claimNext());
+    return;
+  }
+
   if (result.empty()) {
     if (emission->getTypedErrorExplosion() &&
         !IGF.CurFn->getReturnType()->isVoidTy()) {
@@ -562,7 +576,9 @@ void IRGenThunk::emit() {
   resultTy = resultTy.subst(IGF.getSILModule(), subMap);
   IGF.emitScalarReturn(resultTy, resultTy, result,
                        /*swiftCCReturn=*/false,
-                       /*isOutlined=*/false);
+                       /*isOutlined=*/false,
+                       /*mayPeepholeLoad=*/false,
+                       /*errorType=*/SILType());
 }
 
 void IRGenModule::emitDispatchThunk(SILDeclRef declRef) {

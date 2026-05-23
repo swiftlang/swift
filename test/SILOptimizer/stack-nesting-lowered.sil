@@ -1,0 +1,40 @@
+// RUN: %target-sil-opt -sil-disable-input-verify -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+import Builtin
+import Swift
+
+sil_stage lowered
+
+struct VGStruct<each T> {}
+
+sil private @priority_helper : $@convention(thin) (UInt8, UInt8) -> () {
+bb0(%0 : $UInt8, %1 : $UInt8):
+  unreachable
+}
+
+// alloc_pack_metadata must be markable as non-nested
+// CHECK-LABEL: sil [ossa] @test_mark_alloc_pack_metadata_non_nested :
+// CHECK:         builtin "taskAddPriorityEscalationHandler"
+// CHECK-NEXT:    [[ALLOC:%.*]] = alloc_pack_metadata [non_nested] $()
+// CHECK-NEXT:    metatype $@thick VGStruct<Int, Int>.Type
+// CHECK-NEXT:    builtin "taskRemovePriorityEscalationHandler"
+// CHECK-NEXT:    dealloc_pack_metadata [[ALLOC]]
+// CHECK-LABEL: // end sil function 'test_mark_alloc_pack_metadata_non_nested'
+sil [ossa] @test_mark_alloc_pack_metadata_non_nested : $@convention(thin) @async () -> () {
+bb0:
+  specify_test "stack_nesting_fixup"
+
+  %fn = function_ref @priority_helper : $@convention(thin) (UInt8, UInt8) -> ()
+  %thick_fn = thin_to_thick_function %fn to $@noescape @callee_guaranteed (UInt8, UInt8) -> ()
+  %handler = builtin "taskAddPriorityEscalationHandler"(%thick_fn) : $UnsafeRawPointer
+
+  %a = alloc_pack_metadata $()
+  %metatype = metatype $@thick VGStruct<Int, Int>.Type
+
+  %out = builtin "taskRemovePriorityEscalationHandler"(%handler) : $()
+
+  dealloc_pack_metadata %a
+
+  %ret = tuple ()
+  return %ret : $()
+}

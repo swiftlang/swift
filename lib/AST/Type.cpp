@@ -270,8 +270,12 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
+  case TypeKind::BuiltinBorrow:
+  case TypeKind::Join:
+  case TypeKind::Meet:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -436,14 +440,14 @@ Type ExistentialLayout::getSuperclass() const {
   return Type();
 }
 
-bool ExistentialLayout::needsExtendedShape(bool allowInverses) const {
+bool ExistentialLayout::needsExtendedShape(
+    InvertibleProtocolSet allowedInverses) const {
   if (!getParameterizedProtocols().empty())
     return true;
 
-  if (allowInverses && hasInverses())
-    return true;
-
-  return false;
+  // Would any inverses in this layout would be considered by the mangler?
+  allowedInverses.intersect(inverses);
+  return !allowedInverses.empty();
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -984,11 +988,12 @@ unsigned int TypeBase::getOptionalityDepth() {
   return depth;
 }
 
-Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
+Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor,
+                                bool dropIsolation) {
   // Look through optionals.
   if (Type optionalObject = getOptionalObjectType()) {
-    Type newOptionalObject =
-        optionalObject->stripConcurrency(recurse, dropGlobalActor);
+    Type newOptionalObject = optionalObject->stripConcurrency(
+        recurse, dropGlobalActor, dropIsolation);
     if (optionalObject->isEqual(newOptionalObject))
       return Type(this);
 
@@ -1001,8 +1006,19 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     ASTExtInfo extInfo =
         fnType->hasExtInfo() ? fnType->getExtInfo() : ASTExtInfo();
     extInfo = extInfo.withSendable(false);
-    if (dropGlobalActor)
+    if (dropGlobalActor && extInfo.getGlobalActor())
       extInfo = extInfo.withoutIsolation();
+
+    if (dropIsolation) {
+      // Special case for `isolated` parameters, because even though
+      // the isolation was dropped, the parameter itself was left with
+      // `isolated` bit set. `dropIsolation` is intended only for
+      // mangling of `@preconcurrency` declarations and isolated parameters
+      // don't contribute to the type so it's save to keep the original
+      // isolation here.
+      if (!extInfo.getIsolation().isParameter())
+        extInfo = extInfo.withoutIsolation();
+    }
 
     ArrayRef<AnyFunctionType::Param> params = fnType->getParams();
     Type resultType = fnType->getResult();
@@ -1012,7 +1028,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
       for (unsigned paramIdx : indices(params)) {
         const auto &param = params[paramIdx];
         Type newParamType = param.getPlainType()->stripConcurrency(
-            recurse, dropGlobalActor);
+            recurse, dropGlobalActor, dropIsolation);
 
         if (!newParams.empty()) {
           newParams.push_back(param.withType(newParamType));
@@ -1029,7 +1045,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
       if (!newParams.empty())
         params = newParams;
 
-      resultType = resultType->stripConcurrency(recurse, dropGlobalActor);
+      resultType =
+          resultType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
     }
 
     // Drop Sendable requirements.
@@ -1070,8 +1087,9 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   }
 
   if (auto existentialType = getAs<ExistentialType>()) {
-    auto newConstraintType = existentialType->getConstraintType()
-        ->stripConcurrency(recurse, dropGlobalActor);
+    auto newConstraintType =
+        existentialType->getConstraintType()->stripConcurrency(
+            recurse, dropGlobalActor, dropIsolation);
     if (newConstraintType.getPointer() ==
             existentialType->getConstraintType().getPointer())
       return Type(this);
@@ -1096,7 +1114,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     for (unsigned i : indices(members)) {
       auto memberType = members[i];
       auto newMemberType =
-          memberType->stripConcurrency(recurse, dropGlobalActor);
+          memberType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
       if (!newMembers.empty()) {
         newMembers.push_back(newMemberType);
         continue;
@@ -1122,7 +1140,7 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   if (auto existentialMetatype = getAs<ExistentialMetatypeType>()) {
     auto instanceType = existentialMetatype->getExistentialInstanceType();
     auto newInstanceType =
-        instanceType->stripConcurrency(recurse, dropGlobalActor);
+        instanceType->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
     if (instanceType.getPointer() != newInstanceType.getPointer()) {
       std::optional<MetatypeRepresentation> repr;
       if (existentialMetatype->hasRepresentation())
@@ -1142,8 +1160,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     SmallVector<Type, 2> genericArgs;
     llvm::transform(BGT->getGenericArgs(), std::back_inserter(genericArgs),
                     [&](Type argTy) {
-                      auto newArgTy =
-                          argTy->stripConcurrency(recurse, dropGlobalActor);
+                      auto newArgTy = argTy->stripConcurrency(
+                          recurse, dropGlobalActor, dropIsolation);
                       anyChanged |= !newArgTy->isEqual(argTy);
                       return newArgTy;
                     });
@@ -1162,7 +1180,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
     llvm::transform(
         tuple->getElements(), std::back_inserter(elts), [&](const auto &elt) {
           auto eltTy = elt.getType();
-          auto strippedTy = eltTy->stripConcurrency(recurse, dropGlobalActor);
+          auto strippedTy =
+              eltTy->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
           anyChanged |= !strippedTy->isEqual(eltTy);
           return elt.getWithType(strippedTy);
         });
@@ -1171,8 +1190,8 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
   }
 
   if (auto *arrayTy = dyn_cast<ArraySliceType>(this)) {
-    auto newBaseTy =
-        arrayTy->getBaseType()->stripConcurrency(recurse, dropGlobalActor);
+    auto newBaseTy = arrayTy->getBaseType()->stripConcurrency(
+        recurse, dropGlobalActor, dropIsolation);
     return newBaseTy->isEqual(arrayTy->getBaseType())
                ? Type(this)
                : ArraySliceType::get(newBaseTy);
@@ -1180,9 +1199,11 @@ Type TypeBase::stripConcurrency(bool recurse, bool dropGlobalActor) {
 
   if (auto *dictTy = dyn_cast<DictionaryType>(this)) {
     auto keyTy = dictTy->getKeyType();
-    auto strippedKeyTy = keyTy->stripConcurrency(recurse, dropGlobalActor);
+    auto strippedKeyTy =
+        keyTy->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
     auto valueTy = dictTy->getValueType();
-    auto strippedValueTy = valueTy->stripConcurrency(recurse, dropGlobalActor);
+    auto strippedValueTy =
+        valueTy->stripConcurrency(recurse, dropGlobalActor, dropIsolation);
 
     return keyTy->isEqual(strippedKeyTy) && valueTy->isEqual(strippedValueTy)
                ? Type(this)
@@ -1288,6 +1309,16 @@ bool TypeBase::isCGFloat() {
           module->getName().is("Foundation")   ||
           module->getName().is("CoreFoundation")) &&
          NTD->getName().is("CGFloat");
+}
+
+bool TypeBase::isStdlibInteger() {
+  return isInt() || isInt8() || isInt16() || isInt32() || isInt64() ||
+         isInt128() || isUInt() || isUInt8() || isUInt16() || isUInt32() ||
+         isUInt64() || isUInt128();
+}
+
+bool TypeBase::isStdlibFloat() {
+  return isFloat() || isDouble() || isFloat80();
 }
 
 bool TypeBase::isObjCBool() {
@@ -1443,6 +1474,31 @@ Type TypeBase::withCovariantResultType() {
   
   return FunctionType::get(fnType->getParams(), resultFnType,
                            fnType->getExtInfo());
+}
+
+Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
+  if (!hasTypeVariableOrPlaceholder())
+    return Type(this);
+
+  struct Transform : public TypeTransform<Transform> {
+    Transform(ASTContext &ctx) : TypeTransform(ctx) {}
+
+    std::optional<Type> transform(TypeBase *ty, TypePosition) {
+      if (!ty->hasTypeVariableOrPlaceholder())
+        return ty;
+
+      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
+        return ErrorType::get(ctx);
+
+      return std::nullopt;
+    }
+    std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+      // Fold away the sendable dependence if present, the function type will
+      // just become non-Sendable.
+      return std::make_pair(Type(), false);
+    }
+  };
+  return Transform(getASTContext()).doIt(this, TypePosition::Invariant);
 }
 
 /// Whether this parameter accepts an unlabeled trailing closure argument
@@ -1657,8 +1713,7 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
 Type TypeBase::getMetatypeInstanceType() {
   if (auto existentialMetaType = getAs<ExistentialMetatypeType>())
     return existentialMetaType->getExistentialInstanceType();
-
-  if (auto metaTy = getAs<AnyMetatypeType>())
+  else if (auto metaTy = getAs<MetatypeType>())
     return metaTy->getInstanceType();
 
   return this;
@@ -1798,7 +1853,17 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BuiltinTuple:
-    llvm_unreachable("these types are always canonical");
+  case TypeKind::SILBlockStorage:
+  case TypeKind::SILBox:
+  case TypeKind::SILFunction:
+  case TypeKind::SILToken:
+  case TypeKind::SILMoveOnlyWrapped:
+  case TypeKind::Join:
+  case TypeKind::Meet:
+    ABORT([&](llvm::raw_ostream &out) {
+      out << "Should be already canonical:\n";
+      dump(out);
+    });
 
 #define SUGARED_TYPE(id, parent) \
   case TypeKind::id: \
@@ -1943,14 +2008,6 @@ CanType TypeBase::computeCanonicalType() {
     assert(Result->isCanonical());
     break;
   }
-
-  case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
-  case TypeKind::SILFunction:
-  case TypeKind::SILToken:
-  case TypeKind::SILMoveOnlyWrapped:
-    llvm_unreachable("SIL-only types are always canonical!");
-
   case TypeKind::ProtocolComposition: {
     auto *PCT = cast<ProtocolCompositionType>(this);
     SmallVector<Type, 4> CanProtos;
@@ -3760,6 +3817,12 @@ Type ArchetypeType::getExistentialType() const {
   return genericEnv->maybeApplyOuterContextSubstitutions(existentialType);
 }
 
+bool ArchetypeType::mayHaveIsolatedConformance() const {
+  auto genericEnv = getGenericEnvironment();
+  auto genericSig = genericEnv->getGenericSignature();
+  return !genericSig->prohibitsIsolatedConformance(getInterfaceType());
+}
+
 bool ArchetypeType::requiresClass() const {
   if (auto layout = getLayoutConstraint())
     return layout->isClass();
@@ -3836,7 +3899,6 @@ RecursiveTypeProperties ArchetypeType::archetypeProperties(
   if (superclass) {
     auto superclassProps = superclass->getRecursiveProperties();
     superclassProps.removeHasTypeParameter();
-    superclassProps.removeHasDependentMember();
     properties |= superclassProps;
   }
 
@@ -4208,6 +4270,14 @@ CanType ProtocolCompositionType::getMinimalCanonicalType() const {
   return result.subst(existentialSig.Generalization)->getCanonicalType();
 }
 
+bool AnyFunctionType::hasExplicitLifetimeDependencies() const {
+  return hasLifetimeDependencies() &&
+         llvm::any_of(getLifetimeDependencies(),
+                      [](const LifetimeDependenceInfo &dep) {
+                        return dep.isFromAnnotation();
+                      });
+}
+
 ClangTypeInfo AnyFunctionType::getClangTypeInfo() const {
   switch (getKind()) {
   case TypeKind::Function:
@@ -4231,7 +4301,19 @@ Type AnyFunctionType::getThrownError() const {
   }
 }
 
+Type AnyFunctionType::getSendableDependentType() const {
+  switch (getKind()) {
+  case TypeKind::Function:
+    return cast<FunctionType>(this)->getSendableDependentType();
+  case TypeKind::GenericFunction:
+    return Type();
+  default:
+    llvm_unreachable("Illegal type kind for AnyFunctionType.");
+  }
+}
+
 bool AnyFunctionType::isSendable() const {
+  ASSERT(!hasSendableDependentType() && "Query Sendable dependence first");
   return getExtInfo().isSendable();
 }
 
@@ -4316,10 +4398,15 @@ AnyFunctionType::getCanonicalExtInfo(bool useClangFunctionType) const {
     }
   }
 
+  Type sendableDependentType = getSendableDependentType();
+  if (sendableDependentType)
+    sendableDependentType = sendableDependentType->getCanonicalType();
+
   return ExtInfo(bits,
                  useClangFunctionType ? getCanonicalClangTypeInfo()
                                       : ClangTypeInfo(),
-                 globalActor, thrownError, getLifetimeDependencies());
+                 globalActor, thrownError, sendableDependentType,
+                 getLifetimeDependencies());
 }
 
 bool AnyFunctionType::hasNonDerivableClangType() {
@@ -4395,6 +4482,9 @@ bool TypeBase::isNoEscape() const {
 
   if (auto funcTy = dyn_cast<FunctionType>(type))
     return funcTy->isNoEscape();
+
+  if (auto packExpansionTy = dyn_cast<PackExpansionType>(type))
+    return packExpansionTy.getPatternType()->isNoEscape();
 
   if (auto tupleTy = dyn_cast<TupleType>(type)) {
     for (auto eltTy : tupleTy.getElementTypes())
@@ -4659,8 +4749,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
+  case TypeKind::BuiltinBorrow:
+  case TypeKind::Join:
+  case TypeKind::Meet:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4686,7 +4780,6 @@ static RecursiveTypeProperties getBoxRecursiveProperties(
   for (auto &field : Layout->getFields()) {
     auto fieldProps = field.getLoweredType()->getRecursiveProperties();
     fieldProps.removeHasTypeParameter();
-    fieldProps.removeHasDependentMember();
     props |= fieldProps;
   }
   for (auto replacementType : subMap.getReplacementTypes()) {
@@ -5293,8 +5386,7 @@ getConcurrencyDiagnosticBehaviorLimitRec(
   // Metatypes that aren't Sendable were introduced in Swift 6.2, so downgrade
   // them to warnings prior to Swift 7.
   if (type->is<AnyMetatypeType>()) {
-    if (!type->getASTContext().isLanguageModeAtLeast(
-            version::Version::getFutureMajorLanguageVersion()))
+    if (!declCtx->getASTContext().isLanguageModeAtLeast(LanguageMode::future))
       return DiagnosticBehavior::Warning;
   }
 

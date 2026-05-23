@@ -1164,6 +1164,9 @@ inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, const SILModule &M){
 }
 
 void verificationFailure(
+    const Twine &complaint, const SILWitnessTable *wtable,
+    llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
+void verificationFailure(
     const Twine &complaint, const SILFunction *fn,
     llvm::function_ref<void(SILPrintContext &ctx)> extraContext);
 void verificationFailure(

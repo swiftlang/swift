@@ -272,7 +272,7 @@ func testThrowingMethodFromMain(slowServer: SlowServer) async -> String {
 // CHECK:  [[CHECKED_CONT:%.*]] = alloc_stack $CheckedContinuation<String, any Error>
 // CHECK:  {{.*}} = apply [[CHECKED_CONT_INIT_FN]]<String>([[CHECKED_CONT]], [[CONT]]) : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, any Error>) -> @out CheckedContinuation<τ_0_0, any Error>
 // CHECK:  copy_addr [take] [[CHECKED_CONT]] to [init] [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<String, any Error>
-// CHECK:  [[INVOKER:%.*]] = function_ref @$sSo8NSStringCSgSo7NSErrorCSgIeyBhyy_SSTz_
+// CHECK:  [[INVOKER:%.*]] = function_ref @$sSo8NSStringCSgSo7NSErrorCSgIeyBhyy_SSTZ_
 // CHECK:  [[BLOCK:%.*]] = init_block_storage_header [[STORE_ALLOC]] {{.*}}, invoke [[INVOKER]]
 // CHECK:  [[OPTIONAL_BLK:%.*]] = enum {{.*}}, #Optional.some!enumelt, [[BLOCK]]
 // CHECK:  {{.*}} = apply [[METH]]([[STRING_ARG]], [[OPTIONAL_BLK]], {{%.*}}) : $@convention(objc_method) (NSString, Optional<@convention(block) @Sendable (Optional<NSString>, Optional<NSError>) -> ()>, SlowServer) -> ()
@@ -358,7 +358,7 @@ extension OptionalMemberLookups {
   // CHECK:         [[CHECKED_CONT:%.*]] = alloc_stack $CheckedContinuation<(), Never>
   // CHECK:         {{.*}} = apply [[CHECKED_CONT_INIT_FN]]<()>([[CHECKED_CONT]], [[UNSAFE_CONT]]) : $@convention(thin) <τ_0_0> (UnsafeContinuation<τ_0_0, Never>) -> @out CheckedContinuation<τ_0_0, Never>
   // CHECK:         copy_addr [take] [[CHECKED_CONT]] to [init] [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<(), Never>
-  // CHECK:         = function_ref @$sIeyB_yt18objc_async_checked21OptionalMemberLookupsRzlTz_ : $@convention(c) @pseudogeneric <τ_0_0 where τ_0_0 : OptionalMemberLookups> (@inout_aliasable @block_storage Any) -> ()
+  // CHECK:         = function_ref @$sIeyB_yt18objc_async_checked21OptionalMemberLookupsRzlTZ_ : $@convention(c) @pseudogeneric <τ_0_0 where τ_0_0 : OptionalMemberLookups> (@inout_aliasable @block_storage Any) -> ()
   // CHECK:         [[BLOCK:%[0-9]+]] = init_block_storage_header {{.*}} : $*@block_storage Any
   // CHECK:         = apply [[METH]]([[BLOCK]], [[SELF]]) : $@convention(objc_method) (@convention(block) () -> (), Self) -> ()
   // CHECK:         destroy_addr [[CHECKED_CONT_SLOT]] : $*CheckedContinuation<(), Never>

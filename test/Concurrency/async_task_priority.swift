@@ -26,13 +26,20 @@ import Darwin
 @preconcurrency import Dispatch
 import StdlibUnittest
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 6.2, *)
 func loopUntil(priority: TaskPriority) async {
   var currentPriority = Task.currentPriority
+  let loopCountBase = 60
+  var loopCountRemaining = loopCountBase
   while (currentPriority != priority) {
     print("Current priority = \(currentPriority) != \(priority)")
-    await Task.sleep(1_000_000)
+    try? await Task.sleep(for: .seconds(1)) // if changing this, change the fatalError message
+    loopCountRemaining -= 1
     currentPriority = Task.currentPriority
+
+    if loopCountRemaining < 1 {
+      fatalError("Did not reach expected priority \(priority) within: \(loopCountBase) seconds")
+    }
   }
 }
 
@@ -40,7 +47,7 @@ func print(_ s: String = "") {
   fputs("\(s)\n", stderr)
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 6.2, *)
 func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   let basePri = Task.basePriority!
   print("Testing basePri matching expected pri - \(basePri) == \(priority)")
@@ -56,7 +63,7 @@ func expectedBasePri(priority: TaskPriority) -> TaskPriority {
   return basePri
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 6.2, *)
 func expectedEscalatedPri(priority: TaskPriority) -> TaskPriority {
   let curPri = Task.currentPriority
   print("Testing escalated matching expected pri - \(curPri) == \(priority)")
@@ -65,19 +72,19 @@ func expectedEscalatedPri(priority: TaskPriority) -> TaskPriority {
   return curPri
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 6.2, *)
 func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
     let _ = expectedBasePri(priority: basePri)
     let _ = expectedEscalatedPri(priority: curPri)
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 6.2, *)
 func childTaskWaitingForEscalation(sem: DispatchSemaphore, basePri: TaskPriority, curPri : TaskPriority) async {
     sem.wait() /* Wait to be escalated */
     let _ = await testNestedTaskPriority(basePri: basePri, curPri: curPri)
 }
 
-@available(SwiftStdlib 5.9, *)
+@available(SwiftStdlib 6.2, *)
 actor Test {
   private var value = 0
   init() { }
@@ -106,7 +113,7 @@ actor Test {
     let top_level = Task.detached { /* To detach from main actor when running work */
 
       let tests = TestSuite("Task Priority manipulations")
-      if #available(SwiftStdlib 5.9, *) {
+      if #available(SwiftStdlib 6.2, *) {
 
         tests.test("Basic escalation test when task is running") {
             let parentPri = Task.currentPriority
@@ -117,8 +124,8 @@ actor Test {
 
                 // Wait until task is running before asking to be escalated
                 sem.signal()
-                sleep(1)
 
+                await loopUntil(priority: parentPri) /* Suspend task until it is escalated */
                 let _ = expectedEscalatedPri(priority: parentPri)
             }
 
@@ -249,23 +256,34 @@ actor Test {
           // After task2 has suspended waiting for task1,
           // escalating task2 should cause task1 to escalate
 
+          // Semaphore to signal when task1 has observed the escalation
+          let task1ObservedEscalation = DispatchSemaphore(value: 0)
+
+          let semaphoreTimeout = Task {
+            try? await Task.sleep(for: .seconds(10))
+            task1ObservedEscalation.signal() // this signals and "unhangs" the test waiting on the semaphore (would fail then though)
+          }
+          _ = semaphoreTimeout
+
           let task1 = Task.detached(priority: task1Pri) {
-            // Wait until task2 has blocked on task1 and escalated it
-            sleep(1)
+            await loopUntil(priority: task2Pri)
             _ = expectedEscalatedPri(priority: task2Pri)
 
             // Wait until task2 itself has been escalated
-            sleep(5)
+            await loopUntil(priority: parentPri)
             _ = expectedEscalatedPri(priority: parentPri)
+
+            // Signal that we've observed the first escalation
+            task1ObservedEscalation.signal()
           }
 
+          // This will escalate task1
           let task2 = Task.detached(priority: task2Pri) {
             await task1.value
           }
 
-          // Wait for task2 and task1 to run and for task2 to now block on
-          // task1
-          sleep(3)
+          // Wait for task2 and task1 to run and for task2 to now block on task1
+          task1ObservedEscalation.wait()
 
           await task2.value
         }

@@ -1,4 +1,4 @@
-// RUN: %swift -typecheck -verify -parse-stdlib -target aarch64-unknown-linux-android28 %s
+// RUN: %target-typecheck-verify-swift -parse-stdlib -target aarch64-unknown-linux-android28 %s
 
 @available(Android, introduced: 1.0, deprecated: 2.0, obsoleted: 28.0,
               message: "you don't want to do that anyway")

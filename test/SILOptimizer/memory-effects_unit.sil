@@ -1321,8 +1321,8 @@ bb0:
   specify_test "memory_effects"
   %0 = alloc_stack $Int
   %1 = alloc_stack $Int
-  debug_value %0 : $*Int, let, name "x"
-  debug_value undef : $*Int, let, name "y"
+  debug_value %0 : $*Int, let, name "x", expr op_deref
+  debug_value undef : $*Int, let, name "y", expr op_deref
   dealloc_stack %1 : $*Int
   dealloc_stack %0 : $*Int
   %r = tuple ()
@@ -2095,5 +2095,58 @@ bb0(%0 : $*UInt64):
   %2 = apply %1(%0) : $@convention(thin) () -> (Int64, @out UInt64)
   %99 = tuple ()
   return %99 : $()
+}
+
+sil @unused_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> () {
+[global: ]
+}
+
+sil @unused_inout_arg : $@convention(thin) (@inout Int32) -> () {
+[global: ]
+}
+
+// CHECK-LABEL: @unused_indirect_arg_should_be_treated_as_read
+// CHECK:       PAIR #0.
+// CHECK-NEXT:     %2 = apply %1(%0)
+// CHECK-NEXT:     %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:     r=1,w=0
+sil [ossa] @unused_indirect_arg_should_be_treated_as_read : $@convention(thin) (@in_guaranteed Int32) -> () {
+bb0(%0 : $*Int32):
+  specify_test "memory_effects"
+  %1 = function_ref @unused_indirect_arg : $@convention(thin) (@in_guaranteed Int32) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@in_guaranteed Int32) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @unused_inout_arg_is_readnone
+// CHECK:       PAIR #0.
+// CHECK-NEXT:     %2 = apply %1(%0)
+// CHECK-NEXT:     %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:     r=0,w=0
+sil [ossa] @unused_inout_arg_is_readnone : $@convention(thin) (@inout Int32) -> () {
+bb0(%0 : $*Int32):
+  specify_test "memory_effects"
+  %1 = function_ref @unused_inout_arg : $@convention(thin) (@inout Int32) -> ()
+  %2 = apply %1(%0) : $@convention(thin) (@inout Int32) -> ()
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: @test_tsan_inout_access
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %2 = builtin "tsanInoutAccess"(%0 : $*Int32) : $()
+// CHECK-NEXT:      %0 = argument of bb0 : $*Int32
+// CHECK-NEXT:    r=1,w=0
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %2 = builtin "tsanInoutAccess"(%0 : $*Int32) : $()
+// CHECK-NEXT:      %1 = argument of bb0 : $*Int32
+// CHECK-NEXT:    r=0,w=0
+sil [ossa] @test_tsan_inout_access : $@convention(thin) (@inout Int32, @inout Int32) -> () {
+bb0(%0 : $*Int32, %1 : $*Int32):
+  specify_test "memory_effects"
+  %3 = builtin "tsanInoutAccess"(%0 : $*Int32) : $()
+  %r = tuple ()
+  return %r : $()
 }
 

@@ -89,6 +89,8 @@ StringRef Stmt::getDescriptiveKindName(StmtKind K) {
     return "discard";
   case StmtKind::PoundAssert:
     return "#assert";
+  case StmtKind::Opaque:
+    llvm_unreachable("OpaqueStmt only exists for SILGen, the type-checker should never care about it");
   }
   llvm_unreachable("Unhandled case in switch!");
 }
@@ -273,12 +275,19 @@ ASTNode BraceStmt::findAsyncNode() {
     }
 
     PreWalkAction walkToDeclPre(Decl *decl) override {
-      // Do not walk into function or type declarations.
+      // Do not walk into function or type declarations (except for defer
+      // bodies).
       if (auto *patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
         if (patternBinding->isAsyncLet())
           AsyncNode = patternBinding;
 
         return Action::Continue();
+      }
+
+      if (auto *fnDecl = dyn_cast<FuncDecl>(decl)) {
+        if (fnDecl->isDeferBody()) {
+          return Action::Continue();
+        }
       }
 
       return Action::SkipNode();
@@ -402,6 +411,11 @@ BraceStmt *DeferStmt::getBodyAsWritten() const {
   return tempDecl->getBody();
 }
 
+void DeferStmt::makeAsync(ASTContext &ctx) {
+  tempDecl->setHasAsync(true);
+  setCallExpr(AwaitExpr::createImplicit(ctx, SourceLoc(), getCallExpr()));
+}
+
 bool LabeledStmt::isPossibleContinueTarget() const {
   switch (getKind()) {
 #define LABELED_STMT(ID, PARENT)
@@ -453,13 +467,6 @@ void ForEachStmt::setPattern(Pattern *p) {
   Pat->markOwnedByStatement(this);
 }
 
-Expr *ForEachStmt::getTypeCheckedSequence() const {
-  if (auto *expansion = dyn_cast<PackExpansionExpr>(getParsedSequence()))
-    return expansion;
-
-  return iteratorVar ? iteratorVar->getInit(/*index=*/0) : nullptr;
-}
-
 DoCatchStmt *DoCatchStmt::create(DeclContext *dc, LabeledStmtInfo labelInfo,
                                  SourceLoc doLoc, SourceLoc throwsLoc,
                                  TypeLoc thrownType, Stmt *body,
@@ -473,7 +480,8 @@ DoCatchStmt *DoCatchStmt::create(DeclContext *dc, LabeledStmtInfo labelInfo,
 }
 
 bool CaseLabelItem::isSyntacticallyExhaustive() const {
-  return getGuardExpr() == nullptr && !getPattern()->isRefutablePattern();
+  return getGuardExpr() == nullptr &&
+         !getPattern()->isRefutablePattern(/*allowIsPatternCoercion*/ true);
 }
 
 bool DoCatchStmt::isSyntacticallyExhaustive() const {
@@ -484,6 +492,12 @@ bool DoCatchStmt::isSyntacticallyExhaustive() const {
     }
   }
   return false;
+}
+
+BraceStmt *ForEachStmt::getDesugaredStmt() {
+  auto &ctx = DC->getASTContext();
+  return evaluateOrDefault(ctx.evaluator, DesugarForEachStmtRequest{this},
+                           nullptr);
 }
 
 Type DoCatchStmt::getExplicitCaughtType() const {

@@ -14,11 +14,11 @@
 
 #include "ArgumentSource.h"
 #include "Cleanup.h"
+#include "ExecutorBreadcrumb.h"
 #include "Conversion.h"
 #include "Initialization.h"
 #include "LValue.h"
 #include "RValue.h"
-#include "Scope.h"
 #include "SILGenFunction.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
@@ -29,11 +29,10 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/ReferenceCounting.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILUndef.h"
 #include "swift/AST/TypeCheckRequests.h" // FIXME: Temporary
-#include "swift/AST/NameLookupRequests.h" // FIXME: Temporary
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 using namespace Lowering;
@@ -291,6 +290,18 @@ static ManagedValue emitBuiltinFixLifetime(SILGenFunction &SGF,
     SGF.B.createFixLifetime(loc, arg.getValue());
   }
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
+}
+
+static ManagedValue emitBuiltinMarkDependence(SILGenFunction &SGF,
+                                              SILLocation loc,
+                                              SubstitutionMap substitutions,
+                                              ArrayRef<ManagedValue> args,
+                                              SGFContext C) {
+  auto *md = SGF.B.createMarkDependence(loc, args[0].getValue(), args[1].getValue(),
+                                        MarkDependenceKind::Escaping);
+  ASSERT(md->getOwnershipKind() != OwnershipKind::Owned &&
+         "Builtin.markDependence only works for none and guaranteed ownership");
+  return ManagedValue::forBorrowedObjectRValue(md);
 }
 
 static ManagedValue emitCastToReferenceType(SILGenFunction &SGF,
@@ -1226,13 +1237,20 @@ static ManagedValue emitBuiltinAutoDiffApplyDerivativeFunction(
   assert(origFnType->isTrivialNoEscape());
   assert(derivativeFnType->isTrivialNoEscape());
 
-  // Do the apply for the indirect result case.
-  if (derivativeFnType->hasIndirectFormalResults() &&
-      SGF.SGM.M.useLoweredAddresses()) {
+  // Do the apply for the indirect result / error case.
+  if (SGF.SGM.M.useLoweredAddresses() &&
+      (derivativeFnType->hasIndirectFormalResults() ||
+       derivativeFnType->hasIndirectErrorResult())) {
+    assert(derivativeFnType->hasIndirectFormalResults() &&
+           "expecting indirect normal results with indirect error result");
+
     auto indResBuffer = SGF.getBufferForExprResult(
         loc, derivativeFnType->getAllResultsInterfaceType(), C);
     SmallVector<SILValue, 3> applyArgs;
     applyArgs.push_back(SGF.B.createTupleElementAddr(loc, indResBuffer, 0));
+    if (derivativeFnType->hasIndirectErrorResult())
+      applyArgs.push_back(SGF.IndirectErrorResult);
+
     for (auto origFnArgVal : origFnArgVals)
       applyArgs.push_back(origFnArgVal);
     auto differential = SGF.emitApplyWithRethrow(
@@ -1477,13 +1495,6 @@ static ManagedValue emitBuiltinGetCurrentAsyncTask(
                                    SGF.getLoweredType(ctx.TheNativeObjectType),
                                    SubstitutionMap(), {});
   return SGF.emitManagedRValueWithEndLifetimeCleanup(apply);
-}
-
-// Emit SIL for the named builtin: cancelAsyncTask.
-static ManagedValue emitBuiltinCancelAsyncTask(
-    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
-    ArrayRef<ManagedValue> args, SGFContext C) {
-  return SGF.emitCancelAsyncTask(loc, args[0].borrow(SGF, loc).forward(SGF));
 }
 
 // Emit SIL for the named builtin: getCurrentExecutor.
@@ -1846,6 +1857,14 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
   if (throws) {
     SGF.B.emitBlock(errorBlock);
 
+    // After the continuation resumes with a failure, hop back to the expected executor.
+    //
+    // This is critical for NonisolatedNonsending (nonisolated(nonsending))
+    // functions: without this hop, the function may return on whichever thread
+    // resumed the continuation, violating the contract that the function
+    // maintains the caller's isolation.
+    ExecutorBreadcrumb(/*mustReturnToExecutor=*/true).emit(SGF, loc);
+
     Scope errorScope(SGF, loc);
 
     auto errorTy = SGF.getASTContext().getErrorExistentialType();
@@ -1856,6 +1875,9 @@ static ManagedValue emitBuiltinWithUnsafeContinuation(
   }
 
   SGF.B.emitBlock(resumeBlock);
+
+  // After the continuation resumes, hop back to the expected executor.
+  ExecutorBreadcrumb(/*mustReturnToExecutor=*/true).emit(SGF, loc);
 
   // The incoming value is the maximally-abstracted result type of the
   // continuation. Move it out of the resume buffer and reabstract it if
@@ -2040,7 +2062,7 @@ void SILGenModule::noteMemberRefExpr(MemberRefExpr *e) {
   // for a builtin.
   ASTContext &ctx = var->getASTContext();
   if (isDistributedActorAsLocalActorComputedProperty(var)) {
-    useConformance(getDistributedActorAsActorConformanceRef(ctx));
+    useConformance(nullptr, getDistributedActorAsActorConformanceRef(ctx));
   }
 }
 
@@ -2198,6 +2220,141 @@ static ManagedValue emitBuiltinTaskAddPriorityEscalationHandler(
                           SILType::getUnsafeRawPointer(SGF.getASTContext()),
                           subs, {args[0].getValue()});
   return ManagedValue::forRValueWithoutOwnership(b);
+}
+
+static bool isBorrowedByAddress(SILGenFunction &SGF, SILType loweredTy) {
+  if (loweredTy.isAddressableForDeps(SGF.F)) {
+    return true;
+  }
+  if (!SGF.useLoweredAddresses())
+    return false;
+
+  return !loweredTy.isLoadable(SGF.F);
+}
+
+static ManagedValue emitBorrowObject(
+  SILGenFunction &SGF, SILLocation loc, SILType loweredBorrowTy,
+  ArgumentSource &&arg) {
+
+  // Loadable referent (therefore loadable borrow).
+  assert(loweredBorrowTy.isLoadable(SGF.F)
+         && "borrow must be loadable if referent is");
+
+  auto referent = std::move(arg).getAsSingleValue(
+    SGF, SGFContext::AllowGuaranteedPlusZero);
+  if (referent.getType().isAddress()) {
+    referent = SGF.B.createLoadBorrow(loc, referent);
+  }
+  auto borrow = SGF.B.createMakeBorrow(loc, referent.getValue());
+  return ManagedValue::forUnmanagedOwnedValue(borrow);
+}
+
+static ManagedValue emitBorrowAddress(
+  SILGenFunction &SGF, SILLocation loc, SILType loweredBorrowTy,
+  SILValue referentAddr, SGFContext C) {
+
+  if (loweredBorrowTy.isLoadable(SGF.F)) {
+    // Address referent, loadable borrow.
+    auto borrow = SGF.B.createMakeAddrBorrow(loc, referentAddr);
+    return ManagedValue::forUnmanagedOwnedValue(borrow);
+  }
+
+  // Address-only referent and borrow.
+  loweredBorrowTy = loweredBorrowTy.getAddressType();
+  auto buffer = SGF.getBufferForExprResult(loc, loweredBorrowTy, C);
+  SGF.B.createInitBorrowAddr(loc, buffer, referentAddr);
+  return SGF.manageBufferForExprResult(buffer,
+                                       SGF.getTypeLowering(loweredBorrowTy), C);
+}
+
+static ManagedValue emitBuiltinMakeBorrow(SILGenFunction &SGF,
+                                          SILLocation loc,
+                                          SubstitutionMap subs,
+                                          PreparedArguments &&preparedArgs,
+                                          SGFContext C) {
+  auto args = std::move(preparedArgs).getSources();
+  ASSERT(args.size() == 1 && "should only have one argument");
+  ASSERT(subs.getReplacementTypes().size() == 1
+         && "should have one type argument");
+
+  auto argTy = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto loweredArgTy = SGF.getLoweredType(argTy);
+  auto loweredBorrowTy = SILType::getPrimitiveObjectType(
+       BuiltinBorrowType::get(loweredArgTy.getASTType()));
+  if (!isBorrowedByAddress(SGF, loweredArgTy)) {
+    return emitBorrowObject(SGF, loc, loweredBorrowTy, std::move(args[0]));
+  }
+  // Form an address referent by prefering the addressable representation
+  // if available.
+  ManagedValue referent
+    = SGF.tryEmitAddressableParameterAsAddress(std::move(args[0]),
+                                               ValueOwnership::Shared);
+  if (!referent) {
+    referent = std::move(args[0]).getAsSingleValue(SGF);
+    if (referent.getType().isObject()) {
+      auto temp = SGF.emitTemporaryAllocation(loc, referent.getType());
+      referent = SGF.B.createStoreBorrowOrTrivial(loc, referent, temp);
+    }
+  }
+  return emitBorrowAddress(SGF, loc, loweredBorrowTy, referent.getValue(), C);
+}
+
+static ManagedValue emitBuiltinBorrowAt(SILGenFunction &SGF,
+                                        SILLocation loc,
+                                        SubstitutionMap subs,
+                                        ArrayRef<ManagedValue> args,
+                                        SGFContext C) {
+  ASSERT(subs.getReplacementTypes().size() == 1 &&
+         "makeBorrowAt should have one type argument");
+  ASSERT(args.size() == 1 && "makeBorrowAt should have a single argument");
+
+  // The substitution determines the type of the thing we're borrowing.
+
+  auto argTy = subs.getReplacementTypes()[0]->getCanonicalType();
+  auto loweredArgTy = SGF.getLoweredType(argTy);
+
+  // Convert the pointer argument to a SIL address.
+  //
+  // Default to an unaligned pointer. This can be optimized in the presence of
+  // Builtin.assumeAlignment.
+  //
+  // Assume the borrowed value's address is from a raw pointer. Make no attempt
+  // at strict aliasing.
+  //
+  // The memory is invariant over the borrow scope, but not generally invariant.
+  //
+  // Assume natural alignment.
+  SILValue addr =
+    SGF.B.createPointerToAddress(loc, args[0].getUnmanagedValue(),
+                                 loweredArgTy.getAddressType(),
+                                 /*isStrict*/false, /*isInvariant*/false,
+                                 llvm::MaybeAlign());
+
+  // This can only be used in a borrow accessor. For bitwise-borrowable types,
+  // the accessor will emit the load_borrow + return_borrow pair.
+  return ManagedValue::forRValueWithoutOwnership(addr);
+}
+
+static ManagedValue emitBuiltinDereferenceBorrow(SILGenFunction &SGF,
+                                       SILLocation loc,
+                                       SubstitutionMap subs,
+                                       ArrayRef<ManagedValue> args,
+                                       SGFContext C) {
+  // This operation is only valid as the return expression of a borrow accessor,
+  // so typically should only get emitted as part of an lvalue. However,
+  // trivial values can still be emitted as rvalues and end up here, since
+  // a borrow of a trivial value is essentially a copy.
+  auto loweredTy = SGF.getLoweredType(subs.getReplacementTypes()[0]);
+  if (!loweredTy.isTrivial(SGF.F)) {
+    SGF.SGM.diagnose(loc, diag::invalid_sil_builtin, "dereferenceBorrow");
+    auto undef = SILUndef::get(SGF.F, loweredTy);
+    return SGF.emitManagedRValueWithCleanup(undef);
+  }
+
+  // A trivial value can be returned after being dereferenced without
+  // being formally borrowed.
+  auto result = SGF.B.createDereferenceBorrow(loc, args[0].getValue());
+  return ManagedValue::forRValueWithoutOwnership(result);
 }
 
 std::optional<SpecializedEmitter>

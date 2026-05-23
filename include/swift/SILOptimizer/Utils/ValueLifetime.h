@@ -55,6 +55,10 @@ struct ValueLifetimeBoundary {
   /// excluding dead-end blocks. This is only useful when it is known that none
   /// of the lastUsers ends the lifetime, for example when creating a new borrow
   /// scope to enclose all uses.
+  ///
+  /// This requires that none of the lastUsers are phi nodes. Phi nodes that end
+  /// the lifetime are already prohibited, but clients must also check for
+  /// guaranteed forwarding and unowned phis.
   void visitInsertionPoints(
       llvm::function_ref<void(SILBasicBlock::iterator insertPt)> visitor,
       DeadEndBlocks *deBlocks = nullptr);

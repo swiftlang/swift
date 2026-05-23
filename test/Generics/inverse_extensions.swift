@@ -1,7 +1,7 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -enable-experimental-feature SuppressedAssociatedTypes
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
 
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 struct Turtle<T> {}
 extension Turtle where T: ~Copyable {} // expected-error {{'T' required to be 'Copyable' but is marked with '~Copyable'}}

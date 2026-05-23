@@ -86,6 +86,7 @@ public struct UnownedJob: Sendable {
 
   /// The priority of this job.
   @available(StdlibDeploymentTarget 5.9, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   public var priority: JobPriority {
     let raw: UInt8
     if #available(StdlibDeploymentTarget 6.3, *) {
@@ -327,8 +328,9 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// - body: The closure to execute.
   ///
   /// Returns the result of executing the closure.
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
-  public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
+  @safe public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
     let base = unsafe _jobGetExecutorPrivateData(self.context)
     let size = unsafe 2 * MemoryLayout<OpaquePointer>.stride
     return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
@@ -336,6 +338,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   }
 
   /// Kinds of schedulable jobs
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   @frozen
   public struct Kind: Sendable, RawRepresentable {
@@ -357,6 +360,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   }
 
   /// What kind of job this is.
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   public var kind: Kind {
     return Kind(rawValue: _jobGetKind(self.context))!
@@ -454,6 +458,7 @@ extension ExecutorJob {
 
 // Helper to create a trampoline job to execute a job on a specified
 // executor.
+@_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 extension ExecutorJob {
 
@@ -471,6 +476,7 @@ extension ExecutorJob {
   ///
   /// A new ExecutorJob that will enqueue the specified job on the specified
   /// executor.
+  @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   public func createTrampoline(to executor: some Executor) -> ExecutorJob {
     let flags = taskCreateFlags(
@@ -496,6 +502,7 @@ extension ExecutorJob {
 }
 
 // Stack-disciplined job-local allocator support
+@_spi(ExperimentalCustomExecutors)
 @available(StdlibDeploymentTarget 6.3, *)
 extension ExecutorJob {
 
@@ -889,8 +896,23 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe
-public func withUnsafeContinuation<T>(
-  isolation: isolated (any Actor)? = #isolation,
+public nonisolated(nonsending) func withUnsafeContinuation<T>(
+  _ fn: (UnsafeContinuation<T, Never>) -> Void
+) async -> sending T {
+  return await Builtin.withUnsafeContinuation {
+    unsafe fn(UnsafeContinuation<T, Never>($0))
+  }
+}
+
+/// Source-compatibility overload; replaced by
+/// ``withUnsafeContinuation(_:)``.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
+@_disfavoredOverload
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+public func withUnsafeContinuation<T>( // source-compatibility overload
+  isolation: isolated (any Actor)?,
   _ fn: (UnsafeContinuation<T, Never>) -> Void
 ) async -> sending T {
   return await Builtin.withUnsafeContinuation {
@@ -926,8 +948,38 @@ public func withUnsafeContinuation<T>(
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe
-public func withUnsafeThrowingContinuation<T>(
-  isolation: isolated (any Actor)? = #isolation,
+public nonisolated(nonsending) func withUnsafeThrowingContinuation<T, E>(
+  _ fn: (UnsafeContinuation<T, E>) -> Void
+) async throws(E) -> sending T {
+  do {
+    return try await Builtin.withUnsafeThrowingContinuation {
+      unsafe fn(UnsafeContinuation<T, E>($0))
+    }
+  } catch {
+    throw error as! E
+  }
+}
+
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
+public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
+  _ fn: (UnsafeContinuation<T, Error>) -> Void
+) async throws(Error) -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation {
+    unsafe fn(UnsafeContinuation<T, Error>($0))
+  }
+}
+
+/// Source-compatibility overload; replaced by
+/// ``withUnsafeThrowingContinuation(_:)``.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
+@_disfavoredOverload
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+public func withUnsafeThrowingContinuation<T>( // source-compatibility overload
+  isolation: isolated (any Actor)?,
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {

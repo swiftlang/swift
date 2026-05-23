@@ -99,6 +99,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   Actor.swift
   AsyncLet.swift
   CheckedContinuation.swift
+  Continuation.swift
   Errors.swift
   Executor.swift
   ExecutorBridge.swift
@@ -290,6 +291,15 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   set(SWIFT_STDLIB_HAS_ASL FALSE)
   list(APPEND LLVM_OPTIONAL_SOURCES ExecutorImpl.cpp)
 
+  # Under Embedded Swift, all stdlib APIs should be available always. Replace
+  # all availability macros with an empty expansion (`*`).
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
+    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
+  endforeach()
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
+
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
@@ -299,19 +309,35 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     set(extra_c_compile_flags)
     set(extra_swift_compile_flags)
 
+    # Skip Concurrency for freestanding Wasm (no libc/libc++ available).
+    if("${triple}" MATCHES "-none-wasm$")
+      continue()
+    endif()
+
     if (SWIFT_HOST_VARIANT STREQUAL "linux")
       if(NOT "${mod}" MATCHES "-linux-gnu$")
         continue()
       endif()
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
-      if(NOT "${mod}" MATCHES "x86_64|arm64|arm64e|armv7|armv7m|armv7em")
+      if(NOT "${mod}" MATCHES "x86_64|arm64|arm64e|armv7|armv7m|armv7em|armv8m.main|armv8.1m.main")
         continue()
       endif()
 
-      if(NOT "${mod}" MATCHES "-apple-" OR "${mod}" MATCHES "-none-macho" OR "${arch}" STREQUAL "armv7m" OR "${arch}" STREQUAL "armv7em")
+      if(NOT "${mod}" MATCHES "-apple-" OR "${mod}" MATCHES "-none-macho" OR "${arch}" STREQUAL "armv7m" OR "${arch}" STREQUAL "armv7em" OR "${arch}" STREQUAL "armv8m.main" OR "${arch}" STREQUAL "armv8.1m.main")
         # Host is macOS with a macOS SDK. To be able to build the C++ Concurrency runtime for non-Darwin targets using the macOS SDK,
         # we need to pass some extra flags and search paths.
         set(extra_c_compile_flags -stdlib=libc++ -isystem${SWIFT_SDK_OSX_PATH}/usr/include/c++/v1 -isystem${SWIFT_SDK_OSX_PATH}/usr/include -D__APPLE__)
+        # Before Xcode 26.4, we were getting these macros from TargetConditionals.h
+        # now it's on us to define those to keep using the macOS SDK for non Darwin targets
+        if("${arch}" MATCHES "armv7")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_ARM=1)
+        elseif("${arch}" MATCHES "armv8")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_ARM=1)
+        elseif("${arch}" MATCHES "arm64")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_ARM64=1)
+        elseif("${arch}" MATCHES "x86_64")
+          list(APPEND extra_c_compile_flags -DTARGET_CPU_X86_64=1)
+        endif()
       endif()
     endif()
 
@@ -385,6 +411,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     if(NOT "${arch}" MATCHES "wasm32")
       set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
     endif()
+
+    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-${mod} ${triple})
+
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
     # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
@@ -415,6 +444,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
     set_property(TARGET embedded-concurrency-default-executor-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-default-executor-${mod} ${triple})
+
     add_dependencies(embedded-concurrency embedded-concurrency-default-executor-${mod})
   endforeach()
 

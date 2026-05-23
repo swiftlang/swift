@@ -16,6 +16,7 @@
 // RUN: %FileCheck %s < %t/any_as_id.h
 
 // RUN: %check-in-clang %t/any_as_id.h
+// RUN: %check-in-clang %t/any_as_id.h -fno-objc-arc
 
 import Foundation
 
@@ -64,6 +65,8 @@ class AnyAsIdTest : NSObject {
 // CHECK-NEXT: - (id _Nullable)wrapAny:(id _Nonnull)x SWIFT_WARN_UNUSED_RESULT;
   @objc func wrapAny(_ x : Any) -> Any? { return x }
 
+  @objc var contents: Any?
+// CHECK-NEXT:  @property (nonatomic, strong) id _Nullable contents;
 // CHECK-NEXT:  - (nonnull instancetype)init OBJC_DESIGNATED_INITIALIZER;
   /* implicit inherited init() */
 

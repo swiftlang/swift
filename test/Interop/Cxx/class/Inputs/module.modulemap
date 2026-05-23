@@ -172,3 +172,20 @@ module Mirror {
   requires cplusplus
   export *
 }
+
+module SuppressibleProtocols {
+  header "suppressible-protocols.h"
+  requires cplusplus
+  export *
+}
+
+module FriendFunction {
+  header "friend-function.h"
+  requires cplusplus
+  export *
+}
+
+module NoncopyableNonmovableGlobal {
+  header "noncopyable-nonmovable-global.h"
+  requires cplusplus
+}

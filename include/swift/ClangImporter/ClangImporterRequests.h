@@ -17,15 +17,18 @@
 #define SWIFT_CLANG_IMPORTER_REQUESTS_H
 
 #include "swift/AST/ASTTypeIDs.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/EvaluatorDependencies.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Specifiers.h"
 #include "llvm/ADT/Hashing.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
 namespace swift {
@@ -64,14 +67,16 @@ void simple_display(llvm::raw_ostream &out,
                     const ClangDirectLookupDescriptor &desc);
 SourceLoc extractNearestSourceLoc(const ClangDirectLookupDescriptor &desc);
 
-/// This matches SwiftLookupTable::SingleEntry;
-using SingleEntry = llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
-                                       clang::ModuleMacro *>;
+/// This matches SwiftLookupTable::SingleEntry
+using ClangDirectLookupEntry =
+    llvm::PointerUnion<clang::NamedDecl *, clang::MacroInfo *,
+                       clang::ModuleMacro *>;
+
 /// Uses the appropriate SwiftLookupTable to find a set of clang decls given
 /// their name.
 class ClangDirectLookupRequest
     : public SimpleRequest<ClangDirectLookupRequest,
-                           SmallVector<SingleEntry, 4>(
+                           SmallVector<ClangDirectLookupEntry, 4>(
                                ClangDirectLookupDescriptor),
                            RequestFlags::Uncached> {
 public:
@@ -81,8 +86,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  SmallVector<SingleEntry, 4> evaluate(Evaluator &evaluator,
-                                       ClangDirectLookupDescriptor desc) const;
+  SmallVector<ClangDirectLookupEntry, 4>
+  evaluate(Evaluator &evaluator, ClangDirectLookupDescriptor desc) const;
 };
 
 /// The input type for a namespace member lookup request.
@@ -341,6 +346,132 @@ private:
    void cacheResult(ObjCInterfaceAndImplementation value) const;
 };
 
+/// Information describing a possible foreign reference type, produced by the
+/// analysis performed by a ForeignReferenceTypeInfoRequest.
+///
+/// This information incorporates several independent dimensions for "foreign
+/// reference typedness," including the notion of an "invalid" foreign reference
+/// type that can result from, say, a derived type inheriting from multiple FRT
+/// bases (invalid due to ambiguous retain/release functions).
+///
+/// For valid shared reference types, this info also tracks the "canonical"
+/// FRT base which signifies which retain/release functions are to be used.
+class ForeignReferenceTypeInfo {
+  enum Flag {
+    /// This type has (or inherits) valid reference type attributes, if any
+    FlagIsValid = 1 << 0,
+    /// This type is a foreign reference type
+    FlagIsRef = 1 << 1,
+  };
+
+  llvm::PointerIntPair<const clang::RecordDecl *, 2> BaseAndFlags;
+
+  const clang::CXXRecordDecl *primarySuperclass = nullptr;
+
+  ForeignReferenceTypeInfo(const clang::RecordDecl *decl,
+                           const clang::CXXRecordDecl *primarySuperclass,
+                           bool isValid, bool isRef)
+      : BaseAndFlags{decl}, primarySuperclass(primarySuperclass) {
+    unsigned int flags = 0;
+    flags |= isValid ? FlagIsValid : 0;
+    flags |= isRef ? FlagIsRef : 0;
+    BaseAndFlags.setInt(flags);
+  }
+
+public:
+  /// Not a reference type, not valid
+  ForeignReferenceTypeInfo() : BaseAndFlags{nullptr, 0} {}
+
+  /// Not a reference type
+  static ForeignReferenceTypeInfo Value(bool isValid = true) {
+    return {nullptr, nullptr, isValid, /*isRef=*/false};
+  }
+
+  /// A shared reference type using the retain/release functions from \a decl.
+  static ForeignReferenceTypeInfo
+  Shared(const clang::RecordDecl *decl,
+         const clang::CXXRecordDecl *primarySuperclass = nullptr,
+         bool isValid = true) {
+    ASSERT(decl && "shared reference must have a non-null base decl");
+    return {decl, primarySuperclass, isValid, /*isRef=*/true};
+  }
+
+  /// The base decl that is annotated with the retain/release functions that
+  /// this reference type uses.
+  ///
+  /// If this is an invalid reference type, this returns an arbitrary FRT base
+  /// (there may be multiple FRT bases that cause this to be invalid due to
+  /// ambiguity about which retain/release values to use).
+  ///
+  /// Returns \c nullptr for non-shared references.
+  const clang::RecordDecl *getDecl() const { return BaseAndFlags.getPointer(); }
+
+  /// All of its (and its bases') foreign reference type attributes (if any)
+  /// are valid.
+  ///
+  /// This is independent of whether this foreign type should be actually be
+  /// imported with reference semantics.
+  bool isValid() const { return BaseAndFlags.getInt() & FlagIsValid; }
+
+  /// Whether this type or its bases have attributes that ask for it to be
+  /// imported as a reference type.
+  ///
+  /// This is independent of whether those attributes are actually valid.
+  bool isReference() const { return BaseAndFlags.getInt() & FlagIsRef; }
+
+  /// The single FRT base that is the primary (first) direct base of this
+  /// type, suitable for use as the Swift superclass. Returns nullptr if there
+  /// is no single primary FRT base (e.g., multiple FRT bases, or the FRT
+  /// base is not the first direct base).
+  const clang::CXXRecordDecl *getPrimarySuperclass() const {
+    return primarySuperclass;
+  }
+};
+
+struct ForeignReferenceTypeInfoDescriptor {
+  const clang::RecordDecl *decl;
+
+  ForeignReferenceTypeInfoDescriptor(const clang::RecordDecl *decl)
+      : decl{decl} {}
+
+  friend llvm::hash_code
+  hash_value(const ForeignReferenceTypeInfoDescriptor &desc) {
+    return llvm::hash_combine(desc.decl);
+  }
+
+  friend bool operator==(const ForeignReferenceTypeInfoDescriptor &lhs,
+                         const ForeignReferenceTypeInfoDescriptor &rhs) {
+    return lhs.decl == rhs.decl;
+  }
+
+  friend bool operator!=(const ForeignReferenceTypeInfoDescriptor &lhs,
+                         const ForeignReferenceTypeInfoDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const ForeignReferenceTypeInfoDescriptor &desc);
+SourceLoc
+extractNearestSourceLoc(const ForeignReferenceTypeInfoDescriptor &desc);
+
+class ForeignReferenceTypeInfoRequest
+    : public SimpleRequest<ForeignReferenceTypeInfoRequest,
+                           ForeignReferenceTypeInfo(
+                               ForeignReferenceTypeInfoDescriptor),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+
+private:
+  friend SimpleRequest;
+
+  ForeignReferenceTypeInfo evaluate(Evaluator &evaluator,
+                                    ForeignReferenceTypeInfoDescriptor) const;
+};
+
 enum class CxxRecordSemanticsKind {
   Value,
   Reference,
@@ -352,11 +483,9 @@ enum class CxxRecordSemanticsKind {
 struct CxxRecordSemanticsDescriptor final {
   const clang::RecordDecl *decl;
   ASTContext &ctx;
-  ClangImporter::Implementation *importerImpl;
 
-  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl, ASTContext &ctx,
-                               ClangImporter::Implementation *importerImpl)
-      : decl(decl), ctx(ctx), importerImpl(importerImpl) {}
+  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl, ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
 
   friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -421,8 +550,10 @@ private:
 
 struct SafeUseOfCxxDeclDescriptor final {
   const clang::Decl *decl;
+  ASTContext& ctx;
 
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl) : decl(decl) {}
+  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
+      : decl(decl), ctx(ctx) {}
 
   friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -495,6 +626,7 @@ struct CustomRefCountingOperationResult {
     immortal,
     notFound,
     tooManyFound,
+    unreachable,
     foundOperation
   };
 
@@ -657,6 +789,102 @@ private:
   // Evaluation.
   ExplicitSafety evaluate(Evaluator &evaluator,
                           ClangDeclExplicitSafetyDescriptor desc) const;
+};
+
+struct ClangRefCountedSmartPointerDescriptor final {
+  NominalTypeDecl *smartPtr;
+
+  ClangRefCountedSmartPointerDescriptor(NominalTypeDecl *smartPtr)
+      : smartPtr(smartPtr) {}
+
+  friend llvm::hash_code
+  hash_value(const ClangRefCountedSmartPointerDescriptor &desc) {
+    return llvm::hash_combine(desc.smartPtr);
+  }
+
+  friend bool operator==(const ClangRefCountedSmartPointerDescriptor &lhs,
+                         const ClangRefCountedSmartPointerDescriptor &rhs) {
+    return lhs.smartPtr == rhs.smartPtr;
+  }
+
+  friend bool operator!=(const ClangRefCountedSmartPointerDescriptor &lhs,
+                         const ClangRefCountedSmartPointerDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    ClangRefCountedSmartPointerDescriptor desc);
+SourceLoc extractNearestSourceLoc(ClangRefCountedSmartPointerDescriptor desc);
+
+/// Determine the safety of the given Clang declaration.
+class ClangRefCountedSmartPointer
+    : public SimpleRequest<ClangRefCountedSmartPointer,
+                           importer::RefCountedPtrRequestResult(
+                               ClangRefCountedSmartPointerDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  importer::RefCountedPtrRequestResult
+  evaluate(Evaluator &evaluator,
+           ClangRefCountedSmartPointerDescriptor desc) const;
+};
+
+/// Input type for requests that act upon a (defined) C++ record decl.
+struct CxxRecordDeclDescriptor final {
+  const clang::CXXRecordDecl *decl;
+  clang::Sema &sema;
+
+  CxxRecordDeclDescriptor(const clang::CXXRecordDecl *decl, clang::Sema &sema)
+      : decl(decl), sema(sema) {
+    ASSERT(decl->hasDefinition());
+  }
+
+  friend llvm::hash_code
+  hash_value(const CxxRecordDeclDescriptor &desc) {
+    return llvm::hash_combine(desc.decl);
+  }
+
+  friend bool operator==(const CxxRecordDeclDescriptor &lhs,
+                         const CxxRecordDeclDescriptor &rhs) {
+    return lhs.decl == rhs.decl;
+  }
+
+  friend bool operator!=(const CxxRecordDeclDescriptor &lhs,
+                         const CxxRecordDeclDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+void simple_display(llvm::raw_ostream &out,
+                    const CxxRecordDeclDescriptor &desc);
+SourceLoc
+extractNearestSourceLoc(const CxxRecordDeclDescriptor &desc);
+
+/// Uses ClangDirectLookup to find a named member inside of the given namespace.
+class CxxIteratorInfoRequest
+    : public SimpleRequest<CxxIteratorInfoRequest,
+                           std::optional<importer::CxxIteratorCategory>(
+                               CxxRecordDeclDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  std::optional<importer::CxxIteratorCategory>
+  evaluate(Evaluator &evaluator, CxxRecordDeclDescriptor desc) const;
 };
 
 #define SWIFT_TYPEID_ZONE ClangImporter

@@ -28,6 +28,7 @@
 namespace swift {
 
 class ASTContext;
+enum class CodeGenerationModel: uint8_t;
 class SILFunction;
 class SILInstruction;
 class SILModule;
@@ -97,6 +98,11 @@ private:
 
   /// Whether or not there is a valid SILLocation.
   unsigned HasLocation : 1;
+
+  /// The code generation model used for this particular global variable. This
+  /// is zero in the case where it's using the default model, or 1 + the
+  /// CodeGenerationModel otherwise.
+  unsigned CodeGenModel : 2;
 
   /// The VarDecl associated with this SILGlobalVariable. Must by nonnull for
   /// language-level global variables.
@@ -211,6 +217,11 @@ public:
   /// Is this an immutable 'let' property?
   bool isLet() const { return IsLet; }
   void setLet(bool isLet) { IsLet = isLet; }
+
+  /// Determine the explicit code generation model for this global variable.
+  std::optional<CodeGenerationModel> codeGenerationModel() const;
+
+  void setCodeGenerationModel(std::optional<CodeGenerationModel> value);
 
   VarDecl *getDecl() const { return VDecl; }
 

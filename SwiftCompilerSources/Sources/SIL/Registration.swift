@@ -185,6 +185,8 @@ private func registerSILClasses() {
   register(UncheckedEnumDataInst.self)
   register(InitEnumDataAddrInst.self)
   register(UncheckedTakeEnumDataAddrInst.self)
+  register(UncheckedInPlaceEnumDataAddrInst.self)
+  register(UncheckedBorrowEnumDataAddrInst.self)
   register(SelectEnumInst.self)
   register(RefElementAddrInst.self)
   register(RefTailAddrInst.self)
@@ -268,6 +270,13 @@ private func registerSILClasses() {
   register(MergeIsolationRegionInst.self)
   register(IgnoredUseInst.self)
   register(ImplicitActorToOpaqueIsolationCastInst.self)
+
+  register(MakeBorrowInst.self)
+  register(DereferenceBorrowInst.self)
+  register(MakeAddrBorrowInst.self)
+  register(DereferenceAddrBorrowInst.self)
+  register(InitBorrowAddrInst.self)
+  register(DereferenceBorrowAddrInst.self)
 }
 
 private func registerUtilities() {

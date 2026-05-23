@@ -17,6 +17,7 @@
 import Swift
 
 @_spi(CrashLog)
+@available(BacktracingDT 6.2, *)
 public struct CrashLog<Address: FixedWidthInteger>: Codable {
     public struct Frame: Codable {
         enum CodingKeys: String, CodingKey {
@@ -216,12 +217,14 @@ public struct CrashLog<Address: FixedWidthInteger>: Codable {
     }
 }
 
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Address {
     func hexRepresentation<Address:FixedWidthInteger>(nullAs: Address.Type) -> String {
         return hex(Address(self) ?? 0)
     }
 }
 
+@available(BacktracingDT 6.2, *)
 extension CrashLog.Frame.SourceLocation {
     init?(_ symbol: SymbolicatedBacktrace.SourceLocation?) {
         guard let symbol else { return nil }
@@ -236,6 +239,7 @@ extension CrashLog.Frame.SourceLocation {
     }
 }
 
+@available(BacktracingDT 6.2, *)
 extension CrashLog.Frame {
     func richFrame() -> RichFrame<Address>? {
         switch (kind, CrashLog.addressFromString(address), count) {
@@ -356,12 +360,14 @@ extension CrashLog.Frame {
     }
 }
 
+@available(BacktracingDT 6.2, *)
 extension CrashLog.Image {
     func imageMapImage() -> ImageMap.Image {
         return .init(
             name: name,
             path: path,
-            uniqueID: CrashLog.bytesFromHexString(buildId ?? ""),
+            uniqueID:
+                (buildId != nil) ? CrashLog.bytesFromHexString(buildId!) : nil,
             baseAddress: ImageMap.Address(CrashLog.addressFromString(baseAddress) ?? 0),
             endOfText: ImageMap.Address(CrashLog.addressFromString(endOfText) ?? 0)
             )
@@ -379,13 +385,18 @@ extension CrashLog.Image {
     }
 }
 
+@available(BacktracingDT 6.2, *)
 public extension CrashLog.Thread {
     func backtrace(architecture: String, images: ImageMap?) -> Backtrace {
         let frames = self.frames.compactMap { $0.richFrame() }
         return Backtrace(architecture: architecture, frames: frames, images: images)
     }
 
-    func symbolicatedBacktrace(architecture: String, images: ImageMap?) -> SymbolicatedBacktrace? {
+    func symbolicatedBacktrace(
+        architecture: String,
+        images: ImageMap?,
+        platform: Backtrace.SymbolicationPlatform) 
+    -> SymbolicatedBacktrace? {
         guard let images else { return nil }
         let backtrace = backtrace(architecture: architecture, images: images)
         let frames = self.frames.compactMap { frame in
@@ -403,10 +414,12 @@ public extension CrashLog.Thread {
     }
 }
 
+@available(BacktracingDT 6.2, *)
 extension Context {
   static var addressType: any FixedWidthInteger.Type { Address.self }
 }
 
+@available(BacktracingDT 6.2, *)
 extension CrashLog {
     private static func context(forArchitecture arch: String) -> (any Context.Type)? {
         switch arch {
@@ -429,7 +442,10 @@ extension CrashLog {
 
     public mutating func symbolicate(
         allThreads: Bool = false,
-        options: Backtrace.SymbolicationOptions = .default) {
+        platform: Backtrace.SymbolicationPlatform,
+        options: Backtrace.SymbolicationOptions = .default,
+        symbolLocator: SymbolLocator = DefaultSymbolLocator.shared
+        ) {
 
         let images = imageMap()
 
@@ -438,7 +454,11 @@ extension CrashLog {
             let backtrace: Backtrace = thread.backtrace(architecture: architecture, images: images)
 
             if let symbolicatedBacktrace = backtrace.symbolicated(
-                with: images, options: options) {
+                with: images,
+                platform: platform,
+                options: options,
+                symbolLocator: symbolLocator
+                ) {
 
                 thread.updateWithBacktrace(symbolicatedBacktrace: symbolicatedBacktrace)
             }

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -30,9 +30,30 @@ public func flatten<T: Equatable>(
       result.append(elt)
       continue
     }
-    
+
     if elt.0.lowerBound == result.last!.0.upperBound + 1 {
       result[result.count - 1].0 = result.last!.0.lowerBound ... elt.0.upperBound
+    } else {
+      result.append(elt)
+    }
+  }
+
+  return result
+}
+
+public func flatten(
+  _ unflattened: [ClosedRange<UInt32>]
+) -> [ClosedRange<UInt32>] {
+  var result: [ClosedRange<UInt32>] = []
+
+  for elt in unflattened.sorted(by: { $0.lowerBound < $1.lowerBound }) {
+    guard !result.isEmpty else {
+      result.append(elt)
+      continue
+    }
+
+    if elt.lowerBound == result.last!.upperBound + 1 {
+      result[result.count - 1] = result.last!.lowerBound ... elt.upperBound
     } else {
       result.append(elt)
     }
@@ -57,19 +78,19 @@ public func flatten<T: Equatable>(
   _ unflattened: [(UInt32, T)]
 ) -> [(ClosedRange<UInt32>, T)] {
   var result: [(ClosedRange<UInt32>, T)] = []
-  
+
   for elt in unflattened.sorted(by: { $0.0 < $1.0 }) {
     guard !result.isEmpty, result.last!.1 == elt.1 else {
       result.append((elt.0 ... elt.0, elt.1))
       continue
     }
-    
+
     if elt.0 == result.last!.0.upperBound + 1 {
       result[result.count - 1].0 = result.last!.0.lowerBound ... elt.0
     } else {
       result.append((elt.0 ... elt.0, elt.1))
     }
   }
-  
+
   return result
 }

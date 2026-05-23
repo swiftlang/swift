@@ -24,7 +24,7 @@ class C {
 // CHECK-NEXT: // Isolation: global_actor. type: MainActor
 func test() {
   // CHECK: // closure #1 in test()
-  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: // Isolation: @concurrent
   Task.detached {
     let s = S(value: 0)
   }

@@ -21,6 +21,7 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
@@ -238,6 +239,17 @@ llvm::Value *FixedTypeInfo::getIsTriviallyDestroyable(IRGenFunction &IGF, SILTyp
 llvm::Value *FixedTypeInfo::getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const {
   return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
       getBitwiseTakable(ResilienceExpansion::Maximal) >= IsBitwiseTakableOnly);
+}
+llvm::Value *FixedTypeInfo::getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const {
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+      getBitwiseTakable(ResilienceExpansion::Maximal) == IsBitwiseTakableAndBorrowable);
+}
+llvm::Value *FixedTypeInfo::getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const {
+
+  bool isAFD = T.isAddressableForDeps(IGF.IGM.getSILModule(),
+                                      TypeExpansionContext::minimal());
+  
+  return llvm::ConstantInt::get(IGF.IGM.Int1Ty, isAFD);
 }
 llvm::Constant *FixedTypeInfo::getStaticStride(IRGenModule &IGM) const {
   return IGM.getSize(getFixedStride());
@@ -886,7 +898,9 @@ void irgen::storeFixedTypeEnumTagSinglePayload(
   payloadIndex->addIncoming(payloadIndex0, payloadLT4BB);
 
   if (fixedSize > Size(0)) {
-    if (fixedSize.getValueInBits() <= llvm::IntegerType::MAX_INT_BITS / 4) {
+    // TODO: Setting the threshold at PointerSize causes stack clobbering in
+    // Windows validation tests. Investigate this before lowering the value further.
+    if (fixedSize <= IGM.getPointerSize() * 2) {
       // Write the value to the payload as a zero extended integer.
       auto *intType = Builder.getIntNTy(fixedSize.getValueInBits());
       Builder.CreateStore(Builder.CreateZExtOrTrunc(payloadIndex, intType),
@@ -1360,6 +1374,12 @@ namespace {
     llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
+    llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
+    llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override {
+      llvm_unreachable("should not call on an immovable opaque type");
+    }
     llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                           SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1378,8 +1398,8 @@ namespace {
                   StackAllocationIsNested_t isNested) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
-    void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T,
-                         StackAllocationIsNested_t isNested) const override {
+    void deallocateStack(IRGenFunction &IGF, StackAddress addr,
+                         SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
     void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
@@ -2322,6 +2342,10 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     return convertBuiltinFixedArrayType(cast<BuiltinFixedArrayType>(ty));
   }
 
+  case TypeKind::BuiltinBorrow: {
+    return convertBuiltinBorrowType(cast<BuiltinBorrowType>(ty));
+  }
+
   case TypeKind::PrimaryArchetype:
   case TypeKind::ExistentialArchetype:
   case TypeKind::OpaqueTypeArchetype:
@@ -2378,6 +2402,8 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
     llvm_unreachable("should not be asking for the type info an IntegerType");
+  case TypeKind::Hidden:
+    llvm_unreachable("HiddenType should be resolved before IRGen sees it");
   }
   }
   llvm_unreachable("bad type kind");

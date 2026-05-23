@@ -44,15 +44,15 @@ sil @get_wrapper_struct : $@convention(thin) (@inout WrapperStruct) -> ()
 // CHECK:  builtin "sadd_with_overflow_Int64
 // CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2
-// CHECK:  br bb7
+// CHECK:  br bb6
 // CHECK: bb3
 // CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  builtin "sadd_with_overflow_Int64
 // CHECK:  br bb5
 // CHECK: bb5
-// CHECK:  br bb7
-// CHECK: bb7:
+// CHECK:  br bb6
+// CHECK: bb6:
 // CHECK-LABEL: } // end sil function 'loop_unroll_1'
 sil [ossa] @loop_unroll_1 : $@convention(thin) () -> () {
 bb0:
@@ -83,15 +83,15 @@ bb3:
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2:
-// CHECK:  br bb7
+// CHECK:  br bb6
 // CHECK: bb3:
 // CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  br bb5
 // CHECK: bb5:
-// CHECK:  br bb7
-// CHECK: bb7:
+// CHECK:  br bb6
+// CHECK: bb6:
 // CHECK-LABEL: } // end sil function 'loop_unroll_2'
 sil [ossa] @loop_unroll_2 : $@convention(thin) () -> () {
 bb0:
@@ -122,15 +122,15 @@ bb3:
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2:
-// CHECK:  br bb7
+// CHECK:  br bb6
 // CHECK: bb3:
 // CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  br bb5
 // CHECK: bb5:
-// CHECK:  br bb7
-// CHECK: bb7:
+// CHECK:  br bb6
+// CHECK: bb6:
 // CHECK-LABEL: } // end sil function 'loop_unroll_3'
 sil [ossa] @loop_unroll_3 : $@convention(thin) () -> () {
 bb0:
@@ -161,15 +161,15 @@ bb3:
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  cond_br {{.*}}, bb2, bb3
 // CHECK: bb2:
-// CHECK:  br bb7
+// CHECK:  br bb6
 // CHECK: bb3:
 // CHECK:  br bb4
 // CHECK: bb4
 // CHECK:  = builtin "sadd_with_overflow_Int64
 // CHECK:  br bb5
 // CHECK: bb5:
-// CHECK:  br bb7
-// CHECK: bb7:
+// CHECK:  br bb6
+// CHECK: bb6:
 // CHECK-LABEL: } // end sil function 'loop_unroll_4'
 sil [ossa] @loop_unroll_4 : $@convention(thin) () -> () {
 bb0:
@@ -194,11 +194,11 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @loop_unroll_5 :
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb4
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb6
+// CHECK: bb5:
+// CHECK-NEXT:  br bb6
 // CHECK: bb6:
-// CHECK-NEXT:  br bb7
-// CHECK: bb7:
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return
 // CHECK-LABEL: } // end sil function 'loop_unroll_5'
@@ -225,11 +225,11 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @loop_unroll_6 :
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb4
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb6
+// CHECK: bb5:
+// CHECK-NEXT:  br bb6
 // CHECK: bb6:
-// CHECK-NEXT:  br bb7
-// CHECK: bb7:
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return
 // CHECK-NEXT: } // end sil function 'loop_unroll_6'
@@ -256,11 +256,11 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @loop_unroll_7 :
-// CHECK:      bb5:
-// CHECK-NEXT:   br bb4
+// CHECK:      bb2:
+// CHECK-NEXT:   br bb6
+// CHECK: bb5:
+// CHECK-NEXT:  br bb6
 // CHECK: bb6:
-// CHECK-NEXT:  br bb7
-// CHECK: bb7:
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return
 // CHECK-NEXT: } // end sil function 'loop_unroll_7'
@@ -292,14 +292,14 @@ bb3:
 // CHECK: bb2:
 // CHECK:   br bb3({{.*}})
 // CHECK: bb3({{.*}}):
-// CHECK:   br bb11({{.*}})
+// CHECK:   br bb10({{.*}})
 // CHECK: bb4:
-// CHECK:   br bb8({{.*}})
-// CHECK: bb8({{.*}}):
-// CHECK:   cond_br {{.*}}, bb9, bb10
-// CHECK: bb10:
-// CHECK:   br bb11({{.*}})
-// CHECK: bb11({{.*}}):
+// CHECK:   br bb7({{.*}})
+// CHECK: bb7({{.*}}):
+// CHECK:   cond_br {{.*}}, bb8, bb9
+// CHECK: bb9:
+// CHECK:   br bb10({{.*}})
+// CHECK: bb10({{.*}}):
 // CHECK:   return
 // CHECK-LABEL: } // end sil function 'unroll_with_exit_block_arg_1'
 sil [ossa] @unroll_with_exit_block_arg_1 : $@convention(thin) () -> () {
@@ -334,14 +334,14 @@ bb7(%72 : $Builtin.Int64):
 // CHECK: bb2:
 // CHECK:   br bb3{{.*}}
 // CHECK: bb3({{.*}}):
-// CHECK:   br bb11{{.*}}
+// CHECK:   br bb10{{.*}}
 // CHECK: bb4:
-// CHECK:   br bb8{{.*}}
-// CHECK: bb8({{.*}}):
-// CHECK:   cond_br {{.*}}, bb9, bb10
-// CHECK: bb10:
-// CHECK:   br bb11({{.*}})
-// CHECK: bb11({{.*}}):
+// CHECK:   br bb7{{.*}}
+// CHECK: bb7({{.*}}):
+// CHECK:   cond_br {{.*}}, bb8, bb9
+// CHECK: bb9:
+// CHECK:   br bb10({{.*}})
+// CHECK: bb10({{.*}}):
 // CHECK-LABEL: } // end sil function 'unroll_with_exit_block_arg_2'
 sil [ossa] @unroll_with_exit_block_arg_2 : $@convention(thin) () -> () {
 bb0:

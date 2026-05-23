@@ -1421,7 +1421,7 @@ bb0:
   %2 = ref_element_addr %1 : $Z, #Z.y
   store %0 to %2 : $*Y
   debug_value %0 : $Y
-  debug_value %2 : $*Y
+  debug_value %2 : $*Y, expr op_deref
   %11 = tuple ()
   return %11 : $()
 }

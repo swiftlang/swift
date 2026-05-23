@@ -42,11 +42,13 @@ add_library(swiftCore
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
+  BorrowingSequence.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   BridgingBuffer.swift
   Builtin.swift
   BuiltinMath.swift
+  ByteOrder.swift
   Character.swift
   CocoaArray.swift
   Codable.swift
@@ -74,6 +76,7 @@ add_library(swiftCore
   EmptyCollection.swift
   EnumeratedSequence.swift
   Equatable.swift
+  Exclusivity.swift
   ErrorType.swift
   ExistentialCollection.swift
   Filter.swift
@@ -82,6 +85,7 @@ add_library(swiftCore
   FloatingPoint.swift
   FloatingPointFromString.swift
   FloatingPointToString.swift
+  FullyInhabited.swift
   Hashable.swift
   AnyHashable.swift # ORDER DEPENDENCY
   Hasher.swift
@@ -109,6 +113,7 @@ add_library(swiftCore
   Mirrors.swift
   Misc.swift
   MutableCollection.swift
+  MutableRef.swift
   NativeDictionary.swift
   NativeSet.swift
   NewtypeWrapper.swift
@@ -130,6 +135,7 @@ add_library(swiftCore
   RangeReplaceableCollection.swift
   RangeSet.swift
   RangeSetRanges.swift
+  Ref.swift
   ReflectionMirror.swift
   Repeat.swift
   REPL.swift
@@ -205,6 +211,7 @@ add_library(swiftCore
   UnicodeScalarProperties.swift
   CharacterProperties.swift # ORDER DEPENDENCY: UnicodeScalarProperties.swift
   UnicodeSPI.swift
+  UniqueBox.swift
   Unmanaged.swift
   UnmanagedOpaqueString.swift
   UnmanagedString.swift
@@ -313,6 +320,7 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableTypes>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowAndMutateAccessors>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
@@ -332,7 +340,7 @@ target_include_directories(swiftCore INTERFACE
 
 target_link_libraries(swiftCore
   PRIVATE
-    swiftRuntime
+    swiftRuntimeCore
     swiftLLVMSupport
     swiftDemangling
     swiftStdlibStubs
@@ -342,7 +350,7 @@ target_link_libraries(swiftCore
   PUBLIC
     swiftShims
   INTERFACE
-    swiftRuntimeCMakeConfig)
+    swiftRuntimeCoreCMakeConfig)
 
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
 if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
@@ -363,7 +371,7 @@ target_link_options(swiftCore PUBLIC
 
 if(NOT POLICY CMP0157)
   target_compile_options(swiftCore PRIVATE
-    $<TARGET_OBJECTS:swiftRuntime>
+    $<TARGET_OBJECTS:swiftRuntimeCore>
     $<TARGET_OBJECTS:swiftLLVMSupport>
     $<TARGET_OBJECTS:swiftDemangling>
     $<TARGET_OBJECTS:swiftStdlibStubs>

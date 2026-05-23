@@ -370,7 +370,7 @@ SIMPLE_DECL_ATTR(_show_in_interface, ShowInInterface,
 
 DECL_ATTR(c, CDecl,
   OnFunc | OnAccessor | OnEnum,
-  LongAttribute | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+  LongAttribute | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   63)
 DECL_ATTR_ALIAS(_cdecl, CDecl)
 
@@ -559,7 +559,7 @@ SIMPLE_DECL_ATTR(noDerivative, NoDerivative,
   100)
 
 DECL_ATTR(export, Export,
-    OnVar | OnSubscript | OnAbstractFunction,
+    OnVar | OnSubscript | OnAbstractFunction | OnStruct | OnEnum | OnClass | OnExtension,
     ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
     101)
 
@@ -608,7 +608,10 @@ SIMPLE_DECL_ATTR(reasync, AtReasync,
   ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UnreachableInABIAttr,
   110)
 
-// Unused '111'
+SIMPLE_DECL_ATTR(_owned, Owned,
+  OnVar | OnSubscript,
+  NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIBreakingToRemove | ForbiddenInABIAttr,
+  111)
 
 CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,
   OnFunc | OnConstructor | OnDestructor | OnVar | OnSubscript | OnProtocol | OnExtension | OnClass | OnStruct | OnEnum,
@@ -829,10 +832,11 @@ DECL_ATTR(_allowFeatureSuppression, AllowFeatureSuppression,
   157)
 DECL_ATTR_ALIAS(_disallowFeatureSuppression, AllowFeatureSuppression)
 
-SIMPLE_DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
+DECL_ATTR(_preInverseGenerics, PreInverseGenerics,
   OnAbstractFunction | OnSubscript | OnVar | OnExtension,
   UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UnconstrainedInABIAttr,
   158)
+DECL_ATTR_ALIAS(_preInverseGenericsExceptCopyable, PreInverseGenerics)
 
 // Declares that a struct contains "sensitive" data. It enforces that the contents of such a struct value
 // is zeroed out at the end of its lifetime. In other words: the content of such a value is not observable
@@ -874,7 +878,10 @@ DECL_ATTR(abi, ABI,
   LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   165)
 
-// Unused '166': Used to be `@execution(caller | concurrent)` replaced with `@concurrent` and `nonisolated(nonsending)`
+SIMPLE_DECL_ATTR(reparentable, Reparentable,
+  OnProtocol,
+  ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove | UserInaccessible | ForbiddenInABIAttr,
+  166)
 
 SIMPLE_DECL_ATTR(const, ConstVal,
   OnParam | OnVar | OnFunc,
@@ -911,12 +918,11 @@ SIMPLE_DECL_ATTR(_unsafeSelfDependentResult, UnsafeSelfDependentResult,
   UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIBreakingToRemove | EquivalentInABIAttr,
   173)
 
-DECL_ATTR(warn, Warn,
-  OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar | OnNominalType | OnExtension | OnAccessor | OnImport,
-  AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
+DECL_ATTR(diagnose, Diagnose,
+  OnFunc | OnConstructor | OnDestructor | OnSubscript | OnVar | OnNominalType | OnExtension | OnEnumElement | OnAccessor | OnImport | OnTypeAlias | OnAssociatedType | OnMacro,
+  AllowMultipleAttributes | NotSerialized | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove | ForbiddenInABIAttr,
   174)
-
-LAST_DECL_ATTR(Warn)
+LAST_DECL_ATTR(Diagnose)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS

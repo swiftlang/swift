@@ -502,6 +502,8 @@ public:
       return false;
 
     if (isFilenameAndLocation()) {
+      if (R.isNull())
+        return false;
       assert(R.isFilenameAndLocation());
       return *getFilenameAndLocation() == *R.getFilenameAndLocation();
     }

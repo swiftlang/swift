@@ -42,16 +42,6 @@ enum class SILDIExprOperator : unsigned {
   /// Note that this directive can only appear at the end of an
   /// expression, along with `TupleFragment`.
   Fragment,
-  /// Perform arithmetic addition on the top two elements of the
-  /// expression stack and push the result back to the stack.
-  Plus,
-  /// Subtract the top element in expression stack by the second
-  /// element. Then push the result back to the stack.
-  Minus,
-  /// Push an unsigned integer constant onto the stack.
-  ConstUInt,
-  /// Push a signed integer constant onto the stack.
-  ConstSInt,
   /// Specifies that the SSA value is an element of the
   /// associated tuple. This operator takes a TupleType
   /// operand pointing to the tuple type, and the index of the element.

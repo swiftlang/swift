@@ -2,7 +2,7 @@
 // RUN: %empty-directory(%t/mock-sdk)
 // RUN: %empty-directory(%t/mock-sdk/usr/lib/swift)
 // RUN: cp -r %test-resource-dir/xros/Swift.swiftmodule %t/mock-sdk/usr/lib/swift/Swift.swiftmodule
-// RUN: cp %S/Inputs/mock-visionos-sdk/SDKSettings.json %t/mock-sdk/SDKSettings.json
+// RUN: cp %S/Inputs/XROS1.0.sdk/SDKSettings.json %t/mock-sdk/SDKSettings.json
 // RUN: %swift -emit-sil -parse-as-library %s -target arm64-apple-xros1.0 -sdk %t/mock-sdk -I %t/mock-sdk/usr/lib/swift/ -verify
 // RUN: %swift -emit-silgen -parse-as-library %s -target arm64-apple-xros1.0 -sdk %t/mock-sdk -I %t/mock-sdk/usr/lib/swift/ -o %t/output.sil
 // RUN: %FileCheck %s < %t/output.sil

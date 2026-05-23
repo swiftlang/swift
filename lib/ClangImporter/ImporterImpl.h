@@ -34,10 +34,11 @@
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
-#include "clang/AST/DeclVisitor.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/Specifiers.h"
@@ -46,27 +47,18 @@
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Serialization/ModuleFileExtension.h"
-#include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/IntrusiveRefCntPtr.h"
-#include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Path.h"
 #include <functional>
-#include <set>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-namespace llvm {
-
-class SmallBitVector;
-
-}
 
 namespace clang {
 class APValue;
@@ -79,7 +71,7 @@ class ParmVarDecl;
 class Parser;
 class QualType;
 class TypedefNameDecl;
-}
+} // namespace clang
 
 namespace swift {
 
@@ -95,6 +87,11 @@ class Identifier;
 class Pattern;
 class SubscriptDecl;
 class ValueDecl;
+
+/// Check whether the given declaration context is from a system module.
+inline bool isInSystemModule(const DeclContext *D) {
+  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
+}
 
 /// Describes the kind of conversion to apply to a constant value.
 enum class ConstantConvertKind {
@@ -335,9 +332,16 @@ private:
   PlatformKind platformKind;
 
 public:
+  /// Returns a non-optional `PlatformKind` corresponding to the platform name
+  /// if the given platform should be considered for availability on imported
+  /// declarations.
+  std::optional<PlatformKind> platformKindIfRelevant(StringRef platform) const;
+
   /// Returns true when the given platform should be considered for
-  /// availabilityon imported declarations.
-  bool isPlatformRelevant(StringRef platform) const;
+  /// availability on imported declarations.
+  bool isPlatformRelevant(StringRef platform) const {
+    return platformKindIfRelevant(platform).has_value();
+  }
 
   /// Returns true when the given declaration with the given deprecation
   /// should be included in the cutoff of imported deprecated APIs marked
@@ -360,7 +364,7 @@ private:
   PlatformAvailability(const PlatformAvailability&) = delete;
   PlatformAvailability &operator=(const PlatformAvailability &) = delete;
 };
-}
+} // namespace importer
 
 using LookupTableMap =
     llvm::DenseMap<StringRef, std::unique_ptr<SwiftLookupTable>>;
@@ -438,9 +442,12 @@ class LLVM_LIBRARY_VISIBILITY ClangImporter::Implementation
   using Version = importer::ImportNameVersion;
 
 public:
-  Implementation(ASTContext &ctx, DependencyTracker *dependencyTracker,
-                 DWARFImporterDelegate *dwarfImporterDelegate);
+  Implementation(ASTContext &ctx, DependencyTracker *dependencyTracker);
   ~Implementation();
+
+  void setDWARFImporterDelegate(DWARFImporterDelegate *dwarfImporterDelegate) {
+    DWARFImporter = dwarfImporterDelegate;
+  }
 
   class DiagnosticWalker : public clang::RecursiveASTVisitor<DiagnosticWalker> {
   public:
@@ -460,6 +467,11 @@ public:
   /// Swift AST context.
   ASTContext &SwiftContext;
 
+  /// Shared CAS instance from the swift CompilerInstance.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  /// Shared ActionCache instance from the swift CompilerInstance.
+  std::shared_ptr<llvm::cas::ActionCache> ResultCache;
+
   // Associates a vector of import diagnostics with a ClangNode
   std::unordered_map<ImportDiagnosticTarget, std::vector<ImportDiagnostic>,
                      ImportDiagnosticTargetHasher>
@@ -469,10 +481,6 @@ public:
   // purposes.
   std::unordered_set<ImportDiagnostic, ImportDiagnosticHasher>
       CollectedDiagnostics;
-
-  // Keeps track of `clang::RecordDecl`s where diagnostics have already been
-  // emitted due to failed SWIFT_SHARED_REFERENCE inference.
-  std::unordered_set<const clang::RecordDecl *> DiagnosedCxxRefDecls;
 
   // Tracks which function templates have already had a diagnostic emitted,
   // to avoid duplicate diagnostics across instantiations.
@@ -491,10 +499,13 @@ public:
 
   const Version CurrentVersion;
 
-  constexpr static const char * const moduleImportBufferName =
-    "<swift-imported-modules>";
-  constexpr static const char * const bridgingHeaderBufferName =
-    "<bridging-header-import>";
+  constexpr static const char *const moduleImportBufferName =
+      "<swift-imported-modules>";
+  constexpr static const char *const bridgingHeaderBufferName =
+      "<bridging-header-import>";
+  /// The name of system vfsoverlay.
+  constexpr static const char *const clangSystemVFSOverlayName =
+      "<clang-system-vfs-overlay>";
 
 private:
   DiagnosticWalker Walker;
@@ -622,8 +633,14 @@ public:
   }
 
   /// Writes the mangled name of \p clangDecl to \p os.
-  void getMangledName(clang::MangleContext *mangler,
-                      const clang::NamedDecl *clangDecl, raw_ostream &os);
+  static void getMangledName(clang::MangleContext *mangler,
+                             const clang::NamedDecl *clangDecl,
+                             raw_ostream &os);
+
+  /// Writes the Itanium mangled name (even on platforms that do not use Itanium
+  /// mangling, such as Windows) of \p clangDecl to \p os.
+  static void getItaniumMangledName(const clang::NamedDecl *clangDecl,
+                                    raw_ostream &os);
 
 private:
   /// The Importer may be configured to load modules of a different OS Version
@@ -669,21 +686,6 @@ public:
       llvm::DenseMap<llvm::StringRef, std::pair<FuncDecl *, FuncDecl *>>>
       GetterSetterMap;
 
-  /// Keep track of getter/setter pairs for functions imported from C++
-  /// subscript operators based on the type in which they are declared and
-  /// the type of their parameter.
-  ///
-  /// `.first` corresponds to a getter
-  /// `.second` corresponds to a setter
-  llvm::DenseMap<NominalTypeDecl *,
-                 llvm::MapVector<SmallVector<TypeBase *>,
-                                 std::pair<FuncDecl *, FuncDecl *>,
-                                 std::map<SmallVector<TypeBase *>, unsigned>>>
-      cxxSubscripts;
-
-  llvm::MapVector<NominalTypeDecl *, std::pair<FuncDecl *, FuncDecl *>>
-      cxxDereferenceOperators;
-
   llvm::SmallPtrSet<const clang::Decl *, 1> synthesizedAndAlwaysVisibleDecls;
 
 private:
@@ -704,13 +706,80 @@ private:
       unavailableMethods;
 
 public:
+  /// Attempt to lookup and import the synthesized .pointee computed property.
+  /// It also synthesizes __operatorStar(), which is used as the getter and
+  /// setter for .pointee.
+  //
+  /// Requires that \a Record is a (Swift) StructDecl and is imported from
+  /// a CXXRecordDecl.
+  //
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// .pointee and __operatorStar() methods that it returns are members of \a
+  /// Record.
+  std::tuple<VarDecl *, FuncDecl *, FuncDecl *>
+  lookupAndImportPointeeAndOperatorStar(NominalTypeDecl *Record);
+
+  /// Attempt to lookup and import the synthesized .pointee computed property.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl or ClassDecl that is
+  /// imported from a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// .pointee that it returns are members of \a Record.
+  VarDecl *lookupAndImportPointee(NominalTypeDecl *Record);
+
+  /// Attempt to lookup and import the synthesized .successor() method.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl and is imported from
+  /// a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// .successor() that it returns is a member of \a Record.
+  FuncDecl *lookupAndImportSuccessor(NominalTypeDecl *Record);
+
+  /// Attempt to lookup and import the synthesized .subscript members.
+  ///
+  /// Requires that \a Record is imported from a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// .subscript that it returns is a member of \a Record.
+  ///
+  /// If \a noSynthesize is set to true, then no .subscript members will be
+  /// synthesized, and an empty result will be cached. This parameter exists
+  /// specifically to support the prevention of .subscript synthesis for types
+  /// that conform to CxxDictionary, so that the Cxx overlay can provide its
+  /// own implementation of .subscript that returns a nil value instead of
+  /// default-initializing a new entry when given a non-existent key.
+  llvm::ArrayRef<SubscriptDecl *>
+  lookupAndImportSubscripts(NominalTypeDecl *Struct, bool noSynthesize = false);
+
+  /// Attempt to lookup and import the synthesized __convertToBool() method.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl and is imported from
+  /// a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// __convertToBool() that it returns is a member of \a Record.
+  FuncDecl *lookupAndImportOperatorBool(NominalTypeDecl *Struct);
+
+private:
+  /// Stores <.pointee, func __operatorStar(), mutating func __operatorStar()>
+  llvm::DenseMap<NominalTypeDecl *,
+                 std::tuple<VarDecl *, FuncDecl *, FuncDecl *>>
+      importedPointeeCache;
+  llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedSuccessorCache;
+  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<SubscriptDecl *, 1>>
+      importedSubscriptsCache;
+  llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
+
+public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
 
-  bool needsClosureConstructor(const clang::CXXRecordDecl *recordDecl) const;
+  static bool needsClosureConstructor(const clang::CXXRecordDecl *recordDecl);
 
-  bool isSwiftFunctionWrapper(const clang::RecordDecl *decl) const;
+  static bool isSwiftFunctionWrapper(const clang::RecordDecl *decl);
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance);
@@ -718,8 +787,6 @@ public:
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
-
-  static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
   // Cache for already-specialized function templates and any thunks they may
   // have.
@@ -882,8 +949,11 @@ public:
   /// Tracks included headers from the bridging header.
   llvm::DenseSet<clang::FileEntryRef> BridgeHeaderFiles;
 
+  /// The CASID for PCH file if applicable. Otherwise, it should be std::nullopt.
+  std::optional<std::string> CASIDForPCH = std::nullopt;
+
   void addBridgeHeaderTopLevelDecls(clang::Decl *D);
-  bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
+  static bool shouldIgnoreBridgeHeaderTopLevelDecl(clang::Decl *D);
 
 private:
   /// When set, ClangImporter is disabled, and all requests go to the
@@ -896,11 +966,6 @@ private:
   /// The DWARF importer delegate, if installed.
   DWARFImporterDelegate *DWARFImporter = nullptr;
 
-public:
-  /// Only used for testing.
-  void setDWARFImporterDelegate(DWARFImporterDelegate &delegate);
-
-private:
   /// The list of Clang modules found in the debug info.
   llvm::DenseMap<Identifier, LoadedFile *> DWARFModuleUnits;
 
@@ -921,7 +986,7 @@ public:
   ModuleDecl *loadModule(SourceLoc importLoc,
                          ImportPath::Module path);
 
-  void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
+  static void recordImplicitUnwrapForDecl(ValueDecl *decl, bool isIUO) {
     if (!isIUO)
       return;
 
@@ -973,10 +1038,6 @@ public:
   /// Clang decl.
   ClangModuleUnit *getClangModuleForDecl(const clang::Decl *D,
                                          bool allowForwardDeclaration = false);
-
-  /// Returns the module \p Node comes from, or \c nullptr if \p Node does not
-  /// have a valid owning module.
-  const clang::Module *getClangOwningModule(ClangNode Node) const;
 
   /// Whether NSUInteger can be imported as Int in certain contexts. If false,
   /// should always be imported as UInt.
@@ -1067,7 +1128,7 @@ public:
   /// the Swift name. If the Clang name does not start with this prefix,
   /// nothing is removed.
   Identifier importIdentifier(const clang::IdentifierInfo *identifier,
-                              StringRef removePrefix = "");
+                              StringRef removePrefix = "") const;
 
   /// Import an Objective-C selector.
   ObjCSelector importSelector(clang::Selector selector);
@@ -1106,15 +1167,6 @@ public:
   /// Create attribute with given text and attach it to decl, creating or
   /// retrieving a chached source file as needed.
   void importNontrivialAttribute(Decl *MappedDecl, StringRef attributeText);
-
-  /// Utility function to import Clang attributes from a source Swift decl to
-  /// synthesized Swift decl.
-  ///
-  /// \param SourceDecl The Swift decl to copy the atteribute from.
-  /// \param SynthesizedDecl The synthesized Swift decl to attach attributes to.
-  void
-  importAttributesFromClangDeclToSynthesizedSwiftDecl(Decl *SourceDecl,
-                                                      Decl *SynthesizedDecl);
 
   /// Import attributes from the given Clang declaration to its Swift
   /// equivalent.
@@ -1160,6 +1212,14 @@ public:
     return importDeclAndCacheImpl(ClangDecl, version,
                                   /*SuperfluousTypedefsAreTransparent=*/true,
                                   /*UseCanonicalDecl*/ UseCanonicalDecl);
+  }
+
+  Decl *lookupImportedDecl(const clang::NamedDecl *decl) {
+    auto Known = importDeclCached(
+        cast<clang::NamedDecl>(decl->getCanonicalDecl()), CurrentVersion, true);
+    if (Known.has_value())
+      return Known.value();
+    return nullptr;
   }
 
   /// Import the given Clang declaration into Swift.  Use this function
@@ -1258,8 +1318,8 @@ public:
                                    ClangNode ClangN, AccessLevel access);
 
   /// Add a synthesized typealias to the given nominal type.
-  void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
-                               Type underlyingType);
+  static void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
+                                      Type underlyingType);
 
   void addSynthesizedProtocolAttrs(
       NominalTypeDecl *nominal,
@@ -1267,8 +1327,8 @@ public:
       bool isUnchecked = false,
       bool isSuppressed = false);
 
-  void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
-                    AccessorDecl *setter);
+  static void makeComputed(AbstractStorageDecl *storage, AccessorDecl *getter,
+                           AccessorDecl *setter);
 
   /// Retrieve the standard library module.
   ModuleDecl *getStdlibModule();
@@ -1280,7 +1340,7 @@ public:
   /// \returns The named module, or null if the module has not been imported.
   ModuleDecl *getNamedModule(StringRef name);
 
-  ImportPath::Builder getSwiftModulePath(const clang::Module *M);
+  ImportPath::Builder getSwiftModulePath(const clang::Module *M) const;
 
   /// Returns the "Foundation" module, if it can be loaded.
   ///
@@ -1334,8 +1394,8 @@ public:
 
   /// Determines whether the type declared by the given declaration
   /// is over-aligned.
-  bool isOverAligned(const clang::TypeDecl *typeDecl);
-  bool isOverAligned(clang::QualType type);
+  bool isOverAligned(const clang::TypeDecl *typeDecl) const;
+  bool isOverAligned(clang::QualType type) const;
 
   /// Determines whether the given Clang type is serializable in a
   /// Swift AST.  This should only be called after successfully importing
@@ -1347,7 +1407,8 @@ public:
   /// Note that this will only check the requested sugaring of the given
   /// type (depending on \c checkCanonical); the canonical type may be
   /// serializable even if the non-canonical type is not, or vice-versa.
-  bool isSerializable(clang::QualType type, bool checkCanonical);
+  ClangModuleLoader::SerializableInfo isSerializable(clang::QualType type,
+                                                     bool checkCanonical);
 
   /// Try to find a stable Swift serialization path for the given Clang
   /// declaration.
@@ -1634,7 +1695,7 @@ public:
 
   /// Return whether a global of the given type should be imported as a
   /// 'let' declaration as opposed to 'var'.
-  bool shouldImportGlobalAsLet(clang::QualType type);
+  static bool shouldImportGlobalAsLet(clang::QualType type);
 
   /// Record the set of imported protocols for the given declaration,
   /// to be used by member loading.
@@ -1674,28 +1735,25 @@ public:
     return found->second;
   }
 
-  virtual void
-  loadAllMembers(Decl *D, uint64_t unused) override;
+  virtual void loadStorageMembers(Decl *D, uint64_t unused) override;
+  virtual void loadNonStorageMembers(Decl *D, uint64_t unused) override;
 
   virtual TinyPtrVector<ValueDecl *>
   loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
                    uint64_t contextData) override;
 
+  void insertMembersAndAlternates(const clang::NamedDecl *nd,
+                                  SmallVectorImpl<Decl *> &members,
+                                  DeclContext *expectedDC = nullptr);
+
 private:
   void
   loadAllMembersOfObjcContainer(Decl *D,
                                 const clang::ObjCContainerDecl *objcContainer);
-  void loadAllMembersOfRecordDecl(NominalTypeDecl *swiftDecl,
-                                  const clang::RecordDecl *clangRecord,
-                                  ClangInheritanceInfo inheritance);
-
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,
                            SmallVectorImpl<Decl *> &members);
-  void insertMembersAndAlternates(const clang::NamedDecl *nd,
-                                  SmallVectorImpl<Decl *> &members,
-                                  DeclContext *expectedDC = nullptr);
-  void loadAllMembersIntoExtension(Decl *D, uint64_t extra);
+  void loadAllMembersIntoExtension(ExtensionDecl *ext, uint64_t extra);
 
   /// Imports \p decl under \p nameVersion with the name \p newName, and adds
   /// it and its alternates to \p ext.
@@ -1830,10 +1888,9 @@ public:
 
   /// Add implicit typealiases required when turning the given nominal type
   /// into an option set.
-  void addOptionSetTypealiases(NominalTypeDecl *nominal);
+  void addOptionSetTypealiases(NominalTypeDecl *nominal) const;
 
   void swiftify(AbstractFunctionDecl *MappedDecl);
-  void swiftifyProtocol(NominalTypeDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
@@ -1857,8 +1914,8 @@ public:
   ///
   /// FIXME: this is an elaborate hack to badly reflect Clang's
   /// submodule visibility into Swift.
-  bool isVisibleClangEntry(const clang::NamedDecl *clangDecl);
-  bool isVisibleClangEntry(SwiftLookupTable::SingleEntry entry);
+  bool isVisibleClangEntry(const clang::NamedDecl *clangDecl) const;
+  bool isVisibleClangEntry(SwiftLookupTable::SingleEntry entry) const;
 
   /// Look for namespace-scope values with the given name in the given
   /// Swift lookup table.
@@ -1902,7 +1959,7 @@ public:
   void diagnoseTargetDirectly(ImportDiagnosticTarget target);
 
 private:
-  ImportDiagnosticTarget importDiagnosticTargetFromLookupTableEntry(
+  static ImportDiagnosticTarget importDiagnosticTargetFromLookupTableEntry(
       SwiftLookupTable::SingleEntry entry);
 
   bool emitDiagnosticsForTarget(
@@ -1956,6 +2013,18 @@ public:
       return *SinglePCHImport;
     return StringRef();
   }
+
+  /// List decls and imports from the implementation file at \p filename.
+  llvm::Error
+  lookupImplementationFileDeclsFromFile(StringRef filename,
+    llvm::function_ref<void(const clang::Decl*)> receiver,
+    llvm::function_ref<void(const swift::ImportDecl *)> receiverImports) const;
+
+  /// List decls and imports from the bridging header respecting \p filter.
+  void
+  lookupImplementationFileDecls(llvm::function_ref<bool(ClangNode)> filter,
+    llvm::function_ref<void(const clang::Decl*)> receiver,
+    llvm::function_ref<void(const swift::ImportDecl *)> receiverImports) const;
 };
 
 class ImportDiagnosticAdder {
@@ -1975,12 +2044,6 @@ public:
 };
 
 namespace importer {
-
-/// Returns true if the given C/C++ record should be imported as a reference
-/// type into Swift.
-bool recordHasReferenceSemantics(const clang::RecordDecl *decl,
-                                 ClangImporter::Implementation *importerImpl);
-
 /// Whether this is a forward declaration of a type. We ignore forward
 /// declarations in certain cases, and instead process the real declarations.
 bool isForwardDeclOfType(const clang::Decl *decl);
@@ -2016,6 +2079,7 @@ void getNormalInvocationArguments(std::vector<std::string> &invocationArgStrs,
 void addCommonInvocationArguments(std::vector<std::string> &invocationArgStrs,
                                   ASTContext &ctx,
                                   bool requiresBuiltinHeadersInSystemModules,
+                                  bool needSystemVFSOverlay,
                                   bool ignoreClangTarget);
 
 /// Finds a particular kind of nominal by looking through typealiases.
@@ -2161,6 +2225,7 @@ Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 /// correspond to an overloaded C++ operator.
 Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
+bool hasSwiftAttribute(const clang::Decl *decl, ArrayRef<StringRef> attrs);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
 bool hasIteratorAPIAttr(const clang::Decl *decl);
@@ -2168,6 +2233,9 @@ bool hasIteratorAPIAttr(const clang::Decl *decl);
 bool hasNonEscapableAttr(const clang::RecordDecl *decl);
 bool hasNonCopyableAttr(const clang::RecordDecl *decl);
 bool hasEscapableAttr(const clang::RecordDecl *decl);
+CxxValueSemanticsKind
+getCxxValueSemanticsKind(const clang::Type *type,
+                         ClangImporter::Implementation &Impl);
 
 bool isViewType(const clang::CXXRecordDecl *decl);
 
@@ -2213,8 +2281,8 @@ ImportedType findOptionSetEnum(clang::QualType type,
 /// and with the given name.
 ///
 /// The name we're looking for is the Swift name.
-llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
+TinyPtrVector<ValueDecl *> getValueDeclsForName(NominalTypeDecl *decl,
+                                                StringRef name);
 
 template <typename T>
 const T *
@@ -2232,11 +2300,16 @@ getImplicitObjectParamAnnotation(const clang::FunctionDecl *FD) {
   return nullptr;
 }
 
-/// Find a unique base class that is annotated as SHARED_REFERENCE if any.
-const clang::RecordDecl *
-getRefParentOrDiag(const clang::RecordDecl *decl, ASTContext &ctx,
-                   ClangImporter::Implementation *importerImpl);
+/// Emit diagnostics related to foreign reference types for \a decl.
+bool diagnoseForeignReferenceType(const clang::CXXRecordDecl *decl,
+                                  ClangImporter::Implementation &Impl);
 
+/// Returns the module \p Node comes from, or \c nullptr if \p Node does not
+/// have a valid owning module.
+///
+/// Note that \p Node cannot itself be a clang::Module.
+const clang::Module *getClangOwningModule(ClangNode Node,
+                                          const clang::ASTContext &ClangCtx);
 } // end namespace importer
 } // end namespace swift
 

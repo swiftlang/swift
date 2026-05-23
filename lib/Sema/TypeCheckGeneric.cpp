@@ -122,7 +122,7 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
         /*inferenceSources=*/{},
         repr->getLoc(),
         /*forExtension=*/nullptr,
-        /*allowInverses=*/true};
+        ExpandDefaults};
 
     interfaceSignature = evaluateOrDefault(
         ctx.evaluator, request, GenericSignatureWithError())
@@ -205,10 +205,9 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
       requirements.emplace_back(kind, paramType, constraintType);
     }
 
-    interfaceSignature = buildGenericSignature(ctx, outerGenericSignature,
-                                               genericParamTypes,
-                                               std::move(requirements),
-                                               /*allowInverses=*/true);
+    interfaceSignature = buildGenericSignature(
+        ctx, outerGenericSignature, genericParamTypes, std::move(requirements),
+        {ExpandDefaults, InferOutOfScopeImpliedInverses});
     genericParams = originatingGenericContext
         ? originatingGenericContext->getGenericParams()
         : nullptr;
@@ -225,10 +224,17 @@ OpaqueResultTypeRequest::evaluate(Evaluator &evaluator,
     opaqueDecl->setGenericSignature(GenericSignature());
   }
 
+  TypeResolverContext resolverContext = TypeResolverContext::FunctionResult;
+  if (isa<VarDecl>(originatingDecl)) {
+    // Non-opaque result types are resolved against this context, so
+    // replicate that logic here.
+    resolverContext = TypeResolverContext::PatternBindingDecl;
+  }
+
   // Resolving in the context of `opaqueDecl` allows type resolution to create
   // opaque archetypes where needed
   auto interfaceType =
-      TypeResolution::forInterface(opaqueDecl, TypeResolverContext::None,
+      TypeResolution::forInterface(opaqueDecl, resolverContext,
                                    /*unboundTyOpener*/ nullptr,
                                    /*placeholderHandler*/ nullptr,
                                    /*packElementOpener*/ nullptr)
@@ -375,7 +381,7 @@ static bool checkProtocolSelfRequirementsImpl(
                        secondType.getString())
         // FIXME: This should become an unconditional error since violating
         // this invariant can introduce compiler and run time crashes.
-        .warnUntilFutureLanguageModeIf(downgrade);
+        .warnUntilLanguageModeIf(downgrade, LanguageMode::future);
     return true;
   }
 
@@ -460,8 +466,9 @@ void TypeChecker::checkProtocolSelfRequirements(ValueDecl *decl) {
       }
     }
 
-    auto weightedSig = buildGenericSignature(
-        ctx, GenericSignature(), params, reqs, /*allowInverses=*/false);
+    auto weightedSig =
+        buildGenericSignature(ctx, GenericSignature(), params, reqs,
+                              DefaultRequirementOptions());
 
     // Repeat the check with the new signature.
     checkProtocolSelfRequirementsImpl(ctx, proto, decl, sig, weightedSig,
@@ -717,7 +724,7 @@ void TypeChecker::checkShadowedGenericParams(GenericContext *dc) {
       } else {
         genericParamDecl
             ->diagnose(diag::shadowed_generic_param, genericParamDecl)
-            .warnUntilLanguageMode(6);
+            .warnUntilLanguageMode(LanguageMode::v6);
       }
 
       if (existingParamDecl->getLoc()) {
@@ -981,7 +988,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
       genericParams, WhereClauseOwner(GC),
       extraReqs, inferenceSources, loc,
       /*forExtension=*/dyn_cast<ExtensionDecl>(GC),
-      /*allowInverses=*/true};
+      ExpandDefaults};
   return evaluateOrDefault(ctx.evaluator, request,
                            GenericSignatureWithError()).getPointer();
 }

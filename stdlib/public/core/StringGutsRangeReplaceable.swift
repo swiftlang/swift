@@ -10,6 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+@inline(__always)
+internal func _growStringCapacity(_ capacity: Int) -> Int {
+  // 1.625x growth for native String storage. Roughly matches NSString
+  return capacity &+ (capacity &>> 1) &+ (capacity &>> 3)
+}
+
 // COW helpers
 extension _StringGuts {
   internal var nativeCapacity: Int? {
@@ -109,13 +115,14 @@ extension _StringGuts {
     _internalInvariant(
       self.uniqueNativeCapacity == nil || self.uniqueNativeCapacity! < n)
 
-    // If unique and native, apply a 2x growth factor to avoid problematic
-    // performance when used in a loop. If one if those doesn't apply, we
-    // can just use the requested capacity (at least the current utf-8 count).
+    // If unique and native, apply a geometric growth factor to avoid
+    // problematic performance when used in a loop. If one of those doesn't
+    // apply, we can just use the requested capacity (at least the current
+    // utf-8 count).
     // TODO: Don't do this! Growth should only happen for append...
     let growthTarget: Int
     if let capacity = self.uniqueNativeCapacity {
-      growthTarget = Swift.max(n, capacity * 2)
+      growthTarget = Swift.max(n, _growStringCapacity(capacity))
     } else {
       growthTarget = Swift.max(n, self.utf8Count)
     }
@@ -124,7 +131,7 @@ extension _StringGuts {
     // strings or foreign strings that provide contiguous UTF-8 access.
     if _fastPath(isFastUTF8) {
       let isASCII = self.isASCII
-      let storage = unsafe self.withFastUTF8 {
+      let storage = self.withFastUTF8 {
         unsafe __StringStorage.create(
           initializingFrom: $0,
           codeUnitCapacity: growthTarget,
@@ -186,7 +193,7 @@ extension _StringGuts {
       growthTarget = totalCount
     } else {
       growthTarget = Swift.max(
-        totalCount, _growArrayCapacity(nativeCapacity ?? 0))
+        totalCount, _growStringCapacity(nativeCapacity ?? 0))
     }
     self.grow(growthTarget) // NOTE: this already has exponential growth...
   }
@@ -220,7 +227,7 @@ extension _StringGuts {
       return asSmall
     }
     if isFastUTF8 {
-      return unsafe withFastUTF8 { unsafe _SmallString($0)! }
+      return withFastUTF8 { unsafe _SmallString($0)! }
     }
     return _foreignConvertedToSmall()
   }
@@ -337,14 +344,14 @@ extension _StringGuts {
     if isUniqueNative {
       if let repl = newElements as? String {
         if repl._guts.isFastUTF8 {
-          return unsafe repl._guts.withFastUTF8 {
+          return repl._guts.withFastUTF8 {
             unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._guts.isASCII)
           }
         }
       } else if let repl = newElements as? Substring {
         if repl._wholeGuts.isFastUTF8 {
-          return unsafe repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
+          return repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
             unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._wholeGuts.isASCII)
           }
@@ -380,14 +387,14 @@ extension _StringGuts {
     if isUniqueNative {
       if let repl = newElements as? String.UnicodeScalarView {
         if repl._guts.isFastUTF8 {
-          return unsafe repl._guts.withFastUTF8 {
+          return repl._guts.withFastUTF8 {
             unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._guts.isASCII)
           }
         }
       } else if let repl = newElements as? Substring.UnicodeScalarView {
         if repl._wholeGuts.isFastUTF8 {
-          return unsafe repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
+          return repl._wholeGuts.withFastUTF8(range: repl._offsetRange) {
             unsafe uniqueNativeReplaceSubrange(
               bounds, with: $0, isASCII: repl._wholeGuts.isASCII)
           }

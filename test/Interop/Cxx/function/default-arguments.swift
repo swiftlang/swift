@@ -83,17 +83,15 @@ DefaultArgTestSuite.test("method with integer parameter") {
   expectTrue(z1)
 }
 
-// TODO: support default args of constructors
-// (https://github.com/apple/swift/issues/70124)
 DefaultArgTestSuite.test("constructor with integer parameter") {
   let a = HasCtorWithDefaultArg(1, 2, 3)
   expectEqual(a.value, 6)
 
-//  let b = HasCtorWithDefaultArg(1, 2)
-//  expectEqual(b.value, 126)
+  let b = HasCtorWithDefaultArg(1, 2)
+  expectEqual(b.value, 126)
 
-//  let c = HasCtorWithDefaultArg(1)
-//  expectEqual(c.value, 580)
+  let c = HasCtorWithDefaultArg(1)
+  expectEqual(c.value, 580)
 }
 
 DefaultArgTestSuite.test("method in a templated class") {

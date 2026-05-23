@@ -200,9 +200,6 @@ public:
       IndexOfFirstOuterResult++;
       assert(IndexOfFirstOuterResult == Results.size() &&
              "found an outer result before an inner one");
-    } else {
-      assert(IndexOfFirstOuterResult > 0 &&
-             "found outer results without an inner one");
     }
   }
 

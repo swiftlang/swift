@@ -14,7 +14,7 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS)
+#if os(anyAppleOS)
   #if canImport(tgmath_h)
     import tgmath_h
   #else
@@ -149,7 +149,7 @@ func _${derivative_kind}Trunc${generic_signature} (
 %  linear_map_kind = 'differential' if derivative_kind == 'jvp' else 'pullback'
 %  for T in ['Float', 'Double', 'Float80']:
 %    if T == 'Float80':
-#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !os(anyAppleOS))) && (arch(i386) || arch(x86_64))
 %    end
 @inlinable
 @derivative(of: exp)
@@ -290,7 +290,7 @@ func _${derivative_kind}Erfc(_ x: ${T}) -> (value: ${T}, ${linear_map_kind}: (${
 // Binary functions
 %for T in ['Float', 'Double', 'Float80']:
 %  if T == 'Float80':
-#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !os(anyAppleOS))) && (arch(i386) || arch(x86_64))
 %  end
 @inlinable
 @derivative(of: pow)

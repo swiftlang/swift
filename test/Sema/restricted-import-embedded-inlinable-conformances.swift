@@ -24,7 +24,7 @@
 // REQUIRES: embedded_stdlib_cross_compiling
 
 #if IOI
-@_implementationOnly import BADLibrary // expected-ioi-warning {{using '@_implementationOnly' without enabling library evolution for 'main' may lead to instability during execution}}
+@_implementationOnly import BADLibrary // expected-ioi-warning {{safely use '@_implementationOnly' without library evolution by setting '-enable-experimental-feature CheckImplementationOnly' for 'main'}}
 #else
 internal import BADLibrary // expected-access-level-note 35 {{imported as 'internal' from 'BADLibrary' here}}
 #endif

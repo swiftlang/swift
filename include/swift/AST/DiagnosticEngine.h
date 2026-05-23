@@ -23,6 +23,7 @@
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticGroups.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
@@ -30,6 +31,7 @@
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/MapVector.h"
+#include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/Allocator.h"
@@ -292,7 +294,10 @@ namespace swift {
   /// for a transaction.
   struct ActiveDiagnostic {
     Diagnostic Diag;
-    SmallVector<DiagnosticInfo, 2> WrappedDiagnostics;
+
+    // NOTE: The `unique_ptr` here is important since we use a DiagnosticInfo
+    // pointer as the diagnostic argument for `Diag` when wrapping.
+    SmallVector<std::unique_ptr<DiagnosticInfo>, 2> WrappedDiagnostics;
     SmallVector<std::vector<DiagnosticArgument>, 4> WrappedDiagnosticArgs;
 
     ActiveDiagnostic(Diagnostic diag) : Diag(std::move(diag)) {}
@@ -301,14 +306,15 @@ namespace swift {
 
   /// A diagnostic that has no input arguments, so it is trivially-destructable.
   using ZeroArgDiagnostic = Diag<>;
-  
+
   /// Describes an in-flight diagnostic, which is currently active
   /// within the diagnostic engine and can be augmented within additional
   /// information (source ranges, Fix-Its, etc.).
   ///
-  /// Only a single in-flight diagnostic can be active at one time, and all
-  /// additional information must be emitted through the active in-flight
-  /// diagnostic.
+  /// Multiple in-flight diagnostics can be active at the same time. They are
+  /// emitted in FIFO order (based on time of creation) once the number of
+  /// active diagnostics drops to 0. All additional information must be emitted
+  /// through the active in-flight diagnostic.
   class InFlightDiagnostic {
     friend class DiagnosticEngine;
     
@@ -364,6 +370,12 @@ namespace swift {
     /// emitted as a warning, but a note will still be emitted as a note.
     InFlightDiagnostic &limitBehavior(DiagnosticBehavior limit);
 
+    /// Prevent the diagnostic from behaving more severely than \p limit or the
+    /// previously set limit. Use to compose conditions to downgrade a
+    /// diagnostic in succession.
+    InFlightDiagnostic
+    &limitBehaviorIfMorePermissive(DiagnosticBehavior limit);
+
     /// Conditionally prevent the diagnostic from behaving more severely than \p
     /// limit. If the condition is false, no limit is imposed.
     InFlightDiagnostic &limitBehaviorIf(bool shouldLimit,
@@ -391,7 +403,7 @@ namespace swift {
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
     InFlightDiagnostic &limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
-                                                       unsigned majorVersion);
+                                                       LanguageMode mode);
 
     /// Limits the diagnostic behavior to \c limit accordingly if
     /// preconcurrency applies. Otherwise, the behavior limit only applies
@@ -406,39 +418,23 @@ namespace swift {
     /// to stage in concurrency annotations even after their clients have
     /// migrated to Swift 6 using `@preconcurrency` alongside the newly added
     /// `@Sendable` or `@MainActor` annotations.
-    InFlightDiagnostic
-    &limitBehaviorWithPreconcurrency(DiagnosticBehavior limit,
-                                     bool preconcurrency,
-                                     unsigned languageMode = 6) {
+    InFlightDiagnostic &
+    limitBehaviorWithPreconcurrency(DiagnosticBehavior limit,
+                                    bool preconcurrency,
+                                    LanguageMode mode = LanguageMode::v6) {
       if (preconcurrency) {
         return limitBehavior(limit);
       }
 
-      return limitBehaviorUntilLanguageMode(limit, languageMode);
+      return limitBehaviorUntilLanguageMode(limit, mode);
     }
 
-    /// Limit the diagnostic behavior to warning until the next future
-    /// language mode.
-    ///
-    /// This should be preferred over passing the next major version to
-    /// `warnUntilSwiftVersion` to make it easier to find and update clients
-    /// when a new language mode is introduced.
+    /// Limit the diagnostic behavior to warning until the specified language
+    /// mode.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
-    InFlightDiagnostic &warnUntilFutureLanguageMode();
-
-    InFlightDiagnostic &warnUntilFutureLanguageModeIf(bool shouldLimit) {
-      if (!shouldLimit)
-        return *this;
-      return warnUntilFutureLanguageMode();
-    }
-
-    /// Limit the diagnostic behavior to warning until the specified version.
-    ///
-    /// This helps stage in fixes for stricter diagnostics as warnings
-    /// until the next major language version.
-    InFlightDiagnostic &warnUntilLanguageMode(unsigned majorVersion);
+    InFlightDiagnostic &warnUntilLanguageMode(LanguageMode mode);
 
     /// Limit the diagnostic behavior to warning if the context is a
     /// swiftinterface.
@@ -450,15 +446,15 @@ namespace swift {
     InFlightDiagnostic &warnInSwiftInterface(const DeclContext *context);
 
     /// Conditionally limit the diagnostic behavior to warning until
-    /// the specified version.  If the condition is false, no limit is
+    /// the specified language mode. If the condition is false, no limit is
     /// imposed, meaning (presumably) it is treated as an error.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
     /// until the next major language version.
     InFlightDiagnostic &warnUntilLanguageModeIf(bool shouldLimit,
-                                                unsigned majorVersion) {
+                                                LanguageMode mode) {
       if (!shouldLimit) return *this;
-      return warnUntilLanguageMode(majorVersion);
+      return warnUntilLanguageMode(mode);
     }
 
     /// Wraps this diagnostic in another diagnostic. That is, \p wrapper will be
@@ -614,7 +610,6 @@ namespace swift {
                                          ArrayRef<DiagnosticArgument> Args);
   };
 
-
   using WarningGroupBehaviorMap =
       llvm::MapVector<swift::DiagGroupID, WarningGroupBehaviorRule>;
 
@@ -624,6 +619,15 @@ namespace swift {
     /// Whether we should continue to emit diagnostics, even after a
     /// fatal error
     bool showDiagnosticsAfterFatalError = false;
+
+    /// Trap when any error diagnostic is emitted.
+    bool assertOnError = false;
+
+    /// Trap when any warning diagnostic is emitted.
+    bool assertOnWarning = false;
+
+    /// Trap when a diagnostic belonging to one of these groups is emitted.
+    llvm::SmallSet<DiagGroupID, 1> assertOnGroupIDs;
 
     /// Don't emit any warnings
     bool suppressWarnings = false;
@@ -677,6 +681,14 @@ namespace swift {
     }
     bool getShowDiagnosticsAfterFatalError() {
       return showDiagnosticsAfterFatalError;
+    }
+
+    void setAssertOnError(bool val = true) { assertOnError = val; }
+    void setAssertOnWarning(bool val = true) { assertOnWarning = val; }
+    void addAssertOnGroupID(DiagGroupID id) { assertOnGroupIDs.insert(id); }
+
+    bool shouldAssertOnGroup(DiagGroupID id) const {
+      return assertOnGroupIDs.count(id);
     }
 
     /// Whether to skip emitting warnings
@@ -734,6 +746,8 @@ namespace swift {
     void swap(DiagnosticState &other) {
       std::swap(showDiagnosticsAfterFatalError,
                 other.showDiagnosticsAfterFatalError);
+      std::swap(assertOnError, other.assertOnError);
+      std::swap(assertOnWarning, other.assertOnWarning);
       std::swap(suppressWarnings, other.suppressWarnings);
       std::swap(suppressNotes, other.suppressNotes);
       std::swap(suppressRemarks, other.suppressRemarks);
@@ -887,12 +901,16 @@ namespace swift {
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
 
+    /// Path to toolchain-local diagnostic documentation directory
+    /// relative to the compiler executable.
+    std::string localDiagnosticDocumentationPath = "";
+
     /// The Swift language version. This is used to limit diagnostic behavior
     /// until a specific language version, e.g. Swift 6.
     version::Version languageVersion;
 
     /// The stats reporter used to keep track of Swift 6 errors
-    /// diagnosed via \c warnUntilLanguageMode(6).
+    /// diagnosed via \c warnUntilLanguageMode(LanguageMode::v6).
     UnifiedStatsReporter *statsReporter = nullptr;
 
     /// Whether we are actively pretty-printing a declaration as part of
@@ -925,6 +943,10 @@ namespace swift {
     bool getShowDiagnosticsAfterFatalError() {
       return state.getShowDiagnosticsAfterFatalError();
     }
+
+    void setAssertOnError(bool val = true) { state.setAssertOnError(val); }
+    void setAssertOnWarning(bool val = true) { state.setAssertOnWarning(val); }
+    void addAssertOnGroupID(DiagGroupID id) { state.addAssertOnGroupID(id); }
 
     void flushConsumers() {
       ASSERT(NumActiveDiags == 0 && "Expected in-flight diags to be flushed");
@@ -984,6 +1006,13 @@ namespace swift {
     }
     StringRef getDiagnosticDocumentationPath() {
       return diagnosticDocumentationPath;
+    }
+
+    void setLocalDiagnosticDocumentationPath(std::string path) {
+      localDiagnosticDocumentationPath = path;
+    }
+    StringRef getLocalDiagnosticDocumentationPath() {
+      return localDiagnosticDocumentationPath;
     }
 
     bool isPrettyPrintingDecl() const { return IsPrettyPrintingDecl; }
@@ -1499,13 +1528,7 @@ namespace swift {
 
     /// Create a new diagnostic queue with a given engine to forward the
     /// diagnostics to.
-    explicit DiagnosticQueue(DiagnosticEngine &engine, bool emitOnDestruction)
-        : UnderlyingEngine(engine), QueueEngine(engine.SourceMgr),
-          EmitOnDestruction(emitOnDestruction) {
-      // Open a transaction to avoid emitting any diagnostics for the temporary
-      // engine.
-      QueueEngine.TransactionCount++;
-    }
+    explicit DiagnosticQueue(DiagnosticEngine &engine, bool emitOnDestruction);
 
     /// Retrieve the engine which may be used to enqueue diagnostics.
     DiagnosticEngine &getDiags() { return QueueEngine; }

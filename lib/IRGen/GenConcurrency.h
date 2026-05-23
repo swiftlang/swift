@@ -94,8 +94,6 @@ void emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
                        llvm::Value *result, llvm::Value *closure,
                        llvm::Value *closureContext);
 
-void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
-
 llvm::Value *maybeAddEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
                                                  llvm::Value *taskOptions,
                                                  CanType formalResultType);
@@ -137,6 +135,10 @@ void emitBuiltinTaskLocalValuePush(IRGenFunction &IGF, llvm::Value *key,
                                    llvm::Value *valueMetatype);
 
 void emitBuiltinTaskLocalValuePop(IRGenFunction &IGF);
+
+llvm::Value *emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF);
+
+void emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF);
 
 } // end namespace irgen
 } // end namespace swift

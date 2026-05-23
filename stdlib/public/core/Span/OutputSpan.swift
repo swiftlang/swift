@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -14,10 +14,10 @@
 import Swift
 #endif
 
-// `OutputSpan` is a reference to a contiguous region of memory that starts with
-// some number of initialized `Element` instances followed by uninitialized
-// memory. It provides operations to access the items it stores, as well as to
-// add new elements and to remove existing ones.
+/// `OutputSpan` is a reference to a contiguous region of memory that starts
+/// with some number of initialized `Element` instances followed by
+/// uninitialized memory. It provides operations to access the items it stores,
+/// as well as to add new elements and to remove existing ones.
 @safe
 @frozen
 @available(SwiftCompatibilitySpan 5.0, *)
@@ -26,6 +26,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   @usableFromInline
   internal let _pointer: UnsafeMutableRawPointer?
 
+  /// The total number of elements that this output span can contain.
   public let capacity: Int
 
   @usableFromInline
@@ -44,7 +45,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
     }
   }
 
-  /// Create an OutputSpan with zero capacity
+  /// Create an OutputSpan with zero capacity.
   @_alwaysEmitIntoClient
   @lifetime(immortal)
   public init() {
@@ -87,14 +88,17 @@ extension OutputSpan where Element: ~Copyable {
 
   /// The number of additional elements that can be added to this span.
   @_alwaysEmitIntoClient
+  @_transparent
   public var freeCapacity: Int { capacity &- _count }
 
   /// A Boolean value indicating whether the span is empty.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isEmpty: Bool { _count == 0 }
 
   /// A Boolean value indicating whether the span is full.
   @_alwaysEmitIntoClient
+  @_transparent
   public var isFull: Bool { _count == capacity }
 }
 
@@ -164,7 +168,7 @@ extension OutputSpan {
   /// the common case of a completely uninitialized `buffer`.
   ///
   /// - Parameters:
-  ///   - buffer: an `UnsafeMutableBufferPointer` to be initialized
+  ///   - buffer: a slice of an `UnsafeMutableBufferPointer` to be initialized
   ///   - initializedCount: the number of initialized elements
   ///                       at the beginning of `buffer`.
   @unsafe
@@ -185,10 +189,10 @@ extension OutputSpan {
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
-  /// The type that represents an initialized position in an `OutputSpan`.
+  /// The type that represents an initialized index in an `OutputSpan`.
   public typealias Index = Int
 
-  /// The range of initialized positions for this `OutputSpan`.
+  /// The range of initialized indices for this `OutputSpan`.
   @_alwaysEmitIntoClient
   public var indices: Range<Index> {
     unsafe Range(_uncheckedBounds: (0, count))
@@ -202,27 +206,29 @@ extension OutputSpan where Element: ~Copyable {
     _precondition(indices.contains(index), "index out of bounds")
   }
 
-  /// Accesses the element at the specified position.
+  /// Accesses the element at the specified index.
   ///
   /// - Parameter index: A valid index into this span.
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public subscript(_ index: Index) -> Element {
-    unsafeAddress {
+    @_transparent
+    borrow {
       _checkIndex(index)
-      return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: index))
+      return unsafe self[unchecked: index]
     }
+    @_transparent
     @lifetime(self: copy self)
-    unsafeMutableAddress {
+    mutate {
       _checkIndex(index)
-      return unsafe _unsafeAddressOfElement(unchecked: index)
+      return unsafe &(self[unchecked: index])
     }
   }
 
-  /// Accesses the element at the specified position.
+  /// Accesses the element at the specified index.
   ///
-  /// This subscript does not validate `position`; this is an unsafe operation.
+  /// This subscript does not validate `index`; this is an unsafe operation.
   ///
   /// - Parameter index: A valid index into this span.
   ///
@@ -230,12 +236,15 @@ extension OutputSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   public subscript(unchecked index: Index) -> Element {
-    unsafeAddress {
-      unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: index))
+    @_unsafeSelfDependentResult
+    borrow {
+      Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: index))
     }
+    @_unsafeSelfDependentResult
     @lifetime(self: copy self)
-    unsafeMutableAddress {
-      unsafe _unsafeAddressOfElement(unchecked: index)
+    mutate {
+      let address = unsafe _unsafeAddressOfElement(unchecked: index)
+      return unsafe &(UnsafeMutablePointer(address).pointee)
     }
   }
 
@@ -243,27 +252,26 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal func _unsafeAddressOfElement(
     unchecked index: Index
-  ) -> UnsafeMutablePointer<Element> {
+  ) -> Builtin.RawPointer {
     let elementOffset = index &* MemoryLayout<Element>.stride
-    let address = unsafe _start().advanced(by: elementOffset)
-    return unsafe address.assumingMemoryBound(to: Element.self)
+    return unsafe _start().advanced(by: elementOffset)._rawValue
   }
 
-  /// Exchange the elements at the two given offsets
+  /// Exchange the elements at the two given indices.
   ///
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
-    _precondition(indices.contains(Index(i)))
-    _precondition(indices.contains(Index(j)))
+    _precondition(indices.contains(i))
+    _precondition(indices.contains(j))
     unsafe swapAt(unchecked: i, unchecked: j)
   }
 
-  /// Exchange the elements at the two given offsets
+  /// Exchange the elements at the two given indices.
   ///
-  /// This subscript does not validate `i` or `j`; this is an unsafe operation.
+  /// This function does not validate `i` or `j`; this is an unsafe operation.
   ///
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
@@ -271,8 +279,10 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func swapAt(unchecked i: Index, unchecked j: Index) {
-    let pi = unsafe _unsafeAddressOfElement(unchecked: i)
-    let pj = unsafe _unsafeAddressOfElement(unchecked: j)
+    let ri = unsafe _unsafeAddressOfElement(unchecked: i)
+    let pi = unsafe UnsafeMutablePointer<Element>(ri)
+    let rj = unsafe _unsafeAddressOfElement(unchecked: j)
+    let pj = unsafe UnsafeMutablePointer<Element>(rj)
     let temporary = unsafe pi.move()
     unsafe pi.initialize(to: pj.move())
     unsafe pj.initialize(to: consume temporary)
@@ -283,6 +293,8 @@ extension OutputSpan where Element: ~Copyable {
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension OutputSpan where Element: ~Copyable {
   /// Append a single element to this span.
+  ///
+  /// - Parameter value: The element to append.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append(_ value: consuming Element) {
@@ -294,6 +306,8 @@ extension OutputSpan where Element: ~Copyable {
   /// Remove the last initialized element from this span.
   ///
   /// Returns the last element. The `OutputSpan` must not be empty.
+  ///
+  /// - Returns: The removed element.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func removeLast() -> Element {
@@ -304,18 +318,21 @@ extension OutputSpan where Element: ~Copyable {
     }
   }
 
-  /// Remove the last N elements of this span, returning the memory they occupy
-  /// to the uninitialized state.
+  /// Remove the last n elements of this span, returning the memory
+  /// they occupy to the uninitialized state.
   ///
-  /// `n` must not be greater than `count`
+  /// `n` must not be greater than `count`.
+  ///
+  /// - Parameter n: The number of elements to remove.
+  ///     `n` must not be negative or greater than `count`.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
-  public mutating func removeLast(_ k: Int) {
-    _precondition(k >= 0, "Can't remove a negative number of elements")
-    _precondition(k <= _count, "OutputSpan underflow")
-    _count &-= k
-    unsafe _tail().withMemoryRebound(to: Element.self, capacity: k) {
-      _ = unsafe $0.deinitialize(count: k)
+  public mutating func removeLast(_ n: Int) {
+    _precondition(n >= 0, "Can't remove a negative number of elements")
+    _precondition(n <= _count, "OutputSpan underflow")
+    _count &-= n
+    unsafe _tail().withMemoryRebound(to: Element.self, capacity: n) {
+      _ = unsafe $0.deinitialize(count: n)
     }
   }
 
@@ -338,6 +355,11 @@ extension OutputSpan where Element: ~Copyable {
 extension OutputSpan {
 
   /// Repeatedly append an element to this span.
+  ///
+  /// - Parameters:
+  ///   - repeatedValue: The element to append repeatedly.
+  ///   - count: The number of times to append `repeatedValue`.
+  ///       `count` must not exceed `freeCapacity`.
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func append(repeating repeatedValue: Element, count: Int) {
@@ -354,6 +376,7 @@ extension OutputSpan {
 extension OutputSpan where Element: ~Copyable {
   /// Borrow the underlying initialized memory for read-only access.
   @_alwaysEmitIntoClient
+  @_transparent
   public var span: Span<Element> {
     @lifetime(borrow self)
     borrowing get {
@@ -366,6 +389,7 @@ extension OutputSpan where Element: ~Copyable {
 
   /// Exclusively borrow the underlying initialized memory for mutation.
   @_alwaysEmitIntoClient
+  @_transparent
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
     mutating get {
@@ -403,37 +427,24 @@ extension OutputSpan where Element: ~Copyable {
   /// This function cannot verify these two invariants, and therefore
   /// this is an unsafe operation. Violating the invariants of `OutputSpan`
   /// may result in undefined behavior.
+  ///
+  /// - Parameter body: A closure that can read from and write to the
+  ///     buffer and update the initialized count.
+  /// - Returns: The return value of the `body` closure.
   @_alwaysEmitIntoClient
+  @_transparent
   @lifetime(self: copy self)
+  @unsafe
   public mutating func withUnsafeMutableBufferPointer<E: Error, R: ~Copyable>(
     _ body: (
       UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int
     ) throws(E) -> R
   ) throws(E) -> R {
-    guard let start = unsafe _pointer, capacity > 0 else {
-      let buffer = UnsafeMutableBufferPointer<Element>(_empty: ())
-      var initializedCount = 0
-      defer {
-        _precondition(initializedCount == 0, "OutputSpan capacity overflow")
-      }
-      return unsafe try body(buffer, &initializedCount)
-    }
-    // bind memory by hand to sidestep alignment concerns
-    let binding = Builtin.bindMemory(
-      start._rawValue, capacity._builtinWordValue, Element.self
+    let bytes = unsafe UnsafeMutableRawBufferPointer(
+      start: _pointer, count: capacity &* MemoryLayout<Element>.stride
     )
-    defer { Builtin.rebindMemory(start._rawValue, binding) }
-#if SPAN_COMPATIBILITY_STUB
-    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      start: .init(start._rawValue), count: capacity
-    )
-#else
-    let buffer = unsafe UnsafeMutableBufferPointer<Element>(
-      _uncheckedStart: .init(start._rawValue), count: capacity
-    )
-#endif
-    var initializedCount = self._count
+    var initializedCount = _count
     defer {
       _precondition(
         0 <= initializedCount && initializedCount <= capacity,
@@ -441,7 +452,10 @@ extension OutputSpan where Element: ~Copyable {
       )
       self._count = initializedCount
     }
-    return unsafe try body(buffer, &initializedCount)
+    return try unsafe bytes.withMemoryRebound(to: Element.self) {
+      buffer throws(E) -> R in
+      try unsafe body(buffer, &initializedCount)
+    }
   }
 }
 

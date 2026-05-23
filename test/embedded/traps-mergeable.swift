@@ -15,6 +15,7 @@ public func test(i: Int, j: Int) {
 }
 
 // CHECK-NOT: call void asm sideeffect ""
+// CHECK-NOT: nomerge
 
 // CHECK: define {{.*}}@"$e4main4test1i1jySi_SitF"
 // CHECK:   tail call void @llvm.trap()

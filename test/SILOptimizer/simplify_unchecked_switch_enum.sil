@@ -68,6 +68,7 @@ bb1(%2 : @owned $String):
   return %2 : $String
 
 bb2(%4 : @owned $E):
+  destroy_value [dead_end] %4
   unreachable
 }
 
@@ -107,6 +108,7 @@ bb1(%5 : @owned $String):
   return %5 : $String
 
 bb2(%7 : @owned $E):
+  destroy_value [dead_end] %7
   unreachable
 }
 
@@ -151,6 +153,7 @@ bb1(%2 : @owned $String):
   return %2 : $String
 
 bb2(%4 : @owned $E):
+  destroy_value [dead_end] %4
   unreachable
 }
 

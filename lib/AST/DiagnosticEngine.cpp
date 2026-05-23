@@ -270,14 +270,27 @@ InFlightDiagnostic &InFlightDiagnostic::fixItRemove(SourceRange R) {
   // the token we want to remove.
   auto &SM = Engine->SourceMgr;
   auto charRange = toCharSourceRange(SM, R);
+  auto charAfter = extractCharAfter(SM, charRange.getEnd());
 
-  // If we're removing something (e.g. a keyword), do a bit of extra work to
-  // make sure that we leave the code in a good place, without extraneous white
-  // space around its hole.  Specifically, check to see there is whitespace
-  // before and after the end of range.  If so, nuke the space afterward to keep
-  // things consistent.
-  if (extractCharAfter(SM, charRange.getEnd()) == ' ' &&
-      isspace(extractCharBefore(SM, charRange.getStart()))) {
+  // If we're removing something (e.g. a keyword or an attribute), do a bit of
+  // extra work to make sure that we leave the code in a good place, without
+  // extraneous white space around its hole:
+  //
+  //  - If there's a newline immediately following the range, check whether the
+  //    content of the line leading up to the range is all whitespace. Remove
+  //    the entire line if so.
+  //  - If there is a space before and after the end of range, nuke the
+  //    space afterward to keep things consistent.
+  if (charAfter == '\n' || charAfter == '\r') {
+    auto lineStartLoc = Lexer::getLocForStartOfLine(SM, charRange.getStart());
+    auto lineStart = SM.extractText(
+        toCharSourceRange(SM, lineStartLoc, charRange.getStart()));
+    if (lineStart.ltrim().empty()) {
+      charRange = CharSourceRange(
+          lineStartLoc, lineStart.size() + charRange.getByteLength() + 1);
+    }
+  } else if (charAfter == ' ' &&
+             isspace(extractCharBefore(SM, charRange.getStart()))) {
     charRange = CharSourceRange(charRange.getStart(),
                                 charRange.getByteLength()+1);
   }
@@ -459,17 +472,25 @@ InFlightDiagnostic::limitBehavior(DiagnosticBehavior limit) {
 }
 
 InFlightDiagnostic &
+InFlightDiagnostic::limitBehaviorIfMorePermissive(DiagnosticBehavior limit) {
+  auto prev = getDiag().getBehaviorLimit();
+  getDiag().setBehaviorLimit(prev.merge(limit));
+  return *this;
+}
+
+InFlightDiagnostic &
 InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
-                                                   unsigned majorVersion) {
-  if (!Engine->languageVersion.isVersionAtLeast(majorVersion)) {
+                                                   LanguageMode mode) {
+  if (!mode.isEffectiveIn(Engine->languageVersion)) {
     // If the behavior limit is a warning or less, wrap the diagnostic
     // in a message that this will become an error in a later Swift
     // version. We do this before limiting the behavior, because
     // wrapIn will result in the behavior of the wrapping diagnostic.
     if (limit >= DiagnosticBehavior::Warning) {
-      if (majorVersion >= version::Version::getFutureMajorLanguageVersion()) {
+      if (mode.isFuture()) {
         wrapIn(diag::error_in_a_future_swift_lang_mode);
       } else {
+        const auto majorVersion = mode.version().first;
         wrapIn(diag::error_in_swift_lang_mode, majorVersion);
       }
     }
@@ -478,7 +499,7 @@ InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
   }
 
   // Record all of the diagnostics that are going to be emitted.
-  if (majorVersion == 6 && limit != DiagnosticBehavior::Ignore) {
+  if (mode == LanguageMode::v6 && limit != DiagnosticBehavior::Ignore) {
     if (auto stats = Engine->statsReporter) {
       ++stats->getFrontendCounters().NumSwift6Errors;
     }
@@ -487,15 +508,9 @@ InFlightDiagnostic::limitBehaviorUntilLanguageMode(DiagnosticBehavior limit,
   return *this;
 }
 
-InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureLanguageMode() {
-  using namespace version;
-  return warnUntilLanguageMode(Version::getFutureMajorLanguageVersion());
-}
-
 InFlightDiagnostic &
-InFlightDiagnostic::warnUntilLanguageMode(unsigned majorVersion) {
-  return limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning,
-                                        majorVersion);
+InFlightDiagnostic::warnUntilLanguageMode(LanguageMode mode) {
+  return limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, mode);
 }
 
 InFlightDiagnostic &
@@ -520,12 +535,12 @@ InFlightDiagnostic::wrapIn(const Diagnostic &wrapper) {
   llvm::SaveAndRestore<DiagnosticBehavior> limit(
       Diag.BehaviorLimit, DiagnosticBehavior::Unspecified);
 
-  ActiveDiag.WrappedDiagnostics.push_back(*Engine->diagnosticInfoForDiagnostic(
-      Diag, /* includeDiagnosticName= */ false));
+  ActiveDiag.WrappedDiagnostics.push_back(std::make_unique<DiagnosticInfo>(
+      Engine->diagnosticInfoForDiagnostic(Diag, /*diagName*/ false).value()));
 
   Engine->state.swap(tempState);
 
-  auto &wrapped = ActiveDiag.WrappedDiagnostics.back();
+  auto &wrapped = *ActiveDiag.WrappedDiagnostics.back();
 
   // Copy and update its arg list.
   ActiveDiag.WrappedDiagnosticArgs.emplace_back(wrapped.FormatArgs);
@@ -587,13 +602,15 @@ bool DiagnosticEngine::finishProcessing() {
 
 bool DiagnosticEngine::isDiagnosticGroupEnabled(SourceFile *sf, DiagGroupID groupID) const {
 #if SWIFT_BUILD_SWIFT_SYNTAX
-  if (!sf || !sf->getExportedSourceFile())
-    return !state.isIgnoredDiagnosticGroupTree(groupID);
-  auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
-  return swift_ASTGen_isWarningGroupEnabledInFile(
-         sf->getExportedSourceFile(),
-         BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
-         StringRef(getDiagGroupInfoByID(groupID).name));
+  if (sf && sf->Kind != SourceFileKind::Interface &&
+      sf->getExportedSourceFile()) {
+    auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
+    return swift_ASTGen_isWarningGroupEnabledInFile(
+        sf->getExportedSourceFile(),
+        BridgedArrayRef(ruleRefArray.data(), ruleRefArray.size()),
+        StringRef(getDiagGroupInfoByID(groupID).name));
+  }
+  return !state.isIgnoredDiagnosticGroupTree(groupID);
 #else
   // Fallback to checking only the command-line configuration
   return !state.isIgnoredDiagnosticGroupTree(groupID);
@@ -1310,15 +1327,6 @@ DiagnosticBehavior toDiagnosticBehavior(DiagnosticKind kind, bool isFatal) {
   llvm_unreachable("Unhandled DiagnosticKind in switch.");
 }
 
-// A special option only for compiler writers that causes Diagnostics to assert
-// when a failure diagnostic is emitted. Intended for use in the debugger.
-llvm::cl::opt<bool> AssertOnError("swift-diagnostics-assert-on-error",
-                                  llvm::cl::init(false));
-// A special option only for compiler writers that causes Diagnostics to assert
-// when a warning diagnostic is emitted. Intended for use in the debugger.
-llvm::cl::opt<bool> AssertOnWarning("swift-diagnostics-assert-on-warning",
-                                    llvm::cl::init(false));
-
 std::optional<DiagnosticBehavior>
 DiagnosticState::determineUserControlledWarningBehavior(
     const Diagnostic &diag, SourceManager &sourceMgr) const {
@@ -1358,7 +1366,9 @@ DiagnosticState::determineUserControlledWarningBehavior(
         sourceMgr.findBufferContainingLoc(loc));
     if (!sourceFiles.empty()) {
       SourceFile *SF = sourceFiles.front();
-      if (SF && SF->getExportedSourceFile()) {
+      // Don't run syntactic @diagnose controls for .swiftinterface files.
+      if (SF && SF->Kind != SourceFileKind::Interface &&
+          SF->getExportedSourceFile()) {
         auto ruleRefArray = getWarningGroupBehaviorControlRefArray();
         WarningGroupBehavior behavior =
             swift_ASTGen_warningGroupBehaviorAtPosition(
@@ -1453,8 +1463,8 @@ void DiagnosticState::updateFor(DiagnosticBehavior behavior) {
     anyErrorOccurred = true;
   }
 
-  ASSERT((!AssertOnError || !anyErrorOccurred) && "We emitted an error?!");
-  ASSERT((!AssertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
+  ASSERT((!assertOnError || !anyErrorOccurred) && "We emitted an error?!");
+  ASSERT((!assertOnWarning || (behavior != DiagnosticBehavior::Warning)) &&
          "We emitted a warning?!");
 
   previousBehavior = behavior;
@@ -1520,6 +1530,15 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   auto behavior = state.determineBehavior(diagnostic, SourceMgr);
   state.updateFor(behavior);
 
+  if (behavior != DiagnosticBehavior::Ignore) {
+    auto groupID = diagnostic.getGroupID();
+    if (groupID != DiagGroupID::no_group &&
+        state.shouldAssertOnGroup(groupID)) {
+      ASSERT(false && "Trapping on diagnostic group (see "
+                      "-diagnostics-assert-on-group)");
+    }
+  }
+
   if (behavior == DiagnosticBehavior::Ignore)
     return std::nullopt;
 
@@ -1539,17 +1558,17 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
   }
 
   auto groupID = diagnostic.getGroupID();
-  StringRef Category;
+  StringRef CategoryName;
   if (auto wrapped = diagnostic.getWrappedDiagnostic())
-    Category = wrapped.value()->Category;
-  else if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
-    Category = "api-digester-breaking-change";
-  else if (isNoUsageDiagnostic(diagnostic.getID()))
-    Category = "no-usage";
+    CategoryName = wrapped.value()->getCategoryName();
   else if (groupID != DiagGroupID::no_group)
-    Category = getDiagGroupInfoByID(groupID).name;
+    CategoryName = getDiagGroupInfoByID(groupID).name;
+  else if (isAPIDigesterBreakageDiagnostic(diagnostic.getID()))
+    CategoryName = "api-digester-breaking-change";
+  else if (isNoUsageDiagnostic(diagnostic.getID()))
+    CategoryName = "no-usage";
   else if (isDeprecationDiagnostic(diagnostic.getID()))
-    Category = "deprecation";
+    CategoryName = "deprecation";
 
   auto fixIts = diagnostic.getFixIts();
   if (loc.isValid()) {
@@ -1578,7 +1597,7 @@ DiagnosticEngine::diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
       getFormatStringForDiagnostic(diagnostic, includeDiagnosticName);
 
   return DiagnosticInfo(diagnostic.getID(), loc, toDiagnosticKind(behavior),
-                        formatString, diagnostic.getArgs(), Category,
+                        formatString, diagnostic.getArgs(), CategoryName,
                         getDefaultDiagnosticLoc(),
                         /*child note info*/ {}, diagnostic.getRanges(), fixIts,
                         diagnostic.isChildNote());
@@ -1712,7 +1731,9 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
       auto child =
           diagnosticInfoForDiagnostic(childNotes[i],
                                       /* includeDiagnosticName= */ true);
-      assert(child);
+      assert(child || state.getSuppressNotes());
+      if (!child)
+        continue;
       assert(child->Kind == DiagnosticKind::Note &&
              "Expected child diagnostics to all be notes?!");
       childInfo.push_back(*child);
@@ -1724,16 +1745,51 @@ void DiagnosticEngine::emitDiagnostic(const Diagnostic &diagnostic) {
     info->ChildDiagnosticInfo = childInfoPtrs;
 
     // Capture information about the diagnostic group and its documentation
-    // URL.
+    // URL. Build the full category chain (leaf + parents).
     auto groupID = diagnostic.getGroupID();
     if (groupID != DiagGroupID::no_group) {
       const auto &diagGroup = getDiagGroupInfoByID(groupID);
-      
-      std::string docURL(getDiagnosticDocumentationPath());
-      if (!docURL.empty() && docURL.back() != '/')
-        docURL += "/";
-      docURL += diagGroup.documentationFile;
-      info->CategoryDocumentationURL = std::move(docURL);
+
+      auto getDiagnosticGroupDocURL =
+          [&](const DiagGroupInfo &diagGroup) -> std::string {
+        if (diagGroup.toolchainLocalDocumentation) {
+          std::string localPath(getLocalDiagnosticDocumentationPath());
+          if (!localPath.empty()) {
+            if (localPath.back() != '/')
+              localPath += "/";
+            localPath += diagGroup.documentationFile;
+            localPath += ".md";
+            return localPath;
+          }
+          return "";
+        }
+
+        std::string docURL(getDiagnosticDocumentationPath());
+        if (!docURL.empty() && docURL.back() != '/')
+          docURL += "/";
+        docURL += diagGroup.documentationFile;
+        return docURL;
+      };
+
+      // Set the leaf category's documentation URL.
+      info->setCategoryDocumentationURL(getDiagnosticGroupDocURL(diagGroup));
+
+      // Append parent groups by walking up supergroups.
+      auto currentID = groupID;
+      while (true) {
+        const auto &current = getDiagGroupInfoByID(currentID);
+        if (current.supergroups.empty())
+          break;
+        auto parentID = current.supergroups[0];
+        const auto &parent = getDiagGroupInfoByID(parentID);
+        std::string parentDocURL(getDiagnosticDocumentationPath());
+        if (!parentDocURL.empty() && parentDocURL.back() != '/')
+          parentDocURL += "/";
+        parentDocURL += parent.documentationFile;
+        info->CategoryChain.push_back(
+            {StringRef(parent.name), std::move(parentDocURL)});
+        currentID = parentID;
+      }
     }
 
     for (auto &consumer : Consumers) {
@@ -1863,6 +1919,17 @@ void DiagnosticEngine::onTentativeDiagnosticFlush(Diagnostic &diagnostic) {
     auto I = TransactionStrings.insert(content).first;
     argument = DiagnosticArgument(StringRef(I->getKeyData()));
   }
+}
+
+DiagnosticQueue::DiagnosticQueue(DiagnosticEngine &engine,
+                                 bool emitOnDestruction)
+    : UnderlyingEngine(engine), QueueEngine(engine.SourceMgr),
+      EmitOnDestruction(emitOnDestruction) {
+  // Open a transaction to avoid emitting any diagnostics for the temporary
+  // engine.
+  QueueEngine.TransactionCount++;
+
+  QueueEngine.setLanguageVersion(engine.languageVersion);
 }
 
 void DiagnosticQueue::forEach(

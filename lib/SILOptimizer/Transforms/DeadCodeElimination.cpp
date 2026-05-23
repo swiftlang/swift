@@ -17,20 +17,19 @@
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/NodeBits.h"
-#include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBasicBlock.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILUndef.h"
-#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
@@ -51,11 +50,6 @@ namespace {
 // FIXME: Reconcile the similarities between this and
 //        isInstructionTriviallyDead.
 static bool seemsUseful(SILInstruction *I) {
-  // Even though end_lifetime has side-effects, it can be DCE'ed if it does not
-  // have useful dependencies/reverse dependencies
-  if (isa<EndLifetimeInst>(I))
-    return false;
-
   if (isa<UnconditionalCheckedCastInst>(I)) {
     return false;
   }
@@ -71,28 +65,6 @@ static bool seemsUseful(SILInstruction *I) {
 
   if (llvm::any_of(I->getResults(),
                    [](auto result) { return result->isLexical(); })) {
-    return true;
-  }
-
-  // Instructions which end the lifetimes of values which escape can only be
-  // deleted if compensating lifetime ends are added.  Compensating lifetime
-  // ends are added by OSSACompleteLifetime when the def block of the value
-  // is different from the parent block of the instruction.  But
-  // OSSACompleteLifetime requires that liveness be complete--that there are no
-  // pointer escapes.  So we can't delete instructions which end the lifetime
-  // of values which escape to a pointer and whose parent blocks are different.
-  if (llvm::any_of(I->getAllOperands(), [I](Operand &operand) {
-        if (!operand.isLifetimeEnding())
-          return false;
-        auto value = operand.get();
-        if (isa<SILUndef>(value))
-          return false;
-        auto *insertionPoint = value->getDefiningInsertionPoint();
-        ASSERT(insertionPoint);
-        if (insertionPoint->getParent() == I->getParent())
-          return false;
-        return findPointerEscape(value);
-      })) {
     return true;
   }
 
@@ -118,6 +90,10 @@ static bool seemsUseful(SILInstruction *I) {
 
   // Don't delete allocation instructions in DCE.
   if (isa<AllocRefInst>(I) || isa<AllocRefDynamicInst>(I)) {
+    return true;
+  }
+
+  if (!canDeleteDeadMoveOnlyOwnedDestructureInst(I)) {
     return true;
   }
 
@@ -148,9 +124,7 @@ class DCE {
   BasicBlockSet LiveBlocks;
   llvm::SmallVector<SILInstruction *, 64> Worklist;
   PostDominanceInfo *PDT;
-  DeadEndBlocks *deadEndBlocks;
   llvm::DenseMap<SILBasicBlock *, ControllingInfo> ControllingInfoMap;
-  SmallBlotSetVector<SILValue, 8> valuesToComplete;
 
   // Maps instructions which produce a failing condition (like overflow
   // builtins) to the actual cond_fail instructions which handle the failure.
@@ -219,10 +193,8 @@ class DCE {
   void endLifetimeOfLiveValue(Operand *op, SILInstruction *insertPt);
 
 public:
-  DCE(SILFunction *F, PostDominanceInfo *PDT, DominanceInfo *DT,
-      DeadEndBlocks *deadEndBlocks)
-      : F(F), LiveArguments(F), LiveInstructions(F), LiveBlocks(F), PDT(PDT),
-        deadEndBlocks(deadEndBlocks) {}
+  DCE(SILFunction *F, PostDominanceInfo *PDT, DominanceInfo *DT)
+      : F(F), LiveArguments(F), LiveInstructions(F), LiveBlocks(F), PDT(PDT) {}
 
   /// The entry point to the transformation.
   bool run() {
@@ -389,16 +361,6 @@ void DCE::markLive() {
         addReverseDependency(I.getOperand(0), &I);
         break;
       }
-      case SILInstructionKind::EndLifetimeInst: {
-        if (I.getOperand(0)->getType().isAddress()) {
-          // DCE cannot reason about values in memory.
-          markInstructionLive(&I);
-          break;
-        }
-        // The instruction is live only if it's operand value is also live
-        addReverseDependency(I.getOperand(0), &I);
-        break;
-      }
       case SILInstructionKind::BeginBorrowInst: {
         auto *borrowInst = cast<BeginBorrowInst>(&I);
         processBorrow(BorrowedValue(borrowInst));
@@ -436,6 +398,7 @@ void DCE::addReverseDependency(SILValue from, SILInstruction *to) {
 
 void DCE::findGuaranteedPhiDependencies(BorrowedValue borrow) {
   assert(borrow.kind == BorrowedValueKind::BeginBorrow ||
+         borrow.kind == BorrowedValueKind::DereferenceBorrow ||
          borrow.kind == BorrowedValueKind::LoadBorrow);
   LLVM_DEBUG(llvm::dbgs() << "Finding @guaranteed phi dependencies of "
                           << borrow << "\n");
@@ -660,24 +623,12 @@ void DCE::endLifetimeOfLiveValue(Operand *op, SILInstruction *insertPt) {
 
   assert(op->isLifetimeEnding());
 
-  // If DCE is going to delete the block in which we have to insert a
-  // compensating lifetime end, let complete lifetimes utility handle it.
-  if (!LiveBlocks.contains(insertPt->getParent())) {
-    valuesToComplete.insert(lookThroughBorrowedFromDef(value));
-    return;
-  }
-
   SILBuilderWithScope builder(insertPt);
-  if (value->getOwnershipKind() == OwnershipKind::Owned) {
-    auto *destroy = builder.createDestroyValue(
-        RegularLocation::getAutoGeneratedLocation(), value);
-    markInstructionLive(destroy);
-  }
-  if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
-    auto *endBorrow = builder.createEndBorrow(
-        RegularLocation::getAutoGeneratedLocation(), value);
-    markInstructionLive(endBorrow);
-  }
+
+  assert (value->getOwnershipKind() == OwnershipKind::Guaranteed);
+  auto *endBorrow = builder.createEndBorrow(
+      RegularLocation::getAutoGeneratedLocation(), value);
+  markInstructionLive(endBorrow);
 }
 
 // Remove the instructions that are not potentially useful.
@@ -732,26 +683,6 @@ bool DCE::removeDead() {
       for (auto *pred : BB.getPredecessorBlocks()) {
         auto *predTerm = pred->getTerminator();
         SILInstruction *insertPt = predTerm;
-        if (phiArg->isReborrow()) {
-          // If the phiArg is dead and had reborrow dependencies, its baseValue
-          // may also have been dead and a destroy_value of its baseValue may
-          // have been inserted before the pred's terminator. Make sure to
-          // adjust the insertPt before any destroy_value.
-          //
-          // FIXME: This code currently can reorder destroys, e.g., when the
-          //        block already contains a destroy_value just before the
-          //        terminator.  Fix this by making note of the added
-          //        destroy_value insts and only moving the insertion point
-          //        before those that are newly added.
-          for (SILInstruction &predInst : llvm::reverse(*pred)) {
-            if (&predInst == predTerm)
-              continue;
-            if (!isa<DestroyValueInst>(&predInst)) {
-              break;
-            }
-            insertPt = &predInst;
-          }
-        }
         auto *predOp = phiArg->getIncomingPhiOperand(pred);
         if (predOp->isLifetimeEnding()) {
           endLifetimeOfLiveValue(predOp, insertPt);
@@ -762,12 +693,6 @@ bool DCE::removeDead() {
           InstModCallbacks()
               .onCreateNewInst([&](auto *inst) { markInstructionLive(inst); })
               .onDelete([&](auto *inst) {
-                for (auto result : inst->getResults()) {
-                  result = lookThroughBorrowedFromDef(result);
-                  if (valuesToComplete.count(result)) {
-                    valuesToComplete.erase(result);
-                  }
-                }
                 inst->replaceAllUsesOfAllResultsWithUndef();
                 if (isa<ApplyInst>(inst))
                   CallsChanged = true;
@@ -815,19 +740,6 @@ bool DCE::removeDead() {
       LLVM_DEBUG(llvm::dbgs() << "Removing dead instruction:\n");
       LLVM_DEBUG(Inst->dump());
 
-      if (F->hasOwnership()) {
-        for (auto &Op : Inst->getAllOperands()) {
-          if (Op.isLifetimeEnding()) {
-            endLifetimeOfLiveValue(&Op, Inst);
-          }
-        }
-      }
-      for (auto result : Inst->getResults()) {
-        result = lookThroughBorrowedFromDef(result);
-        if (valuesToComplete.count(result)) {
-          valuesToComplete.erase(result);
-        }
-      }
       Inst->replaceAllUsesOfAllResultsWithUndef();
 
       if (isa<ApplyInst>(Inst))
@@ -836,14 +748,6 @@ bool DCE::removeDead() {
       Inst->eraseFromParent();
       Changed = true;
     }
-  }
-
-  OSSACompleteLifetime completion(F, *deadEndBlocks);
-  for (auto value : valuesToComplete) {
-    if (!value.has_value())
-      continue;
-    completion.completeOSSALifetime(*value,
-                                    OSSACompleteLifetime::Boundary::Liveness);
   }
 
   return Changed;
@@ -1055,7 +959,6 @@ public:
     PostDominanceInfo *PDT = PDA->get(F);
 
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
-    auto *DEA = getAnalysis<DeadEndBlocksAnalysis>();
 
     // If we have a function that consists of nothing but a
     // structurally infinite loop like:
@@ -1064,7 +967,7 @@ public:
     if (!PDT->getRootNode())
       return;
 
-    DCE dce(F, PDT, DA->get(F), DEA->get(F));
+    DCE dce(F, PDT, DA->get(F));
     if (dce.run()) {
       using InvalidationKind = SILAnalysis::InvalidationKind;
       unsigned Inv = InvalidationKind::Instructions;
@@ -1075,6 +978,12 @@ public:
         Inv |= (unsigned)InvalidationKind::Branches;
       }
       invalidateAnalysis(SILAnalysis::InvalidationKind(Inv));
+      if (dce.mustInvalidateBranches()) {
+        if (F->needBreakInfiniteLoops())
+          breakInfiniteLoops(getPassManager(), F);
+        if (F->needCompleteLifetimes())
+          completeAllLifetimes(getPassManager(), F);
+      }
     }
   }
 };

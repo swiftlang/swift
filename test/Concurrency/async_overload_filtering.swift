@@ -17,7 +17,7 @@ func filter_async(_: String) -> Void {}
 
 var a: String? = nil
 
-// CHECK: attempting disjunction choice $T0 bound to decl async_overload_filtering.(file).filter_async(fn2:)
+// CHECK: attempting disjunction choice $T0 bound to async_overload_filtering.(file).filter_async(fn2:)
 // CHECK-NOT: simplification result
 // CHECK: overload set choice binding $T0 := {{.*}}
 // CHECK-NEXT: (considering: ({{.*}}) -> {{.*}} applicable fn {{.*}}

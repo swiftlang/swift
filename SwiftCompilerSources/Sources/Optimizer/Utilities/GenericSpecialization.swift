@@ -164,10 +164,9 @@ func specializeWitnessTable(for conformance: Conformance, _ context: ModulePassC
         return origEntry
       }
       return .method(requirement: requirement, witness: specializedMethod)
-    case .baseProtocol(let requirement, let witness):
-      let baseConf = context.getSpecializedConformance(of: witness,
-                                                       for: conformance.type,
-                                                       substitutions: conformance.specializedSubstitutions)
+    case .baseProtocol(let requirement, _):
+      let selfTy = requirement.selfInterfaceType
+      let baseConf = conformance.getAssociatedConformance(ofAssociatedType: selfTy, to: requirement)
       specializeWitnessTable(for: baseConf, context)
       return .baseProtocol(requirement: requirement, witness: baseConf)
     case .associatedType(let requirement, let witness):

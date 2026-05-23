@@ -51,6 +51,7 @@
 #include "clang/AST/DeclObjC.h"
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/SourceManager.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -980,7 +981,7 @@ private:
       }
 
       // Print the raw values, even the ones that we synthesize.
-      auto *ILE = cast<IntegerLiteralExpr>(Elt->getStructuralRawValueExpr());
+      auto *ILE = cast<IntegerLiteralExpr>(Elt->getRawValueExpr());
       os << " = ";
       if (ILE->isNegative())
         os << "-";
@@ -1101,36 +1102,63 @@ private:
            sel.getSelectorPieces().front().str() == "init";
   }
 
+  /// Returns the C++ parameter type strings for a function as they would
+  /// appear in the C++ inline thunk signature.
+  llvm::SmallVector<std::string, 4>
+  getCxxParamTypes(const AbstractFunctionDecl *funcDecl) const {
+    llvm::SmallVector<std::string, 4> result;
+    auto *params = funcDecl->getParameters();
+    if (!params)
+      return result;
+    auto *emittedModule = funcDecl->getModuleContext();
+    for (auto *param : *params) {
+      auto type = param->getInterfaceType();
+      // In C++ different integer types have different bitwidths. To
+      // avoid producing redefinition errors, we are conservative with
+      // these types and consider all integral types the same.
+      if (type->isStdlibInteger()) {
+        result.push_back("int");
+      } else {
+        std::string typeStr;
+        llvm::raw_string_ostream typeOS(typeStr);
+        owningPrinter.printTypeName(typeOS, type, emittedModule);
+        result.push_back(typeStr);
+      }
+    }
+    return result;
+  }
+
   /// Returns true if the given function overload is safe to emit in the current
-  /// C++ lexical scope.
-  bool canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl) const {
+  /// C++ lexical scope. If \p cxxNameOverride is non-empty, it is used as the
+  /// C++ function name instead of the default name derived from the
+  /// declaration.
+  bool
+  canPrintOverloadOfFunction(const AbstractFunctionDecl *funcDecl,
+                             StringRef cxxNameOverride = StringRef()) const {
     assert(outputLang == OutputLanguageMode::Cxx);
     auto &overloads =
         owningPrinter.getCxxDeclEmissionScope().emittedFunctionOverloads;
-    auto cxxName = cxx_translation::getNameForCxx(funcDecl);
-    auto overloadIt = overloads.find(cxxName);
-    if (overloadIt == overloads.end()) {
-      overloads.insert(std::make_pair(
-          cxxName,
-          llvm::SmallVector<const AbstractFunctionDecl *>({funcDecl})));
+    auto cxxName = cxxNameOverride.empty()
+                       ? cxx_translation::getNameForCxx(funcDecl)
+                       : cxxNameOverride;
+    auto paramTypes = getCxxParamTypes(funcDecl);
+    auto [overloadIt, inserted] = overloads.try_emplace(
+        cxxName,
+        llvm::SmallVector<CxxDeclEmissionScope::EmittedFunctionOverload, 2>(
+            {{funcDecl, paramTypes}}));
+    if (inserted)
       return true;
-    }
-    auto selfArity =
-        funcDecl->getParameters() ? funcDecl->getParameters()->size() : 0;
-    for (const auto *overload : overloadIt->second) {
-      auto arity =
-          overload->getParameters() ? overload->getParameters()->size() : 0;
-      // Avoid printing out an overload with the same and arity, as that might
-      // be an ambiguous overload on the C++ side.
-      // FIXME: we should take types into account, not all overloads with the
-      // same arity are ambiguous in C++.
-      if (selfArity == arity) {
+    for (const auto &overload : overloadIt->second) {
+      if (overload.cxxParamTypes == paramTypes) {
         owningPrinter.getCxxDeclEmissionScope()
-            .additionalUnrepresentableDeclarations.push_back(funcDecl);
+            .additionalUnrepresentableDeclarations.insert(
+                {funcDecl,
+                 "An overload with the same C++ parameter types already "
+                 "exists"});
         return false;
       }
     }
-    overloadIt->second.push_back(funcDecl);
+    overloadIt->second.push_back({funcDecl, paramTypes});
     return true;
   }
 
@@ -1173,8 +1201,24 @@ private:
         if (!dispatchInfo)
           return;
       }
-      // FIXME: handle getters/setters ambiguities here too.
-      if (!isa<AccessorDecl>(AFD)) {
+      // Check for naming conflicts between accessors and explicit methods
+      // using the unified emittedFunctionOverloads map.
+      if (auto *accessor = dyn_cast<AccessorDecl>(AFD)) {
+        // Subscript accessors emit as operator[] and cannot conflict with
+        // named methods, so skip the overload check for them.
+        if (!SD) {
+          std::string remappedName = remapPropertyName(accessor, resultTy);
+          if (!canPrintOverloadOfFunction(AFD, remappedName)) {
+            auto comment = ("  // skip emitting accessor method for \'" +
+                            accessor->getStorage()->getBaseIdentifier().str() +
+                            "\'. \'" + remappedName + "\' already declared.\n")
+                               .str();
+            os << comment;
+            owningPrinter.outOfLineDefinitionsOS << comment;
+            return;
+          }
+        }
+      } else {
         if (!canPrintOverloadOfFunction(AFD))
           return;
       }
@@ -1423,7 +1467,7 @@ private:
       // because it's a diagnostic inflicted on /clients/, but it's close
       // enough. It really is invalid to call +new when -init is unavailable.
       StringRef annotationName = "SWIFT_UNAVAILABLE_MSG";
-      if (!getASTContext().isLanguageModeAtLeast(5))
+      if (!getASTContext().isLanguageModeAtLeast(LanguageMode::v5))
         annotationName = "SWIFT_DEPRECATED_MSG";
       os << "+ (nonnull instancetype)new " << annotationName
          << "(\"-init is unavailable\");\n";
@@ -1471,7 +1515,8 @@ private:
   }
 
   /// Print C or C++ trailing attributes for a function declaration.
-  void printFunctionClangAttributes(FuncDecl *FD, AnyFunctionType *funcTy) {
+  void printFunctionClangAttributes(FuncDecl *FD, AnyFunctionType *funcTy,
+                                    Type resultTy) {
     if (funcTy->getResult()->isUninhabited()) {
       if (funcTy->isThrowing())
         os << " SWIFT_NORETURN_EXCEPT_ERRORS";
@@ -1481,6 +1526,9 @@ private:
                !FD->getAttrs().hasAttribute<DiscardableResultAttr>()) {
       os << " SWIFT_WARN_UNUSED_RESULT";
     }
+    if (outputLang == OutputLanguageMode::Cxx)
+      DeclAndTypeClangFunctionPrinter::printCxxReturnsRetainedAttribute(
+          os, resultTy);
   }
 
   // Print out the function signature for a @_cdecl function.
@@ -1500,7 +1548,7 @@ private:
     os << "SWIFT_EXTERN ";
     printFunctionDeclAsCFunctionDecl(FD, FD->getCDeclName(), resultTy);
     os << " SWIFT_NOEXCEPT";
-    printFunctionClangAttributes(FD, funcTy);
+    printFunctionClangAttributes(FD, funcTy, resultTy);
     printAvailability(FD);
     os << ";\n";
   }
@@ -1576,6 +1624,38 @@ private:
     if (representation.isObjCxxOnly())
       os << "#endif // defined(__OBJC__)\n";
     return representation;
+  }
+
+  /// Returns a reason string describing why a function's signature can't be
+  /// represented in C++, identifying the specific unsupported type if possible.
+  std::string getUnsupportedTypeReason(AbstractFunctionDecl *FD) {
+    auto &mod = owningPrinter.M;
+    auto isUnsupported = [&](Type ty) {
+      return DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
+                 owningPrinter.typeMapping, owningPrinter.interopContext,
+                 owningPrinter, &mod, ty)
+          .isUnsupported();
+    };
+
+    if (auto *funcDecl = dyn_cast<FuncDecl>(FD)) {
+      auto resultTy = funcDecl->getResultInterfaceType();
+      if (resultTy && !resultTy->isVoid() && isUnsupported(resultTy))
+        return "Return type '" + resultTy->getString() +
+               "' is not representable in C++";
+    }
+
+    for (auto [i, param] : llvm::enumerate(*FD->getParameters())) {
+      auto paramTy = param->getInterfaceType();
+      if (isUnsupported(paramTy)) {
+        auto name = param->getNameStr();
+        if (name.empty() || name == "_")
+          return "Parameter #" + std::to_string(i) + " of type '" +
+                 paramTy->getString() + "' is not representable in C++";
+        return "Parameter '" + name.str() + "' of type '" +
+               paramTy->getString() + "' is not representable in C++";
+      }
+    }
+    return "";
   }
 
   // Print out the extern C Swift ABI function signature.
@@ -1675,7 +1755,7 @@ private:
         modifiers);
     assert(
         !result.isUnsupported()); // The C signature should be unsupported too.
-    printFunctionClangAttributes(FD, funcTy);
+    printFunctionClangAttributes(FD, funcTy, resultTy);
     printAvailability(FD);
     os << " {\n";
     funcPrinter.printCxxThunkBody(
@@ -1783,8 +1863,9 @@ public:
         continue;
       }
 
+      auto platKind = AvAttr.getPlatform();
       const char *plat;
-      switch (AvAttr.getPlatform()) {
+      switch (platKind) {
       case PlatformKind::macOS:
         plat = "macos";
         break;
@@ -1825,9 +1906,11 @@ public:
         plat = "driverkit";
         break;
       case PlatformKind::Swift:
-      case PlatformKind::anyAppleOS:
         // FIXME: [runtime availability] Figure out how to support this.
-        ASSERT(0);
+        llvm::report_fatal_error("unsupported platform kind");
+        break;
+      case PlatformKind::anyAppleOS:
+        plat = "anyappleos";
         break;
       case PlatformKind::FreeBSD:
         plat = "freebsd";
@@ -1894,9 +1977,7 @@ private:
     assert(!AvAttr.getRename().empty());
 
     auto *renamedDecl = D->getRenamedDecl(AvAttr.getParsedAttr());
-    if (renamedDecl) {
-      assert(shouldInclude(renamedDecl) &&
-             "ObjC printer logic mismatch with renamed decl");
+    if (renamedDecl && shouldInclude(renamedDecl)) {
       SmallString<128> scratch;
       auto renamedObjCRuntimeName =
           renamedDecl->getObjCRuntimeName()->getString(scratch);
@@ -1919,7 +2000,8 @@ private:
                          .printSwiftABIFunctionSignatureAsCxxFunction(FD);
       if (!funcABI) {
         owningPrinter.getCxxDeclEmissionScope()
-            .additionalUnrepresentableDeclarations.push_back(FD);
+            .additionalUnrepresentableDeclarations.insert(
+                {FD, getUnsupportedTypeReason(FD)});
         return;
       }
       if (!canPrintOverloadOfFunction(FD))
@@ -1993,7 +2075,7 @@ private:
       }
     }
 
-    if (ty->isObjCExistentialType() && !isCFTypeRef(ty))
+    if ((ty->isObjCExistentialType() || ty->isAny()) && !isCFTypeRef(ty))
       return true;
 
     return false;

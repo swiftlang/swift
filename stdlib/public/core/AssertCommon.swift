@@ -91,7 +91,7 @@ internal func _fatalErrorFlags() -> UInt32 {
 #if !$Embedded
 @inline(never)
 #else
-@inline(__always)
+@inline(__always) @_transparent
 #endif
 @_semantics("programtermination_point")
 internal func _assertionFailure(
@@ -121,6 +121,7 @@ internal func _assertionFailure(
       file: file, line: line)
   }
 #endif
+  Builtin.condfail_message(false._value, message.unsafeRawPointer)
   Builtin.int_trap()
 }
 
@@ -216,6 +217,7 @@ internal func _assertionFailure(
     _embeddedReportFatalError(prefix: prefix, message: message)
   }
 
+  Builtin.condfail_message(false._value, message.unsafeRawPointer)
   Builtin.int_trap()
 }
 #endif
@@ -230,7 +232,7 @@ internal func _assertionFailure(
 #if !$Embedded
 @inline(never)
 #else
-@inline(__always)
+@inline(__always) @_transparent
 #endif
 @_semantics("programtermination_point")
 internal func _fatalErrorMessage(

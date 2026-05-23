@@ -992,8 +992,13 @@ ExportedLevel swift::isExported(const Decl *D) {
 }
 
 ExportedLevel swift::isExported(const ValueDecl *VD) {
-  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
-    return ExportedLevel::None;
+  if (VD->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+    // Special case stored properties of classes to avoid the short-circuit.
+    auto varDecl = dyn_cast<VarDecl>(VD);
+    if (!varDecl || !varDecl->hasStorage() ||
+        !isa<ClassDecl>(varDecl->getDeclContext()))
+      return ExportedLevel::None;
+  }
   if (VD->isObjCMemberImplementation())
     return ExportedLevel::None;
 
@@ -1014,8 +1019,6 @@ ExportedLevel swift::isExported(const ValueDecl *VD) {
 
   // Is this a type exposed by default in a non-resilient module?
   if (isa<NominalTypeDecl>(VD) &&
-      VD->getASTContext().LangOpts.hasFeature(
-          Feature::CheckImplementationOnly) &&
       VD->getDeclContext()->getParentModule()->getResilienceStrategy() !=
           ResilienceStrategy::Resilient &&
       !VD->getAttrs().hasAttribute<ImplementationOnlyAttr>())
@@ -1064,5 +1067,5 @@ ExportedLevel swift::isExported(const ExtensionDecl *ED) {
   for (const Decl *D : ED->getMembers())
     membersExported = std::max(membersExported, isExported(D));
 
-  return membersExported;
+  return std::min(exported, membersExported);
 }

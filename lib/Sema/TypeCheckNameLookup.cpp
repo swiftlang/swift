@@ -140,7 +140,6 @@ namespace {
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, baseDC}, false}).second) {
-          // HERE, need to look up base decl
           Result.add(LookupResultEntry(baseDC, baseDecl, result), isOuter);
           if (isOuter)
             FoundOuterDecls.push_back(result);
@@ -205,12 +204,15 @@ namespace {
       }
 
       // Dig out the witness.
-      ValueDecl *witness = nullptr;
       auto concrete = conformance.getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
+        auto *witness = concrete->getTypeWitnessAndDecl(assocType)
+            .getWitnessDecl();
+        ASSERT(witness != assocType);
+        if (witness)
+          addResult(witness);
       } else if (found->isProtocolRequirement()) {
-        witness = concrete->getWitnessDecl(found);
+        auto *witness = concrete->getWitnessDecl(found);
 
         // It is possible that a requirement is visible to us, but
         // not the witness. In this case, just return the requirement;
@@ -221,22 +223,18 @@ namespace {
           addResult(found);
           return;
         }
+
+        // If we have an imported conformance or the witness could
+        // not be deserialized, getWitnessDecl() will just return
+        // the requirement, so just drop the lookup result here.
+        if (witness && witness != found)
+          addResult(witness);
       } else if (isa<NominalTypeDecl>(found)) {
         // Declaring nested types inside other types is currently
         // not supported by lookup would still return such members
         // so we have to account for that here as well.
         addResult(found);
-        return;
       }
-
-      // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
-      // default implementations in protocols.
-      //
-      // If we have an imported conformance or the witness could
-      // not be deserialized, getWitnessDecl() will just return
-      // the requirement, so just drop the lookup result here.
-      if (witness && !isa<ProtocolDecl>(witness->getDeclContext()))
-        addResult(witness);
     }
   };
 } // end anonymous namespace
@@ -563,11 +561,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       auto *concrete = conformance.getConcrete();
       auto *normal = concrete->getRootNormalConformance();
 
-      // This is the only case where NormalProtocolConformance::
-      // getTypeWitnessAndDecl() returns a null type.
-      if (dc->getASTContext().evaluator.hasActiveRequest(
-            ResolveTypeWitnessesRequest{normal})) {
-        continue;
+      if (!concrete->hasTypeWitness(assocType)) {
+        // This is the only case where NormalProtocolConformance::
+        // getTypeWitnessAndDecl() returns a null type.
+        if (dc->getASTContext().evaluator.hasActiveRequest(
+              ResolveTypeWitnessesRequest{normal})) {
+          continue;
+        }
       }
 
       auto *typeDecl =
@@ -1019,10 +1019,8 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
   }
 }
 
-bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
-                                                const DeclContext *dc,
-                                                SourceLoc loc,
-                                                DiagnosticBehavior limit) {
+bool swift::shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                                 const DeclContext *dc) {
   // Only diagnose references in source files.
   auto sf = dc->getParentSourceFile();
   if (!sf)
@@ -1030,7 +1028,7 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
 
   auto &ctx = dc->getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
-                          /*allowMigration=*/true))
+                               /*allowMigration=*/true))
     return false;
 
   // Only diagnose members.
@@ -1051,13 +1049,30 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
       return false;
   }
 
-  // In lazy typechecking mode just emit the diagnostic immediately without a
-  // fix-it since there won't be an opportunity to emit delayed diagnostics.
   if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
     // Lazy type-checking and migration for MemberImportVisibility are
     // completely incompatible, so just skip the diagnostic entirely.
     if (ctx.LangOpts.isMigratingToFeature(Feature::MemberImportVisibility))
       return false;
+  }
+
+  return true;
+}
+
+bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                                const DeclContext *dc,
+                                                SourceLoc loc,
+                                                DiagnosticBehavior limit) {
+  if (!shouldDiagnoseMissingImportForMember(decl, dc))
+    return false;
+
+  auto &ctx = dc->getASTContext();
+  auto sf = dc->getParentSourceFile();
+
+  // In lazy typechecking mode just emit the diagnostic immediately without a
+  // fix-it since there won't be an opportunity to emit delayed diagnostics.
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    auto definingModule = decl->getModuleContextForNameLookup();
 
     auto modulesToImport = missingImportsForDefiningModule(definingModule, *sf);
     if (modulesToImport.empty())
@@ -1174,7 +1189,7 @@ ModuleSelectorCorrection(const LookupResult &candidates) {
         kind = CandidateKind::MemberViaSelf;
     }
 
-    auto owningModule = decl->getModuleContext();
+    auto owningModule = decl->getModuleContextForNameLookup();
     candidateModules.insert(
       { owningModule->getNameForModuleSelector(), kind });
   }
@@ -1185,7 +1200,7 @@ ModuleSelectorCorrection(const LookupTypeResult &candidates) {
   // Produce a list of *unique* module selector diagnostics so we don't
   // emit a bunch of duplicates.
   for (auto result : candidates) {
-    auto owningModule = result.Member->getModuleContext();
+    auto owningModule = result.Member->getModuleContextForNameLookup();
     candidateModules.insert(
       { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
   }
@@ -1194,7 +1209,7 @@ ModuleSelectorCorrection(const LookupTypeResult &candidates) {
 ModuleSelectorCorrection::
 ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates) {
   for (auto result : candidates) {
-    auto owningModule = result->getModuleContext();
+    auto owningModule = result->getModuleContextForNameLookup();
     candidateModules.insert(
       { owningModule->getName(), CandidateKind::ContextFree });
   }
@@ -1203,7 +1218,7 @@ ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates) {
 ModuleSelectorCorrection::
 ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates) {
   for (auto result : candidates) {
-    auto owningModule = result.getDecl()->getModuleContext();
+    auto owningModule = result.getDecl()->getModuleContextForNameLookup();
     candidateModules.insert(
       { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
   }

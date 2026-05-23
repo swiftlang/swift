@@ -73,11 +73,10 @@ public:
              getAsBitCastAddress(IGF, alloca.getAddressPointer()));
   }
 
-  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
-                       StackAllocationIsNested_t isNested =
-                           StackAllocationIsNested) const override {
+  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
+                       SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    IGF.emitDynamicStackDeallocation(stackAddress, isNested);
+    IGF.emitDynamicStackDeallocation(stackAddress);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
@@ -108,6 +107,14 @@ public:
 
   llvm::Value *getIsBitwiseTakable(IRGenFunction &IGF, SILType T) const override {
     return emitLoadOfIsBitwiseTakable(IGF, T);
+  }
+
+  llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsBitwiseBorrowable(IGF, T);
+  }
+
+  llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF, SILType T) const override {
+    return emitLoadOfIsAddressableForDependencies(IGF, T);
   }
 
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,

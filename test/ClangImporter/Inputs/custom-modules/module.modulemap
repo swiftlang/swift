@@ -98,6 +98,10 @@ module MissingHeader {
   header "this-header-does-not-exist.h"
 }
 
+module SimpleSwiftNewtypes {
+  header "SimpleSwiftNewtypes.h"
+}
+
 module MoreSwiftNewtypes {
   header "MoreSwiftNewtypes.h"
 }
@@ -291,5 +295,10 @@ module RetroactiveVersioning {
 
 module CVarArgs {
   header "CVarArgs.h"
+  export *
+}
+
+module SystemModuleWithWarnings {
+  header "SystemModuleWithWarnings.h"
   export *
 }

@@ -54,8 +54,11 @@ public func registerOptimizerTests() {
   registerFunctionTests(
     addressOwnershipLiveRangeTest,
     argumentConventionsTest,
+    breakInfiniteLoopsTest,
+    domtreeTest,
     getAutoDiffSpecializationInfoTest,
     interiorLivenessTest,
+    lifetimeComletionTest,
     lifetimeDependenceRootTest,
     lifetimeDependenceScopeTest,
     lifetimeDependenceUseTest,
@@ -72,7 +75,11 @@ public func registerOptimizerTests() {
     escapeInfoTest,
     addressEscapeInfoTest,
     aliasingTest,
-    memoryEffectsTest
+    memoryEffectsTest,
+    scopedHashTableTest,
+    scopedHashTableInsertLookupTest,
+    scopedHashTablePopTest,
+    isOptimizableLazyPropertyGetterTest
   )
 
   registerModuleTest(functionUsesTest, { functionUsesTest.pass.run($0) })

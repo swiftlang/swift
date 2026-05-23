@@ -838,9 +838,9 @@ RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
       return static_cast<bool>(
           storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
   } else {
-    if (storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed)
+    if (storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutineComputed)
       return static_cast<bool>(
-          storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine);
+          storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutine);
   }
   return std::nullopt;
 }
@@ -852,8 +852,8 @@ void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
     storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
     storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
   } else {
-    storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed = 1;
-    storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine = value;
+    storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutine = value;
   }
 }
 
@@ -1027,24 +1027,6 @@ void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 // EnumRawValuesRequest computation.
 //----------------------------------------------------------------------------//
-
-bool EnumRawValuesRequest::isCached() const {
-  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
-}
-
-std::optional<evaluator::SideEffect>
-EnumRawValuesRequest::getCachedResult() const {
-  auto *ED = std::get<0>(getStorage());
-  if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValuesAndTypes))
-    return std::make_tuple<>();
-  return std::nullopt;
-}
-
-void EnumRawValuesRequest::cacheResult(evaluator::SideEffect) const {
-  auto *ED = std::get<0>(getStorage());
-  ED->SemanticFlags |= OptionSet<EnumDecl::SemanticInfoFlags>{
-      EnumDecl::HasFixedRawValues | EnumDecl::HasFixedRawValuesAndTypes};
-}
 
 void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // This request computes the raw type, and so participates in cycles involving
@@ -1421,7 +1403,7 @@ void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
   auto conformance = std::get<0>(getStorage());
 
   // Common case: conformance is nonisolated.
-  if (result.isNonisolated()) {
+  if (result.isNonisolatedOrConcurrent()) {
     conformance->setComputedNonnisolated();
     return;
   }
@@ -1649,6 +1631,25 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
     attr->TypeEraserExpr = TypeExpr::createImplicit(value,
                                                     value->getASTContext());
   }
+}
+
+//----------------------------------------------------------------------------//
+// ResolvePreInverseGenericsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<Type> ResolvePreInverseGenericsRequest::getCachedResult() const {
+  auto *attr = std::get<1>(getStorage());
+  auto Ty = attr->ExceptType;
+  if (!Ty)
+    return std::nullopt;
+
+  return Ty;
+}
+
+void ResolvePreInverseGenericsRequest::cacheResult(Type Ty) const {
+  auto *attr = std::get<1>(getStorage());
+  assert(Ty && Ty->is<ProtocolCompositionType>());
+  attr->ExceptType = Ty;
 }
 
 //----------------------------------------------------------------------------//
@@ -1917,9 +1918,10 @@ SourceLoc MacroDefinitionRequest::getNearestLoc() const {
 
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
-  case CallerIsolationInheriting:
+  case NonisolatedNonsending:
   case ActorInstance:
   case Nonisolated:
+  case NonisolatedConcurrent:
   case NonisolatedUnsafe:
   case Unspecified:
     return false;
@@ -1933,8 +1935,9 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
-  case CallerIsolationInheriting:
+  case NonisolatedNonsending:
   case Nonisolated:
+  case NonisolatedConcurrent:
   case NonisolatedUnsafe:
   case Unspecified:
     return *this;
@@ -1954,7 +1957,7 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     os << "actor" << (asNoun ? " isolation" : "-isolated");
     break;
 
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedNonsending:
     os << "caller isolation inheriting"
        << (asNoun ? " isolation" : "-isolated");
     break;
@@ -1974,6 +1977,13 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     break;
 
   case ActorIsolation::Nonisolated:
+    os << "nonisolated";
+    break;
+
+  case ActorIsolation::NonisolatedConcurrent:
+    os << "@concurrent";
+    break;
+
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     os << "nonisolated";
@@ -1982,6 +1992,16 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     }
     break;
   }
+}
+
+StringRef ActorIsolation::printStringForDiagnostics(
+    ASTContext &ctx, StringRef openingQuotationMark, bool asNoun) const {
+  SmallString<64> str;
+  {
+    llvm::raw_svector_ostream os(str);
+    printForDiagnostics(os, openingQuotationMark, asNoun);
+  }
+  return ctx.getIdentifier(str).str();
 }
 
 void ActorIsolation::print(llvm::raw_ostream &os) const {
@@ -1995,11 +2015,14 @@ void ActorIsolation::print(llvm::raw_ostream &os) const {
       os << ". name: '" << vd->getBaseIdentifier() << "'";
     }
     return;
-  case CallerIsolationInheriting:
-    os << "caller_isolation_inheriting";
-    return;
   case Nonisolated:
     os << "nonisolated";
+    return;
+  case NonisolatedNonsending:
+    os << "nonisolated(nonsending)";
+    return;
+  case NonisolatedConcurrent:
+    os << "@concurrent";
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
@@ -2022,11 +2045,14 @@ void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
   case ActorInstance:
     os << "actor_instance";
     return;
-  case CallerIsolationInheriting:
-    os << "caller_isolation_inheriting";
-    return;
   case Nonisolated:
     os << "nonisolated";
+    return;
+  case NonisolatedNonsending:
+    os << "nonisolated(nonsending)";
+    return;
+  case NonisolatedConcurrent:
+    os << "@concurrent";
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
@@ -2081,11 +2107,12 @@ void swift::simple_display(
       }
       break;
 
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedNonsending:
       out << "isolated to isolation of caller";
       break;
 
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedConcurrent:
     case ActorIsolation::NonisolatedUnsafe:
       out << "nonisolated";
       if (state == ActorIsolation::NonisolatedUnsafe) {
@@ -2769,6 +2796,7 @@ void LifetimeDependenceInfoRequest::cacheResult(
     }
     auto *eed = cast<EnumElementDecl>(decl);
     eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+    return;
   }
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
@@ -2889,4 +2917,40 @@ void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
 
   domain->flags.isPermanentlyEnabledComputed = true;
   domain->flags.isPermanentlyEnabled = isPermanentlyEnabled;
+}
+
+//----------------------------------------------------------------------------//
+// ObjCKeyPathStringRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<Expr *> ObjCKeyPathStringRequest::getCachedResult() const {
+  auto *KP = std::get<0>(getStorage());
+  if (!KP->ObjCStringLiteralExpr)
+    return std::nullopt;
+
+  return KP->ObjCStringLiteralExpr;
+}
+
+void ObjCKeyPathStringRequest::cacheResult(Expr *strExpr) const {
+  auto *KP = std::get<0>(getStorage());
+  ASSERT(strExpr);
+  ASSERT(!KP->ObjCStringLiteralExpr || KP->ObjCStringLiteralExpr == strExpr);
+  KP->ObjCStringLiteralExpr = strExpr;
+}
+
+//----------------------------------------------------------------------------//
+// DesugarForEachStmtRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<BraceStmt *> DesugarForEachStmtRequest::getCachedResult() const {
+  auto *fes = std::get<0>(getStorage());
+  if (!fes->desugaredStmtAndComputed.getInt()) {
+    return std::nullopt;
+  }
+  return fes->desugaredStmtAndComputed.getPointer();
+}
+
+void DesugarForEachStmtRequest::cacheResult(BraceStmt *stmt) const {
+  auto *fes = std::get<0>(getStorage());
+  fes->desugaredStmtAndComputed.setInt(true);
+  fes->setDesugaredStmt(stmt);
 }

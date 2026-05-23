@@ -110,6 +110,8 @@ private:
   // instructions, which we will periodically move to our worklist.
   llvm::SmallVector<SILInstruction *, 64> TrackingList;
 
+  unsigned initialWorklistSize = 0;
+
 public:
   /// Builder used to insert instructions.
   SILBuilder Builder;
@@ -127,16 +129,11 @@ private:
   /// External context struct used by \see ownershipRAUWHelper.
   OwnershipFixupContext ownershipFixupContext;
   
-  /// For invoking Swift instruction passes.
-  SwiftPassInvocation swiftPassInvocation;
-
 public:
   SILCombiner(SILFunctionTransform *parentTransform,
               bool removeCondFails, bool enableCopyPropagation);
 
   bool runOnFunction(SILFunction &F);
-
-  bool shouldRemoveCondFail(CondFailInst &);
 
   void clear() {
     Iteration = 0;
@@ -251,7 +248,6 @@ public:
   SILInstruction *visitPartialApplyInst(PartialApplyInst *AI);
   SILInstruction *visitBeginApplyInst(BeginApplyInst *BAI);
   SILInstruction *optimizeStringObject(BuiltinInst *BI);
-  SILInstruction *visitCondFailInst(CondFailInst *CFI);
   SILInstruction *visitRefToRawPointerInst(RefToRawPointerInst *RRPI);
   SILInstruction *visitUpcastInst(UpcastInst *UCI);
 
@@ -270,7 +266,7 @@ public:
   visitUnconditionalCheckedCastAddrInst(UnconditionalCheckedCastAddrInst *UCCAI);
   SILInstruction *visitRawPointerToRefInst(RawPointerToRefInst *RPTR);
   SILInstruction *
-  visitUncheckedTakeEnumDataAddrInst(UncheckedTakeEnumDataAddrInst *TEDAI);
+  visitUncheckedEnumDataAddrInstBase(UncheckedEnumDataAddrInstBase *TEDAI);
   SILInstruction *visitCondBranchInst(CondBranchInst *CBI);
   SILInstruction *
   visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *UTBCI);
@@ -285,8 +281,6 @@ public:
   SILInstruction *visitSwitchValueInst(SwitchValueInst *SVI);
   SILInstruction *
   visitCheckedCastAddrBranchInst(CheckedCastAddrBranchInst *CCABI);
-  SILInstruction *
-  visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
       

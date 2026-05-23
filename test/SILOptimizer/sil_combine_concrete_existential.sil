@@ -186,7 +186,7 @@ sil @$s37witness_return_optional_indirect_self1SVACycfC : $@convention(method) (
 // CHECK: [[R1:%.*]] = alloc_stack $Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122", any PPP) Self>
 // CHECK: [[W1:%.*]] = witness_method $S, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self? : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
 // CHECK: apply [[W1]]<@opened("83DE9694-7315-11E8-955C-ACDE48001122", any PPP) Self>([[R1]], [[O1]]) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-// CHECK: [[E1:%.*]] = unchecked_take_enum_data_addr
+// CHECK: [[E1:%.*]] = unchecked_inplace_enum_data_addr
 // CHECK: [[O2:%.*]] = open_existential_addr immutable_access {{.*}} : $*any PPP to $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122", any PPP) Self
 // CHECK: [[R2:%.*]] = alloc_stack $Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122", any PPP) Self>
 // CHECK: [[W2:%.*]] = witness_method $@opened("{{.*}}", any PPP) Self, #PPP.returnsOptionalIndirect
@@ -209,18 +209,18 @@ bb0:
   %11 = alloc_stack $Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122", PPP) Self>
   %12 = witness_method $@opened("83DE9694-7315-11E8-955C-ACDE48001122", PPP) Self, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, %8 : $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", PPP) Self : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
   %13 = apply %12<@opened("83DE9694-7315-11E8-955C-ACDE48001122", PPP) Self>(%11, %8) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-  %14 = unchecked_take_enum_data_addr %11 : $*Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122", PPP) Self>, #Optional.some!enumelt
+  %14 = unchecked_inplace_enum_data_addr %11 : $*Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122", PPP) Self>, #Optional.some!enumelt
   copy_addr [take] %14 to [init] %10 : $*@opened("83DE9694-7315-11E8-955C-ACDE48001122", PPP) Self
   inject_enum_addr %7 : $*Optional<PPP>, #Optional.some!enumelt
   dealloc_stack %11 : $*Optional<@opened("83DE9694-7315-11E8-955C-ACDE48001122", PPP) Self>
-  %28 = unchecked_take_enum_data_addr %7 : $*Optional<PPP>, #Optional.some!enumelt
+  %28 = unchecked_inplace_enum_data_addr %7 : $*Optional<PPP>, #Optional.some!enumelt
   %29 = open_existential_addr immutable_access %28 : $*PPP to $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self
   %30 = init_enum_data_addr %6 : $*Optional<PPP>, #Optional.some!enumelt
   %31 = init_existential_addr %30 : $*PPP, $@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self
   %32 = alloc_stack $Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self>
   %33 = witness_method $@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self, #PPP.returnsOptionalIndirect : <Self where Self : PPP> (Self) -> () -> Self?, %29 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
   %34 = apply %33<@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self>(%32, %29) : $@convention(witness_method: PPP) <τ_0_0 where τ_0_0 : PPP> (@in_guaranteed τ_0_0) -> @out Optional<τ_0_0>
-  %41 = unchecked_take_enum_data_addr %32 : $*Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self>, #Optional.some!enumelt
+  %41 = unchecked_inplace_enum_data_addr %32 : $*Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self>, #Optional.some!enumelt
   copy_addr [take] %41 to [init] %31 : $*@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self
   inject_enum_addr %6 : $*Optional<PPP>, #Optional.some!enumelt
   dealloc_stack %32 : $*Optional<@opened("83DE97CA-7315-11E8-955C-ACDE48001122", PPP) Self>
@@ -457,7 +457,7 @@ sil [transparent] [reabstraction_thunk] @testDevirtExistentialEnumThunk : $@conv
 // Test that the witness method's opened archetype is replaced by a
 // concrete conformance.
 //
-// Note that the enum is destroyed by unchecked_take_enum_data_addr
+// Note that the enum is destroyed by unchecked_inplace_enum_data_addr
 // before the apply (and the extracted data is destroy by the copy
 // itself), so SILCombine cannot replace the call's self
 // argument. Instead, we expect a later devirtualizer pass to just
@@ -485,7 +485,7 @@ bb0(%0 : $Array<Int>):
   %6 = init_existential_addr %5 : $*ContiguousBytes, $Array<Int>
   store %0 to %6 : $*Array<Int>
   inject_enum_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt
-  %9 = unchecked_take_enum_data_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt
+  %9 = unchecked_inplace_enum_data_addr %4 : $*Optional<ContiguousBytes>, #Optional.some!enumelt
   copy_addr [take] %9 to [init] %3 : $*ContiguousBytes
   dealloc_stack %4 : $*Optional<ContiguousBytes>
   %12 = open_existential_addr immutable_access %3 : $*ContiguousBytes to $*@opened("8402EC1A-F35D-11E8-950A-D0817AD9F6DD", ContiguousBytes) Self
@@ -805,7 +805,7 @@ bb0(%0 : $S2, %1 : $*Optional<any Q2>):
   store %0 to [trivial] %4
   inject_enum_addr %2, #Optional.some!enumelt
   copy_addr %1 to %2
-  %8 = unchecked_take_enum_data_addr %2, #Optional.some!enumelt
+  %8 = unchecked_inplace_enum_data_addr %2, #Optional.some!enumelt
   %9 = alloc_stack $any Q2
   copy_addr %8 to [init] %9
   %11 = open_existential_addr immutable_access %9 to $*@opened("9EED66EA-C9C5-11F0-85FF-0EA13E3AABB2", any Q2) Self

@@ -134,8 +134,8 @@ extension Instruction {
   /// Deinitialization barriers constrain variable lifetimes. Lexical
   /// end_borrow, destroy_value, and destroy_addr cannot be hoisted above them.
   final func isDeinitBarrier(_ analysis: CalleeAnalysis) -> Bool {
-    if let site = self as? FullApplySite {
-      return site.isBarrier(analysis)
+    if self.isFullApplySite {
+      return (self as! FullApplySite).isBarrier(analysis)
     }
     if let eai = self as? EndApplyInst {
       return eai.isBarrier(analysis)
@@ -143,7 +143,7 @@ extension Instruction {
     if let aai = self as? AbortApplyInst {
       return aai.isBarrier(analysis)
     }
-    return mayAccessPointer || mayLoadWeakOrUnowned || maySynchronize
+    return isDeinitBarrier
   }
 }
 

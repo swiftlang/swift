@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/ABI/InvertibleProtocols.h"
 #include "swift/AST/SILThunkKind.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
@@ -45,7 +46,7 @@ enum class DestructorKind {
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:
-  const ASTContext &Context;
+  ASTContext &Context;
   ModuleDecl *Mod = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
@@ -81,8 +82,8 @@ protected:
   /// If enabled, marker protocols can be encoded in the mangled name.
   bool AllowMarkerProtocols = true;
 
-  /// If enabled, inverses will not be mangled into generic signatures.
-  bool AllowInverses = true;
+  /// The set of inverses allowed to be mangled into generic signatures.
+  InvertibleProtocolSet AllowedInverses = InvertibleProtocolSet::allKnown();
 
   /// If enabled, @isolated(any) can be encoded in the mangled name.
   /// Suppressing type attributes this way is generally questionable ---
@@ -194,7 +195,7 @@ public:
   };
 
   /// lldb overrides \p DWARFMangling to 'true'.
-  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false,
+  ASTMangler(ASTContext &Ctx, bool DWARFMangling = false,
              bool UseAPIMangling = false)
       : Context(Ctx) {
     if (DWARFMangling) {
@@ -209,11 +210,11 @@ public:
 
   /// Create an ASTMangler suitable for mangling a USR for use in semantic
   /// functionality.
-  static ASTMangler forUSR(const ASTContext &Ctx) {
+  static ASTMangler forUSR(ASTContext &Ctx) {
     return ASTMangler(Ctx, /*DWARFMangling*/ true, /*UseAPIMangling*/ true);
   }
 
-  const ASTContext &getASTContext() { return Context; }
+  ASTContext &getASTContext() { return Context; }
 
   void addTypeSubstitution(Type type, GenericSignature sig) {
     type = dropProtocolsFromAssociatedTypes(type, sig);
@@ -560,8 +561,8 @@ protected:
     BaseEntitySignature(const Decl *decl);
   };
 
-  static bool inversesAllowed(const Decl *decl);
-  static bool inversesAllowedIn(const DeclContext *ctx);
+  static InvertibleProtocolSet inversesAllowed(const Decl *decl);
+  static InvertibleProtocolSet inversesAllowedIn(const DeclContext *ctx);
 
   void appendContextOf(const ValueDecl *decl, BaseEntitySignature &base);
   void appendContextualInverses(const GenericTypeDecl *contextDecl,
@@ -807,7 +808,8 @@ protected:
   void appendLifetimeDependence(LifetimeDependenceInfo info);
 
   void gatherExistentialRequirements(SmallVectorImpl<Requirement> &reqs,
-                                     ParameterizedProtocolType *PPT) const;
+                                     SmallVectorImpl<InverseRequirement> &inverses,
+                                     Type base) const;
 
   /// Extracts a list of inverse requirements from a PCT serving as the
   /// constraint type of an existential.

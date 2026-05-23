@@ -281,7 +281,7 @@ function(setup_lit_args ARGS_VAR_OUT tested_sdk test_results_dir resource_dir_ov
   endif()
 
   execute_process(COMMAND
-      $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
+      "${Python3_EXECUTABLE}" "-c" "import psutil"
       RESULT_VARIABLE python_psutil_status
       TIMEOUT 1 # second
       ERROR_QUIET)
@@ -399,12 +399,6 @@ foreach(SDK ${SWIFT_SDKS})
       set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}")
       set(validation_test_bin_dir
           "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
-
-      if(LLVM_ENABLE_LIBXML2)
-        set(SWIFT_HAVE_LIBXML2 TRUE)
-      else()
-        set(SWIFT_HAVE_LIBXML2 FALSE)
-      endif()
 
       set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
       set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)

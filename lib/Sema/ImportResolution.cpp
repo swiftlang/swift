@@ -929,8 +929,8 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                              diag::implementation_only_deprecated);
         inFlight.fixItReplace(import.implementationOnlyRange, "internal");
       }
-    } else if ( // Non-resilient client
-        !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+    } else if (!ctx.LangOpts.hasFeature(Feature::CheckImplementationOnly) &&
+               !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
             targetName.str(), importerName.str())) {
       ctx.Diags.diagnose(import.importLoc,
                          diag::implementation_only_requires_library_evolution,
@@ -1359,6 +1359,11 @@ ScopedImportLookupRequest::evaluate(Evaluator &evaluator,
                  NLKind::QualifiedLookup, ResolutionKind::Overloadable,
                  import->getDeclContext()->getModuleScopeContext(),
                  import->getLoc(), NL_QualifiedDefault);
+
+  // `import macro` has not been implementd. Filter them out for now.
+  llvm::erase_if(decls, [](ValueDecl *VD) {
+    return isa<MacroDecl>(VD);
+  });
 
   auto importLoc = import->getLoc();
   if (decls.empty()) {

@@ -50,6 +50,13 @@ project(SwiftCore
   LANGUAGES C CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
 
+if(CMAKE_VERSION VERSION_LESS 3.31)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Generic" AND CMAKE_SYSTEM_PROCESSOR MATCHES wasm32)
+    set(CMAKE_SYSTEM_NAME WASI)
+    set(WASI 1)
+  endif()
+endif()
+
 # The Swift standard library is not intended for use as a sub-library as part of
 # another project. It is tightly coupled with the compiler version.
 if(NOT PROJECT_IS_TOP_LEVEL)
@@ -105,10 +112,10 @@ defaulted_option(SwiftCore_ENABLE_OVERRIDABLE_RETAIN_RELEASE "Enable override ho
 defaulted_option(SwiftCore_ENABLE_RUNTIME_OS_VERSIONING "Enable runtime OS version detection")
 defaulted_option(SwiftCore_ENABLE_STATIC_PRINT "Disable full print")
 defaulted_option(SwiftCore_ENABLE_COMPACT_ABSOLUTE_FUNCTION_POINTERS "Resolve absolute function pointer as identity")
+defaulted_option(SwiftCore_ENABLE_SOURCE_INFO "Enable generation of .swiftsourceinfo files")
 defaulted_option(SwiftCore_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backdeployment")
 defaulted_option(SwiftCore_ENABLE_CONCURRENCY "Enable Concurrency runtime support")
 defaulted_option(SwiftCore_ENABLE_REMOTE_MIRROR "Enable RemoteMirror runtime support")
-defaulted_option(SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE "Use direct retain release in the runtime/stdlib")
 defaulted_set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR STRING "Default Concurrency global executor implementation")
 option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime. Requires os_log(3) and the os_signpost(3) API." OFF)
 option(SwiftCore_ENABLE_COMMANDLINE_SUPPORT "Enable command line argument support" ON)
@@ -157,7 +164,10 @@ add_compile_definitions(
   $<$<BOOL:${SwiftCore_HAS_DARWIN_LIBMALLOC}>:-DSWIFT_STDLIB_HAS_DARWIN_LIBMALLOC> # Anything that includes include/swift/Runtime/Config.h
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_THREADING_${SwiftCore_THREADING_PACKAGE}>
   $<$<COMPILE_LANGUAGE:C,CXX>:-DSWIFT_RUNTIME_ENABLE_LEAK_CHECKER=$<BOOL:${SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER}>>
-  $<$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS>)
+  $<$<BOOL:${SwiftCore_ENABLE_CLOBBER_FREED_OBJECTS}>:-DSWIFT_RUNTIME_CLOBBER_FREED_OBJECTS>
+  $<$<AND:$<PLATFORM_ID:WASI>,$<COMPILE_LANGUAGE:C,CXX>>:-D_WASI_EMULATED_MMAN>
+  $<$<AND:$<PLATFORM_ID:WASI>,$<COMPILE_LANGUAGE:C,CXX>>:-D_WASI_EMULATED_PROCESS_CLOCKS>
+  $<$<AND:$<PLATFORM_ID:WASI>,$<COMPILE_LANGUAGE:C,CXX>>:-D_WASI_EMULATED_SIGNAL>)
 
 add_compile_options(
   $<$<COMPILE_LANGUAGE:CXX>:-fno-rtti>
@@ -183,6 +193,7 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-strict-memory-safety>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
   "$<$<AND:$<BOOL:${SwiftCore_OPTIMIZATION_REMARKS}>,$<COMPILE_LANGUAGE:Swift>>:-save-optimization-record=${SwiftCore_OPTIMIZATION_REMARKS}>"
   "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
@@ -197,10 +208,7 @@ add_compile_options(
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${SwiftCore_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
 
-if(SwiftCore_ENABLE_DIRECT_RETAIN_RELEASE)
-  find_package(SwiftSwiftDirectRuntime REQUIRED)
-  add_compile_options("$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-direct-retain-release>")
-endif()
+find_package(SwiftSwiftDirectRuntime)
 
 include(ExperimentalFeatures)
 

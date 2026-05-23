@@ -29,7 +29,7 @@ import CoreLib
 
 @c(CFunc)
 public func CFunc(e: CEnum) {}
-// CHECK: typedef SWIFT_ENUM_FWD_DECL(int, CEnum)
+// CHECK: SWIFT_ENUM_FWD_DECL(int, CEnum)
 // CHECK: SWIFT_EXTERN void CFunc(SWIFT_ENUM_TAG CEnum e) SWIFT_NOEXCEPT;
 
 //--- Client.c

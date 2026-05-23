@@ -61,7 +61,7 @@ if #available(SwiftStdlib 5.1, *) {
   asyncTests.test("GlobalDispatchQueue") {
     DispatchQueue.global(qos: .utility).async {
       async {
-#if (os(macOS) || os(iOS) || os(tvOS) || os(watchOS))
+#if os(anyAppleOS)
         // Non-Darwin platforms currently lack qos_class_self().
         assert(Task.currentPriority == .utility)
 #endif

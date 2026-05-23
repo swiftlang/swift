@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "sil-inst-utils"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
@@ -49,19 +50,18 @@ SILValue swift::lookThroughOwnershipInsts(SILValue v) {
 }
 
 SILValue swift::lookThroughMoveOnlyCheckerPattern(SILValue value) {
-  auto *bbi = dyn_cast<BeginBorrowInst>(value);
-  if (!bbi) {
-    return value;
+  while (true) {
+    switch (value->getKind()) {
+    default:
+      return value;
+    case ValueKind::MoveValueInst:
+    case ValueKind::CopyValueInst:
+    case ValueKind::BeginBorrowInst:
+    case ValueKind::MarkUnresolvedNonCopyableValueInst:
+    case ValueKind::CopyableToMoveOnlyWrapperValueInst:
+      value = cast<SingleValueInstruction>(value)->getOperand(0);
+    }
   }
-  auto *muncvi = cast<MarkUnresolvedNonCopyableValueInst>(bbi->getOperand());
-  if (!muncvi) {
-    return value;
-  }
-  auto *cvi = cast<CopyValueInst>(muncvi->getOperand());
-  if (!cvi) {
-    return value;
-  }
-  return cvi->getOperand();
 }
 
 bool swift::visitNonOwnershipUses(SILValue value,
@@ -587,6 +587,8 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::UncheckedEnumDataInst:
   case SILInstructionKind::InitEnumDataAddrInst:
   case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
   case SILInstructionKind::SelectEnumInst:
   case SILInstructionKind::SelectEnumAddrInst:
   case SILInstructionKind::ProjectBlockStorageInst:
@@ -643,6 +645,12 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::IgnoredUseInst:
   case SILInstructionKind::ImplicitActorToOpaqueIsolationCastInst:
   case SILInstructionKind::UncheckedOwnershipInst:
+  case SILInstructionKind::MakeBorrowInst:
+  case SILInstructionKind::DereferenceBorrowInst:
+  case SILInstructionKind::MakeAddrBorrowInst:
+  case SILInstructionKind::DereferenceAddrBorrowInst:
+  case SILInstructionKind::InitBorrowAddrInst:
+  case SILInstructionKind::DereferenceBorrowAddrInst:
     return RuntimeEffect::NoEffect;
 
   case SILInstructionKind::LoadInst: {
@@ -1500,4 +1508,28 @@ bool swift::shouldExpand(SILModule &module, SILType ty) {
 
   unsigned numFields = module.Types.countNumberOfFields(ty, expansion);
   return (numFields <= 6);
+}
+
+void InstructionIndices::indexBlock(SILBasicBlock &block) {
+  unsigned idx = 1;
+  for (SILInstruction &inst : block) {
+    indices.set(inst.asSILNode(), idx);
+    if (indices.fits(idx + 1)) {
+      idx += 1;
+    } else {
+      indicesOverflowed = true;
+    }
+  }
+}
+
+InstructionIndices::InstructionIndices(SILFunction *f)
+    : indices(f, numIndexBits) {
+  for (SILBasicBlock &block : *f) {
+    indexBlock(block);
+  }
+}
+
+InstructionIndices::InstructionIndices(SILBasicBlock *block)
+    : indices(block->getFunction(), numIndexBits) {
+  indexBlock(*block);
 }

@@ -581,6 +581,16 @@ public:
     return Element.getIsBitwiseTakable(IGF,
                                        getElementSILType(IGF.IGM, T));
   }
+  llvm::Value *getIsBitwiseBorrowable(IRGenFunction &IGF,
+                                      SILType T) const override {
+    return Element.getIsBitwiseBorrowable(IGF,
+                                          getElementSILType(IGF.IGM, T));
+  }
+  llvm::Value *getIsAddressableForDependencies(IRGenFunction &IGF,
+                                      SILType T) const override {
+    return Element.getIsAddressableForDependencies(IGF,
+                                          getElementSILType(IGF.IGM, T));
+  }
   llvm::Value *isDynamicallyPackedInline(IRGenFunction &IGF,
                                          SILType T) const override {
     auto startBB = IGF.Builder.GetInsertBlock();
@@ -647,17 +657,16 @@ public:
     return alloca.withAddress(getAddressForPointer(alloca.getAddressPointer()));
   }
 
-  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
-                       StackAllocationIsNested_t isNested) const override {
+  void deallocateStack(IRGenFunction &IGF, StackAddress stackAddress,
+                       SILType T) const override {
     IGF.Builder.CreateLifetimeEnd(stackAddress.getAddress().getAddress());
-    IGF.emitDynamicStackDeallocation(stackAddress, isNested);
+    IGF.emitDynamicStackDeallocation(stackAddress);
   }
 
   void destroyStack(IRGenFunction &IGF, StackAddress stackAddress, SILType T,
                     bool isOutlined) const override {
     emitDestroyCall(IGF, T, stackAddress.getAddress());
-    // For now, just always do nested.
-    deallocateStack(IGF, stackAddress, T, StackAllocationIsNested);
+    deallocateStack(IGF, stackAddress, T);
   }
 
   TypeLayoutEntry *

@@ -11,18 +11,16 @@
 //===----------------------------------------------------------------------===//
 // RUN: %empty-directory(%t)
 //
-// RUN: if [ %target-runtime == "objc" ]; \
-// RUN: then \
+// RUN: %if objc_interop %{ \
 // RUN:   %target-clang %S/Inputs/Mirror/Mirror.mm -c -o %t/Mirror.mm.o -g && \
-// RUN:   %target-build-swift -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror; \
-// RUN: else \
-// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures -o %t/Mirror; \
-// RUN: fi
+// RUN:   %target-build-swift -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures %s -I %S/Inputs/Mirror/ -Xlinker %t/Mirror.mm.o -o %t/Mirror \
+// RUN: %} %else %{ \
+// RUN:   %target-build-swift %s -Xfrontend -disable-access-control -Xfrontend -enable-experimental-feature -Xfrontend ImmutableWeakCaptures -o %t/Mirror \
+// RUN: %}
 // RUN: %target-codesign %t/Mirror
 // RUN: %target-run %t/Mirror
 
 // REQUIRES: executable_test
-// REQUIRES: shell
 // REQUIRES: reflection
 // REQUIRES: swift_feature_ImmutableWeakCaptures
 

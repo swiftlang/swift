@@ -391,3 +391,6 @@ extension Duration: CustomStringConvertible {
 
 @available(StdlibDeploymentTarget 5.7, *)
 extension Duration: DurationProtocol { }
+
+@available(StdlibDeploymentTarget 5.7, *)
+extension Duration: ConvertibleToBytes, ConvertibleFromBytes {}

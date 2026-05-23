@@ -127,6 +127,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::Deinterleave:
     case BuiltinValueKind::StaticReport:
     case BuiltinValueKind::AssertConf:
+    case BuiltinValueKind::InfiniteLoopTrueCondition:
     case BuiltinValueKind::StringObjectOr:
     case BuiltinValueKind::UToSCheckedTrunc:
     case BuiltinValueKind::SToUCheckedTrunc:
@@ -191,7 +192,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignCopyArrayFrontToBack:
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
-    case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::CreateAsyncTask:
     case BuiltinValueKind::TaskRunInline:
     case BuiltinValueKind::StartAsyncLetWithLocalBuffer:
@@ -220,6 +220,10 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::TaskRemovePriorityEscalationHandler:
     case BuiltinValueKind::TaskLocalValuePush:
     case BuiltinValueKind::TaskLocalValuePop:
+    case BuiltinValueKind::AddTaskLocalValue:
+    case BuiltinValueKind::RemoveTaskLocalValue:
+    case BuiltinValueKind::TaskCancellationShieldPush:
+    case BuiltinValueKind::TaskCancellationShieldPop:
       return true;
     }
   }

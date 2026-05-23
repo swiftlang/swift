@@ -20,6 +20,7 @@
 #include "GenEnum.h"
 #include "GenExistential.h"
 #include "GenHeap.h"
+#include "GenMeta.h"
 #include "GenProto.h"
 #include "IRGenDebugInfo.h"
 #include "IRGenFunction.h"
@@ -85,14 +86,7 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
   src = IGF.Builder.CreateElementBitCast(src, IGF.IGM.OpaqueTy);
 
   // Load type metadata for the source's static type and the target type.
-  llvm::Value *srcMetadata = nullptr;
-
-  // Embedded swift currently only supports existential -> concrete type casts.
-  if (IGF.IGM.isEmbeddedWithExistentials()) {
-    srcMetadata = llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy);
-  } else {
-    srcMetadata = IGF.emitTypeMetadataRef(srcType);
-  }
+  llvm::Value *srcMetadata = IGF.emitTypeMetadataRef(srcType);
   llvm::Value *targetMetadata = IGF.emitTypeMetadataRef(targetType);
 
   llvm::Value *args[] = {
@@ -548,6 +542,25 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
   llvm_unreachable("invalid metatype representation");
 }
 
+static std::optional<unsigned> getFastLookupIndex(IRGenModule &IGM,
+                                                  CanType srcInstanceType,
+                                                  ProtocolDecl *proto) {
+  ClassDecl *cDecl = srcInstanceType.getClassOrBoundGenericClass();
+  if (!cDecl)
+    return std::nullopt;
+
+  SILVTable *vTable = IGM.getSILModule().lookUpVTable(cDecl);
+  if (!vTable)
+    return std::nullopt;
+
+  unsigned idx = 0;
+  for (auto c : vTable->getConformances()) {
+    if (c.getProtocol() == proto)
+      return idx;
+    idx += 1;
+  }
+  return std::nullopt;
+}
 
 /// Emit a checked cast to a protocol or protocol composition.
 void irgen::emitScalarExistentialDowncast(
@@ -785,6 +798,33 @@ void irgen::emitScalarExistentialDowncast(
     metadataValue = emitDynamicTypeOfHeapObject(IGF, value,
                                                 MetatypeRepresentation::Thick,
                                                 srcType);
+  }
+
+  // If the vtable has conformance entries (at negative offsets), we can do the cast
+  // by simply loading the witness table from those entries.
+  std::optional<unsigned> fastLookupIndex = std::nullopt;
+
+  if (layout.getProtocols().size() == 1 &&
+      // If we need to check anything else than the conformance, let the runtime
+      // function do it.
+      !checkSuperclassConstraint && !checkClassConstraint) {
+    fastLookupIndex  = getFastLookupIndex(IGF.IGM, srcInstanceType, layout.getProtocols()[0]);
+  }
+  if (fastLookupIndex.has_value()) {
+    llvm::Value *indices[] = {
+         llvm::ConstantInt::get(IGF.IGM.Int32Ty, -(int)fastLookupIndex.value() - MetadataAdjustmentIndex::Class - 1)};
+    auto addr = IGF.Builder.CreateGEP(IGF.IGM.WitnessTablePtrTy, metadataValue, indices);
+    auto wt = IGF.Builder.CreateLoad(Address(
+        addr, IGF.IGM.TypeMetadataPtrTy, IGF.IGM.getPointerAlignment()));
+
+    // If the class does _not_ conform to the protocol, the witness table pointer is null.
+    // However, in this case we need to set the resulting class reference to null.
+    auto nullPtr = llvm::ConstantPointerNull::get(cast<llvm::PointerType>(IGF.IGM.Int8PtrTy));
+    auto isNotNil = IGF.Builder.CreateICmpNE(wt, nullPtr);
+    auto retVal = IGF.Builder.CreateSelect(isNotNil, value, nullPtr);
+    ex.add(retVal);
+    ex.add(wt);
+    return;
   }
 
   // Look up witness tables for the protocols that need them.

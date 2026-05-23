@@ -477,7 +477,6 @@ SwiftInterfaceGenContextRef SwiftInterfaceGenContext::create(
   }
 
   ASTContext &Ctx = CI.getASTContext();
-  CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
 
   // Load implicit imports so that Clang importer can use them.
   for (auto unloadedImport :
@@ -535,7 +534,6 @@ SwiftInterfaceGenContext::createForTypeInterface(CompilerInvocation Invocation,
   registerIDETypeCheckRequestFunctions(CI.getASTContext().evaluator);
   CI.performSema();
   ASTContext &Ctx = CI.getASTContext();
-  CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
 
   // Load standard library so that Clang importer can use it.
   auto *Stdlib = Ctx.getModuleByIdentifier(Ctx.StdlibModuleName);
@@ -850,7 +848,7 @@ void SwiftLangSupport::editorOpenSwiftSourceInterface(
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
   getASTManager()->processASTAsync(Invocation, AstConsumer, Once,
                                    CancellationToken,
-                                   llvm::vfs::getRealFileSystem());
+                                   llvm::vfs::createPhysicalFileSystem());
 }
 
 void SwiftLangSupport::editorOpenHeaderInterface(EditorConsumer &Consumer,

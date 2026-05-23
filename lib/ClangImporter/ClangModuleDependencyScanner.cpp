@@ -16,9 +16,10 @@
 #include "ImporterImpl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/CASOptions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
-#include "swift/Basic/Assertions.h"
 #include "clang/Basic/Diagnostic.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/Frontend/CompilerInvocation.h"
@@ -28,8 +29,8 @@
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/Signals.h"
 #include "llvm/Support/Path.h"
+#include "llvm/Support/Signals.h"
 #include "llvm/Support/StringSaver.h"
 
 using namespace swift;
@@ -55,9 +56,8 @@ std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
   // HACK! Drop the -fmodule-format= argument and the one that
   // precedes it.
   {
-    auto moduleFormatPos = std::find_if(commandLineArgs.begin(),
-                                        commandLineArgs.end(),
-                                        [](StringRef arg) {
+    auto moduleFormatPos = llvm::find_if(commandLineArgs,
+                                         [](StringRef arg) {
       return arg.starts_with("-fmodule-format=");
     });
     assert(moduleFormatPos != commandLineArgs.end());
@@ -66,8 +66,7 @@ std::vector<std::string> ClangImporter::getClangDepScanningInvocationArguments(
   }
 
   // Use `-fsyntax-only` to do dependency scanning and assert if not there.
-  assert(std::find(commandLineArgs.begin(), commandLineArgs.end(),
-                   "-fsyntax-only") != commandLineArgs.end() &&
+  assert(llvm::is_contained(commandLineArgs, "-fsyntax-only") &&
          "missing -fsyntax-only option");
 
   // The Clang modules produced by ClangImporter are always embedded in an

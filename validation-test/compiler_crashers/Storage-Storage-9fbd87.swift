@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"45b18ebd","signature":"swift::rewriting::Symbol::Storage::Storage(swift::rewriting::Symbol::Kind, swift::CanType, llvm::ArrayRef<swift::rewriting::Term>)","signatureAssert":"Assertion failed: (!type->hasUnboundGenericType()), function Storage"}
+// {"kind":"typecheck","original":"45b18ebd","signature":"swift::rewriting::Symbol::Storage::Storage(swift::rewriting::Symbol::Kind, swift::CanType, llvm::ArrayRef<swift::rewriting::Term>)","signatureAssert":"Assertion failed: (!type->hasUnboundGenericType()), function Storage","signatureNext":"Symbol::forConcreteType"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 struct a<b, c
   enum d {

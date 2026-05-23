@@ -52,6 +52,31 @@ Constructor Array.init(unsafeUninitializedCapacity:initializingWith:) is now wit
 Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) has generic signature change from <Element> to <Element, E where E : Swift.Error>
 Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) has parameter 1 type change from (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws -> Swift.Void to (inout Swift.UnsafeMutableBufferPointer<Element>, inout Swift.Int) throws(E) -> Swift.Void
 Constructor ContiguousArray.init(unsafeUninitializedCapacity:initializingWith:) is now without rethrows
+Func RangeReplaceableCollection.filter(_:) has generic signature change from <Self where Self : Swift.RangeReplaceableCollection> to <Self, E where Self : Swift.RangeReplaceableCollection, E : Swift.Error>
+Func RangeReplaceableCollection.filter(_:) has self access kind changing from __Consuming to Consuming
+Func RangeReplaceableCollection.filter(_:) is now without rethrows
+Func Dictionary.filter(_:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.filter(_:) has self access kind changing from __Consuming to Consuming
+Func Dictionary.filter(_:) is now without rethrows
+Func Sequence.filter(_:) has generic signature change from <Self where Self : Swift.Sequence> to <Self, E where Self : Swift.Sequence, E : Swift.Error>
+Func Sequence.filter(_:) is now without rethrows
+Func Set.filter(_:) has generic signature change from <Element where Element : Swift.Hashable> to <Element, E where Element : Swift.Hashable, E : Swift.Error>
+Func Set.filter(_:) has self access kind changing from __Consuming to Consuming
+Func Set.filter(_:) is now without rethrows
+Func Substring.filter(_:) has generic signature change from to <E where E : Swift.Error>
+Func Substring.filter(_:) is now without rethrows
+Func String.withCString(_:) has generic signature change from <Result> to <Result, E where E : Swift.Error>
+Func String.withCString(_:) is now without rethrows
+Func String.withCString(encodedAs:_:) has generic signature change from <Result, TargetEncoding where TargetEncoding : Swift._UnicodeEncoding> to <Result, TargetEncoding, E where TargetEncoding : Swift._UnicodeEncoding, E : Swift.Error>
+Func String.withCString(encodedAs:_:) is now without rethrows
+Func String.withUTF8(_:) has generic signature change from <R> to <R, E where E : Swift.Error>
+Func String.withUTF8(_:) is now without rethrows
+Func Substring.withCString(_:) has generic signature change from <Result> to <Result, E where E : Swift.Error>
+Func Substring.withCString(_:) is now without rethrows
+Func Substring.withCString(encodedAs:_:) has generic signature change from <Result, TargetEncoding where TargetEncoding : Swift._UnicodeEncoding> to <Result, TargetEncoding, E where TargetEncoding : Swift._UnicodeEncoding, E : Swift.Error>
+Func Substring.withCString(encodedAs:_:) is now without rethrows
+Func Substring.withUTF8(_:) has generic signature change from <R> to <R, E where E : Swift.Error>
+Func Substring.withUTF8(_:) is now without rethrows
 
 Protocol SIMDScalar has generic signature change from <Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar> to <Self : Swift.BitwiseCopyable, Self == Self.SIMD16Storage.Scalar, Self.SIMD16Storage : Swift.SIMDStorage, Self.SIMD2Storage : Swift.SIMDStorage, Self.SIMD32Storage : Swift.SIMDStorage, Self.SIMD4Storage : Swift.SIMDStorage, Self.SIMD64Storage : Swift.SIMDStorage, Self.SIMD8Storage : Swift.SIMDStorage, Self.SIMDMaskScalar : Swift.FixedWidthInteger, Self.SIMDMaskScalar : Swift.SIMDScalar, Self.SIMDMaskScalar : Swift.SignedInteger, Self.SIMDMaskScalar == Self.SIMDMaskScalar.SIMDMaskScalar, Self.SIMD16Storage.Scalar == Self.SIMD2Storage.Scalar, Self.SIMD2Storage.Scalar == Self.SIMD32Storage.Scalar, Self.SIMD32Storage.Scalar == Self.SIMD4Storage.Scalar, Self.SIMD4Storage.Scalar == Self.SIMD64Storage.Scalar, Self.SIMD64Storage.Scalar == Self.SIMD8Storage.Scalar>
 
@@ -113,7 +138,6 @@ Protocol FixedWidthInteger has added inherited protocol Copyable
 Protocol FixedWidthInteger has added inherited protocol Escapable
 Protocol FloatingPoint has added inherited protocol Copyable
 Protocol FloatingPoint has added inherited protocol Escapable
-Protocol Hashable has added inherited protocol Escapable
 Protocol Identifiable has added inherited protocol Copyable
 Protocol Identifiable has added inherited protocol Escapable
 Protocol IteratorProtocol has added inherited protocol Copyable
@@ -217,7 +241,7 @@ Constructor ExpressibleByNilLiteral.init(nilLiteral:) has generic signature chan
 Constructor ManagedBufferPointer.init(bufferClass:minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Constructor ManagedBufferPointer.init(unsafeBufferObject:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Constructor OpaquePointer.init(_:) has generic signature change from <T> to <T where T : ~Copyable>
-Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable>
+Constructor Optional.init(_:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Constructor Optional.init(_:) has parameter 0 changing from Default to Owned
 Constructor Optional.init(nilLiteral:) has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Constructor Result.init(catching:) has generic signature change from <Success, Failure where Failure == any Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable>
@@ -283,16 +307,19 @@ Func UnsafeMutablePointer.moveInitialize(from:count:) has generic signature chan
 Func UnsafeMutableRawBufferPointer.bindMemory(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.assumingMemoryBound(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
+Func UnsafeMutableRawPointer.load(fromByteOffset:as:) has generic signature change from <T> to <T where T : ~Escapable>
 Func UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafePointer.deallocate() has generic signature change from <Pointee> to <Pointee where Pointee : ~Copyable>
 Func UnsafeRawBufferPointer.bindMemory(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.assumingMemoryBound(to:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
+Func UnsafeRawPointer.load(fromByteOffset:as:) has generic signature change from <T> to <T where T : ~Escapable>
 Func swap(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
 Func withExtendedLifetime(_:_:) has parameter 0 changing from Default to Shared
 Func withUnsafeBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func withUnsafeBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, T : ~Escapable, Result : ~Copyable>
 Func withUnsafeBytes(of:_:) has parameter 0 changing from Default to Shared
-Func withUnsafeMutableBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
+Func withUnsafeMutableBytes(of:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, T : ~Escapable, Result : ~Copyable>
 Func withUnsafeMutablePointer(to:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
 Func withUnsafePointer(to:_:) has generic signature change from <T, Result> to <T, E, Result where E : Swift.Error, T : ~Copyable, Result : ~Copyable>
 Func withUnsafePointer(to:_:) has parameter 0 changing from Default to Shared
@@ -361,6 +388,18 @@ Func ContiguousArray.withUnsafeBufferPointer(_:) is now without rethrows
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has generic signature change from <Element, R> to <Element, R, E where E : Swift.Error>
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) has parameter 0 type change from (inout Swift.UnsafeMutableBufferPointer<Element>) throws -> R to (inout Swift.UnsafeMutableBufferPointer<Element>) throws(E) -> R
 Func ContiguousArray.withUnsafeMutableBufferPointer(_:) is now without rethrows
+Func Dictionary.mapValues(_:) has generic signature change from <Key, Value, T where Key : Swift.Hashable> to <Key, Value, T, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.mapValues(_:) is now without rethrows
+Func Dictionary.merge(_:uniquingKeysWith:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.merge(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Func Dictionary.merge(_:uniquingKeysWith:) is now without rethrows
+Func Dictionary.merging(_:uniquingKeysWith:) has generic signature change from <Key, Value where Key : Swift.Hashable> to <Key, Value, E where Key : Swift.Hashable, E : Swift.Error>
+Func Dictionary.merging(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Func Dictionary.merging(_:uniquingKeysWith:) is now without rethrows
+Constructor Dictionary.init(_:uniquingKeysWith:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, S : Swift.Sequence, S.Element == (Key, Value)> to <Key, Value, S, E where Key : Swift.Hashable, S : Swift.Sequence, E : Swift.Error, S.Element == (Key, Value)>
+Constructor Dictionary.init(_:uniquingKeysWith:) is now without rethrows
+Constructor Dictionary.init(grouping:by:) has generic signature change from <Key, Value, S where Key : Swift.Hashable, Value == [S.Element], S : Swift.Sequence> to <Key, Value, S, E where Key : Swift.Hashable, Value == [S.Element], S : Swift.Sequence, E : Swift.Error>
+Constructor Dictionary.init(grouping:by:) is now without rethrows
 
 // Adoption of @_addressableForDependencies
 Struct CollectionOfOne is now with @_addressableForDependencies
@@ -398,9 +437,13 @@ Func Comparable.>=(_:_:) has generic signature change from <Self where Self : Sw
 Func Comparable.>=(_:_:) has parameter 0 changing from Default to Shared
 Func Comparable.>=(_:_:) has parameter 1 changing from Default to Shared
 
-// Hashable: ~Copyable
-Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable>
-Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable>
-Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable>
+// Hashable: ~Copyable & Escapable
+Protocol Hashable has generic signature change from <Self : Swift.Equatable> to <Self : Swift.Equatable, Self : ~Copyable, Self : ~Escapable>
+Accessor Hashable.hashValue.Get() has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hashable.hash(into:) has generic signature change from <Self where Self : Swift.Hashable> to <Self where Self : Swift.Hashable, Self : ~Copyable, Self : ~Escapable>
+Func Hasher.combine(_:) has generic signature change from <H where H : Swift.Hashable> to <H where H : Swift.Hashable, H : ~Copyable, H : ~Escapable>
 Func Hasher.combine(_:) has parameter 0 changing from Default to Shared
+
+Func Sequence.reduce(_:_:) has generic signature change from <Self, Result where Self : Swift.Sequence> to <Self, Result where Self : Swift.Sequence, Result : ~Copyable>
+Func Sequence.reduce(_:_:) has parameter 0 changing from Default to Owned
+

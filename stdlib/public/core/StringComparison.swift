@@ -53,8 +53,8 @@ internal func _stringCompareInternal(
   }
 
   let isNFC = lhs.isNFC && rhs.isNFC
-  return unsafe lhs.withFastUTF8 { lhsUTF8 in
-    return unsafe rhs.withFastUTF8 { rhsUTF8 in
+  return lhs.withFastUTF8 { lhsUTF8 in
+    return rhs.withFastUTF8 { rhsUTF8 in
       return unsafe _stringCompareFastUTF8(
         lhsUTF8, rhsUTF8, expecting: expecting, bothNFC: isNFC)
     }
@@ -88,8 +88,8 @@ internal func _stringCompareInternal(
   }
 
   let isNFC = lhs.isNFC && rhs.isNFC
-  return unsafe lhs.withFastUTF8(range: lhsRange) { lhsUTF8 in
-    return unsafe rhs.withFastUTF8(range: rhsRange) { rhsUTF8 in
+  return lhs.withFastUTF8(range: lhsRange) { lhsUTF8 in
+    return rhs.withFastUTF8(range: rhsRange) { rhsUTF8 in
       return unsafe _stringCompareFastUTF8(
         lhsUTF8, rhsUTF8, expecting: expecting, bothNFC: isNFC)
     }

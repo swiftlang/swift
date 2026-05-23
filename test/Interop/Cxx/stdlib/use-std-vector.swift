@@ -213,7 +213,7 @@ StdVectorTestSuite.test("VectorOfImmortalRefPtr").require(.stdlib_5_8).code {
 
 StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
     var v = makeVectorOfNonCopyable()
-    expectEqual(v.size(), 2)
+    expectEqual(v.size(), 3)
     expectFalse(v.empty())
 
     func getNumber(_ x: borrowing NonCopyable) -> Int32 {
@@ -222,12 +222,14 @@ StdVectorTestSuite.test("Subscript of VectorOfNonCopyable") {
 
     expectEqual(getNumber(v[0]), 1)
     expectEqual(getNumber(v[1]), 2)
+    expectEqual(getNumber(v[2]), 3)
 
     v[0] = NonCopyable(3)
     v[1] = NonCopyable(4)
 
     expectEqual(getNumber(v[0]), 3)
     expectEqual(getNumber(v[1]), 4)
+    expectEqual(getNumber(v[2]), 3)
 }
 
 

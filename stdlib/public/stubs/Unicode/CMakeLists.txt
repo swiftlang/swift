@@ -39,6 +39,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       IS_FRAGILE
 
       UnicodeData.cpp
+      UnicodeEmoji.cpp
       UnicodeGrapheme.cpp
       UnicodeNormalization.cpp
       UnicodeScalarProps.cpp
@@ -63,6 +64,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
     set_property(TARGET embedded-unicode-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+    embedded_amend_archive_commands_on_darwin_host(embedded-unicode-${mod} ${triple})
 
     add_dependencies(embedded-unicode embedded-unicode-${mod})
   endforeach()

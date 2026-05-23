@@ -31,6 +31,7 @@
 #include "swift/Parse/ParseSILSupport.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Compiler.h"
@@ -601,7 +602,7 @@ SourceLoc Parser::consumeAttributeLParen() {
   SourceLoc LastTokenEndLoc = getEndOfPreviousLoc();
   if (LastTokenEndLoc != Tok.getLoc() && !isInSILMode()) {
     diagnose(LastTokenEndLoc, diag::attr_extra_whitespace_before_lparen)
-        .warnUntilLanguageMode(6);
+        .warnUntilLanguageMode(LanguageMode::v6);
   }
   return consumeToken(tok::l_paren);
 }
@@ -617,7 +618,7 @@ bool Parser::isAtAttributeLParen(bool isCustomAttr) {
   if (!Tok.isFollowingLParen())
     return false;
 
-  if (Context.isLanguageModeAtLeast(6)) {
+  if (Context.isLanguageModeAtLeast(LanguageMode::v6)) {
     // No-space '(' are always arguments.
     if (getEndOfPreviousLoc() == Tok.getLoc())
       return true;

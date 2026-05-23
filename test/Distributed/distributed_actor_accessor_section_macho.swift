@@ -93,49 +93,49 @@ public distributed actor MyOtherActor {
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic Si___________pIetMHyTgzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
 // CHECK-SAME: (ptr @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTETFTu" to i{{32|64}})
-// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
+// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular, no_dead_strip"}}
 
 /// -> `MyActor.simple2`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic Si_____SS______pIetMHyTgozo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
 // CHECK-SAME: (ptr @"$s27distributed_actor_accessors7MyActorC7simple2ySSSiYaKFTETFTu" to i{{32|64}})
-// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
+// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular, no_dead_strip"}}
 
 /// -> `MyActor.simple3`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic SS_____Si______pIetMHgTgdzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
 // CHECK-SAME: (ptr @"$s27distributed_actor_accessors7MyActorC7simple3ySiSSYaKFTETFTu" to i{{32|64}})
-// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
+// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular, no_dead_strip"}}
 
 /// -> `MyActor.single_case_enum`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic __________AA______pIetMHyTgdzo_ 27distributed_actor_accessors7SimpleEO AA7MyActorC s5ErrorP"
 // CHECK-SAME: (ptr @"$s27distributed_actor_accessors7MyActorC16single_case_enumyAA7SimpleEOAFYaKFTETFTu" to i{{32|64}})
-// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
+// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular, no_dead_strip"}}
 
 /// -> `MyActor.with_indirect_enums`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic _____Si_____AA______pIetMHgTyTgozo_ 27distributed_actor_accessors9IndirectEO AA7MyActorC s5ErrorP"
 // CHECK-SAME: (ptr @"$s27distributed_actor_accessors7MyActorC19with_indirect_enumsyAA9IndirectEOAF_SitYaKFTETFTu" to i{{32|64}})
-// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
+// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular, no_dead_strip"}}
 
 /// -> `MyActor.complex`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic SaySiG_____SSSg__________AD______pIetMHgTgTgTnTgrzo_ 27distributed_actor_accessors3ObjC AA11LargeStructV AA7MyActorC s5ErrorP"
 // CHECK-SAME: (ptr @"$s27distributed_actor_accessors7MyActorC7complexyAA11LargeStructVSaySiG_AA3ObjCSSSgAFtYaKFTETFTu" to i{{32|64}})
-// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
+// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular, no_dead_strip"}}
 
 /// -> `MyActor.generic`
 // CHECK:      @"$s27distributed_actor_accessors7MyActorC7genericyyxYaKSeRzSERzlFTEHF" = private constant
 // CHECK-SAME: @"symbolic x___________pSeRzSERzlIetMHnTgzo_ 27distributed_actor_accessors7MyActorC s5ErrorP"
 // CHECK-SAME: (ptr @"$s27distributed_actor_accessors7MyActorC7genericyyxYaKSeRzSERzlFTETFTu" to i{{32|64}})
-// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
+// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular, no_dead_strip"}}
 
 /// -> `MyOtherActor.empty`
 // CHECK:      @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTEHF" = private constant
 // CHECK-SAME: @"symbolic ___________pIetMHgzo_ 27distributed_actor_accessors12MyOtherActorC s5ErrorP"
 // CHECK-SAME: (ptr @"$s27distributed_actor_accessors12MyOtherActorC5emptyyyYaKFTETFTu" to i{{32|64}})
-// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular"}}
+// CHECK-SAME: , section {{"swift5_accessible_functions"|".sw5acfn$B"|"__TEXT, __swift5_acfuncs, regular, no_dead_strip"}}
 
 // CHECK:      @llvm.used = appending global [{{.*}} x ptr] [
 // CHECK-SAME: @"$s27distributed_actor_accessors7MyActorC7simple1yySiYaKFTEHF"

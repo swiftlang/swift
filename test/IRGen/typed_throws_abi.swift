@@ -19,6 +19,25 @@ struct ThreeWords: Error {
     let z = 0
 }
 
+struct ManyBytes {
+    let x0: UInt8 = 0
+    let x1: UInt8 = 1
+    let x2: UInt8 = 2
+    let x3: UInt8 = 3
+    let x4: UInt8 = 4
+    let x5: UInt8 = 5
+    let x6: UInt8 = 6
+    let x7: UInt8 = 7
+    let x8: UInt8 = 8
+    let x9: UInt8 = 9
+    let x10: UInt8 = 10
+    let x11: UInt8 = 11
+    let x12: UInt8 = 12
+    let x13: UInt8 = 13
+    let x14: UInt8 = 14
+    let x15: UInt8 = 15
+}
+
 struct Impl: P {
     // CHECK: define hidden swiftcc void @"$s16typed_throws_abi4ImplV2f0yySbAA5EmptyVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -130,6 +149,13 @@ struct Impl: P {
             throw Empty()
         }
         return (1, 2, 3, 4, 5)
+    }
+
+    func fManyBytes(_ b: Bool) throws(Empty) -> ManyBytes {
+        guard b else {
+            throw Empty()
+        }
+        return ManyBytes()
     }
 
     // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi4ImplV2g0yySbAA7OneWordVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
@@ -251,6 +277,13 @@ struct Impl: P {
         return (1, 2, 3, 4, 5)
     }
 
+    func gManyBytes(_ b: Bool) throws(OneWord) -> ManyBytes {
+        guard b else {
+            throw OneWord()
+        }
+        return ManyBytes()
+    }
+
     // CHECK: define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi4ImplV2h0yySbAA8TwoWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi8TwoWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -370,6 +403,13 @@ struct Impl: P {
         return (1, 2, 3, 4, 5)
     }
 
+    func hManyBytes(_ b: Bool) throws(TwoWords) -> ManyBytes {
+        guard b else {
+            throw TwoWords()
+        }
+        return ManyBytes()
+    }
+
     // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi4ImplV2i0yySbAA10ThreeWordsVYKF"(i1 %0, ptr swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi10ThreeWordsV
     // CHECK:   br i1 %0, label %[[SUCCESS:.*]], label %[[FAIL:.*]]
@@ -487,6 +527,13 @@ struct Impl: P {
             throw ThreeWords()
         }
         return (1, 2, 3, 4, 5)
+    }
+
+    func iManyBytes(_ b: Bool) throws(ThreeWords) -> ManyBytes {
+        guard b else {
+            throw ThreeWords()
+        }
+        return ManyBytes()
     }
 }
 
@@ -699,6 +746,14 @@ func callImpl_f5(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int, Int) {
         return try impl.f5(b)
     } catch {
         return (0, 0, 0, 0, 0)
+    }
+}
+
+func callImpl_fManyBytes(_ impl: Impl, _ b: Bool) -> ManyBytes {
+    do {
+        return try impl.fManyBytes(b)
+    } catch {
+        return ManyBytes()
     }
 }
 
@@ -920,6 +975,14 @@ func callImpl_g5(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int, Int) {
         return try impl.g5(b)
     } catch {
         return (error.x, 0, 0, 0, 0)
+    }
+}
+
+func callImpl_gManyBytes(_ impl: Impl, _ b: Bool) -> ManyBytes {
+    do {
+        return try impl.gManyBytes(b)
+    } catch {
+        return ManyBytes()
     }
 }
 
@@ -1158,6 +1221,14 @@ func callImpl_h5(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int, Int) {
         return try impl.h5(b)
     } catch {
         return (error.x, error.y, 0, 0, 0)
+    }
+}
+
+func callImpl_hManyBytes(_ impl: Impl, _ b: Bool) -> ManyBytes {
+    do {
+        return try impl.hManyBytes(b)
+    } catch {
+        return ManyBytes()
     }
 }
 
@@ -1416,6 +1487,14 @@ func callImpl_i5(_ impl: Impl, _ b: Bool) -> (Int, Int, Int, Int, Int) {
     }
 }
 
+func callImpl_iManyBytes(_ impl: Impl, _ b: Bool) -> ManyBytes {
+    do {
+        return try impl.iManyBytes(b)
+    } catch {
+        return ManyBytes()
+    }
+}
+
 @available(SwiftStdlib 6.0, *)
 struct ImplAsync: PAsync {
 
@@ -1541,6 +1620,13 @@ struct ImplAsync: PAsync {
             throw Empty()
         }
         return (1, 2, 3, 4, 5)
+    }
+
+    func fManyBytes(_ b: Bool) async throws(Empty) -> ManyBytes {
+        guard b else {
+            throw Empty()
+        }
+        return ManyBytes()
     }
 
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2g0yySbYaAA7OneWordVYKF"(ptr swiftasync %0, i1 %1)
@@ -1673,6 +1759,13 @@ struct ImplAsync: PAsync {
         return (1, 2, 3, 4, 5)
     }
 
+    func gManyBytes(_ b: Bool) async throws(OneWord) -> ManyBytes {
+        guard b else {
+            throw OneWord()
+        }
+        return ManyBytes()
+    }
+
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2h0yySbYaAA8TwoWordsVYKF"(ptr swiftasync %0, i1 %1)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi8TwoWordsV, align 8
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
@@ -1803,6 +1896,13 @@ struct ImplAsync: PAsync {
         return (1, 2, 3, 4, 5)
     }
 
+    func hManyBytes(_ b: Bool) async throws(TwoWords) -> ManyBytes {
+        guard b else {
+            throw TwoWords()
+        }
+        return ManyBytes()
+    }
+
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi9ImplAsyncV2i0yySbYaAA10ThreeWordsVYKF"(ptr swiftasync %0, i1 %1)
     // CHECK:   [[ERROR:%.*]] = alloca %T16typed_throws_abi10ThreeWordsV, align 8
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
@@ -1931,6 +2031,13 @@ struct ImplAsync: PAsync {
             throw ThreeWords()
         }
         return (1, 2, 3, 4, 5)
+    }
+
+    func iManyBytes(_ b: Bool) async throws(ThreeWords) -> ManyBytes {
+        guard b else {
+            throw ThreeWords()
+        }
+        return ManyBytes()
     }
 }
 
@@ -2180,8 +2287,16 @@ func callImplAsync_f5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
     }
 }
 
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_fManyBytes(_ impl: ImplAsync, _ b: Bool) async -> ManyBytes {
+    do {
+        return try await impl.fManyBytes(b)
+    } catch {
+        return ManyBytes()
+    }
+}
 
-// CHECK: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g0ySiAA0eF0V_SbtYaF"(ptr swiftasync %0, i1 %1)
+// CHECK-LABEL: define hidden swifttailcc void @"$s16typed_throws_abi16callImplAsync_g0ySiAA0eF0V_SbtYaF"(ptr swiftasync %0, i1 %1)
 // CHECK:   %swifterror = alloca swifterror ptr, align 8
 // CHECK:   [[CALL:%.*]] = call token @llvm.coro.id.async(i32 16, i32 16, i32 0, ptr @"$s16typed_throws_abi16callImplAsync_g0ySiAA0eF0V_SbtYaFTu")
 // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token [[CALL]], ptr null)
@@ -2435,6 +2550,15 @@ func callImplAsync_g5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
         return try await impl.g5(b)
     } catch {
         return (error.x, 0, 0, 0, 0)
+    }
+}
+
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_gManyBytes(_ impl: ImplAsync, _ b: Bool) async -> ManyBytes {
+    do {
+        return try await impl.gManyBytes(b)
+    } catch {
+        return ManyBytes()
     }
 }
 
@@ -2703,6 +2827,15 @@ func callImplAsync_h5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
         return try await impl.h5(b)
     } catch {
         return (error.x, error.y, 0, 0, 0)
+    }
+}
+
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_hManyBytes(_ impl: ImplAsync, _ b: Bool) async -> ManyBytes {
+    do {
+        return try await impl.hManyBytes(b)
+    } catch {
+        return ManyBytes()
     }
 }
 
@@ -2985,6 +3118,15 @@ func callImplAsync_i5(_ impl: ImplAsync, _ b: Bool) async -> (Int, Int, Int, Int
         return try await impl.i5(b)
     } catch {
         return (error.x, error.y, error.z, 0, 0)
+    }
+}
+
+@available(SwiftStdlib 6.0, *)
+func callImplAsync_iManyBytes(_ impl: ImplAsync, _ b: Bool) async -> ManyBytes {
+    do {
+        return try await impl.iManyBytes(b)
+    } catch {
+        return ManyBytes()
     }
 }
 
@@ -3285,6 +3427,8 @@ protocol P {
     // CHECK: }
     func f5(_ b: Bool) throws(Empty) -> (Int, Int, Int, Int, Int)
 
+    func fManyBytes(_ b: Bool) throws(Empty) -> ManyBytes
+
     // CHECK: define hidden swiftcc i64 @"$s16typed_throws_abi1PP2g0yySbAA7OneWordVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
@@ -3345,6 +3489,8 @@ protocol P {
     // CHECK:   ret void
     // CHECK: }
     func g5(_ b: Bool) throws(OneWord) -> (Int, Int, Int, Int, Int)
+
+    func gManyBytes(_ b: Bool) throws(OneWord) -> ManyBytes
 
     // CHECK:  define hidden swiftcc { i64, i64 } @"$s16typed_throws_abi1PP2h0yySbAA8TwoWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
@@ -3407,6 +3553,8 @@ protocol P {
     // CHECK: }
     func h5(_ b: Bool) throws(TwoWords) -> (Int, Int, Int, Int, Int)
 
+    func hManyBytes(_ b: Bool) throws(TwoWords) -> ManyBytes
+
     // CHECK: define hidden swiftcc { i64, i64, i64 } @"$s16typed_throws_abi1PP2i0yySbAA10ThreeWordsVYKFTj"(i1 %0, ptr noalias swiftself %1, ptr noalias swifterror captures(none) dereferenceable(8) %2, ptr %3, ptr %4)
     // CHECK:   [[ERROR:%.*]] = load ptr, ptr %2
     // CHECK:   [[ISERROR:%.*]] = icmp ne ptr [[ERROR]], null
@@ -3467,6 +3615,8 @@ protocol P {
     // CHECK:   ret void
     // CHECK: }
     func i5(_ b: Bool) throws(ThreeWords) -> (Int, Int, Int, Int, Int)
+
+    func iManyBytes(_ b: Bool) throws(ThreeWords) -> ManyBytes
 }
 
 @available(SwiftStdlib 6.0, *)
@@ -3550,6 +3700,8 @@ protocol PAsync {
     // CHECK: }
     func f5(_ b: Bool) async throws(Empty) -> (Int, Int, Int, Int, Int)
 
+    func fManyBytes(_ b: Bool) async throws(Empty) -> ManyBytes
+
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2g0yySbYaAA7OneWordVYKFTj"(ptr swiftasync %0, i1 %1, ptr noalias swiftself %2, ptr %3, ptr %4)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
@@ -3628,6 +3780,8 @@ protocol PAsync {
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr [[ERROR]])
     // CHECK: }
     func g5(_ b: Bool) async throws(OneWord) -> (Int, Int, Int, Int, Int)
+
+    func gManyBytes(_ b: Bool) async throws(OneWord) -> ManyBytes
 
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2h0yySbYaAA8TwoWordsVYKFTj"(ptr swiftasync %0, i1 %1, ptr noalias swiftself %2, ptr %3, ptr %4)
     // CHECK:   %swifterror = alloca swifterror ptr
@@ -3708,6 +3862,8 @@ protocol PAsync {
     // CHECK: }
     func h5(_ b: Bool) async throws(TwoWords) -> (Int, Int, Int, Int, Int)
 
+    func hManyBytes(_ b: Bool) async throws(TwoWords) -> ManyBytes
+
     // CHECK: define hidden swifttailcc void @"$s16typed_throws_abi6PAsyncP2i0yySbYaAA10ThreeWordsVYKFTj"(ptr swiftasync %0, i1 %1, ptr noalias swiftself %2, ptr %3, ptr %4)
     // CHECK:   %swifterror = alloca swifterror ptr
     // CHECK:   [[CORO:%.*]] = call ptr @llvm.coro.begin(token {{%.*}}, ptr null)
@@ -3786,4 +3942,6 @@ protocol PAsync {
     // CHECK:   call i1 (ptr, i1, ...) @llvm.coro.end.async(ptr [[CORO]], i1 false, ptr @"{{.*}}", ptr {{%.*}}, ptr {{%.*}}, ptr [[ERROR]])
     // CHECK: }
     func i5(_ b: Bool) async throws(ThreeWords) -> (Int, Int, Int, Int, Int)
+
+    func iManyBytes(_ b: Bool) async throws(ThreeWords) -> ManyBytes
 }

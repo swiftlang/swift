@@ -19,6 +19,8 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SIL/SILUndef.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
@@ -119,6 +121,11 @@ private:
     if (Changed) {
       updateAllGuaranteedPhis(getPassManager(), F);
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
+      removeUnreachableBlocks(*F);
+      if (F->needBreakInfiniteLoops())
+        breakInfiniteLoops(getPassManager(), F);
+      if (F->needCompleteLifetimes())
+        completeAllLifetimes(getPassManager(), F);
     }
   }
 
@@ -249,12 +256,20 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     return false;
 
   if (getFunction()->hasOwnership()) {
-    // TODO: Currently disabled because this case may need lifetime extension
-    // Disabling this conservatively for now.
+    // The terminator's condition will be moved to the location of the
+    // switch_enum. If the condition's operand is within a local borrow scope,
+    // moving it may violate OSSA lifetime rules.
     assert(Condition->getNumRealOperands() == 1);
-    BorrowedValue conditionOp(Condition->getOperand(0));
-    if (conditionOp && conditionOp.isLocalScope()) {
-      return false;
+    SILValue condOp = Condition->getOperand(0);
+    if (condOp->getOwnershipKind() == OwnershipKind::Guaranteed) {
+      if (!visitBorrowIntroducers(condOp, [&](SILValue introducer) {
+        if (BorrowedValue(introducer).isLocalScope()) {
+          return false;
+        }
+        return true;
+      })) {
+        return false;
+      }
     }
   }
   // Now do the transformation!

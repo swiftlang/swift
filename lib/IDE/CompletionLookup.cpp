@@ -12,7 +12,6 @@
 
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
-#include "ExprContextAnalysis.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -770,7 +769,8 @@ void CompletionLookup::analyzeActorIsolation(
     break;
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedConcurrent:
+  case ActorIsolation::NonisolatedNonsending:
   case ActorIsolation::NonisolatedUnsafe:
     return;
   }
@@ -1471,7 +1471,7 @@ static StringRef getTypeAnnotationString(const NominalTypeDecl *NTD,
 
   assert(stash.empty());
   llvm::raw_svector_ostream OS(stash);
-  llvm::interleave(attrRoleStrs, OS, ", ");
+  llvm::interleaveComma(attrRoleStrs, OS);
   return {stash.data(), stash.size()};
 }
 
@@ -1695,7 +1695,7 @@ static StringRef getTypeAnnotationString(const MacroDecl *MD,
 
   assert(stash.empty());
   llvm::raw_svector_ostream OS(stash);
-  llvm::interleave(roleStrs, OS, ", ");
+  llvm::interleaveComma(roleStrs, OS);
   return {stash.data(), stash.size()};
 }
 
@@ -3020,6 +3020,7 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
       case TypeAttrKind::Nonisolated:
       case TypeAttrKind::Unchecked:
       case TypeAttrKind::Unsafe:
+      case TypeAttrKind::Reparented:
         // These attributes are only available in inheritance clasuses.
         return;
       default:

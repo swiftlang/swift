@@ -17,6 +17,7 @@
 import Swift
 
 @_spi(Internal)
+@available(BacktracingDT 6.2, *)
 public enum RichFrame<T: FixedWidthInteger>: CustomStringConvertible, Equatable {
   public typealias Address = T
 
@@ -121,6 +122,7 @@ public enum RichFrame<T: FixedWidthInteger>: CustomStringConvertible, Equatable 
   }
 }
 
+@available(BacktracingDT 6.2, *)
 extension RichFrame: LimitableElement {
   // LimitableElement wants to call this "omitted"
   public static func omitted(_ count: Int) -> Self {
@@ -128,6 +130,7 @@ extension RichFrame: LimitableElement {
   }
 }
 
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Frame {
   init<T>(_ frame: RichFrame<T>) {
     switch frame {

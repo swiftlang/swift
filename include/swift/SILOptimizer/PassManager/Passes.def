@@ -67,6 +67,10 @@ PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
 PASS(BooleanLiteralFolding, "boolean-literal-folding",
      "Constant folds initializers of boolean literals")
+PASS(CommonSubexpressionElimination, "common-subexpression-elimination",
+     "Common Subexpression Elimination (Swift)")
+PASS(HighLevelCommonSubexpressionElimination, "high-level-common-subexpression-elimination",
+     "Common Subexpression Elimination on High-Level SIL (Swift)")
 PASS(DestroyHoisting, "destroy-hoisting",
      "Hoist destroy_value instructions")
 PASS(MandatoryDestroyHoisting, "mandatory-destroy-hoisting",
@@ -79,6 +83,8 @@ PASS(ComputeEscapeEffects, "compute-escape-effects",
      "Computes function escape effects")
 PASS(ComputeSideEffects, "compute-side-effects",
      "Computes function side effects")
+PASS(CondFailOptimization, "cond-fail-optimization",
+     "Optimizes cond_fail instructions")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
      "Diagnose Infinitely-Recursive Code")
 PASS(InitializeStaticGlobals, "initialize-static-globals",
@@ -160,6 +166,8 @@ MODULE_PASS(StackProtection, "stack-protection",
      "Decides which functions need stack protectors")
 MODULE_PASS(DiagnoseUnknownConstValues, "diagnose-unknown-const-values",
      "Diagnose any '@const' entities which could not be simplified to a compile-time value")
+MODULE_PASS(ConformanceCheckOptimization, "conformance-check-optimization",
+     "Build conformance entries in vtables for fast class conformance checks")
 MODULE_PASS(EmbeddedSwiftDiagnostics, "embedded-swift-diagnostics",
      "Diagnose violations of Embedded Swift language restrictions")
 
@@ -219,14 +227,10 @@ LEGACY_PASS(CFGPrinter, "view-cfg",
      "View Function CFGs")
 LEGACY_PASS(COWArrayOpts, "cowarray-opt",
      "COW Array Optimization")
-LEGACY_PASS(CSE, "cse",
-     "Common Subexpression Elimination")
 LEGACY_PASS(CallerAnalysisPrinter, "caller-analysis-printer",
      "Print Caller Analysis for Testing")
 LEGACY_PASS(CapturePromotion, "capture-promotion",
      "Capture Promotion to Eliminate Escaping Boxes")
-LEGACY_PASS(ClosureSpecializer, "closure-specialize",
-     "Closure Specialization on Constant Function Arguments")
 
 LEGACY_PASS(ClosureLifetimeFixup, "closure-lifetime-fixup",
      "Closure Lifetime Fixup")
@@ -314,8 +318,6 @@ LEGACY_PASS(GlobalPropertyOpt, "global-property-opt",
      "Global Property Optimization")
 LEGACY_PASS(MandatoryARCOpts, "mandatory-arc-opts",
      "Mandatory ARC Optimization")
-LEGACY_PASS(HighLevelCSE, "high-level-cse",
-     "Common Subexpression Elimination on High-Level SIL")
 LEGACY_PASS(IVInfoPrinter, "iv-info-printer",
      "Print Induction Variable Information for Testing")
 LEGACY_PASS(LowerHopToActor, "lower-hop-to-actor",
@@ -485,6 +487,8 @@ LEGACY_PASS(DiagnoseUnnecessaryPreconcurrencyImports, "sil-diagnose-unnecessary-
      "Diagnose any preconcurrency imports that Sema and TransferNonSendable did not use")
 LEGACY_PASS(ThunkLowering, "sil-thunk-lowering",
      "Lower thunk instructions to actual thunks")
+LEGACY_PASS(MarkNeverWrittenMutableClosureBoxesAsImmutable, "mark-never-written-mutable-closure-boxes-as-immutable",
+     "Mark never written mutable closure boxes as immutable")
 LEGACY_PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 

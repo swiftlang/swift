@@ -73,13 +73,13 @@ typedef void (^NonsendableCompletionHandler)(NSString * _Nullable, NSString * _N
 
 -(void)customizedWithString:(NSString *)operation completionHandler:(void (^)(NSInteger))handler __attribute__((swift_name("customize(with:completionHandler:)"))) __attribute__((swift_async_name("customize(_:)")));
 
--(void)unavailableMethod __attribute__((__swift_attr__("@_unavailableFromAsync")));
--(void)unavailableMethodWithMessage __attribute__((__swift_attr__("@_unavailableFromAsync(message: \"Blarpy!\")")));
+-(void)unavailableMethod __attribute__((__swift_attr__("@_unavailableFromAsync"))); // expected-note {{'unavailableMethod()' declared here}}
+-(void)unavailableMethodWithMessage __attribute__((__swift_attr__("@_unavailableFromAsync(message: \"Blarpy!\")"))); // expected-note {{'unavailableMethodWithMessage()' declared here}}
 
 -(void)dance:(NSString *)step andThen:(void (^)(NSString *))doSomething __attribute__((swift_async(not_swift_private,2)));
 -(void)leap:(NSInteger)height andThen:(void (^)(NSString *))doSomething __attribute__((swift_async(swift_private,2)));
 
--(void)repeatTrick:(NSString *)trick completionHandler:(void (^)(NSInteger))handler __attribute__((swift_async(none)));
+-(void)repeatTrick:(NSString *)trick completionHandler:(void (^)(NSInteger))handler __attribute__((swift_async(none))); // expected-note {{'repeatTrick(_:completionHandler:)' declared here}}
 
 -(void)doSomethingSlowNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSInteger))handler;
 -(void)findAnswerNullably:(NSString *)operation completionHandler:(void (^ _Nullable)(NSString *))handler;
@@ -208,7 +208,8 @@ __attribute__((__swift_attr__("@MainActor")))
 @end
 
 @interface NXButton: NXView
--(void)onButtonPress;
+-(void)onButtonPress; // expected-note {{calls to instance method 'onButtonPress()' from outside of its actor context are implicitly asynchronous}}
+                      // expected-note @-1 {{main actor isolation inferred from inheritance from class 'NXView'}}
 @end
 
 // Do something concurrently, but without escaping.

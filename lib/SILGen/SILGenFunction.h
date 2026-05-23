@@ -449,6 +449,10 @@ public:
   /// This records information about the currently active cleanups.
   CleanupManager Cleanups;
 
+  /// Features that might require cleanup at the end of emission.
+  using EmissionFinalizer = std::function<void(SILGenFunction&)>;
+  std::vector<EmissionFinalizer> EmissionFinalizers;
+
   /// The current context where formal evaluation cleanups are managed.
   FormalEvaluationContext FormalEvalContext;
 
@@ -546,20 +550,25 @@ public:
       : stateOrAlias(original)
     {
     }
-    
+
+    AddressableBuffer(const AddressableBuffer &other) = delete;
+    AddressableBuffer &operator=(const AddressableBuffer &other) = delete;
+
     AddressableBuffer(AddressableBuffer &&other)
-      : stateOrAlias(other.stateOrAlias)
+      : stateOrAlias(other.stateOrAlias), insertPoint(other.insertPoint),
+        cleanupPoints(std::move(other.cleanupPoints))
     {
+      // Make sure we clear out the state on `other` since we don't want its
+      // destructor to do anything.
       other.stateOrAlias = (State*)nullptr;
-      cleanupPoints.swap(other.cleanupPoints);
+      other.insertPoint = nullptr;
     }
     
     AddressableBuffer &operator=(AddressableBuffer &&other) {
-      if (auto state = stateOrAlias.dyn_cast<State*>()) {
-        delete state;
+      if (&other != this) {
+        this->~AddressableBuffer();
+        new (this) AddressableBuffer(std::move(other));
       }
-      stateOrAlias = other.stateOrAlias;
-      cleanupPoints.swap(other.cleanupPoints);
       return *this;
     }
 
@@ -1321,6 +1330,31 @@ public:
 
   void mergeCleanupBlocks();
 
+  void finalizeEmission();
+  void finalizeAddTaskLocalValue(BuiltinInst *builtin);
+
+  /// Add a callback that will run when emission is complete for the
+  /// current function. The callback is expected to have signature:
+  ///
+  ///   void (SILGenFunction &)
+  ///
+  /// The callback escapes the local scope and therefore must not capture
+  /// local variables by reference (i.e. do not use `[&]` in your lambda).
+  ///
+  /// Using this is generally a sign of a hack. Most "clean-up" work
+  /// should be handled by inserting instructions normally, either
+  /// immediately during emission or using a Cleanup object that will
+  /// insert code along exits from the current language-level scope. And
+  /// if the clean-up requires any kind of sophisticated analysis, it
+  /// probably deserves to go in a proper pass. An emission finalizer
+  /// might be appropriate for a hack that solves a narrow problem that
+  /// you can't justify solving in a more principled way, like patching
+  /// up scopes around a specific builtin call.
+  template <class Fn>
+  void addEmissionFinalizer(Fn &&fn) {
+    EmissionFinalizers.emplace_back(std::forward<Fn>(fn));
+  }
+
   //===--------------------------------------------------------------------===//
   // Concurrency
   //===--------------------------------------------------------------------===//
@@ -1801,7 +1835,8 @@ public:
   // Patterns
   //===--------------------------------------------------------------------===//
 
-  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest, SILLocation loc,
+  void emitStmtCondition(StmtCondition Cond, JumpDest FalseDest,
+                         Stmt *parentStmt,
                          ProfileCounter NumTrueTaken = ProfileCounter(),
                          ProfileCounter NumFalseTaken = ProfileCounter());
 
@@ -2047,8 +2082,6 @@ public:
   void emitFinishAsyncLet(SILLocation loc, SILValue asyncLet, SILValue resultBuf);
 
   ManagedValue emitReadAsyncLetBinding(SILLocation loc, VarDecl *var);
-  
-  ManagedValue emitCancelAsyncTask(SILLocation loc, SILValue task);
 
   ManagedValue emitCreateAsyncMainTask(SILLocation loc, SubstitutionMap subs,
                                        ManagedValue flags,
@@ -2086,7 +2119,7 @@ public:
                                         bool isOnSelfParameter);
 
   ManagedValue applyBorrowMutateAccessor(SILLocation loc, ManagedValue fn,
-                                         bool canUnwind, SubstitutionMap subs,
+                                         SubstitutionMap subs,
                                          ArrayRef<ManagedValue> args,
                                          CanSILFunctionType substFnType,
                                          ApplyOptions options);
@@ -2450,6 +2483,13 @@ public:
   void emitOpenExistentialExpr(OpenExistentialExpr *e, F emitSubExpr) {
     emitOpenExistentialExprImpl(e, emitSubExpr);
   }
+
+  /// A mapping from opaque statements to the statements that should be emitted.
+  llvm::SmallDenseMap<OpaqueStmt *, Stmt *> OpaqueStmts;
+
+  /// A mapping from OpaqueValueExprs to the whole expressions that should be
+  /// emitted.
+  llvm::SmallDenseMap<OpaqueValueExpr *, Expr *> OpaqueExprs;
 
   /// Mapping from OpaqueValueExpr/PackElementExpr to their values.
   llvm::SmallDenseMap<Expr *, ManagedValue> OpaqueValues;
@@ -2862,9 +2902,11 @@ public:
   void emitPatternBinding(PatternBindingDecl *D, unsigned entry,
                           bool generateDebugInfo);
 
-  InitializationPtr
-  emitPatternBindingInitialization(Pattern *P, JumpDest failureDest,
-                                   bool generateDebugInfo = true);
+  InitializationPtr emitPatternBindingInitialization(
+      Pattern *P, JumpDest failureDest, bool generateDebugInfo = true,
+      ProfileCounter numTrueTaken = ProfileCounter(),
+      ProfileCounter numFalseTaken = ProfileCounter(),
+      std::optional<SILLocation> customInitLoc = std::nullopt);
 
   void visitNominalTypeDecl(NominalTypeDecl *D) {
     // No lowering support needed.
@@ -3060,9 +3102,6 @@ public:
                                               SILValue addr,
                                               CanType concreteFormalType,
                                               ExistentialRepresentation repr);
-
-  /// Enter a cleanup to cancel the given task.
-  CleanupHandle enterCancelAsyncTaskCleanup(SILValue task);
 
   // Enter a cleanup to cancel and destroy an AsyncLet as it leaves the scope.
   CleanupHandle enterAsyncLetCleanup(SILValue alet, SILValue resultBuf);

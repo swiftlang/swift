@@ -15,13 +15,14 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "Relation.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/Compiler.h"
 
@@ -488,6 +489,52 @@ static bool isDeclAsSpecializedAs(DeclContext *dc, ValueDecl *decl1,
                            false);
 }
 
+namespace {
+
+/// Matches array of function parameters to candidate inputs,
+/// which can be anything suitable (e.g., parameters, arguments).
+///
+/// It claims inputs sequentially and tries to pair between an input
+/// and the next appropriate parameter. The detailed matching behavior
+/// of each pair is specified by a custom function (i.e., pairMatcher).
+/// It considers variadic and defaulted arguments when forming proper
+/// input-parameter pairs; however, other information like label and
+/// type information is not directly used here. It can be implemented
+/// in the custom function when necessary.
+class InputMatcher {
+  size_t NumSkippedParameters;
+  const ParameterListInfo &ParamInfo;
+  const ArrayRef<AnyFunctionType::Param> Params;
+
+public:
+  enum Result {
+    /// The specified inputs are successfully matched.
+    IM_Succeeded,
+    /// There are input(s) left unclaimed while all parameters are matched.
+    IM_HasUnclaimedInput,
+    /// There are parateter(s) left unmatched while all inputs are claimed.
+    IM_HasUnmatchedParam,
+    /// Custom pair matcher function failure.
+    IM_CustomPairMatcherFailed,
+  };
+
+  InputMatcher(const ArrayRef<AnyFunctionType::Param> params,
+               const ParameterListInfo &paramInfo);
+
+  /// Matching a given array of inputs.
+  ///
+  /// \param numInputs The number of inputs.
+  /// \param pairMatcher Custom matching behavior of an input-parameter pair.
+  /// \return the matching result.
+  Result
+  match(int numInputs,
+        std::function<bool(unsigned inputIdx, unsigned paramIdx)> pairMatcher);
+
+  size_t getNumSkippedParameters() const { return NumSkippedParameters; }
+};
+
+}
+
 bool CompareDeclSpecializationRequest::evaluate(
     Evaluator &eval, DeclContext *dc, ValueDecl *decl1, ValueDecl *decl2,
     bool isDynamicOverloadComparison, bool allowMissingConformances,
@@ -532,8 +579,13 @@ bool CompareDeclSpecializationRequest::evaluate(
   // A non-generic declaration is more specialized than a generic declaration.
   if (auto func1 = dyn_cast<AbstractFunctionDecl>(decl1)) {
     auto func2 = cast<AbstractFunctionDecl>(decl2);
-    if (func1->hasGenericParamList() != func2->hasGenericParamList())
-      return completeResult(func2->hasGenericParamList());
+    bool func1IsGeneric =
+        func1->hasGenericParamList() && !isGenericOnlyOverThrownType(func1);
+    bool func2IsGeneric =
+        func2->hasGenericParamList() && !isGenericOnlyOverThrownType(func2);
+
+    if (func1IsGeneric != func2IsGeneric)
+      return completeResult(func2IsGeneric);
   }
 
   if (auto subscript1 = dyn_cast<SubscriptDecl>(decl1)) {
@@ -579,7 +631,8 @@ bool CompareDeclSpecializationRequest::evaluate(
   //      x.i // ensure ambiguous.
   //    }
   //
-  if (C.isLanguageModeAtLeast(5) && !isDynamicOverloadComparison) {
+  if (C.isLanguageModeAtLeast(LanguageMode::v5) &&
+      !isDynamicOverloadComparison) {
     auto inProto1 = isa<ProtocolDecl>(outerDC1);
     auto inProto2 = isa<ProtocolDecl>(outerDC2);
     if (inProto1 != inProto2)
@@ -686,6 +739,21 @@ bool CompareDeclSpecializationRequest::evaluate(
                      cast<ProtocolDecl>(outerDC1)->getDeclaredInterfaceType(),
                      locator);
     break;
+  }
+
+  // throws vs. typed throws. We are calling decl2 by passing parameters from
+  // decl1 as arguments, decl1 is affectively a context for decl2 call, let's
+  // see if that's well-formed in presence of typed throws.
+  if (isa<AbstractFunctionDecl>(decl1) && isa<AbstractFunctionDecl>(decl2)) {
+    auto thrownError1 =
+        openedType1->castTo<FunctionType>()->getEffectiveThrownErrorType();
+    auto thrownError2 =
+        openedType2->castTo<FunctionType>()->getEffectiveThrownErrorType();
+
+    if (thrownError1 && thrownError2) {
+      cs.addConstraint(ConstraintKind::Subtype, *thrownError2, *thrownError1,
+                       locator);
+    }
   }
 
   bool fewerEffectiveParameters = false;
@@ -892,11 +960,12 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
   return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
     if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
-        return tupleType->getElementType(0);
+        return getStrippedType(tupleType->getElementType(0), ctx);
 
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {
-        elts.push_back(elt.getWithoutName());
+        auto eltTy = getStrippedType(elt.getType(), ctx);
+        elts.push_back(TupleTypeElt(eltTy));
       }
 
       return TupleType::get(elts, ctx);
@@ -906,7 +975,8 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
       auto params = funcType->getParams();
       SmallVector<AnyFunctionType::Param, 4> newParams;
       for (auto param : params) {
-        auto newParam = param;
+        auto newParam =
+            param.withType(getStrippedType(param.getPlainType(), ctx));
         switch (param.getParameterFlags().getOwnershipSpecifier()) {
         case ParamSpecifier::Borrowing:
         case ParamSpecifier::Consuming: {
@@ -922,9 +992,8 @@ static Type getStrippedType(Type type, ASTContext &ctx) {
       }
       auto newExtInfo = funcType->getExtInfo().withRepresentation(
           AnyFunctionType::Representation::Swift);
-      return FunctionType::get(newParams,
-                               funcType->getResult(),
-                               newExtInfo);
+      return FunctionType::get(
+          newParams, getStrippedType(funcType->getResult(), ctx), newExtInfo);
     }
 
     return std::nullopt;
@@ -1374,7 +1443,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // compatibility under Swift 4 mode by ensuring we don't introduce any new
     // ambiguities. This will become a more general "is more specialised" rule
     // in Swift 5 mode.
-    if (!cs.getASTContext().isLanguageModeAtLeast(5) &&
+    if (!cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v5) &&
         choice1.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         choice2.getKind() != OverloadChoiceKind::DeclViaDynamic &&
         isa<VarDecl>(decl1) && isa<VarDecl>(decl2)) {
@@ -1584,7 +1653,8 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   // All other things being equal, apply the Swift 4.1 compatibility hack for
   // preferring var members in concrete types over a protocol requirement
   // (see the comment above for the rationale of this hack).
-  if (!cs.getASTContext().isLanguageModeAtLeast(5) && score1 == score2) {
+  if (!cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v5) &&
+      score1 == score2) {
     score1 += isVarAndNotProtocol1;
     score2 += isVarAndNotProtocol2;
   }
@@ -1656,6 +1726,38 @@ ConstraintSystem::findBestSolution(SmallVectorImpl<Solution> &viable,
   }
 
   SolutionDiff diff(viable);
+
+  // Debugging code to verify that compareSolutions() actually defines
+  // a transitive relation.
+  static bool verifySolutionOrder = false;
+
+  if (verifySolutionOrder) {
+    auto matrix = BooleanMatrix::forPredicate(
+        viable.begin(), viable.end(),
+        [&](Solution &s1, Solution &s2) {
+          unsigned idx1 = (&s1 - viable.begin());
+          unsigned idx2 = (&s2 - viable.begin());
+          return (compareSolutions(*this, viable, diff, idx1, idx2) ==
+                  SolutionCompareResult::Better);
+        });
+      if (!matrix.isAntiReflexive()) {
+        llvm::errs() << "Broken solution order: not anti-reflexive\n\n";
+        matrix.multiply(matrix).dump(llvm::errs());
+        abort();
+      }
+      if (!matrix.isAntiSymmetric()) {
+        llvm::errs() << "Broken solution order: not anti-symmetric\n\n";
+        matrix.multiply(matrix).dump(llvm::errs());
+        abort();
+      }
+    if (!matrix.isTransitive()) {
+      llvm::errs() << "Broken solution order: not transitive\n\n";
+      matrix.dump(llvm::errs());
+      llvm::errs() << "Square:\n";
+      matrix.multiply(matrix).dump(llvm::errs());
+      abort();
+    }
+  }
 
   // Find a potential best.
   SmallVector<bool, 16> losers(viable.size(), false);

@@ -8,6 +8,9 @@
 // Needed to declare the ABI entry point
 // REQUIRES: swift_feature_Extern
 
+// These tests exercise known bugs in older Swift stdlib
+// UNSUPPORTED: use_os_stdlib
+
 import StdlibUnittest
 
 let tests = TestSuite("FloatingPointParsing")
@@ -180,8 +183,17 @@ tests.test("HexFloats") {
   expectParse("0x0.0p999999999", 0.0)
   expectParse("0x.0p-999999999", 0.0)
   expectParse("0x0p-999999999", 0.0)
-
   expectParse("0x.000001", 0x0.000001p0)
+
+  expectParse("0x0.80000000000p-1074", 0.0)
+  expectParse("0x0.8000000000000000000000000000000000000000001p-1074", Float64.leastNonzeroMagnitude)
+  expectParse("0x0.80000000000000008p-1074", Float64.leastNonzeroMagnitude)
+  expectParse("0x0.8000000000000001p-1074", Float64.leastNonzeroMagnitude)
+  expectParse("0x0.80000000001p-1074", Float64.leastNonzeroMagnitude)
+
+  expectParse("0x0.0000000000000fffffffffffp-1022", Float64.leastNonzeroMagnitude)
+  expectParse("0x0.fffffffffffp-1074", Float64.leastNonzeroMagnitude)
+
   expectParse("0x1p-1074", Float64.leastNonzeroMagnitude)
   expectParse("0x1p-1074", Float64(bitPattern:1))
   expectParse("0x1p-1073", Float64(bitPattern:2))
@@ -331,6 +343,17 @@ tests.test("Substring - short") {
   let parsed = Float64(s1sub)
   expectNotNil(parsed)
   expectEqual(parsed!.bitPattern, (2.0).bitPattern)
+}
+
+tests.test("Int64.min to -1e19") {
+  expectParse("9223372036854775808e0", 9.2233720368547758E+18)
+  expectParse("-9223372036854775808e0", -9.2233720368547758E+18)
+  expectParse("9223372036854775809e0", 9.2233720368547758E+18)
+  expectParse("-9223372036854775809e0", -9.2233720368547758E+18)
+  expectParse("9999999999999999999e0", 1.0E+19)
+  expectParse("-9999999999999999999e0", -1.0E+19)
+  expectParse("10000000000000000000e0", 1.0E+19)
+  expectParse("-10000000000000000000e0", -1.0E+19)
 }
 
 tests.test("Substring - long") {

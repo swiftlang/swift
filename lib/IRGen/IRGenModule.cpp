@@ -22,7 +22,9 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -108,50 +110,20 @@ static clang::CodeGenerator *createClangCodeGenerator(ASTContext &Context,
 
   auto &CGTI = Importer->getTargetInfo();
   auto &CGO = Importer->getCodeGenOpts();
-  CGO.OptimizationLevel = Opts.shouldOptimize() ? 3 : 0;
 
-  CGO.DebugTypeExtRefs = !Opts.DisableClangModuleSkeletonCUs;
+  // Here we set the AST-benign CodeGenOpts options only. Set the
+  // AST-affecting ones early in ClangImporter::create.
   CGO.DiscardValueNames = !Opts.shouldProvideValueNames();
-  switch (Opts.DebugInfoLevel) {
-  case IRGenDebugInfoLevel::None:
-    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::NoDebugInfo);
-    break;
-  case IRGenDebugInfoLevel::LineTables:
-    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::DebugLineTablesOnly);
-    break;
-  case IRGenDebugInfoLevel::ASTTypes:
-  case IRGenDebugInfoLevel::DwarfTypes:
-    CGO.setDebugInfo(llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
-    break;
-  }
   switch (Opts.DebugInfoFormat) {
   case IRGenDebugInfoFormat::None:
     break;
   case IRGenDebugInfoFormat::DWARF:
-    CGO.DebugCompilationDir = Opts.DebugCompilationDir;
-    CGO.DwarfVersion = Opts.DWARFVersion;
-    CGO.DwarfDebugFlags =
-        Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
-                           Context.LangOpts.hasFeature(Feature::Embedded));
-    break;
   case IRGenDebugInfoFormat::CodeView:
-    CGO.EmitCodeView = true;
-    CGO.DebugCompilationDir = Opts.DebugCompilationDir;
-    // This actually contains the debug flags for codeview.
     CGO.DwarfDebugFlags =
         Opts.getDebugFlags(PD, Context.LangOpts.EnableCXXInterop,
                            Context.LangOpts.hasFeature(Feature::Embedded));
     break;
   }
-  if (!Opts.TrapFuncName.empty()) {
-    CGO.TrapFuncName = Opts.TrapFuncName;
-  }
-
-  // We don't need to perform coverage mapping for any Clang decls we've
-  // synthesized, as they have no user-written code. This is also needed to
-  // avoid a Clang crash when attempting to emit coverage for decls without
-  // source locations (rdar://100172217).
-  CGO.CoverageMapping = false;
 
   auto &VFS = Importer->getClangInstance().getVirtualFileSystem();
   auto &HSI = Importer->getClangPreprocessor()
@@ -235,7 +207,8 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
                          SourceFile *SF, StringRef ModuleName,
                          StringRef OutputFilename,
                          StringRef MainInputFilenameForDebugInfo,
-                         StringRef PrivateDiscriminator)
+                         StringRef PrivateDiscriminator,
+                         StringRef CacheKeyForJob)
     : LLVMContext(new llvm::LLVMContext()), IRGen(irgen),
       Context(irgen.SIL.getASTContext()),
       // The LLVMContext (and the IGM itself) will get deleted by the IGMDeleter
@@ -246,11 +219,12 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
       DataLayout(irgen.getClangDataLayoutString()),
       Triple(irgen.getEffectiveClangTriple()),
       VariantTriple(irgen.getEffectiveClangVariantTriple()),
-      TargetMachine(std::move(target)),
-      silConv(irgen.SIL), OutputFilename(OutputFilename),
+      TargetMachine(std::move(target)), silConv(irgen.SIL),
+      OutputFilename(OutputFilename),
       MainInputFilenameForDebugInfo(MainInputFilenameForDebugInfo),
-      TargetInfo(SwiftTargetInfo::get(*this)), DebugInfo(nullptr),
-      ModuleHash(nullptr), ObjCInterop(Context.LangOpts.EnableObjCInterop),
+      CacheKeyForJob(CacheKeyForJob), TargetInfo(SwiftTargetInfo::get(*this)),
+      DebugInfo(nullptr), ModuleHash(nullptr),
+      ObjCInterop(Context.LangOpts.EnableObjCInterop),
       UseDarwinPreStableABIBit(Context.LangOpts.UseDarwinPreStableABIBit),
       Types(*new TypeConverter(*this)) {
   irgen.addGenModule(SF, this);
@@ -604,10 +578,9 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   }
 
   if (opts.DebugInfoLevel > IRGenDebugInfoLevel::None)
-    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(IRGen.Opts, *CI, *this,
-                                                     Module,
-                                                 MainInputFilenameForDebugInfo,
-                                                     PrivateDiscriminator);
+    DebugInfo = IRGenDebugInfo::createIRGenDebugInfo(
+        IRGen.Opts, *CI, *this, Module, MainInputFilenameForDebugInfo,
+        PrivateDiscriminator, CacheKeyForJob);
 
   if (auto loader = Context.getClangModuleLoader()) {
     ClangASTContext =
@@ -818,6 +791,7 @@ namespace RuntimeConstants {
   const auto ReadOnly = llvm::MemoryEffects::readOnly();
   const auto ArgMemOnly = llvm::MemoryEffects::argMemOnly();
   const auto ArgMemReadOnly = llvm::MemoryEffects::argMemOnly(llvm::ModRefInfo::Ref);
+  const auto InaccessibleMemOnly = llvm::MemoryEffects::inaccessibleMemOnly();
   const auto NoReturn = llvm::Attribute::NoReturn;
   const auto NoUnwind = llvm::Attribute::NoUnwind;
   const auto ZExt = llvm::Attribute::ZExt;
@@ -1039,6 +1013,16 @@ namespace RuntimeConstants {
 
   RuntimeAvailability ValueGenericTypeAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getValueGenericTypeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability
+  TaskPriorityEscalationHandlersAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getTaskPriorityEscalationHandlersAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }
@@ -1455,9 +1439,22 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   if (Opts.UseJIT)
     return false;
 
-  // witness tables are always emitted lazily in embedded swift.
-  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  // witness tables are always emitted lazily in embedded swift, except for
+  // @export(interface) conformances, which have a unique strong definition
+  // in the owning module.
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (auto *normal = dyn_cast<NormalProtocolConformance>(wt->getConformance())) {
+      switch (normal->getEffectiveCodeGenerationModel()) {
+        case CodeGenerationModel::Interface:
+          return false;
+        case CodeGenerationModel::Implementation:
+        case CodeGenerationModel::Inlinable:
+          return true;
+      }
+    }
+
     return true;
+  }
 
   // Regardless of the access level, if the witness table is shared it means
   // we can safely not emit it. Every other module which needs it will generate
@@ -1485,13 +1482,6 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  // In Embedded Swift, only class-bound wtables are allowed.
-  auto &langOpts = SIL.getASTContext().LangOpts;
-  if (langOpts.hasFeature(Feature::Embedded) &&
-      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
-    assert(Conf->getProtocol()->requiresClass());
-  }
-
   if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
@@ -1600,6 +1590,10 @@ llvm::ConstantInt *IRGenModule::getInt32(uint32_t value) {
 
 llvm::ConstantInt *IRGenModule::getSize(Size size) {
   return llvm::ConstantInt::get(SizeTy, size.getValue());
+}
+
+llvm::ConstantInt *IRGenModule::getBool(bool condition) {
+  return llvm::ConstantInt::get(Int1Ty, condition);
 }
 
 llvm::Constant *IRGenModule::getOpaquePtr(llvm::Constant *ptr) {
@@ -2419,6 +2413,12 @@ bool IRGenModule::isConcurrencyAvailable() {
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }
 
+bool IRGenModule::isTypedAllocationAvailable() {
+  auto &langOpts = Context.LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+         langOpts.hasFeature(Feature::TypedAllocation);
+}
+
 /// Pretend the other files that drivers/build systems expect exist by
 /// creating empty files. Used by UseSingleModuleLLVMEmission when
 /// num-threads > 0.
@@ -2456,7 +2456,5 @@ bool swift::writeEmptyOutputFilesFor(
 }
 
 bool IRGenModule::isEmbeddedWithExistentials() const {
-  auto &langOpts = Context.LangOpts;
-  return langOpts.hasFeature(Feature::Embedded) &&
-    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  return Context.LangOpts.hasFeature(Feature::Embedded);
 }

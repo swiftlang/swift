@@ -20,6 +20,7 @@ import Swift
 
 // .. Comparable .............................................................
 
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Address {
   fileprivate var widestRepresentation: UInt64 {
     switch representation {
@@ -35,6 +36,7 @@ extension Backtrace.Address {
   }
 }
 
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Address: Comparable {
   /// Return true if `lhs` is lower than `rhs`
   public static func < (lhs: Backtrace.Address, rhs: Backtrace.Address) -> Bool {
@@ -48,6 +50,7 @@ extension Backtrace.Address: Comparable {
 
 // .. LosslessStringConvertible ..............................................
 
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Address: LosslessStringConvertible {
   /// Create an Backtrace.Address from its string representation
   public init?(_ s: String) {
@@ -120,6 +123,7 @@ extension Backtrace.Address: LosslessStringConvertible {
 
 // .. ExpressibleByIntegerLiteral ............................................
 
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Address: ExpressibleByIntegerLiteral {
   public typealias IntegerLiteralType = UInt64
 
@@ -139,6 +143,7 @@ extension Backtrace.Address: ExpressibleByIntegerLiteral {
 
 // .. FixedWidthInteger conversions ..........................................
 
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Address {
   fileprivate func toFixedWidth<T: FixedWidthInteger>(
     type: T.Type = T.self
@@ -164,6 +169,7 @@ extension FixedWidthInteger {
   ///
   /// This initializer will return nil if the address width is larger than the
   /// type you are attempting to convert into.
+  @available(BacktracingDT 6.2, *)
   public init?(_ address: Backtrace.Address) {
     guard let result = address.toFixedWidth(type: Self.self) else {
       return nil
@@ -172,6 +178,7 @@ extension FixedWidthInteger {
   }
 }
 
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Address {
   /// Convert from a UInt16.
   public init(_ value: UInt16) {
@@ -217,6 +224,7 @@ extension Backtrace.Address {
 
 // -- Arithmetic -------------------------------------------------------------
 
+@available(BacktracingDT 6.2, *)
 extension Backtrace.Address {
   static func - (lhs: Backtrace.Address, rhs: Backtrace.Address) -> Int64 {
     let ulhs = UInt64(lhs)!

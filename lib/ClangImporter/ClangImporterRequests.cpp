@@ -10,15 +10,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/NameLookupRequests.h"
+#include "swift/ClangImporter/ClangImporterRequests.h"
+#include "ImporterImpl.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Evaluator.h"
 #include "swift/AST/Module.h"
-#include "swift/AST/SourceFile.h"
-#include "swift/ClangImporter/ClangImporterRequests.h"
+#include "swift/AST/NameLookupRequests.h"
 #include "swift/Subsystems.h"
-#include "ImporterImpl.h"
 
 using namespace swift;
 

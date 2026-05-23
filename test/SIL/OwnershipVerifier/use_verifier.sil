@@ -1107,28 +1107,6 @@ bb0:
   return %9999 : $()
 }
 
-// Make sure that we do not false positive due to borrow users of %12 in an
-// unreachable block.
-sil [ossa] @test_unreachable_users : $@convention(method) (@guaranteed UnsafeUnownedFieldKlass) -> () {
-bb0(%0 : @guaranteed $UnsafeUnownedFieldKlass):
-  %3 = ref_element_addr %0 : $UnsafeUnownedFieldKlass, #UnsafeUnownedFieldKlass.x
-  %4 = load_borrow %3 : $*@sil_unowned Builtin.NativeObject
-  %5 = strong_copy_unowned_value %4 : $@sil_unowned Builtin.NativeObject
-  end_borrow %4 : $@sil_unowned Builtin.NativeObject
-  %12 = begin_borrow %5 : $Builtin.NativeObject
-  %func = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %func(%12) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  end_borrow %12 : $Builtin.NativeObject
-  destroy_value %5 : $Builtin.NativeObject
-  %36 = tuple ()
-  return %36 : $()
-
-bb1:
-  %func2 = function_ref @guaranteed_nativeobject_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  apply %func2(%12) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
-  unreachable
-}
-
 sil [ossa] @strong_copy_unmanaged_value_test : $@convention(thin) (@sil_unmanaged Builtin.NativeObject) -> @owned Builtin.NativeObject {
 bb0(%0 : $@sil_unmanaged Builtin.NativeObject):
   %1 = strong_copy_unmanaged_value %0 : $@sil_unmanaged Builtin.NativeObject

@@ -89,6 +89,7 @@ template <> struct MachOTraits<4> {
   using SegmentCmd = const struct llvm::MachO::segment_command;
   using Section = const struct llvm::MachO::section;
   static constexpr size_t MagicNumber = llvm::MachO::MH_MAGIC;
+  static constexpr uint32_t SegmentLoadCommand = llvm::MachO::LC_SEGMENT;
 };
 
 template <> struct MachOTraits<8> {
@@ -96,6 +97,7 @@ template <> struct MachOTraits<8> {
   using SegmentCmd = const struct llvm::MachO::segment_command_64;
   using Section = const struct llvm::MachO::section_64;
   static constexpr size_t MagicNumber = llvm::MachO::MH_MAGIC_64;
+  static constexpr uint32_t SegmentLoadCommand = llvm::MachO::LC_SEGMENT_64;
 };
 
 template <unsigned char ELFClass> struct ELFTraits;
@@ -213,7 +215,9 @@ public:
     uint64_t Id;
     StoredPointer RunJob;
     StoredPointer AllocatorSlabPtr;
+    StoredPointer ParentTask;
     std::vector<StoredPointer> ChildTasks;
+    std::vector<StoredPointer> WaitingTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
     StoredPointer ResumeAsyncContext;
   };
@@ -260,47 +264,59 @@ public:
     auto Header = reinterpret_cast<typename T::Header *>(Buf.get());
     assert(Header->magic == T::MagicNumber && "invalid MachO file");
 
-    auto NumCommands = Header->sizeofcmds;
+    auto NumCommands = Header->ncmds;
+    auto SizeOfCommands = Header->sizeofcmds;
 
     // The layout of the executable is such that the commands immediately follow
     // the header.
     auto CmdStartAddress = ImageStart + sizeof(typename T::Header);
-    uint32_t SegmentCmdHdrSize = sizeof(typename T::SegmentCmd);
-    uint64_t Offset = 0;
+
+    // Read all of the load commands into .
+    auto LoadCmdsBuf =
+        this->getReader().readBytes(CmdStartAddress, SizeOfCommands);
+    if (!LoadCmdsBuf)
+      return {};
+    auto LoadCmds = reinterpret_cast<const char *>(LoadCmdsBuf.get());
+
+    // Invoke `visitor(CmdHdr, Offset)` for each segment load command. Return
+    // false to stop iteration.
+    auto forEachSegment = [&](auto &&visitor) {
+      uint64_t Offset = 0;
+      for (unsigned I = 0; I < NumCommands; ++I) {
+        if (Offset + sizeof(llvm::MachO::load_command) > SizeOfCommands)
+          return;
+        auto Cmd = reinterpret_cast<const llvm::MachO::load_command *>(
+            LoadCmds + Offset);
+        auto CmdSize = Cmd->cmdsize;
+        if (Cmd->cmd == T::SegmentLoadCommand) {
+          auto CmdHdr =
+              reinterpret_cast<typename T::SegmentCmd *>(LoadCmds + Offset);
+          if (!visitor(CmdHdr, Offset))
+            return;
+        }
+        Offset += CmdSize;
+      }
+    };
 
     // Find the __TEXT segment.
     typename T::SegmentCmd *TextCommand = nullptr;
-    for (unsigned I = 0; I < NumCommands; ++I) {
-      auto CmdBuf = this->getReader().readBytes(CmdStartAddress + Offset,
-                                                SegmentCmdHdrSize);
-      if (!CmdBuf)
-        return {};
-      auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
-      if (strncmp(CmdHdr->segname, "__TEXT", sizeof(CmdHdr->segname)) == 0) {
-        TextCommand = CmdHdr;
-        savedBuffers.push_back(std::move(CmdBuf));
-        break;
-      }
-      Offset += CmdHdr->cmdsize;
-    }
+    uint64_t TextOffset = 0;
+    forEachSegment([&](auto *CmdHdr, uint64_t Offset) {
+      if (strncmp(CmdHdr->segname, "__TEXT", sizeof(CmdHdr->segname)) != 0)
+        return true;
+      TextCommand = CmdHdr;
+      TextOffset = Offset;
+      return false;
+    });
 
     // No __TEXT segment, bail out.
     if (!TextCommand)
       return {};
 
-   // Find the load command offset.
-    auto loadCmdOffset = ImageStart + Offset + sizeof(typename T::Header);
-
-    // Read the load command.
-    auto LoadCmdBuf = this->getReader().readBytes(
-        loadCmdOffset, sizeof(typename T::SegmentCmd));
-    if (!LoadCmdBuf)
-      return {};
-    auto LoadCmd = reinterpret_cast<typename T::SegmentCmd *>(LoadCmdBuf.get());
-
-    // The sections start immediately after the load command.
-    unsigned NumSect = LoadCmd->nsects;
-    auto SectAddress = loadCmdOffset + sizeof(typename T::SegmentCmd);
+    // The sections start immediately after the __TEXT segment's load command.
+    unsigned NumSect = TextCommand->nsects;
+    auto SectAddress =
+        CmdStartAddress + TextOffset + sizeof(typename T::SegmentCmd);
     auto Sections = this->getReader().readBytes(
         SectAddress, NumSect * sizeof(typename T::Section));
     if (!Sections)
@@ -374,14 +390,8 @@ public:
     auto TextSegmentEnd = TextSegmentStart + TextCommand->vmsize;
     textRanges.push_back(std::make_tuple(TextSegmentStart, TextSegmentEnd));
 
-    // Find the __DATA segments.
-    for (unsigned I = 0; I < NumCommands; ++I) {
-      auto CmdBuf = this->getReader().readBytes(CmdStartAddress + Offset,
-                                                SegmentCmdHdrSize);
-      if (!CmdBuf)
-        return {};
-      auto CmdHdr = reinterpret_cast<typename T::SegmentCmd *>(CmdBuf.get());
-      // Look for any segment name starting with __DATA or __AUTH.
+    // Find the __DATA and __AUTH segments.
+    forEachSegment([&](auto *CmdHdr, uint64_t Offset) {
       if (strncmp(CmdHdr->segname, "__DATA", 6) == 0 ||
           strncmp(CmdHdr->segname, "__AUTH", 6) == 0) {
         auto DataSegmentStart = Slide + CmdHdr->vmaddr;
@@ -390,8 +400,8 @@ public:
                "invalid range for __DATA/__AUTH");
         dataRanges.push_back(std::make_tuple(DataSegmentStart, DataSegmentEnd));
       }
-      Offset += CmdHdr->cmdsize;
-    }
+      return true;
+    });
 
     savedBuffers.push_back(std::move(Buf));
     savedBuffers.push_back(std::move(Sections));
@@ -1832,11 +1842,11 @@ public:
       return "failed to read value of " + AllocationPoolPointerName;
 
     struct PoolRange {
-      RemoteAddress Begin;
+      StoredPointer Begin;
       StoredSize Remaining;
     };
     struct PoolTrailer {
-      RemoteAddress PrevTrailer;
+      StoredPointer PrevTrailer;
       StoredSize PoolSize;
     };
     struct alignas(RemoteAddress) AllocationHeader {
@@ -1857,7 +1867,9 @@ public:
     unsigned LoopCount = 0;
     unsigned LoopLimit = 1000000;
 
-    auto TrailerPtr = Pool->Begin + Pool->Remaining;
+    auto PoolAddressSpace = AllocationPoolAddr->getResolvedAddress().getAddressSpace();
+
+    auto TrailerPtr = RemoteAddress(Pool->Begin + Pool->Remaining, PoolAddressSpace);
     while (TrailerPtr && LoopCount++ < LoopLimit) {
       auto TrailerBytes =
           getReader().readBytes(TrailerPtr, sizeof(PoolTrailer));
@@ -1889,7 +1901,7 @@ public:
         Offset += sizeof(AllocationHeader) + Header->Size;
       }
 
-      TrailerPtr = Trailer->PrevTrailer;
+      TrailerPtr = RemoteAddress(Trailer->PrevTrailer, PoolAddressSpace);
     }
     return std::nullopt;
   }
@@ -2123,6 +2135,16 @@ private:
     Info.AllocatorSlabPtr = AsyncTaskObj->PrivateStorage.Allocator.FirstSlab;
     Info.RunJob = getRunJob(AsyncTaskObj.get());
 
+    Info.ParentTask = 0;
+    if (Info.IsChildTask && asyncTaskSize != 0) {
+      // Parent information ("child fragment") is right after the task itself.
+      RemoteAddress ChildFragmentAddr = AsyncTaskPtr + asyncTaskSize;
+      auto ChildFragmentObj =
+          readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
+      if (ChildFragmentObj)
+        Info.ParentTask = ChildFragmentObj->Parent;
+    }
+
     // Find all child tasks.
     unsigned ChildTaskLoopCount = 0;
     auto RecordPtr = RemoteAddress(AsyncTaskObj->PrivateStorage.Status.Record,
@@ -2181,6 +2203,47 @@ private:
 
       RecordPtr =
           RemoteAddress(RecordObj->Parent, RemoteAddress::DefaultAddressSpace);
+    }
+
+    // Read the wait queue from the FutureFragment, if this is a future task.
+    if (Info.IsFuture && asyncTaskSize != 0) {
+      // The FutureFragment is located after AsyncTask, ChildFragment (if
+      // child), and GroupChildFragment (if group child).
+      // See AsyncTask::futureFragment() in include/swift/ABI/Task.h.
+      auto FutureFragmentAddr = AsyncTaskPtr + asyncTaskSize;
+      if (Info.IsChildTask)
+        FutureFragmentAddr =
+            FutureFragmentAddr + sizeof(ChildFragment<Runtime>);
+      if (Info.IsGroupChildTask)
+        FutureFragmentAddr =
+            FutureFragmentAddr + sizeof(GroupChildFragment<Runtime>);
+
+      auto FutureFragmentObj =
+          readObj<FutureFragment<Runtime>>(FutureFragmentAddr);
+      if (FutureFragmentObj) {
+        // The low 2 bits of WaitQueue are the status; the rest is the first
+        // waiting task pointer.
+        // See FutureFragment::WaitQueueItem in include/swift/ABI/Task.h.
+        const StoredPointer statusMask = 0x03;
+        StoredPointer WaitingTaskPtr =
+            FutureFragmentObj->WaitQueue & ~statusMask;
+
+        // Walk the singly linked list of waiting tasks.
+        unsigned WaitQueueLoopCount = 0;
+        while (WaitingTaskPtr && WaitQueueLoopCount++ < ChildTaskLimit) {
+          Info.WaitingTasks.push_back(WaitingTaskPtr);
+          // The next waiting task is stored in SchedulerPrivate[0] of the
+          // waiting task.
+          // See Job::NextWaitingTaskIndex and AsyncTask::getNextWaitingTask()
+          // in include/swift/ABI/Task.h.
+          RemoteAddress WaitingTaskAddress =
+              RemoteAddress(WaitingTaskPtr, RemoteAddress::DefaultAddressSpace);
+          auto WaitingTaskObj = readObj<AsyncTaskType>(WaitingTaskAddress);
+          if (!WaitingTaskObj)
+            break;
+          WaitingTaskPtr = WaitingTaskObj->SchedulerPrivate[0];
+        }
+      }
     }
 
     const auto TaskResumeContext = stripSignedPointer(
@@ -2347,14 +2410,16 @@ private:
     Builder.addField(*OffsetToFirstCapture,
                      /*alignment=*/sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0,
-                     /*bitwiseTakable=*/true);
+                     /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                     /*afd*/ false);
 
     // Skip the closure's necessary bindings struct, if it's present.
     auto SizeOfNecessaryBindings = Info.NumBindings * sizeof(StoredPointer);
     Builder.addField(/*size=*/SizeOfNecessaryBindings,
                      /*alignment=*/sizeof(StoredPointer),
                      /*numExtraInhabitants=*/0,
-                     /*bitwiseTakable=*/true);
+                     /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                     /*afd*/ false);
 
     // FIXME: should be unordered_set but I'm too lazy to write a hash
     // functor

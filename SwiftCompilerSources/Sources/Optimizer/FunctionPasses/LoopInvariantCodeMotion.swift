@@ -304,7 +304,14 @@ private func collectMovableInstructions(
       case let loadInst as LoadInst:
         // Avoid quadratic complexity in corner cases. Usually, this limit will not be exceeded.
         if loadInstCounter * analyzedInstructions.loopSideEffects.count < 8000,
-           !analyzedInstructions.sideEffectsMayWrite(to: loadInst.address, context.aliasAnalysis) {
+           !analyzedInstructions.sideEffectsMayWrite(to: loadInst.address, context.aliasAnalysis),
+
+           // Usually `load [take]` is not hoisted anyway, because there must be another instruction in the
+           // loop which re-initializes the loaded memory location.
+           // However, this is not necessarily true for alloc_stack locations with dynamic lifetime, e.g. a
+           // pack-loop which is specialized for a single pack element (at runtime the loop is only executed once).
+           loadInst.loadOwnership != .take
+        {
           movableInstructions.hoistUp.append(loadInst)
         }
         
@@ -673,10 +680,9 @@ private extension MovableInstructions {
 
   /// Hoist and sink scoped instructions.
   mutating func hoistWithSinkScopedInstructions(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
-    // Since we don't sink scoped instructions to dead exit blocks, we need to check there's
-    // at least one exit block to which we can sink end instructions. Otherwise we could end up
-    // with partially hoisted scoped instruction that could lead to e.g. value overconsumption.
-    guard !loop.hasNoExitBlocks, loop.exitBlocks.contains(where: { !context.deadEndBlocks.isDeadEnd($0) }) else {
+    // For infinite loops we could end up with partially hoisted scoped instruction that could
+    // lead to e.g. value overconsumption.
+    if loop.hasNoExitBlocks {
       return false
     }
     
@@ -758,13 +764,9 @@ private extension MovableInstructions {
       return false
     }
 
-    // We currently don't support split `load [take]`, i.e. `load [take]` which does _not_ load all
-    // non-trivial fields of the initial value.
+    // We currently don't support split `load [take]`.
     for case let load as LoadInst in loadsAndStores {
-      if load.loadOwnership == .take,
-         let path = accessPath.getProjection(to: load.address.accessPath),
-         !firstStore.destination.type.isProjectingEntireNonTrivialMembers(path: path, in: load.parentFunction)
-      {
+      if load.loadOwnership == .take, load.address.accessPath != accessPath {
         return false
       }
     }
@@ -855,7 +857,7 @@ private extension MovableInstructions {
       }
     
       let builder = Builder(before: loadInst, context)
-      let projection = if loadInst.loadOwnership == .copy {
+      let projection = if loadInst.loadOwnership == .copy || loadInst.loadOwnership == .trivial {
         rootVal.createProjectionAndCopy(path: projectionPath, builder: builder)
       } else {
         rootVal.createProjection(path: projectionPath, builder: builder)
@@ -924,35 +926,6 @@ private extension MovableInstructions {
   }
 }
 
-private extension Type {
-  func isProjectingEntireNonTrivialMembers(path: SmallProjectionPath, in function: Function) -> Bool {
-    let (kind, index, subPath) = path.pop()
-    switch kind {
-    case .root:
-      return true
-    case .structField:
-      guard let fields = getNominalFields(in: function) else {
-        return false
-      }
-      for (fieldIdx, fieldType) in fields.enumerated() {
-        if fieldIdx != index && !fieldType.isTrivial(in: function) {
-          return false
-        }
-      }
-      return fields[index].isProjectingEntireNonTrivialMembers(path: subPath, in: function)
-    case .tupleField:
-      for (elementIdx, elementType) in tupleElements.enumerated() {
-        if elementIdx != index && !elementType.isTrivial(in: function) {
-          return false
-        }
-      }
-      return tupleElements[index].isProjectingEntireNonTrivialMembers(path: subPath, in: function)
-    default:
-      fatalError("path is not materializable")
-    }
-  }
-}
-
 private extension Instruction {
   /// Returns `true` if this instruction follows the default hoisting heuristic which means it
   /// is not a terminator, allocation or deallocation and either a hoistable array semantics call or doesn't have memory effects.
@@ -1014,7 +987,7 @@ private extension Instruction {
     let copyValue = headerBuilder.createCopyValue(operand: preheaderLoadBorrow)
     loadCopyInst.replace(with: copyValue, context)
     
-    for exitBlock in loop.exitBlocks where !context.deadEndBlocks.isDeadEnd(exitBlock) {
+    for exitBlock in loop.exitBlocks {
       assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
       
       let exitBlockBuilder = Builder(before: exitBlock.instructions.first!, context)
@@ -1025,7 +998,7 @@ private extension Instruction {
   func sink(outOf loop: Loop, _ context: FunctionPassContext) -> Bool {
     var changed = false
 
-    for exitBlock in loop.exitBlocks where !context.deadEndBlocks.isDeadEnd(exitBlock) {
+    for exitBlock in loop.exitBlocks {
       assert(exitBlock.hasSinglePredecessor, "Exiting edge should not be critical.")
       
       if changed {
@@ -1128,7 +1101,7 @@ private extension LoadInst {
 private extension FullApplySite {
   /// Returns `true` if this apply inst could be safely hoisted.
   func isSafeReadOnlyApply(_ calleeAnalysis: CalleeAnalysis) -> Bool {
-    guard functionConvention.results.allSatisfy({ $0.convention == .unowned }) else {
+    guard functionConvention.resultsWithError.allSatisfy({ $0.convention == .unowned }) else {
       return false
     }
 

@@ -32,6 +32,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/LanguageMode.h"
+#include "llvm/ADT/SmallVector.h"
 using namespace swift;
 
 static void adjustFunctionTypeForOverride(Type &type) {
@@ -581,7 +583,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
             diags
                 .diagnose(decl, diag::override_sendability_mismatch,
                           decl->getName())
-                .limitBehaviorUntilLanguageMode(limit, 6)
+                .limitBehaviorUntilLanguageMode(limit, LanguageMode::v6)
                 .limitBehaviorIf(
                     fromContext.preconcurrencyBehavior(baseDeclClass));
             return false;
@@ -599,7 +601,7 @@ static void diagnoseGeneralOverrideFailure(ValueDecl *decl,
       diags
           .diagnose(decl, diag::override_global_actor_isolation_mismatch,
                     decl->getName())
-          .limitBehaviorUntilLanguageMode(DiagnosticBehavior::Warning, 6)
+          .warnUntilLanguageMode(LanguageMode::v6)
           .limitBehaviorIf(fromContext.preconcurrencyBehavior(baseDeclClass));
     }
     break;
@@ -915,9 +917,15 @@ OverrideMatcher::OverrideMatcher(ValueDecl *decl, bool ignoreMissingImports)
     if (auto superclassDecl = classDecl->getSuperclassDecl())
       superContexts.push_back(superclassDecl);
   } else if (auto protocol = dyn_cast<ProtocolDecl>(dc)) {
-    auto inheritedProtocols = protocol->getInheritedProtocols();
-    superContexts.insert(superContexts.end(), inheritedProtocols.begin(),
-                         inheritedProtocols.end());
+    for (auto inherited : protocol->getInheritedProtocols()) {
+      // Reparentable protocol members are never overridden by any members of
+      // protocols inheriting from it. This preserves the witness tables of
+      // those inheriting protocols.
+      if (inherited->getAttrs().hasAttribute<ReparentableAttr>())
+        continue;
+
+      superContexts.push_back(inherited);
+    }
   }
 }
 
@@ -1218,7 +1226,7 @@ bool OverrideMatcher::checkOverride(ValueDecl *baseDecl,
   // is helpful in several cases - just not this one.
   auto dc = decl->getDeclContext();
   auto classDecl = dc->getSelfClassDecl();
-  if (decl->getASTContext().isLanguageModeAtLeast(5) &&
+  if (decl->getASTContext().isLanguageModeAtLeast(LanguageMode::v5) &&
       baseDecl->getInterfaceType()->hasDynamicSelfType() &&
       !decl->getInterfaceType()->hasDynamicSelfType() &&
       !classDecl->isSemanticallyFinal()) {
@@ -1615,6 +1623,7 @@ namespace  {
     UNINTERESTING_ATTR(Inline)
     UNINTERESTING_ATTR(Isolated)
     UNINTERESTING_ATTR(Optimize)
+    UNINTERESTING_ATTR(Owned)
     UNINTERESTING_ATTR(Exclusivity)
     UNINTERESTING_ATTR(Nonexhaustive)
     UNINTERESTING_ATTR(NoLocks)
@@ -1708,6 +1717,7 @@ namespace  {
     UNINTERESTING_ATTR(PropertyWrapper)
     UNINTERESTING_ATTR(DisfavoredOverload)
     UNINTERESTING_ATTR(ResultBuilder)
+    UNINTERESTING_ATTR(Reparentable)
     UNINTERESTING_ATTR(ProjectedValueProperty)
     UNINTERESTING_ATTR(OriginallyDefinedIn)
     UNINTERESTING_ATTR(Actor)
@@ -1756,7 +1766,7 @@ namespace  {
     UNINTERESTING_ATTR(Safe)
     UNINTERESTING_ATTR(AddressableForDependencies)
     UNINTERESTING_ATTR(UnsafeSelfDependentResult)
-    UNINTERESTING_ATTR(Warn)
+    UNINTERESTING_ATTR(Diagnose)
 #undef UNINTERESTING_ATTR
 
     void visitABIAttr(ABIAttr *attr) {
@@ -1927,7 +1937,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
          overrideASD->getAttrs().hasAttribute<LazyAttr>()) &&
         !overrideASD->hasObservers()) {
       bool downgradeToWarning = false;
-      if (!ctx.isLanguageModeAtLeast(5) &&
+      if (!ctx.isLanguageModeAtLeast(LanguageMode::v5) &&
           overrideASD->getAttrs().hasAttribute<LazyAttr>()) {
         // Swift 4.0 had a bug where lazy properties were considered
         // computed by the time of this check. Downgrade this diagnostic to
@@ -1993,6 +2003,28 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       diags.diagnose(overrideASD, diag::override_with_more_effects, overrideASD,
                      "throwing");
       return true;
+    }
+
+    // Make sure that if we're overriding a `@dynamicMemberLookup` subscript, it
+    // remains as valid as its parent. `@dynamicMemberLookup`-annotated types
+    // normally go through `AttributeChecker` for validation, but if
+    // `@dynamicMemberLookup` is inherited, there isn't an explicit attr to
+    // validate. Most potential mismatches have been caught at this point, but
+    // we do still need to check that, e.g., the overridden decl hasn't dropped
+    // a default value for one of its parameters.
+    if (auto parentSubscript = dyn_cast<SubscriptDecl>(baseASD)) {
+      auto owningTy = override->getDeclContext()->getDeclaredInterfaceType();
+      if (owningTy->hasDynamicMemberLookupAttribute() &&
+          (bool) parentSubscript->getDynamicMemberLookupKind()) {
+        auto overrideSubscript = cast<SubscriptDecl>(overrideASD);
+
+        auto eligibility = evaluateOrFatal(
+            overrideSubscript->getASTContext().evaluator,
+            DynamicMemberLookupSubscriptRequest{overrideSubscript});
+        if (eligibility.diagnose(overrideSubscript)) {
+          return true;
+        }
+      }
     }
   }
 
@@ -2314,6 +2346,19 @@ computeOverriddenAssociatedTypes(AssociatedTypeDecl *assocType) {
     // Objective-C protocols
     if (inheritedProto->isObjC()) return TypeWalker::Action::Continue;
 
+    // Associated types defined within reparentable protocol RP
+    // are not "overridden" by one defined in a downstream protocol, i.e.,
+    // if P inherits from RP, then P's associated type does not override RP's,
+    // causing P's associated type to serves as the anchor.
+    //
+    // We skip processing any protocols further inherited by RP as they should
+    // all be @reparentable as well.
+    //
+    // See a corresponding bit of code in `swift::removeOverriddenDecls`, where
+    // we deprioritize @reparentable associated types in name-lookup too.
+    if (inheritedProto->getAttrs().hasAttribute<ReparentableAttr>())
+      return TypeWalker::Action::SkipNode;
+
     // Look for associated types with the same name.
     bool foundAny = false;
     if (auto found = inheritedProto->getAssociatedType(assocType->getName())) {
@@ -2370,9 +2415,9 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     case AccessorKind::Get:
     case AccessorKind::Set:
     case AccessorKind::Read:
-    case AccessorKind::Read2:
+    case AccessorKind::YieldingBorrow:
     case AccessorKind::Modify:
-    case AccessorKind::Modify2:
+    case AccessorKind::YieldingMutate:
     case AccessorKind::Borrow:
     case AccessorKind::Mutate:
       break;
@@ -2412,11 +2457,13 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
       case AccessorKind::Get:
       case AccessorKind::DistributedGet:
       case AccessorKind::Read:
-      case AccessorKind::Read2:
+      case AccessorKind::YieldingBorrow:
+      case AccessorKind::Borrow:
         break;
 
       case AccessorKind::Modify:
-      case AccessorKind::Modify2:
+      case AccessorKind::YieldingMutate:
+      case AccessorKind::Mutate:
       case AccessorKind::Set:
         // For setter accessors, we need the base's setter to be
         // accessible from the overriding context, or it's not an override.
@@ -2457,24 +2504,31 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     return noResults;
   }
 
-  auto matches = matcher.match(OverrideCheckingAttempt::PerfectMatch);
-  if (matches.empty()) {
-    return noResults;
+  // Mismatches on @Sendable and global-actor attributes are treated as
+  // warnings depending on the language mode and declaration attributes.
+  // `checkOverrides` would produce mismatching override results and so
+  // should this method.
+  for (auto attempt : {OverrideCheckingAttempt::PerfectMatch,
+                       OverrideCheckingAttempt::MismatchedConcurrency}) {
+    auto matches = matcher.match(attempt);
+    if (matches.empty())
+      continue;
+
+    // If we have more than one potential match from a class, diagnose the
+    // ambiguity and fail.
+    if (matches.size() > 1 && decl->getDeclContext()->getSelfClassDecl()) {
+      diagnoseGeneralOverrideFailure(decl, matches, attempt);
+      invalidateOverrideAttribute(decl);
+      return noResults;
+    }
+
+    // Check the matches. If any are ill-formed, invalidate the override
+    // attribute
+    // so we don't try again.
+    return matcher.checkPotentialOverrides(matches, attempt);
   }
 
-  // If we have more than one potential match from a class, diagnose the
-  // ambiguity and fail.
-  if (matches.size() > 1 && decl->getDeclContext()->getSelfClassDecl()) {
-    diagnoseGeneralOverrideFailure(decl, matches,
-                                   OverrideCheckingAttempt::PerfectMatch);
-    invalidateOverrideAttribute(decl);
-    return noResults;
-  }
-
-  // Check the matches. If any are ill-formed, invalidate the override attribute
-  // so we don't try again.
-  return matcher.checkPotentialOverrides(matches,
-                                         OverrideCheckingAttempt::PerfectMatch);
+  return noResults;
 }
 
 llvm::TinyPtrVector<ValueDecl *>

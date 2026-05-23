@@ -18,8 +18,8 @@ actor A {
   var ns = NonSendable()
 
   // CHECK-LABEL: // unspecifiedAsync<A>(_:)
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
-  // CHECK-NEXT: sil @$s11WithFeature16unspecifiedAsyncyyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
+  // CHECK-NEXT: sil @$s11WithFeature16unspecifiedAsyncyyxYalF : $@convention(thin) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test1() async {
     // If unspecifiedAsync does not inherit the isolation of A, then we will get
     // an error.
@@ -27,7 +27,7 @@ actor A {
   }
 
   // CHECK-LABEL: // unspecifiedAsyncConcurrent<A>(_:)
-  // CHECK: // Isolation: nonisolated
+  // CHECK: // Isolation: @concurrent
   // CHECK: sil @$s11WithFeature26unspecifiedAsyncConcurrentyyxYalF : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   func test1a() async {
     await WithFeature.unspecifiedAsyncConcurrent(ns)
@@ -36,8 +36,8 @@ actor A {
   }
 
   // CHECK-LABEL: // unspecifiedAsyncCaller<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature22unspecifiedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s11WithFeature22unspecifiedAsyncCalleryyxYalF : $@convention(thin) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test1b() async {
     await WithFeature.unspecifiedAsyncCaller(ns)
   }
@@ -52,7 +52,7 @@ actor A {
   }
 
   // CHECK-LABEL: // unspecifiedAsyncConcurrent<A>(_:)
-  // CHECK: // Isolation: nonisolated
+  // CHECK: // Isolation: @concurrent
   // CHECK: sil @$s14WithoutFeature26unspecifiedAsyncConcurrentyyxYalF : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   func test2a() async {
     // If unspecifiedAsync does not inherit the isolation of A, then we will get
@@ -63,21 +63,21 @@ actor A {
   }
 
   // CHECK-LABEL: // unspecifiedAsyncCaller<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s14WithoutFeature22unspecifiedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s14WithoutFeature22unspecifiedAsyncCalleryyxYalF : $@convention(thin) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test2b() async {
     await WithoutFeature.unspecifiedAsyncCaller(ns)
   }
 
   // CHECK-LABEL: // nonisolatedAsync<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature16nonisolatedAsyncyyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s11WithFeature16nonisolatedAsyncyyxYalF : $@convention(thin) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test3() async {
     await WithFeature.nonisolatedAsync(ns)
   }
 
   // CHECK-LABEL: // nonisolatedAsyncConcurrent<A>(_:)
-  // CHECK: // Isolation: nonisolated
+  // CHECK: // Isolation: @concurrent
   // CHECK: sil @$s11WithFeature26nonisolatedAsyncConcurrentyyxYalF : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   func test3a() async {
     await WithFeature.nonisolatedAsyncConcurrent(ns)
@@ -86,8 +86,8 @@ actor A {
   }
 
   // CHECK-LABEL: // nonisolatedAsyncCaller<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature22nonisolatedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s11WithFeature22nonisolatedAsyncCalleryyxYalF : $@convention(thin) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test3b() async {
     await WithFeature.nonisolatedAsyncCaller(ns)
   }
@@ -102,7 +102,7 @@ actor A {
   }
 
   // CHECK-LABEL: // nonisolatedAsyncConcurrent<A>(_:)
-  // CHECK: // Isolation: nonisolated
+  // CHECK: // Isolation: @concurrent
   // CHECK: sil @$s14WithoutFeature26nonisolatedAsyncConcurrentyyxYalF : $@convention(thin) @async <τ_0_0> (@in_guaranteed τ_0_0) -> ()
   func test4a() async {
     await WithoutFeature.nonisolatedAsyncConcurrent(ns)
@@ -111,22 +111,22 @@ actor A {
   }
 
   // CHECK-LABEL: // nonisolatedAsyncCaller<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s14WithoutFeature22nonisolatedAsyncCalleryyxYalF : $@convention(thin) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s14WithoutFeature22nonisolatedAsyncCalleryyxYalF : $@convention(thin) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0) -> ()
   func test4b() async {
     await WithoutFeature.nonisolatedAsyncCaller(ns)
   }
 
   // CHECK-LABEL: // S.unspecifiedAsync<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature1SV16unspecifiedAsyncyyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s11WithFeature1SV16unspecifiedAsyncyyxYalF : $@convention(method) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test5() async {
     let s = WithFeature.S()
     await s.unspecifiedAsync(ns)
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncConcurrent<A>(_:)
-  // CHECK: // Isolation: nonisolated
+  // CHECK: // Isolation: @concurrent
   // CHECK: sil @$s11WithFeature1SV26unspecifiedAsyncConcurrentyyxYalF : $@convention(method) @async <τ_0_0> (@in_guaranteed τ_0_0, S) -> ()
   func test5a() async {
     let s = WithFeature.S()
@@ -136,23 +136,23 @@ actor A {
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncCaller<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature1SV22unspecifiedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s11WithFeature1SV22unspecifiedAsyncCalleryyxYalF : $@convention(method) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test5b() async {
     let s = WithFeature.S()
     await s.unspecifiedAsyncCaller(ns)
   }
 
   // CHECK-LABEL: // S.nonisolatedAsync<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature1SV16nonisolatedAsyncyyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s11WithFeature1SV16nonisolatedAsyncyyxYalF : $@convention(method) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test6() async {
     let s = WithFeature.S()
     await s.nonisolatedAsync(ns)
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncConcurrent<A>(_:)
-  // CHECK: // Isolation: nonisolated
+  // CHECK: // Isolation: @concurrent
   // CHECK: sil @$s11WithFeature1SV26nonisolatedAsyncConcurrentyyxYalF : $@convention(method) @async <τ_0_0> (@in_guaranteed τ_0_0, S) -> ()
   func test6a() async {
     let s = WithFeature.S()
@@ -162,8 +162,8 @@ actor A {
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncCaller<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s11WithFeature1SV22nonisolatedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s11WithFeature1SV22nonisolatedAsyncCalleryyxYalF : $@convention(method) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test6b() async {
     let s = WithFeature.S()
     await s.nonisolatedAsyncCaller(ns)
@@ -180,7 +180,7 @@ actor A {
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncConcurrent<A>(_:)
-  // CHECK: // Isolation: nonisolated
+  // CHECK: // Isolation: @concurrent
   // CHECK: sil @$s14WithoutFeature1SV26unspecifiedAsyncConcurrentyyxYalF : $@convention(method) @async <τ_0_0> (@in_guaranteed τ_0_0, S) -> ()
   func test7a() async {
     let s = WithoutFeature.S()
@@ -190,8 +190,8 @@ actor A {
   }
 
   // CHECK-LABEL: // S.unspecifiedAsyncCaller<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s14WithoutFeature1SV22unspecifiedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s14WithoutFeature1SV22unspecifiedAsyncCalleryyxYalF : $@convention(method) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test7b() async {
     let s = WithoutFeature.S()
     await s.unspecifiedAsyncCaller(ns)
@@ -208,7 +208,7 @@ actor A {
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncConcurrent<A>(_:)
-  // CHECK: // Isolation: nonisolated
+  // CHECK: // Isolation: @concurrent
   // CHECK: sil @$s14WithoutFeature1SV26nonisolatedAsyncConcurrentyyxYalF : $@convention(method) @async <τ_0_0> (@in_guaranteed τ_0_0, S) -> ()
   func test8a() async {
     let s = WithoutFeature.S()
@@ -218,8 +218,8 @@ actor A {
   }
 
   // CHECK-LABEL: // S.nonisolatedAsyncCaller<A>(_:)
-  // CHECK: // Isolation: caller_isolation_inheriting
-  // CHECK: sil @$s14WithoutFeature1SV22nonisolatedAsyncCalleryyxYalF : $@convention(method) @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
+  // CHECK: // Isolation: nonisolated(nonsending)
+  // CHECK: sil @$s14WithoutFeature1SV22nonisolatedAsyncCalleryyxYalF : $@convention(method) @caller_isolated @async <τ_0_0> (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @in_guaranteed τ_0_0, S) -> ()
   func test8b() async {
     let s = WithoutFeature.S()
     await s.nonisolatedAsyncCaller(ns)

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -159,10 +159,26 @@ extension CollectionOfOne: RandomAccessCollection, MutableCollection {
   }
 }
 
+extension CollectionOfOne {
+  @_alwaysEmitIntoClient
+  public func withContiguousStorageIfAvailable<R: ~Copyable, E: Error>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R? {
+    try withUnsafePointer(to: _element) { pointer throws(E) -> R in
+      try unsafe body(UnsafeBufferPointer(start: pointer, count: 1))
+    }
+  }
+}
+
 @available(SwiftCompatibilitySpan 5.0, *)
 @_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
 extension CollectionOfOne {
 
+  /// A span over the single element of this collection.
+  ///
+  /// - Returns: A `Span` over the element of this collection.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
     @lifetime(borrow self)
@@ -173,6 +189,11 @@ extension CollectionOfOne {
     }
   }
 
+  /// A mutable span over the single element of this collection.
+  ///
+  /// - Returns: A `MutableSpan` over the element of this collection.
+  ///
+  /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
     @lifetime(&self)
@@ -204,3 +225,35 @@ extension CollectionOfOne: CustomReflectable {
 
 extension CollectionOfOne: Sendable where Element: Sendable { }
 extension CollectionOfOne.Iterator: Sendable where Element: Sendable { }
+
+extension CollectionOfOne where Element: Equatable {
+  @_alwaysEmitIntoClient
+  public static func ==(lhs: CollectionOfOne<Element>, rhs: CollectionOfOne<Element>) -> Bool {
+    return lhs._element == rhs._element
+  }
+}
+
+extension CollectionOfOne where Element: Hashable {
+  @_alwaysEmitIntoClient
+  public func hash(into hasher: inout Hasher) {
+    hasher.combine(self._element)
+  }
+
+  @_alwaysEmitIntoClient
+  public var hashValue: Int { // Prevent compiler from synthesizing hashValue.
+    var hasher = Hasher()
+    self.hash(into: &hasher)
+    return hasher.finalize()
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension CollectionOfOne: Equatable where Element: Equatable {}
+
+@available(SwiftStdlib 6.4, *)
+extension CollectionOfOne: Hashable where Element: Hashable {}
+
+extension CollectionOfOne: ConvertibleToBytes
+  where Element: ConvertibleToBytes {}
+extension CollectionOfOne: ConvertibleFromBytes
+  where Element: ConvertibleFromBytes {}

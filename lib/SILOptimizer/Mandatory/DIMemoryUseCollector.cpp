@@ -13,6 +13,8 @@
 #define DEBUG_TYPE "definite-init"
 
 #include "DIMemoryUseCollector.h"
+#include "llvm/ADT/Statistic.h"
+
 #include "swift/AST/Expr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
@@ -27,6 +29,9 @@
 
 using namespace swift;
 using namespace ownership;
+
+STATISTIC(NumStructEltBaseScans,
+          "# of stored-property scans computing struct element base indices");
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -131,8 +136,29 @@ computeMemorySILType(MarkUninitializedInst *MUI, SILValue Address) {
   return {MemorySILType, VDecl->isLet()};
 }
 
+static SingleValueInstruction *
+findUninitializedValue(MarkUninitializedInst *MemoryInst) {
+  SingleValueInstruction *inst = MemoryInst;
+  SILValue projectBoxUser = inst;
+
+  // Check for a project_box instruction (possibly via a borrow).
+  if (auto *bbi = projectBoxUser->getSingleUserOfType<BeginBorrowInst>()) {
+    projectBoxUser = bbi;
+  }
+  if (auto pbi = projectBoxUser->getSingleUserOfType<ProjectBoxInst>()) {
+    inst = pbi;
+  }
+
+  // Access move-only values through their marker.
+  if (auto mui = inst->getSingleUserOfType<MarkUnresolvedNonCopyableValueInst>()) {
+    inst = mui;
+  }
+
+  return inst;
+}
+
 DIMemoryObjectInfo::DIMemoryObjectInfo(MarkUninitializedInst *MI)
-    : MemoryInst(MI) {
+    : MemoryInst(MI), uninitializedValue(findUninitializedValue(MI)) {
   auto &Module = MI->getModule();
 
   SILValue Address = MemoryInst;
@@ -184,29 +210,8 @@ SILInstruction *DIMemoryObjectInfo::getFunctionEntryPoint() const {
   return &*getFunction().begin()->begin();
 }
 
-static SingleValueInstruction *
-getUninitializedValue(MarkUninitializedInst *MemoryInst) {
-  SingleValueInstruction *inst = MemoryInst;
-  SILValue projectBoxUser = inst;
-  
-  // Check for a project_box instruction (possibly via a borrow).
-  if (auto *bbi = projectBoxUser->getSingleUserOfType<BeginBorrowInst>()) {
-    projectBoxUser = bbi;
-  }
-  if (auto pbi = projectBoxUser->getSingleUserOfType<ProjectBoxInst>()) {
-    inst = pbi;
-  }
-
-  // Access move-only values through their marker.
-  if (auto mui = inst->getSingleUserOfType<MarkUnresolvedNonCopyableValueInst>()) {
-    inst = mui;
-  }
-
-  return inst;
-}
-
 SingleValueInstruction *DIMemoryObjectInfo::getUninitializedValue() const {
-  return ::getUninitializedValue(MemoryInst);
+  return uninitializedValue;
 }
 
 /// Given a symbolic element number, return the type of the element.
@@ -397,7 +402,7 @@ SILValue DIMemoryObjectInfo::emitElementAddressForDestroy(
 /// Push the symbolic path name to the specified element number onto the
 /// specified std::string.
 static void getPathStringToElementRec(TypeExpansionContext context,
-                                      SILModule &Module, SILType T,
+                                      const SILFunction &func, SILType T,
                                       unsigned EltNo, std::string &Result) {
   CanTupleType TT = T.getAs<TupleType>();
   if (!TT) {
@@ -406,11 +411,17 @@ static void getPathStringToElementRec(TypeExpansionContext context,
     return;
   }
 
+  if (T.isEmptyTuple(func)) {
+    // Tuple has no elements, return.
+    return;
+  }
+
   unsigned FieldNo = 0;
   for (unsigned i = 0, e = TT->getNumElements(); i < e; ++i) {
     auto Field = TT->getElement(i);
     SILType FieldTy = T.getTupleElementType(i);
-    unsigned NumFieldElements = getElementCountRec(context, Module, FieldTy, false);
+    unsigned NumFieldElements =
+        getElementCountRec(context, func.getModule(), FieldTy, false);
 
     if (EltNo < NumFieldElements) {
       Result += '.';
@@ -418,7 +429,7 @@ static void getPathStringToElementRec(TypeExpansionContext context,
         Result += Field.getName().str();
       else
         Result += llvm::utostr(FieldNo);
-      return getPathStringToElementRec(context, Module, FieldTy, EltNo, Result);
+      return getPathStringToElementRec(context, func, FieldTy, EltNo, Result);
     }
 
     EltNo -= NumFieldElements;
@@ -461,7 +472,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
           } else {
             Result += VD->getName().str();
           }
-          getPathStringToElementRec(expansionContext, Module, FieldType,
+          getPathStringToElementRec(expansionContext,
+                                    *MemoryInst->getFunction(), FieldType,
                                     Element, Result);
           return VD;
         }
@@ -484,8 +496,8 @@ DIMemoryObjectInfo::getPathStringToElement(unsigned Element,
   }
 
   // Get the path through a tuple, if relevant.
-  getPathStringToElementRec(expansionContext, Module, MemorySILType, Element,
-                            Result);
+  getPathStringToElementRec(expansionContext, *MemoryInst->getFunction(),
+                            MemorySILType, Element, Result);
 
   // If we are analyzing a variable, we can generally get the decl associated
   // with it.
@@ -556,7 +568,7 @@ SingleValueInstruction *DIMemoryObjectInfo::findUninitializedSelfValue() const {
       // be some kind of `self` (root, delegating, derived etc.)
       // see \c MarkUninitializedInst::Kind for more details.
       if (!isVariableOrResult(MUI))
-        return ::getUninitializedValue(MUI);
+        return findUninitializedValue(MUI);
     }
   }
   return nullptr;
@@ -771,6 +783,7 @@ void ElementUseCollector::collectStructElementUses(StructElementAddrInst *SEAI,
     if (SEAI->getField() == VD)
       break;
 
+    ++NumStructEltBaseScans;
     auto expansionContext = TypeExpansionContext(*SEAI->getFunction());
     auto FieldType = SEAI->getOperand()->getType().getFieldType(VD, Module, expansionContext);
     BaseEltNo += getElementCountRec(expansionContext, Module, FieldType, false);
@@ -1107,12 +1120,12 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       llvm_unreachable("bad access kind");
     }
 
-    // unchecked_take_enum_data_addr takes the address of the payload of an
+    // unchecked_*_enum_data_addr takes the address of the payload of an
     // optional, which could be used to update the payload. So, visit the
     // users of this instruction and ensure that there are no overwrites to an
     // immutable optional. Note that this special handling is for checking
     // immutability and is not for checking initialization before use.
-    if (auto *enumDataAddr = dyn_cast<UncheckedTakeEnumDataAddrInst>(User)) {
+    if (auto *enumDataAddr = dyn_cast<UncheckedEnumDataAddrInstBase>(User)) {
       // Keep track of the fact that we're inside of an enum. This informs our
       // recursion that tuple stores should not be treated as a partial
       // store. This is needed because if the enum has data it would be accessed
@@ -1232,6 +1245,7 @@ bool ElementUseCollector::addClosureElementUses(PartialApplyInst *pai,
       case DIUseKind::Load:
       case DIUseKind::Escape:
       case DIUseKind::InOutArgument:
+      case DIUseKind::InOutSelfArgument:
         break;
       default:
         return false;

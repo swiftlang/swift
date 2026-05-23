@@ -41,7 +41,7 @@ public:
   ~SwiftToClangInteropContext();
 
   IRABIDetailsProvider &getIrABIDetails();
-  const ASTContext &getASTContext() { return mod.getASTContext(); }
+  ASTContext &getASTContext() { return mod.getASTContext(); }
 
   // Runs the given function if we haven't emitted some context-specific stub
   // for the given concrete stub name.

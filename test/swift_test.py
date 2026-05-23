@@ -68,6 +68,7 @@ class SwiftTest(lit.formats.ShTest, object):
             "long_test" not in test.config.available_features
             # Some of these tests are notoriously slow.
             and not ("Interop" in test.path_in_suite and "Cxx" in test.path_in_suite)
+            and not ("swift-dev-utils.test" in test.path_in_suite)
         ):
             test.allowed_retries = 5
 

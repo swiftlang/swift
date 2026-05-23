@@ -1,6 +1,6 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature SuppressedAssociatedTypes)
+// RUN: %target-run-simple-swift(-enable-experimental-feature SuppressedAssociatedTypesWithDefaults)
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 // Noncopyable types are suppressed in field metadata in runtimes lacking
 // reflection support for them (currently all runtimes). However, we want

@@ -1,6 +1,6 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-//
+
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
 // RUN:   -I %swift_src_root%{fs-sep}lib%{fs-sep}ClangImporter%{fs-sep}SwiftBridging -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
@@ -8,14 +8,14 @@
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
 // RUN:   -verify-additional-prefix LIFETIMES- \
 // RUN:   -enable-experimental-feature LifetimeDependence
-//
+
 // RUN: %target-swift-frontend -typecheck -verify %t%{fs-sep}test.swift \
 // RUN:   -I %swift_src_root%{fs-sep}lib%{fs-sep}ClangImporter%{fs-sep}SwiftBridging -I %t%{fs-sep}Inputs \
 // RUN:   -cxx-interoperability-mode=default \
 // RUN:   -verify-ignore-unrelated \
 // RUN:   -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}nonescapable.h \
 // RUN:   -verify-additional-prefix NO-LIFETIMES-
-//
+
 // REQUIRES: swift_feature_LifetimeDependence
 
 //--- Inputs/module.modulemap
@@ -167,6 +167,10 @@ struct SWIFT_ESCAPABLE Invalid {
     View v;
 };
 
+// expected-note@+1 {{escapable record 'Invalid2' cannot have non-escapable base 'View'}}
+struct SWIFT_ESCAPABLE Invalid2 : View {
+};
+
 struct SWIFT_NONESCAPABLE NonEscapable {};
 
 using NonEscapableOptional = std::optional<NonEscapable>;
@@ -180,9 +184,9 @@ struct Aggregate {
   void someMethod() {}
 }; 
 
-// This is a complex record (has user-declared constructors), so we don't infer escapability.
-// By default, it's imported as escapable, which generates an error 
-// because of the non-escapable field 'View'
+// This is a complex record (has user-declared constructor), but since the copy
+// constructor is defaulted and there is no user-provided destructor, we infer
+// escapability from fields. The View field makes it non-escapable.
 struct ComplexRecord {
   int a;
   View b;
@@ -192,12 +196,38 @@ struct ComplexRecord {
   ComplexRecord(const ComplexRecord &other) = default;
 }; 
 
+// escapability is not inferred since it has a user provided copy constructor.
+struct ComplexRecord2 {
+  int a;
+  View b;
+  bool c;
+
+  ComplexRecord2() : a(1), b(), c(false) {}
+  ComplexRecord2(const ComplexRecord2 &other);
+}; 
+
+// escapability is not inferred since it has a user provided copy assignment.
+struct ComplexRecord3 {
+  int a;
+  View b;
+  bool c;
+
+  ComplexRecord3() : a(1), b(), c(false) {}
+  ComplexRecord3& operator=(const ComplexRecord3& other);
+}; 
+
 // expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 Aggregate m1();
 // expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
 
-ComplexRecord m2(); // expected-note {{'m2()' has been explicitly marked unavailable here}}
+// expected-LIFETIMES-error@+2 {{a function with a ~Escapable result needs a parameter to depend on}}
+// expected-LIFETIMES-note@+1 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
+ComplexRecord m2();
+// expected-NO-LIFETIMES-error@-1 {{a function cannot return a ~Escapable result}}
+
+ComplexRecord2 m3(); // expected-note {{'m3()' has been explicitly marked unavailable here}}
+ComplexRecord3 m4(); // expected-note {{'m4()' has been explicitly marked unavailable here}}
 
 // expected-error@+1 {{multiple SWIFT_NONESCAPABLE annotations found on 'DoubleNonEscapableAnnotation'}}
 struct SWIFT_NONESCAPABLE SWIFT_NONESCAPABLE DoubleNonEscapableAnnotation {};
@@ -298,6 +328,9 @@ import CxxStdlib
 // expected-error@+1 {{cannot find type 'Invalid' in scope}}
 public func importInvalid(_ x: Invalid) {}
 
+// expected-error@+1 {{cannot find type 'Invalid2' in scope}}
+public func importInvalid(_ x: Invalid2) {}
+
 // expected-LIFETIMES-error@+3 {{a function with a ~Escapable result needs a parameter to depend on}}
 // expected-LIFETIMES-note@+2 {{'@_lifetime(immortal)' can be used to indicate that values produced by this initializer have no lifetime dependencies}}
 // expected-NO-LIFETIMES-error@+1 {{a function cannot return a ~Escapable result}}
@@ -319,7 +352,7 @@ public func noAnnotations() -> View {
     k2()
     k3()
     l1()
-    l2();
+    l2()
     return View()
 }
 
@@ -347,5 +380,7 @@ public func optional() {
 
 public func inferedEscapability() {
     m1()
-    m2() // expected-error {{'m2()' is unavailable: return type is unavailable in Swift}}
+    m2()
+    m3()  // expected-error {{'m3()' is unavailable: return type is unavailable in Swift}}
+    m4()  // expected-error {{'m4()' is unavailable: return type is unavailable in Swift}}
 }

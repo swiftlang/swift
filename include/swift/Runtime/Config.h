@@ -575,7 +575,14 @@ swift_auth_code(T value, unsigned extra) {
 #    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
 #  endif
 #elif defined(_WIN32)
-#  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
+   // Backtracing is disabled for 32-bit x86 on Windows because the Swift
+   // compiler doesn't respect `stdcall`.  Other architectures don't use a
+   // special calling convention for Win32 APIs, so are OK.
+#  if defined(__i386__)
+#    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
+#  else
+#    define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1
+#  endif
 #  define SWIFT_BACKTRACE_SECTION ".sw5bckt"
 #elif defined(__linux__) && (defined(__aarch64__) || defined(__x86_64__))
 #  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1

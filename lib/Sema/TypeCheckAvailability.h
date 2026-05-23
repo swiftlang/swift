@@ -86,6 +86,10 @@ enum class ExportabilityReason : unsigned {
   AvailableAttribute,
   PublicVarDecl,
   ImplicitlyPublicVarDecl,
+  ImplicitlyPublicVarDeclOpenClass,
+  ImplicitlyPublicVarDeclMissingAttribute,
+  ImplicitlyPublicVarDeclMissingDeinit,
+  ImplicitlyPublicVarDeclMissingAttributeAndDeinit,
   AssociatedValue,
   ImplicitlyPublicAssociatedValue,
 };
@@ -202,9 +206,18 @@ public:
   /// because it is the function body context of an inlinable function.
   bool mustOnlyReferenceExportedDecls() const;
 
-  /// If true, the context reference a dependency of \p originKind  without
-  /// restriction.
-  bool canReferenceOrigin(DisallowedOriginKind originKind) const;
+  /// Level of restriction to references from the context to an \p originKind.
+  /// This check is shared by different diagnostics.
+  DiagnosticBehavior
+  behaviorForReferenceToOrigin(const ValueDecl *D,
+                               DisallowedOriginKind originKind) const;
+
+  /// Returns true if a reference to \p D under the given \p originKind from
+  /// this context is being encapsulated as a hidden stored property. When this
+  /// returns true, the abstract layout for the hidden type has been recorded on
+  /// the current module.
+  bool encapsulatedAsHiddenStoredProperty(
+      const ValueDecl *D, DisallowedOriginKind originKind) const;
 
   /// Get the ExportabilityReason for diagnostics. If this is 'None', there
   /// are no restrictions on referencing unexported declarations.
@@ -261,6 +274,13 @@ bool checkTypeMetadataAvailability(Type type, SourceRange loc,
 
 /// Check if \p decl has a introduction version required by -require-explicit-availability
 void checkExplicitAvailability(Decl *decl);
+
+/// Emit suggested Fix-Its for a reference to an unavailable symbol requiring
+/// the given availability range in the given domain.
+void fixAvailability(SourceRange ReferenceRange, const DeclContext *ReferenceDC,
+                     AvailabilityDomain Domain,
+                     const AvailabilityRange &RequiredAvailability,
+                     ASTContext &Context);
 
 } // namespace swift
 

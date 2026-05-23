@@ -123,10 +123,16 @@ DeclAvailabilityConstraints::getPrimaryConstraint() const {
     if (lhs.getReason() != rhs.getReason())
       return lhs.getReason() < rhs.getReason();
 
-    // Pick the constraint from the broader domain.
-    if (lhs.getDomain() != rhs.getDomain())
-      return rhs.getDomain().contains(lhs.getDomain());
-    
+    if (lhs.getDomain() != rhs.getDomain()) {
+      // Constraints in the universal domain are the strongest.
+      if (rhs.getDomain().isUniversal())
+        return true;
+
+      // Otherwise, pick the constraint from the broader domain.
+      if (lhs.getDomain() != rhs.getDomain())
+        return rhs.getDomain().contains(lhs.getDomain());
+    }
+
     return false;
   };
 
@@ -189,7 +195,18 @@ shouldIgnoreConstraintInContext(const Decl *decl,
   if (!canIgnoreConstraintInUnavailableContexts(decl, constraint, flags))
     return false;
 
-  return context.containsUnavailableDomain(constraint.getDomain());
+  // If the constraint's domain is a superset of the compilation's target
+  // availability domain, use the more specific target availability domain
+  // instead. This allows declarations that are @available(macOS, unavailable)
+  // to be used in contexts that are @available(macOSApplicationExtension,
+  // unavailable), for example.
+  auto &ctx = decl->getASTContext();
+  auto domain = constraint.getDomain();
+  auto targetDomain = ctx.getTargetAvailabilityDomain();
+  if (domain.isSupersetOf(targetDomain))
+    domain = targetDomain;
+
+  return context.isUnavailableForDomain(domain);
 }
 
 /// Returns the `AvailabilityConstraint` that describes how \p attr restricts
@@ -197,38 +214,49 @@ shouldIgnoreConstraintInContext(const Decl *decl,
 static std::optional<AvailabilityConstraint>
 getAvailabilityConstraintForAttr(const Decl *decl,
                                  const SemanticAvailableAttr &attr,
-                                 const AvailabilityContext &context) {
-  // Is the decl unconditionally unavailable?
-  if (attr.isUnconditionallyUnavailable())
-    return AvailabilityConstraint::unavailableUnconditionally(attr);
+                                 const AvailabilityContext &context,
+                                 const AvailabilityConstraintFlags flags) {
+  auto getConstraint = [&]() -> std::optional<AvailabilityConstraint> {
+    // Is the decl unconditionally unavailable?
+    if (attr.isUnconditionallyUnavailable())
+      return AvailabilityConstraint::unavailableUnconditionally(attr);
 
-  auto &ctx = decl->getASTContext();
-  auto domain = attr.getDomain();
-  bool domainSupportsRefinement = domain.supportsContextRefinement();
+    auto &ctx = decl->getASTContext();
+    auto domain = attr.getDomain();
+    bool domainSupportsRefinement = domain.supportsContextRefinement();
 
-  // Compute the available range in the given context. If there is no explicit
-  // range defined by the context, use the deployment range as fallback.
-  std::optional<AvailabilityRange> availableRange;
-  if (domainSupportsRefinement)
-    availableRange = context.getAvailabilityRange(domain, ctx);
-  if (!availableRange)
-    availableRange = domain.getDeploymentRange(ctx);
+    // Compute the available range in the given context. If there is no
+    // explicit range defined by the context, use the deployment range as
+    // fallback.
+    std::optional<AvailabilityRange> availableRange;
+    if (domainSupportsRefinement)
+      availableRange = context.getAvailabilityRange(domain, ctx);
+    if (!availableRange)
+      availableRange = domain.getDeploymentRange(ctx);
 
-  // Is the decl obsoleted in this context?
-  if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
-    if (availableRange && availableRange->isContainedIn(*obsoletedRange))
-      return AvailabilityConstraint::unavailableObsolete(attr);
-  }
+    // Is the decl obsoleted in this context?
+    if (auto obsoletedRange = attr.getObsoletedRange(ctx)) {
+      if (availableRange && availableRange->isContainedIn(*obsoletedRange))
+        return AvailabilityConstraint::unavailableObsolete(attr);
+    }
 
-  // Is the decl not yet introduced in this context?
-  if (auto introducedRange = attr.getIntroducedRange(ctx)) {
-    if (!availableRange || !availableRange->isContainedIn(*introducedRange))
-      return domainSupportsRefinement
-                 ? AvailabilityConstraint::unintroduced(attr)
-                 : AvailabilityConstraint::unavailableUnintroduced(attr);
-  }
+    // Is the decl not yet introduced in this context?
+    if (auto introducedRange = attr.getIntroducedRange(ctx)) {
+      if (!availableRange || !availableRange->isContainedIn(*introducedRange))
+        return domainSupportsRefinement
+                   ? AvailabilityConstraint::unintroduced(attr)
+                   : AvailabilityConstraint::unavailableUnintroduced(attr);
+    }
 
-  return std::nullopt;
+    return std::nullopt;
+  };
+
+  auto constraint = getConstraint();
+  if (constraint &&
+      shouldIgnoreConstraintInContext(decl, *constraint, context, flags))
+    return std::nullopt;
+
+  return constraint;
 }
 
 /// Returns the most specific platform domain from the availability attributes
@@ -268,16 +296,10 @@ static void getAvailabilityConstraintsForDecl(
         !activePlatformDomain->contains(domain))
       continue;
 
-    if (auto constraint = getAvailabilityConstraintForAttr(decl, attr, context))
+    if (auto constraint =
+            getAvailabilityConstraintForAttr(decl, attr, context, flags))
       addConstraint(constraints, *constraint, ctx);
   }
-
-  // After resolving constraints, remove any constraints that indicate the
-  // declaration is unconditionally unavailable in a domain for which
-  // the context is already unavailable.
-  llvm::erase_if(constraints, [&](const AvailabilityConstraint &constraint) {
-    return shouldIgnoreConstraintInContext(decl, constraint, context, flags);
-  });
 }
 
 DeclAvailabilityConstraints
@@ -293,6 +315,16 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
   decl = decl->getAbstractSyntaxDeclForAttributes();
 
   getAvailabilityConstraintsForDecl(constraints, decl, context, flags);
+
+  // For requirements of reparentable protocols, add constraints from the
+  // enclosing protocol itself. We don't need to do this for ordinary protocols
+  // because of the rule that a protocol P cannot inherit from Q if Q is less
+  // available than P. Thus, the availability of the most derived protocol
+  // already carries the same or stricter constraints than its ancestors.
+  if (auto *proto = decl->getDeclContext()->getSelfProtocolDecl()) {
+    if (proto->getAttrs().hasAttribute<ReparentableAttr>())
+      getAvailabilityConstraintsForDecl(constraints, proto, context, flags);
+  }
 
   if (flags.contains(AvailabilityConstraintFlag::SkipEnclosingExtension))
     return constraints;

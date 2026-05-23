@@ -1270,6 +1270,34 @@ public:
   }
 };
 
+class BuiltinBorrowTypeRef final : public TypeRef {
+  const TypeRef *Referent;
+
+  static TypeRefID Profile(const TypeRef *Referent) {
+    TypeRefID ID;
+    ID.addPointer(Referent);
+    return ID;
+  }
+
+public:
+  BuiltinBorrowTypeRef(const TypeRef *Referent)
+    : TypeRef(TypeRefKind::BuiltinBorrow), Referent(Referent) {}
+
+  template <typename Allocator>
+  static const BuiltinBorrowTypeRef *create(Allocator &A,
+                                                const TypeRef *Referent) {
+    FIND_OR_CREATE_TYPEREF(A, BuiltinBorrowTypeRef, Referent);
+  }
+
+  const TypeRef *getReferentType() const {
+    return Referent;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::BuiltinBorrow;
+  }
+};
+
 template <typename ImplClass, typename RetTy = void, typename... Args>
 class TypeRefVisitor {
 public:

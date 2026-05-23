@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::PackType::getExpandedGenericArgs(llvm::ArrayRef<swift::GenericTypeParamType*>, llvm::ArrayRef<swift::Type>)","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast"}
+// {"kind":"typecheck","signature":"swift::PackType::getExpandedGenericArgs(llvm::ArrayRef<swift::GenericTypeParamType*>, llvm::ArrayRef<swift::Type>)","signatureAssert":"Assertion failed: (isa<To>(Val) && \"cast<Ty>() argument of incompatible type!\"), function cast","signatureNext":"TypeAliasType::getExpandedGenericArgs"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 struct a<each b
   typealias c<each d> = a<>

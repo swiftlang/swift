@@ -15,7 +15,7 @@ import _Differentiation
 //
 // CHECK: %[[TAN_VAL:.+]] = struct_element_addr %[[OPT_TAN]] : $*Optional<τ_0_0>.TangentVector, #Optional.TangentVector.value
 //
-// CHECK: %[[TAN_DATA:.+]] = unchecked_take_enum_data_addr %[[TAN_VAL]] : $*Optional<τ_0_0.TangentVector>, #Optional.some!enumelt
+// CHECK: %[[TAN_DATA:.+]] = unchecked_inplace_enum_data_addr %[[TAN_VAL]] : $*Optional<τ_0_0.TangentVector>, #Optional.some!enumelt
 // CHECK: %[[PLUS_EQUAL:.+]] = witness_method $τ_0_0.TangentVector, #AdditiveArithmetic."+="
 // CHECK: apply %[[PLUS_EQUAL]]<τ_0_0.TangentVector>(%[[ADJ_IN_BB]], %[[TAN_DATA]], %{{.*}})
 

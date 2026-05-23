@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::DerivedConformance::deriveDistributedActor(swift::ValueDecl*)"}
+// {"kind":"typecheck","signature":"swift::DerivedConformance::deriveDistributedActor(swift::ValueDecl*)","signatureNext":"ConformanceChecker::resolveWitnessViaDerivation"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 // REQUIRES: OS=macosx
 import Distributed typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem distributed actor a{c, b

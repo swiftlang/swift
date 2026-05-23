@@ -53,9 +53,8 @@ let _ = HasStaticMethodWithDefaultArg.isNonZeroPrivateCounter(1)
 let _ = HasStaticMethodWithDefaultArg.isArgZeroRef() // expected-error {{missing argument for parameter #1 in call}}
 
 let _ = HasCtorWithDefaultArg(1, 2, 3)
-// TODO: support default arguments of constructors (https://github.com/apple/swift/issues/70124)
-//let _ = HasCtorWithDefaultArg(1, 2)
-//let _ = HasCtorWithDefaultArg(1)
+let _ = HasCtorWithDefaultArg(1, 2)
+let _ = HasCtorWithDefaultArg(1)
 
 let _ = TemplatedHasMethodWithDefaultArgFloat().isZero()
 let _ = TemplatedHasMethodWithDefaultArgFloat().isNonZero()

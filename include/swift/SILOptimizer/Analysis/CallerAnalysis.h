@@ -344,7 +344,8 @@ public:
 
   SWIFT_DEBUG_DUMP;
 
-  void print(llvm::raw_ostream &os) const;
+  void print(llvm::raw_ostream &os,
+             NullablePtr<SILFunction> callee = nullptr) const;
 };
 
 } // end namespace swift

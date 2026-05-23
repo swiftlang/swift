@@ -532,89 +532,6 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
     IA->needsStackProtection() || cast<IndexAddrInst>(base)->needsStackProtection());
 }
 
-SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
-  // Remove runtime asserts such as overflow checks and bounds checks.
-  if (RemoveCondFails)
-    return eraseInstFromFunction(*CFI);
-
-  if (shouldRemoveCondFail(*CFI))
-    return eraseInstFromFunction(*CFI);
-
-  auto *I = dyn_cast<IntegerLiteralInst>(CFI->getOperand());
-  if (!I)
-    return nullptr;
-
-  // Erase. (cond_fail 0)
-  if (!I->getValue().getBoolValue())
-    return eraseInstFromFunction(*CFI);
-
-  // Remove non-lifetime-ending code that follows a (cond_fail 1) and set the
-  // block's terminator to unreachable.
-
-  // Are there instructions after this point to delete?
-
-  // First check if the next instruction is unreachable.
-  if (isa<UnreachableInst>(std::next(SILBasicBlock::iterator(CFI))))
-    return nullptr;
-
-  // Otherwise, check if the only instructions are unreachables and destroys of
-  // lexical values.
-
-  // Collect all instructions and, in OSSA, the values they define.
-  llvm::SmallVector<SILInstruction *, 32> ToRemove;
-  ValueSet DefinedValues(CFI->getFunction());
-  for (auto Iter = std::next(CFI->getIterator());
-       Iter != CFI->getParent()->end(); ++Iter) {
-
-    if (isBeginScopeMarker(&*Iter)) {
-      for (auto *scopeUse : cast<SingleValueInstruction>(&*Iter)->getUses()) {
-        auto *scopeEnd = scopeUse->getUser();
-        if (isEndOfScopeMarker(scopeEnd)) {
-          ToRemove.push_back(scopeEnd);
-        }
-      }
-    }
-    if (!CFI->getFunction()->hasOwnership()) {
-      ToRemove.push_back(&*Iter);
-      continue;
-    }
-
-    for (auto result : Iter->getResults()) {
-      DefinedValues.insert(result);
-    }
-    // Look for destroys of lexical values whose def isn't after the cond_fail.
-    if (auto *dvi = dyn_cast<DestroyValueInst>(&*Iter)) {
-      auto value = dvi->getOperand();
-      if (!DefinedValues.contains(value) && value->isLexical())
-        continue;
-    }
-    ToRemove.push_back(&*Iter);
-  }
-
-  unsigned instructionsToDelete = ToRemove.size();
-  // If the last instruction is an unreachable already, it needn't be deleted.
-  if (isa<UnreachableInst>(ToRemove.back())) {
-    --instructionsToDelete;
-  }
-  if (instructionsToDelete == 0)
-    return nullptr;
-
-  for (auto *Inst : ToRemove) {
-    if (Inst->isDeleted())
-      continue;
-
-    // Replace any still-remaining uses with undef and erase.
-    Inst->replaceAllUsesOfAllResultsWithUndef();
-    eraseInstFromFunction(*Inst);
-  }
-
-  // Add an `unreachable` to be the new terminator for this block
-  Builder.setInsertionPoint(CFI->getParent());
-  Builder.createUnreachable(ArtificialUnreachableLocation());
-
-  return nullptr;
-}
-
 /// Whether there exists a unique value to which \p addr is always initialized
 /// at \p forInst.
 ///
@@ -904,6 +821,15 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
   if (!DataAddrInst || !EnumAddrIns) {
     return nullptr;
   }
+  if (func->hasOwnership() &&
+      !DataAddrInst->getType().isTrivial(*func) &&
+      DataAddrInst->getParent() != EnumAddrIns->getParent()) {
+    // The init_enum_data_addr is in a different block than the inject_enum_addr.
+    // This might cause a leak because between the two blocks could be a CFG edge
+    // to a dead-end block with an `unreachable`
+    return nullptr;
+  }
+
   assert((EnumAddrIns == IEAI) &&
          "Found InitEnumDataAddrInst differs from IEAI");
   // Make sure the enum pattern instructions are the only ones which write to
@@ -1111,8 +1037,8 @@ visitUnreachableInst(UnreachableInst *UI) {
 ///
 /// Also remove dead unchecked_take_enum_data_addr:
 ///   (destroy_addr (unchecked_take_enum_data_addr x)) -> (destroy_addr x)
-SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
-    UncheckedTakeEnumDataAddrInst *tedai) {
+SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
+    UncheckedEnumDataAddrInstBase *tedai) {
   // If our TEDAI has no users, there is nothing to do.
   if (tedai->use_empty())
     return nullptr;
@@ -1147,7 +1073,7 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
 
   if (onlyDestroys) {
     // Destroying whole non-copyable enums with a deinit would wrongly trigger calling its deinit.
-    if (tedai->getOperand()->getType().isValueTypeWithDeinit())
+    if (tedai->getEnum()->getType().isValueTypeWithDeinit())
       return nullptr;
 
     // The unchecked_take_enum_data_addr is dead: remove it and replace all
@@ -1156,7 +1082,7 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
       Operand *use = *tedai->use_begin();
       SILInstruction *user = use->getUser();
       if (auto *dai = dyn_cast<DestroyAddrInst>(user)) {
-        dai->setOperand(tedai->getOperand());
+        dai->setOperand(tedai->getEnum());
       } else {
         assert(user->isDebugInstruction());
         eraseInstFromFunction(*user);
@@ -1172,18 +1098,18 @@ SILInstruction *SILCombiner::visitUncheckedTakeEnumDataAddrInst(
   // thing to remember is that an enum is address only if any of its cases are
   // address only. So we *could* have a loadable payload resulting from the
   // TEDAI without the TEDAI being loadable itself.
-  if (tedai->getOperand()->getType().isAddressOnly(*tedai->getFunction()))
+  if (tedai->getEnum()->getType().isAddressOnly(*tedai->getFunction()))
     return nullptr;
 
   // If the enum is noncopyable and any loads cause copies, the transformation
   // would be illegal because it would introduce a copy of the noncopyable enum.
-  if (tedai->getOperand()->getType().isMoveOnly() && anyLoadCopies)
+  if (tedai->getEnum()->getType().isMoveOnly() && anyLoadCopies)
     return nullptr;
 
   // Grab the EnumAddr.
   SILLocation loc = tedai->getLoc();
   Builder.setCurrentDebugScope(tedai->getDebugScope());
-  SILValue enumAddr = tedai->getOperand();
+  SILValue enumAddr = tedai->getEnum();
   EnumElementDecl *enumElt = tedai->getElement();
   SILType payloadType = tedai->getType().getObjectType();
 
@@ -1587,6 +1513,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
     NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                      ARDI->isObjC(), ARDI->canAllocOnStack(),
                                      /*isBare=*/ false,
+                                     ARDI->isStackAllocationNested(),
                                      ARDI->getTailAllocatedTypes(),
                                      getCounts(ARDI));
 
@@ -1613,6 +1540,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       NewInst = Builder.createAllocRef(ARDI->getLoc(), SILInstanceTy,
                                        ARDI->isObjC(), ARDI->canAllocOnStack(),
                                        /*isBare=*/ false,
+                                       ARDI->isStackAllocationNested(),
                                        ARDI->getTailAllocatedTypes(),
                                        getCounts(ARDI));
     }
@@ -1640,7 +1568,7 @@ visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI) {
       return nullptr;
     NewInst = Builder.createAllocRef(
         ARDI->getLoc(), *instanceTy, ARDI->isObjC(), false,
-        /*isBare=*/ false,
+        /*isBare=*/ false, StackAllocationIsNested,
         ARDI->getTailAllocatedTypes(), getCounts(ARDI));
     NewInst = Builder.createUncheckedRefCast(ARDI->getLoc(), NewInst,
                                              ARDI->getType());
@@ -1725,11 +1653,9 @@ SILCombiner::visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtrac
     if (!opTI->isABICompatibleWith(resTI, *DFEI->getFunction()).isCompatible())
       return nullptr;
 
-    std::tie(newValue, std::ignore) =
-      castValueToABICompatibleType(&Builder, parentTransform->getPassManager(),
-                                   DFEI->getLoc(),
-                                   newValue,
-                                   newValue->getType(), DFEI->getType(), {});
+    std::tie(newValue, std::ignore) = castValueToABICompatibleType(
+        &Builder, parentTransform->getPassManager(), DFEI->getLoc(), newValue,
+        newValue->getType(), DFEI->getType());
   }
 
   replaceInstUsesWith(*DFEI, newValue);

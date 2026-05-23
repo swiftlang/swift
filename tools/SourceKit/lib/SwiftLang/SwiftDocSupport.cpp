@@ -1305,7 +1305,6 @@ static bool reportSourceDocInfo(CompilerInvocation Invocation,
   }
 
   ASTContext &Ctx = CI.getASTContext();
-  CloseClangModuleFiles scopedCloseFiles(*Ctx.getClangModuleLoader());
   CI.performSema();
 
   SourceTextInfo SourceInfo;
@@ -1499,7 +1498,7 @@ void SwiftLangSupport::findLocalRenameRanges(
   static const char OncePerASTToken = 0;
   const void *Once = CancelOnSubsequentRequest ? &OncePerASTToken : nullptr;
   getASTManager()->processASTAsync(Invok, ASTConsumer, Once, CancellationToken,
-                                   llvm::vfs::getRealFileSystem());
+                                   llvm::vfs::createPhysicalFileSystem());
 }
 
 SourceFile *SwiftLangSupport::getSyntacticSourceFile(

@@ -27,8 +27,10 @@
 #include "swift/SIL/TypeSubstCloner.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Existential.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SpecializationMangler.h"
 #include "llvm/ADT/SmallVector.h"
@@ -334,7 +336,7 @@ ExistentialTransform::createExistentialSpecializedFunctionType() {
   NewGenericSig = buildGenericSignature(Ctx, OrigGenericSig,
                                         std::move(GenericParams),
                                         std::move(Requirements),
-                                        /*allowInverses=*/true);
+                                        ExpandDefaults);
 
   /// Original list of parameters
   SmallVector<SILParameterInfo, 4> params;
@@ -619,11 +621,12 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
     SILLinkage linkage = getSpecializedLinkage(F, F->getLinkage());
 
     NewF = FunctionBuilder.createFunction(
-        linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-        F->isTransparent(), F->getSerializedKind(), IsNotDynamic,
-        IsNotDistributed, IsNotRuntimeAccessible, F->getEntryCount(),
-        F->isThunk(), F->getClassSubclassScope(), F->getInlineStrategy(),
-        F->getEffectsKind(), nullptr, F->getDebugScope());
+        linkage, Name, NewFTy, F->getActorIsolation(), NewFGenericEnv,
+        F->getLocation(), F->isBare(), F->isTransparent(),
+        F->getSerializedKind(), IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible, F->getEntryCount(), F->isThunk(),
+        F->getClassSubclassScope(), F->getInlineStrategy(), F->getEffectsKind(),
+        nullptr, F->getDebugScope());
 
     /// Set the semantics attributes for the new function.
     for (auto &Attr : F->getSemanticsAttrs())
@@ -649,6 +652,25 @@ void ExistentialTransform::createExistentialSpecializedFunction() {
   populateThunkBody();
 
   assert(F->getDebugScope()->Parent != NewF->getDebugScope()->Parent);
+
+  SILPassManager *pm = &FunctionBuilder.getPassManager();
+  auto *invocation = pm->getSwiftPassInvocation()->getCurrent();
+  invocation->initializeNestedSwiftPassInvocation(F);
+
+  removeUnreachableBlocks(*F);
+
+  if (F->needBreakInfiniteLoops()) {
+    breakInfiniteLoops(pm, F);
+  }
+  if (F->needCompleteLifetimes()) {
+    pm->invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
+    completeAllLifetimes(pm, F);
+  }
+
+  invocation->deinitializeNestedSwiftPassInvocation();
+
+  // We didn't introduce any incomplete lifetimes in the specialized function.
+  NewF->setNeedCompleteLifetimes(false);
 
   LLVM_DEBUG(llvm::dbgs() << "After ExistentialSpecializer Pass\n"; F->dump();
              NewF->dump(););

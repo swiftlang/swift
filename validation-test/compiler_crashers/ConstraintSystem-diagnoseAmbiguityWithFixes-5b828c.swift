@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::constraints::ConstraintSystem::diagnoseAmbiguityWithFixes(llvm::SmallVectorImpl<swift::constraints::Solution>&)","signatureAssert":"Assertion failed: (fn), function diagnoseAmbiguity"}
+// {"kind":"typecheck","signature":"swift::constraints::ConstraintSystem::diagnoseAmbiguityWithFixes(llvm::SmallVectorImpl<swift::constraints::Solution>&)","signatureAssert":"Assertion failed: (fn), function diagnoseAmbiguity","signatureNext":"ConstraintSystem::salvage"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 struct a {
   lazy b : Int -> Int = {

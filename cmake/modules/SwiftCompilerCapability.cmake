@@ -2,8 +2,7 @@
 function(swift_supports_compiler_arguments out_var)
   file(WRITE "${CMAKE_BINARY_DIR}/tmp/dummy.swift" "")
   execute_process(
-    COMMAND "${CMAKE_Swift_COMPILER}" -parse ${ARGN} -
-    INPUT_FILE "${CMAKE_BINARY_DIR}/tmp/dummy.swift"
+    COMMAND "${CMAKE_Swift_COMPILER}" -parse ${ARGN} "${CMAKE_BINARY_DIR}/tmp/dummy.swift"
     OUTPUT_QUIET ERROR_QUIET
     RESULT_VARIABLE result
   )

@@ -28,6 +28,8 @@ template <class T> struct TemplateClassWithMemberTemplates {
 
   template <class U> void setValue(U val) { value = val; }
 
+  template <class U> U getValue() const { return value; }
+
   template<class U> TemplateClassWithMemberTemplates<U> toOtherSpec(const U& u) const {
     return {u};
   }
@@ -36,6 +38,13 @@ template <class T> struct TemplateClassWithMemberTemplates {
 };
 
 using IntWrapper = TemplateClassWithMemberTemplates<int>;
+
+struct IntHolder {
+  int value;
+  IntHolder(int val) : value(val) {}
+  template <class U> U getValue() const { return value; }
+  template <class U> const U &getValueRef() const { return value; }
+};
 
 struct HasStaticMemberTemplates {
   template <class T> static T add(T a, T b) { return a + b; }

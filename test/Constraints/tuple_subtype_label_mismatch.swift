@@ -31,3 +31,29 @@ func testTupleLabelMismatchFuncConversion(fn1: @escaping ((x: Int, y: Int)) -> V
   let _: () -> (x: Int, y: Int) = fn2
   let _: () -> (Int, y: Int) = fn2
 }
+
+func testErasure() {
+  func checkCall<T, Arg0>(
+    _ lhs: T, calling functionCall: (T, Arg0) throws -> Bool, _ argument0: Arg0
+  ) {}
+
+  func test(data: [(key: String, data: String)]) {
+    checkCall(
+      data.self,
+      calling: { $0.contains(where: $1) },
+      { $0 == (key: "Name", data: "kernel") } // Ok
+    )
+
+    checkCall(
+      data.self,
+      calling: { $0.contains(where: $1) },
+      { $0 == ("Name", "kernel") } // Ok
+    )
+
+    checkCall(
+      data.self,
+      calling: { $0.contains(where: $1) },
+      { $0 == (key: "Name", value: "kernel") } // Ok
+    )
+  }
+}

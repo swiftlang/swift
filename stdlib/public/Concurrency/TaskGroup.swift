@@ -46,9 +46,7 @@ import Swift
 ///
 /// - SeeAlso: ``TaskGroup``
 @available(SwiftStdlib 5.1, *)
-#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @inlinable
 public func withTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
@@ -172,9 +170,7 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// - SeeAlso: ``ThrowingTaskGroup``
 /// - SeeAlso: ``ThrowingDiscardingTaskGroup``
 @available(SwiftStdlib 5.1, *)
-#if !hasFeature(Embedded)
 @backDeployed(before: SwiftStdlib 6.0)
-#endif
 @inlinable
 public func withThrowingTaskGroup<ChildTaskResult, GroupResult>(
   of childTaskResultType: ChildTaskResult.Type = ChildTaskResult.self,
@@ -424,9 +420,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   ///
   /// - Returns: The value returned by the next child task that completes.
   @available(SwiftStdlib 5.1, *)
-  #if !hasFeature(Embedded)
   @backDeployed(before: SwiftStdlib 6.0)
-  #endif
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async -> ChildTaskResult? {
     // try!-safe because this function only exists for Failure == Never,
     // and as such, it is impossible to spawn a throwing child task.
@@ -444,9 +438,7 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// Await all of the pending tasks added this group.
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  #if !hasFeature(Embedded)
   @backDeployed(before: SwiftStdlib 6.0)
-  #endif
   internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while let _ = await next(isolation: isolation) {}
   }
@@ -459,6 +451,13 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
 
   /// Wait for all of the group's remaining tasks to complete.
   @_alwaysEmitIntoClient
+  public nonisolated(nonsending) mutating func waitForAll() async {
+    await awaitAllRemainingTasks(isolation: #isolation)
+  }
+
+  /// Wait for all of the group's remaining tasks to complete.
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async {
     await awaitAllRemainingTasks(isolation: isolation)
   }
@@ -502,6 +501,14 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
   /// If the task that's currently running this group is canceled,
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
+  ///
+  /// ### Interaction with task cancellation shields
+  ///
+  /// Cancellation may be suppressed by an active task cancellation shield
+  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// to return `false` even though the task has been cancelled externally.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }
@@ -587,9 +594,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// Await all the remaining tasks on this group.
   @usableFromInline
   @available(SwiftStdlib 5.1, *)
-  #if !hasFeature(Embedded)
   @backDeployed(before: SwiftStdlib 6.0)
-  #endif
   internal mutating func awaitAllRemainingTasks(isolation: isolated (any Actor)? = #isolation) async {
     while true {
       do {
@@ -643,6 +648,28 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// - Throws: The *first* error that was thrown by a child task during draining all the tasks.
   ///           This first error is stored until all other tasks have completed, and is re-thrown afterwards.
   @_alwaysEmitIntoClient
+  public nonisolated(nonsending) mutating func waitForAll() async throws {
+    var firstError: Error? = nil
+
+    // Make sure we loop until all child tasks have completed
+    while !isEmpty {
+      do {
+        while let _ = try await next() {}
+      } catch {
+        // Upon error throws, capture the first one
+        if firstError == nil {
+          firstError = error
+        }
+      }
+    }
+
+    if let firstError {
+      throw firstError
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func waitForAll(isolation: isolated (any Actor)? = #isolation) async throws {
     var firstError: Error? = nil
 
@@ -722,9 +749,7 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// - SeeAlso: `nextResult()`
   @available(SwiftStdlib 5.1, *)
-  #if !hasFeature(Embedded)
   @backDeployed(before: SwiftStdlib 6.0)
-  #endif
   public mutating func next(isolation: isolated (any Actor)? = #isolation) async throws -> ChildTaskResult? {
     return try await _taskGroupWaitNext(group: _group)
   }
@@ -784,6 +809,12 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   ///
   /// - SeeAlso: `next()`
   @_alwaysEmitIntoClient
+  public nonisolated(nonsending) mutating func nextResult() async -> Result<ChildTaskResult, Failure>? {
+    return try! await nextResultForABI()
+  }
+
+  @_alwaysEmitIntoClient
+  @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
   public mutating func nextResult(isolation: isolated (any Actor)? = #isolation) async -> Result<ChildTaskResult, Failure>? {
     return try! await nextResultForABI()
   }
@@ -828,6 +859,14 @@ public struct ThrowingTaskGroup<ChildTaskResult: Sendable, Failure: Error> {
   /// If the task that's currently running this group is canceled,
   /// the group is also implicitly canceled,
   /// which is also reflected in this property's value.
+  ///
+  /// ### Interaction with task cancellation shields
+  ///
+  /// Cancellation may be suppressed by an active task cancellation shield
+  /// (``withTaskCancellationShield(operation:)``), which may cause `isCancelled`
+  /// to return `false` even though the task has been cancelled externally.
+  ///
+  /// - SeeAlso: ``withTaskCancellationShield(operation:)``
   public var isCancelled: Bool {
     return _taskGroupIsCancelled(group: _group)
   }

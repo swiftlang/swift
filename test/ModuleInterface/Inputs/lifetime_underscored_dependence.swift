@@ -89,3 +89,98 @@ public struct RigidArray : ~Copyable {
   }
 }
 
+// Function types
+
+@inlinable
+@_lifetime(copy ne0)
+public func takeCopier(f: @_lifetime(io: copy io) @_lifetime(copy inview) (_ inview: consuming AnotherView, _ io: inout AnotherView) -> AnotherView, ne0: consuming AnotherView, ne1: inout AnotherView) -> AnotherView {
+    let ne2 = f(ne0, &ne1)
+    return ne2
+}
+
+@inlinable
+public func takeCopierUnannotated(f: (consuming AnotherView) -> AnotherView) {}
+
+// Function type lifetime dependencies are printed as they appeared in Swift.
+// Internal labels are preserved when a function type has explicit lifetime
+// dependence information, since these may be used to refer to the sources and
+// targets of lifetimes.
+
+public typealias LabelledNE2NE = @_lifetime(copy ne) (_ ne: AnotherView) -> AnotherView
+public typealias InferredNE2NE = (AnotherView) -> AnotherView
+public typealias InferredLabelledNE2NE = (_ ne: AnotherView) -> AnotherView
+
+public typealias NamedLifetimeType = @_lifetime(copy ne) (_ ne: AnotherView, _ ne2: AnotherView) -> AnotherView
+public typealias InferredLifetimeType = (_ ne: AnotherView, AnotherView) -> AnotherView
+public typealias ImmortalLifetimeType = @_lifetime(immortal) (_ ne: AnotherView, _ ne2: AnotherView) -> AnotherView
+public typealias CapturesLifetimeType = @_lifetime(captures) (_ ne: AnotherView, _ ne2: AnotherView) -> AnotherView
+
+public typealias MixedLifetimeType = @_lifetime(copy ne0) (_ ne0: AnotherView, _ neio: inout AnotherView) -> AnotherView
+public typealias NestedLifetimeType = @_lifetime(neo: copy ne0) (_ nei: inout AnotherView, _ ne0: AnotherView, _ neo: inout AnotherView) -> (_ ne1: AnotherView) -> AnotherView
+
+public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0) ((AnotherView) -> AnotherView, _ ne0: consuming AnotherView, _ ne1: inout AnotherView) -> AnotherView
+
+@inlinable
+public func takeExplicitNestedType(f: ExplicitNestedType) {}
+
+
+@inlinable
+public func returnableCopier(_ aView: AnotherView) -> AnotherView {
+  return aView
+}
+
+@inlinable
+public func returnCopier() -> @_lifetime(copy a) (_ a: AnotherView) -> AnotherView {
+  return returnableCopier
+}
+
+@inlinable
+@_lifetime(dest: immortal)
+public func immortalInout(dest: inout AnotherView) {
+  dest = _overrideLifetime(dest, copying: ())
+}
+
+@inlinable public func takeImmortalInout(
+  closure: @_lifetime(dest: immortal) (_ dest: inout AnotherView) -> ()
+) {}
+
+@inlinable
+@_lifetime(dest: immortal, copy source)
+public func fullReassign(dest: inout AnotherView, source: AnotherView) {
+  dest = source
+}
+
+@inlinable public func takeFullReassign(
+  closure: @_lifetime(dest: immortal, copy source) (_ dest: inout AnotherView, _ source: AnotherView) -> ()
+) {}
+
+@inlinable
+public func takeReadBorrower(f: @_lifetime(borrow a) (_ a: AnotherView) -> AnotherView) {}
+
+@inlinable
+public func takeWriteBorrower(f: @_lifetime(&a) (_ a: inout AnotherView) -> AnotherView) {}
+
+// Infer @_lifetime(copy f)
+@inlinable
+public func takeClosureImplicitDependence(f: () -> AnotherView) -> AnotherView {
+  f()
+}
+
+@_lifetime(f) // Infer @_lifetime(copy f)
+@inlinable
+public func takeClosureImplicitDependenceKind(f: () -> AnotherView) -> AnotherView {
+  f()
+}
+
+@inlinable
+public func takeTakeImplicitCopyClosure(g: @_lifetime(copy f) (_ f: () -> AnotherView) -> AnotherView) {
+}
+
+// Verify that takeClosureImplicitDependenceKind and takeClosureImplicitDependence
+// are both inferred as @_lifetime(copy f). It is illegal to pass a function that
+// borrows its context into a function-type parameter that copies its context.
+@inlinable
+public func callTTICC() {
+  takeTakeImplicitCopyClosure(g: takeClosureImplicitDependenceKind)
+  takeTakeImplicitCopyClosure(g: takeClosureImplicitDependence)
+}

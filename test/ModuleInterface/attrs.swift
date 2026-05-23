@@ -7,26 +7,26 @@
 // RUN: %FileCheck %s --check-prefixes CHECK,PUBLIC-CHECK --input-file %t.swiftinterface
 // RUN: %FileCheck %s --check-prefixes CHECK,PRIVATE-CHECK --input-file %t.private.swiftinterface
 
-// CHECK: @_transparent public func glass() -> Swift.Int { return 0 }{{$}}
+// CHECK: @_transparent public func glass() -> Swift::Int { return 0 }{{$}}
 @_transparent public func glass() -> Int { return 0 }
 
 // CHECK: @_effects(readnone) public func illiterate(){{$}}
 @_effects(readnone) public func illiterate() {}
 
-// CHECK: @_effects(notEscaping arg1.**) public func escapeEffects(arg1: Swift.Int){{$}}
+// CHECK: @_effects(notEscaping arg1.**) public func escapeEffects(arg1: Swift::Int){{$}}
 @_effects(notEscaping arg1.**) public func escapeEffects(arg1: Int) {}
 
 // CHECK-LABEL: @frozen public struct Point {
 @frozen public struct Point {
-  // CHECK-NEXT: public var x: Swift.Int
+  // CHECK-NEXT: public var x: Swift::Int
   public var x: Int
-  // CHECK-NEXT: public var y: Swift.Int
+  // CHECK-NEXT: public var y: Swift::Int
   public var y: Int
 } // CHECK-NEXT: {{^}$}}
 
 public func someGenericFunction<T>(_ t: T) -> Int { return 0 }
 
-// CHECK: @_specialize(exported: true, kind: full, target: someGenericFunction(_:), where T == Swift.Int)
+// CHECK: @_specialize(exported: true, kind: full, target: someGenericFunction(_:), where T == Swift::Int)
 // CHECK: internal func __specialize_someGenericFunction<T>(_ t: T)
 @_specialize(exported: true, target: someGenericFunction(_:), where T == Int)
 internal func __specialize_someGenericFunction<T>(_ t: T) -> Int {
@@ -36,21 +36,21 @@ internal func __specialize_someGenericFunction<T>(_ t: T) -> Int {
 @abi(func __abi__abiAttrOnFunction(param: Int))
 public func abiAttrOnFunction(param: Int) {}
 // CHECK: #if {{.*}} $ABIAttributeSE0479
-// CHECK: @abi(func __abi__abiAttrOnFunction(param: Swift.Int))
-// CHECK: public func abiAttrOnFunction(param: Swift.Int)
+// CHECK: @abi(func __abi__abiAttrOnFunction(param: Swift::Int))
+// CHECK: public func abiAttrOnFunction(param: Swift::Int)
 // CHECK: #else
 // CHECK: @_silgen_name("$s5attrs07__abi__B14AttrOnFunction5paramySi_tF")
-// CHECK: public func abiAttrOnFunction(param: Swift.Int)
+// CHECK: public func abiAttrOnFunction(param: Swift::Int)
 // CHECK: #endif
 
 @abi(let __abi__abiAttrOnVar: Int)
 public var abiAttrOnVar: Int = 42
 // CHECK: #if {{.*}} $ABIAttributeSE0479
-// CHECK: @abi(var __abi__abiAttrOnVar: Swift.Int)
-// CHECK: public var abiAttrOnVar: Swift.Int
+// CHECK: @abi(var __abi__abiAttrOnVar: Swift::Int)
+// CHECK: public var abiAttrOnVar: Swift::Int
 // CHECK: #else
 // CHECK: @available(*, unavailable, message: "this compiler cannot match the ABI specified by the @abi attribute")
-// CHECK: public var abiAttrOnVar: Swift.Int
+// CHECK: public var abiAttrOnVar: Swift::Int
 // CHECK: #endif
 
 public struct MutatingTest {

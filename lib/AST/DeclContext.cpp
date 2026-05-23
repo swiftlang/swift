@@ -17,6 +17,7 @@
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
@@ -534,17 +535,27 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         return {FragileFunctionKind::DefaultArgument};
       }
 
+      if (VD->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+          !VD->isNeverEmittedIntoClient())
+        return {FragileFunctionKind::EmbeddedAlwaysEmitIntoClient};
       return {FragileFunctionKind::None};
     }
 
     // Stored property initializer contexts use minimal resilience expansion
     // if the type is formally fixed layout.
     if (auto *init = dyn_cast <PatternBindingInitializer>(dc)) {
-      auto bindingIndex = init->getBindingIndex();
-      if (auto *varDecl = init->getBinding()->getAnchoringVarDecl(bindingIndex)) {
-        if (varDecl->isInitExposedToClients()) {
+      auto index = init->getBindingIndex();
+      if (auto *varDecl = init->getBinding()->getAnchoringVarDecl(index)) {
+        switch (varDecl->getInitExposedLevel()) {
+        case ExportedLevel::Exported:
           return {FragileFunctionKind::PropertyInitializer};
-        }
+        case ExportedLevel::ImplicitlyExported:
+          if (init->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+            return {FragileFunctionKind::EmbeddedAlwaysEmitIntoClient};
+          break;
+        case ExportedLevel::None:
+          break;
+        };
       }
 
       return {FragileFunctionKind::None};
@@ -569,7 +580,7 @@ swift::FragileFunctionKindRequest::evaluate(Evaluator &evaluator,
         // Accessors are implicitly EmbeddedAlwaysEmitIntoClient if neither the
         // accessor or starage is marked @_neverEmitIntoClient.
         if (!funcIsNEIC && !storageIsNEIC)
-            return FragileFunctionKind::EmbeddedAlwaysEmitIntoClient;
+          return FragileFunctionKind::EmbeddedAlwaysEmitIntoClient;
         return FragileFunctionKind::None;
       };
 
@@ -1180,7 +1191,7 @@ void IterableDeclContext::setMemberLoader(LazyMemberLoader *loader,
 
   ASTContext &ctx = getASTContext();
   auto contextInfo = ctx.getOrCreateLazyIterableContextData(this, loader);
-  FirstDeclAndLazyMembers.setInt(true);
+  forceSetHasLazyMembers();
   contextInfo->memberData = contextData;
 
   ++NumLazyIterableDeclContexts;
@@ -1205,13 +1216,7 @@ bool IterableDeclContext::hasUnparsedMembers() const {
   return true;
 }
 
-void IterableDeclContext::setHasLazyMembers(bool hasLazyMembers) const {
-  FirstDeclAndLazyMembers.setInt(hasLazyMembers);
-}
-
-void IterableDeclContext::loadAllMembers() const {
-  ASTContext &ctx = getASTContext();
-
+void IterableDeclContext::addParsedMembers() const {
   // For contexts within a source file, get the list of parsed members.
   if (getAsGenericContext()->getParentSourceFile()) {
     // Retrieve the parsed members. Even if we've already added the parsed
@@ -1228,18 +1233,35 @@ void IterableDeclContext::loadAllMembers() const {
       }
     }
   }
+}
 
-  if (!hasLazyMembers())
+void IterableDeclContext::loadStorageMembers() const {
+  addParsedMembers();
+
+  if (FirstDeclAndLazyMembers.getInt() == LazyMemberStatus::StorageLoaded ||
+      FirstDeclAndLazyMembers.getInt() == LazyMemberStatus::AllLoaded)
     return;
+  FirstDeclAndLazyMembers.setInt(LazyMemberStatus::StorageLoaded);
 
-  // Don't try to load all members re-entrant-ly.
-  setHasLazyMembers(false);
+  ASTContext &ctx = getASTContext();
+  auto ctxData = ctx.getOrCreateLazyIterableContextData(this,
+                                                        /*lazyLoader=*/nullptr);
+  ctxData->loader->loadStorageMembers(const_cast<Decl *>(getDecl()),
+                                      ctxData->memberData);
+}
 
-  const Decl *container = getDecl();
-  auto contextInfo = ctx.getOrCreateLazyIterableContextData(this,
-    /*lazyLoader=*/nullptr);
-  contextInfo->loader->loadAllMembers(const_cast<Decl *>(container),
-                                      contextInfo->memberData);
+void IterableDeclContext::loadAllMembers() const {
+  loadStorageMembers();
+
+  if (FirstDeclAndLazyMembers.getInt() == LazyMemberStatus::AllLoaded)
+    return;
+  FirstDeclAndLazyMembers.setInt(LazyMemberStatus::AllLoaded);
+
+  ASTContext &ctx = getASTContext();
+  auto ctxData = ctx.getOrCreateLazyIterableContextData(this,
+                                                        /*lazyLoader=*/nullptr);
+  ctxData->loader->loadNonStorageMembers(const_cast<Decl *>(getDecl()),
+                                  ctxData->memberData);
 
   --NumUnloadedLazyIterableDeclContexts;
   // FIXME: (transitional) decrement the redundant "always-on" counter.
@@ -1268,10 +1290,9 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
   // If members were not deserialized, force load here.
   if (!didDeserializeMembers()) {
     // This needs to be set to force load all members if not done already.
-    setHasLazyMembers(true);
-    // Calling getMembers actually loads the members.
-    (void)getMembers();
-    assert(!hasLazyMembers());
+    forceSetHasLazyMembers();
+    loadAllMembers();
+    ASSERT(!hasLazyMembers());
     assert(didDeserializeMembers());
   }
   // Members could have been deserialized from other flows. Check

@@ -217,7 +217,9 @@ int swift_llvm_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     // Then perform the optimizations.
     SourceManager SM;
     DiagnosticEngine Diags(SM);
-    performLLVMOptimizations(Opts, Diags, nullptr, M.get(), TM.get(),
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS =
+        llvm::vfs::createPhysicalFileSystem();
+    performLLVMOptimizations(Opts, Diags, nullptr, M.get(), TM.get(), FS,
                              &Out->os());
   } else {
     std::string Pipeline = PassPipeline;

@@ -137,19 +137,9 @@ SILGen should always use `SILBuilder::emitDebugDescription` to create debug
 values, which will automatically add an op_deref depending on the type of the
 SSA value. As there are no pointers in Swift, this will always do the right
 thing. In SIL passes, use `SILBuilder::createDebugValue` to create debug values,
-or `SILBuilder::createDebugValueAddr` to add an op_deref.
+or `SILBuilder::createDebugValueAddr` to prepend an op_deref.
 
-> [!Warning]
-> At the optimizer level, Swift `Unsafe*Pointer` types can be simplified
-> to address types. As such, a `debug_value` with an address type without an
-> `op_deref` can be valid. SIL passes must not assume that `op_deref` and
-> address types correlate.
-
-Even if `op_deref` is usually at the beginning, it doesn't have to be:
-```
-debug_value %0 : $*UInt8, let, name "hello", expr op_constu:3:op_plus:op_deref
-```
-This will add `3` to the pointer contained in `%0`, then dereference the result.
+For any computation more complex than a simple dereference, [Debug Reconstruction Basic Blocks](SIL/DebugBasicBlocks.md) should be used.
 
 #### Fragments
 
@@ -201,29 +191,18 @@ and, except fragments, no debug expression operator take a struct as input.
 > When multiple fragments are present, they are evaluated in the reverse way —
 > from the field within the variable first, to the SSA's type at the end
 
-#### Arithmetic
-
-An expression can add or subtract a constant offset to a value. To do so, an
-`op_constu` or `op_consts` can be used to push a constant integer to the stack,
-respectively unsigned and signed. Then, the `op_plus` and `op_minus` operators
-can be used to sum or subtract the two values on the stack.
-
-```
-debug_value %0 : $Builtin.Int64, var, name "previous", type $Int, expr op_consts:1:op_minus:op_fragment:#Int._value
-debug_value %0 : $Builtin.Int64, var, name "next", type $Int, expr op_consts:1:op_plus:op_fragment:#Int._value
-```
-
-> [!Caution]
-> This currently doesn't work if a fragment is present.
-
 #### Constants
 
 If a `debug_value` is describing a constant, such as in `let x = 1`, and the
-value is optimized out, we can keep it, using a constant expression, and no SSA
-value.
+value is optimized out, it must be preserved using a constant debug
+reconstruction block (see [DebugBasicBlocks.md](SIL/DebugBasicBlocks.md)):
 
 ```
-debug_value undef : $Int, let, name "x", expr op_consts:1:op_fragment:#Int._value
+debug_value undef : $Int, let, name "x", expr op_fragment:#Int._value, transform {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 1
+  return %0 : $Builtin.Int64
+}
 ```
 
 ### Undef variables

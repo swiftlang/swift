@@ -323,9 +323,6 @@ func returnsFunc2Identifier() -> (Int) -> ImplicitlyUnwrappedOptional<Int> { // 
 }
 
 func opaqueResult() -> (some Equatable)! { return 1 }
-// expected-swift4-warning@-1:40 {{using '!' here is deprecated; this is an error in the Swift 5 language mode}}{{none}}
-// expected-swift5-error@-2:40 {{'!' is not allowed here}}{{none}}
-// expected-note@-3:40 {{use '?' instead}}{{40-41=?}}
 
 let x0 = 1 as ImplicitlyUnwrappedOptional // expected-error {{'ImplicitlyUnwrappedOptional' has been renamed to 'Optional'}}{{15-42=Optional}}
 

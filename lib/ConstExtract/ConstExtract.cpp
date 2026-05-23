@@ -28,6 +28,8 @@
 #include "llvm/ADT/PointerUnion.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
+#include "llvm/Support/PrefixMapper.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
 
@@ -123,10 +125,10 @@ namespace swift {
 bool
 parseProtocolListFromFile(StringRef protocolListFilePath,
                           DiagnosticEngine &diags,
+                          llvm::vfs::FileSystem &fs,
                           std::unordered_set<std::string> &protocols) {
   // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFile(protocolListFilePath);
+  auto FileBufOrErr = fs.getBufferForFile(protocolListFilePath);
   if (!FileBufOrErr) {
     diags.diagnose(SourceLoc(),
                    diag::const_extract_protocol_list_input_file_missing,
@@ -334,14 +336,17 @@ extractCompileTimeValue(Expr *expr, const DeclContext *declContext) {
           }
 
           case DeclKind::Func: {
-            auto identifier = declRefExpr->getDecl()
-                                  ->getName()
-                                  .getBaseIdentifier()
-                                  .str()
-                                  .str();
+            auto funcDecl = cast<FuncDecl>(declRef.getDecl());
+            if (funcDecl->isStatic()) {
+              return std::make_shared<StaticFunctionCallValue>(
+                  baseIdentifierName, callExpr->getType(), parameters);
+            }
 
-            return std::make_shared<StaticFunctionCallValue>(
-                identifier, callExpr->getType(), parameters);
+            return std::make_shared<MemberFunctionCallValue>(
+                baseIdentifierName,
+                extractCompileTimeValue(dotSyntaxCallExpr->getBase(),
+                                        declContext),
+                parameters);
           }
 
           default: {
@@ -930,6 +935,50 @@ void writeValue(llvm::json::OStream &JSON,
     break;
   }
 
+  case CompileTimeValue::ValueKind::MemberFunctionCall: {
+    // Collect the chain: walk baseValue pointers until we reach a
+    // non-MemberFunctionCall
+    struct CallStep {
+      std::string Label;
+      std::vector<FunctionParameter> Parameters;
+    };
+    std::vector<CallStep> chain;
+    std::shared_ptr<CompileTimeValue> cursor = Value;
+    while (cursor && cursor->getKind() ==
+                         CompileTimeValue::ValueKind::MemberFunctionCall) {
+      auto *mfc = cast<MemberFunctionCallValue>(cursor.get());
+      chain.push_back({mfc->getLabel(), mfc->getParameters()});
+      cursor = mfc->getBaseValue();
+    }
+    // chain is in reverse order (outermost first), reverse so base is first
+    std::reverse(chain.begin(), chain.end());
+
+    JSON.attribute("valueKind", "MemberFunctionCall");
+    JSON.attributeObject("value", [&]() {
+      // Write the root (non-MemberFunctionCall) base once
+      JSON.attributeObject("baseValue", [&] { writeValue(JSON, cursor); });
+      // Flat list of call steps in order
+      JSON.attributeArray("calls", [&] {
+        for (auto &step : chain) {
+          JSON.object([&] {
+            JSON.attribute("memberLabel", step.Label);
+            JSON.attributeArray("arguments", [&] {
+              for (auto FP : step.Parameters) {
+                JSON.object([&] {
+                  JSON.attribute("label", FP.Label);
+                  JSON.attribute("type",
+                                 toFullyQualifiedTypeNameString(FP.Type));
+                  writeValue(JSON, FP.Value);
+                });
+              }
+            });
+          });
+        }
+      });
+    });
+    break;
+  }
+
   case CompileTimeValue::ValueKind::MemberReference: {
     auto memberReferenceValue = cast<MemberReferenceValue>(value);
     JSON.attribute("valueKind", "MemberReference");
@@ -1493,8 +1542,8 @@ void writeNominalTypeKind(llvm::json::OStream &JSON,
 }
 
 bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
-                       llvm::raw_ostream &OS) {
-  llvm::json::OStream JSON(OS, 2);
+                       llvm::raw_ostream &OS, bool Compact) {
+  llvm::json::OStream JSON(OS, Compact ? 0 : 2);
   JSON.array([&] {
     for (const auto &TypeInfo : ConstValueInfos) {
       assert(isa<NominalTypeDecl>(TypeInfo.TypeDecl) &&
@@ -1521,6 +1570,80 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
     }
   });
   JSON.flush();
+  return false;
+}
+
+/// Remap the "file" field in a single JSON object using the given
+/// PrefixMapper, if present.
+static void remapLocationInObject(llvm::json::Object &Obj,
+                                  llvm::PrefixMapper &Mapper) {
+  auto FilePath = Obj.getString("file");
+  if (FilePath)
+    Obj["file"] = Mapper.mapToString(*FilePath);
+}
+
+/// Iterate the "propertyWrappers" array and remap locations in each element.
+static void remapPropertyWrappers(llvm::json::Object &Property,
+                                  llvm::PrefixMapper &Mapper) {
+  auto *Wrappers = Property.getArray("propertyWrappers");
+  if (!Wrappers)
+    return;
+  for (auto &Wrapper : *Wrappers) {
+    if (auto *WrapperObj = Wrapper.getAsObject())
+      remapLocationInObject(*WrapperObj, Mapper);
+  }
+}
+
+/// Iterate the "properties" array and remap locations in each element and
+/// its nested propertyWrappers.
+static void remapProperties(llvm::json::Object &TypeEntry,
+                            llvm::PrefixMapper &Mapper) {
+  auto *Properties = TypeEntry.getArray("properties");
+  if (!Properties)
+    return;
+  for (auto &Prop : *Properties) {
+    if (auto *PropObj = Prop.getAsObject()) {
+      remapLocationInObject(*PropObj, Mapper);
+      remapPropertyWrappers(*PropObj, Mapper);
+    }
+  }
+}
+
+bool remapConstValuesJSON(
+    llvm::StringRef Input, llvm::raw_ostream &OS,
+    llvm::ArrayRef<std::pair<std::string, std::string>> PrefixMap) {
+  if (PrefixMap.empty()) {
+    OS << Input;
+    return false;
+  }
+
+  llvm::SmallVector<llvm::MappedPrefix, 4> Prefixes;
+  llvm::MappedPrefix::transformPairs(PrefixMap, Prefixes);
+  llvm::PrefixMapper Mapper;
+  Mapper.addRange(Prefixes);
+  Mapper.sort();
+
+  auto ParsedJSON = llvm::json::parse(Input);
+  if (!ParsedJSON) {
+    llvm::consumeError(ParsedJSON.takeError());
+    return true;
+  }
+
+  auto *TopLevel = ParsedJSON->getAsArray();
+  if (!TopLevel) {
+    OS << Input;
+    return false;
+  }
+
+  for (auto &Entry : *TopLevel) {
+    if (auto *TypeEntry = Entry.getAsObject()) {
+      remapLocationInObject(*TypeEntry, Mapper);
+      remapProperties(*TypeEntry, Mapper);
+    }
+  }
+
+  llvm::json::OStream JSONOut(OS, 2);
+  JSONOut.value(*ParsedJSON);
   return false;
 }
 

@@ -213,6 +213,20 @@ bool SILType::isEmpty(const SILFunction &F) const {
   return false;
 }
 
+bool SILType::isEmptyTuple(const SILFunction &F) const {
+  if (auto tupleTy = getAs<TupleType>()) {
+    // A tuple is empty if it either has no elements or if all elements are
+    // empty.
+    for (unsigned idx = 0, num = tupleTy->getNumElements(); idx < num; ++idx) {
+      if (!getTupleElementType(idx).isEmptyTuple(F))
+        return false;
+    }
+    return true;
+  }
+
+  return false;
+}
+
 bool SILType::isReferenceCounted(SILModule &M) const {
   return M.Types.getTypeLowering(*this,
                                  TypeExpansionContext::minimal())
@@ -765,6 +779,9 @@ bool SILFunctionType::isAddressable(unsigned paramIdx, SILModule &module,
                                     Lowering::TypeConverter &typeConverter,
                                     TypeExpansionContext expansion) {
   SILParameterInfo paramInfo = getParameters()[paramIdx];
+  if (paramIdx == getSelfParameterIndex() && hasGuaranteedAddressResult()) {
+    return getSelfParameter().isFormalIndirect();
+  }
   for (auto &depInfo : getLifetimeDependencies()) {
     auto *addressableIndices = depInfo.getAddressableIndices();
     if (addressableIndices && addressableIndices->contains(paramIdx)) {
@@ -958,30 +975,30 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
           ->getCanonicalType();
         didChange |= param.getInterfaceType() != newParamTy;
-        newParams.push_back(SILParameterInfo(newParamTy, param.getConvention()));
+        newParams.push_back(param.getWithInterfaceType(newParamTy));
       }
       for (auto yield : sft->getYields()) {
         auto newYieldTy = yield.getInterfaceType()
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
           ->getCanonicalType();
         didChange |= yield.getInterfaceType() != newYieldTy;
-        newYields.push_back(SILYieldInfo(newYieldTy, yield.getConvention()));
+        newYields.push_back(yield.getWithInterfaceType(newYieldTy));
       }
       for (auto result : sft->getResults()) {
         auto newResultTy = result.getInterfaceType()
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
           ->getCanonicalType();
         didChange |= result.getInterfaceType() != newResultTy;
-        newResults.push_back(SILResultInfo(newResultTy, result.getConvention()));
+        newResults.push_back(result.getWithInterfaceType(newResultTy));
       }
       if (auto error = sft->getOptionalErrorResult()) {
         auto newErrorTy = error->getInterfaceType()
           ->replaceSubstitutedSILFunctionTypesWithUnsubstituted(M)
           ->getCanonicalType();
         didChange |= error->getInterfaceType() != newErrorTy;
-        newErrorResult = SILResultInfo(newErrorTy, error->getConvention());
+        newErrorResult = error->getWithInterfaceType(newErrorTy);
       }
-      
+
       if (!didChange)
         return sft;
       
@@ -1017,6 +1034,20 @@ SILType SILType::getSILBoxFieldType(const SILFunction *f, unsigned field) const 
     return SILType();
   return ::getSILBoxFieldType(f->getTypeExpansionContext(), boxTy,
                               f->getModule().Types, field);
+}
+
+SILType SILBoxType::getFieldType(SILFunction &fn, unsigned index) {
+  return ::getSILBoxFieldType(fn.getTypeExpansionContext(), this,
+                              fn.getModule().Types, index);
+}
+
+SILBoxType::SILFieldToSILTypeRange
+SILBoxType::getSILFieldTypes(SILFunction &fn) {
+  auto transform = [this, &fn](unsigned index) {
+    return getFieldType(fn, index);
+  };
+  return llvm::map_range(range(getNumFields()),
+                         SILFieldIndexToSILTypeTransform(transform));
 }
 
 SILType
@@ -1227,6 +1258,12 @@ bool SILType::isAddressableForDeps(const SILFunction &function) const {
   auto contextType =
     hasTypeParameter() ? function.mapTypeIntoEnvironment(*this) : *this;
   auto properties = function.getTypeProperties(contextType);
+  return properties.isAddressableForDependencies();
+}
+
+bool SILType::isAddressableForDeps(SILModule &M,
+                                   TypeExpansionContext context) const {
+  auto properties = M.Types.getTypeProperties(*this, context);
   return properties.isAddressableForDependencies();
 }
 

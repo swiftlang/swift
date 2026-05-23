@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -40,6 +41,12 @@ FormalLinkage swift::getDeclLinkage(const ValueDecl *D) {
   if (isa<ClangModuleUnit>(fileContext) &&
           !D->getObjCImplementationDecl())
     return FormalLinkage::PublicNonUnique;
+
+  if (SILDeclRef::declHasNonUniqueDefinition(D))
+    return FormalLinkage::PublicUnique;
+
+  if (D->getModuleContext()->isAggressiveCMOEnabled())
+    return FormalLinkage::PublicUnique;
 
   switch (D->getEffectiveAccess()) {
   case AccessLevel::Package:
@@ -88,8 +95,38 @@ swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
     return SILLinkage::Shared;
 
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();
+
+  // In embedded Swift, conformances get special treatment.
+  auto &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::Embedded)) {
+    // @export(interface) conformances have a unique strong definition in
+    // the module that declares them; importing modules reference them
+    // externally.
+    if (auto *normal = dyn_cast<NormalProtocolConformance>(
+            C->getRootConformance())) {
+      switch (normal->getEffectiveCodeGenerationModel()) {
+        case CodeGenerationModel::Interface:
+          return (definition ? SILLinkage::Public : SILLinkage::PublicExternal);
+
+        case CodeGenerationModel::Implementation:
+        case CodeGenerationModel::Inlinable:
+          return SILLinkage::Shared;
+      }
+    }
+
+    // Other embedded conformances are emitted lazily with shared linkage,
+    // so each importing module emits its own local copy.
+    return SILLinkage::Shared;
+  }
+
   AccessLevel access = std::min(C->getProtocol()->getEffectiveAccess(),
                                 typeDecl->getEffectiveAccess());
+
+  // Aggressive CMO "makes" all types "public".
+  if (typeDecl->getModuleContext()->isAggressiveCMOEnabled()) {
+    access = AccessLevel::Public;
+  }
+
   switch (access) {
     case AccessLevel::Private:
     case AccessLevel::FilePrivate:
@@ -378,7 +415,7 @@ getKeyPathSupportingGenericSignature(Type ty, GenericSignature contextSig) {
                                                contextSig,
                                                {},
                                                std::move(ceRequirements),
-                                               /*allowInverses*/ false);
+                                               DefaultRequirementOptions());
   
   // If the resulting signature has conflicting requirements, then it is
   // impossible for the type to be copyable and equatable.

@@ -21,7 +21,7 @@ sil @consume_nontrivial_struct_addr : $@convention(thin) (@in NonTrivialStruct) 
 // CHECK: [[BORROW:%.*]] = load_borrow [[STACK]]
 // CHECK: apply {{%.*}}([[BORROW]])
 // CHECK-NEXT: end_borrow [[BORROW]]
-// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v" // {{.*}}; line:[[DEBUG_LOC]]
+// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v", expr op_deref // {{.*}}; line:[[DEBUG_LOC]]
 // CHECK: } // end sil function 'non_lifetime_ending_use_test_inst'
 sil [ossa] @non_lifetime_ending_use_test_inst : $@convention(thin) () -> () {
   %f = function_ref @get_nontrivial_struct : $@convention(thin) () -> @owned NonTrivialStruct
@@ -56,7 +56,7 @@ bb1:
 // CHECK: bb2:
 // CHECK-NEXT:   br bb3
 // CHECK: bb3:
-// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v" // {{.*}}; line:[[DEBUG_LOC]]
+// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v", expr op_deref // {{.*}}; line:[[DEBUG_LOC]]
 // CHECK-NEXT: destroy_addr [[STACK]]
 // CHECK: } // end sil function 'non_lifetime_ending_use_test_boundary_edge'
 sil [ossa] @non_lifetime_ending_use_test_boundary_edge : $@convention(thin) () -> () {
@@ -96,7 +96,7 @@ bb3:
 // debug_value undef.
 //
 // CHECK:   [[TAKE:%.*]] = load [take] [[STACK]]
-// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v" // {{.*}}; line:[[DEBUG_LOC]]
+// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v", expr op_deref // {{.*}}; line:[[DEBUG_LOC]]
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: function_ref
 // CHECK-NEXT:   apply {{%.*}}([[TAKE]])
@@ -104,7 +104,7 @@ bb3:
 //
 // CHECK: bb2:
 // CHECK-NEXT:   destroy_addr [[STACK]]
-// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v" // {{.*}}; line:[[DEBUG_LOC]]
+// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v", expr op_deref // {{.*}}; line:[[DEBUG_LOC]]
 // CHECK: } // end sil function 'lifetime_ending_use'
 sil [ossa] @lifetime_ending_use : $@convention(thin) () -> () {
   %f = function_ref @get_nontrivial_struct : $@convention(thin) () -> @owned NonTrivialStruct
@@ -137,12 +137,12 @@ bb3:
 
 // CHECK: bb1:
 // CHECK:   apply {{%.*}}([[STACK]])
-// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v" // {{.*}}; line:[[DEBUG_LOC]]
+// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v", expr op_deref // {{.*}}; line:[[DEBUG_LOC]]
 // CHECK: br bb3
 //
 // CHECK: bb2:
 // CHECK-NEXT:   destroy_addr [[STACK]]
-// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v" // {{.*}}; line:[[DEBUG_LOC]]
+// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v", expr op_deref // {{.*}}; line:[[DEBUG_LOC]]
 // CHECK: } // end sil function 'lifetime_ending_use_addr'
 sil [ossa] @lifetime_ending_use_addr : $@convention(thin) () -> () {
   %f = function_ref @get_nontrivial_struct : $@convention(thin) () -> @owned NonTrivialStruct
@@ -174,19 +174,19 @@ bb3:
 //
 // CHECK: bb1:
 // CHECK:   apply {{%.*}}([[STACK]])
-// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v" // {{.*}}; line:[[DEBUG_LOC]]
+// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v", expr op_deref // {{.*}}; line:[[DEBUG_LOC]]
 // CHECK-NEXT: br bb2
 //
 // CHECK: bb2:
 // CHECK: [[NEW_VAL:%.*]] = apply {{%.*}}() :
 // CHECK-NEXT: store [[NEW_VAL]] to [init] [[STACK]]
 // CHECK-NEXT: destroy_addr [[STACK]]
-// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v" // {{.*}}; line:[[DEBUG_LOC]]
+// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v", expr op_deref // {{.*}}; line:[[DEBUG_LOC]]
 // CHECK-NEXT: br bb4
 //
 // CHECK: bb3:
 // CHECK-NEXT:   destroy_addr [[STACK]]
-// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v" // {{.*}}; line:[[DEBUG_LOC]]
+// CHECK-NEXT: debug_value undef : $*NonTrivialStruct, let, name "v", expr op_deref // {{.*}}; line:[[DEBUG_LOC]]
 // CHECK: br bb4
 // CHECK: } // end sil function 'dead_def_test_inst'
 sil [ossa] @dead_def_test_inst : $@convention(thin) () -> () {

@@ -561,3 +561,51 @@ func validateHopToExecutorLifetimeShortEnough() async {
   let a = MyActor()
   _ = await Klass(on: a)
 }
+
+// ==== -----------------------------------------------------------------------
+// MARK: withCheckedContinuation (nonisolated(nonsending)) hop patterns
+//
+// withCheckedContinuation is now nonisolated(nonsending)
+// (NonisolatedNonsending). At SILGen level the caller still emits a
+// hop_to_executor breadcrumb after the call. The optimizer later recognises
+// NonisolatedNonsending calls as non-suspension-points and removes the
+// breadcrumb as redundant.
+
+extension MyActor {
+  // CHECK-LABEL: sil hidden [ossa] @$s4test7MyActorC23actorWithContinuationFnSiyYaF
+  // CHECK:       bb0([[SELF:%[0-9]+]] : @guaranteed $MyActor):
+  // CHECK:         hop_to_executor [[SELF]] : $MyActor
+  // CHECK:         {{%[0-9]+}} = apply
+  // CHECK:         hop_to_executor [[SELF]] : $MyActor
+  // CHECK:       } // end sil function '$s4test7MyActorC23actorWithContinuationFnSiyYaF'
+  func actorWithContinuationFn() async -> Int {
+    await withCheckedContinuation { c in
+      c.resume(returning: 42)
+    }
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test29globalActorWithContinuationFnSiyYaF
+// CHECK:         [[B:%[0-9]+]] = begin_borrow {{%[0-9]+}} : $MyActor
+// CHECK-NEXT:    hop_to_executor [[B]] : $MyActor
+// CHECK:         {{%[0-9]+}} = apply
+// CHECK:         hop_to_executor [[B]] : $MyActor
+// CHECK:       } // end sil function '$s4test29globalActorWithContinuationFnSiyYaF'
+@GlobalActor
+func globalActorWithContinuationFn() async -> Int {
+  await withCheckedContinuation { c in
+    c.resume(returning: 42)
+  }
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s4test34unspecifiedAsyncWithContinuationFnSiyYaF
+// CHECK:         [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
+// CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]] :
+// CHECK:         {{%[0-9]+}} = apply
+// CHECK:         hop_to_executor [[GENERIC_EXEC]]
+// CHECK:       } // end sil function '$s4test34unspecifiedAsyncWithContinuationFnSiyYaF'
+func unspecifiedAsyncWithContinuationFn() async -> Int {
+  await withCheckedContinuation { c in
+    c.resume(returning: 42)
+  }
+}

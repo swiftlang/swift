@@ -39,6 +39,14 @@
 #define SWIFT_FATAL_ERROR swift_Concurrency_fatalError
 #include "../runtime/StackAllocator.h"
 
+// In embedded builds, pure virtual methods are replaced with
+// __builtin_unreachable() stubs to avoid pulling in __cxa_pure_virtual.
+#if SWIFT_CONCURRENCY_EMBEDDED
+#define SWIFT_CONCURRENCY_ABSTRACT(decl) decl { __builtin_unreachable(); }
+#else
+#define SWIFT_CONCURRENCY_ABSTRACT(decl) decl = 0
+#endif
+
 namespace swift {
 
 // Set to 1 to enable helpful debug spew to stderr
@@ -63,15 +71,18 @@ class ActiveTaskStatus;
 /// done on behalf of a child task.
 void *_swift_task_alloc_specific(AsyncTask *task, size_t size);
 
-/// dellocate task-local memory on behalf of a specific task,
+/// deallocate task-local memory on behalf of a specific task,
 /// not necessarily the current one.  Generally this should only be
 /// done on behalf of a child task.
 void _swift_task_dealloc_specific(AsyncTask *task, void *ptr);
 
 /// Given that we've already set the right executor as the active
 /// executor, run the given job.  This does additional bookkeeping
-/// related to the active task.
-void runJobInEstablishedExecutorContext(Job *job);
+/// related to the active task. actor and executorIdentity are used for emitting
+/// tracing around the run.
+void runJobInEstablishedExecutorContext(Job *job,
+                                        SerialExecutorRef serialExecutor,
+                                        TaskExecutorRef taskExecutor);
 
 /// Adopt the voucher stored in `task`. This removes the voucher from the task
 /// and adopts it on the current thread.
@@ -340,12 +351,8 @@ public:
     fillWithError(future->getError());
   }
   void fillWithError(SwiftError *error) {
-    #if SWIFT_CONCURRENCY_EMBEDDED
-    swift_unreachable("untyped error used in embedded Swift");
-    #else
     errorResult = error;
     swift_errorRetain(error);
-    #endif
   }
 };
 
@@ -486,6 +493,8 @@ class alignas(2 * sizeof(void*)) ActiveTaskStatus {
     /// use the task executor preference when we'd otherwise be running on
     /// the generic global pool.
     HasTaskExecutorPreference = 0x8000,
+    
+    HasActiveTaskCancellationShield = 0x10000,
   };
 
   // Note: this structure is mirrored by ActiveTaskStatusWithEscalation and
@@ -536,12 +545,32 @@ public:
 #endif
 
   /// Is the task currently cancelled?
-  bool isCancelled() const { return Flags & IsCancelled; }
+  /// This does take into account cancellation shields, i.e. while a shield is active this function will always return 'false'.
+  bool isCancelled(bool ignoreShield = false) const { 
+    return (Flags & IsCancelled) && (ignoreShield || !(Flags & HasActiveTaskCancellationShield)); 
+  }
+  bool isCancelledIgnoringShield() const { return Flags & IsCancelled; }
   ActiveTaskStatus withCancelled() const {
 #if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
     return ActiveTaskStatus(Record, Flags | IsCancelled, ExecutionLock);
 #else
     return ActiveTaskStatus(Record, Flags | IsCancelled);
+#endif
+  }  
+  
+  bool hasCancellationShield() const { return Flags & HasActiveTaskCancellationShield; }
+  ActiveTaskStatus withCancellationShield() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags | HasActiveTaskCancellationShield, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags | HasActiveTaskCancellationShield);
+#endif
+  }
+  ActiveTaskStatus withoutCancellationShield() const {
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    return ActiveTaskStatus(Record, Flags & ~HasActiveTaskCancellationShield, ExecutionLock);
+#else
+    return ActiveTaskStatus(Record, Flags & ~HasActiveTaskCancellationShield);
 #endif
   }
 
@@ -729,11 +758,25 @@ public:
     return record_iterator::rangeBeginning(getInnermostRecord());
   }
 
-  void traceStatusChanged(AsyncTask *task, bool isStarting, bool wasRunning) {
-    concurrency::trace::task_status_changed(
-        task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
-        isStoredPriorityEscalated(), isStarting, isRunning(), isEnqueued(),
-        wasRunning);
+  void traceStatusChanged(AsyncTask *task, ActiveTaskStatus oldStatus,
+                          bool isStarting) {
+    uint8_t maxPriority = static_cast<uint8_t>(getStoredPriority());
+    bool cancelled = isCancelled();
+    bool escalated = isStoredPriorityEscalated();
+    bool running = isRunning();
+    bool enqueued = isEnqueued();
+    bool wasRunning = oldStatus.isRunning();
+
+    if (!isStarting &&
+        maxPriority == static_cast<uint8_t>(oldStatus.getStoredPriority()) &&
+        cancelled == oldStatus.isCancelled() &&
+        escalated == oldStatus.isStoredPriorityEscalated() &&
+        running == wasRunning && enqueued == oldStatus.isEnqueued())
+      return;
+
+    concurrency::trace::task_status_changed(task, maxPriority, cancelled,
+                                            escalated, isStarting, running,
+                                            enqueued, wasRunning);
   }
 };
 
@@ -744,6 +787,26 @@ public:
 #endif
 static_assert(sizeof(ActiveTaskStatus) == ACTIVE_TASK_STATUS_SIZE,
   "ActiveTaskStatus is of incorrect size");
+
+/// Global allocator that goes through swift_slowAlloc/swift_slowDealloc.
+struct SwiftGlobalAllocator {
+  void *allocateGlobal(size_t size, size_t alignMask) {
+    return swift_slowAlloc(size, alignMask);
+  }
+
+  void deallocateGlobal(void* ptr, size_t size, size_t alignMask) {
+    swift_slowDealloc(ptr, size, alignMask);
+  }
+};
+
+/// Select the global allocator differently for Embedded Swift (where we always
+/// want to go through swift_slow(Alloc|Dealloc)) or non-embedded (where we
+/// continue using malloc/free).
+#if SWIFT_CONCURRENCY_EMBEDDED
+typedef SwiftGlobalAllocator TaskGlobalAllocator;
+#else
+typedef MallocFreeAllocator TaskGlobalAllocator;
+#endif
 
 struct TaskAllocatorConfiguration {
 #if SWIFT_CONCURRENCY_EMBEDDED
@@ -782,11 +845,13 @@ struct TaskAllocatorConfiguration {
 /// malloc stack logging.
 static constexpr size_t SlabCapacity =
     1024 - 8 -
-    StackAllocator<0, nullptr, TaskAllocatorConfiguration>::slabHeaderSize();
+  StackAllocator<0, nullptr, TaskAllocatorConfiguration, TaskGlobalAllocator>
+    ::slabHeaderSize();
 extern Metadata TaskAllocatorSlabMetadata;
 
 using TaskAllocator = StackAllocator<SlabCapacity, &TaskAllocatorSlabMetadata,
-                                     TaskAllocatorConfiguration>;
+                                     TaskAllocatorConfiguration,
+                                     TaskGlobalAllocator>;
 
 /// Private storage in an AsyncTask object.
 struct AsyncTask::PrivateStorage {
@@ -853,20 +918,29 @@ struct AsyncTask::PrivateStorage {
     // here, before the task-local storage elements are destroyed; in order to
     // respect stack-discipline of the task-local allocator.
     {
-      if (task->hasInitialTaskNameRecord()) {
-        task->dropInitialTaskNameRecord();
-      }
       if (task->hasInitialTaskExecutorPreferenceRecord()) {
         task->dropInitialTaskExecutorPreferenceRecord();
       }
+      // We specifically DO NOT drop the task name record here, even if present,
+      // as it is possible to read it off a task handle (`task.name`).
     }
 
     // Drain unlock the task and remove any overrides on thread as a
     // result of the task
     auto oldStatus = task->_private()._status().load(std::memory_order_relaxed);
     while (true) {
-      assert(oldStatus.getInnermostRecord() == NULL &&
+      #ifndef NDEBUG
+      if (task->hasInitialTaskNameRecord()) {
+        // While we generally drop all task records during complete, the task name record is allowed to
+        // stay until destruction, because we allow reading the name from a task handle: `task.name`.
+        assert((oldStatus.getInnermostRecord() &&
+               (oldStatus.getInnermostRecord()->getKind() == TaskStatusRecordKind::TaskName)) &&
+          "The only remaining task record allowed after complete() is a task name, but was different!");
+      } else {
+        assert(oldStatus.getInnermostRecord() == NULL &&
              "Status records should have been removed by this time!");
+      }
+      #endif
       assert(oldStatus.isRunning());
 
       // Remove drainer, enqueued and override bit if any
@@ -965,9 +1039,9 @@ inline const AsyncTask::PrivateStorage &AsyncTask::_private() const {
   return Private.get();
 }
 
-inline bool AsyncTask::isCancelled() const {
+inline bool AsyncTask::isCancelled(bool ignoreShield = false) const {
   return _private()._status().load(std::memory_order_relaxed)
-                          .isCancelled();
+                          .isCancelled(ignoreShield);
 }
 
 inline uint32_t AsyncTask::flagAsRunning() {
@@ -1015,7 +1089,7 @@ inline uint32_t AsyncTask::flagAsRunning() {
       if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
                /* success */ std::memory_order_relaxed,
                /* failure */ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(this, true, oldStatus.isRunning());
+        newStatus.traceStatusChanged(this, oldStatus, true);
         adoptTaskVoucher(this);
         swift_task_enterThreadLocalContext(
             (char *)&_private().ExclusivityAccessSet[0]);
@@ -1294,6 +1368,44 @@ inline OpaqueValue *AsyncTask::localValueGet(const HeapObject *key) {
 /// Returns true if storage has still more bindings.
 inline bool AsyncTask::localValuePop() {
   return _private().Local.popValue(this);
+}
+
+// ==== Cancellation Shields --------------------------------------------------
+
+inline bool AsyncTask::cancellationShieldPush() {
+  while (true) {
+    auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+    if (oldStatus.hasCancellationShield()) {
+      return false;
+    }
+
+    auto newStatus = oldStatus.withCancellationShield();
+    assert(newStatus.hasCancellationShield());
+    
+    if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
+              /* success */ std::memory_order_relaxed,
+              /* failure */ std::memory_order_relaxed)) {
+      return true; // we did successfully install the shield
+    }
+  } 
+}
+
+inline void AsyncTask::cancellationShieldPop() {
+  while (true) {
+    auto oldStatus = _private()._status().load(std::memory_order_relaxed);
+    if (!oldStatus.hasCancellationShield()) {
+      return;
+    }
+
+    auto newStatus = oldStatus.withoutCancellationShield();
+    assert(!newStatus.hasCancellationShield());
+    
+    if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
+              /* success */ std::memory_order_relaxed,
+              /* failure */ std::memory_order_relaxed)) {
+      return;
+    }
+  } 
 }
 
 } // end namespace swift

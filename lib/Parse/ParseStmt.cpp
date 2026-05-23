@@ -1097,6 +1097,10 @@ ParserResult<Stmt> Parser::parseStmtDefer() {
       return nullptr;
     Status |= Body;
 
+    if (bool(Body.get()->findAsyncNode())) {
+      DS->makeAsync(Context);
+    }
+
     // Clone the current hasher and extract a Fingerprint.
     StableHasher currentHash{*CurrentTokenHash};
     Fingerprint fp(std::move(currentHash));
@@ -1304,7 +1308,7 @@ validateAvailabilitySpecList(Parser &P,
     }
   }
 
-  if (WildcardSpecLoc)
+  if (WildcardSpecLoc && Specs.size() > 1)
     P.diagnose(*WildcardSpecLoc, diag::attr_availability_wildcard_in_macro);
 }
 
@@ -2502,11 +2506,10 @@ ParserResult<Stmt> Parser::parseStmtForEach(LabeledStmtInfo LabelInfo) {
         Body, BraceStmt::create(Context, ForLoc, {}, PreviousLoc, true));
 
   return makeParserResult(
-      Status,
-      new (Context) ForEachStmt(LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc,
-                                pattern.get(), InLoc,
-                                Container.get(), WhereLoc, Where.getPtrOrNull(),
-                                Body.get()));
+      Status, new (Context) ForEachStmt(
+                  LabelInfo, ForLoc, TryLoc, AwaitLoc, UnsafeLoc, pattern.get(),
+                  InLoc, Container.get(), WhereLoc, Where.getPtrOrNull(),
+                  Body.get(), CurDeclContext));
 }
 
 ///

@@ -39,6 +39,10 @@ struct PointerStorage {
 class B { }
 class E : B { }
 
+class D {
+  @_hasStorage weak var c: B?
+}
+
 sil @use_b_guaranteed : $@convention(thin) (@guaranteed B) -> ()
 sil @usearray_error : $@convention(thin) (@guaranteed Array<Error>) -> ()
 
@@ -100,6 +104,11 @@ case rhs(Builtin.NativeObject)
 
 struct MoveOnlyStruct: ~Copyable {
   var value: MyInt
+}
+
+struct S1 {
+  var i: MyInt
+  var o: AnyObject
 }
 
 enum NoncopyableEnum : ~Copyable {
@@ -178,38 +187,11 @@ bb2:
   return %6 : $()
 }
 
-// For now until the proper unreachable pruning code is committed for
-// SILCombine, we should not dce dead instructions in unreachable code.
-
-// CHECK-LABEL: sil [ossa] @dead_inst_elimination_ignore_unreachable
-// CHECK: bb0
-// CHECK-NOT: integer_literal $Builtin.Int64, 24
-// CHECK: bb1
-// CHECK: integer_literal $Builtin.Int64, 48
-sil [ossa] @dead_inst_elimination_ignore_unreachable : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int64, 24
-  br bb2
-
-bb1:
-  %1 = integer_literal $Builtin.Int64, 48
-  br bb2
-
-bb2:
-  %2 = tuple()
-  return %2 : $()
-}
-
 //////////////////////////////////////////////////////////
 // Other DCE Tests taken from diagnose_unreachable.sil //
 //////////////////////////////////////////////////////////
 
-sil [ossa] @exit : $@convention(thin) () -> Never {
-bb0:
-  br bb1
-bb1:
-  br bb1
-}
+sil [ossa] @exit : $@convention(thin) () -> Never
 
 // CHECK-LABEL: sil [ossa] @removeTriviallyDeadInstructions :
 // CHECK: store
@@ -249,6 +231,7 @@ bb2a:
 bb2:
   %9 = function_ref @exit : $@convention(thin) () -> Never // ret.exit : () -> ()
   %10 = apply %9() : $@convention(thin) () -> Never
+  destroy_value [dead_end] %5
   unreachable
 }
 
@@ -1559,7 +1542,7 @@ sil [ossa] @unchecked_addr_cast_forwarding : $@convention(thin) (@inout Builtin.
 bb0(%0 : $*Builtin.NativeObject):
   %1 = unchecked_addr_cast %0 : $*Builtin.NativeObject to $*Builtin.RawPointer
   %2 = unchecked_addr_cast %1 : $*Builtin.RawPointer to $*Builtin.Word
-  debug_value %2 : $*Builtin.Word // should not prevent the optimization
+  debug_value %2 : $*Builtin.Word, expr op_deref // should not prevent the optimization
   %3 = load [trivial] %2 : $*Builtin.Word
   return %3 : $Builtin.Word
 }
@@ -1663,8 +1646,8 @@ bb0(%0 : $*FakeOptional<B>):
   switch_enum_addr %0 : $*FakeOptional<B>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1:
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
-  debug_value %2 : $*B  // should not prevent the optimization
+  %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<B>, #FakeOptional.some!enumelt
+  debug_value %2 : $*B, expr op_deref  // should not prevent the optimization
   %3 = load [copy] %2 : $*B
   return %3 : $B
 
@@ -2260,11 +2243,10 @@ bb0(%0 : $Int):
   return %8 : $()
 }
 
-// CHECK-LABEL: @remove_pointer_compare_to_zero_NE :
-// CHECK-NOT: apply
-// CHECK: cond_fail
-// CHECK: unreachable
-// CHECK: } // end sil function 'remove_pointer_compare_to_zero_NE'
+// CHECK-LABEL: sil [ossa] @remove_pointer_compare_to_zero_NE
+// CHECK:         %1 = integer_literal $Builtin.Int1, -1
+// CHECK:         cond_fail %1
+// CHECK:       } // end sil function 'remove_pointer_compare_to_zero_NE'
 sil [ossa] @remove_pointer_compare_to_zero_NE : $@convention(thin) (Int) -> () {
 bb0(%0 : $Int):
   %1 = string_literal utf8 "ss"
@@ -2912,22 +2894,6 @@ sil public_external [serialized] @materializeForSetClosure : $@convention(thin) 
 bb0(%0 : $Builtin.RawPointer, %1 : $*Builtin.UnsafeValueBuffer, %2 : $*GenContainer<T>, %3 : $@thick GenContainer<T>.Type):
   unreachable
 }
-
-
-// CHECK-LABEL:   sil [ossa] @remove_dead_code_after_cond_fail :
-// CHECK:           [[Ref:%.*]] = integer_literal $Builtin.Int1, -1
-// CHECK-NEXT:      cond_fail [[Ref]]
-// CHECK-NEXT:      unreachable
-// CHECK: } // end sil function 'remove_dead_code_after_cond_fail'
-sil [ossa] @remove_dead_code_after_cond_fail : $@convention(thin) () -> (Int32) {
-bb0:
-  %0 = integer_literal $Builtin.Int32, -2
-  %1 = integer_literal $Builtin.Int1, -1
-  cond_fail %1 : $Builtin.Int1
-  %3 = struct $Int32 (%0 : $Builtin.Int32)
-  return %3 : $Int32
-}
-
 
 // CHECK-LABEL:   sil [ossa] @dont_remove_code_after_cond_fail
 // CHECK:         bb0([[Cond:%.*]] : $Builtin.Int1):
@@ -3681,6 +3647,7 @@ bb3:
 bb4:
   %20 = integer_literal $Builtin.Int1, -1
   cond_fail %20 : $Builtin.Int1
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -3717,6 +3684,7 @@ bb1:
 bb2:
   %20 = integer_literal $Builtin.Int1, -1
   cond_fail %20 : $Builtin.Int1
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -3753,6 +3721,7 @@ bb1:
 bb2:
   %20 = integer_literal $Builtin.Int1, -1
   cond_fail %20 : $Builtin.Int1
+  destroy_value [dead_end] %1
   unreachable
 }
 
@@ -4301,8 +4270,7 @@ bb0(%0 : @guaranteed $B):
 //
 // CHECK-LABEL: sil [ossa] @mark_dependence_base1_lexical1 : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[ADDR:%[^,]+]] : $*Builtin.Int64, [[INSTANCE:%[^,]+]] : @owned $B):
-// CHECK:         [[LIFETIME:%[^,]+]] = move_value [lexical] [[INSTANCE]]
-// CHECK:         [[OPTIONAL:%[^,]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[LIFETIME]]
+// CHECK:         [[OPTIONAL:%[^,]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[INSTANCE]]
 // CHECK:         [[DEPENDENT_ADDR:%[^,]+]] = mark_dependence [[ADDR]]
 // CHECK:         [[VALUE:%[^,]+]] = load [trivial] [[DEPENDENT_ADDR]]
 // CHECK:         return [[VALUE]]
@@ -4834,7 +4802,7 @@ bb0(%0 : @owned $E):
 // CHECK: } // end sil function 'unchecked_take_enum_data_addr_load_borrow'
 sil [ossa] @unchecked_take_enum_data_addr_load_borrow : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> @owned Builtin.NativeObject {
 bb0(%0 : $*Optional<Builtin.NativeObject>):
-  %1 = unchecked_take_enum_data_addr %0 : $*Optional<Builtin.NativeObject>, #Optional.some!enumelt
+  %1 = unchecked_inplace_enum_data_addr %0 : $*Optional<Builtin.NativeObject>, #Optional.some!enumelt
   %2 = load_borrow %1 : $*Builtin.NativeObject
   %3 = copy_value %2 : $Builtin.NativeObject
   end_borrow %2 : $Builtin.NativeObject
@@ -4842,11 +4810,11 @@ bb0(%0 : $*Optional<Builtin.NativeObject>):
 }
 
 // CHECK-LABEL: sil [ossa] @unchecked_take_enum_data_addr_load_borrow_no_reborrow : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> @owned Builtin.NativeObject {
-// CHECK: unchecked_take_enum_data_addr
+// CHECK: unchecked_inplace_enum_data_addr
 // CHECK: } // end sil function 'unchecked_take_enum_data_addr_load_borrow_no_reborrow'
 sil [ossa] @unchecked_take_enum_data_addr_load_borrow_no_reborrow : $@convention(thin) (@inout Optional<Builtin.NativeObject>) -> @owned Builtin.NativeObject {
 bb0(%0 : $*Optional<Builtin.NativeObject>):
-  %1 = unchecked_take_enum_data_addr %0, #Optional.some!enumelt
+  %1 = unchecked_inplace_enum_data_addr %0, #Optional.some!enumelt
   %2 = load_borrow %1
   br bb1(%2)
 
@@ -4980,6 +4948,7 @@ bb0(%0 : @guaranteed $AnyObject):
   cond_br undef, bb3, bb4 
 
 bb3:
+  destroy_value [dead_end] %cast
   unreachable
 
 bb4:
@@ -5035,7 +5004,7 @@ bb2:
 // CHECK: } // end sil function 'unchecked_take_enum_data_addr_promotion_host_load'
 sil [ossa] @unchecked_take_enum_data_addr_promotion_host_load : $@convention(thin) (@inout FakeOptional<KlassNativeObjEither>) -> @owned KlassNativeObjEither {
 bb0(%0 : $*FakeOptional<KlassNativeObjEither>):
-  %1 = unchecked_take_enum_data_addr %0 : $*FakeOptional<KlassNativeObjEither>, #FakeOptional.some!enumelt
+  %1 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<KlassNativeObjEither>, #FakeOptional.some!enumelt
   switch_enum_addr %1 : $*KlassNativeObjEither, case #KlassNativeObjEither.lhs!enumelt: bb1, case #KlassNativeObjEither.rhs!enumelt: bb2
 
 bb1:
@@ -5075,6 +5044,7 @@ bb1(%result : @owned $Builtin.NativeObject):
   return %result : $Builtin.NativeObject
 
 bb2(%error : @owned $Error):
+  destroy_value [dead_end] %error
   unreachable
 }
 
@@ -5543,11 +5513,11 @@ entry(%e_addr : $*NoncopyableEnum):
 // unchecked_take_enum_data_addr of a noncopyable base should be combined if
 // there are only load_borrow users.
 // CHECK-LABEL: sil [ossa] @combine_uteda_load_borrow_noncopyable {{.*}} {
-// CHECK-NOT:     unchecked_take_enum_data_addr
+// CHECK-NOT:     unchecked_inplace_enum_data_addr
 // CHECK-LABEL: } // end sil function 'combine_uteda_load_borrow_noncopyable'
 sil [ossa] @combine_uteda_load_borrow_noncopyable : $@convention(thin) (@in_guaranteed NoncopyableEnum) -> () {
 entry(%e_addr : $*NoncopyableEnum):
-  %i_addr = unchecked_take_enum_data_addr %e_addr : $*NoncopyableEnum, #NoncopyableEnum.i!enumelt
+  %i_addr = unchecked_inplace_enum_data_addr %e_addr : $*NoncopyableEnum, #NoncopyableEnum.i!enumelt
   %i = load_borrow %i_addr : $*CopyableStruct
   apply undef(%i) : $@convention(thin) (@guaranteed CopyableStruct) -> ()
   end_borrow %i : $CopyableStruct
@@ -5605,5 +5575,182 @@ bb1:
   return %9
 }
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_destroy_over_deinit_barrier :
+// CHECK:         load_weak
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'dont_hoist_destroy_over_deinit_barrier'
+sil [ossa] @dont_hoist_destroy_over_deinit_barrier : $@convention(thin) (@owned B, @guaranteed D) -> @owned Optional<B> {
+bb0(%0 : @owned $B, %1 : @guaranteed $D):
+  %2 = copy_value %0
+  destroy_value %0
+  %4 = ref_element_addr %1, #D.c
+  %5 = load_weak %4
+  destroy_value %2
+  return %5
+}
 
+// CHECK-LABEL: sil [ossa] @dont_hoist_destroy_over_deinit_barrier2 :
+// CHECK:         store %1 to [trivial]
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'dont_hoist_destroy_over_deinit_barrier2'
+sil [ossa] @dont_hoist_destroy_over_deinit_barrier2 : $@convention(thin) (@owned Klass, UInt8) -> () {
+bb0(%0 : @owned $Klass, %1 : $UInt8):
+  %2 = begin_borrow %0
+  %3 = ref_tail_addr %2, $UInt8
+  %4 = address_to_pointer %3 to $Builtin.RawPointer
+  end_borrow %2
+  %6 = pointer_to_address %4 to [strict] $*UInt8
+  store %1 to [trivial] %6
+  %8 = end_cow_mutation %0
+  destroy_value %8
+  %10 = tuple ()
+  return %10
+}
+
+// Just check that this doesn't produce illegal SIL
+sil [ossa] @inject_enum_addr_in_different_block : $@convention(thin) (@inout Substring) -> @owned Optional<Character> {
+bb0(%0 : $*Substring):
+  %1 = alloc_stack $Optional<Character>
+  %2 = alloc_stack $Optional<Character>
+  %3 = apply undef() : $@convention(thin) () -> @owned Optional<Character>
+  store %3 to [init] %2
+  %5 = init_enum_data_addr %1, #Optional.some!enumelt
+  %6 = unchecked_inplace_enum_data_addr %2, #Optional.some!enumelt
+  %7 = load [take] %6
+  store %7 to [init] %5
+  dealloc_stack %2
+  %10 = load [copy] %0
+  %11 = move_value [lexical] %10
+  destroy_addr %0
+  cond_br undef, bb1, bb2
+
+bb1:
+  cond_br undef, bb4, bb3
+
+bb2:
+  br bb5
+
+bb3:
+  destroy_value [dead_end] %11
+  unreachable
+
+bb4:
+  br bb5
+
+bb5:
+  %19 = apply undef() : $@convention(thin) () -> @owned Substring
+  store %19 to [init] %0
+  destroy_value %11
+  inject_enum_addr %1, #Optional.some!enumelt
+  %23 = load [take] %1
+  dealloc_stack %1
+  return %23
+}
+
+// Just check that this doesn't produce illegal SIL
+sil [ossa] @cond_fail_in_unreachable : $@convention(thin) (@owned String.UTF8View) -> () {
+bb0(%0 : @owned $String.UTF8View):
+  %1 = apply undef(%0) : $@convention(thin) (@guaranteed String.UTF8View) -> Int
+  %2 = begin_borrow %0
+  %3 = struct_extract %2, #String.UTF8View._guts
+  %4 = apply undef(%3) : $@convention(thin) (@guaranteed _StringGuts) -> ()
+  cond_br undef, bb1, bb2
+
+bb1:
+  end_borrow %2
+  destroy_value %0
+  %8 = tuple ()
+  return %8
+
+bb2:
+  %10 = integer_literal $Builtin.Int1, -1
+  cond_fail %10, "Insufficient space allocated to copy string contents"
+  end_borrow %2
+  destroy_value [dead_end] %0
+  unreachable
+}
+
+// Just check that this doesn't produce illegal SIL
+sil [ossa] @test_forwarding_from_trivial_to_non_copyable : $@convention(thin) (@owned S1) -> () {
+bb0(%0 : @owned $S1):
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #S1.i
+  end_borrow %1
+  destroy_value %0
+  %5 = struct $MoveOnlyStruct (%2), forwarding: @owned
+  destroy_value [dead_end] %5
+  unreachable
+}
+
+struct MyArray<T> {
+  var storage: MyArrayStorage
+}
+
+class MyArrayStorage {
+}
+
+struct MySliceBuffer<T> {
+  var owner: AnyObject
+  var subscriptBaseAddress: UnsafeMutablePointer<T>
+}
+
+struct MyArraySlice<T> {
+  var buffer: MySliceBuffer<T>
+}
+
+// Just check that SILCombine doesn't produce illegal SIL.
+sil [ossa] @dont_cut_off_control_flow_after_cond_fail : $@convention(thin) @async (@in_guaranteed MyArray<S1>) -> () {
+bb0(%0 : $*MyArray<S1>):
+  %2 = load_borrow %0
+  %3 = struct_extract %2, #MyArray.storage
+  %7 = copy_value %3
+  %8 = init_existential_ref %7 : $MyArrayStorage : $MyArrayStorage, $AnyObject
+  %9 = copy_value %8
+  %10 = struct $MySliceBuffer<S1> (%9, undef : $UnsafeMutablePointer<S1>)
+  end_borrow %2
+  %12 = struct $MyArraySlice<S1> (%10)
+  %13 = copy_value %12
+  %14 = destructure_struct %13
+  %15 = begin_borrow [lexical] %14
+  cond_br undef, bb2, bb1
+
+bb1:
+  end_borrow %15
+  destroy_value %14
+  br bb3
+
+bb2:
+  %20 = struct_extract %15, #MySliceBuffer.owner
+  %21 = copy_value %20
+  destroy_value %21
+  end_borrow %15
+  destroy_value %14
+  br bb3
+
+bb3:
+  %26 = begin_borrow [lexical] %12
+  cond_br undef, bb4, bb5
+
+bb4:
+  %28 = integer_literal $Builtin.Int1, -1
+  cond_fail %28, "Division results in an overflow"
+  end_borrow %26
+  destroy_value [dead_end] %12
+  destroy_value [dead_end] %8
+  unreachable
+
+bb5:
+  %34 = struct_extract %26, #MyArraySlice.buffer
+  %35 = struct_extract %34, #MySliceBuffer.subscriptBaseAddress
+  %36 = struct_extract %34, #MySliceBuffer.owner
+  %37 = mark_dependence %35 on %36
+  %38 = struct_extract %37, #UnsafeMutablePointer._rawValue
+  %39 = metatype $@thin S1.Type
+  %40 = builtin "copyArray"<S1>(%39, undef : $Builtin.RawPointer, %38, undef : $Builtin.Word) : $()
+  destroy_value %8
+  end_borrow %26
+  destroy_value %12
+  %44 = tuple ()
+  return %44
+}
 

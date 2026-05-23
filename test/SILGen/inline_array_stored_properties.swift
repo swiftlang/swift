@@ -10,12 +10,7 @@ struct S {
         // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[SELF]]
         // CHECK:   [[ADDRESSOR:%.*]] = function_ref @$s{{.*}}11InlineArrayV
         // CHECK:   [[PTR:%.*]] = apply [[ADDRESSOR]]
-        // CHECK:   [[RAWPTR:%.*]] = struct_extract [[PTR]]
-        // CHECK:   [[ADDR:%.*]] = pointer_to_address [[RAWPTR]]
-        // CHECK:   [[DEP:%.*]] = mark_dependence [unresolved] [[ADDR]]
-        // CHECK:   [[ADDR_ACCESS:%.*]] = begin_access [read] [unsafe] [[DEP]]
-        // CHECK:   load [trivial] [[ADDR_ACCESS]]
-        // CHECK:   end_access [[ADDR_ACCESS]]
+        // CHECK:   load [trivial] [[PTR]]
         // CHECK:   end_access [[ACCESS]]
         x += a[y]
     }
@@ -32,12 +27,7 @@ final class C {
         // CHECK:   [[ACCESS:%.*]] = begin_access [read] [dynamic] [[FIELD]]
         // CHECK:   [[ADDRESSOR:%.*]] = function_ref @$s{{.*}}11InlineArrayV
         // CHECK:   [[PTR:%.*]] = apply [[ADDRESSOR]]
-        // CHECK:   [[RAWPTR:%.*]] = struct_extract [[PTR]]
-        // CHECK:   [[ADDR:%.*]] = pointer_to_address [[RAWPTR]]
-        // CHECK:   [[DEP:%.*]] = mark_dependence [unresolved] [[ADDR]]
-        // CHECK:   [[ADDR_ACCESS:%.*]] = begin_access [read] [unsafe] [[DEP]]
-        // CHECK:   load [trivial] [[ADDR_ACCESS]]
-        // CHECK:   end_access [[ADDR_ACCESS]]
+        // CHECK:   load [trivial] [[PTR]]
         // CHECK:   end_access [[ACCESS]]
         x += a[y]
     }
@@ -50,12 +40,7 @@ func tupleF(tuple: inout (Int, InlineArray<40, Int>), x: inout Int, y: Int) {
     // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[TUPLE]]
     // CHECK:   [[ADDRESSOR:%.*]] = function_ref @$s{{.*}}11InlineArrayV
     // CHECK:   [[PTR:%.*]] = apply [[ADDRESSOR]]
-    // CHECK:   [[RAWPTR:%.*]] = struct_extract [[PTR]]
-    // CHECK:   [[ADDR:%.*]] = pointer_to_address [[RAWPTR]]
-    // CHECK:   [[DEP:%.*]] = mark_dependence [unresolved] [[ADDR]]
-    // CHECK:   [[ADDR_ACCESS:%.*]] = begin_access [read] [unsafe] [[DEP]]
-    // CHECK:   load [trivial] [[ADDR_ACCESS]]
-    // CHECK:   end_access [[ADDR_ACCESS]]
+    // CHECK:   load [trivial] [[PTR]]
     // CHECK:   end_access [[ACCESS]]
     x += tuple.1[y]
 }
@@ -71,12 +56,7 @@ func existentialF(e: inout P, x: inout Int, y: Int) {
     // CHECK:   [[TEMP:%.*]] = alloc_stack $InlineArray
     // CHECK:   [[ADDRESSOR:%.*]] = function_ref @$s{{.*}}11InlineArrayV
     // CHECK:   [[PTR:%.*]] = apply [[ADDRESSOR]]
-    // CHECK:   [[RAWPTR:%.*]] = struct_extract [[PTR]]
-    // CHECK:   [[ADDR:%.*]] = pointer_to_address [[RAWPTR]]
-    // CHECK:   [[DEP:%.*]] = mark_dependence [unresolved] [[ADDR]]
-    // CHECK:   [[ADDR_ACCESS:%.*]] = begin_access [read] [unsafe] [[DEP]]
-    // CHECK:   load [trivial] [[ADDR_ACCESS]]
-    // CHECK:   end_access [[ADDR_ACCESS]]
+    // CHECK:   load [trivial] [[PTR]]
     // CHECK:   dealloc_stack [[TEMP]]
     x += e.a[y]
 }

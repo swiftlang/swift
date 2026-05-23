@@ -17,6 +17,7 @@
 
 #include "swift/Frontend/Frontend.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -27,6 +28,7 @@
 #include "swift/AST/PluginLoader.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
@@ -35,6 +37,7 @@
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
+#include "swift/IRGen/IRABIDetailsProvider.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -285,7 +288,8 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
       getLangOptions().SkipNonExportableDecls;
 
   serializationOpts.SkipImplementationOnlyDecls =
-      getLangOptions().hasFeature(Feature::CheckImplementationOnly);
+      getLangOptions().hasFeature(Feature::CheckImplementationOnlyStrict) &&
+      !::getenv("SWIFT_DISABLE_IMPLICIT_CHECK_IMPLEMENTATION_ONLY");
 
   serializationOpts.ExplicitModuleBuild = FrontendOpts.DisableImplicitModules;
 
@@ -438,7 +442,8 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
         SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
         diagOpts.VerifyIgnoreUnknown, diagOpts.VerifyIgnoreUnrelated,
-        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.UseColor,
+        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.VerifyChildNotes,
+        diagOpts.UseColor,
         diagOpts.AdditionalDiagnosticVerifierPrefixes);
 
     addDiagnosticConsumer(DiagVerifier.get());
@@ -476,19 +481,21 @@ bool CompilerInstance::setupCASIfNeeded(ArrayRef<const char *> Args) {
   if (!getInvocation().requiresCAS())
     return false;
 
-  const auto &Opts = getInvocation().getCASOptions();
-  if (Opts.CASOpts.CASPath.empty() && Opts.CASOpts.PluginPath.empty()) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
-                         "no CAS options provided");
-    return true;
+  if (!CAS) {
+    const auto &Opts = getInvocation().getCASOptions();
+    if (Opts.Config.CASPath.empty() && Opts.Config.PluginPath.empty()) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
+                           "no CAS options provided");
+      return true;
+    }
+    auto MaybeDB = Opts.Config.createDatabases();
+    if (!MaybeDB) {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
+                           toString(MaybeDB.takeError()));
+      return true;
+    }
+    std::tie(CAS, ResultCache) = *MaybeDB;
   }
-  auto MaybeDB = Opts.CASOpts.getOrCreateDatabases();
-  if (!MaybeDB) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_cas_initialization,
-                         toString(MaybeDB.takeError()));
-    return true;
-  }
-  std::tie(CAS, ResultCache) = *MaybeDB;
 
   // create baseline key.
   auto BaseKey = createCompileJobBaseCacheKey(*CAS, Args);
@@ -516,7 +523,8 @@ void CompilerInstance::setupOutputBackend() {
     CASOutputBackend = createSwiftCachingOutputBackend(
         *CAS, *ResultCache, *CompileJobBaseKey, InAndOuts,
         Invocation.getFrontendOptions(),
-        Invocation.getFrontendOptions().RequestedAction);
+        Invocation.getFrontendOptions().RequestedAction,
+        Invocation.getCASOptions().WriteOutputHashXAttr);
 
     if (Invocation.getIRGenOptions().UseCASBackend) {
       auto OutputFiles = InAndOuts.copyOutputFilenames();
@@ -633,11 +641,14 @@ bool CompilerInstance::setup(const CompilerInvocation &Invoke,
 
 bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
                                       std::string &Error,
-                                      ArrayRef<const char *> Args) {
+                                      ArrayRef<const char *> Args,
+                                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                                      std::shared_ptr<llvm::cas::ActionCache> Cache) {
   // This is the fast path for setup an instance for replay but cannot run
   // regular compilation.
   Invocation = Invoke;
 
+  setSharedCASInstances(CAS, Cache);
   if (setupCASIfNeeded(Args)) {
     Error = "Setting up CAS failed";
     return true;
@@ -676,16 +687,23 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
     const auto &ClangOpts = getInvocation().getClangImporterOptions();
 
     if (!CASOpts.BridgingHeaderPCHCacheKey.empty()) {
-      if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
-              getObjectStore(), getActionCache(), Diagnostics,
-              CASOpts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
-              ClangOpts.getPCHInputPath()))
-        MemFS->addFile(Invocation.getClangImporterOptions().getPCHInputPath(),
-                       0, std::move(loadedBuffer));
-      else
-        Diagnostics.diagnose(
-            SourceLoc(), diag::error_load_input_from_cas,
-            Invocation.getClangImporterOptions().getPCHInputPath());
+      auto Proxy = loadCachedCompileResultProxy(
+          getObjectStore(), getActionCache(), CASOpts.BridgingHeaderPCHCacheKey,
+          file_types::ID::TY_PCH);
+
+      if (!Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas, "loading pch file",
+                             llvm::toString(Proxy.takeError()));
+        return true;
+      }
+      if (!*Proxy) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
+                             ClangOpts.getPCHInputPath());
+        return true;
+      }
+      MemFS->addFile(ClangOpts.getPCHInputPath(), 0,
+                     (*Proxy)->getMemoryBuffer());
+      CASIDForPCH = (*Proxy)->getID().toString();
     }
     if (!CASOpts.InputFileKey.empty()) {
       if (Invocation.getFrontendOptions()
@@ -711,25 +729,6 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
         new llvm::vfs::OverlayFileSystem(MemFS);
     OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
     SourceMgr.setFileSystem(std::move(OverlayVFS));
-  } else {
-    // For non-caching -direct-clang-cc1-module-build emit-pcm build,
-    // setup the clang VFS so it can find system modulemap files
-    // (like vcruntime.modulemap) as an input file.
-    if (Invocation.getClangImporterOptions().DirectClangCC1ModuleBuild &&
-        Invocation.getFrontendOptions().RequestedAction ==
-            FrontendOptions::ActionType::EmitPCM) {
-      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS =
-          SourceMgr.getFileSystem();
-      ClangInvocationFileMappingContext Context(
-          Invocation.getLangOptions(), Invocation.getSearchPathOptions(),
-          Invocation.getClangImporterOptions(), Invocation.getCASOptions(),
-          Diagnostics);
-      ClangInvocationFileMapping FileMapping = applyClangInvocationMapping(
-          Context, nullptr, VFS, /*suppressDiagnostic=*/false);
-      if (!FileMapping.redirectedFiles.empty()) {
-        SourceMgr.setFileSystem(std::move(VFS));
-      }
-    }
   }
 
   auto ExpectedOverlay =
@@ -871,9 +870,10 @@ bool CompilerInstance::setUpModuleLoaders() {
   // Wire up the Clang importer. If the user has specified an SDK, use it.
   // Otherwise, we just keep it around as our interface to Clang's ABI
   // knowledge.
-  std::unique_ptr<ClangImporter> clangImporter =
-    ClangImporter::create(*Context, Invocation.getPCHHash(),
-                          getDependencyTracker());
+  std::unique_ptr<ClangImporter> clangImporter = ClangImporter::create(
+      *Context, &Invocation.getIRGenOptions(), Invocation.getPCHHash(),
+      CASIDForPCH, getDependencyTracker(), /*ignoreFileMapping=*/false,
+      getSharedCASInstance(), getSharedCacheInstance());
   if (!clangImporter) {
     Diagnostics.diagnose(SourceLoc(), diag::error_clang_importer_create_fail);
     return true;
@@ -929,7 +929,8 @@ bool CompilerInstance::setUpModuleLoaders() {
         FEOpts.PrebuiltModuleCachePath, FEOpts.BackupModuleInterfaceDir,
         FEOpts.CacheReplayPrefixMap,
         FEOpts.SerializeModuleInterfaceDependencyHashes,
-        FEOpts.shouldTrackSystemDependencies());
+        FEOpts.shouldTrackSystemDependencies(),
+        getSharedCASInstance(), getSharedCacheInstance());
   }
 
   return false;
@@ -991,10 +992,10 @@ std::string CompilerInstance::getBridgingHeaderPath() const {
 }
 
 bool CompilerInstance::setUpInputs() {
-  // There is no input file when building PCM using Caching.
+  // There is no need to setup input when emit PCM. Let ClangImporter and the
+  // underlying clang CompilerInstance to handle inputs.
   if (Invocation.getFrontendOptions().RequestedAction ==
-          FrontendOptions::ActionType::EmitPCM &&
-      Invocation.getCASOptions().EnableCaching)
+      FrontendOptions::ActionType::EmitPCM)
     return false;
 
   // Adds to InputSourceCodeBufferIDs, so may need to happen before the
@@ -1539,7 +1540,7 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     }
     if (Invocation.getLangOptions().hasFeature(Feature::LibraryEvolution))
       MainModule->setResilienceStrategy(ResilienceStrategy::Resilient);
-    if (Invocation.getLangOptions().isLanguageModeAtLeast(6))
+    if (Invocation.getLangOptions().isLanguageModeAtLeast(LanguageMode::v6))
       MainModule->setIsConcurrencyChecked(true);
     if (Invocation.getLangOptions().EnableCXXInterop &&
         Invocation.getLangOptions()
@@ -1553,10 +1554,21 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setSerializePackageEnabled();
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
-    if (Invocation.getLangOptions().hasFeature(Feature::Embedded) &&
-        Invocation.getLangOptions().hasFeature(Feature::DeferredCodeGen))
-      MainModule->setDeferredCodeGen(true);
-
+    if (Invocation.getLangOptions().hasFeature(Feature::Embedded)) {
+      CodeGenerationModel model =
+          Invocation.getLangOptions().CodeGenerationModelOverride
+              .value_or(CodeGenerationModel::Inlinable);
+      MainModule->setCodeGenerationModel(model);
+    } else {
+      // CodeGenerationModelOverride is rejected at parse time outside Embedded.
+      MainModule->setCodeGenerationModel(CodeGenerationModel::Interface);
+    }
+    if (Invocation.getSILOptions().CMOMode ==
+          CrossModuleOptimizationMode::Aggressive ||
+        Invocation.getSILOptions().CMOMode ==
+          CrossModuleOptimizationMode::Everything) {
+      MainModule->setAggressiveCMOEnabled(true);
+    }
     configureAvailabilityDomains(getASTContext(),
                                  Invocation.getFrontendOptions(), MainModule);
 
@@ -1727,6 +1739,8 @@ void CompilerInstance::finishTypeChecking() {
     loadDerivativeConfigurations(SF);
     return false;
   });
+
+  handleOSLogStringSectionName(*getMainModule());
 }
 
 SourceFile::ParsingOptions
@@ -1822,6 +1836,8 @@ void CompilerInstance::freeASTContext() {
 /// Perform "stable" optimizations that are invariant across compiler versions.
 static bool performMandatorySILPasses(CompilerInvocation &Invocation,
                                       SILModule *SM) {
+  FrontendStatsTracer tracer(SM->getASTContext().Stats,
+                             "SIL-mandatory-passes");
   // Don't run diagnostic passes at all when merging modules.
   if (Invocation.getFrontendOptions().RequestedAction ==
       FrontendOptions::ActionType::MergeModules) {
@@ -1876,6 +1892,9 @@ static void countStatsPostSILOpt(UnifiedStatsReporter &Stats,
 }
 
 bool CompilerInstance::performSILProcessing(SILModule *silModule) {
+  FrontendStatsTracer tracer(silModule->getASTContext().Stats,
+                             "SIL-processing");
+
   if (performMandatorySILPasses(Invocation, silModule) &&
       !Invocation.getFrontendOptions().AllowModuleWithCompilerErrors)
     return true;
@@ -1916,6 +1935,75 @@ void CompilerInstance::emitEndOfPipelineDebuggingOutput() {
 
   if (opts.DumpClangLookupTables && ctx.getClangModuleLoader())
     ctx.getClangModuleLoader()->dumpSwiftLookupTables();
+
+  if (opts.DumpAbstractLayout) {
+    auto &sf = getPrimaryOrMainSourceFile();
+
+    for (auto *decl : sf.getTopLevelDecls()) {
+      auto *structDecl = dyn_cast<StructDecl>(decl);
+      if (!structDecl)
+        continue;
+      if (auto layout = computeAbstractStructLayout(
+              structDecl, Invocation.getIRGenOptions())) {
+        llvm::outs() << structDecl->getName() << ":\n";
+        llvm::outs() << "  size: " << layout->typeLayout.size << "\n";
+        llvm::outs() << "  alignment: " << layout->typeLayout.alignment << "\n";
+        llvm::outs() << "  stride: " << layout->typeLayout.stride << "\n";
+        llvm::outs() << "  bitwiseCopyable: "
+                     << (layout->typeLayout.bitwiseCopyable ? "true" : "false")
+                     << "\n";
+        llvm::outs() << "  isOpaque: "
+                     << (layout->typeLayout.isOpaque ? "true" : "false") << "\n";
+        llvm::outs() << "  fields:\n";
+        for (auto &field : layout->fields) {
+          llvm::outs() << "    " << field.name << ": "
+                       << field.typeLayout.mangledName
+                       << ", offset=" << field.offset
+                       << ", size=" << field.typeLayout.size
+                       << ", isOpaque="
+                       << (field.typeLayout.isOpaque ? "true" : "false")
+                       << ", bitwiseCopyable="
+                       << (field.typeLayout.bitwiseCopyable ? "true" : "false")
+                       << "\n";
+        }
+      }
+    }
+  }
+
+  if (opts.DumpHiddenTypeLayouts) {
+    // Dump every hidden-type layout known to this compilation:
+    // both local and imported.
+    auto dumpHiddenLayouts = [](ModuleDecl *M) {
+      auto layouts = M->getSortedHiddenTypeLayouts();
+      if (layouts.empty())
+        return;
+      llvm::outs() << "Module: " << M->getName() << "\n";
+      for (auto &entry : layouts) {
+        const auto &layout = entry.second;
+        llvm::outs() << "  " << entry.first
+                     << ": size=" << layout.size
+                     << ", alignment=" << layout.alignment
+                     << ", stride=" << layout.stride
+                     << ", bitwiseCopyable="
+                     << (layout.bitwiseCopyable ? "true" : "false")
+                     << ", opaque=" << (layout.isOpaque ? "true" : "false")
+                     << "\n";
+      }
+    };
+
+    dumpHiddenLayouts(getMainModule());
+    SmallVector<ModuleDecl *, 8> sortedLoaded;
+    for (auto &entry : ctx.getLoadedModules())
+      sortedLoaded.push_back(entry.second);
+    llvm::sort(sortedLoaded, [](ModuleDecl *a, ModuleDecl *b) {
+      return a->getName().str() < b->getName().str();
+    });
+    for (ModuleDecl *M : sortedLoaded) {
+      if (M == getMainModule())
+        continue;
+      dumpHiddenLayouts(M);
+    }
+  }
 }
 
 bool CompilerInstance::isCancellationRequested() const {
@@ -1940,4 +2028,66 @@ const PrimarySpecificPaths &
 CompilerInstance::getPrimarySpecificPathsForSourceFile(
     const SourceFile &SF) const {
   return Invocation.getPrimarySpecificPathsForSourceFile(SF);
+}
+
+std::optional<AbstractStructLayout>
+swift::computeAbstractStructLayout(const StructDecl *decl,
+                                   const IRGenOptions &irgenOpts) {
+  auto *mod = decl->getModuleContext();
+  IRABIDetailsProvider abiProvider(*mod, irgenOpts);
+
+  uint64_t currentOffset = 0;
+  uint64_t maxAlignment = 1;
+  bool allBitwiseCopyable = true;
+  bool anyOpaque = false;
+  AbstractStructLayout result;
+
+  for (auto *field : decl->getStoredProperties()) {
+    auto fieldType = field->getInterfaceType();
+    auto *fieldNominal = fieldType->getAnyNominal();
+    if (!fieldNominal)
+      return std::nullopt;
+
+    AbstractFieldLayout entry;
+    entry.offset = 0;
+    entry.name = field->getName().str();
+
+    if (auto clangLayout = computeClangAbstractLayout(fieldNominal)) {
+      entry.typeLayout = *clangLayout;
+      if (!clangLayout->bitwiseCopyable)
+        allBitwiseCopyable = false;
+      if (clangLayout->isOpaque)
+        anyOpaque = true;
+    } else if (auto sizeAlign = abiProvider.getTypeSizeAlignment(fieldNominal)) {
+      entry.typeLayout.mangledName =
+          Mangle::ASTMangler(fieldNominal->getASTContext())
+              .mangleNominalType(fieldNominal);
+      entry.typeLayout.size = (uint64_t)sizeAlign->size;
+      entry.typeLayout.alignment = (uint64_t)sizeAlign->alignment;
+      entry.typeLayout.stride = llvm::alignTo(sizeAlign->size, sizeAlign->alignment);
+      entry.typeLayout.bitwiseCopyable = fieldType->isBitwiseCopyable();
+      // Hiding fields of Swift types isn't currently supported, so the layout
+      // can never be opaque.
+      entry.typeLayout.isOpaque = false;
+      if (!entry.typeLayout.bitwiseCopyable)
+        allBitwiseCopyable = false;
+    } else {
+      return std::nullopt;
+    }
+
+    uint64_t fieldOffset = llvm::alignTo(currentOffset, entry.typeLayout.alignment);
+    entry.offset = fieldOffset;
+    result.fields.push_back(entry);
+
+    currentOffset = fieldOffset + entry.typeLayout.size;
+    maxAlignment = std::max(maxAlignment, entry.typeLayout.alignment);
+  }
+
+  result.typeLayout.size = llvm::alignTo(currentOffset, maxAlignment);
+  result.typeLayout.alignment = maxAlignment;
+  result.typeLayout.stride = llvm::alignTo(result.typeLayout.size, maxAlignment);
+  result.typeLayout.bitwiseCopyable = allBitwiseCopyable;
+  result.typeLayout.isOpaque = anyOpaque;
+
+  return result;
 }

@@ -418,9 +418,6 @@ bb0(%0 : $Int):
 // basic blocks to analysis state is re-hashed. The number of
 // blocks in this test is determined by the initial size of the
 // 'BlockOutAccesses' DenseMap in the implementation.
-//
-//  The unreachable block below must branch to bN where
-//    N = 3/4 * INITIAL_SIZE - 2
 sil [ossa] @blockMapRehash : $@convention(method) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
  br bb1
@@ -471,8 +468,6 @@ bb22:
 bb23:
   %1 = tuple ()
   return %1 : $()
-bbUnreachable:
-  br bb22
 }
 
 // Check that a pointer_to_address access passes diagnostics.
@@ -529,7 +524,7 @@ bb0(%0 : $*(Int, Int)):
 // CHECK-LABEL: sil hidden [ossa] @inlinedEnumValue
 sil hidden [ossa] @inlinedEnumValue : $@convention(thin) (@in Optional<Int>, Int) -> Int {
 bb0(%0 : $*Optional<Int>, %1 : $Int):
-  %6 = unchecked_take_enum_data_addr %0 : $*Optional<Int>, #Optional.some!enumelt
+  %6 = unchecked_inplace_enum_data_addr %0 : $*Optional<Int>, #Optional.some!enumelt
   %7 = begin_access [read] [static] %6 : $*Int
   %8 = load [trivial] %7 : $*Int
   end_access %7 : $*Int

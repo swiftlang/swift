@@ -7,7 +7,7 @@
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface)
 // RUN: %FileCheck %s < %t.swiftinterface
 
-// CHECK-LABEL: func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Swift.Void = {
+// CHECK-LABEL: func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Swift{{::|\.}}Void = {
 // CHECK-NOT: #if NOT_PROVIDED
 // CHECK-NOT: print("should not exist")
 // CHECK-NOT: #elseif !NOT_PROVIDED
@@ -35,7 +35,7 @@ public func hasClosureDefaultArgWithComplexNestedPoundIfs(_ x: () -> Void = {
 }) {
 }
 
-// CHECK-LABEL: func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Swift.Void = {
+// CHECK-LABEL: func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Swift{{::|\.}}Void = {
 // CHECK-NOT: #if NOT_PROVIDED
 // CHECK-NOT: print("should not exist")
 // CHECK-NOT: #else
@@ -64,7 +64,7 @@ public func hasClosureDefaultArgWithComplexPoundIf(_ x: () -> Void = {
 }) {
 }
 
-// CHECK-LABEL: func hasClosureDefaultArgWithMultilinePoundIfCondition(_ x: () -> Swift.Void = {
+// CHECK-LABEL: func hasClosureDefaultArgWithMultilinePoundIfCondition(_ x: () -> Swift{{::|\.}}Void = {
 // CHECK-NOT: #if (
 // CHECK-NOT:   !false && true
 // CHECK-NOT: )
@@ -95,7 +95,7 @@ public func hasClosureDefaultArgWithMultilinePoundIfCondition(_ x: () -> Void = 
 }) {
 }
 
-// CHECK-LABEL: func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Swift.Void = {
+// CHECK-LABEL: func hasClosureDefaultArgWithSinglePoundIf(_ x: () -> Swift{{::|\.}}Void = {
 // CHECK-NOT: #if true
 // CHECK: print("true")
 // CHECK-NOT: #else

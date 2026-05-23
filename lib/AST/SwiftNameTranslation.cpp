@@ -206,7 +206,25 @@ swift::cxx_translation::getNameForCxx(const ValueDecl *VD,
     return "init";
 
   if (VD->isOperator()) {
-    std::string name = ("operator" + VD->getBaseIdentifier().str()).str();
+    auto funcDecl = cast<FuncDecl>(VD);
+    // Swift allows custom operator spelling, but C++ doesn't. Make sure the
+    // operator we are emitting is valid in C++.
+    StringRef swiftSpelling = funcDecl->getBaseIdentifier().str();
+    bool swiftUnaryOperator = funcDecl->isUnaryOperator();
+    bool swiftBinaryOperator = funcDecl->isBinaryOperator();
+
+    bool isValidCxxOperator = llvm::StringSwitch<bool>(swiftSpelling)
+#define OVERLOADED_OPERATOR(Name, Spelling, Token, Unary, Binary, MemberOnly)  \
+      .Case(Spelling,                                                          \
+            (Unary && swiftUnaryOperator || Binary && swiftBinaryOperator))
+#include "clang/Basic/OperatorKinds.def"
+#undef OVERLOADED_OPERATOR
+      .Default(false);
+
+    if (!isValidCxxOperator)
+      return StringRef();
+
+    std::string name = ("operator" + swiftSpelling).str();
     return ctx.getIdentifier(name).str();
   }
 
@@ -325,7 +343,9 @@ swift::cxx_translation::getDeclRepresentation(
       return {Unsupported, UnrepresentableProtocol};
     }
     // Swift's consume semantics are not yet supported in C++.
-    if (!typeDecl->canBeCopyable())
+    // However, non-copyable types imported from C/C++ can be exposed back,
+    // as C++ already knows how to handle them.
+    if (!typeDecl->canBeCopyable() && !typeDecl->hasClangNode())
       return {Unsupported, UnrepresentableMoveOnly};
     if (isa<ClassDecl>(VD) && VD->isObjC())
       return {Unsupported, UnrepresentableObjC};

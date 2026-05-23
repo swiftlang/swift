@@ -1,7 +1,7 @@
 
 // RUN: rm -rf %t
 // RUN: split-file %s %t
-// RUN: %target-swift-frontend -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std -Xcc -std=c++20 -I %t/Inputs  %t/test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1
+// RUN: %target-swift-frontend -typecheck -verify -I %swift_src_root/lib/ClangImporter/SwiftBridging -Xcc -iapinotes-modules -Xcc %swift_src_root/stdlib/public/Cxx/std -Xcc -std=c++20 -I %t/Inputs  %t/test.swift -strict-memory-safety -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm -plugin-path %swift-plugin-dir 2>&1
 
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_LifetimeDependence
@@ -108,6 +108,30 @@ template <typename T> struct PassThru {
 struct IsUnsafe { int *p; };
 struct HasUnsafe : TTake2<PassThru<HasUnsafe>, IsUnsafe> {};
 using AlsoUnsafe = PassThru<HasUnsafe>;
+
+struct SWIFT_UNSAFE ExplicitlyUnsafeStruct {};
+struct HasUnsafeMember {
+  HasUnsafeMember();
+  ExplicitlyUnsafeStruct member;
+};
+
+struct HasUnsafeBase : ExplicitlyUnsafeStruct {
+  HasUnsafeBase();
+};
+
+struct SWIFT_SAFE WrapsUnsafeMember {
+  WrapsUnsafeMember();
+  ExplicitlyUnsafeStruct member;
+};
+
+struct SWIFT_SAFE WrapsUnsafeBase : ExplicitlyUnsafeStruct {
+  WrapsUnsafeBase();
+};
+
+struct SWIFT_SAFE WrapsUnannotatedMember {
+  WrapsUnannotatedMember();
+  Unannotated member;
+};
 
 //--- test.swift
 
@@ -228,4 +252,21 @@ func useTTakeUnsafeTuple(x: HasUnsafe) {
 func useTTakeUnsafeTuple(x: AlsoUnsafe) {
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
+}
+
+func explicitlyUnsafeTypes(a: ExplicitlyUnsafeStruct, 
+                           b: HasUnsafeMember,
+                           c: HasUnsafeBase,
+                           d: WrapsUnsafeMember,
+                           e: WrapsUnsafeBase,
+                           f: WrapsUnannotatedMember) {
+ // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+ _ = a // expected-note{{reference to parameter 'a' involves unsafe type}} 
+ // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+ _ = b // expected-note{{reference to parameter 'b' involves unsafe type}}
+ // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+ _ = c // expected-note{{reference to parameter 'c' involves unsafe type}}
+ _ = d
+ _ = e
+ _ = f
 }

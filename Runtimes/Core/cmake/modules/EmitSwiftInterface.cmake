@@ -25,20 +25,32 @@ function(emit_swift_interface target)
     message(STATUS "Removing regular file ${module_directory} to support nested swiftmodule generation")
     file(REMOVE "${module_directory}")
   endif()
+
   target_compile_options(${target} PRIVATE
     "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-path ${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule>")
   set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
     "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule"
     "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftdoc"
     "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo")
+
+  if(SwiftCore_ENABLE_SOURCE_INFO)
+    target_compile_options(${target} PRIVATE
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-module-source-info-path "$<SHELL_PATH:${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftsourceinfo>">")
+  else()
+    target_compile_options(${target} PRIVATE
+      "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-avoid-emit-module-source-info>")
+  endif()
+
   if(SwiftCore_VARIANT_MODULE_TRIPLE)
     target_compile_options(${target} PRIVATE
       "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-emit-variant-module-path ${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftmodule>")
     set_property(TARGET "${target}" APPEND PROPERTY ADDITIONAL_CLEAN_FILES
       "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftmodule"
       "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftdoc"
-      "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftsourceinfo")
+      "${module_directory}/${SwiftCore_VARIANT_MODULE_TRIPLE}.swiftsourceinfo"
+    )
   endif()
+
   add_custom_command(OUTPUT "${module_directory}/${SwiftCore_MODULE_TRIPLE}.swiftmodule"
     DEPENDS ${target})
   target_sources(${target}

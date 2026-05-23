@@ -354,11 +354,12 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
       exit(-1);
     }
 
-    if (auto firstVersion = feature->getLanguageMode()) {
-      if (Invocation.getLangOptions().isLanguageModeAtLeast(*firstVersion)) {
+    if (auto languageMode = feature->getLanguageMode()) {
+      if (Invocation.getLangOptions().isLanguageModeAtLeast(
+              languageMode.value())) {
         llvm::errs() << "error: upcoming feature " << QuotedString(featureName)
-                     << " is already enabled as of Swift version "
-                     << *firstVersion << '\n';
+                     << " already enabled as of the Swift "
+                     << languageMode->versionString() << " language mode\n";
         exit(-1);
       }
     }
@@ -436,7 +437,7 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
                            options.OutputFilename, toString(outFile.takeError()));
     return 1;
   }
-  auto closeFile = llvm::make_scope_exit([&]() {
+  llvm::scope_exit closeFile([&]() {
     if (auto E = outFile->keep()) {
       CI.getDiags().diagnose(SourceLoc(), diag::error_closing_output,
                              options.OutputFilename, toString(std::move(E)));

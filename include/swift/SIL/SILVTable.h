@@ -26,6 +26,7 @@
 #ifndef SWIFT_SIL_SILVTABLE_H
 #define SWIFT_SIL_SILVTABLE_H
 
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/SIL/SILAllocated.h"
 #include "swift/SIL/SILDeclRef.h"
 #include "swift/SIL/SILFunction.h"
@@ -107,6 +108,39 @@ class SILVTable final : public SILAllocated<SILVTable>,
 public:
   using Entry = SILVTableEntry;
 
+  /// Conformance entries are used for fast conformance lookup, which doesn't
+  /// need to query the runtime's conformance lookup table.
+  /// A conformance entry specifies if the class conforms or does not conform
+  /// to a protocol. At runtime, a type cast instruction to an existential can
+  /// directly load the witness table pointer from the VTable. If null, the
+  /// class does not conform to the protocol.
+  class ConformanceEntry {
+    llvm::PointerUnion<ProtocolDecl *, ProtocolConformance *> protocolOrConformance;
+
+  public:
+    ConformanceEntry(ProtocolDecl *noConformance)
+      : protocolOrConformance(noConformance) {}
+    ConformanceEntry(ProtocolConformance *conformance)
+      : protocolOrConformance(conformance) {}
+
+    // Returns true if the class conforms to the protocol.
+    bool hasConformance() const {
+      return isa<ProtocolConformance *>(protocolOrConformance);
+    }
+
+    ProtocolDecl *getProtocol() const {
+      if (auto *proto = protocolOrConformance.dyn_cast<ProtocolDecl*>()) {
+        return proto;
+      }
+      return cast<ProtocolConformance *>(protocolOrConformance)->getProtocol();
+    }
+
+    ProtocolConformance *getConformance() const {
+      ASSERT(hasConformance());
+      return cast<ProtocolConformance *>(protocolOrConformance);
+    }
+  };
+
   // Disallow copying into temporary objects.
   SILVTable(const SILVTable &other) = delete;
   SILVTable &operator=(const SILVTable &) = delete;
@@ -124,6 +158,8 @@ private:
 
   /// The number of SILVTables entries.
   unsigned NumEntries : 31;
+
+  std::vector<ConformanceEntry> conformances;
 
   /// Private constructor. Create SILVTables by calling SILVTable::create.
   SILVTable(ClassDecl *c, SILType classType, SerializedKind_t serialized,
@@ -181,7 +217,13 @@ public:
   MutableArrayRef<Entry> getMutableEntries() {
     return getTrailingObjects(NumEntries);
   }
-                          
+
+  ArrayRef<ConformanceEntry> getConformances() const { return conformances; }
+
+  void appendConformance(ConformanceEntry entry) {
+    conformances.push_back(entry);
+  }
+
   void updateVTableCache(const Entry &entry);
 
   /// Look up the implementation function for the given method.

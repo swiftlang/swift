@@ -24,7 +24,7 @@ StorageImplInfo StorageImplInfo::getMutableOpaque(OpaqueReadOwnership ownership,
                                                   const ASTContext &ctx) {
   ReadWriteImplKind rwKind;
   if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
-    rwKind = ReadWriteImplKind::Modify2;
+    rwKind = ReadWriteImplKind::YieldingMutate;
   else
     rwKind = ReadWriteImplKind::Modify;
   return {getOpaqueReadImpl(ownership, ctx), WriteImplKind::Set, rwKind};
@@ -36,10 +36,12 @@ ReadImplKind StorageImplInfo::getOpaqueReadImpl(OpaqueReadOwnership ownership,
   case OpaqueReadOwnership::Owned:
     return ReadImplKind::Get;
   case OpaqueReadOwnership::OwnedOrBorrowed:
-  case OpaqueReadOwnership::Borrowed:
+  case OpaqueReadOwnership::YieldingBorrow:
     if (ctx.LangOpts.hasFeature(Feature::CoroutineAccessors))
-      return ReadImplKind::Read2;
+      return ReadImplKind::YieldingBorrow;
     return ReadImplKind::Read;
+  case OpaqueReadOwnership::Borrow:
+    return ReadImplKind::Borrow;
   }
   llvm_unreachable("bad read-ownership kind");
 }

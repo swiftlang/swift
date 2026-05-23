@@ -70,11 +70,11 @@
 // CHECK-PUBLIC-CLIENT: ufiPackageFunc()
 // CHECK-PUBLIC-CLIENT: let u = UfiPackageKlass()
 // CHECK-PUBLIC-CLIENT: return u.ufiPkgVar
-// CHECK-PUBLIC-CLIENT: public class ClientKlass1 : Utils.UfiPackageProto
+// CHECK-PUBLIC-CLIENT: public class ClientKlass1 : Utils::UfiPackageProto
 // CHECK-PUBLIC-CLIENT: @usableFromInline
-// CHECK-PUBLIC-CLIENT: package var ufiPkgVar: Swift.String
-// CHECK-PUBLIC-CLIENT: public class ClientKlass2 : Utils.UfiPackageProto
-// CHECK-PUBLIC-CLIENT: public var ufiPkgVar: Swift.String
+// CHECK-PUBLIC-CLIENT: package var ufiPkgVar: Swift::String
+// CHECK-PUBLIC-CLIENT: public class ClientKlass2 : Utils::UfiPackageProto
+// CHECK-PUBLIC-CLIENT: public var ufiPkgVar: Swift::String
 
 // RUN: %target-swift-typecheck-module-from-interface(%t/Client.private.swiftinterface) -module-name Client -I %t -verify
 

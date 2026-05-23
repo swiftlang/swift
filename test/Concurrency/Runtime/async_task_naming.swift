@@ -20,6 +20,13 @@ func test() async {
     return 12
   }.value
 
+  let task = Task(name: "Caplin the Task Handle") {
+    return 12
+  }
+  _ = await task.value
+  // CHECK: task.name = Caplin the Task Handle
+  print("task.name = \(task.name ?? "NONE")")
+
   _ = try? await Task(name: "Caplin the Throwing Task") {
     // CHECK: Task.name = Caplin the Throwing Task
     print("Task.name = \(Task.name ?? "NONE")")
@@ -112,6 +119,27 @@ func test() async {
       print("Task.name = \(Task.name ?? "NONE")")
     }
   }
+
+  // Task name must remain accessible after the task completes and is awaited.
+  let completedTask = Task(name: "Caplin the Completed Task") {
+    return 42
+  }
+  _ = await completedTask.value
+  // CHECK: completed task.name = Caplin the Completed Task
+  print("completed task.name = \(completedTask.name ?? "NONE")")
+  // Access it again to make sure it's stable
+  // CHECK: completed task.name (again) = Caplin the Completed Task
+  print("completed task.name (again) = \(completedTask.name ?? "NONE")")
+
+  // Task without a name should return nil, both during and after completion
+  let unnamedTask = Task {
+    // CHECK: unnamed Task.name = NONE OK
+    print("unnamed Task.name = \(Task.name ?? "NONE OK")")
+    return 1
+  }
+  _ = await unnamedTask.value
+  // CHECK: unnamed task.name (after) = NONE OK
+  print("unnamed task.name (after) = \(unnamedTask.name ?? "NONE OK")")
 }
 
 await test()

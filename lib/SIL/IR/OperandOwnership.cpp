@@ -203,6 +203,8 @@ OPERAND_OWNERSHIP(TrivialUse, TupleElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedAddrCast)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedRefCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, UncheckedTakeEnumDataAddr)
+OPERAND_OWNERSHIP(TrivialUse, UncheckedInPlaceEnumDataAddr)
+OPERAND_OWNERSHIP(TrivialUse, UncheckedBorrowEnumDataAddr)
 OPERAND_OWNERSHIP(TrivialUse, UnconditionalCheckedCastAddr)
 OPERAND_OWNERSHIP(TrivialUse, DynamicPackIndex)
 OPERAND_OWNERSHIP(TrivialUse, PackPackIndex)
@@ -210,6 +212,11 @@ OPERAND_OWNERSHIP(TrivialUse, PackElementGet)
 OPERAND_OWNERSHIP(TrivialUse, PackElementSet)
 OPERAND_OWNERSHIP(TrivialUse, TuplePackElementAddr)
 OPERAND_OWNERSHIP(TrivialUse, GlobalAddr)
+OPERAND_OWNERSHIP(TrivialUse, MakeAddrBorrow)
+OPERAND_OWNERSHIP(TrivialUse, InitBorrowAddr)
+OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrow)
+OPERAND_OWNERSHIP(TrivialUse, DereferenceAddrBorrow)
+OPERAND_OWNERSHIP(TrivialUse, DereferenceBorrowAddr)
 
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).
@@ -430,6 +437,28 @@ OperandOwnershipClassifier::visitBeginBorrowInst(BeginBorrowInst *borrow) {
   return OperandOwnership::Borrow;
 }
 
+// A make_borrow is nested in the referent's scope. It creates a value with no
+// ownership, which cannot be tracked by OSSA utilities. Normally, we
+// conservatively declare such untracked uses as PointerEscape. But, if we
+// treated make_borrow as an escape, then liveness would bailout causing
+// diagnostic errors, particularly in the move-checker. That would render
+// Builtin.makeBorrow useless, So instead, we optimistically treat make_borrow
+// like an InstantaneousUse. This assumes, without verification, that all uses
+// are already guarded by a mark_dependence.
+//
+// TODO: Correctness currently relies on cooperation by the programmer to
+// correctly use Builtin.makeBorrow with no compiler checking. Instead, we
+// should treat the result of make_borrow like a non-Escapable value. It's
+// operand ownership should be `Borrow`, it should produce an `Owned`
+// non-Escapable value, OSSA liveness should find all dependent uses (just like
+// mark_dependence), and LifetimeDependenceDiagnostics should verify that all
+// dependent uses are within the original borrow scope. To do this, it will need
+// to look through stores into the field of a wrapper type (Borrow<T>).
+OperandOwnership
+OperandOwnershipClassifier::visitMakeBorrowInst(MakeBorrowInst *borrow) {
+  return OperandOwnership::InstantaneousUse;
+}
+
 OperandOwnership
 OperandOwnershipClassifier::visitBorrowedFromInst(BorrowedFromInst *bfi) {
   return getOperandIndex() == 0 ? OperandOwnership::GuaranteedForwarding
@@ -626,6 +655,9 @@ OperandOwnership OperandOwnershipClassifier::visitReturnInst(ReturnInst *i) {
   case OwnershipKind::Any:
     llvm_unreachable("invalid value ownership");
   case OwnershipKind::Guaranteed:
+    // TODO: Could this be treated as a Reborrow? That would let the return
+    // be understood as a lifetime-ender for the borrow.
+    // return OperandOwnership::Reborrow;
     return OperandOwnership::GuaranteedForwarding;
   case OwnershipKind::None:
     return OperandOwnership::TrivialUse;
@@ -791,6 +823,7 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AllocRaw)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, And)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, GenericAnd)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssertConf)
+BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InfiniteLoopTrueCondition)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignCopyArrayNoAlias)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignCopyArrayFrontToBack)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, AssignCopyArrayBackToFront)
@@ -1030,7 +1063,6 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
 
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskRunInline)
 
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CancelAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyDefaultActor)
 
@@ -1064,6 +1096,12 @@ BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskRemovePriorityEscalationHandler)
 // This is a trivial use since our first operand is a Builtin.RawPointer and our
 // second is an address to our generic Value.
 BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskLocalValuePush)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, AddTaskLocalValue)
+// Trivial use of the token result of AddTaskLocalValue.
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, RemoveTaskLocalValue)
+
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPush)
+BUILTIN_OPERAND_OWNERSHIP(TrivialUse, TaskCancellationShieldPop)
 
 #undef BUILTIN_OPERAND_OWNERSHIP
 

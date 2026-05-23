@@ -25,15 +25,6 @@ bb0:
   return %1 : $Builtin.NativeObject
 }
 
-// CHECK-LABEL: define hidden swift{{(tail)?}}cc void @cancel_task(ptr %0)
-// CHECK:  call swift{{(tail)?}}cc void @swift_task_cancel(ptr %0)
-sil hidden [ossa] @cancel_task : $@convention(method) (@guaranteed Builtin.NativeObject) -> () {
-bb0(%0 : @guaranteed $Builtin.NativeObject):
-  %4 = builtin "cancelAsyncTask"(%0 : $Builtin.NativeObject) : $()
-  %5 = tuple ()
-  return %5 : $()
-}
-
 // CHECK-LABEL: define hidden swift{{(tail)?}}cc void @launch_future
 sil hidden [ossa] @launch_future : $@convention(method) <T> (Int, @owned @async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>) -> () {
 bb0(%flags : $Int, %taskFunction: @owned $@async @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error Error) for <T>):

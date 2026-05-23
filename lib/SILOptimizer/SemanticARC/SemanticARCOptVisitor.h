@@ -196,6 +196,7 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   FORWARDING_INST(DifferentiableFunctionExtract)
   FORWARDING_INST(LinearFunctionExtract)
   FORWARDING_INST(FunctionExtractIsolation)
+  FORWARDING_INST(ImplicitActorToOpaqueIsolationCast)
 #undef FORWARDING_INST
 
   bool processWorklist();
@@ -203,7 +204,6 @@ struct LLVM_LIBRARY_VISIBILITY SemanticARCOptVisitor
   bool optimizeWithoutFixedPoint();
 
   bool performGuaranteedCopyValueOptimization(CopyValueInst *cvi);
-  bool eliminateDeadLiveRangeCopyValue(CopyValueInst *cvi);
   bool tryJoiningCopyValueLiveRangeWithOperand(CopyValueInst *cvi);
   bool tryPerformOwnedCopyValueOptimization(CopyValueInst *cvi);
 };

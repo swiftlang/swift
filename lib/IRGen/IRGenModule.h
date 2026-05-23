@@ -318,6 +318,13 @@ private:
 public:
   /// The set of eagerly emitted opaque types.
   llvm::SmallPtrSet<OpaqueTypeDecl *, 4> EmittedNonLazyOpaqueTypeDecls;
+
+  /// A record of all ExtensionDescriptors emitted for protocol-to-protocol
+  /// conformances, as two such LinkEntity's can be unequal
+  /// (point to different extensions of the same protocol) but name the same
+  /// symbol ultimately, because the two extensions may have the same
+  /// generic signature, etc.
+  llvm::DenseSet<ExtensionDecl*> AllConformanceOfProtocolExtensionDescriptors;
 private:
 
   /// The queue of lazy field metadata records to emit.
@@ -716,6 +723,7 @@ public:
   llvm::StringMap<ModuleDecl*> OriginalModules;
   llvm::SmallString<128> OutputFilename;
   llvm::SmallString<128> MainInputFilenameForDebugInfo;
+  llvm::SmallString<128> CacheKeyForJob;
 
   /// Order dependency -- TargetInfo must be initialized after Opts.
   const SwiftTargetInfo TargetInfo;
@@ -1446,6 +1454,7 @@ private:
     unsigned align: 16;
     unsigned pod: 1;
     unsigned bitwiseTakable: 2;
+    unsigned addressableForDependencies: 1;
   };
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;
@@ -1573,8 +1582,6 @@ public:
       "__TEXT,__objc_methname,cstring_literals";
   static constexpr const char ObjCMethodTypeSectionName[] =
       "__TEXT,__objc_methtype,cstring_literals";
-  static constexpr const char OSLogStringSectionName[] =
-      "__TEXT,__oslogstring,cstring_literals";
 
   /// Returns the special builtin types that should be emitted in the stdlib
   /// module.
@@ -1643,13 +1650,14 @@ public:
               SourceFile *SF,
               StringRef ModuleName, StringRef OutputFilename,
               StringRef MainInputFilenameForDebugInfo,
-              StringRef PrivateDiscriminator);
+              StringRef PrivateDiscriminator,
+              StringRef CacheKeyForJob);
 
   /// The constructor used when we just need an IRGenModule for type lowering.
   IRGenModule(IRGenerator &irgen, std::unique_ptr<llvm::TargetMachine> &&target)
     : IRGenModule(irgen, std::move(target), /*SF=*/nullptr,
                   "<fake module name>", "<fake output filename>",
-                  "<fake main input filename>", "") {}
+                  "<fake main input filename>", "", "") {}
 
   ~IRGenModule();
 
@@ -1725,7 +1733,7 @@ public:
   llvm::ConstantInt *getInt32(uint32_t value);
   llvm::ConstantInt *getSize(Size size);
   llvm::Constant *getAlignment(Alignment align);
-  llvm::Constant *getBool(bool condition);
+  llvm::ConstantInt *getBool(bool condition);
 
   /// Cast the given constant to i8*.
   llvm::Constant *getOpaquePtr(llvm::Constant *pointer);
@@ -1795,7 +1803,8 @@ public:
   llvm::GlobalValue *defineTypeMetadata(
       CanType concreteType, bool isPattern, bool isConstant,
       ConstantInitFuture init, llvm::StringRef section = {},
-      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {});
+      SmallVector<std::pair<Size, SILDeclRef>, 8> vtableEntries = {},
+      unsigned numConformanceEntries = 0);
 
   TypeEntityReference
   getContextDescriptorEntityReference(const LinkEntity &entity);
@@ -2091,6 +2100,7 @@ private:
   void emitSwiftAsyncExtendedFrameInfoWeakRef();
 public:
   bool isConcurrencyAvailable();
+  bool isTypedAllocationAvailable();
   void noteSwiftAsyncFunctionDef() {
     hasSwiftAsyncFunctionDef = true;
   }
@@ -2153,23 +2163,25 @@ struct DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey> {
   using FixedLayoutKey = swift::irgen::IRGenModule::FixedLayoutKey;
 
   static inline FixedLayoutKey getEmptyKey() {
-    return {0, 0xFFFFFFFFu, 0, 0, 0};
+    return {0, 0xFFFFFFFFu, 0, 0, 0, 0};
   }
 
   static inline FixedLayoutKey getTombstoneKey() {
-    return {0, 0xFFFFFFFEu, 0, 0, 0};
+    return {0, 0xFFFFFFFEu, 0, 0, 0, 0};
   }
 
   static unsigned getHashValue(const FixedLayoutKey &key) {
     return hash_combine(key.size, key.numExtraInhabitants, key.align,
-                        (bool)key.pod, (bool)key.bitwiseTakable);
+                        (bool)key.pod, (bool)key.bitwiseTakable,
+                        (bool)key.addressableForDependencies);
   }
   static bool isEqual(const FixedLayoutKey &a, const FixedLayoutKey &b) {
     return a.size == b.size
       && a.numExtraInhabitants == b.numExtraInhabitants
       && a.align == b.align
       && a.pod == b.pod
-      && a.bitwiseTakable == b.bitwiseTakable;
+      && a.bitwiseTakable == b.bitwiseTakable
+      && a.addressableForDependencies == b.addressableForDependencies;
   }
 };
 

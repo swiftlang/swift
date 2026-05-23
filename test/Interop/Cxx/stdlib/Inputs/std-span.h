@@ -6,12 +6,14 @@
 #include <string>
 #include <vector>
 
-#ifndef __counted_by // cstddef already imports ptrcheck.h on apple platforms
-#if defined(__has_feature) && __has_feature(bounds_safety_attributes)
-  #define __counted_by(x) __attribute__((__counted_by__(x)))
-#else
-  #define __counted_by(x)
+#ifdef __counted_by
+#undef __counted_by // some libstdc++ versions seem to include incompatible definitions of __counted_by??
 #endif
+
+#if defined(__has_feature) && __has_feature(bounds_safety_attributes)
+#define __counted_by(x) __attribute__((__counted_by__(x)))
+#else
+#define __counted_by(x)
 #endif
 
 using ConstSpanOfInt = std::span<const int>;
@@ -92,6 +94,7 @@ inline ConstSpanOfInt funcWithSafeWrapper3(const VecOfInt &v
 
 struct X {
   inline void methodWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
+  SpanOfInt getMutable(ConstSpanOfInt s [[clang::noescape]]) [[clang::lifetimebound]];
 };
 
 inline ConstSpanOfInt mixedFuncWithSafeWrapper1(const int * __counted_by(len) p
@@ -172,8 +175,13 @@ struct S {};
 struct SpanWithoutTypeAlias {
   std::span<const int> bar() [[clang::lifetimebound]];
   void foo(std::span<const int> s [[clang::noescape]]);
+  std::span<S<int>> nestedTemplateInstantiationReturn() [[clang::lifetimebound]];
+  void nestedTemplateInstantiationParam(std::span<S<int>> s [[clang::noescape]]);
+  S<int> * __counted_by(len) nestedTemplateInstantiationReturnCounted(int len) [[clang::lifetimebound]];
+  void nestedTemplateInstantiationParamCounted(S<int> * __counted_by(len) p [[clang::noescape]], int len);
   void otherTemplatedType(ConstSpanOfInt copy [[clang::noescape]], S<int>);
   void otherTemplatedType2(ConstSpanOfInt copy [[clang::noescape]], S<int> *);
+  S<int> *otherTemplatedTypeReturn(ConstSpanOfInt copy [[clang::noescape]]);
 };
 
 inline void func(ConstSpanOfInt copy [[clang::noescape]]) {}
@@ -197,5 +205,20 @@ struct IMMORTAL_FRT DependsOnSelfFRT {
     return SpanOfInt(v.data(), v.size());
   }
 };
+
+struct NonCopyable {
+  NonCopyable(int n) : number(n) {}
+  NonCopyable(const NonCopyable &other) = delete;
+  NonCopyable(NonCopyable &&other) = default;
+  ~NonCopyable() {}
+  int number;
+};
+
+using SpanOfNonCopyable = std::span<NonCopyable>;
+
+inline SpanOfNonCopyable makeSpanOfNonCopyable() {
+  static NonCopyable arr[]{1, 2, 3};
+  return SpanOfNonCopyable(arr);
+}
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H

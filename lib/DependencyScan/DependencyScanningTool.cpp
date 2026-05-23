@@ -12,19 +12,48 @@
 
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
-#include "swift/Basic/LLVMInitialize.h"
-#include "swift/Basic/TargetInfo.h"
-#include "swift/Basic/ColorUtils.h"
 #include "swift/Basic/Defer.h"
-#include "swift/DependencyScan/DependencyScanningTool.h"
+#include "swift/Basic/TargetInfo.h"
 #include "swift/DependencyScan/DependencyScanImpl.h"
+#include "swift/DependencyScan/DependencyScanningTool.h"
 #include "swift/DependencyScan/SerializedModuleDependencyCacheFormat.h"
 #include "swift/DependencyScan/StringUtils.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FileSystem.h"
-#include "llvm/Support/VirtualOutputBackends.h"
 
-#include <sstream>
+namespace {
+llvm::ErrorOr<swift::CompilerInvocation>
+ConstructInvocation(llvm::ArrayRef<const char *> CommandArgs,
+                    llvm::StringRef executable, llvm::StringRef pwd,
+                    swift::DiagnosticEngine &DE) {
+  auto unescape =
+#if LLVM_ON_WIN32
+      llvm::cl::TokenizeWindowsCommandLine;
+#else
+      llvm::cl::TokenizeGNUCommandLine;
+#endif
+
+  llvm::BumpPtrAllocator Alloc;
+  llvm::SmallVector<std::string, 16> Args;
+  for (llvm::StringRef Arg : CommandArgs) {
+    llvm::StringSaver Saver(Alloc);
+    llvm::SmallVector<const char *, 4> Tokens;
+    // Unescape any arguments
+    unescape(Arg, Saver, Tokens, /*MarkEOLs=*/false);
+    Args.push_back(llvm::join(Tokens, " "));
+  }
+
+  std::vector<const char *> arguments;
+  arguments.reserve(Args.size());
+  std::transform(std::begin(Args), std::end(Args), std::back_inserter(arguments),
+                 [](const std::string &S) { return S.data(); });
+
+  swift::CompilerInvocation Invocation;
+  if (Invocation.parseArgs(arguments, DE, nullptr, pwd, executable))
+    return std::make_error_code(std::errc::invalid_argument);
+  return Invocation;
+}
+} // anonymous namespace
 
 namespace swift {
 namespace dependencies {
@@ -36,32 +65,17 @@ llvm::ErrorOr<swiftscan_string_ref_t> getTargetInfo(ArrayRef<const char *> Comma
                                                     const char *main_executable_path) {
   llvm::sys::SmartScopedLock<true> Lock(TargetInfoMutex);
 
-  // Parse arguments.
-  std::string CommandString;
-  for (const auto *c : Command) {
-    CommandString.append(c);
-    CommandString.append(" ");
-  }
-  SmallVector<const char *, 4> Args;
-  llvm::BumpPtrAllocator Alloc;
-  llvm::StringSaver Saver(Alloc);
-  // Ensure that we use the Windows command line parsing on Windows as we need
-  // to ensure that we properly handle paths.
-  if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows()) 
-    llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
-  else
-    llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
   SourceManager dummySM;
   DiagnosticEngine DE(dummySM);
-  CompilerInvocation Invocation;
-  if (Invocation.parseArgs(Args, DE, nullptr, {}, main_executable_path)) {
-    return std::make_error_code(std::errc::invalid_argument);
-  }
+  llvm::ErrorOr<CompilerInvocation> Invocation =
+      ConstructInvocation(Command, main_executable_path, {}, DE);
+  if (std::error_code EC = Invocation.getError())
+    return EC;
 
   // Store the result to a string.
   std::string ResultStr;
   llvm::raw_string_ostream StrOS(ResultStr);
-  swift::targetinfo::printTargetInfo(Invocation, StrOS);
+  swift::targetinfo::printTargetInfo(*Invocation, StrOS);
   return c_string_utils::create_clone(ResultStr.c_str());
 }
 
@@ -246,6 +260,9 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
   hollowImportInfoSet->imports = nullptr;
   hollowMainModuleInfo->imports = hollowImportInfoSet;
 
+  // Default library level
+  hollowMainModuleInfo->library_level = SWIFTSCAN_LIBRARY_LEVEL_OTHER;
+
   // Populate the diagnostic info
   hollowResult->diagnostics =
       mapCollectedDiagnosticsForOutput(diagnostics);
@@ -267,8 +284,7 @@ static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
 }
 
 DependencyScanningTool::DependencyScanningTool()
-    : ScanningService(std::make_unique<SwiftDependencyScanningService>()),
-      Alloc(), Saver(Alloc) {}
+    : ScanningService(std::make_unique<SwiftDependencyScanningService>()) {}
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
 DependencyScanningTool::getDependencies(ArrayRef<const char *> Command,
@@ -364,38 +380,28 @@ llvm::ErrorOr<ScanQueryContext> DependencyScanningTool::createScanQueryContext(
       return std::make_error_code(std::errc::invalid_argument);
     }
 
-    CompilerInvocation Invocation;
     SmallString<128> WorkingDirectory(WorkingDir);
     if (WorkingDirectory.empty())
       llvm::sys::fs::current_path(WorkingDirectory);
 
-    // Parse/tokenize arguments.
-    std::string CommandString;
-    for (const auto *c : CommandArgs) {
-      CommandString.append(c);
-      CommandString.append(" ");
-    }
-    SmallVector<const char *, 4> Args;
-    llvm::BumpPtrAllocator Alloc;
-    llvm::StringSaver Saver(Alloc);
-    // Ensure that we use the Windows command line parsing on Windows as we need
-    // to ensure that we properly handle paths.
-    if (llvm::Triple(llvm::sys::getProcessTriple()).isOSWindows())
-      llvm::cl::TokenizeWindowsCommandLine(CommandString, Saver, Args);
-    else
-      llvm::cl::TokenizeGNUCommandLine(CommandString, Saver, Args);
+    llvm::ErrorOr<CompilerInvocation> Invocation =
+        ConstructInvocation(CommandArgs, "swiftc", WorkingDirectory,
+                            Instance->getDiags());
+    if (std::error_code EC = Invocation.getError())
+      return EC;
 
-    if (Invocation.parseArgs(Args, Instance->getDiags(),
-                             nullptr, WorkingDirectory, "/tmp/foo")) {
-      return std::make_error_code(std::errc::invalid_argument);
-    }
+    // Setup the CAS instance from scanning service if applicable.
+    if (Invocation->requiresCAS())
+      Instance->setSharedCASInstances(
+          ScanningService->getClangScanningService().getCAS(),
+          ScanningService->getClangScanningService().getActionCache());
 
     // Setup the instance
     std::string InstanceSetupError;
-    if (Instance->setup(Invocation, InstanceSetupError))
+    if (Instance->setup(*Invocation, InstanceSetupError))
       return std::make_error_code(std::errc::not_supported);
 
-    Invocation.getFrontendOptions().LLVMArgs.clear();
+    Invocation->getFrontendOptions().LLVMArgs.clear();
 
     // Setup the caching service after the instance finishes setup.
     if (ScanningService->setupCachingDependencyScanningService(*Instance))

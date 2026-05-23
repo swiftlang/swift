@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -compute-side-effects -cse | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -compute-side-effects -common-subexpression-elimination | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -124,9 +124,12 @@ bb0(%0 : $Int64):
   return %14 : $Int64
 }
 
+// The CSE pass does not eliminate @owned-returning applies in OSSA because
+// replacing them would require inserting copies that are unlikely to be
+// optimized away.
 // CHECK-LABEL: sil [ossa] @cse_retain_only_apply :
 // CHECK: apply
-// CHECK-NOT: apply
+// CHECK: apply
 // CHECK-LABEL:} // end sil function 'cse_retain_only_apply'
 sil [ossa] @cse_retain_only_apply : $@convention(thin) () -> () {
 bb0:
@@ -147,9 +150,10 @@ bb0(%0 : @owned $Klass):
   return %0 : $Klass
 }
 
+// @owned result: not CSE'd (see comment on cse_retain_only_apply above)
 // CHECK-LABEL: sil [ossa] @apply_nontrivial_test1 :
 // CHECK: apply
-// CHECK-NOT: apply
+// CHECK: apply
 // CHECK-LABEL:} // end sil function 'apply_nontrivial_test1'
 sil [ossa] @apply_nontrivial_test1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
@@ -169,9 +173,10 @@ bb0(%0 : @guaranteed $Klass):
   return %copy : $Klass
 }
 
+// @owned result: not CSE'd (see comment on cse_retain_only_apply above)
 // CHECK-LABEL: sil [ossa] @apply_nontrivial_test2 :
 // CHECK: apply
-// CHECK-NOT: apply
+// CHECK: apply
 // CHECK-LABEL:} // end sil function 'apply_nontrivial_test2'
 sil [ossa] @apply_nontrivial_test2 : $@convention(thin) (@guaranteed Klass) -> () {
 bb0(%0 : @guaranteed $Klass):
@@ -184,9 +189,10 @@ bb0(%0 : @guaranteed $Klass):
   return %r : $()
 }
 
+// @owned result: not CSE'd (see comment on cse_retain_only_apply above)
 // CHECK-LABEL: sil [ossa] @apply_nontrivial_test3 :
 // CHECK: apply
-// CHECK-NOT: apply
+// CHECK: apply
 // CHECK-LABEL:} // end sil function 'apply_nontrivial_test3'
 sil [ossa] @apply_nontrivial_test3 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):

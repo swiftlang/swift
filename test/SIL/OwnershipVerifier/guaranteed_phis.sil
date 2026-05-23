@@ -402,6 +402,19 @@ bb3(%14 : @reborrow $Klass, %15 : @reborrow $Klass):
   return %20
 }
 
+sil [ossa] @borrowed_from_trivial_enum : $@convention(thin) () -> () {
+bb0:
+  %0 = enum $Optional<Klass>, #Optional.none!enumelt
+  %1 = begin_borrow %0
+  br bb1(%1)
+
+bb1(%3 : @reborrow $Optional<Klass>):
+  %4 = borrowed %3 from (%0)
+  end_borrow %4
+  %r = tuple ()
+  return %r
+}
+
 sil [ossa] @dont_follow_trivial_field_to_phi : $@convention(thin) (@owned KlassAndInt, @guaranteed Klass) -> () {
 bb0(%0 : @owned $KlassAndInt, %1 : @guaranteed $Klass):
   %2 = begin_borrow %0

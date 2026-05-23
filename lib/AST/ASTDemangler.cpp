@@ -25,6 +25,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclNameExtractor.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
@@ -583,8 +584,8 @@ Type ASTBuilder::createFunctionType(
     isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
   } else if (extFlags.isIsolatedAny()) {
     isolation = FunctionTypeIsolation::forErased();
-  } else if (extFlags.isNonIsolatedCaller()) {
-    isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+  } else if (extFlags.isNonisolatedNonsending()) {
+    isolation = FunctionTypeIsolation::forNonisolatedNonsending();
   }
 
   auto noescape =
@@ -597,7 +598,11 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
-  // TODO: Handle LifetimeDependenceInfo here.
+  // TODO: Handle LifetimeDependenceInfo here. Until this is implemented,
+  // IRGen's debug-info round-trip check excludes types containing
+  // function types with lifetime dependencies; remove the
+  // containsFunctionTypeWithLifetimeDependencies workaround in
+  // lib/IRGen/IRGenDebugInfo.cpp when this lands.
   auto einfo = FunctionType::ExtInfoBuilder(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
@@ -780,9 +785,17 @@ Type ASTBuilder::createImplFunctionType(
   #undef SIMPLE_CASE
   }
 
-  auto isolation = SILFunctionTypeIsolation::forUnknown();
-  if (flags.hasErasedIsolation())
-    isolation = SILFunctionTypeIsolation::forErased();
+  SILFunctionTypeIsolation isolation = SILFunctionTypeIsolation::forUnknown();
+  switch (flags.getIsolation()) {
+#define ISOLATION(CASE)                                                        \
+  case ImplFunctionIsolation::CASE:                                            \
+    isolation = SILFunctionTypeIsolation::for##CASE();                         \
+    break;
+    ISOLATION(Unknown)
+    ISOLATION(NonisolatedNonsending)
+    ISOLATION(Erased)
+#undef ISOLATION
+  }
 
   // There's no representation of this in the mangling because it can't
   // occur in well-formed programs.
@@ -833,6 +846,9 @@ Type ASTBuilder::createImplFunctionType(
     clangFnType = getASTContext().getCanonicalClangFunctionType(
         funcParams, result, representation);
   }
+  // TODO: Handle LifetimeDependenceInfo here. Sibling of the AST-level TODO
+  // at the top of `createFunctionType` above; both must be implemented before
+  // the IRGen workaround in lib/IRGen/IRGenDebugInfo.cpp can be removed.
   auto einfo =
       SILFunctionType::ExtInfoBuilder(
           representation, flags.isPseudogeneric(), !flags.isEscaping(),
@@ -1121,11 +1137,9 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
   if (!genericTypeParams.empty()) {
     SmallVector<BuiltRequirement, 2> RequirementsVec(Requirements);
     appendInversesAsRequirements(InverseRequirements, RequirementsVec);
-    signature = swift::buildGenericSignature(Ctx,
-                                             signature,
-                                             genericTypeParams,
-                                             std::move(RequirementsVec),
-                                             /*allowInverses=*/true);
+    signature = swift::buildGenericSignature(
+        Ctx, signature, genericTypeParams, std::move(RequirementsVec),
+        ExpandDefaults);
   }
   SmallVector<SILField, 4> silFields;
   for (auto field: fields)
@@ -1233,6 +1247,10 @@ Type ASTBuilder::createBuiltinFixedArrayType(Type size, Type element) {
                                     element->getCanonicalType());
 }
 
+Type ASTBuilder::createBuiltinBorrowType(Type referent) {
+  return BuiltinBorrowType::get(referent->getCanonicalType());
+}
+
 GenericSignature
 ASTBuilder::createGenericSignature(ArrayRef<BuiltType> builtParams,
                                    ArrayRef<BuiltRequirement> requirements) {
@@ -1323,7 +1341,9 @@ llvm::ArrayRef<ModuleDecl *>
 ASTBuilder::findPotentialModules(NodePointer node, ModuleDecl *&scratch) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
 
-  const auto moduleName = node->getText();
+  // Round-trip the module name through getIdentifier to normalize it if a raw
+  // identifier was passed to `-module-abi-name`.
+  const auto moduleName = getIdentifier(node->getText()).str();
 
   if (moduleName == CLANG_HEADER_MODULE_NAME) {
     auto *importer = Ctx.getClangModuleLoader();
@@ -1414,7 +1434,7 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   appendInversesAsRequirements(inverseRequirements, requirements);
 
   return buildGenericSignature(Ctx, baseGenericSig, {}, std::move(requirements),
-                               /*allowInverses=*/true)
+                               ExpandDefaults)
       .getCanonicalSignature();
 }
 

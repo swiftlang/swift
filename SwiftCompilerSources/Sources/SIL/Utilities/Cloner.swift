@@ -133,7 +133,7 @@ public struct Cloner<Context: MutatingContext> {
       fatalError("expected instruction to clone or already cloned value")
     }
 
-    for op in inst.operands {
+    for op in inst.definedOperands {
       if cloneRecursively(value: op.value, customGetCloned: customGetCloned) == nil {
         return nil
       }

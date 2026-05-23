@@ -33,7 +33,9 @@ sil [ossa] @takeOwnedCTwice : $@convention(thin) (@owned C, @owned C) -> ()
 sil [ossa] @takeOwnedCAndGuaranteedC : $@convention(thin) (@owned C, @guaranteed C) -> ()
 sil [ossa] @takeGuaranteedC : $@convention(thin) (@guaranteed C) -> ()
 sil [ossa] @borrowB : $@convention(thin) (@guaranteed B) -> ()
-sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> ()
+sil [ossa] @takeGuaranteedAnyObject : $@convention(thin) (@guaranteed AnyObject) -> () {
+[global:]
+}
 sil [ossa] @getMOS : $() -> (@owned MOS)
 
 // -O hoists the destroy
@@ -845,12 +847,12 @@ bb4:
 // TODO: with lifetime completion, both copies should be deleted.
 //
 // CHECK-LABEL: sil hidden [ossa] @testDeadBorrow : {{.*}} {
-// CHECK: bb0:
-// CHECK:   copy_value
-// CHECK:   destroy_value
-// CHECK:   copy_value
-// CHECK:   begin_borrow
-// CHECK:   unreachable
+// CHECK:       bb0:
+// CHECK:         %1 = apply
+// CHECK-NEXT:    %2 = begin_borrow %1
+// CHECK-NEXT:    end_borrow %2
+// CHECK-NEXT:    destroy_value [dead_end] %1
+// CHECK-NEXT:    unreachable
 // CHECK-LABEL: } // end sil function 'testDeadBorrow'
 sil hidden [ossa] @testDeadBorrow : $@convention(thin) () -> () {
 bb0:
@@ -860,6 +862,9 @@ bb0:
   destroy_value %1 : $C
   %6 = copy_value %0 : $C
   %7 = begin_borrow %6 : $C
+  end_borrow %7
+  destroy_value [dead_end] %6
+  destroy_value [dead_end] %0
   unreachable
 }
 
@@ -1011,10 +1016,8 @@ bb0:
 // CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
 // CHECK:         [[BORROW:%[^,]+]] = function_ref @takeGuaranteedC
 // CHECK:         apply [[BORROW]]([[INSTANCE]])
-// The destroy of the copy should be hoisted over the deinit barrier, and then
-// canonicalization of the lexical value should remove the copy.
-// CHECK:         destroy_value [[INSTANCE]]
 // CHECK:         apply [[BARRIER]]()
+// CHECK:         destroy_value [[INSTANCE]]
 // CHECK-LABEL: } // end sil function 'hoist_destroy_of_copy_of_lexical_over_deinit_barrier'
 sil [ossa] @hoist_destroy_of_copy_of_lexical_over_deinit_barrier : $(@owned C) -> () {
 entry(%instance : @owned $C):

@@ -375,6 +375,41 @@ bb0(%0 : @owned $String, %1 : @guaranteed $String):
   ...
 ```
 
+## The Control Flow Graph
+
+The basic blocks of a function form a control flow graph (CFG). The nodes of
+the CFG are the blocks. Edges are defined by the set of target blocks to which
+the terminator instruction of a block may jump to. In the following example,
+block `bb1` has two successor blocks `bb2` and `bb3` because the `cond_br`
+might branch to `bb2` or `bb3`.
+```
+    bb1:
+      cond_br %cond, bb2, bb3
+```
+
+## Control Flow Graph Invariants
+
+In OSSA following rules apply to the CFG of a function:
+
+- No critical edges: every edge in the CFG must have either a single
+  predecessor or a single successor block.
+
+- No unreachable blocks: All blocks must be reachable from the entry block
+  of the function.
+
+- No infinite loops: all cyclic strongly connected components (SCC) in the
+  CFG must have at least one edge which is exiting the cyclic SCC.
+
+Optimization passes must make sure to leave the CFG of an OSSA function in a
+valid state by:
+
+- inserting blocks at critical edges
+
+- removing unreachable blocks
+
+- creating artificial exit edges from infinite loops to dead-end blocks
+  (= blocks which end in an `unreachable` instruction)
+
 # Values and Operands
 
 SIL values are introduced with the `%` sigil and named by an
@@ -1168,6 +1203,8 @@ sil-vtable ::= 'sil_vtable' identifier '{' sil-vtable-entry* '}'
 sil-vtable ::= 'sil_vtable' sil-type '{' sil-vtable-entry* '}'
 
 sil-vtable-entry ::= sil-decl-ref ':' sil-linkage? sil-function-name
+sil-vtable-entry ::= 'conformance' protocol-conformance
+sil-vtable-entry ::= 'no_conformance' protocol-decl
 ```
 
 SIL represents dynamic dispatch for class methods using the
@@ -1228,6 +1265,22 @@ overridden methods in the SIL vtable for a derived class (such as
 
 In case the SIL function is a thunk, the function name is preceded with
 the linkage of the original implementing function.
+
+In addition to method entries, a vtable can also contain conformance entries.
+Conformance entries are used for fast conformance lookup, which doesn't
+need to query the runtime's conformance lookup table.
+A conformance entry specifies if the class conforms or does not conform to a
+protocol. At runtime, a type cast instruction to an existential can directly
+load the witness table pointer from the vtable. If null, the class does not
+conform to the protocol.
+
+```
+sil_vtable $C {
+  conformance C : P   // C conforms to protocol P
+  no_conformance Q    // C does not conform to protocol Q
+  // ...
+}
+```
 
 If the vtable refers to a specialized class, a SIL type specifies the
 bound generic class type:

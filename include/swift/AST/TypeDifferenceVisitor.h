@@ -416,6 +416,10 @@ public:
     return asImpl().visitDifferentTypeStructure(type1, type2);
   }
 
+  bool visitHiddenType(CanHiddenType type1, CanHiddenType type2) {
+    return type1->getMangledName() != type2->getMangledName();
+  }
+
   bool visitOptSubstitutionMap(CanType type1, CanType type2,
                                SubstitutionMap subs1, SubstitutionMap subs2) {
     if ((bool) subs1 != (bool) subs2)

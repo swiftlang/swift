@@ -687,7 +687,7 @@ bb4:
   switch_enum %0 : $Optional<C>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb6
 
 bb5:
-  %25 = unchecked_take_enum_data_addr %21 : $*Optional<C>, #Optional.some!enumelt
+  %25 = unchecked_inplace_enum_data_addr %21 : $*Optional<C>, #Optional.some!enumelt
   %26 = load %25 : $*C
   dealloc_stack %21 : $*Optional<C>
   %29 = ref_element_addr %26 : $C, #C.value

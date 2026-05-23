@@ -1351,6 +1351,29 @@ func functionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note 2{{en
   }
 }
 
+@available(OSX, introduced: 51)
+@inlinable
+public func fragileFunctionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note {{enclosing scope here}}
+  if #available(OSX 51, *) { } // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
+}
+
+public protocol Mystery { }
+public struct Secret: Mystery {
+  public init() { }
+}
+public struct SuperSecret: Mystery {
+  public init() { }
+}
+
+@available(OSX, introduced: 51)
+@inlinable
+public func fragileFunctionWithSpecifiedAvailabilityUselessCheckAndOpaqueResult() -> some Mystery {
+  if #available(OSX 51, *) {
+    return Secret()
+  }
+  return SuperSecret()
+}
+
 // #available(...) outside if statement guards
 
 func injectToOptional<T>(_ v: T) -> T? {

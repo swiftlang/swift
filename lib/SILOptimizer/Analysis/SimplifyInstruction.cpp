@@ -695,7 +695,7 @@ swift::replaceAllSimplifiedUsesAndErase(SILInstruction *i, SILValue result,
 
   if (svi->getFunction()->hasOwnership()) {
     OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
-    OwnershipRAUWHelper helper(ctx, svi, result);
+    OwnershipRAUWHelper helper(ctx, svi, result, /*respectLexicalFlags=*/ true);
     return helper.perform();
   }
   return replaceAllUsesAndErase(svi, result, callbacks);
@@ -741,13 +741,15 @@ SILBasicBlock::iterator swift::simplifyAndReplaceAllSimplifiedUsesAndErase(
   if (!svi->getFunction()->hasOwnership())
     return replaceAllUsesAndErase(svi, result, callbacks);
 
+#ifndef SWIFT_ENABLE_SWIFT_IN_SWIFT // requires complete lifetimes
   // If we weren't passed a dead end blocks, we can't optimize without ownership
   // enabled.
   if (!deadEndBlocks)
     return next;
+#endif
 
   OwnershipFixupContext ctx{callbacks, *deadEndBlocks};
-  OwnershipRAUWHelper helper(ctx, svi, result);
+  OwnershipRAUWHelper helper(ctx, svi, result, /*respectLexicalFlags=*/ true);
 
   // If our RAUW helper is invalid, we do not support RAUWing this case, so
   // just return next.

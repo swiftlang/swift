@@ -66,11 +66,11 @@ namespace constraints {
 enum class DeclTypeCheckingSemantics {
   /// A normal declaration.
   Normal,
-  
+
   /// The type(of:) declaration, which performs a "dynamic type" operation,
   /// with different behavior for existential and non-existential arguments.
   TypeOf,
-  
+
   /// The withoutActuallyEscaping(_:do:) declaration, which makes a nonescaping
   /// closure temporarily escapable.
   WithoutActuallyEscaping,
@@ -294,7 +294,7 @@ public:
         RequirementFailureInfo{Req, SubstReq, { }, IsolatedConformances,
                                IsolatedConformanceProto});
   }
-  
+
   const RequirementFailureInfo &getRequirementFailureInfo() const {
     assert(Kind == CheckRequirementsResult::RequirementFailure);
 
@@ -549,8 +549,6 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                            Type builderType);
 
-bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
-
 void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
 
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
@@ -727,12 +725,6 @@ void filterSolutionsForCodeCompletion(
 bool typeCheckForCodeCompletion(
     constraints::SyntacticElementTarget &target,
     llvm::function_ref<void(const constraints::Solution &)> callback);
-
-/// Check the key-path expression.
-///
-/// Returns the type of the last component of the key-path.
-std::optional<Type> checkObjCKeyPathExpr(DeclContext *dc, KeyPathExpr *expr,
-                                         bool requireResultType = false);
 
 /// Type check whether the given type declaration includes members of
 /// unsupported recursive value types.
@@ -926,6 +918,11 @@ void checkConformancesInContext(IterableDeclContext *idc);
 
 /// Check that the type of the given property conforms to NSCopying.
 ProtocolConformanceRef checkConformanceToNSCopying(VarDecl *var);
+
+/// Simplify generic argument expressions which are type sugar productions that
+/// got parsed as expressions due to the parser not knowing which identifiers
+/// are type names.
+TypeExpr *simplifyGenericArgumentTypeExpr(DeclContext *DC, Expr *E);
 
 /// \name Name lookup
 ///
@@ -1155,14 +1152,9 @@ void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkCallerSideDefaultArgumentEffects(DeclContext *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
 /// Whether the given expression can throw, and if so, the thrown type.
 std::optional<Type> canThrow(ASTContext &ctx, Expr *expr);
-
-/// Whether the given for..each statement can throw, and if so, the thrown
-/// error type.
-std::optional<Type> canThrow(ASTContext &ctx, ForEachStmt *forEach);
 
 /// Determine the error type that is thrown out of the body of the given
 /// do-catch statement.
@@ -1321,40 +1313,6 @@ diag::RequirementKind getProtocolRequirementKind(ValueDecl *Requirement);
 /// `dynamicallyCall(withKeywordArguments:)`.
 bool isValidDynamicCallableMethod(FuncDecl *decl,
                                   bool hasKeywordArguments);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)`.
-bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                         bool ignoreLabel = false);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter that conforms to
-/// `ExpressibleByStringLiteral` protocol.
-bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                      bool ignoreLabel = false);
-
-/// Returns the KeyPath parameter type for a valid implementation of
-/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
-/// @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-///
-/// Returns null if the given subscript is not a valid dynamic member lookup
-/// implementation.
-BoundGenericType *
-getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
-                                     bool ignoreLabel = false);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
-/// @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-bool isValidKeyPathDynamicMemberLookup(SubscriptDecl *decl,
-                                       bool ignoreLabel = false);
 
 /// Compute the wrapped value type for the given property that has attached
 /// property wrappers, when the backing storage is known to have the given type.
@@ -1560,6 +1518,11 @@ void recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 
+/// Returns true if a diagnostic ought to be emitted for any explicit reference
+/// to decl made from within the given DeclContext.
+bool shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                          const DeclContext *dc);
+
 /// Emit or delay a diagnostic that suggests adding a missing import that is
 /// necessary to bring \p decl into scope in the containing source file. If
 /// delayed, the diagnostic will instead be emitted after type checking the
@@ -1572,6 +1535,12 @@ bool maybeDiagnoseMissingImportForMember(
 /// Emit delayed diagnostics regarding imports that should be added to the
 /// source file.
 void diagnoseMissingImports(SourceFile &sf);
+
+// Guide ForEachStmt type-checking by indicating whether the BorrowingSequence
+// protocol should be used, thus enabling Borrowing iteration for a given
+// sequence type.
+bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
+                                SourceLoc loc, DeclContext *dc);
 
 } // end namespace swift
 

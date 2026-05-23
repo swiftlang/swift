@@ -52,6 +52,9 @@ public:
   /// Retrieves a specific output specified by \p Kind, if it exists.
   std::optional<Output> getOutput(file_types::ID Kind) const;
 
+  /// \returns the input index associated with this compiler result.
+  llvm::Expected<unsigned> getInputIndex() const;
+
   /// Print this result to \p OS.
   llvm::Error print(llvm::raw_ostream &OS);
 
@@ -70,7 +73,8 @@ public:
     /// Build a single \c ObjectRef representing the provided outputs. The
     /// result can be used with \c CompileJobResultSchema to retrieve the
     /// original outputs.
-    llvm::Expected<llvm::cas::ObjectRef> build(llvm::cas::ObjectStore &CAS);
+    llvm::Expected<llvm::cas::ObjectRef> build(llvm::cas::ObjectStore &CAS,
+                                               unsigned InputIndex);
 
   private:
     struct PrivateImpl;
@@ -78,6 +82,7 @@ public:
   };
 
 private:
+  ArrayRef<file_types::ID> getOutputKinds() const;
   llvm::cas::ObjectRef getOutputObject(size_t I) const;
   llvm::cas::ObjectRef getPathsListRef() const;
   file_types::ID getOutputKind(size_t I) const;

@@ -222,12 +222,6 @@ bool Requirement::canBeSatisfied() const {
   llvm_unreachable("Bad requirement kind");
 }
 
-bool Requirement::isInvertibleProtocolRequirement() const {
-  return getKind() == RequirementKind::Conformance
-      && getFirstType()->is<GenericTypeParamType>()
-      && getProtocolDecl()->getInvertibleProtocolKind();
-}
-
 /// Determine the canonical ordering of requirements.
 static unsigned getRequirementKindOrder(RequirementKind kind) {
   switch (kind) {
@@ -265,7 +259,7 @@ int Requirement::compare(const Requirement &other) const {
 
   int compareProtos =
     TypeDecl::compare(getProtocolDecl(), other.getProtocolDecl());
-  assert(compareProtos != 0 && "Duplicate conformance requirements");
+  ASSERT(compareProtos != 0 && "Duplicate conformance requirements");
 
   return compareProtos;
 }

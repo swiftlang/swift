@@ -197,9 +197,14 @@ CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
                                         std::optional<Size::int_type> Size) {
   if (!Ty || Ty->hasTypeParameter())
     return {};
-  auto *StorageType = IGM.getStorageTypeForUnlowered(Ty);
   std::optional<uint64_t> SizeInBits;
-  if (StorageType->isSized())
+
+  auto *StorageType = IGM.getStorageTypeForUnlowered(Ty);
+  // Prefer the storage type where possible. This is more accurate in case of
+  // Int1 where we see the exact number of used bits.
+  // If the type does NOT have a fixed size, then ignore the storage type as it
+  // ithe storage type is just a pointer.
+  if (StorageType->isSized() && Info.isFixedSize())
     SizeInBits = IGM.DataLayout.getTypeSizeInBits(StorageType);
   else if (Info.isFixedSize()) {
     const FixedTypeInfo &FixTy = *cast<const FixedTypeInfo>(&Info);

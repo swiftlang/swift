@@ -1,0 +1,70 @@
+// RUN: %target-sil-opt -sil-print-types -verify-debug-value-expr -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck %s
+
+// REQUIRES: asserts
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { parent @test_type_mismatch : $@convention(thin) () -> () }
+sil_scope 2 { parent @test_arg_type_mismatch : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 3 { parent @test_deref_mismatch : $@convention(thin) () -> () }
+sil_scope 4 { parent @test_no_transform_type_mismatch : $@convention(thin) (Builtin.Int32) -> () }
+
+// The transform block returns Builtin.Int32 but the fragment narrows to
+// Builtin.Int64.
+// CHECK-LABEL: Begin Error in function test_type_mismatch
+// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK-LABEL: End Error in function test_type_mismatch
+sil @test_type_mismatch : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $Builtin.Int32, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int32, 42
+    return %0 : $Builtin.Int32
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// The block arg is Int32 but SSA operand is Int64.
+// CHECK-LABEL: Begin Error in function test_arg_type_mismatch
+// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK-LABEL: End Error in function test_arg_type_mismatch
+sil @test_arg_type_mismatch : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%arg : $Builtin.Int64):
+  debug_value %arg : $Builtin.Int64, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0(%0 : $Builtin.Int32):
+    %1 = integer_literal $Builtin.Int64, 10
+    return %1 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// Transform returns object type but op_deref is present (expects address).
+// CHECK-LABEL: Begin Error in function test_deref_mismatch
+// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK-LABEL: End Error in function test_deref_mismatch
+sil @test_deref_mismatch : $@convention(thin) () -> () {
+bb0:
+  debug_value undef : $Builtin.Int64, let, name "x", type $Int64, expr op_deref:op_fragment:#Int64._value, transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int64, 42
+    return %0 : $Builtin.Int64
+  }
+  %r = tuple ()
+  return %r : $()
+}
+
+// No transform: SSA type doesn't match fragment-narrowed vartype.
+// CHECK-LABEL: Begin Error in function test_no_transform_type_mismatch
+// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK-LABEL: End Error in function test_no_transform_type_mismatch
+sil @test_no_transform_type_mismatch : $@convention(thin) (Builtin.Int32) -> () {
+bb0(%arg : $Builtin.Int32):
+  debug_value %arg : $Builtin.Int32, let, name "x", type $Int64, expr op_fragment:#Int64._value
+  %r = tuple ()
+  return %r : $()
+}

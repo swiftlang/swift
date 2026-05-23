@@ -541,7 +541,7 @@ void AvailableValueDataflowFixup::verifyOwnership(DeadEndBlocks &deBlocks) {
       continue;
 
     for (auto result : inst->getResults()) {
-      result.verifyOwnership(&deBlocks);
+      result.verifyOwnership(&deBlocks, /*instIndices=*/ nullptr);
     }
   }
   insertedInsts.clear();
@@ -1956,7 +1956,7 @@ private:
 
   /// Return true if a mark_dependence can be promoted. If so, this initializes
   /// the available values in promotions.
-  bool canPromoteMarkDepBase(MarkDependenceInst *md);
+  bool canPromoteMarkDepBase(MarkDependenceInstruction md);
 
   /// Return true if a load [take] or destroy_addr can be promoted. If so, this
   /// initializes the available values in promotions.
@@ -2032,7 +2032,9 @@ bool OptimizeDeadAlloc::canRemoveDeadAllocation() {
   }
 
   for (auto *md : promotions.markDepBases.instructions()) {
-    if (!canPromoteMarkDepBase(cast<MarkDependenceInst>(md)))
+    MarkDependenceInstruction mdInstruction(md);
+    assert(mdInstruction && "md is a MarkDependenceInst or MarkDependenceAddrInst");
+    if (!canPromoteMarkDepBase(mdInstruction))
       return false;
   }
   if (isTrivial()) {
@@ -2149,16 +2151,16 @@ SILInstruction *OptimizeDeadAlloc::collectUsesForPromotion() {
   return nullptr;
 }
 
-bool OptimizeDeadAlloc::canPromoteMarkDepBase(MarkDependenceInst *md) {
-  SILValue srcAddr = md->getBase();
+bool OptimizeDeadAlloc::canPromoteMarkDepBase(MarkDependenceInstruction md) {
+  SILValue srcAddr = md.getBase();
   SmallVector<AvailableValue, 8> availableValues;
   auto loadInfo =
-      DataflowContext.computeAvailableValues(srcAddr, md, availableValues);
+      DataflowContext.computeAvailableValues(srcAddr, *md, availableValues);
   if (!loadInfo.has_value())
     return false;
 
   unsigned index = promotions.markDepBases.initializeAvailableValues(
-      md, std::move(availableValues));
+      *md, std::move(availableValues));
 
   SILType baseTy = loadInfo->loadType;
   if (auto *abi = dyn_cast<AllocBoxInst>(TheMemory)) {

@@ -9,7 +9,6 @@
 import Distributed
 import FakeDistributedActorSystems
 
-@available(SwiftStdlib 5.7, *)
 typealias DefaultDistributedActorSystem = FakeActorSystem
 
 class MyClass { }
@@ -24,7 +23,6 @@ protocol HasActorSystem {
 extension MyActor: HasActorSystem { }
 
 // CHECK: %T27distributed_actor_accessors7MyActorC = type <{ %swift.refcounted, %swift.defaultactor, %T27FakeDistributedActorSystems0C7AddressV, %T27FakeDistributedActorSystems0aC6SystemV, ptr }>
-@available(SwiftStdlib 5.7, *)
 public distributed actor MyActor {
   var field: MyClass = MyClass()
 
@@ -36,7 +34,6 @@ public distributed actor MyActor {
 // This does not have the concrete fields in the IR type because the LocalTestingDistributedActorSystem
 // is declared in Distributed, which means that it is compiled with library evolution turned on,
 // which causes the type to be laid out at runtime.
-@available(SwiftStdlib 5.7, *)
 public distributed actor MyActorInt {
   public typealias ActorSystem = LocalTestingDistributedActorSystem
   var field: String = ""

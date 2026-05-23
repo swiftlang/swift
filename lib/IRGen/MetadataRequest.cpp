@@ -1082,6 +1082,21 @@ MetadataAccessStrategy irgen::getTypeMetadataAccessStrategy(CanType type) {
     if (requiresForeignTypeMetadata(nominal))
       return MetadataAccessStrategy::ForeignAccessor;
 
+    // @objc @implementation classes *should* be treated like imported ObjC
+    // classes, meaning they should use non-unique accessors. However, previous
+    // versions of the Swift compiler incorrectly emitted a public unique
+    // accessor, and clients which knew about the implementation (i.e. which had
+    // a swiftmodule that hadn't been generated from a swiftinterface) could
+    // sometimes use it.
+    //
+    // To improve this situation without breaking ABI, we'll use a non-unique
+    // accessor for classes implemented outside the main module, and fall
+    // through otherwise.
+    if (isa<ClassDecl>(nominal) && nominal->getObjCImplementationDecl()
+          && !nominal->getObjCImplementationDecl()
+                ->getModuleContext()->isMainModule())
+      return MetadataAccessStrategy::NonUniqueAccessor;
+
     // If the type doesn't guarantee that it has an access function,
     // we might have to use a non-unique accessor.
 
@@ -1258,6 +1273,20 @@ static MetadataResponse emitFixedArrayMetadataRef(IRGenFunction &IGF,
     call->setDoesNotThrow();
 
     return MetadataResponse::handle(IGF, request, call);
+}
+
+static MetadataResponse emitBorrowMetadataRef(IRGenFunction &IGF,
+                                              CanBuiltinBorrowType type,
+                                              DynamicMetadataRequest request) {
+  auto call = IGF.Builder.CreateCall(
+    IGF.IGM.getGetBorrowTypeMetadataFunctionPointer(),
+    {request.get(IGF),
+     IGF.emitTypeMetadataRef(type->getReferentType(), MetadataState::Abstract)
+        .getMetadata()});
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  call->setDoesNotThrow();
+
+  return MetadataResponse::handle(IGF, request, call);
 }
 
 static MetadataResponse emitTupleTypeMetadataRef(IRGenFunction &IGF,
@@ -1437,7 +1466,7 @@ getFunctionTypeFlags(CanFunctionType type) {
   if (isolation.isErased())
     extFlags = extFlags.withIsolatedAny();
 
-  if (isolation.isNonIsolatedCaller())
+  if (isolation.isNonisolatedNonsending())
     extFlags = extFlags.withNonIsolatedCaller();
 
   auto flags = FunctionTypeFlags()
@@ -1477,11 +1506,9 @@ emitFunctionTypeMetadataParams(IRGenFunction &IGF,
   if (!params.empty()) {
     auto arrayTy =
         llvm::ArrayType::get(IGF.IGM.TypeMetadataPtrTy, info.numParams);
-    info.parameters = StackAddress(IGF.createAlloca(
-        arrayTy, IGF.IGM.getTypeMetadataAlignment(), "function-parameters"));
-
-    IGF.Builder.CreateLifetimeStart(info.parameters.getAddress(),
-                                    IGF.IGM.getPointerSize() * info.numParams);
+    info.parameters = IGF.emitStaticAlloca(
+        arrayTy, IGF.IGM.getPointerSize() * info.numParams,
+        IGF.IGM.getTypeMetadataAlignment(), "function-parameters");
 
     for (unsigned i : indices(params)) {
       auto param = params[i];
@@ -1547,12 +1574,7 @@ emitDynamicFunctionTypeMetadataParams(IRGenFunction &IGF,
 static void cleanupFunctionTypeMetadataParams(IRGenFunction &IGF,
                                               FunctionTypeMetadataParamInfo info) {
   if (info.parameters.isValid()) {
-    if (info.parameters.getExtraInfo()) {
-      IGF.emitDeallocateDynamicAlloca(info.parameters);
-    } else {
-      IGF.Builder.CreateLifetimeEnd(info.parameters.getAddress(),
-                                    IGF.IGM.getPointerSize() * info.numParams);
-    }
+    IGF.emitStackDeallocation(info.parameters);
   }
 }
 
@@ -1563,6 +1585,69 @@ static CanPackType getInducedPackType(AnyFunctionType::CanParamArrayRef params,
     elts.push_back(param.getPlainType());
   
   return CanPackType::get(ctx, elts);
+}
+
+static MetadataResponse
+emitExtendedFunctionTypeMetadataBackdeploy(IRGenFunction &IGF,
+                                           ArrayRef<llvm::Value *> arguments,
+                                           FunctionTypeMetadataParamInfo info) {
+  assert(arguments.size() == 8 && "We always expect 8 parameters");
+  std::array<llvm::Type *, 8> types;
+  for (auto pair : llvm::enumerate(arguments)) {
+    types[pair.index()] = pair.value()->getType();
+  }
+  auto *helper = IGF.IGM.getOrCreateHelperFunction(
+      "__swift_getExtendedFunctionTypeMetadata_backDeploy", IGF.IGM.PtrTy,
+      types, [&](auto &subIGF) {
+        llvm::Function *curFn = subIGF.CurFn;
+        std::array<llvm::Value *, 8> arguments;
+        for (auto pair : llvm::enumerate(curFn->args())) {
+          arguments[pair.index()] = &pair.value();
+        }
+        std::array<llvm::Value *, 4> backdeployArgs = {
+            arguments[0],
+            // We skip the second parameter since it is for the differentiable
+            // entry.
+            arguments[2], arguments[3], arguments[4]};
+
+        auto fnPtr = subIGF.IGM.getGetFunctionMetadataExtendedFunctionPointer();
+        auto isNonNull =
+            subIGF.Builder.CreateIsNotNull(fnPtr.getPointer(subIGF));
+        auto *successBlock =
+            subIGF.createBasicBlock("have-get-function-metadata-extended");
+        auto *failBlock = subIGF.createBasicBlock(
+            "do-not-have-get-function-metadata-extended");
+        auto *contBB =
+            subIGF.createBasicBlock("cont-get-function-metadata-extended-call");
+        subIGF.Builder.CreateCondBr(isNonNull, successBlock, failBlock);
+
+        subIGF.Builder.emitBlock(successBlock);
+        auto *successValue = subIGF.Builder.CreateCall(fnPtr, arguments);
+        successValue->setDoesNotThrow();
+        subIGF.Builder.CreateBr(contBB);
+
+        subIGF.Builder.emitBlock(failBlock);
+        auto *failValue = subIGF.Builder.CreateCall(
+            subIGF.IGM.getGetFunctionMetadataFunctionPointer(), backdeployArgs);
+        failValue->setDoesNotThrow();
+        subIGF.Builder.CreateBr(contBB);
+
+        subIGF.Builder.emitBlock(contBB);
+        auto *phi = subIGF.Builder.CreatePHI(failValue->getType(), 2);
+        phi->addIncoming(successValue, successBlock);
+        phi->addIncoming(failValue, failBlock);
+        subIGF.Builder.CreateRet(phi);
+      });
+
+  auto fnType = llvm::FunctionType::get(IGF.IGM.PtrTy, types,
+                                        false /*is var arg*/);
+  auto sig = Signature(fnType, {}, IGF.IGM.DefaultCC);
+  auto fnPtr = FunctionPointer::forDirect(FunctionPointer::Kind::Function,
+                                          helper, nullptr, sig);
+  auto call = IGF.Builder.CreateCall(fnPtr, arguments);
+  call->setDoesNotThrow();
+  cleanupFunctionTypeMetadataParams(IGF, info);
+  return MetadataResponse::forComplete(call);
 }
 
 static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
@@ -1652,7 +1737,6 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
 
   default:
     llvm::SmallVector<llvm::Value *, 8> arguments;
-
     arguments.push_back(flagsVal);
 
     llvm::Value *diffKindVal = nullptr;
@@ -1729,24 +1813,42 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
       arguments.push_back(llvm::ConstantPointerNull::get(IGF.IGM.TypeMetadataPtrTy));
     }
 
-    auto getMetadataFn =
-        flags.hasExtendedFlags()
-            ? IGF.IGM.getGetFunctionMetadataExtendedFunctionPointer()
-        : type->getGlobalActor()
-            ? (IGF.IGM.isConcurrencyAvailable()
-                   ? IGF.IGM
-                         .getGetFunctionMetadataGlobalActorFunctionPointer()
-                   : IGF.IGM
-                         .getGetFunctionMetadataGlobalActorBackDeployFunctionPointer())
-        : type->isDifferentiable()
-            ? IGF.IGM.getGetFunctionMetadataDifferentiableFunctionPointer()
-            : IGF.IGM.getGetFunctionMetadataFunctionPointer();
+    // If we have a function that is nonisolated(nonsending) and that is the
+    // only extended flag that it has, allow for the metadata call to backdeploy
+    // by calling GetFunctionMetadata instead of GetFunctionMetadataExtended if
+    // we backdeploy and GetFunctionMetadataExtended is not available.
+    //
+    // SAFETY: This is safe to do as long as we do not attempt to reflect (in a
+    // way that exposes the async bits of the type), cast, or existential erase
+    // these types.
+    if (flags.hasExtendedFlags() &&
+        (extFlags == decltype(extFlags)().withNonIsolatedCaller()) &&
+        !type->isDifferentiable() &&
+        cast<llvm::Function>(IGF.IGM.getGetFunctionMetadataExtendedFn())
+            ->hasExternalWeakLinkage()) {
+      return emitExtendedFunctionTypeMetadataBackdeploy(IGF, arguments, info);
+    }
+
+    auto getMetadataFn = [&]() -> FunctionPointer {
+      if (flags.hasExtendedFlags())
+        return IGF.IGM.getGetFunctionMetadataExtendedFunctionPointer();
+
+      if (type->getGlobalActor()) {
+        if (IGF.IGM.isConcurrencyAvailable())
+          return IGF.IGM.getGetFunctionMetadataGlobalActorFunctionPointer();
+        return IGF.IGM
+            .getGetFunctionMetadataGlobalActorBackDeployFunctionPointer();
+      }
+
+      if (type->isDifferentiable())
+        return IGF.IGM.getGetFunctionMetadataDifferentiableFunctionPointer();
+
+      return IGF.IGM.getGetFunctionMetadataFunctionPointer();
+    }();
 
     auto call = IGF.Builder.CreateCall(getMetadataFn, arguments);
     call->setDoesNotThrow();
-
     cleanupFunctionTypeMetadataParams(IGF, info);
-
     return MetadataResponse::forComplete(call);
   }
 }
@@ -1786,6 +1888,15 @@ namespace {
       }
 
       return emitDirectMetadataRef(type);
+    }
+
+#define UNSUPPORTED_METADATA(type)                                              \
+    MetadataResponse                                                            \
+    visit##type##Type(Can##type##Type t, DynamicMetadataRequest request) {      \
+      ABORT([&](llvm::raw_ostream &out) {                                       \
+        out << "Cannot emit metadata for type:\n";                              \
+        t->dump(out);                                                           \
+      });                                                                       \
     }
 
     MetadataResponse
@@ -1847,11 +1958,7 @@ namespace {
       return emitDirectMetadataRef(type);
     }
 
-    MetadataResponse
-    visitBuiltinPackIndexType(CanBuiltinPackIndexType type,
-                              DynamicMetadataRequest request) {
-      llvm_unreachable("metadata unsupported for this builtin type");
-    }
+    UNSUPPORTED_METADATA(BuiltinPackIndex)
 
     MetadataResponse
     visitBuiltinFloatType(CanBuiltinFloatType type,
@@ -1864,13 +1971,20 @@ namespace {
                            DynamicMetadataRequest request) {
       return emitDirectMetadataRef(type);
     }
-    
-    MetadataResponse
-    visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type,
-                                   DynamicMetadataRequest request) {
-      llvm_unreachable("not a real type");
-    }
 
+    UNSUPPORTED_METADATA(BuiltinUnboundGeneric)
+
+    MetadataResponse
+    visitBuiltinBorrowType(CanBuiltinBorrowType type,
+                           DynamicMetadataRequest request) {
+      if (auto cached = tryGetLocal(type, request)) {
+        return cached;
+      }
+
+      auto response = emitBorrowMetadataRef(IGF, type, request);
+      return setLocal(type, response);
+    }
+    
     MetadataResponse
     visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type,
                                DynamicMetadataRequest request) {
@@ -1899,20 +2013,9 @@ namespace {
       return emitTypeMetadataPackRef(IGF, type, request);
     }
 
-    MetadataResponse visitSILPackType(CanSILPackType type,
-                                      DynamicMetadataRequest request) {
-      llvm_unreachable("cannot emit metadata for a SIL pack type");
-    }
-
-    MetadataResponse visitPackExpansionType(CanPackExpansionType type,
-                                            DynamicMetadataRequest request) {
-      llvm_unreachable("cannot emit metadata for a pack expansion by itself");
-    }
-
-    MetadataResponse visitPackElementType(CanPackElementType type,
-                                          DynamicMetadataRequest request) {
-      llvm_unreachable("cannot emit metadata for a pack element by itself");
-    }
+    UNSUPPORTED_METADATA(SILPack)
+    UNSUPPORTED_METADATA(PackExpansion)
+    UNSUPPORTED_METADATA(PackElement)
 
     MetadataResponse visitTupleType(CanTupleType type,
                                     DynamicMetadataRequest request) {
@@ -1924,12 +2027,7 @@ namespace {
       return setLocal(type, response);
     }
 
-    MetadataResponse visitGenericFunctionType(CanGenericFunctionType type,
-                                              DynamicMetadataRequest request) {
-      IGF.unimplemented(SourceLoc(),
-                        "metadata ref for generic function type");
-      return MetadataResponse::getUndef(IGF);
-    }
+    UNSUPPORTED_METADATA(GenericFunction)
 
     MetadataResponse visitFunctionType(CanFunctionType type,
                                        DynamicMetadataRequest request) {
@@ -1953,6 +2051,10 @@ namespace {
       
       if (auto metatype = tryGetLocal(type, request))
         return metatype;
+
+      if (IGF.IGM.isEmbeddedWithExistentials()) {
+        return MetadataResponse::forComplete(IGF.IGM.getAddrOfTypeMetadata(type));
+      }
 
       auto instMetadata =
         IGF.emitAbstractTypeMetadataRef(type.getInstanceType());
@@ -1989,11 +2091,7 @@ namespace {
       return setLocal(type, MetadataResponse::forComplete(call));
     }
 
-    MetadataResponse visitModuleType(CanModuleType type,
-                                     DynamicMetadataRequest request) {
-      IGF.unimplemented(SourceLoc(), "metadata ref for module type");
-      return MetadataResponse::getUndef(IGF);
-    }
+    UNSUPPORTED_METADATA(Module)
 
     MetadataResponse visitDynamicSelfType(CanDynamicSelfType type,
                                           DynamicMetadataRequest request) {
@@ -2017,7 +2115,8 @@ namespace {
 
       // These currently aren't wrapped in ExistentialType, but we
       // can future-proof against them ending up in this path.
-      if (type->isAny() || type->isAnyObject())
+      if (!type->getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+          (type->isAny() || type->isAnyObject()))
         return emitSingletonExistentialTypeMetadata(type);
 
       auto metadata = emitExistentialTypeMetadata(type);
@@ -2044,6 +2143,11 @@ namespace {
     }
 
     llvm::Value *emitExistentialTypeMetadata(CanExistentialType type) {
+      if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+        llvm::Constant *result = IGF.IGM.getAddrOfTypeMetadata(type);
+        return result;
+      }
+
       auto layout = type.getExistentialLayout();
 
       if (!layout.getParameterizedProtocols().empty()) {
@@ -2165,46 +2269,35 @@ namespace {
     MetadataResponse
     visitProtocolCompositionType(CanProtocolCompositionType type,
                                  DynamicMetadataRequest request) {
-      if (type->isAny() || type->isAnyObject())
-        return emitSingletonExistentialTypeMetadata(type);
-
-      assert(false && "constraint type should be wrapped in existential type");
+      if (type->isAny() || type->isAnyObject()) {
+        if (!type->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+          return emitSingletonExistentialTypeMetadata(type);
+      } else {
+        assert(false && "constraint type should be wrapped in existential type");
+      }
 
       CanExistentialType existential(
           ExistentialType::get(type)->castTo<ExistentialType>());
-
-      if (auto metatype = tryGetLocal(existential, request))
-        return metatype;
-
-      auto metadata = emitExistentialTypeMetadata(existential);
-      return setLocal(type, MetadataResponse::forComplete(metadata));
+      return visitExistentialType(existential, request);
     }
 
-    MetadataResponse
-    visitParameterizedProtocolType(CanParameterizedProtocolType type,
-                                   DynamicMetadataRequest request) {
-      llvm_unreachable("constraint type should be wrapped in existential type");
-    }
 
-    MetadataResponse visitReferenceStorageType(CanReferenceStorageType type,
-                                               DynamicMetadataRequest request) {
-      llvm_unreachable("reference storage type should have been converted by "
-                       "SILGen");
-    }
-    MetadataResponse visitSILFunctionType(CanSILFunctionType type,
-                                          DynamicMetadataRequest request) {
-      llvm_unreachable("should not be asking for metadata of a lowered SIL "
-                       "function type--SILGen should have used the AST type");
-    }
-    MetadataResponse visitSILTokenType(CanSILTokenType type,
-                                          DynamicMetadataRequest request) {
-      llvm_unreachable("should not be asking for metadata of a SILToken type");
-    }
-    MetadataResponse
-    visitSILMoveOnlyWrappedType(CanSILMoveOnlyWrappedType type,
-                                DynamicMetadataRequest request) {
-      llvm_unreachable("should not be asking for metadata of a move only type");
-    }
+    UNSUPPORTED_METADATA(ParameterizedProtocol)
+    UNSUPPORTED_METADATA(ReferenceStorage)
+    UNSUPPORTED_METADATA(SILFunction)
+    UNSUPPORTED_METADATA(SILToken)
+    UNSUPPORTED_METADATA(SILMoveOnlyWrapped)
+    UNSUPPORTED_METADATA(GenericTypeParam)
+    UNSUPPORTED_METADATA(DependentMember)
+    UNSUPPORTED_METADATA(LValue)
+    UNSUPPORTED_METADATA(InOut)
+    UNSUPPORTED_METADATA(Error)
+    UNSUPPORTED_METADATA(Integer)
+    UNSUPPORTED_METADATA(Hidden)
+    UNSUPPORTED_METADATA(SILBlockStorage)
+    UNSUPPORTED_METADATA(BuiltinDefaultActorStorage)
+    UNSUPPORTED_METADATA(BuiltinNonDefaultDistributedActorStorage)
+
     MetadataResponse visitArchetypeType(CanArchetypeType type,
                                         DynamicMetadataRequest request) {
       if (auto packArchetypeType = dyn_cast<PackArchetypeType>(type))
@@ -2212,46 +2305,6 @@ namespace {
 
       return emitArchetypeTypeMetadataRef(IGF, type, request);
     }
-
-    MetadataResponse visitGenericTypeParamType(CanGenericTypeParamType type,
-                                               DynamicMetadataRequest request) {
-      llvm_unreachable("dependent type should have been substituted by Sema or SILGen");
-    }
-
-    MetadataResponse visitDependentMemberType(CanDependentMemberType type,
-                                              DynamicMetadataRequest request) {
-      llvm_unreachable("dependent type should have been substituted by Sema or SILGen");
-    }
-
-    MetadataResponse visitLValueType(CanLValueType type,
-                                     DynamicMetadataRequest request) {
-      llvm_unreachable("lvalue type should have been lowered by SILGen");
-    }
-    MetadataResponse visitInOutType(CanInOutType type,
-                                    DynamicMetadataRequest request) {
-      llvm_unreachable("inout type should have been lowered by SILGen");
-    }
-    MetadataResponse visitErrorType(CanErrorType type,
-                                    DynamicMetadataRequest request) {
-      llvm_unreachable("error type should not appear in IRGen");
-    }
-
-    MetadataResponse visitIntegerType(CanIntegerType type,
-                                      DynamicMetadataRequest request) {
-      llvm_unreachable("integer type should not appear in IRGen");
-    }
-
-    // These types are artificial types used for internal purposes and
-    // should never appear in a metadata request.
-#define INTERNAL_ONLY_TYPE(ID)                                               \
-    MetadataResponse visit##ID##Type(Can##ID##Type type,                     \
-                                     DynamicMetadataRequest request) {       \
-      llvm_unreachable("cannot ask for metadata of compiler-internal type"); \
-    }
-    INTERNAL_ONLY_TYPE(SILBlockStorage)
-    INTERNAL_ONLY_TYPE(BuiltinDefaultActorStorage)
-    INTERNAL_ONLY_TYPE(BuiltinNonDefaultDistributedActorStorage)
-#undef INTERNAL_ONLY_TYPE
 
     MetadataResponse visitSILBoxType(CanSILBoxType type,
                                      DynamicMetadataRequest request) {
@@ -2269,6 +2322,8 @@ namespace {
       IGF.setScopedLocalTypeMetadata(type, response);
       return response;
     }
+
+#undef UNSUPPORTED_METADATA
   };
 } // end anonymous namespace
 
@@ -3390,15 +3445,6 @@ llvm::Value *IRGenFunction::emitTypeMetadataRef(CanType type) {
 MetadataResponse
 IRGenFunction::emitTypeMetadataRef(CanType type,
                                    DynamicMetadataRequest request) {
-  auto &langOpts = type->getASTContext().LangOpts;
-  if (langOpts.hasFeature(Feature::Embedded) &&
-      !langOpts.hasFeature(Feature::EmbeddedExistentials) &&
-      !isMetadataAllowedInEmbedded(type)) {
-    llvm::errs() << "Metadata pointer requested in embedded Swift for type "
-                 << type << "\n";
-    llvm::report_fatal_error("metadata used in embedded mode");
-  }
-
   type = IGM.getRuntimeReifiedType(type);
   // Look through any opaque types we're allowed to.
   type = IGM.substOpaqueTypesWithUnderlyingTypes(type);
@@ -3412,7 +3458,7 @@ IRGenFunction::emitTypeMetadataRef(CanType type,
   if (type->hasArchetype() ||
       !shouldTypeMetadataAccessUseAccessor(IGM, type) ||
       isa<PackType>(type) ||
-      langOpts.hasFeature(Feature::Embedded)) {
+      IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
     return emitDirectTypeMetadataRef(*this, type, request);
   }
 

@@ -753,6 +753,7 @@ Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_3_0ABvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_4_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_5_0ABvpZMV
 Added: _$ss7Float80V12signalingNaNABvpZMV
 Added: _$ss7Float80V13_exponentBiasSuvpZMV
 Added: _$ss7Float80V13_quietNaNMasks6UInt64VvpZMV
@@ -1167,3 +1168,139 @@ Added: _$sSS9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
 Added: _$sSs17UnicodeScalarViewV20isTriviallyIdentical2toSbAB_tF
 Added: _$sSs8UTF8ViewV20isTriviallyIdentical2toSbAB_tF
 Added: _$sSs9UTF16ViewV20isTriviallyIdentical2toSbAB_tF
+
+// SE-0498: Add Runtime.demangle function
+Added: __swift_runtime_demangle
+Added: __swift_runtime_demangle_allocate
+
+// New SPI for dynamic exclusivity checking.
+Added: __swift_exclusivityAccessGetParent
+Added: __swift_exclusivityAccessSetNext
+
+// Runtime support for `Builtin.Borrow`
+Added: _swift_dereferenceBorrow
+Added: _swift_getBorrowTypeMetadata
+Added: _swift_initBorrow
+
+// BorrowingSequence + supporting symbols
+Added: _$s17BorrowingIterators0A8SequencePTl
+Added: _$s7Elements17BorrowingSequencePTl
+Added: _$s7Elements25BorrowingIteratorProtocolPTl
+Added: _$sSTss17BorrowingSequenceRzrlE04makeA8Iterators0aD7AdapterVy0D0STQzGyF
+Added: _$ss11InlineArrayVyxq_Gs17BorrowingSequencesRi__rlMc
+Added: _$ss11MutableSpanVyxGs17BorrowingSequencesRi_zrlMc
+Added: _$ss14MutableRawSpanVs17BorrowingSequencesMc
+Added: _$ss14MutableRawSpanVs17BorrowingSequencesWP
+Added: _$ss17BorrowingSequenceMp
+Added: _$ss17BorrowingSequenceP04makeA8Iterator0aD0QzyFTj
+Added: _$ss17BorrowingSequenceP04makeA8Iterator0aD0QzyFTq
+Added: _$ss17BorrowingSequenceP19underestimatedCountSivgTj
+Added: _$ss17BorrowingSequenceP0A8IteratorAB_s0aC8ProtocolTn
+Added: _$ss17BorrowingSequenceTL
+Added: _$ss24BorrowingIteratorAdapterV8curValue7ElementQzSgvM
+Added: _$ss24BorrowingIteratorAdapterV8curValue7ElementQzSgvg
+Added: _$ss24BorrowingIteratorAdapterV8curValue7ElementQzSgvpMV
+Added: _$ss24BorrowingIteratorAdapterV8curValue7ElementQzSgvs
+Added: _$ss24BorrowingIteratorAdapterV8iteratorAByxGx_tcfC
+Added: _$ss24BorrowingIteratorAdapterV8iteratorxvM
+Added: _$ss24BorrowingIteratorAdapterV8iteratorxvg
+Added: _$ss24BorrowingIteratorAdapterV8iteratorxvpMV
+Added: _$ss24BorrowingIteratorAdapterV8iteratorxvs
+Added: _$ss24BorrowingIteratorAdapterV8nextSpan12maximumCounts0E0Vy7ElementQzGSi_tF
+Added: _$ss24BorrowingIteratorAdapterVMa
+Added: _$ss24BorrowingIteratorAdapterVMn
+Added: _$ss24BorrowingIteratorAdapterVyxGs0aB8ProtocolsMc
+Added: _$ss25BorrowingIteratorProtocolMp
+Added: _$ss25BorrowingIteratorProtocolP4skip2byS2i_tFTj
+Added: _$ss25BorrowingIteratorProtocolP4skip2byS2i_tFTq
+Added: _$ss25BorrowingIteratorProtocolP8nextSpan12maximumCounts0E0Vy7ElementQzGSi_tFTj
+Added: _$ss25BorrowingIteratorProtocolP8nextSpan12maximumCounts0E0Vy7ElementQzGSi_tFTq
+Added: _$ss25BorrowingIteratorProtocolTL
+Added: _$ss4SpanVyxGs17BorrowingSequencesRi_zrlMc
+Added: _$ss7RawSpanV5_spans0B0Vys5UInt8VGvg
+Added: _$ss7RawSpanVs17BorrowingSequencesMc
+Added: _$ss7RawSpanVs17BorrowingSequencesWP
+Added: _$ss11InlineArrayVsRi__rlE21makeBorrowingIterators04SpanE0Vyq_GyF
+Added: _$ss11MutableSpanVsRi_zrlE21makeBorrowingIterators0bE0VyxGyF
+Added: _$ss12SpanIteratorVMa
+Added: _$ss12SpanIteratorVMn
+Added: _$ss12SpanIteratorVsRi_zrlE5_spans0A0VyxGvM
+Added: _$ss12SpanIteratorVsRi_zrlE5_spans0A0VyxGvg
+Added: _$ss12SpanIteratorVsRi_zrlE5_spans0A0VyxGvs
+Added: _$ss12SpanIteratorVsRi_zrlE6_countSivM
+Added: _$ss12SpanIteratorVsRi_zrlE6_countSivg
+Added: _$ss12SpanIteratorVsRi_zrlE6_countSivs
+Added: _$ss12SpanIteratorVsRi_zrlE6_startSivM
+Added: _$ss12SpanIteratorVsRi_zrlE6_startSivg
+Added: _$ss12SpanIteratorVsRi_zrlE6_startSivs
+Added: _$ss12SpanIteratorVsRi_zrlEyAByxGs0A0VyxGcfC
+Added: _$ss12SpanIteratorVyxGs09BorrowingB8ProtocolsRi_zrlMc
+Added: _$ss14MutableRawSpanV21makeBorrowingIterators0cF0Vys5UInt8VGyF
+Added: _$ss17BorrowingSequenceP19underestimatedCountSivgTj
+Added: _$ss17BorrowingSequenceP19underestimatedCountSivgTq
+Added: _$ss17BorrowingSequenceP31_customContainsEquatableElementySbSg0F0QzFTj
+Added: _$ss17BorrowingSequenceP31_customContainsEquatableElementySbSg0F0QzFTq
+Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zrlE024_customContainsEquatableC0ySbSgADF
+Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zrlE19underestimatedCountSivg
+Added: _$ss17BorrowingSequencePsRi_zRi0_z7ElementRj_zrlE19underestimatedCountSivpMV
+Added: _$ss4SpanVsRi_zrlE21makeBorrowingIterators0aD0VyxGyF
+Added: _$ss7RawSpanV21makeBorrowingIterators0bE0Vys5UInt8VGyF
+Added: _$sSTss17BorrowingSequenceRzrlE19underestimatedCountSivg
+Added: _$sSTss17BorrowingSequenceRzrlE19underestimatedCountSivpMV
+Added: _$sSTss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0STQzF
+Added: _$sSlss17BorrowingSequenceRzrlE19underestimatedCountSivg
+Added: _$sSlss17BorrowingSequenceRzrlE19underestimatedCountSivpMV
+Added: _$sSlss17BorrowingSequenceRzrlE31_customContainsEquatableElementySbSg0F0STQzF
+
+// Necessary for Distributed to compute distributed remote reference object size
+Added: __ZN5swift26getResilientMetadataBoundsEPKNS_21TargetClassDescriptorINS_9InProcessEEE
+
+// Ref
+Added: _$ss3RefVMa
+Added: _$ss3RefVMn
+Added: _$ss3RefVsRi_zRi0_zrlE7builtinxBWvg
+
+// MutableRef
+Added: _$ss10MutableRefVMa
+Added: _$ss10MutableRefVMn
+Added: _$ss10MutableRefVsRi_zrlE7pointerSpyxGvg
+
+// SE-0514 Hashable Conformance for Dictionary.Keys, CollectionOfOne and EmptyCollection
+Added: _$sSD4KeysV9hashValueSivpMV
+Added: _$sSD4KeysVyxq__GSHsMc
+Added: _$sSD4KeysVyxq__GSHsWP
+Added: _$ss15CollectionOfOneVsSHRzlE9hashValueSivpMV
+Added: _$ss15CollectionOfOneVyxGSHsSHRzlMc
+Added: _$ss15CollectionOfOneVyxGSQsSQRzlMc
+Added: _$ss15EmptyCollectionV9hashValueSivpMV
+Added: _$ss15EmptyCollectionVyxGSHsMc
+Added: _$ss15EmptyCollectionVyxGSHsWP
+
+// SE-0525 RawSpan and safe-loading API
+Added: _$ss9ByteOrderO2eeoiySbAB_ABtFZ
+Added: _$ss9ByteOrderO4hash4intoys6HasherVz_tF
+Added: _$ss9ByteOrderO6nativeABvgZ
+Added: _$ss9ByteOrderO6nativeABvpZMV
+Added: _$ss9ByteOrderO6nativeABvpZMV
+Added: _$ss9ByteOrderO9hashValueSivg
+Added: _$ss9ByteOrderO9hashValueSivpMV
+Added: _$ss9ByteOrderOMa
+Added: _$ss9ByteOrderOMn
+Added: _$ss9ByteOrderON
+Added: _$ss9ByteOrderOSHsMc
+Added: _$ss9ByteOrderOSHsWP
+Added: _$ss9ByteOrderOSQsMc
+Added: _$ss9ByteOrderOSQsWP
+
+// Wrapper for SWIFT_CONCURRENCY_TRACING_SUBSYSTEM environment variable
+Added: _concurrencyTracingSubsystem
+
+// UniqueBox type metadata accessor
+Added: _$ss9UniqueBoxVMa
+// UniqueBox type descriptor
+Added: _$ss9UniqueBoxVMn
+// UniqueBox.pointer getter
+Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
+
+// Cross-encoding strcmp for Foundation
+Added: __swift_unicodeBuffersEqual_nonNormalizing

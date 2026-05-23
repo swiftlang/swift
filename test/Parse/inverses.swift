@@ -1,6 +1,6 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature SuppressedAssociatedTypes
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature SuppressedAssociatedTypesWithDefaults -solver-enable-optimize-operator-defaults
 
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 protocol U {}
 
@@ -88,12 +88,18 @@ func ownership2(_ t: ~ borrowing Int) {} // expected-error {{cannot find type 'b
 
 func ownership3(_ t: consuming some ~Clone) {}
 
-func what(one: ~Copyable..., // expected-error {{noncopyable type '~Copyable' cannot be used within a variadic type yet}}
-          two: ~(Copyable...) // expected-error {{variadic parameter cannot appear outside of a function parameter list}}
-                              // expected-error@-1 {{parameter of noncopyable type '~Copyable' must specify ownership}}
+func what1(one: ~Copyable...,  // expected-error {{type '~Copyable' does not conform to protocol 'Copyable'}}
+                               // expected-note@-1 {{required because variadic parameter type must be stored inside an 'Array'}}
+           two: ~(Copyable...) // expected-error {{variadic parameter cannot appear outside of a function parameter list}}
+                               // expected-error@-1 {{parameter of noncopyable type '~Copyable' must specify ownership}}
               // expected-note@-2{{add 'borrowing' for an immutable reference}}
               // expected-note@-3{{add 'inout' for a mutable reference}}
               // expected-note@-4{{add 'consuming' to take the value from the caller}}
+          ) {}
+
+func what2(one: ~Escapable...,  // expected-error {{type '~Escapable' does not conform to protocol 'Escapable'}}
+                                // expected-note@-1 {{required because variadic parameter type must be stored inside an 'Array'}}
+           two: ~(Escapable...) // expected-error {{variadic parameter cannot appear outside of a function parameter list}}
           ) {}
 
 struct A { struct B { struct C {} } }
@@ -123,7 +129,9 @@ func typeInExpression() {
 
   _ = X<(borrowing any ~Copyable) -> Void>()
 
-  _ = ~Copyable.self // expected-error{{unary operator '~' cannot be applied to an operand of type '(any Copyable).Type'}}
+  _ = ~Copyable.self // expected-error{{type '(any Copyable).Type' cannot conform to 'BinaryInteger'}}
+  // expected-note@-1{{required by referencing operator function '~' on 'BinaryInteger' where 'Self' = '(any Copyable).Type'}}
+  // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
   _ = (any ~Copyable).self
 }
 

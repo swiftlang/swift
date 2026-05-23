@@ -591,3 +591,6 @@ extension UInt128 {
     return rhs < lhs
   }
 }
+
+@available(SwiftStdlib 6.0, *)
+extension UInt128: ConvertibleToBytes, ConvertibleFromBytes {}

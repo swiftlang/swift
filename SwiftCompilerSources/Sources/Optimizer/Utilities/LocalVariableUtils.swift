@@ -320,6 +320,9 @@ struct LocalVariableAccessMap: Collection, CustomStringConvertible {
       case .indirectOut:
         self.isLiveIn = false
         self.isLiveOut = true
+      case .directGuaranteed: // Box captured by closure
+        self.isLiveIn = true
+        self.isLiveOut = true
       default:
         return nil
       }
@@ -517,6 +520,9 @@ extension LocalVariableAccessWalker: AddressUseVisitor {
       // Handle instructions that initialize both temporaries and local variables. If operand's address is the same as
       // the local variable's address, then this fully kills operand liveness. The original value in operand's address
       // cannot be used in any way.
+      visit(LocalVariableAccess(.store, operand))
+    case let iba as InitBorrowAddrInst:
+      assert(iba.borrow == operand.value)
       visit(LocalVariableAccess(.store, operand))
     case let md as MarkDependenceAddrInst:
       assert(operand == md.addressOperand)

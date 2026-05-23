@@ -16,19 +16,28 @@ import SwiftShims
 // embedded Swift, in an embedded-programming friendly way (we mainly need
 // printing to not need to heap allocate).
 
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+private func writeSingleChar(_ c: CInt) {
+  _ = _swift_writeCharToStandardOutput(c)
+}
+#else
 @_extern(c, "putchar")
-@discardableResult
 func putchar(_: CInt) -> CInt
+
+private func writeSingleChar(_ c: CInt) {
+  _ = putchar(c)
+}
+#endif
 
 public func print(_ string: StaticString, terminator: StaticString = "\n") {
   var p = unsafe string.utf8Start
   while unsafe p.pointee != 0 {
-    putchar(CInt(unsafe p.pointee))
+    writeSingleChar(CInt(unsafe p.pointee))
     unsafe p += 1
   }
   unsafe p = terminator.utf8Start
   while unsafe p.pointee != 0 {
-    putchar(CInt(unsafe p.pointee))
+    writeSingleChar(CInt(unsafe p.pointee))
     unsafe p += 1
   }
 }
@@ -38,12 +47,12 @@ public func print(_ string: String, terminator: StaticString = "\n") {
   var string = string
   string.withUTF8 { buf in
     for unsafe c in unsafe buf {
-      putchar(CInt(c))
+      writeSingleChar(CInt(c))
     }
   }
   var p = unsafe terminator.utf8Start
   while unsafe p.pointee != 0 {
-    putchar(CInt(unsafe p.pointee))
+    writeSingleChar(CInt(unsafe p.pointee))
     unsafe p += 1
   }
 }
@@ -53,30 +62,30 @@ public func print(_ object: some CustomStringConvertible, terminator: StaticStri
   var string = object.description
   string.withUTF8 { buf in
     for unsafe c in unsafe buf {
-      putchar(CInt(c))
+      writeSingleChar(CInt(c))
     }
   }
   var p = unsafe terminator.utf8Start
   while unsafe p.pointee != 0 {
-    putchar(CInt(unsafe p.pointee))
+    writeSingleChar(CInt(unsafe p.pointee))
     unsafe p += 1
   }
 }
 
 func print(_ buf: UnsafeBufferPointer<UInt8>, terminator: StaticString = "\n") {
   for unsafe c in unsafe buf {
-    putchar(CInt(c))
+    writeSingleChar(CInt(c))
   }
   var p = unsafe terminator.utf8Start
   while unsafe p.pointee != 0 {
-    unsafe putchar(CInt(p.pointee))
+    unsafe writeSingleChar(CInt(p.pointee))
     unsafe p += 1
   }
 }
 
 func printCharacters(_ buf: UnsafeRawBufferPointer) {
   for unsafe c in unsafe buf {
-    putchar(CInt(c))
+    writeSingleChar(CInt(c))
   }
 }
 
@@ -128,7 +137,7 @@ extension BinaryInteger {
     return count
   }
 
-  func writeToStdout() {
+  func writeToStdout(radix: Int = 10) {
     // Avoid withUnsafeTemporaryAllocation which is not typed-throws ready yet
     let byteCount = 64
     let stackBuffer = Builtin.stackAlloc(byteCount._builtinWordValue,
@@ -136,7 +145,7 @@ extension BinaryInteger {
     let buffer = unsafe UnsafeMutableRawBufferPointer(start: .init(stackBuffer),
         count: byteCount).baseAddress!.assumingMemoryBound(to: UInt8.self)
 
-    let count = unsafe _toStringImpl(buffer, 64, 10, false)
+    let count = unsafe _toStringImpl(buffer, 64, radix, false)
 
     unsafe printCharacters(UnsafeBufferPointer(start: buffer, count: count))
 
@@ -145,7 +154,12 @@ extension BinaryInteger {
 }
 
 public func print(_ integer: some BinaryInteger, terminator: StaticString = "\n") {
-  integer.writeToStdout()
+  integer.writeToStdout(radix: 10)
+  print("", terminator: terminator)
+}
+
+internal func printAsHex(_ integer: some BinaryInteger, terminator: StaticString = "\n") {
+  integer.writeToStdout(radix: 16)
   print("", terminator: terminator)
 }
 
@@ -155,4 +169,22 @@ public func print(_ boolean: Bool, terminator: StaticString = "\n") {
   } else {
     print("false", terminator: terminator)
   }
+}
+
+/// Hook used to print a fatal error from C code, e.g., parts of the Swift
+/// Concurrency runtime.
+@c @used
+public func _swift_fatalError(_ message: UnsafePointer<UInt8>) -> Never {
+  if _isDebugAssertConfiguration() {
+    print("fatal error", terminator: ": ")
+
+    var pointer = unsafe message
+    while unsafe pointer.pointee != 0 {
+      unsafe writeSingleChar(CInt(pointer.pointee))
+      unsafe pointer += 1
+    }
+  } else {
+    Builtin.condfail_message(true._value, message._rawValue)
+  }
+  Builtin.unreachable()
 }

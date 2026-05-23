@@ -32,6 +32,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
 #include "swift/Sema/OverloadChoice.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
 #include <string>
@@ -295,8 +296,7 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
     // Passing a static member reference as an argument needs to be downgraded
     // to a warning until future major mode to maintain source compatibility for
     // code with non-Sendable metatypes.
-    if (!cs.getASTContext().isLanguageModeAtLeast(
-            version::Version::getFutureMajorLanguageVersion())) {
+    if (!cs.getASTContext().isLanguageModeAtLeast(LanguageMode::future)) {
       auto *argLoc = cs.getConstraintLocator(locator);
       if (auto *argument = getAsExpr(simplifyLocatorToAnchor(argLoc))) {
         if (auto overload = cs.findSelectedOverloadFor(
@@ -331,7 +331,7 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
   }
 
   // Otherwise, warn until Swift 6.
-  if (!cs.getASTContext().isLanguageModeAtLeast(6))
+  if (!cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v6))
     return FixBehavior::DowngradeToWarning;
 
   return FixBehavior::Error;
@@ -364,6 +364,17 @@ bool MarkGlobalActorFunction::attempt(ConstraintSystem &cs,
       *fixBehavior);
 
   return cs.recordFix(fix);
+}
+
+AddSendableAttribute::AddSendableAttribute(ConstraintSystem &cs,
+                                           FunctionType *fromType,
+                                           FunctionType *toType,
+                                           ConstraintLocator *locator,
+                                           FixBehavior fixBehavior)
+    : ContextualMismatch(cs, FixKind::AddSendableAttribute, fromType, toType,
+                         locator, fixBehavior) {
+  DEBUG_ASSERT(cs.simplifyType(fromType)->isSendableType() !=
+               cs.simplifyType(toType)->isSendableType());
 }
 
 bool AddSendableAttribute::diagnose(const Solution &solution,
@@ -2002,7 +2013,7 @@ bool AllowSendingMismatch::diagnose(const Solution &solution,
 AllowSendingMismatch *AllowSendingMismatch::create(ConstraintSystem &cs,
                                                    Type srcType, Type dstType,
                                                    ConstraintLocator *locator) {
-  auto fixBehavior = cs.getASTContext().isLanguageModeAtLeast(6)
+  auto fixBehavior = cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v6)
                          ? FixBehavior::Error
                          : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())
@@ -2784,7 +2795,7 @@ bool AllowFunctionSpecialization::diagnose(const Solution &solution,
 AllowFunctionSpecialization *
 AllowFunctionSpecialization::create(ConstraintSystem &cs, ValueDecl *decl,
                                     ConstraintLocator *locator) {
-  auto fixBehavior = cs.getASTContext().isLanguageModeAtLeast(6)
+  auto fixBehavior = cs.getASTContext().isLanguageModeAtLeast(LanguageMode::v6)
                          ? FixBehavior::Error
                          : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())

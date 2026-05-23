@@ -570,10 +570,12 @@ SILLocation.
 ### debug_value
 
 ```
-sil-instruction ::= debug_value sil-debug-value-option* sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)?
+sil-instruction ::= debug_value sil-debug-value-option* sil-operand (',' debug-var-attr)* advanced-debug-var-attr* (',' 'expr' debug-info-expr)? (',' 'transform' debug-transform-block)?
 sil-debug-value-option ::= [poison]
 sil-debug-value-option ::= [moveable_value_debuginfo]
 sil-debug-value-option ::= [trace]
+
+debug-transform-block ::= '{' sil-basic-block '}'
 
 debug_value %1 : $Int
 ```
@@ -645,28 +647,12 @@ It means: "You can get the value of source variable 'x' by
 *dereferencing* SSA value `%a`". The `op_deref` is a SIL DIExpression
 operator that represents "dereference". If there are multiple SIL
 DIExpression operators (or arguments), they are evaluated from left to
-right:
-
-```
-debug_value %b : $**Int, name "y", expr op_deref:op_deref
-```
-
-In the snippet above, two `op_deref` operators will be applied on SSA
-value `%b` sequentially.
+right.
 
 Note that normally when the SSA value has an address type, there will be
-a `op_deref` in the SIL DIExpression. Because there is no pointer in
-Swift so you always need to dereference an address-type SSA value to get
-the value of a source variable. However, if the SSA value is a
-`alloc_stack`, the `debug_value` is used to indicate the *declaration*
-of a source variable. Or, you can say, used to specify the location
-(memory address) of the source variable. Therefore, we don't need to
-add a `op_deref` in this case:
-
-```
-%a = alloc_stack $Int, ...
-debug_value %a : $*Int, name "my_var"
-```
+a `op_deref` in the SIL DIExpression, as there is no address types in
+Swift source code. There can only be one `op_deref`, as double address types
+don't exist in SIL.
 
 The `op_fragment` operator is used to specify the SSA value of a
 specific field in an aggregate-type source variable. This SIL
@@ -705,6 +691,18 @@ It is worth noting that a SIL DIExpression is similar to
 LLVM debug info metadata. While LLVM represents `!DIExpression` are a
 list of 64-bit integers, SIL DIExpression can have elements with various
 types, like AST nodes or strings.
+
+A `debug_value` can have an attached **transform block**: a standalone `SILBasicBlock` containing SIL instructions that describe how to reconstruct the variable's value. See [DebugBasicBlocks.md](DebugBasicBlocks.md) for the full design.
+
+```
+debug_value undef : $Builtin.Int64, let, name "x", type $Int, expr op_fragment:#Int._value, transform {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 42
+  return %0 : $Builtin.Int64
+}
+```
+
+When both a transform block and a DIExpression are present, the transform block is evaluated first.
 
 The `[trace]` flag is available for compiler unit testing. It is not
 produced during normal compilation. It is used combination with internal
@@ -2794,7 +2792,7 @@ will be an `@isolated(any)` function type.
 
 **Ownership Semantics of Closure Context during Invocation**: By
 default, an escaping `partial_apply` (`partial_apply` without
-`[on_stack]]` creates a closure whose invocation takes ownership of the
+`[on_stack]`) creates a closure whose invocation takes ownership of the
 context, meaning that a call implicitly releases the closure.
 
 If the `partial_apply` is marked with the flag `[callee_guaranteed]`,
@@ -3596,8 +3594,11 @@ b_dest(%b : $String):
 
 An address-only enum can be tested by branching on it using the
 [switch_enum_addr](#switch_enum_addr) terminator. Its value can then be
-taken by destructively projecting the enum value with
-[unchecked_take_enum_data_addr](#unchecked_take_enum_data_addr):
+taken by projecting the enum value with
+[unchecked_take_enum_data_addr](#unchecked_take_enum_data_addr),
+[unchecked_borrow_enum_data_addr](#unchecked_borrow_enum_data_addr),
+[unchecked_inplace_enum_data_addr](#unchecked_inplace_enum_data_addr),
+:
 
 ```
 enum Foo<T> { case A(T), B(String) }
@@ -3735,12 +3736,53 @@ value referenced by the result address valid. In these cases, the enum
 memory cannot be reinitialized as an enum until the payload has also
 been invalidated.
 
+### unchecked_borrow_enum_data_addr
+
+```
+sil-instruction ::= 'unchecked_borrow_enum_data_addr' sil-operand ',' sil-decl-ref 'in' sil-operand
+
+%2 = unchecked_borrow_enum_data_addr %0 : $*U, #U.DataCase!enumelt in %1
+// $U must be an enum type
+// #U.DataCase must be a case of enum $U with data
+// %1 must be the address of an uninitialized memory location of type $*U
+// %2 will be of address type $*T for the data type of case U.DataCase
+```
+
+Borrows the address of the payload for the given enum `case` in-place in
+memory. It is undefined behavior if the referenced enum does not contain
+a value of the given `case`.
+
+A valid enum value must exist at the `%0` address when the instruction executes.
+The representation of the value may be bitwise-copied into the scratch space
+parameter `%1` if necessary. `%1` must be uninitialized prior to the instruction's
+execution, and neither `%0` or `%1` may be modified or deallocated while the result
+of the instruction is in use. The result address also must not be written through
+or deallocated. The memory at `%0` is not modified by the instruction.
+
+### unchecked_inplace_enum_data_addr
+
+```
+sil-instruction ::= 'unchecked_inplace_enum_data_addr' sil-operand ',' sil-decl-ref
+
+%1 = unchecked_inplace_enum_data_addr %0 : $*U, #U.DataCase!enumelt
+// $U must be an enum type with a nondestructive projection operation
+// #U.DataCase must be a case of enum $U with data
+// %1 will be of address type $*T for the data type of case U.DataCase
+```
+
 If an enum has no more than one payload case, or if the declaration is
 ever address-only, then `unchecked_take_enum_data_addr` is
 guaranteed to be nondestructive, and the payload address can be accessed
-without invalidating the enum in these cases. The payload can be
-invalidated to invalidate the enum (assuming the enum does not have a
-`deinit` at the type level).
+without invalidating the enum in these cases. `unchecked_inplace_enum_data_addr`
+represents an in-place projection that does not require modifying or bitwise-copying
+the representation.
+
+It is undefined behavior if the referenced enum does not contain
+a value of the given `case`. Since this is a simple projection, ownership is
+forwarded through the instruction, so if the user has ownership of the original
+value stored at `%0`, it may consume the payload through `%1` and thereby
+invalidate the enum (assuming the enum does not have an active `deinit` that
+must be executed).
 
 ### select_enum
 
@@ -5708,6 +5750,108 @@ sil-instruction ::= 'has_symbol' sil-decl-ref
 Returns true if each of the underlying symbol addresses associated with
 the given declaration are non-null. This can be used to determine
 whether a weakly-imported declaration is available at runtime.
+
+## `Builtin.Borrow` support
+
+The `Builtin.Borrow` type is the primitive building block for forming first-
+class borrowed accesses to other values. Some Swift values never have
+a fixed memory address, but address-only values are always fixed in memory, and
+some loadable types have dependencies that take the address of an in-memory
+representation. As such, `Builtin.Borrow<T>` may have one of two
+representations, depending on the properties of `T`:
+
+- `Builtin.Borrow<T>` may contain a bitwise copy of the representation of
+  the referenced `T`.
+- `Builtin.Borrow<T>` may contain the address of the referenced `T` in memory.
+
+The layout of `Builtin.Borrow<T>` for any specific concrete type `T` is always
+the same, so when the layout of `T` is fully known, `Builtin.Borrow<T>` is
+always loadable even if that `T` is not. On the other hand, for a `T` with
+unknown layout, `Builtin.Borrow<T>` will also have unknown layout and be
+treated as address-only. This leaves three cases for SIL to represent:
+
+- Both `T` and `Builtin.Borrow<T>` are loadable. Values of `Builtin.Borrow<T>`
+  are created by `make_borrow`, and the referenced value is dereferenced with
+  `dereference_borrow`.
+- `T` is address-only, or has address-dependent references, but
+  `Builtin.Borrow<T>` is loadable. Values of `Builtin.Borrow<T>` are created
+  by `make_addr_borrow`, and the address of the referenced value is retrieved
+  with `dereference_addr_borrow`.
+- `T` and `Builtin.Borrow<T>` are both address-only. Memory locations of type
+  `Builtin.Borrow<T>` are initialized using `init_borrow_addr`, and the address
+  of the referenced value is retrieved with `dereference_borrow_addr`.
+
+### make_borrow
+
+```none
+sil-instruction ::= 'make_borrow' sil-value
+
+%borrow: $Builtin.Borrow<T> = make_borrow %target: $T
+```
+
+Returns a `Builtin.Borrow` value referencing the given value.
+
+The result `%borrow` has a lifetime dependency on borrowing `%target`.
+
+### dereference_borrow
+
+```none
+sil-instruction ::= 'dereference_borrow' sil-value
+
+%target: $T = dereference_borrow %borrow: $Builtin.Borrow<T>
+```
+
+Returns the value referenced by a `Builtin.Borrow`. The result `%target` is
+a borrow of the original value, scoped by the lifetime of `%borrow`.
+
+### make_addr_borrow
+
+```none
+sil-instruction ::= 'make_addr_borrow' sil-value
+
+%borrow: $Builtin.Borrow<T> = make_addr_borrow %target: $*T
+```
+
+Returns a `Builtin.Borrow` value referencing the value at the given memory
+location.
+
+The result `%borrow` has a lifetime dependency on the borrow stored
+at the memory location `%target`.
+
+### dereference_addr_borrow
+
+```none
+sil-instruction ::= 'dereference_addr_borrow' sil-value
+
+%target: $*T = dereference_addr_borrow %borrow: $Builtin.Borrow<T>
+```
+
+Returns the address of the value referenced by a `Builtin.Borrow`.
+
+### init_borrow_addr
+
+```none
+sil-instruction ::= 'init_borrow_addr' sil-value 'with' sil-value
+
+init_borrow_addr %borrow : $*Builtin.Borrow<T> with $target : $*T
+```
+
+Initializes a `Builtin.Borrow` in memory to reference a target value in
+memory.
+
+The value stored to `%borrow` has a lifetime dependency on the borrow stored
+at the memory location `%target`.
+
+### dereference_addr_borrow
+
+```none
+sil-instruction ::= 'dereference_addr_borrow' sil-value
+
+%target: $*T = dereference_addr_borrow %borrow: $Builtin.Borrow<T>
+```
+
+Returns the address of the value referenced by a `Builtin.Borrow` in memory.
+
 
 ## Miscellaneous instructions
 

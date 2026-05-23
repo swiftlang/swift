@@ -1790,7 +1790,7 @@ class NonOverride: Overridden {
 // if they were allowed on the same decl.
 @_silgen_name("conflictingAttrsSilgenName")
 @abi(func silgenName1())
-func silgenName1() {} // expected-error@-2 {{cannot use '@_silgen_name' and '@abi' on the same global function because they serve the same purpose}} {{1-44=}}
+func silgenName1() {} // expected-error@-2 {{cannot use '@_silgen_name' and '@abi' on the same global function because they serve the same purpose}} {{1-+1:1=}}
 
 @abi(@_silgen_name("silgenNameWithABI") func silgenName2()) // expected-error {{unused '_silgen_name' attribute in '@abi'}} {{6-40=}}
 func silgenName2() {}

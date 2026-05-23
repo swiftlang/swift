@@ -10,6 +10,7 @@ class CliArguments(argparse.Namespace):
     clone_with_ssh: bool
     skip_history: bool
     skip_tags: bool
+    partial_clone: bool
     skip_repository_list: List[str]
     all_repositories: bool
     scheme: Optional[str]
@@ -27,6 +28,7 @@ class CliArguments(argparse.Namespace):
     use_submodules: bool
     verbose: bool
     command: Optional[Any]
+    max_retries: int
 
     @staticmethod
     def parse_args() -> "CliArguments":
@@ -54,6 +56,13 @@ repositories.
         )
         parser.add_argument(
             "--skip-tags", help="Skip tags when obtaining sources", action="store_true"
+        )
+        parser.add_argument(
+            "--partial-clone",
+            help="Use partial clones (--filter=blob:none) to fetch only commits and "
+            "trees, deferring blob downloads until they are needed. Significantly "
+            "reduces clone size for CI. Requires Git 2.19 or later.",
+            action="store_true",
         )
         parser.add_argument(
             "--skip-repository",
@@ -130,6 +139,14 @@ repositories.
             action="store_true",
         )
         parser.add_argument(
+            "--max-retries",
+            help="Maximum number of times update-checkout will retry if the"
+            " cloning of any repository failed. 0 for no retries, -1 for"
+            " unlimited retries.",
+            type=int,
+            default=3,
+        )
+        parser.add_argument(
             "-j",
             "--jobs",
             type=int,
@@ -158,4 +175,4 @@ repositories.
         subparsers = parser.add_subparsers(dest='command')
         subparsers.add_parser('status', help='Print the status of all the repositories')
 
-        return parser.parse_args()
+        return parser.parse_args(namespace=CliArguments())

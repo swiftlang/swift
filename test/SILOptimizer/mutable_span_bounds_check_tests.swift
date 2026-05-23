@@ -156,7 +156,7 @@ public func span_bubble_sort(_ span: inout MutableSpan<Int>) {
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests6sortedySbs11MutableSpanVySiGF :
 // CHECK-SIL: bb4:
 // CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
-// CHECK-SIL: cond_fail {{.*}}, "index out of bounds"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests6sortedySbs11MutableSpanVySiGF'
 public func sorted(_ span: borrowing MutableSpan<Int>) -> Bool {

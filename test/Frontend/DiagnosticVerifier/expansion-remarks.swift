@@ -16,6 +16,7 @@ func foo() {}
 expected-expansion@-2:14{{
     expected-remark@1{{macro content: |func foo(_ x: Int) {|}}
     expected-remark@2{{macro content: |    let a = 2|}}
+    expected-ignored-error@42{{this diagnostic should not affect the expansion}}
     expected-warning@2{{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
     expected-remark@3{{macro content: |    let b = x|}}
     expected-warning@3{{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}

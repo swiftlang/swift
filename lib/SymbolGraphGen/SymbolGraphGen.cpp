@@ -176,7 +176,7 @@ int symbolgraphgen::emitSymbolGraphForModule(
       !WildcardExportClangModules.empty() || !ExportedClangModules.empty())
     importCollector.importFilter = std::move(importFilter);
 
-  SmallVector<Decl *, 64> ModuleDecls;
+  SmallVector<Decl *> ModuleDecls;
   swift::getTopLevelDeclsForDisplay(
       M, ModuleDecls, [&importCollector](ModuleDecl *M, SmallVectorImpl<Decl *> &results) {
         M->getDisplayDeclsRecursivelyAndImports(results, importCollector);

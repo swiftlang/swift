@@ -53,6 +53,7 @@ class ConcreteDeclRef;
 class PackConformance;
 class ProtocolConformance;
 class Requirement;
+class AvailabilityConstraint;
 enum class EffectKind : uint8_t;
 
 /// A ProtocolConformanceRef is a handle to a protocol conformance which
@@ -171,6 +172,11 @@ public:
       llvm::function_ref<bool(ProtocolConformanceRef)> body
   ) const;
 
+  /// Returns the availability constraint that restricts use of this conformance
+  /// in the given context, or \c nullopt if the conformance is available.
+  std::optional<AvailabilityConstraint>
+  getAvailabilityConstraint(DeclContext *dc, SourceLoc loc) const;
+
   using OpaqueValue = void*;
   OpaqueValue getOpaqueValue() const { return Union.getOpaqueValue(); }
   static ProtocolConformanceRef getFromOpaqueValue(OpaqueValue value) {
@@ -217,7 +223,7 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(llvm::raw_ostream &out, unsigned indent = 0,
-            bool details = true) const;
+            bool details = true) const LLVM_ATTRIBUTE_USED;
 
   void print(llvm::raw_ostream &out) const;
 

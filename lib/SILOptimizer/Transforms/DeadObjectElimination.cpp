@@ -865,6 +865,8 @@ void DeadObjectElimination::salvageDebugInfo(SILInstruction *toBeRemoved) {
   if (!SI)
     return;
 
+  // TODO: this logic should be merged with the regular salvageDebugInfo.
+  // debug_value on the alloc_stack are not handled?
   auto *parent = SI->getDest()->getDefiningInstruction();
   auto varInfo = buildDIExpression(parent);
   if (!varInfo)
@@ -887,6 +889,10 @@ DeadObjectElimination::buildDIExpression(SILInstruction *current) {
       return {};
     if (!var->Type)
       var->Type = dvci->getElementType();
+    // Strip op_deref: we are salvaging an element being stored.
+    // Note: as this is an AllocStackInst, the DIExpr is always
+    // a single op_deref.
+    var->DIExpr = {};
     return var;
   }
   if (auto *tupleAddr = dyn_cast<TupleElementAddrInst>(current)) {

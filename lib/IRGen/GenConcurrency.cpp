@@ -368,6 +368,21 @@ void irgen::emitBuiltinTaskLocalValuePop(IRGenFunction &IGF) {
   call->setCallingConv(IGF.IGM.SwiftCC);
 }
 
+llvm::Value *irgen::emitBuiltinTaskCancellationShieldPush(IRGenFunction &IGF) {
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskCancellationShieldPushFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+  return call;
+}
+
+void irgen::emitBuiltinTaskCancellationShieldPop(IRGenFunction &IGF) {
+  auto *call =
+      IGF.Builder.CreateCall(IGF.IGM.getTaskCancellationShieldPopFunctionPointer(), {});
+  call->setDoesNotThrow();
+  call->setCallingConv(IGF.IGM.SwiftCC);
+}
+
 void irgen::emitFinishAsyncLet(IRGenFunction &IGF,
                                llvm::Value *asyncLet,
                                llvm::Value *resultBuffer) {
@@ -490,16 +505,6 @@ void irgen::emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
 }
 
 
-void irgen::emitTaskCancel(IRGenFunction &IGF, llvm::Value *task) {
-  if (task->getType() != IGF.IGM.SwiftTaskPtrTy) {
-    task = IGF.Builder.CreateBitCast(task, IGF.IGM.SwiftTaskPtrTy);
-  }
-
-  auto *call =
-      IGF.Builder.CreateCall(IGF.IGM.getTaskCancelFunctionPointer(), {task});
-  call->setDoesNotThrow();
-  call->setCallingConv(IGF.IGM.SwiftCC);
-}
 
 template <class RecordTraits>
 static Address allocateOptionRecord(IRGenFunction &IGF,

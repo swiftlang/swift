@@ -30,6 +30,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -37,6 +38,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -315,21 +317,17 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
 
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
-//  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
-//    return !silFnTy->isNoEscape();
-//  }
-//
-// auto functionType = cast<const FunctionType *>(eitherFnTy);
-//
-//  // TODO: what about autoclosures?
-//  return !functionType->isNoEscape();
+  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
+    return !silFnTy->isNoEscape();
+  }
+
+  auto functionType = cast<const AnyFunctionType *>(eitherFnTy);
+
+  return !functionType->isNoEscape();
 
   // FIXME: unify TypeBase::isNoEscape with TypeBase::isEscapable
   // LazyConformanceEmitter::visitDestroyValueInst chokes on these instructions
   // destroy_value %2 : $@convention(block) @noescape () -> ()
-  //
-  // Wrongly claim that all functions today conform to Escapable for now:
-  return true;
 }
 
 static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
@@ -487,6 +485,8 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
       ASTContext &ctx = protocol->getASTContext();
 
       // FixedArray is Sendable, Copyable, or Escapable if its element type is.
+      // FIXME: If the type arguments contain type variables, this should set
+      // up a proper conditional conformance.
       if (auto bfa = dyn_cast<BuiltinFixedArrayType>(builtinType)) {
         if (lookupConformance(bfa->getElementType(), protocol)) {
           return ProtocolConformanceRef(
@@ -494,6 +494,28 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
                                       BuiltinConformanceKind::Synthesized));
         }
         break;
+      }
+
+      if (auto bba = dyn_cast<BuiltinBorrowType>(builtinType)) {
+        // Borrow is always Copyable.
+        if (*kp == KnownProtocolKind::Copyable) {
+          return ProtocolConformanceRef(
+              ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
+        }
+        // Borrow is never Escapable.
+        if (*kp == KnownProtocolKind::Escapable) {
+          return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+        }
+
+        // Borrow is Sendable[Metatype] if its element type is.
+        // FIXME: If the type arguments contain type variables, this should set
+        // up a proper conditional conformance.
+        if (lookupConformance(bba->getReferentType(), protocol)) {
+          return ProtocolConformanceRef(
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
+        }
       }
     
       // All other builtin types are Sendable, SendableMetatype, Copyable, and

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -import-objc-header %S/Inputs/tail_allocated_c_array.h -swift-version 5 -g %s -o %t/a.out
+// RUN: %target-build-swift -import-objc-header %S/Inputs/tail_allocated_c_array.h -swift-version 5 -g %s -o %t/a.out %if !legacy_swift_driver && !CPU=wasm32 %{ -explicit-module-build %}
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -442,16 +442,15 @@ keyPath.test("optional force-unwrapping") {
   expectTrue(value.questionableCanary === newCanary)
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-keyPath.test("optional force-unwrapping trap") {
+keyPath.test("optional force-unwrapping trap")
+.require(.crashTesting)
+.code {
   let origin_x = \TestOptional.origin!.x
   var value = TestOptional(origin: nil)
 
   expectCrashLater()
   _ = value[keyPath: origin_x]
 }
-#endif
 
 struct TestOptional2 {
   var optional: TestOptional?

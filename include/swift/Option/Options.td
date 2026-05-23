@@ -285,18 +285,18 @@ def sdk : Separate<["-"], "sdk">,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Compile against <sdk>">, MetaVarName<"<sdk>">;
 
-def swift_version : Separate<["-"], "swift-version">,
-  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
-         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
-  HelpText<"Interpret input according to a specific Swift language version number">,
-  MetaVarName<"<vers>">;
-
 def language_mode : Separate<["-"], "language-mode">,
   Flags<[FrontendOption, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
          SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Interpret input according to a specific Swift language mode">,
-  MetaVarName<"<mode>">,
-  Alias<swift_version>;
+  MetaVarName<"<mode>">;
+
+def swift_version : Separate<["-"], "swift-version">,
+  Flags<[FrontendOption, HelpHidden, ModuleInterfaceOption, SwiftSymbolGraphExtractOption,
+         SwiftAPIDigesterOption, SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Interpret input according to a specific Swift language version number">,
+  MetaVarName<"<vers>">,
+  Alias<language_mode>;
 
 def min_swift_runtime_version
     : Separate<["-"], "min-swift-runtime-version">,
@@ -654,10 +654,13 @@ def module_name_EQ : Joined<["-"], "module-name=">, Flags<[FrontendOption]>,
   Alias<module_name>;
 
 def debug_module_path : Separate<["-"], "debug-module-path">,
-  Flags<[FrontendOption]>,
-  HelpText<"Path to this module's binary swiftmodule artifact (required by debug info)">;
-def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption]>,
+  Flags<[FrontendOption, ArgumentIsPath]>,
+  HelpText<"Path or cache key to this module's binary swiftmodule artifact (required by debug info)">;
+def debug_module_path_EQ : Joined<["-"], "debug-module-path=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<debug_module_path>;
+def debug_module_self_key : Flag<["-"], "debug-module-self-key">,
+  Flags<[FrontendOption]>,
+  HelpText<"Embeded the key of current job in debug info generation (required by debug info)">;
 
 def module_alias : Separate<["-"], "module-alias">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
@@ -938,6 +941,12 @@ def experimental_serialize_debug_info:
   Flag<["-"], "experimental-serialize-debug-info">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enables serialization/deserialization of debug scopes">;
+
+def disable_safe_interop_wrappers :
+  Flag<["-"], "disable-safe-interop-wrappers">,
+  Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption, HelpHidden]>,
+  HelpText<"Disable safe interop wrapper generation and bounds attribute parsing">;
 // Diagnostic control options
 def suppress_warnings : Flag<["-"], "suppress-warnings">,
   Flags<[FrontendOption]>,
@@ -1051,21 +1060,21 @@ def default_isolation_EQ :  Joined<["-"], "default-isolation=">,
 
 def enable_experimental_feature :
   Separate<["-"], "enable-experimental-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enable an experimental feature">;
 
 def disable_experimental_feature :
   Separate<["-"], "disable-experimental-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Disable an experimental feature">;
 
 def enable_upcoming_feature : Separate<["-"], "enable-upcoming-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Enable a feature that will be introduced in an upcoming language "
            "version">;
 
 def disable_upcoming_feature : Separate<["-"], "disable-upcoming-feature">,
-  Flags<[FrontendOption, ModuleInterfaceOption]>,
+  Flags<[FrontendOption, ModuleInterfaceOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Disable a feature that will be introduced in an upcoming language "
            "version">;
 
@@ -1507,6 +1516,10 @@ def print_ast_decl : Flag<["-"], "print-ast-decl">,
   HelpText<"Parse and type-check input file(s) and pretty print declarations from AST(s)">,
   ModeOpt,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def emit_polyglot_ast : Flag<["-"], "emit-polyglot-ast">,
+  HelpText<"Parse the Objective-C input file and emit polyglot AST as JSON">,
+  ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_pcm : Flag<["-"], "dump-pcm">,
   HelpText<"Dump debugging information about a precompiled Clang module">,
   ModeOpt,
@@ -1599,6 +1612,16 @@ def target_variant : Separate<["-"], "target-variant">,
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Generate 'zippered' code for macCatalyst that can run on the specified"
            " variant target triple in addition to the main -target triple">;
+
+def target_arch_variant
+    : Separate<["-"], "target-arch-variant">,
+      Flags<[FrontendOption, NoInteractiveOption, NewDriverOnlyOption,
+             ModuleInterfaceOption, ModuleWrapOption,
+             SwiftSynthesizeInterfaceOption]>,
+      MetaVarName<"<arch-variant>">,
+      HelpText<"Generate code for an additional arch/slice variant of the "
+               "target architecture"
+               "into fat mach-o binaries">;
 
 def clang_target : Separate<["-"], "clang-target">,
   Flags<[FrontendOption, SwiftSymbolGraphExtractOption,
@@ -1916,6 +1939,12 @@ def block_availability_platforms: Separate<["-"], "block-availability-platforms"
   HelpText<"Remove the given platforms from symbol graph availability metadata, e.g. 'macOS,Swift'">,
   MetaVarName<"<platforms>">;
 
+def active_platform_availability_only
+    : Flag<["-"], "active-platform-availability-only">,
+      Flags<[SwiftSymbolGraphExtractOption]>,
+      HelpText<"Only emit availability metadata for platforms that are active "
+               "according to the target">;
+
 // swift-synthesize-interface-only options
 def include_submodules : Flag<["-"], "include-submodules">,
   Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
@@ -2012,10 +2041,21 @@ def ignore_spi_groups : Separate<["-", "--"], "ignore-spi-group">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"SPI group name to not diagnose about">;
 
+def ignore_spi_groups_new_api
+    : Separate<["-", "--"], "ignore-spi-group-new-api">,
+      Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+      HelpText<"Suppress “new API without '@available’ diagnostic for given "
+               "SPI group name">;
+
 def protocol_requirement_allow_list: Separate<["-", "--"], "protocol-requirement-allow-list">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
   HelpText<"File containing a new-line separated list of protocol names">,
   MetaVarName<"<path>">;
+
+def const_gather_protocols_list
+  : Separate<["-"], "const-gather-protocols-list">, MetaVarName<"<path>">,
+    Flags<[NewDriverOnlyOption, ArgumentIsPath, FrontendOption]>,
+    HelpText<"Specify a list of protocols for extraction of conformances 'const values'">;
 
 def input_paths: Separate<["-", "--"], "input-paths">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption, ArgumentIsPath]>,
@@ -2148,8 +2188,13 @@ def driver_print_graphviz:
 
 def driver_explicit_module_build:
   Flag<["-"], "explicit-module-build">,
-  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  Flags<[NewDriverOnlyOption]>,
   HelpText<"Prebuild module dependencies to make them explicit">;
+
+def driver_no_explicit_module_build:
+  Flag<["-"], "no-explicit-module-build">,
+  Flags<[NewDriverOnlyOption]>,
+  HelpText<"Opt out of the default explicit-module-build behavior for swiftc">;
 
 def incremental_dependency_scan:
   Flag<["-"], "incremental-dependency-scan">,
@@ -2313,6 +2358,10 @@ def cache_remarks:  Flag<["-"], "Rcache-compile-job">,
 def cache_disable_replay:  Flag<["-"], "cache-disable-replay">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,
   HelpText<"Skip loading the compilation result from cache">;
+
+def write_output_hash_xattr:  Flag<["-"], "write-output-hash-xattr">,
+  Flags<[FrontendOption, CacheInvariant]>,
+  HelpText<"When caching, write the output file's hash (as determined by the CAS hashing schema) as a file extended attribute.">;
 
 def cas_path: Separate<["-"], "cas-path">,
   Flags<[FrontendOption, NewDriverOnlyOption, CacheInvariant]>,

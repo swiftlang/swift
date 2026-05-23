@@ -1,8 +1,6 @@
 // RUN: %target-run-simple-swift(-cxx-interoperability-mode=default -I %S/Inputs)
 
 // REQUIRES: executable_test
-// Metadata for foreign reference types is not supported on Windows.
-// UNSUPPORTED: OS=windows-msvc
 
 import StdlibUnittest
 import Mirror

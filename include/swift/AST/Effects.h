@@ -42,7 +42,18 @@ enum class EffectKind : uint8_t {
   Throws = 1 << 0,
   Async  = 1 << 1,
   Unsafe = 1 << 2,
+  LAST_EFFECT = Unsafe,
 };
+namespace EffectKinds {
+constexpr std::array<EffectKind, 3> all() {
+  return {
+      EffectKind::Throws,
+      EffectKind::Async,
+      EffectKind::Unsafe,
+  };
+}
+static_assert(EffectKinds::all().back() == EffectKind::LAST_EFFECT);
+} // namespace EffectKinds
 using PossibleEffects = OptionSet<EffectKind>;
 
 void simple_display(llvm::raw_ostream &out, const EffectKind kind);

@@ -279,11 +279,26 @@ public:
   /// Whether to protocol-qualify DependentMemberTypes.
   bool ProtocolQualifiedDependentMemberTypes = false;
 
-  /// If true, printed module names will use the "exported" name, which may be
-  /// different from the regular name.
+  enum class ExportedModuleNameUsage : uint8_t {
+    /// If there is an exported module name, always use it instead of the
+    /// regular name.
+    Always,
+
+    /// If there is an exported module name and the named module is the main
+    /// module or has been loaded by the main module, use it instead of the
+    /// regular name.
+    IfLoaded,
+
+    /// Always use the regular name.
+    Never,
+  };
+
+  /// Conditions under which printed module names will use the "exported" name,
+  /// which may be different from the regular name.
   ///
   /// \see FileUnit::getExportedModuleName
-  bool UseExportedModuleNames = false;
+  ExportedModuleNameUsage UseExportedModuleNames =
+    ExportedModuleNameUsage::Never;
 
   /// If true, printed module names will use the "public" (for documentation)
   /// name, which may be different from the regular name.
@@ -410,6 +425,9 @@ public:
 
   /// Suppress printing of ~Sendable in inheritance and requirement lists.
   bool SuppressTildeSendable = false;
+
+  /// Suppress printing of @c in favor of @_cdecl.
+  bool SuppressCAttribute = false;
 
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
@@ -633,6 +651,11 @@ public:
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
 
+  /// Whether to print homogeneous unlabeled tuples in compact form
+  /// (e.g. `(Int /* ... repeated 5 times ... */)` instead of 
+  /// `(Int, Int, Int, Int, Int)`).
+  bool PrintHomogeneousTuplesCompactly = false;
+
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
 
@@ -702,6 +725,7 @@ public:
   static PrintOptions forDiagnosticArguments() {
     PrintOptions result;
     result.PrintExplicitPackTypes = false;
+    result.PrintHomogeneousTuplesCompactly = true;
     return result;
   }
 
@@ -731,6 +755,7 @@ public:
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
     result.PrintDocumentationComments = false;
+    result.PrintHomogeneousTuplesCompactly = true;
     result.PrintCurrentMembersOnly = true;
     if (printFullConvention)
       result.PrintFunctionRepresentationAttrs =
@@ -778,7 +803,8 @@ public:
                                               bool preferTypeRepr,
                                               bool printFullConvention,
                                               InterfaceMode interfaceMode,
-                                              bool useExportedModuleNames,
+                                              ExportedModuleNameUsage
+                                                useExportedModuleNames,
                                               bool aliasModuleNames,
                                               llvm::SmallSet<StringRef, 4>
                                                 *aliasModuleNamesTargets

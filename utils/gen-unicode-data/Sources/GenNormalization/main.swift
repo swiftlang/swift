@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -15,32 +15,32 @@ import GenUtils
 // Main entry point into the normalization generator.
 func generateNormalization(for platform: String) {
   var result = readFile("Input/NormalizationData.h")
-  
-  let derivedNormalizationProps = readFile("Data/16/DerivedNormalizationProps.txt")
-  
+
+  let derivedNormalizationProps = readFile("Data/17/DerivedNormalizationProps.txt")
+
   let unicodeData: String
-  
+
   switch platform {
   case "Apple":
-    unicodeData = readFile("Data/16/Apple/UnicodeData.txt")
+    unicodeData = readFile("Data/17/Apple/UnicodeData.txt")
   default:
-    unicodeData = readFile("Data/16/UnicodeData.txt")
+    unicodeData = readFile("Data/17/UnicodeData.txt")
   }
-  
+
   // Get all NFX_QC information and put it together with CCC info.
   var normData: [UInt32: UInt16] = [:]
   getQCData(from: derivedNormalizationProps, with: &normData)
   getCCCData(from: unicodeData, with: &normData)
-  
+
   // Take the NFX_QC info and CCC and emit it as a singular "normData".
   let flattenedNormData = flatten(Array(normData))
   emitNormData(flattenedNormData, into: &result)
-  
+
   // Get and emit decomposition data.
   let decompData = getDecompData(from: unicodeData)
   let decompMph = mph(for: decompData.map { UInt64($0.0) })
   emitDecomp(decompMph, decompData, into: &result)
-  
+
   // Get and emit composition data. (Remove composition exclusions)
   let compExclusions = getCompExclusions(from: derivedNormalizationProps)
   let filteredDecomp = decompData.filter { (scalar, _) in
@@ -50,12 +50,12 @@ func generateNormalization(for platform: String) {
   }
   let compMph = mph(for: Array(Set(filteredDecomp.map { UInt64($0.1[1]) })))
   emitComp(compMph, filteredDecomp, into: &result)
-  
+
   result += """
   #endif // #ifndef NORMALIZATION_DATA_H
-  
+
   """
-  
+
   // Finally, write it out.
   write(result, to: "Output/\(platform)/NormalizationData.h")
 }

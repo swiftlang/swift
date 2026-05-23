@@ -8,6 +8,6 @@
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs/stdlib_rebuild -module-cache-path %t.mcp) -target arm64-apple-macosx15.0 \
 // RUN:   -resource-dir resource_dir -compile-module-from-interface -o OtherModule.swiftmodule \
 // RUN:   %S/Inputs/stdlib_rebuild/usr/lib/swift/OtherModule.swiftmodule/arm64-apple-macos.swiftinterface
-// RUN: llvm-bcanalyzer -dump OtherModule.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer -dump OtherModule.swiftmodule | %FileCheck %s
 
 // CHECK-NOT: <DEPENDENCY_DIRECTORY abbrevid=11/> blob data = '/

@@ -234,7 +234,7 @@ Type swift::getDistributedActorSerializationType(
 
   // Protocols are allowed to either not provide a `SerializationRequirement`
   // at all or provide it in a conformance requirement.
-  if (resultTy->hasDependentMember() &&
+  if (resultTy->isTypeParameter() &&
       actorOrExtension->getSelfProtocolDecl()) {
     auto sig = actorOrExtension->getGenericSignatureOfContext();
 

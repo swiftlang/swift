@@ -12,6 +12,7 @@ swift_compiler_sources(Optimizer
   SimplifyApply.swift
   SimplifyBeginBorrow.swift
   SimplifyBeginCOWMutation.swift
+  SimplifyBorrow.swift
   SimplifyBranch.swift
   SimplifyBuiltin.swift
   SimplifyCheckedCast.swift
@@ -24,6 +25,7 @@ swift_compiler_sources(Optimizer
   SimplifyDebugStep.swift
   SimplifyDestroyValue.swift
   SimplifyDestructure.swift
+  SimplifyDifferentiableFunction.swift
   SimplifyEndCOWMutationAddr.swift
   SimplifyExplicitCopy.swift
   SimplifyFixLifetime.swift
@@ -33,6 +35,7 @@ swift_compiler_sources(Optimizer
   SimplifyLoad.swift
   SimplifyLoadBorrow.swift
   SimplifyMarkDependence.swift
+  SimplifyMoveValue.swift
   SimplifyPartialApply.swift
   SimplifyPointerToAddress.swift
   SimplifyRefCasts.swift
@@ -43,6 +46,7 @@ swift_compiler_sources(Optimizer
   SimplifySwitchEnum.swift
   SimplifyTuple.swift
   SimplifyTupleExtract.swift
+  SimplifyTuplePackElementAddr.swift
   SimplifyTypeValue.swift
   SimplifyUncheckedAddrCast.swift
   SimplifyUncheckedEnumData.swift

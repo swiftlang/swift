@@ -16,6 +16,10 @@
 #include "llvm/Support/JSON.h"
 
 #include <stdio.h>
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#endif
 
 namespace {
 struct TestItem {
@@ -191,6 +195,11 @@ TestItem *TestRunner::findMatchItem(const llvm::json::Value &req) {
 }
 
 int TestRunner::run() {
+#if defined(_WIN32)
+  // Set I/O to binary mode. Avoid CRLF translation, and Ctrl+Z (0x1A) as EOF.
+  _setmode(_fileno(stdin), _O_BINARY);
+  _setmode(_fileno(stdout), _O_BINARY);
+#endif
   size_t ioSize;
   while (true) {
     // Read request header.

@@ -185,7 +185,12 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
   SILFunctionConventions fnConv(silFnType, SGF.SGM.M);
 
   SILValue functionRef = SGF.emitGlobalFunctionRef(loc, function);
-  auto subs = SGF.F.getForwardingSubstitutionMap();
+
+  // Only if the callee is generic, provide a forwarding substitution map.
+  SubstitutionMap subs;
+  if (fnType->getInvocationGenericSignature())
+    subs = SGF.F.getForwardingSubstitutionMap();
+
   SmallVector<SILValue, 4> directResults;
 
   // If the function is a coroutine, we need to use 'begin_apply'.
@@ -199,23 +204,32 @@ static void emitBackDeployForwardApplyAndReturnOrThrow(
     SILBasicBlock *unwindBB = SGF.createBasicBlock();
 
     auto *apply = SGF.B.createBeginApply(loc, functionRef, subs, params);
-    SmallVector<SILValue, 4> rawResults;
-    for (auto result : apply->getAllResults())
-      rawResults.push_back(result);
 
-    auto token = rawResults.pop_back_val();
-    SGF.B.createYield(loc, rawResults, resumeBB, unwindBB);
+    SmallVector<SILValue, 4> yields;
+    auto yieldResults = apply->getYieldedValues();
+    yields.append(yieldResults.begin(), yieldResults.end());
+
+    SGF.B.createYield(loc, yields, resumeBB, unwindBB);
 
     // Emit resume block.
     SGF.B.emitBlock(resumeBB);
-    SGF.B.createEndApply(loc, token,
+    SGF.B.createEndApply(loc, apply->getTokenResult(),
                          SILType::getEmptyTupleType(SGF.getASTContext()));
+    if (apply->isCalleeAllocated()) {
+      SGF.B.createDeallocStack(loc, apply->getCalleeAllocationResult());
+    }
+
     SGF.B.createBranch(loc, SGF.ReturnDest.getBlock());
 
     // Emit unwind block.
     SGF.B.emitBlock(unwindBB);
-    SGF.B.createEndApply(loc, token,
+    SGF.B.createEndApply(loc, apply->getTokenResult(),
                          SILType::getEmptyTupleType(SGF.getASTContext()));
+
+    if (apply->isCalleeAllocated()) {
+      SGF.B.createDeallocStack(loc, apply->getCalleeAllocationResult());
+    }
+
     SGF.B.createBranch(loc, SGF.CoroutineUnwindDest.getBlock());
     return;
   }
