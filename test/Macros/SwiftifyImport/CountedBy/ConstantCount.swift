@@ -76,12 +76,12 @@ public func plain(_ ptr: UnsafeBufferPointer<CInt>) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func opt(_ ptr: UnsafeBufferPointer<CInt>?) {
-    let _ptrCount = unsafe ptr?.count ?? 0
+public func opt(_ ptr: UnsafeBufferPointer<CInt>) {
+    let _ptrCount = ptr.count
     if _ptrCount != 37 {
       fatalError("bounds check failure in opt: expected \(37) but got \(_ptrCount)")
     }
-    return unsafe opt(ptr?.baseAddress)
+    return unsafe opt(ptr.baseAddress)
 }
 ------------------------------
 @__swiftmacro_4test3mut15_SwiftifyImportfMp_.swift
@@ -100,12 +100,12 @@ public func mut(_ ptr: UnsafeMutableBufferPointer<CInt>) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func mutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>?) {
-    let _ptrCount = unsafe ptr?.count ?? 0
+public func mutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>) {
+    let _ptrCount = ptr.count
     if _ptrCount != 37 {
       fatalError("bounds check failure in mutOpt: expected \(37) but got \(_ptrCount)")
     }
-    return unsafe mutOpt(ptr?.baseAddress)
+    return unsafe mutOpt(ptr.baseAddress)
 }
 ------------------------------
 @__swiftmacro_4test8noescape15_SwiftifyImportfMp_.swift
@@ -130,18 +130,18 @@ public func noescape(_ ptr: Span<CInt>) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func noescapeOpt(_ ptr: Span<CInt>?) {
-    let _ptrCount = ptr?.count ?? 0
+public func noescapeOpt(_ ptr: Span<CInt>) {
+    let _ptrCount = ptr.count
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescapeOpt: expected \(37) but got \(_ptrCount)")
     }
-    let _ptrPtr = ptr?.withUnsafeBufferPointer {
+    let _ptrPtr = ptr.withUnsafeBufferPointer {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr)
     }
-    return unsafe noescapeOpt(_ptrPtr?.baseAddress)
+    return unsafe noescapeOpt(_ptrPtr.baseAddress)
 }
 ------------------------------
 @__swiftmacro_4test11noescapeMut15_SwiftifyImportfMp_.swift
@@ -166,18 +166,18 @@ public func noescapeMut(_ ptr: inout MutableSpan<CInt>) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
-public func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) {
-    let _ptrCount = ptr?.count ?? 0
+public func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>) {
+    let _ptrCount = ptr.count
     if _ptrCount != 37 {
       fatalError("bounds check failure in noescapeMutOpt: expected \(37) but got \(_ptrCount)")
     }
-    let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
+    let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr)
     }
-    return unsafe noescapeMutOpt(_ptrPtr?.baseAddress)
+    return unsafe noescapeMutOpt(_ptrPtr.baseAddress)
 }
 ------------------------------
 @__swiftmacro_4test11plainReturn15_SwiftifyImportfMp_.swift
@@ -192,12 +192,8 @@ public func plainReturn() -> UnsafeBufferPointer<CInt> {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func optReturn() -> UnsafeBufferPointer<CInt>? {
-    let _resultValue = unsafe optReturn()
-    if unsafe _resultValue == nil {
-      return nil
-    }
-    return unsafe UnsafeBufferPointer<CInt>(start: _resultValue!, count: Int(37))
+public func optReturn() -> UnsafeBufferPointer<CInt> {
+    return unsafe UnsafeBufferPointer<CInt>(start: unsafe optReturn(), count: Int(37))
 }
 ------------------------------
 @__swiftmacro_4test9mutReturn15_SwiftifyImportfMp_.swift
@@ -212,12 +208,8 @@ public func mutReturn() -> UnsafeMutableBufferPointer<CInt> {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func mutOptReturn() -> UnsafeMutableBufferPointer<CInt>? {
-    let _resultValue = unsafe mutOptReturn()
-    if unsafe _resultValue == nil {
-      return nil
-    }
-    return unsafe UnsafeMutableBufferPointer<CInt>(start: _resultValue!, count: Int(37))
+public func mutOptReturn() -> UnsafeMutableBufferPointer<CInt> {
+    return unsafe UnsafeMutableBufferPointer<CInt>(start: unsafe mutOptReturn(), count: Int(37))
 }
 ------------------------------
 @__swiftmacro_4test6escape15_SwiftifyImportfMp_.swift
@@ -236,12 +228,12 @@ public func escape(_ ptr: UnsafeBufferPointer<CInt>) -> UnsafePointer<CInt> {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func escapeOpt(_ ptr: UnsafeBufferPointer<CInt>?) -> UnsafePointer<CInt>? {
-    let _ptrCount = unsafe ptr?.count ?? 0
+public func escapeOpt(_ ptr: UnsafeBufferPointer<CInt>) -> UnsafePointer<CInt>? {
+    let _ptrCount = ptr.count
     if _ptrCount != 37 {
       fatalError("bounds check failure in escapeOpt: expected \(37) but got \(_ptrCount)")
     }
-    return unsafe escapeOpt(ptr?.baseAddress)
+    return unsafe escapeOpt(ptr.baseAddress)
 }
 ------------------------------
 @__swiftmacro_4test9escapeMut15_SwiftifyImportfMp_.swift
@@ -260,11 +252,11 @@ public func escapeMut(_ ptr: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutableP
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func escapeMutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>?) -> UnsafeMutablePointer<CInt>? {
-    let _ptrCount = unsafe ptr?.count ?? 0
+public func escapeMutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<CInt>? {
+    let _ptrCount = ptr.count
     if _ptrCount != 37 {
       fatalError("bounds check failure in escapeMutOpt: expected \(37) but got \(_ptrCount)")
     }
-    return unsafe escapeMutOpt(ptr?.baseAddress)
+    return unsafe escapeMutOpt(ptr.baseAddress)
 }
 ------------------------------

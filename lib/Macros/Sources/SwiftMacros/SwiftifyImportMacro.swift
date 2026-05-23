@@ -121,15 +121,21 @@ struct CountedBy: ParamInfo {
   var pointerIndex: SwiftifyExpr
   var count: ExprSyntax
   var sizedBy: Bool
+  var isOrNull: Bool
   var nonescaping: Bool
   var dependencies: [LifetimeDependence]
   var original: SyntaxProtocol
 
   var description: String {
-    if sizedBy {
-      return ".sizedBy(pointer: \(pointerIndex), size: \"\(count)\", nonescaping: \(nonescaping))"
+    let name: String
+    switch (sizedBy, isOrNull) {
+    case (true, true):  name = "sizedByOrNull"
+    case (true, false): name = "sizedBy"
+    case (false, true): name = "countedByOrNull"
+    case (false, false): name = "countedBy"
     }
-    return ".countedBy(pointer: \(pointerIndex), count: \"\(count)\", nonescaping: \(nonescaping))"
+    let label = sizedBy ? "size" : "count"
+    return ".\(name)(pointer: \(pointerIndex), \(label): \"\(count)\", nonescaping: \(nonescaping))"
   }
 
   func getBoundsCheckedThunkBuilder(
@@ -140,12 +146,13 @@ struct CountedBy: ParamInfo {
       return CountedOrSizedPointerThunkBuilder(
         base: base, index: i - 1, countExpr: count,
         funcDecl: funcDecl,
-        nonescaping: nonescaping, isSizedBy: sizedBy)
+        nonescaping: nonescaping, isSizedBy: sizedBy, isOrNull: isOrNull)
     case .return:
       return CountedOrSizedReturnPointerThunkBuilder(
         base: base, countExpr: count,
         funcDecl: funcDecl,
-        nonescaping: nonescaping, isSizedBy: sizedBy, dependencies: dependencies)
+        nonescaping: nonescaping, isSizedBy: sizedBy, isOrNull: isOrNull,
+        dependencies: dependencies)
     case .self:
       return base
     }
@@ -757,15 +764,24 @@ extension SpanBoundsThunkBuilder {
 protocol PointerBoundsThunkBuilder: BoundsThunkBuilder {
   var nullable: Bool { get }
   var isSizedBy: Bool { get }
+  var isOrNull: Bool { get }
   var generateSpan: Bool { get }
   var isParameter: Bool { get }
 }
 
 extension PointerBoundsThunkBuilder {
-  var nullable: Bool { return oldType.is(OptionalTypeSyntax.self) }
+  // Whether the wrapper exposes the buffer parameter / return value as an
+  // Optional. Only the `*OrNull` variants propagate the underlying nullability;
+  // the plain variants always produce a non-Optional Span/buffer pointer.
+  var nullable: Bool { return isOrNull && oldTypeIsOptional }
+
+  var oldTypeIsOptional: Bool { return oldType.is(OptionalTypeSyntax.self) }
 
   var newType: TypeSyntax {
     get throws {
+      if !isOrNull, let optType = oldType.as(OptionalTypeSyntax.self) {
+        return try transformType(optType.wrappedType, generateSpan, isSizedBy, isParameter)
+      }
       return try transformType(oldType, generateSpan, isSizedBy, isParameter)
     }
   }
@@ -800,6 +816,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   public let funcDecl: FunctionParts
   public let nonescaping: Bool
   public let isSizedBy: Bool
+  public let isOrNull: Bool
   public let dependencies: [LifetimeDependence]
   let isParameter: Bool = false
 
@@ -840,6 +857,26 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
           return nil
         }
         """)))
+    } else if oldTypeIsOptional && generateSpan {
+      // Span's `_unsafeStart` requires a non-nil pointer; the underlying
+      // function promises to only return null if count is 0, we can handle
+      // that by returning a default constructed Span. The precondition helps
+      // guard Span's invariants against misbehaving functions. UBP accepts
+      // null pointers in its initializer, and does not promise safety, so
+      // it doesn't require this check.
+      let call = try base.buildFunctionCall([:])
+      let cast = try newType
+      let attrName = isSizedBy ? "sized_by" : "counted_by"
+      let valueName = isSizedBy ? "size" : "count"
+      res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax(
+        "let _resultValue = \(call)")))
+      res.append(CodeBlockItemSyntax.Item(StmtSyntax(
+        """
+        if unsafe _resultValue == nil {
+          precondition(\(countExpr) == 0, "\(raw: attrName) may only be null if \(raw: valueName) is 0 (unlike \(raw: attrName)_or_null)")
+          return \(raw: cast)()
+        }
+        """)))
     }
     return res
   }
@@ -853,11 +890,9 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
       }
     var cast = try newType
     var expr: ExprSyntax
-    if nullable {
-      // The call has already been bound to `_resultValue` (and the nil case
-      // handled with an early `return nil`) by `buildPreReturnStatements`,
-      // so here we only need to construct the buffer from the unwrapped
-      // result.
+    if nullable || (oldTypeIsOptional && generateSpan) {
+      // The call has already been bound to `_resultValue` (and the empty
+      // case handled with an early return) by `buildPreReturnStatements`.
       if let optType = cast.as(OptionalTypeSyntax.self) {
         cast = optType.wrappedType
       }
@@ -866,6 +901,8 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
         \(raw: cast)(\(raw: startLabel): \(raw: castOpaquePointerToRawPointer("_resultValue!")), \(raw: countLabel): Int(\(countExpr)))
         """
     } else {
+      // Either input is non-Optional, or output is an UnsafeBufferPointer
+      // (whose initializer accepts a nullable start).
       let call = try base.buildFunctionCall(pointerArgs)
       expr =
         """
@@ -895,6 +932,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   public let funcDecl: FunctionParts
   public let nonescaping: Bool
   public let isSizedBy: Bool
+  public let isOrNull: Bool
   let isParameter: Bool = true
 
   var generateSpan: Bool { nonescaping }
@@ -982,7 +1020,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   }
 
   func unwrapIfNonnullable(_ expr: ExprSyntax) -> ExprSyntax {
-    if !nullable {
+    if !oldTypeIsOptional {
       return ExprSyntax(ForceUnwrapExprSyntax(expression: expr))
     }
     return expr
@@ -1025,10 +1063,8 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   }
 
   func getPointerArg() throws -> ExprSyntax {
-    if nullable {
-      return ExprSyntax("\(name)?.baseAddress")
-    }
-    return ExprSyntax("\(name).baseAddress!")
+    let qMark = nullable ? "?" : ""
+    return unwrapIfNonnullable("\(name)\(raw: qMark).baseAddress")
   }
 
   func buildFunctionCall(_ argOverrides: [Int: ExprSyntax]) throws -> ExprSyntax {
@@ -1165,7 +1201,8 @@ func parseSwiftifyExpr(_ expr: ExprSyntax) throws -> SwiftifyExpr {
 }
 
 func parseCountedByEnum(
-  _ enumConstructorExpr: FunctionCallExprSyntax, _ signature: FunctionSignatureSyntax, _ rewriter: CountExprRewriter
+  _ enumConstructorExpr: FunctionCallExprSyntax, _ signature: FunctionSignatureSyntax,
+  _ rewriter: CountExprRewriter, isOrNull: Bool
 ) throws -> ParamInfo {
   let argumentList = enumConstructorExpr.arguments
   let pointerExprArg = try getArgumentByName(argumentList, "pointer")
@@ -1187,11 +1224,13 @@ func parseCountedByEnum(
     }
   }
   return CountedBy(
-    pointerIndex: pointerExpr, count: rewrittenCountExpr, sizedBy: false,
+    pointerIndex: pointerExpr, count: rewrittenCountExpr, sizedBy: false, isOrNull: isOrNull,
     nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr))
 }
 
-func parseSizedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax, _ rewriter: CountExprRewriter) throws -> ParamInfo {
+func parseSizedByEnum(
+  _ enumConstructorExpr: FunctionCallExprSyntax, _ rewriter: CountExprRewriter, isOrNull: Bool
+) throws -> ParamInfo {
   let argumentList = enumConstructorExpr.arguments
   let pointerExprArg = try getArgumentByName(argumentList, "pointer")
   let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
@@ -1203,8 +1242,8 @@ func parseSizedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax, _ rewriter:
   let unwrappedCountExpr = ExprSyntax(stringLiteral: sizeExprStringLit.representedLiteralValue!)
   let rewrittenCountExpr = rewriter.visit(unwrappedCountExpr)
   return CountedBy(
-    pointerIndex: pointerExpr, count: rewrittenCountExpr, sizedBy: true, nonescaping: false,
-    dependencies: [], original: ExprSyntax(enumConstructorExpr))
+    pointerIndex: pointerExpr, count: rewrittenCountExpr, sizedBy: true, isOrNull: isOrNull,
+    nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr))
 }
 
 func parseEndedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
@@ -1350,10 +1389,14 @@ func parseMacroParam(
   }
   let enumName = try parseEnumName(paramExpr)
   switch enumName {
-  case "countedBy", "countedByOrNull":
-    return try parseCountedByEnum(enumConstructorExpr, signature, rewriter)
-  case "sizedBy", "sizedByOrNull":
-    return try parseSizedByEnum(enumConstructorExpr, rewriter)
+  case "countedBy":
+    return try parseCountedByEnum(enumConstructorExpr, signature, rewriter, isOrNull: false)
+  case "countedByOrNull":
+    return try parseCountedByEnum(enumConstructorExpr, signature, rewriter, isOrNull: true)
+  case "sizedBy":
+    return try parseSizedByEnum(enumConstructorExpr, rewriter, isOrNull: false)
+  case "sizedByOrNull":
+    return try parseSizedByEnum(enumConstructorExpr, rewriter, isOrNull: true)
   case "endedBy": return try parseEndedByEnum(enumConstructorExpr)
   case "nonescaping":
     let index = try parseNonEscaping(enumConstructorExpr)

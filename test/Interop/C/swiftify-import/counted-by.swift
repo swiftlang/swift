@@ -81,9 +81,9 @@ void nonnull(int len, int * __counted_by(len) _Nonnull p);
 
 // expected-expansion@+7:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableBufferPointer<Int32>?) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: unsafe p?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    return unsafe nullable(len, p?.baseAddress)|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
+//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@4{{macro content: |    return unsafe nullable(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void nullable(int len, int * __counted_by(len) _Nullable p);
@@ -247,7 +247,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: dc40e34e2ead0c5c89061ff84e7ecb31d97f258952fb2ff356304ee00b98cb00
+// GENERATED-HASH: 32b628e12ecfcec33231930d5885791ba7495890d2d1a1f446471647c30baec1
 import Test
 
 func call_simple(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) {
@@ -406,7 +406,7 @@ func call_octalLiteral(_ p: UnsafeMutablePointer<Int32>!) {
   return unsafe nullUnspecified(p)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableBufferPointer<Int32>?) {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableBufferPointer<Int32>) {
   return unsafe nullable(p)
 }
 

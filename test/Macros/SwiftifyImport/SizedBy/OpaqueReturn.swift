@@ -39,12 +39,8 @@ public func nonnullUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointe
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func nullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointer? {
-    let _resultValue = unsafe nullableUnsafeRawBufferPointer(size)
-    if unsafe _resultValue == nil {
-      return nil
-    }
-    return unsafe UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(_resultValue!), count: Int(size))
+public func nullableUnsafeRawBufferPointer(_ size: CInt) -> UnsafeRawBufferPointer {
+    return unsafe UnsafeRawBufferPointer(start: unsafe UnsafeRawPointer(unsafe nullableUnsafeRawBufferPointer(size)), count: Int(size))
 }
 ------------------------------
 @__swiftmacro_4test33impNullableUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
@@ -74,17 +70,18 @@ public func nonnullSpan(p: RawSpan) -> RawSpan {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(copy p) @_disfavoredOverload
-public func nullableSpan(p: RawSpan?) -> RawSpan? {
-    let size = CInt(exactly: p?.byteCount ?? 0)!
-    let _pPtr = p?.withUnsafeBytes {
+public func nullableSpan(p: RawSpan) -> RawSpan {
+    let size = CInt(exactly: p.byteCount)!
+    let _pPtr = p.withUnsafeBytes {
         unsafe $0
     }
     defer {
         _fixLifetime(p)
     }
-    let _resultValue = unsafe nullableSpan(p: OpaquePointer(_pPtr?.baseAddress), size)
+    let _resultValue = unsafe nullableSpan(p: OpaquePointer(_pPtr.baseAddress), size)
     if unsafe _resultValue == nil {
-      return nil
+      precondition(size == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")
+      return RawSpan()
     }
     return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(_resultValue!), byteCount: Int(size)), copying: ())
 }
