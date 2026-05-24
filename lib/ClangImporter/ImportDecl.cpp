@@ -7583,7 +7583,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     return nullptr;
 
   Impl.importAttributes(getter, swiftGetter);
-  Impl.ImportedDecls[{getter, getVersion()}] = swiftGetter;
+  Impl.ImportedDecls[{getter->getCanonicalDecl(), getVersion()}] = swiftGetter;
   if (swift3GetterName)
     markAsVariant(swiftGetter, *swift3GetterName);
 
@@ -7597,7 +7597,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       return nullptr;
 
     Impl.importAttributes(setter, swiftSetter);
-    Impl.ImportedDecls[{setter, getVersion()}] = swiftSetter;
+    Impl.ImportedDecls[{setter->getCanonicalDecl(), getVersion()}] =
+        swiftSetter;
     if (swift3SetterName)
       markAsVariant(swiftSetter, *swift3SetterName);
   }
