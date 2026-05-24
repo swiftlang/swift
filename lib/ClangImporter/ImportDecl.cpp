@@ -2504,6 +2504,14 @@ namespace {
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>(), nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+      // We've written a partial entry into ImportedDecls so that nested
+      // member imports (especially those that recurse into us via
+      // VisitRecordDecl) can find this StructDecl/ClassDecl instead of
+      // looping. If we later decide to bail out and return nullptr, we need to
+      // erase the partial entry.
+      auto eraseCacheOnBailOut = [&] {
+        Impl.ImportedDecls.erase({decl->getCanonicalDecl(), getVersion()});
+      };
 
       if (getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
           CxxValueSemanticsKind::Copyable) {
@@ -2546,6 +2554,7 @@ namespace {
                                Impl.SwiftContext.AllocateCopy(
                                    base.getType().getAsString())),
                     base.getBeginLoc());
+                eraseCacheOnBailOut();
                 return nullptr;
               }
             }
@@ -2686,6 +2695,7 @@ namespace {
                   Diagnostic(diag::nonescapable_member_of_escapable, false,
                              decl, nd->getName()),
                   decl->getLocation());
+              eraseCacheOnBailOut();
               return nullptr;
             }
           }
@@ -2987,8 +2997,10 @@ namespace {
       // If we need it, add an explicit "deinit" to this type.
       synthesizer.addExplicitDeinitIfRequired(result, decl);
 
-      if (!injectBridgingConversionsForRefCountedSmartPtrs(result))
+      if (!injectBridgingConversionsForRefCountedSmartPtrs(result)) {
+        eraseCacheOnBailOut();
         return nullptr;
+      }
 
       result->setMemberLoader(&Impl, 0);
       return result;
