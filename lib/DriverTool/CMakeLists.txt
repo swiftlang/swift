@@ -11,6 +11,7 @@ set(driver_sources_and_options
                 modulewrap_main.cpp
                 swift_api_digester_main.cpp
                 swift_cache_tool_main.cpp
+                swift_interface_tool_main.cpp
                 swift_symbolgraph_extract_main.cpp
                 swift_synthesize_interface_main.cpp
                 swift_parse_test_main.cpp
@@ -28,16 +29,20 @@ add_swift_host_library(swiftDriverTool STATIC
 )
 target_link_libraries(swiftDriverTool
                       PUBLIC
-                      ${driver_common_libs})
+                      ${driver_common_libs}
+                      PRIVATE
+                      swiftSerialization)
 
 if (SWIFT_BUILD_SWIFT_SYNTAX)
   target_link_libraries(swiftDriverTool
     PRIVATE
     swiftASTGen
+    swiftInterfaceTool
   )
 
   add_dependencies(swiftDriverTool
     swiftASTGen
+    swiftInterfaceTool
   )
 endif()
 
@@ -53,3 +58,9 @@ swift_tablegen(SwiftCacheToolOptions.inc -gen-opt-parser-defs)
 swift_add_public_tablegen_target(SwiftCacheToolOptions)
 
 add_dependencies(swiftDriverTool SwiftCacheToolOptions)
+
+set(LLVM_TARGET_DEFINITIONS SwiftInterfaceToolOptions.td)
+swift_tablegen(SwiftInterfaceToolOptions.inc -gen-opt-parser-defs)
+swift_add_public_tablegen_target(SwiftInterfaceToolOptions)
+
+add_dependencies(swiftDriverTool SwiftInterfaceToolOptions)

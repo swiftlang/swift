@@ -2679,6 +2679,7 @@ UniqueUnderlyingTypeSubstitutionsRequest::evaluate(
         return true;
       case SourceFileKind::Main:
       case SourceFileKind::Library:
+      case SourceFileKind::SourceInterface:
         // Don't typecheck bodies in auxiliary source files.
         return false;
       }

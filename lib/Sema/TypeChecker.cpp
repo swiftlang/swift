@@ -411,6 +411,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   switch (SF.Kind) {
   case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
+  case SourceFileKind::SourceInterface:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
     diagnoseObjCMethodConflicts(SF);
@@ -438,6 +439,7 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   switch (SF.Kind) {
   case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
+  case SourceFileKind::SourceInterface:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::Main: {
     CustomDerivativesRequest request(&SF);

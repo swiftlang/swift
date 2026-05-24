@@ -527,6 +527,7 @@ struct BridgedFunction {
     Main,
     SIL,
     Interface,
+    SourceInterface,
     MacroExpansion,
     DefaultArgument, // must match swift::SourceFileKind::DefaultArgument
     None

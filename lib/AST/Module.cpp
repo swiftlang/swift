@@ -798,6 +798,7 @@ ModuleDecl::ModuleDecl(Identifier name, ASTContext &ctx,
     assert(files.empty() ||
            !isa<SourceFile>(file) ||
            cast<SourceFile>(file)->Kind == SourceFileKind::Library ||
+           cast<SourceFile>(file)->Kind == SourceFileKind::SourceInterface ||
            cast<SourceFile>(file)->Kind == SourceFileKind::SIL);
     files.push_back(file);
   });

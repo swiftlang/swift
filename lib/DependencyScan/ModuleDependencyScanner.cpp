@@ -28,6 +28,9 @@
 #include "swift/Serialization/ScanningLoaders.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Subsystems.h"
+#if SWIFT_BUILD_SWIFT_SYNTAX
+#include "swift/Bridging/ASTGen.h"
+#endif
 #include "clang/CAS/IncludeTree.h"
 #include "clang/Lex/HeaderSearchOptions.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
@@ -512,6 +515,77 @@ bool SwiftDependencyTracker::trackFile(const Twine &path) {
   return true;
 }
 
+llvm::Error SwiftDependencyTracker::trackFileWithContent(const Twine &path,
+                                                          StringRef content) {
+  auto ref = CAS->storeFromString({}, content);
+  if (!ref)
+    return ref.takeError();
+  std::string realPath =
+      Mapper ? Mapper->mapToString(path.str()) : path.str();
+  TrackedFiles.try_emplace(realPath, *ref, content.size());
+  return llvm::Error::success();
+}
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+void ModuleDependencyScanner::beginSourceMinimization(
+    ArrayRef<std::string> sourceFiles) {
+  MinimizationPool.emplace();
+  auto FS = ScanASTContext.SourceMgr.getFileSystem();
+
+  for (const auto &file : sourceFiles) {
+    MinimizationPool->async([this, file, FS]() {
+      auto bufOrErr = FS->getBufferForFile(file);
+      if (!bufOrErr) {
+        ScanASTContext.Diags.diagnose(
+            SourceLoc(), diag::error_scanner_extra,
+            "error opening '" + file + "': " +
+                bufOrErr.getError().message());
+        return;
+      }
+
+      StringRef source = (*bufOrErr)->getBuffer();
+      BridgedStringRef bridgedSource(source);
+      BridgedStringRef bridgedModule("");
+      BridgedStringRef bridgedFilename(file);
+      auto *sf = swift_ASTGen_parseSourceFile(
+          bridgedSource, bridgedModule, bridgedFilename, nullptr,
+          BridgedGeneratedSourceFileKindNone);
+      if (!sf) {
+        ScanASTContext.Diags.diagnose(
+            SourceLoc(), diag::error_scanner_extra,
+            "failed to parse '" + file + "' for minimization");
+        return;
+      }
+
+      BridgedStringRef bridgedResult;
+      swift_ASTGen_minimizeSourceForInterface(
+          sf,
+          ScanASTContext.LangOpts.hasFeature(Feature::InternalImportsByDefault),
+          ScanCompilerInvocation.getCASOptions()
+              .RemoveInternalDeclsOnMinimization,
+          &bridgedResult);
+      swift_ASTGen_destroySourceFile(sf);
+
+      std::lock_guard<std::mutex> lock(MinimizationMutex);
+      MinimizedSources[file] = bridgedResult;
+    });
+  }
+}
+
+void ModuleDependencyScanner::waitForMinimization() {
+  if (MinimizationPool)
+    MinimizationPool->wait();
+}
+#endif
+
+std::optional<StringRef>
+ModuleDependencyScanner::getMinimizedSource(StringRef path) const {
+  auto it = MinimizedSources.find(path);
+  if (it == MinimizedSources.end())
+    return std::nullopt;
+  return it->second.unbridged();
+}
+
 llvm::Expected<llvm::cas::ObjectProxy>
 SwiftDependencyTracker::createTreeFromDependencies() {
   llvm::SmallVector<clang::cas::IncludeTree::FileList::FileEntry> Files;
@@ -614,6 +688,10 @@ ModuleDependencyScanner::ModuleDependencyScanner(
 }
 
 ModuleDependencyScanner::~ModuleDependencyScanner() {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  for (auto &entry : MinimizedSources)
+    swift_ASTGen_freeBridgedString(entry.second);
+#endif
   auto finError = finalizeWorkerClangScanningTool();
   assert(!finError && "ClangScanningTool finalization must succeed.");
 }
@@ -759,8 +837,10 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
       if (!sourceFile)
         continue;
 
-      mainDependencies.addModuleImports(*sourceFile, alreadyAddedModules,
-                                        &ScanASTContext.SourceMgr);
+      mainDependencies.addModuleImports(
+          *sourceFile, alreadyAddedModules, &ScanASTContext.SourceMgr,
+          ScanCompilerInvocation.getCASOptions()
+              .RemoveInternalDeclsOnMinimization);
     }
 
     // Pass all the successful canImport checks from the ASTContext as part of
@@ -958,6 +1038,19 @@ std::vector<ModuleDependencyID>
 ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID) {
   PrettyStackTraceStringAction trace("Performing dependency scan of: ",
                                      rootModuleID.ModuleName);
+
+  // Kick off async source minimization before the scan begins so that
+  // it overlaps with transitive dependency resolution.
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (rootModuleID.Kind == ModuleDependencyKind::SwiftSource &&
+      ScanCompilerInvocation.getCASOptions().EnableCaching &&
+      ScanCompilerInvocation.getCASOptions().EnableMinimizedSourceScanning) {
+    auto &mainDep = DependencyCache.findKnownDependency(rootModuleID);
+    if (auto *sourceDep = mainDep.getAsSwiftSourceModule())
+      beginSourceMinimization(sourceDep->sourceFiles);
+  }
+#endif
+
   // If scanning for an individual Clang module, simply resolve its imports
   if (rootModuleID.Kind == ModuleDependencyKind::Clang) {
     ModuleDependencyIDSetVector discoveredClangModules;
@@ -992,6 +1085,13 @@ ModuleDependencyScanner::performDependencyScan(ModuleDependencyID rootModuleID) 
   }
 
   ScanDiagnosticReporter.emitScanMetrics(DependencyCache);
+
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  // Wait for source minimization to complete before returning so that
+  // results are available for resolution.
+  waitForMinimization();
+#endif
+
   return allModules.takeVector();
 }
 

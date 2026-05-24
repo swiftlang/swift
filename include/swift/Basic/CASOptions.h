@@ -57,6 +57,15 @@ public:
   /// Cache key for imported bridging header.
   std::string BridgingHeaderPCHCacheKey;
 
+  /// Use minimized source files during dependency scanning.
+  /// When enabled, the scanner generates minimized source and builds a CAS
+  /// filesystem with it in place of the real source files.
+  bool EnableMinimizedSourceScanning = false;
+
+  /// When minimizing source for dependency scanning, also remove
+  /// internal/fileprivate declarations (not just strip function bodies).
+  bool RemoveInternalDeclsOnMinimization = false;
+
   /// Has immutable file system input.
   bool HasImmutableFileSystem = false;
 
@@ -77,7 +86,8 @@ public:
     // The CASIDs are generated from scanner, thus not part of the hash since
     // they will always be empty when requested.
     // TODO: Add frozen clang::CASOptions to the hash.
-    return llvm::hash_combine(EnableCaching);
+    return llvm::hash_combine(EnableCaching, EnableMinimizedSourceScanning,
+                              RemoveInternalDeclsOnMinimization);
   }
 
   /// Return a hash code of any components from these options that should

@@ -197,6 +197,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 
     case SourceFileKind::Library:
     case SourceFileKind::Interface:
+    case SourceFileKind::SourceInterface:
     case SourceFileKind::SIL:
       braceItemListKind = BraceItemListKind::TopLevelLibrary;
       break;
@@ -6033,7 +6034,8 @@ bool Parser::isStartOfSwiftDecl(bool allowPoundIfAttributes,
 
   if (Tok.is(tok::pound)) {
     if (isStartOfFreestandingMacroExpansion()) {
-      if (isInSILMode() || SF.Kind == SourceFileKind::Interface)
+      if (isInSILMode() || SF.Kind == SourceFileKind::Interface ||
+          SF.Kind == SourceFileKind::SourceInterface)
         return false;
 
       // Parse '#<identifier>' after attrs/modifiers as a macro expansion decl.
@@ -8180,6 +8182,7 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
   // to the new terminology.
   else if (P.Tok.getRawText() == "read"
 	   && (P.SF.Kind == SourceFileKind::Interface
+	       || P.SF.Kind == SourceFileKind::SourceInterface
 	       || P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors))) {
     P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,
 	       "borrow", "read");
@@ -8187,6 +8190,7 @@ static ParserStatus parseAccessorIntroducer(Parser &P,
   }
   else if (P.Tok.getRawText() == "modify"
 	   && (P.SF.Kind == SourceFileKind::Interface
+	       || P.SF.Kind == SourceFileKind::SourceInterface
 	       || P.Context.LangOpts.hasFeature(Feature::CoroutineAccessors))) {
     P.diagnose(P.Tok.getLoc(), diag::old_coroutine_accessor,
 	       "mutate", "modify");
@@ -8346,7 +8350,9 @@ bool Parser::parseAccessorAfterIntroducer(
   // It's okay not to have a body if there's an external asm name.
   if (!Tok.is(tok::l_brace)) {
     // Accessors don't need bodies in module interfaces or @abi attrs
-    if (SF.Kind == SourceFileKind::Interface || Flags.contains(PD_StubOnly))
+    if (SF.Kind == SourceFileKind::Interface ||
+        SF.Kind == SourceFileKind::SourceInterface ||
+        Flags.contains(PD_StubOnly))
       return false;
 
     // _silgen_name'd accessors don't need bodies.
@@ -10465,6 +10471,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   if (!Tok.is(tok::l_brace)) {
     switch (SF.Kind) {
     case SourceFileKind::Interface:
+    case SourceFileKind::SourceInterface:
     case SourceFileKind::SIL:
       // It's okay to have no body for SIL code or module interfaces.
       break;

@@ -1411,6 +1411,9 @@ def migrator_update_swift: Flag<["-"], "migrator-update-swift">,
 def parse_as_library : Flag<["-"], "parse-as-library">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file(s) as libraries, not scripts">;
+def parse_as_interface : Flag<["-"], "parse-as-interface">,
+  Flags<[FrontendOption, NoInteractiveOption]>,
+  HelpText<"Parse the input file(s) as module interface">;
 def parse_sil : Flag<["-"], "parse-sil">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Parse the input file as SIL code, not Swift source">;
@@ -2346,6 +2349,16 @@ def experimental_clang_importer_direct_cc1_scan:
 def cache_compile_job:  Flag<["-"], "cache-compile-job">,
   Flags<[FrontendOption, NewDriverOnlyOption]>,
   HelpText<"Enable compiler caching">;
+
+def scan_dependencies_minimized_source :
+  Flag<["-"], "scan-dependencies-minimized-source">,
+  Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
+  HelpText<"Use minimized source files during dependency scanning">;
+
+def scan_dependencies_remove_internal_decls :
+  Flag<["-"], "scan-dependencies-remove-internal-decls">,
+  Flags<[FrontendOption, NewDriverOnlyOption, HelpHidden]>,
+  HelpText<"Remove internal/fileprivate declarations during minimized source scanning">;
 
 def no_cache_compile_job:  Flag<["-"], "no-cache-compile-job">,
   Flags<[FrontendOption, NoDriverOption, HelpHidden]>,

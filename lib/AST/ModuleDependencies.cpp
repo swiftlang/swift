@@ -217,7 +217,7 @@ void ModuleDependencyInfo::addModuleImport(
 
 void ModuleDependencyInfo::addModuleImports(
     const SourceFile &sourceFile, llvm::StringSet<> &alreadyAddedModules,
-    const SourceManager *sourceManager) {
+    const SourceManager *sourceManager, bool removeInternalImports) {
   // Add all of the module dependencies.
   SmallVector<Decl *, 32> decls;
   sourceFile.getTopLevelDecls(decls);
@@ -239,6 +239,17 @@ void ModuleDependencyInfo::addModuleImports(
               realPath, importDecl->getLoc(), sourceFile,
               importDecl->isExported()))
         continue;
+
+      // When removing internal declarations, skip internal/fileprivate
+      // imports. @_implementationOnly imports are kept because the
+      // compiler needs them for type-checking the interface.
+      if (removeInternalImports &&
+          !importDecl->getAttrs().hasAttribute<ImplementationOnlyAttr>()) {
+        auto accessLevel = importDecl->getAccessLevel();
+        if (accessLevel == AccessLevel::Internal ||
+            accessLevel == AccessLevel::FilePrivate)
+          continue;
+      }
 
       addModuleImport(realPath, importDecl->isExported(),
                       importDecl->getAccessLevel(),

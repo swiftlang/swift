@@ -326,6 +326,7 @@ std::vector<Token> swift::tokenize(const LangOptions &LangOpts,
 static LexerMode sourceFileKindToLexerMode(SourceFileKind kind) {
   switch (kind) {
     case swift::SourceFileKind::Interface:
+    case swift::SourceFileKind::SourceInterface:
       return LexerMode::SwiftInterface;
     case swift::SourceFileKind::SIL:
       return LexerMode::SIL;

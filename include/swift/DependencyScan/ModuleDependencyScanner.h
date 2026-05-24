@@ -14,12 +14,14 @@
 #include "swift/Basic/SourceManager.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/Basic/BasicBridging.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/ScanningLoaders.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/CASFileSystem.h"
 #include "llvm/Support/ThreadPool.h"
+#include <mutex>
 
 namespace swift {
 class DependencyTracker;
@@ -245,6 +247,11 @@ public:
   /// \returns true if the file is tracked, false if the file doesn't exist.
   bool trackFile(const Twine &path);
 
+  /// Track a file with substituted content. Stores \p content in CAS and
+  /// tracks \p path with the resulting ObjectRef instead of disk content.
+  /// \returns llvm::Error on failure (CAS store error), success otherwise.
+  llvm::Error trackFileWithContent(const Twine &path, StringRef content);
+
   llvm::Expected<llvm::cas::ObjectProxy> createTreeFromDependencies();
   
 private:
@@ -309,6 +316,14 @@ public:
     assert(CacheFS && "Expect CacheFS available");
     return *CacheFS;
   }
+
+  /// Whether async source minimization was started.
+  bool isMinimizingSource() const { return MinimizationPool.has_value(); }
+
+  /// Get pre-computed minimized content for a source file.
+  /// Must only be called after performDependencyScan() has returned.
+  /// \returns the minimized content, or None if not available.
+  std::optional<StringRef> getMinimizedSource(StringRef path) const;
 
 private:
   // Private methods that create, initialize and finalize the scanner.
@@ -473,6 +488,13 @@ private:
   std::mutex WorkersLock;
   /// Count of filesystem queries performed
   std::atomic<unsigned> NumLookups = 0;
+
+  /// Async source minimization state.
+  void beginSourceMinimization(ArrayRef<std::string> sourceFiles);
+  void waitForMinimization();
+  std::optional<llvm::DefaultThreadPool> MinimizationPool;
+  llvm::StringMap<BridgedStringRef> MinimizedSources;
+  std::mutex MinimizationMutex;
 };
 
 /// Check if a module path is under one of the known SDK private framework

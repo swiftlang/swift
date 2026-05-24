@@ -987,7 +987,8 @@ public:
   /// file to the set of module imports.
   void addModuleImports(const SourceFile &sourceFile,
                         llvm::StringSet<> &alreadyAddedModules,
-                        const SourceManager *sourceManager);
+                        const SourceManager *sourceManager,
+                        bool removeInternalImports = false);
 
   /// Add a dependency on the given module, if it was not already in the set.
   void addModuleImport(ImportPath::Module module, bool isExported,

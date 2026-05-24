@@ -1389,6 +1389,8 @@ tryMatchInputModeToSourceFileKind(FrontendOptions::ParseInputMode mode) {
     return SourceFileKind::SIL;
   case FrontendOptions::ParseInputMode::SwiftModuleInterface:
     return SourceFileKind::Interface;
+  case FrontendOptions::ParseInputMode::SwiftSourceInterface:
+    return SourceFileKind::SourceInterface;
   case FrontendOptions::ParseInputMode::Swift:
     return SourceFileKind::Main;
   }
@@ -1454,13 +1456,19 @@ bool CompilerInstance::createFilesForMainModule(
   // Finally add the library files.
   // FIXME: This is the only demand point for InputSourceCodeBufferIDs. We
   // should compute this list of source files lazily.
+  auto inputMode = Invocation.getFrontendOptions().InputMode;
   for (auto BufferID : InputSourceCodeBufferIDs) {
     // Skip the main buffer, we've already handled it.
     if (BufferID == MainBufferID)
       continue;
 
+    auto Kind = SourceFileKind::Library;
+    if (inputMode ==
+        FrontendOptions::ParseInputMode::SwiftSourceInterface)
+      Kind = SourceFileKind::SourceInterface;
+
     auto *libraryFile =
-        createSourceFileForMainModule(mod, SourceFileKind::Library, BufferID);
+        createSourceFileForMainModule(mod, Kind, BufferID);
     files.push_back(libraryFile);
   }
   return false;

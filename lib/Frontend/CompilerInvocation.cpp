@@ -825,6 +825,10 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   Opts.EnableCachingRemarks |= Args.hasArg(OPT_cache_remarks);
   Opts.CacheSkipReplay |= Args.hasArg(OPT_cache_disable_replay);
   Opts.WriteOutputHashXAttr |= Args.hasArg(OPT_write_output_hash_xattr);
+  Opts.EnableMinimizedSourceScanning |=
+      Args.hasArg(OPT_scan_dependencies_minimized_source);
+  Opts.RemoveInternalDeclsOnMinimization |=
+      Args.hasArg(OPT_scan_dependencies_remove_internal_decls);
   if (const Arg *A = Args.getLastArg(OPT_cas_path))
     Opts.Config.CASPath = A->getValue();
 

@@ -79,6 +79,7 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
   }
   case SourceFileKind::Library:
   case SourceFileKind::Main:
+  case SourceFileKind::SourceInterface:
   case SourceFileKind::Interface:
     break;
   case SourceFileKind::SIL:

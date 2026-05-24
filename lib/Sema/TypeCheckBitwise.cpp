@@ -345,6 +345,7 @@ bool DeriveImplicitBitwiseCopyableConformance::allowedForFile() {
       return false;
 
     case SourceFileKind::Library:
+    case SourceFileKind::SourceInterface:
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
     case SourceFileKind::Main:

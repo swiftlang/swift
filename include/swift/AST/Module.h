@@ -100,6 +100,7 @@ enum class SourceFileKind {
   Main,     ///< A .swift file that can have top-level code.
   SIL,      ///< Came from a .sil file.
   Interface, ///< Came from a .swiftinterface file, representing another module.
+  SourceInterface, ///< A .swift file parsed as interface (-parse-as-interface).
   MacroExpansion, ///< Came from a macro expansion.
   DefaultArgument, ///< Came from default argument at caller side
 };

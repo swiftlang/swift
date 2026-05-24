@@ -3066,6 +3066,13 @@ bool PatternBindingDecl::isDefaultInitializable(unsigned i) const {
   if (entry.isInitialized())
     return true;
 
+  // @_hasInitialValue means the property had an initializer that was stripped
+  // during source minimization. Treat it as default-initializable.
+  if (auto singleVar = getSingleVar()) {
+    if (singleVar->getAttrs().hasAttribute<HasInitialValueAttr>())
+      return true;
+  }
+
   // If the outermost attached property wrapper vends an `init()`, use that
   // for default initialization.
   if (isDefaultInitializableViaPropertyWrapper(i))

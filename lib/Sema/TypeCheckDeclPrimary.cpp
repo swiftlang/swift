@@ -1726,6 +1726,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     switch (SF->Kind) {
     case SourceFileKind::SIL:
     case SourceFileKind::Interface:
+    case SourceFileKind::SourceInterface:
       return;
     case SourceFileKind::DefaultArgument:
     case SourceFileKind::Library:
@@ -2772,6 +2773,7 @@ public:
           switch (SF->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
+          case SourceFileKind::SourceInterface:
             break;
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Main:
@@ -2797,6 +2799,7 @@ public:
           switch (SF->Kind) {
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
+          case SourceFileKind::SourceInterface:
             return;
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Main:
@@ -2820,6 +2823,7 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Interface:
           case SourceFileKind::SIL:
+          case SourceFileKind::SourceInterface:
             return;
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Library:

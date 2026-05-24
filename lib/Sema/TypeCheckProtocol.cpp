@@ -4864,7 +4864,10 @@ ConformanceChecker::resolveWitnessViaLookup(ValueDecl *requirement) {
 
   if (!numViable) {
     // Save the missing requirement for later diagnosis.
-    getASTContext().addDelayedMissingWitness(Conformance, {requirement, matches});
+    // In SourceInterface mode, skip this — the opaque witness fallback in
+    // resolveWitnessViaDefault will handle it after derivation is attempted.
+    if (!DC->isInSwiftSourceInterface())
+      getASTContext().addDelayedMissingWitness(Conformance, {requirement, matches});
     return ResolveWitnessResult::Missing;
   }
 
@@ -5009,6 +5012,22 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDefault(
   if (allowOptionalWitness(Proto, Conformance, requirement)) {
     recordOptionalWitness(requirement);
     return ResolveWitnessResult::Success;
+  }
+
+  // In SourceInterface mode, treat any remaining missing witnesses as opaque.
+  // This handles internal witnesses that were removed by the source minimizer.
+  // Unlike .swiftinterface files (which apply this fallback during lookup),
+  // SourceInterface files apply it after derivation so that synthesized
+  // conformances (e.g. Equatable, Hashable) still work.
+  if (DC->isInSwiftSourceInterface()) {
+    if (Conformance && !Conformance->isInvalid()) {
+      auto match = matchWitness(ReqEnvironmentCache, Proto, Conformance, DC,
+                                requirement, requirement);
+      if (match.isViable()) {
+        recordWitness(requirement, match);
+        return ResolveWitnessResult::Success;
+      }
+    }
   }
 
   return ResolveWitnessResult::ExplicitFailed;
@@ -7235,7 +7254,8 @@ void TypeChecker::checkConformancesInContext(IterableDeclContext *idc) {
   // If there were any unsatisfied requirements, check whether there
   // are any near-matches we should diagnose.
   if (!unsatisfiedReqs.empty()) {
-    if (sf->Kind != SourceFileKind::Interface) {
+    if (sf->Kind != SourceFileKind::Interface &&
+        sf->Kind != SourceFileKind::SourceInterface) {
       // Find all of the members that aren't used to satisfy
       // requirements, and check whether they are close to an
       // unsatisfied or defaulted requirement.

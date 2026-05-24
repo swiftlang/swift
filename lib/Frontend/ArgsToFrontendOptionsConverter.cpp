@@ -289,6 +289,8 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (Args.hasArg(OPT_parse_sil) || Opts.InputsAndOutputs.shouldTreatAsSIL()) {
     Opts.InputMode = FrontendOptions::ParseInputMode::SIL;
+  } else if (Args.hasArg(OPT_parse_as_interface)) {
+    Opts.InputMode = FrontendOptions::ParseInputMode::SwiftSourceInterface;
   } else if (Opts.InputsAndOutputs.shouldTreatAsModuleInterface()) {
     Opts.InputMode = FrontendOptions::ParseInputMode::SwiftModuleInterface;
   } else if (Args.hasArg(OPT_parse_as_library)) {
@@ -299,6 +301,14 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   if (Opts.RequestedAction == FrontendOptions::ActionType::NoneAction) {
     Opts.RequestedAction = determineRequestedAction(Args);
+  }
+
+  if (Args.hasArg(OPT_parse_as_interface) &&
+      !FrontendOptions::isActionCompatibleWithInterfaceInput(
+          Opts.RequestedAction)) {
+    Diags.diagnose(SourceLoc(),
+                   diag::error_mode_incompatible_with_interface_input);
+    return true;
   }
 
   if (FrontendOptions::doesActionBuildModuleFromInterface(

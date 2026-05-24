@@ -172,6 +172,7 @@ public:
     CacheTool,       // swift-cache-tool
     ParseTest,       // swift-parse-test
     SynthesizeInterface,  // swift-synthesize-interface
+    InterfaceTool,  // swift-interface-tool
   };
 
   class InputInfoMap;
