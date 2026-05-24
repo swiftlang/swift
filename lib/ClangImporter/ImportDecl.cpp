@@ -4103,7 +4103,15 @@ namespace {
 
       // We may have already imported this function decl while importing its
       // decl context. Check decl cache to make sure we don't import twice.
-      auto known = Impl.ImportedDecls.find({decl, getVersion()});
+      const clang::Decl *cacheKey;
+      if (funcTemplate)
+        // Function templates are cached under the FunctionTemplateDecl
+        // so use funcTemplate as cache key if set.
+        cacheKey = funcTemplate->getCanonicalDecl();
+      else
+        // Otherwise use decl's canonical decl, matching importDeclAndCacheImpl
+        cacheKey = decl->getCanonicalDecl();
+      auto known = Impl.ImportedDecls.find({cacheKey, getVersion()});
       if (known != Impl.ImportedDecls.end()) {
         return known->second;
       }
@@ -4250,7 +4258,7 @@ namespace {
 
       // We may have already imported this function decl while importing its
       // type signature. Check decl cache to make sure we don't import twice.
-      auto known2 = Impl.ImportedDecls.find({decl, getVersion()});
+      auto known2 = Impl.ImportedDecls.find({cacheKey, getVersion()});
       if (known2 != Impl.ImportedDecls.end()) {
         return known2->second;
       }
