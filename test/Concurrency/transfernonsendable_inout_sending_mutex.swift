@@ -19,7 +19,7 @@ class NonSendableKlass {
 // a reference that aliases the Mutex's protected state.
 func testMutexWithLockReturnsParam() {
   let m = Mutex(NonSendableKlass())
-  let _ = m.withLock { $0 } // expected-error {{'inout sending' parameter '$0' cannot be returned}}
+  let _ = m.withLock { $0 } // expected-warning {{'inout sending' parameter '$0' cannot be returned}}
   // expected-note @-1 {{returning 'inout sending' parameter '$0' risks concurrent access as caller assumes '$0' and result can be sent to different isolation domains}}
 }
 
@@ -27,7 +27,7 @@ func testMutexWithLockReturnsParam() {
 func testMutexWithLockExplicitClosure() {
   let m = Mutex(NonSendableKlass())
   let _ = m.withLock { (state: inout sending NonSendableKlass) -> NonSendableKlass in
-    return state // expected-error {{'inout sending' parameter 'state' cannot be returned}}
+    return state // expected-warning {{'inout sending' parameter 'state' cannot be returned}}
     // expected-note @-1 {{returning 'inout sending' parameter 'state' risks concurrent access as caller assumes 'state' and result can be sent to different isolation domains}}
   }
 }
@@ -37,7 +37,7 @@ func testMutexWithLockReturnsDerived() {
   let m = Mutex(NonSendableKlass())
   let _ = m.withLock { (state: inout sending NonSendableKlass) -> NonSendableKlass in
     let copy = state
-    return copy // expected-error {{'copy' cannot be returned}}
+    return copy // expected-warning {{'copy' cannot be returned}}
     // expected-note @-1 {{returning 'copy' risks concurrent access to 'inout sending' parameter 'state' as caller assumes 'state' and result can be sent to different isolation domains}}
   }
 }
@@ -55,7 +55,7 @@ func testMutexWithLockAssignsOverButStillReturnsIt() {
   let m = Mutex(NonSendableKlass())
   let _ = m.withLock { (state: inout sending NonSendableKlass) -> NonSendableKlass in
     state = NonSendableKlass()
-    return state // expected-error {{'inout sending' parameter 'state' cannot be returned}}
+    return state // expected-warning {{'inout sending' parameter 'state' cannot be returned}}
     // expected-note @-1 {{returning 'inout sending' parameter 'state' risks concurrent access as caller assumes 'state' and result can be sent to different isolation domains}}
   }
 }

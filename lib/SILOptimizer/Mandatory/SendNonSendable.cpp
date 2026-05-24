@@ -2534,6 +2534,7 @@ private:
   /// isolation.
   SILDynamicMergedIsolationInfo isolationInfo;
 
+  bool downgradeToWarning = false;
   bool emittedErrorDiagnostic = false;
 
 public:
@@ -2548,7 +2549,8 @@ public:
         inoutSendingParamElement(error.inoutSendingElement),
         returnedValue(
             raFuncInfo->getValueMap().getRepresentative(error.returnedValue)),
-        isolationInfo(error.isolationInfo) {}
+        isolationInfo(error.isolationInfo),
+        downgradeToWarning(error.downgradeToWarning) {}
 
   ~InOutSendingReturnedDiagnosticEmitter() {
     // If we were supposed to emit a diagnostic and didn't emit an unknown
@@ -2686,9 +2688,11 @@ public:
   InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
                                    U &&...args) {
     emittedErrorDiagnostic = true;
-    return std::move(getASTContext()
-                         .Diags.diagnose(loc, diag, std::forward<U>(args)...)
-                         .warnUntilLanguageMode(LanguageMode::v6));
+    auto diag_ = getASTContext().Diags.diagnose(loc, diag,
+                                                std::forward<U>(args)...);
+    if (downgradeToWarning)
+      return std::move(diag_.warnUntilLanguageMode(LanguageMode::future));
+    return std::move(diag_.warnUntilLanguageMode(LanguageMode::v6));
   }
 
   template <typename... T, typename... U>
