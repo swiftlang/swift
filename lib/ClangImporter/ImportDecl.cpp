@@ -2487,6 +2487,14 @@ namespace {
 
       Impl.validateSwiftAttributes(decl);
       auto loc = Impl.importSourceLoc(decl->getLocation());
+
+      // Do not import std::promise.
+      if (decl->isInStdNamespace() && decl->getName() == "promise" &&
+          getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
+              CxxValueSemanticsKind::Copyable) {
+        return nullptr;
+      }
+
       if (recordHasReferenceSemantics(decl))
         result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
@@ -2499,10 +2507,6 @@ namespace {
 
       if (getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
           CxxValueSemanticsKind::Copyable) {
-        if (decl->isInStdNamespace() && decl->getName() == "promise") {
-          // Do not import std::promise.
-          return nullptr;
-        }
         result->addAttribute(new (Impl.SwiftContext)
                                  MoveOnlyAttr(/*Implicit=*/true));
         addSuppressedProtocol(result, KnownProtocolKind::Copyable);
