@@ -1612,6 +1612,14 @@ namespace {
       if (!SwiftType)
         return nullptr;
 
+      // While importing the underlying type, we may encounter this typedef
+      // again and thus may already have imported this typedef by this point.
+      // If so, reuse the cached result rather than creating a duplicate.
+      auto alreadyImported = Impl.ImportedDecls.find(
+          {Decl->getCanonicalDecl(), getVersion()});
+      if (alreadyImported != Impl.ImportedDecls.end())
+        return alreadyImported->second;
+
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
       auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
           Decl, importer::convertClangAccess(Decl->getAccess()),
