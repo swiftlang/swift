@@ -213,6 +213,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     llvm::PrefixMapper *Mapper)
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
+      workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()),
       clangScanningTool(
           *globalScanningService.ClangScanningService,
           getClangScanningFS(globalScanningService, CAS, ScanASTContext)),
@@ -226,7 +227,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
 
   // Instantiate a worker-specific diagnostic engine and copy over
   // the scanner's diagnostic consumers (expected to be thread-safe).
-  workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(ScanASTContext.SourceMgr);
+  workerDiagnosticEngine = std::make_unique<DiagnosticEngine>(workerSourceMgr);
   for (auto &scannerDiagConsumer : DiagnosticReporter.Diagnostics.getConsumers())
     workerDiagnosticEngine->addConsumer(*scannerDiagConsumer);
 
@@ -239,7 +240,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
                       workerCompilerInvocation->getSymbolGraphOptions(),
                       workerCompilerInvocation->getCASOptions(),
                       workerCompilerInvocation->getSerializationOptions(),
-                      ScanASTContext.SourceMgr, *workerDiagnosticEngine));
+                      workerSourceMgr, *workerDiagnosticEngine));
 
   scanningASTDelegate = std::make_unique<InterfaceSubContextDelegateImpl>(
       workerASTContext->SourceMgr, workerDiagnosticEngine.get(),
@@ -333,10 +334,14 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
         clangModuleDependencies.takeError(),
         [this, &moduleName](const llvm::StringError &E) {
           auto &message = E.getMessage();
-          if (message.find("fatal error: module '" + moduleName.str().str() +
-                           "' not found") == std::string::npos)
-            workerDiagnosticEngine->diagnose(
-                SourceLoc(), diag::clang_dependency_scan_error, message);
+          // Empty messages are cached clang loadModule failures whose
+          // diagnostic was already reported on the first lookup.
+          if (message.empty() ||
+              message.find("fatal error: module '" + moduleName.str().str() +
+                           "' not found") != std::string::npos)
+            return;
+          workerDiagnosticEngine->diagnose(
+              SourceLoc(), diag::clang_dependency_scan_error, message);
         });
     return std::nullopt;
   }

@@ -58,7 +58,7 @@ const uint16_t SWIFTMODULE_VERSION_MAJOR = 0;
 /// describe what change you made. The content of this comment isn't important;
 /// it just ensures a conflict if two people change the module format.
 /// Don't worry about adhering to the 80-column limit for this line.
-const uint16_t SWIFTMODULE_VERSION_MINOR = 997; // ActorIsolation::Kind: split Nonisolated from NonisolatedConcurrent
+const uint16_t SWIFTMODULE_VERSION_MINOR = 1004; // SIL global codegen model
 
 /// A standard hash seed used for all string hashes in a serialized module.
 ///
@@ -867,6 +867,12 @@ enum BlockID {
   /// \sa decl_member_tables_block
   DECL_MEMBER_TABLES_BLOCK_ID,
 
+  /// The hidden-type layouts block, which records layout information
+  /// for stored property that is hidden from module clients.
+  ///
+  /// \sa hidden_type_layouts_block
+  HIDDEN_TYPE_LAYOUTS_BLOCK_ID,
+
   /// The module documentation container block, which contains all other
   /// documentation blocks.
   ///
@@ -1014,6 +1020,12 @@ namespace options_block {
     OSLOG_STRING_SECTION_NAME,
     AGGRESSIVE_CMO,
     LIBRARY_LEVEL,
+    // Internal sentinel. MUST remain the last enumerator in this block.
+    // Equal to one past the last real record kind. Used by
+    // Serialization.cpp to statically assert that OPTIONS_BLOCK's
+    // abbreviation-code width is wide enough for every possible
+    // BCRecordLayout declared in the block.
+    LAST_RECORD_KIND_MARKER,
   };
 
   using SDKPathLayout = BCRecordLayout<
@@ -1618,6 +1630,11 @@ namespace decls_block {
     INTEGER_TYPE,
     BCFixed<1>,   // is negative?
     BCBlob        // integer value text
+  );
+
+  TYPE_LAYOUT(HiddenTypeLayout,
+    HIDDEN_TYPE,
+    BCBlob        // mangled name of the original (hidden) type
   );
 
   using TypeAliasLayout = BCRecordLayout<
@@ -2377,8 +2394,8 @@ namespace decls_block {
     TypeIDField                       // result type
   >;
 
-  using WarnDeclAttrLayout = BCRecordLayout<
-    Warn_DECL_ATTR,
+  using DiagnoseDeclAttrLayout = BCRecordLayout<
+    Diagnose_DECL_ATTR,
     BCFixed<1> // implicit flag
   >;
 
@@ -2578,6 +2595,12 @@ namespace decls_block {
     BCFixed<1> /* implicit flag */ \
   >;
 #include "swift/AST/DeclAttr.def"
+
+  using PreInverseGenericsDeclAttrLayout = BCRecordLayout<
+    PreInverseGenerics_DECL_ATTR,
+    BCFixed<1>, // implicit
+    TypeIDField // except type
+  >;
 
   using DynamicReplacementDeclAttrLayout = BCRecordLayout<
     DynamicReplacement_DECL_ATTR,
@@ -2857,6 +2880,23 @@ namespace decl_member_tables_block {
     DECL_MEMBERS, // record ID
     BCVBR<16>,  // table offset within the blob (see below)
     BCBlob  // maps from DeclIDs to DeclID vectors
+  >;
+}
+
+/// \sa HIDDEN_TYPE_LAYOUTS_BLOCK_ID
+namespace hidden_type_layouts_block {
+  enum RecordKind {
+    HIDDEN_TYPE_LAYOUT = 1,
+  };
+
+  using HiddenTypeLayoutLayout = BCRecordLayout<
+    HIDDEN_TYPE_LAYOUT,
+    BCVBR<32>,    // size (bytes)
+    BCVBR<8>,     // alignment (bytes)
+    BCVBR<32>,    // stride (bytes)
+    BCFixed<1>,   // bitwiseCopyable (always 1 in V1)
+    BCFixed<1>,   // opaque (always 0 in V1)
+    BCBlob        // mangled name of the hidden type
   >;
 }
 

@@ -582,15 +582,21 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
     var args = pointerArgs
     let typeName = getUnattributedType(oldType).description
+    let castName =
+      if typeMappings[typeName] == typeName {
+        ".init"  // std::span is not hidden behind any type alias, can't name it using Swift syntax
+      } else {
+        typeName // use the concrete type for readability, and to be polite to the typechecker
+      }
     assert(args[index] == nil)
 
     let (_, isConst) = dropCxxQualifiers(try genericArg)
     if isConst {
-      args[index] = ExprSyntax("\(raw: typeName)(\(raw: name))")
+      args[index] = ExprSyntax("\(raw: castName)(\(raw: name))")
       return try base.buildFunctionCall(args)
     } else {
       let unwrappedName = TokenSyntax("_\(name.withoutBackticks)Ptr")
-      args[index] = ExprSyntax("\(raw: typeName)(\(unwrappedName))")
+      args[index] = ExprSyntax("\(raw: castName)(\(unwrappedName))")
       let call = try base.buildFunctionCall(args)
 
       // MutableSpan - unlike Span - cannot be bitcast to std::span due to being ~Copyable,
@@ -1777,16 +1783,24 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
     + disfavoredOverload)
   let trivia =
     leadingTrivia + .docLineComment("/// This is an auto-generated wrapper for safer interop\n")
+  var modifiers = funcComponents.modifiers
+  if parentNode?.as(ClassDeclSyntax.self) != nil {
+    if let openIdx = modifiers.firstIndex(where: { mod in mod.name.tokenKind == .keyword(.open)}) {
+      // "open final" is not allowed in Swift
+      modifiers[openIdx] = DeclModifierSyntax(name: .keyword(.public))
+    }
+    modifiers.append(DeclModifierSyntax(name: .keyword(.final)))
+  }
   if let origFuncDecl = declaration.as(FunctionDeclSyntax.self) {
     return DeclSyntax(
       origFuncDecl
         .with(\.signature, newSignature)
         .with(\.body, body)
         .with(\.attributes, attributes)
+        .with(\.modifiers, modifiers)
         .with(\.leadingTrivia, trivia))
   }
   if let origInitDecl = declaration.as(InitializerDeclSyntax.self) {
-    var modifiers = funcComponents.modifiers
     if parentNode?.as(ClassDeclSyntax.self) != nil { // convenience inits are forbidden in structs
       let alreadyConvenienceInit = modifiers.contains(where: { mod in
         mod.name.text == "convenience"

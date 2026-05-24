@@ -1982,10 +1982,9 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
                                   /*replacement=*/initialValue),
             /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
         if (auto var = asi->getVarInfo()) {
-          SILBuilder Builder(inst, ctx);
-          // Force the debug_value to be in the same scope as the alloc_stack
-          // so it refers to the correct variable.
-          Builder.setCurrentDebugScope(asi->getDebugScope());
+          // Remove the implicit op_deref, as it is no longer on the stack.
+          var->DIExpr = {};
+          SILBuilder Builder(inst, ctx, asi->getDebugScope());
           Builder.createDebugValue(inst->getLoc(), initialValue, *var);
         }
       }

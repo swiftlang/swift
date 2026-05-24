@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend -emit-ir %s | %FileCheck %s
 
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/OSLog.swiftmodule -module-name OSLog %S/Inputs/OSLogAltName.swift
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/os.swiftmodule -module-name os %S/Inputs/OSLogAltName.swift
 // RUN: %target-swift-frontend -emit-ir %s -I %t -DIMPORT_OSLOG | %FileCheck -check-prefix ALT-NAME %s
 
 // REQUIRES: OS=macosx || OS=ios || OS=watchos
@@ -16,7 +16,7 @@ sil_stage canonical
 import Builtin
 
 #if IMPORT_OSLOG
-import OSLog
+import os
 #endif
 
 sil @oslog_utf8_literal : $@convention(thin) () -> Builtin.RawPointer {

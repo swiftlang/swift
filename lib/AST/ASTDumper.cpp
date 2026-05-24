@@ -5143,7 +5143,6 @@ public:
   TRIVIAL_ATTR_PRINTER(Override, override)
   TRIVIAL_ATTR_PRINTER(Owned, owned)
   TRIVIAL_ATTR_PRINTER(Postfix, postfix)
-  TRIVIAL_ATTR_PRINTER(PreInverseGenerics, pre_inverse_generics)
   TRIVIAL_ATTR_PRINTER(Preconcurrency, preconcurrency)
   TRIVIAL_ATTR_PRINTER(Prefix, prefix)
   TRIVIAL_ATTR_PRINTER(PropertyWrapper, property_wrapper)
@@ -5503,6 +5502,12 @@ public:
         Label::always("comment_range"));
     printFoot();
   }
+  void visitPreInverseGenericsAttr(PreInverseGenericsAttr *Attr, Label label) {
+    printCommon(Attr, "pre_inverse_generics_attr", label);
+    if (auto *tyR = Attr->getExceptTypeRepr())
+      printRec(tyR, Label::optional("except_repr"));
+    printFoot();
+  }
   void visitRawLayoutAttr(RawLayoutAttr *Attr, Label label) {
     printCommon(Attr, "raw_layout_attr", label);
     if (auto *tyR = Attr->getScalarLikeType()) {
@@ -5648,8 +5653,8 @@ public:
     printFoot();
   }
                          
-  void visitWarnAttr(WarnAttr *Attr, Label label) {
-    printCommon(Attr, "warn", label);
+  void visitDiagnoseAttr(DiagnoseAttr *Attr, Label label) {
+    printCommon(Attr, "diagnose", label);
     auto &diagGroupInfo = getDiagGroupInfoByID(Attr->DiagnosticGroupID);
     printFieldRaw([&](raw_ostream &out) { out << diagGroupInfo.name; },
                   Label::always("diagGroupID:"));
@@ -6201,6 +6206,7 @@ namespace {
       printFlag(paramFlags.isNonEphemeral(), "nonEphemeral");
       printFlag(paramFlags.isCompileTimeLiteral(), "compileTimeLiteral");
       printFlag(paramFlags.isConstValue(), "constValue");
+      printFlag(paramFlags.isSending(), "sending");
       printFlag(getDumpString(paramFlags.getValueOwnership()));
     }
 
@@ -6692,6 +6698,17 @@ namespace {
       if (auto sendableTy = T->getSendableDependentType())
         printRec(sendableTy, Label::always("sendable_dep"));
 
+      if (T->hasLifetimeDependencies()) {
+        for (auto &dep : T->getLifetimeDependencies()) {
+          std::string str;
+          llvm::raw_string_ostream os(str);
+          StreamPrinter sp(os);
+          sp.printLifetimeDependence(dep, T->getParams(),
+                                     PrintOptions::forDebugging());
+          printFieldQuoted(str, Label::always("lifetime"));
+        }
+      }
+
       printClangTypeRec(T->getClangTypeInfo(), T->getASTContext(),
                         Label::optional("clang_type_info"));
       printAnyFunctionParamsRec(T->getParams(), Label::always("input"));
@@ -6877,6 +6894,13 @@ namespace {
       printFlag(T->isNegative(), "is_negative");
       printFieldQuoted(T->getValue(), Label::always("value"), LiteralValueColor);
       printFieldQuoted(T->getDigitsText(), Label::always("text"), IdentifierColor);
+      printFoot();
+    }
+
+    void visitHiddenType(HiddenType *T, Label label) {
+      printCommon("hidden_type", label);
+      printFieldQuoted(T->getMangledName(), Label::always("mangled_name"),
+                       IdentifierColor);
       printFoot();
     }
 

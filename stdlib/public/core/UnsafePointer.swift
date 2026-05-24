@@ -1401,3 +1401,6 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
     (Int(bitPattern: self) & (MemoryLayout<Pointee>.alignment &- 1)) == 0
   }
 }
+
+extension UnsafePointer: ConvertibleToBytes {}
+extension UnsafeMutablePointer: ConvertibleToBytes {}

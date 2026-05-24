@@ -2293,6 +2293,7 @@ namespace {
     UNSUPPORTED_METADATA(InOut)
     UNSUPPORTED_METADATA(Error)
     UNSUPPORTED_METADATA(Integer)
+    UNSUPPORTED_METADATA(Hidden)
     UNSUPPORTED_METADATA(SILBlockStorage)
     UNSUPPORTED_METADATA(BuiltinDefaultActorStorage)
     UNSUPPORTED_METADATA(BuiltinNonDefaultDistributedActorStorage)

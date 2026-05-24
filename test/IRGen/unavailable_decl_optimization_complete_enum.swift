@@ -6,8 +6,8 @@
 
 // CHECK: private constant [27 x i8] c"availableEnumAvailableCase\00"
 
-// FIXME: Should this reflection metadata for an unavailable case be stripped?
-// CHECK: private constant [29 x i8] c"availableEnumUnavailableCase\00"
+// CHECK-NO-STRIP-RESILIENT: private constant [29 x i8] c"availableEnumUnavailableCase\00"
+// CHECK-STRIP-RESILIENT-NOT: availableEnumUnavailableCase
 
 // CHECK-NO-STRIP-RESILIENT: @"$s4Test13AvailableEnumO09availableC34UnavailableCaseWithAssociatedValueyAcA0E6StructVcACmFWC" = {{.*}}constant
 // CHECK-STRIP-RESILIENT-NOT: @"$s4Test13AvailableEnumO09availableC34UnavailableCaseWithAssociatedValueyAcA0E6StructVcACmFWC" =

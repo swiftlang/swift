@@ -56,12 +56,14 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:strict-memory-safety>
 - <doc:unavailable-sendable-conformance>
 - <doc:unknown-warning-group>
+- <doc:unnecessary-effect-marker>
 - <doc:unsupported-scoped-import>
 - <doc:untyped-throws>
 - <doc:unused-import-access>
 - <doc:no-use-throwing-unstructured-task>
 - <doc:no-usage>
 - <doc:use-any-apple-os-availability>
+- <doc:useless-availability-check>
 
 
 ## Topics
@@ -74,6 +76,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:sendable-closure-captures>
 - <doc:compilation-caching>
 - <doc:string-interpolation-conformance>
+- <doc:conversion-from-isolated-any-to-synchronous>
 - <doc:region-isolation-cross-isolation-data-race>
 - <doc:deprecated-declaration>
 - <doc:implementation-only-deprecated>
@@ -116,6 +119,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:opaque-type-inference>
 - <doc:region-isolation-unknown-pattern>
 - <doc:unknown-warning-group>
+- <doc:unnecessary-effect-marker>
 - <doc:availability-unrecognized-name>
 - <doc:mutable-global-variable>
 - <doc:unsupported-scoped-import>
@@ -124,4 +128,5 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:no-use-throwing-unstructured-task>
 - <doc:no-usage>
 - <doc:use-any-apple-os-availability>
+- <doc:useless-availability-check>
 - <doc:existential-member-access-limitations>

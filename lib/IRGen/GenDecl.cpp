@@ -29,6 +29,7 @@
 #include "swift/AST/TypeMemberVisitor.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1156,13 +1157,6 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
   }
 
   if (f.isPossiblyUsedExternally()) {
-    // Under the embedded linkage model, if it has a non-unique definition,
-    // treat it lazily.
-    if (f.hasNonUniqueDefinition() && !f.isSwiftRuntimeFunction()
-        && !f.markedAsUsed()) {
-      return true;
-    }
-
     return false;
   }
 
@@ -1175,11 +1169,10 @@ static bool isLazilyEmittedFunction(SILFunction &f, SILModule &m) {
 // Eagerly emit global variables that are externally visible.
 static bool isLazilyEmittedGlobalVariable(SILGlobalVariable &v, SILModule &m) {
   if (v.isPossiblyUsedExternally()) {
-    // Under the embedded linkage model, if it has a non-unique definition,
-    // treat it lazily.
-    if (v.hasNonUniqueDefinition() && !v.markedAsUsed()) {
+    // Globals that come from a different module will be lazily emitted unless
+    // explicitly marked @used.
+    if (v.getParentModule() != m.getSwiftModule() && !v.markedAsUsed())
       return true;
-    }
 
     return false;
   }
@@ -1589,10 +1582,15 @@ bool IRGenerator::hasLazyMetadata(TypeDecl *type) {
   auto &langOpts = SIL.getASTContext().LangOpts;
   if (langOpts.hasFeature(Feature::Embedded) &&
       (isa<StructDecl>(type) || isa<EnumDecl>(type))) {
-    bool isGeneric = cast<NominalTypeDecl>(type)->isGenericContext();
-    HasLazyMetadata[type] = !isGeneric;
-
-    return !isGeneric;
+    auto *nominal = cast<NominalTypeDecl>(type);
+    // @export(interface) types have a unique definition in their defining
+    // module; importing modules reference them as external symbols rather than
+    // lazily emitting their own copy.
+    bool isExportInterface =
+      nominal->getEffectiveCodeGenerationModel() == CodeGenerationModel::Interface;
+    bool isLazy = !nominal->isGenericContext() && !isExportInterface;
+    HasLazyMetadata[type] = isLazy;
+    return isLazy;
   }
 
   auto canBeLazy = [&]() -> bool {

@@ -810,6 +810,19 @@ public:
   /// modules, but in a manner that ensures that all copies are equivalent.
   bool isSynthesizedNonUnique() const;
 
+  /// Retrieve the code generation model explicitly requested for this
+  /// conformance, inherited from the @export attribute on the declaring
+  /// nominal type or extension. Returns nullopt if the declaring context
+  /// does not specify an explicit code generation model.
+  std::optional<CodeGenerationModel>
+  getExplicitCodeGenerationModel() const;
+
+  /// Compute the code generation model for the conformance, combining the
+  /// explicitly-specified information from attributes with defaults
+  /// based on Embedded Swift or feature flags.
+  CodeGenerationModel
+  getEffectiveCodeGenerationModel() const;
+
   /// Whether this conformance represents the conformance of one protocol's
   /// conforming types to another protocol.
   ///

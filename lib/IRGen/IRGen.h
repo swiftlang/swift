@@ -332,7 +332,7 @@ public:
   template<unsigned Value>
   static constexpr Alignment create() {
     Alignment result;
-    result.Shift = llvm::CTLog2<Value>();
+    result.Shift = llvm::ConstantLog2<Value>();
     return result;
   }
 

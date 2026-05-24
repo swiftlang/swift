@@ -14,6 +14,7 @@ ALL_DIAGS=$(
 CXX_SOURCES=$(find lib include tools -name \*.cpp -or -name \*.h)
 DIAGS_IN_CXX_SOURCES=$(
     grep -E --only-matching --no-filename --null-data 'diag::\n?\s*[a-zA-Z0-9_]+' $CXX_SOURCES \
+    | tr '\0' '\n' \
     | sed -e 's/diag:://' -e 's/[[:space:]]//g')
 
 # Get potentially unused diags from C++ sources.

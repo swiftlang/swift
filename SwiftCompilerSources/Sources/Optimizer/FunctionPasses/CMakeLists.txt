@@ -9,6 +9,7 @@
 swift_compiler_sources(Optimizer
   AllocBoxToStack.swift
   AssumeSingleThreaded.swift
+  CommonSubexpressionElimination.swift
   AsyncDemotion.swift
   AutoDiffBranchTracingEnumUtilities.swift
   BooleanLiteralFolding.swift

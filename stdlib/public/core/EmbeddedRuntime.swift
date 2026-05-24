@@ -320,23 +320,36 @@ public func swift_allocEmptyBox() -> Builtin.RawPointer {
 /// Therefore, one cannot not use `swift_release` but rather must use
 /// `swift_releaseBox` to implement the "release" function of a box object.
 
-@_silgen_name("swift_allocBox")
-public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.RawPointer) {
-  let alignMask = Int(unsafe _swift_embedded_metadata_get_align_mask(UnsafeMutableRawPointer(metadata)))
-  let size = Int(unsafe _swift_embedded_metadata_get_size(UnsafeMutableRawPointer(metadata)))
+/// Computes the footprint of a box whose payload is described by `metadata`:
+/// the offset at which the payload starts within the allocation, the total
+/// allocation size, and the alignment mask to request from the allocator.
+/// `swift_allocBox` and `swift_deallocBox` must agree on these values.
+func _boxAllocationLayout(
+  metadata: UnsafeRawPointer
+) -> (startOfBoxedValue: Int, size: Int, alignMask: Int) {
+  let payloadAlignMask = Int(unsafe _swift_embedded_metadata_get_align_mask(metadata))
+  let payloadSize = Int(unsafe _swift_embedded_metadata_get_size(metadata))
   let headerSize = unsafe MemoryLayout<Int>.size + MemoryLayout<UnsafeRawPointer>.size
   let headerAlignMask = unsafe MemoryLayout<UnsafeRawPointer>.alignment - 1
-  let startOfBoxedValue = ((headerSize + alignMask) & ~alignMask)
-  let requiredSize: Int = startOfBoxedValue + size
-  let requiredAlignmentMask: Int = alignMask | headerAlignMask
+  let startOfBoxedValue = (headerSize + payloadAlignMask) & ~payloadAlignMask
+  return (
+    startOfBoxedValue: startOfBoxedValue,
+    size: startOfBoxedValue + payloadSize,
+    alignMask: payloadAlignMask | headerAlignMask
+  )
+}
 
-  let p = unsafe swift_slowAlloc(requiredSize, requiredAlignmentMask)!
+@_silgen_name("swift_allocBox")
+public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointer, Builtin.RawPointer) {
+  let layout = unsafe _boxAllocationLayout(metadata: UnsafeMutableRawPointer(metadata))
+
+  let p = unsafe swift_slowAlloc(layout.size, layout.alignMask)!
   let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
 
   unsafe _swift_embedded_set_heap_object_metadata_pointer(object, UnsafeMutableRawPointer(metadata))
   unsafe object.pointee.refcount = 1
 
-  let boxedValueAddr = unsafe UnsafeMutableRawPointer(p).advanced(by: startOfBoxedValue)
+  let boxedValueAddr = unsafe UnsafeMutableRawPointer(p).advanced(by: layout.startOfBoxedValue)
 
   return (object._rawValue, boxedValueAddr._rawValue)
 }
@@ -345,11 +358,28 @@ public func swift_allocBox(_ metadata: Builtin.RawPointer) -> (Builtin.RawPointe
 public func swift_deallocBox(_ pointer: UnsafeMutableRawPointer) {
   let object = unsafe pointer.bindMemory(to: HeapObject.self, capacity: 1)
   let metadata = unsafe _swift_embedded_get_heap_object_metadata_pointer(object)
+  let layout = unsafe _boxAllocationLayout(metadata: metadata)
   unsafe swift_slowDealloc(
     UnsafeMutableRawPointer(object),
-    _swift_embedded_metadata_get_size(metadata),
-    _swift_embedded_metadata_get_align_mask(metadata)
+    layout.size,
+    layout.alignMask
   )
+}
+
+/// Extracts the type metadata out of a heap object.
+@c
+public func swift_getObjectType(_ pointer: UnsafeMutableRawPointer) -> UnsafeRawPointer {
+  let object = unsafe pointer.bindMemory(to: HeapObject.self, capacity: 1)
+  return unsafe _swift_embedded_get_heap_object_metadata_pointer(object)
+}
+
+/// Determines whether two witness tables are the same.
+///
+/// The only way this can be true in Embedded Swift is if they refer to the same
+/// address in memory.
+@c
+public func swift_compareWitnessTables(_ lhs: UnsafeRawPointer, _ rhs: UnsafeRawPointer) -> Bool {
+  unsafe lhs == rhs
 }
 
 // MARK: - Error boxing (swift_allocError / swift_deallocError / swift_getErrorValue)

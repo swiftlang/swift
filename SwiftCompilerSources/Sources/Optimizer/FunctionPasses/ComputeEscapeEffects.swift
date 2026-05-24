@@ -32,6 +32,7 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
 
   let returnInst = function.returnInstruction
   let argsWithDefinedEffects = getArgIndicesWithDefinedEscapingEffects(of: function)
+  let complexityBudget = getComplexityBudget(for: function)
 
   for arg in function.arguments {
     // We are not interested in arguments with trivial types.
@@ -59,10 +60,10 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
   
     // Now compute effects for two important cases:
     //   * the argument itself + any value projections, and...
-    if addArgEffects(arg, argPath: SmallProjectionPath(), to: &newEffects, returnInst, context) {
+    if addArgEffects(arg, argPath: SmallProjectionPath(), to: &newEffects, returnInst, complexityBudget, context) {
       //   * single class indirections
       _ = addArgEffects(arg, argPath: SmallProjectionPath(.anyValueFields).push(.anyClassField),
-                        to: &newEffects, returnInst, context)
+                        to: &newEffects, returnInst, complexityBudget, context)
     }
   }
 
@@ -81,12 +82,18 @@ let computeEscapeEffects = FunctionPass(name: "compute-escape-effects") {
 private
 func addArgEffects(_ arg: FunctionArgument, argPath ap: SmallProjectionPath,
                    to newEffects: inout [EscapeEffects.ArgumentEffect],
-                   _ returnInst: ReturnInstruction?, _ context: FunctionPassContext) -> Bool {
+                   _ returnInst: ReturnInstruction?,
+                   _ complexityBudget: Int,
+                   _ context: FunctionPassContext) -> Bool {
   // Correct the path if the argument is not a class reference itself, but a value type
   // containing one or more references.
   let argPath = arg.type.isClass ? ap : ap.push(.anyValueFields)
   
-  guard let result = arg.at(argPath).visit(using: ArgEffectsVisitor(), initialWalkingDirection: .down, context) else {
+  guard let result = arg.at(argPath).visit(using: ArgEffectsVisitor(),
+                                           initialWalkingDirection: .down,
+                                           complexityBudget: complexityBudget,
+                                           context)
+  else {
     return false
   }
   
@@ -146,6 +153,12 @@ private func isOperandOfRecursiveCall(_ op: Operand) -> Bool {
     return true
   }
   return false
+}
+
+private func getComplexityBudget(for function: Function) -> Int {
+  var numInsts = 0
+  for _ in function.instructions { numInsts += 1 }
+  return 1_000_000 / numInsts
 }
 
 private struct ArgEffectsVisitor : EscapeVisitorWithResult {

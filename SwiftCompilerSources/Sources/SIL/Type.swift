@@ -213,7 +213,9 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
     return idx >= 0 ? idx : nil
   }
 
-  /// Returns true if this is a struct, enum or tuple and `otherType` is contained in this type - or is the same type.
+  /// Returns true if this is an aggregate containing `otherType` - or is the same type.
+  ///
+  /// Recurses into the element types of structs, tuples, enum payloads, and `Builtin.FixedArray`.
   public func aggregateIsOrContains(_ otherType: Type, in function: Function) -> Bool {
     if self == otherType {
       return true
@@ -232,6 +234,15 @@ public struct Type : TypeProperties, CustomStringConvertible, NoReflectionChildr
         return true
       }
       return cases.contains { $0.payload?.aggregateIsOrContains(otherType, in: function) ?? false }
+    }
+    if isBuiltinFixedArray {
+      // Match the address-ness of `self` so TBAA callers that pass address
+      // types recurse correctly into the element type.
+      var elementType = builtinFixedArrayElementType(in: function)
+      if isAddress {
+        elementType = elementType.addressType
+      }
+      return elementType.aggregateIsOrContains(otherType, in: function)
     }
     return false
   }

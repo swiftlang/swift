@@ -59,6 +59,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
@@ -67,6 +68,7 @@
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/MathExtras.h"
+#include "llvm/Transforms/Utils/Local.h"
 
 #include "CallEmission.h"
 #include "EntryPointArgumentEmission.h"
@@ -1029,6 +1031,7 @@ public:
   emitShadowCopyIfNeeded(llvm::Value *Storage, llvm::Type *StorageType,
                          const SILDebugScope *Scope, SILDebugVariable VarInfo,
                          bool IsAnonymous, bool WasMoved,
+                         SILDebugInfoExpression *ExprToExtend = nullptr,
                          std::optional<Alignment> Align = std::nullopt) {
     // Never emit shadow copies when optimizing, or if already on the stack.  No
     // debug info is emitted for refcounts either
@@ -1054,6 +1057,11 @@ public:
     auto shadow = emitShadowCopy(Storage, Scope, VarInfo, Align, true, WasMoved)
                       .getAddress();
 
+    // The shadow copy adds an extra layer of indirection.
+    if (ExprToExtend)
+      ExprToExtend->prependElements(
+          {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+
     // Mark variables in async functions for lifetime extension, so they get
     // spilled into the async context.
     if (!IGM.IRGen.Opts.shouldOptimize() &&
@@ -1073,17 +1081,19 @@ public:
                                       llvm::Type *StorageType,
                                       const SILDebugScope *Scope,
                                       SILDebugVariable VarInfo,
-                                      bool IsAnonymous, bool WasMoved) {
+                                      bool IsAnonymous, bool WasMoved,
+                                      SILDebugInfoExpression *ExprToExtend = nullptr) {
     return emitShadowCopyIfNeeded(Storage.getAddress(), StorageType, Scope,
                                   VarInfo, IsAnonymous, WasMoved,
-                                  Storage.getAlignment());
+                                  ExprToExtend, Storage.getAlignment());
   }
 
   /// Like \c emitShadowCopyIfNeeded() but takes an exploded value.
   void emitShadowCopyIfNeeded(SILValue &SILVal, const SILDebugScope *Scope,
                               SILDebugVariable VarInfo, bool IsAnonymous,
                               bool WasMoved,
-                              llvm::SmallVectorImpl<llvm::Value *> &copy) {
+                              llvm::SmallVectorImpl<llvm::Value *> &copy,
+                              SILDebugInfoExpression *ExprToExtend = nullptr) {
     Explosion e = getLoweredExplosion(SILVal);
 
     // Only do this at -O0.
@@ -1113,7 +1123,8 @@ public:
       auto &ti = getTypeInfo(SILVal->getType());
       copy.push_back(emitShadowCopyIfNeeded(e.claimNext(), ti.getStorageType(),
                                             Scope, VarInfo,
-                                            IsAnonymous, WasMoved));
+                                            IsAnonymous, WasMoved,
+                                            ExprToExtend));
       return;
     }
 
@@ -1191,20 +1202,20 @@ public:
   void emitDebugVariableDeclaration(
       StorageType Storage, DebugTypeInfo Ty, SILType SILTy,
       const SILDebugScope *DS, SILLocation VarLoc, SILDebugVariable VarInfo,
-      IndirectionKind Indirection,
+      bool InCoroContext = false,
       AddrDbgInstrKind DbgInstrKind = AddrDbgInstrKind::DbgDeclare) {
     assert(IGM.DebugInfo && "debug info not enabled");
 
     if (VarInfo.ArgNo) {
       PrologueLocation AutoRestore(IGM.DebugInfo.get(), Builder);
       IGM.DebugInfo->emitVariableDeclaration(
-          Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection,
+          Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
           ArtificialKind::RealValue, DbgInstrKind);
       return;
     }
 
     IGM.DebugInfo->emitVariableDeclaration(
-        Builder, Storage, Ty, DS, VarLoc, VarInfo, Indirection,
+        Builder, Storage, Ty, DS, VarLoc, VarInfo, InCoroContext,
         ArtificialKind::RealValue, DbgInstrKind);
   }
 
@@ -5802,6 +5813,11 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
 }
 
 static bool isInvariantAddress(SILValue v) {
+  // Debug reconstruction blocks have standalone block arguments with no
+  // predecessors, which confuses the access path walker.
+  if (v->getParentBlock()->isDebugReconstructionBlock())
+    return false;
+
   SILValue accessedAddress = getTypedAccessAddress(v);
   if (auto *ptrRoot = dyn_cast<PointerToAddressInst>(accessedAddress)) {
     return ptrRoot->isInvariant();
@@ -6029,15 +6045,22 @@ void IRGenSILFunction::emitErrorResultVar(CanSILFunctionType FnTy,
   assert(Var && "error result without debug info");
   auto Storage =
       emitShadowCopyIfNeeded(ErrorResultSlot.getAddress(), nullptr, getDebugScope(),
-                             *Var, false, false /*was move*/);
+                             *Var, false, false /*was move*/, &Var->DIExpr);
   if (!IGM.DebugInfo)
     return;
+  // The error result slot is an alloca storing a pointer to the error.
+  // We need two layers of indirection.
+  // The VarInfo initially has an empty DIExpr and undef value, so we need
+  // to recreate the whole DIExpr.
+  Var->DIExpr.prependElements(
+      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference),
+       SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
   auto DbgTy = DebugTypeInfo::getErrorResult(
       ErrorInfo.getReturnValueType(IGM.getSILModule(), FnTy,
                                    IGM.getMaximalTypeExpansionContext()),IGM);
   IGM.DebugInfo->emitVariableDeclaration(Builder, Storage, DbgTy,
                                          getDebugScope(), {}, *Var,
-                                         IndirectValue, ArtificialValue);
+                                         /*InCoroContext=*/false, ArtificialValue);
 }
 
 void IRGenSILFunction::emitPoisonDebugValueInst(DebugValueInst *i) {
@@ -6149,6 +6172,39 @@ static bool InCoroContext(SILFunction &f, SILInstruction &i) {
   return f.isAsync() && !i.getDebugScope()->InlinedCallSite;
 }
 
+/// Salvage an LLVM instruction emitted within a debug reconstruction block.
+/// Most instructions are handled by llvm::salvageDebugInfo which encodes
+/// their effects into the DWARF expression, but some instructions, such as
+/// loads, need a special case.
+static void salvageDebugReconstructionInst(llvm::Instruction *I) {
+  if (auto *LI = dyn_cast<llvm::LoadInst>(I)) {
+    llvm::SmallVector<llvm::DbgVariableIntrinsic *, 1> DbgInsts;
+    llvm::SmallVector<llvm::DbgVariableRecord *, 2> DbgRecords;
+    llvm::findDbgUsers(DbgInsts, LI, &DbgRecords);
+    llvm::Value *Addr = LI->getPointerOperand();
+    for (llvm::DbgVariableRecord *DVR : DbgRecords) {
+      // Insert DW_OP_deref after each arg that references the load.
+      // This loop works the same way as llvm::salvageDebugInfoForDbgValues.
+      // It iterates over the inputs (`locations`) of the debug record (although
+      // there usually is only one), and when the input is this load instruction,
+      // the DIExpression is updated to add a deref to all uses.
+      auto locations = DVR->location_ops();
+      llvm::DIExpression *expr = DVR->getExpression();
+      auto locationIterator = find(locations, LI);
+      while (locationIterator != locations.end()) {
+        unsigned locationNo = std::distance(locations.begin(), locationIterator);
+        expr = llvm::DIExpression::appendOpsToArg(expr,
+                                                  {llvm::dwarf::DW_OP_deref}, locationNo);
+        locationIterator = std::find(std::next(locationIterator), locations.end(), LI);
+      }
+      DVR->replaceVariableLocationOp(LI, Addr);
+      DVR->setExpression(expr);
+    }
+    return;
+  }
+  llvm::salvageDebugInfo(*I);
+}
+
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   auto SILVal = i->getOperand();
   bool IsAddrVal = SILVal->getType().isAddress();
@@ -6190,17 +6246,6 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   }
 
   auto RealTy = SILTy.getASTType();
-  if (IsAddrVal && IsInCoro)
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(i->getOperand())) {
-      // Usually debug info only ever describes the *result* of a projectBox
-      // call. To allow the debugger to display a boxed parameter of an async
-      // continuation object, however, the debug info can only describe the box
-      // itself and thus also needs to emit a box type for it so the debugger
-      // knows to call into Remote Mirrors to unbox the value.
-      RealTy = PBI->getOperand()->getType().getASTType();
-      assert(isa<SILBoxType>(RealTy));
-    }
-
   VarDecl *VD = i->getDecl();
   if (!VD) {
     // The source location of a DebugValueInst inserted by the SIL optimizer is
@@ -6218,21 +6263,82 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   } else
     return;
 
-  // Since debug_value is expressing indirection explicitly via op_deref,
-  // we're not using either IndirectValue or CoroIndirectValue here.
-  IndirectionKind Indirection = IsInCoro? CoroDirectValue : DirectValue;
-
   // Put the value into a shadow-copy stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
-  if (IsAddrVal) {
-    auto &ti = getTypeInfo(SILVal->getType());
+  llvm::SmallVector<llvm::Instruction *, 4> DebugBBInsts;
+  if (auto *DebugBB = i->getDebugReconstructionBlock()) {
+    // Debug basic blocks should not exist at -Onone. They don't support
+    // shadow copies or async lifetime extension.
+    auto *BB = Builder.GetInsertBlock();
+    auto InsertPt = Builder.GetInsertPoint();
+    // Record the state of the builder, to cleanup later.
+    llvm::Instruction *LastBefore =
+        (InsertPt == BB->begin()) ? nullptr : &*std::prev(InsertPt);
+
+    if (!DebugBB->args_empty()) {
+      // Bind the block argument to the operand.
+      SILValue operand = i->getOperand();
+      SILArgument *blockArg = DebugBB->getArgument(0);
+      if (operand->getType().isAddress()) {
+        setLoweredAddress(blockArg, getLoweredAddress(operand));
+      } else {
+        Explosion e = getLoweredExplosion(operand);
+        setLoweredExplosion(blockArg, e);
+      }
+    }
+    // Emit all instructions inline, except the return.
+    for (auto &BBInst : *DebugBB) {
+      if (isa<TermInst>(&BBInst))
+        break;
+      this->visit(&BBInst);
+    }
+    auto *RI = cast<ReturnInst>(DebugBB->getTerminator());
+    SILValue ResultVal = RI->getOperand();
+    // Set Copy to the value being returned by the debug block.
+    if (ResultVal->getType().isAddress()) {
+      Copy.emplace_back(getLoweredAddress(ResultVal).getAddress());
+    } else {
+      Explosion e = getLoweredExplosion(ResultVal);
+      auto vals = e.claimAll();
+      Copy.append(vals.begin(), vals.end());
+    }
+
+    // Collect LLVM instructions emitted by the debug BB so we can salvage and
+    // erase them after the debug record is emitted.
+    assert(BB == Builder.GetInsertBlock() &&
+           InsertPt == Builder.GetInsertPoint() &&
+           "DebugBB content must not affect control flow!");
+    auto Start =
+        LastBefore ? std::next(LastBefore->getIterator()) : BB->begin();
+    for (auto It = Start; It != InsertPt; ++It)
+      DebugBBInsts.push_back(&*It);
+  } else if (getLoweredValue(SILVal).isBoxWithAddress()) {
+    // Special case for debug_values cloned from an alloc_box: Use the
+    // project_box address rather than the actual box.
+    auto &TI = getTypeInfo(SILVal->getType());
+    auto Addr = getLoweredValue(SILVal).getAddressOfBox();
+    auto *Storage = Addr.getAddress();
+
+    VarInfo->DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+
     Copy.emplace_back(emitShadowCopyIfNeeded(
-        getLoweredAddress(SILVal).getAddress(), ti.getStorageType(),
+        Storage, TI.getStorageType(),
         i->getDebugScope(), *VarInfo, IsAnonymous,
-        i->usesMoveableValueDebugInfo()));
+        i->usesMoveableValueDebugInfo(), &VarInfo->DIExpr));
+  } else if (IsAddrVal) {
+    auto &TI = getTypeInfo(SILVal->getType());
+    auto Addr = getLoweredAddress(SILVal);
+    auto *Storage = Addr.getAddress();
+
+    Copy.emplace_back(emitShadowCopyIfNeeded(
+        Storage, TI.getStorageType(),
+        i->getDebugScope(), *VarInfo, IsAnonymous,
+        i->usesMoveableValueDebugInfo(), &VarInfo->DIExpr));
   } else {
     emitShadowCopyIfNeeded(SILVal, i->getDebugScope(), *VarInfo, IsAnonymous,
-                           i->usesMoveableValueDebugInfo(), Copy);
+                           i->usesMoveableValueDebugInfo(), Copy,
+                           &VarInfo->DIExpr);
   }
 
   bindArchetypes(DbgTy.getType());
@@ -6241,7 +6347,14 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   emitDebugVariableDeclaration(
       Copy, DbgTy, SILTy, i->getDebugScope(), i->getLoc(), *VarInfo,
-      Indirection, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
+      IsInCoro, AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
+
+  // Erase any LLVM instructions emitted by the debug BB. They were only needed
+  // to produce the dbg intrinsic; salvage converts references into DWARF exprs.
+  for (auto *I : llvm::reverse(DebugBBInsts)) {
+    salvageDebugReconstructionInst(I);
+    I->eraseFromParent();
+  }
 }
 
 void IRGenSILFunction::visitDebugStepInst(DebugStepInst *i) {
@@ -6684,10 +6797,13 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
          isa<llvm::IntrinsicInst>(addr) || isCallToSwiftTaskAlloc(addr) ||
          isCallToMalloc(addr));
 
-  auto Indirection = DirectValue;
-  if (InCoroContext(*CurSILFn, *i))
-    Indirection =
-        isCallToSwiftTaskAlloc(addr) ? CoroIndirectValue : CoroDirectValue;
+  bool IsInCoro = InCoroContext(*CurSILFn, *i);
+
+  // For task alloc (swift_task_alloc), the address is itself behind a pointer,
+  // so prepend an extra op_deref.
+  if (isCallToSwiftTaskAlloc(addr))
+    VarInfo->DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
 
   if (!IGM.IRGen.Opts.DisableDebuggerShadowCopies &&
       !IGM.IRGen.Opts.shouldOptimize())
@@ -6697,8 +6813,9 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
         addr = emitShadowCopy(addr, DS, *VarInfo, IGM.getPointerAlignment(),
                               /*init*/ true, i->usesMoveableValueDebugInfo())
                    .getAddress();
-        Indirection =
-            InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue;
+        // This adds a layer of indirection to the debug variable.
+        VarInfo->DIExpr.prependElements(
+            {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
       }
 
   // Ignore compiler-generated patterns but not optional bindings.
@@ -6720,7 +6837,7 @@ void IRGenSILFunction::emitDebugInfoAfterAllocStack(AllocStackInst *i,
     }
 
     emitDebugVariableDeclaration(
-        addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, Indirection,
+        addr, DbgTy, SILTy, DS, i->getLoc(), *VarInfo, IsInCoro,
         AddrDbgInstrKind(i->usesMoveableValueDebugInfo()));
   }
 }
@@ -6949,9 +7066,6 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   assert(i->getBoxType()->getLayout()->getFields().size() == 1
          && "multi field boxes not implemented yet");
-  const TypeInfo &type = getTypeInfo(
-      getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(), i->getBoxType(),
-                         IGM.getSILModule().Types, 0));
 
   // Derive name from SIL location.
   bool IsAnonymous = false;
@@ -6974,9 +7088,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
-  if (!Decl)
-    return;
-
   // FIXME: This is a workaround to not produce local variables for
   // capture list arguments like "[weak self]". The better solution
   // would be to require all variables to be described with a
@@ -6991,24 +7102,37 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       IGM.getMaximalTypeExpansionContext(),
       i->getBoxType(), IGM.getSILModule().Types, 0);
   auto RealType = SILTy.getASTType();
-  auto DbgTy =
-      DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
+  DebugTypeInfo DbgTy;
+  if (Decl) {
+    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, getTypeInfo(SILTy),
+                                            IGM);
+  } else if (!SILTy.hasArchetype() && !Name.empty()) {
+    // Handle the cases that read from a SIL file.
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
+  } else {
+    return;
+  }
 
   auto VarInfo = i->getVarInfo();
   if (!VarInfo)
     return;
   auto &ti = getTypeInfo(SILTy);
   auto Storage =
-      emitShadowCopyIfNeeded(boxWithAddr.getAddress(), ti.getStorageType(),
+      emitShadowCopyIfNeeded(boxWithAddr.getAddressPointer(), ti.getStorageType(),
                              i->getDebugScope(),
-                             *VarInfo, IsAnonymous, false /*was moved*/);
+                             *VarInfo, IsAnonymous, false /*was moved*/,
+                             &VarInfo->DIExpr);
 
   if (!IGM.DebugInfo)
     return;
 
+  // The box content address points to the variable — one level of indirection.
+  VarInfo->DIExpr.prependElements(
+      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+
   IGM.DebugInfo->emitVariableDeclaration(
       Builder, Storage, DbgTy, i->getDebugScope(), i->getLoc(), *VarInfo,
-      InCoroContext(*CurSILFn, *i) ? CoroIndirectValue : IndirectValue);
+      InCoroContext(*CurSILFn, *i));
 }
 
 void IRGenSILFunction::visitProjectBoxInst(swift::ProjectBoxInst *i) {

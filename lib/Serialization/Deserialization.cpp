@@ -2490,16 +2490,24 @@ ModuleFile::resolveCrossReference(ModuleID MID, uint32_t pathLen) {
     // signature. Even if we recover, print as a warning the errors we skip.
     if (getContext().LangOpts.EnableWorkaroundBrokenModules &&
         errorKind == ModularizationError::Kind::DeclMoved &&
-        baseModule->findUnderlyingClangModule() &&
+        (baseModule->findUnderlyingClangModule() ||
+         baseModule->isClangHeaderImportModule()) &&
         foundIn->findUnderlyingClangModule() &&
         !values.empty()) {
-      // Print the error as a warning and notify of the recovery attempt.
-      llvm::handleAllErrors(std::move(error),
-        [&](const ModularizationError &modularError) {
-          modularError.diagnose(this, DiagnosticBehavior::Warning);
-        });
-      getContext().Diags.diagnose(SourceLoc(),
-                                  diag::modularization_issue_worked_around);
+      if (baseModule->isClangHeaderImportModule()) {
+        // C++ namespaces are placed in the '__ObjC' header import module
+        // but are found in their actual Clang module during deserialization.
+        // This is expected, so recover silently.
+        llvm::consumeError(std::move(error));
+      } else {
+        // Print the error as a warning and notify of the recovery attempt.
+        llvm::handleAllErrors(std::move(error),
+          [&](const ModularizationError &modularError) {
+            modularError.diagnose(this, DiagnosticBehavior::Warning);
+          });
+        getContext().Diags.diagnose(SourceLoc(),
+                                    diag::modularization_issue_worked_around);
+      }
     } else {
       return std::move(error);
     }
@@ -6749,6 +6757,26 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       }
 #include "swift/AST/DeclAttr.def"
 
+      case decls_block::PreInverseGenerics_DECL_ATTR: {
+        bool isImplicit;
+        TypeID typeID;
+        serialization::decls_block::PreInverseGenericsDeclAttrLayout::
+            readRecord(scratch, isImplicit, typeID);
+        assert(!isImplicit);
+
+        if (typeID) {
+          auto type = MF.getTypeChecked(typeID);
+          if (!type) {
+            return type.takeError();
+          }
+          Attr = new (ctx) PreInverseGenericsAttr(
+            SourceLoc(), SourceRange(), /*exceptRepr=*/nullptr, type.get());
+        } else {
+          Attr = new (ctx) PreInverseGenericsAttr(SourceLoc(), SourceRange());
+        }
+        break;
+      }
+
       default:
         // We don't know how to deserialize this kind of attribute.
         MF.fatal(llvm::make_error<InvalidRecordKindError>(recordID));
@@ -7434,7 +7462,7 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolated)) {
     // do nothing
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedNonsending)) {
-    isolation = swift::FunctionTypeIsolation::forNonIsolatedCaller();
+    isolation = swift::FunctionTypeIsolation::forNonisolatedNonsending();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Parameter)) {
     isolation = swift::FunctionTypeIsolation::forParameter();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Erased)) {
@@ -8366,6 +8394,16 @@ Expected<Type> DESERIALIZE_TYPE(INTEGER_TYPE)(ModuleFile &MF,
   decls_block::IntegerTypeLayout::readRecord(scratch, isNegative);
 
   return IntegerType::get(blobData, isNegative, ctx);
+}
+
+Expected<Type> DESERIALIZE_TYPE(HIDDEN_TYPE)(ModuleFile &MF,
+                                             SmallVectorImpl<uint64_t> &scratch,
+                                             StringRef blobData) {
+  auto &ctx = MF.getContext();
+
+  decls_block::HiddenTypeLayout::readRecord(scratch);
+
+  return HiddenType::get(ctx, blobData);
 }
 } // namespace decls_block
 } // namespace serialization

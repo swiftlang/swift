@@ -542,8 +542,24 @@ unsigned Decl::getAttachedMacroDiscriminator(DeclBaseName macroName,
             foundDiscriminator = discriminator;
         });
 
-    if (foundDiscriminator)
+    if (foundDiscriminator) {
       return *foundDiscriminator;
+    }
+
+    // For computed properties with only an implicit get,
+    // the attr is on the parent VarDecl.
+    if (role == MacroRole::Body) {
+      if (auto *accessor = dyn_cast<AccessorDecl>(this)) {
+        if (auto *var = dyn_cast<VarDecl>(accessor->getStorage())) {
+          if (!var->hasStorage() && !var->isSettable(/*useDC=*/nullptr)) {
+            auto *getter = var->getParsedAccessor(AccessorKind::Get);
+            if (!getter || getter->isImplicitGetter()) {
+              return var->getAttachedMacroDiscriminator(macroName, role, attr);
+            }
+          }
+        }
+      }
+    }
   }
 
   // If that failed, conjure up a discriminator.
@@ -2350,6 +2366,53 @@ Decl::getExplicitCodeGenerationModel() const {
   if (sawInlinable)
     return CodeGenerationModel::Inlinable;
 
+  // An accessor inherits its code generation model from the variable or
+  // subscript it implements, so that `@export(...)` on a var or subscript
+  // controls the linkage of its accessors as well as its storage.
+  //
+  // We only inherit when the storage has effective public visibility.
+  if (auto accessor = dyn_cast<AccessorDecl>(this)) {
+    if (auto storage = accessor->getStorage()) {
+      AccessScope access =
+          storage->getFormalAccessScope(
+              nullptr, /*treatUsableFromInlineAsPublic*/false,
+              /*ignoreImportAccessLevel*/false);
+      if (access.isPublic())
+        return storage->getExplicitCodeGenerationModel();
+    }
+  }
+
+  return std::nullopt;
+}
+
+/// Determine the code generation model that is required by the given
+/// declaration.
+///
+/// This accounts for limitations of the code generation model. For example,
+/// a generic declaration can only be treated as @export(implementation) in
+/// Embedded Swift, because there are no unspecialized generics.
+static std::optional<CodeGenerationModel>
+getRequiredCodeGenerationModel(const Decl *decl) {
+  bool isEmbedded = decl->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+
+  // A generic declaration must be @export(implementation) in Embedded Swift.
+  auto dc = decl->getInnermostDeclContext();
+  if (auto sig = dc->getGenericSignatureOfContext()) {
+    if (!sig->areAllParamsConcrete() && isEmbedded)
+      return CodeGenerationModel::Implementation;
+  }
+
+  // Foreign types are always @export(implementation).
+  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+    if (isa<ClangModuleUnit>(nominal->getModuleScopeContext()))
+      return CodeGenerationModel::Implementation;
+  }
+
+  // Types must be @export(interface) in non-Embedded Swift, because the type
+  // metadata symbols need to be unique.
+  if (isa<TypeDecl>(decl) && !isEmbedded)
+    return CodeGenerationModel::Interface;
+
   return std::nullopt;
 }
 
@@ -2360,7 +2423,11 @@ Decl::getEffectiveCodeGenerationModel() const {
   if (auto explicitModel = getExplicitCodeGenerationModel())
     return *explicitModel;
 
-  // Otherwise, apply the model-level defaults.
+  // If there is a required code generation model, return that.
+  if (auto required = getRequiredCodeGenerationModel(this))
+    return *required;
+
+  // Otherwise, apply the module-level default.
   return getModuleContext()->codeGenerationModel();
 }
 
@@ -10061,6 +10128,36 @@ void SubscriptDecl::setElementInterfaceType(Type type) {
                                         std::move(type));
 }
 
+BoundGenericType *
+SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
+  // Allow composing a key path type with a `Sendable` protocol as a way to
+  // express sendability requirements.
+  if (auto *existential = paramTy->getAs<ExistentialType>()) {
+    auto layout = existential->getExistentialLayout();
+
+    auto protocols = layout.getProtocols();
+    if (!llvm::all_of(protocols, [](ProtocolDecl *proto) {
+          return proto->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+                 proto->getInvertibleProtocolKind();
+        })) {
+      return nullptr;
+    }
+
+    paramTy = layout.getSuperclass();
+    if (!paramTy) {
+      return nullptr;
+    }
+  }
+
+  if (!paramTy->isKeyPath() &&
+      !paramTy->isWritableKeyPath() &&
+      !paramTy->isReferenceWritableKeyPath()) {
+    return nullptr;
+  }
+
+  return paramTy->getAs<BoundGenericType>();
+}
+
 SubscriptDecl *
 SubscriptDecl::createDeserialized(ASTContext &Context, DeclName Name,
                                   StaticSpellingKind StaticSpelling,
@@ -10157,6 +10254,28 @@ SourceRange SubscriptDecl::getSignatureSourceRange() const {
     }
   }
   return getSubscriptLoc();
+}
+
+std::optional<SubscriptDecl::DynamicMemberLookupKind>
+SubscriptDecl::getDynamicMemberLookupKind() const {
+  auto &ctx = getASTContext();
+  auto eligibility = evaluateOrFatal(
+      ctx.evaluator,
+      DynamicMemberLookupSubscriptRequest{this});
+
+  // `getDynamicMemberKind()` checks `isValid()`
+  return eligibility.getDynamicMemberKind();
+}
+
+BoundGenericType *SubscriptDecl::getDynamicMemberLookupKeyPathType() const {
+  if (getDynamicMemberLookupKind() != DynamicMemberLookupKind::KeyPath) {
+    return nullptr;
+  }
+
+  auto *indices = getIndices();
+  ASSERT(indices->size() > 0 && "subscript must have at least one arg");
+  return getDynamicMemberParamTypeAsKeyPathType(
+      indices->get(0)->getInterfaceType());
 }
 
 DeclName AbstractFunctionDecl::getEffectiveFullName() const {

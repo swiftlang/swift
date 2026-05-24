@@ -254,11 +254,17 @@ void SILGenFunction::emitExpectedExecutorProlog() {
   if (ExpectedExecutor.isNecessary()) {
     auto executor = ExpectedExecutor.getEager(); // never lazy
     if (F.isAsync()) {
-      // For an async function, hop to the executor.
-      B.createHopToExecutor(
-          RegularLocation::getDebugOnlyLocation(F.getLocation(), getModule()),
-          executor,
-          /*mandatory*/ false);
+      auto *closureExpr = dyn_cast<ClosureExpr>(FunctionDC);
+      if (closureExpr && closureExpr->behavesLikeNonisolatedNonsending()) {
+        // Do nothing if the closure behaves as if it has
+        // `nonisolated(nonsending)` isolation.
+      } else {
+        // For all other async functions, hop to the executor.
+        B.createHopToExecutor(
+            RegularLocation::getDebugOnlyLocation(F.getLocation(), getModule()),
+            executor,
+            /*mandatory*/ false);
+      }
     } else if (wantDataRaceChecks) {
       // For a synchronous function, check that we're on the same executor.
       // Note: if we "know" that the code is completely Sendable-safe, this

@@ -6,18 +6,18 @@
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
-// RUN: env %env-SWIFT_DEBUG_HELP=YES %env-SWIFT_DEBUG_SOME_UNKNOWN_VARIABLE=42 %env-SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION=YES %env-SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=abc %env-SWIFT_DETERMINISTIC_HASHING=whatever %env-SWIFT_ENABLE_MANGLED_NAME_VERIFICATION=YES %env-SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE=YES %target-run %t/main >%t.out 2>%t.err
+// RUN: env %env-SWIFT_DEBUG_HELP=YES %env-SWIFT_DEBUG_SOME_UNKNOWN_VARIABLE=42 %env-SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION=YES %env-SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=abc %env-SWIFT_DETERMINISTIC_HASHING=whatever %env-SWIFT_ENABLE_MANGLED_NAME_VERIFICATION=YES %env-SWIFT_DEBUG_RUNTIME_ALLOC_SCRIBBLE_BYTE=0xaa %target-run %t/main >%t.out 2>%t.err
 // RUN: cat %t.err %t.out | %FileCheck %s --dump-input fail
 
 // CHECK-DAG: {{Warning: unknown environment variable SWIFT_DEBUG_SOME_UNKNOWN_VARIABLE|Using getenv to read variables. Unknown SWIFT_DEBUG_ variables will not be flagged.}}
 // CHECK-DAG: Warning: cannot parse value SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT=abc, defaulting to 2.
 // CHECK-DAG: Warning: cannot parse value SWIFT_DETERMINISTIC_HASHING=whatever, defaulting to false.
 // CHECK-DAG: Swift runtime debugging:
-// CHECK-DAG:    bool SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION [default: false] - Enable additional metadata allocation tracking for swift-inspect to use.
-// CHECK-DAG: uint8_t SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT [default: 2] - Print warnings when using implicit @objc entrypoints. Set to desired reporting level, 0-3.
-// CHECK-DAG:    bool SWIFT_DETERMINISTIC_HASHING [default: false] - Disable randomized hash seeding.
-// CHECK-DAG:    bool SWIFT_ENABLE_MANGLED_NAME_VERIFICATION [default: false] - Enable verification that metadata can roundtrip through a mangled name each time metadata is instantiated.
-// CHECK-DAG:    bool SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE [default: false] - Scribble on runtime allocations such as metadata allocations.
+// CHECK-DAG: boolean SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION [default: false] - Enable additional metadata allocation tracking for swift-inspect to use.
+// CHECK-DAG:   uint8 SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT [default: 2] - Print warnings when using implicit @objc entrypoints. Set to desired reporting level, 0-3.
+// CHECK-DAG: boolean SWIFT_DETERMINISTIC_HASHING [default: false] - Disable randomized hash seeding.
+// CHECK-DAG: boolean SWIFT_ENABLE_MANGLED_NAME_VERIFICATION [default: false] - Enable verification that metadata can roundtrip through a mangled name each time metadata is instantiated.
+// CHECK-DAG: optional_uint8 SWIFT_DEBUG_RUNTIME_ALLOC_SCRIBBLE_BYTE [default: {{.*}}] - Scribble on runtime allocations such as metadata allocations.
 // CHECK-DAG:  string SWIFT_ROOT [default: "{{[^"]*}}"] - Overrides the root directory of the Swift installation. This is used to locate auxiliary files relative to the runtime itself.
 
 // We need to do this because the DAG checks require a non-DAG check as an

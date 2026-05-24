@@ -176,6 +176,8 @@ extension ASTGenVisitor {
         return handle(self.generateOptimizeAttr(attribute: node)?.asDeclAttribute)
       case .OriginallyDefinedIn:
         return self.generateOriginallyDefinedInAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
+      case .PreInverseGenerics:
+        return handle(self.generatePreInverseGenericsAttr(attribute: node)?.asDeclAttribute)
       case .PrivateImport:
         return handle(self.generatePrivateImportAttr(attribute: node)?.asDeclAttribute)
       case .ProjectedValueProperty:
@@ -198,8 +200,8 @@ extension ASTGenVisitor {
         return handle(self.generateStorageRestrictionAttr(attribute: node)?.asDeclAttribute)
       case .SwiftNativeObjCRuntimeBase:
         return handle(self.generateSwiftNativeObjCRuntimeBaseAttr(attribute: node)?.asDeclAttribute)
-      case .Warn:
-        return handle(self.generateWarnAttr(attribute: node)?.asDeclAttribute)
+      case .Diagnose:
+        return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
       case .Transpose:
         return handle(self.generateTransposeAttr(attribute: node)?.asDeclAttribute)
       case .TypeEraser:
@@ -228,6 +230,9 @@ extension ASTGenVisitor {
       case nil where attrName == "_versioned":
         // TODO: Diagnose.
         return handle(self.generateSimpleDeclAttr(attribute: node, kind: .UsableFromInline))
+      case nil where attrName == "warn":
+        // TODO: Diagnose. 'warn' is renamed to 'diagnose'
+        return handle(self.generateDiagnoseAttr(attribute: node)?.asDeclAttribute)
 
       // Simple attributes.
       case .AddressableSelf,
@@ -293,7 +298,6 @@ extension ASTGenVisitor {
         .ObjCNonLazyRealization,
         .Owned,
         .Preconcurrency,
-        .PreInverseGenerics,
         .PropertyWrapper,
         .Reparentable,
         .RequiresStoredPropertyInits,
@@ -1729,6 +1733,23 @@ extension ASTGenVisitor {
     )
   }
 
+  func generatePreInverseGenericsAttr(attribute node: AttributeSyntax) -> BridgedPreInverseGenericsAttr? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      switch args.first?.label?.rawText {
+        case "except":
+          fatalError("ASTGen does not yet support the except: argument")
+        default:
+          // TODO: Diagnose.
+          fatalError("invalid argument for @_preInverseGenerics attribute")
+      }
+      return .createParsed(
+          self.ctx,
+          atLoc: self.generateSourceLoc(node.atSign),
+          range: self.generateAttrSourceRange(node)
+      )
+    }
+  }
+
   func generateRawLayoutAttr(attribute node: AttributeSyntax) -> BridgedRawLayoutAttr? {
     self.generateWithLabeledExprListArguments(attribute: node) { args in
       switch args.first?.label?.rawText {
@@ -2182,9 +2203,9 @@ extension ASTGenVisitor {
   
   /// E.g.:
   ///   ```
-  ///   @warn(DiagGroupID, as: Behavior, reason: String?)
+  ///   @diagnose(DiagGroupID, as: Behavior, reason: String?)
   ///   ```
-  func generateWarnAttr(attribute node: AttributeSyntax) -> BridgedWarnAttr? {
+  func generateDiagnoseAttr(attribute node: AttributeSyntax) -> BridgedDiagnoseAttr? {
     guard let diagGroupIdentifier: swift.Identifier = self.generateWithLabeledExprListArguments(attribute: node, { args in
       self.generateConsumingAttrOption(args: &args, label: nil) { expr in
         guard let declRefExpr = expr.as(DeclReferenceExprSyntax.self) else {

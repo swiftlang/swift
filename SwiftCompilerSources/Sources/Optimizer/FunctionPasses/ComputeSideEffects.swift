@@ -250,6 +250,9 @@ private struct CollectedEffects {
       is CondFailInst:
       break
 
+    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
+      break
+
     case is BeginCOWMutationInst, is IsUniqueInst:
       // Model reference count reading as "destroy" for now. Although we could introduce a "read-refcount"
       // effect, it would not give any significant benefit in any of our current optimizations.
@@ -587,6 +590,9 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
     // Warning: all instruction listed here, must also be handled in `CollectedEffects.addInstructionEffects`
     case is StoreInst, is StoreWeakInst, is StoreUnownedInst, is ApplySite, is DestroyAddrInst,
          is DebugValueInst:
+      return .continueWalk
+
+    case let bi as BuiltinInst where bi.id == .TSanInoutAccess:
       return .continueWalk
 
     default:

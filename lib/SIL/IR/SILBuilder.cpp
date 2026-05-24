@@ -72,7 +72,11 @@ SILType SILBuilder::getPartialApplyResultType(
           .intoBuilder()
           .withRepresentation(SILFunctionType::Representation::Thick)
           .withIsolation(resultIsolation)
-          .withIsPseudogeneric(false);
+          .withIsPseudogeneric(false)
+          .withLifetimeDependencies(LifetimeDependenceInfo::partialApply(
+              context.getContext()->getASTContext(),
+              FTI->getLifetimeDependencies(), FTI->getNumParameters(),
+              argCount));
   if (onStack)
     extInfoBuilder = extInfoBuilder.withNoEscape();
   auto extInfo = extInfoBuilder.build();

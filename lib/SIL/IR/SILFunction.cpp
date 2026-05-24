@@ -91,7 +91,7 @@ GenericSignature SILSpecializeAttr::buildTypeErasedSignature(
         C, GenericSignature(),
         SmallVector<GenericTypeParamType *>(sig.getGenericParams()),
         requirementsErased,
-        /*allowInverses=*/false);
+        DefaultRequirementOptions());
   }
 
   return sig;
@@ -742,6 +742,13 @@ SILBasicBlock *SILFunction::createBasicBlockAfter(SILBasicBlock *afterBB) {
 SILBasicBlock *SILFunction::createBasicBlockBefore(SILBasicBlock *beforeBB) {
   SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
   BlockList.insert(beforeBB->getIterator(), newBlock);
+  return newBlock;
+}
+
+SILBasicBlock *SILFunction::createEmptyDebugReconstructionBlock() {
+  SILBasicBlock *newBlock = new (getModule()) SILBasicBlock(this);
+  newBlock->index = -2;
+  // Do NOT insert into BlockList - this is a standalone debug block.
   return newBlock;
 }
 

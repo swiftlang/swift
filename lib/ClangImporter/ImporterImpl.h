@@ -686,18 +686,6 @@ public:
       llvm::DenseMap<llvm::StringRef, std::pair<FuncDecl *, FuncDecl *>>>
       GetterSetterMap;
 
-  /// Keep track of getter/setter pairs for functions imported from C++
-  /// subscript operators based on the type in which they are declared and
-  /// the type of their parameter.
-  ///
-  /// `.first` corresponds to a getter
-  /// `.second` corresponds to a setter
-  llvm::DenseMap<NominalTypeDecl *,
-                 llvm::MapVector<SmallVector<TypeBase *>,
-                                 std::pair<FuncDecl *, FuncDecl *>,
-                                 std::map<SmallVector<TypeBase *>, unsigned>>>
-      cxxSubscripts;
-
   llvm::SmallPtrSet<const clang::Decl *, 1> synthesizedAndAlwaysVisibleDecls;
 
 private:
@@ -731,23 +719,48 @@ public:
   std::tuple<VarDecl *, FuncDecl *, FuncDecl *>
   lookupAndImportPointeeAndOperatorStar(NominalTypeDecl *Record);
 
-  // Attempt to lookup and import the synthesized .pointee computed property.
-  //
-  /// Requires that \a Record is a (Swift) StructDecl and is imported from
-  /// a CXXRecordDecl.
-  //
+  /// Attempt to lookup and import the synthesized .pointee computed property.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl or ClassDecl that is
+  /// imported from a CXXRecordDecl.
+  ///
   /// This function is idempotent, and if successful, ensures the synthesized
   /// .pointee that it returns are members of \a Record.
   VarDecl *lookupAndImportPointee(NominalTypeDecl *Record);
 
   /// Attempt to lookup and import the synthesized .successor() method.
-  //
+  ///
   /// Requires that \a Record is a (Swift) StructDecl and is imported from
   /// a CXXRecordDecl.
-  //
+  ///
   /// This function is idempotent, and if successful, ensures the synthesized
   /// .successor() that it returns is a member of \a Record.
   FuncDecl *lookupAndImportSuccessor(NominalTypeDecl *Record);
+
+  /// Attempt to lookup and import the synthesized .subscript members.
+  ///
+  /// Requires that \a Record is imported from a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// .subscript that it returns is a member of \a Record.
+  ///
+  /// If \a noSynthesize is set to true, then no .subscript members will be
+  /// synthesized, and an empty result will be cached. This parameter exists
+  /// specifically to support the prevention of .subscript synthesis for types
+  /// that conform to CxxDictionary, so that the Cxx overlay can provide its
+  /// own implementation of .subscript that returns a nil value instead of
+  /// default-initializing a new entry when given a non-existent key.
+  llvm::ArrayRef<SubscriptDecl *>
+  lookupAndImportSubscripts(NominalTypeDecl *Struct, bool noSynthesize = false);
+
+  /// Attempt to lookup and import the synthesized __convertToBool() method.
+  ///
+  /// Requires that \a Record is a (Swift) StructDecl and is imported from
+  /// a CXXRecordDecl.
+  ///
+  /// This function is idempotent, and if successful, ensures the synthesized
+  /// __convertToBool() that it returns is a member of \a Record.
+  FuncDecl *lookupAndImportOperatorBool(NominalTypeDecl *Struct);
 
 private:
   /// Stores <.pointee, func __operatorStar(), mutating func __operatorStar()>
@@ -755,6 +768,9 @@ private:
                  std::tuple<VarDecl *, FuncDecl *, FuncDecl *>>
       importedPointeeCache;
   llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedSuccessorCache;
+  llvm::DenseMap<NominalTypeDecl *, llvm::SmallVector<SubscriptDecl *, 1>>
+      importedSubscriptsCache;
+  llvm::DenseMap<NominalTypeDecl *, FuncDecl *> importedOperatorBoolCache;
 
 public:
   llvm::DenseMap<const clang::ParmVarDecl*, FuncDecl*> defaultArgGenerators;
@@ -2209,7 +2225,7 @@ Identifier getOperatorName(ASTContext &ctx, clang::OverloadedOperatorKind op);
 /// correspond to an overloaded C++ operator.
 Identifier getOperatorName(ASTContext &ctx, Identifier op);
 
-bool hasSwiftAttribute(const clang::Decl *decl, StringRef attr);
+bool hasSwiftAttribute(const clang::Decl *decl, ArrayRef<StringRef> attrs);
 bool hasOwnedValueAttr(const clang::RecordDecl *decl);
 bool hasUnsafeAPIAttr(const clang::Decl *decl);
 bool hasIteratorAPIAttr(const clang::Decl *decl);
@@ -2265,8 +2281,8 @@ ImportedType findOptionSetEnum(clang::QualType type,
 /// and with the given name.
 ///
 /// The name we're looking for is the Swift name.
-llvm::SmallVector<ValueDecl *, 1>
-getValueDeclsForName(NominalTypeDecl* decl, StringRef name);
+TinyPtrVector<ValueDecl *> getValueDeclsForName(NominalTypeDecl *decl,
+                                                StringRef name);
 
 template <typename T>
 const T *

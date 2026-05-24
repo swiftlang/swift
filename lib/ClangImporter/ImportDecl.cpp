@@ -19,7 +19,9 @@
 #include "ClangDerivedConformances.h"
 #include "ImporterImpl.h"
 #include "SwiftDeclSynthesizer.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ASTMangler.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Builtins.h"
@@ -42,6 +44,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -91,6 +94,7 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/Casting.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/MathExtras.h"
 #include "llvm/Support/Path.h"
 
 #include <algorithm>
@@ -175,13 +179,8 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
   }
 }
 
-bool importer::hasImmortalAttrs(const clang::RecordDecl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "retain:immortal" ||
-                    swiftAttr->getAttribute() == "release:immortal";
-           return false;
-         });
+bool importer::hasAnyImmortalAttr(const clang::RecordDecl *decl) {
+  return hasSwiftAttribute(decl, {"retain:immortal", "release:immortal"});
 }
 
 importer::ReturnOwnershipInfo::ReturnOwnershipInfo(
@@ -923,11 +922,7 @@ static bool areRecordFieldsComplete(const clang::CXXRecordDecl *decl) {
 }
 
 static bool hasComputedPropertyAttr(const clang::Decl *decl) {
-  return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
-           if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-             return swiftAttr->getAttribute() == "import_computed_property";
-           return false;
-         });
+  return hasSwiftAttribute(decl, {"import_computed_property"});
 }
 
 /// Whether to import a member decl when importing its parent record.
@@ -2538,6 +2533,23 @@ namespace {
               }
             }
           }
+
+          // If this is an inherited foreign reference type, check if it has a
+          // suitable superclass.
+          auto frtInfo = evaluateOrDefault(
+              Impl.SwiftContext.evaluator,
+              ForeignReferenceTypeInfoRequest({cxxRecordDecl}), {});
+          if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
+            if (auto baseDecl = cast_or_null<ClassDecl>(
+                    Impl.importDecl(primaryBase, getVersion()))) {
+              auto classResult = cast<ClassDecl>(result);
+              Type superclassType = baseDecl->getDeclaredInterfaceType();
+              classResult->setSuperclass(superclassType);
+              classResult->setInherited(
+                  Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
+                      TypeLoc::withoutLoc(superclassType)}));
+            }
+          }
         }
       }
 
@@ -2927,25 +2939,6 @@ namespace {
           // Add computed properties directly because they won't be found from
           // the clang decl during lazy member lookup.
           result->addMember(p);
-        }
-
-        auto it = Impl.cxxSubscripts.find(result);
-        if (it != Impl.cxxSubscripts.end()) {
-          for (const auto &subscriptInfo : it->second) {
-            auto getterAndSetter = subscriptInfo.second;
-            auto subscript = synthesizer.makeSubscript(getterAndSetter.first,
-                                                       getterAndSetter.second);
-            // Also add subscripts directly because they won't be found from the
-            // clang decl.
-            result->addMember(subscript);
-
-            // Add the subscript as an alternative for the getter so that it
-            // gets carried into derived classes.
-            auto *subscriptImpl = getterAndSetter.first
-                                      ? getterAndSetter.first
-                                      : getterAndSetter.second;
-            Impl.addAlternateDecl(subscriptImpl, subscript);
-          }
         }
       }
 
@@ -3822,7 +3815,7 @@ namespace {
       HeaderLoc loc(decl->getLocation());
 
       if (recordDecl && recordHasReferenceSemantics(recordDecl) &&
-          !hasImmortalAttrs(recordDecl)) {
+          !hasAnyImmortalAttr(recordDecl)) {
         if (attrInfo.hasConflictingAttr()) {
           Impl.diagnose(loc, diag::both_returns_retained_returns_unretained,
                         decl);
@@ -3878,42 +3871,10 @@ namespace {
       if (!typeDecl)
         return true;
 
-      if (importedName.isSubscriptAccessor()) {
-        SmallVector<TypeBase *> params;
-        for (auto parameter : *(func->getParameters())) {
-          auto parameterType = parameter->getTypeInContext();
-          if (!parameterType)
-            return false;
-          if (parameter->isInOut())
-            // Subscripts with inout parameters are not allowed in Swift.
-            return false;
-          params.push_back(parameterType.getPointer());
-        }
-        // Subscript setter is marked as mutating in Swift even if the
-        // C++ `operator []` is `const`.
-        if (importedName.getAccessorKind() ==
-                ImportedAccessorKind::SubscriptSetter &&
-            !dc->isModuleScopeContext() &&
-            !typeDecl->getDeclaredType()->isForeignReferenceType())
-          func->setSelfAccessKind(SelfAccessKind::Mutating);
-
-        auto &getterAndSetterMap = Impl.cxxSubscripts[typeDecl];
-        auto &getterAndSetter = getterAndSetterMap[params];
-
-        switch (importedName.getAccessorKind()) {
-        case ImportedAccessorKind::SubscriptGetter:
-          getterAndSetter.first = func;
-          break;
-        case ImportedAccessorKind::SubscriptSetter:
-          getterAndSetter.second = func;
-          break;
-        default:
-          llvm_unreachable("invalid subscript kind");
-        }
-
-        Impl.markUnavailable(func, "use subscript");
+      if (importedName.isSubscriptAccessor())
+        // Subscript accessors do not need any special handling applied here.
+        // They are fixed up in lookupAndImportSubscripts().
         return true;
-      }
 
       // Check if this method _is_ an overloaded operator but is not a
       // call / subscript / dereference / increment. Those
@@ -4092,6 +4053,21 @@ namespace {
           Impl.importDeclContextOf(decl, importedName.getEffectiveContext());
       if (!dc)
         return nullptr;
+
+      // A non-static C++ method cannot be imported as a member of a different
+      // type via swift_name attribute.
+      if (auto method = dyn_cast<clang::CXXMethodDecl>(decl)) {
+        if (auto nominal = dc->getSelfNominalTypeDecl()) {
+          if (!method->isStatic() && importedName.importAsMember() &&
+              nominal->getClangDecl() != method->getParent()) {
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::swift_name_method_different_context);
+            Impl.diagnose(HeaderLoc(decl->getLocation()),
+                          diag::note_while_importing, decl->getName());
+            return nullptr;
+          }
+        }
+      }
 
       // We may have already imported this function decl while importing its
       // decl context. Check decl cache to make sure we don't import twice.
@@ -9800,16 +9776,10 @@ void ClangImporter::Implementation::importAttributes(
     }
 
     // Map Clang's swift_objc_members attribute to @objcMembers.
-    if (ID->hasAttr<clang::SwiftObjCMembersAttr>() &&
-        isa<ClassDecl>(MappedDecl)) {
-      if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
-        auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
-        MappedDecl->addAttribute(attr);
-      }
-    }
-
-    // Infer @objcMembers on XCTestCase.
-    if (ID->getName() == "XCTestCase") {
+    // Also infer @objcMembers on XCTestCase.
+    if ((ID->hasAttr<clang::SwiftObjCMembersAttr>() &&
+         isa<ClassDecl>(MappedDecl)) ||
+        ID->getName() == "XCTestCase") {
       if (!MappedDecl->getAttrs().hasAttribute<ObjCMembersAttr>()) {
         auto attr = new (C) ObjCMembersAttr(/*IsImplicit=*/true);
         MappedDecl->addAttribute(attr);
@@ -10409,7 +10379,7 @@ GenericSignature ClangImporter::Implementation::buildGenericSignature(
       SwiftContext, GenericSignature(),
       std::move(genericParamTypes),
       std::move(requirements),
-      /*allowInverses=*/true);
+      ExpandDefaults);
 }
 
 Decl *
@@ -10768,6 +10738,11 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
       assert(swiftDecl->getClangDecl() != clangRecord);
       auto baseMember = cast<ValueDecl>(member);
 
+      // Do not clone members that are separately synthesized for each type,
+      // otherwise we will get duplicates.
+      if (Impl.isMemberSynthesizedPerType(baseMember))
+        continue;
+
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
       // name and arity.
@@ -10810,6 +10785,11 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
   const clang::CXXRecordDecl *cxxRecord;
   if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) &&
       cxxRecord->isCompleteDefinition()) {
+    auto derivedInfo =
+        evaluateOrDefault(Impl.SwiftContext.evaluator,
+                          ForeignReferenceTypeInfoRequest({cxxRecord}), {});
+    auto superclassClangDecl = derivedInfo.getPrimarySuperclass();
+
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
         continue;
@@ -10824,6 +10804,13 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
         continue;
 
       auto *baseRecord = cast<clang::RecordType>(baseType)->getDecl();
+
+      // Skip cloning members from the base that is the Swift superclass;
+      // those members are reachable through the superclass chain.
+      if (superclassClangDecl && baseRecord->getCanonicalDecl() ==
+                                     superclassClangDecl->getCanonicalDecl())
+        continue;
+
       auto baseInheritance = ClangInheritanceInfo(inheritance, base);
       load(baseRecord, baseInheritance);
     }
@@ -10831,8 +10818,10 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
 
   if ((isa<clang::CXXRecordDecl>(swiftDecl->getClangDecl())) && !storage &&
       !inheritance) {
-    Impl.lookupAndImportPointee(swiftDecl);
-    Impl.lookupAndImportSuccessor(swiftDecl);
+    (void)Impl.lookupAndImportPointee(swiftDecl);
+    (void)Impl.lookupAndImportSuccessor(swiftDecl);
+    (void)Impl.lookupAndImportOperatorBool(swiftDecl);
+    (void)Impl.lookupAndImportSubscripts(swiftDecl);
   }
 }
 } // namespace
@@ -11214,6 +11203,44 @@ struct ClangDeclTraceFormatter : public UnifiedStatsReporter::TraceFormatter {
 };
 
 static ClangDeclTraceFormatter TF;
+
+// MARK: - Abstract Layout Computation
+
+std::optional<AbstractTypeLayout>
+swift::computeClangAbstractLayout(const NominalTypeDecl *decl) {
+  auto *clangDecl =
+      dyn_cast_or_null<clang::RecordDecl>(decl->getClangDecl());
+  if (!clangDecl)
+    return std::nullopt;
+
+  clangDecl = clangDecl->getDefinition();
+  if (!clangDecl)
+    return std::nullopt;
+
+  auto &ctx = decl->getASTContext();
+  auto *clangLoader = ctx.getClangModuleLoader();
+  if (!clangLoader)
+    return std::nullopt;
+
+  auto &clangCtx = clangLoader->getClangASTContext();
+  const auto &recordLayout = clangCtx.getASTRecordLayout(clangDecl);
+
+  AbstractTypeLayout result;
+  result.mangledName = Mangle::ASTMangler(ctx).mangleNominalType(decl);
+  result.size = recordLayout.getSize().getQuantity();
+  result.alignment = recordLayout.getAlignment().getQuantity();
+  result.stride = llvm::alignTo(result.size, result.alignment);
+
+  Type swiftType = decl->getDeclaredInterfaceType();
+  result.bitwiseCopyable = swiftType->isBitwiseCopyable();
+
+  if (auto *structDecl = dyn_cast<StructDecl>(decl))
+    result.isOpaque = structDecl->isCxxNonTrivial();
+  else
+    result.isOpaque = false;
+
+  return result;
+}
 
 template<>
 const UnifiedStatsReporter::TraceFormatter*

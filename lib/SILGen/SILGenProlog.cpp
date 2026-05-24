@@ -1310,7 +1310,7 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     // allow formation of the address for this captured value.  Create a
     // temporary within the closure to provide this address.
     if (VD->isSettable(VD->getDeclContext())) {
-      auto addr = SGF.emitTemporary(VD, lowering);
+      auto addr = SGF.emitTemporary(Loc, lowering);
       // We have created a copy that needs to be destroyed.
       val = SGF.B.emitCopyValueOperation(Loc, val);
       // We use the SILValue version of this because the SILGenBuilder version
@@ -1319,14 +1319,14 @@ static void emitCaptureArguments(SILGenFunction &SGF,
       //
       // MG: Is this the right semantics for createStore? Seems like that
       // should be potentially a different API.
-      SGF.B.emitStoreValueOperation(VD, val.forward(SGF), addr->getAddress(),
+      SGF.B.emitStoreValueOperation(Loc, val.forward(SGF), addr->getAddress(),
                                     StoreOwnershipQualifier::Init);
       addr->finishInitialization(SGF);
       val = addr->getManagedAddress();
     }
     
     if (isNoImplicitCopy && !val.getType().isMoveOnly()) {
-      val = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(VD, val);
+      val = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(Loc, val);
     }
 
     // If this constant is a move only type, we need to add no_consume_or_assign checking to
@@ -1361,9 +1361,9 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     box = SGF.F.begin()->createFunctionArgument(
         SILType::getPrimitiveObjectType(boxTy), VD);
     box->setClosureCapture(true);
-    arg = SGF.B.createProjectBox(VD, box, 0);
+    arg = SGF.B.createProjectBox(Loc, box, 0);
     if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
-      arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(VD, arg);
+      arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(Loc, arg);
     }
     enforcement = isMutable
       ? SILAccessEnforcement::Dynamic
@@ -1389,13 +1389,13 @@ static void emitCaptureArguments(SILGenFunction &SGF,
     
     if (isNoImplicitCopy && !arg->getType().isMoveOnly()) {
       if (fnConv.isSILIndirect(paramInfo)) {
-        arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(VD, arg);
+        arg = SGF.B.createCopyableToMoveOnlyWrapperAddr(Loc, arg);
 
       } else if (paramInfo.isGuaranteedInCallee()) {
-        arg = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(VD, arg);
+        arg = SGF.B.createGuaranteedCopyableToMoveOnlyWrapperValue(Loc, arg);
 
       } else {
-        arg = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(VD, arg);
+        arg = SGF.B.createOwnedCopyableToMoveOnlyWrapperValue(Loc, arg);
       }
     }
 

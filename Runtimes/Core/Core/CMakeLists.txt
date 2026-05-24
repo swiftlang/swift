@@ -42,13 +42,13 @@ add_library(swiftCore
   BidirectionalCollection.swift
   Bitset.swift
   Bool.swift
-  Borrow.swift
   BorrowingSequence.swift
   BridgeObjectiveC.swift
   BridgeStorage.swift
   BridgingBuffer.swift
   Builtin.swift
   BuiltinMath.swift
+  ByteOrder.swift
   Character.swift
   CocoaArray.swift
   Codable.swift
@@ -85,6 +85,7 @@ add_library(swiftCore
   FloatingPoint.swift
   FloatingPointFromString.swift
   FloatingPointToString.swift
+  FullyInhabited.swift
   Hashable.swift
   AnyHashable.swift # ORDER DEPENDENCY
   Hasher.swift
@@ -94,7 +95,6 @@ add_library(swiftCore
   Indices.swift
   InlineArray.swift
   _InlineArray.swift
-  Inout.swift
   InputStream.swift
   IntegerParsing.swift
   Integers.swift
@@ -113,6 +113,7 @@ add_library(swiftCore
   Mirrors.swift
   Misc.swift
   MutableCollection.swift
+  MutableRef.swift
   NativeDictionary.swift
   NativeSet.swift
   NewtypeWrapper.swift
@@ -134,6 +135,7 @@ add_library(swiftCore
   RangeReplaceableCollection.swift
   RangeSet.swift
   RangeSetRanges.swift
+  Ref.swift
   ReflectionMirror.swift
   Repeat.swift
   REPL.swift
@@ -318,7 +320,6 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowInout>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowAndMutateAccessors>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>

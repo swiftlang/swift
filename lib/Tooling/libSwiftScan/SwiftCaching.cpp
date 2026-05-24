@@ -471,23 +471,21 @@ createCachedCompilation(SwiftScanCAS &CAS, const llvm::cas::CASID &ID,
   if (!Proxy)
     return Proxy.takeError();
 
-  // Load input file name from the key CAS object. Input file name is the data
-  // blob in the root node.
-  auto KeyProxy = CAS.getCAS().getProxy(Key);
-  if (!KeyProxy)
-    return KeyProxy.takeError();
-  auto Input = KeyProxy->getData();
+  auto KeyRef = CAS.getCAS().getReference(Key);
+  if (!KeyRef)
+    return nullptr;
 
-  unsigned Index = llvm::support::endian::read<uint32_t>(
-      Input.data(), llvm::endianness::little);
   {
     swift::cas::CompileJobResultSchema Schema(CAS.getCAS());
     if (Schema.isRootNode(*Proxy)) {
       auto Result = Schema.load(Proxy->getRef());
       if (!Result)
         return Result.takeError();
-      return new SwiftCachedCompilationHandle(KeyProxy->getRef(), *Ref,
-                                              std::move(*Result), Index, CAS);
+      auto Index = Result->getInputIndex();
+      if (!Index)
+        return Index.takeError();
+      return new SwiftCachedCompilationHandle(*KeyRef, *Ref, std::move(*Result),
+                                              *Index, CAS);
     }
   }
   {
@@ -496,8 +494,8 @@ createCachedCompilation(SwiftScanCAS &CAS, const llvm::cas::CASID &ID,
       auto Result = Schema.load(Proxy->getRef());
       if (!Result)
         return Result.takeError();
-      return new SwiftCachedCompilationHandle(KeyProxy->getRef(), *Ref,
-                                              std::move(*Result), Index, CAS);
+      return new SwiftCachedCompilationHandle(*KeyRef, *Ref, std::move(*Result),
+                                              0, CAS);
     }
   }
   return createUnsupportedSchemaError();

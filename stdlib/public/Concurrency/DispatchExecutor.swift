@@ -151,7 +151,6 @@ fileprivate func _dispatchEnqueue<C: Clock, E: Executor>(
   guard let (clockID, seconds, nanoseconds) = timestamp(for: instant,
                                                         clock: clock) else {
     fatalError("Sorry, cannot schedule on an unknown clock")
-    return
   }
 
   let tolSec: Int64, tolNanosec: Int64

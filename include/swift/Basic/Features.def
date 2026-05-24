@@ -285,6 +285,7 @@ LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
 LANGUAGE_FEATURE(BuiltinAddTaskLocalValue, 0, "addTaskLocalValue and removeTaskLocalValue builtins")
 SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly marking non-Sendable types")
 LANGUAGE_FEATURE(SuppressedAssociatedTypesWithDefaults, 503, "Associated types that are ~Copyable and ~Escapable")
+LANGUAGE_FEATURE(SourceWarningControl, 522, "Source-level warning control with @diagnose")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -347,12 +348,6 @@ EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
 EXPERIMENTAL_FEATURE(KeyPathWithMethodMembers, false)
-
-// Whether to emit an Embedded Swift module with "deferred" code generation,
-// meaning that the only code that will be emitted into the object file is
-// code that was marked as "never emit into client". For everything else,
-// Swift still store the SIL and emit it into the client only when used.
-EXPERIMENTAL_FEATURE(DeferredCodeGen, true)
 
 // Whether to compile scripts lazily in immediate mode
 EXPERIMENTAL_FEATURE(LazyImmediate, false)
@@ -562,6 +557,9 @@ EXPERIMENTAL_FEATURE(DefaultIsolationPerFile, false)
 /// Enable @_lifetime attribute
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(Lifetimes, true)
 
+/// Enable @_preInverseGenerics(except:) attribute
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(PreInverseGenericsExcept, true)
+
 /// Deprecates the compatibility memberwise initializer introduced by SE-0502,
 /// and removes it in the next major language mode.
 EXPERIMENTAL_FEATURE(DeprecateCompatMemberwiseInit, false)
@@ -604,20 +602,18 @@ EXPERIMENTAL_FEATURE(EnforceSPIOperatorGroup, true)
 /// Allows an existing protocol to refine a new one, without ABI break.
 EXPERIMENTAL_FEATURE(Reparenting, true)
 
-/// Enable source-level warning control with `@warn`
-EXPERIMENTAL_FEATURE(SourceWarningControl, true)
-
 /// Allows a `get` returning a noncopyable type have owned semantics in opaque interfaces.
 EXPERIMENTAL_FEATURE(UnderscoreOwned, true)
-
-/// Allows the standard library `Borrow` and `Inout` types to be used.
-EXPERIMENTAL_FEATURE(BorrowInout, true)
 
 /// Allow access to the BorrowingSequence protocols/types outside the stdlib.
 EXPERIMENTAL_FEATURE(BorrowingSequence, true)
 
 /// Turns some source breaking access control warnings into errors.
 EXPERIMENTAL_FEATURE(StrictAccessControl, true)
+
+/// Allow stored properties of types from an internal bridging header in
+/// non-resilient modules. Layout will be encoded in the .swiftmodule.
+EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

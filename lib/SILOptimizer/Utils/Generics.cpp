@@ -515,6 +515,10 @@ static bool canDropMetatypeArg(ApplySite apply, SILFunction *callee,
   if (isUsedAsDynamicSelf(calleeArg))
     return false;
 
+  // TODO: Adjust LifetimeDependencInfo when dropping the argument.
+  if (apply.getOrigCalleeType()->hasLifetimeDependencies())
+    return false;
+
   if (calleeArg->getType().getASTType()->hasDynamicSelfType())
     return false;
 
@@ -1139,7 +1143,7 @@ getGenericEnvironmentAndSignatureWithRequirements(
   auto NewGenSig = buildGenericSignature(M.getASTContext(),
                                          OrigGenSig, { },
                                          std::move(RequirementsCopy),
-                                         /*allowInverses=*/false);
+                                         DefaultRequirementOptions());
   auto NewGenEnv = NewGenSig.getGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
@@ -1817,7 +1821,7 @@ FunctionSignaturePartialSpecializer::
   // Finalize the archetype builder.
   auto GenSig = buildGenericSignature(Ctx, GenericSignature(),
                                       AllGenericParams, AllRequirements,
-                                      /*allowInverses=*/false);
+                                      DefaultRequirementOptions());
   auto *GenEnv = GenSig.getGenericEnvironment();
   return { GenEnv, GenSig };
 }

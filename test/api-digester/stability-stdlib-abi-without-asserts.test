@@ -680,6 +680,9 @@ Func UnsafeMutableRawPointer.assumingMemoryBound(to:) is now with @_preInverseGe
 Func UnsafeMutableRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.bindMemory(to:capacity:) has mangled name changing from 'Swift.UnsafeMutableRawPointer.bindMemory<A>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafeMutablePointer<A>' to 'Swift.UnsafeMutableRawPointer.bindMemory<A where A: ~Swift.Copyable>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafeMutablePointer<A>'
 Func UnsafeMutableRawPointer.bindMemory(to:capacity:) is now with @_preInverseGenerics
+Func UnsafeMutableRawPointer.load(fromByteOffset:as:) has generic signature change from <T> to <T where T : ~Escapable>
+Func UnsafeMutableRawPointer.load(fromByteOffset:as:) has mangled name changing from 'Swift.UnsafeMutableRawPointer.load<A>(fromByteOffset: Swift.Int, as: A.Type) -> A' to 'Swift.UnsafeMutableRawPointer.load<A where A: ~Swift.Escapable>(fromByteOffset: Swift.Int, as: A.Type) -> A'
+Func UnsafeMutableRawPointer.load(fromByteOffset:as:) is now with @_preInverseGenerics
 Func UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:) has mangled name changing from 'Swift.UnsafeMutableRawPointer.moveInitializeMemory<A>(as: A.Type, from: Swift.UnsafeMutablePointer<A>, count: Swift.Int) -> Swift.UnsafeMutablePointer<A>' to 'Swift.UnsafeMutableRawPointer.moveInitializeMemory<A where A: ~Swift.Copyable>(as: A.Type, from: Swift.UnsafeMutablePointer<A>, count: Swift.Int) -> Swift.UnsafeMutablePointer<A>'
 Func UnsafeMutableRawPointer.moveInitializeMemory(as:from:count:) is now with @_preInverseGenerics
@@ -695,6 +698,9 @@ Func UnsafeRawPointer.assumingMemoryBound(to:) is now with @_preInverseGenerics
 Func UnsafeRawPointer.bindMemory(to:capacity:) has generic signature change from <T> to <T where T : ~Copyable>
 Func UnsafeRawPointer.bindMemory(to:capacity:) has mangled name changing from 'Swift.UnsafeRawPointer.bindMemory<A>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafePointer<A>' to 'Swift.UnsafeRawPointer.bindMemory<A where A: ~Swift.Copyable>(to: A.Type, capacity: Swift.Int) -> Swift.UnsafePointer<A>'
 Func UnsafeRawPointer.bindMemory(to:capacity:) is now with @_preInverseGenerics
+Func UnsafeRawPointer.load(fromByteOffset:as:) has generic signature change from <T> to <T where T : ~Escapable>
+Func UnsafeRawPointer.load(fromByteOffset:as:) has mangled name changing from 'Swift.UnsafeRawPointer.load<A>(fromByteOffset: Swift.Int, as: A.Type) -> A' to 'Swift.UnsafeRawPointer.load<A where A: ~Swift.Escapable>(fromByteOffset: Swift.Int, as: A.Type) -> A'
+Func UnsafeRawPointer.load(fromByteOffset:as:) is now with @_preInverseGenerics
 Func _fixLifetime(_:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Func _fixLifetime(_:) has mangled name changing from 'Swift._fixLifetime<A>(A) -> ()' to 'Swift._fixLifetime<A where A: ~Swift.Copyable, A: ~Swift.Escapable>(A) -> ()'
 Func _fixLifetime(_:) has parameter 0 changing from Default to Shared

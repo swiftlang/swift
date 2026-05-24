@@ -17,19 +17,18 @@
 using namespace swift;
 using namespace symbolgraphgen;
 
-namespace {
-StringRef getDomain(const SemanticAvailableAttr &AvAttr) {
+StringRef Availability::getDomainDescription(AvailabilityDomain Domain) {
   // FIXME: [avalailability] Move the definition of these strings into
   // AvailabilityDomain so that new domains are handled automatically.
 
-  if (AvAttr.getDomain().isPackageDescription())
+  if (Domain.isPackageDescription())
     return { "SwiftPM" };
 
-  if (AvAttr.getDomain().isSwiftLanguageMode())
+  if (Domain.isSwiftLanguageMode())
     return { "Swift" };
 
   // Platform-specific availability.
-  switch (AvAttr.getPlatform()) {
+  switch (Domain.getPlatformKind()) {
     case swift::PlatformKind::iOS:
       return { "iOS" };
     case swift::PlatformKind::macCatalyst:
@@ -73,12 +72,12 @@ StringRef getDomain(const SemanticAvailableAttr &AvAttr) {
   }
   llvm_unreachable("invalid platform kind");
 }
-} // end anonymous namespace
 
 Availability::Availability(const SemanticAvailableAttr &AvAttr)
-    : Domain(getDomain(AvAttr)), Introduced(AvAttr.getIntroduced()),
-      Deprecated(AvAttr.getDeprecated()), Obsoleted(AvAttr.getObsoleted()),
-      Message(AvAttr.getMessage()), Renamed(AvAttr.getRename()),
+    : Domain(getDomainDescription(AvAttr.getDomain())),
+      Introduced(AvAttr.getIntroduced()), Deprecated(AvAttr.getDeprecated()),
+      Obsoleted(AvAttr.getObsoleted()), Message(AvAttr.getMessage()),
+      Renamed(AvAttr.getRename()),
       IsUnconditionallyDeprecated(AvAttr.isUnconditionallyDeprecated()),
       IsUnconditionallyUnavailable(AvAttr.isUnconditionallyUnavailable()) {
   assert(!Domain.empty());

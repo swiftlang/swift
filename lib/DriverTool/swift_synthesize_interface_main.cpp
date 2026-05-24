@@ -16,10 +16,12 @@
 
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LLVMInitialize.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Version.h"
+#include "swift/Driver/PluginPaths.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/ModuleInterfacePrinting.h"
@@ -27,6 +29,7 @@
 #include "swift/Parse/ParseVersion.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Support/Path.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -64,8 +67,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   auto MainExecutablePath = llvm::sys::fs::getMainExecutable(Argv0, MainAddr);
 
   if (ParsedArgs.getLastArg(OPT_help) || Args.empty()) {
-    std::string ExecutableName =
-        llvm::sys::path::stem(MainExecutablePath).str();
+    std::string ExecutableName = llvm::sys::path::stem(Argv0).str();
     Table->printHelp(llvm::outs(), ExecutableName.c_str(),
                      "Swift Interface Synthesizer",
                      SwiftSynthesizeInterfaceOption, 0,
@@ -132,13 +134,41 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   }
   Invocation.setImportSearchPaths(ImportSearchPaths);
 
+  // Add default toolchain-relative plugin paths.
+  SmallString<261> toolchainRoot{MainExecutablePath};
+  llvm::sys::path::remove_filename(toolchainRoot); // remove executable name
+  llvm::sys::path::remove_filename(toolchainRoot); // remove 'bin'
+
+  SearchPathOptions &SearchPathOpts = Invocation.getSearchPathOptions();
+
+  SmallString<261> inProcPluginServerPath;
+  driver::appendInProcPluginServerPath(toolchainRoot, inProcPluginServerPath);
+  SearchPathOpts.InProcessPluginServerPath =
+      std::string(inProcPluginServerPath);
+
+  SmallString<261> defaultPluginPath;
+  driver::appendPluginsPath(toolchainRoot, defaultPluginPath);
+  SearchPathOpts.PluginSearchOpts.emplace_back(
+      PluginSearchOption::PluginPath{std::string(defaultPluginPath)});
+
+#if defined(__APPLE__) || defined(__unix__)
+  SmallString<261> localPluginPath;
+  driver::appendLocalPluginsPath(toolchainRoot, localPluginPath);
+  SearchPathOpts.PluginSearchOpts.emplace_back(
+      PluginSearchOption::PluginPath{std::string(localPluginPath)});
+#endif
+
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
+  Invocation.getLangOptions().AttachCommentsToDecls = true;
   Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags,
                                                     Invocation.getFrontendOptions());
   Invocation.computeCXXStdlibOptions();
 
   if (ParsedArgs.hasArg(OPT_disable_safe_interop_wrappers))
     Invocation.getLangOptions().DisableSafeInteropWrappers = true;
+
+  if (parseFeatureArgs(Invocation.getLangOptions(), ParsedArgs, Diags))
+    return EXIT_FAILURE;
 
   std::string ModuleCachePath = "";
   if (auto *A = ParsedArgs.getLastArg(OPT_module_cache_path)) {
@@ -169,28 +199,60 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
 
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {
-    llvm::outs() << InstanceSetupError << '\n';
+    llvm::errs() << InstanceSetupError << '\n';
     return EXIT_FAILURE;
   }
 
+  (void)CI.getMainModule(); // clang modules inherit default imports from main module
   auto M = CI.getASTContext().getModuleByName(ModuleName);
   if (!M) {
     llvm::errs() << "Couldn't load module '" << ModuleName << '\''
                  << " in the current SDK and search paths.\n";
 
+    bool Verbose = ParsedArgs.hasArg(OPT_v);
+
     SmallVector<Identifier, 32> VisibleModuleNames;
     CI.getASTContext().getVisibleTopLevelModuleNames(VisibleModuleNames);
 
     if (VisibleModuleNames.empty()) {
-      llvm::errs() << "Could not find any modules.\n";
+      if (Verbose)
+        llvm::errs() << "Could not find any modules.\n";
     } else {
-      std::sort(VisibleModuleNames.begin(), VisibleModuleNames.end(),
-                [](const Identifier &A, const Identifier &B) -> bool {
-                  return A.str() < B.str();
+      const unsigned Threshold = 3;
+      SmallVector<std::pair<unsigned, StringRef>, 4> Suggestions;
+      for (const auto &Name : VisibleModuleNames) {
+        unsigned D = StringRef(ModuleName)
+                         .edit_distance_insensitive(
+                             Name.str(), /*AllowReplacements=*/true,
+                             /*MaxEditDistance=*/Threshold);
+        if (D <= Threshold)
+          Suggestions.push_back({D, Name.str()});
+      }
+      std::sort(Suggestions.begin(), Suggestions.end(),
+                [](const auto &A, const auto &B) {
+                  if (A.first != B.first)
+                    return A.first < B.first;
+                  return A.second < B.second;
                 });
-      llvm::errs() << "Current visible modules:\n";
-      for (const auto &ModuleName : VisibleModuleNames) {
-        llvm::errs() << ModuleName.str() << "\n";
+      const unsigned MaxSuggestions = 5;
+      if (Suggestions.size() > MaxSuggestions)
+        Suggestions.resize(MaxSuggestions);
+
+      if (!Suggestions.empty()) {
+        llvm::errs() << "Did you mean:\n";
+        for (const auto &S : Suggestions)
+          llvm::errs() << "  " << S.second << "\n";
+      }
+
+      if (Verbose) {
+        std::sort(VisibleModuleNames.begin(), VisibleModuleNames.end(),
+                  [](const Identifier &A, const Identifier &B) -> bool {
+                    return A.str() < B.str();
+                  });
+        llvm::errs() << "Current visible modules:\n";
+        for (const auto &Name : VisibleModuleNames) {
+          llvm::errs() << "  " << Name.str() << "\n";
+        }
       }
     }
     return EXIT_FAILURE;

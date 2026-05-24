@@ -18,7 +18,7 @@
 import Swift
 
 @available(StdlibDeploymentTarget 6.3, *)
-@_silgen_name("_swift_exit")
+@_extern(c, "_swift_exit")
 internal func _exit(result: CInt)
 
 #if !$Embedded

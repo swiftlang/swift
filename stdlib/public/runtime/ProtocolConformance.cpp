@@ -1640,7 +1640,8 @@ static bool swift_isInConformanceExecutionContextImpl(
     // Check whether we are running on this global actor.
     if (!_swift_task_isCurrentGlobalActorHook(
            context->globalActorIsolationType,
-           context->globalActorIsolationWitnessTable))
+           context->globalActorIsolationWitnessTable,
+           context->globalActorIsolationType))
       return false;
   }
 
@@ -1794,10 +1795,6 @@ bool swift::_swift_class_isSubclass(const Metadata *subclass,
                                     const Metadata *superclass) {
   return isSubclass(subclass, superclass);
 }
-
-static std::optional<TypeLookupError>
-checkInvertibleRequirements(const Metadata *type,
-                              InvertibleProtocolSet ignored);
 
 static std::optional<TypeLookupError>
 checkGenericRequirement(
@@ -2293,8 +2290,8 @@ checkInvertibleRequirementsStructural(const Metadata *type,
 /// Check that the given `type` meets all invertible protocol requirements
 /// that haven't been explicitly suppressed by `ignored`.
 std::optional<TypeLookupError>
-checkInvertibleRequirements(const Metadata *type, 
-                              InvertibleProtocolSet ignored) {
+swift::checkInvertibleRequirements(const Metadata *type,
+                                   InvertibleProtocolSet ignored) {
   auto contextDescriptor = type->getTypeContextDescriptor();
   if (!contextDescriptor)
     return checkInvertibleRequirementsStructural(type, ignored);

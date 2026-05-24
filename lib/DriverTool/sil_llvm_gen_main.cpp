@@ -437,7 +437,7 @@ int sil_llvm_gen_main(ArrayRef<const char *> argv, void *MainAddr) {
                            options.OutputFilename, toString(outFile.takeError()));
     return 1;
   }
-  auto closeFile = llvm::make_scope_exit([&]() {
+  llvm::scope_exit closeFile([&]() {
     if (auto E = outFile->keep()) {
       CI.getDiags().diagnose(SourceLoc(), diag::error_closing_output,
                              options.OutputFilename, toString(std::move(E)));

@@ -164,7 +164,7 @@ inline SILValue stripAccessMarkers(SILValue v) {
   return v;
 }
 
-inline bool isGuaranteedAddressReturn(SILValue value) {
+inline bool isAddressReturn(SILValue value) {
   auto *defInst = dyn_cast_or_null<ApplyInst>(value->getDefiningInstruction());
   if (!defInst) {
     return false;
@@ -1803,7 +1803,7 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     if (isExternalGlobalAddressor(cast<ApplyInst>(sourceAddr)))
       return asImpl().visitUnidentified(sourceAddr);
 
-    if (isGuaranteedAddressReturn(sourceAddr)) {
+    if (isAddressReturn(sourceAddr)) {
       auto *selfOp = &cast<ApplyInst>(sourceAddr)->getSelfArgumentOperand();
       if (selfOp->get()->getType().isObject()) {
         return asImpl().visitUnidentified(sourceAddr);

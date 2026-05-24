@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -822,6 +822,10 @@ ERROR(const_unsupported_keypath,none,
       "keypaths not supported in a literal expression", ())
 ERROR(const_opaque_decl_ref,none,
       "unable to resolve variable reference in a literal expression", ())
+ERROR(const_public_let_ref,none,
+      "reference to a %select{%error|%error|%error|package|public|open}0 "
+      "'let' binding is not permitted in a literal expression",
+      (AccessLevel))
 ERROR(const_opaque_func_decl_ref,none,
       "unable to resolve function reference in a literal expression", ())
 ERROR(const_non_convention_c_conversion,none,
@@ -834,6 +838,12 @@ ERROR(const_integer_overflow,none,
       "operation results in integer overflow", ())
 ERROR(const_divide_by_zero,none,
       "division by zero", ())
+ERROR(const_shift_negative,none,
+      "negative shift amount is not permitted in a literal expression", ())
+ERROR(const_shift_out_of_range,none,
+      "shift amount %0 is greater than or equal to the %1-bit width of "
+      "the operand in a literal expression",
+      (unsigned, unsigned))
 ERROR(const_unknown_default,none,
       "not supported in a literal expression", ())
 NOTE(const_failed_fold_declref_init,none,
@@ -1737,10 +1747,25 @@ ERROR(invalid_dynamic_member_lookup_type,none,
       "'@dynamicMemberLookup' requires %0 to have a "
       "'subscript(dynamicMember:)' method that accepts either "
       "'ExpressibleByStringLiteral' or a key path", (Type))
-NOTE(invalid_dynamic_member_subscript, none,
-     "add an explicit argument label to this subscript to satisfy "
-     "the '@dynamicMemberLookup' requirement", ())
-ERROR(dynamic_member_lookup_candidate_inaccessible,none,
+ERROR(invalid_dynamic_member_subscript_missing_param_label, none,
+      "'@dynamicMemberLookup' requires %0 to have an explicit parameter label",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_arg_label, none,
+      "'@dynamicMemberLookup' requires %0 to have an explicit 'dynamicMember' "
+      "argument label",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_order, none,
+      "'@dynamicMemberLookup' requires %0 to appear first in the parameter "
+      "list",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_invalid_type, none,
+      "'@dynamicMemberLookup' requires %0 to be either "
+      "'ExpressibleByStringLiteral' or a key path",
+      (ParamDecl *))
+ERROR(invalid_dynamic_member_subscript_missing_default, none,
+      "'@dynamicMemberLookup' requires %0 to have a default value",
+      (ParamDecl *))
+ERROR(dynamic_member_lookup_candidate_inaccessible, none,
       "'@dynamicMemberLookup' requires %0 to be as accessible as its "
       "enclosing type",
       (ValueDecl *))
@@ -2895,6 +2920,8 @@ NOTE(nonsendable_function_type,none,
 NOTE(nonsendable_tuple_type,none,
      "a tuple type must be composed of 'Sendable' elements to conform to "
      "'Sendable'", ())
+NOTE(nonescapable_function_type,none,
+     "a function type can be marked '@escaping' to conform to 'Escapable'", ())
 NOTE(non_sendable_nominal,none,
      "%kind0 does not conform to the 'Sendable' protocol",
       (const ValueDecl *))
@@ -4435,6 +4462,13 @@ ERROR(attr_rawlayout_invalid_count_type,none,
       "'@_rawLayout' count must either be integer literal or a generic "
       "argument", ())
 
+ERROR(attr_pre_inverse_generics_invalid_except,none,
+      "'except' argument to '@_preInverseGenerics' must consist only of "
+      "inverse constraints such as '~Copyable' or '~Escapable'", ())
+WARNING(attr_pre_inverse_generics_except_all,none,
+      "'@_preInverseGenerics' that excepts all inverse constraints is "
+      "equivalent to not using the attribute", ())
+
 // lazy
 ERROR(lazy_not_on_let,none,
       "'lazy' cannot be used on a let", ())
@@ -5231,7 +5265,7 @@ ERROR(capture_across_type_decl,none,
       "scope",
       (const NominalTypeDecl *, const ValueDecl *))
 
-ERROR(isolated_any_conversion_to_synchronous_func,none,
+GROUPED_ERROR(isolated_any_conversion_to_synchronous_func,ConversionFromIsolatedAnyToSynchronous,none,
       "converting @isolated(any) function of type %0 to synchronous function type %1 is not allowed",
       (Type, Type))
 
@@ -5654,6 +5688,9 @@ NOTE(because_rethrows_default_argument_throws,none,
 NOTE(because_rethrows_conformance_throws,none,
      "call is to 'rethrows' function, but a conformance has a throwing witness", ())
 
+ERROR(for_throw_without_try,none,
+      "for-in loop can throw, but is not marked with 'try'", ())
+
 ERROR(throwing_call_in_nonthrowing_autoclosure,none,
       "%0 can throw, but it is executed in a non-throwing "
       "autoclosure",(StringRef))
@@ -5717,7 +5754,7 @@ NOTE(note_error_to_optional,none,
 NOTE(note_disable_error_propagation,none,
       "did you mean to disable error propagation?", ())
 
-WARNING(no_throw_in_try,none,
+GROUPED_WARNING(no_throw_in_try,UnnecessaryEffectMarker,none,
         "no calls to throwing functions occur within 'try' expression", ())
 
 WARNING(no_throw_in_do_with_catch,none,
@@ -5744,7 +5781,7 @@ NOTE(async_call_without_await_in_autoclosure,none,
 NOTE(async_call_without_await_in_async_let,none,
       "call is 'async' in an 'async let' initializer", ())
 
-WARNING(no_async_in_await,none,
+GROUPED_WARNING(no_async_in_await,UnnecessaryEffectMarker,none,
         "no 'async' operations occur within 'await' expression", ())
 ERROR(async_in_nonasync_function,none,
       "%select{'async'|'async' call|'await'|'async let'|'async' property access|'async' subscript access}0 in "
@@ -6574,6 +6611,9 @@ ERROR(invalid_ownership_incompatible_class,none,
 ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
       "%0 is incompatible with 'weak' references, because it is a foreign reference type",
       (Type))
+ERROR(downcast_to_foreign_reference_type,none,
+      "downcast from %0 to %1 is not supported for foreign reference types",
+      (Type, Type))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -7346,9 +7386,10 @@ ERROR(availability_inout_accessor_only_in, none,
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
 
-WARNING(availability_query_useless_enclosing_scope, none,
-        "unnecessary check for '%0'; enclosing scope ensures guard "
-        "will always be true", (StringRef))
+GROUPED_WARNING(availability_query_useless_enclosing_scope,
+                UselessAvailabilityCheck, none,
+                "unnecessary check for '%0'; enclosing scope ensures guard "
+                "will always be true", (StringRef))
 
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
@@ -7710,6 +7751,12 @@ WARNING(debug_long_closure_body, none,
         (unsigned, unsigned))
 WARNING(debug_long_expression, none,
         "expression took %0ms to type-check (limit: %1ms)",
+        (unsigned, unsigned))
+WARNING(debug_long_expression_scopes, none,
+        "expression took %0 scope(s) to type-check (limit: %1)",
+        (unsigned, unsigned))
+WARNING(debug_long_expression_trail, none,
+        "expression took %0 trail step(s) to type-check (limit: %1)",
         (unsigned, unsigned))
 
 //------------------------------------------------------------------------------
@@ -8320,9 +8367,6 @@ ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
 
-ERROR(experimental_macro,none,
-      "macro %0 is experimental",
-      (DeclName))
 ERROR(experimental_closure_body_macro,none,
       "function body macros on closures is experimental",
       ())
@@ -8440,6 +8484,18 @@ NOTE(add_generic_parameter_non_bitwise_copyable_conformance,none,
 ERROR(bitwise_copyable_outside_module,none,
       "conformance to 'BitwiseCopyable' must occur in the same module as %kind0",
       (const ValueDecl *))
+ERROR(convertible_to_bytes_outside_stdlib,none,
+      "type conforming to 'ConvertibleToBytes' must be defined in the standard library module",
+      (const ValueDecl *))
+ERROR(convertible_to_bytes_outside_module,none,
+      "conformance to 'ConvertibleToBytes' must occur in the same module as %kind0",
+      (const ValueDecl *))
+ERROR(convertible_from_bytes_outside_stdlib,none,
+      "type conforming to 'ConvertibleFromBytes' must be defined in the standard library module",
+      (const ValueDecl *))
+ERROR(convertible_from_bytes_outside_module,none,
+      "conformance to 'ConvertibleFromBytes' must occur in the same module as %kind0",
+      (const ValueDecl *))
 ERROR(suppress_inferrable_protocol_extension,none,
       "conformance to inferrable protocol %0 cannot be suppressed in an extension", (const ProtocolDecl *))
 ERROR(suppress_nonsuppressable_protocol,none,
@@ -8456,12 +8512,6 @@ ERROR(inverse_conditional_must_be_fully_explicit,none,
         "conditional conformance to %0 must explicitly "
         "state whether %1 is required to conform to %2 or not",
         (const ProtocolDecl *, Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_non_requirement_explicit,none,
-     "specify that the conformance does not require %0 to conform to %1",
-     (Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_requirement_explicit,none,
-     "specify that the conformance requires %0 to conform to %1",
-     (Type, const ProtocolDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
@@ -8472,9 +8522,8 @@ NOTE(noncopyable_parameter_ownership_suggestion, none,
       "add '%0' %1", (StringRef, StringRef))
 ERROR(ownership_specifier_nonescaping_closure,none,
       "'%0' cannot be applied to nonescaping closure", (StringRef))
-ERROR(noncopyable_generics_variadic, none,
-      "noncopyable type %0 cannot be used within a variadic type yet",
-      (Type))
+NOTE(noncopyable_or_nonescaping_variadic, none,
+     "required because variadic parameter type must be stored inside an 'Array'", ())
 NOTE(noncopyable_generics_implicit_conformance_req, none,
      "'where %noformat0: %noformat1' is implicit here",
      (Type, Type))
@@ -8610,16 +8659,9 @@ ERROR(lifetime_dependence_duplicate_param_id, none,
 ERROR(lifetime_dependence_cannot_use_kind, none,
       "invalid use of %0 lifetime dependence for %1 ownership",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_use_parsed_scoped_consuming, none,
-      "invalid use of scoped lifetime dependence with consuming ownership",
-      ())
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
-ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
-      "expected 'nil' or 'self' as return values in an initializer with "
-      "lifetime dependent specifiers",
-       ())
 ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
       "lifetime dependence specifiers cannot be applied to tuple elements", ())
 ERROR(lifetime_dependence_contextual_keyword_conflict_name, none,
@@ -8653,10 +8695,6 @@ NOTE(lifetime_escapable_source_requires_escapable_note, none,
      "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
 ERROR(lifetime_dependence_unknown_type, none,
       "lifetime dependence checking failed due to unknown %0 type", (StringRef))
-
-ERROR(borrow_inout_experimental,none,
-      "'%0' is an experimental feature",
-      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements
@@ -8819,9 +8857,9 @@ GROUPED_WARNING(unsafe_without_unsafe,StrictMemorySafety,none,
       "expression uses unsafe constructs but is not marked with 'unsafe'", ())
 GROUPED_WARNING(for_unsafe_without_unsafe,StrictMemorySafety,none,
       "for-in loop uses unsafe constructs but is not marked with 'unsafe'", ())
-WARNING(no_unsafe_in_unsafe,none,
+GROUPED_WARNING(no_unsafe_in_unsafe,UnnecessaryEffectMarker,none,
         "no unsafe operations occur within 'unsafe' expression", ())
-WARNING(no_unsafe_in_unsafe_for,none,
+GROUPED_WARNING(no_unsafe_in_unsafe_for,UnnecessaryEffectMarker,none,
         "no unsafe operations occur within 'unsafe' for-in loop", ())
 NOTE(make_subclass_unsafe,none,
      "make class %0 '@unsafe' to allow unsafe overrides of safe superclass "
@@ -8898,6 +8936,12 @@ GROUPED_ERROR(self_referential_superclass_in_embedded_swift,
               "a generic argument of the superclass refers to the subclass itself, "
               "creating a circular metadata dependency",
               (Type, Type))
+
+GROUPED_ERROR(export_interface_on_generic_in_embedded_swift,
+              EmbeddedRestrictions, none,
+              "'@export(interface)' cannot be applied to a "
+              "%kind0 in Embedded Swift",
+              (const Decl *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
@@ -9184,11 +9228,8 @@ NOTE(invalid_redecl_of_file_isolation_prev,none,
 //===----------------------------------------------------------------------===//
 ERROR(attr_inline_always_experimental,none,
       "'@inline(always)' is an experimental feature", ())
-ERROR(attr_inline_always_requires_inlinable,none,
-      "'@inline(always)' on public or package declarations must be used "
-      "together with '@inlinable'", ())
 ERROR(attr_inline_always_no_usable_from_inline,none,
-      "cannot use '@inline(always)' together with '@usableFromInline'", ())
+      "'@inline(always)' implies '@usableFromInline'; do not use both", ())
 ERROR(attr_inline_always_requires_final_method,none,
       "'@inline(always)' on class %select{methods|vars}1 requires %0 to be "
       "marked 'final'", (DeclName, bool))
@@ -9224,10 +9265,6 @@ GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,none,
                 "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
                 "Consider using an 'inout' parameter instead.", (bool))
 
-GROUPED_WARNING(perf_hint_param_expects_existential,ExistentialType,none,
-                "Performance: %0 expects an existential, leading to heap allocation, reference counting, "
-                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
-                (const ParamDecl*))
 GROUPED_WARNING(perf_hint_func_returns_existential,ExistentialType,none,
                 "Performance: %0 returns an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
@@ -9260,7 +9297,7 @@ ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
 REMARK(macro_expansion_line, none, "macro content: |%0|", (StringRef))
 
 GROUPED_WARNING(oslog_missing_string_section,OSLog,none,
-                "global variable 'osLogStringSectionName' is missing from the OSLog module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
+                "global variable 'osLogStringSectionName' is missing from the 'os' module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
 GROUPED_ERROR(oslog_string_section_not_literal,OSLog,none,
               "global variable 'osLogStringSectionName' requires a string literal initializer", ())
 

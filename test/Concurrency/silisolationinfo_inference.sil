@@ -1184,7 +1184,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedStruct):
 sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_addr : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
 bb0(%0 : $*MainActorIsolatedStruct):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self", expr op_deref
   %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.ns
   debug_value [trace] %1
   %9999 = tuple ()
@@ -1198,7 +1198,7 @@ bb0(%0 : $*MainActorIsolatedStruct):
 sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_addr_globalactor : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
 bb0(%0 : $*MainActorIsolatedStruct):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self", expr op_deref
   %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.globalActorNS
   debug_value [trace] %1
   %9999 = tuple ()
@@ -1212,7 +1212,7 @@ bb0(%0 : $*MainActorIsolatedStruct):
 sil [ossa] @test_globalactor_inference_on_nominal_field_globalactorstruct_addr_nonisolated_unsafe : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
 bb0(%0 : $*MainActorIsolatedStruct):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self", expr op_deref
   %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
   debug_value [trace] %1
   %9999 = tuple ()
@@ -1268,7 +1268,7 @@ bb0(%0 : @guaranteed $NonisolatedStruct):
 sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr : $@convention(thin) (@in_guaranteed NonisolatedStruct) -> () {
 bb0(%0 : $*NonisolatedStruct):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*NonisolatedStruct, let, name "self"
+  debug_value %0 : $*NonisolatedStruct, let, name "self", expr op_deref
   %1 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.ns
   debug_value [trace] %1
   %9999 = tuple ()
@@ -1282,7 +1282,7 @@ bb0(%0 : $*NonisolatedStruct):
 sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_globalactor : $@convention(thin) (@in_guaranteed NonisolatedStruct) -> () {
 bb0(%0 : $*NonisolatedStruct):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*NonisolatedStruct, let, name "self"
+  debug_value %0 : $*NonisolatedStruct, let, name "self", expr op_deref
   %1 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.globalActorNS
   debug_value [trace] %1
   %9999 = tuple ()
@@ -1296,7 +1296,7 @@ bb0(%0 : $*NonisolatedStruct):
 sil [ossa] @test_globalactor_inference_on_nominal_field_nonisolatedstruct_addr_nonisolated_unsafe : $@convention(thin) (@in_guaranteed NonisolatedStruct) -> () {
 bb0(%0 : $*NonisolatedStruct):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*NonisolatedStruct, let, name "self"
+  debug_value %0 : $*NonisolatedStruct, let, name "self", expr op_deref
   %1 = struct_element_addr %0 : $*NonisolatedStruct, #NonisolatedStruct.nsNonisolatedUnsafe
   debug_value [trace] %1
   %9999 = tuple ()
@@ -2266,7 +2266,7 @@ bb0(%0 : @guaranteed $Builtin.ImplicitActor, %1 : @guaranteed $NonSendableKlass)
 sil [isolation "global_actor(CustomActor)"] [ossa] @init_existential_addr_get_conformance_test : $@convention(method) <Self where Self : MyProtocol> (@in_guaranteed Self) -> () {
 bb0(%0 : $*Self):
   specify_test "sil_isolation_info_get_conformance_isolation_inferrence @trace[0]"
-  debug_value %0, let, name "self", argno 1
+  debug_value %0, let, name "self", argno 1, expr op_deref
   %alloc = alloc_stack $any MyProtocol
   %addr = init_existential_addr %alloc : $*any MyProtocol, $Self
   debug_value [trace] %addr

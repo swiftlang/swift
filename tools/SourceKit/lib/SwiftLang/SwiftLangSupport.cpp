@@ -1184,16 +1184,6 @@ void SwiftLangSupport::getPolyglotAST(
   Receiver(RequestResult<std::string>::fromResult(buffer));
 }
 
-CloseClangModuleFiles::~CloseClangModuleFiles() {
-  clang::Preprocessor &PP = loader.getClangPreprocessor();
-  clang::ModuleMap &ModMap = PP.getHeaderSearchInfo().getModuleMap();
-  for (auto I = ModMap.module_begin(), E = ModMap.module_end(); I != E; ++I) {
-    clang::Module *M = I->second;
-    if (!M->isSubModule() && M->getASTFile())
-      M->getASTFile()->closeFile();
-  }
-}
-
 void SourceKit::disableExpensiveSILOptions(SILOptions &Opts) {
   // Disable the sanitizers.
   Opts.Sanitizers = {};

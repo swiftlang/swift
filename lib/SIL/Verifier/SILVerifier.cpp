@@ -87,6 +87,11 @@ static llvm::cl::opt<bool> VerifyDIHoles("verify-di-holes", llvm::cl::init(
 #endif
                                                                 ));
 
+// Verify the type chain of debug_value instructions. Disabled by default
+// while we fix all root causes.
+static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
+                                                llvm::cl::init(false));
+
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
@@ -1113,6 +1118,25 @@ public:
       ~VerifierErrorEmitterGuard() { getEmitter().value = {}; }
     };
 
+    class VerifierErrorEmitterUnguard {
+      SILVerifier *verifier;
+      decltype(value) restore;
+
+      VerifierErrorEmitter &getEmitter() const {
+        return verifier->ErrorEmitter;
+      }
+
+    public:
+      VerifierErrorEmitterUnguard(SILVerifier *verifier)
+          : verifier(verifier) {
+        assert(bool(getEmitter().value) && "Construct is already unset");
+        restore = getEmitter().value;
+        getEmitter().value = {};
+      }
+
+      ~VerifierErrorEmitterUnguard() { getEmitter().value = restore; }
+    };
+
     void emitError(const Twine &complaint,
                    llvm::function_ref<void(SILPrintContext &)> extraContext) {
       if (!value.has_value()) {
@@ -1601,9 +1625,9 @@ public:
         auto userI = cast<SILInstruction>(user);
         require(userI->getParent(),
                 "instruction used by unparented instruction");
-        if (I->isStaticInitializerInst()) {
+        if (I->isStaticInitializerInst() || BB->isDebugReconstructionBlock()) {
           require(userI->getParent() == BB,
-                "instruction used by instruction not in same static initializer");
+                  "instruction used by instruction in different basic block");
         } else {
           require(userI->getFunction() == &F,
                   "instruction used by instruction in different function");
@@ -1624,9 +1648,9 @@ public:
       if (auto *valueI = operand.get()->getDefiningInstruction()) {
         require(valueI->getParent(),
                 "instruction uses value of unparented instruction");
-        if (I->isStaticInitializerInst()) {
+        if (I->isStaticInitializerInst() || BB->isDebugReconstructionBlock()) {
           require(valueI->getParent() == BB,
-              "instruction uses value which is not in same static initializer");
+              "instruction uses value which is not in the same basic block");
         } else {
           require(valueI->getFunction() == &F,
                   "instruction uses value of instruction from another function");
@@ -1804,12 +1828,6 @@ public:
     
     SILType DebugVarTy = varInfo->Type ? *varInfo->Type :
       SSAType.getObjectType();
-    if (!varInfo->DIExpr && !isa<SILBoxType>(SSAType.getASTType())) {
-      // FIXME: Remove getObjectType() below when we fix create/createAddr
-      require(DebugVarTy.removingMoveOnlyWrapper()
-              == SSAType.getObjectType().removingMoveOnlyWrapper(),
-              "debug type mismatch without a DIExpr");
-    }
 
     auto *debugScope = inst->getDebugScope();
     if (varInfo->ArgNo)
@@ -1937,6 +1955,34 @@ public:
                   " in a di-expression");
       }
     }
+  }
+
+  void checkDebugValueInst(DebugValueInst *inst) {
+    // Verify debug basic block and type chain.
+    if (auto *DebugBB = inst->getDebugReconstructionBlock()) {
+      // Structural checks.
+      require(DebugBB->isDebugReconstructionBlock(),
+              "debug block must be marked as such");
+      require(DebugBB->getParent() == inst->getFunction(),
+              "debug block must belong to the same function");
+      require(!DebugBB->empty(),
+              "debug block must not be empty");
+      require(isa<ReturnInst>(DebugBB->getTerminator()),
+              "debug block must end with a return instruction");
+
+      // Verify basic block content.
+      {
+        VerifierErrorEmitter::VerifierErrorEmitterUnguard unguard(this);
+        for (auto &I : *DebugBB) {
+          visit(&I);
+        }
+      }
+    }
+
+    // Type chain: SSA operand -> DebugBB -> deref -> fragments -> vartype
+    if (VerifyDebugValueExpr)
+      require(inst->isExprTypeValid(),
+              "debug_value type chain should hold");
   }
 
   void checkInstructionsDebugInfo(SILInstruction *inst) {
@@ -2969,8 +3015,9 @@ public:
     switch (LI->getOwnershipQualifier()) {
     case LoadOwnershipQualifier::Unqualified:
       // We should not see loads with unqualified ownership when SILOwnership is
-      // enabled.
-      require(!F.hasOwnership(),
+      // enabled, unless they are in a debug reconstruction block.
+      require(!F.hasOwnership() ||
+              LI->getParent()->isDebugReconstructionBlock(),
               "Load with unqualified ownership in a qualified function");
       break;
     case LoadOwnershipQualifier::Copy:
@@ -4064,6 +4111,11 @@ public:
     auto MetaTy = MI->getType().castTo<MetatypeType>();
     require(MetaTy->hasRepresentation(),
             "metatype instruction must have a metatype representation");
+
+    require(!MetaTy.getInstanceType()->mapTypeOutOfEnvironment()->isValueParameter()
+            && !MetaTy.getInstanceType()->is<IntegerType>(),
+            "metatype cannot be a value generic argument");
+
     verifyLocalArchetype(MI, MetaTy.getInstanceType());
   }
   void checkValueMetatypeInst(ValueMetatypeInst *MI) {
@@ -5611,6 +5663,11 @@ public:
   }
 
   void checkReturnInst(ReturnInst *RI) {
+    // Return instruction has a different meaning in debug reconstruction
+    // blocks. This meaning is checked in checkDebugValueInst.
+    if (RI->getParent()->isDebugReconstructionBlock())
+      return;
+
     LLVM_DEBUG(RI->print(llvm::dbgs()));
 
     SILType functionResultType =

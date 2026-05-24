@@ -1766,7 +1766,7 @@ namespace  {
     UNINTERESTING_ATTR(Safe)
     UNINTERESTING_ATTR(AddressableForDependencies)
     UNINTERESTING_ATTR(UnsafeSelfDependentResult)
-    UNINTERESTING_ATTR(Warn)
+    UNINTERESTING_ATTR(Diagnose)
 #undef UNINTERESTING_ATTR
 
     void visitABIAttr(ABIAttr *attr) {
@@ -2003,6 +2003,28 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       diags.diagnose(overrideASD, diag::override_with_more_effects, overrideASD,
                      "throwing");
       return true;
+    }
+
+    // Make sure that if we're overriding a `@dynamicMemberLookup` subscript, it
+    // remains as valid as its parent. `@dynamicMemberLookup`-annotated types
+    // normally go through `AttributeChecker` for validation, but if
+    // `@dynamicMemberLookup` is inherited, there isn't an explicit attr to
+    // validate. Most potential mismatches have been caught at this point, but
+    // we do still need to check that, e.g., the overridden decl hasn't dropped
+    // a default value for one of its parameters.
+    if (auto parentSubscript = dyn_cast<SubscriptDecl>(baseASD)) {
+      auto owningTy = override->getDeclContext()->getDeclaredInterfaceType();
+      if (owningTy->hasDynamicMemberLookupAttribute() &&
+          (bool) parentSubscript->getDynamicMemberLookupKind()) {
+        auto overrideSubscript = cast<SubscriptDecl>(overrideASD);
+
+        auto eligibility = evaluateOrFatal(
+            overrideSubscript->getASTContext().evaluator,
+            DynamicMemberLookupSubscriptRequest{overrideSubscript});
+        if (eligibility.diagnose(overrideSubscript)) {
+          return true;
+        }
+      }
     }
   }
 

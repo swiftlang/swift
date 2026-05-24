@@ -1019,10 +1019,8 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
   }
 }
 
-bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
-                                                const DeclContext *dc,
-                                                SourceLoc loc,
-                                                DiagnosticBehavior limit) {
+bool swift::shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                                 const DeclContext *dc) {
   // Only diagnose references in source files.
   auto sf = dc->getParentSourceFile();
   if (!sf)
@@ -1030,7 +1028,7 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
 
   auto &ctx = dc->getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
-                          /*allowMigration=*/true))
+                               /*allowMigration=*/true))
     return false;
 
   // Only diagnose members.
@@ -1051,13 +1049,30 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
       return false;
   }
 
-  // In lazy typechecking mode just emit the diagnostic immediately without a
-  // fix-it since there won't be an opportunity to emit delayed diagnostics.
   if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
     // Lazy type-checking and migration for MemberImportVisibility are
     // completely incompatible, so just skip the diagnostic entirely.
     if (ctx.LangOpts.isMigratingToFeature(Feature::MemberImportVisibility))
       return false;
+  }
+
+  return true;
+}
+
+bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                                const DeclContext *dc,
+                                                SourceLoc loc,
+                                                DiagnosticBehavior limit) {
+  if (!shouldDiagnoseMissingImportForMember(decl, dc))
+    return false;
+
+  auto &ctx = dc->getASTContext();
+  auto sf = dc->getParentSourceFile();
+
+  // In lazy typechecking mode just emit the diagnostic immediately without a
+  // fix-it since there won't be an opportunity to emit delayed diagnostics.
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    auto definingModule = decl->getModuleContextForNameLookup();
 
     auto modulesToImport = missingImportsForDefiningModule(definingModule, *sf);
     if (modulesToImport.empty())

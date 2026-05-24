@@ -48,6 +48,7 @@ SwiftStdlib 6.1:macOS 15.4, iOS 18.4, watchOS 11.4, tvOS 18.4, visionOS 2.4
 SwiftStdlib 6.2:anyAppleOS 26.0
 SwiftStdlib 6.3:anyAppleOS 26.4
 SwiftStdlib 6.4:anyAppleOS 9999
+SwiftStdlib 6.5:anyAppleOS 9999
 # TODO: When you add a new version, remember to tell the compiler about it
 # by also adding it to include/swift/AST/RuntimeVersions.def.
 

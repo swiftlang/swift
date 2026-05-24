@@ -2245,6 +2245,54 @@ public struct StaticFooFuncMacro: DeclarationMacro {
   }
 }
 
+public struct ProtocolRequirementMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func macroRequirement() -> Int",
+    ]
+  }
+}
+
+public struct ProtocolAssociatedTypeMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "associatedtype MacroAssociatedType",
+      "func makeMacroAssociatedValue() -> MacroAssociatedType",
+    ]
+  }
+}
+
+public struct PeerProtocolRequirementMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func peerRequirement() -> Int",
+    ]
+  }
+}
+
+public struct MemberProtocolRequirementMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func memberRequirement() -> Int",
+    ]
+  }
+}
+
 public struct SelfAlwaysEqualOperator: DeclarationMacro {
   public static func expansion(
     of node: some FreestandingMacroExpansionSyntax,
@@ -2738,6 +2786,49 @@ struct EmptyBodyMacro: BodyMacro {
     in context: some MacroExpansionContext
   ) throws -> [CodeBlockItemSyntax] {
     []
+  }
+}
+
+public struct PrintBodyMacro: BodyMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    func nameFromContextNode(_ node: Syntax) -> String? {
+      if let varDecl = node.as(VariableDeclSyntax.self) {
+        return varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+      }
+      if let binding = node.as(PatternBindingSyntax.self) {
+        return binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+      }
+      if let named = node.asProtocol(NamedDeclSyntax.self) {
+        return named.name.text
+      }
+      return nil
+    }
+
+    // Determine the declaration's own name component (for named decls like functions).
+    // For accessors, the name comes from the lexical context instead.
+    let ownName: String?
+    if let funcDecl = declaration.as(FunctionDeclSyntax.self) {
+      ownName = funcDecl.name.text
+    } else if let varDecl = declaration.as(VariableDeclSyntax.self) {
+      ownName = varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+    } else {
+      ownName = nil
+    }
+
+    // Build the full dot-separated path from outermost to innermost context, then own name.
+    let contextNames = context.lexicalContext.compactMap { nameFromContextNode($0) }.reversed()
+    let allNames = Array(contextNames) + (ownName.map { [$0] } ?? [])
+    let name = allNames.isEmpty ? "unknown" : allNames.joined(separator: ".")
+
+    let originalBody = declaration.body.map { Array($0.statements) } ?? []
+    return [
+      "print(\"start body (from macro, \(raw: name))\")",
+      "defer { print(\"end body (from macro, \(raw: name))\") }",
+    ] + originalBody
   }
 }
 

@@ -5,6 +5,34 @@
 
 ## Swift (next)
 
+* [SE-0522][]: Introduced the `@diagnose` declaration attribute for source-level
+  control over compiler warning behavior. `@diagnose(GroupID, as: error|warning|ignored)`
+  overrides diagnostic behavior for the specified warning group within the
+  lexical scope of the annotated declaration, relative to its enclosing scope.
+  An optional `reason:` parameter accepts a string literal for documentation.
+
+  ```swift
+  @diagnose(DeprecatedDeclaration, as: warning, reason: "Must maintain compatibility until end of release cycle")
+  func bridgeToLegacySystem() {
+    oldAPI() // warning: 'oldAPI()' is deprecated [#DeprecatedDeclaration]
+  }
+  ```
+
+  During the evolution process, this feature existed under the experimental
+  feature named `SourceWarningControl`.
+
+* The compiler API note `SwiftImportAs` now has support for always importing C structs as `OpaquePointer`. 
+  This can be used to unify the imported C pointer type in situations where the visibility of the struct might differ.
+  For example, the C `FILE` pointer in Android imports differently on API 23 compared to API 24 and above. We can unify that using the new API note:
+  
+  ```
+  ---
+  Name: _stdio
+  Tags:
+  - Name: __sFILE
+    SwiftImportAs: opaque_pointer
+  ```
+
 * When building modules using library evolution, Swift now uses module selectors in module interface files by default,
   improving their robustness against name collisions and ambiguity. Compiler flags previously used to work around these
   issues are disabled in this configuration and can now be removed. If necessary, you can disable this new behavior by
@@ -176,6 +204,19 @@
   }
   ```
 
+## Swift 6.3
+
+* [SE-0489][]:
+  When you encounter errors while encoding or decoding `Codable` types, the resulting error messages are now more human-readable thanks to improved `debugDescription` output.
+
+  Before:
+
+  `typeMismatch(Swift.String, Swift.DecodingError.Context(codingPath: [_CodingKey(stringValue: "Index 0", intValue: 0), CodingKeys(stringValue: "address", intValue: nil), CodingKeys(stringValue: "city", intValue: nil), CodingKeys(stringValue: "birds", intValue: nil), _CodingKey(stringValue: "Index 1", intValue: 1), CodingKeys(stringValue: "name", intValue: nil)], debugDescription: "Expected to decode String but found number instead.", underlyingError: nil))`
+
+  After:
+
+  `DecodingError.typeMismatch: expected value of type String. Path: [0].address.city.birds[1].name. Debug description: Expected to decode String but found number instead.`
+
 * The raw span accessor properties of `Span` and `MutableSpan` (`bytes` and
   `mutableBytes`) as well as the two generic `append()` methods of
   `OutputRawSpan` are newly marked with `@unsafe`. These changes are corrections
@@ -202,19 +243,6 @@
   applies when the memory is to later be used again as `Element`. In that case,
   the non-padding bytes of `Element` must allow every bit pattern to be
   permissible in a valid value of `Element`.
-
-## Swift 6.3
-
-* [SE-0489][]:
-  When you encounter errors while encoding or decoding `Codable` types, the resulting error messages are now more human-readable thanks to improved `debugDescription` output.
-
-  Before:
-
-  `typeMismatch(Swift.String, Swift.DecodingError.Context(codingPath: [_CodingKey(stringValue: "Index 0", intValue: 0), CodingKeys(stringValue: "address", intValue: nil), CodingKeys(stringValue: "city", intValue: nil), CodingKeys(stringValue: "birds", intValue: nil), _CodingKey(stringValue: "Index 1", intValue: 1), CodingKeys(stringValue: "name", intValue: nil)], debugDescription: "Expected to decode String but found number instead.", underlyingError: nil))`
-
-  After:
-
-  `DecodingError.typeMismatch: expected value of type String. Path: [0].address.city.birds[1].name. Debug description: Expected to decode String but found number instead.`
 
 * [SE-0491][]:
   You can now use a module selector to specify which module Swift should look inside to find a named declaration. A
@@ -11175,6 +11203,7 @@ using the `.dynamicType` member to retrieve the type of an expression should mig
 [SE-0503]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0503-suppressed-associated-types.md
 [SE-0504]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0504-task-cancellation-shields.md
 [SE-0518]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0518-tilde-sendable.md
+[SE-0522]: https://github.com/swiftlang/swift-evolution/blob/main/proposals/0522-source-warning-control.md
 [#64927]: <https://github.com/apple/swift/issues/64927>
 [#42697]: <https://github.com/apple/swift/issues/42697>
 [#42728]: <https://github.com/apple/swift/issues/42728>

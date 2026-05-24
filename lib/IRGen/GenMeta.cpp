@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -29,6 +29,7 @@
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -1551,6 +1552,18 @@ namespace {
       }
     }
 
+    /// Returns the qualified name for a class template specialization, which
+    /// includes both the namespace and template arguments.
+    static std::string getQualifiedNameForCxxTemplateSpecialization(
+        const clang::ClassTemplateSpecializationDecl *spec,
+        StringRef swiftName) {
+      std::string result;
+      llvm::raw_string_ostream os(result);
+      spec->printNestedNameSpecifier(os);
+      os << swiftName;
+      return result;
+    }
+
     /// Fill out all the aspects of the type identity.
     void computeIdentity() {
       // Remember the user-facing name.
@@ -1572,13 +1585,10 @@ namespace {
         // declaration's name as the ABI name.
       } else if (auto clangDecl =
                      Mangle::ASTMangler::getClangDeclForMangling(Type)) {
-        // Class template specializations need to use their mangled name so
-        // that each specialization gets its own metadata. A class template
-        // specialization's Swift name will always be the mangled name, so just
-        // use that.
         if (auto spec =
                 dyn_cast<clang::ClassTemplateSpecializationDecl>(clangDecl)) {
-          abiName = Type->getName().str();
+          abiName = getQualifiedNameForCxxTemplateSpecialization(
+              spec, Type->getName().str());
           IsCxxSpecializedTemplate = true;
         } else
           abiName = clangDecl->getQualifiedNameAsString();
@@ -5712,6 +5722,17 @@ void irgen::emitEmbeddedClassMetadata(IRGenModule &IGM, ClassDecl *classDecl) {
 }
 
 void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
+  // @export(interface) classes have a unique definition in their defining
+  // module; importing modules reference them as external symbols rather than
+  // lazily emitting their own copy.
+  if (IGM.isEmbeddedWithExistentials()) {
+    if (auto *classDecl = classTy->getClassOrBoundGenericClass()) {
+      if (classDecl->getEffectiveCodeGenerationModel()
+              == CodeGenerationModel::Interface)
+        return;
+    }
+  }
+
   // Might already be emitted, skip if that's the case.
   auto entity =
       LinkEntity::forTypeMetadata(classTy, TypeMetadataAddress::AddressPoint);
@@ -7645,6 +7666,8 @@ SpecialProtocol irgen::getSpecialProtocolID(ProtocolDecl *P) {
   case KnownProtocolKind::Escapable:
   case KnownProtocolKind::BitwiseCopyable:
   case KnownProtocolKind::SendableMetatype:
+  case KnownProtocolKind::ConvertibleToBytes:
+  case KnownProtocolKind::ConvertibleFromBytes:
     return SpecialProtocol::None;
   }
 
@@ -7888,8 +7911,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       if (auto invertible = protocol->getInvertibleProtocolKind()) {
         ++metadata.NumRequirements;
 
-        InvertibleProtocolSet mask(0xFFFF);
-        mask.remove(*invertible);
+        auto mask = InvertibleProtocolSet::allExcept(*invertible);
 
         auto flags = GenericRequirementFlags(
             GenericRequirementKind::InvertedProtocols,

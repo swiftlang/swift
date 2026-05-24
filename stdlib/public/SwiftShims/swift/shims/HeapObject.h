@@ -295,6 +295,9 @@ static const unsigned ObjCReservedLowBits =
     _swift_abi_ObjCReservedLowBits;
 static const __swift_uintptr_t BridgeObjectTagBitsMask =
     _swift_BridgeObject_TaggedPointerBits;
+static const __swift_uintptr_t UntaggedNonNativeBridgeObjectBits =
+   SwiftSpareBitsMask & ~ObjCReservedBitsMask & ~BridgeObjectTagBitsMask;
+
 } // heap_object_abi
 #endif // __cplusplus
 

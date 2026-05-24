@@ -439,7 +439,11 @@ public:
     CanType t = getBridgedTargetType();
     if (!t)
       return std::nullopt;
-    return SILType::getPrimitiveObjectType(t);
+    // Lower the bridged target through the TypeConverter so that
+    // DynamicSelfType is stripped consistently with how SIL lowers the
+    // cast instruction's target type. Otherwise `as? Self` in a class
+    // extension of a bridgeable class makes the two sides disagree.
+    return getFunction()->getLoweredType(t).getObjectType();
   }
 
   bool isConditional() const {

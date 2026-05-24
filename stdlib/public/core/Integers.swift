@@ -1402,7 +1402,7 @@ internal func _BinaryIntegerToASCII<T: BinaryInteger>(
   let radix = radix.magnitude
 
   // We need a `MutableRawSpan` to use wide store/load operations.
-  var buffer = unsafe utf8Buffer.mutableBytes
+  var buffer = utf8Buffer.mutableBytes
   var offset = buffer.byteCount
 
   if value == (0 as T.Magnitude) {

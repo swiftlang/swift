@@ -1750,7 +1750,7 @@ public:
         // See if setting isolation of old type to nonisolated(nonsending)
         // yields the new type.
         auto addedNonIsolatedNonSending = oldFnTy->getExtInfo().withIsolation(
-            FunctionTypeIsolation::forNonIsolatedCaller());
+            FunctionTypeIsolation::forNonisolatedNonsending());
 
         return oldFnTy->withExtInfo(addedNonIsolatedNonSending) == newFnTy;
       }
@@ -8089,17 +8089,6 @@ ManagedValue SILGenFunction::emitAsyncLetStart(
       getLoweredType(ctx.TheRawPointerType), subs,
       {taskOptions, taskFunction.getValue(), resultBuf});
 
-  return ManagedValue::forObjectRValueWithoutOwnership(apply);
-}
-
-ManagedValue SILGenFunction::emitCancelAsyncTask(
-    SILLocation loc, SILValue task) {
-  ASTContext &ctx = getASTContext();
-  auto apply = B.createBuiltin(
-      loc,
-      ctx.getIdentifier(getBuiltinName(BuiltinValueKind::CancelAsyncTask)),
-      getLoweredType(ctx.TheEmptyTupleType), SubstitutionMap(),
-      { task });
   return ManagedValue::forObjectRValueWithoutOwnership(apply);
 }
 

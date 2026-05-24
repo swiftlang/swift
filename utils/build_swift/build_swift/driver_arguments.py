@@ -173,6 +173,13 @@ def _apply_default_arguments(args):
     if not args.android or not args.build_android:
         args.build_android = False
 
+    # By default, pedantic diagnostics are enabled only when assertions in
+    # the Swift project are also enabled. Otherwise we risk breaking
+    # no-assertions builds, which are not among the required pull request
+    # checks.
+    if args.swift_pedantic_diagnostics is None:
+        args.swift_pedantic_diagnostics = args.swift_assertions
+
     # By default use the same number of lit workers as build jobs.
     if not args.lit_jobs:
         args.lit_jobs = args.build_jobs
@@ -484,6 +491,31 @@ def create_argument_parser():
     option('--sccache', toggle_true,
            default=os.environ.get('SWIFT_USE_SCCACHE') == '1',
            help='use sccache')
+    option('--enable-caching', toggle_true,
+           default=os.environ.get('SWIFT_USE_CACHING') == '1',
+           help='enable compilation caching using clang-cache and swift '
+                'cache-compile-job (incompatible with --sccache)')
+    option('--caching-cas-path', store_path,
+           default=None,
+           help='the path to the CAS directory for caching builds. '
+                'Defaults to $BUILD_ROOT/cas')
+    option('--caching-depscan-socket', store,
+           default='/tmp/clang-scand',
+           help='the socket path for the clang-cache depscan daemon')
+    option('--caching-plugin-path', store_path,
+           default=None,
+           help='the path to the CAS plugin for caching builds')
+    option('--caching-plugin-option', append,
+           help='options to pass to the CAS plugin. Can be specified '
+                'multiple times.')
+    option('--caching-prefix-map', toggle_true,
+           help='enable prefix mapping for cached builds. Maps source, '
+                'SDK, and toolchain paths to canonical prefixes.')
+    option('--caching-remote-service-path', store_path,
+           default=None,
+           help='the path to the remote caching service socket. Implies '
+                '--caching-prefix-map. Uses libToolchainCASPlugin.dylib '
+                'from Xcode if --caching-plugin-path is not provided.')
     option('--enable-asan', toggle_true,
            help='enable Address Sanitizer')
     option('--enable-ubsan', toggle_true,
@@ -1091,6 +1123,18 @@ def create_argument_parser():
            store('swift_stdlib_strict_availability'),
            const=False,
            help='disable strict availability checking in the Swift standard library (you want this OFF for CI or at-desk builds)')
+
+    # -------------------------------------------------------------------------
+    in_group('Diagnostics')
+
+    option('--swift-pedantic-diagnostics', store,
+           const=True,
+           help='Enable and escalate certain compiler warnings for code health '
+                '(e.g. unused code) to errors when building the Swift project '
+                '(default: enabled when assertions in the Swift project are '
+                'enabled)')
+    option('--no-swift-pedantic-diagnostics', store('swift_pedantic_diagnostics'),
+           const=False)
 
     # -------------------------------------------------------------------------
     in_group('Select the CMake generator')

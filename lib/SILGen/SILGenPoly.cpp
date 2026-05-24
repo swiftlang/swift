@@ -4547,6 +4547,48 @@ ResultPlanner::expandInnerTupleOuterIndirect(AbstractionPattern innerOrigType,
 
   auto outerSubstTupleType = dyn_cast<TupleType>(outerSubstType);
 
+  // FIXME: This entire function dispatches on whether `outerSubstType` is a
+  // tuple to decide between "single-slot injection" (optional/existential)
+  // and "parallel tuple walk". That's the wrong dimension: the abstraction
+  // pattern determines how the value is *passed*, not the substituted type.
+  // When `outerOrigType` is opaque (e.g. an archetype) the outer is a
+  // single `@out` slot regardless of whether the substituted type happens
+  // to be a tuple.
+  //
+  // The branch below handles the case where the inner result is a single
+  // tuple-typed indirect slot being injected into the outer's single opaque
+  // slot. This covers the typed-throws reabstraction patterns:
+  //  - closure returning `()` into generic `T ~> ()`
+  //    (https://github.com/swiftlang/swift/issues/77880,
+  //     https://github.com/swiftlang/swift/issues/88027)
+  //  - closure returning `(A, B, ...)` into generic `T ~> (A, B, ...)`
+  // Without it, the parallel tuple walk either under-claims (empty tuple;
+  // `AllInnerResults.empty()` assertion) or over-claims (non-empty tuple;
+  // `claimNext` on empty assertion). The fix only applies when the inner
+  // has a single unclaimed result slot matching the outer single slot; if
+  // the inner has per-element result slots (no single whole-tuple slot),
+  // the parallel walk's per-element claims remain correct.
+  //
+  // A more principled fix dispatches this whole function on
+  // `outerOrigType.isTuple()` and handles 1-to-N result-slot mappings in
+  // `planSingleIntoIndirect` (or a new helper). That's tracked separately.
+  //
+  // Exclude tuples containing pack expansions: the existing parallel walk
+  // handles them correctly (pack-expansion-aware reabstraction), and
+  // `planSingleIntoIndirect` does not — its downstream `Transform` machinery
+  // treats the slot as a single fixed-layout value and would crash on the
+  // dynamic-layout pack-expansion tuple.
+  if (outerSubstTupleType && !outerOrigType.isTuple()
+      && AllInnerResults.size() == 1
+      && !outerSubstTupleType.containsPackExpansionType()) {
+    SILResultInfo innerResult = claimNextInnerResult();
+    planSingleIntoIndirect(innerOrigType, innerSubstType,
+                           outerOrigType, outerSubstType,
+                           innerResult,
+                           outerResultAddrMV.getLValueAddress());
+    return;
+  }
+
   // If the outer type is not a tuple, it must be optional.
   if (!outerSubstTupleType) {
     auto outerResultAddr = outerResultAddrMV.getLValueAddress();

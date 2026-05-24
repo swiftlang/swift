@@ -764,7 +764,9 @@ BridgedASTType::MetatypeRepresentation BridgedASTType::getRepresentationOfMetaty
 }
 
 BridgedOptionalInt BridgedASTType::getValueOfIntegerType() const {
-  return getFromAPInt(unbridged()->getAs<swift::IntegerType>()->getValue());
+  if (auto *intType = unbridged()->getAs<swift::IntegerType>())
+    return getFromAPInt(intType->getValue());
+  return BridgedOptionalInt();
 }
 
 BridgedSubstitutionMap BridgedASTType::getContextSubstitutionMap() const {
@@ -834,6 +836,10 @@ SwiftInt BridgedASTType::GenericTypeParam_getIndex() const {
 swift::GenericTypeParamKind
 BridgedASTType::GenericTypeParam_getParamKind() const {
   return llvm::cast<swift::GenericTypeParamType>(type)->getParamKind();
+}
+
+bool BridgedASTType::Tuple_containsPackExpansionType() const {
+  return llvm::cast<swift::TupleType>(type)->containsPackExpansionType();
 }
 
 BridgedASTTypeArray BridgedASTType::BoundGenericType_getGenericArgs() const {

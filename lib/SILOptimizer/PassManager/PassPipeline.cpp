@@ -406,7 +406,7 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   // Cleanup.
   P.addDCE();
   // Also CSE semantic calls.
-  P.addHighLevelCSE();
+  P.addHighLevelCommonSubexpressionElimination();
   P.addSILCombine();
   P.addSimplifyCFG();
   // Optimize access markers for better LICM: might merge accesses
@@ -576,7 +576,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // SILCombine can expose further opportunities for SimplifyCFG.
   P.addSimplifyCFG();
 
-  P.addCSE();
+  P.addCommonSubexpressionElimination();
   if (OpLevel == OptimizationLevelKind::HighLevel) {
     // Early RLE does not touch loads from Arrays. This is important because
     // later array optimizations, like ABCOpt, get confused if an array load in
@@ -594,7 +594,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   // Remove redundant arguments right before CSE and DCE, so that CSE and DCE
   // can cleanup redundant and dead instructions.
   P.addRedundantPhiElimination();
-  P.addCSE();
+  P.addCommonSubexpressionElimination();
   P.addDCE();
   P.addDeadAccessScopeElimination();
 

@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
+#include "swift/AST/SearchPathOptions.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -383,7 +384,7 @@ static void getLibStdCxxFileMapping(
     return;
   }
 
-  constexpr StringRef additionalFiles[] = {
+  std::vector<StringRef> additionalFiles = {
       // libstdc++ 4.8.5 bundled with CentOS 7 does not include corecvt.
       "codecvt",
       // C++17 and newer:
@@ -443,12 +444,28 @@ static void getLibStdCxxFileMapping(
       "span",
       "stop_token",
       "syncstream",
+      "version",
       // C++23 and newer:
       "expected",
       "flat_map",
       "flat_set",
       "mdspan",
-    };
+      "print",
+      "spanstream",
+      "stacktrace",
+      "stdfloat",
+  };
+  // <coroutine> in libstdc++ has an #error that fires if coroutines were not
+  // enabled via a compile time flag. This prevents us from listing <coroutine>
+  // in the modulemap unconditionally.
+  // <generator> relies on <coroutine>.
+  if (parsedStdlibArgs.hasFlag(clang::driver::options::OPT_fcoroutines,
+                               clang::driver::options::OPT_fno_coroutines,
+                               /*default*/ false)) {
+    additionalFiles.push_back("coroutine");
+    additionalFiles.push_back("generator");
+  }
+
   std::string additionalHeaderDirectives;
   llvm::raw_string_ostream os(additionalHeaderDirectives);
   os << contents.substr(0, headerInjectionPoint);

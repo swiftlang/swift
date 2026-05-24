@@ -1634,6 +1634,25 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
 }
 
 //----------------------------------------------------------------------------//
+// ResolvePreInverseGenericsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<Type> ResolvePreInverseGenericsRequest::getCachedResult() const {
+  auto *attr = std::get<1>(getStorage());
+  auto Ty = attr->ExceptType;
+  if (!Ty)
+    return std::nullopt;
+
+  return Ty;
+}
+
+void ResolvePreInverseGenericsRequest::cacheResult(Type Ty) const {
+  auto *attr = std::get<1>(getStorage());
+  assert(Ty && Ty->is<ProtocolCompositionType>());
+  attr->ExceptType = Ty;
+}
+
+//----------------------------------------------------------------------------//
 // ResolveRawLayoutTypeRequest computation.
 //----------------------------------------------------------------------------//
 

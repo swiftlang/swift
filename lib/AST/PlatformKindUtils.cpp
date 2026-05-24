@@ -194,7 +194,7 @@ bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                                    ForRuntimeQuery);
 }
 
-static PlatformKind platformForTriple(const llvm::Triple &triple,
+PlatformKind swift::platformForTriple(const llvm::Triple &triple,
                                       bool enableAppExtensionRestrictions) {
   if (triple.isMacOSX()) {
     return (enableAppExtensionRestrictions

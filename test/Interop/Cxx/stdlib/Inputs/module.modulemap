@@ -134,3 +134,15 @@ module StdSingleFieldAggregate {
   requires cplusplus
   export *
 }
+
+module IteratorCycleUnrelatedOperator {
+  header "iterator-cycle-unrelated-operator.h"
+  requires cplusplus
+  export *
+}
+
+module StdCoroutine {
+  header "std-coroutine.h"
+  requires cplusplus
+  export *
+}

@@ -129,7 +129,6 @@ UNINTERESTING_FEATURE(FlowSensitiveConcurrencyCaptures)
 UNINTERESTING_FEATURE(CodeItemMacros)
 UNINTERESTING_FEATURE(PreambleMacros)
 UNINTERESTING_FEATURE(TupleConformances)
-UNINTERESTING_FEATURE(DeferredCodeGen)
 UNINTERESTING_FEATURE(LazyImmediate)
 UNINTERESTING_FEATURE(MoveOnlyClasses)
 UNINTERESTING_FEATURE(NoImplicitCopy)
@@ -169,6 +168,7 @@ UNINTERESTING_FEATURE(Embedded)
 UNINTERESTING_FEATURE(Volatile)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypes)
 UNINTERESTING_FEATURE(SuppressedAssociatedTypesWithDefaults)
+UNINTERESTING_FEATURE(SourceWarningControl)
 UNINTERESTING_FEATURE(StructLetDestructuring)
 UNINTERESTING_FEATURE(MacrosOnImports)
 UNINTERESTING_FEATURE(NonisolatedNonsendingByDefault)
@@ -276,6 +276,21 @@ static bool usesFeatureLifetimes(Decl *decl) {
   if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
     return !varDecl->getTypeInContext()->isEscapable();
   }
+  return false;
+}
+
+static PreInverseGenericsAttr *getPreInverseGenericsExcept(Decl *decl) {
+  if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
+    for (auto i : range(pbd->getNumPatternEntries()))
+      if (auto anchorVar = pbd->getAnchoringVarDecl(i))
+        return getPreInverseGenericsExcept(anchorVar);
+
+  return decl->getAttrs().getAttribute<PreInverseGenericsAttr>();
+}
+
+static bool usesFeaturePreInverseGenericsExcept(Decl *decl) {
+  if (auto *attr = getPreInverseGenericsExcept(decl))
+    return attr->hasExcept(decl);
   return false;
 }
 
@@ -444,10 +459,6 @@ static bool usesFeatureIsolatedConformances(Decl *decl) {
 
 static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
   return false;
-}
-
-static bool usesFeatureSourceWarningControl(Decl *decl) {
-  return decl->getAttrs().hasAttribute<WarnAttr>();
 }
 
 static bool usesFeatureCompileTimeValues(Decl *decl) {
@@ -685,18 +696,8 @@ static bool usesFeatureReparenting(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(StrictAccessControl)
-
-static bool usesFeatureBorrowInout(Decl *decl) {
-  auto &ctx = decl->getASTContext();
-
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    decl = ext->getExtendedNominal();
-  }
-
-  return decl == ctx.getBorrowDecl() || decl == ctx.getInoutDecl();
-}
-
 UNINTERESTING_FEATURE(BorrowingSequence)
+UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

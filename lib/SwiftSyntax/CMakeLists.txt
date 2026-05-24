@@ -54,6 +54,10 @@ set(SWIFT_SYNTAX_MODULES
   SwiftLibraryPluginProvider
 )
 
+foreach(module ${SWIFT_SYNTAX_MODULES})
+  _add_swift_caching_compile_options(${module})
+endforeach()
+
 # Install shared runtime libraries
 if(CMAKE_SYSTEM_NAME MATCHES Windows)
   swift_install_in_component(TARGETS ${SWIFT_SYNTAX_MODULES}

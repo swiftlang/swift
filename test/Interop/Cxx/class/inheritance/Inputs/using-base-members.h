@@ -79,4 +79,15 @@ public:
   using OperatorBase::operator[];
 };
 
+struct OperatorBaseProtectedInheritance : protected OperatorBase {};
+
+struct ProtectedOperatorBoolBase {
+protected:
+  operator bool() const { return true; }
+};
+
+struct ProtectedOperatorBoolMadePublic : ProtectedOperatorBoolBase {
+  using ProtectedOperatorBoolBase::operator bool;
+};
+
 #endif // !_USING_BASE_MEMBERS_H

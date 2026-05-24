@@ -417,6 +417,12 @@ Added: _swift_task_isCancelledWithFlags
 Added: _$sSct5_taskBovg
 Added: _$sSct5_taskBovpMV
 
+// Swift.UnsafeCurrentTask.init(Builtin.NativeObject) -> Swift.UnsafeCurrentTask
+Added: _$sSctySctBocfC
+// Swift.withUnsafeCurrentTaskNonsending<A>(body: nonisolated(nonsending) (Swift.UnsafeCurrentTask?) async throws -> A) async throws -> A
+Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlF
+Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlFTu
+
 // CoroutineAccessors
 Added: _swift_task_dealloc_through
 
@@ -430,3 +436,10 @@ Added: _$sScT4nameSSSgvg
 Added: _$sScT4nameSSSgvpMV
 Added: _$sSct4nameSSSgvg
 Added: _$sSct4nameSSSgvpMV
+
+// Continuation (noncopyable, ~Copyable Success)
+Added: _$ss12ContinuationVMa
+Added: _$ss12ContinuationVMn
+Added: _$ss12ContinuationVsRi_zrlE7contextBcvg
+Added: _$ss12ContinuationVsRi_zrlEfD
+Added: _$ss12ContinuationVsRi_zrlEyAByxq_GBccfC
