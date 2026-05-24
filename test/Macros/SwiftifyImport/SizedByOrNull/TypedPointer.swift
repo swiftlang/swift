@@ -69,9 +69,8 @@ public func mutParam(_ ptr: UnsafeMutableRawBufferPointer) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func exprParam(_ ptr: UnsafeMutableRawBufferPointer, _ size: CInt, _ count: CInt) {
-    let _ptrCount = ptr.count
-    if _ptrCount != size * count {
-      fatalError("bounds check failure in exprParam: expected \(size * count) but got \(_ptrCount)")
+    if ptr.count != size * count {
+      fatalError("bounds check failure in exprParam: expected \(size * count) but got \(ptr.count)")
     }
     return unsafe exprParam(ptr.baseAddress!.assumingMemoryBound(to: UInt8.self), size, count)
 }

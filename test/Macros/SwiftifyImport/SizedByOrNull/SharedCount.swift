@@ -18,9 +18,9 @@ public func myFunc(_ ptr: UnsafeRawPointer, _ ptr2: UnsafeRawPointer, _ size: CI
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer) {
-    let size = CInt(exactly: ptr.count)!
-    if ptr2.count != size {
-      fatalError("bounds check failure in myFunc: expected \(size) but got \(ptr2.count)")
+    let size = CInt(exactly: ptr2.count)!
+    if ptr.count != size {
+      fatalError("bounds check failure in myFunc: expected \(size) but got \(ptr.count)")
     }
     return unsafe myFunc(ptr.baseAddress!, ptr2.baseAddress!, size)
 }

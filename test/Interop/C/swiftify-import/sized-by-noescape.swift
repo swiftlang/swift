@@ -52,9 +52,9 @@ void swiftAttr(int len, const void *p) __attribute__((swift_attr(
 // expected-expansion@+22:108{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func shared(_ p1: RawSpan, _ p2: RawSpan) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p1.byteCount)!|}}
-//   expected-remark@4{{macro content: |    if p2.byteCount != len {|}}
-//   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p2.byteCount)")|}}
+//   expected-remark@3{{macro content: |    let len = Int32(exactly: p2.byteCount)!|}}
+//   expected-remark@4{{macro content: |    if p1.byteCount != len {|}}
+//   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p1.byteCount)")|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    let _p1Ptr = p1.withUnsafeBytes {|}}
 //   expected-remark@8{{macro content: |        unsafe $0|}}
@@ -73,21 +73,20 @@ void swiftAttr(int len, const void *p) __attribute__((swift_attr(
 // }}
 void shared(int len, const void * __sized_by(len) __noescape p1, const void * __sized_by(len) __noescape p2);
 
-// expected-expansion@+16:89{{
+// expected-expansion@+15:89{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: RawSpan) {|}}
-//   expected-remark@3{{macro content: |    let _pCount = p.byteCount|}}
-//   expected-remark@4{{macro content: |    if _pCount != len - offset {|}}
-//   expected-remark@5{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(_pCount)")|}}
-//   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
-//   expected-remark@8{{macro content: |        unsafe $0|}}
-//   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    defer {|}}
-//   expected-remark@11{{macro content: |        _fixLifetime(p)|}}
-//   expected-remark@12{{macro content: |    }|}}
-//   expected-remark@13{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress!)|}}
-//   expected-remark@14{{macro content: |}|}}
+//   expected-remark@3{{macro content: |    if p.byteCount != len - offset {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(p.byteCount)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
+//   expected-remark@7{{macro content: |        unsafe $0|}}
+//   expected-remark@8{{macro content: |    }|}}
+//   expected-remark@9{{macro content: |    defer {|}}
+//   expected-remark@10{{macro content: |        _fixLifetime(p)|}}
+//   expected-remark@11{{macro content: |    }|}}
+//   expected-remark@12{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress!)|}}
+//   expected-remark@13{{macro content: |}|}}
 // }}
 void complexExpr(int len, int offset, const void * __sized_by(len - offset) __noescape p);
 

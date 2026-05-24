@@ -65,9 +65,8 @@ public func escapeMutOpt(_ ptr: UnsafeMutablePointer<CInt>?) -> UnsafeMutablePoi
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func plain(_ ptr: UnsafeBufferPointer<CInt>) {
-    let _ptrCount = ptr.count
-    if _ptrCount != 37 {
-      fatalError("bounds check failure in plain: expected \(37) but got \(_ptrCount)")
+    if ptr.count != 37 {
+      fatalError("bounds check failure in plain: expected \(37) but got \(ptr.count)")
     }
     return unsafe plain(ptr.baseAddress!)
 }
@@ -77,8 +76,7 @@ public func plain(_ ptr: UnsafeBufferPointer<CInt>) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func opt(_ ptr: UnsafeBufferPointer<CInt>?) {
-    let _ptrCount = unsafe ptr?.count ?? 0
-    if _ptrCount != 37 {
+    if let _ptrCount = unsafe ptr?.count, _ptrCount != 37 {
       fatalError("bounds check failure in opt: expected \(37) but got \(_ptrCount)")
     }
     return unsafe opt(ptr?.baseAddress)
@@ -89,9 +87,8 @@ public func opt(_ ptr: UnsafeBufferPointer<CInt>?) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func mut(_ ptr: UnsafeMutableBufferPointer<CInt>) {
-    let _ptrCount = ptr.count
-    if _ptrCount != 37 {
-      fatalError("bounds check failure in mut: expected \(37) but got \(_ptrCount)")
+    if ptr.count != 37 {
+      fatalError("bounds check failure in mut: expected \(37) but got \(ptr.count)")
     }
     return unsafe mut(ptr.baseAddress!)
 }
@@ -101,8 +98,7 @@ public func mut(_ ptr: UnsafeMutableBufferPointer<CInt>) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func mutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>?) {
-    let _ptrCount = unsafe ptr?.count ?? 0
-    if _ptrCount != 37 {
+    if let _ptrCount = unsafe ptr?.count, _ptrCount != 37 {
       fatalError("bounds check failure in mutOpt: expected \(37) but got \(_ptrCount)")
     }
     return unsafe mutOpt(ptr?.baseAddress)
@@ -113,9 +109,8 @@ public func mutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>?) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func noescape(_ ptr: Span<CInt>) {
-    let _ptrCount = ptr.count
-    if _ptrCount != 37 {
-      fatalError("bounds check failure in noescape: expected \(37) but got \(_ptrCount)")
+    if ptr.count != 37 {
+      fatalError("bounds check failure in noescape: expected \(37) but got \(ptr.count)")
     }
     let _ptrPtr = ptr.withUnsafeBufferPointer {
         unsafe $0
@@ -131,8 +126,7 @@ public func noescape(_ ptr: Span<CInt>) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func noescapeOpt(_ ptr: Span<CInt>?) {
-    let _ptrCount = ptr?.count ?? 0
-    if _ptrCount != 37 {
+    if let _ptrCount = ptr?.count, _ptrCount != 37 {
       fatalError("bounds check failure in noescapeOpt: expected \(37) but got \(_ptrCount)")
     }
     let _ptrPtr = ptr?.withUnsafeBufferPointer {
@@ -149,9 +143,8 @@ public func noescapeOpt(_ ptr: Span<CInt>?) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func noescapeMut(_ ptr: inout MutableSpan<CInt>) {
-    let _ptrCount = ptr.count
-    if _ptrCount != 37 {
-      fatalError("bounds check failure in noescapeMut: expected \(37) but got \(_ptrCount)")
+    if ptr.count != 37 {
+      fatalError("bounds check failure in noescapeMut: expected \(37) but got \(ptr.count)")
     }
     let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
         unsafe $0
@@ -167,8 +160,7 @@ public func noescapeMut(_ ptr: inout MutableSpan<CInt>) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func noescapeMutOpt(_ ptr: inout MutableSpan<CInt>?) {
-    let _ptrCount = ptr?.count ?? 0
-    if _ptrCount != 37 {
+    if let _ptrCount = ptr?.count, _ptrCount != 37 {
       fatalError("bounds check failure in noescapeMutOpt: expected \(37) but got \(_ptrCount)")
     }
     let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
@@ -225,9 +217,8 @@ public func mutOptReturn() -> UnsafeMutableBufferPointer<CInt>? {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func escape(_ ptr: UnsafeBufferPointer<CInt>) -> UnsafePointer<CInt> {
-    let _ptrCount = ptr.count
-    if _ptrCount != 37 {
-      fatalError("bounds check failure in escape: expected \(37) but got \(_ptrCount)")
+    if ptr.count != 37 {
+      fatalError("bounds check failure in escape: expected \(37) but got \(ptr.count)")
     }
     return unsafe escape(ptr.baseAddress!)
 }
@@ -237,8 +228,7 @@ public func escape(_ ptr: UnsafeBufferPointer<CInt>) -> UnsafePointer<CInt> {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func escapeOpt(_ ptr: UnsafeBufferPointer<CInt>?) -> UnsafePointer<CInt>? {
-    let _ptrCount = unsafe ptr?.count ?? 0
-    if _ptrCount != 37 {
+    if let _ptrCount = unsafe ptr?.count, _ptrCount != 37 {
       fatalError("bounds check failure in escapeOpt: expected \(37) but got \(_ptrCount)")
     }
     return unsafe escapeOpt(ptr?.baseAddress)
@@ -249,9 +239,8 @@ public func escapeOpt(_ ptr: UnsafeBufferPointer<CInt>?) -> UnsafePointer<CInt>?
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func escapeMut(_ ptr: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<CInt> {
-    let _ptrCount = ptr.count
-    if _ptrCount != 37 {
-      fatalError("bounds check failure in escapeMut: expected \(37) but got \(_ptrCount)")
+    if ptr.count != 37 {
+      fatalError("bounds check failure in escapeMut: expected \(37) but got \(ptr.count)")
     }
     return unsafe escapeMut(ptr.baseAddress!)
 }
@@ -261,8 +250,7 @@ public func escapeMut(_ ptr: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutableP
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func escapeMutOpt(_ ptr: UnsafeMutableBufferPointer<CInt>?) -> UnsafeMutablePointer<CInt>? {
-    let _ptrCount = unsafe ptr?.count ?? 0
-    if _ptrCount != 37 {
+    if let _ptrCount = unsafe ptr?.count, _ptrCount != 37 {
       fatalError("bounds check failure in escapeMutOpt: expected \(37) but got \(_ptrCount)")
     }
     return unsafe escapeMutOpt(ptr?.baseAddress)

@@ -48,9 +48,9 @@ void swiftAttr(int len, int *p) __attribute__((
 // expected-expansion@+22:114{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p1: copy p1) @_lifetime(p2: copy p2) @_disfavoredOverload public func shared(_ p1: inout MutableSpan<Int32>, _ p2: inout MutableSpan<Int32>) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p1.count)!|}}
-//   expected-remark@4{{macro content: |    if p2.count != len {|}}
-//   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p2.count)")|}}
+//   expected-remark@3{{macro content: |    let len = Int32(exactly: p2.count)!|}}
+//   expected-remark@4{{macro content: |    if p1.count != len {|}}
+//   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p1.count)")|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    let _p1Ptr = p1.withUnsafeMutableBufferPointer {|}}
 //   expected-remark@8{{macro content: |        unsafe $0|}}
@@ -69,21 +69,20 @@ void swiftAttr(int len, int *p) __attribute__((
 // }}
 void shared(int len, int * __counted_by_or_null(len) __noescape p1, int * __counted_by_or_null(len) __noescape p2);
 
-// expected-expansion@+16:92{{
+// expected-expansion@+15:92{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: inout MutableSpan<Int32>) {|}}
-//   expected-remark@3{{macro content: |    let _pCount = p.count|}}
-//   expected-remark@4{{macro content: |    if _pCount != len - offset {|}}
-//   expected-remark@5{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(_pCount)")|}}
-//   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
-//   expected-remark@8{{macro content: |        unsafe $0|}}
-//   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    defer {|}}
-//   expected-remark@11{{macro content: |        _fixLifetime(p)|}}
-//   expected-remark@12{{macro content: |    }|}}
-//   expected-remark@13{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress!)|}}
-//   expected-remark@14{{macro content: |}|}}
+//   expected-remark@3{{macro content: |    if p.count != len - offset {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(p.count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@7{{macro content: |        unsafe $0|}}
+//   expected-remark@8{{macro content: |    }|}}
+//   expected-remark@9{{macro content: |    defer {|}}
+//   expected-remark@10{{macro content: |        _fixLifetime(p)|}}
+//   expected-remark@11{{macro content: |    }|}}
+//   expected-remark@12{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress!)|}}
+//   expected-remark@13{{macro content: |}|}}
 // }}
 void complexExpr(int len, int offset, int * __counted_by_or_null(len - offset) __noescape p);
 
@@ -196,21 +195,20 @@ void keyword(int len, int * __counted_by_or_null(len) _Nullable func __noescape,
 // }}
 void pointerName(int len, int * __counted_by_or_null(len) _Nullable pointerName __noescape);
 
-// expected-expansion@+16:91{{
+// expected-expansion@+15:91{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_lenName_param2: copy _lenName_param2) @_disfavoredOverload public func lenName(_ _lenName_param0: Int32, _ _lenName_param1: Int32, _ _lenName_param2: inout MutableSpan<Int32>?) {|}}
-//   expected-remark@3{{macro content: |    let __lenName_param2Count = _lenName_param2?.count ?? 0|}}
-//   expected-remark@4{{macro content: |    if __lenName_param2Count != _lenName_param0 * _lenName_param1 {|}}
-//   expected-remark@5{{macro content: |      fatalError("bounds check failure in lenName: expected \\(_lenName_param0 * _lenName_param1) but got \\(__lenName_param2Count)")|}}
-//   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    let __lenName_param2Ptr = _lenName_param2?.withUnsafeMutableBufferPointer {|}}
-//   expected-remark@8{{macro content: |        unsafe $0|}}
-//   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    defer {|}}
-//   expected-remark@11{{macro content: |        _fixLifetime(_lenName_param2)|}}
-//   expected-remark@12{{macro content: |    }|}}
-//   expected-remark@13{{macro content: |    return unsafe lenName(_lenName_param0, _lenName_param1, __lenName_param2Ptr?.baseAddress)|}}
-//   expected-remark@14{{macro content: |}|}}
+//   expected-remark@3{{macro content: |    if let __lenName_param2Count = _lenName_param2?.count, __lenName_param2Count != _lenName_param0 * _lenName_param1 {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in lenName: expected \\(_lenName_param0 * _lenName_param1) but got \\(__lenName_param2Count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    let __lenName_param2Ptr = _lenName_param2?.withUnsafeMutableBufferPointer {|}}
+//   expected-remark@7{{macro content: |        unsafe $0|}}
+//   expected-remark@8{{macro content: |    }|}}
+//   expected-remark@9{{macro content: |    defer {|}}
+//   expected-remark@10{{macro content: |        _fixLifetime(_lenName_param2)|}}
+//   expected-remark@11{{macro content: |    }|}}
+//   expected-remark@12{{macro content: |    return unsafe lenName(_lenName_param0, _lenName_param1, __lenName_param2Ptr?.baseAddress)|}}
+//   expected-remark@13{{macro content: |}|}}
 // }}
 void lenName(int lenName, int size, int * __counted_by_or_null(lenName * size) _Nullable p __noescape);
 

@@ -34,9 +34,9 @@ public func myFunc5(_ ptr: UnsafePointer<CInt>, _ ptr2: UnsafePointer<CInt>, _ p
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>) {
-    let len = CInt(exactly: ptr.count)!
-    if ptr2.count != len {
-      fatalError("bounds check failure in myFunc: expected \(len) but got \(ptr2.count)")
+    let len = CInt(exactly: ptr2.count)!
+    if ptr.count != len {
+      fatalError("bounds check failure in myFunc: expected \(len) but got \(ptr.count)")
     }
     return unsafe myFunc(ptr.baseAddress!, ptr2.baseAddress!, len)
 }
@@ -47,9 +47,8 @@ public func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func myFunc2(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ size: CInt) {
     let len = CInt(exactly: ptr.count)!
-    let _ptr2Count = ptr2.count
-    if _ptr2Count != len * size {
-      fatalError("bounds check failure in myFunc2: expected \(len * size) but got \(_ptr2Count)")
+    if ptr2.count != len * size {
+      fatalError("bounds check failure in myFunc2: expected \(len * size) but got \(ptr2.count)")
     }
     return unsafe myFunc2(ptr.baseAddress!, ptr2.baseAddress!, len, size)
 }
@@ -61,9 +60,8 @@ public func myFunc2(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointe
 public func myFunc3(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ ptr3: UnsafeBufferPointer<CInt>) {
     let len = CInt(exactly: ptr.count)!
     let size = CInt(exactly: ptr2.count)!
-    let _ptr3Count = ptr3.count
-    if _ptr3Count != len * size {
-      fatalError("bounds check failure in myFunc3: expected \(len * size) but got \(_ptr3Count)")
+    if ptr3.count != len * size {
+      fatalError("bounds check failure in myFunc3: expected \(len * size) but got \(ptr3.count)")
     }
     return unsafe myFunc3(ptr.baseAddress!, ptr2.baseAddress!, ptr3.baseAddress!, len, size)
 }
@@ -75,9 +73,8 @@ public func myFunc3(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointe
 public func myFunc4(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ ptr3: UnsafeBufferPointer<CInt>) {
     let size = CInt(exactly: ptr2.count)!
     let len = CInt(exactly: ptr3.count)!
-    let _ptrCount = ptr.count
-    if _ptrCount != len * size {
-      fatalError("bounds check failure in myFunc4: expected \(len * size) but got \(_ptrCount)")
+    if ptr.count != len * size {
+      fatalError("bounds check failure in myFunc4: expected \(len * size) but got \(ptr.count)")
     }
     return unsafe myFunc4(ptr.baseAddress!, ptr2.baseAddress!, ptr3.baseAddress!, len, size)
 }
@@ -89,9 +86,8 @@ public func myFunc4(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointe
 public func myFunc5(_ ptr: UnsafeBufferPointer<CInt>, _ ptr2: UnsafeBufferPointer<CInt>, _ ptr3: UnsafeBufferPointer<CInt>) {
     let size = CInt(exactly: ptr2.count)!
     let len = CInt(exactly: ptr3.count)!
-    let _ptrCount = ptr.count
-    if _ptrCount != len * size {
-      fatalError("bounds check failure in myFunc5: expected \(len * size) but got \(_ptrCount)")
+    if ptr.count != len * size {
+      fatalError("bounds check failure in myFunc5: expected \(len * size) but got \(ptr.count)")
     }
     return unsafe myFunc5(ptr.baseAddress!, ptr2.baseAddress!, ptr3.baseAddress!, len, size)
 }

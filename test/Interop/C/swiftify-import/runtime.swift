@@ -13,6 +13,7 @@ module Test {
 
 //--- Inputs/header.h
 #define __counted_by(x) __attribute__((__counted_by__(x)))
+#define __counted_by_or_null(x) __attribute__((__counted_by_or_null__(x)))
 #define __noescape __attribute__((__noescape__))
 #define __lifetimebound __attribute__((__lifetimebound__))
 #include <stdlib.h>
@@ -62,6 +63,40 @@ static inline const int* __counted_by(count) _Nullable interop_counted_return_nu
   int *out = malloc(count * sizeof(int));
   for(int i = 0; i < count; i++)
     out[i] = in[i];
+  return out;
+}
+
+static inline void interop_mixed_param_param(const int* __counted_by_or_null(count) _Nullable in_or_null __noescape,
+                                             int * __counted_by(count) _Nonnull out __noescape,
+                                             int count) {
+  if (in_or_null) {
+    for(int i = 0; i < count; i++)
+      out[i] = in_or_null[i];
+  } else {
+    for(int i = 0; i < count; i++)
+      out[i] = 0;
+  }
+}
+
+static inline void interop_mixed_three(const int* __counted_by_or_null(count) _Nullable in_or_null_a __noescape,
+                                       int * __counted_by(count) _Nonnull out __noescape,
+                                       const int* __counted_by_or_null(count) _Nullable in_or_null_b __noescape,
+                                       int count) {
+  for(int i = 0; i < count; i++)
+    out[i] = (in_or_null_a ? in_or_null_a[i] : 0) + (in_or_null_b ? in_or_null_b[i] : 0);
+}
+
+static inline const int* __counted_by(count) _Nonnull
+interop_mixed_param_return(const int* __counted_by_or_null(count) _Nullable in_or_null,
+                           int count) {
+  // this intentionally always allocates *something*. The wrapping function should
+  // handle empty buffers with non-null pointers.
+  int *out = malloc(count * sizeof(int) > 0 ? count * sizeof(int) : 1);
+  if (in_or_null) {
+    for(int i = 0; i < count; i++) out[i] = in_or_null[i];
+  } else {
+    for(int i = 0; i < count; i++) out[i] = 0;
+  }
   return out;
 }
 
@@ -431,6 +466,73 @@ Suite.test("Mismatching lengths span nullable") {
     var emptyArrOut: [Int32] = []
     var spanOut = emptyArrOut.mutableSpan
     expectCrash { interop_counted_noescape_nullable(emptyArr.span, &spanOut) }
+}
+
+// --- Mixed nullability shared-count tests ---
+
+Suite.test("Mixed shared count: param+param, OrNull nil") {
+    var arrOut: [Int32] = [9, 9, 9]
+    var spanOut = arrOut.mutableSpan
+    interop_mixed_param_param(nil, &spanOut)
+    expectEqual([0, 0, 0] as [Int32], arrOut)
+}
+
+Suite.test("Mixed shared count: param+param, OrNull non-nil matching") {
+    let arrIn: [Int32] = [1, 2, 3]
+    var arrOut: [Int32] = [9, 9, 9]
+    var spanOut = arrOut.mutableSpan
+    interop_mixed_param_param(Optional(arrIn.span), &spanOut)
+    expectEqual(arrIn, arrOut)
+}
+
+Suite.test("Mixed shared count: param+param, mismatched non-nil") {
+    let arrIn: [Int32] = [1, 2, 3, 4]
+    var arrOut: [Int32] = [9, 9, 9]
+    var spanOut = arrOut.mutableSpan
+    expectCrash { interop_mixed_param_param(Optional(arrIn.span), &spanOut) }
+}
+
+Suite.test("Mixed shared count: param+param, empty + nil") {
+    var arrOut: [Int32] = []
+    var spanOut = arrOut.mutableSpan
+    interop_mixed_param_param(nil, &spanOut)
+    expectEqual([] as [Int32], arrOut)
+}
+
+Suite.test("Mixed shared count: three params, both OrNull nil") {
+    var arrOut: [Int32] = [7, 7]
+    var spanOut = arrOut.mutableSpan
+    interop_mixed_three(nil, &spanOut, nil)
+    expectEqual([0, 0] as [Int32], arrOut)
+}
+
+Suite.test("Mixed shared count: three params, one OrNull non-nil one nil") {
+    let arrA: [Int32] = [10, 20]
+    var arrOut: [Int32] = [0, 0]
+    var spanOut = arrOut.mutableSpan
+    interop_mixed_three(Optional(arrA.span), &spanOut, nil)
+    expectEqual([10, 20] as [Int32], arrOut)
+}
+
+Suite.test("Mixed shared count: three params, OrNull mismatched") {
+    let arrA: [Int32] = [10, 20, 30]
+    var arrOut: [Int32] = [0, 0]
+    var spanOut = arrOut.mutableSpan
+    expectCrash { interop_mixed_three(Optional(arrA.span), &spanOut, nil) }
+}
+
+Suite.test("Mixed shared count: param+return, OrNull nil") {
+    let buf = unsafe interop_mixed_param_return(nil)
+    expectEqual(0, buf.count)
+}
+
+Suite.test("Mixed shared count: param+return, OrNull non-nil") {
+    let arrIn: [Int32] = [4, 5, 6]
+    arrIn.withUnsafeBufferPointer { bufIn in
+      let buf = unsafe interop_mixed_param_return(bufIn)
+      expectEqual(3, buf.count)
+      for i in 0..<3 { unsafe expectTrue(arrIn[i] == buf[i]) }
+    }
 }
 
 runAllTests()

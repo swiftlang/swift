@@ -125,6 +125,7 @@ struct CountedBy: ParamInfo {
   var nonescaping: Bool
   var dependencies: [LifetimeDependence]
   var original: SyntaxProtocol
+  var emitBoundCheck: Bool = false
 
   var description: String {
     let name: String
@@ -146,7 +147,8 @@ struct CountedBy: ParamInfo {
       return CountedOrSizedPointerThunkBuilder(
         base: base, index: i - 1, countExpr: count,
         funcDecl: funcDecl,
-        nonescaping: nonescaping, isSizedBy: sizedBy, isOrNull: isOrNull)
+        nonescaping: nonescaping, isSizedBy: sizedBy, isOrNull: isOrNull,
+        emitBoundCheck: emitBoundCheck)
     case .return:
       return CountedOrSizedReturnPointerThunkBuilder(
         base: base, countExpr: count,
@@ -435,12 +437,13 @@ func getPointeeType(_ type: TypeSyntax) -> TypeSyntax? {
 
 protocol BoundsCheckedThunkBuilder {
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax
-  // buildBasicBoundsChecks creates a variable with the same name as the parameter it replaced,
-  // or if that variable already exists (because another pointer has the same count), checks that
-  // the values match.
-  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item]
+  // `let <count> = ...` bindings that extract the length of a buffer to compare the rest to.
+  func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item]
+  // compare counts against ones extracted from buildBasicBoundsExtractions to make sure
+  // all buffers sharing a count use the same count.
+  func buildBasicBoundsChecks() throws -> [CodeBlockItemSyntax.Item]
   // buildCompoundBoundsChecks performs bounds checks of count expressions that contain operations.
-  // It may refer to names constructed in buildBasicBoundsChecks (in the case of shared variables),
+  // It may refer to names constructed in buildBasicBoundsExtractions (in the case of shared variables),
   // so those must come before this in the function body.
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item]
   // Extracts the inner bufferpointer from spans, so that the rest of the code is not nested in
@@ -454,6 +457,11 @@ protocol BoundsCheckedThunkBuilder {
   // function signature was changed.
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax
+  // Build the `name1?.count ?? name2?.count ?? ... ?? 0` extraction expression
+  // for an all-Optional group of parameters sharing the same count.
+  // Called on the extractor, which the pre-pass picks to be the outermost
+  // sharer so that `self.base.base...` reaches every other builder in the same group.
+  func chainedNullableCount(name: TokenSyntax, isUnsafe: inout Bool) -> ExprSyntax
 }
 
 extension BoundsCheckedThunkBuilder {
@@ -477,8 +485,11 @@ func getParam(_ funcDecl: FunctionParts, _ paramIndex: Int) -> FunctionParameter
 struct NonescapableReturnThunkBuilder: BoundsCheckedThunkBuilder {
   public let base: BoundsCheckedThunkBuilder
 
-  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
-    return try base.buildBasicBoundsChecks(&extractedCountArgs)
+  func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsExtractions()
+  }
+  func buildBasicBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsChecks()
   }
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildCompoundBoundsChecks()
@@ -492,6 +503,9 @@ struct NonescapableReturnThunkBuilder: BoundsCheckedThunkBuilder {
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
     -> FunctionSignatureSyntax {
     return try base.buildFunctionSignature(argTypes, returnType)
+  }
+  func chainedNullableCount(name: TokenSyntax, isUnsafe: inout Bool) -> ExprSyntax {
+    return base.chainedNullableCount(name: name, isUnsafe: &isUnsafe)
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
@@ -507,7 +521,10 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     base = function
   }
 
-  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
+  func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item] {
+    return []
+  }
+  func buildBasicBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return []
   }
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
@@ -515,6 +532,9 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
   }
   func buildSpanUnwraps() throws -> [CodeBlockItemSyntax.Item] {
     return []
+  }
+  func chainedNullableCount(name: TokenSyntax, isUnsafe: inout Bool) -> ExprSyntax {
+    return ExprSyntax("0") // close the `?? ... ?? 0` chain with `0`
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
@@ -591,8 +611,11 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
   let isSizedBy: Bool = false
   let isParameter: Bool = true
 
-  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
-    return try base.buildBasicBoundsChecks(&extractedCountArgs)
+  func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsExtractions()
+  }
+  func buildBasicBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsChecks()
   }
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildCompoundBoundsChecks()
@@ -610,6 +633,9 @@ struct CxxSpanThunkBuilder: SpanBoundsThunkBuilder, ParamBoundsThunkBuilder {
     var types = argTypes
     types[index] = try newType
     return try base.buildFunctionSignature(types, returnType)
+  }
+  func chainedNullableCount(name: TokenSyntax, isUnsafe: inout Bool) -> ExprSyntax {
+    return base.chainedNullableCount(name: name, isUnsafe: &isUnsafe)
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
@@ -656,8 +682,11 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
     return signature.returnClause!.type
   }
 
-  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
-    return try base.buildBasicBoundsChecks(&extractedCountArgs)
+  func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsExtractions()
+  }
+  func buildBasicBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsChecks()
   }
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildCompoundBoundsChecks()
@@ -674,6 +703,9 @@ struct CxxSpanReturnThunkBuilder: SpanBoundsThunkBuilder {
   {
     assert(returnType == nil)
     return try base.buildFunctionSignature(argTypes, newType)
+  }
+  func chainedNullableCount(name: TokenSyntax, isUnsafe: inout Bool) -> ExprSyntax {
+    return base.chainedNullableCount(name: name, isUnsafe: &isUnsafe)
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
@@ -833,8 +865,15 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
     return try base.buildFunctionSignature(argTypes, newType)
   }
 
-  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
-    return try base.buildBasicBoundsChecks(&extractedCountArgs)
+  func chainedNullableCount(name: TokenSyntax, isUnsafe: inout Bool) -> ExprSyntax {
+    return base.chainedNullableCount(name: name, isUnsafe: &isUnsafe)
+  }
+
+  func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsExtractions()
+  }
+  func buildBasicBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return try base.buildBasicBoundsChecks()
   }
   func buildCompoundBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
     return try base.buildCompoundBoundsChecks()
@@ -933,6 +972,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   public let nonescaping: Bool
   public let isSizedBy: Bool
   public let isOrNull: Bool
+  public let emitBoundCheck: Bool
   let isParameter: Bool = true
 
   var generateSpan: Bool { nonescaping }
@@ -949,28 +989,51 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     return try base.buildFunctionSignature(types, returnType)
   }
 
-  func checkBound(countName spanCount: ExprSyntax) -> StmtSyntax {
+  // We shouldn't need this for any case, but UnsafeBufferPointer?.count is
+  // currently seen as unsafe.
+  var nullableCountAccessNeedsUnsafe: Bool { !generateSpan }
+
+  func checkBound() -> StmtSyntax {
+    if nullable {
+      let local = TokenSyntax("_\(name.withoutBackticks)Count").escapeIfNeeded
+      let unsafeKw = nullableCountAccessNeedsUnsafe ? "unsafe " : ""
+      return
+        """
+        if let \(local) = \(raw: unsafeKw)\(name)?.\(raw: countLabel), \(local) != \(countExpr) {
+          fatalError("bounds check failure in \(funcDecl.name): expected \\(\(countExpr)) but got \\(\(local))")
+        }
+        """
+    }
+    let actual = ExprSyntax("\(name).\(raw: countLabel)")
     return
       """
-      if \(spanCount) != \(countExpr) {
-        fatalError("bounds check failure in \(funcDecl.name): expected \\(\(countExpr)) but got \\(\(spanCount))")
+      if \(actual) != \(countExpr) {
+        fatalError("bounds check failure in \(funcDecl.name): expected \\(\(countExpr)) but got \\(\(actual))")
       }
       """
   }
 
-  func buildBasicBoundsChecks(_ extractedCountArgs: inout Set<Int>) throws -> [CodeBlockItemSyntax.Item] {
-    var res = try base.buildBasicBoundsChecks(&extractedCountArgs)
+  func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item] {
+    var res = try base.buildBasicBoundsExtractions()
+    if emitBoundCheck {
+      return res
+    }
     if let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
       let i = try getParameterIndexForDeclRef(signature.parameterClause.parameters, countVar)
-      if extractedCountArgs.contains(i) {
-        res.append(CodeBlockItemSyntax.Item(checkBound(countName: makeCount())))
-      } else {
-        // this is the first parameter with this count parameter, nothing to compare against
-        let count = castIntToTargetType(expr: makeCount(), type: getParam(signature, i).type)
-        res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax(
-          "let \(countVar.baseName) = \(count)")))
-        extractedCountArgs.insert(i)
-      }
+      let expr = makeCount()
+      let count = castIntToTargetType(expr: expr, type: getParam(signature, i).type)
+      res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax(
+        "let \(countVar.baseName) = \(count)")))
+    }
+    return res
+  }
+  func buildBasicBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    var res = try base.buildBasicBoundsChecks()
+    if countExpr.is(DeclReferenceExprSyntax.self),
+       emitBoundCheck {
+      // Compare this sharer's count against the value bound in
+      // buildBasicBoundsExtractions by the chosen extractor.
+      res.append(CodeBlockItemSyntax.Item(checkBound()))
     }
     return res
   }
@@ -978,11 +1041,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
     var res = try base.buildCompoundBoundsChecks()
 
     if !countExpr.is(DeclReferenceExprSyntax.self) {
-      let countName = ExprSyntax("_\(name)Count")
-      let count: VariableDeclSyntax = try VariableDeclSyntax(
-        "let \(countName) = \(makeCount())")
-      res.append(CodeBlockItemSyntax.Item(count))
-      res.append(CodeBlockItemSyntax.Item(checkBound(countName: countName)))
+      res.append(CodeBlockItemSyntax.Item(checkBound()))
     }
     return res
   }
@@ -1034,12 +1093,24 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   }
 
   func makeCount() -> ExprSyntax {
-    // We shouldn't need this for any case, but UnsafeBufferPointer?.count is currently seen as unsafe
-    let unsafeKw = (generateSpan || !nullable) ? "" : "unsafe "
-    if nullable {
-      return ExprSyntax("\(raw: unsafeKw)\(name)?.\(raw: countLabel) ?? 0")
+    if nullable, let countVar = countExpr.as(DeclReferenceExprSyntax.self) {
+      var isUnsafe = false
+      let chain = chainedNullableCount(name: countVar.baseName, isUnsafe: &isUnsafe)
+      let unsafeKw = isUnsafe ? "unsafe " : ""
+      return ExprSyntax("\(raw: unsafeKw)\(chain)")
     }
-    return ExprSyntax("\(raw: unsafeKw)\(name).\(raw: countLabel)")
+    return ExprSyntax("\(name).\(raw: countLabel)")
+  }
+
+  func chainedNullableCount(name: TokenSyntax, isUnsafe: inout Bool) -> ExprSyntax {
+    guard nullable,
+          let myCountVar = countExpr.as(DeclReferenceExprSyntax.self),
+          myCountVar.baseName.text == name.text else {
+      return base.chainedNullableCount(name: name, isUnsafe: &isUnsafe)
+    }
+    isUnsafe = isUnsafe || nullableCountAccessNeedsUnsafe
+    let rest = base.chainedNullableCount(name: name, isUnsafe: &isUnsafe)
+    return ExprSyntax("\(self.name)?.\(raw: countLabel) ?? \(rest)")
   }
 
   func getCountName() -> TokenSyntax {
@@ -1490,6 +1561,61 @@ func setLifetimeDependencies(
   }
 }
 
+// For each count parameter shared by two or more `CountedBy` parameter
+// entries, pick one entry to be the count extractor and mark the rest as
+// checkers. The extractor binds `let <count> = <param>.count`. The checkers
+// emit a bounds-check against <count>.
+func assignSharedCountExtraction(_ args: inout [ParamInfo], _ funcDecl: FunctionParts) {
+  // key: index of count parameter (compound expressions not handled here)
+  // value: index of pointer parameter
+  var sharers: [Int: [Int]] = [:]
+  for (argIdx, arg) in args.enumerated() {
+    guard let countedBy = arg as? CountedBy,
+          case .param = countedBy.pointerIndex,
+          let countVar = countedBy.count.as(DeclReferenceExprSyntax.self),
+          let countParamIdx = try? getParameterIndexForDeclRef(
+            funcDecl.signature.parameterClause.parameters, countVar)
+    else { continue }
+    sharers[countParamIdx, default: []].append(argIdx)
+  }
+
+  for (_, argIndices) in sharers where argIndices.count >= 2 {
+    struct SharerInfo {
+      let argIdx: Int
+      let paramName: TokenSyntax
+      let isNullable: Bool
+    }
+    let infos: [SharerInfo] = argIndices.compactMap { argIdx in
+      let countedBy = args[argIdx] as! CountedBy
+      guard case .param(let pi) = countedBy.pointerIndex else { return nil }
+      let param = getParam(funcDecl, pi - 1)
+      return SharerInfo(
+        argIdx: argIdx,
+        paramName: param.name,
+        isNullable: countedBy.isOrNull && param.type.is(OptionalTypeSyntax.self),
+      )
+    }
+
+    let extractorIdx: Int
+    if let nonNull = infos.last(where: { !$0.isNullable }) {
+      // If there are non-Optional pointers, pick one of those and skip the
+      // optional chain.
+      extractorIdx = nonNull.argIdx
+    } else {
+      // All sharers are Optional. Pick the last sharer so it becomes the
+      // outermost builder in the chain; that way the recursive
+      // chainedNullableCount calls reach the rest of the group.
+      extractorIdx = infos.last!.argIdx
+    }
+
+    for info in infos where info.argIdx != extractorIdx {
+      var cb = args[info.argIdx] as! CountedBy
+      cb.emitBoundCheck = true
+      args[info.argIdx] = cb
+    }
+  }
+}
+
 func isInout(_ type: TypeSyntax) -> Bool {
   guard let attr = type.as(AttributedTypeSyntax.self) else {
     return false
@@ -1807,6 +1933,7 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
     }
     return paramOrReturnIndex(a.pointerIndex) < paramOrReturnIndex(b.pointerIndex)
   }
+  assignSharedCountExtraction(&parsedArgs, funcComponents)
   let baseBuilder = FunctionCallBuilder(funcComponents)
 
   var builder: BoundsCheckedThunkBuilder = parsedArgs.reduce(
@@ -1821,12 +1948,12 @@ func constructOverloadFunction(forDecl declaration: some DeclSyntaxProtocol, lea
     }
   }
   let newSignature = try builder.buildFunctionSignature([:], nil)
-  var eliminatedArgs = Set<Int>()
-  let basicChecks = try builder.buildBasicBoundsChecks(&eliminatedArgs)
+  let basicExtractions = try builder.buildBasicBoundsExtractions()
+  let basicChecks = try builder.buildBasicBoundsChecks()
   let compoundChecks = try builder.buildCompoundBoundsChecks()
   let unwraps = try builder.buildSpanUnwraps()
   let preReturn = try builder.buildPreReturnStatements()
-  let checks = (basicChecks + compoundChecks + unwraps + preReturn).map { e in
+  let checks = (basicExtractions + basicChecks + compoundChecks + unwraps + preReturn).map { e in
     CodeBlockItemSyntax(leadingTrivia: "\n", item: e)
   }
   let call: CodeBlockItemSyntax =
