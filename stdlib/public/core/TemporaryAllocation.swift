@@ -239,6 +239,27 @@ public func withUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
   }
 }
 
+/// Provides scoped access to an output span of the specified type and capacity.
+///
+/// This function is useful for cheaply allocating storage for a sequence of
+/// values for a brief duration. Storage may be allocated on the heap or on the
+/// stack, depending on the required size and alignment.
+///
+/// When `body` is called, it is passed an empty `OutputSpan`. `body` may
+/// append or initialize elements in the output span. Any elements that have
+/// been initialized when `body` returns are deinitialized automatically, and
+/// deallocation is also automatic.
+///
+/// - Parameters:
+///   - type: The type of the elements in the buffer being temporarily
+///     allocated.
+///   - capacity: The capacity of the output span being temporarily allocated.
+///   - body: A closure to invoke and to which the allocated output span
+///     should be passed.
+///
+/// - Returns: Whatever is returned by `body`.
+///
+/// - Throws: Whatever is thrown by `body`.
 @available(SwiftCompatibilitySpan 5.0, *)
 @_alwaysEmitIntoClient @_transparent
 public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
@@ -259,6 +280,28 @@ public func withTemporaryAllocation<T: ~Copyable, R: ~Copyable, E: Error>(
   }
 }
 
+/// Provides scoped access to an output raw span with the specified byte count
+/// and alignment.
+///
+/// This function is useful for cheaply allocating raw storage for a brief
+/// duration. Storage may be allocated on the heap or on the stack, depending on
+/// the required size and alignment.
+///
+/// When `body` is called, it is passed an empty `OutputRawSpan`. `body`
+/// may append bytes to the output raw span. After `body` returns, deallocation
+/// is automatic.
+///
+/// - Parameters:
+///   - byteCount: The number of bytes to temporarily allocate. `byteCount` must
+///     not be negative.
+///   - alignment: The alignment of the new, temporary region of allocated
+///     memory, in bytes. `alignment` must be a whole power of 2.
+///   - body: A closure to invoke and to which the allocated output raw span
+///     should be passed.
+///
+/// - Returns: Whatever is returned by `body`.
+///
+/// - Throws: Whatever is thrown by `body`.
 @available(SwiftCompatibilitySpan 5.0, *)
 @_alwaysEmitIntoClient @_transparent
 public func withTemporaryAllocation<R: ~Copyable, E: Error>(
