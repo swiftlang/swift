@@ -680,9 +680,8 @@ bool importer::isInitMethod(const clang::ObjCMethodDecl *method) {
   // attribute on a selector that doesn't start with `init`/`_init` would
   // produce a malformed argument label, so we require the syntactic form.
   auto firstSlot = method->getSelector().getNameForSlot(0);
-  StringRef afterUnderscore =
-      firstSlot.starts_with("_") ? firstSlot.drop_front(1) : firstSlot;
-  return camel_case::getFirstWord(afterUnderscore) == "init";
+  firstSlot.consume_front("_");
+  return camel_case::getFirstWord(firstSlot) == "init";
 }
 
 bool importer::isObjCId(const clang::Decl *decl) {
