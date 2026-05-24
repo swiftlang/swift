@@ -116,7 +116,9 @@ struct TestError: Error {}
         }
       }
 
-      tests.test("Task<Int, Never>.take then .value on alias traps") {
+      tests.test("Task<Int, Never>.take then .value on alias traps")
+        .skip(.wasiAny(reason: "expectCrashLater trap fails silently on the WASI bot (cause unconfirmed)"))
+        .code {
         expectCrashLater()
         let task = Task { 42 }
         let alias = task
@@ -127,7 +129,9 @@ struct TestError: Error {}
         _ = await alias.value
       }
 
-      tests.test("Task<Int, Never>.take twice on alias traps") {
+      tests.test("Task<Int, Never>.take twice on alias traps")
+        .skip(.wasiAny(reason: "expectCrashLater trap fails silently on the WASI bot (cause unconfirmed)"))
+        .code {
         expectCrashLater()
         let task = Task { 7 }
         let alias = task
