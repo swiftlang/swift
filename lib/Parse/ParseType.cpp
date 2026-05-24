@@ -977,16 +977,18 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
   }
 
   auto applyOpaque = [&](TypeRepr *type) -> TypeRepr * {
+    if (opaqueLoc.isInvalid() && anyLoc.isInvalid()) {
+      return type;
+    }
+
     // Unwrap any layers of optionality, keeping track of what we peeled off.
     SmallVector<TypeRepr *, 2> optionals;
     TypeRepr *base = type;
     InverseTypeRepr *inverseToReapply = nullptr;
 
-    if (opaqueLoc.isValid() || anyLoc.isValid()) {
-      if (auto *inv = dyn_cast<InverseTypeRepr>(base)) {
-        inverseToReapply = inv;
-        base = inv->getConstraint();
-      }
+    if (auto *inv = dyn_cast<InverseTypeRepr>(base)) {
+      inverseToReapply = inv;
+      base = inv->getConstraint();
     }
 
     while (true) {
@@ -1010,21 +1012,19 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
     // parsed as bound to the elements, not to the whole composition. Check the
     // last element so that if we have something like `some P & Q?`, we can
     // diagnose it specifically with a fix-it.
-    if (opaqueLoc.isValid() || anyLoc.isValid()) {
-      if (auto *comp = dyn_cast<CompositionTypeRepr>(base)) {
-        if (!comp->getTypes().empty()) {
-          auto *last = comp->getTypes().back();
-          auto *lastForDiag = last;
-          if (auto *inv = dyn_cast<InverseTypeRepr>(lastForDiag)) {
-            lastForDiag = inv->getConstraint();
-          }
-          if (isa<OptionalTypeRepr>(lastForDiag) ||
-              isa<ImplicitlyUnwrappedOptionalTypeRepr>(lastForDiag)) {
-            diagnose(last->getEndLoc(),
-                    diag::confusing_some_any_optional_composition)
-                .fixItInsert(comp->getStartLoc(), "(")
-                .fixItInsert(last->getEndLoc(), ")");
-          }
+    if (auto *comp = dyn_cast<CompositionTypeRepr>(base)) {
+      if (!comp->getTypes().empty()) {
+        auto *last = comp->getTypes().back();
+        auto *lastForDiag = last;
+        if (auto *inv = dyn_cast<InverseTypeRepr>(lastForDiag)) {
+          lastForDiag = inv->getConstraint();
+        }
+        if (isa<OptionalTypeRepr>(lastForDiag) ||
+            isa<ImplicitlyUnwrappedOptionalTypeRepr>(lastForDiag)) {
+          diagnose(last->getEndLoc(),
+                   diag::confusing_some_any_optional_composition)
+              .fixItInsert(comp->getStartLoc(), "(")
+              .fixItInsert(last->getEndLoc(), ")");
         }
       }
     }
