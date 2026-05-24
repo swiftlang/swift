@@ -9,9 +9,11 @@
 - (instancetype)_initWithOther:(int)x;
 
 // Explicit `swift_name(init(...))` should be honored on a `_init`-prefixed
-// selector; the user's custom argument label is preserved.
+// selector. The annotated label differs from what the implicit naming path
+// would produce (`init(_otherSwiftName:)`), so the test fails if the
+// annotation is silently dropped.
 - (instancetype)_initWithOtherSwiftName:(int)x
-    __attribute__((swift_name("init(_otherSwiftName:)")));
+    __attribute__((swift_name("init(customLabel:)")));
 
 // `objc_method_family(init)` on a `_init`-prefixed selector should be
 // honored too.
@@ -25,9 +27,10 @@
 // shadowing the inherited no-arg init.
 - (instancetype)_init __attribute__((objc_method_family(init)));
 
-// `-_initWithArray:` exercises the `omitNeedlessWords` path: without the
-// underscore-preserve fix the omission could collapse the label to `init(_:)`.
-// With the fix, the leading `_` is retained: `init(_array:)`.
+// Unlike `_initWithOther:` above, `NSArray *` matches the trailing `Array`
+// word in the selector, so this routes through `omitNeedlessWordsInFunctionName`
+// after the underscore is prepended. Guards against the label collapsing
+// to `init(_:)`.
 - (instancetype)_initWithArray:(NSArray *)arr;
 
 // Class methods are never imported as initializers, regardless of the

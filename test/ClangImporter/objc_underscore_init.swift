@@ -10,8 +10,10 @@ func test() {
     // stays visible at the use site.
     _ = UnderscoreInitTest(_other: 1)
 
-    // Explicit `swift_name(init(_otherSwiftName:))` is honored.
-    _ = UnderscoreInitTest(_otherSwiftName: 2)
+    // Explicit `swift_name(init(customLabel:))` is honored. The label
+    // differs from what the implicit naming path would produce
+    // (`init(_otherSwiftName:)`), so this fails if the annotation is dropped.
+    _ = UnderscoreInitTest(customLabel: 2)
 
     // `objc_method_family(init)` is honored.
     _ = UnderscoreInitTest(_otherFamily: 3)
@@ -22,7 +24,10 @@ func test() {
     // Zero-arg `-_init` imports as `init()` (no spurious label).
     _ = UnderscoreInitTest()
 
-    // `omitNeedlessWords` doesn't strip the leading underscore.
+    // Unlike `_other:` above, `NSArray *` matches the trailing `Array`
+    // word, routing this through `omitNeedlessWordsInFunctionName` after
+    // the underscore is prepended. Guards against the label collapsing
+    // to `init(_:)`.
     _ = UnderscoreInitTest(_array: [])
 
     // Class methods are never imported as initializers, regardless of the
