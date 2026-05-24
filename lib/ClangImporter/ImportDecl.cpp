@@ -5725,7 +5725,22 @@ namespace {
 
       // Check whether there's some special method to import.
       if (!forceClassMethod) {
-        if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()))
+        // Don't cache when the accessor we're producing will be attached
+        // to a synthesized property (importObjCMethodAsEffectfulProp).
+        // In that case the property VarDecl is the user-facing decl and
+        // **it** (and not this accessor) is what the outer
+        // importDeclAndCacheImpl will cache under {canonical, version}.
+        //
+        // We detect this case by checking whether the storage's clang
+        // decl is the same ObjCMethodDecl we're importing; that's only
+        // true for the synthesized-from-method effectful-prop case, not
+        // for ordinary @property accessors (whose storage is the
+        // ObjCPropertyDecl).
+        bool isEffectfulPropAccessor =
+            accessorInfo &&
+            accessorInfo->Storage->getClangDecl() == decl;
+        if (!isEffectfulPropAccessor &&
+            dc == Impl.importDeclContextOf(decl, decl->getDeclContext()))
           Impl.ImportedDecls.try_emplace(
               {decl->getCanonicalDecl(), getVersion()}, result);
 
