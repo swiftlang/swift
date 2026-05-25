@@ -99,7 +99,7 @@ public enum _SwiftifyProtocolMethodInfo {
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(borrow source)
+@_lifetime(borrow source)
 public func _swiftifyOverrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -119,7 +119,7 @@ public func _swiftifyOverrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(copy source)
+@_lifetime(copy source)
 public func _swiftifyOverrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(

@@ -151,7 +151,7 @@ public protocol BorrowingSequence<Element>: ~Copyable, ~Escapable {
   associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable
 
   /// Returns a borrowing iterator over the elements of this sequence.
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   func makeBorrowingIterator() -> BorrowingIterator
   
   /// A value less than or equal to the number of elements in the sequence,
@@ -210,7 +210,7 @@ public struct BorrowingIteratorAdapter<Iterator: IteratorProtocol>: BorrowingIte
   }
 
   @_transparent
-  @lifetime(&self)
+  @_lifetime(&self)
   public mutating func nextSpan(maximumCount: Int) -> Span<Iterator.Element> {
     curValue = iterator.next()
     return curValue._span()

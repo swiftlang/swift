@@ -593,7 +593,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_transparent
     borrowing get {
       guard count > 0 else {
@@ -613,7 +613,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     @_transparent
     mutating get {
       guard count > 0 else {
@@ -636,7 +636,7 @@ extension InlineArray: BorrowingSequence where Element: ~Copyable {
   
   @available(SwiftStdlib 6.4, *)
   @inlinable
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public func makeBorrowingIterator() -> SpanIterator<Element> {
     SpanIterator(self.span)
   }
