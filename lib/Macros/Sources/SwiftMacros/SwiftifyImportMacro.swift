@@ -1592,7 +1592,7 @@ func assignSharedCountExtraction(_ args: inout [ParamInfo], _ funcDecl: Function
       return SharerInfo(
         argIdx: argIdx,
         paramName: param.name,
-        isNullable: countedBy.isOrNull && param.type.is(OptionalTypeSyntax.self),
+        isNullable: countedBy.isOrNull && param.type.is(OptionalTypeSyntax.self)
       )
     }
 
