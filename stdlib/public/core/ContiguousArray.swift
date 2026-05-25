@@ -1300,7 +1300,7 @@ extension ContiguousArray {
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       let pointer = unsafe _buffer.firstElementAddress
       let count = _buffer.immutableCount
@@ -1402,7 +1402,7 @@ extension ContiguousArray {
   ///   O(*n*) otherwise.
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       // _makeMutableAndUnique*() inserts begin_cow_mutation.
       // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.

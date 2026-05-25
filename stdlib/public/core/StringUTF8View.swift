@@ -320,7 +320,7 @@ extension String.UTF8View {
 @available(SwiftStdlib 6.2, *)
 extension String.UTF8View {
 
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   internal borrowing func _underlyingSpan() -> Span<UTF8.CodeUnit> {
 #if _runtime(_ObjC)
     // handle non-UTF8 Objective-C bridging cases here
@@ -358,7 +358,7 @@ extension String.UTF8View {
   ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<UTF8.CodeUnit> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       _underlyingSpan()
     }
@@ -377,7 +377,7 @@ extension String.UTF8View {
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
     @_alwaysEmitIntoClient @inline(__always)
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       span
     }
@@ -385,7 +385,7 @@ extension String.UTF8View {
 #else // !(os(watchOS) && _pointerBitWidth(_32))
   @available(watchOS, unavailable)
   public var span: Span<UTF8.CodeUnit> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       fatalError("\(#function) unavailable on 32-bit watchOS")
     }
@@ -404,7 +404,7 @@ extension String.UTF8View {
   ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       if _guts.isSmall, _guts.count > _SmallString.contiguousCapacity() {
         return nil

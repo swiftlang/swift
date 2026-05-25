@@ -464,7 +464,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   /// - Returns: A new instance of type `T`, copied from the buffer pointer's
   ///   memory.
   @_alwaysEmitIntoClient
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public func loadUnaligned<T: BitwiseCopyable & ~Escapable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
@@ -1214,7 +1214,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @unsafe
   @_alwaysEmitIntoClient
   public var bytes: RawSpan {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_transparent
     get {
       unsafe RawSpan(_unsafeBytes: self)
@@ -1240,7 +1240,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   @unsafe
   @_alwaysEmitIntoClient
   public var mutableBytes: MutableRawSpan {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_transparent
     get {
       unsafe MutableRawSpan(_unsafeBytes: self)
