@@ -786,7 +786,7 @@ extension Substring.UTF8View: BidirectionalCollection {
 @available(SwiftStdlib 6.2, *)
 extension Substring.UTF8View {
 
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   private borrowing func _underlyingSpan() -> Span<UTF8.CodeUnit> {
 #if _runtime(_ObjC)
     // handle non-UTF8 Objective-C bridging cases here
@@ -847,7 +847,7 @@ extension Substring.UTF8View {
   ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<UTF8.CodeUnit> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       _underlyingSpan()
     }
@@ -886,7 +886,7 @@ extension Substring.UTF8View {
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
     @_alwaysEmitIntoClient @inline(__always)
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       span
     }
@@ -930,7 +930,7 @@ extension Substring.UTF8View {
   ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var _span: Span<UTF8.CodeUnit>? {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       if _wholeGuts.isSmall,
          _wholeGuts.count > _SmallString.contiguousCapacity() {

@@ -47,7 +47,7 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
 
   /// Create an OutputSpan with zero capacity.
   @_alwaysEmitIntoClient
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init() {
     unsafe _pointer = nil
     capacity = 0
@@ -108,7 +108,7 @@ extension OutputSpan where Element: ~Copyable  {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   @usableFromInline
   internal init(
     _uncheckedBuffer buffer: UnsafeMutableBufferPointer<Element>,
@@ -133,7 +133,7 @@ extension OutputSpan where Element: ~Copyable  {
   ///                       at the beginning of `buffer`.
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     buffer: UnsafeMutableBufferPointer<Element>,
     initializedCount: Int
@@ -173,7 +173,7 @@ extension OutputSpan {
   ///                       at the beginning of `buffer`.
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>,
     initializedCount: Int
@@ -219,7 +219,7 @@ extension OutputSpan where Element: ~Copyable {
       return unsafe self[unchecked: index]
     }
     @_transparent
-    @lifetime(self: copy self)
+    @_lifetime(self: copy self)
     mutate {
       _checkIndex(index)
       return unsafe &(self[unchecked: index])
@@ -241,7 +241,7 @@ extension OutputSpan where Element: ~Copyable {
       Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: index))
     }
     @_unsafeSelfDependentResult
-    @lifetime(self: copy self)
+    @_lifetime(self: copy self)
     mutate {
       let address = unsafe _unsafeAddressOfElement(unchecked: index)
       return unsafe &(UnsafeMutablePointer(address).pointee)
@@ -262,7 +262,7 @@ extension OutputSpan where Element: ~Copyable {
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
     _precondition(indices.contains(i))
     _precondition(indices.contains(j))
@@ -277,7 +277,7 @@ extension OutputSpan where Element: ~Copyable {
   /// - Parameter j: A valid index into this span.
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func swapAt(unchecked i: Index, unchecked j: Index) {
     let ri = unsafe _unsafeAddressOfElement(unchecked: i)
     let pi = unsafe UnsafeMutablePointer<Element>(ri)
@@ -296,7 +296,7 @@ extension OutputSpan where Element: ~Copyable {
   ///
   /// - Parameter value: The element to append.
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func append(_ value: consuming Element) {
     _precondition(_count < capacity, "OutputSpan capacity overflow")
     unsafe _tail().initializeMemory(as: Element.self, to: value)
@@ -309,7 +309,7 @@ extension OutputSpan where Element: ~Copyable {
   ///
   /// - Returns: The removed element.
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func removeLast() -> Element {
     _precondition(!isEmpty, "OutputSpan underflow")
     _count &-= 1
@@ -326,7 +326,7 @@ extension OutputSpan where Element: ~Copyable {
   /// - Parameter n: The number of elements to remove.
   ///     `n` must not be negative or greater than `count`.
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func removeLast(_ n: Int) {
     _precondition(n >= 0, "Can't remove a negative number of elements")
     _precondition(n <= _count, "OutputSpan underflow")
@@ -339,7 +339,7 @@ extension OutputSpan where Element: ~Copyable {
   /// Remove all this span's elements and return its memory
   /// to the uninitialized state.
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func removeAll() {
     guard count > 0 else { return }
     _ = unsafe _start().withMemoryRebound(to: Element.self, capacity: _count) {
@@ -361,7 +361,7 @@ extension OutputSpan {
   ///   - count: The number of times to append `repeatedValue`.
   ///       `count` must not exceed `freeCapacity`.
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func append(repeating repeatedValue: Element, count: Int) {
     _precondition(count <= freeCapacity, "OutputSpan capacity overflow")
     unsafe _tail().initializeMemory(
@@ -378,7 +378,7 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
       let buffer = unsafe UnsafeBufferPointer(start: pointer, count: _count)
@@ -391,7 +391,7 @@ extension OutputSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       let pointer = unsafe _pointer?.assumingMemoryBound(to: Element.self)
       let buffer = unsafe UnsafeMutableBufferPointer(
@@ -433,7 +433,7 @@ extension OutputSpan where Element: ~Copyable {
   /// - Returns: The return value of the `body` closure.
   @_alwaysEmitIntoClient
   @_transparent
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   @unsafe
   public mutating func withUnsafeMutableBufferPointer<E: Error, R: ~Copyable>(
     _ body: (
