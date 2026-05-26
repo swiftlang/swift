@@ -81,7 +81,7 @@ struct Main {
 // CHECK-IR-NEXT:   ret void
 // CHECK-IR-NEXT: }
 
-// CHECK-IR:      define {{.*}}i32 @main(
+// CHECK-IR:      define {{.*}}i32 @{{(main|__main_argc_argv)}}(
 // CHECK-IR-NEXT: entry:
 // CHECK-IR-NEXT:   alloca %T4main10MySubClassC
 // CHECK-IR-NEXT:   alloca %T4main12MyFinalClassC
