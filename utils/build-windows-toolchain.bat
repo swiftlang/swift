@@ -125,7 +125,7 @@ set "args=%args% --skip-repository ninja"
 set "args=%args% --skip-repository swift-integration-tests"
 set "args=%args% --skip-repository swift-stress-tester"
 
-call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-history --reset-to-remote --github-comment "%ghprbCommentBody%"
+call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-history --reset-to-remote --github-comment "!ghprbCommentBody!"
 
 goto :eof
 endlocal
