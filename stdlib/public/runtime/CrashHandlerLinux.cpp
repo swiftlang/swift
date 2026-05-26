@@ -84,6 +84,7 @@ uint32_t currently_paused();
 void wait_paused(uint32_t expected, const struct timespec *timeout);
 int  memserver_start();
 int  memserver_entry(void *);
+void memserver_stop();
 void closeFds(int memserver_master_fd);
 
 ssize_t safe_read(int fd, void *buf, size_t len) {
@@ -224,8 +225,12 @@ tgkill(int tgid, int tid, int sig) {
 #define SYS_close_range 436
 #endif
 
+#ifndef CLOSE_RANGE_UNSHARE
 #define CLOSE_RANGE_UNSHARE 0x2
+#endif
+#ifndef CLOSE_RANGE_CLOEXEC
 #define CLOSE_RANGE_CLOEXEC 0x4
+#endif
 
 static int _close_range(unsigned int first, unsigned int last, int flags) {
   if (syscall(SYS_close_range, first, last, flags) == 0)
@@ -239,14 +244,14 @@ static int _close_range(unsigned int first, unsigned int last, int flags) {
 }
 
 void
-reset_signal(int signum)
+reset_signal(int signum, struct sigaction *old_handler)
 {
   struct sigaction sa;
   sa.sa_handler = SIG_DFL;
   sa.sa_flags = 0;
   sigemptyset(&sa.sa_mask);
 
-  sigaction(signum, &sa, NULL);
+  sigaction(signum, &sa, old_handler);
 }
 
 void
@@ -260,9 +265,11 @@ handle_fatal_signal(int signum,
   // Prevent this from exploding if more than one thread gets here at once
   suspend_other_threads(&self);
 
+  struct sigaction old_handlers[lengthof(signalsToHandle)];
+
   // Remove our signal handlers; crashes should kill us here
   for (unsigned n = 0; n < lengthof(signalsToHandle); ++n)
-    reset_signal(signalsToHandle[n]);
+    reset_signal(signalsToHandle[n], &old_handlers[n]);
 
   // Find the program counter
   void *pc = 0;
@@ -291,7 +298,14 @@ handle_fatal_signal(int signum,
   case SIGSEGV:
   case SIGBUS:
   case SIGTRAP:
-    crashInfo.fault_address = (uint64_t)pinfo->si_addr;
+    // If this was sent deliberately by another process, the address
+    // won't be set; in that case, set the fault address to the program
+    // counter.
+    if (pinfo->si_code != SI_USER) {
+      crashInfo.fault_address = (uint64_t)pinfo->si_addr;
+    } else {
+      crashInfo.fault_address = (uint64_t)pc;
+    }
     break;
   default:
     crashInfo.fault_address = (uint64_t)pc;
@@ -319,8 +333,28 @@ handle_fatal_signal(int signum,
 
   /* The memserver may have set signal handlers,
      so reset SIGSEGV and SIGBUS again */
-  reset_signal(SIGSEGV);
-  reset_signal(SIGBUS);
+  reset_signal(SIGSEGV, nullptr);
+  reset_signal(SIGBUS, nullptr);
+
+  // If we were killed by another process, kill ourselves now
+  if (pinfo->si_code == SI_USER) {
+    pid_t our_pid = getpid();
+    if (our_pid != 1) {
+      // Since the signal handlers have been reset, this should cause
+      // us to terminate.
+      tgkill(our_pid, self.tid, signum);
+      _exit(EXIT_FAILURE);
+    } else {
+      // In PID 1, fatal signals won't actually terminate us(!), so in
+      // this case what we want to do is stop the memory server and
+      // reinstall the signal handlers in order that we catch future
+      // crashes.
+      memserver_stop();
+
+      for (unsigned n = 0; n < lengthof(signalsToHandle); ++n)
+        sigaction(signalsToHandle[n], &old_handlers[n], nullptr);
+    }
+  }
 
   // Restart the other threads
   resume_other_threads();
@@ -716,7 +750,6 @@ char memserver_stack[4096] __attribute__((aligned(SWIFT_PAGE_SIZE)));
 char memserver_buffer[4096];
 int memserver_fd;
 sigjmp_buf memserver_fault_buf;
-pid_t memserver_pid;
 
 #define MIN_FD_TO_CLOSE 3
 
@@ -764,8 +797,6 @@ memserver_start()
     memserver_error("memserver_start: clone failed");
     return ret;
   }
-
-  memserver_pid = getpid();
 
   return fds[1];
 }
@@ -854,6 +885,11 @@ memserver_entry(void *dummy __attribute__((unused))) {
  fail:
   close(fd);
   return result;
+}
+
+void
+memserver_stop() {
+  close(memserver_fd);
 }
 
 } // namespace
