@@ -21,9 +21,9 @@
 public func invokeMacroInSwiftModule(_ p: UnsafePointer<Int32>, _ len: Int32) {}
 
 if CommandLine.arguments.dropFirst().first == "interop" {
-  invokeMacroInClangModule(Span()) // CLANG: bridging.h:10: Fatal error: Unexpectedly found nil while unwrapping an Optional value
+  invokeMacroInClangModule(Span()) // CLANG: bridging.h:3: Fatal error: Unexpectedly found nil while unwrapping an Optional value
 } else {
-  invokeMacroInSwiftModule(Span()) // SWIFT: test.swift:11: Fatal error: Unexpectedly found nil while unwrapping an Optional value
+  invokeMacroInSwiftModule(Span()) // SWIFT: test.swift:2: Fatal error: Unexpectedly found nil while unwrapping an Optional value
 }
 //--- bridging.h
 #include <ptrcheck.h>

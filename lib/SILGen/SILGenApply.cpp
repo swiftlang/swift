@@ -20,6 +20,7 @@
 #include "LValue.h"
 #include "RValue.h"
 #include "ResultPlan.h"
+#include "SILGenFunction.h"
 #include "Scope.h"
 #include "SpecializedEmitter.h"
 #include "StorageRefResult.h"
@@ -2250,8 +2251,9 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
 /// If the given source loc is in a macro expansion buffer, this
 /// method walks up the macro expansion buffer tree to the outermost
 /// source file. Otherwise, the method returns the given loc.
-static SourceLoc
-getLocInOutermostSourceFile(SourceManager &sourceManager, SourceLoc loc) {
+SourceLoc
+SILGenFunction::getLocInOutermostSourceFile(SourceLoc loc) {
+  auto &sourceManager = getSourceManager();
   auto outermostLoc = loc;
   auto bufferID = sourceManager.findBufferContainingLoc(outermostLoc);
 
@@ -2297,7 +2299,7 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
   case MagicIdentifierLiteralExpr::Column: {
     unsigned Value = 0;
     if (auto Loc = magicLiteral->getStartLoc()) {
-      Loc = getLocInOutermostSourceFile(SGF.getSourceManager(), Loc);
+      Loc = SGF.getLocInOutermostSourceFile(Loc);
       if (Loc.isValid()) {
         Value = magicLiteral->getKind() == MagicIdentifierLiteralExpr::Line
                     ? ctx.SourceMgr.getPresumedLineAndColumnForLoc(Loc).first
@@ -7000,8 +7002,7 @@ StringRef SILGenFunction::getMagicFunctionString() {
 
 StringRef SILGenFunction::getMagicFilePathString(SourceLoc loc) {
   assert(loc.isValid());
-  auto &sourceManager = getSourceManager();
-  auto outermostLoc = getLocInOutermostSourceFile(sourceManager, loc);
+  auto outermostLoc = getLocInOutermostSourceFile(loc);
 
   return getSourceManager().getDisplayNameForLoc(outermostLoc);
 }
