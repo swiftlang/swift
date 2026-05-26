@@ -17,7 +17,7 @@ public class Klass {}
 // CHECK-NEXT: Name:            sil.memory
 // CHECK-NEXT: DebugLoc:        { File: '{{.*}}basic_yaml.swift',
 // CHECK-NEXT:                    Line: [[# @LINE + 7 ]], Column: 21 }
-// CHECK-NEXT: Function:        main
+// CHECK-NEXT: Function:        {{main|__main_argc_argv}}
 // CHECK-NEXT: Args:
 // CHECK-NEXT:   - String:          'heap allocated ref of type '''
 // CHECK-NEXT:   - ValueType:       Klass
