@@ -257,8 +257,72 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
         auto remoteCallArgumentInitDecl =
             RCA->getDistributedRemoteCallArgumentInitFunction();
-        auto boundRCAType = BoundGenericType::get(
-            RCA, Type(), {thunk->mapTypeIntoEnvironment(param->getInterfaceType())});
+
+        // If the parameter is `some P` / `any P` (or `Optional`) where
+        // P is a `@Resolvable protocol`, encode the parameter
+        // as the macro-generated `$P` stub type.
+        Type paramTy =
+            thunk->mapTypeIntoEnvironment(param->getInterfaceType());
+        Expr *argumentDeclRefExpr = new (C) DeclRefExpr(
+            ConcreteDeclRef(param), dloc, implicit,
+            AccessSemantics::Ordinary, paramTy);
+
+        // --- Automatic @Resolvable protocol proxying
+        //
+        // If @Resolvable protocol parameter, substitute with $P.resolve()'d reference
+        // Because sending a `some P` or `any P` means transferring a `$P` on the wire,
+        // as the remote peer may not know our concrete P implementation, we need to send the "proxy".
+        //
+        // This way the remote side will decode it as `$P` proxy, which conforms to `P`,
+        // so the `some/any P` parameter is correctly filled in by a `$P` instance on
+        // the recipient without ever knowing the concrete type of the sender.
+        if (auto resolvableMatch =
+                findDistributedResolvableExistentialOrOpaqueProtocol(paramTy)) {
+          if (auto *stub = getDistributedActorStub(resolvableMatch.proto)) {
+            auto stubInterfaceTy = stub->getDeclaredInterfaceType();
+            if (stubInterfaceTy && !stubInterfaceTy->hasError()) {
+              // Important! We replace the type of the parameter with `$P`
+              paramTy = thunk->mapTypeIntoEnvironment(stubInterfaceTy);
+
+              // --- We then have to make the parameter be actually a `$P`
+              // TODO: It would be simpler if we did just create a new `$P`,
+              //  but we'd need to allow `self.id = id` inside distributed actors;
+              //  Once we allow that, we can just create an instance without this fake resolve.
+              {
+                // paramRef.id
+                auto *paramIdExpr = UnresolvedDotExpr::createImplicit(
+                    C, argumentDeclRefExpr, C.Id_id);
+
+                // $P (as a metatype expression).
+                auto *stubTypeExpr = TypeExpr::createImplicit(stubInterfaceTy, C);
+
+                // $P.resolve(...)
+                DeclName resolveName(C, C.getIdentifier("resolve"),
+                                     {C.Id_id, C.getIdentifier("using")});
+                auto *resolveExpr = UnresolvedDotExpr::createImplicit(
+                    C, stubTypeExpr, resolveName);
+
+                // Get the `system` from the actor that the call is being made on.
+                auto *systemRef = new (C) DeclRefExpr(
+                    ConcreteDeclRef(systemVar), dloc, implicit);
+
+                // $P.resolve(id: paramRef.id, using: system)
+                // We have enforced in sema that the system must be compatible.
+                auto *resolveArgList = ArgumentList::forImplicitCallTo(
+                    DeclNameRef(resolveName), {paramIdExpr, systemRef}, C);
+                auto *resolveCall =
+                    CallExpr::createImplicit(C, resolveExpr, resolveArgList);
+
+                // try <resolve>
+                argumentDeclRefExpr =
+                    TryExpr::createImplicit(C, sloc, resolveCall);
+              }
+            }
+          }
+        }
+
+        auto boundRCAType =
+            BoundGenericType::get(RCA, Type(), {paramTy});
         auto remoteCallArgumentInitDeclRef =
             TypeExpr::createImplicit(boundRCAType, C);
 
@@ -270,10 +334,7 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
              // name:
              new (C) StringLiteralExpr(parameterName, SourceRange(), implicit),
              // _ argument:
-             new (C) DeclRefExpr(
-                 ConcreteDeclRef(param), dloc, implicit,
-                 AccessSemantics::Ordinary,
-                 thunk->mapTypeIntoEnvironment(param->getInterfaceType()))
+             argumentDeclRefExpr
             },
             C);
 
