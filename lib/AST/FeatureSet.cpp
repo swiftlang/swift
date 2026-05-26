@@ -699,6 +699,16 @@ UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
 UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
 
+static bool usesFeatureBorrowInout(Decl *decl) {
+  auto &ctx = decl->getASTContext();
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    decl = ext->getExtendedNominal();
+  }
+
+  return decl == ctx.getRefDecl() || decl == ctx.getMutableRefDecl();
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
