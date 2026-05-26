@@ -1575,39 +1575,41 @@ ParameterListInfo::ParameterListInfo(
   // Note which parameters have default arguments and/or accept unlabeled
   // trailing closure arguments with the forward-scan rule.
   for (auto i : range(0, params.size())) {
-    auto param = paramList->get(i);
-    if (param->isDefaultArgument()) {
-      defaultArguments.set(i);
-    }
+    setFlagsFor(paramList->get(i), i);
+  }
+}
 
-    if (allowsUnlabeledTrailingClosureParameter(param)) {
-      acceptsUnlabeledTrailingClosures.set(i);
-    }
+void ParameterListInfo::setFlagsFor(const ParamDecl *param, unsigned index) {
+  if (param->isDefaultArgument()) {
+    defaultArguments.set(index);
+  }
 
-    if (param->hasExternalPropertyWrapper()) {
-      propertyWrappers.set(i);
-    }
+  if (allowsUnlabeledTrailingClosureParameter(param)) {
+    acceptsUnlabeledTrailingClosures.set(index);
+  }
 
-    if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>()) {
-      implicitSelfCapture.set(i);
-    }
+  if (param->hasExternalPropertyWrapper()) {
+    propertyWrappers.set(index);
+  }
 
-    if (auto *attr =
-            param->getAttrs().getAttribute<InheritActorContextAttr>()) {
-      if (attr->isAlways()) {
-        alwaysInheritActorContext.set(i);
-      } else {
-        inheritActorContext.set(i);
-      }
-    }
+  if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>()) {
+    implicitSelfCapture.set(index);
+  }
 
-    if (param->getInterfaceType()->is<PackExpansionType>()) {
-      variadicGenerics.set(i);
+  if (auto *attr = param->getAttrs().getAttribute<InheritActorContextAttr>()) {
+    if (attr->isAlways()) {
+      alwaysInheritActorContext.set(index);
+    } else {
+      inheritActorContext.set(index);
     }
+  }
 
-    if (param->isSending()) {
-      sendingParameters.set(i);
-    }
+  if (param->getInterfaceType()->is<PackExpansionType>()) {
+    variadicGenerics.set(index);
+  }
+
+  if (param->isSending()) {
+    sendingParameters.set(index);
   }
 }
 
