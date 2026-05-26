@@ -6196,7 +6196,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
-  ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
+  ParameterListInfo paramInfo(params, skipCurriedSelf, callee);
 
   // If this application is an init(wrappedValue:) call that needs an injected
   // wrapped value placeholder, the first non-defaulted argument must be
