@@ -220,8 +220,6 @@ extension ${Self}: LosslessStringConvertible {
   %end
   }
 
-  % if bits in [16, 32, 64]:
-
   // Various entry points that take concrete types.  Note that these
   // are deliberately NOT inlinable:
   // * There is no performance advantage to inlining
@@ -278,37 +276,6 @@ extension ${Self}: LosslessStringConvertible {
     }
   #endif
   }
-
-  % elif bits in [80]:
-
-  // For now, continue relying on libc-based implementation for Float80 support
-  // TODO: Implement `parse_float80(_:Span)` so this can
-  // be implemented the same as above.
-  @available(SwiftStdlib 5.3, *)
-  public init?(_ text: Substring) {
-    self = 0.0
-    let success = unsafe _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
-      // Make a copy of `text` to ensure we have a null-terminated C string
-      // to pass to the libc API:
-      text.withCString { chars -> Bool in
-        switch unsafe chars[0] {
-        case 9, 10, 11, 12, 13, 32:
-          return false // Reject leading whitespace
-        case 0:
-          return false // Reject empty string
-        default:
-          break
-        }
-        let endPtr = unsafe _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
-        // Succeed only if endPtr points to end of C string
-        return unsafe endPtr != nil && endPtr![0] == 0
-      }
-    }
-    if !success {
-      return nil
-    }
-  }
-  % end
 }
 
 
