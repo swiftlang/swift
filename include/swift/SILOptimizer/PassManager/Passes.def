@@ -465,8 +465,6 @@ LEGACY_PASS(LexicalLifetimeEliminator, "sil-lexical-lifetime-eliminator",
      "Pass that removes lexical lifetime markers from borrows and alloc stack")
 LEGACY_PASS(ConsumeOperatorCopyableAddressesChecker, "sil-consume-operator-copyable-addresses-checker",
      "Pass that performs consume operator checking for copyable addresses")
-LEGACY_PASS(DebugInfoCanonicalizer, "sil-onone-debuginfo-canonicalizer",
-     "Canonicalize debug info at -Onone by propagating debug info into coroutine funclets")
 LEGACY_PASS(PartialApplySimplification, "partial-apply-simplification",
      "Transform partial_apply instructions into explicit closure box constructions")
 LEGACY_PASS(RegionAnalysisInvalidationTransform, "region-analysis-invalidation-transform",
