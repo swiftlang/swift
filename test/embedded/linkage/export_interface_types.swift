@@ -129,28 +129,27 @@ extension PlainEnum: Equatable {
 // LIBRARY-SIL-DAG: sil_witness_table shared NonExportedEnum: Greeter module Library
 // LIBRARY-SIL-DAG: sil_witness_table PlainStruct: Greeter module Library
 
-// Members of an @export(interface) type or extension inherit the
-// `[export_interface]` SIL function attribute, both for user-written
-// methods and for compiler-synthesized members (e.g. derived `==`).
-// LIBRARY-SIL-DAG: sil [export_interface]{{.*}} @$e7Library11ExportedFooV5greetyyF
-// LIBRARY-SIL-DAG: sil [export_interface]{{.*}} @$e7Library13ExportedClassC5greetyyF
-// LIBRARY-SIL-DAG: sil [export_interface]{{.*}} @$e7Library12ExportedEnumO5greetyyF
+// Members of an @export(interface) type or extension inherit
+// `[export_interface]` *only when they are compiler-synthesized*.
+// User-written methods keep their default linkage so that authors retain
+// per-member control and explicit members aren't silently promoted to a
+// strong cross-module symbol.
+
+// Compiler-synthesized members of @export(interface) types/extensions
+// DO inherit `[export_interface]`: derived `==` (whether the conformance
+// is declared on the type itself or on an @export(interface) extension).
 // LIBRARY-SIL-DAG: sil [export_interface]{{.*}} @$e7Library12ExportedEnumO21__derived_enum_equalsySbAC_ACtFZ
-// LIBRARY-SIL-DAG: sil [export_interface]{{.*}} @$e7Library11PlainStructV5greetyyF
-
-// Multiple members of a single @export(interface) extension all inherit
-// the attribute (the conformance witness, an extra non-witness method,
-// and a computed property's getter).
-// LIBRARY-SIL-DAG: sil [export_interface]{{.*}} @$e7Library11PlainStructV8describeyyF
-// LIBRARY-SIL-DAG: sil [export_interface]{{.*}} @$e7Library11PlainStructV7doubledSivg
-
-// A synthesized `==` from an @export(interface) extension-declared
-// `Equatable` conformance also inherits the attribute (the synthesized
-// member's DeclContext is the extension itself).
 // LIBRARY-SIL-DAG: sil [export_interface]{{.*}} @$e7Library9PlainEnumO21__derived_enum_equalsySbAC_ACtFZ
 
-// And: a non-@export(interface) extension on the same type does NOT
-// promote its members. They keep the default shared/linkonce behavior.
+// User-written methods of @export(interface) types/extensions do NOT
+// inherit `[export_interface]`; they keep the default per-importer
+// linkage. (We assert this with -NOT directives at SIL level.)
+// LIBRARY-SIL-NOT: sil [export_interface]{{.*}} @$e7Library11ExportedFooV5greetyyF
+// LIBRARY-SIL-NOT: sil [export_interface]{{.*}} @$e7Library13ExportedClassC5greetyyF
+// LIBRARY-SIL-NOT: sil [export_interface]{{.*}} @$e7Library12ExportedEnumO5greetyyF
+// LIBRARY-SIL-NOT: sil [export_interface]{{.*}} @$e7Library11PlainStructV5greetyyF
+// LIBRARY-SIL-NOT: sil [export_interface]{{.*}} @$e7Library11PlainStructV8describeyyF
+// LIBRARY-SIL-NOT: sil [export_interface]{{.*}} @$e7Library11PlainStructV7doubledSivg
 // LIBRARY-SIL-NOT: sil [export_interface]{{.*}} @$e7Library11PlainStructV19nonExportedDescribe
 
 //--- Application.swift
@@ -234,27 +233,22 @@ public func compareExportedEnum(_ a: ExportedEnum, _ b: ExportedEnum) -> Bool {
 // APPLICATION-SIL-DAG: sil_witness_table shared NonExportedBar: Greeter module Library
 // APPLICATION-SIL-DAG: sil_witness_table shared NonExportedEnum: Greeter module Library
 
-// Members of @export(interface) types/extensions are referenced as
-// declarations only in the importer (no body emitted here, even for
-// synthesized members like derived `==`). Class methods are dispatched
-// via the vtable so they don't appear as direct symbol references here.
-// APPLICATION-IR-DAG: declare {{.*}}@"$e7Library11ExportedFooV5greetyyF"
-// APPLICATION-IR-DAG: declare {{.*}}@"$e7Library12ExportedEnumO5greetyyF"
+// Compiler-synthesized members of @export(interface) types/extensions
+// are referenced as external declarations in the importer: derived `==`
+// (whether on the type or on an extension).
 // APPLICATION-IR-DAG: declare {{.*}}@"$e7Library12ExportedEnumO21__derived_enum_equalsySbAC_ACtFZ"
-// APPLICATION-IR-DAG: declare {{.*}}@"$e7Library11PlainStructV5greetyyF"
-
-// All members of the @export(interface) extension on PlainStruct are
-// external declarations in the importer (witness, extra method, and the
-// computed property's getter).
-// APPLICATION-IR-DAG: declare {{.*}}@"$e7Library11PlainStructV8describeyyF"
-// APPLICATION-IR-DAG: declare {{.*}}@"$e7Library11PlainStructV7doubledSivg"
-
-// And the synthesized `==` from the @export(interface) extension-declared
-// Equatable conformance on PlainEnum.
 // APPLICATION-IR-DAG: declare {{.*}}@"$e7Library9PlainEnumO21__derived_enum_equalsySbAC_ACtFZ"
 
-// The non-@export(interface) extension's member is NOT externalized; the
+// User-written methods are NOT inherited as @export(interface); the
 // importer emits its own linkonce_odr copy (i.e. a `define`, not a
-// `declare`).
+// `declare`). Class methods go through the vtable, so we don't check them
+// at the IR level here.
+// APPLICATION-IR-DAG: define {{.*}}@"$e7Library11ExportedFooV5greetyyF"
+// APPLICATION-IR-DAG: define {{.*}}@"$e7Library12ExportedEnumO5greetyyF"
+// APPLICATION-IR-DAG: define {{.*}}@"$e7Library11PlainStructV5greetyyF"
+// APPLICATION-IR-DAG: define {{.*}}@"$e7Library11PlainStructV8describeyyF"
+// APPLICATION-IR-DAG: define {{.*}}@"$e7Library11PlainStructV7doubledSivg"
 // APPLICATION-IR-DAG: define {{.*}}@"$e7Library11PlainStructV19nonExportedDescribeyyF"
-// APPLICATION-IR-NOT: declare {{.*}}@"$e7Library11PlainStructV19nonExportedDescribeyyF"
+// APPLICATION-IR-NOT: declare {{.*}}@"$e7Library11ExportedFooV5greetyyF"
+// APPLICATION-IR-NOT: declare {{.*}}@"$e7Library12ExportedEnumO5greetyyF"
+// APPLICATION-IR-NOT: declare {{.*}}@"$e7Library11PlainStructV5greetyyF"
