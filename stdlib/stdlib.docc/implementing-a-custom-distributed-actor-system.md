@@ -29,7 +29,7 @@ These responsibilities map to specific methods on the `DistributedActorSystem` p
 - **Call** a remote method on a distributed actor.
 - **Encode** an outgoing invocation, send it to the remote peer, and await a reply.
 - **Decode** an incoming invocation and dispatch it to the target actor.
-- **Report** the results and errors.
+- **Reply** with the results and errors.
 
 The rest of this article walks through each responsibility, providing examples
 that build to a minimal in-memory transport. For deeper coverage of the language
@@ -432,7 +432,7 @@ the recipient.
 > Tip: If you support generic distributed calls, don't trust incoming types. Validate
 > them against a known allow-list before decoding.
 
-### Report results and errors
+### Reply with the results and errors
 
 The final step of a remote call chain is the ``Distributed/DistributedTargetInvocationResultHandler``
 that you use to return results and errors.
