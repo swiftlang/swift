@@ -408,15 +408,15 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(_ position: Index) -> Element {
     @_transparent
-    unsafeAddress {
+    borrow {
       _checkIndex(position)
-      return unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
+      return unsafe self[unchecked: position]
     }
     @_transparent
     @lifetime(self: copy self)
-    unsafeMutableAddress {
+    mutate {
       _checkIndex(position)
-      return unsafe _unsafeAddressOfElement(unchecked: position)
+      return unsafe &self[unchecked: position]
     }
   }
 
@@ -432,13 +432,16 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public subscript(unchecked position: Index) -> Element {
     @_transparent
-    unsafeAddress {
-      unsafe UnsafePointer(_unsafeAddressOfElement(unchecked: position))
+    @_unsafeSelfDependentResult
+    borrow {
+      Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: position))
     }
     @_transparent
+    @_unsafeSelfDependentResult
     @lifetime(self: copy self)
-    unsafeMutableAddress {
-      unsafe _unsafeAddressOfElement(unchecked: position)
+    mutate {
+      let address = unsafe _unsafeAddressOfElement(unchecked: position)
+      return unsafe &(UnsafeMutablePointer(address).pointee)
     }
   }
 
@@ -447,10 +450,9 @@ extension MutableSpan where Element: ~Copyable {
   @_transparent
   internal func _unsafeAddressOfElement(
     unchecked position: Index
-  ) -> UnsafeMutablePointer<Element> {
+  ) -> Builtin.RawPointer {
     let elementOffset = position &* MemoryLayout<Element>.stride
-    let address = unsafe _start().advanced(by: elementOffset)
-    return unsafe address.assumingMemoryBound(to: Element.self)
+    return unsafe _start().advanced(by: elementOffset)._rawValue
   }
 }
 
@@ -480,8 +482,10 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @lifetime(self: copy self)
   public mutating func swapAt(unchecked i: Index, unchecked j: Index) {
-    let pi = unsafe _unsafeAddressOfElement(unchecked: i)
-    let pj = unsafe _unsafeAddressOfElement(unchecked: j)
+    let ri = unsafe _unsafeAddressOfElement(unchecked: i)
+    let pi = unsafe UnsafeMutablePointer<Element>(ri)
+    let rj = unsafe _unsafeAddressOfElement(unchecked: j)
+    let pj = unsafe UnsafeMutablePointer<Element>(rj)
     let temporary = unsafe pi.move()
     unsafe pi.initialize(to: pj.move())
     unsafe pj.initialize(to: consume temporary)
