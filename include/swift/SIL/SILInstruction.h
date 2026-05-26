@@ -5626,7 +5626,8 @@ class DebugValueInst final
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                  SILDebugVariable Var, PoisonRefs_t poisonRefs,
-                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
+                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
+                 bool prependDeref);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
                                 PoisonRefs_t poisonRefs,
@@ -5704,7 +5705,7 @@ public:
     // Make a temporary copy to prepend a deref. This is safe as
     // SILDebugVariable contains a copy of the expression.
     llvm::SmallVector<SILDIExprElement, 4> DIExprCopy;
-    if (sharedUInt8().DebugValueInst.prependDeref) {
+    if (hasDeref()) {
       DIExprCopy.push_back(SILDIExprElement::createOperator(
           SILDIExprOperator::Dereference));
       DIExprCopy.append(DIExprElements.begin(), DIExprElements.end());
@@ -5740,6 +5741,12 @@ public:
   static DebugValueInst *hasAddrVal(SILInstruction *I) {
     auto *DVI = dyn_cast_or_null<DebugValueInst>(I);
     return DVI && DVI->hasAddrVal()? DVI : nullptr;
+  }
+
+  /// Whether this debug value has a DIExpr with a deref. If this instruction
+  /// has a debug reconstruction block, this returns false.
+  bool hasDeref() const {
+    return sharedUInt8().DebugValueInst.prependDeref;
   }
 
   /// Prepends a deref operator to this debug_value in place.
