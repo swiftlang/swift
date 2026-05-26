@@ -271,7 +271,7 @@ public:
     // the header.
     auto CmdStartAddress = ImageStart + sizeof(typename T::Header);
 
-    // Read all of the load commands into .
+    // Read all of the load commands.
     auto LoadCmdsBuf =
         this->getReader().readBytes(CmdStartAddress, SizeOfCommands);
     if (!LoadCmdsBuf)
@@ -283,12 +283,19 @@ public:
     auto forEachSegment = [&](auto &&visitor) {
       uint64_t Offset = 0;
       for (unsigned I = 0; I < NumCommands; ++I) {
+        // Guard against malformed input; if the load command goes past the end
+        // of what we've read, bail out.
         if (Offset + sizeof(llvm::MachO::load_command) > SizeOfCommands)
           return;
+
         auto Cmd = reinterpret_cast<const llvm::MachO::load_command *>(
             LoadCmds + Offset);
         auto CmdSize = Cmd->cmdsize;
         if (Cmd->cmd == T::SegmentLoadCommand) {
+          // Check that the full segment command lies within the buffer too.
+          if (Offset + sizeof(typename T::SegmentCmd) > SizeOfCommands)
+            return;
+
           auto CmdHdr =
               reinterpret_cast<typename T::SegmentCmd *>(LoadCmds + Offset);
           if (!visitor(CmdHdr, Offset))
@@ -315,15 +322,13 @@ public:
 
     // The sections start immediately after the __TEXT segment's load command.
     unsigned NumSect = TextCommand->nsects;
-    auto SectAddress =
-        CmdStartAddress + TextOffset + sizeof(typename T::SegmentCmd);
-    auto Sections = this->getReader().readBytes(
-        SectAddress, NumSect * sizeof(typename T::Section));
-    if (!Sections)
+    auto SectionsBuf = reinterpret_cast<const char *>(TextCommand + 1);
+
+    // Make sure they all lie within the buffer we've read.
+    if (TextOffset + NumSect * sizeof(typename T::Section) > SizeOfCommands)
       return {};
 
     auto Slide = ImageStart - TextCommand->vmaddr;
-    auto SectionsBuf = reinterpret_cast<const char *>(Sections.get());
 
     auto findMachOSectionByName = [&](llvm::StringRef Name)
         -> std::pair<RemoteRef<void>, uint64_t> {
@@ -403,8 +408,6 @@ public:
       return true;
     });
 
-    savedBuffers.push_back(std::move(Buf));
-    savedBuffers.push_back(std::move(Sections));
     return InfoID;
   }
 
