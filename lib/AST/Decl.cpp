@@ -2427,6 +2427,32 @@ Decl::getEffectiveCodeGenerationModel() const {
   if (auto required = getRequiredCodeGenerationModel(this))
     return *required;
 
+  // A member of a nominal type or extension inherits its code generation
+  // model from the enclosing type/extension's *explicit* model, so that
+  // `@export(...)` on a type or extension controls the linkage of its
+  // members — including members synthesized by the compiler (e.g. derived
+  // `Equatable.==`). We only consider an explicit model on the parent so
+  // that this inheritance only kicks in when the user has actually written
+  // `@export(...)` (or an equivalent attribute) on the type/extension.
+  //
+  // We only inherit when the member itself has effective public visibility,
+  // to avoid promoting internal/private members to public symbols in
+  // importing modules.
+  if (auto *valueDecl = dyn_cast<ValueDecl>(this)) {
+    AccessScope access =
+        valueDecl->getFormalAccessScope(
+            nullptr, /*treatUsableFromInlineAsPublic*/false,
+            /*ignoreImportAccessLevel*/false);
+    if (access.isPublic()) {
+      if (auto *parent = getDeclContext()->getAsDecl()) {
+        if (isa<NominalTypeDecl>(parent) || isa<ExtensionDecl>(parent)) {
+          if (auto parentModel = parent->getExplicitCodeGenerationModel())
+            return *parentModel;
+        }
+      }
+    }
+  }
+
   // Otherwise, apply the module-level default.
   return getModuleContext()->codeGenerationModel();
 }
