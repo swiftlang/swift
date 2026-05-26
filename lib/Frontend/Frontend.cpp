@@ -54,7 +54,6 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
-#include "llvm/CAS/CASFileSystem.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -675,95 +674,14 @@ bool CompilerInstance::setupForReplay(const CompilerInvocation &Invoke,
 }
 
 bool CompilerInstance::setUpVirtualFileSystemOverlays() {
-  const auto &CASOpts = getInvocation().getCASOptions();
-  if (CASOpts.EnableCaching && !CASOpts.HasImmutableFileSystem &&
-      FrontendOptions::supportCompilationCaching(
-          Invocation.getFrontendOptions().RequestedAction)) {
-    Diagnostics.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
+  std::optional<std::string> CASIDForPCH;
+  auto FS = Invocation.createVirtualFileSystemOverlays(
+      SourceMgr.getFileSystem(), CAS, ResultCache, CASIDForPCH, Diagnostics);
+  if (!FS)
     return true;
-  }
-
-  if (Invocation.getCASOptions().requireCASFS()) {
-    if (Invocation.getCASOptions().HasImmutableFileSystem) {
-      // Set up CASFS as BaseFS.
-      auto FS = createCASFileSystem(*CAS, CASOpts.ClangIncludeTree,
-                                    CASOpts.ClangIncludeTreeFileList);
-      if (!FS) {
-        Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
-                             toString(FS.takeError()));
-        return true;
-      }
-      SourceMgr.setFileSystem(std::move(*FS));
-    }
-
-    // If we need to load any files from CAS, try load it now and overlay it.
-    llvm::IntrusiveRefCntPtr<llvm::vfs::InMemoryFileSystem> MemFS =
-        new llvm::vfs::InMemoryFileSystem();
-    const auto &ClangOpts = getInvocation().getClangImporterOptions();
-
-    if (!CASOpts.BridgingHeaderPCHCacheKey.empty()) {
-      auto Proxy = loadCachedCompileResultProxy(
-          getObjectStore(), getActionCache(), CASOpts.BridgingHeaderPCHCacheKey,
-          file_types::ID::TY_PCH);
-
-      if (!Proxy) {
-        Diagnostics.diagnose(SourceLoc(), diag::error_cas, "loading pch file",
-                             llvm::toString(Proxy.takeError()));
-        return true;
-      }
-      if (!*Proxy) {
-        Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
-                             ClangOpts.getPCHInputPath());
-        return true;
-      }
-      MemFS->addFile(ClangOpts.getPCHInputPath(), 0,
-                     (*Proxy)->getMemoryBuffer());
-      CASIDForPCH = (*Proxy)->getID().toString();
-    }
-    if (!CASOpts.InputFileKey.empty()) {
-      if (Invocation.getFrontendOptions()
-              .InputsAndOutputs.getAllInputs()
-              .size() != 1)
-        Diagnostics.diagnose(SourceLoc(),
-                             diag::error_wrong_input_num_for_input_file_key);
-      else {
-        auto InputPath = Invocation.getFrontendOptions()
-                             .InputsAndOutputs.getFilenameOfFirstInput();
-        auto Type = file_types::lookupTypeFromFilename(
-            llvm::sys::path::filename(InputPath));
-        if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
-                getObjectStore(), getActionCache(), Diagnostics,
-                CASOpts.InputFileKey, Type, InputPath))
-          MemFS->addFile(InputPath, 0, std::move(loadedBuffer));
-        else
-          Diagnostics.diagnose(SourceLoc(), diag::error_load_input_from_cas,
-                               InputPath);
-      }
-    }
-    llvm::IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> OverlayVFS =
-        new llvm::vfs::OverlayFileSystem(MemFS);
-    OverlayVFS->pushOverlay(SourceMgr.getFileSystem());
-    SourceMgr.setFileSystem(std::move(OverlayVFS));
-  }
-
-  auto ExpectedOverlay =
-      Invocation.getSearchPathOptions().makeOverlayFileSystem(
-          SourceMgr.getFileSystem());
-  if (!ExpectedOverlay) {
-    llvm::handleAllErrors(
-        ExpectedOverlay.takeError(), [&](const llvm::FileError &FE) {
-          if (FE.convertToErrorCode() == std::errc::no_such_file_or_directory) {
-            Diagnostics.diagnose(SourceLoc(), diag::cannot_open_file,
-                                 FE.getFileName(), FE.messageWithoutFileInfo());
-          } else {
-            Diagnostics.diagnose(SourceLoc(), diag::invalid_vfs_overlay_file,
-                                 FE.getFileName());
-          }
-        });
-    return true;
-  }
-
-  SourceMgr.setFileSystem(*ExpectedOverlay);
+  if (CASIDForPCH)
+    this->CASIDForPCH = *CASIDForPCH;
+  SourceMgr.setFileSystem(std::move(FS));
   return false;
 }
 
