@@ -2369,6 +2369,37 @@ Decl::getExplicitCodeGenerationModel() const {
   return std::nullopt;
 }
 
+/// Determine the code generation model that is required by the given
+/// declaration.
+///
+/// This accounts for limitations of the code generation model. For example,
+/// a generic declaration can only be treated as @export(implementation) in
+/// Embedded Swift, because there are no unspecialized generics.
+std::optional<CodeGenerationModel>
+Decl::getRequiredCodeGenerationModel() const {
+  bool isEmbedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
+
+  // A generic declaration must be @export(implementation) in Embedded Swift.
+  auto dc = getInnermostDeclContext();
+  if (auto sig = dc->getGenericSignatureOfContext()) {
+    if (!sig->areAllParamsConcrete() && isEmbedded)
+      return CodeGenerationModel::Implementation;
+  }
+
+  // Foreign types are always @export(implementation).
+  if (auto nominal = dyn_cast<NominalTypeDecl>(this)) {
+    if (isa<ClangModuleUnit>(nominal->getModuleScopeContext()))
+      return CodeGenerationModel::Implementation;
+  }
+
+  // Types must be @export(interface) in non-Embedded Swift, because the type
+  // metadata symbols need to be unique.
+  if (isa<TypeDecl>(this) && !isEmbedded)
+    return CodeGenerationModel::Interface;
+
+  return std::nullopt;
+}
+
 CodeGenerationModel
 Decl::getEffectiveCodeGenerationModel() const {
   // If there is an explicit attribute that specifies the model for this
