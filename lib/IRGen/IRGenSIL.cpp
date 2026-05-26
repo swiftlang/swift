@@ -829,13 +829,13 @@ public:
           // The current basic block must be a successor of the dbg.value().
           continue;
 
-        llvm::SmallVector<llvm::DbgValueInst *, 4> DbgValues;
-        llvm::findDbgValues(DbgValues, Var);
-        for (auto *DVI : DbgValues)
-          if (DVI->getParent() == BB)
+        llvm::SmallVector<llvm::DbgVariableRecord *, 4> DbgValues;
+        llvm::findDbgValues(Var, DbgValues);
+        for (auto *DVR : DbgValues)
+          if (DVR->getParent() == BB)
             IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
-                DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
-                DVI->getDebugLoc(), CurBB->getFirstInsertionPt());
+                DVR->getValue(), DVR->getVariable(), DVR->getExpression(),
+                DVR->getDebugLoc(), CurBB->getFirstInsertionPt());
       }
     }
   }
