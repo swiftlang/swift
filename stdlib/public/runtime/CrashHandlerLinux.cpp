@@ -254,6 +254,12 @@ handle_fatal_signal(int signum,
                     siginfo_t *pinfo,
                     void *uctx)
 {
+  // Ignore signals that have been deliberately sent by another
+  // process; the signals we want to handle are those caused by crashes,
+  // not random mischief.
+  if (pinfo->si_code == SI_USER)
+    return;
+
   int old_err = errno;
   struct thread self = { 0, (int64_t)gettid(), (uint64_t)uctx };
 
