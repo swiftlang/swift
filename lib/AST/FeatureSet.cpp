@@ -684,6 +684,16 @@ static bool usesFeatureReparenting(Decl *decl) {
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
 
+static bool usesFeatureBorrowInout(Decl *decl) {
+  auto &ctx = decl->getASTContext();
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    decl = ext->getExtendedNominal();
+  }
+
+  return decl == ctx.getRefDecl() || decl == ctx.getMutableRefDecl();
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------
