@@ -102,6 +102,7 @@ enum class SourceFileKind {
   Interface, ///< Came from a .swiftinterface file, representing another module.
   MacroExpansion, ///< Came from a macro expansion.
   DefaultArgument, ///< Came from default argument at caller side
+  SyntheticMacro, ///< Came from a synthesized macro
 };
 
 /// Contains information about where a particular path is used in

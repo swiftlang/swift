@@ -61,6 +61,7 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
   SourceRange range;
   AvailabilityScope *parentContext = nullptr;
   switch (SF->Kind) {
+  case SourceFileKind::SyntheticMacro:
   case SourceFileKind::MacroExpansion:
   case SourceFileKind::DefaultArgument: {
     // Look up the parent context in the enclosing file that this file's

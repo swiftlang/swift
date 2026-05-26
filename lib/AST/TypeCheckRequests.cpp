@@ -2676,6 +2676,7 @@ UniqueUnderlyingTypeSubstitutionsRequest::evaluate(
       case SourceFileKind::MacroExpansion:
       case SourceFileKind::DefaultArgument:
       case SourceFileKind::SIL:
+      case SourceFileKind::SyntheticMacro:
         return true;
       case SourceFileKind::Main:
       case SourceFileKind::Library:

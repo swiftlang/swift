@@ -203,6 +203,7 @@ void Parser::parseTopLevelItems(SmallVectorImpl<ASTNode> &items) {
 
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       braceItemListKind = BraceItemListKind::MacroExpansion;
       break;
     }
@@ -10472,6 +10473,7 @@ parseDeclDeinit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
     case SourceFileKind::DefaultArgument:
+    case SourceFileKind::SyntheticMacro:
       if (Tok.is(tok::identifier)) {
         diagnose(Tok, diag::destructor_has_name).fixItRemove(Tok.getLoc());
         consumeToken();
