@@ -485,6 +485,20 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
       return cast<AllocBoxInst>(**this)->usesMoveableValueDebugInfo();
     }
   }
+  
+  /// Returns true if this DebugVarCarryingInst is a `debug_value`
+  /// with a reconstruction block.
+  bool hasDebugReconstructionBlock() const {
+    switch (getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(**this)->getDebugReconstructionBlock();
+    case Kind::AllocStack:
+    case Kind::AllocBox:
+      return false;
+    }
+  }
 
   /// If we are attempting to create a "debug_value" clone of this debug var
   /// carrying inst, return the appropriate SILValue to use as the operand of
