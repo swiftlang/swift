@@ -249,6 +249,8 @@ getBridgedGeneratedSourceFileKind(const GeneratedSourceInfo *genInfo) {
     return BridgedGeneratedSourceFileKindDefaultArgument;
   case GeneratedSourceInfo::AttributeFromClang:
     return BridgedGeneratedSourceFileKindAttributeFromClang;
+  case GeneratedSourceInfo::SyntheticMacroDeclaration:
+    return BridgedGeneratedSourceFileKindSyntheticMacroDeclaration;
   }
 }
 
@@ -439,6 +441,7 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
     switch (generatedInfo->kind) {
     case GeneratedSourceInfo::DeclarationMacroExpansion:
     case GeneratedSourceInfo::CodeItemMacroExpansion:
+    case GeneratedSourceInfo::SyntheticMacroDeclaration:
       if (parser.CurDeclContext->isTypeContext()) {
         parser.parseExpandedMemberList(items);
       } else {

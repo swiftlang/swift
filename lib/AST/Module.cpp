@@ -1184,6 +1184,8 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
     return std::nullopt;
+  case GeneratedSourceInfo::SyntheticMacroDeclaration:
+    return MacroRole::Declaration;
   }
 }
 

@@ -662,6 +662,7 @@ adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacroDeclaration:
     return expandedCode;
   }
 }

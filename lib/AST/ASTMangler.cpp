@@ -4988,6 +4988,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacroDeclaration:
     return appendMacroExpansionLoc();
   }
   
@@ -5040,6 +5041,7 @@ void ASTMangler::appendMacroExpansionContext(
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
+  case GeneratedSourceInfo::SyntheticMacroDeclaration:
     llvm_unreachable("Exited above");
   }
 
