@@ -1899,11 +1899,9 @@ static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
       createOutlinedCopyCall(copyBuilder, address, dest, pass);
       storeUser->eraseFromParent();
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
-      SILBuilder dbgBuilder(dbgInst, dbgInst->getDebugScope());
-      // Rewrite the debug_value to point to the variable in the alloca.
-      dbgBuilder.createDebugValueAddr(dbgInst->getLoc(), address,
-                                      *dbgInst->getVarInfo());
-      dbgInst->eraseFromParent();
+      // Update the debug_value to point to the variable in the alloca.
+      dbgInst->setOperand(address);
+      dbgInst->prependDeref();
     }
   }
 }
@@ -2425,11 +2423,7 @@ static void rewriteFunction(StructLoweringState &pass,
       } else {
         assert(currOperand->getType().isAddress() &&
                "Expected an address type");
-        // SILBuilderWithScope skips over metainstructions.
-        SILBuilder debugBuilder(instr, instr->getDebugScope());
-        debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand,
-                                          *instr->getVarInfo());
-        instr->getParent()->erase(instr);
+        instr->prependDeref();
       }
     }
   }
@@ -4784,10 +4778,9 @@ protected:
       assignment.markForDeletion(dbg);
       return;
     }
-    auto builder = assignment.getBuilder(dbg->getIterator());
     SILValue addr = assignment.getAddressForValue(dbg->getOperand());
-    builder.createDebugValueAddr(dbg->getLoc(), addr, *dbg->getVarInfo());
-    assignment.markForDeletion(dbg);
+    dbg->setOperand(addr);
+    dbg->prependDeref();
   }
 
   void visitRetainValueInst(RetainValueInst *r) {

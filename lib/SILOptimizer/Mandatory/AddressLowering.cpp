@@ -3584,9 +3584,8 @@ protected:
   void visitDebugValueInst(DebugValueInst *debugInst) {
     SILValue srcVal = debugInst->getOperand();
     SILValue srcAddr = pass.valueStorageMap.getStorage(srcVal).storageAddress;
-    builder.createDebugValueAddr(debugInst->getLoc(), srcAddr,
-                                 *debugInst->getVarInfo());
-    pass.deleter.forceDelete(debugInst);
+    debugInst->setOperand(srcAddr);
+    debugInst->prependDeref();
   }
 
   void visitDeinitExistentialValueInst(
