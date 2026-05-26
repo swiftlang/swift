@@ -388,7 +388,7 @@ static MacroInfo getMacroInfo(const GeneratedSourceInfo &Info,
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
-  case GeneratedSourceInfo::SyntheticMacroDeclaration:
+  case GeneratedSourceInfo::SyntheticMacro:
     break;
   }
   return Result;

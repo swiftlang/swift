@@ -178,7 +178,7 @@ SourceRange swift::getUnexpandedMacroRange(const SourceManager &SM,
     case GeneratedSourceInfo::PrettyPrinted:
     case GeneratedSourceInfo::DefaultArgument:
     case GeneratedSourceInfo::AttributeFromClang:
-    case GeneratedSourceInfo::SyntheticMacroDeclaration:
+    case GeneratedSourceInfo::SyntheticMacro:
       return SourceRange();
     }
   }

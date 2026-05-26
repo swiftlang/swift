@@ -406,7 +406,7 @@ void SourceManager::setGeneratedSourceInfo(
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
-  case GeneratedSourceInfo::SyntheticMacroDeclaration:
+  case GeneratedSourceInfo::SyntheticMacro:
     break;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:

@@ -1118,7 +1118,7 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
 
   // Setting up the GSI
   GeneratedSourceInfo info;
-  info.kind = GeneratedSourceInfo::Kind::SyntheticMacroDeclaration;
+  info.kind = GeneratedSourceInfo::Kind::SyntheticMacro;
   info.originalSourceRange = CharSourceRange(parentLoc, 0);
   info.generatedSourceRange = C.SourceMgr.getRangeForBuffer(bufferID);
   info.astNode = nullptr;

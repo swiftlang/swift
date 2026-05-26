@@ -75,7 +75,7 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
       auto originalNode = SF->getNodeInEnclosingSourceFile();
       auto loc = SourceLoc();
       auto infos = Ctx.SourceMgr.getGeneratedSourceInfo(SF->getBufferID());
-      if (infos->kind == GeneratedSourceInfo::SyntheticMacroDeclaration) {
+      if (infos->kind == GeneratedSourceInfo::SyntheticMacro) {
         loc = infos->generatedSourceRange.getStart();
       } else {
         loc = originalNode.getStartLoc();

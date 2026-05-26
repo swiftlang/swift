@@ -146,7 +146,7 @@ public func parseSourceFile(
   case .declarationMacroExpansion,
       .codeItemMacroExpansion,
       .peerMacroExpansion,
-      .syntheticMacroDeclaration:
+      .syntheticMacro:
     if let dc, dc.isTypeContext {
       parsed = Syntax(MemberBlockItemListFileSyntax.parse(from: &parser))
     } else {

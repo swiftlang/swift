@@ -72,7 +72,7 @@ public:
     AttributeFromClang,
 
     /// A macro declaration synthesized by the compiler
-    SyntheticMacroDeclaration,
+    SyntheticMacro,
     // TODO: Handle all macro roles ?
   } kind;
 
@@ -91,8 +91,8 @@ public:
       return "DefaultArgument";
     case AttributeFromClang:
       return "AttributeFromClang";
-    case SyntheticMacroDeclaration:
-      return "SyntheticMacroDeclaration";
+    case SyntheticMacro:
+      return "SyntheticMacro";
     }
     llvm_unreachable("Invalid kind");
   }

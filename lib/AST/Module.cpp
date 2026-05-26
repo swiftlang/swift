@@ -1183,7 +1183,7 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
   case GeneratedSourceInfo::AttributeFromClang:
-  case GeneratedSourceInfo::SyntheticMacroDeclaration:
+  case GeneratedSourceInfo::SyntheticMacro:
     return std::nullopt;
   }
 }

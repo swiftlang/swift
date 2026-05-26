@@ -386,7 +386,7 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGeneratedSourceFileKind {
   BridgedGeneratedSourceFileKindPrettyPrinted,
   BridgedGeneratedSourceFileKindDefaultArgument,
   BridgedGeneratedSourceFileKindAttributeFromClang,
-  BridgedGeneratedSourceFileKindSyntheticMacroDeclaration,
+  BridgedGeneratedSourceFileKindSyntheticMacro,
 
   BridgedGeneratedSourceFileKindNone,
 };
