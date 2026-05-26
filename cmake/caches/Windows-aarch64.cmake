@@ -27,8 +27,6 @@ set(LLVM_TARGETS_TO_BUILD AArch64 ARM WebAssembly X86 CACHE STRING "")
 
 # Disable certain targets to reduce the configure time or to avoid configuration
 # differences (and in some cases weird build errors on a complete build).
-set(LLVM_BUILD_LLVM_DYLIB NO CACHE BOOL "")
-set(LLVM_BUILD_LLVM_C_DYLIB NO CACHE BOOL "")
 set(LLVM_ENABLE_LIBEDIT NO CACHE BOOL "")
 set(LLVM_ENABLE_LIBXML2 YES CACHE BOOL "")
 set(LLVM_ENABLE_OCAMLDOC NO CACHE BOOL "")
@@ -40,7 +38,6 @@ set(LLVM_INCLUDE_DOCS NO CACHE BOOL "")
 set(LLVM_INCLUDE_EXAMPLES NO CACHE BOOL "")
 set(LLVM_INCLUDE_GO_TESTS NO CACHE BOOL "")
 set(LLVM_TOOL_GOLD_BUILD NO CACHE BOOL "")
-set(LLVM_TOOL_LLVM_SHLIB_BUILD NO CACHE BOOL "")
 
 set(CLANG_ENABLE_LIBXML2 NO CACHE BOOL "")
 
