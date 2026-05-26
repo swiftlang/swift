@@ -1525,10 +1525,7 @@ static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
   return paramType->is<AnyFunctionType>();
 }
 
-ParameterListInfo::ParameterListInfo(
-    ArrayRef<AnyFunctionType::Param> params,
-    const ValueDecl *paramOwner,
-    bool skipCurriedSelf) {
+ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params) {
   defaultArguments.resize(params.size());
   propertyWrappers.resize(params.size());
   implicitSelfCapture.resize(params.size());
@@ -1536,7 +1533,13 @@ ParameterListInfo::ParameterListInfo(
   alwaysInheritActorContext.resize(params.size());
   variadicGenerics.resize(params.size());
   sendingParameters.resize(params.size());
+  acceptsUnlabeledTrailingClosures.resize(params.size());
+}
 
+ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                                     const ValueDecl *paramOwner,
+                                     bool skipCurriedSelf)
+    : ParameterListInfo(params) {
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //
@@ -1566,14 +1569,33 @@ ParameterListInfo::ParameterListInfo(
   if (params.size() != paramList->size())
     return;
 
-  // Now we have enough information to determine which parameters accept
-  // unlabeled trailing closures.
-  acceptsUnlabeledTrailingClosures.resize(params.size());
-
   // Note which parameters have default arguments and/or accept unlabeled
   // trailing closure arguments with the forward-scan rule.
   for (auto i : range(0, params.size())) {
     setFlagsFor(paramList->get(i), i);
+  }
+}
+
+ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                                     bool skipCurriedSelf,
+                                     ConcreteDeclRef declRef)
+  : ParameterListInfo(params) {
+  if (!declRef || params.empty())
+    return;
+
+  auto *decl = declRef.getDecl();
+  if (decl->hasCurriedSelf() && !skipCurriedSelf)
+    return;
+
+  auto *paramList = decl->getParameterList();
+  if (!paramList)
+    return;
+
+  auto subs = declRef.getSubstitutions();
+  for (auto i : indices(params)) {
+    if (auto *param = subs ? getParameterAt(declRef, i) : paramList->get(i)) {
+      setFlagsFor(param, i);
+    }
   }
 }
 

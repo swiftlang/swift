@@ -4231,8 +4231,19 @@ struct ParameterListInfo {
 public:
   ParameterListInfo() { }
 
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params);
   ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
                     const ValueDecl *paramOwner, bool skipCurriedSelf);
+
+  /// Constructs parameter information from the given set of parameters
+  /// that are associated with the given substituted declaration reference.
+  ///
+  /// Note that number of parameters doesn't necessary always match arity of the
+  /// parameter list because variadic generic parameters without arguments
+  /// are removed from the function type and multi-parameter matches are
+  /// flattened.
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                    bool skipCurriedSelf, ConcreteDeclRef declRef);
 
   /// Whether the parameter at the given index has a default argument.
   bool hasDefaultArgument(unsigned paramIdx) const;
