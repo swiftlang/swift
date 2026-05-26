@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "DerivedConformance.h"
+#include "CodeSynthesis.h"
 #include "TypeCheckConcurrency.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
@@ -25,6 +26,8 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/Support/Casting.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace swift;
 
@@ -995,4 +998,162 @@ bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
   }
 
   return false;
+}
+
+/// Provides the location to use when plumbing the synthesized  macro expansion
+/// with its parent context for name lookup.
+static SourceLoc getValidParentLocForDerivation(DerivedConformance &derived, ValueDecl *requirement) {
+  auto atLoc = derived.Conformance->getLoc();
+  if (atLoc.isValid())
+    return atLoc;
+
+  atLoc = requirement->getStartLoc();
+  if (atLoc.isValid())
+    return atLoc;
+
+  atLoc = requirement->getEndLoc();
+  if (atLoc.isValid())
+    return atLoc;
+
+  atLoc = derived.Nominal->getBraces().Start;
+  if (atLoc.isValid())
+    return atLoc;
+
+  atLoc = derived.Nominal->getBraces().End;
+  if (atLoc.isValid())
+    return atLoc;
+
+  llvm_unreachable("Could not find suitable source loc");
+}
+
+/// Returns a unique name for the buffer being created for `derived`
+/// conformance.
+static std::string getUniqueBufferNameForDerivation(DerivedConformance &derived,
+                                                    ValueDecl *requirement) {
+
+  std::string res = "__derivation_macro__";
+  res += derived.Nominal->getNameStr();
+  res += "@";
+  res += requirement->getBaseName().getIdentifier().str();
+  res += "__buffer";
+  return res;
+}
+
+
+/// Function supposed to be called for every ASTNode produced by the expansion
+/// of a synthesized macro declaration.
+/// It is generally used to set-up these declarations but also to return a
+/// valid `ValueDecl *` if the node could be a witness.
+static ValueDecl *
+handleASTNodeForDerivation(ASTContext &C, DerivedConformance &derived,
+                           ASTNode node,
+                           bool addNonIsolated = true,
+                           bool getterShouldBeImmutableComputed = true) {
+  auto *decl = node.dyn_cast<Decl *>();
+
+  // No particular set up needed and definitely not a witness, we can skip it.
+  if (isa<PatternBindingDecl>(decl))
+    return nullptr;
+
+  // Building the scope tree manually
+  auto bufferID = C.SourceMgr.findBufferContainingLoc(decl->getStartLoc());
+  auto *SF = C.SourceMgr.getSourceFilesForBufferID(
+      bufferID)[0]; // We assume there is only on SourceFile here.
+  auto scope = SF->getScope();
+  scope.buildFullyExpandedTree();
+
+  auto *vDecl = dyn_cast<ValueDecl>(decl);
+  if (!vDecl)
+    return nullptr;
+
+  // Setting up the correct access
+  vDecl->getFormalAccess();
+  vDecl->overwriteAccess(derived.Nominal->getFormalAccess());
+
+  // Handling function decls
+  if (auto *fDecl = dyn_cast<AbstractFunctionDecl>(vDecl)) {
+    if (addNonIsolated)
+    addNonIsolatedToSynthesized(derived, fDecl);
+
+    // FIXME: This call is needed when building the stdlib, otherwise causing
+    // some linking errors on the witnesses. Will eventually get rid of it so
+    // that the body is synthesized only if needed.
+    (void)fDecl->getMacroExpandedBody();
+  }
+
+  // Handling var decls
+  else if (auto *varDecl = dyn_cast<VarDecl>(vDecl)) {
+    // In all derivation cases for the moment, the getter of a
+    // derived var decl should be immutable computed, so the default
+    // value of this flag is true
+    if (getterShouldBeImmutableComputed)
+      varDecl->setImplInfo(StorageImplInfo::getImmutableComputed());
+
+    // If it has a getter, then set it up properly
+    if (auto *getter = varDecl->getAccessor(AccessorKind::Get)) {
+      getter->setImplicit();
+      getter->setSynthesized();
+
+      // Compute formal access so we can overwrite it.
+      getter->getFormalAccess();
+      getter->overwriteAccess(derived.Nominal->getFormalAccess());
+    }
+  }
+
+  return vDecl;
+}
+
+ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
+                                            ValueDecl *requirement,
+                                            StringRef code) {
+  auto *parentDC = derived.getConformanceContext();
+  auto &C = parentDC->getASTContext();
+
+  // Creating the buffer containing `code`. It is needed as macro need explicit
+  // buffers to be expanded.
+  auto bufferID = C.SourceMgr.addNewSourceBuffer(llvm::MemoryBuffer::getMemBufferCopy(
+      code, getUniqueBufferNameForDerivation(derived, requirement)));
+
+  auto parentLoc = getValidParentLocForDerivation(derived, requirement);
+
+  // Setting up the GSI
+  GeneratedSourceInfo info;
+  info.kind = GeneratedSourceInfo::Kind::SyntheticMacroDeclaration;
+  info.originalSourceRange = CharSourceRange(parentLoc, 0);
+  info.generatedSourceRange = C.SourceMgr.getRangeForBuffer(bufferID);
+  info.astNode = nullptr;
+  info.declContext = parentDC;
+  C.SourceMgr.setGeneratedSourceInfo(bufferID, info);
+
+  auto *SF = new (C) SourceFile(*derived.getParentModule(), SourceFileKind::MacroExpansion, bufferID);
+
+  // Find the parsed MacroExpansionDecl * from the parsed source file.
+  MacroExpansionDecl *expansion = nullptr;
+  for (auto *decl: SF->getTopLevelDecls()) {
+    decl->setImplicit();
+    auto mDecl = dyn_cast<MacroExpansionDecl>(decl);
+    if (!mDecl) continue;
+    if (expansion) {
+      llvm_unreachable(
+          "Expected a single macro expansion decl in the code buffer.");
+    }
+    expansion = mDecl;
+  }
+  ASSERT(expansion);
+
+  // Find the expanded `ValueDecl *` and return it. There should only ever be a
+  // single one
+  ValueDecl *witness = nullptr;
+  expansion->forEachExpandedNode([&](ASTNode node) {
+    auto *vDecl = handleASTNodeForDerivation(C, derived, node);
+    if (!vDecl) return;
+    if (witness) {
+      llvm_unreachable("Expected a single ValueDecl * from the expansion of "
+                       "the synthesized macro decl.");
+    }
+    witness = vDecl;
+  });
+  ASSERT(witness && "Expected a witness but got NULL");
+
+  return witness;
 }

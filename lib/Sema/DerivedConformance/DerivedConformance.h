@@ -465,6 +465,11 @@ public:
 /// because they involve mutable state.
 bool memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal);
 
+/// Returns the value decl expanded from the macro in `code` in the context of
+/// the \p derived derived conformance for the \p requirement requirement.
+ValueDecl *deriveRequirementViaMacro(DerivedConformance &derived,
+                                     ValueDecl *requirement, StringRef code);
+
 } // namespace swift
 
 #endif
