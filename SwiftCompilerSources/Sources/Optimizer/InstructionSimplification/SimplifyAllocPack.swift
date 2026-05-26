@@ -60,7 +60,7 @@ extension AllocPackInst : Simplifiable, SILCombineSimplifiable {
 
     // Collect users.
     var packElementGets: [(index: Int, instruction: PackElementGetInst)] = []
-    var packElementSets: [(index: Int, value: Value)] = []
+    var packElementSets: [(index: Int, instruction: PackElementSetInst)] = []
     var deallocPacks: [DeallocPackInst] = []
     var dynamicSet = false
     var dynamicGet = false
@@ -78,7 +78,7 @@ extension AllocPackInst : Simplifiable, SILCombineSimplifiable {
       case let pes as PackElementSetInst:
         // Can only eliminate a pack that is accessed with scalar indices.
         if let spi = pes.indexOperand.value as? ScalarPackIndexInst {
-          packElementSets.append((index: spi.componentIndex, value: pes.valueOperand.value))
+          packElementSets.append((index: spi.componentIndex, instruction: pes))
         } else {
           dynamicSet = true
         }
@@ -132,9 +132,17 @@ extension AllocPackInst : Simplifiable, SILCombineSimplifiable {
     // undefined behaviour to get a pack element before it is set.
 
     for (index, peg) in packElementGets {
-      peg.replace(with: packElementSets[index].value, context)
+      peg.replace(with: packElementSets[index].instruction.valueOperand.value, context)
     }
-    
+
+    // Salvage any debug info by creating a debug_value with an
+    // op_tuple_fragment for each pack_element set.
+    //
+    // TODO: Bridge the APIs for building DI expressions so we can do this
+    // directly within the pass, rather than calling out to salvageDebugInfo.
+    for (_, pes) in packElementSets {
+      context.salvageDebugInfo(of: pes)
+    }
 
     // Erase the alloc_pack and all its associated instructions.
     context.erase(instructionIncludingAllUsers: self)
