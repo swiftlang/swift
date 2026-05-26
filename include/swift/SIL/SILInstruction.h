@@ -5756,6 +5756,14 @@ public:
   /// Otherwise, it will be prepended to the DIExpr.
   void prependDeref();
 
+  /// Removes a deref operator to this debug_value in place.
+  /// This must be called when the operand is changed from an address type to
+  /// an object type (when moved from the stack to a register, for example).
+  /// If a reconstruction block exists, a load is removed at the beginning. If
+  /// there is no load at the beginning, the operand is killed, marking the
+  /// variable as optimized away.
+  void stripDeref();
+
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)
   /// and checks that the result matches the SSA operand type, and that there

@@ -502,6 +502,46 @@ void DebugValueInst::prependDeref() {
   load->setOperand(newArg);
 }
 
+void DebugValueInst::stripDeref() {
+  // If we have an undef, nothing to do.
+  if (isa<SILUndef>(getOperand()))
+    return;
+  if (!ReconstructionBlock) {
+    ASSERT(hasDeref() && "Cannot strip deref without one!");
+    sharedUInt8().DebugValueInst.prependDeref = false;
+    return;
+  }
+
+  // Replace all uses of the operand with undef.
+  // Load users are salvaged to use the direct value.
+  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILType objType = oldArg->getType().getObjectType();
+  SILValue undefAddr = SILUndef::get(oldArg);
+  SmallVector<LoadInst *, 16> loads;
+  while (!oldArg->use_empty()) {
+    Operand *use = *oldArg->use_begin();
+    SILInstruction *user = use->getUser();
+    use->set(undefAddr);
+    // Only load users of the operand can be salvaged.
+    if (auto *load = dyn_cast<LoadInst>(user)) {
+      loads.push_back(load);
+    }
+  }
+
+  // If there are no loads, this operand is no longer used. Kill it.
+  if (loads.empty())
+    return killOperand();
+
+  // Otherwise, replace the arguments and all uses
+  SILArgument *newArg =
+      ReconstructionBlock->replacePhiArgument(0, objType, OwnershipKind::None);
+
+  for (LoadInst *load : loads) {
+    load->replaceAllUsesWith(newArg);
+    load->eraseFromParent();
+  }
+}
+
 SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   if (ReconstructionBlock)
     return ReconstructionBlock;
