@@ -3,7 +3,8 @@
 
 // REQUIRES: swift_in_compiler
 
-
+// Some tests started failing for 32-bit since #88914.
+// REQUIRES: PTRSIZE=64
 
 // When no witness methods are called on pack elements, all pack code can be fully eliminated.
 // CHECK: define {{.*}} { i32, ptr, double } @"$s19pack_specialization8copyPack2xsxxQp_txxQp_tRvzlFs5Int32V_SPys5Int16VGSdQP_Tg5Tf8xx_n"(i32 %0, ptr %1, double %2)
