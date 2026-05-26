@@ -72,7 +72,7 @@ extern "C" int csops(int, unsigned int, void *, size_t);
 
 #include "BacktracePrivate.h"
 
-#define DEBUG_BACKTRACING_SETTINGS 0
+#define DEBUG_BACKTRACING 0
 
 #ifndef lengthof
 #define lengthof(x) (sizeof(x) / sizeof(x[0]))
@@ -263,7 +263,7 @@ bool isStdinATty()
 void _swift_processBacktracingSetting(llvm::StringRef key, llvm::StringRef value);
 void _swift_parseBacktracingSettings(const char *);
 
-#if DEBUG_BACKTRACING_SETTINGS
+#if DEBUG_BACKTRACING
 const char *algorithmToString(UnwindAlgorithm algorithm) {
   switch (algorithm) {
   case UnwindAlgorithm::Auto: return "Auto";
@@ -290,7 +290,7 @@ const char *presetToString(Preset preset) {
   case Preset::Auto: return "Auto";
   case Preset::Friendly: return "Friendly";
   case Preset::Medium: return "Medium";
-  case Preset::Full: return Full;
+  case Preset::Full: return "Full";
   }
 }
 #endif
@@ -574,7 +574,8 @@ BacktraceInitializer::BacktraceInitializer() {
   }
 #endif
 
-#if DEBUG_BACKTRACING_SETTINGS
+#if SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
+#if DEBUG_BACKTRACING
   printf("\nBACKTRACING SETTINGS\n"
          "\n"
          "algorithm: %s\n"
@@ -592,7 +593,7 @@ BacktraceInitializer::BacktraceInitializer() {
          onOffTtyToString(_swift_backtraceSettings.color),
          _swift_backtraceSettings.timeout,
          presetToString(_swift_backtraceSettings.preset),
-         swiftBacktracePath);
+         _swift_backtraceSettings.swiftBacktracePath);
 
   printf("\nBACKTRACING ENV\n");
 
@@ -603,6 +604,7 @@ BacktraceInitializer::BacktraceInitializer() {
     ptr += len + 1;
   }
   printf("\n");
+#endif
 #endif
 }
 
@@ -1145,7 +1147,7 @@ _swift_backtrace_demangle(const char *mangledName,
 
     *outputBufferSize = strlen(result) + 1;
 
-    return outputBuffer;
+    return result;
 #endif
   }
 
@@ -1580,6 +1582,21 @@ _swift_spawnBacktracer(CrashInfo *crashInfo)
     CloseHandle(processInfo.hProcess);
     return false;
   }
+
+#if DEBUG_BACKTRACING
+  if (dwExitCode != 0) {
+    char message[128];
+    int len = snprintf(message, sizeof(message),
+                        "swift runtime: swift-backtrace.exe exited with status 0x%08lX (%lu)\n",
+                        (unsigned long)dwExitCode,
+                        (unsigned long)dwExitCode);
+    if (len > 0) {
+      DWORD written;
+      HANDLE hErr = GetStdHandle(STD_ERROR_HANDLE);
+      WriteFile(hErr, message, (DWORD)len, &written, NULL);
+    }
+  }
+#endif  
 
   CloseHandle(processInfo.hProcess);
   return dwExitCode == 0;
