@@ -471,24 +471,29 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
     DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace);
 }
 
-DebugValueInst *
-DebugValueInst::createAddr(SILDebugLocation DebugLoc, SILValue Operand,
-                           SILModule &M, SILDebugVariable Var,
-                           UsesMoveableValueDebugInfo_t wasMoved, bool trace) {
-  Var.DIExpr.prependElements(
-    {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
-  return DebugValueInst::create(DebugLoc, Operand, M, Var, DontPoisonRefs,
-                                wasMoved, trace);
-}
+void DebugValueInst::prependDeref() {
+  ASSERT(!sharedUInt8().DebugValueInst.prependDeref &&
+         "Debug value cannot have two derefs!");
+  if (!ReconstructionBlock) {
+    sharedUInt8().DebugValueInst.prependDeref = true;
+    return;
+  }
+  // If we have an undef, the reconstruction block shouldn't have an argument.
+  // Nothing to do.
+  if (isa<SILUndef>(getOperand()))
+    return;
 
-bool DebugValueInst::exprStartsWithDeref() const {
-  if (!NumDIExprOperands)
-    return false;
-
-  llvm::ArrayRef<SILDIExprElement> DIExprElements(
-      getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
-  return DIExprElements.front().getAsOperator()
-          == SILDIExprOperator::Dereference;
+  // If we have a reconstruction block, add a load at the beginning.
+  SILBuilder builder(ReconstructionBlock->begin());
+  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILType addrType = oldArg->getType().getAddressType();
+  SILValue undefAddress = SILUndef::get(getFunction(), addrType);
+  LoadInst *load = builder.createLoad(getLoc(), undefAddress,
+                                      LoadOwnershipQualifier::Unqualified);
+  oldArg->replaceAllUsesWith(load);
+  SILArgument *newArg =
+      ReconstructionBlock->replacePhiArgument(0, addrType, OwnershipKind::None);
+  load->setOperand(newArg);
 }
 
 SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
@@ -504,10 +509,18 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   if (isa<SILUndef>(operand)) {
     // No arguments, return the same undef directly.
     retVal = operand;
+  } else if (sharedUInt8().DebugValueInst.prependDeref) {
+    // Convert the deref to a load.
+    SILArgument *arg = block->createPhiArgument(
+        operand->getType().getAddressType(), OwnershipKind::None);
+    retVal = builder.createLoad(getLoc(), arg,
+                                LoadOwnershipQualifier::Unqualified);
   } else {
     // Add a block argument matching the operand type.
     retVal = block->createPhiArgument(operand->getType(), OwnershipKind::None);
   }
+  // If the prependDeref flag was set, reset it, including in the undef case.
+  sharedUInt8().DebugValueInst.prependDeref = false;
 
   builder.createReturn(getLoc(), retVal);
   ReconstructionBlock = block;
