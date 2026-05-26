@@ -1013,6 +1013,30 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
                                                                kind.value());
         });
 
+      // Optional<FRT> maps to a nullable pointer so the instantiated
+      // function re-imports with an optional return type. Otherwise, it would
+      // be re-imported as non-optional FRT.
+      if (argType->isForeignReferenceType()) {
+        return withCache([&]() {
+          if (auto nominal = argType->getAs<NominalType>()) {
+            if (auto clangTypeDecl = dyn_cast_or_null<clang::TypeDecl>(
+                    nominal->getDecl()->getClangDecl())) {
+              auto ptrTy = ClangASTContext.getPointerType(
+                  ClangASTContext.getTypeDeclType(clangTypeDecl));
+              auto nullableAttr = new (ClangASTContext) clang::TypeNullableAttr(
+                  ClangASTContext,
+                  clang::AttributeCommonInfo(
+                      clang::SourceRange(),
+                      clang::AttributeCommonInfo::AT_TypeNullable,
+                      clang::AttributeCommonInfo::Form::Implicit()));
+              return ClangASTContext.getAttributedType(nullableAttr, ptrTy,
+                                                       ptrTy);
+            }
+          }
+          return clang::QualType();
+        });
+      }
+
       // Arbitrary optional types are not (yet) supported
       return clang::QualType();
     }
