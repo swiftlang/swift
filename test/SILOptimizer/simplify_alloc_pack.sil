@@ -504,11 +504,12 @@ bb0:
 
 // MARK: Debug Info Handling
 
-// TODO: Retain debug info when eliminating packs.
+// Retain debug info when eliminating packs.
 
 // CHECK-LABEL: sil [ossa] @debuginfo_a : $@convention(thin) () -> () {
 // CHECK:         [[ALLOC_A:%[0-9]+]] = alloc_stack $A
 // CHECK-NOT:     alloc_pack
+// CHECK:         debug_value [[ALLOC_A]], let, name "pack", expr op_deref
 // CHECK:         [[USE:%[0-9]+]] = function_ref @use
 // CHECK-NEXT:    apply [[USE]]<A>([[ALLOC_A]])
 // CHECK-LABEL: } // end sil function 'debuginfo_a'
@@ -532,6 +533,8 @@ bb0:
 // CHECK:         [[ALLOC_A:%[0-9]+]] = alloc_stack $A
 // CHECK:         [[ALLOC_B:%[0-9]+]] = alloc_stack $B
 // CHECK-NOT:     alloc_pack
+// CHECK:         debug_value [[ALLOC_A]], let, name "pack", type $(A, B), expr op_deref:op_tuple_fragment:$(A, B):0
+// CHECK:         debug_value [[ALLOC_B]], let, name "pack", type $(A, B), expr op_deref:op_tuple_fragment:$(A, B):1
 // CHECK:         [[USE:%[0-9]+]] = function_ref @use
 // CHECK-NEXT:    apply [[USE]]<A>([[ALLOC_A]])
 // CHECK-NEXT:    apply [[USE]]<B>([[ALLOC_B]])
