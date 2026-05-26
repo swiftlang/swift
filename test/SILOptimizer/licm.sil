@@ -2361,3 +2361,30 @@ bb3:
   return %r
 }
 
+// CHECK-LABEL: sil [ossa] @licm_trivial_store_to_nontrivial_addr :
+// CHECK:         load [take] %0 : $*Optional<String>
+// CHECK:       bb1({{%[0-9]+}} : @owned $Optional<String>):
+// CHECK:       bb3:
+// CHECK:         store {{%[0-9]+}} to [trivial] %0
+// CHECK-LABEL: } // end sil function 'licm_trivial_store_to_nontrivial_addr'
+sil [ossa] @licm_trivial_store_to_nontrivial_addr : $@convention(thin) () -> @out Optional<String> {
+bb0(%0 : $*Optional<String>):
+  %none = enum $Optional<String>, #Optional.none!enumelt
+  store %none to [trivial] %0 : $*Optional<String>
+  br bb1
+
+bb1:
+  %loaded = load [take] %0 : $*Optional<String>
+  destroy_value %loaded : $Optional<String>
+  %none2 = enum $Optional<String>, #Optional.none!enumelt
+  store %none2 to [trivial] %0 : $*Optional<String>
+  cond_br undef, bb2, bb3
+
+bb2:
+  br bb1
+
+bb3:
+  %r = tuple ()
+  return %r : $()
+}
+
