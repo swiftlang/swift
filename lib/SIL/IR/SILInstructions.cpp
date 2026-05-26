@@ -573,6 +573,15 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   return block;
 }
 
+void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
+  auto *srcBB = src->getDebugReconstructionBlock();
+  if (!srcBB)
+    return;
+  auto *newBB = getFunction()->createEmptyDebugReconstructionBlock();
+  setDebugReconstructionBlock(newBB);
+  DebugBasicBlockCloner(*getFunction()).clone(srcBB, newBB);
+}
+
 void DebugValueInst::killOperand() {
   if (isa<SILUndef>(getOperand())) {
     // Already undef: no operand to kill.

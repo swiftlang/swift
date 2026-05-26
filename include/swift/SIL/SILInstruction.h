@@ -5787,6 +5787,9 @@ public:
     ReconstructionBlock = BB;
   }
 
+  /// Clones the reconstruction block from \p src onto this debug value.
+  void cloneReconstructionBlockFrom(DebugValueInst *src);
+
   /// Returns a variable reconstruction basic block for this debug value.
   /// If this debug value has no debug reconstruction block, a new one is
   /// created and attached to this instruction.
