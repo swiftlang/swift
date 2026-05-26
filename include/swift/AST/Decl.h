@@ -1128,6 +1128,16 @@ public:
   /// @_neverEmitIntoClient.
   bool isNeverEmittedIntoClient() const;
 
+  /// Compute the code generation model that is required for this declaration.
+  ///
+  /// This function applies the limitations of the compilation model to
+  /// determine if there's a code generation model that *must* be used for the
+  /// given declaration. For example, generic declarations must be
+  /// `@export(implementation)` in Embedded Swift, because it does not support
+  /// unspecialized generics.
+  std::optional<CodeGenerationModel>
+  getRequiredCodeGenerationModel() const;
+
   /// Compute the code generation model that was explicitly requested for
   /// this declaration.
   ///

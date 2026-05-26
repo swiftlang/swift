@@ -2391,26 +2391,26 @@ Decl::getExplicitCodeGenerationModel() const {
 /// This accounts for limitations of the code generation model. For example,
 /// a generic declaration can only be treated as @export(implementation) in
 /// Embedded Swift, because there are no unspecialized generics.
-static std::optional<CodeGenerationModel>
-getRequiredCodeGenerationModel(const Decl *decl) {
-  bool isEmbedded = decl->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+std::optional<CodeGenerationModel>
+Decl::getRequiredCodeGenerationModel() const {
+  bool isEmbedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
   // A generic declaration must be @export(implementation) in Embedded Swift.
-  auto dc = decl->getInnermostDeclContext();
+  auto dc = getInnermostDeclContext();
   if (auto sig = dc->getGenericSignatureOfContext()) {
     if (!sig->areAllParamsConcrete() && isEmbedded)
       return CodeGenerationModel::Implementation;
   }
 
   // Foreign types are always @export(implementation).
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(this)) {
     if (isa<ClangModuleUnit>(nominal->getModuleScopeContext()))
       return CodeGenerationModel::Implementation;
   }
 
   // Types must be @export(interface) in non-Embedded Swift, because the type
   // metadata symbols need to be unique.
-  if (isa<TypeDecl>(decl) && !isEmbedded)
+  if (isa<TypeDecl>(this) && !isEmbedded)
     return CodeGenerationModel::Interface;
 
   return std::nullopt;
@@ -2418,14 +2418,15 @@ getRequiredCodeGenerationModel(const Decl *decl) {
 
 CodeGenerationModel
 Decl::getEffectiveCodeGenerationModel() const {
+  // If there is a required code generation model, return that. This overrides
+  // any explicitly-written model, which is diagnosed in attribute checking.
+  if (auto required = getRequiredCodeGenerationModel())
+    return *required;
+
   // If there is an explicit attribute that specifies the model for this
   // declaration, use it.
   if (auto explicitModel = getExplicitCodeGenerationModel())
     return *explicitModel;
-
-  // If there is a required code generation model, return that.
-  if (auto required = getRequiredCodeGenerationModel(this))
-    return *required;
 
   // A member of a nominal type or extension inherits its code generation
   // model from the enclosing type/extension's *explicit* model, so that

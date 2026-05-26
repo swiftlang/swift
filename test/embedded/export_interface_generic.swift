@@ -49,3 +49,14 @@ extension GenericHolder: P {}
 // @export(implementation) does not have this restriction.
 @export(implementation)
 public struct GenericImplStruct<T> {}
+
+extension P {
+  @export(interface) // expected-error{{'@export(interface)' cannot be applied to a instance method 'f()' in Embedded Swift}}
+  public func f() { }
+}
+
+@export(interface) // expected-error{{'@export(interface)' cannot be applied to a global function 'globalGeneric' in Embedded Swift}}
+public func globalGeneric<T>(_: T) { }
+
+@export(interface) // expected-error{{'@export(interface)' attribute cannot be applied to this declaration}}
+protocol Q { }
