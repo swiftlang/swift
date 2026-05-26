@@ -1080,10 +1080,6 @@ public:
       PoisonRefs_t poisonRefs = DontPoisonRefs,
       UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
       bool trace = false, bool overrideLoc = true);
-  DebugValueInst *createDebugValueAddr(
-      SILLocation Loc, SILValue src, SILDebugVariable Var,
-      UsesMoveableValueDebugInfo_t wasMoved = DoesNotUseMoveableValueDebugInfo,
-      bool trace = false);
 
   DebugStepInst *createDebugStep(SILLocation Loc) {
     return insert(new (getModule()) DebugStepInst(getSILDebugLocation(Loc)));
@@ -1092,8 +1088,10 @@ public:
   /// Create a debug_value according to the type of \p src
   DebugValueInst *emitDebugDescription(SILLocation Loc, SILValue src,
                                        SILDebugVariable Var) {
-    if (src->getType().isAddress())
-      return createDebugValueAddr(Loc, src, Var);
+    if (src->getType().isAddress()) {
+      Var.DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+    }
     return createDebugValue(Loc, src, Var);
   }
 
