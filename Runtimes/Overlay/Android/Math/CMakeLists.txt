@@ -15,5 +15,3 @@ install(TARGETS swift_math
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 emit_swift_interface(swift_math)
 install_swift_interface(swift_math)
-
-embed_manifest(swift_math)

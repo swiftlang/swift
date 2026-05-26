@@ -36,10 +36,60 @@ if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 endif()
 
 set(DISPATCH_SDKS)
+set(SWIFT_LIBDISPATCH_USE_PACKAGE FALSE)
+set(SWIFT_LIBDISPATCH_INCLUDE_DIRECTORIES
+  ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime
+  ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+
+if(dispatch_DIR AND
+    NOT "${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS AND
+    NOT "${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASI")
+  find_package(dispatch CONFIG REQUIRED)
+  if(NOT TARGET dispatch)
+    message(FATAL_ERROR
+      "dispatch package at ${dispatch_DIR} did not provide dispatch")
+  endif()
+  if(NOT TARGET BlocksRuntime)
+    message(FATAL_ERROR
+      "dispatch package at ${dispatch_DIR} did not provide BlocksRuntime")
+  endif()
+  foreach(target dispatch BlocksRuntime)
+    get_target_property(include_directories ${target} INTERFACE_INCLUDE_DIRECTORIES)
+    if(include_directories)
+      list(APPEND SWIFT_LIBDISPATCH_INCLUDE_DIRECTORIES ${include_directories})
+    endif()
+  endforeach()
+  list(REMOVE_DUPLICATES SWIFT_LIBDISPATCH_INCLUDE_DIRECTORIES)
+
+  set(SWIFT_LIBDISPATCH_PACKAGE_VARIANT_SUFFIXES)
+  if(SWIFT_HOST_VARIANT_SDK AND SWIFT_HOST_VARIANT_ARCH)
+    list(APPEND SWIFT_LIBDISPATCH_PACKAGE_VARIANT_SUFFIXES
+      "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_HOST_VARIANT_ARCH}")
+  endif()
+  if(SWIFT_PRIMARY_VARIANT_SDK AND SWIFT_PRIMARY_VARIANT_ARCH)
+    list(APPEND SWIFT_LIBDISPATCH_PACKAGE_VARIANT_SUFFIXES
+      "${SWIFT_SDK_${SWIFT_PRIMARY_VARIANT_SDK}_LIB_SUBDIR}-${SWIFT_PRIMARY_VARIANT_ARCH}")
+  endif()
+  list(REMOVE_DUPLICATES SWIFT_LIBDISPATCH_PACKAGE_VARIANT_SUFFIXES)
+
+  foreach(variant_suffix ${SWIFT_LIBDISPATCH_PACKAGE_VARIANT_SUFFIXES})
+    foreach(target dispatch BlocksRuntime)
+      set(variant_target "${target}-${variant_suffix}")
+      if(NOT TARGET "${variant_target}")
+        add_library("${variant_target}" INTERFACE IMPORTED GLOBAL)
+        set_target_properties("${variant_target}" PROPERTIES
+          INTERFACE_LINK_LIBRARIES "${target}"
+          INTERFACE_INCLUDE_DIRECTORIES "${SWIFT_LIBDISPATCH_INCLUDE_DIRECTORIES}")
+      endif()
+    endforeach()
+  endforeach()
+  set(SWIFT_LIBDISPATCH_USE_PACKAGE TRUE)
+endif()
 
 # Build the host libdispatch if needed.
 if(SWIFT_BUILD_HOST_DISPATCH)
-  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  if(NOT CMAKE_SYSTEM_NAME STREQUAL "Darwin" AND
+      NOT SWIFT_LIBDISPATCH_USE_PACKAGE)
     if(NOT "${SWIFT_HOST_VARIANT_SDK}" IN_LIST SWIFT_SDKS)
       list(APPEND DISPATCH_SDKS "${SWIFT_HOST_VARIANT_SDK}")
     endif()
@@ -51,7 +101,10 @@ foreach(sdk ${SWIFT_SDKS})
   # Darwin targets have libdispatch available, do not build it.
   # Wasm/WASI doesn't support libdispatch yet.
   # See https://github.com/apple/swift/issues/54533 for more details.
-  if(NOT "${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS AND NOT "${sdk}" STREQUAL "WASI")
+  if(NOT "${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS AND
+      NOT "${sdk}" STREQUAL "WASI" AND
+      NOT (SWIFT_LIBDISPATCH_USE_PACKAGE AND
+           "${sdk}" STREQUAL "${SWIFT_HOST_VARIANT_SDK}"))
     list(APPEND DISPATCH_SDKS "${sdk}")
   endif()
 endforeach()
@@ -264,10 +317,8 @@ foreach(sdk ${DISPATCH_SDKS})
   endforeach()
 endforeach()
 
-if(DISPATCH_SDKS)
+if(DISPATCH_SDKS OR SWIFT_LIBDISPATCH_USE_PACKAGE)
   # FIXME(compnerd) this should be taken care of by the
   # INTERFACE_INCLUDE_DIRECTORIES above
-  include_directories(AFTER
-                      ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE}/src/BlocksRuntime
-                      ${SWIFT_PATH_TO_LIBDISPATCH_SOURCE})
+  include_directories(AFTER ${SWIFT_LIBDISPATCH_INCLUDE_DIRECTORIES})
 endif()
