@@ -4266,6 +4266,9 @@ public:
 
   /// Retrieve the number of parameters for which we have information.
   unsigned size() const { return defaultArguments.size(); }
+
+private:
+  void setFlagsFor(const ParamDecl *param, unsigned index);
 };
 
 /// Turn a param list into a symbolic and printable representation that does not
