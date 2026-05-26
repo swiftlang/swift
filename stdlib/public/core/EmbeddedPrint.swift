@@ -54,12 +54,14 @@ extension String {
   }
 }
 
+@inline(never)
 public func print(_ string: StaticString, terminator: StaticString = "\n") {
   string.writeToStandardOutput()
   terminator.writeToStandardOutput()
 }
 
 @_disfavoredOverload
+@inline(never)
 public func print(_ string: String, terminator: StaticString = "\n") {
   var string = string
   string.writeToStandardOutput()
@@ -67,12 +69,14 @@ public func print(_ string: String, terminator: StaticString = "\n") {
 }
 
 @_disfavoredOverload
+@inline(never)
 public func print(_ object: some CustomStringConvertible, terminator: StaticString = "\n") {
   var string = object.description
   string.writeToStandardOutput()
   terminator.writeToStandardOutput()
 }
 
+@inline(never)
 func print(_ buf: UnsafeBufferPointer<UInt8>, terminator: StaticString = "\n") {
   unsafe writeChars(buf)
   terminator.writeToStandardOutput()
@@ -138,6 +142,7 @@ extension BinaryInteger {
   }
 }
 
+@inline(never)
 public func print(_ integer: some BinaryInteger, terminator: StaticString = "\n") {
   integer.writeToStdout(radix: 10)
   print("", terminator: terminator)
@@ -148,6 +153,7 @@ internal func printAsHex(_ integer: some BinaryInteger, terminator: StaticString
   print("", terminator: terminator)
 }
 
+@inline(never)
 public func print(_ boolean: Bool, terminator: StaticString = "\n") {
   if boolean {
     print("true", terminator: terminator)
