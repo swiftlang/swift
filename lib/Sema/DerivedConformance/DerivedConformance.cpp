@@ -1125,7 +1125,7 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
   info.declContext = parentDC;
   C.SourceMgr.setGeneratedSourceInfo(bufferID, info);
 
-  auto *SF = new (C) SourceFile(*derived.getParentModule(), SourceFileKind::MacroExpansion, bufferID);
+  auto *SF = new (C) SourceFile(*derived.getParentModule(), SourceFileKind::SyntheticMacro, bufferID);
 
   // Find the parsed MacroExpansionDecl * from the parsed source file.
   MacroExpansionDecl *expansion = nullptr;
