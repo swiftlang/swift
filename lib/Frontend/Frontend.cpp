@@ -57,6 +57,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
+#include "llvm/Support/SandboxingFileSystem.h"
 #include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/TargetParser/Triple.h"
 #include <llvm/ADT/StringExtras.h>
@@ -706,6 +707,51 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
           Invocation.getFrontendOptions().RequestedAction)) {
     Diagnostics.diagnose(SourceLoc(), diag::error_caching_no_cas_fs);
     return true;
+  }
+
+  if (!CASOpts.DepscanCASFileSystemRootID.empty() &&
+      Invocation.getFrontendOptions().RequestedAction ==
+          FrontendOptions::ActionType::ScanDependencies) {
+    if (CASOpts.requireCASFS()) {
+      Diagnostics.diagnose(
+          SourceLoc(), diag::error_option_incompatible, "-scanner-cas-fs",
+          "-clang-include-tree-root | -clang-include-tree-filelist | "
+          "-input-file-key | -bridging-header-pch-key");
+      return true;
+    }
+
+    auto reportError = [&](llvm::Error E) -> bool {
+      Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                           toString(std::move(E)));
+      return true;
+    };
+
+    auto ID = CAS->parseID(CASOpts.DepscanCASFileSystemRootID);
+    if (!ID)
+      return reportError(ID.takeError());
+    auto CASFS = llvm::cas::createCASFileSystem(CAS, *ID);
+    if (!CASFS)
+      return reportError(CASFS.takeError());
+
+    if (!CASOpts.CASFSEscapePaths.empty()) {
+      SmallVector<StringRef, 4> EscapePaths;
+      for (const auto &Path : CASOpts.CASFSEscapePaths) {
+        EscapePaths.push_back(Path);
+      }
+      auto SandboxFS = llvm::vfs::createSandboxingFileSystem(
+          SourceMgr.getFileSystem(), EscapePaths);
+      if (!SandboxFS) {
+        Diagnostics.diagnose(SourceLoc(), diag::error_cas_fs_creation,
+                             toString(SandboxFS.takeError()));
+        return true;
+      }
+      auto OverlayFS = llvm::makeIntrusiveRefCnt<llvm::vfs::OverlayFileSystem>(
+          std::move(*CASFS));
+      OverlayFS->pushOverlay(std::move(*SandboxFS));
+      SourceMgr.setFileSystem(std::move(OverlayFS));
+    } else {
+      SourceMgr.setFileSystem(std::move(*CASFS));
+    }
   }
 
   if (Invocation.getCASOptions().requireCASFS()) {

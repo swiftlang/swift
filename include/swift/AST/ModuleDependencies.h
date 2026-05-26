@@ -1087,6 +1087,9 @@ class SwiftDependencyScanningService {
   /// The CAS configuration created the Scanning Service if used.
   std::optional<llvm::cas::CASConfiguration> CASConfig;
 
+  /// Escape paths used for the Scanning Service.
+  std::vector<std::string> CASFSEscapePaths;
+
   /// The persistent Clang dependency scanner service.
   ///
   /// Created by the first scan (see \c setupDependencyScanningService), which
