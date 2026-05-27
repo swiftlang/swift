@@ -344,7 +344,7 @@ Suite.test("Non-empty array with return") {
 Suite.test("Empty inline array with return_lifetimebound") {
     let emptyArr: [0 of Int32] = []
     // empty inline array pointer is null
-    expectCrash { interop_counted_return_lifetimebound(emptyArr.span) }
+    expectCrash { let _ = interop_counted_return_lifetimebound(emptyArr.span) }
 }
 
 Suite.test("Non-empty inline array with return_lifetimebound") {
@@ -355,14 +355,14 @@ Suite.test("Non-empty inline array with return_lifetimebound") {
 
 Suite.test("Default span with return_lifetimebound") {
     // default span pointer is null
-    expectCrash { interop_counted_return_lifetimebound(Span()) }
+    expectCrash { let _ = interop_counted_return_lifetimebound(Span()) }
 }
 
 Suite.test("Empty inline array with return") {
     let emptyArr: [0 of Int32] = []
     emptyArr.span.withUnsafeBufferPointer { buf in
       // empty inline array pointer is null
-      expectCrash { unsafe interop_counted_return(buf) }
+      expectCrash { let _ = unsafe interop_counted_return(buf) }
     }
 }
 
@@ -376,7 +376,7 @@ Suite.test("Non-empty inline array with return") {
 
 Suite.test("Default buffer pointer with return") {
     // default buffer pointer is null
-    expectCrash { unsafe interop_counted_return(UnsafeBufferPointer(_empty:())) }
+    expectCrash { let _ = unsafe interop_counted_return(UnsafeBufferPointer(_empty:())) }
 }
 
 Suite.test("Empty array with return_lifetimebound_nullable") {
@@ -403,7 +403,6 @@ Suite.test("Non-empty array with return_nullable") {
     let arr: [Int32] = [1, 2, 3]
     arr.withUnsafeBufferPointer { buf in
         let result = unsafe interop_counted_return_nullable(buf)
-        unsafe expectTrue(result != nil)
         unsafe expectEqual(buf, result)
     }
 }
@@ -411,21 +410,18 @@ Suite.test("Non-empty array with return_nullable") {
 Suite.test("Empty inline array with return_lifetimebound_nullable") {
     let emptyArr: [0 of Int32] = []
     let result = interop_counted_return_lifetimebound_nullable(emptyArr.span)
-    expectTrue(result != nil)
     expectEqual(emptyArr.span, result)
 }
 
 Suite.test("Non-empty inline array with return_lifetimebound_nullable") {
     let arr: [3 of Int32] = [1, 2, 3]
     let result = interop_counted_return_lifetimebound_nullable(arr.span)
-    expectTrue(result != nil)
     expectEqual(arr.span, result)
 }
 
 Suite.test("Default span with return_lifetimebound_nullable") {
     let span = Span<Int32>()
     let result = interop_counted_return_lifetimebound_nullable(span)
-    expectTrue(result != nil)
     expectEqual(span, result)
 }
 
@@ -433,7 +429,6 @@ Suite.test("Empty inline array with return_nullable") {
     let emptyArr: [0 of Int32] = []
     emptyArr.span.withUnsafeBufferPointer { buf in
       let result = unsafe interop_counted_return_nullable(buf)
-      expectTrue(unsafe result != nil)
       unsafe expectEqual(buf, result)
     }
 }
@@ -442,7 +437,6 @@ Suite.test("Non-empty inline array with return_nullable") {
     let arr: [3 of Int32] = [1, 2, 3]
     arr.span.withUnsafeBufferPointer { buf in
       let result = unsafe interop_counted_return_nullable(buf)
-      expectTrue(unsafe result != nil)
       unsafe expectEqual(buf, result)
     }
 }
@@ -450,7 +444,6 @@ Suite.test("Non-empty inline array with return_nullable") {
 Suite.test("Default buffer with return_nullable") {
     let buf = UnsafeBufferPointer<Int32>(_empty:())
     let result = unsafe interop_counted_return_nullable(buf)
-    expectTrue(unsafe result != nil)
     unsafe expectEqual(buf, result)
 }
 
