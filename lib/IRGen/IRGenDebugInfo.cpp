@@ -4115,7 +4115,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       // that corresponds with a funclet edge. This operation effectively sets
       // up the rest of the pipeline to be stupid and just emit the
       // llvm.dbg.value in the correct places. This is done by the SILOptimizer
-      // pass DebugInfoCanonicalizer.
+      // pass MovedAsyncVarDebugInfoPropagator.
       auto InsertBefore = Builder.GetInsertPoint();
       if (InsertBefore != ParentBlock->end()) {
         InsertPt = &*InsertBefore;
