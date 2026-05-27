@@ -55,8 +55,8 @@ extension UniqueArray where Element: ~Copyable {
   ///    of the callback invocations.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func replace<E: Error>(
-    removing subrange: Range<Int>,
+  public mutating func replaceSubrange<E: Error>(
+    _ subrange: Range<Int>,
     addingCount newItemCount: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) -> Void {
@@ -64,8 +64,8 @@ extension UniqueArray where Element: ~Copyable {
     _precondition(newItemCount >= 0, "Cannot add a negative number of items")
     // FIXME: Avoid moving the subsequent elements twice on resize.
     _ensureFreeCapacity(newItemCount - subrange.count)
-    try _storage._uncheckedReplace(
-      removing: subrange,
+    try _storage._uncheckedReplaceSubrange(
+      subrange,
       addingCount: newItemCount,
       initializingWith: initializer)
   }
@@ -104,13 +104,13 @@ extension UniqueArray where Element: ~Copyable {
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func replace(
-    removing subrange: Range<Int>,
+  public mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     moving newElements: UnsafeMutableBufferPointer<Element>,
   ) {
     // FIXME: Avoid moving the subsequent elements twice.
     _ensureFreeCapacity(newElements.count - subrange.count)
-    unsafe _storage.replace(removing: subrange, moving: newElements)
+    unsafe _storage.replaceSubrange(subrange, moving: newElements)
   }
 
   /// Replaces the specified range of elements by moving the contents of an
@@ -142,18 +142,18 @@ extension UniqueArray where Element: ~Copyable {
   /// - Complexity: O(`self.count` + `items.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func replace(
-    removing subrange: Range<Int>,
+  public mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     moving items: inout OutputSpan<Element>
   ) {
     // FIXME: Avoid moving the subsequent elements twice.
     _ensureFreeCapacity(items.count - subrange.count)
-    _storage.replace(removing: subrange, moving: &items)
+    _storage.replaceSubrange(subrange, moving: &items)
   }
 }
 
 @available(SwiftStdlib 6.4, *)
-extension UniqueArray {
+extension UniqueArray where Element: Copyable {
   /// Replaces the specified subrange of elements by copying the elements of
   /// the given buffer pointer, which must be fully initialized.
   ///
@@ -184,13 +184,13 @@ extension UniqueArray {
   ///   *m* is the count of `newElements`.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func replace(
-    removing subrange: Range<Int>,
+  public mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     copying newElements: UnsafeBufferPointer<Element>
   ) {
     // FIXME: Avoid moving the subsequent elements twice.
     _ensureFreeCapacity(newElements.count - subrange.count)
-    unsafe _storage.replace(removing: subrange, copying: newElements)
+    unsafe _storage.replaceSubrange(subrange, copying: newElements)
   }
 
   /// Replaces the specified subrange of elements by copying the elements of
@@ -223,12 +223,12 @@ extension UniqueArray {
   ///   *m* is the count of `newElements`.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func replace(
-    removing subrange: Range<Int>,
+  public mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     copying newElements: UnsafeMutableBufferPointer<Element>
   ) {
-    unsafe self.replace(
-      removing: subrange,
+    unsafe self.replaceSubrange(
+      subrange,
       copying: UnsafeBufferPointer(newElements))
   }
 
@@ -262,13 +262,13 @@ extension UniqueArray {
   ///   *m* is the count of `newElements`.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func replace(
-    removing subrange: Range<Int>,
+  public mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     copying newElements: Span<Element>
   ) {
     // FIXME: Avoid moving the subsequent elements twice.
     _ensureFreeCapacity(newElements.count - subrange.count)
-    _storage.replace(removing: subrange, copying: newElements)
+    _storage.replaceSubrange(subrange, copying: newElements)
   }
 
   /// Replaces the specified subrange of elements by copying the elements of
@@ -301,15 +301,15 @@ extension UniqueArray {
   ///   *m* is the count of `newElements`.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func replace(
-    removing subrange: Range<Int>,
+  public mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     copying newElements: __owned some Collection<Element>
   ) {
     // FIXME: Avoid moving the subsequent elements twice.
     let c = newElements.count
     _ensureFreeCapacity(c - subrange.count)
-    _storage._replace(
-      removing: subrange,
+    _storage._replaceSubrange(
+      subrange,
       copyingCollection: newElements,
       newCount: c)
   }

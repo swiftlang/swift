@@ -54,8 +54,8 @@ extension _RigidArray where Element: ~Copyable {
   ///    of the callback invocations.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  internal mutating func replace<E: Error>(
-    removing subrange: Range<Int>,
+  internal mutating func replaceSubrange<E: Error>(
+    _ subrange: Range<Int>,
     addingCount newItemCount: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) -> Void {
@@ -64,15 +64,15 @@ extension _RigidArray where Element: ~Copyable {
     _precondition(
       newItemCount - subrange.count <= freeCapacity,
       "RigidArray capacity overflow")
-    try _uncheckedReplace(
-      removing: subrange,
+    try _uncheckedReplaceSubrange(
+      subrange,
       addingCount: newItemCount,
       initializingWith: initializer)
   }
 
   @_alwaysEmitIntoClient
-  internal mutating func _uncheckedReplace<E: Error>(
-    removing subrange: Range<Int>,
+  internal mutating func _uncheckedReplaceSubrange<E: Error>(
+    _ subrange: Range<Int>,
     addingCount newItemCount: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) -> Void {
@@ -126,11 +126,11 @@ extension _RigidArray where Element: ~Copyable {
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  internal mutating func replace(
-    removing subrange: Range<Int>,
+  internal mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     moving newElements: UnsafeMutableBufferPointer<Element>,
   ) {
-    replace(removing: subrange, addingCount: newElements.count) { target in
+    replaceSubrange(subrange, addingCount: newElements.count) { target in
       unsafe target.withUnsafeMutableBufferPointer { buffer, count in
         count = unsafe buffer._moveInitializePrefix(from: newElements)
       }
@@ -165,13 +165,13 @@ extension _RigidArray where Element: ~Copyable {
   /// - Complexity: O(`self.count` + `items.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  internal mutating func replace(
-    removing subrange: Range<Int>,
+  internal mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     moving items: inout OutputSpan<Element>
   ) {
     unsafe items.withUnsafeMutableBufferPointer { buffer, count in
       let source = unsafe buffer._extracting(first: count)
-      unsafe self.replace(removing: subrange, moving: source)
+      unsafe replaceSubrange(subrange, moving: source)
       count = 0
     }
   }
@@ -207,11 +207,11 @@ extension _RigidArray where Element: Copyable {
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  internal mutating func replace(
-    removing subrange: Range<Int>,
+  internal mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     copying newElements: UnsafeBufferPointer<Element>
   ) {
-    replace(removing: subrange, addingCount: newElements.count) { target in
+    replaceSubrange(subrange, addingCount: newElements.count) { target in
       unsafe target.withUnsafeMutableBufferPointer { buffer, count in
         count = unsafe buffer._initializePrefix(copying: newElements)
       }
@@ -246,12 +246,12 @@ extension _RigidArray where Element: Copyable {
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  internal mutating func replace(
-    removing subrange: Range<Int>,
+  internal mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     copying newElements: UnsafeMutableBufferPointer<Element>
   ) {
-    unsafe self.replace(
-      removing: subrange,
+    unsafe replaceSubrange(
+      subrange,
       copying: UnsafeBufferPointer(newElements))
   }
 
@@ -283,22 +283,22 @@ extension _RigidArray where Element: Copyable {
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  internal mutating func replace(
-    removing subrange: Range<Int>,
+  internal mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     copying newElements: Span<Element>
   ) {
     newElements.withUnsafeBufferPointer { buffer in
-      unsafe self.replace(removing: subrange, copying: buffer)
+      unsafe replaceSubrange(subrange, copying: buffer)
     }
   }
 
   @_alwaysEmitIntoClient
-  internal mutating func _replace(
-    removing subrange: Range<Int>,
+  internal mutating func _replaceSubrange(
+    _ subrange: Range<Int>,
     copyingCollection newElements: __owned some Collection<Element>,
     newCount: Int
   ) {
-    self.replace(removing: subrange, addingCount: newCount) { target in
+    replaceSubrange(subrange, addingCount: newCount) { target in
       unsafe target.withUnsafeMutableBufferPointer { dst, dstCount in
         let done: Void? = newElements.withContiguousStorageIfAvailable { src in
           let i = unsafe dst._initializePrefix(copying: src)
@@ -346,12 +346,12 @@ extension _RigidArray where Element: Copyable {
   /// - Complexity: O(`self.count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  internal mutating func replace(
-    removing subrange: Range<Int>,
+  internal mutating func replaceSubrange(
+    _ subrange: Range<Int>,
     copying newElements: __owned some Collection<Element>
   ) {
-    _replace(
-      removing: subrange,
+    _replaceSubrange(
+      subrange,
       copyingCollection: newElements,
       newCount: newElements.count)
   }
