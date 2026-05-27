@@ -1433,29 +1433,13 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     // If the target conforms to either and the conformance has not yet been
     // evaluated, then we should do that here.
     //
-    // If the user has already explicitly defined a CodingKeys type and we are
-    // in the middle of computing stored properties for this type, skip
-    // conformance evaluation to avoid a circular dependency. This cycle occurs
-    // when property wrapper initializers reference CodingKeys in their
-    // arguments, triggering: StoredPropertiesRequest -> PropertyWrapper
-    // type-check -> resolve CodingKeys -> Codable conformance ->
-    // StoredPropertiesRequest.
-    bool shouldSkip = false;
-    if (evaluator.hasActiveRequest(StoredPropertiesRequest{target})) {
-      auto codingKeysDecls =
-          target->lookupDirect(DeclName(Context.Id_CodingKeys));
-      if (!codingKeysDecls.empty())
-        shouldSkip = true;
-    }
-    if (!shouldSkip) {
-      // Try to synthesize Decodable first. If that fails, try to synthesize
-      // Encodable. If either succeeds and CodingKeys should have been
-      // synthesized, it will be synthesized.
-      auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
-      auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-      if (!evaluateTargetConformanceTo(decodableProto)) {
-        (void)evaluateTargetConformanceTo(encodableProto);
-      }
+    // Try to synthesize Decodable first. If that fails, try to synthesize
+    // Encodable. If either succeeds and CodingKeys should have been
+    // synthesized, it will be synthesized.
+    auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
+    auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
+    if (!evaluateTargetConformanceTo(decodableProto)) {
+      (void)evaluateTargetConformanceTo(encodableProto);
     }
   }
     break;
