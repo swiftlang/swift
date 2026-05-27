@@ -20,11 +20,6 @@
 #include "llvm/ADT/SmallPtrSet.h"
 #include "llvm/ADT/SmallVector.h"
 
-namespace llvm {
-  class Function;
-  class Module;
-}
-
 namespace swift {
   class CompilerInstance;
   class DiagnosticEngine;
@@ -43,8 +38,6 @@ void *loadSwiftRuntime(ArrayRef<std::string> runtimeLibPaths);
 bool tryLoadLibraries(ArrayRef<LinkLibrary> LinkLibraries,
                       SearchPathOptions SearchPathOpts,
                       DiagnosticEngine &Diags);
-bool linkLLVMModules(llvm::Module *Module,
-                     std::unique_ptr<llvm::Module> &&SubModule);
 bool autolinkImportedModules(ModuleDecl *M, const IRGenOptions &IRGenOpts);
 
 } // end namespace immediate
