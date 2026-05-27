@@ -15,6 +15,8 @@
 // RUN: %target-build-swift -target %module-target-future %s -parse-as-library -emit-module -emit-library -module-name NoncopyableFields -o %t/%target-library-name(NoncopyableFields)
 // RUN: %target-swift-reflection-dump %t/%target-library-name(NoncopyableFields) | %FileCheck %s
 
+// FIXME: this should be `-target %target-swift-6.4-abi-triple` once the platform versions are known.
+
 struct NC: ~Copyable {}
 
 struct AlwaysNoncopyableBox<T>: ~Copyable {

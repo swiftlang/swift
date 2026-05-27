@@ -20,6 +20,8 @@
 // RUN:   -target %target-future-triple \
 // RUN:   > %t/test_safe_runtime.irgen
 
+// FIXME: this should be `-target %target-swift-6.4-abi-triple` once the platform versions are known.
+
 // RUN: %FileCheck --check-prefix=NEW %s < %t/test_new.irgen
 // RUN: %FileCheck --check-prefix=OLD %s < %t/test_old.irgen
 // RUN: %FileCheck --check-prefix=SAFE-RUNTIME %s < %t/test_safe_runtime.irgen
