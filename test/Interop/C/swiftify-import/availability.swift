@@ -29,7 +29,7 @@ void span(int *__counted_by(len) p __noescape, int len) __attribute__((availabil
 @available(macOS 10.5, *) @_alwaysEmitIntoClient @_disfavoredOverload
 public func bufferPointer(_ _bufferPointer_param0: UnsafeMutableBufferPointer<Int32>) {
     let _bufferPointer_param1 = Int32(exactly: _bufferPointer_param0.count)!
-    return unsafe bufferPointer(_bufferPointer_param0.baseAddress!, _bufferPointer_param1)
+    return unsafe bufferPointer(_bufferPointer_param0.baseAddress, _bufferPointer_param1)
 }
 ------------------------------
 @__swiftmacro_So4span15_SwiftifyImportfMp_.swift
@@ -44,7 +44,7 @@ public func span(_ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe span(_pPtr.baseAddress!, len)
+    return unsafe span(_pPtr.baseAddress, len)
 }
 ------------------------------
 //--- ios-expansions.expected

@@ -805,9 +805,11 @@ extension PointerBoundsThunkBuilder {
   // Whether the wrapper exposes the buffer parameter / return value as an
   // Optional. Only the `*OrNull` variants propagate the underlying nullability;
   // the plain variants always produce a non-Optional Span/buffer pointer.
-  var nullable: Bool { return isOrNull && oldTypeIsOptional }
+  var nullable: Bool { return isOrNull && oldTypeIsNormalOptional }
 
-  var oldTypeIsOptional: Bool { return oldType.is(OptionalTypeSyntax.self) }
+  var oldTypeIsNormalOptional: Bool { return oldType.is(OptionalTypeSyntax.self) }
+  var oldTypeIsAnyOptional: Bool { return oldType.is(OptionalTypeSyntax.self) ||
+    oldType.is(ImplicitlyUnwrappedOptionalTypeSyntax.self) }
 
   var newType: TypeSyntax {
     get throws {
@@ -896,7 +898,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
           return nil
         }
         """)))
-    } else if oldTypeIsOptional && generateSpan {
+    } else if oldTypeIsAnyOptional && generateSpan {
       // Span's `_unsafeStart` requires a non-nil pointer; the underlying
       // function promises to only return null if count is 0, we can handle
       // that by returning a default constructed Span. The precondition helps
@@ -907,8 +909,15 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
       let cast = try newType
       let attrName = isSizedBy ? "sized_by" : "counted_by"
       let valueName = isSizedBy ? "size" : "count"
+      var castToNormalOptional = ""
+      if !oldTypeIsNormalOptional {
+        let IUOType = oldType.as(ImplicitlyUnwrappedOptionalTypeSyntax.self)!
+        // Immediatiely casting to a normal optional guarantees that we don't
+        // accidentally unwrap it implicitly
+        castToNormalOptional = ": \(IUOType.wrappedType)?"
+      }
       res.append(CodeBlockItemSyntax.Item(try VariableDeclSyntax(
-        "let _resultValue = \(call)")))
+        "let _resultValue\(raw: castToNormalOptional) = \(call)")))
       res.append(CodeBlockItemSyntax.Item(StmtSyntax(
         """
         if unsafe _resultValue == nil {
@@ -929,7 +938,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
       }
     var cast = try newType
     var expr: ExprSyntax
-    if nullable || (oldTypeIsOptional && generateSpan) {
+    if nullable || (oldTypeIsAnyOptional && generateSpan) {
       // The call has already been bound to `_resultValue` (and the empty
       // case handled with an early return) by `buildPreReturnStatements`.
       if let optType = cast.as(OptionalTypeSyntax.self) {
@@ -1079,7 +1088,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamBoundsThunkBuilder, PointerBounds
   }
 
   func unwrapIfNonnullable(_ expr: ExprSyntax) -> ExprSyntax {
-    if !oldTypeIsOptional {
+    if !oldTypeIsAnyOptional {
       return ExprSyntax(ForceUnwrapExprSyntax(expression: expr))
     }
     return expr

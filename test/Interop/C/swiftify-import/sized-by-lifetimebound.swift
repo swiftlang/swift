@@ -23,7 +23,7 @@
 #endif
 #define __lifetimebound __attribute__((lifetimebound))
 
-// expected-experimental-expansion@+13:70{{
+// expected-experimental-expansion@+18:70{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func simple(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.byteCount)!|}}
@@ -33,12 +33,17 @@
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe simple(len, len2, _pPtr.baseAddress!), byteCount: Int(len)), copying: ())|}}
-//   expected-experimental-remark@11{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeRawPointer? = unsafe simple(len, len2, _pPtr.baseAddress)|}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      precondition(len == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
+//   expected-experimental-remark@13{{macro content: |      return RawSpan()|}}
+//   expected-experimental-remark@14{{macro content: |    }|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: _resultValue!, byteCount: Int(len)), copying: ())|}}
+//   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 const void * __sized_by(len) simple(int len, int len2, const void * p __sized_by(len2) __lifetimebound);
 
-// expected-experimental-expansion@+13:60{{
+// expected-experimental-expansion@+18:60{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func shared(_ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len = Int32(exactly: p.byteCount)!|}}
@@ -48,12 +53,17 @@ const void * __sized_by(len) simple(int len, int len2, const void * p __sized_by
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe shared(len, _pPtr.baseAddress!), byteCount: Int(len)), copying: ())|}}
-//   expected-experimental-remark@11{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeRawPointer? = unsafe shared(len, _pPtr.baseAddress)|}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      precondition(len == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
+//   expected-experimental-remark@13{{macro content: |      return RawSpan()|}}
+//   expected-experimental-remark@14{{macro content: |    }|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: _resultValue!, byteCount: Int(len)), copying: ())|}}
+//   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 const void * __sized_by(len) shared(int len, const void * p __sized_by(len) __lifetimebound);
 
-// expected-experimental-expansion@+13:96{{
+// expected-experimental-expansion@+18:96{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.byteCount)!|}}
@@ -63,12 +73,17 @@ const void * __sized_by(len) shared(int len, const void * p __sized_by(len) __li
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe complexExpr(len, offset, len2, _pPtr.baseAddress!), byteCount: Int(len - offset)), copying: ())|}}
-//   expected-experimental-remark@11{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeRawPointer? = unsafe complexExpr(len, offset, len2, _pPtr.baseAddress)|}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      precondition(len - offset == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
+//   expected-experimental-remark@13{{macro content: |      return RawSpan()|}}
+//   expected-experimental-remark@14{{macro content: |    }|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: _resultValue!, byteCount: Int(len - offset)), copying: ())|}}
+//   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 const void * __sized_by(len - offset) complexExpr(int len, int offset, int len2, const void * p __sized_by(len2) __lifetimebound);
 
-// expected-experimental-expansion@+13:115{{
+// expected-experimental-expansion@+18:115{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func nullUnspecified(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.byteCount)!|}}
@@ -78,8 +93,13 @@ const void * __sized_by(len - offset) complexExpr(int len, int offset, int len2,
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe nullUnspecified(len, len2, _pPtr.baseAddress!), byteCount: Int(len)), copying: ())|}}
-//   expected-experimental-remark@11{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeRawPointer? = unsafe nullUnspecified(len, len2, _pPtr.baseAddress)|}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      precondition(len == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
+//   expected-experimental-remark@13{{macro content: |      return RawSpan()|}}
+//   expected-experimental-remark@14{{macro content: |    }|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: _resultValue!, byteCount: Int(len)), copying: ())|}}
+//   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 const void * __sized_by(len) _Null_unspecified nullUnspecified(int len, int len2, const void * _Null_unspecified p __sized_by(len2) __lifetimebound);
 
@@ -119,7 +139,7 @@ const void * __sized_by(len) _Nonnull nonnull(int len, int len2, const void * _N
 const void * __sized_by(len) _Nullable nullable(int len, int len2, const void * _Nullable p __sized_by(len2) __lifetimebound);
 
 typedef struct foo opaque_t;
-// expected-experimental-expansion@+13:66{{
+// expected-experimental-expansion@+18:66{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func opaque(_ len: Int32, _ p: RawSpan) -> RawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.byteCount)!|}}
@@ -129,20 +149,30 @@ typedef struct foo opaque_t;
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(unsafe opaque(len, len2, OpaquePointer(_pPtr.baseAddress!))), byteCount: Int(len)), copying: ())|}}
-//   expected-experimental-remark@11{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue: OpaquePointer? = unsafe opaque(len, len2, OpaquePointer(_pPtr.baseAddress))|}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      precondition(len == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
+//   expected-experimental-remark@13{{macro content: |      return RawSpan()|}}
+//   expected-experimental-remark@14{{macro content: |    }|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(_resultValue!), byteCount: Int(len)), copying: ())|}}
+//   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 opaque_t * __sized_by(len) opaque(int len, int len2, opaque_t * p __sized_by(len2) __lifetimebound);
 
-// expected-experimental-expansion@+6:70{{
+// expected-experimental-expansion@+11:70{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow p) @_disfavoredOverload public func nonsizedLifetime(_ len: Int32, _ p: UnsafeRawPointer!) -> RawSpan {|}}
-//   expected-experimental-remark@3{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe nonsizedLifetime(len, p), byteCount: Int(len)), copying: ())|}}
-//   expected-experimental-remark@4{{macro content: |}|}}
+//   expected-experimental-remark@3{{macro content: |    let _resultValue: UnsafeRawPointer? = unsafe nonsizedLifetime(len, p)|}}
+//   expected-experimental-remark@4{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@5{{macro content: |      precondition(len == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
+//   expected-experimental-remark@6{{macro content: |      return RawSpan()|}}
+//   expected-experimental-remark@7{{macro content: |    }|}}
+//   expected-experimental-remark@8{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: _resultValue!, byteCount: Int(len)), copying: ())|}}
+//   expected-experimental-remark@9{{macro content: |}|}}
 // }}
 const void * __sized_by(len) nonsizedLifetime(int len, const void * p __lifetimebound);
 
-// expected-experimental-expansion@+13:65{{
+// expected-experimental-expansion@+19:65{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_disfavoredOverload public func bytesized(_ p: RawSpan) -> MutableRawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let size = Int32(exactly: p.byteCount)!|}}
@@ -152,12 +182,18 @@ const void * __sized_by(len) nonsizedLifetime(int len, const void * p __lifetime
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe bytesized(size, _pPtr.baseAddress!.assumingMemoryBound(to: UInt8.self)), byteCount: Int(size)), copying: ())|}}
-//   expected-experimental-remark@11{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeMutablePointer<UInt8>? = unsafe bytesized(size, _pPtr.baseAddress.assumingMemoryBound(to: UInt8.self))|}}
+//   expected-experimental-error@10{{value of optional type 'UnsafeRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeRawPointer'}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      precondition(size == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
+//   expected-experimental-remark@13{{macro content: |      return MutableRawSpan()|}}
+//   expected-experimental-remark@14{{macro content: |    }|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: _resultValue!, byteCount: Int(size)), copying: ())|}}
+//   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 uint8_t *__sized_by(size)  bytesized(int size, const uint8_t * p __sized_by(size) __lifetimebound);
 
-// expected-experimental-expansion@+13:85{{
+// expected-experimental-expansion@+19:85{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func charsized(_ p: inout MutableRawSpan) -> MutableRawSpan {|}}
 //   expected-experimental-remark@3{{macro content: |    let size = Int32(exactly: p.byteCount)!|}}
@@ -167,8 +203,14 @@ uint8_t *__sized_by(size)  bytesized(int size, const uint8_t * p __sized_by(size
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: unsafe charsized(_pPtr.baseAddress!.assumingMemoryBound(to: CChar.self), size), byteCount: Int(size)), copying: ())|}}
-//   expected-experimental-remark@11{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeMutablePointer<CChar>? = unsafe charsized(_pPtr.baseAddress.assumingMemoryBound(to: CChar.self), size)|}}
+//   expected-experimental-error@10{{value of optional type 'UnsafeMutableRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeMutableRawPointer'}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      precondition(size == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
+//   expected-experimental-remark@13{{macro content: |      return MutableRawSpan()|}}
+//   expected-experimental-remark@14{{macro content: |    }|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableRawSpan(_unsafeStart: _resultValue!, byteCount: Int(size)), copying: ())|}}
+//   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 char *__sized_by(size) charsized(char * p __sized_by(size) __lifetimebound, int size);
 
