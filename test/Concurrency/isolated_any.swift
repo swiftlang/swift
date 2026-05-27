@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature InferSendableFromCaptures %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature InferSendableFromCaptures -verify-additional-prefix noerror- %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature InferSendableFromCaptures -verify-additional-prefix werror- -Werror ConversionFromIsolatedAnyToSynchronous %s
 
 // REQUIRES: swift_feature_InferSendableFromCaptures
 
@@ -71,13 +72,15 @@ func testConvertIsolatedAnyToNonIsolated(fn: @Sendable @isolated(any) () -> ()) 
 
 func requireSendableNonIsolated_sync(_ fn: @Sendable () -> ()) {}
 func testConvertIsolatedAnyToNonIsolated_sync(fn: @Sendable @isolated(any) () -> ()) {
-  // expected-warning @+1 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-noerror-warning @+2 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-werror-error @+1 {{converting @isolated(any) function of type '@isolated(any) @Sendable () -> ()' to synchronous function type '@Sendable () -> ()' is not allowed; this will be an error in a future Swift language mode}}
   requireSendableNonIsolated_sync(fn)
 }
 
 func requireNonSendableNonIsolated_sync(_ fn: () -> ()) {}
 func testConvertIsolatedAnyToNonSendableNonIsolated_sync(fn: @isolated(any) () -> ()) {
-  // expected-warning @+1 {{converting @isolated(any) function of type '@isolated(any) () -> ()' to synchronous function type '() -> ()' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-noerror-warning @+2 {{converting @isolated(any) function of type '@isolated(any) () -> ()' to synchronous function type '() -> ()' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-werror-error @+1 {{converting @isolated(any) function of type '@isolated(any) () -> ()' to synchronous function type '() -> ()' is not allowed; this will be an error in a future Swift language mode}}
   requireNonSendableNonIsolated_sync(fn)
 }
 
@@ -141,7 +144,8 @@ func nonSendableIsolatedAnySyncToSendableSync(
   _ fn: @escaping @isolated(any) () -> Void // expected-note {{parameter 'fn' is implicitly non-Sendable}}
 ) {
   let _: @Sendable () -> Void = fn  // expected-warning {{using non-Sendable parameter 'fn' in a context expecting a '@Sendable' closure}}
-  // expected-warning @-1 {{converting @isolated(any) function of type '@isolated(any) () -> Void' to synchronous function type '@Sendable () -> Void' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-noerror-warning @-1 {{converting @isolated(any) function of type '@isolated(any) () -> Void' to synchronous function type '@Sendable () -> Void' is not allowed; this will be an error in a future Swift language mode}}
+  // expected-werror-error @-2 {{converting @isolated(any) function of type '@isolated(any) () -> Void' to synchronous function type '@Sendable () -> Void' is not allowed; this will be an error in a future Swift language mode}}
 }
 
 func nonSendableIsolatedAnyAsyncToSendableSync(
