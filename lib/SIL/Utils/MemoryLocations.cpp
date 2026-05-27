@@ -185,12 +185,6 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
   SILFunction *function = loc->getFunction();
   assert(function && "cannot analyze a SILValue which is not in a function");
 
-  // Ignore trivial types to keep the number of locations small. Trivial types
-  // are not interesting anyway, because such memory locations are not
-  // destroyed.
-  if (!handleTrivialLocations && loc->getType().isTrivial(*function))
-    return;
-
   /// We don't handle empty tuples and empty structs.
   ///
   /// Locations with empty types don't even need a store to count as
@@ -269,19 +263,6 @@ void MemoryLocations::clear() {
   nonTrivialLocations.clear();
 }
 
-static bool hasInoutArgument(ApplySite AS) {
-  for (Operand &op : AS.getArgumentOperands()) {
-    switch (AS.getArgumentConvention(op)) {
-    case SILArgumentConvention::Indirect_Inout:
-    case SILArgumentConvention::Indirect_InoutAliasable:
-      return true;
-    default:
-      break;
-    }
-  }
-  return false;
-}
-
 bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx,
                                     SmallVectorImpl<SILValue> &collectedVals,
                                     SubLocationMap &subLocationMap) {
@@ -331,18 +312,9 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::InitEnumDataAddrInst:
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
       case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
-        if (!handleNonTrivialProjections)
-          return false;
         // The payload is represented as a single sub-location of the enum.
         if (!analyzeAddrProjection(cast<SingleValueInstruction>(user), locIdx,
                                   /*fieldNr*/ 0, collectedVals, subLocationMap))
-          return false;
-        break;
-      case SILInstructionKind::PartialApplyInst:
-        // inout/inout_aliasable conventions means that the argument "escapes".
-        // This is okay for memory verification, but cannot handled by other
-        // optimizations, like DestroyHoisting.
-        if (!handleNonTrivialProjections && hasInoutArgument(ApplySite(user)))
           return false;
         break;
       case SILInstructionKind::LoadBorrowInst:
@@ -392,6 +364,7 @@ bool MemoryLocations::analyzeLocationUsesRecursively(SILValue V, unsigned locIdx
       case SILInstructionKind::UnconditionalCheckedCastAddrInst:
       case SILInstructionKind::TryApplyInst:
       case SILInstructionKind::BeginApplyInst:
+      case SILInstructionKind::PartialApplyInst:
       case SILInstructionKind::CopyAddrInst:
       case SILInstructionKind::YieldInst:
       case SILInstructionKind::DeallocStackInst:

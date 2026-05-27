@@ -188,17 +188,8 @@ private:
   /// The bit-set of locations for which numNonTrivialFieldsNotCovered is > 0.
   Bits nonTrivialLocations;
 
-  /// If true, support init_enum_data_addr, unchecked_take_enum_data_addr,
-  /// init_existential_addr and open_existential_addr.
-  bool handleNonTrivialProjections;
-
-  /// If true, also analyze trivial memory locations.
-  bool handleTrivialLocations;
-
 public:
-  MemoryLocations(bool handleNonTrivialProjections, bool handleTrivialLocations) :
-    handleNonTrivialProjections(handleNonTrivialProjections),
-    handleTrivialLocations(handleTrivialLocations) {}
+  MemoryLocations() {}
 
   MemoryLocations(const MemoryLocations &) = delete;
   MemoryLocations &operator=(const MemoryLocations &) = delete;
