@@ -2279,6 +2279,10 @@ IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
  IRGenModule *IGM = GenModules.lookup(SF);
 
  if (!IGM) {
+   // SF is a macro expansion buffer from a _SwiftifyImport macro attached
+   // to a function imported from clang module, so it doesn't have a mapping
+   // in GenModule. The contents are @_alwaysEmitIntoClient, so for all intents
+   // and purposes they belong to the primary module.
    ASSERT(SF->getParentModule()->findUnderlyingClangModule());
    return getPrimaryIGM();
  }
