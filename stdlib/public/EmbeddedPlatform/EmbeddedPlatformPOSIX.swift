@@ -36,8 +36,14 @@ public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbyt
 }
 
 @implementation @c
-public func _swift_writeCharToStandardOutput(_ c: CInt) -> CInt {
-  putchar(c)
+public func _swift_writeToStandardOutput(
+  _ pointer: UnsafePointer<UInt8>?,
+  _ count: Int
+) -> CInt {
+  for unsafe char in unsafe UnsafeBufferPointer(start: pointer, count: count) {
+    _ = putchar(CInt(char))
+  }
+  return CInt(count)
 }
 
 @implementation @c

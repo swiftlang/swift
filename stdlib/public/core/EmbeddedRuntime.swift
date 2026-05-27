@@ -146,9 +146,6 @@ public func _swift_generateRandom(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 @_extern(c, "_swift_generateRandomHashSeed")
 public func _swift_generateRandomHashSeed(_ buf: UnsafeMutableRawPointer, _ nbytes: Int)
 
-@_extern(c, "_swift_writeCharToStandardOutput")
-public func _swift_writeCharToStandardOutput(_: CInt) -> CInt
-
 @_extern(c, "_swift_typedAllocate")
 public func _swift_typedAllocate(_ buf: UnsafeMutablePointer<UnsafeMutableRawPointer?>, _ size: Int, _ alignMask: Int, _ typeId: UInt64)
 
