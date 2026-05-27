@@ -122,3 +122,30 @@ actor ActorNonSendableAssocReturn: AssocReturn {
   func produce() async -> NS { NS() }
   // expected-error@-1 {{non-Sendable type 'NS' cannot be returned from actor-isolated implementation to caller of protocol requirement 'produce()'}}
 }
+
+// https://github.com/swiftlang/swift/issues/89226
+// Nested Sendable struct binding the associated type.
+actor ActorNestedSendableStructAssoc: AssocParam {
+  struct Value: Sendable {}
+  func process(_ value: Value) async {}
+}
+
+// Nested non-Sendable class binding the associated type (gotta reject this).
+actor ActorNestedNonSendableClassAssoc: AssocParam {
+  class Value {} // expected-note {{class 'Value' does not conform to the 'Sendable' protocol}}
+  func process(_ value: Value) async {}
+  // expected-error@-1 {{non-Sendable parameter type 'ActorNestedNonSendableClassAssoc.Value' cannot be sent from caller of protocol requirement 'process' into actor-isolated implementation}}
+}
+
+// https://github.com/swiftlang/swift/issues/89372
+// When the conformer is generic and binds the requirement's associated type to one of its
+// own unconstrained parameters, the witness must be rejected as T carries no Sendable conformance.
+actor ActorGenericConformerUnconstrainedAssoc<T>: AssocParam {
+  // expected-note@-1 {{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{48-48=: Sendable}}
+  func process(_ value: T) async {}
+  // expected-error@-1 {{non-Sendable parameter type 'T' cannot be sent from caller of protocol requirement 'process' into actor-isolated implementation}}
+}
+
+actor ActorGenericConformerSendableAssoc<T: Sendable>: AssocParam {
+  func process(_ value: T) async {}
+}
