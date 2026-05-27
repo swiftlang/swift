@@ -1227,35 +1227,64 @@ NOTE(regionbasedisolation_inout_sending_in_same_region_note, none,
 // Merge Region Failure Error
 //
 
-GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_unknown, RegionIsolationCrossIsolationDataRace, none,
-      "allowing references between %select{%0|%1 %0}4 and %3 %2 risks causing data races",
-      (Identifier, StringRef, Identifier, StringRef, bool))
-NOTE(regionbasedisolation_merge_region_failure_error_unknown_note, none,
-     "%0 could become accessible to %3 code despite remaining accessible to %select{code in the current task|%1 code}4",
-     (Identifier, StringRef, Identifier, StringRef, bool))
-GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_assign, RegionIsolationCrossIsolationDataRace, none,
-      "assigning %select{%0|%1 %0}4 to %3 %2 risks causing data races",
-      (Identifier, StringRef, Identifier, StringRef, bool))
-NOTE(regionbasedisolation_merge_region_failure_error_assign_note, none,
-      "%0 could become accessible to %2 code despite remaining accessible to %select{code in the current task|%1 code}3",
-      (Identifier, StringRef, StringRef, bool))
-GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation, RegionIsolationCrossIsolationDataRace, none,
-      "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
-      (Identifier, StringRef, const ValueDecl *, StringRef, bool))
-GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_type, RegionIsolationCrossIsolationDataRace, none,
-      "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
-      (Type, StringRef, const ValueDecl *, StringRef, bool))
+// Generic merge -- instruction does not match a more specific shape below.
+GROUPED_ERROR(rbi_merge_failure_unknown, RegionIsolationCrossIsolationDataRace, none,
+      "executing operation could allow for references between values exposed to "
+      "%select{%0 code|code in the current task}2 and "
+      "%select{%1 code|code in the current task}3 "
+      "risking data races",
+      (StringRef, StringRef, bool, bool))
 
-// We always put the potential task-isolated value first to simplify the note.
-GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_nonisolatedfunction, RegionIsolationCrossIsolationDataRace, none,
-      "passing %select{%0|%1 %0}5 and %3 %2 as arguments to %kind4 risks causing data races",
-      (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
-NOTE(regionbasedisolation_merge_region_failure_error_nonisolatedfunction_note, none,
-     "%2 could begin referencing %0 allowing concurrent access to %0 by %3 code and %select{code in the current task|%1 code}5", (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
+// Store / assignment that brings two domains into the same region.
+GROUPED_ERROR(rbi_merge_failure_assign, RegionIsolationCrossIsolationDataRace, none,
+      "assignment could allow for references between values exposed to "
+      "%select{%0 code|code in the current task}2 and "
+      "%select{%1 code|code in the current task}3 "
+      "risking data races",
+      (StringRef, StringRef, bool, bool))
 
-GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_cast, RegionIsolationCrossIsolationDataRace, none,
-      "casting %select{%0|%1 %0}4 to %3 %2 risks causing data races",
-      (Identifier, StringRef, Type, StringRef, bool))
+// Nonisolated callee receiving arguments from two different domains.
+GROUPED_ERROR(rbi_merge_failure_nonisolatedfn, RegionIsolationCrossIsolationDataRace, none,
+      "passing arguments to %kind2 could allow for references between values exposed to "
+      "%select{%0 code|code in the current task}3 and "
+      "%select{%1 code|code in the current task}4 "
+      "risking data races",
+      (StringRef, StringRef, const ValueDecl *, bool, bool))
+
+// Isolated callee receiving a value from a different domain.
+// Two variants: a named primary that includes the source value's name when we
+// can recover it, and an unnamed primary (no leading article) when we cannot.
+GROUPED_ERROR(rbi_merge_failure_isolatedfn, RegionIsolationCrossIsolationDataRace, none,
+      "passing value to %2 %kind1 could allow for references between values exposed to "
+      "%select{%0 code|code in the current task}3 and "
+      "%select{%2 code|code in the current task}4 "
+      "risking data races",
+      (StringRef, const ValueDecl *, StringRef, bool, bool))
+GROUPED_ERROR(rbi_merge_failure_isolatedfn_named, RegionIsolationCrossIsolationDataRace, none,
+      "passing %0 to %3 %kind2 could allow for references between values exposed to "
+      "%select{%1 code|code in the current task}4 and "
+      "%select{%3 code|code in the current task}5 "
+      "risking data races",
+      (Identifier, StringRef, const ValueDecl *, StringRef, bool, bool))
+
+// Cast across isolation domains.
+GROUPED_ERROR(rbi_merge_failure_cast, RegionIsolationCrossIsolationDataRace, none,
+      "casting value to type %1 could allow for references between values exposed to "
+      "%select{%0 code|code in the current task}3 and "
+      "%select{%2 code|code in the current task}4 "
+      "risking data races",
+      (StringRef, Type, StringRef, bool, bool))
+
+// Per-value notes -- two variants. We use the named form when we can recover a
+// name for the value, otherwise the bare form. We deliberately do not emit a
+// "value of type T" form, because SIL values often do not carry a reliable AST
+// type.
+NOTE(rbi_merge_failure_value_note_named, none,
+     "%0 is exposed to %select{%1 code|code in the current task}2",
+     (Identifier, StringRef, bool))
+NOTE(rbi_merge_failure_value_note_bare, none,
+     "value is exposed to %select{%0 code|code in the current task}1",
+     (StringRef, bool))
 
 // Concurrency related diagnostics
 ERROR(executor_factory_must_conform, none,

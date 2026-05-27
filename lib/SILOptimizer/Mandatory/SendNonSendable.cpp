@@ -225,6 +225,79 @@ inferNameAndRootHelper(SILValue value) {
   return VariableNameInferrer::inferNameAndRoot(value);
 }
 
+/// Run the name inferrer over \p value purely to recover the source location
+/// of the leaf-most component pushed onto the inferred name path -- e.g. the
+/// seai for `customField` in `self.customField`. Returns an invalid SourceLoc
+/// if no name can be inferred.
+///
+/// Unlike \c inferNameHelper, this is *not* gated by \c ForceTypedErrors -- we
+/// want a usable loc even when name recovery has been suppressed for the
+/// bare-note testing path, so the note can still anchor at the leaf access.
+static SourceLoc inferFirstNameProvidingLocHelper(SILValue value) {
+  if (auto pair = VariableNameInferrer::inferNameAndFirstPathComponent(value))
+    return pair->second;
+  return SourceLoc();
+}
+
+/// Pick the most precise SourceLoc we can find for \p value: prefer the AST
+/// decl location for function arguments (so notes land on the parameter name,
+/// not the `func` keyword), otherwise the defining instruction's source loc,
+/// finally the SILValue's own coarse loc.
+///
+/// Returns SourceLoc() when we have nothing better than the function-level
+/// fallback (e.g. for a phi argument with no defining instruction). In that
+/// case the caller should consider the first-pushed name-path component as a
+/// better anchor.
+static SourceLoc preciseSourceLocForValue(SILValue value) {
+  if (auto *arg = dyn_cast<SILFunctionArgument>(value))
+    if (auto *decl = arg->getDecl())
+      if (auto loc = decl->getLoc())
+        return loc;
+  if (auto *defInst = value->getDefiningInstruction())
+    if (auto astLoc = defInst->getLoc().getSourceLoc())
+      return astLoc;
+  return SourceLoc();
+}
+
+/// Emit a per-value note describing one side of an incompatible region merge.
+/// \p ownIso is the isolation of \p value (the textual rendering used when the
+/// value is *not* task-isolated). \p ownIsTaskIsolated drives a `%select` that
+/// renders "code in the current task" instead of "X-isolated code" for the
+/// task-isolated case, matching the wording used elsewhere in the diagnostic
+/// suite.
+///
+/// Falls back to a bare note if name inference fails -- we deliberately do not
+/// try to recover an AST type, since SIL values often do not carry a reliable
+/// one. Skips emission entirely when no precise SourceLoc is available, since
+/// a note at <unknown>:0 is unhelpful and prevents test verifiers from being
+/// able to anchor on the note.
+///
+/// We prefer the value's own precise loc (the use site) when available. Only
+/// when the value has nothing better than the function-level fallback (e.g.
+/// the value is a phi argument with no defining instruction, as in
+/// `switch_enum` over a stored property accessed in an init) do we fall back
+/// to the location of the leaf-most component pushed onto the inferred name
+/// path -- e.g. the seai for `customField` in `self.customField`. That keeps
+/// notes on direct use-site values anchored at the use, while still producing
+/// usable locs for the phi-arg case (where the old code would land on the
+/// `init` keyword far from the access).
+static void emitMergeRegionValueNote(SILValue value, StringRef ownIso,
+                                     bool ownIsTaskIsolated) {
+  auto &ctx = value->getFunction()->getASTContext();
+  SourceLoc loc = preciseSourceLocForValue(value);
+  if (!loc)
+    loc = inferFirstNameProvidingLocHelper(value);
+  if (!loc)
+    return;
+  if (auto name = inferNameHelper(value)) {
+    diagnoseNote(ctx, loc, diag::rbi_merge_failure_value_note_named, *name,
+                 ownIso, ownIsTaskIsolated);
+    return;
+  }
+  diagnoseNote(ctx, loc, diag::rbi_merge_failure_value_note_bare, ownIso,
+               ownIsTaskIsolated);
+}
+
 /// Sometimes we use a store_borrow + temporary to materialize a borrowed value
 /// to be passed to another function. We want to emit the error on the function
 /// itself, not the store_borrow so we get the best location. We only do this if
@@ -3959,53 +4032,38 @@ private:
 };
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitUnknown() {
-  auto srcRegionValue = valueMap.getRepresentativeValue(srcRegionValueElt);
-  auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
-
-  // For now skip this.
-  if (dstRegionValue.hasRegionIntroducingInst())
-    return;
-
-  auto srcIsolation = srcIsolationInfo;
-  auto dstIsolation = dstIsolationInfo;
-
-  // Canonicalize so that srcRegionValue is always the task-isolated value. We
-  // do this only here since in this case, we can get away with doing this to
-  // implement a simpler diagnostic. E.x.: This doesn't work for assign.
-  if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
-    std::swap(srcIsolation, dstIsolation);
-    std::swap(srcRegionValue, dstRegionValue);
-  }
-
-  // We should always be able to find a name for an inout sending param. If we
-  // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName) {
-    return emitUnknownPatternError();
-  }
-  auto dstName = inferNameHelper(dstRegionValue.getValue());
-  if (!dstName) {
-    return emitUnknownPatternError();
-  }
-
   if (!srcIsolationInfo)
     return emitUnknownPatternError();
   if (!dstIsolationInfo)
     return emitUnknownPatternError();
 
+  auto srcRegionValue = valueMap.getRepresentativeValue(srcRegionValueElt);
+  auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
+
+  auto srcIsolation = srcIsolationInfo;
+  auto dstIsolation = dstIsolationInfo;
+
+  // Canonicalize so that srcRegionValue is always the task-isolated value when
+  // possible. This only affects which isolation string is rendered first.
+  if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
+    std::swap(srcIsolation, dstIsolation);
+    std::swap(srcRegionValue, dstRegionValue);
+  }
+
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
   auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
 
-  diagnoseError(op->getUser(),
-                diag::regionbasedisolation_merge_region_failure_error_unknown,
-                *srcName, srcIsolationStr, *dstName, dstIsolationStr,
-                !srcIsolation->isTaskIsolated())
+  diagnoseError(op->getUser(), diag::rbi_merge_failure_unknown, srcIsolationStr,
+                dstIsolationStr, srcIsolation->isTaskIsolated(),
+                dstIsolation->isTaskIsolated())
       .limitBehaviorIf(getBehaviorLimit());
-  diagnoseNote(
-      op->getUser(),
-      diag::regionbasedisolation_merge_region_failure_error_unknown_note,
-      *srcName, srcIsolationStr, *dstName, dstIsolationStr,
-      !srcIsolation->isTaskIsolated());
+
+  if (auto srcValue = srcRegionValue.maybeGetValue())
+    emitMergeRegionValueNote(srcValue, srcIsolationStr,
+                             srcIsolation->isTaskIsolated());
+  if (auto dstValue = dstRegionValue.maybeGetValue())
+    emitMergeRegionValueNote(dstValue, dstIsolationStr,
+                             dstIsolation->isTaskIsolated());
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitAssign() {
@@ -4020,37 +4078,27 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitAssign() {
   auto srcIsolation = srcIsolationInfo;
   auto dstIsolation = dstIsolationInfo;
 
-  // Canonicalize so that srcRegionValue is always the task-isolated value. We
-  // do this only here since in this case, we can get away with doing this to
-  // implement a simpler diagnostic. E.x.: This doesn't work for assign.
+  // Canonicalize so that srcRegionValue is always the task-isolated value when
+  // possible. This only affects which isolation string is rendered first.
   if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
     std::swap(srcIsolation, dstIsolation);
     std::swap(srcRegionValue, dstRegionValue);
   }
 
-  // We should always be able to find a name for an inout sending param. If we
-  // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName) {
-    return emitUnknownPatternError();
-  }
-  auto dstName = inferNameHelper(dstRegionValue.getValue());
-  if (!dstName) {
-    return emitUnknownPatternError();
-  }
+  auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
+  auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
 
-  auto srcIsolationStr = srcIsolationInfo.printForDiagnostics(getFunction());
-  auto dstIsolationStr = dstIsolationInfo.printForDiagnostics(getFunction());
-  diagnoseError(op->getUser(),
-                diag::regionbasedisolation_merge_region_failure_error_assign,
-                *srcName, srcIsolationStr, *dstName, dstIsolationStr,
-                !srcIsolation->isTaskIsolated())
+  diagnoseError(op->getUser(), diag::rbi_merge_failure_assign, srcIsolationStr,
+                dstIsolationStr, srcIsolation->isTaskIsolated(),
+                dstIsolation->isTaskIsolated())
       .limitBehaviorIf(getBehaviorLimit());
-  diagnoseNote(
-      op->getUser(),
-      diag::regionbasedisolation_merge_region_failure_error_assign_note,
-      *srcName, srcIsolationStr, dstIsolationStr,
-      !srcIsolation->isTaskIsolated());
+
+  if (auto srcValue = srcRegionValue.maybeGetValue())
+    emitMergeRegionValueNote(srcValue, srcIsolationStr,
+                             srcIsolation->isTaskIsolated());
+  if (auto dstValue = dstRegionValue.maybeGetValue())
+    emitMergeRegionValueNote(dstValue, dstIsolationStr,
+                             dstIsolation->isTaskIsolated());
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
@@ -4064,46 +4112,36 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitNonisolatedFunction() {
   auto srcRegionValue = valueMap.getRepresentativeValue(srcRegionValueElt);
   auto dstRegionValue = valueMap.getRepresentativeValue(dstRegionValueElt);
 
-  // Canonicalize so that srcRegionValue is always the task-isolated value. We
-  // do this only here since in this case, we can get away with doing this to
-  // implement a simpler diagnostic. E.x.: This doesn't work for assign.
+  // Canonicalize so that srcRegionValue is always the task-isolated value when
+  // possible. This only affects which isolation string is rendered first.
   if (!srcIsolation->isTaskIsolated() && dstIsolation->isTaskIsolated()) {
     std::swap(srcIsolation, dstIsolation);
     std::swap(srcRegionValue, dstRegionValue);
   }
 
-  // We should always be able to find a name for an inout sending param. If we
-  // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName) {
-    return emitUnknownPatternError();
-  }
-  auto dstName = inferNameHelper(dstRegionValue.getValue());
-  if (!dstName) {
-    return emitUnknownPatternError();
-  }
-
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
   auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
+
+  // If we cannot recover a callee decl, fall through to the generic unknown
+  // shape rather than emitting an unknown-pattern error.
   auto as = ApplySite::isa(op->getUser());
   if (!as)
-    return emitUnknownPatternError();
+    return emitUnknown();
   auto declRef = as.getCalleeDeclRef();
   if (!declRef)
-    return emitUnknownPatternError();
+    return emitUnknown();
 
-  diagnoseError(
-      op->getUser(),
-      diag::regionbasedisolation_merge_region_failure_error_nonisolatedfunction,
-      *srcName, srcIsolationStr, *dstName, dstIsolationStr, declRef.getDecl(),
-      !srcIsolation->isTaskIsolated())
+  diagnoseError(op->getUser(), diag::rbi_merge_failure_nonisolatedfn,
+                srcIsolationStr, dstIsolationStr, declRef.getDecl(),
+                srcIsolation->isTaskIsolated(), dstIsolation->isTaskIsolated())
       .limitBehaviorIf(getBehaviorLimit());
-  diagnoseNote(
-      op->getUser(),
-      diag::
-          regionbasedisolation_merge_region_failure_error_nonisolatedfunction_note,
-      *srcName, srcIsolationStr, *dstName, dstIsolationStr, declRef.getDecl(),
-      !srcIsolation->isTaskIsolated());
+
+  if (auto srcValue = srcRegionValue.maybeGetValue())
+    emitMergeRegionValueNote(srcValue, srcIsolationStr,
+                             srcIsolation->isTaskIsolated());
+  if (auto dstValue = dstRegionValue.maybeGetValue())
+    emitMergeRegionValueNote(dstValue, dstIsolationStr,
+                             dstIsolation->isTaskIsolated());
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitIsolatedFunction() {
@@ -4130,41 +4168,31 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitIsolatedFunction() {
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
   auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
 
-  // We should always be able to find a name for an inout sending param. If we
-  // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName) {
-    if (auto *svi =
-            dyn_cast<SingleValueInstruction>(srcRegionValue.getValue())) {
-      if (auto *expr = svi->getLoc().getAsASTNode<Expr>()) {
-        diagnoseError(
-            op->getUser(),
-            diag::
-                regionbasedisolation_merge_region_failure_error_functionisolation_type,
-            expr->findOriginalType(), srcIsolationStr, declRef.getDecl(),
-            dstIsolationStr, !srcIsolation->isTaskIsolated())
-            .limitBehaviorIf(getBehaviorLimit());
-        return;
-      }
-    }
-    if (auto *arg = dyn_cast<SILFunctionArgument>(srcRegionValue.getValue())) {
-      diagnoseError(
-          op->getUser(),
-          diag::
-              regionbasedisolation_merge_region_failure_error_functionisolation_type,
-          arg->getDecl()->getInterfaceType(), srcIsolationStr,
-          declRef.getDecl(), dstIsolationStr, !srcIsolation->isTaskIsolated())
-          .limitBehaviorIf(getBehaviorLimit());
-      return;
-    }
-    return emitUnknownPatternError();
+  // Prefer a named primary when we can recover a name for the source value;
+  // fall back to the unnamed form otherwise. The named primary embeds the name
+  // directly so the user does not have to read the follow-up note to see which
+  // value triggered the diagnostic.
+  std::optional<Identifier> srcName;
+  if (auto srcValue = srcRegionValue.maybeGetValue())
+    srcName = inferNameHelper(srcValue);
+
+  if (srcName) {
+    diagnoseError(op->getUser(), diag::rbi_merge_failure_isolatedfn_named,
+                  *srcName, srcIsolationStr, declRef.getDecl(), dstIsolationStr,
+                  srcIsolation->isTaskIsolated(),
+                  dstIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
+  } else {
+    diagnoseError(op->getUser(), diag::rbi_merge_failure_isolatedfn,
+                  srcIsolationStr, declRef.getDecl(), dstIsolationStr,
+                  srcIsolation->isTaskIsolated(),
+                  dstIsolation->isTaskIsolated())
+        .limitBehaviorIf(getBehaviorLimit());
   }
-  diagnoseError(
-      op->getUser(),
-      diag::regionbasedisolation_merge_region_failure_error_functionisolation,
-      *srcName, srcIsolationStr, declRef.getDecl(), dstIsolationStr,
-      !srcIsolation->isTaskIsolated())
-      .limitBehaviorIf(getBehaviorLimit());
+
+  if (auto srcValue = srcRegionValue.maybeGetValue())
+    emitMergeRegionValueNote(srcValue, srcIsolationStr,
+                             srcIsolation->isTaskIsolated());
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emitCast() {
@@ -4203,16 +4231,14 @@ void IncompatibleRegionMergeDiagnosticEmitter::emitCast() {
   auto srcIsolationStr = srcIsolation.printForDiagnostics(getFunction());
   auto dstIsolationStr = dstIsolation.printForDiagnostics(getFunction());
 
-  // We should always be able to find a name for an inout sending param. If we
-  // do not, emit an unknown pattern error.
-  auto srcName = inferNameHelper(srcRegionValue.getValue());
-  if (!srcName)
-    return emitUnknownPatternError();
-  diagnoseError(op->getUser(),
-                diag::regionbasedisolation_merge_region_failure_error_cast,
-                *srcName, srcIsolationStr, cast.getTargetFormalType(),
-                dstIsolationStr, !srcIsolation->isTaskIsolated())
+  diagnoseError(op->getUser(), diag::rbi_merge_failure_cast, srcIsolationStr,
+                cast.getTargetFormalType(), dstIsolationStr,
+                srcIsolation->isTaskIsolated(), dstIsolation->isTaskIsolated())
       .limitBehaviorIf(getBehaviorLimit());
+
+  if (auto srcValue = srcRegionValue.maybeGetValue())
+    emitMergeRegionValueNote(srcValue, srcIsolationStr,
+                             srcIsolation->isTaskIsolated());
 }
 
 void IncompatibleRegionMergeDiagnosticEmitter::emit() {
