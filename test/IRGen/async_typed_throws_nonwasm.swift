@@ -24,10 +24,7 @@ struct Main {
 }
 
 // Off-wasm regression guard for the `TwasmA` thin-to-thick wrapper introduced
-// for swiftlang/swift#89320. The wrapper exists to work around an LLVM wasm
-// backend lowering bug; on every non-wasm target, `IGM.Triple.isWasm()`
-// short-circuits the predicate in IRGenSIL.cpp and the wrapper is NOT
-// emitted. main() must call run() passing the closure's own Tu directly.
+// for swiftlang/swift#89320.
 
 // CHECK-LABEL: define {{(hidden|internal)}} {{(swiftcc|swifttailcc)}} void @"$s{{[^"]+}}4MainV4mainyyYaFZ"
 // CHECK: call {{(swiftcc|swifttailcc)}} void @"$s{{[^"]+}}3runy{{[^"]+}}"({{.*}} ptr @"$s{{[^"]+}}fU_Tu",
