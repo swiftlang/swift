@@ -4708,8 +4708,22 @@ namespace {
           if (auto updatedName =
                   Impl.importFullName(decl, Impl.CurrentVersion)) {
             auto *valueDecl = cast<ValueDecl>(method);
-            if (valueDecl->getName() != updatedName.getDeclName())
-              valueDecl->setName(updatedName.getDeclName());
+            auto newName = updatedName.getDeclName();
+
+            // Mirror the name reconciliation in importFunctionDecl:
+            // rebuild compound name from the function's actual parameter list
+            // so it stays a valid function-decl name.
+            if (auto *fn = dyn_cast<AbstractFunctionDecl>(valueDecl);
+                fn && newName) {
+              if (newName.isSimpleName() || newName.getArgumentNames().size() !=
+                                                fn->getParameters()->size()) {
+                newName = DeclName(Impl.SwiftContext,
+                                   newName.getBaseName(), fn->getParameters());
+              }
+            }
+
+            if (valueDecl->getName() != newName)
+              valueDecl->setName(newName);
           }
         }
       }
