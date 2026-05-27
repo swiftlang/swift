@@ -61,16 +61,13 @@ if(NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT OR NOT SWIFT_BUILD_
       add_swift_target_library_single(
         embedded-builtin_float-${mod}
         swift_Builtin_float
-        ONLY_SWIFTMODULE
         IS_FRAGILE
         
-        ${BUILTIN_FLOAT_SOURCES}
         GYB_SOURCES
           ${BUILTIN_FLOAT_GYB_SOURCES}
   
         SWIFT_COMPILE_FLAGS
           ${BUILTIN_FLOAT_SWIFT_FLAGS}
-          -Xcc -ffreestanding -enable-experimental-feature Embedded
   
         MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
         SDK "embedded"

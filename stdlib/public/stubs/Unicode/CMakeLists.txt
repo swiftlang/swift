@@ -18,12 +18,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       continue()
     endif()
 
-    if (SWIFT_HOST_VARIANT STREQUAL "linux")
-      set(extra_c_compile_flags -ffreestanding)
-    elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
-      set(extra_c_compile_flags -ffreestanding)
-    endif()
-    list(APPEND extra_c_compile_flags -nostdinc++)
+    set(extra_c_compile_flags -nostdinc++)
 
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
@@ -64,8 +59,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
     set_property(TARGET embedded-unicode-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-
-    embedded_amend_archive_commands_on_darwin_host(embedded-unicode-${mod} ${triple})
 
     add_dependencies(embedded-unicode embedded-unicode-${mod})
   endforeach()

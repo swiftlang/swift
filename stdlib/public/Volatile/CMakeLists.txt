@@ -39,16 +39,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     add_swift_target_library_single(
       embedded-volatile-${mod}
       swift_Volatile
-      ONLY_SWIFTMODULE
       IS_SDK_OVERLAY IS_FRAGILE
 
       Volatile.swift
 
       SWIFT_COMPILE_FLAGS
-        -Xcc -ffreestanding -enable-experimental-feature Embedded
         -parse-stdlib
-      C_COMPILE_FLAGS
-        -ffreestanding
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"

@@ -395,9 +395,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         ${SWIFT_CONCURRENCY_GYB_SOURCES}
 
       SWIFT_COMPILE_FLAGS
-        ${extra_swift_compile_flags} -enable-experimental-feature Embedded
+        ${extra_swift_compile_flags}
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
-        -Xfrontend -emit-empty-object-file
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
       C_COMPILE_FLAGS
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
@@ -405,7 +404,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
-      ARCHITECTURE_SUBDIR_NAME "${mod}"
       DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
       )
@@ -424,8 +422,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     if(NOT "${arch}" MATCHES "wasm32")
       set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
     endif()
-
-    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-${mod} ${triple})
 
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
@@ -457,8 +453,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
     set_property(TARGET embedded-concurrency-default-executor-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
-
-    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-default-executor-${mod} ${triple})
 
     add_dependencies(embedded-concurrency embedded-concurrency-default-executor-${mod})
   endforeach()

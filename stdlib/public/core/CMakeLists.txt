@@ -550,12 +550,11 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     add_swift_target_library_single(
       embedded-stdlib-${mod}
       swiftCore
-      ONLY_SWIFTMODULE
       IS_STDLIB IS_STDLIB_CORE IS_FRAGILE
       ${SWIFTLIB_EMBEDDED_SOURCES}
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS
-        ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded ${swift_embedded_stdlib_extra_compile_flags}
+        ${swift_stdlib_compile_flags} ${swift_embedded_stdlib_extra_compile_flags}
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"

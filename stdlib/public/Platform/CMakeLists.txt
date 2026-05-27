@@ -491,7 +491,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     add_swift_target_library_single(
       embedded-stdlib-platform-${triple}
       swiftWASILibc
-      ONLY_SWIFTMODULE
       IS_STDLIB IS_FRAGILE
         ${swift_platform_sources}
         POSIXError.swift
@@ -507,7 +506,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
-      ARCHITECTURE_SUBDIR_NAME "${triple}"
       DEPENDS embedded-stdlib-${triple} wasilibc_modulemap
       INSTALL_IN_COMPONENT sdk-overlay
     )

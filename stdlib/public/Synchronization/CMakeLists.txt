@@ -205,7 +205,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     add_swift_target_library_single(
       embedded-synchronization-${mod}
       swiftSynchronization
-      ONLY_SWIFTMODULE
       IS_FRAGILE
       
       ${SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES}
@@ -215,7 +214,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
 
       SWIFT_COMPILE_FLAGS
         ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
-        -Xcc -ffreestanding -enable-experimental-feature Embedded
 
       MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"

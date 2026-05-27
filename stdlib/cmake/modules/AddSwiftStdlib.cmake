@@ -158,6 +158,9 @@ function(_add_target_variant_c_compile_link_flags)
     list(APPEND result "-DSWIFT_LIBC_IS_MUSL")
   endif()
 
+  if("${CFLAGS_SDK}" STREQUAL "embedded")
+    list(APPEND result "-ffreestanding")
+  endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
     # Make sure the Android NDK lld is used.
@@ -745,7 +748,6 @@ endfunction()
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
-#     [ONLY_SWIFTMODULE]
 #     [NO_SWIFTMODULE]
 #     [IS_SDK_OVERLAY]
 #     [IS_FRAGILE]
@@ -807,9 +809,6 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the standard library core.
 #
-# ONLY_SWIFTMODULE
-#   Do not build either static or shared, build just the .swiftmodule.
-#
 # NO_SWIFTMODULE
 #   Only build either static or shared, and skip the .swiftmodule.
 #
@@ -839,7 +838,6 @@ function(add_swift_target_library_single target name)
         OBJECT_LIBRARY
         SHARED
         STATIC
-        ONLY_SWIFTMODULE
         NO_SWIFTMODULE
         NO_LINK_NAME
         INSTALL_WITH_SHARED
@@ -914,13 +912,19 @@ function(add_swift_target_library_single target name)
   precondition(SWIFTLIB_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
   precondition(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
   if (NOT SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME)
-    set(SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
+      # For Embedded Swift, use the whole module triple for the subdirectory.
+      set(SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_MODULE}")
+    else()
+      # The architecture itself suffices for non-Embedded Swift.
+      set(SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME "${SWIFTLIB_SINGLE_ARCHITECTURE}")
+    endif()
   endif()
 
   if(NOT SWIFTLIB_SINGLE_SHARED AND
      NOT SWIFTLIB_SINGLE_STATIC AND
      NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY AND
-     NOT SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
+     NOT "${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
@@ -980,8 +984,8 @@ function(add_swift_target_library_single target name)
     set(libkind SHARED)
   elseif(SWIFTLIB_SINGLE_STATIC)
     set(libkind STATIC)
-  elseif(SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
-    set(libkind NONE)
+  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
+    set(libkind STATIC)
   else()
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
@@ -1022,6 +1026,16 @@ function(add_swift_target_library_single target name)
     endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
       -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
+  endif()
+
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
+      # Flags required to build embedded libraries
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded)
+
+      # Embedded Swift builds with empty object files by default. Everything
+      # is emitted into the client.
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-emit-empty-object-file)
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -enable-experimental-feature;CodeGenerationModel=implementation)
   endif()
 
   # Define availability macros.
@@ -1142,7 +1156,6 @@ function(add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${SWIFTLIB_SINGLE_IS_FRAGILE_keyword}
-      ${SWIFTLIB_SINGLE_ONLY_SWIFTMODULE_keyword}
       ${SWIFTLIB_SINGLE_NO_SWIFTMODULE_keyword}
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
@@ -1219,15 +1232,6 @@ function(add_swift_target_library_single target name)
   if(libkind STREQUAL "SHARED")
     list(APPEND INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS
          ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS_SHARED_ONLY})
-  endif()
-
-  if (SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
-    add_custom_target("${target}"
-      DEPENDS "${swift_module_dependency_target}")
-    if(TARGET "${install_in_component}")
-      add_dependencies("${install_in_component}" "${target}")
-    endif()
-    return()
   endif()
 
   add_library("${target}" ${libkind}
@@ -1721,6 +1725,10 @@ function(add_swift_target_library_single target name)
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
 
+  if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
+    embedded_amend_archive_commands_on_darwin_host(${target} "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
+  endif()
+
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than
   # `clang++` as we explicitly link against the C++ runtime.  We were previously
   # actually passing `-nostdlib++` to avoid the C++ runtime linkage.
@@ -1796,7 +1804,6 @@ endfunction()
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [IS_OSLOG]
-#     [ONLY_SWIFTMODULE]
 #     [NO_SWIFTMODULE]
 #     [INSTALL_WITH_SHARED]
 #     INSTALL_IN_COMPONENT comp
@@ -1912,9 +1919,6 @@ endfunction()
 # IS_OSLOG
 #   Treat the library as OSLog library.
 #
-# ONLY_SWIFTMODULE
-#   Do not build either static or shared, build just the .swiftmodule.
-#
 # NO_SWIFTMODULE
 #   Only build either static or shared, and skip the .swiftmodule.
 #
@@ -2007,7 +2011,6 @@ function(add_swift_target_library name)
         IS_OSLOG
         IS_SWIFT_ONLY
         NOSWIFTRT
-        ONLY_SWIFTMODULE
         NO_SWIFTMODULE
         OBJECT_LIBRARY
         SHARED
@@ -2636,7 +2639,6 @@ function(add_swift_target_library name)
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
-        ${SWIFTLIB_ONLY_SWIFTMODULE_keyword}
         ${SWIFTLIB_NO_SWIFTMODULE_keyword}
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
         INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
