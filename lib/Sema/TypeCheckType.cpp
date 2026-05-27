@@ -6587,7 +6587,7 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
       auto kp = getKnownProtocolKind(ip);
 
       if (layout.requiresClass()) {
-        auto superclass = layout.getSuperclass();
+        auto superclass = layout.explicitSuperclass;
         diagnose(repr->getStartLoc(),
                  diag::inverse_with_class_constraint,
                  !superclass,
