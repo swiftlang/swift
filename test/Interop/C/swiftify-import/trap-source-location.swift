@@ -1,4 +1,5 @@
 // REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
 
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
