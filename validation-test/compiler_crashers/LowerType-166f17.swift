@@ -1,4 +1,4 @@
-// {"kind":"emit-silgen","original":"44923edd","signature":"(anonymous namespace)::TypeClassifierBase<(anonymous namespace)::LowerType, swift::Lowering::TypeLowering*>::visit(swift::CanType, swift::Lowering::AbstractionPattern, swift::IsTypeExpansionSensitive_t)","signatureNext":"Lowering::TypeConverter::getTypeLowering"}
+// {"kind":"emit-silgen","original":"44923edd","signature":"swift::CanTypeVisitor<(anonymous namespace)::LowerType, swift::Lowering::TypeLowering*, swift::Lowering::AbstractionPattern, swift::IsTypeExpansionSensitive_t>::visit(swift::CanType, swift::Lowering::AbstractionPattern, swift::IsTypeExpansionSensitive_t)","signatureNext":"TypeClassifierBase::visit"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
 struct a: Hashable {
 }
