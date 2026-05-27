@@ -308,6 +308,10 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValuePhiArg(
              variableNamePath.print(llvm::dbgs()));
 
   unsigned oldSnapShotIndex = variableNamePath.pushSnapShot();
+  // Also save firstNameProvidingLoc so we can restore it on failure --
+  // otherwise a failed phi branch could leave us pointing at a loc that
+  // never contributed to the final name path.
+  SourceLoc oldFirstNameProvidingLoc = firstNameProvidingLoc;
   LLVM_DEBUG(llvm::dbgs() << "After pushing a snap shot!\n";
              variableNamePath.print(llvm::dbgs()));
 
@@ -319,6 +323,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValuePhiArg(
   }
 
   variableNamePath.popSnapShot(oldSnapShotIndex);
+  firstNameProvidingLoc = oldFirstNameProvidingLoc;
   LLVM_DEBUG(llvm::dbgs() << "After popping a snap shot!\n";
              variableNamePath.print(llvm::dbgs()));
   return SILValue();
@@ -371,7 +376,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     if (auto *use = getAnyDebugUse(searchValue)) {
       if (auto debugVar = DebugVarCarryingInst(use->getUser())) {
         assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-        variableNamePath.push_back(debugVar.getName());
+        pushPathComponent(debugVar.getName(),
+                          searchValue.getLoc().getSourceLoc());
 
         // We return the value, not the debug_info.
         return searchValue;
@@ -394,7 +400,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
             if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
               assert(debugVar.getKind() ==
                      DebugVarCarryingInst::Kind::DebugValue);
-              variableNamePath.push_back(debugVar.getName());
+              pushPathComponent(debugVar.getName(),
+                                searchValue.getLoc().getSourceLoc());
 
               // We return the value, not the debug_info.
               return searchValue;
@@ -408,7 +415,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       if (auto *debugUse = getAnyDebugUse(bbi)) {
         if (auto debugVar = DebugVarCarryingInst(debugUse->getUser())) {
           assert(debugVar.getKind() == DebugVarCarryingInst::Kind::DebugValue);
-          variableNamePath.push_back(debugVar.getName());
+          pushPathComponent(debugVar.getName(),
+                            searchValue.getLoc().getSourceLoc());
 
           // We return the value, not the debug_info.
           return searchValue;
@@ -435,12 +443,14 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         return SILValue();
       }
 
-      variableNamePath.push_back(DebugVarCarryingInst(allocInst).getName());
+      pushPathComponent(DebugVarCarryingInst(allocInst).getName(),
+                        allocInst->getLoc().getSourceLoc());
       return allocInst;
     }
 
     if (auto *abi = dyn_cast<AllocBoxInst>(searchValue)) {
-      variableNamePath.push_back(DebugVarCarryingInst(abi).getName());
+      pushPathComponent(DebugVarCarryingInst(abi).getName(),
+                        abi->getLoc().getSourceLoc());
       return abi;
     }
 
@@ -452,7 +462,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     }
 
     if (auto *globalAddrInst = dyn_cast<GlobalAddrInst>(searchValue)) {
-      variableNamePath.push_back(VarDeclCarryingInst(globalAddrInst).getName());
+      pushPathComponent(VarDeclCarryingInst(globalAddrInst).getName(),
+                        globalAddrInst->getLoc().getSourceLoc());
       return globalAddrInst;
     }
 
@@ -462,43 +473,50 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     }
 
     if (auto *rei = dyn_cast<RefElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(VarDeclCarryingInst(rei).getName());
+      pushPathComponent(VarDeclCarryingInst(rei).getName(),
+                        rei->getLoc().getSourceLoc());
       searchValue = rei->getOperand();
       continue;
     }
 
     if (auto *sei = dyn_cast<StructExtractInst>(searchValue)) {
-      variableNamePath.push_back(getNameFromDecl(sei->getField()));
+      pushPathComponent(getNameFromDecl(sei->getField()),
+                        sei->getLoc().getSourceLoc());
       searchValue = sei->getOperand();
       continue;
     }
 
     if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(searchValue)) {
-      variableNamePath.push_back(getNameFromDecl(uedi->getElement()));
+      pushPathComponent(getNameFromDecl(uedi->getElement()),
+                        uedi->getLoc().getSourceLoc());
       searchValue = uedi->getOperand();
       continue;
     }
 
     if (auto *tei = dyn_cast<TupleExtractInst>(searchValue)) {
-      variableNamePath.push_back(getStringRefForIndex(tei->getFieldIndex()));
+      pushPathComponent(getStringRefForIndex(tei->getFieldIndex()),
+                        tei->getLoc().getSourceLoc());
       searchValue = tei->getOperand();
       continue;
     }
 
     if (auto *sei = dyn_cast<StructElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(getNameFromDecl(sei->getField()));
+      pushPathComponent(getNameFromDecl(sei->getField()),
+                        sei->getLoc().getSourceLoc());
       searchValue = sei->getOperand();
       continue;
     }
 
     if (auto *tei = dyn_cast<TupleElementAddrInst>(searchValue)) {
-      variableNamePath.push_back(getStringRefForIndex(tei->getFieldIndex()));
+      pushPathComponent(getStringRefForIndex(tei->getFieldIndex()),
+                        tei->getLoc().getSourceLoc());
       searchValue = tei->getOperand();
       continue;
     }
 
     if (auto *utedai = dyn_cast<UncheckedEnumDataAddrInstBase>(searchValue)) {
-      variableNamePath.push_back(getNameFromDecl(utedai->getElement()));
+      pushPathComponent(getNameFromDecl(utedai->getElement()),
+                        utedai->getLoc().getSourceLoc());
       searchValue = utedai->getEnum();
       continue;
     }
@@ -508,7 +526,8 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     // them and add the case to the variableNamePath.
     if (auto *e = dyn_cast<EnumInst>(searchValue)) {
       if (e->hasOperand()) {
-        variableNamePath.push_back(getNameFromDecl(e->getElement()));
+        pushPathComponent(getNameFromDecl(e->getElement()),
+                          e->getLoc().getSourceLoc());
         searchValue = e->getOperand();
         continue;
       }
@@ -516,8 +535,9 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
 
     if (auto *dti = dyn_cast_or_null<DestructureTupleInst>(
             searchValue->getDefiningInstruction())) {
-      variableNamePath.push_back(
-          getStringRefForIndex(*dti->getIndexOfResult(searchValue)));
+      pushPathComponent(
+          getStringRefForIndex(*dti->getIndexOfResult(searchValue)),
+          dti->getLoc().getSourceLoc());
       searchValue = dti->getOperand();
       continue;
     }
@@ -525,15 +545,16 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     if (auto *dsi = dyn_cast_or_null<DestructureStructInst>(
             searchValue->getDefiningInstruction())) {
       unsigned index = *dsi->getIndexOfResult(searchValue);
-      variableNamePath.push_back(
-          getNameFromDecl(dsi->getStructDecl()->getStoredProperties()[index]));
+      pushPathComponent(
+          getNameFromDecl(dsi->getStructDecl()->getStoredProperties()[index]),
+          dsi->getLoc().getSourceLoc());
       searchValue = dsi->getOperand();
       continue;
     }
 
     if (auto *fArg = dyn_cast<SILFunctionArgument>(searchValue)) {
       if (auto *decl = fArg->getDecl()) {
-        variableNamePath.push_back(decl->getBaseName().userFacingName());
+        pushPathComponent(decl->getBaseName().userFacingName(), decl->getLoc());
         return fArg;
       }
     }
@@ -564,14 +585,15 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       if (call.getSubstCalleeType()->hasSelfParam()) {
         if (auto *f = dyn_cast<FunctionRefBaseInst>(call.getCallee())) {
           if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
-            variableNamePath.push_back(getNameFromDecl(dc->getAsDecl()));
+            pushPathComponent(getNameFromDecl(dc->getAsDecl()),
+                              call.getLoc().getSourceLoc());
             return call.getSelfArgument();
           }
         }
 
         if (auto *mi = dyn_cast<MethodInst>(call.getCallee())) {
-          variableNamePath.push_back(
-              getNameFromDecl(mi->getMember().getDecl()));
+          pushPathComponent(getNameFromDecl(mi->getMember().getDecl()),
+                            call.getLoc().getSourceLoc());
           return call.getSelfArgument();
         }
       }
@@ -726,6 +748,21 @@ VariableNameInferrer::inferNameAndRoot(SILValue value) {
   if (!rootValue)
     return {};
   return {{fn->getASTContext().getIdentifier(resultingName), rootValue}};
+}
+
+std::optional<std::pair<Identifier, SourceLoc>>
+VariableNameInferrer::inferNameAndFirstPathComponent(SILValue value) {
+  auto *fn = value->getFunction();
+  if (!fn)
+    return {};
+  VariableNameInferrer::Options options;
+  options |= VariableNameInferrer::Flag::InferSelfThroughAllAccessors;
+  SmallString<64> resultingName;
+  VariableNameInferrer inferrer(fn, options, resultingName);
+  if (!inferrer.inferByWalkingUsesToDefs(value))
+    return {};
+  return {{fn->getASTContext().getIdentifier(resultingName),
+           inferrer.getFirstNameProvidingLoc()}};
 }
 
 //===----------------------------------------------------------------------===//
