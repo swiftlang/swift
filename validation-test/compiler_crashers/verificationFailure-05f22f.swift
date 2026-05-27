@@ -1,4 +1,4 @@
-// {"kind":"emit-silgen","original":"3c74143f","signature":"swift::verificationFailure(llvm::Twine const&, swift::SILArgument const*, llvm::function_ref<void (swift::SILPrintContext&)>)","signatureNext":"SILVerifier"}
+// {"kind":"emit-silgen","original":"3c74143f","signature":"swift::verificationFailure(llvm::Twine const&, swift::SILArgument const*, llvm::function_ref<void (swift::SILPrintContext&)>)","signatureNext":"SILVerifier::visitSILBasicBlock"}
 // RUN: not --crash %target-swift-frontend -emit-silgen %s
 @propertyWrapper
 struct a<b> {

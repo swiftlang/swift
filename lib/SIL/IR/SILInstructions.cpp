@@ -438,7 +438,7 @@ SILType AllocBoxInst::getAddressType() const {
 DebugValueInst::DebugValueInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
     PoisonRefs_t poisonRefs,
-    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace)
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace, bool prependDeref)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
@@ -451,6 +451,8 @@ DebugValueInst::DebugValueInst(
   if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
+  if (prependDeref)
+    this->prependDeref();
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
@@ -466,14 +468,18 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
     Var.Scope = nullptr;
   if (Var.Type == Operand->getType().getObjectType())
     Var.Type = {};
+  // Use the prependDeref bit rather than storing it in the DIExpr.
+  bool prependDeref = Var.DIExpr.startsWithDeref();
+  if (prependDeref) {
+    Var.DIExpr.eraseElement(Var.DIExpr.element_begin());
+  }
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf)
-    DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace);
+    DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace, prependDeref);
 }
 
 void DebugValueInst::prependDeref() {
-  ASSERT(!sharedUInt8().DebugValueInst.prependDeref &&
-         "Debug value cannot have two derefs!");
+  ASSERT(!hasDeref() && "Debug value cannot have two derefs!");
   if (!ReconstructionBlock) {
     sharedUInt8().DebugValueInst.prependDeref = true;
     return;
@@ -509,7 +515,7 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   if (isa<SILUndef>(operand)) {
     // No arguments, return the same undef directly.
     retVal = operand;
-  } else if (sharedUInt8().DebugValueInst.prependDeref) {
+  } else if (hasDeref()) {
     // Convert the deref to a load.
     SILArgument *arg = block->createPhiArgument(
         operand->getType().getAddressType(), OwnershipKind::None);
@@ -556,6 +562,9 @@ bool DebugValueInst::isExprTypeValid() const {
       if (debugBB->getArgument(0)->getType() != valueType)
         return false;
     }
+    // Cannot have both an op_deref and a debug reconstruction block.
+    if (hasDeref())
+      return false;
     auto *terminator = cast<ReturnInst>(debugBB->getTerminator());
     valueType = terminator->getOperand()->getType();
   }
@@ -580,13 +589,18 @@ bool DebugValueInst::isExprTypeValid() const {
       break;
     }
     default:
-      break;
+      // Invalid operator
+      return false;
     }
   }
 
   // There must be as many op_derefs as SIL type indirection levels.
   // SIL only supports one level of indirection, so op_deref too.
   if (derefCount != valueType.isAddress())
+    return false;
+
+  // The op_deref must be stored in the prependDeref bit.
+  if (derefCount != hasDeref())
     return false;
 
   return RunningType.removingMoveOnlyWrapper() ==
