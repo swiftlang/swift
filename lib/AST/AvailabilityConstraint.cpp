@@ -29,6 +29,25 @@ AvailabilityConstraint::getDomainAndRange(const ASTContext &ctx) const {
   }
 }
 
+AvailabilityDomainAndRange
+AvailabilityConstraint::getFixItDomainAndRange(const ASTContext &ctx) const {
+  auto attrDomain = getAttr().getDomain();
+  if (attrDomain.contains(
+          AvailabilityDomain::forPlatform(PlatformKind::anyAppleOS))) {
+    switch (getReason()) {
+    case Reason::UnavailableUnconditionally:
+    case Reason::UnavailableObsolete:
+      return AvailabilityDomainAndRange(
+          attrDomain, AvailabilityRange(getAttr().getObsoleted().value()));
+    case Reason::UnavailableUnintroduced:
+    case Reason::Unintroduced:
+      return AvailabilityDomainAndRange(
+          attrDomain, AvailabilityRange(getAttr().getIntroduced().value()));
+    }
+  }
+  return getDomainAndRange(ctx);
+}
+
 bool AvailabilityConstraint::isActiveForRuntimeQueries(
     const ASTContext &ctx) const {
   if (getAttr().getPlatform() == PlatformKind::none)
