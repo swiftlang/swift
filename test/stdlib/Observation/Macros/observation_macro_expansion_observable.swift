@@ -83,5 +83,7 @@ final class DidSetSourceLocationUsesAbsolutePath {
 }
 
 // CHECK-LABEL: @__swiftmacro{{.*}}DidSetSourceLocationUsesAbsolutePath{{.*}}ObservationTracked{{.*}}.swift
-// CHECK:       #sourceLocation(file: "{{.*}}Macros{{.*}}observation_macro_expansion_observable.swift",
+// On Windows the path contains backslashes, so swift-syntax emits a raw
+// string literal (`#"..."#`) instead of a plain `"..."`. Allow either form.
+// CHECK:       #sourceLocation(file: {{#?}}"{{.*}}Macros{{.*}}observation_macro_expansion_observable.swift"{{#?}},
 _ = 0
