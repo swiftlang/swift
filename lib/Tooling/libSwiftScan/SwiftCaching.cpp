@@ -987,6 +987,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
 
   // Setup DiagnosticsConsumers.
   DiagnosticHelper DH = DiagnosticHelper::create(Inst, Invocation, Err);
+  DH.initDiagnosticConsumers();
 
   std::string InstanceSetupError;
   if (Inst.setupForReplay(Instance.Invocation, InstanceSetupError,
@@ -1007,7 +1008,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
       makeIntrusiveRefCnt<llvm::vfs::OnDiskOutputBackend>(), Out);
 
   if (!replayCachedCompilerOutputsForInput(
-          CAS, Comp.Output, Input, Comp.InputIndex, Inst.getDiags(), DH,
+          CAS, Comp.Output, Input, Comp.InputIndex, Inst.getDiags(),
           Backend, Instance.Invocation.getFrontendOptions(), *CDP, Remarks,
           UseCASBackend,
           Instance.Invocation.getCASOptions().WriteOutputHashXAttr)) {
