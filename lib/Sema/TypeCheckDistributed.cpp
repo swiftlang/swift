@@ -437,29 +437,79 @@ static bool checkDistributedTargetResultType(
       checkDistributedSerializationRequirementIsExactlyCodable(
           C, serializationRequirement);
 
-  for (auto serializationReq: serializationRequirements) {
-    auto conformance = checkConformance(resultType, serializationReq);
-    if (conformance.isInvalid()) {
+  // --- Special case: `-> some/any P` where P is a `@Resolvable protocol`
+  // Wire format encodes the actor's `id` as a Codable ActorID,
+  // so the existential/opaque does not need to conform to the serialization requirement.
+  bool skipCodableCheck = false;
+  auto resolvableMatch = findDistributedResolvableExistentialOrOpaqueProtocol(resultType);
+  if (resolvableMatch.isAmbiguous) {
+    if (diagnose) {
+      valueDecl->diagnose(
+          diag::distributed_actor_func_result_resolvable_protocol_composition_ambiguous,
+          resultType, valueDecl);
+      valueDecl->diagnose(
+          diag::distributed_actor_func_resolvable_protocol_composition_ambiguous_note);
+    }
+    return true;
+  }
+
+  if (auto *resolvableProto = resolvableMatch.proto) {
+    auto protocolSystemTy =
+        getResolvableProtocolConcreteActorSystemType(resolvableProto);
+    if (!protocolSystemTy) {
       if (diagnose) {
-        llvm::StringRef conformanceToSuggest = isCodableRequirement ?
-                                               "Codable" : // Codable is a typealias, easier to diagnose like that
-                                               serializationReq->getNameStr();
+        valueDecl->diagnose(
+            diag::distributed_actor_func_result_resolvable_protocol_no_concrete_actor_system,
+            resultType, valueDecl, resolvableProto->getName());
+      }
+      return true;
+    }
 
-        auto diag = valueDecl->diagnose(
-            diag::distributed_actor_target_result_not_codable,
-            resultType,
-            valueDecl,
-            conformanceToSuggest
-        );
+    auto enclosingSystemTy =
+        getConcreteReplacementForProtocolActorSystemType(valueDecl);
 
-        if (isCodableRequirement) {
-          if (auto resultNominalType = resultType->getAnyNominal()) {
-            addCodableFixIt(resultNominalType, diag);
+    if (enclosingSystemTy && !enclosingSystemTy->isEqual(protocolSystemTy)) {
+      if (diagnose) {
+        valueDecl->diagnose(
+            diag::distributed_actor_func_result_resolvable_actor_system_mismatch,
+            resultType, valueDecl,
+            resolvableProto->getName(), protocolSystemTy);
+        resolvableProto->diagnose(
+            diag::distributed_actor_func_result_resolvable_actor_system_mismatch_note,
+            resolvableProto->getName(), protocolSystemTy);
+      }
+      return true;
+    }
+
+    // `@Resolvable protocol` result — skip Codable check, wire uses actor ID
+    skipCodableCheck = true;
+  }
+
+  if (!skipCodableCheck) {
+    for (auto serializationReq: serializationRequirements) {
+      auto conformance = checkConformance(resultType, serializationReq);
+      if (conformance.isInvalid()) {
+        if (diagnose) {
+          llvm::StringRef conformanceToSuggest = isCodableRequirement ?
+                                                 "Codable" : // Codable is a typealias, easier to diagnose like that
+                                                 serializationReq->getNameStr();
+
+          auto diag = valueDecl->diagnose(
+              diag::distributed_actor_target_result_not_codable,
+              resultType,
+              valueDecl,
+              conformanceToSuggest
+          );
+
+          if (isCodableRequirement) {
+            if (auto resultNominalType = resultType->getAnyNominal()) {
+              addCodableFixIt(resultNominalType, diag);
+            }
           }
         }
-      } // end if: diagnose
 
-      return true;
+        return true;
+      }
     }
   }
 
@@ -562,6 +612,8 @@ bool CheckDistributedFunctionRequest::evaluate(
         func->diagnose(
             diag::distributed_actor_func_param_resolvable_protocol_composition_ambiguous,
             param->getArgumentName(), param->getInterfaceType(), func);
+        func->diagnose(
+            diag::distributed_actor_func_resolvable_protocol_composition_ambiguous_note);
         return true;
       }
 

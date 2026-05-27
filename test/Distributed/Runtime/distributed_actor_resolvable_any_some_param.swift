@@ -14,7 +14,7 @@
 
 // This test exercises the **remote-branch** wire round-trip for a
 // `distributed func` that takes a `some/any P` parameter where `P` is a
-// `@Resolvable protocol`.
+// `@Resolvable protocol`, and for a `distributed func` that *returns* `any P`.
 
 import Distributed
 import FakeDistributedActorSystems
@@ -27,6 +27,8 @@ where ActorSystem == FakeRoundtripActorSystem {
   distributed func sayHi() -> String
   distributed func sendAnyGreeter(_ g: any Greeter) async throws -> String
   distributed func sendSomeGreeter(_ g: some Greeter) async throws -> String
+  distributed func echoActor(_ g: any Greeter) async throws -> any Greeter
+  distributed var currentSelf: any Greeter { get }
 }
 
 distributed actor GreeterImpl: Greeter {
@@ -41,6 +43,17 @@ distributed actor GreeterImpl: Greeter {
     print("sendSomeGreeter type: \(type(of: g))")
     return try await g.sayHi()
   }
+
+  distributed func echoActor(_ g: any Greeter) async throws -> any Greeter {
+    print("echoActor type: \(type(of: g))")
+    return g
+  }
+
+  distributed var currentSelf: any Greeter {
+    // FakeRoundtripActorSystem passes values by reference; resolve as $Greeter
+    // so the caller receives a remote proxy, not the local GreeterImpl instance.
+    return try! $Greeter.resolve(id: id, using: actorSystem)
+  }
 }
 
 // ==== -----------------------------------------------------------------------
@@ -51,8 +64,8 @@ func test_anyGreeter() async throws {
   let local = GreeterImpl(actorSystem: system)
   let proxy = try GreeterImpl.resolve(id: local.id, using: system)
 
-  print("--- any ---")
-  // CHECK: --- any ---
+  print("any Greeter")
+  // CHECK-LABEL: any Greeter
   let result = try await proxy.sendAnyGreeter(local)
   // CHECK: sendAnyGreeter type: $Greeter
   print("result: \(result)")
@@ -64,10 +77,41 @@ func test_someGreeter() async throws {
   let local = GreeterImpl(actorSystem: system)
   let proxy = try GreeterImpl.resolve(id: local.id, using: system)
 
-  print("--- some ---")
-  // CHECK: --- some ---
+  print("some Greeter")
+  // CHECK-LABEL: some Greeter
   let result = try await proxy.sendSomeGreeter(local)
   // CHECK: sendSomeGreeter type: $Greeter
+  print("result: \(result)")
+  // CHECK: result: Hi from
+}
+
+func test_echoActor() async throws {
+  let system = FakeRoundtripActorSystem()
+  let local = GreeterImpl(actorSystem: system)
+  let proxy = try GreeterImpl.resolve(id: local.id, using: system)
+
+  print("echo any Greeter -> any Greeter")
+  // CHECK-LABEL: echo any Greeter -> any Greeter
+  let echoed = try await proxy.echoActor(local)
+  // CHECK: echoActor type: $Greeter
+  print("echoed type: \(type(of: echoed))")
+  // CHECK: echoed type: $Greeter
+  let result = try await echoed.sayHi()
+  print("result: \(result)")
+  // CHECK: result: Hi from
+}
+
+func test_currentSelf() async throws {
+  let system = FakeRoundtripActorSystem()
+  let local = GreeterImpl(actorSystem: system)
+  let proxy = try GreeterImpl.resolve(id: local.id, using: system)
+
+  print("var currentSelf -> any Greeter")
+  // CHECK-LABEL: var currentSelf -> any Greeter
+  let got = try await proxy.currentSelf
+  print("currentSelf type: \(type(of: got))")
+  // CHECK: currentSelf type: $Greeter
+  let result = try await got.sayHi()
   print("result: \(result)")
   // CHECK: result: Hi from
 }
@@ -79,5 +123,7 @@ func test_someGreeter() async throws {
   static func main() async throws {
     try await test_anyGreeter()
     try await test_someGreeter()
+    try await test_echoActor()
+    try await test_currentSelf()
   }
 }

@@ -41,7 +41,8 @@ distributed actor Worker {
 distributed actor BadComposition {
   typealias ActorSystem = FakeActorSystem
 
-  // expected-error@+1{{parameter '_' of type 'any Greeter & PowerSwitch' in distributed instance method contains more than one '@Resolvable protocol'; Declare new @Resolvable protocol that refines those protocols and use it instead}}
+  // expected-error@+2{{parameter '_' of type 'any Greeter & PowerSwitch' in distributed instance method contains more than one '@Resolvable protocol'}}
+  // expected-note@+1{{declare a new '@Resolvable protocol' that refines those protocols and use it instead}}
   distributed func ambiguous(_ g: any Greeter & PowerSwitch) {}
 }
 

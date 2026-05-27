@@ -825,6 +825,40 @@ void DistributedAccessor::emit() {
   auto directResultTy = targetConv.getSILResultType(expansionContext);
   const auto &directResultTI = IGM.getTypeInfo(directResultTy);
 
+  // === `@Resolvable protocol` result
+  // The caller's result buffer is sized for `$P` (one class ref word), but the
+  // target returns `any P` (existential: class ref + witness tables). Allocate
+  // a temp existential-sized buffer, emit the result there, then copy just the
+  // class ref into the real result buffer.
+  bool isResolvableExistResult = false;
+  NominalTypeDecl *resolvableResultStub = nullptr;
+  llvm::Value *resolvableExistTempBuf = nullptr;
+
+  if (auto *funcDecl = Target.getAbstractFunctionDecl()) {
+    if (auto *func = dyn_cast<FuncDecl>(funcDecl)) {
+    Type declaredResult = func->getResultInterfaceType();
+    if (auto *env = func->getGenericEnvironment())
+      declaredResult = env->mapTypeIntoEnvironment(declaredResult);
+    if (!declaredResult->isVoid()) {
+      if (auto match =
+              findDistributedResolvableExistentialOrOpaqueProtocol(declaredResult)) {
+        if (auto *stub = getDistributedActorStub(match.proto)) {
+          isResolvableExistResult = true;
+          resolvableResultStub = stub;
+          auto existAlign = directResultTI.getBestKnownAlignment();
+          auto &existTIFixed = cast<FixedTypeInfo>(directResultTI);
+          auto existSizeVal = IGM.getSize(existTIFixed.getFixedSize());
+          auto tempAlloca =
+              IGF.emitDynamicAlloca(IGM.Int8Ty, existSizeVal, existAlign);
+          resolvableExistTempBuf = IGF.Builder.CreateBitCast(
+              tempAlloca.getAddress().getAddress(), IGM.PtrTy);
+          AllocatedArguments.push_back(tempAlloca);
+        }
+      }
+    }
+    }
+  }
+
   Explosion arguments;
 
   unsigned numAsyncContextParams =
@@ -871,7 +905,8 @@ void DistributedAccessor::emit() {
     // conform to protocols), there could be only a single indirect result type
     // associated with distributed method.
     assert(targetConv.getNumIndirectSILResults() == 1);
-    arguments.add(typedResultBuffer);
+    arguments.add(isResolvableExistResult ? resolvableExistTempBuf
+                                          : typedResultBuffer);
   }
 
   // There is always at least one parameter associated with accessor - `self`
@@ -940,10 +975,35 @@ void DistributedAccessor::emit() {
     // indirect result (e.g. large struct) it result buffer would be passed
     // as an argument.
     {
-      Address resultAddr(typedResultBuffer, directResultTI.getStorageType(),
+      llvm::Value *destBuf =
+          isResolvableExistResult ? resolvableExistTempBuf : typedResultBuffer;
+      Address resultAddr(destBuf, directResultTI.getStorageType(),
                          directResultTI.getBestKnownAlignment());
       emission->emitToMemory(resultAddr, cast<LoadableTypeInfo>(directResultTI),
                              /*isOutlined=*/false);
+    }
+
+    // == `@Resolvable protocol` result: copy class ref from existential temp buf to result buf
+    if (isResolvableExistResult && resolvableExistTempBuf) {
+      auto stubCanTy =
+          resolvableResultStub->getDeclaredInterfaceType()->getCanonicalType();
+      auto stubSILTy = SILType::getPrimitiveObjectType(stubCanTy);
+
+      auto refPtrTy = llvm::PointerType::get(IGM.getLLVMContext(), /*AddrSpace=*/0);
+
+      auto existPtrBitcast =
+          IGF.Builder.CreateBitCast(resolvableExistTempBuf, refPtrTy);
+      llvm::Value *classRef = IGF.Builder.CreateLoad(
+          Address(existPtrBitcast, IGM.getStorageType(stubSILTy),
+                  IGM.getPointerAlignment()),
+          "result_actor_ref");
+
+      auto resultPtrBitcast =
+          IGF.Builder.CreateBitCast(typedResultBuffer, refPtrTy);
+      IGF.Builder.CreateStore(
+          classRef,
+          Address(resultPtrBitcast, IGM.getStorageType(stubSILTy),
+                  IGM.getPointerAlignment()));
     }
 
     // Both accessor and distributed method are always `async throws`
