@@ -2268,7 +2268,7 @@ def emit_module_dependencies_path:
 def use_frontend_parseable_output:
   Flag<["-"], "use-frontend-parseable-output">,
   Flags<[HelpHidden, NewDriverOnlyOption, CacheInvariant]>,
-  HelpText<"Emit parseable-output from swift-frontend jobs instead of from "
+  HelpText<"Deprecated: Emit parseable-output from swift-frontend jobs instead of from "
            "the driver">;
 
 def print_explicit_dependency_graph:

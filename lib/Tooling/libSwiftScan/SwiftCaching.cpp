@@ -986,8 +986,7 @@ static llvm::Error replayCompilation(SwiftScanReplayInstance &Instance,
   const auto &Input = AllInputs[Comp.InputIndex];
 
   // Setup DiagnosticsConsumers.
-  DiagnosticHelper DH = DiagnosticHelper::create(
-      Inst, Invocation, Instance.Args, Err, /*QuasiPID=*/true);
+  DiagnosticHelper DH = DiagnosticHelper::create(Inst, Invocation, Err);
 
   std::string InstanceSetupError;
   if (Inst.setupForReplay(Instance.Invocation, InstanceSetupError,

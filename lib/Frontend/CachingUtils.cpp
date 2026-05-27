@@ -281,23 +281,17 @@ static bool replayCachedCompilerOutputsImpl(
   if (!CanReplayAllOutput)
     return false;
 
-  auto failedReplay = [DiagHelper]() {
-    if (DiagHelper)
-      DiagHelper->endMessage(/*retCode=*/1);
-    return false;
-  };
-
   // Replay Diagnostics first so the output failures comes after.
   // Also if the diagnostics replay failed, proceed to re-compile.
   if (DiagnosticsOutput) {
-    // Only starts message if there are diagnostics.
+    // Only set up the diagnostic consumers if there are diagnostics to replay.
     if (DiagHelper)
-      DiagHelper->beginMessage();
+      DiagHelper->initDiagnosticConsumers();
     if (auto E =
             CDP.replayCachedDiagnostics(DiagnosticsOutput->Proxy.getData())) {
       Diag.diagnose(SourceLoc(), diag::error_replay_cached_diag,
                     toString(std::move(E)));
-      return failedReplay();
+      return false;
     }
   }
 
@@ -318,21 +312,21 @@ static bool replayCachedCompilerOutputsImpl(
       auto Schema = std::make_unique<llvm::mccasformats::v1::MCSchema>(CAS);
       if (auto E = Schema->serializeObjectFile(Output.Proxy, *File)) {
         Diag.diagnose(SourceLoc(), diag::error_mccas, toString(std::move(E)));
-        return failedReplay();
+        return false;
       }
     } else if (Output.Kind == file_types::ID::TY_Dependencies) {
       if (emitMakeDependenciesFromSerializedBuffer(
             Output.Proxy.getData(), *File, Opts, Output.Input, Diag)) {
         Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
                       "failed to emit dependency file");
-        return failedReplay();
+        return false;
       }
     } else if (Output.Kind == file_types::ID::TY_ConstValues) {
       if (remapConstValuesJSON(Output.Proxy.getData(), *File,
                                Opts.CacheReplayPrefixMap)) {
         Diag.diagnose(SourceLoc(), diag::cache_replay_failed,
                       "failed to remap const values file");
-        return failedReplay();
+        return false;
       }
     } else
       *File << Output.Proxy.getData();
@@ -353,8 +347,6 @@ static bool replayCachedCompilerOutputsImpl(
                     Output.Key.toString());
   }
 
-  if (DiagHelper)
-    DiagHelper->endMessage(/*retCode=*/0);
   return true;
 }
 

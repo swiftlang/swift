@@ -2503,7 +2503,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   CompilerInvocation Invocation;
 
-  DiagnosticHelper DH = DiagnosticHelper::create(*Instance, Invocation, Args);
+  DiagnosticHelper DH = DiagnosticHelper::create(*Instance, Invocation);
 
   // Hopefully we won't trigger any LLVM-level fatal errors, but if we do try
   // to route them through our usual textual diagnostics before crashing.
@@ -2648,17 +2648,14 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     llvm::EnableStatistics();
   }
 
-  DH.beginMessage();
+  DH.initDiagnosticConsumers();
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;
 
   std::string InstanceSetupError;
   if (Instance->setup(Invocation, InstanceSetupError, Args)) {
-    int ReturnCode = 1;
-    DH.endMessage(ReturnCode);
-
-    return finishDiagProcessing(ReturnCode, /*verifierEnabled*/ false);
+    return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
   // The compiler instance has been configured; notify our observer.
@@ -2668,7 +2665,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
 
   if (Invocation.getFrontendOptions().GenReproducer) {
     int ReturnCode = generateReproducer(*Instance, Args) ? 1 : 0;
-    DH.endMessage(ReturnCode);
     return finishDiagProcessing(ReturnCode, /*verifierEnabled*/ false);
   }
 
@@ -2756,7 +2752,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   if (auto *StatsReporter = Instance->getStatsReporter())
     StatsReporter->noteCurrentProcessExitStatus(r);
 
-  DH.endMessage(r);
   return r;
 }
 
