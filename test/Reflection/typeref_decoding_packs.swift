@@ -10,6 +10,7 @@
 
 // FIXME: rdar://127796117
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
+// UNSUPPORTED: CPU=armv7k && OS=watchos
 
 // RUN: %target-build-swift -target %target-swift-5.9-abi-triple %S/Inputs/Packs.swift -parse-as-library -emit-module -emit-library %no-fixup-chains -module-name TypesToReflect -o %t/%target-library-name(TypesToReflect)
 // RUN: %target-build-swift -target %target-swift-5.9-abi-triple %S/Inputs/Packs.swift -emit-module -emit-executable %no-fixup-chains -module-name TypesToReflect -o %t/TypesToReflect
