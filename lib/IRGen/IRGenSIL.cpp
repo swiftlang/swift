@@ -6206,17 +6206,6 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   }
 
   auto RealTy = SILTy.getASTType();
-  if (IsAddrVal && IsInCoro)
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(i->getOperand())) {
-      // Usually debug info only ever describes the *result* of a projectBox
-      // call. To allow the debugger to display a boxed parameter of an async
-      // continuation object, however, the debug info can only describe the box
-      // itself and thus also needs to emit a box type for it so the debugger
-      // knows to call into Remote Mirrors to unbox the value.
-      RealTy = PBI->getOperand()->getType().getASTType();
-      assert(isa<SILBoxType>(RealTy));
-    }
-
   VarDecl *VD = i->getDecl();
   if (!VD) {
     // The source location of a DebugValueInst inserted by the SIL optimizer is
@@ -6236,7 +6225,21 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
   // Put the value into a shadow-copy stack slot at -Onone.
   llvm::SmallVector<llvm::Value *, 8> Copy;
-  if (IsAddrVal) {
+  if (getLoweredValue(SILVal).isBoxWithAddress()) {
+    // Special case for debug_values cloned from an alloc_box: Use the
+    // project_box address rather than the actual box.
+    auto &TI = getTypeInfo(SILVal->getType());
+    auto Addr = getLoweredValue(SILVal).getAddressOfBox();
+    auto *Storage = Addr.getAddress();
+
+    VarInfo->DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+
+    Copy.emplace_back(emitShadowCopyIfNeeded(
+        Storage, TI.getStorageType(),
+        i->getDebugScope(), *VarInfo, IsAnonymous,
+        i->usesMoveableValueDebugInfo(), &VarInfo->DIExpr));
+  } else if (IsAddrVal) {
     auto &TI = getTypeInfo(SILVal->getType());
     auto Addr = getLoweredAddress(SILVal);
     auto *Storage = Addr.getAddress();
@@ -6969,9 +6972,6 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   assert(i->getBoxType()->getLayout()->getFields().size() == 1
          && "multi field boxes not implemented yet");
-  const TypeInfo &type = getTypeInfo(
-      getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(), i->getBoxType(),
-                         IGM.getSILModule().Types, 0));
 
   // Derive name from SIL location.
   bool IsAnonymous = false;
@@ -6994,9 +6994,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
-  if (!Decl)
-    return;
-
   // FIXME: This is a workaround to not produce local variables for
   // capture list arguments like "[weak self]". The better solution
   // would be to require all variables to be described with a
@@ -7011,8 +7008,16 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       IGM.getMaximalTypeExpansionContext(),
       i->getBoxType(), IGM.getSILModule().Types, 0);
   auto RealType = SILTy.getASTType();
-  auto DbgTy =
-      DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
+  DebugTypeInfo DbgTy;
+  if (Decl) {
+    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, getTypeInfo(SILTy),
+                                            IGM);
+  } else if (!SILTy.hasArchetype() && !Name.empty()) {
+    // Handle the cases that read from a SIL file.
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
+  } else {
+    return;
+  }
 
   auto VarInfo = i->getVarInfo();
   if (!VarInfo)
