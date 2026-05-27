@@ -2,6 +2,7 @@
 // RUN: %target-swift-frontend -sil-verify-all -enable-experimental-feature Lifetimes -disable-llvm-optzns -disable-availability-checking -emit-ir -verify -module-name main %s
 
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: optimized_stdlib
 
 public struct BigPod { var a, b, c, d, e: Int }
 public struct BigArc { var a, b, c, d, e: AnyObject }
