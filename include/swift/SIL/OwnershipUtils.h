@@ -195,6 +195,10 @@ bool findUsesOfSimpleValue(SILValue value,
 bool visitGuaranteedForwardingPhisForSSAValue(
     SILValue value, function_ref<bool(Operand *)> func);
 
+/// Visit all GuaranteedForwardingPhis of \p value, following phi uses.
+bool visitExtendedGuaranteedForwardingPhis(
+    SILValue value, function_ref<bool(Operand *)> visitor);
+
 //===----------------------------------------------------------------------===//
 //                                Abstractions
 //===----------------------------------------------------------------------===//
