@@ -2732,7 +2732,8 @@ private:
 
           if (auto *existential = ty->getAs<ExistentialType>()) {
             if (auto superclass =
-                    existential->getExistentialLayout().getSuperclass()) {
+                    existential->getExistentialLayout()
+                      .getExplicitSuperclassOrProtocolSuperclass()) {
               if (superclass->isKnownImmutableKeyPathType())
                 return StorageAccessKind::Get;
             }
