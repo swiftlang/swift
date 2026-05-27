@@ -812,7 +812,12 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
                                       unsigned &prefixLength) {
   /// Is this an initializer?
   if (isInitMethod(method)) {
-    prefixLength = 4;
+    // Length of the leading "init" word (4) plus any leading underscore (1)
+    // on SPI-prefixed selectors like `-_initFoo:`. Callers strip this many
+    // characters from the first selector piece to compute the first
+    // argument label.
+    StringRef firstSlot = method->getSelector().getNameForSlot(0);
+    prefixLength = firstSlot.starts_with("_") ? 5 : 4;
     return true;
   }
 
@@ -2119,8 +2124,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     // For initializers, compute the first argument name.
     if (isInitializer) {
+      StringRef firstSlot = selector.getNameForSlot(0);
+      bool hasUnderscorePrefix = firstSlot.starts_with("_");
+
       // Skip over the prefix.
-      auto argName = selector.getNameForSlot(0).substr(initializerPrefixLen);
+      auto argName = firstSlot.substr(initializerPrefixLen);
 
       // Drop "With" if present after the "init".
       bool droppedWith = false;
@@ -2137,7 +2145,24 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       if (droppedWith && isSwiftReservedName(argName)) {
         selectorSplitScratch = "with";
         selectorSplitScratch +=
-            selector.getNameForSlot(0).substr(initializerPrefixLen + 4);
+            firstSlot.substr(initializerPrefixLen + 4);
+        argName = selectorSplitScratch;
+      }
+
+      // For SPI-prefixed selectors (`-_initFoo:`), preserve the underscore on
+      // the imported argument label so the SPI marker is visible at the use
+      // site, e.g. `init(_foo:)` rather than `init(foo:)`.
+      //
+      // `argName` may currently alias `selectorSplitScratch` (from the
+      // lowercase or with-restore steps above). We read it into a separate
+      // local `withUnderscore` first, then assign back to `selectorSplitScratch`
+      // — this order is safe because `withUnderscore += argName` finishes
+      // reading from the scratch before the scratch is overwritten.
+      if (hasUnderscorePrefix && !argName.empty()) {
+        SmallString<16> withUnderscore;
+        withUnderscore = "_";
+        withUnderscore += argName;
+        selectorSplitScratch = withUnderscore;
         argName = selectorSplitScratch;
       }
 
