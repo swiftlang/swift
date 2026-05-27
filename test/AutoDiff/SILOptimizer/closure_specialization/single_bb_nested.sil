@@ -1,0 +1,98 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -autodiff-closure-specialization %s | %FileCheck %s
+
+// The SIL corresponds to the following Swift source:
+//
+// func foo(_ x: Float) -> Float {
+//   return sin(x)
+// }
+//
+// @differentiable(reverse)
+// func bar(_ x: Float) -> Float {
+//   return foo(x)
+// }
+
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+import _Differentiation
+
+// CHECK: // reverse-mode derivative of bar(_:)
+// CHECK: sil hidden [ossa] @$s3src3baryS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+// CHECK: bb0(%0 : $Float):
+// CHECK:   %[[#A3:]] = function_ref @$sSo4sinfyS2fFTo : $@convention(c) (Float) -> Float
+// CHECK:   %[[#A4:]] = apply %[[#A3]](%0) : $@convention(c) (Float) -> Float
+// CHECK:   %[[#A9:]] = function_ref @$s3src3baryS2fFTJpSpSr22$s3src3fooyS2fFTJpSpSrS2fIegyd_Tf1nc_n62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK:   %[[#A10:]] = partial_apply [callee_guaranteed] %[[#A9]](%0) : $@convention(thin) (Float, Float) -> Float
+// CHECK:   %[[#A11:]] = tuple (%[[#A4]] : $Float, %[[#A10]] : $@callee_guaranteed (Float) -> Float)
+// CHECK:   return %[[#A11]] : $(Float, @callee_guaranteed (Float) -> Float)
+// CHECK: } // end sil function '$s3src3baryS2fFTJrSpSr'
+
+// reverse-mode derivative of bar(_:)
+sil hidden [ossa] @$s3src3baryS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
+bb0(%0 : $Float):
+  // function_ref @objc sinf(_:)
+  %3 = function_ref @$sSo4sinfyS2fFTo : $@convention(c) (Float) -> Float
+  %4 = apply %3(%0) : $@convention(c) (Float) -> Float
+  // function_ref closure #1 in _vjpSin(_:)
+  %5 = function_ref @$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_ : $@convention(thin) (Float, Float) -> Float
+  %6 = partial_apply [callee_guaranteed] %5(%0) : $@convention(thin) (Float, Float) -> Float
+  // function_ref pullback of foo(_:)
+  %7 = function_ref @$s3src3fooyS2fFTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float
+  %8 = partial_apply [callee_guaranteed] %7(%6) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float
+  // function_ref pullback of bar(_:)
+  %9 = function_ref @$s3src3baryS2fFTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float
+  %10 = partial_apply [callee_guaranteed] %9(%8) : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float
+  %11 = tuple (%4, %10)
+  return %11
+} // end sil function '$s3src3baryS2fFTJrSpSr'
+
+// CHECK: // specialized pullback of bar(_:)
+// CHECK: sil private [ossa] @$s3src3baryS2fFTJpSpSr22$s3src3fooyS2fFTJpSpSrS2fIegyd_Tf1nc_n62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK: bb0(%0 : $Float, %1 : $Float):
+// CHECK:   %[[#B10:]] = function_ref @$s3src3fooyS2fFTJpSpSr62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n : $@convention(thin) (Float, Float) -> Float
+// CHECK:   %[[#B11:]] = apply %[[#B10]](%0, %1) : $@convention(thin) (Float, Float) -> Float
+// CHECK:   return %[[#B11]] : $Float
+// CHECK: } // end sil function '$s3src3baryS2fFTJpSpSr22$s3src3fooyS2fFTJpSpSrS2fIegyd_Tf1nc_n62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n'
+
+// pullback of bar(_:)
+sil private [ossa] @$s3src3baryS2fFTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float {
+bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (Float) -> Float):
+  %2 = apply %1(%0) : $@callee_guaranteed (Float) -> Float
+  destroy_value %1
+  return %2
+} // end sil function '$s3src3baryS2fFTJpSpSr'
+
+// CHECK: // specialized pullback of foo(_:)
+// CHECK: sil private [ossa] @$s3src3fooyS2fFTJpSpSr62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n : $@convention(thin) (Float, Float) -> Float {
+// CHECK: bb0(%0 : $Float, %1 : $Float):
+// CHECK:   %[[#C2:]] = function_ref @$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_ : $@convention(thin) (Float, Float) -> Float
+// CHECK:   %[[#C7:]] = apply %[[#C2]](%0, %1) : $@convention(thin) (Float, Float) -> Float
+// CHECK:   return %[[#C7]] : $Float
+// CHECK: } // end sil function '$s3src3fooyS2fFTJpSpSr62$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_SfTf1nc_n'
+
+// pullback of foo(_:)
+sil private [ossa] @$s3src3fooyS2fFTJpSpSr : $@convention(thin) (Float, @owned @callee_guaranteed (Float) -> Float) -> Float {
+bb0(%0 : $Float, %1 : @owned $@callee_guaranteed (Float) -> Float):
+  %2 = apply %1(%0) : $@callee_guaranteed (Float) -> Float
+  destroy_value %1
+  return %2
+} // end sil function '$s3src3fooyS2fFTJpSpSr'
+
+// closure #1 in _vjpSin(_:)
+sil shared [ossa] @$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_ : $@convention(thin) (Float, Float) -> Float {
+bb0(%0 : $Float, %1 : @closureCapture $Float):
+  // function_ref @objc cosf(_:)
+  %2 = function_ref @$sSo4cosfyS2fFTo : $@convention(c) (Float) -> Float
+  %3 = apply %2(%1) : $@convention(c) (Float) -> Float
+  %4 = struct_extract %0, #Float._value
+  %5 = struct_extract %3, #Float._value
+  %6 = builtin "fmul_FPIEEE32"(%4, %5) : $Builtin.FPIEEE32
+  %7 = struct $Float (%6)
+  return %7
+} // end sil function '$s16_Differentiation7_vjpSinySf5value_S2fc8pullbacktSfFS2fcfU_'
+
+sil @$sSo4cosfyS2fFTo : $@convention(c) (Float) -> Float
+sil @$sSo4sinfyS2fFTo : $@convention(c) (Float) -> Float

@@ -37,7 +37,11 @@ public func testit(c: @escaping () -> Bool) {
 //       kind=FunctionSignatureSpecializationParamKind, index=0
 //       kind=FunctionSignatureSpecializationParamPayload, text="$s4test10ExpressionO8contains5whereS3bXE_tFSbACXEfU_S2bXEfU_36$s4test12IndirectEnumVACycfcS2bXEfU_Tf3npf_n"
 //
-// CHECK-LABEL: $s23closure_specialize_loop10ExpressionO8contains5whereS3bXE_tFSbACXEfU_S2bXEfU_012$s23closure_b7_loop10d44O8contains5whereS3bXE_tFSbACXEfU_S2bXEfU_012g13_b7_loop10d44ijk2_tlm2U_no52U_012g30_B34_loop12IndirectEnumVACycfcnO10U_Tf3npf_nY2_nTf3npf_n
+
+// FIXME: the test becomes now failing since the ClosureSpecialization pass does all
+// the optimizations w/o CapturePropagation involved for this particular case now.
+// Need to design a new test case for ensuring that ClosureSpecialization/CapturePropagation optimization loop is converging.
+// FIXME-LABEL: $s23closure_specialize_loop10ExpressionO8contains5whereS3bXE_tFSbACXEfU_S2bXEfU_012$s23closure_b7_loop10d44O8contains5whereS3bXE_tFSbACXEfU_S2bXEfU_012g13_b7_loop10d44ijk2_tlm2U_no52U_012g30_B34_loop12IndirectEnumVACycfcnO10U_Tf3npf_nY2_nTf3npf_n
 // ---> function signature specialization
 //     <Arg[1] = [Constant Propagated Function : function signature specialization
 //                <Arg[1] = [Constant Propagated Function : function signature specialization

@@ -58,18 +58,36 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 let closureSpecialization = FunctionPass(name: "closure-specialization") {
   (function: Function, context: FunctionPassContext) in
 
+  closureSpecializationImpl(function: function, context: context)
+}
+
+func closureSpecializationImpl(function: Function, context: FunctionPassContext) {
   guard function.hasOwnership else {
     return
   }
 
-  for inst in function.instructions {
-    if let apply = inst as? FullApplySite {
-      _ = trySpecialize(apply: apply, context)
+  var remainingSpecializationRounds = 5
+
+  repeat {
+    var changed = false
+
+    for inst in function.instructions {
+      if let apply = inst as? FullApplySite {
+        if trySpecialize(apply: apply, context) {
+          changed = true
+        }
+      }
     }
-  }
-  if context.needFixStackNesting {
-    context.fixStackNesting(in: function)
-  }
+
+    if context.needFixStackNesting {
+      context.fixStackNesting(in: function)
+    }
+    if !changed {
+      break
+    }
+
+    remainingSpecializationRounds -= 1
+  } while remainingSpecializationRounds > 0
 }
 
 /// AutoDiff Closure Specialization
@@ -520,10 +538,77 @@ private struct SpecializationInfo {
 
     addMissingDestroysAtFunctionExits(for: clonedClosureArguments, cloner.context)
 
+    /// When we have several partial_apply instructions capturing each other in a chain,
+    /// we might be able to perform several specialization rounds.
+    /// The decision whether to specialize a closure depends on if it's fully applied in the callee.
+    /// So, we need to fold partial_apply+apply of "less nested" already specialized closure
+    /// to allow specialization of "more nested" not yet specialized closure.
+    ///
+    /// === BEFORE SPECIALIZATION ===
+    /// // VJP of bar(Float) -> Float
+    /// bb0(%0: Float)
+    ///   %4 = apply %sinf(%0)
+    ///   %6 = partial_apply %pb_sinf(%0)
+    ///   %8 = partial_apply %pb_foo(%6)
+    ///   %10 = partial_apply %pb_bar(%8)
+    ///   return (%4, %10)
+    ///
+    /// // pb_bar: pullback of bar(Float) -> Float
+    /// bb0(%0 : Float, %1 : (Float) -> Float):
+    ///   %2 = apply %1(%0)
+    ///   return %2
+    ///
+    /// // pb_foo: pullback of foo(Float) -> Float
+    /// bb0(%0 : Float, %1 : (Float) -> Float):
+    ///   %2 = apply %1(%0)
+    ///   return %2
+    ///
+    /// === AFTER SPECIALIZATION ROUND 1 ===
+    /// // VJP of bar(Float) -> Float
+    /// bb0(%0: Float)
+    ///   %4 = apply %sinf(%0)
+    ///   %6 = partial_apply %pb_sinf(%0)
+    ///   %10 = partial_apply %pb_bar_spec_round1(%6)
+    ///   return (%4, %10)
+    ///
+    /// // pb_bar_spec_round1: specialized pullback of bar(Float) -> Float
+    /// bb0(%0 : Float, %1 : (Float) -> Float):
+    ///   %2 = function_ref @pb_foo : (Float, (Float) -> Float) -> Float
+    ///   %4 = apply %2(%0, %1) // <-- folded from _/ %3 = partial_apply %2(%1)
+    ///                         //                  \ %4 = apply %3(%0)
+    ///   return %4
+    ///
+    /// // pb_foo: pullback of foo(Float) -> Float: unchanged
+
     for rootClosure in rootClosures {
       let clonedRootClosure = cloner.getClonedValue(of: rootClosure) as! PartialApplyInst
       let _ = cloner.context.tryOptimizeApplyOfPartialApply(closure: clonedRootClosure)
     }
+
+    /// Further specialization rounds might leave the specialized callee in a state where
+    /// it contains a specializable closure with an apply taking the closure as an argument.
+    /// Run closure specialization pass for the callee we've just specialized.
+    ///
+    /// === AFTER SPECIALIZATION ROUND 2 ===
+    /// // VJP of bar(Float) -> Float
+    /// bb0(%0: Float)
+    ///   %4 = apply %sinf(%0)
+    ///   %10 = partial_apply %pb_bar_spec_round2(%0)
+    ///   return (%4, %10)
+    ///
+    /// // pb_bar_spec_round2: specialized pullback of bar(Float) -> Float
+    /// bb0(%0 : Float, %1 : Float):
+    ///   %8 = apply %pb_foo_spec(%0, %0) // <-- specialized _/ %6 = partial_apply %pb_sinf(%0)
+    ///                                   //                  \ %8 = apply %pb_foo(%0, %6)
+    ///   return %8
+    ///
+    /// // pb_foo_spec: specialized pullback of foo(Float) -> Float
+    /// bb0(%0 : Float, %1 : Float):
+    ///   %7 = apply %pb_sinf(%0, %1) // <-- folded from _/ %6 = partial_apply %pb_sinf(%1)
+    ///                               //                  \ %7 = apply %6(%0)
+    ///   return %7
+
+    closureSpecializationImpl(function: cloner.targetFunction, context: cloner.context)
   }
 
   private func addFunctionArgumentsWithoutClosures(using cloner: inout Cloner) {
