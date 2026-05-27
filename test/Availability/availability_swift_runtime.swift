@@ -28,25 +28,3 @@ func alwaysAvailable() {
 func availableSwift6() {
   availableInSwift6_0Runtime()
 }
-
-@available(Swift, introduced: 5.0, obsoleted: 5.1)
-func obsoletedBeforeSwiftRuntime() {}
-// expected-note@-1 {{'obsoletedBeforeSwiftRuntime()' was obsoleted in Swift 5.1}}
-
-func reachableUseStillDiagnosed() {
-  obsoletedBeforeSwiftRuntime()
-  // expected-error@-1 {{'obsoletedBeforeSwiftRuntime()' is unavailable in Swift}}
-}
-
-func useInUnreachableUnavailableBranch() {
-  if #unavailable(Swift 5.1) {
-    obsoletedBeforeSwiftRuntime()
-  }
-}
-
-func useInUnreachableAvailableElseBranch() {
-  if #available(Swift 5.1, *) {
-  } else {
-    obsoletedBeforeSwiftRuntime()
-  }
-}
