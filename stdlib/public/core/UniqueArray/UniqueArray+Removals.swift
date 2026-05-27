@@ -22,7 +22,7 @@ extension UniqueArray where Element: ~Copyable {
     if keepCapacity {
       _storage.removeAll()
     } else {
-      _storage = RigidArray(capacity: 0)
+      _storage = _RigidArray(capacity: 0)
     }
   }
 

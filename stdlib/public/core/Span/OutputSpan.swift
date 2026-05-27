@@ -570,7 +570,7 @@ extension OutputSpan where Element: Copyable {
   @_alwaysEmitIntoClient
   @_lifetime(self: copy self)
   internal mutating func _append(copying source: Span<Element>) {
-    unsafe source.withUnsafeBufferPointer { buffer in
+    source.withUnsafeBufferPointer { buffer in
       unsafe self._append(copying: buffer)
     }
   }

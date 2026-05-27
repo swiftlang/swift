@@ -14,8 +14,7 @@
 extension UniqueArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public func isTriviallyIdentical(to other: borrowing Self) -> Bool {
-    unsafe self._count == other._count &&
-    self._storage.isTriviallyIdentical(to: other._storage)
+    _storage.isTriviallyIdentical(to: other._storage)
   }
 }
 

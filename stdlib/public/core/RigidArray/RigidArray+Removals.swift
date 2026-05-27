@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Removes and returns the element at the specified position.
   ///
   /// All the elements following the specified position are moved to close the
@@ -25,7 +25,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @discardableResult
-  public mutating func remove(at index: Int) -> Element {
+  internal mutating func remove(at index: Int) -> Element {
     _checkItemIndex(index)
     let old = unsafe _storage.moveElement(from: index)
     _closeGap(at: index, count: 1)
@@ -38,7 +38,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(*n*), where *n* is the original count of the array.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func removeAll() {
+  internal mutating func removeAll() {
     unsafe _items.deinitialize()
     _count = 0
   }
@@ -53,7 +53,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @discardableResult
-  public mutating func removeLast() -> Element {
+  internal mutating func removeLast() -> Element {
     _precondition(!isEmpty, "Cannot remove last element from an empty array")
     let old = unsafe _storage.moveElement(from: _count - 1)
     _count -= 1
@@ -73,7 +73,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(`k`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func removeLast(_ k: Int) {
+  internal mutating func removeLast(_ k: Int) {
     if k == 0 { return }
     _precondition(
       k >= 0 && k <= _count,
@@ -95,7 +95,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func removeSubrange(_  bounds: Range<Int>) {
+  internal mutating func removeSubrange(_  bounds: Range<Int>) {
     _checkValidBounds(bounds)
     guard !bounds.isEmpty else { return }
     unsafe _storage.extracting(bounds).deinitialize()
@@ -111,14 +111,14 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func removeSubrange(_  bounds: some RangeExpression<Int>) {
+  internal mutating func removeSubrange(_  bounds: some RangeExpression<Int>) {
     // FIXME: Remove this in favor of a standard algorithm.
     removeSubrange(bounds.relative(to: indices))
   }
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Removes and returns the last element of the array, if there is one.
   ///
   /// - Returns: The last element of the array if the array is not empty;
@@ -127,7 +127,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func popLast() -> Element? {
+  internal mutating func popLast() -> Element? {
     // FIXME: Remove this in favor of a standard algorithm.
     if isEmpty { return nil }
     return removeLast()

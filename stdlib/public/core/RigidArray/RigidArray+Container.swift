@@ -11,14 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// A Boolean value indicating whether this array contains no elements.
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var isEmpty: Bool {
+  internal var isEmpty: Bool {
     count == 0
   }
 
@@ -28,20 +28,21 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var count: Int {
+  internal var count: Int {
     _count
   }
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// A type that represents a position in the array: an integer offset from the
   /// start.
   ///
   /// Valid indices consist of the position of every element and a "past the
   /// end” position that’s not valid for use as a subscript argument.
   @available(SwiftStdlib 6.4, *)
-  public typealias Index = Int
+  @usableFromInline
+  internal typealias Index = Int
 
   /// The position of the first element in a nonempty array. This is always zero.
   ///
@@ -49,7 +50,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var startIndex: Int {
+  internal var startIndex: Int {
     0
   }
 
@@ -61,7 +62,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var endIndex: Int {
+  internal var endIndex: Int {
     count
   }
 
@@ -71,7 +72,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var indices: Range<Int> {
+  internal var indices: Range<Int> {
     unsafe Range(uncheckedBounds: (0, count))
   }
 
@@ -101,7 +102,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal func _ptr(to index: Int) -> UnsafePointer<Element> {
@@ -128,7 +129,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public subscript(position: Int) -> Element {
+  internal subscript(position: Int) -> Element {
     @_transparent
     @_unsafeSelfDependentResult
     borrow {
@@ -144,7 +145,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Exchanges the values at the specified indices of the array.
   ///
   /// Both parameters must be valid indices of the array and not equal to
@@ -156,7 +157,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func swapAt(_ i: Int, _ j: Int) {
+  internal mutating func swapAt(_ i: Int, _ j: Int) {
     _checkItemIndex(i)
     _checkItemIndex(j)
     unsafe _items.swapAt(i, j)
@@ -164,7 +165,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Returns the position immediately after the given index.
   ///
   /// - Note: To improve performance, this method does not validate that the
@@ -179,10 +180,10 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public func index(after index: Int) -> Int {
+  internal func index(after index: Int) -> Int {
     index + 1
   }
-  
+
   /// Returns the position immediately before the given index.
   ///
   /// - Note: To improve performance, this method does not validate that the
@@ -197,7 +198,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public func index(before index: Int) -> Int {
+  internal func index(before index: Int) -> Int {
     index - 1
   }
 
@@ -214,7 +215,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public func formIndex(after index: inout Int) {
+  internal func formIndex(after index: inout Int) {
     index += 1
   }
 
@@ -231,7 +232,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public func formIndex(before index: inout Int) {
+  internal func formIndex(before index: inout Int) {
     index -= 1
   }
 
@@ -255,7 +256,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public func index(_ index: Int, offsetBy n: Int) -> Int {
+  internal func index(_ index: Int, offsetBy n: Int) -> Int {
     index + n
   }
   
@@ -274,7 +275,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public func distance(from start: Index, to end: Index) -> Int {
+  internal func distance(from start: Index, to end: Index) -> Int {
     end - start
   }
   
@@ -311,7 +312,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public func formIndex(
+  internal func formIndex(
     _ index: inout Index,
     offsetBy n: inout Int,
     limitedBy limit: Index

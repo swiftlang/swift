@@ -1012,8 +1012,8 @@ extension Span: BorrowingSequence where Element: ~Copyable {
 extension Span where Element: Equatable & ~Copyable {
   @_alwaysEmitIntoClient
   internal func _elementsEqual(to other: borrowing Self) -> Bool {
-    return unsafe self.withUnsafeBufferPointer { a in
-      unsafe other.withUnsafeBufferPointer { b in
+    return self.withUnsafeBufferPointer { a in
+      other.withUnsafeBufferPointer { b in
         guard a.count == b.count else { return false }
         guard unsafe a.baseAddress != b.baseAddress else { return true }
         var i = 0

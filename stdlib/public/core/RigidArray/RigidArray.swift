@@ -50,7 +50,8 @@
 @available(SwiftStdlib 6.4, *)
 @frozen
 @safe
-public struct RigidArray<Element: ~Copyable>: ~Copyable {
+@usableFromInline
+internal struct _RigidArray<Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal var _storage: UnsafeMutableBufferPointer<Element>
 
@@ -71,17 +72,17 @@ public struct RigidArray<Element: ~Copyable>: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray: @unchecked Sendable where Element: Sendable & ~Copyable {}
+extension _RigidArray: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// The maximum number of elements this rigid array can hold.
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var capacity: Int {
+  internal var capacity: Int {
     _assumeNonNegative(unsafe _storage.count)
   }
 
@@ -92,7 +93,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var freeCapacity: Int {
+  internal var freeCapacity: Int {
     _assumeNonNegative(capacity &- count)
   }
 
@@ -104,13 +105,13 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var isFull: Bool {
+  internal var isFull: Bool {
     freeCapacity == 0
   }
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal var _items: UnsafeMutableBufferPointer<Element> {
     unsafe _storage.extracting(Range(uncheckedBounds: (0, _count)))
@@ -123,14 +124,14 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// A span over the elements of this array, providing direct read-only access.
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var span: Span<Element> {
+  internal var span: Span<Element> {
     @_lifetime(borrow self)
     get {
       let result = unsafe Span(_unsafeElements: _items)
@@ -145,7 +146,7 @@ extension RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public var mutableSpan: MutableSpan<Element> {
+  internal var mutableSpan: MutableSpan<Element> {
     @_lifetime(&self)
     mutating get {
       let result = unsafe MutableSpan(_unsafeElements: _items)
@@ -170,7 +171,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Arbitrarily edit the storage underlying this array by invoking a
   /// user-supplied closure with a mutable `OutputSpan` view over it.
   /// This method calls its function argument at most once, allowing it to
@@ -190,7 +191,7 @@ extension RigidArray where Element: ~Copyable {
   ///    argument.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func edit<E: Error, R: ~Copyable>(
+  internal mutating func edit<E: Error, R: ~Copyable>(
     _ body: (inout OutputSpan<Element>) throws(E) -> R
   ) throws(E) -> R {
     var span = unsafe OutputSpan(buffer: _storage, initializedCount: _count)
@@ -213,7 +214,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal func _contiguousSubrange(following index: inout Int) -> Range<Int> {
     _precondition(index >= 0 && index <= _count, "Index out of bounds")
@@ -230,7 +231,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Grow or shrink the capacity of a rigid array instance without discarding
   /// its contents.
   ///
@@ -244,7 +245,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func reallocate(capacity newCapacity: Int) {
+  internal mutating func reallocate(capacity newCapacity: Int) {
     _precondition(newCapacity >= count, "RigidArray capacity overflow")
     guard newCapacity != capacity else { return }
     let newStorage: UnsafeMutableBufferPointer<Element> = .allocate(
@@ -265,21 +266,21 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func reserveCapacity(_ n: Int) {
+  internal mutating func reserveCapacity(_ n: Int) {
     guard capacity < n else { return }
     reallocate(capacity: n)
   }
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray {
+extension _RigidArray {
   /// Copy the contents of this array into a newly allocated rigid array
   /// instance with just enough capacity to hold all its elements.
   ///
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public func clone() -> Self {
+  internal func clone() -> Self {
     clone(capacity: self.count)
   }
   
@@ -292,9 +293,9 @@ extension RigidArray {
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public func clone(capacity: Int) -> Self {
+  internal func clone(capacity: Int) -> Self {
     _precondition(capacity >= count, "RigidArray capacity overflow")
-    var result = RigidArray<Element>(capacity: capacity)
+    var result = Self(capacity: capacity)
     let initialized = unsafe result._storage.initialize(fromContentsOf: _items)
     _precondition(initialized == count)
     result._count = count
@@ -303,7 +304,7 @@ extension RigidArray {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal mutating func _closeGap(
     at index: Int, count: Int

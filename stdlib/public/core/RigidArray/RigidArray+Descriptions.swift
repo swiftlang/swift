@@ -16,9 +16,9 @@
 // }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
-  public var description: String {
+  internal var description: String {
     /// FIXME: Print the item descriptions when available.
     "<\(count) items>"
   }
@@ -30,9 +30,9 @@ extension RigidArray where Element: ~Copyable {
 // }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
-  public var debugDescription: String {
+  internal var debugDescription: String {
     /// FIXME: Print the item descriptions when available.
     "<\(count) items>"
   }

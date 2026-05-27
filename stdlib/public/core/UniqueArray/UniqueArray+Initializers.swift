@@ -64,7 +64,7 @@ extension UniqueArray where Element: Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   public init(repeating repeatedValue: Element, count: Int) {
-    self.init(consuming: RigidArray(repeating: repeatedValue, count: count))
+    self.init(consuming: _RigidArray(repeating: repeatedValue, count: count))
   }
 }
 
@@ -76,7 +76,7 @@ extension UniqueArray where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public init(consuming storage: consuming RigidArray<Element>) {
+  internal init(consuming storage: consuming _RigidArray<Element>) {
     self._storage = storage
   }
 }

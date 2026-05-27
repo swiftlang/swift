@@ -11,14 +11,14 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Initializes a new rigid array with zero capacity and no elements.
   ///
   /// - Complexity: O(1)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public init() {
+  internal init() {
     unsafe _storage = .init(start: nil, count: 0)
     _count = 0
   }
@@ -26,7 +26,7 @@ extension RigidArray where Element: ~Copyable {
   /// Initializes a new rigid array with the specified capacity and no elements.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public init(capacity: Int) {
+  internal init(capacity: Int) {
     _precondition(capacity >= 0, "Array capacity must be nonnegative")
     if capacity > 0 {
       unsafe _storage = .allocate(capacity: capacity)
@@ -38,7 +38,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Creates a new array with the specified capacity, directly initializing
   /// its storage using an output span.
   ///
@@ -51,7 +51,7 @@ extension RigidArray where Element: ~Copyable {
   ///       output span before it returns (or before it throws an error).
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public init<E: Error>(
+  internal init<E: Error>(
     capacity: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
   ) throws(E) {
@@ -61,7 +61,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: Copyable {
+extension _RigidArray where Element: Copyable {
   /// Creates a new array containing the specified number of a single,
   /// repeated value.
   ///
@@ -73,7 +73,7 @@ extension RigidArray where Element: Copyable {
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public init(repeating repeatedValue: Element, count: Int) {
+  internal init(repeating repeatedValue: Element, count: Int) {
     self.init(capacity: count)
     unsafe _freeSpace.initialize(repeating: repeatedValue)
     _count = count
@@ -81,7 +81,7 @@ extension RigidArray where Element: Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: Copyable {
+extension _RigidArray where Element: Copyable {
   /// Creates a new array with the specified capacity, holding a copy
   /// of the contents of a given sequence.
   ///
@@ -92,7 +92,7 @@ extension RigidArray where Element: Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public init(
+  internal init(
     capacity: Int,
     copying contents: some Sequence<Element>
   ) {
@@ -111,7 +111,7 @@ extension RigidArray where Element: Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public init(
+  internal init(
     capacity: Int? = nil,
     copying contents: some Collection<Element>
   ) {
@@ -130,7 +130,7 @@ extension RigidArray where Element: Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public init(
+  internal init(
     capacity: Int? = nil,
     copying span: Span<Element>
   ) {

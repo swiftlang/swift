@@ -11,10 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray: Hashable where Element: Hashable & ~Copyable {
+extension _RigidArray: Hashable where Element: Hashable & ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public func hash(into hasher: inout Hasher) {
+  internal func hash(into hasher: inout Hasher) {
     hasher.combine(self.count)
     self.span._hashContents(into: &hasher)
   }

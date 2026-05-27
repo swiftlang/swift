@@ -41,10 +41,10 @@
 @frozen
 public struct UniqueArray<Element: ~Copyable>: ~Copyable {
   @usableFromInline
-  internal var _storage: RigidArray<Element>
+  internal var _storage: _RigidArray<Element>
 
   @_alwaysEmitIntoClient
-  internal init(_storage: consuming RigidArray<Element>) {
+  internal init(_storage: consuming _RigidArray<Element>) {
     self._storage = _storage
   }
 }

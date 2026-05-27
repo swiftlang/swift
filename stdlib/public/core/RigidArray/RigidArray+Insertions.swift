@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Inserts a new element into the array at the specified position.
   ///
   /// If the array does not have sufficient capacity to hold any more elements,
@@ -31,7 +31,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(`self.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func insert(_ item: consuming Element, at index: Int) {
+  internal mutating func insert(_ item: consuming Element, at index: Int) {
     _checkValidIndex(index)
     _precondition(!isFull, "RigidArray capacity overflow")
     if index < count {
@@ -46,7 +46,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Inserts a given number of new items into this array at the specified
   /// position, using a callback to directly initialize array storage by
   /// populating an output span.
@@ -89,7 +89,7 @@ extension RigidArray where Element: ~Copyable {
   ///    of the callback invocations.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func insert<E: Error>(
+  internal mutating func insert<E: Error>(
     addingCount newItemCount: Int,
     at index: Int,
     initializingWith initializer: (inout OutputSpan<Element>) throws(E) -> Void
@@ -113,7 +113,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray where Element: ~Copyable {
+extension _RigidArray where Element: ~Copyable {
   /// Moves the elements of a fully initialized buffer into this array,
   /// starting at the specified position, and leaving the buffer
   /// uninitialized.
@@ -133,7 +133,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(`self.count` + `items.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func insert(
+  internal mutating func insert(
     moving items: UnsafeMutableBufferPointer<Element>,
     at index: Int
   ) {
@@ -160,7 +160,7 @@ extension RigidArray where Element: ~Copyable {
   /// - Complexity: O(`self.count` + `items.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func insert(
+  internal mutating func insert(
     moving items: inout OutputSpan<Element>,
     at index: Int
   ) {
@@ -173,7 +173,7 @@ extension RigidArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension RigidArray {
+extension _RigidArray where Element: Copyable {
   /// Copies the elements of a fully initialized buffer pointer into this
   /// array at the specified position.
   ///
@@ -196,7 +196,7 @@ extension RigidArray {
   /// - Complexity: O(`count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func insert(
+  internal mutating func insert(
     copying newElements: UnsafeBufferPointer<Element>, at index: Int
   ) {
     guard newElements.count > 0 else { return }
@@ -227,7 +227,7 @@ extension RigidArray {
   /// - Complexity: O(`count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func insert(
+  internal mutating func insert(
     copying newElements: UnsafeMutableBufferPointer<Element>,
     at index: Int
   ) {
@@ -254,7 +254,7 @@ extension RigidArray {
   /// - Complexity: O(`count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func insert(
+  internal mutating func insert(
     copying newElements: Span<Element>, at index: Int
   ) {
     guard newElements.count > 0 else { return }
@@ -310,7 +310,7 @@ extension RigidArray {
   /// - Complexity: O(`count` + `newElements.count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func insert(
+  internal mutating func insert(
     copying newElements: some Collection<Element>, at index: Int
   ) {
     _insertCollection(
