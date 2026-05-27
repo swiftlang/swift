@@ -111,12 +111,11 @@ Default: @("X64","X86","ARM64")
 Clean non-compiler builds while building. Use this for a fresh build when
 experiencing issues.
 
-.PARAMETER SkipBuild
-Skip the build phase entirely. Useful for testing packaging or other post-build
-steps.
+.PARAMETER Toolchain
+Build the toolchain.
 
-.PARAMETER SkipPackaging
-Skip building the MSI installers and packaging. Useful for development builds.
+.PARAMETER Package
+Build the MSI installers and packaging.
 
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
@@ -208,10 +207,12 @@ param
   [string[]] $WindowsSDKVersions = @("Windows", "WindowsExperimental"),
   [string] $WindowsSDKVersionDefault = "Windows",
 
+  # Build Phases
+  [switch] $Toolchain = $true,
+  [switch] $Package = $false,
+
   # Incremental Build Support
   [switch] $Clean,
-  [switch] $SkipBuild = $false,
-  [switch] $SkipPackaging = $false,
   [string[]] $Test = @(),
 
   [switch] $IncludeDS2 = $false,
@@ -1372,13 +1373,13 @@ function Get-Dependencies {
     }
     Install-PythonModules
 
-    if ($SkipBuild -and $SkipPackaging) { return }
+    if ($Toolchain -or $Package) {
+      DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
+      Expand-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
+      Write-Success "WiX $($WiX.Version)"
+    }
 
-    DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
-    Expand-ZipFile WiX-$($WiX.Version).zip $BinaryCache WiX-$($WiX.Version)
-    Write-Success "WiX $($WiX.Version)"
-
-    if ($SkipBuild) { return }
+    if (-not $Toolchain) { return }
 
     if ($EnableCaching) {
       $SCCache = Get-SCCache
@@ -1432,13 +1433,11 @@ function Get-Dependencies {
         # Check whether VsDevShell can already resolve the requested Windows SDK Version
         Invoke-IsolatingEnvVars { Invoke-VsDevShell $HostPlatform }
       } catch {
-        $Package = Microsoft.Windows.SDK.CPP
-
         Write-Output "Windows SDK $WinSDKVersion not found. Downloading from nuget.org ..."
-        Invoke-Program nuget install $Package -Version $WinSDKVersion -OutputDirectory $NugetRoot
+        Invoke-Program nuget install Microsoft.Windows.SDK.CPP -Version $WinSDKVersion -OutputDirectory $NugetRoot
 
         # Set to script scope so Invoke-VsDevShell can read it.
-        $script:CustomWinSDKRoot = "$NugetRoot\$Package.$WinSDKVersion\c"
+        $script:CustomWinSDKRoot = "$NugetRoot\Microsoft.Windows.SDK.CPP.$WinSDKVersion\c"
 
         # Install each required architecture package and move files under the base /lib directory.
         $Builds = $WindowsSDKBuilds.Clone()
@@ -1447,8 +1446,8 @@ function Get-Dependencies {
         }
 
         foreach ($Build in $Builds) {
-          Invoke-Program nuget install $Package.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
-          Copy-Directory "$NugetRoot\$Package.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
+          Invoke-Program nuget install Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
+          Copy-Directory "$NugetRoot\Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
         }
       }
     }
@@ -4253,7 +4252,7 @@ if ($Clean) {
   Remove-Item -Force -Recurse -Path (Get-InstallDir $HostPlatform) -ErrorAction Ignore
 }
 
-if (-not $SkipBuild) {
+if ($Toolchain) {
   if ($EnableCaching) {
     Invoke-Program (Get-SCCache).Path --zero-stats
   }
@@ -4495,24 +4494,24 @@ if (-not $SkipBuild) {
 Install-HostToolchain $HostPlatform.ToolchainInstallRoot
 Install-EmbeddablePython
 
-if (-not $SkipBuild) {
+if ($Toolchain) {
   Invoke-BuildStep Build-SymbolKit $HostPlatform
   Invoke-BuildStep Build-DocC $HostPlatform
 }
 
-if (-not $SkipBuild) {
+if ($Toolchain) {
   Invoke-BuildStep Build-mimalloc $HostPlatform
 }
 
-if (-not $SkipBuild -and $IncludeNoAsserts) {
+if ($Toolchain -and $IncludeNoAsserts) {
   Build-NoAssertsToolchain
 }
 
-if (-not $SkipBuild) {
+if ($Toolchain) {
   Invoke-BuildStep Patch-mimalloc $HostPlatform
 }
 
-if (-not $SkipPackaging) {
+if ($Package) {
   Invoke-BuildStep Build-Installer $HostPlatform
 }
 
