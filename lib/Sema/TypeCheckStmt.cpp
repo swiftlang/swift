@@ -3564,8 +3564,7 @@ private:
                        seqType, protoDecl,
                        domainAndRange.getDomain().getNameForAttributePrinting(),
                        domainAndRange.getRange().getVersionString());
-    fixAvailability(loc, dc, domainAndRange.getDomain(),
-                    domainAndRange.getRange(), ctx);
+    fixAvailability(loc, dc, constraint.getFixItDomainAndRange(ctx), ctx);
   }
 
   void buildMakeIteratorVar() {

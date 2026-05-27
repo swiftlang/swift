@@ -727,9 +727,11 @@ static void findAvailabilityFixItNodes(
 
 /// Emit a diagnostic note and Fix-It to add an @available attribute
 /// on the given declaration for the given version range.
-static void fixAvailabilityForDecl(
-    SourceRange ReferenceRange, const Decl *D, AvailabilityDomain Domain,
-    const AvailabilityRange &RequiredAvailability, ASTContext &Context) {
+static void fixAvailabilityForDecl(SourceRange ReferenceRange, const Decl *D,
+                                   const AvailabilityDomainAndRange &DomainAndRange,
+                                   ASTContext &Context) {
+  AvailabilityDomain Domain = DomainAndRange.getDomain();
+  const AvailabilityRange &RequiredAvailability = DomainAndRange.getRange();
   assert(D);
 
   // Don't suggest adding an @available to a declaration where we would
@@ -836,9 +838,8 @@ static bool fixAvailabilityByNarrowingNearbyVersionCheck(
 /// Emit a diagnostic note and Fix-It to add an if #available(...) { } guard
 /// that checks for the given version range around the given node.
 static void fixAvailabilityByAddingVersionCheck(
-    ASTNode NodeToWrap, AvailabilityDomain Domain,
-    const AvailabilityRange &RequiredAvailability, SourceRange ReferenceRange,
-    ASTContext &Context) {
+    ASTNode NodeToWrap, const AvailabilityDomainAndRange &DomainAndRange,
+    SourceRange ReferenceRange, ASTContext &Context) {
   // If this is an implicit variable that wraps an expression,
   // let's point to it's initializer. For example, result builder
   // transform captures expressions into implicit variables.
@@ -883,7 +884,8 @@ static void fixAvailabilityByAddingVersionCheck(
       StartAt += NewLine.length();
     }
 
-    AvailabilityDomain QueryDomain = Domain;
+    AvailabilityDomain QueryDomain = DomainAndRange.getDomain();
+    const AvailabilityRange &RequiredAvailability = DomainAndRange.getRange();
 
     // Runtime availability checks that specify app extension platforms don't
     // work, so only suggest checks against the base platform.
@@ -918,8 +920,7 @@ static void fixAvailabilityByAddingVersionCheck(
 
 void swift::fixAvailability(SourceRange ReferenceRange,
                             const DeclContext *ReferenceDC,
-                            AvailabilityDomain Domain,
-                            const AvailabilityRange &RequiredAvailability,
+                            const AvailabilityDomainAndRange &DomainAndRange,
                             ASTContext &Context) {
   if (ReferenceRange.isInvalid())
     return;
@@ -935,19 +936,19 @@ void swift::fixAvailability(SourceRange ReferenceRange,
   // Suggest wrapping in if #available(...) { ... } if possible.
   if (NodeToWrapInVersionCheck.has_value()) {
     fixAvailabilityByAddingVersionCheck(NodeToWrapInVersionCheck.value(),
-                                        Domain, RequiredAvailability,
-                                        ReferenceRange, Context);
+                                        DomainAndRange, ReferenceRange,
+                                        Context);
   }
 
   // Suggest adding availability attributes.
   if (FoundMemberDecl) {
-    fixAvailabilityForDecl(ReferenceRange, FoundMemberDecl, Domain,
-                           RequiredAvailability, Context);
+    fixAvailabilityForDecl(ReferenceRange, FoundMemberDecl, DomainAndRange,
+                           Context);
   }
 
   if (FoundTypeLevelDecl) {
-    fixAvailabilityForDecl(ReferenceRange, FoundTypeLevelDecl, Domain,
-                           RequiredAvailability, Context);
+    fixAvailabilityForDecl(ReferenceRange, FoundTypeLevelDecl, DomainAndRange,
+                           Context);
   }
 }
 
@@ -956,9 +957,10 @@ static void diagnosePotentialUnavailability(
     llvm::function_ref<InFlightDiagnostic(AvailabilityDomain,
                                           AvailabilityRange)>
         Diagnose,
-    const DeclContext *ReferenceDC, AvailabilityDomain Domain,
-    const AvailabilityRange &Availability) {
+    const DeclContext *ReferenceDC, const AvailabilityDomainAndRange &DomainAndRange) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  AvailabilityDomain Domain = DomainAndRange.getDomain();
+  const AvailabilityRange &Availability = DomainAndRange.getRange();
 
   {
     auto Err = Diagnose(Domain, Availability);
@@ -968,7 +970,7 @@ static void diagnosePotentialUnavailability(
             ReferenceRange, ReferenceDC, Domain, Availability, Context, Err))
       return;
   }
-  fixAvailability(ReferenceRange, ReferenceDC, Domain, Availability, Context);
+  fixAvailability(ReferenceRange, ReferenceDC, DomainAndRange, Context);
 }
 
 // FIXME: [availability] Should this take an AvailabilityContext instead of
@@ -993,7 +995,8 @@ bool TypeChecker::checkAvailability(SourceRange ReferenceRange,
 
   if (!availabilityAtLocation.isContainedIn(PlatformRange)) {
     diagnosePotentialUnavailability(ReferenceRange, Diagnose, ReferenceDC,
-                                    domain, PlatformRange);
+                                    AvailabilityDomainAndRange(domain,
+                                                               PlatformRange));
     return true;
   }
 
@@ -1059,13 +1062,15 @@ static Diagnostic getPotentialUnavailabilityDiagnostic(
 // Emits a diagnostic for a reference to a declaration that is potentially
 // unavailable at the given source location. Returns true if an error diagnostic
 // was emitted.
-static bool
-diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
-                                const DeclContext *ReferenceDC,
-                                AvailabilityDomain Domain,
-                                const AvailabilityRange &Availability,
-                                bool WarnBeforeDeploymentTarget = false) {
+static bool diagnosePotentialUnavailability(
+    const ValueDecl *D, SourceRange ReferenceRange,
+    const DeclContext *ReferenceDC,
+    const AvailabilityDomainAndRange &DomainAndRange,
+    const AvailabilityDomainAndRange &FixItDomainAndRange,
+    bool WarnBeforeDeploymentTarget = false) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  AvailabilityDomain Domain = DomainAndRange.getDomain();
+  const AvailabilityRange &Availability = DomainAndRange.getRange();
   if (Context.LangOpts.DisableAvailabilityChecking)
     return false;
 
@@ -1082,7 +1087,7 @@ diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
       return IsError;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, Domain, Availability, Context);
+  fixAvailability(ReferenceRange, ReferenceDC, FixItDomainAndRange, Context);
   return IsError;
 }
 
@@ -1090,9 +1095,12 @@ diagnosePotentialUnavailability(const ValueDecl *D, SourceRange ReferenceRange,
 /// potentially unavailable.
 static void diagnosePotentialAccessorUnavailability(
     const AccessorDecl *Accessor, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, AvailabilityDomain Domain,
-    const AvailabilityRange &Availability, bool ForInout) {
+    const DeclContext *ReferenceDC,
+    const AvailabilityDomainAndRange &DomainAndRange,
+    const AvailabilityDomainAndRange &FixItDomainAndRange, bool ForInout) {
   ASTContext &Context = ReferenceDC->getASTContext();
+  AvailabilityDomain Domain = DomainAndRange.getDomain();
+  const AvailabilityRange &Availability = DomainAndRange.getRange();
 
   assert(Accessor->isGetterOrSetter());
 
@@ -1111,7 +1119,7 @@ static void diagnosePotentialAccessorUnavailability(
       return;
   }
 
-  fixAvailability(ReferenceRange, ReferenceDC, Domain, Availability, Context);
+  fixAvailability(ReferenceRange, ReferenceDC, FixItDomainAndRange, Context);
 }
 
 static DiagnosticBehavior
@@ -1137,12 +1145,15 @@ behaviorLimitForExplicitUnavailability(
 /// unavailable at the given source location.
 static bool diagnosePotentialUnavailability(
     const RootProtocolConformance *rootConf, const ExtensionDecl *ext,
-    SourceLoc loc, const DeclContext *dc, AvailabilityDomain domain,
-    const AvailabilityRange &availability) {
+    SourceLoc loc, const DeclContext *dc,
+    const AvailabilityDomainAndRange &domainAndRange,
+    const AvailabilityDomainAndRange &fixItDomainAndRange) {
   ASTContext &ctx = dc->getASTContext();
   if (ctx.LangOpts.DisableAvailabilityChecking)
     return false;
 
+  AvailabilityDomain domain = domainAndRange.getDomain();
+  const AvailabilityRange &availability = domainAndRange.getRange();
   {
     auto type = rootConf->getType();
     auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
@@ -1169,7 +1180,7 @@ static bool diagnosePotentialUnavailability(
       return true;
   }
 
-  fixAvailability(loc, dc, domain, availability, ctx);
+  fixAvailability(loc, dc, fixItDomainAndRange, ctx);
   return true;
 }
 
@@ -3153,6 +3164,7 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
     return false;
 
   auto domainAndRange = constraint->getDomainAndRange(ctx);
+  auto fixItDomainAndRange = constraint->getFixItDomainAndRange(ctx);
   auto domain = domainAndRange.getDomain();
   auto requiredRange = domainAndRange.getRange();
 
@@ -3164,10 +3176,11 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 
   if (accessor) {
     bool forInout = Flags.contains(DeclAvailabilityFlag::ForInout);
-    diagnosePotentialAccessorUnavailability(accessor, R, DC, domain,
-                                            requiredRange, forInout);
+    diagnosePotentialAccessorUnavailability(accessor, R, DC, domainAndRange,
+                                            fixItDomainAndRange, forInout);
   } else {
-    if (!diagnosePotentialUnavailability(D, R, DC, domain, requiredRange))
+    if (!diagnosePotentialUnavailability(D, R, DC, domainAndRange,
+                                         fixItDomainAndRange))
       return false;
   }
 
@@ -3681,9 +3694,9 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
 
       // Diagnose (and possibly signal) for potential unavailability
       auto domainAndRange = constraint->getDomainAndRange(ctx);
-      if (diagnosePotentialUnavailability(rootConf, ext, loc, DC,
-                                          domainAndRange.getDomain(),
-                                          domainAndRange.getRange())) {
+      auto fixItDomainAndRange = constraint->getFixItDomainAndRange(ctx);
+      if (diagnosePotentialUnavailability(
+              rootConf, ext, loc, DC, domainAndRange, fixItDomainAndRange)) {
         maybeEmitAssociatedTypeNote();
         return true;
       }
