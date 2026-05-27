@@ -24,7 +24,9 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -995,4 +997,94 @@ bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
   }
 
   return false;
+}
+
+/// Returns a string containing swift syntax describing the case \p  decl with
+/// relevant information.
+static std::string getCaseInfoString(const EnumElementDecl *decl) {
+  std::string res;
+  llvm::raw_string_ostream out(res);
+  out << "CaseInfo(name: " << QuotedString(decl->getNameStr())
+      << ", associatedValues: [";
+  if (decl->hasAssociatedValues()) {
+    auto payloadType = decl->getPayloadInterfaceType();
+    auto *tupleType = payloadType->getAs<TupleType>();
+    bool first = true;
+    for (const auto elem : tupleType->getElements()) {
+      if (!first) out << ", ";
+      first = false;
+      if (elem.hasName()) out << QuotedString(elem.getName().str());
+      else out << "nil";
+    }
+  }
+  out << "])";
+  out.flush();
+  return res;
+}
+
+/// Returns a string containing swift syntax describing the enum \p
+/// decl with relevant information.
+static std::string getEnumTypeKindString(EnumDecl *decl) {
+  std::string res = "enumLike(EnumTypeInfo(isObjC: ";
+  res += decl->isObjC() ? "true" : "false";
+  res += ", cases: [";
+  auto elements = decl->getAllElements();
+  for (const auto *elem : elements) {
+    if (elem != elements.front()) res += ", ";
+    res += getCaseInfoString(elem);
+  }
+  res += "]))";
+  return res;
+}
+
+/// Returns a string containing swift syntax describing the stored property \p
+/// decl with relevant information.
+static std::string getStoredPropertyString(const VarDecl *decl) {
+  bool isVar = decl->getIntroducer() == VarDecl::Introducer::Var;
+  std::string res;
+  llvm::raw_string_ostream out(res);
+  out << "StoredProperty(name: " << QuotedString(decl->getNameStr())
+      << ", typeName: " << QuotedString(decl->getTypeInContext().getString())
+      << ", isVar: " << (isVar ? "true" : "false")
+      << ", isStatic: " << (decl->isStatic() ? "true" : "false") << ")";
+  out.flush();
+  return res;
+}
+
+/// Returns a string containing swift syntax describing struct \p decl with
+/// relevant information.
+static std::string getStructTypeKindString(StructDecl *decl) {
+  std::string res = "structLike(StructTypeInfo(properties: [";
+  auto properties = decl->getStoredProperties();
+  for (const auto *prop: properties) {
+    if (prop != properties.front()) res += ", ";
+    res += getStoredPropertyString(prop);
+  }
+  res += "]))";
+  return res;
+}
+
+/// Returns a string containing swift syntax describing \p decl with relevant
+/// information. For the moment, only struct and enum types are supported.
+static std::string getNominalTypeKindString(NominalTypeDecl *decl) {
+  if (auto *enumDecl = dyn_cast<EnumDecl>(decl))
+    return getEnumTypeKindString(enumDecl);
+
+  if (auto *structDecl = dyn_cast<StructDecl>(decl))
+    return getStructTypeKindString(structDecl);
+
+  llvm_unreachable("todo");
+}
+
+std::string swift::getNominalTypeInfoString(DerivedConformance &derived) {
+  bool isUnsafe =
+      derived.Conformance->getExplicitSafety() == ExplicitSafety::Unsafe;
+
+  std::string res;
+  llvm::raw_string_ostream out(res);
+  out << "NominalTypeInfo(name: " << QuotedString(derived.Nominal->getNameStr())
+      << ", kind: " << getNominalTypeKindString(derived.Nominal)
+      << ", isUnsafe: " << (isUnsafe ? "true" : "false") << ")";
+  out.flush();
+  return res;
 }
