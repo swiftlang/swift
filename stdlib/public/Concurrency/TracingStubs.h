@@ -18,14 +18,13 @@
 #define SWIFT_CONCURRENCY_TRACINGSIGNPOST_H
 
 #include "Tracing.h"
+#include "swift/ABI/Executor.h"
 
 namespace swift {
 namespace concurrency {
 namespace trace {
 
 inline void actor_create(HeapObject *actor) {}
-
-inline void actor_destroy(HeapObject *actor) {}
 
 inline void actor_deallocate(HeapObject *actor) {}
 
@@ -56,7 +55,8 @@ inline void task_resume(AsyncTask *task) {}
 
 inline void task_status_changed(AsyncTask *task, uint8_t maxPriority,
                                 bool isCancelled, bool isEscalated,
-                                bool isStarting, bool isRunning, bool isEnqueued) {}
+                                bool isStarting, bool isRunning,
+                                bool isEnqueued, bool wasRunning) {}
 
 inline void task_flags_changed(AsyncTask *task, uint8_t jobPriority,
                                bool isChildTask, bool isFuture,
@@ -74,11 +74,19 @@ inline void job_enqueue_global(Job *job) {}
 
 inline void job_enqueue_global_with_delay(unsigned long long delay, Job *job) {}
 
-inline void job_enqueue_main_executor(Job *job) {}
+inline void job_enqueue_executor(Job *job, SerialExecutorRef serialExecutor,
+                                  TaskExecutorRef taskExecutor) {}
 
-inline job_run_info job_run_begin(Job *job) { return {}; }
+inline job_run_info job_run_begin(Job *job, SerialExecutorRef serialExecutor,
+                                  TaskExecutorRef taskExecutor) {
+  return {};
+}
 
 inline void job_run_end(job_run_info info) {}
+
+inline void task_switch_executor(AsyncTask *task,
+                                 SerialExecutorRef serialExecutor,
+                                 TaskExecutorRef taskExecutor) {}
 
 } // namespace trace
 } // namespace concurrency

@@ -24,3 +24,16 @@ public struct M_109232806: ~Copyable {
 public func test_109232806(m: borrowing M_109232806) {
   _ = m.y
 }
+
+
+// rdar://162749287
+struct DonutEventHandler: ~Copyable {
+    mutating func deliciouslyDo<Result>(
+        operation: (inout Self) async throws -> Result,
+        withHandler handler: (Int) async throws -> Void
+    ) async rethrows -> Result {
+        return try await withoutActuallyEscaping(handler) { escapingHandler in
+            return try await operation(&self)
+        }
+    }
+}

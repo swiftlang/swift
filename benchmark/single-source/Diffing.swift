@@ -52,12 +52,12 @@ public let benchmarks = [
   BenchmarkInfo(
     name: "Diffing.Large.Similar",
     runFunction: { diff($0, from: bigUnabridgedLorem, to: bigLoremIpsum) },
-    tags: t,
+    tags: t + [.skip],
     setUpFunction: { blackHole((bigUnabridgedLorem, bigLoremIpsum)) }),
   BenchmarkInfo(
     name: "Diffing.Large.Disparate",
     runFunction: { diff($0, from: bigNumbersAndSymbols, to: bigAlphabets) },
-    tags: t,
+    tags: t + [.skip],
     setUpFunction: { blackHole((bigNumbersAndSymbols, bigAlphabets)) }),
 ]
 

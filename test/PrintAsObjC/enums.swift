@@ -2,23 +2,24 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-module -emit-module-doc -o %t %s -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/enums.swiftmodule -typecheck -verify -emit-objc-header-path %t/enums.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
-// RUN: %FileCheck %s < %t/enums.h
+// RUN: %FileCheck %s -input-file %t/enums.h
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/enums.h
 // RUN: %check-in-clang %t/enums.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.h -include ctypes.h -include CoreFoundation.h
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-module -o /dev/null -emit-module-doc-path /dev/null -module-name enums %s -emit-objc-header-path %t/enums.WMO.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
-// RUN: %FileCheck %s < %t/enums.WMO.h
-// RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/enums.WMO.h
+// RUN: %FileCheck %s -input-file %t/enums.WMO.h
+// RUN: %FileCheck -check-prefix=NEGATIVE %s -input-file %t/enums.WMO.h
 // RUN: %check-in-clang %t/enums.WMO.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.WMO.h -include ctypes.h -include CoreFoundation.h
+// RUN: %check-in-clang -fno-modules -Qunused-arguments %t/enums.WMO.h -include ctypes.h -include CoreFoundation.h -std=c99
 
 // Ensure that providing the output header path via the supplementary output
 // file map also works.
 
 // RUN: echo "{\"%s\": {\"objc-header\": \"%t/enums-supplemental.h\"}}" > %t-output-file-map.json
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -enable-source-import -typecheck -verify -supplementary-output-file-map %t-output-file-map.json -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
-// RUN: %FileCheck -check-prefix CHECK-SUPPLEMENTAL %s < %t/enums-supplemental.h
+// RUN: %FileCheck -check-prefix CHECK-SUPPLEMENTAL %s -input-file %t/enums-supplemental.h
 
 // REQUIRES: objc_interop
 
@@ -26,12 +27,12 @@ import Foundation
 
 // NEGATIVE-NOT: NSMalformedEnumMissingTypedef :
 // NEGATIVE-NOT: enum EnumNamed
-// CHECK-LABEL: enum FooComments : NSInteger;
-// CHECK-LABEL: enum NegativeValues : int16_t;
-// CHECK-LABEL: enum ObjcEnumNamed : NSInteger;
+// CHECK-LABEL: SWIFT_ENUM_FWD_DECL(NSInteger, FooComments)
+// CHECK-LABEL: SWIFT_ENUM_FWD_DECL(int16_t, NegativeValues)
+// CHECK-LABEL: SWIFT_ENUM_FWD_DECL(NSInteger, ObjcEnumNamed)
 
-// CHECK-SUPPLEMENTAL: enum NegativeValues : int16_t;
-// CHECK-SUPPLEMENTAL: enum ObjcEnumNamed : NSInteger;
+// CHECK-SUPPLEMENTAL: SWIFT_ENUM_FWD_DECL(int16_t, NegativeValues)
+// CHECK-SUPPLEMENTAL: SWIFT_ENUM_FWD_DECL(NSInteger, ObjcEnumNamed)
 
 // CHECK-LABEL: @interface AnEnumMethod
 // CHECK-NEXT: - (enum NegativeValues)takeAndReturnEnum:(enum FooComments)foo SWIFT_WARN_UNUSED_RESULT;

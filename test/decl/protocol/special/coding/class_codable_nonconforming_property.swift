@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown
 
 struct NonCodable : Hashable {
     func hash(into hasher: inout Hasher) {}

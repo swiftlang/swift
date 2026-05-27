@@ -9,6 +9,7 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   Decls.swift
   Diagnostics.swift
   DiagnosticsBridge.swift
+  EmbeddedSupport.swift
   Exprs.swift
   Fingerprint.swift
   Generics.swift
@@ -22,17 +23,21 @@ add_pure_swift_host_library(swiftASTGen STATIC CXX_INTEROP
   Stmts.swift
   TypeAttrs.swift
   Types.swift
+  WarningGroupBehaviorConfiguration.swift
 
   DEPENDENCIES
     swiftAST
   SWIFT_DEPENDENCIES
+    _CompilerSwiftCompilerPluginMessageHandling
     _CompilerRegexParser
     _CompilerSwiftSyntax
     _CompilerSwiftIfConfig
+    _CompilerSwiftWarningControl
     _CompilerSwiftLexicalLookup
     _CompilerSwiftOperators
     _CompilerSwiftSyntaxBuilder
     _CompilerSwiftParser
     _CompilerSwiftParserDiagnostics
     _CompilerSwiftDiagnostics
+    swiftBasicSwift
 )

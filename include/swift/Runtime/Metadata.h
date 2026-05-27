@@ -217,6 +217,7 @@ bool swift_compareTypeContextDescriptors(const TypeContextDescriptor *lhs,
                                          const TypeContextDescriptor *rhs);
 
 /// Compute the bounds of class metadata with a resilient superclass.
+SWIFT_EXPORT_FROM_ATTRIBUTE(swiftCore) // Cannot use SWIFT_RUNTIME_EXPORT because it is not compatible with C linkage
 ClassMetadataBounds getResilientMetadataBounds(
                                            const ClassDescriptor *descriptor);
 int32_t getResilientImmediateMembersOffset(const ClassDescriptor *descriptor);
@@ -463,7 +464,11 @@ bool swift_compareProtocolConformanceDescriptors(
 ///
 /// \returns a metadata pack allocated on the heap, with the least significant
 /// bit set to true.
+#if SWIFT_COMPATIBILITY_PACKS
+SWIFT_RUNTIME_COMPATIBILITY SWIFT_CC(swift)
+#else
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+#endif
 const Metadata * const *
 swift_allocateMetadataPack(const Metadata * const *ptr, size_t count);
 
@@ -478,7 +483,11 @@ swift_allocateMetadataPack(const Metadata * const *ptr, size_t count);
 ///
 /// \returns a witness table pack allocated on the heap, with the least
 /// significant bit set to true.
+#if SWIFT_COMPATIBILITY_PACKS
+SWIFT_RUNTIME_COMPATIBILITY SWIFT_CC(swift)
+#else
 SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+#endif
 const WitnessTable * const *
 swift_allocateWitnessTablePack(const WitnessTable * const *ptr, size_t count);
 
@@ -580,6 +589,13 @@ MetadataResponse
 swift_getFixedArrayTypeMetadata(MetadataRequest request,
                                 intptr_t count,
                                 const Metadata *element);
+
+/// Fetch a metadata record representing a `Builtin.Borrow`
+/// of a given referent type.
+SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+MetadataResponse
+swift_getBorrowTypeMetadata(MetadataRequest request,
+                            const Metadata *referent);
 
 /// Fetch a uniqued metadata for a tuple type.
 ///
@@ -1060,7 +1076,7 @@ struct ConcurrencyStandardTypeDescriptors {
 /// Function that determines whether we are executing on the given global
 /// actor. The metadata is for the global actor type, and the witness table
 /// is the conformance of that type to the GlobalActor protocol.
-typedef bool (* SWIFT_CC(swift) IsCurrentGlobalActor)(const Metadata *, const WitnessTable *);
+typedef SWIFT_CC(swift) bool (*IsCurrentGlobalActor)(const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
 
 /// Register various concurrency-related data and hooks needed in the Swift
 /// standard library / runtime. This includes type descriptors with standard

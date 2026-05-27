@@ -1,0 +1,98 @@
+// RUN: %target-sil-opt -wmo %s -conformance-check-optimization | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+@_semantics("fast_cast")
+protocol FastCastBaseProtocol : BaseClass {}
+
+@_semantics("fast_cast")
+protocol FastCastIntermediateProtocol : IntermediateClass {}
+
+protocol SlowCastProtocol : BaseClass {}
+
+class BaseClass {}
+
+class IntermediateClass : BaseClass {}
+
+class ConformingClass : IntermediateClass, FastCastBaseProtocol {}
+
+class NonConformingClass : IntermediateClass, SlowCastProtocol {}
+
+class ConformingClass2 : IntermediateClass, FastCastIntermediateProtocol { }
+
+// CHECK-LABEL: sil_vtable BaseClass {
+// CHECK-NEXT:    no_conformance FastCastBaseProtocol
+// CHECK-NEXT:  }
+sil_vtable BaseClass {
+}
+
+// CHECK-LABEL: sil_vtable IntermediateClass {
+// CHECK-NEXT:    no_conformance FastCastBaseProtocol
+// CHECK-NEXT:    no_conformance FastCastIntermediateProtocol
+// CHECK-NEXT:  }
+sil_vtable IntermediateClass {
+}
+
+// CHECK-LABEL: sil_vtable ConformingClass {
+// CHECK-NEXT:    conformance ConformingClass: FastCastBaseProtocol module main
+// CHECK-NEXT:    no_conformance FastCastIntermediateProtocol
+// CHECK-NEXT:  }
+sil_vtable ConformingClass {
+}
+
+// CHECK-LABEL: sil_vtable NonConformingClass {
+// CHECK-NEXT:    no_conformance FastCastBaseProtocol
+// CHECK-NEXT:    no_conformance FastCastIntermediateProtocol
+// CHECK-NEXT:  }
+sil_vtable NonConformingClass {
+}
+
+// CHECK-LABEL: sil_vtable ConformingClass2 {
+// CHECK-NEXT:    no_conformance FastCastBaseProtocol
+// CHECK-NEXT:    conformance ConformingClass2: FastCastIntermediateProtocol module main
+// CHECK-NEXT:  }
+sil_vtable ConformingClass2 {
+}
+
+// Ineligible Classes (should not be optimized)
+
+@_semantics("fast_cast")
+protocol P2: GenBase {}
+
+class GenBase {}
+
+class GenericClass<T> : GenBase, P2 {}
+
+class C2 : GenBase {}
+
+// CHECK-LABEL: sil_vtable GenericClass {
+// CHECK-NEXT:  }
+sil_vtable GenericClass {
+}
+
+// CHECK-LABEL: sil_vtable C2 {
+// CHECK-NEXT:  }
+sil_vtable C2 {
+}
+
+@_semantics("fast_cast")
+protocol P3: Base3 {}
+
+class Base3 {}
+
+open class OpenClass : Base3, P3 {}
+
+class C3 : Base3 {}
+
+// CHECK-LABEL: sil_vtable OpenClass {
+// CHECK-NEXT:  }
+sil_vtable OpenClass {
+}
+
+// CHECK-LABEL: sil_vtable C3 {
+// CHECK-NEXT:  }
+sil_vtable C3 {
+}

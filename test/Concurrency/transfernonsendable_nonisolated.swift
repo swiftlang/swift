@@ -132,3 +132,26 @@ func callMainActorIsolatedFunction() async {
   await useValueAsync(x)
   useValueSync(x)
 }
+
+public final class LoggingScope {
+  static let _subsystem: TaskLocal<String?>! = nil
+}
+
+func withCancellationHandling<R>(_ body: () async throws -> R) async rethrows -> R {
+  try await body()
+}
+
+func withLoggingSubsystemAndScope<R>(
+    perform body: () async throws -> R
+) async rethrows -> R {
+  return try await LoggingScope._subsystem.withValue(nil) {
+    try await withCancellationHandling(body)
+  }
+}
+func withLoggingSubsystemAndScopeNonsending<R>(
+  perform body: nonisolated(nonsending) () async throws -> R
+) async rethrows -> R {
+  return try await LoggingScope._subsystem.withValue(nil) {
+    try await withCancellationHandling(body)
+  }
+}

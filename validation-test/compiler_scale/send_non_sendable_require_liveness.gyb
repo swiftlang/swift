@@ -1,0 +1,40 @@
+// RUN: %scale-test --invert-result --expected-exit-code 1 --begin 10 --end 100 --step 10 --select NumRequireLivenessInstScans -Xfrontend=-swift-version -Xfrontend=6 %s
+// REQUIRES: asserts
+// REQUIRES: concurrency
+
+// Test that RequireLiveness::process() does not scale quadratically in the
+// number of "sending risks data races" errors in a function.
+//
+// The pattern:
+//   - N non-Sendable values each sent to a @MainActor function
+//   - All N values are used again inside an `if cond` block (a separate SIL
+//     basic block from the sends), so RequireLiveness must walk the successor
+//     block to find the "last require"
+//   - SendNonSendable.cpp calls RequireLiveness::process() once per error (N times)
+//   - Each process() call scans the instructions in the `if cond` block, which
+//     contains O(N) instructions → O(N²) total instruction scans
+//
+// This test uses --invert-result to document the *known-bad* quadratic scaling.
+// --expected-exit-code 1 because the code intentionally contains N errors.
+
+class NS {}
+
+@MainActor func sendToMain<T>(_ t: T) async {}
+func useValue<T>(_ t: T) {}
+
+func test(cond: Bool) async {
+% for i in range(int(N)):
+  let v${i} = NS()
+% end
+% for i in range(int(N)):
+  await sendToMain(v${i})
+% end
+  // The `if cond` block is a separate SIL basic block. Each sendToMain(vi)
+  // produces an error, and RequireLiveness::process() scans this O(N)-instruction
+  // block to find the matching useValue(vi) → O(N²) total scans.
+  if cond {
+% for i in range(int(N)):
+    useValue(v${i})
+% end
+  }
+}

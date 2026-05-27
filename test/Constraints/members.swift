@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -swift-version 5
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -swift-version 5
 
 ////
 // Members of structs
@@ -633,7 +633,7 @@ func rdar_50467583_and_50909555() {
     // expected-error@-1 {{no exact matches in call to subscript}}
     // expected-note@-2 {{found candidate with type '(Int) -> Int'}}
     // expected-note@-3 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
-    // expected-note@-4 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+    // expected-note@-4 {{found candidate with type '(UnboundedRange) -> ArraySlice<Int>' (aka '((UnboundedRange_) -> ()) -> ArraySlice<Int>')}}
     // expected-note@-5 * {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
   }
   
@@ -846,4 +846,11 @@ func testCompoundLeadingDot() {
   // Make sure we correctly strip the argument label.
   let _: S = .foo(x:)(0)
   let _: S = .foo(x:)(x: 0) // expected-error {{extraneous argument label 'x:' in call}}
+}
+
+/// Make sure that anyObject is handled correctly on .init member lookup
+class E {}
+
+func foofoo() -> some E {
+  return .init() //ok
 }

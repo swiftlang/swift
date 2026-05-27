@@ -27,6 +27,8 @@ NOTE(kind_declname_declared_here,none,
      "%0 %1 declared here", (DescriptiveDeclKind, DeclName))
 NOTE(decl_declared_here_with_kind,none,
      "%kind0 declared here", (const Decl *))
+NOTE(through_decl_declared_here_with_kind,none,
+     "through %kind0 declared here", (const Decl *))
 
 ERROR(not_implemented,none,
       "INTERNAL ERROR: feature not implemented: %0", (StringRef))
@@ -217,9 +219,6 @@ NOTE(scanner_find_cycle_swift_overlay_path, none,
 NOTE(scanner_cycle_source_target_shadow_module, none,
      "source target '%0' shadowing a%select{ |n SDK }2Swift module with the same name at: '%1'", (StringRef, StringRef, bool))
 
-ERROR(scanner_arguments_invalid, none,
-      "dependencies scanner cannot be configured with arguments: '%0'", (StringRef))
-
 ERROR(error_scanner_extra, none,
       "failed inside dependency scanner: '%0'", (StringRef))
 
@@ -228,9 +227,6 @@ REMARK(warn_scanner_deserialize_failed, none,
 
 REMARK(remark_reuse_cache, none,
        "Incremental module scan: Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
-
-REMARK(remark_scanner_uncached_lookups, none,
-       "Module Dependency Scanner queries executed: '%0'.", (unsigned))
 
 REMARK(remark_save_cache, none,
        "Incremental module scan: Serializing module scanning dependency cache to: '%0'.", (StringRef))
@@ -278,13 +274,19 @@ ERROR(lookup_outputs_dont_match,none,
 "Unqualified lookup output from ASTScope and SwiftLexicalLookup don't match", ())
 
 //------------------------------------------------------------------------------
+// MARK: Accessor diagnostics
+//------------------------------------------------------------------------------
+
+ERROR(borrow_mutate_accessor_not_supported_in_decl, none,
+      "%0 is unsupported here", (StringRef))
+
+//------------------------------------------------------------------------------
 // MARK: bridged diagnostics
 //------------------------------------------------------------------------------
 
 NOTE(bridged_note, none, "%0", (StringRef))
 WARNING(bridged_warning, none,"%0", (StringRef))
 ERROR(bridged_error, none, "%0", (StringRef))
-ERROR(bridged_fatal_error, Fatal, "%0", (StringRef))
 REMARK(bridged_remark, none, "%0", (StringRef))
 
 //------------------------------------------------------------------------------

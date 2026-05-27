@@ -300,7 +300,7 @@ public enum BorrowingInstruction : CustomStringConvertible, Hashable {
 extension BorrowingInstruction {
   private func visitEndBorrows(value: Value, _ context: Context, _ visitor: @escaping (Operand) -> WalkResult)
     -> WalkResult {
-    return value.lookThroughBorrowedFromUser.uses.filterUses(ofType: EndBorrowInst.self).walk {
+    return value.lookThroughBorrowedFromUser.uses.filter(usersOfType: EndBorrowInst.self).walk {
       visitor($0)
     }
   }
@@ -341,6 +341,7 @@ extension BorrowingInstruction {
 public enum BeginBorrowValue {
   case beginBorrow(BeginBorrowInst)
   case loadBorrow(LoadBorrowInst)
+  case dereferenceBorrow(DereferenceBorrowInst)
   case beginApply(Value)
   case uncheckOwnershipConversion(UncheckedOwnershipConversionInst)
   case functionArgument(FunctionArgument)
@@ -352,6 +353,8 @@ public enum BeginBorrowValue {
       self = .beginBorrow(bbi)
     case let lbi as LoadBorrowInst:
       self = .loadBorrow(lbi)
+    case let dbi as DereferenceBorrowInst:
+      self = .dereferenceBorrow(dbi)
     case let uoci as UncheckedOwnershipConversionInst where uoci.ownership == .guaranteed:
       self = .uncheckOwnershipConversion(uoci)
     case let arg as FunctionArgument where arg.ownership == .guaranteed:
@@ -371,6 +374,7 @@ public enum BeginBorrowValue {
     switch self {
     case .beginBorrow(let bbi): return bbi
     case .loadBorrow(let lbi): return lbi
+    case .dereferenceBorrow(let dbi): return dbi
     case .beginApply(let v): return v
     case .uncheckOwnershipConversion(let uoci): return uoci
     case .functionArgument(let arg): return arg
@@ -380,9 +384,12 @@ public enum BeginBorrowValue {
 
   public init?(using operand: Operand) {
     switch operand.instruction {
-    case is BeginBorrowInst, is LoadBorrowInst:
-      let inst = operand.instruction as! SingleValueInstruction
-      self = BeginBorrowValue(inst)!
+    case let bbi as BeginBorrowInst:
+      self = .beginBorrow(bbi)
+    case let lbi as LoadBorrowInst:
+      self = .loadBorrow(lbi)
+    case let dbi as DereferenceBorrowInst:
+      self = .dereferenceBorrow(dbi)
     case is BranchInst:
       guard let phi = Phi(using: operand) else {
         return nil
@@ -412,7 +419,7 @@ public enum BeginBorrowValue {
 
   public var hasLocalScope: Bool {
     switch self {
-    case .beginBorrow, .loadBorrow, .beginApply, .reborrow, .uncheckOwnershipConversion:
+    case .beginBorrow, .loadBorrow, .dereferenceBorrow, .beginApply, .reborrow, .uncheckOwnershipConversion:
       return true
     case .functionArgument:
       return false
@@ -429,6 +436,8 @@ public enum BeginBorrowValue {
       return beginBorrow.operand
     case let .loadBorrow(loadBorrow):
       return loadBorrow.operand
+    case let .dereferenceBorrow(derefBorrow):
+      return derefBorrow.operand
     case .beginApply, .functionArgument, .reborrow, .uncheckOwnershipConversion:
       return nil
     }
@@ -497,7 +506,7 @@ public final class EnclosingValueIterator : IteratorProtocol {
       case let .beginBorrow(bbi):
         // Gather the outer enclosing borrow scope.
         worklist.pushIfNotVisited(bbi.borrowedValue)
-      case .loadBorrow, .beginApply, .functionArgument, .uncheckOwnershipConversion:
+      case .loadBorrow, .dereferenceBorrow, .beginApply, .functionArgument, .uncheckOwnershipConversion:
         // There is no enclosing value on this path.
         break
       case .reborrow(let phi):
@@ -534,7 +543,10 @@ public final class EnclosingValueIterator : IteratorProtocol {
         } else if let forwardingInst = value.forwardingInstruction {
           // Recurse through guaranteed forwarding non-phi instructions.
           let ops = forwardingInst.forwardedOperands
-          worklist.pushIfNotVisited(contentsOf: ops.lazy.map { $0.value })
+          worklist.pushIfNotVisited(contentsOf: ops.values)
+        } else if value.isGuaranteedApplyResult {
+          let selfArgument = (value as! ApplyInst).arguments.last!
+          worklist.pushIfNotVisited(selfArgument)
         } else {
           fatalError("cannot get borrow introducers for unknown guaranteed value")
         }
@@ -616,6 +628,19 @@ extension Value {
       }
     }
     return self
+  }
+
+  public var isGuaranteedApplyResult: Bool {
+    guard let definingInstruction = self.definingInstruction else {
+      return false
+    }
+    guard let apply = definingInstruction as? ApplyInst else {
+      return false
+    }
+    guard apply.singleDirectResult != nil else {
+      return false
+    }
+    return apply.functionConvention.resultsWithError[0].convention == .guaranteed
   }
 }
 

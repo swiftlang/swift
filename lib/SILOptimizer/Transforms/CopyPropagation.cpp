@@ -466,9 +466,12 @@ void CopyPropagation::propagateCopies(
   StackList<BeginBorrowInst *> beginBorrowsToShrink(f);
   StackList<MoveValueInst *> moveValues(f);
 
+  unsigned numInstsInFunction = 0;
+
   // Driver: Find all copied or borrowed defs.
   for (auto &bb : *f) {
     for (auto &i : bb) {
+      numInstsInFunction += 1;
       if (auto *copy = dyn_cast<CopyValueInst>(&i)) {
         defWorklist.updateForCopy(copy);
       } else if (auto *borrow = dyn_cast<BeginBorrowInst>(&i)) {
@@ -482,6 +485,12 @@ void CopyPropagation::propagateCopies(
       }
     }
   }
+
+  // For very large functions OSSA canonicalization can run into noticeable quadratic
+  // behavior. Don't canonicalize functions with more than 100000 SIL instructions.
+  // This limit is large enough to not affect most of real-world SIL functions.
+  if (numInstsInFunction > 100000)
+    return;
 
   // canonicalizer performs all modifications through deleter's callbacks, so we
   // don't need to explicitly check for changes.
@@ -681,17 +690,13 @@ void CopyPropagation::run() {
 }
 
 void CopyPropagation::verifyOwnership() {
-  auto *f = getFunction();
-  auto *deBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
-  f->verifyOwnership(f->getModule().getOptions().OSSAVerifyComplete
-                         ? nullptr
-                         : deBlocksAnalysis->get(f));
+  getFunction()->verifyOwnership();
 }
 
-// MandatoryCopyPropagation is not currently enabled in the -Onone pipeline
-// because it may negatively affect the debugging experience.
+// MandatoryCopyPropagation runs in the -Onone pipeline and needs to be more
+// conservative, preserving debug information.
 SILTransform *swift::createMandatoryCopyPropagation() {
-  return new CopyPropagation(PruneDebugInsts, /*canonicalizeAll*/ true,
+  return new CopyPropagation(DontPruneDebugInsts, /*canonicalizeAll*/ true,
                              /*canonicalizeBorrows*/ false);
 }
 

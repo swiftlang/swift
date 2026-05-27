@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -parse-as-library
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -parse-as-library
 
 enum MyError: Error {
 case failed

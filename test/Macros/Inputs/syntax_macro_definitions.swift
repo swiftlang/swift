@@ -2,7 +2,7 @@ import SwiftDiagnostics
 import SwiftOperators
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 import SwiftSyntaxBuilder
-@_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntaxMacros
 
 /// Replace the label of the first element in the tuple with the given
 /// new label.
@@ -2051,7 +2051,7 @@ public struct DefineAnonymousTypesMacro: DeclarationMacro {
 
       results += ["""
 
-      struct \(context.makeUniqueName("name"))<T> where T == Equatable { // expect error: need 'any'
+      struct \(context.makeUniqueName("name"))<T> where T == Equatable { // expected-warning{{must be written 'any Hashable'}}
         #introduceTypeCheckingErrors // make sure we get nested errors
       }
       """]
@@ -2070,7 +2070,7 @@ public struct IntroduceTypeCheckingErrorsMacro: DeclarationMacro {
       """
 
       struct \(context.makeUniqueName("name")) {
-        struct \(context.makeUniqueName("name"))<T> where T == Hashable { // expect error: need 'any'
+        struct \(context.makeUniqueName("name"))<T> where T == Hashable { // expected-warning{{must be written 'any Hashable'}}
         }
       }
       """
@@ -2241,6 +2241,54 @@ public struct StaticFooFuncMacro: DeclarationMacro {
   ) throws -> [DeclSyntax] {
     return [
       "static func foo() {}",
+    ]
+  }
+}
+
+public struct ProtocolRequirementMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func macroRequirement() -> Int",
+    ]
+  }
+}
+
+public struct ProtocolAssociatedTypeMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "associatedtype MacroAssociatedType",
+      "func makeMacroAssociatedValue() -> MacroAssociatedType",
+    ]
+  }
+}
+
+public struct PeerProtocolRequirementMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func peerRequirement() -> Int",
+    ]
+  }
+}
+
+public struct MemberProtocolRequirementMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    return [
+      "func memberRequirement() -> Int",
     ]
   }
 }
@@ -2662,7 +2710,6 @@ extension FunctionParameterSyntax {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
 public struct RemoteBodyMacro: BodyMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2701,7 +2748,6 @@ public struct RemoteBodyMacro: BodyMacro {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
 public struct BodyMacroWithControlFlow: BodyMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2725,7 +2771,68 @@ struct ThrowCancellationMacro: BodyMacro {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
+struct EmptyBodyMacro: BodyMacro {
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    []
+  }
+
+  static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor closure: ClosureExprSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    []
+  }
+}
+
+public struct PrintBodyMacro: BodyMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingBodyFor declaration: some DeclSyntaxProtocol & WithOptionalCodeBlockSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [CodeBlockItemSyntax] {
+    func nameFromContextNode(_ node: Syntax) -> String? {
+      if let varDecl = node.as(VariableDeclSyntax.self) {
+        return varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+      }
+      if let binding = node.as(PatternBindingSyntax.self) {
+        return binding.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+      }
+      if let named = node.asProtocol(NamedDeclSyntax.self) {
+        return named.name.text
+      }
+      return nil
+    }
+
+    // Determine the declaration's own name component (for named decls like functions).
+    // For accessors, the name comes from the lexical context instead.
+    let ownName: String?
+    if let funcDecl = declaration.as(FunctionDeclSyntax.self) {
+      ownName = funcDecl.name.text
+    } else if let varDecl = declaration.as(VariableDeclSyntax.self) {
+      ownName = varDecl.bindings.first?.pattern.as(IdentifierPatternSyntax.self)?.identifier.text
+    } else {
+      ownName = nil
+    }
+
+    // Build the full dot-separated path from outermost to innermost context, then own name.
+    let contextNames = context.lexicalContext.compactMap { nameFromContextNode($0) }.reversed()
+    let allNames = Array(contextNames) + (ownName.map { [$0] } ?? [])
+    let name = allNames.isEmpty ? "unknown" : allNames.joined(separator: ".")
+
+    let originalBody = declaration.body.map { Array($0.statements) } ?? []
+    return [
+      "print(\"start body (from macro, \(raw: name))\")",
+      "defer { print(\"end body (from macro, \(raw: name))\") }",
+    ] + originalBody
+  }
+}
+
+@_spi(ExperimentalLanguageFeatures)
 public struct TracedPreambleMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2766,7 +2873,7 @@ public struct TracedPreambleMacro: PreambleMacro {
   }
 }
 
-@_spi(ExperimentalLanguageFeature)
+@_spi(ExperimentalLanguageFeatures)
 public struct LoggerMacro: PreambleMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2979,4 +3086,22 @@ public struct BigEndianAccessorMacro: AccessorMacro {
             """
         ]
     }
+}
+
+public struct CustomConditionCheckMacro: ExpressionMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> ExprSyntax {
+    guard let firstElement = node.arguments.first,
+          let stringLiteral = firstElement.expression
+      .as(StringLiteralExprSyntax.self),
+          stringLiteral.segments.count == 1,
+          case let .stringSegment(conditionName)? = stringLiteral.segments.first else {
+      throw CustomError.message("macro requires a string literal containing the name of a custom condition")
+    }
+
+    let isSet = try context.buildConfiguration?.isCustomConditionSet(name: conditionName.content.text) ?? false
+    return "\(literal: isSet)"
+  }
 }

@@ -1,9 +1,9 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN: -enable-experimental-feature Lifetimes \
-// RUN: -enable-experimental-feature SuppressedAssociatedTypes
+// RUN: -enable-experimental-feature SuppressedAssociatedTypesWithDefaults
 
 // REQUIRES: swift_feature_Lifetimes
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 // expected-note@+1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
 struct AttemptImplicitConditionalConformance<T: ~Copyable>: ~Copyable {
@@ -413,11 +413,17 @@ public func checkAnyObject<Result>(_ t: Result) where Result: AnyObject {
     checkCopyable(t)
 }
 
+protocol AnyObjectRefining: AnyObject {}
+
 func checkExistentialAndClasses(
     _ a: any AnyObject & ~Copyable, // expected-error {{composition involving 'AnyObject' cannot contain '~Copyable'}}
     _ b: any Soup & Copyable & ~Escapable & ~Copyable,
     // expected-error@-1 {{composition involving class requirement 'Soup' cannot contain '~Copyable'}}
-    _ c: some (~Escapable & Removed) & Soup // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
+    _ c: some (~Escapable & Removed) & Soup, // expected-error {{composition cannot contain '~Escapable' when another member requires 'Escapable'}}
+    _ d: borrowing any AnyObjectRefining & ~Copyable,
+    // expected-error@-1 {{composition involving 'AnyObject' cannot contain '~Copyable'}}
+    _ e: AnyObject & ~Escapable,
+    // expected-error@-1 {{composition involving 'AnyObject' cannot contain '~Escapable'}}
     ) {}
 
 protocol HasNCBuddy: ~Copyable {
@@ -538,5 +544,5 @@ func testYap(_ y: Yapping<NC>) {
 protocol Veggie: ~Copyable {}
 func generalized(_ x: Any.Type) {}
 func testMetatypes(_ t: (any Veggie & ~Copyable).Type) {
-  generalized(t) // expected-error {{cannot convert value of type '(any Veggie & ~Copyable).Type' to expected argument type 'any Any.Type'}}
+  generalized(t) // expected-error {{argument type 'any Veggie & ~Copyable' does not conform to expected type 'Copyable'}}
 }

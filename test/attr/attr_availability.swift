@@ -39,6 +39,15 @@ func incorrect_platform_not_similar() {}
 @available(HAL9000, unavailable) // expected-warning {{unrecognized platform name 'HAL9000'}}
 func availabilityUnknownPlatform() {}
 
+@available(Swift 6.2, *) // expected-error {{Swift requires '-enable-experimental-feature SwiftRuntimeAvailability'}}
+func swift6_2() {}
+
+@available(SwiftLanguageMode 6.0, *) // expected-error {{Swift requires '-enable-experimental-feature SwiftRuntimeAvailability'}}
+func swiftLanguageMode6_0() {}
+
+@available(anyAppleOS 26, *)
+func anyAppleOS26() {}
+
 // <rdar://problem/17669805> Availability can't appear on a typealias
 @available(*, unavailable, message: "oh no you don't")
 typealias int = Int // expected-note {{'int' has been explicitly marked unavailable here}}
@@ -1208,9 +1217,17 @@ struct BadRename {
   init(range: Range<Int>, step: Int) { }
 }
 
+func log(message: String) { }
+
+@available(*, unavailable, renamed: "log(message:)")
+func log(format: String, _ args: Any...) { fatalError() } // expected-note {{'log(format:_:)' has been explicitly marked unavailable here}}
+
 func testBadRename() {
   _ = BadRename(from: 5, to: 17) // expected-warning{{'init(from:to:step:)' is deprecated: replaced by 'init(range:step:)'}}{{documentation-file=deprecated-declaration}}
   // expected-note@-1{{use 'init(range:step:)' instead}}
+
+  // Regression test for https://github.com/apple/swift/issues/64694
+  log(format: "") // expected-error{{'log(format:_:)' has been renamed to 'log(message:)'}}
 }
 
 struct AvailableGenericParam<@available(*, deprecated) T> {}

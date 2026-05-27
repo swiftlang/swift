@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-as-library %s -o %t/a.out
 // RUN: %target-codesign %t/a.out
-// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out
+// RUN: env %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %t/a.out
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -117,27 +117,29 @@ final class MainActorEcho {
         await MainFriend().callCheck(echo: echo)
       }
 
-      #if !os(WASI)
-      tests.test("MainActor.assumeIsolated: wrongly assume the main executor, from actor on other executor") {
+      tests.test("MainActor.assumeIsolated: wrongly assume the main executor, from actor on other executor")
+      .require(.crashTesting)
+      .code {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected 'MainActor' executor.")
         await SomeoneOnDefaultExecutor().callCheckMainActor(echo: echo)
       }
-      #endif
 
       // === some Actor -------------------------------------------------------
 
       let someone = SomeoneOnDefaultExecutor()
-      #if !os(WASI)
-      tests.test("assumeOnActorExecutor: wrongly assume someone's executor, from 'main() async'") {
+      tests.test("assumeOnActorExecutor: wrongly assume someone's executor, from 'main() async'")
+      .require(.crashTesting)
+      .code {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected same executor as a.SomeoneOnDefaultExecutor.")
         checkAssumeSomeone(someone: someone)
       }
 
-      tests.test("assumeOnActorExecutor: wrongly assume someone's executor, from MainActor method") {
+      tests.test("assumeOnActorExecutor: wrongly assume someone's executor, from MainActor method")
+      .require(.crashTesting)
+      .code {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected same executor as a.SomeoneOnDefaultExecutor.")
         checkAssumeSomeone(someone: someone)
       }
-      #endif
 
       tests.test("assumeOnActorExecutor: assume someone's executor, from SomeoneOnDefaultExecutor") {
         await someone.callCheckSomeone()
@@ -147,12 +149,12 @@ final class MainActorEcho {
         await SomeonesFriend(someone: someone).callCheckSomeone()
       }
 
-      #if !os(WASI)
-      tests.test("assumeOnActorExecutor: wrongly assume the main executor, from actor on other executor") {
+      tests.test("assumeOnActorExecutor: wrongly assume the main executor, from actor on other executor")
+      .require(.crashTesting)
+      .code {
         expectCrashLater(withMessage: "Incorrect actor executor assumption; Expected same executor as a.SomeoneOnDefaultExecutor.")
         await CompleteStranger(someone: someone).callCheckSomeone()
       }
-      #endif
 
     }
 

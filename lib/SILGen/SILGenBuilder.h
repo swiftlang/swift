@@ -87,7 +87,16 @@ public:
                            CanType formalConcreteType, ManagedValue concrete,
                            ArrayRef<ProtocolConformanceRef> conformances);
 
-  using SILBuilder::createPartialApply;
+  PartialApplyInst *createPartialApply(
+      SILLocation Loc, SILValue Fn, SubstitutionMap Subs,
+      ArrayRef<SILValue> Args, ParameterConvention CalleeConvention,
+      SILFunctionTypeIsolation ResultIsolation =
+          SILFunctionTypeIsolation::forUnknown(),
+      PartialApplyInst::OnStackKind OnStack =
+          PartialApplyInst::OnStackKind::NotOnStack,
+      StackAllocationIsNested_t IsNested = StackAllocationIsNested,
+      const GenericSpecializationInformation *SpecializationInfo = nullptr);
+
   ManagedValue createPartialApply(SILLocation loc, SILValue fn,
                                   SubstitutionMap subs,
                                   ArrayRef<ManagedValue> args,
@@ -254,6 +263,14 @@ public:
   using SILBuilder::createUncheckedTakeEnumDataAddr;
   ManagedValue createUncheckedTakeEnumDataAddr(SILLocation loc, ManagedValue operand,
                                                EnumElementDecl *element, SILType ty);
+
+  using SILBuilder::createUncheckedInPlaceEnumDataAddr;
+  ManagedValue createUncheckedInPlaceEnumDataAddr(SILLocation loc, ManagedValue operand,
+                                               EnumElementDecl *element, SILType ty);
+
+  using SILBuilder::createUncheckedEnumDataAddrForTake;
+  ManagedValue createUncheckedEnumDataAddrForTake(SILLocation loc, ManagedValue operand,
+                                                  EnumElementDecl *element, SILType ty);
 
   /// Given the address of a value, load a scalar value from it if the type
   /// is loadable.  Most general routines in SILGen expect to work with
@@ -551,6 +568,27 @@ public:
 
     createTupleAddrConstructor(loc, destAddr, values, isInitOfDest);
   }
+
+  SILValue convertToImplicitActor(SILLocation loc, SILValue value);
+
+  ManagedValue convertToImplicitActor(SILLocation loc, ManagedValue value) {
+    auto type = SILType::getBuiltinImplicitActorType(getASTContext());
+    if (value.getType() == type)
+      return value;
+    SILValue result =
+        convertToImplicitActor(loc, value.borrow(SGF, loc).getValue());
+    return ManagedValue::forBorrowedRValue(result);
+  }
+
+  using SILBuilder::createImplicitActorToOpaqueIsolationCast;
+  ManagedValue createImplicitActorToOpaqueIsolationCast(SILLocation loc,
+                                                        ManagedValue mv) {
+    return ManagedValue::forBorrowedRValue(
+        createImplicitActorToOpaqueIsolationCast(loc, mv.getUnmanagedValue()));
+  }
+
+  using SILBuilder::createUncheckedOwnership;
+  ManagedValue createUncheckedOwnership(SILLocation loc, ManagedValue base);
 };
 
 } // namespace Lowering

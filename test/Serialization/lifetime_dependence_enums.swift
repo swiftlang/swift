@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t  %S/Inputs/def_lifetime_dependence_enums.swift 
 
-// RUN: llvm-bcanalyzer %t/def_lifetime_dependence_enums.swiftmodule 
+// RUN: %llvm-bcanalyzer %t/def_lifetime_dependence_enums.swiftmodule 
 
 // RUN: %target-swift-frontend -c -module-name lifetime-dependence-enums -Xllvm -sil-print-after=EarlyPerfInliner -O -I %t %s \
 // RUN: -enable-experimental-feature Lifetimes -o /dev/null 2>&1 | %FileCheck %s

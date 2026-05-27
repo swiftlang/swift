@@ -20,7 +20,7 @@ using namespace swift;
 
 ActorIsolation ActorIsolation::forMainActor(ASTContext &ctx) {
   return ActorIsolation::forGlobalActor(
-      ctx.getMainActorType()->mapTypeOutOfContext());
+      ctx.getMainActorType()->mapTypeOutOfEnvironment());
 }
 
 // These constructors are defined out-of-line so that including ActorIsolation.h
@@ -171,6 +171,7 @@ bool ActorIsolation::isEqual(const ActorIsolation &lhs,
 
   switch (lhs.getKind()) {
   case Nonisolated:
+  case NonisolatedConcurrent:
   case NonisolatedUnsafe:
   case Unspecified:
     return true;
@@ -182,7 +183,7 @@ bool ActorIsolation::isEqual(const ActorIsolation &lhs,
     // to answer.
     return false;
 
-  case CallerIsolationInheriting:
+  case NonisolatedNonsending:
     // This returns false for the same reason as erased. The caller has to check
     // against the actual caller isolation.
     return false;

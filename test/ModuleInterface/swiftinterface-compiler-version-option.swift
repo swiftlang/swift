@@ -28,7 +28,7 @@
 // CHECK-OPTION-SAME: -interface-compiler-version {{.*}}
 
 /// Check option in swiftmodule
-// RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck --check-prefix=CHECK-MODULE-OPTION %s
+// RUN: %llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck --check-prefix=CHECK-MODULE-OPTION %s
 // CHECK-MODULE-OPTION: <OPTIONS_BLOCK
 // CHECK-MODULE-OPTION-NOT: <SWIFT_INTERFACE_COMPILER_VERSION abbrevid={{.*}}/> blob data = '{{.*}}'
 // CHECK-MODULE-OPTION: </OPTIONS_BLOCK>
@@ -38,7 +38,7 @@
 // RUN: %target-swift-frontend -compile-module-from-interface %t/Lib.swiftinterface -o %t/Lib.swiftmodule -module-name Lib
 
 /// Check option in swiftmodule
-// RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck --check-prefix=CHECK-REBUILT-MODULE-OPTION %s
+// RUN: %llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck --check-prefix=CHECK-REBUILT-MODULE-OPTION %s
 // CHECK-REBUILT-MODULE-OPTION: <OPTIONS_BLOCK
 // CHECK-REBUILT-MODULE-OPTION: <SWIFT_INTERFACE_COMPILER_VERSION abbrevid={{.*}}/> blob data = '{{.*}}'
 // CHECK-REBUILT-MODULE-OPTION: </OPTIONS_BLOCK>

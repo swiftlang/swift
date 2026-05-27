@@ -71,6 +71,17 @@ static void configureARM64(IRGenModule &IGM, const llvm::Triple &triple,
   // half for the kernel.
   target.SwiftRetainIgnoresNegativeValues = true;
 
+  // ARM64 Darwin has swiftSwiftDirectRuntime, but not in Embedded mode. JIT
+  // mode can't load the static library, so disable it there as well.
+  bool targetOSHasDirectRuntime = triple.isMacOSX() || triple.isiOS() ||
+                                  triple.isWatchOS() || triple.isXROS();
+
+  if (targetOSHasDirectRuntime &&
+      !IGM.getSwiftModule()->getASTContext().LangOpts.hasFeature(
+          Feature::Embedded) &&
+      !IGM.getOptions().UseJIT)
+    target.HasSwiftSwiftDirectRuntimeLibrary = true;
+
   target.UsableSwiftAsyncContextAddrIntrinsic = true;
 }
 

@@ -136,7 +136,7 @@ private:
     // Remap archetypes in the derivative generic signature, if it exists.
     if (type->hasArchetype()) {
       type = derivativeGenericSignature.getReducedType(
-          type->mapTypeOutOfContext());
+          type->mapTypeOutOfEnvironment());
     }
     // Look up conformance in the current module.
     auto lookupConformance = LookUpConformanceInModule();

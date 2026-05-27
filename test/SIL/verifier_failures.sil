@@ -1,4 +1,9 @@
-// RUN: %target-sil-opt -emit-sorted-sil -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -sil-verify-all=false -enable-sil-verify-all=false -emit-sorted-sil -verify-continue-on-failure -o /dev/null %s 2>&1 | %FileCheck '--implicit-check-not=Begin Error' %s
+
+// NOTE: We run the verification when we parse. We turn off sil-verify-all so
+// that we do not emit the diagnostics a second time after sil-opt ends. We do
+// this so that we can use an implicit-check-not line to make sure that
+// additional diagnostics are not emitted.
 
 // REQUIRES: asserts
 
@@ -9,6 +14,41 @@ import Builtin
 class C {}
 
 protocol Error {}
+
+// CHECK-LABEL: Begin Error in function dominance_violation_in_block
+// CHECK:       SIL verification failed: instruction isn't dominated by its operand
+// CHECK-LABEL: End Error in function dominance_violation_in_block
+sil [ossa] @dominance_violation_in_block : $@convention(thin) () -> () {
+bb0:
+  fix_lifetime %1 : $Builtin.Int32
+  %1 = integer_literal $Builtin.Int32, 0
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: Begin Error in function dominance_violation_in_instruction
+// CHECK:       SIL verification failed: instruction isn't dominated by its operand
+// CHECK-LABEL: End Error in function dominance_violation_in_instruction
+sil [ossa] @dominance_violation_in_instruction : $@convention(thin) () -> () {
+bb0:
+  %1 = apply undef(%1) : $@convention(thin) (Builtin.Int32) -> Builtin.Int32
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: Begin Error in function dominance_violation_multi_bb
+// CHECK:       SIL verification failed: instruction isn't dominated by its operand
+// CHECK-LABEL: End Error in function dominance_violation_multi_bb
+sil [ossa] @dominance_violation_multi_bb : $@convention(thin) () -> () {
+bb0:
+  fix_lifetime %1 : $Builtin.Int32
+  br bb1
+
+bb1:
+  %1 = integer_literal $Builtin.Int32, 0
+  %retval = tuple ()
+  return %retval : $()
+}
 
 // CHECK-LABEL: Begin Error in function end_borrow_1_addr_alloc_stack
 // CHECK:       SIL verification failed: end_borrow of an address not produced by store_borrow
@@ -68,3 +108,77 @@ failure(%error : @owned $any Error):
   dealloc_stack %allocation : $*Builtin.SILToken
   throw %error : $any Error
 }
+
+// CHECK-LABEL: Begin Error in function abort_apply_callee_allocated_coro_2
+// CHECK: SIL verification failed: abort_apply of callee-allocated yield-once coroutine!?: !bai->getSubstCalleeType()->isCalleeAllocatedCoroutine()
+// CHECK: End Error in function abort_apply_callee_allocated_coro_2
+sil [ossa] @abort_apply_callee_allocated_coro_2 : $@convention(thin) () -> (@error any Error) {
+entry:
+  (%value, %token, %allocation) = begin_apply undef() : $@yield_once_2 @convention(thin) () -> @yields @in_guaranteed ()
+  end_apply %token as $()
+  dealloc_stack %allocation : $*Builtin.SILToken
+  return undef : $()
+
+failure(%error : @owned $any Error):
+  abort_apply %token
+  dealloc_stack %allocation : $*Builtin.SILToken
+  throw %error : $any Error
+}
+
+sil [ossa] @yield_test : $@yield_once @convention(thin) (@inout Builtin.Int32) -> @yields @inout Builtin.Int32 {
+bb0(%0 : $*Builtin.Int32):
+  (%2, %3) = begin_apply undef(%0) : $@yield_once @convention(method) (@inout Builtin.Int32) -> @yields @inout Builtin.Int32
+  yield %2, resume bb1, unwind bb2
+
+bb1:
+  %5 = end_apply %3 as $()
+  %6 = tuple ()
+  return %6
+
+bb2:
+  abort_apply %3
+  unwind
+}
+
+// We shouldn't error here. Make sure that we properly handle the dealloc_stack
+// user vs the end_apply user.
+sil [ossa] @test_begin_apply_1 : $@yield_once @convention(method) (@guaranteed Builtin.Int32) -> @yields Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  (%3, %4, %5) = begin_apply undef(%0) : $@yield_once_2 @convention(method) (@guaranteed Builtin.Int32) -> @yields Builtin.Int32
+  %6 = end_apply %4 as $()
+  yield %3 : $Builtin.Int32, resume bb1, unwind bb2
+
+bb1:
+  dealloc_stack %5 : $*Builtin.SILToken
+  %9 = tuple ()
+  return %9 : $()
+
+bb2:
+  dealloc_stack %5 : $*Builtin.SILToken
+  unwind
+}
+
+sil [ossa] @test_begin_apply_2 : $@yield_once @convention(method) (@guaranteed Builtin.Int32) -> @yields Builtin.Int32 {
+bb0(%0 : $Builtin.Int32):
+  (%3, %4, %5) = begin_apply undef(%0) : $@yield_once_2 @convention(method) (@guaranteed Builtin.Int32) -> @yields Builtin.Int32
+  dealloc_stack %5 : $*Builtin.SILToken
+  yield %3 : $Builtin.Int32, resume bb1, unwind bb2
+
+bb1:
+  %6 = end_apply %4 as $()
+  %9 = tuple ()
+  return %9 : $()
+
+bb2:
+  %7 = end_apply %4 as $()
+  unwind
+}
+
+// CHECK-LABEL: Begin Error in function private_without_body
+// CHECK: SIL verification failed: internal/private function must have a body
+// CHECK: End Error in function private_without_body
+// CHECK-LABEL: Begin Error in function private_without_body
+// CHECK: SIL verification failed: external declaration of internal SILFunction not allowed
+// CHECK: End Error in function private_without_body
+sil private @private_without_body : $@convention(thin) () -> ()
+

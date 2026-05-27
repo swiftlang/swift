@@ -451,7 +451,9 @@ RequirementSignatureRequest::evaluate(Evaluator &evaluator,
       }
     }
 
-    // FIXME: We don't have the inverses from desugaring available here!
+    // FIXME: We should pass proto->getInverseRequirements() instead of
+    //        an empty vector, but this makes the requirement machine angry.
+    //        For now, we check them in `checkProtocolRefinementRequirements`.
     SmallVector<InverseRequirement, 2> missingInverses;
 
     // Diagnose redundant requirements and conflicting requirements.
@@ -549,7 +551,7 @@ AbstractGenericSignatureRequest::evaluate(
          const GenericSignatureImpl *baseSignatureImpl,
          SmallVector<GenericTypeParamType *, 2> addedParameters,
          SmallVector<Requirement, 2> addedRequirements,
-         bool allowInverses) const {
+         DefaultRequirementOptions options) const {
   GenericSignature baseSignature = GenericSignature{baseSignatureImpl};
   // If nothing is added to the base signature, just return the base
   // signature.
@@ -569,7 +571,7 @@ AbstractGenericSignatureRequest::evaluate(
 
   // If there are no added requirements, we can form the signature directly
   // with the added parameters.
-  if (addedRequirements.empty() && !allowInverses) {
+  if (addedRequirements.empty() && !options.contains(ExpandDefaults)) {
     auto result = GenericSignature::get(genericParams,
                                         baseSignature.getRequirements());
     return GenericSignatureWithError(result, GenericSignatureErrors());
@@ -600,7 +602,7 @@ AbstractGenericSignatureRequest::evaluate(
         AbstractGenericSignatureRequest{
           canBaseSignature.getPointer(), std::move(canAddedParameters),
           std::move(canAddedRequirements),
-          allowInverses},
+          options},
         GenericSignatureWithError());
     if (!canSignatureResult.getPointer())
       return GenericSignatureWithError();
@@ -665,15 +667,17 @@ AbstractGenericSignatureRequest::evaluate(
 
   /// Next, we need to expand default requirements and then apply inverses.
   SmallVector<Type, 2> paramsAsTypes;
-  if (allowInverses) {
+  if (options.contains(ExpandDefaults)) {
     for (auto *gtpt : addedParameters)
       paramsAsTypes.push_back(gtpt);
   }
 
   SmallVector<StructuralRequirement, 2> defaults;
-  InverseRequirement::expandDefaults(ctx, paramsAsTypes, defaults);
-  applyInverses(ctx, paramsAsTypes, inverses, requirements,
-                defaults, errors);
+  SmallVector<Type, 2> expandedGPs;
+  InverseRequirement::expandDefaults(ctx, paramsAsTypes, requirements, defaults,
+                                     expandedGPs);
+  applyInverses(ctx, expandedGPs, inverses, requirements, options, defaults,
+                errors);
   requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();
@@ -750,26 +754,6 @@ AbstractGenericSignatureRequest::evaluate(
   }
 }
 
-/// If completion fails, build a dummy generic signature where everything is
-/// Copyable and Escapable, to avoid spurious downstream diagnostics
-/// concerning move-only types.
-static GenericSignature getPlaceholderGenericSignature(
-    ASTContext &ctx, ArrayRef<GenericTypeParamType *> genericParams) {
-  SmallVector<Requirement, 2> requirements;
-  for (auto param : genericParams) {
-    if (param->isValue())
-      continue;
-
-    for (auto ip : InvertibleProtocolSet::allKnown()) {
-      auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
-      requirements.emplace_back(RequirementKind::Conformance, param,
-                                proto->getDeclaredInterfaceType());
-    }
-  }
-
-  return GenericSignature::get(genericParams, requirements);
-}
-
 GenericSignatureWithError
 InferredGenericSignatureRequest::evaluate(
         Evaluator &evaluator,
@@ -778,7 +762,7 @@ InferredGenericSignatureRequest::evaluate(
         WhereClauseOwner whereClause,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeBase *, 2> inferenceSources,
-        SourceLoc loc, ExtensionDecl *forExtension, bool allowInverses) const {
+        SourceLoc loc, ExtensionDecl *forExtension, DefaultRequirementOptions options) const {
   GenericSignature parentSig(parentSigImpl);
 
   SmallVector<GenericTypeParamType *, 4> genericParams(
@@ -879,29 +863,21 @@ InferredGenericSignatureRequest::evaluate(
   // After realizing requirements, expand default requirements only for local
   // generic parameters, as the outer parameters have already been expanded.
   SmallVector<Type, 4> paramTypes;
-  if (allowInverses) {
+  if (options.contains(ExpandDefaults)) {
     paramTypes.append(genericParams.begin() + numOuterParams,
                       genericParams.end());
   }
 
   SmallVector<StructuralRequirement, 2> defaults;
-  InverseRequirement::expandDefaults(ctx, paramTypes, defaults);
-  applyInverses(ctx, paramTypes, inverses, requirements,
-                defaults, errors);
+  SmallVector<Type, 2> expandedGPs;
+  InverseRequirement::expandDefaults(ctx, paramTypes, requirements, defaults, expandedGPs);
+  applyInverses(ctx, expandedGPs, inverses, requirements, options, defaults,
+                errors);
   
   // Any remaining implicit defaults in a conditional inverse requirement
   // extension must be made explicit.
   if (forExtension) {
     auto invertibleProtocol = forExtension->isAddingConformanceToInvertible();
-    // FIXME: to workaround a reverse condfail, always infer the requirements if
-    //  the extension is in a swiftinterface file. This is temporary and should
-    //  be removed soon. (rdar://130424971)
-    if (auto *sf = forExtension->getOutermostParentSourceFile()) {
-      if (sf->Kind == SourceFileKind::Interface
-          && !ctx.LangOpts.hasFeature(Feature::SE427NoInferenceOnExtension)) {
-        invertibleProtocol = std::nullopt;
-      }
-    }
     if (invertibleProtocol) {
       for (auto &def : defaults) {
         // Check whether a corresponding explicit requirement was provided.
@@ -996,7 +972,7 @@ InferredGenericSignatureRequest::evaluate(
                          diag::requirement_machine_completion_rule,
                          rule);
 
-      auto result = getPlaceholderGenericSignature(ctx, genericParams);
+      auto result = GenericSignature::forInvalid(genericParams);
 
       if (rewriteCtx.getDebugOptions().contains(DebugFlags::Timers)) {
         rewriteCtx.endTimer("InferredGenericSignatureRequest");
@@ -1060,14 +1036,16 @@ InferredGenericSignatureRequest::evaluate(
           continue;
 
         if (reduced->isTypeParameter()) {
-          ctx.Diags.diagnose(loc, diag::requires_generic_params_made_equal,
-                             genericParam, result->getSugaredType(reduced))
-            .warnUntilSwiftVersion(6);
+          ctx.Diags
+              .diagnose(loc, diag::requires_generic_params_made_equal,
+                        genericParam, result->getSugaredType(reduced))
+              .warnUntilLanguageMode(LanguageMode::v6);
         } else {
-          ctx.Diags.diagnose(loc,
-                             diag::requires_generic_param_made_equal_to_concrete,
-                             genericParam)
-            .warnUntilSwiftVersion(6);
+          ctx.Diags
+              .diagnose(loc,
+                        diag::requires_generic_param_made_equal_to_concrete,
+                        genericParam)
+              .warnUntilLanguageMode(LanguageMode::v6);
         }
       }
     }

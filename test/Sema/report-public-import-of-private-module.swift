@@ -12,6 +12,10 @@
 // RUN:   %t/sdk/System/Library/PrivateFrameworks/PrivateSwift.framework/Modules/PrivateSwift.swiftmodule/source.swift \
 // RUN:   -o %t/sdk/System/Library/PrivateFrameworks/PrivateSwift.framework/Modules/PrivateSwift.swiftmodule/%target-swiftmodule-name
 
+/// Build an IPI module (not installed in the SDK).
+// RUN: %target-swift-frontend -emit-module -module-name IPISwift \
+// RUN:   %t/IPISwift.swift -o %t/IPISwift.swiftmodule -library-level ipi
+
 /// Expect errors when building a public client.
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
@@ -40,6 +44,48 @@
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/PublicImports.swift \
 // RUN:   -F %t/sdk/System/Library/PrivateFrameworks/ -module-cache-path %t \
 // RUN:   -library-level ipi -module-name MainLib
+
+/// Expect errors when a distributed module publicly imports an IPI module.
+/// The import is visible in the module's interface, but the IPI module won't
+/// be in the SDK.
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/IPIFromAPI.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -library-level api -verify -module-name MainLib
+// RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/IPIFromSPI.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -library-level spi -verify -module-name MainLib
+// RUN: %target-swift-frontend -typecheck %t/IPIExportedImport.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -library-level api -verify -module-name MainLib
+// RUN: %target-swift-frontend -typecheck %t/IPIExplicitlyPublic.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -library-level api -verify -module-name MainLib
+
+/// Expect no errors when the IPI import is hidden from the interface.
+/// @_implementationOnly, internal, and package imports don't leak into
+/// the .swiftinterface, so the IPI dependency is invisible to consumers.
+// RUN: %target-swift-frontend -typecheck %t/IPIImplOnly.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -library-level api -module-name MainLib
+// RUN: %target-swift-frontend -typecheck %t/IPIInternalImport.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -library-level api -module-name MainLib
+// RUN: %target-swift-frontend -typecheck %t/IPIPackageImport.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -library-level api -package-name MainPkg -module-name MainLib
+// RUN: %target-swift-frontend -typecheck %t/IPIFromIPI.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -library-level ipi -module-name MainLib
+// RUN: %target-swift-frontend -typecheck %t/IPIFromOther.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -module-name MainLib
+
+/// With InternalImportsByDefault, bare `import` becomes internal,
+/// so importing an IPI module from an API module should be allowed.
+// RUN: %target-swift-frontend -typecheck %t/IPIBareImportIIBD.swift \
+// RUN:   -I %t -module-cache-path %t \
+// RUN:   -library-level api -enable-upcoming-feature InternalImportsByDefault -module-name MainLib
+
 //--- PublicImports.swift
 import PublicSwift
 import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}{{1-1=internal }}
@@ -88,6 +134,12 @@ import LocalClang // expected-error{{private module 'LocalClang' is imported pub
 // RUN: -sdk %t/sdk -module-cache-path %t -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -I %t -module-name Client
 
+/// Expect error when building from a swiftinterface that imports an IPI module.
+// RUN: not %target-swift-typecheck-module-from-interface(%t/IPIClient.private.swiftinterface) \
+// RUN:   -I %t -module-cache-path %t -module-name IPIClient 2>&1 \
+// RUN:   | %FileCheck %s --check-prefix CHECK-IPI-INTERFACE
+// CHECK-IPI-INTERFACE: Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'IPIClient'
+
 //--- Client.private.swiftinterface
 // swift-interface-format-version: 1.0
 // swift-compiler-version: Swift version 5.8-dev effective-4.1.50
@@ -100,6 +152,13 @@ import PublicClang_Private
 import FullyPrivateClang
 import LocalClang
 @_exported import MainLib
+
+//--- IPIClient.private.swiftinterface
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Swift version 5.8-dev effective-4.1.50
+// swift-module-flags: -swift-version 4 -module-name IPIClient -library-level api
+
+import IPISwift
 
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/InternalImports.swift \
 // RUN:   -module-name MainLib -module-cache-path %t \
@@ -170,3 +229,37 @@ public import PublicSwift
 // expected-warning @-1 {{public import of 'PublicSwift' was not used in public declarations or inlinable code}}{{1-8=}}
 public import PrivateSwift // expected-error{{private module 'PrivateSwift' is imported publicly from the public module 'MainLib'}}{{1-8=}}
 // expected-warning @-1 {{public import of 'PrivateSwift' was not used in public declarations or inlinable code}}{{1-8=}}
+
+//--- IPISwift.swift
+public func ipiFunc() {}
+
+//--- IPIFromAPI.swift
+import IPISwift // expected-error {{Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'MainLib'}}
+
+//--- IPIFromSPI.swift
+import IPISwift // expected-error {{Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'MainLib'}}
+
+//--- IPIFromIPI.swift
+import IPISwift
+
+//--- IPIFromOther.swift
+import IPISwift
+
+//--- IPIImplOnly.swift
+@_implementationOnly import IPISwift
+
+//--- IPIInternalImport.swift
+internal import IPISwift
+
+//--- IPIPackageImport.swift
+package import IPISwift
+
+//--- IPIExportedImport.swift
+@_exported import IPISwift // expected-error {{Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'MainLib'}}
+
+//--- IPIExplicitlyPublic.swift
+public import IPISwift // expected-error {{Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'MainLib'}}
+// expected-warning @-1 {{public import of 'IPISwift' was not used in public declarations or inlinable code}}
+
+//--- IPIBareImportIIBD.swift
+import IPISwift

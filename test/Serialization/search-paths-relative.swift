@@ -15,8 +15,8 @@
 // RUN: %FileCheck -check-prefix=SWIFT6 %s < %t/swift_6_output.txt
 
 // Check the actual serialized search paths.
-// RUN: llvm-bcanalyzer -dump %t/has_xref.swiftmodule > %t/has_xref.swiftmodule.txt
-// RUN: llvm-bcanalyzer -dump %t/explicit.swiftmodule > %t/explicit.swiftmodule.txt
+// RUN: %llvm-bcanalyzer -dump %t/has_xref.swiftmodule > %t/has_xref.swiftmodule.txt
+// RUN: %llvm-bcanalyzer -dump %t/explicit.swiftmodule > %t/explicit.swiftmodule.txt
 // RUN: %FileCheck %s < %t/has_xref.swiftmodule.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/has_xref.swiftmodule.txt
 // RUN: %FileCheck -check-prefix=EXPLICIT %s < %t/explicit.swiftmodule.txt

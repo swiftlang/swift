@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-additional-prefix targeted-and-ni- -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns-ni- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -swift-version 5 -verify-additional-prefix targeted-and-ni-
-// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -strict-concurrency=complete -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -enable-upcoming-feature NonisolatedNonsendingByDefault -swift-version 5 -DNONISOLATEDNONSENDING
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-ignore-unrelated -verify-additional-prefix targeted-and-ni- -strict-concurrency=targeted -verify-additional-prefix targeted- -emit-sil -o /dev/null %s
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-ignore-unrelated -strict-concurrency=complete -verify-additional-prefix tns-ni- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -swift-version 5 -verify-additional-prefix targeted-and-ni-
+// RUN: %target-swift-frontend -target %target-swift-5.0-abi-triple -verify -verify-ignore-unrelated -strict-concurrency=complete -verify-additional-prefix tns-ni-ns- -verify-additional-prefix tns- -emit-sil -o /dev/null %s -enable-upcoming-feature NonisolatedNonsendingByDefault -swift-version 5 -DNONISOLATEDNONSENDING
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -96,7 +96,7 @@ public actor MyActor: MyProto {
   func g(ns1: NS1) async {
     await nonisolatedAsyncFunc1(ns1)
     // expected-tns-ni-warning @-1 {{sending 'ns1' risks causing data races}}
-    // expected-tns-ni-note @-2 {{sending 'self'-isolated 'ns1' to nonisolated global function 'nonisolatedAsyncFunc1' risks causing data races between nonisolated and 'self'-isolated uses}}
+    // expected-tns-ni-note @-2 {{sending 'self'-isolated 'ns1' to @concurrent global function 'nonisolatedAsyncFunc1' risks causing data races between @concurrent and 'self'-isolated uses}}
     _ = await nonisolatedAsyncFunc2()
   }
 }
@@ -113,8 +113,8 @@ struct WrapClass<T: NSClass> {
 
 extension WrapClass: Sendable where T: Sendable { }
 
-// expected-warning@+2 {{conformance of 'SendableSubclass' to protocol 'Sendable' is already unavailable}}
-// expected-note@+1 {{'SendableSubclass' inherits conformance to protocol 'Sendable' from superclass here}}
+// expected-warning@+2 {{'SendableSubclass' inherits an unavailable 'Sendable' conformance; conforming here risks data races}}
+// expected-note@+1 {{'SendableSubclass' inherits unavailable conformance to protocol 'Sendable' from superclass here}}
 class SendableSubclass: NSClass, @unchecked Sendable { }
 
 @available(SwiftStdlib 5.1, *)
@@ -297,10 +297,10 @@ final class NonSendable {
     // expected-tns-warning @-1 {{sending 'self' risks causing data races}}
     // expected-tns-note @-2 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
 
-    _ = await x
+    _ = await x // expected-tns-warning {{passing 'self' to main actor-isolated getter for property 'x' risks causing data races}}
     // expected-warning@-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
 
-    _ = await self.x
+    _ = await self.x // expected-tns-warning {{passing 'self' to main actor-isolated getter for property 'x' risks causing data races}}
       // expected-warning@-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
   }
 
@@ -367,12 +367,12 @@ func callNonisolatedAsyncClosure(
 ) async {
   await g(ns)
   // expected-tns-ni-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to @concurrent callee risks causing data races between @concurrent and main actor-isolated uses}}
 
   let f: (NonSendable) async -> () = globalSendable // okay
   await f(ns)
   // expected-tns-ni-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to nonisolated callee risks causing data races between nonisolated and main actor-isolated uses}}
+  // expected-tns-ni-note @-2 {{sending main actor-isolated 'ns' to @concurrent callee risks causing data races between @concurrent and main actor-isolated uses}}
 }
 #endif
 
@@ -463,13 +463,15 @@ func preconcurrencyContext(_: @escaping @Sendable () -> Void) {}
 struct DowngradeForPreconcurrency {
   func capture(completion: @escaping @MainActor () -> Void) {
     preconcurrencyContext {
-      Task {
-        completion()
+        Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+            completion() // expected-tns-note {{closure captures 'completion' which is accessible to code in the current task}}
         // expected-warning@-1 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in a '@Sendable' closure}}
         // expected-warning@-2 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in an isolated closure}}
         // expected-note@-3 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         // expected-warning@-4 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
         // expected-note@-5 {{calls to parameter 'completion' from outside of its actor context are implicitly asynchronous}}
+        // expected-complete-and-tns-warning @-7 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+        // expected-complete-and-tns-note @-7 {{closure captures 'completion' which is accessible to code in the current task}}
       }
     }
   }
@@ -477,9 +479,12 @@ struct DowngradeForPreconcurrency {
   var x: NonSendable
   func createStream() -> AsyncStream<NonSendable> {
     AsyncStream<NonSendable> {
-      self.x
-      // expected-warning@-1 {{main actor-isolated property 'x' cannot be accessed from outside of the actor; this is an error in the Swift 6 language mode}} {{7-7=await }}
-      // expected-warning@-2 {{non-Sendable type 'NonSendable' of property 'x' cannot exit main actor-isolated context; this is an error in the Swift 6 language mode}}
+      self.x // expected-tns-ni-warning {{assigning '$return_value' to task-isolated 'self.x.some' risks causing data races}}
+      // expected-tns-ni-note @-1 {{'$return_value' could become accessible to task-isolated code despite remaining accessible to code in the current task}}
+      // expected-tns-ni-ns-warning @-2 {{assigning '$return_value' to @concurrent task-isolated 'self.x.some' risks causing data races}}
+      // expected-tns-ni-ns-note @-3 {{'$return_value' could become accessible to @concurrent task-isolated code despite remaining accessible to code in the current task}}
+      // expected-warning @-4 {{main actor-isolated property 'x' cannot be accessed from outside of the actor; this is an error in the Swift 6 language mode}} {{7-7=await }}
+      // expected-warning @-5 {{non-Sendable type 'NonSendable' of property 'x' cannot exit main actor-isolated context; this is an error in the Swift 6 language mode}}
     }
   }
 }

@@ -252,6 +252,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::BuiltinTypeName:
   case Node::Kind::BuiltinTupleType:
   case Node::Kind::BuiltinFixedArray:
+  case Node::Kind::BuiltinBorrow:
   case Node::Kind::Class:
   case Node::Kind::DependentGenericType:
   case Node::Kind::DependentMemberType:
@@ -386,6 +387,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ImplDifferentiabilityKind:
   case Node::Kind::ImplEscaping:
   case Node::Kind::ImplErasedIsolation:
+  case Node::Kind::ImplNonisolatedNonsendingIsolation:
   case Node::Kind::ImplSendingResult:
   case Node::Kind::ImplConvention:
   case Node::Kind::ImplParameterResultDifferentiability:
@@ -434,7 +436,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::MethodDescriptor:
   case Node::Kind::MethodLookupFunction:
   case Node::Kind::ModifyAccessor:
-  case Node::Kind::Modify2Accessor:
+  case Node::Kind::YieldingMutateAccessor:
   case Node::Kind::NativeOwningAddressor:
   case Node::Kind::NativeOwningMutableAddressor:
   case Node::Kind::NativePinningAddressor:
@@ -462,7 +464,7 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::PeerAttachedMacroExpansion:
   case Node::Kind::PostfixOperator:
   case Node::Kind::PreambleAttachedMacroExpansion:
-  case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
+  case Node::Kind::CheckedObjCAsyncCompletionHandlerImpl:
   case Node::Kind::PrefixOperator:
   case Node::Kind::PrivateDeclName:
   case Node::Kind::PropertyDescriptor:
@@ -485,8 +487,9 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
   case Node::Kind::ReabstractionThunkHelperWithSelf:
   case Node::Kind::ReabstractionThunkHelperWithGlobalActor:
   case Node::Kind::ReadAccessor:
-  case Node::Kind::Read2Accessor:
+  case Node::Kind::YieldingBorrowAccessor:
   case Node::Kind::RelatedEntityDeclName:
+  case Node::Kind::RepresentationChanged:
   case Node::Kind::RetroactiveConformance:
   case Node::Kind::Setter:
   case Node::Kind::Shared:
@@ -622,6 +625,8 @@ bool NodePrinter::isSimpleType(NodePointer Node) {
     case Node::Kind::DependentGenericParamValueMarker:
     case Node::Kind::CoroFunctionPointer:
     case Node::Kind::DefaultOverride:
+    case Node::Kind::BorrowAccessor:
+    case Node::Kind::MutateAccessor:
       return false;
     }
     printer_unreachable("bad node kind");
@@ -1245,6 +1250,15 @@ void NodePrinter::printFunctionSigSpecializationParams(NodePointer Node,
       }
       Printer << "]";
       break;
+    case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
+      if (Idx + 2 > End)
+        return;
+      Printer << "[";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << " ";
+      print(Node->getChild(Idx++), depth + 1);
+      Printer << "]";
+      break;
     default:
       assert(
        ((V & unsigned(FunctionSigSpecializationParamKind::OwnedToGuaranteed)) ||
@@ -1318,6 +1332,10 @@ void NodePrinter::printSpecializationPrefix(NodePointer node,
       Printer << "specialized ";
       SpecializationPrefixPrinted = true;
     }
+    return;
+  }
+  if (node->getFirstChild()->getKind() == Node::Kind::RepresentationChanged) {
+    Printer << "representation changed of ";
     return;
   }
   Printer << Description << " <";
@@ -1416,6 +1434,10 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::AsyncRemoved:
     Printer << "async demotion of ";
+    print(Node->getChild(0), depth + 1);
+    return nullptr;
+  case Node::Kind::RepresentationChanged:
+    Printer << "representation changed of ";
     print(Node->getChild(0), depth + 1);
     return nullptr;
   case Node::Kind::CurryThunk:
@@ -1887,11 +1909,15 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::FunctionSignatureSpecializationParam:
     printer_unreachable("should be handled in printSpecializationPrefix");
   case Node::Kind::FunctionSignatureSpecializationParamPayload: {
-    std::string demangledName = demangleSymbolAsString(Node->getText());
-    if (demangledName.empty()) {
-      Printer << Node->getText();
-    } else {
-      Printer << demangledName;
+    if (Node->hasText()) {
+      std::string demangledName = demangleSymbolAsString(Node->getText());
+      if (demangledName.empty()) {
+        Printer << Node->getText();
+      } else {
+        Printer << demangledName;
+      }
+    } else if (Node->hasIndex()) {
+      Printer << Node->getIndex();
     }
     return nullptr;
   }
@@ -1969,6 +1995,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     case FunctionSigSpecializationParamKind::ClosureProp:
       Printer << "Closure Propagated";
       return nullptr;
+    case FunctionSigSpecializationParamKind::ClosurePropPreviousArg:
+      Printer << "Same As Argument";
+      return nullptr;
     case FunctionSigSpecializationParamKind::ExistentialToGeneric:
     case FunctionSigSpecializationParamKind::Dead:
     case FunctionSigSpecializationParamKind::OwnedToGuaranteed:
@@ -1992,6 +2021,11 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     print(Node->getChild(0), depth + 1);
     Printer << ", ";
     print(Node->getChild(1), depth + 1);
+    Printer << ">";
+    return nullptr;
+  case Node::Kind::BuiltinBorrow:
+    Printer << "Builtin.Borrow<";
+    print(Node->getChild(0), depth + 1);
     Printer << ">";
     return nullptr;
   case Node::Kind::Number:
@@ -2369,14 +2403,28 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << "merged ";
     }
     return nullptr;
-  case Node::Kind::TypeSymbolicReference:
+  case Node::Kind::TypeSymbolicReference: {
     Printer << "type symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    if (Node->hasRemoteAddress()) {
+      auto ra = Node->getRemoteAddress();
+      Printer.writeHex(ra.first);
+      Printer << " (" << ra.second << ")";
+    } else if (Node->hasIndex()) {
+      Printer.writeHex(Node->getIndex());
+    }
     return nullptr;
-  case Node::Kind::OpaqueTypeDescriptorSymbolicReference:
+  }
+  case Node::Kind::OpaqueTypeDescriptorSymbolicReference: {
     Printer << "opaque type symbolic reference 0x";
-    Printer.writeHex(Node->getIndex());
+    if (Node->hasRemoteAddress()) {
+      auto ra = Node->getRemoteAddress();
+      Printer.writeHex(ra.first);
+      Printer << " (" << ra.second << ")";
+    } else if (Node->hasIndex()) {
+      Printer.writeHex(Node->getIndex());
+    }
     return nullptr;
+  }
   case Node::Kind::DistributedThunk:
     if (!Options.ShortenThunk) {
       Printer << "distributed thunk ";
@@ -2749,18 +2797,24 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ReadAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "read");
-  case Node::Kind::Read2Accessor:
+  case Node::Kind::YieldingBorrowAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
-                                "read2");
+                                "yielding_borrow");
   case Node::Kind::ModifyAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "modify");
-  case Node::Kind::Modify2Accessor:
+  case Node::Kind::YieldingMutateAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
-                                "modify2");
+                                "yielding_mutate");
   case Node::Kind::InitAccessor:
     return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
                                 "init");
+  case Node::Kind::BorrowAccessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "borrow");
+  case Node::Kind::MutateAccessor:
+    return printAbstractStorage(Node->getFirstChild(), depth, asPrefixContext,
+                                "mutate");
   case Node::Kind::Allocator:
     return printEntity(
         Node, depth, asPrefixContext, TypePrinting::FunctionStyle,
@@ -2838,6 +2892,9 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::ImplEscaping:
     Printer << "@escaping";
+    return nullptr;
+  case Node::Kind::ImplNonisolatedNonsendingIsolation:
+    Printer << "@caller_isolated";
     return nullptr;
   case Node::Kind::ImplErasedIsolation:
     Printer << "@isolated(any)";
@@ -3358,8 +3415,8 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
       Printer << ')';
     }
     return nullptr;
-  case Node::Kind::PredefinedObjCAsyncCompletionHandlerImpl:
-    Printer << "predefined ";
+  case Node::Kind::CheckedObjCAsyncCompletionHandlerImpl:
+    Printer << "checked ";
     LLVM_FALLTHROUGH;
   case Node::Kind::ObjCAsyncCompletionHandlerImpl:
     Printer << "@objc completion handler block implementation for ";

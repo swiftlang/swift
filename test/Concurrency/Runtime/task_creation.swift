@@ -43,7 +43,7 @@ enum SomeError: Error {
       return 11
     }
 
-    let result = try! await t1.get() + t2.get() + t3.get() + t4.get()
+    let result = try! await t1.value + t2.value + t3.value + t4.value
     assert(result == 32)
   }
 }

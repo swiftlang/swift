@@ -2,7 +2,7 @@
 // RUN: %swift-ide-test -test-input-complete -source-filename %s -target x86_64-scei-ps4
 
 #if os(FreeBSD)
-// This block should not parse.
+// This block should not be type checked.
 // os(FreeBSD) does not imply os(PS4)
 let i: Int = "Hello"
 #endif

@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/IDE/CodeCompletionStringBuilder.h"
+#include "CodeCompletionStringBuilder.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -48,7 +48,7 @@ Type ide::eraseArchetypes(Type type, GenericSignature genericSig) {
       // Don't erase opaque archetype.
       if (isa<OpaqueTypeArchetypeType>(archetypeType) &&
           archetypeType->isRoot())
-        return std::nullopt;
+        return archetypeType;
 
       auto genericSig =
           archetypeType->getGenericEnvironment()->getGenericSignature();

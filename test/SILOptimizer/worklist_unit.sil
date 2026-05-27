@@ -1,0 +1,87 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+// CHECK-LABEL: begin running test 1 of 1 on forward: instruction_worklist with: false
+// CHECK-NEXT:    string_literal utf8 "begin"
+// CHECK-NEXT:    br bb1
+// CHECK-NEXT:    string_literal utf8 "b"
+// CHECK-NEXT:    cond_br undef, bb2, bb3
+// CHECK-NEXT:    br bb4
+// CHECK-NEXT:    string_literal utf8 "f"
+// CHECK-NEXT:    cond_br undef, bb5, bb6
+// CHECK-NEXT:    string_literal utf8 "g"
+// CHECK-NEXT:    br bb1
+// CHECK-NEXT:    string_literal utf8 "c"
+// CHECK-NEXT:    string_literal utf8 "d"
+// CHECK-NEXT:    br bb4
+// CHECK-NEXT:  end running test 1 of 1 on forward: instruction_worklist with: false
+sil [ossa] @forward : $@convention(thin) () -> () {
+bb0:
+  specify_test "instruction_worklist false"
+  %0 = string_literal utf8 "a"
+  %1 = string_literal utf8 "begin"
+  br bb1
+
+bb1:
+  %3 = string_literal utf8 "b"
+  cond_br undef, bb2, bb3
+
+bb2:
+  %4 = string_literal utf8 "c"
+  %5 = string_literal utf8 "d"
+  br bb4
+
+bb3:
+  %6 = string_literal utf8 "transparent"
+  %7 = string_literal utf8 "e"
+  br bb4
+
+bb4:
+  %9 = string_literal utf8 "f"
+  cond_br undef, bb5, bb6
+
+bb5:
+  br bb1
+
+bb6:
+  %10 = string_literal utf8 "g"
+  %11 = string_literal utf8 "end"
+  %12 = tuple ()
+  return %12
+}
+
+// CHECK-LABEL: begin running test 1 of 1 on backward: instruction_worklist with: true
+// CHECK-NEXT:    string_literal utf8 "begin"
+// CHECK-NEXT:    string_literal utf8 "transparent"
+// CHECK-NEXT:    cond_br undef, bb1, bb2
+// CHECK-NEXT:    string_literal utf8 "begin"
+// CHECK-NEXT:    string_literal utf8 "b"
+// CHECK-NEXT:  end running test 1 of 1 on backward: instruction_worklist with: true
+sil [ossa] @backward : $@convention(thin) () -> () {
+bb0:
+  specify_test "instruction_worklist true"
+  %0 = string_literal utf8 "a"
+  %1 = string_literal utf8 "end"
+  cond_br undef, bb1, bb2
+
+bb1:
+  %3 = string_literal utf8 "b"
+  %4 = string_literal utf8 "begin"
+  %5 = string_literal utf8 "c"
+  br bb4
+
+bb2:
+  %7 = string_literal utf8 "transparent"
+  %8 = string_literal utf8 "d"
+  br bb3
+
+bb3:
+  %10 = string_literal utf8 "begin"
+  br bb4
+
+bb4:
+  %12 = tuple ()
+  return %12
+}
+

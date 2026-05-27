@@ -18,13 +18,13 @@
 // CHECK:         "-dwarf-ext-refs"
 // CHECK:         "-fmodule-file-cache-key",
 // CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "{{.*}}{{/|\\}}A-{{.*}}.pcm",
+// CHECK-NEXT:    "A-{{.*}}.pcm",
 // CHECK-NEXT:    "-Xcc",
 // CHECK-NEXT:    "llvmcas://{{.*}}",
 // CHECK-NEXT:    "-Xcc",
 // CHECK-NEXT:    "-fmodule-file-cache-key",
 // CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "{{.*}}{{/|\\}}B-{{.*}}.pcm",
+// CHECK-NEXT:    "B-{{.*}}.pcm",
 // CHECK-NEXT:    "-Xcc",
 // CHECK-NEXT:    "llvmcas://{{.*}}"
 
@@ -41,9 +41,9 @@
 // RUN: llvm-cas --cas %t/cas --make-blob --data %t/map.json > %t/map.casid
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/bridging.pch
+// RUN: %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
-// RUN:   %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
+// RUN:   %target-swift-frontend @%t/header.cmd %t/Bridging.h -disable-implicit-swift-modules -O -o %t/bridging.pch > %t/keys.json
 // RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
@@ -94,7 +94,7 @@
 // RUN:   -explicit-swift-module-map-file @%t/map2.casid @%t/User.cmd %t/user.swift \
 // RUN:   -emit-module -o %t/User.swiftmodule
 
-// RUN: llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
 // CHECK-NO-HEADER-NOT: <IMPORTED_HEADER
 
 /// Importing binary module with bridging header for a cached build while also importing a bridging header.
@@ -159,7 +159,7 @@
 // RUN:   -emit-module -o %t/User3.swiftmodule
 
 /// Verify the encoded here is just the `-import-objc-header` option.
-// RUN: llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
 // CHECK-HEADER: <IMPORTED_HEADER
 // CHECK-HEADER-SAME: Bridging3.h
 

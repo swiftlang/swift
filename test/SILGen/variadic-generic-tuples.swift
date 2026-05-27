@@ -88,8 +88,8 @@ public struct Container<each T> {
 // CHECK:       bb2:
 // CHECK-NEXT:    [[INDEX:%.*]] = dynamic_pack_index [[IDX]] of $Pack{repeat Stored<each T>}
 // CHECK-NEXT:    open_pack_element [[INDEX]] of <each T> at <Pack{repeat each T}>, shape $each T, uuid [[UUID:".*"]]
-// CHECK-NEXT:    [[ARG_COPY_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[ARG_COPY]] : $*(repeat Stored<each T>) as $*Stored<@pack_element([[UUID]]) each T>
 // CHECK-NEXT:    [[PACK_ELT_ADDR:%.*]] = pack_element_get [[INDEX]] of %0 : $*Pack{repeat Stored<each T>} as $*Stored<@pack_element([[UUID]]) each T>
+// CHECK-NEXT:    [[ARG_COPY_ELT_ADDR:%.*]] = tuple_pack_element_addr [[INDEX]] of [[ARG_COPY]] : $*(repeat Stored<each T>) as $*Stored<@pack_element([[UUID]]) each T>
 // CHECK-NEXT:    [[ELT_VALUE:%.*]] = load [trivial] [[PACK_ELT_ADDR]] : $*Stored<@pack_element([[UUID]]) each T>
 // CHECK-NEXT:    store [[ELT_VALUE]] to [trivial] [[ARG_COPY_ELT_ADDR]] : $*Stored<@pack_element([[UUID]]) each T>
 // CHECK-NEXT:    [[NEXT_IDX:%.*]] = builtin "add_Word"([[IDX]] : $Builtin.Word, [[ONE]] : $Builtin.Word) : $Builtin.Word
@@ -102,7 +102,7 @@ public struct Container<each T> {
 //   Finally, the actual assignment.
 // CHECK-NEXT:    [[ACCESS:%.*]] = begin_access [modify] [unknown] %1 :
 // CHECK-NEXT:    [[FIELD:%.*]] = struct_element_addr [[ACCESS]] : $*Container<repeat each T>, #Container.storage
-// CHECK-NEXT:    copy_addr [take] [[COPY2]] to [[FIELD]] : $*(repeat Stored<each T>)
+// CHECK-NEXT:    copy_addr [[COPY2]] to [[FIELD]] : $*(repeat Stored<each T>)
 // CHECK-NEXT:    end_access [[ACCESS]]
 //   Clean up.
 // CHECK-NEXT:    dealloc_stack [[COPY2]]
@@ -430,6 +430,16 @@ func convertVoidPayloads() {
   convertPayloads(as: Void.self)
 }
 
+// CHECK-LABEL:   sil{{.*}} [ossa] @{{.*}}convertPayloads{{.*}} :
+// CHECK:           ignored_use {{.*}}
+// CHECK-NEXT:      unreachable
+//
+// CHECK:           bb1:
+// CHECK-NOT:         Preds
+// CHECK:             [[BOGUS_ALLOC:%.*]] = alloc_stack $(repeat each Value)
+// CHECK-NEXT:        copy_addr [take] undef to [init] [[BOGUS_ALLOC]]
+//
+// CHECK:             = tuple_pack_element_addr {{.*}} of [[BOGUS_ALLOC]]
 func convertPayloads<each Value>(as valueTypes: repeat (each Value).Type) -> (repeat each Value) {
   fatalError()
 }

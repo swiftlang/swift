@@ -48,16 +48,37 @@ extension Context {
 
   public func getBuiltinIntegerType(bitWidth: Int) -> Type { _bridged.getBuiltinIntegerType(bitWidth).type }
 
+  public func getBuiltinWordType() -> Type { _bridged.getBuiltinWordType().type }
+
   public func getTupleType(elements: [Type]) -> AST.`Type` {
+    return getTupleType(elements: elements.map{ $0.rawType })
+  }
+
+  public func getTupleType(elements: [AST.`Type`]) -> AST.`Type` {
     let bridgedElements = elements.map { $0.bridged }
     return bridgedElements.withBridgedArrayRef {
       AST.`Type`(bridged: _bridged.getTupleType($0))
     }
   }
 
-  public var swiftArrayDecl: NominalTypeDecl {
-    _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self)
+  public func getTupleType(elements: [(label: Identifier, type: AST.`Type`)]) -> AST.`Type` {
+    return elements.map{$0.type}.withBridgedArrayRef{
+      types in elements.map{$0.label}.withBridgedArrayRef{labels in
+      AST.`Type`(bridged: _bridged.getTupleTypeWithLabels(types, labels))}}
   }
+
+  public var swiftArrayDecl: NominalTypeDecl { _bridged.getSwiftArrayDecl().getAs(NominalTypeDecl.self) }
+  public var swiftIntDecl: NominalTypeDecl { _bridged.getSwiftIntDecl().getAs(NominalTypeDecl.self) }
+  public var swiftInt64Decl: NominalTypeDecl { _bridged.getSwiftInt64Decl().getAs(NominalTypeDecl.self) }
+  public var swiftInt32Decl: NominalTypeDecl { _bridged.getSwiftInt32Decl().getAs(NominalTypeDecl.self) }
+  public var swiftInt16Decl: NominalTypeDecl { _bridged.getSwiftInt16Decl().getAs(NominalTypeDecl.self) }
+  public var swiftInt8Decl: NominalTypeDecl { _bridged.getSwiftInt8Decl().getAs(NominalTypeDecl.self) }
+  public var swiftUIntDecl: NominalTypeDecl { _bridged.getSwiftUIntDecl().getAs(NominalTypeDecl.self) }
+  public var swiftUInt64Decl: NominalTypeDecl { _bridged.getSwiftUInt64Decl().getAs(NominalTypeDecl.self) }
+  public var swiftUInt32Decl: NominalTypeDecl { _bridged.getSwiftUInt32Decl().getAs(NominalTypeDecl.self) }
+  public var swiftUInt16Decl: NominalTypeDecl { _bridged.getSwiftUInt16Decl().getAs(NominalTypeDecl.self) }
+  public var swiftUInt8Decl: NominalTypeDecl { _bridged.getSwiftUInt8Decl().getAs(NominalTypeDecl.self) }
+  public var swiftStringDecl: NominalTypeDecl { _bridged.getSwiftStringDecl().getAs(NominalTypeDecl.self) }
 
   public var swiftMutableSpan: NominalTypeDecl {
     _bridged.getSwiftMutableSpanDecl().getAs(NominalTypeDecl.self)
@@ -90,14 +111,6 @@ extension Context {
       return _bridged.lookupStdlibFunction(nameStr).function
     }
   }
-
-  public func getSpecializedConformance(of genericConformance: Conformance,
-                                        for type: AST.`Type`,
-                                        substitutions: SubstitutionMap) -> Conformance
-  {
-    let c = _bridged.getSpecializedConformance(genericConformance.bridged, type.bridged, substitutions.bridged)
-    return Conformance(bridged: c)
-  }
 }
 
 extension MutatingContext {
@@ -119,6 +132,10 @@ extension MutatingContext {
 
   public func notifyEffectsChanged() {
     _bridged.notifyChanges(.Effects)
+  }
+
+  public func hasChanged(_ kind: BridgedContext.NotificationKind) -> Bool {
+    _bridged.hasChangeNotification(kind)
   }
 
   public func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool, markedAsUsed: Bool) -> GlobalVariable {
@@ -169,6 +186,12 @@ extension MutatingContext {
     }
     notifyInstructionsChanged()
 
+    for operand in instruction.operands {
+      if let opInst = operand.value.definingInstruction {
+        notifyInstructionChanged(opInst)
+      }
+    }
+
     _bridged.eraseInstruction(instruction.bridged, salvageDebugInfo)
   }
 
@@ -194,6 +217,7 @@ extension MutatingContext {
 
   public func erase(instructionIncludingDebugUses inst: Instruction) {
     precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
+    salvageDebugInfo(of: inst)
     erase(instructionIncludingAllUsers: inst)
   }
 
@@ -201,4 +225,9 @@ extension MutatingContext {
     _bridged.eraseBlock(block.bridged)
   }
 
+  /// Transfer debug info associated with (the result of) `instruction` to a
+  /// new `debug_value` instruction before `instruction` is deleted.
+  public func salvageDebugInfo(of instruction: Instruction) {
+    BridgedContext.salvageDebugInfo(instruction.bridged)
+  }
 }

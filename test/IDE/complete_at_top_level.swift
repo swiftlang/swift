@@ -213,7 +213,7 @@ func resyncParserB5() {}
 
 for var i = 0; ; {
   #^TOP_LEVEL_STMT_5?check=PLAIN_TOP_LEVEL;check=TOP_LEVEL_STMT_5^#
-// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
+// TOP_LEVEL_STMT_5: Decl[LocalVar]/Local: i[#_#]{{; name=.+$}}
 }
 
 func resyncParserB6() {}
@@ -234,7 +234,7 @@ func resyncParserB8() {}
 
 for i in unknown_var {
   #^TOP_LEVEL_STMT_8?check=PLAIN_TOP_LEVEL;check=TOP_LEVEL_STMT_8^#
-// TOP_LEVEL_STMT_8: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
+// TOP_LEVEL_STMT_8: Decl[LocalVar]/Local: i[#_#]{{; name=.+$}}
 }
 
 func resyncParserB9() {}
@@ -258,8 +258,8 @@ func resyncParserB11() {}
 // rdar://21346928
 func optStr() -> String? { return nil }
 let x = (optStr() ?? "autoclosure").#^TOP_LEVEL_AUTOCLOSURE_1?check=AUTOCLOSURE_STRING^#
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal/IsSystem: unicodeScalars[#String.UnicodeScalarView#]
-// AUTOCLOSURE_STRING: Decl[InstanceVar]/CurrNominal/IsSystem: utf16[#String.UTF16View#]
+// AUTOCLOSURE_STRING-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: unicodeScalars[#String.UnicodeScalarView#]
+// AUTOCLOSURE_STRING-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: utf16[#String.UTF16View#]
 
 func resyncParserB12() {}
 

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func myMap<T1, T2>(_ array: [T1], _ fn: (T1) -> T2) -> [T2] {}
 
@@ -187,7 +187,8 @@ func r22162441(_ lines: [String]) {
 
 func testMap() {
   let a = 42
-  [1,a].map { $0 + 1.0 } // expected-error {{cannot convert value of type 'Int' to expected element type 'Double'}}
+  [1,a].map { $0 + 1.0 } // expected-error {{binary operator '+' cannot be applied to operands of type 'Int' and 'Double'}}
+  // expected-note@-1 {{overloads for '+' exist with these partially matching parameter lists: (Double, Double), (Int, Int)}}
 }
 
 // <rdar://problem/22414757> "UnresolvedDot" "in wrong phase" assertion from verifier
@@ -1362,7 +1363,7 @@ do {
     }
   }
 
-  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> Void' to non-throwing function type '(Int) -> Void'}}
+  test { // expected-error {{invalid conversion from throwing function of type '(Int) throws -> _' to non-throwing function type '(Int) -> Void'}}
     try $0.missing // expected-error {{value of type 'Int' has no member 'missing'}}
   }
 }
@@ -1414,4 +1415,18 @@ func test_implicit_result_conversions() {
     _ = 42
     return // Ok
   }
+}
+
+// Random example reduced from swift-build which tripped an assert not
+// previously covered by our test suite
+do {
+  struct S {
+    var x: [Int: [String]] = [:]
+  }
+
+  let s = [S]()
+
+  let _: [Int: Set<String>] = s.map(\.x)
+      .reduce([:], { x, y in x.merging(y, uniquingKeysWith: +) })
+      .mapValues { Set($0) }
 }

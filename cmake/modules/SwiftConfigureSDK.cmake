@@ -451,6 +451,7 @@ macro(configure_sdk_unix name architectures)
         message(STATUS "OpenBSD Version: ${openbsd_system_version}")
 
         set(SWIFT_SDK_OPENBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-openbsd${openbsd_system_version}")
+        set(SWIFT_SDK_OPENBSD_ARCH_${arch}_MODULE "${arch}-unknown-openbsd")
 
         add_link_options("LINKER:-z,origin")
 

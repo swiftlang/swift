@@ -18,6 +18,7 @@
 #ifndef SWIFT_FRONTEND_H
 #define SWIFT_FRONTEND_H
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/IRGenOptions.h"
@@ -43,6 +44,7 @@
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "clang/Basic/FileManager.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SetVector.h"
@@ -63,10 +65,26 @@ class FrontendObserver;
 class SerializedModuleLoaderBase;
 class MemoryBufferSerializedModuleLoader;
 class SILModule;
+class StructDecl;
 
 namespace Lowering {
 class TypeConverter;
 }
+
+struct AbstractFieldLayout {
+  uint64_t offset;
+  llvm::StringRef name;
+  AbstractTypeLayout typeLayout;
+};
+
+struct AbstractStructLayout {
+  AbstractTypeLayout typeLayout;
+  llvm::SmallVector<AbstractFieldLayout, 4> fields;
+};
+
+std::optional<AbstractStructLayout>
+computeAbstractStructLayout(const StructDecl *decl,
+                            const IRGenOptions &irgenOpts);
 
 struct ModuleBuffers {
   std::unique_ptr<llvm::MemoryBuffer> ModuleBuffer;
@@ -79,6 +97,20 @@ struct ModuleBuffers {
                   ModuleDocBuffer(std::move(ModuleDocBuffer)),
                   ModuleSourceInfoBuffer(std::move(ModuleSourceInfoBuffer)) {}
 };
+
+/// Parse `-enable-experimental-feature`, `-disable-experimental-feature`,
+/// `-enable-upcoming-feature`, and `-disable-upcoming-feature` arguments from
+/// \p Args and apply the resulting feature state to \p Opts. Also processes
+/// pseudo-features such as `StrictConcurrency=...`, `AvailabilityMacro=...`,
+/// `RequiresObjC=...`, `CodeGenerationModel=...`, and `ApproachableConcurrency`.
+///
+/// The last-specified flag for a given feature wins. Shared by
+/// `swift-frontend` and `swift-synthesize-interface`.
+///
+/// \returns true if any argument was malformed in a way that should prevent
+/// further compilation.
+bool parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
+                      DiagnosticEngine &Diags);
 
 /// The abstract configuration of the compiler, including:
 ///   - options for all stages of translation,
@@ -95,6 +127,7 @@ class CompilerInvocation {
   FrontendOptions FrontendOpts;
   ClangImporterOptions ClangImporterOpts;
   symbolgraphgen::SymbolGraphOptions SymbolGraphOpts;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   SearchPathOptions SearchPathOpts;
   DiagnosticOptions DiagnosticOpts;
   MigratorOptions MigratorOpts;
@@ -247,8 +280,6 @@ public:
 
   void setRuntimeResourcePath(StringRef Path);
 
-  void setPlatformAvailabilityInheritanceMapPath(StringRef Path);
-
   /// Compute the default prebuilt module cache path for a given resource path
   /// and SDK version. This function is also used by LLDB.
   static std::string
@@ -260,9 +291,6 @@ public:
   /// @note This should be called once, after search path options and frontend
   ///       options have been parsed.
   void setDefaultPrebuiltCacheIfNecessary();
-
-  /// If we haven't explicitly passed -blocklist-paths, set it to the default value.
-  void setDefaultBlocklistsIfNecessary();
 
   /// If we haven't explicitly passed '-in-process-plugin-server-path', infer
   /// it as a default value.
@@ -506,6 +534,7 @@ class CompilerInstance {
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
   std::shared_ptr<llvm::cas::ActionCache> ResultCache;
   std::optional<llvm::cas::ObjectRef> CompileJobBaseKey;
+  std::string CASIDForPCH;
 
   SourceManager SourceMgr;
   DiagnosticEngine Diagnostics{SourceMgr};
@@ -603,6 +632,11 @@ public:
   }
   std::shared_ptr<llvm::cas::ObjectStore> getSharedCASInstance() const {
     return CAS;
+  }
+  void setSharedCASInstances(std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                             std::shared_ptr<llvm::cas::ActionCache> Cache) {
+    this->CAS = std::move(CAS);
+    this->ResultCache = std::move(Cache);
   }
   std::optional<llvm::cas::ObjectRef> getCompilerBaseKey() const {
     return CompileJobBaseKey;
@@ -725,7 +759,9 @@ public:
 
   /// The fast setup function for cache replay.
   bool setupForReplay(const CompilerInvocation &Invocation, std::string &Error,
-                      ArrayRef<const char *> Args = {});
+                      ArrayRef<const char *> Args,
+                      std::shared_ptr<llvm::cas::ObjectStore> CAS,
+                      std::shared_ptr<llvm::cas::ActionCache> Cache);
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
@@ -789,11 +825,6 @@ private:
 public:
   /// Parses and type-checks all input files.
   void performSema();
-
-  /// Loads any access notes for the main module.
-  ///
-  /// FIXME: This should be requestified.
-  void loadAccessNotesIfNeeded();
 
   /// Parses and performs import resolution on all input files.
   ///

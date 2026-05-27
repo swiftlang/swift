@@ -21,7 +21,9 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Statistic.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -30,6 +32,11 @@
 using namespace llvm;
 using namespace swift;
 using namespace constraints;
+
+#define DEBUG_TYPE "Constraint solver overall"
+
+STATISTIC(NumEarlyBindingAttempts, "bindings attempted before disjunctions");
+STATISTIC(NumLateBindingAttempts, "bindings attempted after disjunctions");
 
 ComponentStep::Scope::Scope(ComponentStep &component)
     : CS(component.CS), Component(component) {
@@ -258,113 +265,69 @@ StepResult ComponentStep::take(bool prevFailed) {
   // Setup active scope, only if previous component didn't fail.
   setupScope();
 
-  /// Try to figure out what this step is going to be,
-  /// after the scope has been established.
-  SmallString<64> potentialBindings;
-  llvm::raw_svector_ostream bos(potentialBindings);
+  auto attemptBinding = [&](const inference::BindingSet &bindingSet) {
+    if (bindingSet.getNumExactBindings() == 1)
+      ++NumEarlyBindingAttempts;
+    else
+      ++NumLateBindingAttempts;
 
-  auto bestBindings = CS.determineBestBindings([&](const BindingSet &bindings) {
-    if (CS.isDebugMode() && bindings.hasViableBindings()) {
-      bos.indent(CS.solverState->getCurrentIndent() + 2);
-      bos << "(";
-      bindings.dump(bos, CS.solverState->getCurrentIndent() + 2);
-      bos << ")\n";
-    }
-  });
-
-  auto disjunction = CS.selectDisjunction();
-  auto *conjunction = CS.selectConjunction();
-
-  if (CS.isDebugMode()) {
-    SmallVector<Constraint *, 4> disjunctions;
-    CS.collectDisjunctions(disjunctions);
-    std::vector<std::string> overloadDisjunctions;
-    for (const auto &disjunction : disjunctions) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-
-      auto constraints = disjunction->getNestedConstraints();
-      if (constraints[0]->getKind() == ConstraintKind::BindOverload)
-        overloadDisjunctions.push_back(
-            constraints[0]->getFirstType()->getString(PO));
-    }
-
-    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
-      auto &log = getDebugLogger();
-      log << "(Potential Binding(s): " << '\n';
-      log << potentialBindings;
-    }
-
-    if (!overloadDisjunctions.empty()) {
-      auto &log = getDebugLogger();
-      log.indent(CS.solverState->getCurrentIndent() + 2);
-      log << "Disjunction(s) = [";
-      interleave(overloadDisjunctions, log, ", ");
-      log << "]\n";
-    }
-
-    if (!potentialBindings.empty() || !overloadDisjunctions.empty()) {
-      auto &log = getDebugLogger();
-      log << ")\n";
-    }
-  }
-
-  enum class StepKind { Binding, Disjunction, Conjunction };
-
-  auto chooseStep = [&]() -> std::optional<StepKind> {
-    // Bindings usually happen first, but sometimes we want to prioritize a
-    // disjunction or conjunction.
-    if (bestBindings) {
-      if (disjunction &&
-          !bestBindings->favoredOverDisjunction(disjunction->first))
-        return StepKind::Disjunction;
-
-      if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
-        return StepKind::Conjunction;
-
-      return StepKind::Binding;
-    }
-    if (disjunction)
-      return StepKind::Disjunction;
-
-    if (conjunction)
-      return StepKind::Conjunction;
-
-    return std::nullopt;
+    return suspend(
+        std::make_unique<TypeVariableStep>(CS, bindingSet.getTypeVariable(),
+                                           bindingSet, Solutions));
   };
 
-  if (auto step = chooseStep()) {
-    switch (*step) {
-    case StepKind::Binding:
-      return suspend(
-          std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
-    case StepKind::Disjunction: {
-      CS.retireConstraint(disjunction->first);
-      return suspend(
-          std::make_unique<DisjunctionStep>(CS, *disjunction, Solutions));
-    }
-    case StepKind::Conjunction: {
-      CS.retireConstraint(conjunction);
+  auto attemptDisjunction = [&](std::pair<Constraint *,
+                                          llvm::TinyPtrVector<Constraint *>> disjunction) {
+    CS.retireConstraint(disjunction.first);
+    return suspend(
+        std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+  };
+
+  auto attemptConjunction = [&](Constraint *conjunction) {
+    CS.retireConstraint(conjunction);
       return suspend(
           std::make_unique<ConjunctionStep>(CS, conjunction, Solutions));
+  };
+
+  const auto *bestBindings = CS.determineBestBindings();
+  if (!CS.shouldAttemptFixes()) {
+    // If we have a binding set ready to go, attempt it first.
+    if (bestBindings && bestBindings->getNumExactBindings() == 1) {
+      return attemptBinding(*bestBindings);
     }
-    }
-    llvm_unreachable("Unhandled case in switch!");
   }
+
+  // FIXME: Remove favoredOverDisjunction() and favoredOverConjunction().
+
+  // Check if we have a disjunction that is better than our binding set.
+  auto disjunction = CS.selectDisjunction();
+  if (disjunction &&
+      (!bestBindings ||
+       !bestBindings->favoredOverDisjunction(disjunction->first))) {
+    return attemptDisjunction(*disjunction);
+  }
+
+  // Check if we have a conjunction that is better than our binding set.
+  auto *conjunction = CS.selectConjunction();
+  if (conjunction &&
+      (!bestBindings ||
+       !bestBindings->favoredOverConjunction(conjunction))) {
+    return attemptConjunction(conjunction);
+  }
+
+  if (bestBindings)
+    return attemptBinding(*bestBindings);
 
   if (!CS.solverState->allowsFreeTypeVariables() && CS.hasFreeTypeVariables()) {
     // If there are no disjunctions or type variables to bind
     // we can't solve this system unless we have free type variables
     // allowed in the solution.
     if (CS.isDebugMode()) {
-      PrintOptions PO;
-      PO.PrintTypesForDebugging = true;
-
       auto &log = getDebugLogger();
       log << "(failed due to free variables:";
       for (auto *typeVar : CS.getTypeVariables()) {
         if (!typeVar->getImpl().hasRepresentativeOrFixed()) {
-          log << " " << typeVar->getString(PO);
+          log << " " << typeVar->getString(PrintOptions::forDebugging());
         }
       }
       log << ")\n";
@@ -375,9 +338,9 @@ StepResult ComponentStep::take(bool prevFailed) {
 
   auto printConstraints = [&](const ConstraintList &constraints) {
     for (auto &constraint : constraints) {
-      constraint.print(
-          getDebugLogger().indent(CS.solverState->getCurrentIndent()),
-          &CS.getASTContext().SourceMgr, CS.solverState->getCurrentIndent());
+      constraint.print(getDebugLogger(),
+                       &CS.getASTContext().SourceMgr,
+                       CS.solverState->getCurrentIndent());
       getDebugLogger() << "\n";
     }
   };
@@ -828,9 +791,13 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // (expression) gets a fresh time slice to get solved. This
   // is important for closures with large number of statements
   // in them.
-  if (CS.Timer) {
+  if (CS.Timer)
     CS.Timer.reset();
-    CS.startExpressionTimer(element.getLocator());
+
+  {
+    auto *locator = element.getLocator();
+    auto anchor = simplifyLocatorToAnchor(locator);
+    CS.startExpression(anchor ? anchor : locator->getAnchor());
   }
 
   auto success = element.attempt(CS);
@@ -887,23 +854,24 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
     if (Solutions.size() > 1)
       filterSolutions(Solutions, /*minimize=*/true);
 
-    // In diagnostic mode we need to stop a conjunction
-    // but consider it successful if there are:
+    // In diagnostic mode we need to stop a conjunction but consider it
+    // successful if there are:
     //
-    // - More than one solution for this element. Ambiguity
-    //   needs to get propagated back to the outer context
-    //   to be diagnosed.
-    // - A single solution that requires one or more fixes,
-    //   continuing would result in more errors associated
-    //   with the failed element.
+    // - More than one solution for this element. Ambiguity needs to get
+    //   propagated back to the outer context to be diagnosed.
+    // - A single solution that requires one or more fixes or holes, since
+    //   continuing would result in more errors associated with the failed
+    //   element, and we don't preserve scores across elements.
     if (CS.shouldAttemptFixes()) {
       if (Solutions.size() > 1)
         Producer.markExhausted();
 
       if (Solutions.size() == 1) {
         auto score = Solutions.front().getFixedScore();
-        if (score.Data[SK_Fix] > 0 && !CS.isForCodeCompletion())
-          Producer.markExhausted();
+        if (!CS.isForCodeCompletion()) {
+          if (score.Data[SK_Fix] > 0 || score.Data[SK_Hole] > 0)
+            Producer.markExhausted();
+        }
       }
     } else if (Solutions.size() != 1) {
       return failConjunction();
@@ -1053,7 +1021,7 @@ void ConjunctionStep::SolverSnapshot::replaySolution(const Solution &solution) {
 
   // If inference succeeded, we are done.
   auto score = solution.getFixedScore();
-  if (score.Data[SK_Fix] == 0)
+  if (score.Data[SK_Fix] == 0 && score.Data[SK_Hole] == 0)
     return;
 
   // If this conjunction represents a closure and inference

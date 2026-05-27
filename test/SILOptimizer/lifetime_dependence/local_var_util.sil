@@ -18,20 +18,20 @@ sil @makeDepNE : $@convention(thin) (@inout NE) -> @lifetime(borrow address_for_
 // CHECK-LABEL: testNEInitNoEscape: local_variable_reachable_uses with: %1, @instruction
 // CHECK: ### Access map:
 // CHECK-NEXT: Access map for:   %{{.*}} = alloc_box ${ var NE }, var, name "self"
-// CHECK-NEXT: assign: true, store  destroy_value %{{.*}} : ${ var NE }
-// CHECK-NEXT: assign: false, escape  %{{.*}} = address_to_pointer %{{.*}} : $*NE to $Builtin.RawPointer
-// CHECK-NEXT: assign: true, beginAccess  %{{.*}} = begin_access [modify] [unknown] %{{.*}} : $*NE
-// CHECK-NEXT: assign: false, load  %{{.*}} = load [copy] %{{.*}} : $*NE
-// CHECK-NEXT: assign: true, beginAccess  %{{.*}} = begin_access [modify] [unknown] %{{.*}} : $*NE
+// CHECK-NEXT: assign: value, hasEscaped: unknown, store, destroy_value %{{.*}} : ${ var NE }
+// CHECK-NEXT: assign: no, hasEscaped: true, escape, %{{.*}} = address_to_pointer %{{.*}} : $*NE to $Builtin.RawPointer
+// CHECK-NEXT: assign: value, hasEscaped: unknown, beginAccess, %{{.*}} = begin_access [modify] [unknown] %{{.*}} : $*NE
+// CHECK-NEXT: assign: no, hasEscaped: unknown, load, %{{.*}} = load [copy] %{{.*}} : $*NE
+// CHECK-NEXT: assign: value, hasEscaped: unknown, beginAccess, %{{.*}} = begin_access [modify] [unknown] %{{.*}} : $*NE
 // CHECK-NEXT: ### Modify:   %{{.*}} = begin_access [modify] [unknown] %4 : $*NE
 // CHECK-NEXT: ### Reachable access:
-// CHECK-NEXT: load  %{{.*}} = load [copy] %{{.*}} : $*NE
+// CHECK-NEXT: load, %{{.*}} = load [copy] %{{.*}} : $*NE
 // CHECK-NEXT: testNEInitNoEscape: local_variable_reachable_uses with: %1, @instruction
 
 // CHECK-LABEL: testNEInitNoEscape: local_variable_reaching_assignments with: %1, @instruction
 // CHECK: ### Instruction:   end_access %{{.*}} : $*NE
 // CHECK-NEXT: ### Reachable assignments:
-// CHECK-NEXT: beginAccess  %21 = begin_access [modify] [unknown] %4 : $*NE
+// CHECK-NEXT: beginAccess, %21 = begin_access [modify] [unknown] %4 : $*NE
 // CHECK-NEXT: testNEInitNoEscape: local_variable_reaching_assignments with: %1, @instruction
 sil [ossa] @testNEInitNoEscape : $@convention(thin) (@inout NE) -> @lifetime(borrow 0) @owned NE {
 bb0(%0 : $*NE):
@@ -86,10 +86,10 @@ bb3:
 // CHECK-LABEL: testNEInitEscape: local_variable_reachable_uses with: %1, @instruction
 // CHECK: ### Access map:
 // CHECK-NEXT: Access map for:   %{{.*}} = alloc_box ${ var NE }, var, name "self"
-// CHECK-NEXT: assign: true, store  destroy_value %{{.*}} : ${ var NE }
-// CHECK-NEXT: assign: false, load  %{{.*}} = load [copy] %{{.*}} : $*NE
-// CHECK-NEXT: assign: true, beginAccess  %{{.*}} = begin_access [modify] [unknown] %{{.*}} : $*NE
-// CHECK-NEXT: assign: false, escape  %6 = address_to_pointer %4 : $*NE to $Builtin.RawPointer
+// CHECK-NEXT: assign: value, hasEscaped: unknown, store, destroy_value %{{.*}} : ${ var NE }
+// CHECK-NEXT: assign: no, hasEscaped: unknown, load, %{{.*}} = load [copy] %{{.*}} : $*NE
+// CHECK-NEXT: assign: value, hasEscaped: unknown, beginAccess, %{{.*}} = begin_access [modify] [unknown] %{{.*}} : $*NE
+// CHECK-NEXT: assign: no, hasEscaped: true, escape, %6 = address_to_pointer %4 : $*NE to $Builtin.RawPointer
 // CHECK-NEXT: ### Modify:   %{{.*}} = begin_access [modify] [unknown] %4 : $*NE
 // CHECK-NEXT: !!! Reachable escape
 // CHECK-NEXT: testNEInitEscape: local_variable_reachable_uses with: %1, @instruction

@@ -77,10 +77,40 @@ func getTagsFromSwiftRepo(branch: Branch, dryRun: Bool = false) async throws -> 
   let decoder = JSONDecoder()
   decoder.keyDecodingStrategy = .convertFromSnakeCase
 
-  log("[INFO] Starting to download snapshot information from github.")
-  async let data = URLSession.shared.data(from: github_tag_list_url).0
-  let allTags = try! decoder.decode([Tag].self, from: await data)
-  log("[INFO] Finished downloading snapshot information from github.")
+  // Cache tags to a temporary file for 1 hour to avoid GitHub API rate limits.
+  let cachePath = URL(fileURLWithPath: "/tmp/swift_snapshot_tool_tags_cache.json")
+  let cacheTTL: TimeInterval = 3600 // 1 hour
+
+  let allTags: [Tag]
+  if let attrs = try? FileManager.default.attributesOfItem(atPath: cachePath.path),
+     let modDate = attrs[.modificationDate] as? Date,
+     Date().timeIntervalSince(modDate) < cacheTTL,
+     let cachedData = try? Data(contentsOf: cachePath) {
+    log("[INFO] Using cached snapshot information.")
+    allTags = try! decoder.decode([Tag].self, from: cachedData)
+  } else {
+    log("[INFO] Starting to download snapshot information from github.")
+    async let data = URLSession.shared.data(from: github_tag_list_url).0
+    let downloadedData = try await data
+
+    // GitHub may return a dictionary (e.g. rate limit error) instead of
+    // the expected array. Detect this and fall back to a stale cache if
+    // available.
+    if let firstByte = downloadedData.first, firstByte == UInt8(ascii: "{") {
+      log("[INFO] GitHub API returned an error response (likely rate-limited).")
+      if let cachedData = try? Data(contentsOf: cachePath) {
+        log("[INFO] Falling back to stale cache.")
+        allTags = try! decoder.decode([Tag].self, from: cachedData)
+      } else {
+        let body = String(data: downloadedData, encoding: .utf8) ?? "(unreadable)"
+        fatalError("GitHub API rate limited and no cache available: \(body)")
+      }
+    } else {
+      allTags = try! decoder.decode([Tag].self, from: downloadedData)
+      try? downloadedData.write(to: cachePath)
+      log("[INFO] Finished downloading snapshot information from github.")
+    }
+  }
 
   // Then filter the tags to just include the specific snapshot branch
   // prefix. Add the branch to an aggregate BranchTag.
@@ -90,7 +120,7 @@ func getTagsFromSwiftRepo(branch: Branch, dryRun: Bool = false) async throws -> 
     BranchTag(tag: $0, branch: branch)
   }
 
-  // Then sort so that the newest branch prefix 
+  // Then sort so that the newest branch prefix
   filteredTags.sort { $0.tag.ref < $1.tag.ref }
   filteredTags.reverse()
 

@@ -71,7 +71,7 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
 #define SVE_TYPE(Name, Id, SingletonId)                                        \
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
-#include "clang/Basic/AArch64SVEACLETypes.def"
+#include "clang/Basic/AArch64ACLETypes.def"
 #define PPC_VECTOR_TYPE(Name, Id, Size)                                        \
   case clang::BuiltinType::Id:                                                 \
     return context.Id##Ty;
@@ -84,10 +84,14 @@ getClangBuiltinTypeFromKind(const clang::ASTContext &context,
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
-#define AMDGPU_TYPE(Name, Id, SingletonId)                                     \
+#define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
   case clang::BuiltinType::Id:                                                 \
     return context.SingletonId;
 #include "clang/Basic/AMDGPUTypes.def"
+#define HLSL_INTANGIBLE_TYPE(Name, Id, SingletonId)                            \
+  case clang::BuiltinType::Id:                                                 \
+    return context.SingletonId;
+#include "clang/Basic/HLSLIntangibleTypes.def"
   }
 
   // Not a valid BuiltinType.
@@ -655,7 +659,7 @@ clang::QualType ClangTypeConverter::visitEnumType(EnumType *type) {
 
   auto ED = type->getDecl();
   if (!ED->isCCompatibleEnum())
-    // Can't translate something not marked with @objc or @cdecl.
+    // Can't translate something not marked with @objc or @c.
     return clang::QualType();
 
   // @objc enums lower to their raw types.
@@ -1008,6 +1012,30 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
           return convertPointerType</*templateArgument=*/true>(pointeeType,
                                                                kind.value());
         });
+
+      // Optional<FRT> maps to a nullable pointer so the instantiated
+      // function re-imports with an optional return type. Otherwise, it would
+      // be re-imported as non-optional FRT.
+      if (argType->isForeignReferenceType()) {
+        return withCache([&]() {
+          if (auto nominal = argType->getAs<NominalType>()) {
+            if (auto clangTypeDecl = dyn_cast_or_null<clang::TypeDecl>(
+                    nominal->getDecl()->getClangDecl())) {
+              auto ptrTy = ClangASTContext.getPointerType(
+                  ClangASTContext.getTypeDeclType(clangTypeDecl));
+              auto nullableAttr = new (ClangASTContext) clang::TypeNullableAttr(
+                  ClangASTContext,
+                  clang::AttributeCommonInfo(
+                      clang::SourceRange(),
+                      clang::AttributeCommonInfo::AT_TypeNullable,
+                      clang::AttributeCommonInfo::Form::Implicit()));
+              return ClangASTContext.getAttributedType(nullableAttr, ptrTy,
+                                                       ptrTy);
+            }
+          }
+          return clang::QualType();
+        });
+      }
 
       // Arbitrary optional types are not (yet) supported
       return clang::QualType();

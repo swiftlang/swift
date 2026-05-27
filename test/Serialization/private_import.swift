@@ -4,11 +4,11 @@
 // the -enable-private-imports flag correctly...
 
 // RUN: %target-swift-frontend -emit-module -DBASE -o %t %s
-// RUN: llvm-bcanalyzer -dump %t/private_import.swiftmodule > %t/private_import.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/private_import.swiftmodule > %t/private_import.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=NO-PRIVATE-IMPORT %s < %t/private_import.dump.txt
 
 // RUN: %target-build-swift -module-name private_import -emit-module -o %t -enable-private-imports %S/Inputs/private_import_other.swift %S/Inputs/private_import_other_2.swift
-// RUN: llvm-bcanalyzer -dump %t/private_import.swiftmodule > %t/private_import.dump.txt
+// RUN: %llvm-bcanalyzer -dump %t/private_import.swiftmodule > %t/private_import.dump.txt
 // RUN: %FileCheck -check-prefix=CHECK -check-prefix=PRIVATE-IMPORT %s < %t/private_import.dump.txt
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/private_import.dump.txt
 

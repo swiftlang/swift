@@ -31,7 +31,7 @@
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangler.h"
-#include "swift/RemoteInspection/GenericMetadataCacheEntry.h"
+#include "swift/Runtime/Borrow.h"
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/ExistentialContainer.h"
@@ -82,19 +82,13 @@ using namespace swift;
 using namespace metadataimpl;
 
 #if defined(__APPLE__)
-// Binaries using noncopyable types check the address of the symbol
-// `swift_runtimeSupportsNoncopyableTypes` before exposing any noncopyable
-// type metadata through in-process reflection, to prevent existing code
-// that expects all types to be copyable from crashing or causing bad behavior
-// by copying noncopyable types. The runtime does not yet support noncopyable
-// types, so we explicitly define this symbol to be zero for now. Binaries
-// weak-import this symbol so they will resolve it to a zero address on older
-// runtimes as well.
-//
-// Note: If this symbol's value ever gets updated, the corresponding condition
-// handled by IRGen MUST be updated in tandem.
+// Binaries compiled with older deployment targets check the address of the
+// symbol `swift_runtimeSupportsNoncopyableTypes` before exposing any
+// noncopyable type metadata through in-process reflection. If the address is
+// zero, then the metadata is not exposed to the runtime. Binaries weak-import
+// this symbol so they will resolve it to a zero address on older runtimes too.
 __asm__("  .globl _swift_runtimeSupportsNoncopyableTypes\n");
-__asm__(".set _swift_runtimeSupportsNoncopyableTypes, 0\n");
+__asm__(".set _swift_runtimeSupportsNoncopyableTypes, 1\n");
 #endif
 
 // GenericParamDescriptor is a single byte, so while it's difficult to
@@ -1695,10 +1689,12 @@ swift::swift_getFixedArrayTypeMetadata(MetadataRequest request,
                             MetadataState::Complete};
   }
   
-  // If the element type has no tail padding, then its metadata is good enough
+  // If the element type has no tail padding, and is already addressable-for-
+  // dependencies, then its metadata is good enough
   // to hold space for the vector.
   if (count == 1
-      && element->getValueWitnesses()->size == element->getValueWitnesses()->stride) {
+      && element->getValueWitnesses()->size == element->getValueWitnesses()->stride
+      && element->getValueWitnesses()->isAddressableForDependencies()) {
     return MetadataResponse{element, MetadataState::Complete};
   }
   
@@ -1889,12 +1885,14 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
   auto arraySize
     = Witnesses.size = Witnesses.stride = eltWitnesses->stride * count;
   // We take on most of the properties of the element type, except that an array
-  // of elements might end up larger than an inline buffer.
+  // of elements might end up larger than an inline buffer, and the array is
+  // always addressable for dependencies.
   Witnesses.flags = eltWitnesses->flags
     .withInlineStorage(
               ValueWitnessTable::isValueInline(eltWitnesses->isBitwiseTakable(),
                                                arraySize,
-                                               eltWitnesses->getAlignment()));
+                                               eltWitnesses->getAlignment()))
+    .withAddressableForDependencies(true);
   // We get extra inhabitants from the first element.
   Witnesses.extraInhabitantCount = eltWitnesses->extraInhabitantCount;
   
@@ -1918,6 +1916,284 @@ FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
                                MetadataState::NonTransitiveComplete) };
   }
   
+  // Otherwise, do a full completeness check.
+  return checkTransitiveCompleteness();
+}
+
+/***************************************************************************/
+/*** Borrows ***************************************************************/
+/***************************************************************************/
+
+namespace {
+
+class BorrowCacheEntry
+  : public MetadataCacheEntryBase<BorrowCacheEntry, int>
+{
+public:
+  // We have to give MetadataCacheEntryBase a non-empty list of trailing
+  // objects or else it gets annoyed.
+  template<typename...Etc>
+  static size_t numTrailingObjects(OverloadToken<int>, Etc &&...) { return 0; }
+
+  AllocationResult allocate() {
+    swift_unreachable("allocated during construction");
+  }
+
+  ValueWitnessTable Witnesses;
+  FullMetadata<BorrowTypeMetadata> Data;
+
+  struct Key {
+    const Metadata *Referent;
+
+
+    static llvm::hash_code hash_value(const Metadata *referent) {
+      return llvm::hash_combine(referent);
+    }
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      return hash_value(key.Referent);
+    }
+  };
+  
+  static const char *getName() { return "BorrowCache"; }
+  
+  ValueType getValue() {
+    return &Data;
+  }
+  void setValue(ValueType value) {
+    assert(value == &Data);
+  }
+  
+  BorrowCacheEntry(const Key &key, MetadataWaitQueue::Worker &worker,
+                   MetadataRequest request);
+
+  MetadataStateWithDependency tryInitialize(Metadata *metadata,
+                                    PrivateMetadataState state,
+                                    PrivateMetadataCompletionContext *context);
+
+  MetadataStateWithDependency checkTransitiveCompleteness() {
+    auto dependency = swift::checkTransitiveCompleteness(&Data);
+    return { dependency ? PrivateMetadataState::NonTransitiveComplete
+                        : PrivateMetadataState::Complete,
+             dependency };
+  }
+
+  intptr_t getKeyIntValueForDump() {
+    return 0; // No single meaningful value
+  }
+
+  friend llvm::hash_code hash_value(const BorrowCacheEntry &value) {
+    return Key::hash_value(value.Data.Referent);
+  }
+
+  bool matchesKey(const Key &key) {
+    return Data.Referent == key.Referent;
+  }
+
+};
+
+class BorrowCacheStorage :
+  public LockingConcurrentMapStorage<BorrowCacheEntry, BorrowCacheTag> {
+public:
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+  static BorrowCacheEntry *
+  resolveExistingEntry(const BorrowTypeMetadata *metadata) {
+    // The correctness of this arithmetic is verified by an assertion in
+    // the BorrowCacheEntry constructor.
+    auto bytes = reinterpret_cast<const char*>(asFullMetadata(metadata));
+    bytes -= offsetof(BorrowCacheEntry, Data);
+    auto entry = reinterpret_cast<const BorrowCacheEntry*>(bytes);
+    return const_cast<BorrowCacheEntry*>(entry);
+  }
+#pragma clang diagnostic pop
+};
+
+class BorrowCache :
+  public LockingConcurrentMap<BorrowCacheEntry, BorrowCacheStorage> {
+};
+
+static Lazy<BorrowCache> BorrowTypes;
+
+} // end anonymous namespace
+
+MetadataResponse
+swift::swift_getBorrowTypeMetadata(MetadataRequest request,
+                                   const Metadata *referent) {
+  auto &cache = BorrowTypes.get();
+  BorrowCacheEntry::Key key{referent};
+  return cache.getOrInsert(key, request).second;
+}
+
+BorrowCacheEntry::BorrowCacheEntry(const Key &key,
+                                   MetadataWaitQueue::Worker &worker,
+                                   MetadataRequest request)
+  : MetadataCacheEntryBase(worker, PrivateMetadataState::Abstract) {
+  Data.setKind(MetadataKind::Borrow);
+  Data.Referent = key.Referent;
+
+  assert(BorrowCacheStorage::resolveExistingEntry(&Data) == this);
+}
+
+static void borrow_destroy(OpaqueValue *dest, const Metadata *metatype) {
+  // Borrows are always trivially destroyable.
+}
+
+static OpaqueValue *
+borrow_initializeWithCopy(OpaqueValue *dest, OpaqueValue *src,
+                          const Metadata *metatype) {
+  // Borrows are always bitwise copyable and takeable.
+  return (OpaqueValue *) memcpy(dest, src, metatype->vw_size());
+}
+
+static OpaqueValue *
+borrow_assignWithCopy(OpaqueValue *dest, OpaqueValue *src,
+                          const Metadata *metatype) {
+  // Borrows are always bitwise copyable and takeable.
+  return (OpaqueValue *) memcpy(dest, src, metatype->vw_size());
+}
+
+static OpaqueValue *
+borrow_initializeWithTake(OpaqueValue *dest, OpaqueValue *src,
+                          const Metadata *metatype) {
+  // Borrows are always bitwise copyable and takeable.
+  return (OpaqueValue *) memcpy(dest, src, metatype->vw_size());
+}
+
+static OpaqueValue *
+borrow_assignWithTake(OpaqueValue *dest, OpaqueValue *src,
+                      const Metadata *metatype) {
+  // Borrows are always bitwise copyable and takeable.
+  return (OpaqueValue *) memcpy(dest, src, metatype->vw_size());
+}
+
+static OpaqueValue *borrow_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
+                                                            ValueBuffer *src,
+                                                            const Metadata *metatype) {
+  if (metatype->getValueWitnesses()->isValueInline()) {
+    return borrow_initializeWithCopy(
+      generic_projectBuffer<true>(dest, metatype),
+      generic_projectBuffer<true>(src, metatype),
+      metatype);
+  }
+  
+  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
+  *reinterpret_cast<HeapObject**>(dest) = srcReference;
+  swift_retain(srcReference);
+  return generic_projectBuffer<false>(dest, metatype);
+}
+
+static unsigned
+borrow_getEnumTagSinglePayload(const OpaqueValue *theEnum,
+                               unsigned numEmptyCases,
+                               const Metadata *metatype) {
+  auto borrowType = cast<BorrowTypeMetadata>(metatype);
+  auto referentType = borrowType->Referent;
+  auto rep = swift_getBorrowRepresentation(referentType);
+
+  switch (rep) {
+  case BorrowRepresentation::Inline:
+    return referentType->vw_getEnumTagSinglePayload(theEnum, numEmptyCases);
+
+  case BorrowRepresentation::Pointer:
+    // $sBp = Builtin.RawPointer
+    // WV = Value witness table
+    // N = Full metadata
+    return $sBpWV.getEnumTagSinglePayload(theEnum, numEmptyCases,
+                                          &asMetadata(&$sBpN)->base);
+  }
+}
+
+static void
+borrow_storeEnumTagSinglePayload(OpaqueValue *theEnum,
+                                 unsigned whichCase,
+                                 unsigned numEmptyCases,
+                                 const Metadata *metatype) {
+  auto borrowType = cast<BorrowTypeMetadata>(metatype);
+  auto referentType = borrowType->Referent;
+  auto rep = swift_getBorrowRepresentation(referentType);
+
+  switch (rep) {
+  case BorrowRepresentation::Inline:
+    referentType->vw_storeEnumTagSinglePayload(theEnum, whichCase, numEmptyCases);
+    break;
+
+  case BorrowRepresentation::Pointer:
+    // $sBp = Builtin.RawPointer
+    // WV = Value witness table
+    // N = Full metadata
+    $sBpWV.storeEnumTagSinglePayload(theEnum, whichCase, numEmptyCases,
+                                     &asMetadata(&$sBpN)->base);
+    break;
+  }
+}
+
+MetadataStateWithDependency
+BorrowCacheEntry::tryInitialize(Metadata *metadata,
+                                PrivateMetadataState state,
+                                PrivateMetadataCompletionContext *context) {
+  // If we've already reached non-transitive completeness, just check that.
+  if (state == PrivateMetadataState::NonTransitiveComplete) {
+    return checkTransitiveCompleteness();
+  }
+
+  // Otherwise, we must still be abstract, because vectors don't have an
+  // intermediate state between that and non-transitive completeness.
+  assert(state == PrivateMetadataState::Abstract);
+
+  // Require the referent type to be layout-complete.
+  const Metadata *referent = Data.Referent;
+  auto referentRequest = MetadataRequest(MetadataState::LayoutComplete,
+                                         /*nonblocking*/ true);
+  auto referentResponse = swift_checkMetadataState(referentRequest, referent);
+
+  // If the referent is not layout-complete, we have to suspend.
+  if (!isAtLeast(referentResponse.State, MetadataState::LayoutComplete)) {
+    return {PrivateMetadataState::Abstract,
+            MetadataDependency(referent, MetadataState::LayoutComplete)};
+  }
+
+  Data.ValueWitnesses = &Witnesses;
+
+  // The borrow's layout is dependent on whether the referent is bitwise
+  // borrowable or not. If it is, then we take on all of the witnesses as the
+  // referent type. Otherwise, the representation is a pointer so take the
+  // witnesses from 'Builtin.RawPointer'
+  Witnesses.size = swift_getBorrowSize(referent);
+  Witnesses.stride = swift_getBorrowStride(referent);
+  Witnesses.extraInhabitantCount = swift_getBorrowExtraInhabitants(referent);
+
+  auto borrowAlignment = swift_getBorrowAlignment(referent);
+  auto isInline = ValueWitnessTable::isValueInline(/* isBitwiseTakeable */ true,
+                                                   Witnesses.size,
+                                                   borrowAlignment);
+
+  Witnesses.flags = ValueWitnessFlags()
+                    .withAlignment(borrowAlignment)
+                    .withBitwiseTakable(true)
+                    .withBitwiseBorrowable(true)
+                    .withCopyable(true)
+                    .withInlineStorage(isInline);
+  
+  // Copy in the value witnesses.
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  Witnesses.LOWER_ID = borrow_##LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
+
+  // If the referent type is complete, so are we.
+  if (referentResponse.State == MetadataState::Complete) {
+    return {PrivateMetadataState::Complete, MetadataDependency()};
+  }
+
+  // If it isn't at least non-transitively complete, wait for it to be.
+  if (!isAtLeast(referentResponse.State, MetadataState::NonTransitiveComplete)) {
+    return {PrivateMetadataState::NonTransitiveComplete,
+            MetadataDependency(referent,
+                               MetadataState::NonTransitiveComplete) };
+  }
+
   // Otherwise, do a full completeness check.
   return checkTransitiveCompleteness();
 }
@@ -2326,8 +2602,10 @@ static void performBasicLayout(TypeLayout &layout,
   size_t size = layout.size;
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
+  bool isCopyable = layout.flags.isCopyable();
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
   bool isBitwiseBorrowable = layout.flags.isBitwiseBorrowable();
+  bool isAddressableForDependencies = layout.flags.isAddressableForDependencies();
   for (unsigned i = 0; i != numElements; ++i) {
     auto &elt = elements[i];
 
@@ -2342,8 +2620,11 @@ static void performBasicLayout(TypeLayout &layout,
     size += eltLayout->size;
     alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
     if (!eltLayout->flags.isPOD()) isPOD = false;
+    if (!eltLayout->flags.isCopyable()) isCopyable = false;
     if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
     if (!eltLayout->flags.isBitwiseBorrowable()) isBitwiseBorrowable = false;
+    if (eltLayout->flags.isAddressableForDependencies())
+      isAddressableForDependencies = true;
   }
   bool isInline =
       ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
@@ -2352,8 +2633,10 @@ static void performBasicLayout(TypeLayout &layout,
   layout.flags = ValueWitnessFlags()
                      .withAlignmentMask(alignMask)
                      .withPOD(isPOD)
+                     .withCopyable(isCopyable)
                      .withBitwiseTakable(isBitwiseTakable)
                      .withBitwiseBorrowable(isBitwiseBorrowable)
+                     .withAddressableForDependencies(isAddressableForDependencies)
                      .withInlineStorage(isInline);
   layout.extraInhabitantCount = 0;
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
@@ -2934,6 +3217,12 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
         assignUnlessEqual(fieldOffsets[i], offset);
       });
 
+  // If the struct is always noncopyable, we must honor that.
+  if (layout.flags.isCopyable() &&
+      structType->getDescription()->isUnconditionallySuppressing(
+          InvertibleProtocolKind::Copyable))
+    layout.flags = layout.flags.withCopyable(false);
+
   // We have extra inhabitants if any element does. Use the field with the most.
   unsigned extraInhabitantCount = 0;
   for (unsigned i = 0; i < numFields; ++i) {
@@ -2972,6 +3261,12 @@ static void swift_cvw_initStructMetadataWithLayoutStringImpl(
       [&](size_t i, const uint8_t *fieldType, uint32_t offset) {
         assignUnlessEqual(fieldOffsets[i], offset);
       });
+
+  // If the struct is always noncopyable, we must honor that.
+  if (layout.flags.isCopyable() &&
+        structType->getDescription()->isUnconditionallySuppressing(
+            InvertibleProtocolKind::Copyable))
+    layout.flags = layout.flags.withCopyable(false);
 
   // We have extra inhabitants if any element does. Use the field with the most.
   unsigned extraInhabitantCount = 0;
@@ -7903,6 +8198,8 @@ std::tuple<const void *, size_t> MetadataAllocator::InitialPoolLocation() {
 
 bool swift::_swift_debug_metadataAllocationIterationEnabled = false;
 const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
+const size_t swift::_swift_debug_allocationPoolSize = InitialPoolSize;
+const size_t swift::_swift_debug_metadataAllocatorPageSize = PoolRange::PageSize;
 std::atomic<const void *> swift::_swift_debug_metadataAllocationBacktraceList;
 
 static void recordBacktrace(void *allocation) {
@@ -7923,43 +8220,43 @@ static void recordBacktrace(void *allocation) {
   });
 }
 
-static inline bool scribbleEnabled() {
-#ifndef NDEBUG
-  // When DEBUG is defined, always scribble.
-  return true;
-#else
-  // When DEBUG is not defined, only scribble when the
-  // SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE environment variable is set.
-  return SWIFT_UNLIKELY(
-          runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE());
-#endif
-}
-
-static constexpr char scribbleByte = 0xAA;
+static std::optional<uint8_t> ScribbleByte;
 
 template <typename Pointee>
 static inline void memsetScribble(Pointee *bytes, size_t totalSize) {
-  if (scribbleEnabled())
-    memset(bytes, scribbleByte, totalSize);
+  if (SWIFT_LIKELY(!ScribbleByte))
+    return;
+
+  memset(bytes, ScribbleByte.value(), totalSize);
 }
 
 /// When scribbling is enabled, check the specified region for the scribble
 /// values to detect overflows. When scribbling is disabled, this is a no-op.
 static inline void checkScribble(char *bytes, size_t totalSize) {
-  if (scribbleEnabled())
-    for (size_t i = 0; i < totalSize; i++)
-      if (bytes[i] != scribbleByte) {
-        const size_t maxToPrint = 16;
-        size_t remaining = totalSize - i;
-        size_t toPrint = std::min(remaining, maxToPrint);
-        std::string hex = toHex(llvm::StringRef{&bytes[i], toPrint});
-        swift::fatalError(
-            0, "corrupt metadata allocation arena detected at %p: %s%s",
-            &bytes[i], hex.c_str(), toPrint < remaining ? "..." : "");
-      }
+  if (SWIFT_LIKELY(!ScribbleByte))
+    return;
+
+  // scribbleByte is unsigned, so do an unsigned comparison here.
+  auto ptr = reinterpret_cast<uint8_t *>(bytes);
+  for (size_t i = 0; i < totalSize; i++)
+    if (ptr[i] != ScribbleByte.value()) {
+      const size_t maxToPrint = 16;
+      size_t remaining = totalSize - i;
+      size_t toPrint = std::min(remaining, maxToPrint);
+      std::string hex = toHex(llvm::StringRef{&bytes[i], toPrint});
+      swift::fatalError(
+          0, "corrupt metadata allocation arena detected at %p: %s%s",
+          &bytes[i], hex.c_str(), toPrint < remaining ? "..." : "");
+    }
 }
 
 static void checkAllocatorDebugEnvironmentVariables(void *context) {
+  // Set our ScribbleByte from the environment variable. If it's not set but
+  // SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE is set, then set the byte to 0xaa.
+  ScribbleByte = runtime::environment::SWIFT_DEBUG_RUNTIME_ALLOC_SCRIBBLE_BYTE();
+  if (!ScribbleByte && runtime::environment::SWIFT_DEBUG_ENABLE_MALLOC_SCRIBBLE())
+    ScribbleByte = 0xaa;
+
   memsetScribble(InitialAllocationPool.Pool, InitialPoolSize);
 
   _swift_debug_metadataAllocationIterationEnabled =

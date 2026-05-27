@@ -53,14 +53,20 @@ public:
 
 private:
   /// The application level of the function reference.
-  ApplyLevel ApplyLevelKind;
+  uint8_t ApplyLevelKind : 2;
 
   /// Whether the function was referenced using a compound function name,
   /// e.g., "f(a:b:)".
-  bool IsCompoundName;
+  uint8_t IsCompoundName : 1;
 
-  FunctionRefInfo(ApplyLevel applyLevel, bool isCompoundName)
-      : ApplyLevelKind(applyLevel), IsCompoundName(isCompoundName) {}
+  /// Whether the function was referenced using a module selector,
+  /// e.g. "main::f".
+  uint8_t HasModuleSelector : 1;
+
+  FunctionRefInfo(ApplyLevel applyLevel, bool isCompoundName,
+                  bool hasModuleSelector)
+      : ApplyLevelKind(static_cast<uint8_t>(applyLevel)),
+        IsCompoundName(isCompoundName), HasModuleSelector(hasModuleSelector) {}
 
 public:
   /// An unapplied function reference for a given DeclNameLoc.
@@ -70,53 +76,67 @@ public:
   static FunctionRefInfo unapplied(DeclNameRef nameRef);
 
   /// An unapplied function reference using a base name, e.g `let x = fn`.
-  static FunctionRefInfo unappliedBaseName() {
-    return FunctionRefInfo(ApplyLevel::Unapplied, /*isCompoundName*/ false);
+  static FunctionRefInfo unappliedBaseName(bool hasModuleSelector = false) {
+    return FunctionRefInfo(ApplyLevel::Unapplied, /*isCompoundName*/ false,
+                           hasModuleSelector);
   }
 
   /// An unapplied function reference using a compound name,
   /// e.g `let x = fn(x:)`.
-  static FunctionRefInfo unappliedCompoundName() {
-    return FunctionRefInfo(ApplyLevel::Unapplied, /*isCompoundName*/ true);
+  static FunctionRefInfo unappliedCompoundName(bool hasModuleSelector = false) {
+    return FunctionRefInfo(ApplyLevel::Unapplied, /*isCompoundName*/ true,
+                           hasModuleSelector);
   }
 
   /// A single application using a base name, e.g `fn(x: 0)`.
-  static FunctionRefInfo singleBaseNameApply() {
-    return FunctionRefInfo(ApplyLevel::SingleApply, /*isCompoundName*/ false);
+  static FunctionRefInfo singleBaseNameApply(bool hasModuleSelector = false) {
+    return FunctionRefInfo(ApplyLevel::SingleApply, /*isCompoundName*/ false,
+                           hasModuleSelector);
   }
 
   /// A single application using a compound name, e.g `fn(x:)(0)`.
-  static FunctionRefInfo singleCompoundNameApply() {
-    return FunctionRefInfo(ApplyLevel::SingleApply, /*isCompoundName*/ true);
+  static FunctionRefInfo singleCompoundNameApply(bool hasModuleSelector=false) {
+    return FunctionRefInfo(ApplyLevel::SingleApply, /*isCompoundName*/ true,
+                           hasModuleSelector);
   }
 
   /// A double application using a base name, e.g `S.fn(S())(x: 0)`.
-  static FunctionRefInfo doubleBaseNameApply() {
-    return FunctionRefInfo(ApplyLevel::DoubleApply, /*isCompoundName*/ false);
+  static FunctionRefInfo doubleBaseNameApply(bool hasModuleSelector = false) {
+    return FunctionRefInfo(ApplyLevel::DoubleApply, /*isCompoundName*/ false,
+                           hasModuleSelector);
   }
 
   /// A double application using a compound name, e.g `S.fn(x:)(S())(0)`.
-  static FunctionRefInfo doubleCompoundNameApply() {
-    return FunctionRefInfo(ApplyLevel::DoubleApply, /*isCompoundName*/ true);
+  static FunctionRefInfo doubleCompoundNameApply(bool hasModuleSelector=false) {
+    return FunctionRefInfo(ApplyLevel::DoubleApply, /*isCompoundName*/ true,
+                           hasModuleSelector);
   }
 
   /// Reconstructs a FunctionRefInfo from its \c getOpaqueValue().
   static FunctionRefInfo fromOpaque(uint8_t bits) {
-    return FunctionRefInfo(static_cast<ApplyLevel>(bits >> 1), bits & 0x1);
+    return FunctionRefInfo(static_cast<ApplyLevel>(bits >> 2), bits & 0x2,
+                           bits & 0x1);
   }
 
   /// Retrieves an opaque value that can be stored in e.g a bitfield.
   uint8_t getOpaqueValue() const {
-    return (static_cast<uint8_t>(ApplyLevelKind) << 1) | !!IsCompoundName;
+    return (static_cast<uint8_t>(ApplyLevelKind) << 2) |
+            (!!IsCompoundName << 1) | !!HasModuleSelector;
   }
 
   /// Whether the function reference is part of a call, and if so how many
   /// applications were used.
-  ApplyLevel getApplyLevel() const { return ApplyLevelKind; }
+  ApplyLevel getApplyLevel() const {
+    return static_cast<ApplyLevel>(ApplyLevelKind);
+  }
 
   /// Whether the function was referenced using a compound name,
   /// e.g `fn(x:)(0)`.
   bool isCompoundName() const { return IsCompoundName; }
+
+  /// Whether the function was referenced using a module selector,
+  /// e.g. `main::f`.
+  bool hasModuleSelector() const { return HasModuleSelector; }
 
   /// Whether the function reference is not part of a call.
   bool isUnapplied() const {
@@ -146,7 +166,8 @@ public:
   friend bool operator==(const FunctionRefInfo &lhs,
                          const FunctionRefInfo &rhs) {
     return lhs.getApplyLevel() == rhs.getApplyLevel() &&
-           lhs.isCompoundName() == rhs.isCompoundName();
+           lhs.isCompoundName() == rhs.isCompoundName() &&
+           lhs.hasModuleSelector() == rhs.hasModuleSelector();
   }
   friend bool operator!=(const FunctionRefInfo &lhs,
                          const FunctionRefInfo &rhs) {

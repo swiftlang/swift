@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -update-borrowed-from -test-runner %s 2>&1 | %FileCheck %s
+// RUN: %target-sil-opt -test-runner %s 2>&1 | %FileCheck %s
 
 enum FakeOptional<T> {
   case some(T)
@@ -16,33 +16,33 @@ sil [ossa] @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
 // Test we don't get an assert while replacing branch target of checked_cast_br
 sil [ossa] @test_cfg1 : $@convention(thin) (@guaranteed SuperKlass) -> @out FakeOptional<Klass> {
 bb0(%0 : $*FakeOptional<Klass>, %1 : @guaranteed $SuperKlass):
-  %2 = init_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
-  checked_cast_br SuperKlass in %1 : $SuperKlass to Klass, bb1, bb2
+  %2 = init_enum_data_addr %0, #FakeOptional.some!enumelt
+  checked_cast_br SuperKlass in %1 to Klass, bb1, bb2
 
-bb1(%6 : @guaranteed $Klass):
-  %7 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %6 : $Klass
-  br bb3(%7 : $FakeOptional<Klass>)
+bb1(%4 : @guaranteed $Klass):
+  %5 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %4
+  br bb3(%5)
 
-bb2(%9 : @guaranteed $SuperKlass):
-  %10 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
-  br bb3(%10 : $FakeOptional<Klass>)
+bb2(%7 : @guaranteed $SuperKlass):
+  %8 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  br bb3(%8)
 
+bb3(%10 : @guaranteed $FakeOptional<Klass>):
+  %11 = borrowed %10 from (%1)
+  switch_enum %11, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
 
-bb3(%12 : @guaranteed $FakeOptional<Klass>):
-  switch_enum %12 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb4, case #FakeOptional.none!enumelt: bb6
-
-bb4(%14 : @guaranteed $Klass):
-  %15 = copy_value %14 : $Klass
-  store %15 to [init] %2 : $*Klass
-  inject_enum_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+bb4(%13 : @guaranteed $Klass):
+  %14 = copy_value %13
+  store %14 to [init] %2
+  inject_enum_addr %0, #FakeOptional.some!enumelt
   br bb5
 
 bb5:
-  %21 = tuple ()
-  return %21 : $()
+  %18 = tuple ()
+  return %18
 
 bb6:
-  inject_enum_addr %0 : $*FakeOptional<Klass>, #FakeOptional.none!enumelt
+  inject_enum_addr %0, #FakeOptional.none!enumelt
   br bb5
 }
 
@@ -59,23 +59,25 @@ enum E1<T> {
 sil [ossa] @test_simplify_term_with_identical_dest_blocks1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   specify_test "simplify_cfg_simplify_term_with_identical_dest_blocks @block[0]"
-  %1 = begin_borrow %0 : $Klass
-  br bb1(%1 : $Klass)
+  %2 = begin_borrow %0
+  br bb1(%2)
 
-bb1(%3 : @guaranteed $Klass):
-  br bb2(%3 : $Klass)
+bb1(%4 : @reborrow $Klass):
+  %5 = borrowed %4 from (%0)
+  br bb2(%5)
 
-bb2(%5 : @guaranteed $Klass):
-  end_borrow %5 : $Klass
-  destroy_value %0 : $Klass
-  %t = tuple ()
-  return %t : $()
+bb2(%7 : @reborrow $Klass):
+  %8 = borrowed %7 from (%0)
+  end_borrow %8
+  destroy_value %0
+  %11 = tuple ()
+  return %11
 }
 
 // CHECK-LABEL: sil [ossa] @test_simplify_term_with_identical_dest_blocks2 :
 // CHECK: bb0
-// CHECK: br bb2
-// CHECK: bb2
+// CHECK: br bb1
+// CHECK: bb1
 // CHECK-LABEL: } // end sil function 'test_simplify_term_with_identical_dest_blocks2'
 sil [ossa] @test_simplify_term_with_identical_dest_blocks2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):

@@ -1,4 +1,4 @@
-// Only run this test with older libc++, before the top-level std module got split into multiple top-level modules.
+// Don't run this test with libc++ versions 17-19, when the top-level std module was split into multiple top-level modules.
 // RUN: %empty-directory(%t)
 // RUN: %target-clangxx %S/Inputs/check-libcxx-version.cpp -o %t/check-libcxx-version
 // RUN: %target-codesign %t/check-libcxx-version
@@ -23,10 +23,10 @@
 
 // CHECK-IOSFWD: enum std {
 // CHECK-IOSFWD:   enum __1 {
-// CHECK-IOSFWD:     struct basic_string<CChar, std.__1.char_traits<CChar>, std.__1.allocator<CChar>> : CxxMutableRandomAccessCollection {
+// CHECK-IOSFWD:     struct basic_string<CChar, std.__1.char_traits<CChar>, std.__1.allocator<CChar>> : CxxMutableRandomAccessCollection, CxxBorrowingSequence {
 // CHECK-IOSFWD:       typealias value_type = CChar
 // CHECK-IOSFWD:     }
-// CHECK-IOSFWD:     struct basic_string<CWideChar, std.__1.char_traits<CWideChar>, std.__1.allocator<CWideChar>> : CxxMutableRandomAccessCollection {
+// CHECK-IOSFWD:     struct basic_string<CWideChar, std.__1.char_traits<CWideChar>, std.__1.allocator<CWideChar>> : CxxMutableRandomAccessCollection, CxxBorrowingSequence {
 // CHECK-IOSFWD:       typealias value_type = CWideChar
 // CHECK-IOSFWD:     }
 // CHECK-IOSFWD:     typealias string = std.__1.basic_string<CChar, std.__1.char_traits<CChar>, std.__1.allocator<CChar>>

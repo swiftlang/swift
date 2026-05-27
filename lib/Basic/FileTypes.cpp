@@ -60,6 +60,10 @@ ID file_types::lookupTypeForExtension(StringRef Ext) {
 // Compute the file type from filename. This handles the lookup for extensions
 // with multiple dots, like `.private.swiftinterface` correctly.
 ID file_types::lookupTypeFromFilename(StringRef Filename) {
+  // stdin is treated as a Swift input
+  if (Filename == "-")
+    return TY_Swift;
+
   StringRef MaybeExt = Filename;
   // Search from leftmost `.`, return the first match or till all dots are
   // consumed.
@@ -113,6 +117,7 @@ bool file_types::isTextual(ID Id) {
   case file_types::TY_SwiftOverlayFile:
   case file_types::TY_JSONDependencies:
   case file_types::TY_JSONArguments:
+  case file_types::TY_JSONPolyglotAST:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
   case file_types::TY_ConstValues:
@@ -196,6 +201,7 @@ bool file_types::isAfterLLVM(ID Id) {
   case file_types::TY_PackageSwiftModuleInterfaceFile:
   case file_types::TY_JSONDependencies:
   case file_types::TY_JSONArguments:
+  case file_types::TY_JSONPolyglotAST:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
@@ -258,6 +264,7 @@ bool file_types::isPartOfSwiftCompilation(ID Id) {
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_JSONDependencies:
   case file_types::TY_JSONArguments:
+  case file_types::TY_JSONPolyglotAST:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:
@@ -322,6 +329,7 @@ bool file_types::isProducedFromDiagnostics(ID Id) {
   case file_types::TY_BitstreamOptRecord:
   case file_types::TY_JSONDependencies:
   case file_types::TY_JSONArguments:
+  case file_types::TY_JSONPolyglotAST:
   case file_types::TY_IndexUnitOutputPath:
   case file_types::TY_SwiftABIDescriptor:
   case file_types::TY_SwiftAPIDescriptor:

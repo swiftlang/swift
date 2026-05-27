@@ -115,11 +115,6 @@ struct InteriorLivenessVisitor :
 
   InteriorLiveness &interiorLiveness;
 
-  // If domInfo is nullptr, then InteriorLiveness never assumes dominance. As a
-  // result it may report extra unenclosedPhis. In that case, any attempt to
-  // create a new phi would result in an immediately redundant phi.
-  const DominanceInfo *domInfo = nullptr;
-
   /// handleInnerScopeCallback may add uses to the inner scope, but it may not
   /// modify the use-list containing \p borrowingOperand. This callback can be
   /// used to ensure that the inner scope is complete before visiting its scope
@@ -134,13 +129,11 @@ struct InteriorLivenessVisitor :
   NodeSet visited;
 
   InteriorLivenessVisitor(
-    InteriorLiveness &interiorLiveness,
-    const DominanceInfo *domInfo,
-    InteriorLiveness::InnerScopeHandlerRef handleInnerScope)
-    : interiorLiveness(interiorLiveness),
-      domInfo(domInfo),
-      handleInnerScopeCallback(handleInnerScope),
-      visited(interiorLiveness.ownershipDef->getFunction()) {}
+      InteriorLiveness &interiorLiveness,
+      InteriorLiveness::InnerScopeHandlerRef handleInnerScope)
+      : interiorLiveness(interiorLiveness),
+        handleInnerScopeCallback(handleInnerScope),
+        visited(interiorLiveness.ownershipDef->getFunction()) {}
 
   bool handleUsePoint(Operand *use, UseLifetimeConstraint useConstraint) {
     interiorLiveness.liveness.updateForUse(
@@ -182,11 +175,11 @@ struct InteriorLivenessVisitor :
   }
 };
 
-void InteriorLiveness::compute(const DominanceInfo *domInfo, InnerScopeHandlerRef handleInnerScope) {
+void InteriorLiveness::compute(InnerScopeHandlerRef handleInnerScope) {
   liveness.initializeDef(ownershipDef);
   addressUseKind = AddressUseKind::NonEscaping;
-  InteriorLivenessVisitor(*this, domInfo, handleInnerScope)
-    .visitInteriorUses(ownershipDef);
+  InteriorLivenessVisitor(*this, handleInnerScope)
+      .visitInteriorUses(ownershipDef);
 }
 
 void InteriorLiveness::print(llvm::raw_ostream &OS) const {
@@ -328,12 +321,11 @@ static FunctionTest
                            SILValue value = arguments.takeValue();
                            function.print(llvm::outs());
                            llvm::outs() << "Interior liveness: " << value;
-                           auto *domTree = test.getDominanceInfo();
                            InteriorLiveness liveness(value);
                            auto handleInnerScope = [](SILValue innerBorrow) {
                              llvm::outs() << "Inner scope: " << innerBorrow;
                            };
-                           liveness.compute(domTree, handleInnerScope);
+                           liveness.compute(handleInnerScope);
                            liveness.print(llvm::outs());
 
                            PrunedLivenessBoundary boundary;

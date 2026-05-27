@@ -125,6 +125,19 @@ sil-function-attribute ::= '[weak_imported]'
 
 Cross-module references to this function should always use weak linking.
 
+### Export of of the function body
+
+```
+sil-function-attribute ::= '[export_interface]'
+sil-function-attribute ::= '[export_implementation]'
+```
+
+SIL representation of the `@export(interface)` and `@export(implementation)`
+attributes, respectively. The former implies that the function body is never
+serialized to be made available to clients of the module. The latter implies
+that the function body is always serialized, and clients must emit a (shared)
+copy of it if they need to use the function.
+
 ### Stack protection
 
 ```
@@ -228,3 +241,11 @@ Specifies that the optimizer and IRGen must not add runtime calls which
 are not in the function originally. This attribute is set for functions
 with performance constraints or functions which are called from
 functions with performance constraints.
+
+### Naming
+
+```
+sil-function-attribute :: '[' asmname "' identifier '" ']'
+```
+
+Specifies that the SIL function should be lowered to LLVM IR with the given function name.

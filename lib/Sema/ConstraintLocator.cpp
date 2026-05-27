@@ -95,7 +95,6 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::ArgumentAttribute:
   case ConstraintLocator::UnresolvedMemberChainResult:
   case ConstraintLocator::PlaceholderType:
-  case ConstraintLocator::ImplicitConversion:
   case ConstraintLocator::ImplicitDynamicMemberSubscript:
   case ConstraintLocator::SyntacticElement:
   case ConstraintLocator::PackType:
@@ -110,6 +109,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
   case ConstraintLocator::CoercionOperand:
   case ConstraintLocator::PackExpansionType:
   case ConstraintLocator::ThrownErrorType:
+  case ConstraintLocator::FunctionSendability:
   case ConstraintLocator::FallbackType:
   case ConstraintLocator::KeyPathSubscriptIndex:
   case ConstraintLocator::ExistentialMemberAccessConversion:
@@ -129,8 +129,7 @@ unsigned LocatorPathElt::getNewSummaryFlags() const {
 }
 
 void LocatorPathElt::dump(raw_ostream &out) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
+  PrintOptions PO = PrintOptions::forDebugging();
 
   auto dumpReqKind = [&out](RequirementKind kind) {
     out << " (";
@@ -462,12 +461,6 @@ void LocatorPathElt::dump(raw_ostream &out) const {
     out << "implicit dynamic member subscript";
     break;
 
-  case ConstraintLocator::ConstraintLocator::ImplicitConversion: {
-    auto convElt = elt.castTo<LocatorPathElt::ImplicitConversion>();
-    out << "implicit conversion " << getName(convElt.getConversionKind());
-    break;
-  }
-
   case ConstraintLocator::ConstraintLocator::PackType: {
     auto packElt = elt.castTo<LocatorPathElt::PackType>();
     out << "pack type '" << packElt.getType()->getString(PO) << "'";
@@ -525,6 +518,10 @@ void LocatorPathElt::dump(raw_ostream &out) const {
   }
   case ConstraintLocator::ThrownErrorType: {
     out << "thrown error type";
+    break;
+  }
+  case ConstraintLocator::FunctionSendability: {
+    out << "function sendability";
     break;
   }
   case ConstraintLocator::FallbackType: {
@@ -811,9 +808,6 @@ void ConstraintLocator::dump(ConstraintSystem *CS) const {
 
 
 void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
-  PrintOptions PO;
-  PO.PrintTypesForDebugging = true;
-  
   out << "locator@" << (void*) this << " [";
 
   constraints::dumpAnchor(anchor, sm, out);

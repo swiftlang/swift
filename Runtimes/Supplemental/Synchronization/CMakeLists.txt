@@ -13,6 +13,7 @@ list(APPEND CMAKE_MODULE_PATH
   "${CMAKE_SOURCE_DIR}/../cmake/modules"
   "${CMAKE_SOURCE_DIR}/../../cmake/modules")
 
+include(LanguageVersions)
 include(SwiftProjectVersion)
 project(SwiftSynchronization
   LANGUAGES Swift
@@ -21,6 +22,14 @@ project(SwiftSynchronization
 # FIXME(compnerd) this is a workaround for `GNUInstallDirs` which cannot be used
 # with a pure Swift project.
 enable_language(C)
+
+# FIXME(compnerd) this is a compatibility shim for CMake <3.31.
+if(CMAKE_VERSION VERSION_LESS 3.31)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Generic" AND CMAKE_SYSTEM_PROCESSOR MATCHES "wasm32")
+    set(CMAKE_SYSTEM_NAME WASI)
+    set(WASI 1)
+  endif()
+endif()
 
 if(NOT PROJECT_IS_TOP_LEVEL)
   message(SEND_ERROR "Swift Synchronization must build as a standalone project")
@@ -71,9 +80,8 @@ add_compile_options(
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-enable-builtin-module>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NoncopyableGenerics2>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypes>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SE427NoInferenceOnExtension>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Werror StrictMemorySafety>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature SuppressedAssociatedTypesWithDefaults>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature NonescapableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature LifetimeDependence>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature InoutLifetimeDependence>"
@@ -90,8 +98,11 @@ add_compile_options(
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
+  "$<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+find_package(SwiftSwiftDirectRuntime)
 
 # LNK4049: symbol 'symbol' defined in 'filename.obj' is imported
 # LNK4286: symbol 'symbol' defined in 'filename_1.obj' is imported by 'filename_2.obj'
@@ -102,7 +113,7 @@ add_compile_options(
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
-add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 gyb_expand(Atomics/AtomicIntegers.swift.gyb Atomics/AtomicIntegers.swift)
 gyb_expand(Atomics/AtomicStorage.swift.gyb Atomics/AtomicStorage.swift)
@@ -128,9 +139,18 @@ if(${PROJECT_NAME}_SINGLE_THREADED_MODE)
 else()
   target_sources(swiftSynchronization PRIVATE
     Mutex/Mutex.swift
+    # Apple Sources
     $<$<PLATFORM_ID:Darwin>:Mutex/DarwinImpl.swift>
+    # Android and Linux Sources
     $<$<PLATFORM_ID:Android,Linux>:Mutex/LinuxImpl.swift>
-    $<$<PLATFORM_ID:Android,WASI>:Mutex/SpinLoopHint.swift>
+    $<$<PLATFORM_ID:Android,Linux>:Mutex/SpinLoopHint.swift>
+    # FreeBSD Sources
+    $<$<PLATFORM_ID:FreeBSD>:Mutex/FreeBSDImpl.swift>
+    # OpenBSD Sources
+    $<$<PLATFORM_ID:OpenBSD>:Mutex/OpenBSDImpl.swift>
+    # Wasm Sources
+    $<$<PLATFORM_ID:WASI>:Mutex/WasmImpl.swift>
+    # Windows Sources
     $<$<PLATFORM_ID:Windows>:Mutex/WindowsImpl.swift>)
 endif()
 
@@ -141,7 +161,8 @@ target_link_libraries(swiftSynchronization PRIVATE
   swiftCore
   $<$<PLATFORM_ID:Android>:swiftAndroid>
   $<$<PLATFORM_ID:Darwin>:swiftDarwin>
-  $<$<PLATFORM_ID:Windows>:ClangModules>)
+  $<$<PLATFORM_ID:Windows>:ClangModules>
+  $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 if(WIN32 AND CMAKE_SYSTEM_PROCESSOR STREQUAL i686)
   # FIXME(#83765) `-whole-module-optimization` should not be needed. However,

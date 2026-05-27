@@ -190,15 +190,44 @@ public struct Builder {
     }
   }
 
-  public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
-    let literal = bridged.createIntegerLiteral(type.bridged, value)
+  /// Creates a integer literal instruction with the given integer value and
+  /// type. If an extension is necessary, the value is extended in accordance
+  /// with the signedness of `Value`.
+  public func createIntegerLiteral<Value: FixedWidthInteger>(
+    _ value: Value,
+    type: Type
+  ) -> IntegerLiteralInst {
+    precondition(
+      Value.bitWidth <= Int.bitWidth,
+      "Cannot fit \(Value.bitWidth)-bit integer into \(Int.bitWidth)-bit 'Swift.Int'"
+    )
+    // Extend the value based on its signedness to the bit width of `Int` and
+    // reinterpret it as an `Int`.
+    let extendedValue: Int =
+      if Value.isSigned {
+        Int(value)
+      } else {
+        // NB: This initializer is effectively a generic equivalent
+        // of `Int(bitPattern:)`
+        Int(truncatingIfNeeded: value)
+      }
+
+    let literal = bridged.createIntegerLiteral(type.bridged, extendedValue, Value.isSigned)
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
   }
-    
-  public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
+
+  /// Creates a `Builtin.Int1` integer literal instruction with a value
+  /// corresponding to the given Boolean.
+  public func createBoolLiteral(_ value: Bool) -> IntegerLiteralInst {
+    let boolType = notificationHandler.getBuiltinIntegerType(1).type
+    let integerValue: UInt = value ? 1 : 0
+    return createIntegerLiteral(integerValue, type: boolType)
+  }
+
+  public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false, isNested: Bool = false,
                              tailAllocatedTypes: TypeArray, tailAllocatedCounts: [Value]) -> AllocRefInst {
     return tailAllocatedCounts.withBridgedValues { countsRef in
-      let dr = bridged.createAllocRef(type.bridged, isObjC, canAllocOnStack, isBare, tailAllocatedTypes.bridged, countsRef)
+      let dr = bridged.createAllocRef(type.bridged, isObjC, canAllocOnStack, isBare, isNested, tailAllocatedTypes.bridged, countsRef)
       return notifyNew(dr.getAs(AllocRefInst.self))
     }
   }
@@ -219,10 +248,32 @@ public struct Builder {
     return notifyNew(allocStack.getAs(AllocStackInst.self))
   }
 
+  public func createAllocPack(_ packType: Type) -> AllocPackInst {
+    let allocPack = bridged.createAllocPack(packType.bridged)
+    return notifyNew(allocPack.getAs(AllocPackInst.self))
+  }
+
+  public func createAllocPackMetadata(nested: Bool = true) -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata(nested)
+    return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
+  }
+
+  public func createAllocPackMetadata(_ packType: Type,
+                                      nested: Bool = true) -> AllocPackMetadataInst {
+    let allocPackMetadata = bridged.createAllocPackMetadata(packType.bridged, nested)
+    return notifyNew(allocPackMetadata.getAs(AllocPackMetadataInst.self))
+  }
+
   @discardableResult
   public func createDeallocStack(_ operand: Value) -> DeallocStackInst {
     let dr = bridged.createDeallocStack(operand.bridged)
     return notifyNew(dr.getAs(DeallocStackInst.self))
+  }
+
+  @discardableResult
+  public func createDeallocPack(_ operand: Value) -> DeallocPackInst {
+    let dr = bridged.createDeallocPack(operand.bridged)
+    return notifyNew(dr.getAs(DeallocPackInst.self))
   }
 
   @discardableResult
@@ -258,6 +309,11 @@ public struct Builder {
   public func createUncheckedAddrCast(from value: Value, to type: Type) -> UncheckedAddrCastInst {
     let cast = bridged.createUncheckedAddrCast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UncheckedAddrCastInst.self))
+  }
+
+  public func createUncheckedValueCast(from value: Value, to type: Type) -> UncheckedValueCastInst {
+    let cast = bridged.createUncheckedValueCast(value.bridged, type.bridged)
+    return notifyNew(cast.getAs(UncheckedValueCastInst.self))
   }
 
   public func createUpcast(from value: Value, to type: Type) -> UpcastInst {
@@ -405,8 +461,8 @@ public struct Builder {
   }
 
   @discardableResult
-  public func createDestroyValue(operand: Value) -> DestroyValueInst {
-    return notifyNew(bridged.createDestroyValue(operand.bridged).getAs(DestroyValueInst.self))
+  public func createDestroyValue(operand: Value, isDeadEnd: Bool = false) -> DestroyValueInst {
+    return notifyNew(bridged.createDestroyValue(operand.bridged, isDeadEnd).getAs(DestroyValueInst.self))
   }
 
   @discardableResult
@@ -417,6 +473,11 @@ public struct Builder {
   @discardableResult
   public func createEndLifetime(of value: Value) -> EndLifetimeInst {
     return notifyNew(bridged.createEndLifetime(value.bridged).getAs(EndLifetimeInst.self))
+  }
+
+  @discardableResult
+  public func createExtendLifetime(of value: Value) -> ExtendLifetimeInst {
+    return notifyNew(bridged.createExtendLifetime(value.bridged).getAs(ExtendLifetimeInst.self))
   }
 
   @discardableResult
@@ -508,6 +569,19 @@ public struct Builder {
     return notifyNew(uteda.getAs(UncheckedTakeEnumDataAddrInst.self))
   }
 
+  public func createUncheckedBorrowEnumDataAddr(enumAddress: Value,
+                                              scratchAddress: Value,
+                                              caseIndex: Int) -> UncheckedBorrowEnumDataAddrInst {
+    let uteda = bridged.createUncheckedBorrowEnumDataAddr(enumAddress.bridged, scratchAddress.bridged, caseIndex)
+    return notifyNew(uteda.getAs(UncheckedBorrowEnumDataAddrInst.self))
+  }
+
+  public func createUncheckedInPlaceEnumDataAddr(enumAddress: Value,
+                                              caseIndex: Int) -> UncheckedInPlaceEnumDataAddrInst {
+    let uteda = bridged.createUncheckedInPlaceEnumDataAddr(enumAddress.bridged, caseIndex)
+    return notifyNew(uteda.getAs(UncheckedInPlaceEnumDataAddrInst.self))
+  }
+
   public func createInitEnumDataAddr(enumAddress: Value, caseIndex: Int, type: Type) -> InitEnumDataAddrInst {
     let uteda = bridged.createInitEnumDataAddr(enumAddress.bridged, caseIndex, type.bridged)
     return notifyNew(uteda.getAs(InitEnumDataAddrInst.self))
@@ -516,6 +590,17 @@ public struct Builder {
   public func createEnum(caseIndex: Int, payload: Value?, enumType: Type) -> EnumInst {
     let enumInst = bridged.createEnum(caseIndex, payload.bridged, enumType.bridged)
     return notifyNew(enumInst.getAs(EnumInst.self))
+  }
+
+  public static let optionalNoneCaseIndex = 0
+  public static let optionalSomeCaseIndex = 1
+
+  public func createOptionalNone(type: Type) -> EnumInst {
+    return createEnum(caseIndex: Self.optionalNoneCaseIndex, payload: nil, enumType: type)
+  }
+
+  public func createOptionalSome(operand: Value, type: Type) -> EnumInst {
+    return createEnum(caseIndex: Self.optionalSomeCaseIndex, payload: operand, enumType: type)
   }
 
   public func createThinToThickFunction(thinFunction: Value, resultType: Type) -> ThinToThickFunctionInst {
@@ -529,10 +614,13 @@ public struct Builder {
     capturedArguments: [Value], 
     calleeConvention: ArgumentConvention, 
     hasUnknownResultIsolation: Bool, 
-    isOnStack: Bool
+    isOnStack: Bool,
+    /// If true this `partial_apply [on_stack]` must follow proper stack allocation nesting rules.
+    isNested: Bool
   ) -> PartialApplyInst {
     return capturedArguments.withBridgedValues { capturedArgsRef in
-      let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged, substitutionMap.bridged, hasUnknownResultIsolation, isOnStack)
+      let pai = bridged.createPartialApply(function.bridged, capturedArgsRef, calleeConvention.bridged,
+                                           substitutionMap.bridged, hasUnknownResultIsolation, isOnStack, isNested)
       return notifyNew(pai.getAs(PartialApplyInst.self))
     }
   }
@@ -655,6 +743,11 @@ public struct Builder {
     return notifyNew(store.getAs(StoreInst.self))
   }
 
+  public func createStoreBorrow(source: Value, destination: Value) -> StoreBorrowInst {
+    let storeBorrow = bridged.createStoreBorrow(source.bridged, destination.bridged)
+    return notifyNew(storeBorrow.getAs(StoreBorrowInst.self))
+  }
+
   public func createInitExistentialRef(instance: Value,
                                        existentialType: Type,
                                        formalConcreteType: CanonicalType,
@@ -677,6 +770,22 @@ public struct Builder {
                                                    BridgedConformanceArray(pcArray: $0))
     }
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
+  }
+
+  public func createScalarPackIndex(componentIndex: Int, indexedPackType: CanonicalType) -> ScalarPackIndexInst {
+    let scalarPackIndex = bridged.createScalarPackIndex(SwiftInt(componentIndex), indexedPackType.bridged)
+    return notifyNew(scalarPackIndex.getAs(ScalarPackIndexInst.self))
+  }
+
+  public func createPackElementGet(packIndex: Value, pack: Value, elementType: Type) -> PackElementGetInst {
+    let packElementGet = bridged.createPackElementGet(packIndex.bridged, pack.bridged, elementType.bridged)
+    return notifyNew(packElementGet.getAs(PackElementGetInst.self))
+  }
+
+  @discardableResult
+  public func createPackElementSet(elementValue: Value, packIndex: Value, pack: Value) -> PackElementSetInst {
+    let packElementSet = bridged.createPackElementSet(elementValue.bridged, packIndex.bridged, pack.bridged)
+    return notifyNew(packElementSet.getAs(PackElementSetInst.self))
   }
 
   public func createMetatype(
@@ -755,16 +864,46 @@ public struct Builder {
     let convertFunction = bridged.createConvertEscapeToNoEscape(originalFunction.bridged, resultType.bridged, isLifetimeGuaranteed)
     return notifyNew(convertFunction.getAs(ConvertEscapeToNoEscapeInst.self))
   }
-}
 
+  public func createMakeBorrow(referent: Value) -> MakeBorrowInst {
+    let makeBorrow = bridged.createMakeBorrow(referent.bridged)
+    return notifyNew(makeBorrow.getAs(MakeBorrowInst.self))
+  }
+
+  public func createMakeAddrBorrow(referent: Value) -> MakeAddrBorrowInst {
+    let makeAddrBorrow = bridged.createMakeAddrBorrow(referent.bridged)
+    return notifyNew(makeAddrBorrow.getAs(MakeAddrBorrowInst.self))
+  }
+
+  @discardableResult
+  public func createFixLifetime(operand: Value) -> FixLifetimeInst {
+    let fixLifetime = bridged.createFixLifetime(operand.bridged)
+    return notifyNew(fixLifetime.getAs(FixLifetimeInst.self))
+  }
+}
 
 //===----------------------------------------------------------------------===//
 //                                  Utilities
 //===----------------------------------------------------------------------===//
 
 extension Builder {
+  public func emitLoadBorrow(fromAddress: Value) -> LoadInstruction {
+    if !fromAddress.parentFunction.hasOwnership {
+      return createLoad(fromAddress: fromAddress, ownership: .unqualified)
+    }
+
+    if fromAddress.type.isTrivial(in: fromAddress.parentFunction) {
+      return createLoad(fromAddress: fromAddress, ownership: .trivial)
+    }
+
+    return createLoadBorrow(fromAddress: fromAddress)
+  }
+
   public func emitDestroy(of value: Value) {
     if value.type.isTrivial(in: value.parentFunction) {
+      return
+    }
+    if value.type.isAddress {
       return
     }
     if value.parentFunction.hasOwnership {

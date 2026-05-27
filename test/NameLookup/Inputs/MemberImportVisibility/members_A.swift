@@ -8,11 +8,31 @@ public struct Y<T> { }
 
 extension Y: P where T: P { }
 
-public struct Z: P { }
+public struct Z: P {
+  public init() {}
+}
 
 infix operator <<<
 infix operator >>>
 infix operator <>
+
+@available(*, deprecated)
+public func shadowedByMemberOnXinA() { }
+
+@available(*, deprecated)
+public func shadowedByMemberOnXinB() { }
+
+@available(*, deprecated)
+public func shadowedByMemberOnXinC() { }
+
+@available(*, deprecated)
+public func shadowedByStaticMemberOnXinA() { }
+
+@available(*, deprecated)
+public func shadowedByStaticMemberOnXinB() { }
+
+@available(*, deprecated)
+public func shadowedByStaticMemberOnXinC() { }
 
 extension X {
   public func XinA() { }
@@ -25,12 +45,20 @@ extension X {
   public static func <<<(a: Self, b: Self) -> Self { a }
 
   public struct NestedInA {}
+  public protocol ProtoNestedInA {}
+
+  public func shadowedByMemberOnXinA() { }
+  public static func shadowedByStaticMemberOnXinA() { }
 }
 
 extension Y {
   public func YinA() { }
 
   public static func <<<(a: Self, b: Self) -> Self { a }
+}
+
+extension P where Self == Z {
+  public static var zInA: Z { Z() }
 }
 
 public enum EnumInA {
@@ -40,14 +68,57 @@ public enum EnumInA {
 open class BaseClassInA {
   open func methodInA() {}
   open func overriddenMethod() {}
+  open func overriddenInBMethod() {}
 }
 
-public protocol ProtocolInA {
-  func defaultedRequirementInA()
-  func defaultedRequirementInB()
-  func defaultedRequirementInC()
+public protocol EmptyProtocolInA { }
+
+public protocol ProtocolInA1 {
+  func defaultedRequirementInA() // has an inherited default
 }
 
-extension ProtocolInA {
+extension ProtocolInA1 {
   public func defaultedRequirementInA() { }
+}
+
+public protocol ProtocolInA2 {
+  func defaultedRequirementInA() // has an inherited default
+  func defaultedRequirementInB() // has a retroactive default (in B)
+  func defaultedRequirementInC() // has a retroactive default (in C)
+}
+
+extension ProtocolInA2 {
+  public func defaultedRequirementInA() { }
+}
+
+public protocol ProtocolInA3 {
+  func defaultedRequirementInBAndC() // has retroactive defaults (in both B and C)
+}
+
+public protocol BaseProtocolInA4 {
+  func defaultedRequirementInRefinementInA() // has a retroactive default (in an extension on a refined protocol)
+}
+
+public protocol ProtocolInA4: BaseProtocolInA4 { }
+
+extension ProtocolInA4 {
+  public func defaultedRequirementInRefinementInA() { }
+}
+
+public protocol ProtocolWithAssociatedTypesInA {
+  associatedtype WitnessedInA
+  associatedtype WitnessedInB
+  associatedtype WitnessedInC
+}
+
+public struct StructInA1 {
+  public struct WitnessedInA { }
+}
+
+public struct StructInA2: Equatable { }
+
+public struct EquatableInA: Equatable {
+  public static func ==(_: Self, _: Self) -> Bool {
+    false
+  }
 }

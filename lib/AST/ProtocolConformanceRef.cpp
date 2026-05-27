@@ -18,6 +18,8 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "AbstractConformance.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -114,7 +116,7 @@ ProtocolConformanceRef::subst(InFlightSubstitution &IFS) const {
   return IFS.lookupConformance(origType, proto, /*level=*/0);
 }
 
-ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() const {
+ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfEnvironment() const {
   if (isConcrete()) {
     return getConcrete()->subst(
         MapTypeOutOfContext(),
@@ -129,7 +131,7 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
         SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isAbstract()) {
     auto *abstract = getAbstract();
-    return forAbstract(abstract->getType()->mapTypeOutOfContext(),
+    return forAbstract(abstract->getType()->mapTypeOutOfEnvironment(),
                        abstract->getProtocol());
   }
 
@@ -202,8 +204,12 @@ Type ProtocolConformanceRef::getTypeWitness(AssociatedTypeDecl *assocType,
   auto conformingType = abstract->getType();
   ASSERT(abstract->getProtocol() == assocType->getProtocol());
 
-  if (auto *archetypeType = conformingType->getAs<ArchetypeType>())
-    return archetypeType->getNestedType(assocType);
+  if (auto *archetypeType = conformingType->getAs<ArchetypeType>()) {
+    auto witnessType = archetypeType->getNestedType(assocType);
+    if (!witnessType)
+      return ErrorType::get(assocType->getASTContext());
+    return witnessType;
+  }
 
   return DependentMemberType::get(conformingType, assocType);
 }
@@ -252,7 +258,7 @@ ProtocolConformanceRef::getAssociatedConformance(Type assocType,
     auto subjectType = computeSubjectType(archetypeType->getInterfaceType());
 
     return lookupConformance(
-        genericEnv->mapTypeIntoContext(subjectType),
+        genericEnv->mapTypeIntoEnvironment(subjectType),
         protocol);
   }
 
@@ -396,6 +402,33 @@ bool ProtocolConformanceRef::forEachIsolatedConformance(
   }
 
   return false;
+}
+
+std::optional<AvailabilityConstraint>
+ProtocolConformanceRef::getAvailabilityConstraint(DeclContext *dc,
+                                                  SourceLoc loc) const {
+  // FIXME: Missing logic for pack conformances which is not currently needed.
+  // See diagnoseConformanceAvailability for implementation guidance.
+  if (!isConcrete())
+    return std::nullopt;
+
+  auto availability = AvailabilityContext::forLocation(loc, dc);
+  // Conformance declarations can be more available than the protocols they
+  // involve due to source compatibility exceptions. Thus, it is important to 
+  // verify that neither pose a constraint in the given context when checking 
+  // for availability of a conformance.
+  if (auto constraint =
+          getAvailabilityConstraintsForDecl(getProtocol(), availability)
+              .getPrimaryConstraint())
+    return constraint;
+
+  auto *conformanceDC = getConcrete()->getRootConformance()->getDeclContext();
+  if (auto constraint = getAvailabilityConstraintsForDecl(
+                            conformanceDC->getAsDecl(), availability)
+                            .getPrimaryConstraint())
+    return constraint;
+
+  return std::nullopt;
 }
 
 void swift::simple_display(llvm::raw_ostream &out, ProtocolConformanceRef conformanceRef) {

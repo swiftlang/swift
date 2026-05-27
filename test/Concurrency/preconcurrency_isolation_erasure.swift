@@ -1,0 +1,29 @@
+// RUN: %target-swift-emit-silgen %s -verify -swift-version 5 | %FileCheck %s
+
+// REQUIRES: concurrency
+
+// Check that isolation is erased from `@preconcurrency` declarations.
+
+@preconcurrency public let nestedTypes: () -> @isolated(any) () -> Void = { { } }
+// CHECK-LABEL: sil_global [let] @$s32preconcurrency_isolation_erasure11nestedTypesyycycvp
+
+@preconcurrency func testGlobalActorErasure(_: @MainActor () -> Void) {}
+// CHECK-LABEL: sil hidden [ossa] @$s32preconcurrency_isolation_erasure22testGlobalActorErasureyyyyXEF
+
+@preconcurrency func testIsolatedAnyErasure(_: @isolated(any) () -> Void) {}
+// CHECK-LABEL: sil hidden [ossa] @$s32preconcurrency_isolation_erasure22testIsolatedAnyErasureyyyyXEF
+
+struct Data<T> {
+}
+
+struct S {
+  @preconcurrency
+  init(_: [Data<nonisolated(nonsending) @Sendable () async -> Void>]? = nil) {}
+  // CHECK-LABEL: sil hidden [ossa] @$s32preconcurrency_isolation_erasure1SVyACSayAA4DataVyyyYacGGSgcfC
+}
+
+// CHECK: sil [ossa] @$s32preconcurrency_isolation_erasure17testIsolatedParam0B0yScA_pSgYi_tF
+@preconcurrency public func testIsolatedParam(isolation: isolated (any Actor)? = nil) {}
+
+// CHECK: sil [ossa] @$s32preconcurrency_isolation_erasure019testIsolatedParamInF02fnyyScA_pSgYiXE_tF
+@preconcurrency public func testIsolatedParamInParam(fn: (isolated (any Actor)?) -> Void) {}

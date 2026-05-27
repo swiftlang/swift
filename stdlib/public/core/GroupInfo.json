@@ -80,6 +80,7 @@
     "RangeSetRanges.swift",
     "CollectionOfOne.swift",
     "BridgingBuffer.swift",
+    "BorrowingSequence.swift",
     "Sequence.swift",
     "SequenceAlgorithms.swift",
     "RangeReplaceableCollection.swift",
@@ -178,7 +179,9 @@
       "UInt128.swift"],
     "Floating": [
       "FloatingPoint.swift",
+      "FloatingPointFromString.swift",
       "FloatingPointParsing.swift",
+      "FloatingPointToString.swift",
       "FloatingPointTypes.swift",
       "FloatingPointRandom.swift"],
     "Vector": [
@@ -265,16 +268,24 @@
     "Equatable.swift",
     "Comparable.swift",
     "Codable.swift",
+    "ByteOrder.swift",
+    "FullyInhabited.swift",
     "LegacyABI.swift",
     "MigrationSupport.swift",
     "PtrAuth.swift",
     "Duration.swift",
     "DurationProtocol.swift",
     "Instant.swift",
+    "EmbeddedCasting.swift",
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
     "EmbeddedPrint.swift",
-    "InlineArray.swift"
+    "InlineArray.swift",
+    "_InlineArray.swift",
+    "Exclusivity.swift",
+    "Ref.swift",
+    "MutableRef.swift",
+    "UniqueBox.swift"
   ],
   "Result": [
     "Result.swift"

@@ -158,6 +158,8 @@ public:
 
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args);
   
+  OpaqueTypeDecl *resolveOpaqueTypeDecl(NodePointer opaqueDescriptor);
+
   Type resolveOpaqueType(NodePointer opaqueDescriptor,
                          ArrayRef<ArrayRef<Type>> args,
                          unsigned ordinal);
@@ -273,6 +275,8 @@ public:
   Type createNegativeIntegerType(intptr_t value);
 
   Type createBuiltinFixedArrayType(Type size, Type element);
+
+  Type createBuiltinBorrowType(Type referent);
 
   BuiltGenericSignature
   createGenericSignature(ArrayRef<BuiltType> params,

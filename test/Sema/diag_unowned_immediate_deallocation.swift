@@ -452,10 +452,10 @@ func testGenericWeakClassDiag() {
 // The diagnostic doesn't currently support tuple shuffles.
 func testDontDiagnoseThroughTupleShuffles() {
   unowned let (c1, (c2, c3)): (c: C, (b: C, a: C)) = ((a: D(), b: C()), c: D())
-  // expected-warning@-1 {{expression shuffles the elements of this tuple; this behavior is deprecated}}
-  // expected-warning@-2 {{expression shuffles the elements of this tuple; this behavior is deprecated}}
+  // expected-warning@-1 {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
+  // expected-warning@-2 {{implicit reordering of tuple elements from '_:c:' to 'c:_:' is deprecated; this will be an error in a future Swift language mode}}
   unowned let c4 = ((a: C(), b: C()) as (b: C, a: C)).0
-  // expected-warning@-1 {{expression shuffles the elements of this tuple; this behavior is deprecated}}
+  // expected-warning@-1 {{implicit reordering of tuple elements from 'a:b:' to 'b:a:' is deprecated; this will be an error in a future Swift language mode}}
 
   _ = c1; _ = c2; _ = c3; _ = c4
 }

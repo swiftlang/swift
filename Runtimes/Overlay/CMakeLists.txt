@@ -23,6 +23,14 @@ project(SwiftOverlay
   LANGUAGES C CXX Swift
   VERSION ${SWIFT_RUNTIME_VERSION})
 
+# FIXME(compnerd) add a compatibility shim for WASI on older CMake releases.
+if(CMAKE_VERSION VERSION_LESS 3.31)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Generic" AND CMAKE_SYSTEM_PROCESSOR MATCHES "wasm32")
+    set(CMAKE_SYSTEM_NAME WASI)
+    set(WASI 1)
+  endif()
+endif()
+
 set(CMAKE_Swift_LANGUAGE_VERSION 5)
 
 find_package(SwiftCore)
@@ -63,18 +71,29 @@ option(SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT "Add symbols for runtime backd
 add_compile_definitions(
   $<$<BOOL:${SwiftOverlay_ENABLE_BACKDEPLOYMENT_SUPPORT}>:SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT>)
 
+if(WASI)
+  add_compile_definitions(
+    $<$<COMPILE_LANGUAGE:C,CXX>:_WASI_EMULATED_MMAN>
+    $<$<COMPILE_LANGUAGE:C,CXX>:_WASI_EMULATED_PROCESS_CLOCKS>
+    $<$<COMPILE_LANGUAGE:C,CXX>:_WASI_EMULATED_SIGNAL>)
+  add_compile_options(
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -D_WASI_EMULATED_MMAN>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -D_WASI_EMULATED_PROCESS_CLOCKS>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xcc -D_WASI_EMULATED_SIGNAL>")
+endif()
+
 add_compile_options(
-  $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdlibimport>
   $<$<COMPILE_LANGUAGE:Swift>:-strict-memory-safety>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-lexical-lifetimes=false>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-concurrency-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-implicit-string-processing-module-import>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enforce-exclusivity=unchecked>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-ossa-modules>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -target-min-inlining-version -Xfrontend min>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_LIBRARY_EVOLUTION}>,$<COMPILE_LANGUAGE:Swift>>:-enable-library-evolution>"
   "$<$<AND:$<BOOL:${${PROJECT_NAME}_ENABLE_PRESPECIALIZATION}>,$<COMPILE_LANGUAGE:Swift>>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+find_package(SwiftSwiftDirectRuntime)
 
 include(ExperimentalFeatures)
 
@@ -87,16 +106,26 @@ include(ExperimentalFeatures)
 # a compromise, treat all linker warnings as errors.
 add_link_options($<$<PLATFORM_ID:Windows>:LINKER:/WX>)
 # Ensure all symbols are fully resolved on Linux
-add_link_options($<$<PLATFORM_ID:Linux>:LINKER:-z,defs>)
+add_link_options($<$<PLATFORM_ID:Android,Linux>:LINKER:-z,defs>)
 
 include(ExperimentalFeatures)
+
+if(NOT LINUX)
+  # explicit module builds crash the Swift compiler when building the Glibc
+  # platform overlay https://github.com/swiftlang/swift/issues/84740
+  add_compile_options($<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>)
+endif()
 
 add_subdirectory(clang)
 if(ANDROID)
   add_subdirectory(Android)
-endif()
-if(WIN32)
+elseif(WIN32)
   add_subdirectory(Windows)
+elseif(WASI)
+  add_subdirectory(WASI)
+elseif(LINUX)
+  defaulted_set(SwiftOverlay_LINUX_LIBC STRING "Select Linux libc flavor. Options are: glibc")
+  add_subdirectory("Linux/${SwiftOverlay_LINUX_LIBC}")
 endif()
 
 if(SwiftOverlay_ENABLE_CXX_INTEROP)

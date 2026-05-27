@@ -45,3 +45,12 @@ let resultRValue = lhsRValue + rhsRValue // expected-error {{binary operator '+'
 let lhsLRValue = LValueAndRValueArithmetic(value: 123)
 let rhsLRValue = LValueAndRValueArithmetic(value: 146)
 let resultLRValue = lhsLRValue + rhsLRValue
+
+// FIXME: out-of-line operator*() is not imported as .pointee
+var mutAllStar = AllStar()
+let _ = mutAllStar.pointee  // expected-error {{no member 'pointee'}}
+let allStar = AllStar()     // FIXME-note {{change 'let' to 'var' to make it mutable}}
+let _ = allStar.pointee     // FIXME-error {{cannot use mutating getter on immutable value}}
+                            // expected-error@-1 {{no member 'pointee'}}
+var _: AllStar  = mutAllStar * allStar
+var _: AllStar = allStar * mutAllStar

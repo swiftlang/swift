@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/CursorInfo.h"
-#include "ExprContextAnalysis.h"
+#include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
@@ -324,7 +324,7 @@ private:
       return;
     }
     Type SolutionInterfaceTy =
-        S.simplifyType(S.getType(DeclToResolve))->mapTypeOutOfContext();
+        S.simplifyType(S.getType(DeclToResolve))->mapTypeOutOfEnvironment();
 
     addResult({/*BaseType=*/nullptr, /*IsDynamicRef=*/false, DeclToResolve,
                SolutionInterfaceTy});
@@ -374,14 +374,14 @@ public:
 
 // MARK: - CursorInfoDoneParsingCallback
 
-class CursorInfoDoneParsingCallback : public DoneParsingCallback {
+class CursorInfoDoneParsingCallback : public ReadyForTypeCheckingCallback {
   CursorInfoConsumer &Consumer;
   SourceLoc RequestedLoc;
 
 public:
   CursorInfoDoneParsingCallback(Parser &P, CursorInfoConsumer &Consumer,
                                 SourceLoc RequestedLoc)
-      : DoneParsingCallback(), Consumer(Consumer), RequestedLoc(RequestedLoc) {}
+      : Consumer(Consumer), RequestedLoc(RequestedLoc) {}
 
 private:
   /// Shared core of `getExprResult` and `getDeclResult`.
@@ -489,7 +489,7 @@ public:
                      SrcFile, Finder);
   }
 
-  void doneParsing(SourceFile *SrcFile) override {
+  void readyForTypeChecking(SourceFile *SrcFile) override {
     if (!SrcFile) {
       return;
     }

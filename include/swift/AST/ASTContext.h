@@ -23,18 +23,12 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
-#include "swift/AST/SILOptions.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BlockList.h"
-#include "swift/Basic/CASOptions.h"
-#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -77,6 +71,7 @@ namespace swift {
   class AvailabilityRange;
   class BoundGenericType;
   class BuiltinTupleDecl;
+  class CASOptions;
   class ClangModuleLoader;
   class ClangNode;
   class ClangTypeConverter;
@@ -88,6 +83,8 @@ namespace swift {
   class DerivativeAttr;
   class DifferentiableAttr;
   class ExtensionDecl;
+  struct ExplicitSwiftModuleMap;
+  struct ExplicitClangModuleMap;
   struct ExternalSourceLocs;
   class ForeignRepresentationInfo;
   class FuncDecl;
@@ -98,6 +95,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
+  class LangOptions;
   struct MacroDiscriminatorContext;
   class ModuleInterfaceChecker;
   class PatternBindingDecl;
@@ -105,13 +103,14 @@ namespace swift {
   class PluginLoader;
   class SourceFile;
   class SourceLoc;
+  class SerializationOptions;
+  class SILOptions;
   struct TemplateInstantiationError;
   class Type;
   class TypeVariableType;
   class TupleType;
   class FunctionType;
   class ArchetypeType;
-  class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
   class PackageUnit;
@@ -140,6 +139,7 @@ namespace swift {
   class DiagnosticEngine;
   struct RawComment;
   class DocComment;
+  class SearchPathOptions;
   class SILBoxType;
   class SILTransform;
   class TypeAliasDecl;
@@ -161,6 +161,10 @@ namespace rewriting {
 
 namespace ide {
   class TypeCheckCompletionCallback;
+}
+
+namespace symbolgraphgen {
+  struct SymbolGraphOptions;
 }
 
 /// Lists the set of "known" Foundation entities that are used in the
@@ -720,11 +724,17 @@ public:
   /// Get Sequence.makeIterator().
   FuncDecl *getSequenceMakeIterator() const;
 
+  /// Get BorrowingSequence.makeBorrowingIterator().
+  FuncDecl *getBorrowingSequenceMakeBorrowingIterator() const;
+
   /// Get AsyncSequence.makeAsyncIterator().
   FuncDecl *getAsyncSequenceMakeAsyncIterator() const;
 
   /// Get IteratorProtocol.next().
   FuncDecl *getIteratorNext() const;
+
+  /// Get BorrowingIteratorProtocol.nextSpan(maximumCount:).
+  FuncDecl *getBorrowingIteratorNextSpan() const;
 
   /// Get AsyncIteratorProtocol.next().
   FuncDecl *getAsyncIteratorNext() const;
@@ -752,6 +762,12 @@ public:
   /// If this is true, the method getAllocateUninitializedArray
   /// promises to return non-null.
   bool hasArrayLiteralIntrinsics() const;
+
+  /// Retrieve the declaration of Swift.CGFloat.init(_: Double).
+  ConcreteDeclRef getCGFloatInitDecl() const;
+
+  /// Retrieve the declaration of Swift.Double.init(_: CGFloat).
+  ConcreteDeclRef getDoubleInitDecl() const;
 
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
   ConcreteDeclRef getBoolBuiltinInitDecl() const;
@@ -800,6 +816,9 @@ public:
   // Retrieve the declaration of
   // Swift._stdlib_isOSVersionAtLeastOrVariantVersionAtLeast.
   FuncDecl *getIsOSVersionAtLeastOrVariantVersionAtLeast() const;
+
+  /// Retrieve the declaration of Swift._isSwiftRuntimeVersionAtLeast.
+  FuncDecl *getIsSwiftRuntimeVersionAtLeast() const;
 
   /// Look for the declaration with the given name within the
   /// passed in module.
@@ -914,6 +933,8 @@ public:
   // runtime version.
 #define FEATURE(N, V)                                                          \
   inline AvailabilityRange get##N##Availability() const {                      \
+    if (LangOpts.hasFeature(Feature::Embedded))                                \
+      return AvailabilityRange::alwaysAvailable();                             \
     return getSwiftAvailability V;                                             \
   }                                                                            \
   inline AvailabilityRange get##N##RuntimeAvailability() const {               \
@@ -1026,12 +1047,6 @@ public:
   /// Availability macros parsed from the command line arguments.
   const AvailabilityMacroMap &getAvailabilityMacroMap() const;
 
-  /// Test support utility for loading a platform remap file
-  /// in case an SDK is not specified to the compilation.
-  const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
-  getAuxiliaryDarwinPlatformRemapInfo(
-      clang::DarwinSDKInfo::OSEnvPair Kind) const;
-
   //===--------------------------------------------------------------------===//
   // Diagnostics Helper functions
   //===--------------------------------------------------------------------===//
@@ -1044,7 +1059,6 @@ public:
 
   // Builtin type and simple types that are used frequently.
   const CanType TheErrorType;             /// This is the ErrorType singleton.
-  const CanType TheUnresolvedType;        /// This is the UnresolvedType singleton.
   const CanType TheEmptyTupleType;        /// This is '()', aka Void
   const CanType TheEmptyPackType;
   const CanType TheAnyType;               /// This is 'Any', the empty protocol composition
@@ -1072,6 +1086,15 @@ public:
   /// Does any proper bookkeeping to keep all module loaders up to date as well.
   void addSearchPath(StringRef searchPath, bool isFramework, bool isSystem);
 
+  ExplicitSwiftModuleMap *getExplicitSwiftModuleMap();
+  ExplicitClangModuleMap *getExplicitClangModuleMap();
+
+  /// Look up the library level for a module from the explicit module map.
+  /// \param isClang Whether to look in the Clang module map (true) or the
+  ///                Swift module map (false).
+  std::optional<LibraryLevel>
+  getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang);
+
   /// Adds a module loader to this AST context.
   ///
   /// \param loader The new module loader, which will be added after any
@@ -1085,7 +1108,7 @@ public:
   ///                interface.
   void addModuleLoader(std::unique_ptr<ModuleLoader> loader,
                        bool isClang = false, bool isDWARF = false,
-                       bool IsInterface = false);
+                       bool IsInterface = false, bool IsExplicit = false);
 
   /// Add a module interface checker to use for this AST context.
   void addModuleInterfaceChecker(std::unique_ptr<ModuleInterfaceChecker> checker);
@@ -1294,6 +1317,10 @@ public:
     return const_cast<ASTContext *>(this)->getStdlibModule(false);
   }
 
+  /// Names of underscored modules whose contents, if imported, should be
+  /// treated as separately-imported overlays of the standard library module.
+  ArrayRef<Identifier> StdlibOverlayNames;
+
   /// Insert an externally-sourced module into the set of known loaded modules
   /// in this context.
   void addLoadedModule(ModuleDecl *M);
@@ -1474,6 +1501,16 @@ public:
   /// the language options.
   bool shouldPerformTypoCorrection();
 
+  /// Record that, when emitting the current module, references to \p type in
+  /// stored properties of public types should be substituted with a
+  /// \c HiddenType carrying \p mangledName.
+  void recordTypeToHideWhenEmittingModule(CanType type, StringRef mangledName);
+
+  /// If \p type was recorded as needing to be hidden when emitting the current
+  /// module, return its mangled name; otherwise return \c std::nullopt.
+  std::optional<StringRef>
+  lookupTypeToHideWhenEmittingModule(CanType type) const;
+
 private:
   friend class IntrinsicInfo;
   /// Retrieve an LLVMContext that is used for scratch space for intrinsic lookup.
@@ -1541,13 +1578,14 @@ public:
       const ValueDecl *base, const ValueDecl *derived,
       const OverrideGenericSignatureReqCheck direction);
 
-  /// Whether our effective Swift version is at least 'major'.
+  /// Returns a boolean value indicating whether the language mode is at least
+  /// `mode`.
   ///
-  /// This is usually the check you want; for example, when introducing
+  /// This is very likely the check you want; for example, when introducing
   /// a new language feature which is only visible in Swift 5, you would
-  /// check for isSwiftVersionAtLeast(5).
-  bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
-    return LangOpts.isSwiftVersionAtLeast(major, minor);
+  /// check for `isLanguageModeAtLeast(LanguageMode::v5)`.
+  bool isLanguageModeAtLeast(LanguageMode mode) const {
+    return LangOpts.isLanguageModeAtLeast(mode);
   }
 
   /// Check whether it's important to respect access control restrictions
@@ -1604,6 +1642,10 @@ public:
   }
 
 private:
+  friend class BuiltinGenericType;
+  GenericSignature &getCachedBuiltinGenericTypeSignature(TypeKind kind);
+
+private:
   friend Decl;
 
   std::optional<ExternalSourceLocs *> getExternalSourceLocs(const Decl *D);
@@ -1625,6 +1667,10 @@ public:
   /// then this returns the universal domain (`*`).
   AvailabilityDomain getTargetAvailabilityDomain() const;
 };
+
+inline SourceLoc extractNearestSourceLoc(const ASTContext *ctx) {
+  return SourceLoc();
+}
 
 } // end namespace swift
 

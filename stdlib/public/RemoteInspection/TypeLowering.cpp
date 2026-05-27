@@ -18,6 +18,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "llvm/Support/ErrorHandling.h"
 #if SWIFT_ENABLE_REFLECTION
 
 #include "llvm/Support/MathExtras.h"
@@ -221,6 +222,16 @@ public:
     case TypeInfoKind::Array: {
       printHeader("array");
       printBasic(TI);
+      auto &ArrayTI = cast<ArrayTypeInfo>(TI);
+      printField("count", std::to_string(ArrayTI.getElementCount()));
+      printRec(*ArrayTI.getElementTypeInfo());
+      stream << ")";
+      return;
+    }
+
+    case TypeInfoKind::Borrow: {
+      printHeader("borrow");
+      printBasic(TI);
       stream << ")";
       return;
     }
@@ -247,14 +258,18 @@ BuiltinTypeInfo::BuiltinTypeInfo(TypeRefBuilder &builder,
     : TypeInfo(TypeInfoKind::Builtin, descriptor.Size,
                descriptor.Alignment, descriptor.Stride,
                descriptor.NumExtraInhabitants,
-               descriptor.IsBitwiseTakable),
+               descriptor.Borrowability,
+               descriptor.AddressableForDependencies),
       Name(descriptor.getMangledTypeName()) {}
 
 BuiltinTypeInfo::BuiltinTypeInfo(unsigned Size, unsigned Alignment,
                                  unsigned Stride, unsigned NumExtraInhabitants,
-                                 bool BitwiseTakable)
+                                 BitwiseBorrowability Borrowability,
+                                 bool AddressableForDependencies)
     : TypeInfo(TypeInfoKind::Builtin, Size, Alignment, Stride,
-               NumExtraInhabitants, BitwiseTakable) {}
+               NumExtraInhabitants,
+               Borrowability,
+               AddressableForDependencies) {}
 
 // Builtin.Int<N> is mangled as 'Bi' N '_'
 // Returns 0 if this isn't an Int
@@ -481,14 +496,16 @@ BitMask RecordTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const
   return mask;
 }
 
-ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI)
+ArrayTypeInfo::ArrayTypeInfo(intptr_t size, const TypeRef *elementTR,
+                             const TypeInfo *elementTI)
     : TypeInfo(TypeInfoKind::Array,
                /* size */ elementTI->getStride() * size,
                /* alignment */ elementTI->getAlignment(),
                /* stride */ elementTI->getStride() * size,
                /* numExtraInhabitants */ elementTI->getNumExtraInhabitants(),
-               /* isBitwiseTakable */ elementTI->isBitwiseTakable()),
-      ElementTI(elementTI) {}
+               /* borrowability */ elementTI->getBorrowability(),
+               /* FixedArray is always afd */ true),
+      ElementTR(elementTR), ElementTI(elementTI), ElementCount(size) {}
 
 bool ArrayTypeInfo::readExtraInhabitantIndex(
     remote::MemoryReader &reader, remote::RemoteAddress address,
@@ -505,10 +522,11 @@ class UnsupportedEnumTypeInfo: public EnumTypeInfo {
 public:
   UnsupportedEnumTypeInfo(unsigned Size, unsigned Alignment,
                           unsigned Stride, unsigned NumExtraInhabitants,
-                          bool BitwiseTakable, EnumKind Kind,
+                          BitwiseBorrowability Borrowability,
+                          bool AFD, EnumKind Kind,
                           const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
-                   BitwiseTakable, Kind, Cases) {}
+                   Borrowability, AFD, Kind, Cases) {}
 
   bool readExtraInhabitantIndex(remote::MemoryReader &reader,
                        remote::RemoteAddress address,
@@ -534,7 +552,9 @@ class EmptyEnumTypeInfo: public EnumTypeInfo {
 public:
   EmptyEnumTypeInfo(const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(/*Size*/ 0, /* Alignment*/ 1, /*Stride*/ 1,
-                   /*NumExtraInhabitants*/ 0, /*BitwiseTakable*/ true,
+                   /*NumExtraInhabitants*/ 0,
+                   /*Borrowability*/ BitwiseBorrowability::TakableAndBorrowable,
+                   /*AFD*/ false,
                    EnumKind::NoPayloadEnum, Cases) {
     // No cases
     assert(Cases.size() == 0);
@@ -567,7 +587,8 @@ public:
                    /* Alignment*/ 1,
                    /*Stride*/ 1,
                    /*NumExtraInhabitants*/ 0,
-                   /*BitwiseTakable*/ true,
+                   /*Borrowability*/ BitwiseBorrowability::TakableAndBorrowable,
+                   /*AFD*/ false,
                    Kind, Cases) {
     // Exactly one case
     assert(Cases.size() == 1);
@@ -617,7 +638,8 @@ public:
                         EnumKind Kind,
                         const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
-                   /*BitwiseTakable*/ true,
+                   /*Borrowability*/ BitwiseBorrowability::TakableAndBorrowable,
+                   /*AFD*/ false,
                    Kind, Cases) {
     // There are at least 2 cases
     // (one case would be trivial, zero is impossible)
@@ -671,11 +693,12 @@ class SinglePayloadEnumTypeInfo: public EnumTypeInfo {
 public:
   SinglePayloadEnumTypeInfo(unsigned Size, unsigned Alignment,
                             unsigned Stride, unsigned NumExtraInhabitants,
-                            bool BitwiseTakable,
+                            BitwiseBorrowability Borrowability,
+                            bool AFD,
                             EnumKind Kind,
                             const std::vector<FieldInfo> &Cases)
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
-                   BitwiseTakable, Kind, Cases) {
+                   Borrowability, AFD, Kind, Cases) {
     // The first case has a payload (possibly empty)
     assert(Cases[0].TR != 0);
     // At most one non-empty payload case
@@ -840,11 +863,12 @@ class TaggedMultiPayloadEnumTypeInfo: public EnumTypeInfo {
 public:
   TaggedMultiPayloadEnumTypeInfo(unsigned Size, unsigned Alignment,
                            unsigned Stride, unsigned NumExtraInhabitants,
-                           bool BitwiseTakable,
+                           BitwiseBorrowability Borrowability,
+                           bool AFD,
                            const std::vector<FieldInfo> &Cases,
                            unsigned NumEffectivePayloadCases)
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
-                   BitwiseTakable, EnumKind::MultiPayloadEnum, Cases),
+                   Borrowability, AFD, EnumKind::MultiPayloadEnum, Cases),
       NumEffectivePayloadCases(NumEffectivePayloadCases) {
     // Definition of "multi-payload enum"
     assert(getCases().size() > 1); // At least 2 cases
@@ -950,12 +974,13 @@ class MultiPayloadEnumTypeInfo: public EnumTypeInfo {
 public:
   MultiPayloadEnumTypeInfo(unsigned Size, unsigned Alignment,
                            unsigned Stride, unsigned NumExtraInhabitants,
-                           bool BitwiseTakable,
+                           BitwiseBorrowability Borrowability,
+                           bool AFD,
                            const std::vector<FieldInfo> &Cases,
                            BitMask spareBitsMask,
                            unsigned NumEffectivePayloadCases)
     : EnumTypeInfo(Size, Alignment, Stride, NumExtraInhabitants,
-                   BitwiseTakable, EnumKind::MultiPayloadEnum, Cases),
+                   Borrowability, AFD, EnumKind::MultiPayloadEnum, Cases),
       spareBitsMask(spareBitsMask),
       NumEffectivePayloadCases(NumEffectivePayloadCases) {
     assert(Cases[0].TR != 0);
@@ -1162,7 +1187,6 @@ class ExistentialTypeInfoBuilder {
 
   void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
     Invalid = true;
-    DEBUG_LOG(fprintf(stderr, "%s\n", msg); if (TR) TR->dump());
     TC.setError(msg, TR);
   }
 
@@ -1347,7 +1371,7 @@ public:
 
     if (ObjC) {
       if (WitnessTableCount > 0) {
-        DEBUG_LOG(fprintf(stderr, "@objc existential with witness tables\n"));
+        TC.setError("@objc existential with witness tables");
         return nullptr;
       }
 
@@ -1384,7 +1408,7 @@ public:
     case ExistentialTypeRepresentation::Opaque: {
       auto *TI = TC.getTypeInfo(TC.getRawPointerTypeRef(), ExternalTypeInfo);
       if (TI == nullptr) {
-        DEBUG_LOG(fprintf(stderr, "No TypeInfo for RawPointer\n"));
+        TC.setError("no TypeInfo for RawPointer");
         return nullptr;
       }
 
@@ -1395,7 +1419,8 @@ public:
       builder.addField(TI->getSize() * 3,
                        TI->getAlignment(),
                        /*numExtraInhabitants=*/0,
-                       /*bitwiseTakable=*/true);
+                       /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                       /*afd=*/ true);
       builder.addField("metadata", TC.getAnyMetatypeTypeRef(), ExternalTypeInfo);
       break;
     }
@@ -1438,7 +1463,8 @@ public:
 unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
                                          unsigned fieldAlignment,
                                          unsigned numExtraInhabitants,
-                                         bool bitwiseTakable) {
+                                         BitwiseBorrowability borrowability,
+                                         bool addressableForDependencies) {
   assert(fieldAlignment > 0);
 
   // Align the current size appropriately
@@ -1453,8 +1479,11 @@ unsigned RecordTypeInfoBuilder::addField(unsigned fieldSize,
   // Update the aggregate alignment
   Alignment = std::max(Alignment, fieldAlignment);
 
-  // The aggregate is bitwise takable if all elements are.
-  BitwiseTakable &= bitwiseTakable;
+  // The aggregate is as borrowable as its least borrowable field.
+  Borrowability = std::min(Borrowability, borrowability);
+
+  // The aggregate is addressable for dependencies if any field is.
+  AddressableForDependencies |= addressableForDependencies;
 
   switch (Kind) {
   // The extra inhabitants of a struct or tuple are the same as the extra
@@ -1498,7 +1527,8 @@ void RecordTypeInfoBuilder::addField(
   unsigned offset = addField(TI->getSize(),
                              TI->getAlignment(),
                              TI->getNumExtraInhabitants(),
-                             TI->isBitwiseTakable());
+                             TI->getBorrowability(),
+                             TI->isAddressableForDependencies());
   Fields.push_back({Name, offset, -1, TR, *TI});
 }
 
@@ -1513,7 +1543,7 @@ const RecordTypeInfo *RecordTypeInfoBuilder::build() {
 
   return TC.makeTypeInfo<RecordTypeInfo>(
       Size, Alignment, Stride,
-      NumExtraInhabitants, BitwiseTakable,
+      NumExtraInhabitants, Borrowability, AddressableForDependencies,
       Kind, Fields);
 }
 
@@ -1541,23 +1571,24 @@ const ReferenceTypeInfo *TypeConverter::getReferenceTypeInfo(
 
   auto BuiltinTI = Builder.getBuiltinTypeDescriptor(TR);
   if (BuiltinTI == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for reference type: "); TR->dump());
+    setError("no TypeInfo for reference type", TR);
     return nullptr;
   }
 
   unsigned numExtraInhabitants = BuiltinTI->NumExtraInhabitants;
-  bool bitwiseTakable = true;
+  BitwiseBorrowability borrowability
+    = BitwiseBorrowability::TakableAndBorrowable;
 
   switch (Kind) {
   case ReferenceKind::Strong:
     break;
   case ReferenceKind::Weak:
     numExtraInhabitants = 0;
-    bitwiseTakable = false;
+    borrowability = BitwiseBorrowability::None;
     break;
   case ReferenceKind::Unowned:
     if (Refcounting == ReferenceCounting::Unknown)
-      bitwiseTakable = false;
+      borrowability = BitwiseBorrowability::None;
     break;
   case ReferenceKind::Unmanaged:
     break;
@@ -1567,10 +1598,15 @@ const ReferenceTypeInfo *TypeConverter::getReferenceTypeInfo(
                                              BuiltinTI->Alignment,
                                              BuiltinTI->Stride,
                                              numExtraInhabitants,
-                                             bitwiseTakable,
+                                             borrowability,
                                              Kind, Refcounting);
   ReferenceCache[key] = TI;
   return TI;
+}
+
+void TypeConverter::setError(const char *msg, const TypeRef *TR) {
+  DEBUG_LOG(fprintf(stderr, "%s\n", msg); if (TR) TR->dump());
+  LastError = {msg, TR};
 }
 
 std::string TypeConverter::takeLastError() {
@@ -1585,6 +1621,23 @@ std::string TypeConverter::takeLastError() {
   return s.str();
 }
 
+const TypeInfo *
+TypeConverter::getRawPointerTypeInfo() {
+  if (RawPointerTI != nullptr)
+    return RawPointerTI;
+
+  auto descriptor =
+      getBuilder().getBuiltinTypeDescriptor(getRawPointerTypeRef());
+  if (descriptor == nullptr) {
+    setError("no TypeInfo for function type");
+    return nullptr;
+  }
+
+  RawPointerTI = makeTypeInfo<BuiltinTypeInfo>(getBuilder(), *descriptor.get());
+
+  return RawPointerTI;
+}
+
 /// Thin functions consist of a function pointer. We do not use
 /// Builtin.RawPointer here, since the extra inhabitants differ.
 const TypeInfo *
@@ -1595,7 +1648,7 @@ TypeConverter::getThinFunctionTypeInfo() {
   auto descriptor =
       getBuilder().getBuiltinTypeDescriptor(getThinFunctionTypeRef());
   if (descriptor == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for function type\n"));
+    setError("no TypeInfo for function type");
     return nullptr;
   }
 
@@ -1630,7 +1683,7 @@ TypeConverter::getAnyMetatypeTypeInfo() {
   auto descriptor =
       getBuilder().getBuiltinTypeDescriptor(getAnyMetatypeTypeRef());
   if (descriptor == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for metatype type\n"));
+    setError("no TypeInfo for metatype type");
     return nullptr;
   }
 
@@ -1649,7 +1702,7 @@ const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
   auto descriptor =
       getBuilder().getBuiltinTypeDescriptor(getRawPointerTypeRef());
   if (descriptor == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No TypeInfo for default actor storage type\n"));
+    setError("no TypeInfo for default actor storage type");
     return nullptr;
   }
 
@@ -1658,7 +1711,9 @@ const TypeInfo *TypeConverter::getDefaultActorStorageTypeInfo() {
 
   DefaultActorStorageTI = makeTypeInfo<BuiltinTypeInfo>(
       /*Size=*/size, /*Alignment*/ alignment, /*Stride=*/size,
-      /*NumExtraInhabitants*/ 0, /*BitwiseTakable*/ true);
+      /*NumExtraInhabitants*/ 0,
+      /*Borrowability*/ BitwiseBorrowability::TakableAndBorrowable,
+      /*AFD*/ false);
 
   return DefaultActorStorageTI;
 }
@@ -1857,6 +1912,10 @@ public:
   bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     return visit(BA->getElementType());
   }
+
+  bool visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    return visit(BA->getReferentType());
+  }
 };
 
 bool TypeConverter::hasFixedSize(const TypeRef *TR) {
@@ -1990,7 +2049,7 @@ public:
   }
 
   MetatypeRepresentation visitObjCClassTypeRef(const ObjCClassTypeRef *OC) {
-    return MetatypeRepresentation::Unknown;
+    return MetatypeRepresentation::Thick;
   }
 
   MetatypeRepresentation visitObjCProtocolTypeRef(const ObjCProtocolTypeRef *OP) {
@@ -2017,20 +2076,24 @@ public:
   }
 
   MetatypeRepresentation visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
-    return visit(BA->getElementType());
+    return MetatypeRepresentation::Thin;
+  }
+
+  MetatypeRepresentation visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    return MetatypeRepresentation::Thin;
   }
 };
 
 class EnumTypeInfoBuilder {
   TypeConverter &TC;
   unsigned Size, Alignment, NumExtraInhabitants;
-  bool BitwiseTakable;
+  BitwiseBorrowability Borrowability;
+  bool AddressableForDependencies;
   std::vector<FieldInfo> Cases;
   bool Invalid;
 
   void markInvalid(const char *msg, const TypeRef *TR = nullptr) {
     Invalid = true;
-    DEBUG_LOG(fprintf(stderr, "%s\n", msg); if (TR) TR->dump());
     TC.setError(msg, TR);
   }
 
@@ -2050,24 +2113,29 @@ class EnumTypeInfoBuilder {
     Cases.push_back({Name, /*offset=*/0, /*value=*/-1, nullptr, emptyTI});
   }
 
-  void addCase(const std::string &Name, const TypeRef *TR,
-               const TypeInfo *TI) {
+  void addCase(const std::string &Name, const TypeRef *TR, const TypeInfo *TI,
+               const TypeRef *IndirectPayloadTR = nullptr) {
     if (TI == nullptr) {
       markInvalid("no type info for case type", TR);
       static TypeInfo emptyTI;
-      Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, emptyTI});
+      Cases.push_back(
+          {Name, /*offset=*/0, /*value=*/-1, TR, emptyTI, IndirectPayloadTR});
     } else {
       Size = std::max(Size, TI->getSize());
       Alignment = std::max(Alignment, TI->getAlignment());
-      BitwiseTakable &= TI->isBitwiseTakable();
-      Cases.push_back({Name, /*offset=*/0, /*value=*/-1, TR, *TI});
+      Borrowability = std::min(Borrowability, TI->getBorrowability());
+      AddressableForDependencies |= TI->isAddressableForDependencies();
+      Cases.push_back(
+          {Name, /*offset=*/0, /*value=*/-1, TR, *TI, IndirectPayloadTR});
     }
   }
 
 public:
   EnumTypeInfoBuilder(TypeConverter &TC)
     : TC(TC), Size(0), Alignment(1), NumExtraInhabitants(0),
-      BitwiseTakable(true), Invalid(false) {}
+      Borrowability(BitwiseBorrowability::TakableAndBorrowable),
+      AddressableForDependencies(false),
+      Invalid(false) {}
 
   const TypeInfo *build(const TypeRef *TR, FieldDescriptorBase &FD,
                         remote::TypeInfoProvider *ExternalTypeInfo) {
@@ -2099,25 +2167,25 @@ public:
           // We don't have typeinfo; something is very broken.
           markInvalid("no type info for single enum case", CaseTR);
           return nullptr;
-	} else if (Case.Indirect) {
-	  // An indirect case is non-empty (it stores a pointer)
-	  // and acts like a non-generic (because the pointer has spare bits)
-	  ++NonGenericNonEmptyPayloadCases;
+      	} else if (Case.Indirect) {
+      	  // An indirect case is non-empty (it stores a pointer)
+      	  // and acts like a non-generic (because the pointer has spare bits)
+      	  ++NonGenericNonEmptyPayloadCases;
           LastPayloadCaseTR = CaseTR;
         } else if (Case.Generic) {
-	  // Otherwise, we never consider spare bits from generic cases
+      	  // Otherwise, we never consider spare bits from generic cases
           ++GenericPayloadCases;
           LastPayloadCaseTR = CaseTR;
         } else if (CaseTI->getSize() == 0) {
-	  // Needed to distinguish a "single-payload enum"
-	  // whose only case is empty.
+      	  // Needed to distinguish a "single-payload enum"
+      	  // whose only case is empty.
           ++NonGenericEmptyPayloadCases;
         } else {
-	  // Finally, we consider spare bits from regular payloads
+      	  // Finally, we consider spare bits from regular payloads
           ++NonGenericNonEmptyPayloadCases;
           LastPayloadCaseTR = CaseTR;
         }
-        addCase(Case.Name, CaseTR, CaseTI);
+        addCase(Case.Name, CaseTR, CaseTI, Case.Indirect ? Case.TR : nullptr);
       }
     }
     // For determining a layout strategy, cases w/ empty payload are treated the
@@ -2148,7 +2216,8 @@ public:
     if (Size > (1024ULL * 1024)) {
       unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
       return TC.makeTypeInfo<UnsupportedEnumTypeInfo>(
-	Size, Alignment, Stride, NumExtraInhabitants, BitwiseTakable, Kind, Cases);
+      	Size, Alignment, Stride, NumExtraInhabitants, Borrowability,
+      	AddressableForDependencies, Kind, Cases);
     }
 
     if (Cases.size() == 1) {
@@ -2224,8 +2293,8 @@ public:
       }
       unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
       return TC.makeTypeInfo<SinglePayloadEnumTypeInfo>(
-        Size, Alignment, Stride, NumExtraInhabitants, BitwiseTakable, Kind, Cases);
-
+        Size, Alignment, Stride, NumExtraInhabitants, Borrowability,
+        AddressableForDependencies, Kind, Cases);
     }
 
     //
@@ -2272,7 +2341,8 @@ public:
         Stride = 1;
       return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, Cases, EffectivePayloadCases);
+        Borrowability, AddressableForDependencies, Cases,
+        EffectivePayloadCases);
     }
 
     // This is a multi-payload enum that:
@@ -2282,7 +2352,10 @@ public:
     Size = FixedDescriptor->Size;
     Alignment = FixedDescriptor->Alignment;
     NumExtraInhabitants = FixedDescriptor->NumExtraInhabitants;
-    BitwiseTakable = FixedDescriptor->IsBitwiseTakable;
+    Borrowability = FixedDescriptor->Borrowability;
+    // Builtin descriptors don't record addressable-for-dependencies, but we
+    // can derive it reliably from the payloads, so AddressableForDependencies
+    // is left as is.
     unsigned Stride = ((Size + Alignment - 1) & ~(Alignment - 1));
     if (Stride == 0)
       Stride = 1;
@@ -2292,8 +2365,8 @@ public:
     bool hasAddrOnly = false;
     for (auto Case : Cases) {
       if (Case.TR != 0) {
-	auto submask = Case.TI.getSpareBits(TC, hasAddrOnly);
-	localSpareBitMask.andMask(submask, 0);
+      	auto submask = Case.TI.getSpareBits(TC, hasAddrOnly);
+      	localSpareBitMask.andMask(submask, 0);
       }
     }
 
@@ -2304,12 +2377,12 @@ public:
       // * We can't copy it to strip spare bits.
       return TC.makeTypeInfo<TaggedMultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, Cases, EffectivePayloadCases);
+        Borrowability, AddressableForDependencies, Cases, EffectivePayloadCases);
     } else {
       // General case can mix spare bits and extra discriminator
       return TC.makeTypeInfo<MultiPayloadEnumTypeInfo>(
         Size, Alignment, Stride, NumExtraInhabitants,
-        BitwiseTakable, Cases, localSpareBitMask,
+        Borrowability, AddressableForDependencies, Cases, localSpareBitMask,
         EffectivePayloadCases);
     }
   }
@@ -2324,8 +2397,9 @@ class LowerType
     if (auto N = dyn_cast<NominalTypeRef>(TR)) {
       Demangler Dem;
       auto Node = N->getDemangling(Dem);
-      if (Node->getKind() == Node::Kind::Type && Node->getNumChildren() == 1) {
-	auto Alias = Node->getChild(0);
+      if (Node && Node->getKind() == Node::Kind::Type &&
+          Node->getNumChildren() == 1) {
+        auto Alias = Node->getChild(0);
 	if (Alias->getKind() == Node::Kind::TypeAlias && Alias->getNumChildren() == 2) {
 	  auto Module = Alias->getChild(0);
 	  auto Name = Alias->getChild(1);
@@ -2374,7 +2448,7 @@ public:
     /// metadata.
     auto descriptor = TC.getBuilder().getBuiltinTypeDescriptor(B);
     if (descriptor == nullptr) {
-      DEBUG_LOG(fprintf(stderr, "No TypeInfo for builtin type: "); B->dump());
+      TC.setError("no TypeInfo for builtin type", B);
       return nullptr;
     }
     return TC.makeTypeInfo<BuiltinTypeInfo>(TC.getBuilder(), *descriptor.get());
@@ -2423,7 +2497,7 @@ public:
 
 
         // If the external provider also fails we're out of luck.
-        DEBUG_LOG(fprintf(stderr, "No TypeInfo for nominal type: "); TR->dump());
+        TC.setError("no TypeInfo for nominal type", TR);
         return nullptr;
       }
     }
@@ -2458,7 +2532,7 @@ public:
     case FieldDescriptorKind::ObjCProtocol:
     case FieldDescriptorKind::ClassProtocol:
     case FieldDescriptorKind::Protocol:
-      DEBUG_LOG(fprintf(stderr, "Invalid field descriptor: "); TR->dump());
+      TC.setError("Invalid field descriptor", TR);
       return nullptr;
     }
 
@@ -2482,12 +2556,12 @@ public:
   }
 
   const TypeInfo *visitPackTypeRef(const PackTypeRef *P) {
-    DEBUG_LOG(fprintf(stderr, "Cannot have pack type here: "); P->dump());
+    TC.setError("cannot have pack type here", P);
     return nullptr;
   }
 
   const TypeInfo *visitPackExpansionTypeRef(const PackExpansionTypeRef *PE) {
-    DEBUG_LOG(fprintf(stderr, "Cannot have pack expansion type here: "); PE->dump());
+    TC.setError("cannot have pack expansion type here", PE);
     return nullptr;
   }
 
@@ -2522,7 +2596,7 @@ public:
   const TypeInfo *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
     switch (HasSingletonMetatype().visit(M)) {
     case MetatypeRepresentation::Unknown:
-      DEBUG_LOG(fprintf(stderr, "Unknown metatype representation: "); M->dump());
+      TC.setError("unknown metatype representation", M);
       return nullptr;
     case MetatypeRepresentation::Thin:
       return TC.getEmptyTypeInfo();
@@ -2540,8 +2614,10 @@ public:
 
     if (auto *PC = dyn_cast<ProtocolCompositionTypeRef>(TR)) {
       builder.addProtocolComposition(PC);
+    } else if (auto *CET = dyn_cast<ConstrainedExistentialTypeRef>(TR)) {
+      builder.addProtocolComposition(CET->getBase());
     } else {
-      DEBUG_LOG(fprintf(stderr, "Invalid existential metatype: "); EM->dump());
+      TC.setError("invalid existential metatype", EM);
       return nullptr;
     }
 
@@ -2557,13 +2633,13 @@ public:
 
   const TypeInfo *
   visitGenericTypeParameterTypeRef(const GenericTypeParameterTypeRef *GTP) {
-    DEBUG_LOG(fprintf(stderr, "Unresolved generic TypeRef: "); GTP->dump());
+    TC.setError("unresolved generic TypeRef", GTP);
     return nullptr;
   }
 
   const TypeInfo *
   visitDependentMemberTypeRef(const DependentMemberTypeRef *DM) {
-    DEBUG_LOG(fprintf(stderr, "Unresolved generic TypeRef: "); DM->dump());
+    TC.setError("unresolved generic TypeRef", DM);
     return nullptr;
   }
 
@@ -2589,7 +2665,7 @@ public:
   rebuildStorageTypeInfo(const TypeInfo *TI, ReferenceKind Kind) {
     // If we can't lower the original storage type, give up.
     if (TI == nullptr) {
-      DEBUG_LOG(fprintf(stderr, "Invalid reference type"));
+      TC.setError("invalid reference type");
       return nullptr;
     }
 
@@ -2612,12 +2688,12 @@ public:
       // Destructure the existential and replace the "object"
       // field with the right reference kind.
       if (SubKind == RecordKind::ClassExistential) {
-        bool BitwiseTakable = RecordTI->isBitwiseTakable();
+        auto Borrowability = RecordTI->getBorrowability();
         std::vector<FieldInfo> Fields;
         for (auto &Field : RecordTI->getFields()) {
           if (Field.Name == "object") {
             auto *FieldTI = rebuildStorageTypeInfo(&Field.TI, Kind);
-            BitwiseTakable &= FieldTI->isBitwiseTakable();
+            Borrowability = std::min(Borrowability, FieldTI->getBorrowability());
             Fields.push_back({Field.Name, Field.Offset, /*value=*/-1, Field.TR, *FieldTI});
             continue;
           }
@@ -2629,13 +2705,21 @@ public:
             RecordTI->getAlignment(),
             RecordTI->getStride(),
             RecordTI->getNumExtraInhabitants(),
-            BitwiseTakable,
+            Borrowability,
+            RecordTI->isAddressableForDependencies(),
             SubKind, Fields);
+      }
+
+      // `Unmanaged` is layout-identical to its referent. A valid referent
+      // always lowers to a single pointer word.
+      if (Kind == ReferenceKind::Unmanaged && SubKind == RecordKind::Struct &&
+          RecordTI->getSize() == TC.targetPointerSize()) {
+        return RecordTI;
       }
     }
 
     // Anything else -- give up
-    DEBUG_LOG(fprintf(stderr, "Invalid reference type"));
+    TC.setError("invalid reference type");
     return nullptr;
   }
 
@@ -2663,27 +2747,61 @@ public:
   }
 
   const TypeInfo *visitOpaqueTypeRef(const OpaqueTypeRef *O) {
-    DEBUG_LOG(fprintf(stderr, "Can't lower opaque TypeRef"));
+    TC.setError("can't lower opaque TypeRef", O);
     return nullptr;
   }
 
   const TypeInfo *visitOpaqueArchetypeTypeRef(const OpaqueArchetypeTypeRef *O) {
     // TODO: Provide a hook for the client to try to resolve the opaque archetype
     // with additional information?
-    DEBUG_LOG(fprintf(stderr, "Can't lower unresolved opaque archetype TypeRef"));
+    TC.setError("can't lower unresolved opaque archetype TypeRef", O);
     return nullptr;
   }
 
   const TypeInfo *visitIntegerTypeRef(const IntegerTypeRef *I) {
-    DEBUG_LOG(fprintf(stderr, "Can't lower integer TypeRef"));
+    TC.setError("can't lower integer TypeRef", I);
     return nullptr;
   }
 
   const TypeInfo *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
     auto elementTI = visit(BA->getElementType());
-    auto size = cast<IntegerTypeRef>(BA->getSizeType())->getValue();
+    if (!elementTI) {
+      TC.setError("invalid FixedArray element type", BA);
+      return nullptr;
+    }
+    auto sizeInt = dyn_cast<IntegerTypeRef>(BA->getSizeType());
+    if (!sizeInt) {
+      TC.setError("non-integer FixedArray size type", BA);
+      return nullptr;
+    }
 
-    return TC.makeTypeInfo<ArrayTypeInfo>(size, elementTI);
+    return TC.makeTypeInfo<ArrayTypeInfo>(sizeInt->getValue(),
+                                          BA->getElementType(), elementTI);
+  }
+
+  const TypeInfo *visitBuiltinBorrowTypeRef(const BuiltinBorrowTypeRef *BA) {
+    auto referentTI = visit(BA->getReferentType());
+    if (!referentTI) {
+      TC.setError("invalid Borrow referent type", BA);
+      return nullptr;
+    }
+
+    const TypeInfo *representationTI;
+    auto pointerTI = TC.getRawPointerTypeInfo();
+
+    // The borrow uses pointer representation if:
+    // - it's larger than four pointers; or
+    // - it's addressable-for-dependencies; or
+    // - it's not bitwise-borrowable.
+    if (referentTI->getSize() > 4 * pointerTI->getSize()
+        || referentTI->isAddressableForDependencies()
+        || !referentTI->isBitwiseBorrowable()) {
+      representationTI = pointerTI;
+    } else {
+      representationTI = referentTI;
+    }
+    
+    return TC.makeTypeInfo<BorrowTypeInfo>(referentTI, representationTI);
   }
 };
 
@@ -2691,7 +2809,7 @@ const TypeInfo *
 TypeConverter::getTypeInfo(const TypeRef *TR,
                            remote::TypeInfoProvider *ExternalTypeInfo) {
   if (!TR) {
-    DEBUG_LOG(fprintf(stderr, "null TypeRef"));
+    setError("null TypeRef");
     return nullptr;
   }
 
@@ -2708,7 +2826,7 @@ TypeConverter::getTypeInfo(const TypeRef *TR,
   // Detect invalid recursive value types (IRGen should not emit
   // them in the first place, but there might be bugs)
   if (!RecursionCheck.insert(TR).second) {
-    DEBUG_LOG(fprintf(stderr, "TypeRef recursion detected"));
+    setError("TypeRef recursion detected");
     return nullptr;
   }
 
@@ -2731,7 +2849,7 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     remote::TypeInfoProvider *ExternalTypeInfo) {
   auto FD = getBuilder().getFieldDescriptor(TR);
   if (FD == nullptr) {
-    DEBUG_LOG(fprintf(stderr, "No field descriptor: "); TR->dump());
+    setError("no field descriptor", TR);
     return nullptr;
   }
 
@@ -2743,15 +2861,19 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
     RecordTypeInfoBuilder builder(*this, RecordKind::ClassInstance);
 
     std::vector<FieldTypeInfo> Fields;
-    if (!getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo, Fields))
+    if (!getBuilder().getFieldTypeRefs(TR, *FD.get(), ExternalTypeInfo,
+                                       Fields)) {
+      setError("cannot get fields", TR);
       return nullptr;
+    }
 
     // Start layout from the given instance start offset. This should
     // be the superclass instance size.
     builder.addField(/*size=*/start,
                      /*alignment=*/1,
                      /*numExtraInhabitants=*/0,
-                     /*bitwiseTakable=*/true);
+                     /*borrowability=*/BitwiseBorrowability::TakableAndBorrowable,
+                     /*addressableForDependencies=*/false);
 
     for (auto Field : Fields)
       builder.addField(Field.Name, Field.TR, ExternalTypeInfo);
@@ -2764,11 +2886,23 @@ const RecordTypeInfo *TypeConverter::getClassInstanceTypeInfo(
   case FieldDescriptorKind::ClassProtocol:
   case FieldDescriptorKind::Protocol:
     // Invalid field descriptor.
-    DEBUG_LOG(fprintf(stderr, "Invalid field descriptor: "); TR->dump());
+    setError("invalid field descriptor", TR);
     return nullptr;
   }
 
   swift_unreachable("Unhandled FieldDescriptorKind in switch.");
+}
+
+bool
+BorrowTypeInfo::readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                         remote::RemoteAddress address,
+                                         int *index) const {
+  return RepresentationTI->readExtraInhabitantIndex(reader, address, index);
+}
+
+BitMask
+BorrowTypeInfo::getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const {
+  return RepresentationTI->getSpareBits(TC, hasAddrOnly);
 }
 
 } // namespace reflection

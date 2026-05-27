@@ -164,6 +164,14 @@ inline SILValue stripAccessMarkers(SILValue v) {
   return v;
 }
 
+inline bool isAddressReturn(SILValue value) {
+  auto *defInst = dyn_cast_or_null<ApplyInst>(value->getDefiningInstruction());
+  if (!defInst) {
+    return false;
+  }
+  return defInst->hasAddressResult();
+}
+
 /// Return the source address after stripping as many access projections as
 /// possible without losing the address type.
 ///
@@ -248,13 +256,6 @@ bool mayLoadWeakOrUnowned(SILInstruction* instruction);
 /// Conservatively, whether this instruction could involve a synchronization
 /// point like a memory barrier, lock or syscall.
 bool maySynchronize(SILInstruction* instruction);
-
-/// Conservatively, whether this instruction could be a barrier to hoisting
-/// destroys.
-///
-/// Does not consider function so effects, so every apply is treated as a
-/// barrier.
-bool mayBeDeinitBarrierNotConsideringSideEffects(SILInstruction *instruction);
 
 } // end namespace swift
 
@@ -375,12 +376,12 @@ protected:
     // Define bits for use in AccessStorageAnalysis. Each identified storage
     // object is mapped to one instance of this subclass.
     SWIFT_INLINE_BITFIELD_FULL(StorageAccessInfo, AccessRepresentation,
-                               64 - NumAccessRepresentationBits,
+                               64 - NumberOfAccessRepresentationBits,
                                accessKind : NumSILAccessKindBits,
                                noNestedConflict : 1,
-                               storageIndex : 64 - (NumAccessRepresentationBits
-                                                    + NumSILAccessKindBits
-                                                    + 1));
+                               storageIndex : 64 -
+                                   (NumberOfAccessRepresentationBits +
+                                    NumSILAccessKindBits + 1));
 
     // Define bits for use in the AccessEnforcementOpts pass. Each begin_access
     // in the function is mapped to one instance of this subclass.  Reserve a
@@ -390,13 +391,11 @@ protected:
     //
     // `AccessRepresentation` refers to the AccessRepresentationBitfield defined
     // above, setting aside enough bits for common data.
-    SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo,
-                               AccessRepresentation,
-                               64 - NumAccessRepresentationBits,
-                               seenNestedConflict : 1,
-                               seenIdenticalStorage : 1,
-                               beginAccessIndex :
-                                 62 - NumAccessRepresentationBits);
+    SWIFT_INLINE_BITFIELD_FULL(AccessEnforcementOptsInfo, AccessRepresentation,
+                               64 - NumberOfAccessRepresentationBits,
+                               seenNestedConflict : 1, seenIdenticalStorage : 1,
+                               beginAccessIndex : 62 -
+                                   NumberOfAccessRepresentationBits);
 
     // Define data flow bits for use in the AccessEnforcementDom pass. Each
     // begin_access in the function is mapped to one instance of this subclass.
@@ -1568,6 +1567,8 @@ inline Operand *getAccessProjectionOperand(SingleValueInstruction *svi) {
   case SILInstructionKind::IndexAddrInst:
   case SILInstructionKind::TailAddrInst:
   case SILInstructionKind::InitEnumDataAddrInst:
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst:
   // open_existential_addr and unchecked_take_enum_data_addr are problematic
   // because they both modify memory and are access projections. Ideally, they
   // would not be casts, but will likely be eliminated with opaque values.
@@ -1802,6 +1803,14 @@ Result AccessUseDefChainVisitor<Impl, Result>::visit(SILValue sourceAddr) {
     if (isExternalGlobalAddressor(cast<ApplyInst>(sourceAddr)))
       return asImpl().visitUnidentified(sourceAddr);
 
+    if (isAddressReturn(sourceAddr)) {
+      auto *selfOp = &cast<ApplyInst>(sourceAddr)->getSelfArgumentOperand();
+      if (selfOp->get()->getType().isObject()) {
+        return asImpl().visitUnidentified(sourceAddr);
+      }
+      return asImpl().visitAccessProjection(cast<ApplyInst>(sourceAddr), selfOp);
+    }
+
     // Don't currently allow any other calls to return an accessed address.
     return asImpl().visitNonAccess(sourceAddr);
   }
@@ -1944,7 +1953,8 @@ public:
   }
 
   SILValue visitPhi(SILPhiArgument *phi) {
-    assert(false && "unexpected phi on access path");
+    // "Address" phis can happen because we look through `pointer_to_address`
+    // instructions and a phi can be a `Builtin.RawPointer`.
     return SILValue();
   }
 

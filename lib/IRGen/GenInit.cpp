@@ -59,19 +59,17 @@ void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
                      var->isDefinition() ? ForDefinition : NotForDefinition);
 }
 
-StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
-                                          const Twine &name) const {
+StackAddress
+FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T, const Twine &name,
+                             StackAllocationIsNested_t isNested) const {
   // If the type is known to be empty, don't actually allocate anything.
   if (isKnownEmpty(ResilienceExpansion::Maximal)) {
     auto addr = getUndefAddress();
-    return { addr };
+    return StackAddress(addr, StackAddress::StaticAlloca, nullptr);
   }
 
-  Address alloca =
-    IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
-  IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
-  
-  return { alloca };
+  return IGF.emitStaticAlloca(getStorageType(), getFixedSize(),
+                              getFixedAlignment(), name);
 }
 
 void FixedTypeInfo::destroyStack(IRGenFunction &IGF, StackAddress addr,

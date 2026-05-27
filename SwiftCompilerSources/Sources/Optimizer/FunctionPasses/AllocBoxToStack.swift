@@ -257,31 +257,8 @@ private struct FunctionSpecializations {
         return argOp.value
       }
     }
-    let specializedCallee = builder.createFunctionRef(originalToSpecialized[callee]!)
+    apply.replace(withCallTo: originalToSpecialized[callee]!, arguments: newArgs, context)
 
-    switch apply {
-    case let applyInst as ApplyInst:
-      let newApply = builder.createApply(function: specializedCallee, applyInst.substitutionMap, arguments: newArgs)
-      applyInst.replace(with: newApply, context)
-    case let partialAp as PartialApplyInst:
-      let newApply = builder.createPartialApply(function: specializedCallee, substitutionMap:
-                                                partialAp.substitutionMap,
-                                                capturedArguments: newArgs,
-                                                calleeConvention: partialAp.calleeConvention,
-                                                hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
-                                                isOnStack: partialAp.isOnStack)
-      partialAp.replace(with: newApply, context)
-    case let tryApply as TryApplyInst:
-      builder.createTryApply(function: specializedCallee, tryApply.substitutionMap, arguments: newArgs,
-                             normalBlock: tryApply.normalBlock, errorBlock: tryApply.errorBlock)
-      context.erase(instruction: tryApply)
-    case let beginApply as BeginApplyInst:
-      let newApply = builder.createBeginApply(function: specializedCallee, beginApply.substitutionMap,
-                                              arguments: newArgs)
-      beginApply.replace(with: newApply, context)
-    default:
-      fatalError("unknown apply")
-    }
     // It is important to delete the dead `function_ref`. Otherwise it will still reference the original
     // function which prevents deleting it in the mandatory-allocbox-to-stack pass.
     if fri.uses.isEmpty {
@@ -363,7 +340,7 @@ private func createAllocStack(for allocBox: AllocBoxInst, flags: Flags, _ contex
                                      isLexical: flags.isLexical,
                                      isFromVarDecl: flags.isFromVarDecl)
   let stackLocation: Value
-  if let mu = allocBox.uses.getSingleUser(ofType: MarkUninitializedInst.self) {
+  if let mu = allocBox.uses.singleUser(ofType: MarkUninitializedInst.self) {
     stackLocation = builder.createMarkUninitialized(value: asi, kind: mu.kind)
   } else {
     stackLocation = asi
@@ -484,7 +461,7 @@ private func hoistMarkUnresolvedInsts(stackAddress: Value,
     builder = Builder(atBeginOf: stackAddress.parentBlock, context)
   }
   let mu = builder.createMarkUnresolvedNonCopyableValue(value: stackAddress, checkKind: checkKind,  isStrict: false)
-  stackAddress.uses.ignore(user: mu).ignoreDebugUses.ignoreUses(ofType: DeallocStackInst.self)
+  stackAddress.uses.ignore(user: mu).ignoreDebugUses.ignore(usersOfType: DeallocStackInst.self)
     .replaceAll(with: mu, context)
 }
 
@@ -504,7 +481,8 @@ private extension ApplySite {
     {
       if self is FullApplySite,
          // If the function is inlined later, there is no point in specializing it.
-         !callee.shouldOptimize || callee.inlineStrategy == .always
+         !callee.shouldOptimize || callee.inlineStrategy == .heuristicAlways ||
+         callee.inlineStrategy == .always
       {
         return nil
       }

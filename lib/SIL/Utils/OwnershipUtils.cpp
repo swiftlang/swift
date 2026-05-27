@@ -23,6 +23,7 @@
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/ScopedAddressUtils.h"
 #include "swift/SIL/Test.h"
 
 using namespace swift;
@@ -432,7 +433,13 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
   return true;
 }
 
-// TODO: refactor this with SSAPrunedLiveness::computeLiveness.
+// TODO: Replace all calls to this with SSAPrunedLiveness::computeLiveness()
+// after extending that utility to handle unowned values and extending
+// PrunedLiveRange::recursivelyUpdateForDef to handle
+// OperandOwnership::ForwardingUnowned.
+//
+// findPointerEscape normally considers unowned values to be an escape, but the
+// RAUW utility relies on them being handled here.
 bool swift::findUsesOfSimpleValue(SILValue value,
                                   SmallVectorImpl<Operand *> *usePoints) {
   for (auto *use : value->getUses()) {
@@ -450,6 +457,17 @@ bool swift::findUsesOfSimpleValue(SILValue value,
         return false;
       }
       break;
+    case OperandOwnership::ForwardingUnowned: {
+      auto *forwardInst = dyn_cast<SingleValueInstruction>(use->getUser());
+      if (forwardInst) {
+        // only handle a single use so we don't need a visited set.
+        auto *use = forwardInst->getSingleUse();
+        if (use && use->get()->getOwnershipKind() == OwnershipKind::Unowned) {
+          return findUsesOfSimpleValue(forwardInst, usePoints);
+        }
+      }
+      return false;
+    }
     default:
       break;
     }
@@ -483,6 +501,8 @@ bool swift::visitGuaranteedForwardingPhisForSSAValue(
   // Transitively, collect GuaranteedForwarding uses.
   for (unsigned i = 0; i < guaranteedForwardingOps.size(); i++) {
     for (auto val : guaranteedForwardingOps[i]->getUser()->getResults()) {
+      if (val->getOwnershipKind() == OwnershipKind::None)
+        continue;
       for (auto *valUse : val->getUses()) {
         if (valUse->getOperandOwnership() ==
             OperandOwnership::GuaranteedForwarding) {
@@ -734,9 +754,7 @@ bool BorrowingOperand::visitScopeEndingUses(
     bool dead = true;
     for (auto *use : user->getUses()) {
       dead = false;
-      auto builtinUser = dyn_cast<BuiltinInst>(use->getUser());
-      if (!builtinUser
-          || builtinUser->getBuiltinKind() != BuiltinValueKind::EndAsyncLetLifetime)
+      if (!isBuiltinInst(use->getUser(), BuiltinValueKind::EndAsyncLetLifetime))
         continue;
 
       if (!visitScopeEnd(use)) {
@@ -898,6 +916,9 @@ void BorrowedValueKind::print(llvm::raw_ostream &os) const {
   case BorrowedValueKind::BeginApplyToken:
     os << "BeginApply";
     return;
+  case BorrowedValueKind::DereferenceBorrow:
+    os << "DereferenceBorrow";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -929,6 +950,7 @@ bool BorrowedValue::visitLocalScopeEndingUses(
     llvm_unreachable("Should only call this with a local scope");
   case BorrowedValueKind::LoadBorrow:
   case BorrowedValueKind::BeginBorrow:
+  case BorrowedValueKind::DereferenceBorrow:
   case BorrowedValueKind::Phi:
   case BorrowedValueKind::BeginApplyToken:
     for (auto *use : lookThroughBorrowedFromUser(value)->getUses()) {
@@ -1245,6 +1267,11 @@ bool swift::getAllBorrowIntroducingValues(SILValue inputValue,
     if (auto scopeIntroducer = BorrowedValue(value)) {
       out.push_back(scopeIntroducer);
       continue;
+    }
+
+    // If the introducer is a ScopedAddressValue, bailout.
+    if (auto scopedAddress = ScopedAddressValue(value)) {
+      return false;
     }
 
     // If v produces .none ownership, then we can ignore it. It is important
@@ -1684,7 +1711,8 @@ void swift::visitExtendedGuaranteedForwardingPhiBaseValuePairs(
     BorrowedValue borrow, function_ref<void(SILPhiArgument *, SILValue)>
                               visitGuaranteedForwardingPhiBaseValuePair) {
   assert(borrow.kind == BorrowedValueKind::BeginBorrow ||
-         borrow.kind == BorrowedValueKind::LoadBorrow);
+         borrow.kind == BorrowedValueKind::LoadBorrow ||
+         borrow.kind == BorrowedValueKind::DereferenceBorrow);
   // A GuaranteedForwardingPhi can have different base values on different
   // control flow paths.
   // For that reason, worklist stores (GuaranteedForwardingPhi operand, base
@@ -1831,6 +1859,7 @@ public:
             cast<BeginBorrowInst>(value)->getOperand(), visitor);
 
       case BorrowedValueKind::LoadBorrow:
+      case BorrowedValueKind::DereferenceBorrow:
       case BorrowedValueKind::SILFunctionArgument:
       case BorrowedValueKind::BeginApplyToken:
         // There is no enclosing def on this path.
@@ -2050,6 +2079,7 @@ protected:
       break;
     }
     case BorrowedValueKind::LoadBorrow:
+    case BorrowedValueKind::DereferenceBorrow:
     case BorrowedValueKind::SILFunctionArgument:
     case BorrowedValueKind::BeginApplyToken:
       // There is no enclosing def on this path.

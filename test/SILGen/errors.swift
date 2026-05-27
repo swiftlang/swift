@@ -615,8 +615,9 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:         [[T0:%.*]] = function_ref @$ss27_allocateUninitializedArray{{.*}}F
 // CHECK:         [[T1:%.*]] = apply [[T0]]<Cat>([[N]])
 // CHECK:         ([[ARRAY:%.*]], [[T2:%.*]]) = destructure_tuple [[T1]]
-// CHECK:         [[MDI:%.*]] = mark_dependence [[T2]]  : $Builtin.RawPointer on [[ARRAY]]
-// CHECK:         [[ELT0:%.*]] = pointer_to_address [[MDI]] : $Builtin.RawPointer to [strict] $*Cat
+// CHECK:         [[BB:%.*]] = begin_borrow [[ARRAY]]
+// CHECK:            struct_extract [[BB]]
+// CHECK:         [[ELT0:%.*]] = ref_tail_addr
 //   Element 0.
 // CHECK:         [[T0:%.*]] = function_ref @$s6errors10make_a_catAA3CatCyKF : $@convention(thin) () -> (@owned Cat, @error any Error)
 // CHECK:         try_apply [[T0]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[NORM_0:bb[0-9]+]], error [[ERR_0:bb[0-9]+]]
@@ -654,7 +655,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:    return
 //   Failure from element 0.
 // CHECK:       [[ERR_0]]([[ERROR:%.*]] : @owned $any Error):
-// CHECK-NOT:     end_borrow
+// CHECK:         end_borrow [[BB]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$ss29_deallocateUninitializedArray{{.*}}F
 // CHECK-NEXT:    apply [[T0]]<Cat>([[ARRAY]])
@@ -663,6 +664,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK:       [[ERR_2]]([[ERROR:%.*]] : @owned $any Error):
 // CHECK-NEXT:    destroy_addr [[ELT1]]
 // CHECK-NEXT:    destroy_addr [[ELT0]]
+// CHECK:         end_borrow [[BB]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$ss29_deallocateUninitializedArray{{.*}}F
 // CHECK-NEXT:    apply [[T0]]<Cat>([[ARRAY]])
@@ -672,6 +674,7 @@ func test_variadic(_ cat: Cat) throws {
 // CHECK-NEXT:    destroy_addr [[ELT2]]
 // CHECK-NEXT:    destroy_addr [[ELT1]]
 // CHECK-NEXT:    destroy_addr [[ELT0]]
+// CHECK-NEXT:    end_borrow [[BB]]
 // CHECK-NEXT:    // function_ref
 // CHECK-NEXT:    [[T0:%.*]] = function_ref @$ss29_deallocateUninitializedArray{{.*}}F
 // CHECK-NEXT:    apply [[T0]]<Cat>([[ARRAY]])

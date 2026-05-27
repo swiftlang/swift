@@ -784,12 +784,18 @@ public:
   id _quickLookObjectForPointer(void *value);
 #endif
 
+  /// Check that the given `type` conforms to all invertible protocols not in
+  /// `ignored`. Returns an error if the type fails to conform to one of them.
+  std::optional<TypeLookupError>
+  checkInvertibleRequirements(const Metadata *type,
+                              InvertibleProtocolSet ignored);
+
   /// Hook function that calls into the concurrency library to check whether
   /// we are currently executing the given global actor.
   SWIFT_RUNTIME_LIBRARY_VISIBILITY
-  extern bool (* __ptrauth_swift_is_global_actor_function SWIFT_CC(swift)
-                     _swift_task_isCurrentGlobalActorHook)(
-      const Metadata *, const WitnessTable *);
+  extern SWIFT_CC(swift) bool (*__ptrauth_swift_is_global_actor_function
+                               _swift_task_isCurrentGlobalActorHook)(
+      const Metadata *, const WitnessTable *, SWIFT_CONTEXT const Metadata *);
 
 } // end namespace swift
 

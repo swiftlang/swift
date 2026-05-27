@@ -78,6 +78,7 @@ public:
   void serializeFunctionsInModule(SILPassManager *manager);
   void serializeWitnessTablesInModule();
   void serializeVTablesInModule();
+  void serializeMoveonlyDeinitsInModule();
 
 private:
   bool isReferenceSerializeCandidate(SILFunction *F, SILOptions options);
@@ -159,6 +160,12 @@ private:
 public:
   InstructionVisitor(SILFunction &F, CrossModuleOptimization &CMS, VisitMode visitMode) :
     SILCloner(F), CMS(CMS), mode(visitMode) {}
+
+  ~InstructionVisitor() {
+    // We use the cloner for type visiting which may clone `unreachable` instructions.
+    // However, this does not introduce any incomplete lifetimes.
+    Builder.getFunction().setNeedCompleteLifetimes(false);
+  }
 
   SILType remapType(SILType Ty) {
     if (Ty.hasLocalArchetype()) {
@@ -343,9 +350,9 @@ static bool isSerializeCandidate(SILFunction *F, SILOptions options) {
 
 bool CrossModuleOptimization::isReferenceSerializeCandidate(SILFunction *F, 
                                                             SILOptions options) {
+  if (isSerializedWithRightKind(F->getModule(), F))
+    return true;
   if (isPackageCMOEnabled(F->getModule().getSwiftModule())) {
-    if (isSerializedWithRightKind(F->getModule(), F))
-      return true;
     return hasPublicOrPackageVisibility(F->getLinkage(),
                                         /*includePackage*/ true);
   }
@@ -471,6 +478,24 @@ void CrossModuleOptimization::serializeVTablesInModule() {
   }
 }
 
+void CrossModuleOptimization::serializeMoveonlyDeinitsInModule() {
+  for (SILMoveOnlyDeinit *deinit : M.getMoveOnlyDeinits()) {
+    if (deinit->isAnySerialized())
+      continue;
+    SILFunction *deinitFunc = deinit->getImplementation();
+    if (!canUseFromInline(deinitFunc))
+      continue;
+
+    if (everything)
+      makeFunctionUsableFromInline(deinitFunc);
+    if (deinitFunc->hasValidLinkageForFragileRef(IsSerialized)) {
+      deinit->setSerializedKind(IsSerialized);
+    } else if (deinitFunc->hasValidLinkageForFragileRef(IsSerializedForPackage)) {
+      deinit->setSerializedKind(IsSerializedForPackage);
+    }
+  }
+}
+
 /// Recursively walk the call graph and select functions to be serialized.
 ///
 /// The results are stored in \p canSerializeFlags and the result for \p
@@ -487,6 +512,11 @@ bool CrossModuleOptimization::canSerializeFunction(
   // Temporarily set the flag to false (to avoid infinite recursion) until we set
   // it to true at the end of this function.
   canSerializeFlags[function] = false;
+
+  // We can't serialize a function that explicitly opted out of being
+  // serialized.
+  if (function->isNeverEmitIntoClient())
+    return false;
 
   if (everything) {
     canSerializeFlags[function] = true;
@@ -531,7 +561,14 @@ bool CrossModuleOptimization::canSerializeFunction(
   // or should at least increase the size limit.
   bool skipSizeLimitCheck = isPackageCMOEnabled(M.getSwiftModule());
 
-  if (!conservative) {
+  int sizeLimit = CMOFunctionSizeLimit;
+
+  if (conservative) {
+    // Even in conservative mode we want to serialize most generic functions,
+    // except they are large (for code size reasons).
+    if (function->getLoweredFunctionType()->isPolymorphic())
+      sizeLimit = sizeLimit * 20;
+  } else {
     // The basic heuristic: serialize all generic functions, because it makes a
     // huge difference if generic functions can be specialized or not.
     if (function->getLoweredFunctionType()->isPolymorphic())
@@ -541,12 +578,11 @@ bool CrossModuleOptimization::canSerializeFunction(
   }
 
   if (!skipSizeLimitCheck) {
-    // Also serialize "small" non-generic functions.
     int size = 0;
     for (SILBasicBlock &block : *function) {
       for (SILInstruction &inst : block) {
         size += (int)instructionInlineCost(inst);
-        if (size >= CMOFunctionSizeLimit)
+        if (size >= sizeLimit)
           return false;
       }
     }
@@ -732,6 +768,10 @@ bool CrossModuleOptimization::canSerializeDecl(NominalTypeDecl *decl) {
 }
 
 bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
+  // If we are prevented from serializing this global, don't.
+  if (global->codeGenerationModel() == CodeGenerationModel::Interface)
+    return false;
+
   // Check for referenced functions in the initializer.
   for (const SILInstruction &initInst : *global) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(&initInst)) {
@@ -921,7 +961,7 @@ void CrossModuleOptimization::serializeInstruction(SILInstruction *inst,
                                        const FunctionFlags &canSerializeFlags) {
   // Put callees onto the worklist if they should be serialized as well.
   if (auto *FRI = dyn_cast<FunctionRefBaseInst>(inst)) {
-    SILFunction *callee = FRI->getReferencedFunctionOrNull();
+    SILFunction *callee = FRI->getInitiallyReferencedFunction();
     assert(callee);
     if (!callee->isDefinition() || callee->isAvailableExternally())
       return;
@@ -1020,6 +1060,12 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Package)
     return;  
 
+  // In Embedded Swift every ValueDecl is "usableFromInline". There is code that
+  // makes sure that the ABI linkage is public.
+  if (decl->getASTContext().LangOpts.hasFeature(Feature::Embedded) ||
+      decl->getModuleContext()->isAggressiveCMOEnabled())
+    return;
+
   // This function should not be called in Package CMO mode.
   assert(!isPackageCMOEnabled(M.getSwiftModule()));
 
@@ -1034,7 +1080,7 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
     // immutable at this point.
     auto &ctx = decl->getASTContext();
     auto *attr = new (ctx) UsableFromInlineAttr(/*implicit=*/true);
-    decl->getAttrs().add(attr);
+    decl->addAttribute(attr);
 
     if (everything) {
       // The following does _not_ apply to the Package CMO as
@@ -1139,6 +1185,7 @@ class CrossModuleOptimizationPass: public SILModuleTransform {
     // Serialize SIL v-tables and witness-tables if package-cmo is enabled.
     CMO.serializeVTablesInModule();
     CMO.serializeWitnessTablesInModule();
+    CMO.serializeMoveonlyDeinitsInModule();
   }
 };
 

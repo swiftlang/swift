@@ -231,6 +231,8 @@ struct ActorReferenceResult {
   const ActorIsolation isolation;
 
 private:
+  struct Builder;
+
   static ActorReferenceResult
   forSameConcurrencyDomain(ActorIsolation isolation,
                            Options options = std::nullopt);
@@ -557,7 +559,7 @@ bool diagnoseIfAnyNonSendableTypes(
 
         if (!diagnosed) {
           ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
-              .limitBehaviorUntilSwiftVersion(behavior, 6)
+              .limitBehaviorUntilLanguageMode(behavior, LanguageMode::v6)
               .limitBehaviorIf(preconcurrency);
           diagnosed = true;
         }
@@ -609,8 +611,7 @@ bool diagnoseSendabilityErrorBasedOn(
 /// and perform any necessary resolution and diagnostics, returning the
 /// global actor attribute and type it refers to (or \c std::nullopt).
 std::optional<std::pair<CustomAttr *, NominalTypeDecl *>>
-checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
-                           ArrayRef<CustomAttr *> attrs);
+checkGlobalActorAttributes(SourceLoc loc, ArrayRef<CustomAttr *> attrs);
 
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
@@ -789,6 +790,18 @@ bool checkIsolatedConformancesInContext(
 /// type match the isolated of the context.
 bool checkIsolatedConformancesInContext(
     Type type, SourceLoc loc, const DeclContext *dc,
+    HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
+
+/// Check for isolated conformances escaping through a call that crosses
+/// an isolation boundary. The conformances in the 'declRef' are checked against
+/// the given target isolation of the call rather than the isolation of its
+/// DeclContext.
+///
+/// Also checks for abstract (generic) conformances that may be isolated,
+/// skipping Self conformances for protocol members (used only for dispatch).
+bool checkIsolatedConformancesForIsolationCrossing(
+    ConcreteDeclRef declRef, SourceLoc loc,
+    ActorIsolation targetIsolation, const DeclContext *dc,
     HandleConformanceIsolationFn handleBad = doNotDiagnoseConformanceIsolation);
 
 /// For a protocol conformance that does not have a "raw" isolation, infer its isolation.

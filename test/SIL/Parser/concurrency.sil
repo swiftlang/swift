@@ -5,16 +5,15 @@ sil_stage raw // CHECK: sil_stage raw
 
 import Builtin
 import Swift
-
-actor Actor { }
+import _Concurrency
 
 // CHECK-LABEL: sil @test_hop_to_executor
-sil @test_hop_to_executor : $@convention(thin) (@guaranteed Actor) -> () {
-bb0(%0 : $Actor):
-  // CHECK: hop_to_executor %0 : $Actor
-  hop_to_executor %0 : $Actor
-  // CHECK: hop_to_executor [mandatory] %0 : $Actor
-  hop_to_executor [mandatory] %0 : $Actor
+sil @test_hop_to_executor : $@convention(thin) (@guaranteed any Actor) -> () {
+bb0(%0 : $any Actor):
+  // CHECK: hop_to_executor %0 : $any Actor
+  hop_to_executor %0 : $any Actor
+  // CHECK: hop_to_executor [mandatory] %0 : $any Actor
+  hop_to_executor [mandatory] %0 : $any Actor
   %2 = tuple ()
   return %2 : $()
 }
@@ -32,3 +31,24 @@ bb0:
 }
 
 
+// CHECK-LABEL: sil [ossa] @test_cast_implicitactor_to_opaqueisolation : $@convention(thin) (@guaranteed Builtin.ImplicitActor) -> @owned Optional<any Actor> {
+// CHECK: implicitactor_to_opaqueisolation_cast {{%.*}} : $Builtin.ImplicitActor
+// CHECK: } // end sil function 'test_cast_implicitactor_to_opaqueisolation'
+sil [ossa] @test_cast_implicitactor_to_opaqueisolation : $@convention(thin) (@guaranteed Builtin.ImplicitActor) -> @owned Optional<any Actor> {
+bb0(%0 : @guaranteed $Builtin.ImplicitActor):
+  %1 = implicitactor_to_opaqueisolation_cast %0 : $Builtin.ImplicitActor
+  %2 = copy_value %1 : $Optional<any Actor>
+  return %2 : $Optional<any Actor>
+}
+
+// CHECK-LABEL: sil [ossa] @test_implicitactor_to_opaqueisolation_on_unowned : $@convention(thin) () -> @owned Optional<any Actor> {
+// CHECK: implicitactor_to_opaqueisolation_cast {{%.*}} : $Builtin.ImplicitActor
+// CHECK: } // end sil function 'test_implicitactor_to_opaqueisolation_on_unowned'
+sil [ossa] @test_implicitactor_to_opaqueisolation_on_unowned : $@convention(thin) () -> @owned Optional<any Actor> {
+bb0:
+  %0 = enum $Optional<any Actor>, #Optional.none!enumelt
+  %1 = unchecked_value_cast %0 : $Optional<any Actor> to $Builtin.ImplicitActor
+  %2 = implicitactor_to_opaqueisolation_cast %1 : $Builtin.ImplicitActor
+  %3 = copy_value %2 : $Optional<any Actor>
+  return %3 : $Optional<any Actor>
+}

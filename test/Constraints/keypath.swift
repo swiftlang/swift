@@ -342,3 +342,44 @@ func test_new_key_path_type_requirements() {
   // expected-error@-1 {{key path cannot refer to noncopyable type 'S'}}
   // expected-error@-2 {{local function 'test' requires that 'S' conform to 'Copyable'}}
 }
+
+// Test case for transitive key path root inference vs. keypath to function
+// conversion
+protocol Wrapper {
+  associatedtype Value
+}
+
+struct _MapWrapper<T, U>: Wrapper {
+  typealias Value = U
+}
+
+extension Wrapper {
+  func map<T>(_: (Value) -> T) -> _MapWrapper<Self, T> {
+    fatalError()
+  }
+}
+
+extension Optional: Wrapper where Wrapped: Wrapper {
+  typealias Value = Wrapped.Value
+}
+
+protocol Shape {}
+
+struct Empty: Shape {}
+
+struct Polygon {
+  init(_: Int) {}
+
+  var shape: any Shape {
+    fatalError()
+  }
+}
+
+func test_transitive_key_path_root_inference1(x: Int?) -> (any Shape)? {
+  return x.map(Polygon.init).map(\.shape)
+}
+
+func test_transitive_key_path_root_inference2(x: Int?) -> any Shape {
+  let shape = x.map(Polygon.init).map(\.shape) ?? Empty()
+  return shape
+}

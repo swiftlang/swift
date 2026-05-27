@@ -102,8 +102,6 @@ public:
   static bool isArgZeroRef(ArgTy &a = customTy) { return a.value == 0; }
 };
 
-// TODO: support default arguments of constructors
-// (https://github.com/apple/swift/issues/70124)
 struct HasCtorWithDefaultArg {
   int value;
 
@@ -125,6 +123,8 @@ inline int ambiguous(int a) { return a; }
 
 inline int nonTrailing(int a, int b = 2) { return a + b; }
 inline int nonTrailing(int a = 1, int b);
+
+inline int takesUnnamedParam(int = 123) { return 456; }
 
 // MARK: - Un-instantiatable default expressions
 

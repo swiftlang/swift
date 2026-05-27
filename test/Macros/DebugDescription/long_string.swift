@@ -15,7 +15,10 @@ struct MyStruct: CustomDebugStringConvertible {
     """
   }
 }
-// CHECK: static let _lldb_summary = (
-// CHECK:     /* version */ 1 as UInt8,
-// CHECK:     /* record size */ 192 as UInt8, 2 as UInt8,
-// CHECK: 8-bit integer. See https://en.wikipedia.org/wiki/LEB128" */ 175 as UInt8, 2 as UInt8, 65 as UInt8,
+/// CHECK: static let _lldb_summary: (
+// CHECK:   {{UInt8(, UInt8)*}}
+// CHECK: ) =
+// CHECK: (
+// CHECK:     /* version */ 1,
+// CHECK:     /* record size */ 192, 2,
+// CHECK: 8-bit integer. See https://en.wikipedia.org/wiki/LEB128" */ 175, 2, 65,

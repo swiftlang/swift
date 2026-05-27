@@ -96,7 +96,7 @@ set(SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS
   "-strict-memory-safety"
 )
 
-add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IMPORTS_NON_OSSA 
+add_swift_target_library(swiftSynchronization ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${SWIFT_SYNCHRONIZATION_SOURCES}
 
   GYB_SOURCES
@@ -189,13 +189,27 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    endif()
+
+    set(SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES)
+
+    if("${arch}" MATCHES "wasm32")
+      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_SOURCES})
+      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_WASM_SOURCES})
+    else()
+      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_ATOMIC_SOURCES})
+    endif()
+      
     add_swift_target_library_single(
       embedded-synchronization-${mod}
       swiftSynchronization
       ONLY_SWIFTMODULE
       IS_FRAGILE
       
-      ${SWIFT_SYNCHRONIZATION_ATOMIC_SOURCES}
+      ${SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES}
+      
       GYB_SOURCES
         ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
 

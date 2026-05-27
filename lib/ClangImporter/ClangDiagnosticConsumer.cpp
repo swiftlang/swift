@@ -20,7 +20,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/Frontend/DiagnosticRenderer.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
-#include "clang/Lex/LexDiagnostic.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
@@ -34,10 +33,8 @@ namespace {
 
   public:
     ClangDiagRenderer(const clang::LangOptions &langOpts,
-                      clang::DiagnosticOptions *diagOpts,
-                      decltype(callback) fn)
-       : DiagnosticNoteRenderer(langOpts, diagOpts),
-         callback(fn) {}
+                      clang::DiagnosticOptions &diagOpts, decltype(callback) fn)
+        : DiagnosticNoteRenderer(langOpts, diagOpts), callback(fn) {}
 
   private:
     /// Is this a diagnostic that doesn't do the user any good to show if it
@@ -107,10 +104,9 @@ namespace {
 
 ClangDiagnosticConsumer::ClangDiagnosticConsumer(
     ClangImporter::Implementation &impl,
-    clang::DiagnosticOptions &clangDiagOptions,
-    bool dumpToStderr)
-  : TextDiagnosticPrinter(llvm::errs(), &clangDiagOptions),
-    ImporterImpl(impl), DumpToStderr(dumpToStderr) {}
+    clang::DiagnosticOptions &clangDiagOptions, bool dumpToStderr)
+    : TextDiagnosticPrinter(llvm::errs(), clangDiagOptions), ImporterImpl(impl),
+      DumpToStderr(dumpToStderr) {}
 
 void ClangDiagnosticConsumer::HandleDiagnostic(
     clang::DiagnosticsEngine::Level clangDiagLevel,
@@ -179,7 +175,7 @@ void ClangDiagnosticConsumer::HandleDiagnostic(
     assert(clangDiag.hasSourceManager());
     auto clangCI = ImporterImpl.getClangInstance();
     ClangDiagRenderer renderer(clangCI->getLangOpts(),
-                               &clangCI->getDiagnosticOpts(), emitDiag);
+                               clangCI->getDiagnosticOpts(), emitDiag);
     clang::FullSourceLoc clangDiagLoc(clangDiag.getLocation(),
                                       clangDiag.getSourceManager());
     renderer.emitDiagnostic(clangDiagLoc, clangDiagLevel, message,

@@ -7,7 +7,7 @@
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %S/Inputs/custom-modules -I %t) -emit-module -o %t %S/Inputs/ImplementProtoRenaming.swift
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %S/Inputs/custom-modules -I %t) -typecheck %s -verify
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %S/Inputs/custom-modules -I %t) -typecheck %s -verify -verify-ignore-unrelated
 
 // REQUIRES: objc_interop
 

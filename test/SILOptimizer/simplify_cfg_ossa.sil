@@ -1,4 +1,6 @@
-// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-experimental-feature MoveOnlyEnumDeinits -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 // OSSA form of tests from simplify_cfg.sil and simplify_cfg_simple.sil.
 //
@@ -62,6 +64,12 @@ struct NonTrivial {
 struct S {
   var a: Int
   var b: NonTrivial
+}
+
+enum NCE: ~Copyable {
+  case a
+  case b(AnyObject)
+  deinit
 }
 
 ///////////
@@ -564,18 +572,6 @@ bb5:
 
 bb6(%8 : $Int64):
   return %8 : $Int64
-}
-
-// CHECK-LABEL: @infinite_loop
-// CHECK: bb0
-// CHECK-NEXT: br bb1
-// CHECK: bb1
-// CHECK-NEXT: br bb1
-sil [ossa] @infinite_loop : $@convention(thin) () -> () {
-bb0:
-  br bb1
-bb1:
-  br bb1
 }
 
 // CHECK-LABEL: @dead_loop
@@ -1864,7 +1860,7 @@ bb0(%0 : $Optional<A>, %1 : @guaranteed $OptionalKlassWrapper):
   switch_enum_addr %2 : $*Optional<A>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
 
 bb1:
-  %5 = unchecked_take_enum_data_addr %2 : $*Optional<A>, #Optional.some!enumelt
+  %5 = unchecked_inplace_enum_data_addr %2 : $*Optional<A>, #Optional.some!enumelt
   %6 = load [trivial] %5 : $*A
   br bb3(%6 : $A)
 
@@ -1944,6 +1940,44 @@ bb3:
   return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @insert_compensating_endlifetime_in_switch_enum_destination_block :
+// CHECK:       bb0(%0 : @owned $Optional<AnyObject>):
+// CHECK-NEXT:    end_lifetime %0
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'insert_compensating_endlifetime_in_switch_enum_destination_block'
+sil [ossa] @insert_compensating_endlifetime_in_switch_enum_destination_block : $@convention(thin) (@owned Optional<AnyObject>) -> () {
+bb0(%0 : @owned $Optional<AnyObject>):
+  switch_enum %0, case #Optional.none!enumelt: bb1, case #Optional.some!enumelt: bb2
+
+bb1:
+  %15 = tuple ()
+  return %15
+
+bb2(%4 : @owned $AnyObject):
+  destroy_value %4
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @insert_compensating_endlifetime_in_switch_enum_destination_block2 :
+// CHECK:       bb0(%0 : @owned $NCE):
+// CHECK-NEXT:    %1 = drop_deinit %0
+// CHECK-NEXT:    end_lifetime %1
+// CHECK-NEXT:    tuple
+// CHECK:       } // end sil function 'insert_compensating_endlifetime_in_switch_enum_destination_block2'
+sil [ossa] @insert_compensating_endlifetime_in_switch_enum_destination_block2 : $@convention(thin) (@owned NCE) -> () {
+bb0(%0 : @owned $NCE):
+  %1 = drop_deinit %0
+  switch_enum %1, case #NCE.a!enumelt: bb1, case #NCE.b!enumelt: bb2
+
+bb1:
+  %15 = tuple ()
+  return %15
+
+bb2(%4 : @owned $AnyObject):
+  destroy_value %4
+  unreachable
+}
+
 // CHECK-LABEL: sil [ossa] @replace_phi_arg_with_borrowed_from_use :
 // CHECK:       bb3([[R:%.*]] : @reborrow $B):
 // CHECK:       bb6([[G:%.*]] : @guaranteed $E):
@@ -2021,3 +2055,46 @@ bb9:
   return %23
 }
 
+struct NCWrapper : ~Copyable {
+  var val: Builtin.Int64
+  deinit
+}
+
+enum NCOptional : ~Copyable {
+  case some(NCWrapper)
+  case none
+}
+
+// CHECK-LABEL: sil [ossa] @test_switch_enum_thread_overconsume :
+// CHECK-NOT:     switch_enum
+// CHECK-LABEL: } // end sil function 'test_switch_enum_thread_overconsume'
+sil [ossa] @test_switch_enum_thread_overconsume : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%0 : $Builtin.Int64):
+  %stk = alloc_stack $NCWrapper
+  cond_br undef, bb_init, bb_none
+
+bb_init:
+  %w = struct $NCWrapper (%0 : $Builtin.Int64)
+  %some = enum $NCOptional, #NCOptional.some!enumelt, %w : $NCWrapper
+  br bb_switch(%some : $NCOptional)
+
+bb_none:
+  %none = enum $NCOptional, #NCOptional.none!enumelt
+  br bb_switch(%none : $NCOptional)
+
+bb_switch(%opt : @owned $NCOptional):
+  switch_enum %opt : $NCOptional, case #NCOptional.some!enumelt: bb_some, case #NCOptional.none!enumelt: bb_use_none
+
+bb_some(%val : @owned $NCWrapper):
+  store %val to [init] %stk : $*NCWrapper
+  destroy_addr %stk : $*NCWrapper
+  br bb_exit
+
+bb_use_none:
+  br bb_exit
+
+bb_exit:
+  dealloc_stack %stk : $*NCWrapper
+  %r = tuple ()
+  return %r : $()
+}

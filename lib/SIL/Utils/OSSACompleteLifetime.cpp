@@ -169,7 +169,7 @@ static FunctionTest LivenessPartialBoundaryOutsideUsersTest(
     [](auto &function, auto &arguments, auto &test) {
       SILValue value = arguments.takeValue();
       InteriorLiveness liveness(value);
-      liveness.compute(test.getDominanceInfo());
+      liveness.compute();
       visitUsersOutsideLinearLivenessBoundary(
           value, liveness.getLiveness(),
           [](auto *inst) { inst->print(llvm::outs()); });
@@ -583,7 +583,7 @@ bool OSSACompleteLifetime::analyzeAndUpdateLifetime(SILValue value,
                                  nonDestroyingEnd, deadEndBlocks);
   }
   InteriorLiveness liveness(value);
-  liveness.compute(domInfo, handleInnerScope);
+  liveness.compute(handleInnerScope);
   if (VerifyLifetimeCompletion && boundary != Boundary::Availability &&
       liveness.getAddressUseKind() != AddressUseKind::NonEscaping) {
     llvm::errs() << "Incomplete liveness for: " << value;
@@ -619,10 +619,9 @@ static FunctionTest OSSACompleteLifetimeTest(
       auto *deb = test.getDeadEndBlocks();
       llvm::outs() << "OSSA lifetime completion on " << kind
                    << " boundary: " << value;
-      OSSACompleteLifetime completion(&function, /*domInfo*/ nullptr, *deb,
-                                      OSSACompleteLifetime::IgnoreTrivialVariable,
-                                      /*forceLivenessVerification=*/false,
-                                      nonDestroyingEnd);
+      OSSACompleteLifetime completion(
+          &function, *deb, OSSACompleteLifetime::IgnoreTrivialVariable,
+          /*forceLivenessVerification=*/false, nonDestroyingEnd);
       completion.completeOSSALifetime(value, kind);
       function.print(llvm::outs());
     });
@@ -699,7 +698,7 @@ bool UnreachableLifetimeCompletion::completeLifetimes() {
     }
   }
 
-  OSSACompleteLifetime completion(function, domInfo, deadEndBlocks);
+  OSSACompleteLifetime completion(function, deadEndBlocks);
 
   bool changed = false;
   for (auto value : incompleteValues) {

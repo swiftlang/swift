@@ -1,0 +1,67 @@
+// RUN: %target-swift-frontend -disable-debugger-shadow-copies -primary-file %s -emit-ir -g -o - | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { loc "file.swift":1:6 parent @test_transform_const : $@convention(thin) () -> () }
+sil_scope 2 { loc "file.swift":5:6 parent @test_transform_add : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 3 { loc "file.swift":10:6 parent @test_transform_multi : $@convention(thin) (Builtin.Int64) -> () }
+
+// CHECK-LABEL: define {{.*}} @test_transform_const
+sil @test_transform_const : $@convention(thin) () -> () {
+bb0:
+// The transform block produces a constant i64 42 that is used in #dbg_value.
+// CHECK: #dbg_value(i64 42, ![[VAR1:[0-9]+]]
+  debug_value undef : $Builtin.Int64, let, name "x", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0:
+    %0 = integer_literal $Builtin.Int64, 42
+    return %0 : $Builtin.Int64
+  }, loc "file.swift":2:3, scope 1
+  %r = tuple ()
+  return %r : $(), loc "file.swift":3:3, scope 1
+}
+
+// CHECK-LABEL: define {{.*}} @test_transform_add
+sil @test_transform_add : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%arg : $Builtin.Int64):
+// The transform block adds 10 to the argument. The add instruction should be
+// salvaged into a DWARF expression and erased from the IR.
+// CHECK-NOT: add {{.*}} 10
+// CHECK: #dbg_value(i64 %0, ![[VAR2:[0-9]+]], !DIExpression(DW_OP_plus_uconst, 10, DW_OP_stack_value)
+  debug_value %arg : $Builtin.Int64, let, name "y", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0(%0 : $Builtin.Int64):
+    %1 = integer_literal $Builtin.Int64, 10
+    %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+    return %2 : $Builtin.Int64
+  }, loc "file.swift":6:3, scope 2
+  %r = tuple ()
+  return %r : $(), loc "file.swift":7:3, scope 2
+}
+
+// CHECK-LABEL: define {{.*}} @test_transform_multi
+sil @test_transform_multi : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%arg : $Builtin.Int64):
+// Multiple arithmetic instructions that all get salvaged and erased.
+// `(x + 10) * 2 + 3`: three real LLVM instructions, all must be erased.
+// CHECK-NOT: add
+// CHECK-NOT: mul
+// CHECK: #dbg_value(i64 %0, ![[VAR3:[0-9]+]], !DIExpression(DW_OP_plus_uconst, 10, DW_OP_constu, 2, DW_OP_mul, DW_OP_plus_uconst, 3, DW_OP_stack_value)
+  debug_value %arg : $Builtin.Int64, let, name "z", type $Int64, expr op_fragment:#Int64._value, transform {
+  bb0(%0 : $Builtin.Int64):
+    %1 = integer_literal $Builtin.Int64, 10
+    %2 = builtin "add_Int64"(%0 : $Builtin.Int64, %1 : $Builtin.Int64) : $Builtin.Int64
+    %3 = integer_literal $Builtin.Int64, 2
+    %4 = builtin "mul_Int64"(%2 : $Builtin.Int64, %3 : $Builtin.Int64) : $Builtin.Int64
+    %5 = integer_literal $Builtin.Int64, 3
+    %6 = builtin "add_Int64"(%4 : $Builtin.Int64, %5 : $Builtin.Int64) : $Builtin.Int64
+    return %6 : $Builtin.Int64
+  }, loc "file.swift":11:3, scope 3
+  %r = tuple ()
+  return %r : $(), loc "file.swift":12:3, scope 3
+}
+
+// CHECK-DAG: ![[VAR1]] = !DILocalVariable(name: "x"
+// CHECK-DAG: ![[VAR2]] = !DILocalVariable(name: "y"
+// CHECK-DAG: ![[VAR3]] = !DILocalVariable(name: "z"

@@ -1,3 +1,8 @@
+module DeducingThis {
+  header "deducing-this.h"
+  requires cplusplus23
+}
+
 module Methods {
   header "methods.h"
   requires cplusplus
@@ -22,5 +27,10 @@ module SRetWinARM64 {
 
 module InRegSRet {
   header "inreg-sret.h"
+  requires cplusplus
+}
+
+module SwiftNameDifferentType {
+  header "swift-name-different-type.h"
   requires cplusplus
 }

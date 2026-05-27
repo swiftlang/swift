@@ -60,6 +60,7 @@ namespace {
   class LookupResultBuilder {
     LookupResult &Result;
     DeclContext *DC;
+    Identifier ModuleSelector;
     NameLookupOptions Options;
 
     /// The vector of found declarations.
@@ -72,8 +73,9 @@ namespace {
 
   public:
     LookupResultBuilder(LookupResult &result, DeclContext *dc,
-                        NameLookupOptions options)
-      : Result(result), DC(dc), Options(options) {
+                        Identifier moduleSelector, NameLookupOptions options)
+      : Result(result), DC(dc), ModuleSelector(moduleSelector), Options(options)
+    {
       if (dc->getASTContext().isAccessControlDisabled())
         Options |= NameLookupFlags::IgnoreAccessControl;
     }
@@ -82,6 +84,11 @@ namespace {
       // Remove any overridden declarations from the found-declarations set.
       removeOverriddenDecls(FoundDecls);
       removeOverriddenDecls(FoundOuterDecls);
+
+      // Remove any declarations excluded by the module selector from the
+      // found-declarations set.
+      removeOutOfModuleDecls(FoundDecls, ModuleSelector, DC);
+      removeOutOfModuleDecls(FoundOuterDecls, ModuleSelector, DC);
 
       // Remove any shadowed declarations from the found-declarations set.
       removeShadowedDecls(FoundDecls, DC);
@@ -133,7 +140,6 @@ namespace {
 
       auto addResult = [&](ValueDecl *result) {
         if (Known.insert({{result, baseDC}, false}).second) {
-          // HERE, need to look up base decl
           Result.add(LookupResultEntry(baseDC, baseDecl, result), isOuter);
           if (isOuter)
             FoundOuterDecls.push_back(result);
@@ -198,12 +204,15 @@ namespace {
       }
 
       // Dig out the witness.
-      ValueDecl *witness = nullptr;
       auto concrete = conformance.getConcrete();
       if (auto assocType = dyn_cast<AssociatedTypeDecl>(found)) {
-        witness = concrete->getTypeWitnessAndDecl(assocType).getWitnessDecl();
+        auto *witness = concrete->getTypeWitnessAndDecl(assocType)
+            .getWitnessDecl();
+        ASSERT(witness != assocType);
+        if (witness)
+          addResult(witness);
       } else if (found->isProtocolRequirement()) {
-        witness = concrete->getWitnessDecl(found);
+        auto *witness = concrete->getWitnessDecl(found);
 
         // It is possible that a requirement is visible to us, but
         // not the witness. In this case, just return the requirement;
@@ -214,22 +223,18 @@ namespace {
           addResult(found);
           return;
         }
+
+        // If we have an imported conformance or the witness could
+        // not be deserialized, getWitnessDecl() will just return
+        // the requirement, so just drop the lookup result here.
+        if (witness && witness != found)
+          addResult(witness);
       } else if (isa<NominalTypeDecl>(found)) {
         // Declaring nested types inside other types is currently
         // not supported by lookup would still return such members
         // so we have to account for that here as well.
         addResult(found);
-        return;
       }
-
-      // FIXME: the "isa<ProtocolDecl>()" check will be wrong for
-      // default implementations in protocols.
-      //
-      // If we have an imported conformance or the witness could
-      // not be deserialized, getWitnessDecl() will just return
-      // the requirement, so just drop the lookup result here.
-      if (witness && !isa<ProtocolDecl>(witness->getDeclContext()))
-        addResult(witness);
     }
   };
 } // end anonymous namespace
@@ -290,7 +295,10 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
                                   UnqualifiedLookupRequest{descriptor}, {});
 
   LookupResult result;
-  LookupResultBuilder builder(result, dc, options);
+  // Disable module selector filtering--UnqualifiedLookupRequest should have
+  // done it.
+  LookupResultBuilder builder(result, dc, /*moduleSelector=*/Identifier(),
+                              options);
   for (auto idx : indices(lookup.allResults())) {
     const auto &found = lookup[idx];
     // Determine which type we looked through to find this result.
@@ -307,7 +315,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
         }
         assert(typeDC->isTypeContext());
       }
-      foundInType = dc->mapTypeIntoContext(
+      foundInType = dc->mapTypeIntoEnvironment(
         typeDC->getDeclaredInterfaceType());
       assert(foundInType && "bogus base declaration?");
     }
@@ -381,7 +389,7 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
 
-  LookupResultBuilder builder(result, dc, options);
+  LookupResultBuilder builder(result, dc, name.getModuleSelector(), options);
   SmallVector<ValueDecl *, 4> lookupResults;
   dc->lookupQualified(type, name, loc, subOptions, lookupResults);
 
@@ -426,7 +434,7 @@ TypeChecker::isUnsupportedMemberTypeAccess(Type type, TypeDecl *typeDecl,
     // Non-generic type aliases can only be accessed if the
     // underlying type is not dependent.
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(typeDecl)) {
-      if (!aliasDecl->isGeneric() &&
+      if (!aliasDecl->hasGenericParamList() &&
           aliasDecl->getUnderlyingType()->hasTypeParameter() &&
           !doesTypeAliasFullyConstrainAllOuterGenericParams(aliasDecl)) {
         return UnsupportedMemberTypeAccessKind::TypeAliasOfUnboundGeneric;
@@ -553,11 +561,13 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       auto *concrete = conformance.getConcrete();
       auto *normal = concrete->getRootNormalConformance();
 
-      // This is the only case where NormalProtocolConformance::
-      // getTypeWitnessAndDecl() returns a null type.
-      if (dc->getASTContext().evaluator.hasActiveRequest(
-            ResolveTypeWitnessesRequest{normal})) {
-        continue;
+      if (!concrete->hasTypeWitness(assocType)) {
+        // This is the only case where NormalProtocolConformance::
+        // getTypeWitnessAndDecl() returns a null type.
+        if (dc->getASTContext().evaluator.hasActiveRequest(
+              ResolveTypeWitnessesRequest{normal})) {
+          continue;
+        }
       }
 
       auto *typeDecl =
@@ -1009,15 +1019,28 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
   }
 }
 
-bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
-                                                const DeclContext *dc,
-                                                SourceLoc loc,
-                                                DiagnosticBehavior limit) {
+bool swift::shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                                 const DeclContext *dc) {
+  // Only diagnose references in source files.
+  auto sf = dc->getParentSourceFile();
+  if (!sf)
+    return false;
+
+  auto &ctx = dc->getASTContext();
+  if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility,
+                               /*allowMigration=*/true))
+    return false;
+
+  // Only diagnose members.
+  if (!decl->getDeclContext()->isTypeContext())
+    return false;
+
+  // Only diagnose declarations that haven't been imported.
   if (dc->isDeclImported(decl))
     return false;
 
   auto definingModule = decl->getModuleContextForNameLookup();
-  if (dc->getASTContext().LangOpts.EnableCXXInterop) {
+  if (ctx.LangOpts.EnableCXXInterop) {
     // With Cxx interop enabled, there are some declarations that always belong
     // to the Clang header import module which should always be implicitly
     // visible. However, that module is not implicitly imported in source files
@@ -1026,19 +1049,30 @@ bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
       return false;
   }
 
-  auto sf = dc->getParentSourceFile();
-  if (!sf)
-    return false;
-
-  auto &ctx = dc->getASTContext();
-
-  // In lazy typechecking mode just emit the diagnostic immediately without a
-  // fix-it since there won't be an opportunity to emit delayed diagnostics.
   if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
     // Lazy type-checking and migration for MemberImportVisibility are
     // completely incompatible, so just skip the diagnostic entirely.
     if (ctx.LangOpts.isMigratingToFeature(Feature::MemberImportVisibility))
       return false;
+  }
+
+  return true;
+}
+
+bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                                const DeclContext *dc,
+                                                SourceLoc loc,
+                                                DiagnosticBehavior limit) {
+  if (!shouldDiagnoseMissingImportForMember(decl, dc))
+    return false;
+
+  auto &ctx = dc->getASTContext();
+  auto sf = dc->getParentSourceFile();
+
+  // In lazy typechecking mode just emit the diagnostic immediately without a
+  // fix-it since there won't be an opportunity to emit delayed diagnostics.
+  if (ctx.TypeCheckerOpts.EnableLazyTypecheck) {
+    auto definingModule = decl->getModuleContextForNameLookup();
 
     auto modulesToImport = missingImportsForDefiningModule(definingModule, *sf);
     if (modulesToImport.empty())
@@ -1133,4 +1167,117 @@ void swift::diagnoseMissingImports(SourceFile &sf) {
                                            fixItCache);
     }
   }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const LookupResult &candidates) {
+  // Produce a list of *unique* module selector diagnostics so we don't
+  // emit a bunch of duplicates.
+  for (auto result : candidates) {
+    ValueDecl * decl = result.getValueDecl();
+
+    CandidateKind kind;
+    if (!result.getDeclContext()) {
+      if (decl->getDeclContext()->isLocalContext())
+        kind = CandidateKind::Local;
+      else
+        kind = CandidateKind::ContextFree;
+    } else {
+      if (result.getDeclContext()->isTypeContext())
+        kind = CandidateKind::MemberViaContext;
+      else // found through result.getDeclContext()'s implicit `self`
+        kind = CandidateKind::MemberViaSelf;
+    }
+
+    auto owningModule = decl->getModuleContextForNameLookup();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), kind });
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const LookupTypeResult &candidates) {
+  // Produce a list of *unique* module selector diagnostics so we don't
+  // emit a bunch of duplicates.
+  for (auto result : candidates) {
+    auto owningModule = result.Member->getModuleContextForNameLookup();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const SmallVectorImpl<ValueDecl *> &candidates) {
+  for (auto result : candidates) {
+    auto owningModule = result->getModuleContextForNameLookup();
+    candidateModules.insert(
+      { owningModule->getName(), CandidateKind::ContextFree });
+  }
+}
+
+ModuleSelectorCorrection::
+ModuleSelectorCorrection(const SmallVectorImpl<constraints::OverloadChoice> &candidates) {
+  for (auto result : candidates) {
+    auto owningModule = result.getDecl()->getModuleContextForNameLookup();
+    candidateModules.insert(
+      { owningModule->getNameForModuleSelector(), CandidateKind::ContextFree });
+  }
+}
+
+bool ModuleSelectorCorrection::diagnose(ASTContext &ctx,
+                                        DeclNameLoc nameLoc,
+                                        DeclNameRef originalName) const {
+  if (candidateModules.empty())
+    return false;
+
+  ctx.Diags.diagnose(nameLoc, diag::wrong_module_selector,
+                     originalName.getFullName(),
+                     originalName.getModuleSelector());
+
+  SourceLoc moduleSelectorLoc = nameLoc.getModuleSelectorLoc();
+
+  for (auto pair : candidateModules) {
+    Identifier moduleName = pair.first;
+    switch (pair.second) {
+    case CandidateKind::ContextFree:
+      ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                         moduleName)
+          .fixItReplace(moduleSelectorLoc, moduleName.str());
+      break;
+
+    case CandidateKind::MemberViaSelf: {
+      SmallString<64> replacement("self.");
+      if (moduleName != originalName.getModuleSelector()) {
+        // The module selector specified the wrong module; replace it.
+        replacement += moduleName.str();
+
+        ctx.Diags.diagnose(moduleSelectorLoc, diag::note_change_module_selector,
+                           moduleName)
+            .fixItReplace(moduleSelectorLoc, replacement);
+      } else {
+        // The module selector specified the right module, but we need to
+        // make the `self.` explicit.
+        ctx.Diags.diagnose(moduleSelectorLoc,
+                           diag::note_add_explicit_self_with_module_selector)
+            .fixItInsert(moduleSelectorLoc, replacement);
+      }
+      break;
+    }
+    case CandidateKind::MemberViaContext:
+      // FIXME: If we had more info here, we could construct a reference
+      //        to the outer type in question.
+      ctx.Diags.diagnose(moduleSelectorLoc,
+                         diag::note_remove_module_selector_outer_type)
+          .fixItRemoveChars(moduleSelectorLoc, nameLoc.getBaseNameLoc());
+      break;
+
+    case CandidateKind::Local:
+      ctx.Diags.diagnose(moduleSelectorLoc,
+                         diag::note_remove_module_selector_local_decl)
+          .fixItRemoveChars(moduleSelectorLoc, nameLoc.getBaseNameLoc());
+      break;
+    }
+  }
+
+  return true;
 }

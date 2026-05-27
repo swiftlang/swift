@@ -11,18 +11,18 @@
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 
 // RUN: echo %t/main.swift > %t/inputs.FileList
-// RUN: %target-swift-frontend -emit-module -o %t/Test.swiftmodule -g -O \
+// RUN: %target-swift-frontend-plain -emit-module -o %t/Test.swiftmodule -g -O \
 // RUN:   -cache-compile-job -cas-path %t/cas -swift-version 5 \
 // RUN:   -disable-implicit-swift-modules -swift-version 5 -enable-cross-import-overlays \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
 // RUN:   -module-name Test -explicit-swift-module-map-file @%t/map.casid \
 // RUN:   -filelist %t/inputs.FileList @%t/MyApp.cmd
 
-// RUN: llvm-bcanalyzer --dump %t/Test.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer --dump %t/Test.swiftmodule | %FileCheck %s
 
-// CHECK: <XCC abbrevid=6/> blob data = '-cc1'
-// CHECK: <XCC abbrevid=6/> blob data = '-D'
-// CHECK: <XCC abbrevid=6/> blob data = 'TEST=1'
+// CHECK: <XCC abbrevid=[[XCC:[0-9]+]]/> blob data = '-cc1'
+// CHECK: <XCC abbrevid=[[XCC]]/> blob data = '-D'
+// CHECK: <XCC abbrevid=[[XCC]]/> blob data = 'TEST=1'
 // CHECK-NOT: <XCC abbrevid=6/> blob data = '--target=
 
 //--- main.swift

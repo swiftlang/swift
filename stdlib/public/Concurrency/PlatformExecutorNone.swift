@@ -12,7 +12,8 @@
 
 import Swift
 
-@available(StdlibDeploymentTarget 6.2, *)
+@_spi(ExperimentalCustomExecutors)
+@available(StdlibDeploymentTarget 6.3, *)
 public struct PlatformExecutorFactory: ExecutorFactory {
   public static let mainExecutor: any MainExecutor = UnimplementedMainExecutor()
   public static let defaultExecutor: any TaskExecutor = UnimplementedTaskExecutor()

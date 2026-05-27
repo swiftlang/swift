@@ -20,7 +20,7 @@
 #include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
-#include "clang/Rewrite/Core/RewriteBuffer.h"
+#include "llvm/ADT/RewriteBuffer.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -782,11 +782,11 @@ accept(SourceManager &SM, RegionType Type, ArrayRef<Replacement> Replacements) {
 namespace {
 class ClangFileRewriterHelper {
   unsigned InterestedId;
-  clang::RewriteBuffer RewriteBuf;
+  llvm::RewriteBuffer RewriteBuf;
   bool HasChange;
   llvm::raw_ostream &OS;
 
-  void removeCommentLines(clang::RewriteBuffer &Buffer, StringRef Input,
+  void removeCommentLines(llvm::RewriteBuffer &Buffer, StringRef Input,
                           StringRef LineHeader) {
     size_t Pos = 0;
     while (true) {

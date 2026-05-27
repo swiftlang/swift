@@ -18,3 +18,15 @@ func test(seq: any AsyncSequence) async {
     error.printMe()
   }
 }
+
+protocol P {}
+protocol Q: AsyncSequence where Self.Element: P {}
+
+protocol R {
+  associatedtype X: Q
+  func bar() -> X
+}
+
+func foo(_ x: any R) async throws {
+  for try await _ in x.bar() {}
+}

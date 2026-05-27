@@ -28,7 +28,7 @@ import Library
 
 test()
 
-// CHECK-LABEL: sil shared @$s7Library4testyyF
+// CHECK-LABEL: sil shared [export_implementation] @$s7Library4testyyF
 // CHECK: [[MACOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 14
 // CHECK: [[MACOS_MINOR:%.*]] = integer_literal $Builtin.Word, 0
 // CHECK: [[MACOS_PATCH:%.*]] = integer_literal $Builtin.Word, 0

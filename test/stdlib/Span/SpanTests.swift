@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2024 - 2025 Apple Inc. and the Swift project authors
+// Copyright (c) 2024 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -212,7 +212,7 @@ suite.test("RawSpan from Span")
   let array = Array(0..<count)
   array.withUnsafeBufferPointer {
     let span = Span(_unsafeElements: $0)
-    let raw  = RawSpan(_elements: span)
+    let raw  = RawSpan(unsafeElements: span)
     expectEqual(raw.byteCount, span.count*MemoryLayout<Int>.stride)
   }
 }
@@ -440,29 +440,24 @@ suite.test("suffix extracting() functions")
 }
 
 suite.test("withUnsafeBufferPointer")
-.skip(.custom(
-  { if #available(SwiftStdlib 6.2, *) { false } else { true } },
-  reason: "Requires Swift 6.2's standard library"
-))
-.code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
-  let capacity: UInt8 = 64
-  let a = Array(0..<capacity)
-  a.withUnsafeBufferPointer {
-    ub in
-    let span = Span(_unsafeElements: ub)
+.require(.stdlib_6_2).code {
+  let capacity = 10
+  var a = ContiguousArray(0..<10)
+  a.withUnsafeMutableBufferPointer {
+    let span = Span(_unsafeElements: $0)
     span.withUnsafeBufferPointer {
-      let i = Int.random(in: 0..<$0.count)
-      expectEqual($0[i], ub[i])
+      expectEqual($0.count, capacity)
+      for i in $0.indices {
+        expectEqual($0[i], i)
+      }
     }
 
-    let emptyBuffer = UnsafeBufferPointer(rebasing: ub[0..<0])
-    expectEqual(emptyBuffer.baseAddress, ub.baseAddress)
-
+    let emptyBuffer = UnsafeBufferPointer(rebasing: $0[0..<0])
+    expectEqual(emptyBuffer.baseAddress, $0.baseAddress)
     let emptySpan = Span(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBufferPointer {
-      expectNil($0.baseAddress)
+      expectEqual($0.count, 0)
+      expectNotNil($0.baseAddress)
     }
   }
 }
@@ -491,12 +486,13 @@ suite.test("withUnsafeBytes()")
 
     let emptySpan = Span(_unsafeElements: emptyBuffer)
     emptySpan.withUnsafeBytes {
-      expectNil($0.baseAddress)
+      expectTrue($0.isEmpty)
+      expectNotNil($0.baseAddress)
     }
   }
 }
 
-suite.test("isIdentical(to:)")
+suite.test("isTriviallyIdentical(to:)")
 .skip(.custom(
   { if #available(SwiftStdlib 6.2, *) { false } else { true } },
   reason: "Requires Swift 6.2's standard library"
@@ -504,23 +500,70 @@ suite.test("isIdentical(to:)")
 .code {
   guard #available(SwiftStdlib 6.2, *) else { return }
 
+  func checkTriviallyIdentical<T: BitwiseCopyable>(
+    _ x: UnsafeMutableBufferPointer<T>,
+    _ y: UnsafeMutableBufferPointer<T>,
+    _ expected: Bool,
+    stackTrace: SourceLocStack = SourceLocStack(),
+    showFrame: Bool = true,
+    file: String = #file,
+    line: UInt = #line
+  ) {
+    let stackTrace = stackTrace.pushIf(showFrame, file: file, line: line)
+    do {
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x = UnsafeBufferPointer<T>(x)
+      let y = UnsafeBufferPointer<T>(y)
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x = UnsafeRawBufferPointer(x)
+      let y = UnsafeRawBufferPointer(y)
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x = UnsafeMutableRawBufferPointer(x)
+      let y = UnsafeMutableRawBufferPointer(y)
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x: Span<T> = unsafe x.span
+      let y: Span<T> = unsafe y.span
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+      expectEqual(expected, x.isIdentical(to: y), stackTrace: stackTrace)
+    }
+    do {
+      let x: RawSpan = unsafe x.span.bytes
+      let y: RawSpan = unsafe y.span.bytes
+      expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+      expectEqual(expected, x.isIdentical(to: y), stackTrace: stackTrace)
+    }
+  }
+
+  let a = UnsafeMutableBufferPointer<Int>(start: nil, count: 0)
   let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: 8)
+  let c = b.extracting(..<6) // FIXME: (first: 6)
+  let d = b.extracting(2...) // FIXME: (last: 6)
+  let e = c.extracting(2...) // FIXME: (last: 4)
+  let f = d.extracting(..<4) // FIXME: (first: 4)
+
   _ = b.initialize(fromContentsOf: 0..<8)
   defer { b.deallocate() }
 
-  let span = Span(_unsafeElements: b)
-  let pre = span.extracting(first: 6)
-  let suf = span.extracting(last: 6)
+  checkTriviallyIdentical(a, a, true)
+  checkTriviallyIdentical(b, b, true)
+  checkTriviallyIdentical(c, c, true)
+  checkTriviallyIdentical(d, d, true)
+  checkTriviallyIdentical(e, e, true)
+  checkTriviallyIdentical(f, f, true)
 
-  expectFalse(
-    pre.isIdentical(to: suf)
-  )
-  expectFalse(
-    pre.isIdentical(to: span)
-  )
-  expectTrue(
-    pre.extracting(last: 4).isIdentical(to: suf.extracting(first: 4))
-  )
+  checkTriviallyIdentical(a, b, false)
+  checkTriviallyIdentical(b, c, false)
+  checkTriviallyIdentical(c, d, false)
+  checkTriviallyIdentical(d, e, false)
+  checkTriviallyIdentical(e, f, true)
 }
 
 suite.test("indices(of:)")
@@ -599,8 +642,6 @@ private struct NCSendable: ~Copyable, Sendable {}
 
 suite.test("Span Sendability")
 .require(.stdlib_6_2).code {
-  guard #available(SwiftStdlib 6.2, *) else { return }
-
   let buffer = UnsafeMutableBufferPointer<NCSendable>.allocate(capacity: 1)
   defer { buffer.deallocate() }
   buffer.initializeElement(at: 0, to: NCSendable())
@@ -608,4 +649,81 @@ suite.test("Span Sendability")
 
   let span = Span(_unsafeElements: buffer)
   send(span)
+}
+
+suite.test("init(viewing:)")
+.require(.stdlib_6_4).code {
+
+  let capacity = 4
+  let a = ContiguousArray(0..<capacity)
+  a.withUnsafeBufferPointer {
+    let raw = unsafe RawSpan(_unsafeBytes: UnsafeRawBufferPointer($0))
+    let span = Span<Int>(viewing: raw)
+    expectEqual(span.count, capacity)
+    for i in 0..<capacity {
+      expectEqual(span[i], i)
+    }
+  }
+}
+
+suite.test("init(viewing:) traps on misaligned pointer")
+.require(.crashTesting)
+.require(.stdlib_6_4).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride * 2 + 1,
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { unsafe buffer.deallocate() }
+  _ = unsafe buffer.initializeMemory(
+    as: UInt8.self, fromContentsOf: repeatElement(0, count: buffer.count)
+  )
+  let misaligned = unsafe UnsafeRawBufferPointer(rebasing: buffer.dropFirst())
+  expectEqual(misaligned.count, MemoryLayout<Int>.stride * 2)
+
+  let raw = unsafe RawSpan(_unsafeBytes: misaligned)
+
+  expectCrashLater()
+  _ = Span<Int>(viewing: raw)
+}
+
+suite.test("init(viewing:) traps on non-stride byteCount")
+.require(.crashTesting)
+.require(.stdlib_6_4).code {
+  let buffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: MemoryLayout<Int>.stride + 1,
+    alignment: MemoryLayout<Int>.alignment
+  )
+  defer { unsafe buffer.deallocate() }
+  _ = unsafe buffer.initializeMemory(
+    as: UInt8.self, fromContentsOf: repeatElement(0, count: buffer.count)
+  )
+  let raw = unsafe RawSpan(_unsafeBytes: buffer)
+
+  expectCrashLater()
+  _ = Span<Int>(viewing: raw)
+}
+
+suite.test("safe bytes property")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  let array = ContiguousArray(0..<capacity)
+  let bytes = array.span.bytes
+  expectEqual(bytes.byteCount, capacity * MemoryLayout<Int>.stride)
+  for i in 0..<capacity {
+    let value = bytes.load(fromByteOffset: i*MemoryLayout<Int>.stride, as: Int.self)
+    expectEqual(value, array[i])
+  }
+}
+
+suite.test("safe bytes round-trip")
+.require(.stdlib_6_4).code {
+  let capacity = 4
+  let a = ContiguousArray(0..<capacity)
+  let span = a.span
+  let bytes = span.bytes
+  let roundTripped = Span<Int>(viewing: bytes)
+  expectEqual(roundTripped.count, capacity)
+  for i in 0..<capacity {
+    expectEqual(roundTripped[i], span[i])
+  }
 }

@@ -11,6 +11,7 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: objc_interop
 // REQUIRES: swift_feature_ParserASTGen
+// REQUIRES: string_processing
 
 @objc class MyCls {
   @objc(theValue) var value: Int { 1 }

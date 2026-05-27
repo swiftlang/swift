@@ -445,23 +445,23 @@ bb0(%0 : @guaranteed $FakeOptional<Klass>):
 sil [ossa] @function_argument_inference_through_uncheckedtakeenumdataaddr : $@convention(thin) (@in FakeOptional<Klass>) -> @owned Klass {
 bb0(%0 : $*FakeOptional<Klass>):
   specify_test "variable_name_inference @trace[0]"
-  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1, expr op_deref
+  %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
   %3 = load [take] %2 : $*Klass
   debug_value [trace] %3 : $Klass
   return %3 : $Klass
 }
 
 // CHECK-LABEL: begin running test 1 of 1 on function_argument_inference_through_uncheckedtakeenumdataaddr_2: variable_name_inference with: @trace[0]
-// CHECK: Input Value:   %2 = unchecked_take_enum_data_addr %0
+// CHECK: Input Value:   %2 = unchecked_inplace_enum_data_addr %0
 // CHECK: Name: 'self.some'
 // CHECK: Root: %0 = argument of bb0 : $*FakeOptional<Klass>
 // CHECK: end running test 1 of 1 on function_argument_inference_through_uncheckedtakeenumdataaddr_2: variable_name_inference with: @trace[0]
 sil [ossa] @function_argument_inference_through_uncheckedtakeenumdataaddr_2 : $@convention(thin) (@in FakeOptional<Klass>) -> @owned Klass {
 bb0(%0 : $*FakeOptional<Klass>):
   specify_test "variable_name_inference @trace[0]"
-  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1
-  %2 = unchecked_take_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
+  debug_value %0 : $*FakeOptional<Klass>, let, name "self", argno 1, expr op_deref
+  %2 = unchecked_inplace_enum_data_addr %0 : $*FakeOptional<Klass>, #FakeOptional.some!enumelt
   debug_value [trace] %2 : $*Klass
   %3 = load [take] %2 : $*Klass
   return %3 : $Klass
@@ -543,6 +543,7 @@ bb7:
   br bb1(%4 : $FirstSecondThirdEnum<Klass>)
 
 bb4a(%unused : @owned $FakeOptional<Klass>):
+  destroy_value [dead_end] %unused
   unreachable
 
 bb8:
@@ -591,6 +592,7 @@ bb7:
   br bb1(%4 : $FirstSecondThirdEnum<Klass>)
 
 bb4a(%unused : @owned $FakeOptional<Klass>):
+  destroy_value [dead_end] %unused
   unreachable
 
 bb8:
@@ -762,7 +764,7 @@ bb0(%0 : @owned $Klass):
 sil [ossa] @init_existential_addr_temporary_copy_addr : $@convention(thin) (@in Klass) -> () {
 bb0(%0 : $*Klass):
   specify_test "variable_name_inference @trace[0]"
-  debug_value %0 : $*Klass, var, name "my arg"
+  debug_value %0 : $*Klass, var, name "my arg", expr op_deref
   %1 = alloc_stack $Any
   %2 = init_existential_addr %1 : $*Any, $Klass
   copy_addr [take] %0 to [init] %2 : $*Klass

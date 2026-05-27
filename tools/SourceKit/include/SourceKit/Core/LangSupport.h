@@ -35,6 +35,12 @@ namespace llvm {
   class MemoryBuffer;
 }
 
+namespace swift {
+namespace ide {
+struct FormattedSignatureHelp;
+} // namespace ide
+} // namespace swift
+
 namespace SourceKit {
 class GlobalConfig;
 using swift::ide::CancellableResult;
@@ -1012,33 +1018,14 @@ public:
   virtual void cancelled() = 0;
 };
 
-struct SignatureHelpResponse {
-  struct Parameter {
-    unsigned Offset;
-    unsigned Length;
-    StringRef DocComment;
-
-    Parameter() {}
-  };
-
-  struct Signature {
-    StringRef Text;
-    StringRef Doc;
-    std::optional<unsigned> ActiveParam;
-    ArrayRef<Parameter> Params;
-  };
-
-  unsigned ActiveSignature;
-  ArrayRef<Signature> Signatures;
-};
-
 class SignatureHelpConsumer {
   virtual void anchor();
 
 public:
   virtual ~SignatureHelpConsumer() {}
 
-  virtual void handleResult(const SignatureHelpResponse &Result) = 0;
+  virtual void
+  handleResult(const swift::ide::FormattedSignatureHelp &Result) = 0;
   virtual void setReusingASTContext(bool flag) = 0;
   virtual void failed(StringRef ErrDescription) = 0;
   virtual void cancelled() = 0;
@@ -1181,6 +1168,13 @@ public:
                  std::optional<VFSOptions> VfsOptions,
                  SourceKitCancellationToken CancellationToken,
                  std::function<void(const RequestResult<DiagnosticsResult> &)>
+                     Receiver) = 0;
+
+  virtual void
+  getPolyglotAST(StringRef PrimaryFilePath, ArrayRef<const char *> Args,
+                 std::optional<VFSOptions> VfsOptions,
+                 SourceKitCancellationToken CancellationToken,
+                 std::function<void(const RequestResult<std::string> &)>
                      Receiver) = 0;
 
   virtual void getSemanticTokens(

@@ -79,3 +79,9 @@ bb0(%0 : @noImplicitCopy @_eagerMove $BufferView):
   return %12 : $BufferView                        
 } 
 
+// CHECK-LABEL: sil hidden @takeCapturesClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @lifetime(captures) @owned BufferView) -> ()
+sil hidden @takeCapturesClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> @lifetime(captures) @owned BufferView) -> () {
+bb0(%0 : $@noescape @callee_guaranteed () -> @lifetime(captures) @owned BufferView):
+  %1 = tuple ()
+  return %1 : $()
+}

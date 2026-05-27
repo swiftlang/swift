@@ -101,12 +101,15 @@ public:
   /// getGlobalNameForReference - Given a reference to a global name, look it
   /// up and return an appropriate SIL function.
   SILFunction *getGlobalNameForReference(Identifier Name, CanSILFunctionType Ty,
+                                         ActorIsolation isolation,
                                          SourceLoc Loc,
                                          bool IgnoreFwdRef = false);
   /// getGlobalNameForDefinition - Given a definition of a global name, look
   /// it up and return an appropriate SIL function.
   SILFunction *getGlobalNameForDefinition(Identifier Name,
-                                          CanSILFunctionType Ty, SourceLoc Loc);
+                                          CanSILFunctionType Ty,
+                                          ActorIsolation isolation,
+                                          SourceLoc Loc);
 
   /// getBBForDefinition - Return the SILBasicBlock for a definition of the
   /// specified block.
@@ -332,6 +335,7 @@ public:
                       StringRef &OpcodeName);
   bool parseSILDebugVar(SILDebugVariable &Var);
 
+  bool parseSILDebugTransformBlock(SILBasicBlock *&DebugBB, SILBuilder &B);
   bool parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr);
 
   /// Parses the basic block arguments as part of branch instruction.
@@ -351,6 +355,7 @@ public:
   bool parseSILFunctionRef(SILLocation InstLoc, SILFunction *&ResultFn);
 
   bool parseSILBasicBlock(SILBuilder &B);
+  bool parseSILBasicBlockArgList(SILBasicBlock *BB, bool isEntry);
   bool parseKeyPathPatternComponent(KeyPathPatternComponent &component,
                                     SmallVectorImpl<SILType> &operandTypes,
                                     SourceLoc componentLoc,

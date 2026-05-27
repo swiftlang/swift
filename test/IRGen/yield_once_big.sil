@@ -57,7 +57,7 @@ entry:
   %1000 = integer_literal $Builtin.Int32, 1000
   apply %marker(%1000) : $@convention(thin) (Builtin.Int32) -> ()
 
-  // CHECK-NEXT:    call swiftcc void @make_big(ptr noalias{{( nocapture)?}} sret({{.*}}){{( captures\(none\))?}} [[TEMP]], ptr %C)
+  // CHECK-NEXT:    call swiftcc void @make_big(ptr noalias sret({{.*}}) captures(none) [[TEMP]], ptr %C)
   %make = function_ref @make_big : $@convention(thin) <T: SomeClass> () -> (@owned Big<T>)
   %value = apply %make<C>() : $@convention(thin) <T: SomeClass> () -> (@owned Big<T>)
 
@@ -129,6 +129,14 @@ entry(%flag : $Builtin.Int1):
   // CHECK-NEXT:    [[R6:%.*]] = load ptr, ptr [[T0]], align
   // CHECK-NEXT:    [[T0:%.*]] = getelementptr inbounds{{.*}} [[BIGSUB]], ptr [[PTR]], i32 0, i32 7
   // CHECK-NEXT:    [[R7:%.*]] = load ptr, ptr [[T0]], align
+  // CHECK:         call void @swift_release(ptr [[R0]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R1]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R2]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R3]])
+  // CHECK:         call void @swift_release(ptr [[R4]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R5]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R6]])
+  // CHECK-NEXT:    call void @swift_release(ptr [[R7]])
 
   //   Branch.
   // CHECK-NEXT:    br i1 %0,
@@ -155,24 +163,16 @@ no:
   br cont
 
 cont:
-  // CHECK:         call void @swift_release(ptr [[R0]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R1]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R2]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R3]])
-  // CHECK:         call void @swift_release(ptr [[R4]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R5]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R6]])
-  // CHECK-NEXT:    call void @swift_release(ptr [[R7]])
   destroy_value %value : $Big<SomeSubclass>
 
-  // CHECK-NEXT:    ret void
+  // CHECK:         ret void
   %ret = tuple ()
   return %ret : $()
 }
 
 // CHECK-LABEL: define{{( dllexport)?}}{{( protected)?}} swiftcc { ptr, ptr } @test_simple_guaranteed
-// CHECK-32-SAME:  (ptr noalias dereferenceable([[BUFFER_SIZE:16]]) %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(32) %1, ptr %C)
-// CHECK-64-SAME:  (ptr noalias dereferenceable([[BUFFER_SIZE:32]]) %0, ptr noalias {{(nocapture|captures\(none\))}} dereferenceable(64) %1, ptr %C)
+// CHECK-32-SAME:  (ptr noalias dereferenceable([[BUFFER_SIZE:16]]) %0, ptr noalias captures(none) dereferenceable(32) %1, ptr %C)
+// CHECK-64-SAME:  (ptr noalias dereferenceable([[BUFFER_SIZE:32]]) %0, ptr noalias captures(none) dereferenceable(64) %1, ptr %C)
 sil [ossa] @test_simple_guaranteed : $@yield_once <C: SomeClass> (@in_guaranteed BigWrapper<C>) -> (@yields @guaranteed Big<C>) {
 entry(%arg : $*BigWrapper<C>):
   //   Allocate space for the return value of make_big.

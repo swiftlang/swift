@@ -15,6 +15,7 @@
 #include "swift/SILOptimizer/Analysis/IsSelfRecursiveAnalysis.h"
 #include "swift/SILOptimizer/Utils/PerformanceInlinerUtils.h"
 #include "swift/AST/Module.h"
+#include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "llvm/Support/CommandLine.h"
@@ -716,7 +717,7 @@ static bool isCallerAndCalleeLayoutConstraintsCompatible(FullApplySite AI) {
 
   for (auto Param : SubstParams) {
     // Map the parameter into context
-    auto ContextTy = Callee->mapTypeIntoContext(Param->getCanonicalType());
+    auto ContextTy = Callee->mapTypeIntoEnvironment(Param->getCanonicalType());
     auto Archetype = ContextTy->getAs<ArchetypeType>();
     if (!Archetype)
       continue;
@@ -761,6 +762,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
   // If our inline selection is only always inline, do a quick check if we have
   // an always inline function and bail otherwise.
   if (WhatToInline == InlineSelection::OnlyInlineAlways &&
+      Callee->getInlineStrategy() != HeuristicAlwaysInline &&
       Callee->getInlineStrategy() != AlwaysInline) {
     return nullptr;
   }
@@ -840,6 +842,12 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     }
   }
 
+  if (AI.hasSubstitutions()) {
+    auto Subs = AI.getSubstitutionMap();
+    if (Subs.getRecursiveProperties().hasDynamicSelf())
+      return nullptr;
+  }
+
   // Detect self-recursive calls.
   if (Caller == Callee) {
     return nullptr;
@@ -873,7 +881,7 @@ SILFunction *swift::getEligibleFunction(FullApplySite AI,
     if (!isCallerAndCalleeLayoutConstraintsCompatible(AI) &&
         // TODO: revisit why we can make an exception for inline-always
         // functions. Some tests depend on it.
-        Callee->getInlineStrategy() != AlwaysInline && !Callee->isTransparent())
+        Callee->getInlineStrategy() != HeuristicAlwaysInline && !Callee->isTransparent())
       return nullptr;
   }
 

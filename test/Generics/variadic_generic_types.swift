@@ -125,7 +125,7 @@ struct WithPack<each T> {}
 // FIXME: The diagnostics are misleading.
 
 extension WithPack<Int, Int> {}
-// expected-error@-1 {{same-element requirements are not yet supported}}
+// expected-error@-1 {{same-type requirements between packs and concrete types are not yet supported}}
 
 extension WithPack where (repeat each T) == (Int, Int) {}
 // expected-error@-1 {{generic signature requires types '(repeat each T)' and '(Int, Int)' to be the same}}

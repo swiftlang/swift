@@ -1,7 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature Extern -disable-availability-checking
 
-// https://github.com/apple/swift/issues/70776
-// REQUIRES: github70776
 // REQUIRES: swift_feature_Extern
 
 @_extern(wasm, module: "m1", name: "f1")
@@ -13,7 +11,7 @@ func f2ErrorOnMissingNameLiteral(x: Int) -> Int // expected-error{{expected '{' 
 @_extern(wasm, module: "m3", name) // expected-error  {{expected ':' after label 'name'}}
 func f3ErrorOnMissingNameColon(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
-@_extern(wasm, module: "m4",) // expected-error  {{expected name argument to @_extern attribute}}
+@_extern(wasm, module: "m4",) // expected-error  {{expected name argument to '@_extern'}}
 func f4ErrorOnMissingNameLabel(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
 @_extern(wasm, module: "m5") // expected-error {{expected ',' in '_extern' attribute}}
@@ -25,19 +23,19 @@ func f6ErrorOnMissingModuleLiteral(x: Int) -> Int // expected-error{{expected '{
 @_extern(wasm, module) // expected-error {{expected ':' after label 'module'}} expected-error {{expected ',' in '_extern' attribute}}
 func f7ErrorOnMissingModuleColon(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
-@_extern(wasm,) // expected-error {{expected module argument to @_extern attribute}} expected-error {{expected ',' in '_extern' attribute}}
+@_extern(wasm,) // expected-error {{expected module argument to '@_extern'}} expected-error {{expected ',' in '_extern' attribute}}
 func f8ErrorOnMissingModuleLabel(x: Int) -> Int // expected-error{{expected '{' in body of function declaration}}
 
 @_extern(wasm, module: "m9", name: "f9")
 func f9WithBody() {} // expected-error {{unexpected body of function declaration}}
 
 struct S {
-    @_extern(wasm, module: "m10", name: "f10") // expected-error {{@_extern attribute can only be applied to global functions}}
+    @_extern(wasm, module: "m10", name: "f10") // expected-error {{'@_extern' can only be applied to globals}}
     func f10Member()
 }
 
 func f11Scope() {
-    @_extern(wasm, module: "m11", name: "f11")
+    @_extern(wasm, module: "m11", name: "f11") // expected-error{{'@_extern' can only be applied to globals}}
     func f11Inner()
 }
 
@@ -50,7 +48,7 @@ func externCValid()
 @_extern(c, "_start_with_underscore")
 func underscoredValid()
 
-@_extern(c, "") // expected-error {{expected non-empty C name in @_extern attribute}}
+@_extern(c, "") // expected-error {{expected non-empty C name in '@_extern'}}
 func emptyCName()
 
 // Allow specifying any identifier explicitly
@@ -70,20 +68,28 @@ func omitCName()
 func editingCName() // expected-error {{expected '{' in body of function declaration}}
 
 struct StructScopeC {
-    @_extern(c, "member_decl") // expected-error {{@_extern attribute can only be applied to global functions}}
+    @_extern(c, "member_decl") // expected-error {{'@_extern' can only be applied to globals}}
     func memberDecl()
 
     @_extern(c, "static_member_decl")
     static func staticMemberDecl()
+
+    @_extern(c, "global_static_variable")
+    static var globalVariable: Int
+}
+
+struct GenericStruct<T> {
+  @_extern(c, "static_member_decl") // expected-error{{'@_extern' can only be applied to globals}}
+  static func genericStaticMemberDecl()
 }
 
 func funcScopeC() {
-    @_extern(c, "func_scope_inner")
+    @_extern(c, "func_scope_inner") // expected-error {{'@_extern' can only be applied to globals}}
     func inner()
 }
 
-@_extern(c, "c_value") // expected-error {{@_extern may only be used on 'func' declarations}}
-var nonFunc: Int = 0
+@_extern(c, "c_value")
+var nonFunc: Int = 0 // expected-error{{'@_extern' variable cannot have an initializer}}
 
 @_extern(c, "with_body")
 func withInvalidBody() {} // expected-error {{unexpected body of function declaration}}
@@ -134,23 +140,23 @@ func throwsFuncC() throws // expected-error {{raising errors from C functions is
 @_extern(c)
 func genericFuncC<T>(_: T) // expected-error {{'T' cannot be represented in C}}
 
-@_extern(c) // expected-error {{@_extern attribute cannot be applied to an '@_cdecl' declaration}}
+@_extern(c) // expected-error {{'@_extern' cannot be applied to an @_cdecl declaration}}
 @_cdecl("another_c_name")
 func withAtCDecl_C()
 
-@_extern(wasm, module: "", name: "") // expected-error {{@_extern attribute cannot be applied to an '@_cdecl' declaration}}
+@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an @_cdecl declaration}}
 @_cdecl("another_c_name")
 func withAtCDecl_Wasm()
 
-@_extern(c) // expected-error {{@_extern attribute cannot be applied to an '@_silgen_name' declaration}}
+@_extern(c) // expected-error {{'@_extern' cannot be applied to an @_silgen_name declaration}}
 @_silgen_name("another_sil_name")
 func withAtSILGenName_C()
 
-@_extern(wasm, module: "", name: "") // expected-error {{@_extern attribute cannot be applied to an '@_silgen_name' declaration}}
+@_extern(wasm, module: "", name: "") // expected-error {{'@_extern' cannot be applied to an @_silgen_name declaration}}
 @_silgen_name("another_sil_name")
 func withAtSILGenName_Wasm()
 
-@_extern(c) // expected-error {{@_extern attribute cannot be applied to an '@_silgen_name' declaration}} expected-error {{@_extern attribute cannot be applied to an '@_cdecl' declaration}}
+@_extern(c) // expected-error {{'@_extern' cannot be applied to an @_silgen_name declaration}} expected-error {{'@_extern' cannot be applied to an @_cdecl declaration}}
 @_cdecl("another_c_name")
 @_silgen_name("another_sil_name")
 func withAtSILGenName_CDecl_C()

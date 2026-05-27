@@ -26,11 +26,7 @@ bb0(%0 : $*Optional<Any>, %1 : $*Any):
 
 // CHECK-LABEL: sil @test_enum_without_initialize :
 // CHECK:      bb0(%0 : $*Optional<Any>, %1 : $*Any):
-// CHECK-NEXT:   destroy_addr %0
-// CHECK-NEXT:   [[E:%[0-9]+]] = init_enum_data_addr %0
-// CHECK-NEXT:   copy_addr [take] %1 to [init] [[E]]
-// CHECK-NEXT:   inject_enum_addr %0 : $*Optional<Any>, #Optional.some!enumelt
-// CHECK-NOT:    copy_addr
+// CHECK-NOT:    destroy_addr
 // CHECK: } // end sil function 'test_enum_without_initialize'
 sil @test_enum_without_initialize : $@convention(thin) (@in Any) -> @out Optional<Any> {
 bb0(%0 : $*Optional<Any>, %1 : $*Any):
@@ -311,3 +307,22 @@ bb0(%0 : $*FakeOptional):
   %13 = tuple ()
   return %13
 }
+
+// CHECK-LABEL: sil @dont_insert_destroy_before_retain
+// CHECK-NOT:     destroy_addr
+// CHECK-LABEL: } // end sil function 'dont_insert_destroy_before_retain'
+sil @dont_insert_destroy_before_retain : $@convention(thin) (@owned AnyObject, @inout Either<AnyObject, AnyObject>) -> () {
+bb0(%0 : $AnyObject, %1 : $*Either<AnyObject, AnyObject>):
+  %2 = unchecked_take_enum_data_addr %1, #Either.left!enumelt
+  %3 = load %2
+  %4 = alloc_stack $Either<AnyObject, AnyObject>
+  %5 = init_enum_data_addr %4, #Either.left!enumelt
+  strong_retain %3
+  store %0 to %5
+  inject_enum_addr %4, #Either.left!enumelt
+  copy_addr [take] %4 to %1
+  dealloc_stack %4
+  %11 = tuple ()
+  return %11
+}
+

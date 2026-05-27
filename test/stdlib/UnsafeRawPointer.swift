@@ -126,8 +126,8 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.unaligned")
   expectEqual(result, 0xffff_0000)
 }
 
-#if !os(WASI)
 UnsafeMutableRawPointerExtraTestSuite.test("load.invalid")
+.require(.crashTesting)
 .skip(.custom({ !_isDebugAssertConfiguration() },
               reason: "This tests a debug precondition.."))
 .code {
@@ -140,6 +140,7 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.invalid")
 }
 
 UnsafeMutableRawPointerExtraTestSuite.test("load.invalid.mutable")
+.require(.crashTesting)
 .skip(.custom({ !_isDebugAssertConfiguration() },
               reason: "This tests a debug precondition.."))
 .code {
@@ -150,7 +151,6 @@ UnsafeMutableRawPointerExtraTestSuite.test("load.invalid.mutable")
   }
   expectUnreachable()
 }
-#endif
 
 UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
 .require(.stdlib_5_7)
@@ -178,8 +178,8 @@ UnsafeMutableRawPointerExtraTestSuite.test("store.unaligned")
               0)
 }
 
-#if !os(WASI)
 UnsafeMutableRawPointerExtraTestSuite.test("store.invalid")
+.require(.crashTesting)
 .skip(.custom({ !_isDebugAssertConfiguration() },
               reason: "This tests a debug precondition.."))
 .require(.stdlib_5_7)
@@ -195,7 +195,6 @@ UnsafeMutableRawPointerExtraTestSuite.test("store.invalid")
   p1.storeBytes(of: m, as: Missile.self)
   expectUnreachable()
 }
-#endif
 
 UnsafeMutableRawPointerExtraTestSuite.test("copyMemory") {
   let sizeInBytes = 4 * MemoryLayout<Int>.stride
@@ -303,9 +302,9 @@ func checkPtr(
   }
 }
 
-#if !os(WASI)
-// Trap tests aren't available on WASI.
-UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:") {
+UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:")
+.require(.crashTesting)
+.code {
   let check = checkPtr(UnsafeMutableRawPointer.initializeMemory(as:from:count:))
   check(Check.Disjoint)
   // This check relies on _debugPrecondition() so will only trigger in
@@ -316,7 +315,9 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:") {
   }
 }
 
-UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:.Right") {
+UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:.Right")
+.require(.crashTesting)
+.code {
   let check = checkPtr(UnsafeMutableRawPointer.initializeMemory(as:from:count:))
   // This check relies on _debugPrecondition() so will only trigger in
   // -Onone mode.
@@ -325,7 +326,6 @@ UnsafeMutableRawPointerExtraTestSuite.test("initializeMemory:as:from:count:.Righ
     check(Check.RightOverlap)
   }
 }
-#endif
 
 UnsafeMutableRawPointerExtraTestSuite.test("moveInitialize:from:") {
   let check =
@@ -392,6 +392,20 @@ UnsafeMutableRawPointerExtraTestSuite.test("pointer-comparisons") {
   expectTrue(a.assumingMemoryBound(to: Int.self) != b)
   expectTrue(b.assumingMemoryBound(to: UInt.self) > UnsafeMutableRawPointer(a))
   expectTrue(a < b.assumingMemoryBound(to: Double.self))
+}
+
+UnsafeMutableRawPointerExtraTestSuite.test("zero-allocation") {
+  let a = UnsafeMutableRawPointer.allocate(byteCount: 0, alignment: 1)
+  let b = UnsafeMutableRawPointer.allocate(byteCount: 0, alignment: 16)
+  let c = UnsafeMutableRawPointer.allocate(byteCount: 0, alignment: 1024)
+  defer {
+    a.deallocate()
+    b.deallocate()
+    c.deallocate()
+  }
+  expectNotEqual(Int(bitPattern: a), 0x0)
+  expectNotEqual(Int(bitPattern: b), 0x0)
+  expectNotEqual(Int(bitPattern: c), 0x0)
 }
 
 runAllTests()

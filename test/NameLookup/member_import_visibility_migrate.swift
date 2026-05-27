@@ -14,7 +14,16 @@
 // RUN: %target-swift-frontend -emit-module -o %t %t/InternalUsesOnlyDefaultedImportSPIOnly.swift -I %t
 // RUN: %target-swift-frontend -emit-module -o %t %t/PublicUsesOnlySPIOnly.swift -I %t
 
+// FIXME: This step shouldn't be needed once conformances broken by missing imports are diagnosed properly
 // RUN: %target-swift-frontend -typecheck -verify -swift-version 5 \
+// RUN:   -primary-file %t/main.swift \
+// RUN:   %t/imports.swift \
+// RUN:   -I %t -package-name Package \
+// RUN:   -DCONFORMANCES \
+// RUN:   -verify-additional-prefix conformance- \
+// RUN:   -enable-upcoming-feature MemberImportVisibility:migrate
+
+// RUN: %target-swift-frontend -emit-silgen -verify -swift-version 5 \
 // RUN:   -primary-file %t/main.swift \
 // RUN:   %t/imports.swift \
 // RUN:   -I %t -package-name Package \
@@ -81,6 +90,70 @@ extension Int {
   internal func usesTypealiasInMixedUses_Internal(x: TypealiasInMixedUses) {} // expected-note {{type alias 'TypealiasInMixedUses' from 'MixedUses' used here}}
 }
 
+struct GenericType<T> { }
+
+extension Int {
+  var referencesMemberInInternalUsesOnly: Int { memberInInternalUsesOnly } // expected-note {{property 'memberInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+
+  func testTypes<T: ProtocolInInternalUsesOnly>(_ t: T) -> TypealiasInInternalUsesOnly? {
+    // expected-note@-1 {{protocol 'ProtocolInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    // expected-note@-2 {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+
+    let _: TypealiasInInternalUsesOnly = 0 // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    _ = TypealiasInInternalUsesOnly.self // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    _ = (TypealiasInInternalUsesOnly).self // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    _ = (Int, TypealiasInInternalUsesOnly).self // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    _ = GenericType<TypealiasInInternalUsesOnly>.self // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    return t as? TypealiasInInternalUsesOnly // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+  }
+
+  func testLeadingDotSyntax() {
+    func takesP<T: ProtocolInInternalUsesOnly>(_: T) { } // expected-note {{protocol 'ProtocolInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+    takesP(.staticDefaultMemberInInternalUsesOnly) // expected-note {{static property 'staticDefaultMemberInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+  }
+}
+
+extension Int.TypealiasInInternalUsesOnly { } // expected-note {{type alias 'TypealiasInInternalUsesOnly' from 'InternalUsesOnly' used here}}
+
+#if CONFORMANCES
+protocol InternalProtocolWithImportedWitnesses {
+  var memberInInternalUsesOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnly' with type 'Int'}}
+  var memberInInternalUsesOnlyDefaultedImport: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlyDefaultedImport' with type 'Int'}}
+  var memberInMixedUses: Int { get } // expected-conformance-note {{protocol requires property 'memberInMixedUses' with type 'Int'}}
+  var memberInInternalUsesOnlyReexported: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlyReexported' with type 'Int'}}
+  var memberInInternalUsesOnlySPIOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlySPIOnly' with type 'Int'}}
+  var memberInInternalUsesOnlyDefaultedImportSPIOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlyDefaultedImportSPIOnly' with type 'Int'}}
+  var memberInInternalUsesOnlyTransitivelyImported: Int { get } // expected-conformance-note {{protocol requires property 'memberInInternalUsesOnlyTransitivelyImported' with type 'Int'}}
+}
+
+// FIXME: Missing import should be diagnosed instead of a failure to conform.
+extension Int: InternalProtocolWithImportedWitnesses { }
+// expected-conformance-error@-1 {{type 'Int' does not conform to protocol 'InternalProtocolWithImportedWitnesses'}}
+// expected-conformance-note@-2 {{add stubs for conformance}}
+
+package protocol PackageProtocolWithImportedWitnesses {
+  var memberInPackageUsesOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInPackageUsesOnly' with type 'Int'}}
+  var memberInMixedUses: Int { get } // expected-conformance-note {{protocol requires property 'memberInMixedUses' with type 'Int'}}
+}
+
+// FIXME: Missing import should be diagnosed instead of a failure to conform.
+extension Int: PackageProtocolWithImportedWitnesses { }
+// expected-conformance-error@-1 {{type 'Int' does not conform to protocol 'PackageProtocolWithImportedWitnesses'}}
+// expected-conformance-note@-2 {{add stubs for conformance}}
+
+public protocol PublicProtocolWithImportedWitnesses {
+  var memberInPublicUsesOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInPublicUsesOnly' with type 'Int'}}
+  var memberInPublicUsesOnlyDefaultedImport: Int { get } // expected-conformance-note {{protocol requires property 'memberInPublicUsesOnlyDefaultedImport' with type 'Int'}}
+  var memberInMixedUses: Int { get } // expected-conformance-note {{protocol requires property 'memberInMixedUses' with type 'Int'}}
+  var memberInPublicUsesOnlySPIOnly: Int { get } // expected-conformance-note {{protocol requires property 'memberInPublicUsesOnlySPIOnly' with type 'Int'}}
+}
+
+// FIXME: Missing import should be diagnosed instead of a failure to conform.
+extension Int: PublicProtocolWithImportedWitnesses { }
+// expected-conformance-error@-1 {{type 'Int' does not conform to protocol 'PublicProtocolWithImportedWitnesses'}}
+// expected-conformance-note@-2 {{add stubs for conformance}}
+#endif
+
 //--- imports.swift
 
 internal import InternalUsesOnly
@@ -97,8 +170,15 @@ internal import ImportsOtherModules
 //--- InternalUsesOnly.swift
 
 extension Int {
+  public protocol ProtocolInInternalUsesOnly { }
   public typealias TypealiasInInternalUsesOnly = Self
   public var memberInInternalUsesOnly: Int { return self }
+}
+
+extension Int: Int.ProtocolInInternalUsesOnly { }
+
+extension Int.ProtocolInInternalUsesOnly where Self == Int {
+  public static var staticDefaultMemberInInternalUsesOnly: Int { 0 }
 }
 
 //--- InternalUsesOnlyDefaultedImport.swift

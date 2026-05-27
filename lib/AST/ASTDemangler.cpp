@@ -25,6 +25,7 @@
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclNameExtractor.h"
+#include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleNameLookup.h"
@@ -281,7 +282,7 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
     return Type();
 
   // If the declaration is generic, fail.
-  if (nominalDecl->isGeneric())
+  if (nominalDecl->hasGenericParamList())
     return Type();
 
   // Imported types can be renamed to be members of other (non-generic)
@@ -332,8 +333,7 @@ Type ASTBuilder::createTypeAliasType(GenericTypeDecl *decl, Type parent) {
 
 static SubstitutionMap
 createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
-                                     ArrayRef<Type> args,
-                                     LookupConformanceFn lookupConformance) {
+                                     ArrayRef<Type> args) {
   if (!genericSig)
     return SubstitutionMap();
   
@@ -341,15 +341,7 @@ createSubstitutionMapFromGenericArgs(GenericSignature genericSig,
     return SubstitutionMap();
 
   return SubstitutionMap::get(
-      genericSig,
-      [&](SubstitutableType *t) -> Type {
-        auto *gp = cast<GenericTypeParamType>(t);
-        unsigned ordinal = genericSig->getGenericParamOrdinal(gp);
-        if (ordinal < args.size())
-          return args[ordinal];
-        return Type();
-      },
-      lookupConformance);
+      genericSig, args, LookUpConformanceInModule());
 }
 
 Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
@@ -364,8 +356,7 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
 
   // Build a SubstitutionMap.
   auto genericSig = nominalDecl->getGenericSignature();
-  auto subs = createSubstitutionMapFromGenericArgs(
-      genericSig, args, LookUpConformanceInModule());
+  auto subs = createSubstitutionMapFromGenericArgs(genericSig, args);
   if (!subs)
     return Type();
   auto origType = nominalDecl->getDeclaredInterfaceType();
@@ -375,48 +366,53 @@ Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
   return origType.subst(subs);
 }
 
+OpaqueTypeDecl *ASTBuilder::resolveOpaqueTypeDecl(NodePointer opaqueDescriptor) {
+  if (opaqueDescriptor->getKind() != Node::Kind::OpaqueReturnTypeOf)
+    return nullptr;
+
+  auto definingDecl = opaqueDescriptor->getChild(0);
+  auto definingGlobal = Factory.createNode(Node::Kind::Global);
+  definingGlobal->addChild(definingDecl, Factory);
+  auto mangling = mangleNode(definingGlobal, ManglingFlavor);
+  if (!mangling.isSuccess())
+    return nullptr;
+  auto mangledName = mangling.result();
+
+  auto moduleNode = findModuleNode(definingDecl);
+  if (!moduleNode)
+    return nullptr;
+
+  ModuleDecl *scratch;
+  auto potentialParentModules = findPotentialModules(moduleNode, scratch);
+  if (potentialParentModules.empty())
+    return nullptr;
+
+  for (auto module : potentialParentModules)
+    if (auto decl = module->lookupOpaqueResultType(mangledName))
+      return decl;
+
+  return nullptr;
+}
+
 Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
                                    ArrayRef<ArrayRef<Type>> args,
                                    unsigned ordinal) {
-  if (opaqueDescriptor->getKind() == Node::Kind::OpaqueReturnTypeOf) {
-    auto definingDecl = opaqueDescriptor->getChild(0);
-    auto definingGlobal = Factory.createNode(Node::Kind::Global);
-    definingGlobal->addChild(definingDecl, Factory);
-    auto mangling = mangleNode(definingGlobal, ManglingFlavor);
-    if (!mangling.isSuccess())
-      return Type();
-    auto mangledName = mangling.result();
+  OpaqueTypeDecl *opaqueDecl = resolveOpaqueTypeDecl(opaqueDescriptor);
+  if (!opaqueDecl)
+    return Type();
 
-    auto moduleNode = findModuleNode(definingDecl);
-    if (!moduleNode)
-      return Type();
-
-    ModuleDecl *scratch;
-    auto potentialParentModules = findPotentialModules(moduleNode, scratch);
-    if (potentialParentModules.empty())
-      return Type();
-
-    OpaqueTypeDecl *opaqueDecl = nullptr;
-    for (auto module : potentialParentModules)
-      if (auto decl = module->lookupOpaqueResultType(mangledName))
-        opaqueDecl = decl;
-
-    if (!opaqueDecl)
-      return Type();
-    SmallVector<Type, 8> allArgs;
-    for (auto argSet : args) {
-      allArgs.append(argSet.begin(), argSet.end());
-    }
-
-    SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
-        opaqueDecl->getGenericSignature(), allArgs,
-        LookUpConformanceInModule());
-    Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
-    return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
+  SmallVector<Type, 8> allArgs;
+  for (auto argSet : args) {
+    allArgs.append(argSet.begin(), argSet.end());
   }
-  
-  // TODO: named opaque types
-  return Type();
+
+  if (ordinal >= opaqueDecl->getOpaqueGenericParams().size())
+    return Type();
+
+  SubstitutionMap subs = createSubstitutionMapFromGenericArgs(
+      opaqueDecl->getGenericSignature(), allArgs);
+  Type interfaceType = opaqueDecl->getOpaqueGenericParams()[ordinal];
+  return OpaqueTypeArchetypeType::get(opaqueDecl, interfaceType, subs);
 }
 
 Type ASTBuilder::createBoundGenericType(GenericTypeDecl *decl,
@@ -588,8 +584,8 @@ Type ASTBuilder::createFunctionType(
     isolation = FunctionTypeIsolation::forGlobalActor(globalActor);
   } else if (extFlags.isIsolatedAny()) {
     isolation = FunctionTypeIsolation::forErased();
-  } else if (extFlags.isNonIsolatedCaller()) {
-    isolation = FunctionTypeIsolation::forNonIsolatedCaller();
+  } else if (extFlags.isNonisolatedNonsending()) {
+    isolation = FunctionTypeIsolation::forNonisolatedNonsending();
   }
 
   auto noescape =
@@ -602,7 +598,11 @@ Type ASTBuilder::createFunctionType(
     clangFunctionType = Ctx.getClangFunctionType(funcParams, output,
                                                  representation);
 
-  // TODO: Handle LifetimeDependenceInfo here.
+  // TODO: Handle LifetimeDependenceInfo here. Until this is implemented,
+  // IRGen's debug-info round-trip check excludes types containing
+  // function types with lifetime dependencies; remove the
+  // containsFunctionTypeWithLifetimeDependencies workaround in
+  // lib/IRGen/IRGenDebugInfo.cpp when this lands.
   auto einfo = FunctionType::ExtInfoBuilder(
                    representation, noescape, flags.isThrowing(), thrownError,
                    resultDiffKind, clangFunctionType, isolation,
@@ -785,9 +785,17 @@ Type ASTBuilder::createImplFunctionType(
   #undef SIMPLE_CASE
   }
 
-  auto isolation = SILFunctionTypeIsolation::forUnknown();
-  if (flags.hasErasedIsolation())
-    isolation = SILFunctionTypeIsolation::forErased();
+  SILFunctionTypeIsolation isolation = SILFunctionTypeIsolation::forUnknown();
+  switch (flags.getIsolation()) {
+#define ISOLATION(CASE)                                                        \
+  case ImplFunctionIsolation::CASE:                                            \
+    isolation = SILFunctionTypeIsolation::for##CASE();                         \
+    break;
+    ISOLATION(Unknown)
+    ISOLATION(NonisolatedNonsending)
+    ISOLATION(Erased)
+#undef ISOLATION
+  }
 
   // There's no representation of this in the mangling because it can't
   // occur in well-formed programs.
@@ -838,6 +846,9 @@ Type ASTBuilder::createImplFunctionType(
     clangFnType = getASTContext().getCanonicalClangFunctionType(
         funcParams, result, representation);
   }
+  // TODO: Handle LifetimeDependenceInfo here. Sibling of the AST-level TODO
+  // at the top of `createFunctionType` above; both must be implemented before
+  // the IRGen workaround in lib/IRGen/IRGenDebugInfo.cpp can be removed.
   auto einfo =
       SILFunctionType::ExtInfoBuilder(
           representation, flags.isPseudogeneric(), !flags.isEscaping(),
@@ -1126,11 +1137,9 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
   if (!genericTypeParams.empty()) {
     SmallVector<BuiltRequirement, 2> RequirementsVec(Requirements);
     appendInversesAsRequirements(InverseRequirements, RequirementsVec);
-    signature = swift::buildGenericSignature(Ctx,
-                                             signature,
-                                             genericTypeParams,
-                                             std::move(RequirementsVec),
-                                             /*allowInverses=*/true);
+    signature = swift::buildGenericSignature(
+        Ctx, signature, genericTypeParams, std::move(RequirementsVec),
+        ExpandDefaults);
   }
   SmallVector<SILField, 4> silFields;
   for (auto field: fields)
@@ -1143,8 +1152,7 @@ Type ASTBuilder::createSILBoxTypeWithLayout(
   SubstitutionMap substs;
   if (signature)
     substs = createSubstitutionMapFromGenericArgs(
-        signature, replacements,
-        LookUpConformanceInModule());
+        signature, replacements);
   return SILBoxType::get(Ctx, layout, substs);
 }
 
@@ -1239,6 +1247,10 @@ Type ASTBuilder::createBuiltinFixedArrayType(Type size, Type element) {
                                     element->getCanonicalType());
 }
 
+Type ASTBuilder::createBuiltinBorrowType(Type referent) {
+  return BuiltinBorrowType::get(referent->getCanonicalType());
+}
+
 GenericSignature
 ASTBuilder::createGenericSignature(ArrayRef<BuiltType> builtParams,
                                    ArrayRef<BuiltRequirement> requirements) {
@@ -1329,7 +1341,9 @@ llvm::ArrayRef<ModuleDecl *>
 ASTBuilder::findPotentialModules(NodePointer node, ModuleDecl *&scratch) {
   assert(node->getKind() == Demangle::Node::Kind::Module);
 
-  const auto moduleName = node->getText();
+  // Round-trip the module name through getIdentifier to normalize it if a raw
+  // identifier was passed to `-module-abi-name`.
+  const auto moduleName = getIdentifier(node->getText()).str();
 
   if (moduleName == CLANG_HEADER_MODULE_NAME) {
     auto *importer = Ctx.getClangModuleLoader();
@@ -1420,7 +1434,7 @@ CanGenericSignature ASTBuilder::demangleGenericSignature(
   appendInversesAsRequirements(inverseRequirements, requirements);
 
   return buildGenericSignature(Ctx, baseGenericSig, {}, std::move(requirements),
-                               /*allowInverses=*/true)
+                               ExpandDefaults)
       .getCanonicalSignature();
 }
 
@@ -1556,6 +1570,17 @@ ASTBuilder::findDeclContext(NodePointer node) {
       }
     }
 
+    // FIXME: We shouldn't be attempting to find an exact extension match,
+    // clients only need the nominal for qualified lookup. Additionally, the
+    // module in which the extension resides is currently used to filter the
+    // lookup results. This means when we have multiple matches, the particular
+    // extension we choose matters.
+    //
+    // We ought to refactor things such that we return a module ABI name +
+    // nominal decl which downstream logic can use to lookup and limit results
+    // to only those that appear in the ABI module. Then we can delete all this
+    // logic.
+    SmallVector<ExtensionDecl *, 4> genericExts;
     for (auto *ext : nominalDecl->getExtensions()) {
       bool found = false;
       for (ModuleDecl *module : moduleDecls) {
@@ -1594,6 +1619,39 @@ ASTBuilder::findDeclContext(NodePointer node) {
         if (requirements.empty())
           return ext;
       }
+      genericExts.push_back(ext);
+    }
+    if (!genericSig)
+      return nullptr;
+
+    SmallVector<Requirement, 2> requirements;
+    SmallVector<InverseRequirement, 2> inverses;
+    genericSig->getRequirementsWithInverses(requirements, inverses);
+
+    // If we didn't find a result yet, try again without invertible requirements
+    // since `demangleGenericSignature` won't include them, e.g won't include
+    // Copyable for:
+    //
+    // struct S<T: ~Copyable> {}
+    // protocol P: ~Copyable {}
+    // extension S where T: P/*, T: Copyable*/ {}
+    //
+    // We do this as a separate loop to avoid disturbing existing lookup
+    // behavior for cases where there's an extension with matching inverses,
+    // since the choice of extension matters (see above FIXME).
+    //
+    // FIXME: This is a complete hack, we ought to delete all this logic and
+    // just return the nominal + module ABI name.
+    for (auto *ext : genericExts) {
+      auto extSig = ext->getGenericSignature().getCanonicalSignature();
+      if (extSig.getGenericParams() != genericSig.getGenericParams())
+        continue;
+
+      SmallVector<Requirement, 2> extReqs;
+      SmallVector<InverseRequirement, 2> extInvs;
+      extSig->getRequirementsWithInverses(extReqs, extInvs);
+      if (extReqs == requirements)
+        return ext;
     }
 
     return nullptr;

@@ -379,3 +379,43 @@ bb0(%0 : $*GenericRefStruct<T>, %1 : $*T, %2 : $@thin GenericRefStruct<T>.Type):
   %38 = tuple ()                                  // user: %39
   return %38 : $()                                // id: %39
 }
+
+@propertyWrapper struct Box<Value> {
+  @_hasStorage private var storage: AnyObject
+  var wrappedValue: Value
+}
+
+struct S {
+  @Box var x: Int?
+}
+
+sil @designated_init : $@convention(method) (@thin S.Type) -> @owned S
+sil @field_init : $@convention(thin) (Optional<Int>, @thin S.Type) -> @out Box<Optional<Int>>
+sil @field_set : $@convention(method) (Optional<Int>, @inout S) -> ()
+
+// Just check that this compiles successfully.
+sil [ossa] @test_delegating_init : $@convention(method) (Optional<Int>, @thin S.Type) -> @owned S {
+bb0(%0 : $Optional<Int>, %1 : $@thin S.Type):
+  %2 = alloc_stack [lexical] [var_decl] $S, var, name "self", type $S
+  %3 = mark_uninitialized [delegatingself] %2
+  debug_value %0, let, name "x", argno 1
+
+  %5 = function_ref @designated_init : $@convention(method) (@thin S.Type) -> @owned S
+  %6 = apply %5(%1) : $@convention(method) (@thin S.Type) -> @owned S
+  assign %6 to %3
+  %8 = begin_access [modify] [static] %3
+
+  %9 = function_ref @field_init : $@convention(thin) (Optional<Int>, @thin S.Type) -> @out Box<Optional<Int>>
+  %10 = partial_apply [callee_guaranteed] %9(%1) : $@convention(thin) (Optional<Int>, @thin S.Type) -> @out Box<Optional<Int>>
+
+  %11 = function_ref @field_set : $@convention(method) (Optional<Int>, @inout S) -> ()
+  %12 = partial_apply [callee_guaranteed] [on_stack] %11(%8) : $@convention(method) (Optional<Int>, @inout S) -> ()
+  assign_or_init #S.x, self %8, value %0, init %10, set %12
+  end_access %8
+  destroy_value %12
+  destroy_value %10
+  %17 = load [copy] %3
+  destroy_addr %3
+  dealloc_stack %2
+  return %17
+}

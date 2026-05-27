@@ -2,17 +2,17 @@
 
 @propertyWrapper
 public struct Wrapper<T> {
-  // CHECK: [[@LINE-1]]:15 | struct/Swift | Wrapper | [[Wrapper_USR:.*]] | Def | rel: 0
+  // CHECK: [[@LINE-1]]:15 | struct(public)/Swift | Wrapper | [[Wrapper_USR:.*]] | Def | rel: 0
   public var wrappedValue: T
-  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | wrappedValue | [[wrappedValue_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:14 | instance-property(public)/Swift | wrappedValue | [[wrappedValue_USR:.*]] | Def,RelChild | rel: 1
 
   public init(initialValue: T) {
-  // CHECK: [[@LINE-1]]:10 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:10 | constructor(public)/Swift | init(initialValue:) | [[WrapperInit_USR:.*]] | Def,RelChild | rel: 1
     self.wrappedValue = initialValue
   }
 
   public init(body: () -> T) {
-  // CHECK: [[@LINE-1]]:10 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:10 | constructor(public)/Swift | init(body:) | [[WrapperBodyInit_USR:.*]] | Def,RelChild | rel: 1
     self.wrappedValue = body()
   }
 
@@ -26,15 +26,15 @@ public struct Projection<T> {
 }
 
 var globalInt: Int { return 17 }
-// CHECK: [[@LINE-1]]:5 | variable/Swift | globalInt | [[globalInt_USR:.*]] | Def | rel: 0
+// CHECK: [[@LINE-1]]:5 | variable(internal)/Swift | globalInt | [[globalInt_USR:.*]] | Def | rel: 0
 
 public struct HasWrappers {
   @Wrapper
   // CHECK: [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref,RelCont | rel: 1
   public var x: Int = globalInt
-  // CHECK-NOT: [[@LINE-1]]:23 | variable/Swift | globalInt
+  // CHECK-NOT: [[@LINE-1]]:23 | variable{{.*}}/Swift | globalInt
   // CHECK: [[@LINE-4]]:4 | constructor/Swift | init(initialValue:) | [[WrapperInit_USR]] | Ref,Call,Impl,RelCont | rel: 1
-  // CHECK: [[@LINE-3]]:14 | instance-property/Swift | x | [[x_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-3]]:14 | instance-property(public)/Swift | x | [[x_USR:.*]] | Def,RelChild | rel: 1
   // CHECK: [[@LINE-4]]:23 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read,RelCont | rel: 1
 
   @Wrapper(body: { globalInt })
@@ -42,8 +42,8 @@ public struct HasWrappers {
   // CHECK: [[@LINE-2]]:20 | variable/Swift | globalInt | [[globalInt_USR]] | Ref,Read,RelCont | rel: 1
   // CHECK: [[@LINE-3]]:4 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR]] | Ref,Call,RelCont | rel: 1
   public var y: Int
-  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | y | [[y_USR:.*]] | Def,RelChild | rel: 1
-  // CHECK-NOT: [[@LINE-6]]:20 | variable/Swift | globalInt
+  // CHECK: [[@LINE-1]]:14 | instance-property(public)/Swift | y | [[y_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK-NOT: [[@LINE-6]]:20 | variable{{.*}}/Swift | globalInt
 
   @Wrapper(body: {
   // CHECK:      [[@LINE-1]]:4 | struct/Swift | Wrapper | [[Wrapper_USR]] | Ref,RelCont | rel: 1
@@ -64,11 +64,11 @@ public struct HasWrappers {
   })
   // CHECK: [[@LINE-17]]:4 | constructor/Swift | init(body:) | [[WrapperBodyInit_USR]] | Ref,Call,RelCont | rel: 1
   public var z: Int
-  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | z | [[z_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:14 | instance-property(public)/Swift | z | [[z_USR:.*]] | Def,RelChild | rel: 1
 
   @Wrapper
   public var `escaped identifier`: Int = globalInt
-  // CHECK: [[@LINE-1]]:14 | instance-property/Swift | escaped identifier | [[escaped_identifier_USR:.*]] | Def,RelChild | rel: 1
+  // CHECK: [[@LINE-1]]:14 | instance-property(public)/Swift | escaped identifier | [[escaped_identifier_USR:.*]] | Def,RelChild | rel: 1
 
   func backingUse() {
     _ = _y.wrappedValue + _z.wrappedValue + x + _x.wrappedValue + $y.item

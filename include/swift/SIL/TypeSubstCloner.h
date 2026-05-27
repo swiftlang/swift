@@ -222,7 +222,7 @@ protected:
         getOpLocation(Inst->getLoc()), Helper.getCallee(),
         Helper.getSubstitutions(), Helper.getArguments(),
         Inst->getCalleeConvention(), Inst->getResultIsolation(),
-        Inst->isOnStack(),
+        Inst->isOnStack(), Inst->isStackAllocationNested(),
         GenericSpecializationInformation::create(Inst, getBuilder()));
     recordClonedInstruction(Inst, N);
   }
@@ -384,42 +384,60 @@ protected:
   enum { ForInlining = true };
   /// Helper function to clone the parent function of a SILDebugScope if
   /// necessary when inlining said function into a new generic context.
-  /// \param SubsMap - the substitutions of the inlining/specialization process.
-  /// \param RemappedSig - the generic signature.
+  /// \param SubsMap - the substitutions for the call to the callee.
+  /// \param CalleeSig - the callee generic signature.
   template<typename FunctionBuilderTy>
   static SILFunction *remapParentFunction(FunctionBuilderTy &FuncBuilder,
                                           SILModule &M,
                                           SILFunction *ParentFunction,
                                           SubstitutionMap SubsMap,
-                                          GenericSignature RemappedSig,
+                                          GenericSignature CalleeSig,
                                           bool ForInlining = false) {
     // If the original, non-inlined version of the function had no generic
     // environment, there is no need to remap it.
-    auto *OriginalEnvironment = ParentFunction->getGenericEnvironment();
-    if (!RemappedSig || !OriginalEnvironment)
+    auto *CalleeEnv = ParentFunction->getGenericEnvironment();
+    if (!CalleeSig || !CalleeEnv)
       return ParentFunction;
 
-    if (SubsMap.getRecursiveProperties().hasPrimaryArchetype())
-      SubsMap = SubsMap.mapReplacementTypesOutOfContext();
+    // FIXME: Pass the CallerSig down directly instead of doing this.
+    GenericSignature CallerSig;
+    if (SubsMap.getRecursiveProperties().hasPrimaryArchetype()) {
+      for (auto ReplacementType : SubsMap.getReplacementTypes()) {
+        ReplacementType.visit([&](Type t) {
+          if (t->is<PrimaryArchetypeType>() || t->is<PackArchetypeType>()) {
+            auto sig =
+              t->castTo<ArchetypeType>()->getGenericEnvironment()
+                ->getGenericSignature();
+            if (!CallerSig)
+              CallerSig = sig;
+            else
+              ASSERT(CallerSig.getPointer() == sig.getPointer());
+          }
+        });
+      }
+
+      SubsMap = SubsMap.mapReplacementTypesOutOfEnvironment();
+    }
 
     // One abstract function in the debug info can only have one set of variables
     // and types. We check if the function is called with non-identity substitutions
     // to decide whether it's necessary to clone a unique copy of the function
     // declaration with the substitutions applied for the debug info.
-    if (SubsMap.isIdentity())
+    if (SubsMap.isIdentity() &&
+        !SubsMap.getRecursiveProperties().hasTypeParameter())
       return ParentFunction;
 
-    // Note that mapReplacementTypesOutOfContext() can't do anything for
+    // Note that mapReplacementTypesOutOfEnvironment() can't do anything for
     // opened existentials, and since archetypes can't be mangled, ignore
     // this case for now.
     if (SubsMap.getRecursiveProperties().hasLocalArchetype())
-      return ParentFunction;
+      SubsMap = {};
 
     // Clone the function with the substituted type for the debug info.
     Mangle::GenericSpecializationMangler Mangler(M.getASTContext(), ParentFunction,
                                                  IsNotSerialized);
     std::string MangledName =
-      Mangler.mangleForDebugInfo(RemappedSig, SubsMap, ForInlining);
+      Mangler.mangleForDebugInfo(CalleeSig, SubsMap, CallerSig, ForInlining);
 
     if (ParentFunction->getName() == MangledName)
       return ParentFunction;
@@ -431,7 +449,8 @@ protected:
       // but the symbol will be referred to by the debug info metadata.
       ParentFunction = FuncBuilder.getOrCreateFunction(
           ParentFunction->getLocation(), MangledName, SILLinkage::Shared,
-          ParentFunction->getLoweredFunctionType(), ParentFunction->isBare(),
+          ParentFunction->getLoweredFunctionType(),
+          ParentFunction->getActorIsolation(), ParentFunction->isBare(),
           ParentFunction->isTransparent(), ParentFunction->getSerializedKind(),
           IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, 0,
           ParentFunction->isThunk(), ParentFunction->getClassSubclassScope());
@@ -443,7 +462,7 @@ protected:
         // undead.
         if (ParentFunction->empty()) {
           FuncBuilder.eraseFunction(ParentFunction);
-          ParentFunction->setGenericEnvironment(OriginalEnvironment);
+          ParentFunction->setGenericEnvironment(CalleeEnv);
         }
       }
     }

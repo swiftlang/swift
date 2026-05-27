@@ -13,24 +13,25 @@
 // RUN: %target-swift-frontend -emit-module %t/PrivateLib.swift -o %t
 
 /// A resilient client will error on public imports.
-/// Keep AccessLevelOnImport to get the error from Swift 6 in Swift 5.
+/// Use AccessLevelOnImport or InternalImportsByDefault to get the error
+/// from Swift 7 in Swift 5.
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -enable-library-evolution -swift-version 5 \
 // RUN:   -enable-experimental-feature AccessLevelOnImport -verify \
-// RUN:   -package-name pkg
-// RUN: %target-swift-frontend -typecheck %t/Client_Swift6.swift -I %t \
+// RUN:   -package-name pkg -library-level api
+// RUN: %target-swift-frontend -typecheck %t/Client_Swift7.swift -I %t \
 // RUN:   -enable-library-evolution \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
-// RUN:   -verify -package-name pkg
+// RUN:   -verify -package-name pkg -library-level api
 
 /// A non-resilient client doesn't complain.
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5 \
 // RUN:   -enable-experimental-feature AccessLevelOnImport \
-// RUN:   -package-name pkg
-// RUN: %target-swift-frontend -typecheck %t/Client_Swift6.swift -I %t \
+// RUN:   -package-name pkg -library-level api
+// RUN: %target-swift-frontend -typecheck %t/Client_Swift7.swift -I %t \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault \
-// RUN:   -package-name pkg
+// RUN:   -package-name pkg -library-level api
 
 // REQUIRES: swift_feature_AccessLevelOnImport
 // REQUIRES: swift_feature_InternalImportsByDefault
@@ -53,10 +54,10 @@ internal import InternalLib
 fileprivate import FileprivateLib
 private import PrivateLib
 
-//--- Client_Swift6.swift
+//--- Client_Swift7.swift
 
 import DefaultLib
-public import PublicLib // expected-error {{module 'PublicLib' was not compiled with library evolution support; using it means binary compatibility for 'Client_Swift6' can't be guaranteed}} {{1-8=}}
+public import PublicLib // expected-error {{module 'PublicLib' was not compiled with library evolution support; using it means binary compatibility for 'Client_Swift7' can't be guaranteed}} {{1-8=}}
 // expected-warning @-1 {{public import of 'PublicLib' was not used in public declarations or inlinable code}}
 package import PackageLib
 // expected-warning @-1 {{package import of 'PackageLib' was not used in package declarations}}

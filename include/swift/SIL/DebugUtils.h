@@ -204,45 +204,6 @@ inline Operand *getAnyDebugUse(SILValue value) {
   return *ii;
 }
 
-/// Erases the instruction \p I from it's parent block and deletes it, including
-/// all debug instructions which use \p I.
-/// Precondition: The instruction may only have debug instructions as uses.
-/// If the iterator \p InstIter references any deleted instruction, it is
-/// incremented.
-///
-/// \p callBack will be invoked before each instruction is deleted. \p callBack
-/// is not responsible for deleting the instruction because this utility
-/// unconditionally deletes the \p I and its debug users.
-///
-/// Returns an iterator to the next non-deleted instruction after \p I.
-inline SILBasicBlock::iterator eraseFromParentWithDebugInsts(
-    SILInstruction *I, llvm::function_ref<void(SILInstruction *)> callBack =
-                           [](SILInstruction *) {}) {
-
-  auto nextII = std::next(I->getIterator());
-
-  auto results = I->getResults();
-
-  bool foundAny;
-  do {
-    foundAny = false;
-    for (auto result : results) {
-      while (!result->use_empty()) {
-        foundAny = true;
-        auto *User = result->use_begin()->getUser();
-        assert(User->isDebugInstruction());
-        if (nextII == User->getIterator())
-          nextII++;
-        callBack(User);
-        User->eraseFromParent();
-      }
-    }
-  } while (foundAny);
-
-  I->eraseFromParent();
-  return nextII;
-}
-
 /// Return true if the def-use graph rooted at \p V contains any non-debug,
 /// non-trivial users.
 bool hasNonTrivialNonDebugTransitiveUsers(

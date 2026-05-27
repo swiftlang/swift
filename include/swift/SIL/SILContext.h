@@ -90,6 +90,10 @@ public:
     changeNotifications = (NotificationKind)(changeNotifications | notification);
   }
 
+  NotificationKind getChangeNotifications() const {
+    return changeNotifications;
+  }
+
   FixedSizeSlab *allocSlab(FixedSizeSlab *afterSlab);
 
   FixedSizeSlab *freeSlab(FixedSizeSlab *slab);

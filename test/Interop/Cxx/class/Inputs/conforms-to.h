@@ -46,4 +46,12 @@ struct DerivedFromHasTestAndPlay : HasPlay, HasTest {};
 struct DerivedFromHasImportedConf : HasImportedConf {};
 struct DerivedFromDerivedFromHasImportedConf : HasImportedConf {};
 
+struct __attribute__((swift_attr("conforms_to:SwiftTest.Consumable"))) NonCopyable {
+  NonCopyable() = default;
+  NonCopyable(const NonCopyable &) = delete;
+  NonCopyable(NonCopyable &&) = default;
+
+  void consumable() const;
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_DESTRUCTORS_H

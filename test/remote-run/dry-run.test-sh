@@ -1,9 +1,9 @@
 REQUIRES: rsync
-REQUIRES: shell
+UNSUPPORTED: OS=windows-msvc
 
 RUN: %empty-directory(%t)
 RUN: %debug-remote-run -n --input-prefix %S/Inputs/ ls %S/Inputs/upload/1.txt %S/Inputs/upload/2.txt 2>&1 >/dev/null | %FileCheck -check-prefix CHECK-INPUT %s
-RUN: test -z "`ls %t`"
+RUN: ls %t | count 0
 RUN: test ! -e %t-REMOTE
 
 CHECK-INPUT: /usr/bin/env /bin/mkdir -p {{.+}}-REMOTE/input

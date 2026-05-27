@@ -246,10 +246,12 @@ class LLVM(cmake_product.CMakeProduct):
                 platform, arch,
                 crosscompiling=self.is_cross_compile_target(host_target))
             llvm_cmake_options.define('CMAKE_TOOLCHAIN_FILE:PATH', toolchain_file)
-            if not self.is_release():
-                # On Linux build LLVM and subprojects with -gsplit-dwarf which is more
-                # space/time efficient than -g on that platform.
-                llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
+
+        target_supports_split_dwarf = host_target.startswith(('linux', 'freebsd'))
+        if target_supports_split_dwarf and self.is_debug_info():
+            # On platforms that support split-dwarf, build LLVM and subprojects with
+            #  -gsplit-dwarf which is more space/time efficient than -g on that platform.
+            llvm_cmake_options.define('LLVM_USE_SPLIT_DWARF:BOOL', 'YES')
 
         build = True
         if not self.args._build_llvm or (not self.args.cross_compile_build_swift_tools
@@ -359,7 +361,7 @@ class LLVM(cmake_product.CMakeProduct):
             llvm_cmake_options.define(
                 f'BUILTINS_{builtins_runtimes_target_for_darwin}_'
                 'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:'
-                'STRING', 'armv6 armv6m armv7 armv7m armv7em')
+                'STRING', 'armv6 armv6m armv7 armv7m armv7em armv8m.main armv8.1m.main')
 
         llvm_enable_projects = ['clang']
         llvm_enable_runtimes = []
@@ -428,11 +430,6 @@ class LLVM(cmake_product.CMakeProduct):
             # outside of `build-script` (e.g. with `run-test`)
             build_targets.append('LLVMTestingSupport')
 
-        build_root = os.path.dirname(self.build_dir)
-        host_machine_target = targets.StdlibDeploymentTarget.host_target().name
-        host_build_dir = os.path.join(build_root, 'llvm-{}'.format(
-            host_machine_target))
-
         if self.is_cross_compile_target(host_target):
             build_root = os.path.dirname(self.build_dir)
             host_machine_target = targets.StdlibDeploymentTarget.host_target().name
@@ -446,8 +443,6 @@ class LLVM(cmake_product.CMakeProduct):
                                                 'clang-tidy-confusable-chars-gen')
             llvm_cmake_options.define('CLANG_TIDY_CONFUSABLE_CHARS_GEN',
                                       confusable_chars_gen)
-            pseudo_gen = os.path.join(host_build_dir, 'bin', 'clang-pseudo-gen')
-            llvm_cmake_options.define('CLANG_PSEUDO_GEN', pseudo_gen)
             llvm = os.path.join(host_build_dir, 'llvm')
             llvm_cmake_options.define('LLVM_NATIVE_BUILD', llvm)
 

@@ -5,42 +5,40 @@ func foo() {
   /*HERE*/
 }
 
-// REQUIRES: shell
+// UNSUPPORTED: OS=windows-msvc
 
 // RUN: %empty-directory(%t/Frameworks)
 // RUN: %empty-directory(%t/MyProject)
 
-// RUN: COMPILER_ARGS=( \
-// RUN:   -target %target-triple \
-// RUN:   -module-name MyProject \
-// RUN:   -F %t/Frameworks \
-// RUN:   -I %t/MyProject \
-// RUN:   -import-objc-header %t/MyProject/Bridging.h \
-// RUN:   %t/MyProject/Library.swift \
-// RUN:   %s \
-// RUN: )
-// RUN: INPUT_DIR=%S/Inputs/checkdeps
+// DEFINE: %{args} = \
+// DEFINE:   -target %target-triple \
+// DEFINE:   -module-name MyProject \
+// DEFINE:   -F %t/Frameworks \
+// DEFINE:   -I %t/MyProject \
+// DEFINE:   -import-objc-header %t/MyProject/Bridging.h \
+// DEFINE:   %t/MyProject/Library.swift \
+// DEFINE:   %s
 
-// RUN: cp -R $INPUT_DIR/MyProject %t/
+// RUN: cp -R %S/Inputs/checkdeps/MyProject %t/
 // RUN: touch -t 202001010101 %t/MyProject/Library.swift
-// RUN: cp -R $INPUT_DIR/ClangFW.framework %t/Frameworks/
+// RUN: cp -R %S/Inputs/checkdeps/ClangFW.framework %t/Frameworks/
 // RUN: %empty-directory(%t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule)
-// RUN: %target-swift-frontend -emit-module -module-name SwiftFW -o %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name $INPUT_DIR/SwiftFW_src/Funcs.swift
+// RUN: %target-swift-frontend -emit-module -module-name SwiftFW -o %t/Frameworks/SwiftFW.framework/Modules/SwiftFW.swiftmodule/%target-swiftmodule-name %S/Inputs/checkdeps/SwiftFW_src/Funcs.swift
 
 // RUN: %sourcekitd-test \
 // RUN:   -req=global-config -req-opts=completion_check_dependency_interval=0 == \
 
 // RUN:   -shell -- echo "### Initial" == \
-// RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
+// RUN:   -req=complete -pos=5:3 %s -- %{args} == \
 
 // RUN:   -shell -- echo "### Modify local library file" == \
-// RUN:   -shell -- cp -R $INPUT_DIR/MyProject_mod/Library.swift %t/MyProject/ == \
+// RUN:   -shell -- cp -R %S/Inputs/checkdeps/MyProject_mod/Library.swift %t/MyProject/ == \
 // RUN:   -shell -- touch -t 210001010101 %t/MyProject/Library.swift == \
-// RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} == \
+// RUN:   -req=complete -pos=5:3 %s -- %{args} == \
 
 // RUN:   -shell -- echo '### Fast completion' == \
 // RUN:   -shell -- touch -t 202001010101 %t/MyProject/Library.swift == \
-// RUN:   -req=complete -pos=5:3 %s -- ${COMPILER_ARGS[@]} \
+// RUN:   -req=complete -pos=5:3 %s -- %{args} \
 
 // RUN:   | %FileCheck %s
 

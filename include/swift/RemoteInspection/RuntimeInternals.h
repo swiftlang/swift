@@ -200,6 +200,18 @@ struct ChildFragment {
   typename Runtime::StoredPointer NextChild;
 };
 
+template <typename Runtime>
+struct GroupChildFragment {
+  typename Runtime::StoredPointer Group;
+};
+
+template <typename Runtime>
+struct FutureFragment {
+  // The low 2 bits are the status, the rest is a pointer to the first
+  // waiting AsyncTask.
+  typename Runtime::StoredPointer WaitQueue;
+};
+
 } // end namespace reflection
 } // end namespace swift
 

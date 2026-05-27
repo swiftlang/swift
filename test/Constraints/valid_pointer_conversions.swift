@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 func foo(_ a: [[UInt8]], _ p: [UnsafeRawPointer]) {
   foo(a, a) // expect-warning {{all paths through this function will call itself}}
@@ -87,4 +87,59 @@ do {
 
   let _: UInt8 = result1 // Ok
   let _: [UInt8] = result2 // Ok
+}
+
+protocol PointerProtocol {}
+extension UnsafePointer: PointerProtocol {}
+
+extension PointerProtocol {
+  func foo(_ x: Self) {} // expected-note {{found this candidate}}
+  func foo(_ x: UnsafePointer<CChar>) {} // expected-note {{found this candidate}}
+}
+
+func testGenericPointerConversions(
+  chars: [CChar], mutablePtr: UnsafeMutablePointer<CChar>, ptr: UnsafePointer<CChar>
+) {
+  func id<T>(_ x: T) -> T { x }
+  func optID<T>(_ x: T?) -> T { x! }
+  func takesCharPtrs(_: UnsafePointer<CChar>, _: UnsafePointer<CChar>?) {}
+
+  // Make sure we don't end up with an ambiguity here, we should prefer to
+  // do the pointer conversion for `takesPtrs` not `id`.
+  takesCharPtrs(chars, "a")
+  takesCharPtrs(id(chars), id("a"))
+  takesCharPtrs(id("a"), optID(chars))
+  takesCharPtrs(mutablePtr, mutablePtr)
+  takesCharPtrs(id(mutablePtr), id(mutablePtr))
+  takesCharPtrs(id(mutablePtr), optID(mutablePtr))
+
+  // Make sure this is ambiguous.
+  ptr.foo(chars) // expected-error {{ambiguous use of 'foo'}}
+}
+
+// Make sure we prefer non-pack overloads when pointer conversions are involved.
+func testOverloadedPackPointerConversions() {
+  func takesPtr(_ ptr: UnsafePointer<CChar>) {}
+
+  // Deprecation does not impact solution score, so we can use it to ensure
+  // we don't pick it.
+  @available(*, deprecated, message: "shouldn't have picked this overload")
+  func packOverloaded1<each T, R>(_ xs: repeat each T, fn: (repeat each T) -> R?) {}
+  func packOverloaded1<T, R>(_ x: T, fn: (T) -> R?) {}
+  packOverloaded1("") { takesPtr($0) }
+
+  @available(*, deprecated, message: "shouldn't have picked this overload")
+  func packOverloaded2<each T, R>(_ xs: (repeat each T)?, fn: (repeat each T) -> R?) {}
+  func packOverloaded2<T, R>(_ x: T?, fn: (T) -> R?) {}
+  packOverloaded2("") { takesPtr($0) }
+
+  @available(*, deprecated, message: "shouldn't have picked this overload")
+  func packOverloaded3<each T, R>(_ xs: repeat (each T)?, fn: (repeat each T) -> R?) {}
+  func packOverloaded3<T, R>(_ x: T?, fn: (T) -> R?) {}
+  packOverloaded3("") { takesPtr($0) }
+
+  @available(*, deprecated, message: "shouldn't have picked this overload")
+  func packOverloaded4<each T, R>(_ xs: (repeat (each T)?)?, fn: (repeat each T) -> R?) {}
+  func packOverloaded4<T, R>(_ x: T??, fn: (T) -> R?) {}
+  packOverloaded4("") { takesPtr($0) }
 }

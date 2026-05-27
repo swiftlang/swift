@@ -455,12 +455,26 @@ static bool shouldNotSpecialize(SILFunction *Callee, SILFunction *Caller,
   return false;
 }
 
-// Addressable parameters cannot be dropped because the address may
-// escape. They also can't be promoted to direct convention, so there
-// is no danger in preserving them.
 static bool canConvertArg(CanSILFunctionType substType, unsigned paramIdx,
                           SILFunction *caller) {
+  // The `self` parameter of a borrow accessor with an indirect return
+  // cannot be promoted, since the returned address might point into the
+  // parameter.
+  //
+  // TODO: It may be possible to promote `self` and the result if and only
+  // if both the parameter and result do or do not get promoted in unison.
+  if (substType->getNumResults() == 1
+      && substType->getSingleResult().getConvention()
+           == ResultConvention::GuaranteedAddress
+      && substType->getSelfParameterIndex() == paramIdx) {
+    return false;
+  }
+  
+  // Addressable parameters cannot be dropped because the address may
+  // escape. They also can't be promoted to direct convention, so there
+  // is no danger in preserving them.
   return !substType->isAddressable(paramIdx, caller);
+
 }
 
 // If there is no read from an indirect argument, this argument has to be
@@ -499,6 +513,10 @@ static bool canDropMetatypeArg(ApplySite apply, SILFunction *callee,
   SILArgument *calleeArg = callee->getArguments()[calleeArgIdx];
 
   if (isUsedAsDynamicSelf(calleeArg))
+    return false;
+
+  // TODO: Adjust LifetimeDependencInfo when dropping the argument.
+  if (apply.getOrigCalleeType()->hasLifetimeDependencies())
     return false;
 
   if (calleeArg->getType().getASTType()->hasDynamicSelfType())
@@ -614,7 +632,7 @@ bool ReabstractionInfo::prepareAndCheck(ApplySite Apply, SILFunction *Callee,
       if (CalleeGenericEnv) {
         if (auto Archetype = Replacement->getAs<ArchetypeType>()) {
           auto OrigArchetype =
-              CalleeGenericEnv->mapTypeIntoContext(GP)->castTo<ArchetypeType>();
+              CalleeGenericEnv->mapTypeIntoEnvironment(GP)->castTo<ArchetypeType>();
           if (Archetype->requiresClass() && !OrigArchetype->requiresClass())
             HasNonArchetypeGenericParams = true;
           if (Archetype->getLayoutConstraint() &&
@@ -910,7 +928,7 @@ getReturnTypeCategory(const SILResultInfo &RI,
                   const SILFunctionConventions &substConv,
                   TypeExpansionContext typeExpansion) {
   auto ResultTy = substConv.getSILType(RI, typeExpansion);
-  ResultTy = mapTypeIntoContext(ResultTy);
+  ResultTy = mapTypeIntoEnvironment(ResultTy);
   auto &TL = getModule().Types.getTypeLowering(ResultTy, typeExpansion);
 
   if (!TL.isLoadable())
@@ -931,7 +949,7 @@ getParamTypeCategory(const SILParameterInfo &PI,
                   const SILFunctionConventions &substConv,
                   TypeExpansionContext typeExpansion) {
   auto ParamTy = substConv.getSILType(PI, typeExpansion);
-  ParamTy = mapTypeIntoContext(ParamTy);
+  ParamTy = mapTypeIntoEnvironment(ParamTy);
   auto &TL = getModule().Types.getTypeLowering(ParamTy, typeExpansion);
 
   if (!TL.isLoadable())
@@ -1008,13 +1026,13 @@ CanSILFunctionType ReabstractionInfo::createThunkType(PartialApplyInst *forPAI) 
   return newFnTy;
 }
 
-SILType ReabstractionInfo::mapTypeIntoContext(SILType type) const {
+SILType ReabstractionInfo::mapTypeIntoEnvironment(SILType type) const {
   if (Callee) {
-    return Callee->mapTypeIntoContext(type);
+    return Callee->mapTypeIntoEnvironment(type);
   }
   assert(!methodDecl.isNull());
   if (auto *genericEnv = M->Types.getConstantGenericEnvironment(methodDecl))
-    return genericEnv->mapTypeIntoContext(getModule(), type);
+    return genericEnv->mapTypeIntoEnvironment(getModule(), type);
   return type;
 }
 
@@ -1125,7 +1143,7 @@ getGenericEnvironmentAndSignatureWithRequirements(
   auto NewGenSig = buildGenericSignature(M.getASTContext(),
                                          OrigGenSig, { },
                                          std::move(RequirementsCopy),
-                                         /*allowInverses=*/false);
+                                         DefaultRequirementOptions());
   auto NewGenEnv = NewGenSig.getGenericEnvironment();
   return { NewGenEnv, NewGenSig };
 }
@@ -1494,7 +1512,7 @@ public:
       SubstitutionMap::get(
         SpecializedGenericSig,
         [&](SubstitutableType *type) -> Type {
-          return GenericEnvironment::mapTypeIntoContext(
+          return GenericEnvironment::mapTypeIntoEnvironment(
               CalleeGenericEnv,
               SpecializedGenericSig.getReducedType(type));
         },
@@ -1711,7 +1729,7 @@ void FunctionSignaturePartialSpecializer::
 
     // Add a same type requirement based on the provided generic parameter
     // substitutions.
-    auto ReplacementCallerInterfaceTy = Replacement->mapTypeOutOfContext();
+    auto ReplacementCallerInterfaceTy = Replacement->mapTypeOutOfEnvironment();
 
     auto SpecializedReplacementCallerInterfaceTy =
         ReplacementCallerInterfaceTy.subst(
@@ -1803,7 +1821,7 @@ FunctionSignaturePartialSpecializer::
   // Finalize the archetype builder.
   auto GenSig = buildGenericSignature(Ctx, GenericSignature(),
                                       AllGenericParams, AllRequirements,
-                                      /*allowInverses=*/false);
+                                      DefaultRequirementOptions());
   auto *GenEnv = GenSig.getGenericEnvironment();
   return { GenEnv, GenSig };
 }
@@ -1818,7 +1836,7 @@ SubstitutionMap FunctionSignaturePartialSpecializer::computeClonerParamSubs() {
                  CalleeGenericSig->print(llvm::dbgs()));
       auto SpecializedInterfaceTy =
           Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
-      return SpecializedGenericEnv->mapTypeIntoContext(
+      return SpecializedGenericEnv->mapTypeIntoEnvironment(
           SpecializedInterfaceTy);
     },
     LookUpConformanceInModule());
@@ -1836,8 +1854,8 @@ void FunctionSignaturePartialSpecializer::computeCallerInterfaceSubs(
       // First, map callee's interface type to specialized interface type.
       auto Ty = Type(type).subst(CalleeInterfaceToSpecializedInterfaceMap);
       Type SpecializedInterfaceTy =
-        SpecializedGenericEnv->mapTypeIntoContext(Ty)
-          ->mapTypeOutOfContext();
+        SpecializedGenericEnv->mapTypeIntoEnvironment(Ty)
+          ->mapTypeOutOfEnvironment();
       assert(!SpecializedInterfaceTy->hasError());
       return SpecializedInterfaceTy;
     },
@@ -2413,7 +2431,8 @@ bool swift::specializeClassMethodInst(ClassMethodInst *cm) {
   SILType substitutedType =
       funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
 
-  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), cm->getMember(), m);
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), cm->getMember(),
+                           /*convertIndirectToDirect=*/ true, m);
   reInfo.createSubstitutedAndSpecializedTypes();
   CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
   SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
@@ -2465,7 +2484,8 @@ bool swift::specializeWitnessMethodInst(WitnessMethodInst *wm) {
   SILType substitutedType =
       funcTy.substGenericArgs(m, subs, TypeExpansionContext::minimal());
 
-  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), wm->getMember(), m);
+  ReabstractionInfo reInfo(substitutedType.getAs<SILFunctionType>(), wm->getMember(),
+                           /*convertIndirectToDirect=*/ false, m);
   reInfo.createSubstitutedAndSpecializedTypes();
   CanSILFunctionType finalFuncTy = reInfo.getSpecializedType();
   SILType finalSILTy = SILType::getPrimitiveObjectType(finalFuncTy);
@@ -2649,7 +2669,7 @@ swift::replaceWithSpecializedCallee(ApplySite applySite, SILValue callee,
     auto *newPAI = builder.createPartialApply(
         loc, callee, subs, arguments,
         pai->getCalleeConvention(), pai->getResultIsolation(),
-        pai->isOnStack());
+        pai->isOnStack(), pai->isStackAllocationNested());
     pai->replaceAllUsesWith(newPAI);
     return newPAI;
   }
@@ -2740,9 +2760,9 @@ protected:
 SILFunction *ReabstractionThunkGenerator::createThunk() {
   CanSILFunctionType thunkType = ReInfo.createThunkType(OrigPAI);
   SILFunction *Thunk = FunctionBuilder.getOrCreateSharedFunction(
-      Loc, ThunkName, thunkType, IsBare, IsTransparent,
-      ReInfo.getSerializedKind(), ProfileCounter(), IsThunk, IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible);
+      Loc, ThunkName, thunkType, ActorIsolation::forUnspecified(), IsBare,
+      IsTransparent, ReInfo.getSerializedKind(), ProfileCounter(), IsThunk,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
   // Re-use an existing thunk.
   if (!Thunk->empty())
     return Thunk;
@@ -2814,7 +2834,7 @@ FullApplySite ReabstractionThunkGenerator::createApplyAndReturn(
       Builder.createThrowAddr(Loc);
     } else {
       SILValue errorValue = ErrorBB->createPhiArgument(
-          SpecializedFunc->mapTypeIntoContext(
+          SpecializedFunc->mapTypeIntoEnvironment(
               specConv.getSILErrorType(Builder.getTypeExpansionContext())),
           OwnershipKind::Owned);
       if (resultAddr.errorAddress) {
@@ -2827,7 +2847,7 @@ FullApplySite ReabstractionThunkGenerator::createApplyAndReturn(
       }
     }
     returnValue = NormalBB->createPhiArgument(
-        SpecializedFunc->mapTypeIntoContext(
+        SpecializedFunc->mapTypeIntoEnvironment(
             specConv.getSILResultType(Builder.getTypeExpansionContext())),
         OwnershipKind::Owned);
     Builder.setInsertionPoint(NormalBB);
@@ -2896,7 +2916,7 @@ ReabstractionThunkGenerator::convertReabstractionThunkArguments(
       // Store the result later.
       // FIXME: This only handles a single result! Partial specialization could
       // induce some combination of direct and indirect results.
-      SILType ResultTy = SpecializedFunc->mapTypeIntoContext(
+      SILType ResultTy = SpecializedFunc->mapTypeIntoEnvironment(
           substConv.getSILType(substRI, Builder.getTypeExpansionContext()));
       assert(ResultTy.isAddress());
       assert(!resultAddr.returnAddress);
@@ -2913,7 +2933,7 @@ ReabstractionThunkGenerator::convertReabstractionThunkArguments(
   if (thunkType->hasIndirectErrorResult()) {
     if (ReInfo.isErrorResultConverted()) {
       SILResultInfo substRI = thunkType->getErrorResult();
-      SILType errorTy = SpecializedFunc->mapTypeIntoContext(
+      SILType errorTy = SpecializedFunc->mapTypeIntoEnvironment(
           substConv.getSILType(substRI, Builder.getTypeExpansionContext()));
       assert(errorTy.isAddress());
       assert(!resultAddr.errorAddress);
@@ -2940,7 +2960,7 @@ ReabstractionThunkGenerator::convertReabstractionThunkArguments(
       // Convert an originally indirect to direct specialized parameter.
       assert(!specConv.isSILIndirect(SpecType->getParameters()[specArgIdx]));
       // Instead of passing the address, pass the loaded value.
-      SILType ParamTy = SpecializedFunc->mapTypeIntoContext(
+      SILType ParamTy = SpecializedFunc->mapTypeIntoEnvironment(
           substConv.getSILType(thunkType->getParameters()[specArgIdx],
                                Builder.getTypeExpansionContext()));
       assert(ParamTy.isAddress());
@@ -3511,7 +3531,7 @@ void swift::trySpecializeApplyOfGeneric(
     SingleValueInstruction *newPAI = Builder.createPartialApply(
       PAI->getLoc(), FRI, Subs, Arguments,
       PAI->getCalleeConvention(), PAI->getResultIsolation(),
-      PAI->isOnStack());
+      PAI->isOnStack(), PAI->isStackAllocationNested());
     PAI->replaceAllUsesWith(newPAI);
     DeadApplies.insert(PAI);
     return;

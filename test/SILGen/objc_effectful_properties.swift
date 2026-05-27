@@ -52,7 +52,7 @@ func testAsyncThrows(eff : EffProps) async {
 
 // CHECK-LABEL: sil {{.*}}@${{.*}}17testMainActorProp
 func testMainActorProp(eff : EffProps) async {
-  // CHECK:         [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK:         [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
   // CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]] :
   // CHECK:         hop_to_executor [[GENERIC_EXEC]] :
   // CHECK: } // end sil function '${{.*}}17testMainActorProp
@@ -61,7 +61,7 @@ func testMainActorProp(eff : EffProps) async {
 
 // CHECK-LABEL: sil {{.*}}@${{.*}}19testMainActorMethod
 func testMainActorMethod(eff : EffProps) async {
-  // CHECK:         [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
+  // CHECK:         [[GENERIC_EXEC:%.*]] = enum $Optional<any Actor>, #Optional.none
   // CHECK-NEXT:    hop_to_executor [[GENERIC_EXEC]] :
   // CHECK:         hop_to_executor [[GENERIC_EXEC]] :
   // CHECK: } // end sil function '${{.*}}19testMainActorMethod

@@ -233,17 +233,15 @@ private indirect enum GlobalInitValue {
   }
 
   private mutating func setEnumCase(to value: InitValue, at path: SmallProjectionPath, index: Int, type: Type) -> Bool {
-    switch value {
+    if path.isEmpty, case .enumCaseWithoutPayload(let iea) = value {
 
-    case .enumCaseWithoutPayload(let iea):
       guard case .undefined = self else {
         // The enum was set twice.
         return false
       }
       assert(index == iea.caseIndex)
       self = .enumCase(caseIndex: index)
-
-    case .value:
+    } else {
       guard let payloadType = type.getEnumCases(in: value.parentFunction)!.getPayloadType(ofCaseIndex: index) else {
         return false
       }
@@ -289,7 +287,7 @@ private indirect enum GlobalInitValue {
       fatalError("cannot materialize undefined init value")
 
     case .constant(let value):
-      return cloner.cloneRecursivelyToGlobal(value: value)
+      return cloner.cloneRecursively(globalInitValue: value)
 
     case .aggregate(let fields):
       if type.isStruct {
@@ -406,7 +404,7 @@ private extension Value {
       case is LoadInst:
         return true
       case is StructInst, is TupleInst:
-        worklist.pushIfNotVisited(contentsOf: (v as! Instruction).operands.lazy.map { $0.value })
+        worklist.pushIfNotVisited(contentsOf: (v as! Instruction).operands.values)
       case let ei as EnumInst:
         if let payload = ei.payload {
           worklist.pushIfNotVisited(payload)
@@ -480,7 +478,7 @@ private struct InitValueBuilder: AddressDefUseWalker {
       case .PrepareInitialization:
         return .continueWalk
       case .AddressOfRawLayout:
-        if let addr2Ptr = bi.uses.getSingleUser(ofType: PointerToAddressInst.self) {
+        if let addr2Ptr = bi.uses.singleUser(ofType: PointerToAddressInst.self) {
           return walkDownUses(ofAddress: addr2Ptr, path: path)
         }
         return .abortWalk

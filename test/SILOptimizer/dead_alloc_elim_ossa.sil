@@ -579,3 +579,28 @@ bb0:
   return %5
 }
 
+struct UInt64 {
+  var _value: Builtin.Int64
+}
+
+// CHECK-LABEL: sil @dont_remove_store_read_via_address_to_pointer :
+// CHECK:         [[S:%[0-9]+]] = alloc_stack
+// CHECK:         tuple_element_addr [[S]]{{.*}}, 0
+// CHECK:         store
+// CHECK:         tuple_element_addr [[S]]{{.*}}, 1
+// CHECK:         store
+// CHECK:       } // end sil function 'dont_remove_store_read_via_address_to_pointer'
+sil @dont_remove_store_read_via_address_to_pointer : $@convention(thin) (UInt64, UInt64) -> Builtin.Int64 {
+bb0(%0 : $UInt64, %1 : $UInt64):
+  %2 = alloc_stack $(UInt64, UInt64)
+  %3 = tuple_element_addr %2 : $*(UInt64, UInt64), 0
+  store %0 to %3 : $*UInt64
+  %5 = tuple_element_addr %2 : $*(UInt64, UInt64), 1
+  store %1 to %5 : $*UInt64
+  %7 = address_to_pointer [stack_protection] %2 : $*(UInt64, UInt64) to $Builtin.RawPointer
+  %8 = pointer_to_address %7 : $Builtin.RawPointer to $*UInt64
+  %9 = struct_element_addr %8 : $*UInt64, #UInt64._value
+  %10 = load %9 : $*Builtin.Int64
+  dealloc_stack %2 : $*(UInt64, UInt64)
+  return %10 : $Builtin.Int64
+}

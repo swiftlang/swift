@@ -250,6 +250,57 @@ StringCreateTests.test("Validating.utf16")
   expectNil(String(validating: AnyCollection(i3), as: UTF16.self))
 }
 
+StringCreateTests.test("UTF16.surrogatePairAtBlockBoundary")
+.require(.stdlib_6_0)
+.code {
+  guard #available(SwiftStdlib 6.0, *) else { return }
+
+  // Place a valid surrogate pair (U+10000) so that the lead sits on, or one
+  // before, each of the block-size boundaries the UTF-16 transcoder uses
+  // (8 on 32-bit, 16 on 64-bit). Before the relevant fix, a pair straddling the
+  // boundary was treated as two unpaired surrogates, which caused
+  // String(validating:as:) to return nil for a valid input and
+  // String(decoding:as:) to over-allocate (emitting two U+FFFD repairs
+  // instead of one U+10000).
+  for leadPos in [7, 8, 15, 16, 23, 31] {
+    let length = leadPos + 18
+    var units: [UInt16] = Array(repeating: 0x0800, count: length)
+    units[leadPos] = 0xD800
+    units[leadPos + 1] = 0xDC00
+
+    let validated = units.withUnsafeBufferPointer {
+      String(validating: $0, as: UTF16.self)
+    }
+    expectNotNil(validated, "leadPos=\(leadPos)")
+    expectEqual(Array(validated?.utf16 ?? "".utf16), units, "leadPos=\(leadPos)")
+
+    let decoded = String(decoding: units, as: UTF16.self)
+    expectEqual(Array(decoded.utf16), units, "leadPos=\(leadPos)")
+  }
+}
+
+StringCreateTests.test("UTF16.surrogatePairFillsBlock")
+.require(.stdlib_6_0)
+.code {
+  guard #available(SwiftStdlib 6.0, *) else { return }
+
+  // Buffer length is exactly the SIMD block size, with one surrogate pair
+  // inside and the rest filled with non-ASCII BMP scalars. This verifies that
+  // we don't reintroduce a count overflow that was fixed during development of
+  // the vectorized path for UTF16 decoding
+  for blockSize in [8, 16] {
+    for leadPos in 0 ..< (blockSize - 1) {
+      var units: [UInt16] = Array(repeating: 0x0800, count: blockSize)
+      units[leadPos] = 0xD800
+      units[leadPos + 1] = 0xDC00
+      let decoded = String(decoding: units, as: UTF16.self)
+      expectEqual(
+        Array(decoded.utf16), units,
+        "blockSize=\(blockSize) leadPos=\(leadPos)")
+    }
+  }
+}
+
 StringCreateTests.test("Validating.utf32")
 .require(.stdlib_6_0)
 .code {

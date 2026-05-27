@@ -98,8 +98,8 @@ if #available(SwiftStdlib 6.2, *) {
       case notNFC
     }
 
-    let nfcQCNo = "\u{0374}"
-    let nfcQCYes = "\u{0374}"
+    // FIXME: let nfcQCNo = "\u{0374}"
+    // FIXME: let nfcQCYes = "\u{0374}"
 
     let tests: [(String, Normalness)] = [
       ("abc", .known),
@@ -177,15 +177,59 @@ if #available(SwiftStdlib 6.2, *) {
         // Equivalence means no-one is less than the other
         expectFalse(utf8Decomposed.isCanonicallyLessThan(utf8Precomposed))
         expectFalse(utf8Precomposed.isCanonicallyLessThan(utf8Decomposed))
-
       }
-
     }
-
-
   }
 
+  suite.test("isTriviallyIdentical(to:)") {
+    func checkTriviallyIdentical(
+      _ x: Span<UInt8>,
+      _ y: Span<UInt8>,
+      _ expected: Bool,
+      stackTrace: SourceLocStack = SourceLocStack(),
+      showFrame: Bool = true,
+      file: String = #file,
+      line: UInt = #line
+    ) throws(UTF8.ValidationError) {
+      let stackTrace = stackTrace.pushIf(showFrame, file: file, line: line)
+      do {
+        expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+      }
+      do {
+        let x = try UTF8Span(validating: x)
+        let y = try UTF8Span(validating: y)
+        expectEqual(expected, x.isTriviallyIdentical(to: y), stackTrace: stackTrace)
+      }
+    }
 
+    let a = Span<UInt8>()
+
+    var s = "isTriviallyIdentical(to:)"
+    s.makeContiguousUTF8()
+    guard let b = expectNotNil(s.utf8._span) else { return }
+
+    let c = b.extracting(first: 20)
+    let d = b.extracting(last: 23)
+    let e = c.extracting(last: 18)
+    let f = d.extracting(first: 18)
+
+    do throws(UTF8.ValidationError) {
+      try checkTriviallyIdentical(a, a, true)
+      try checkTriviallyIdentical(b, b, true)
+      try checkTriviallyIdentical(c, c, true)
+      try checkTriviallyIdentical(d, d, true)
+      try checkTriviallyIdentical(e, e, true)
+      try checkTriviallyIdentical(f, f, true)
+
+      try checkTriviallyIdentical(a, b, false)
+      try checkTriviallyIdentical(b, c, false)
+      try checkTriviallyIdentical(c, d, false)
+      try checkTriviallyIdentical(d, e, false)
+      try checkTriviallyIdentical(e, f, true)
+    } catch {
+      expectUnreachableCatch(error)
+    }
+  }
 }
 
 // TODO: Rest of this file is in-progress TODOs

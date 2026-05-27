@@ -1,4 +1,5 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=cond_fail | %FileCheck %s
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=cond_fail | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-ASSERT
+// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=cond_fail -remove-runtime-asserts | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERT
 
 // REQUIRES: swift_in_compiler
 
@@ -16,20 +17,26 @@ bb0:
   return %r : $()
 }
 
-// CHECK-LABEL: sil @failing
+// CHECK-LABEL: sil [ossa] @dont_remove_lifetime_ending_instructions :
 // CHECK:         cond_fail
-// CHECK:       } // end sil function 'failing'
-sil @failing : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Int1, -1
-  cond_fail %0 : $Builtin.Int1, "failing"
-  %r = tuple ()
-  return %r : $()
+// CHECK-NEXT:    end_borrow %1
+// CHECK-NEXT:    destroy_value [dead_end] %0
+// CHECK-NEXT:    unreachable
+// CHECK:       } // end sil function 'dont_remove_lifetime_ending_instructions'
+sil [ossa] @dont_remove_lifetime_ending_instructions : $@convention(thin) (@owned String) -> () {
+bb0(%0 : @owned $String):
+  %1 = begin_borrow %0
+  %2 = integer_literal $Builtin.Int1, -1
+  cond_fail %2 : $Builtin.Int1, "failing"
+  end_borrow %1
+  destroy_value [dead_end] %0
+  unreachable
 }
 
-// CHECK-LABEL: sil @unknown
-// CHECK:         cond_fail
-// CHECK:       } // end sil function 'unknown'
+// CHECK-LABEL:        sil @unknown
+// CHECK-ASSERT:         cond_fail
+// CHECK-NOASSERT-NOT:   cond_fail
+// CHECK:              } // end sil function 'unknown'
 sil @unknown : $@convention(thin) (Builtin.Int1) -> () {
 bb0(%0 : $Builtin.Int1):
   cond_fail %0 : $Builtin.Int1, "unknown"

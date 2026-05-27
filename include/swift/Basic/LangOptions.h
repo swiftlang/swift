@@ -19,9 +19,11 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/CXXStdlibKind.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Version.h"
@@ -68,22 +70,24 @@ namespace swift {
     Complete,
   };
 
-  /// Access or distribution level of a library.
+  /// Intended distribution level of a module.
+  ///
+  /// Ordered from more private to more public.
   enum class LibraryLevel : uint8_t {
-    /// Application Programming Interface that is publicly distributed so
-    /// public decls are really public and only @_spi decls are SPI.
-    API,
+    /// This isn't a library or the library distribution intent is unknown.
+    Other,
 
-    /// System Programming Interface that has restricted distribution
-    /// all decls in the module are considered to be SPI including public ones.
-    SPI,
-
-    /// Internal Programming Interface that is not distributed and only usable
-    /// from within a project.
+    /// Internal Programming Interface: the module is not distributed and
+    /// only usable from within its project.
     IPI,
 
-    /// The library has some other undefined distribution.
-    Other
+    /// System Programming Interface: the module has restricted distribution,
+    /// all public decls in the module are considered to be SPI.
+    SPI,
+
+    /// Application Programming Interface: the module is distributed publicly,
+    /// public decls are really public and only @_spi decls are SPI.
+    API,
   };
 
   enum class AccessNoteDiagnosticBehavior : uint8_t {
@@ -186,6 +190,9 @@ namespace swift {
     /// Swift runtime version to compile for.
     version::Version RuntimeVersion = version::Version::getCurrentLanguageVersion();
 
+    /// The minimum Swift runtime version that the progam can be deployed to.
+    version::Version MinSwiftRuntimeVersion;
+
     /// PackageDescription version to compile for.
     version::Version PackageDescriptionVersion;
 
@@ -240,9 +247,6 @@ namespace swift {
     // Availability macros definitions to be expanded at parsing.
     SmallVector<std::string, 4> AvailabilityMacros;
 
-    /// Require public declarations to declare that they are Sendable (or not).
-    bool RequireExplicitSendable = false;
-
     /// Detect and automatically import modules' cross-import overlays.
     bool EnableCrossImportOverlays = false;
 
@@ -267,9 +271,6 @@ namespace swift {
 
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
-
-    /// Emit a remark on early exit in explicit interface build
-    bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
     ///
     /// Support for alternate usage modes
@@ -333,10 +334,6 @@ namespace swift {
     /// language mode of clang on a per-header or even per-module basis. Also
     /// disabled because it is not complete.
     bool EnableCXXInterop = false;
-
-    /// The C++ interoperability source compatibility version. Defaults
-    /// to the Swift language version.
-    version::Version cxxInteropCompatVersion;
 
     /// What version of C++ interoperability a textual interface was originally
     /// generated with (if at all).
@@ -457,7 +454,7 @@ namespace swift {
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target
     /// decl moved to a different module that is already loaded.
-    bool ForceWorkaroundBrokenModules = false;
+    bool EnableWorkaroundBrokenModules = true;
 
     /// Whether to enable the new operator decl and precedencegroup lookup
     /// behavior. This is a staging flag, and will be removed in the future.
@@ -493,6 +490,9 @@ namespace swift {
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
 
+    /// The path to load access notes from.
+    std::string AccessNotesPath;
+
     /// How should we emit diagnostics about access notes?
     AccessNoteDiagnosticBehavior AccessNoteBehavior =
         AccessNoteDiagnosticBehavior::RemarkOnFailureOrSuccess;
@@ -523,6 +523,10 @@ namespace swift {
     /// opening files under sourcekitd on Windows, as memory mapping on Windows
     /// prevents files from being written.
     bool OpenSourcesAsVolatile = false;
+
+    /// Whether the AST is being built for SourceKit.
+    /// FIXME: Eliminate this, it's a layering violation.
+    bool IsForSourceKit = false;
 
     /// Load swiftmodule files in memory as volatile and avoid mmap.
     bool EnableVolatileModules = false;
@@ -643,6 +647,12 @@ namespace swift {
     /// Enables dumping macro expansions.
     bool DumpMacroExpansions = false;
 
+    /// Emits a remark with the content of each macro expansion line, for matching with -verify
+    bool RemarkMacroExpansions = false;
+
+    /// Enables dumping imports for each SourceFile.
+    bool DumpSourceFileImports = false;
+
     /// The model of concurrency to be used.
     ConcurrencyModel ActiveConcurrencyModel = ConcurrencyModel::Standard;
 
@@ -652,6 +662,11 @@ namespace swift {
     /// List of top level modules to be considered as if they had require ObjC
     /// in their module map.
     llvm::SmallVector<StringRef> ModulesRequiringObjC;
+
+    /// User override for the main module's code generation model, set by
+    /// `-enable-experimental-feature CodeGenerationModel=<value>`. Only
+    /// honored in Embedded Swift; rejected at parse time outside Embedded.
+    std::optional<CodeGenerationModel> CodeGenerationModelOverride;
 
     /// Whether to ignore checks that a module is resilient during
     /// type-checking, SIL verification, and IR emission,
@@ -663,6 +678,10 @@ namespace swift {
     /// Defines the default actor isolation.
     DefaultIsolation DefaultIsolationBehavior = DefaultIsolation::Nonisolated;
 
+    /// Whether to enable generation of safe wrappers and parsing of bounds
+    /// attributes (default enabled) or not.
+    bool DisableSafeInteropWrappers = false;
+
     /// Whether or not to allow experimental features that are only available
     /// in "production".
 #ifdef NDEBUG
@@ -671,8 +690,9 @@ namespace swift {
     bool RestrictNonProductionExperimentalFeatures = false;
 #endif
 
-    /// Set to true if we support AArch64TBI.
-    bool HasAArch64TBI = false;
+    /// The section and segment name to use for OSLog strings.
+    mutable std::string OSLogStringSectionName =
+        "__TEXT,__oslogstring,cstring_literals";
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -736,20 +756,14 @@ namespace swift {
       return CustomConditionalCompilationFlags;
     }
 
-    /// Whether our effective Swift version is at least 'major'.
+    /// Returns a boolean value indicating whether the language mode is at least
+    /// `mode`.
     ///
-    /// This is usually the check you want; for example, when introducing
+    /// This is very likely the check you want; for example, when introducing
     /// a new language feature which is only visible in Swift 5, you would
-    /// check for isSwiftVersionAtLeast(5).
-    bool isSwiftVersionAtLeast(unsigned major, unsigned minor = 0) const {
-      return EffectiveLanguageVersion.isVersionAtLeast(major, minor);
-    }
-
-    /// Whether the C++ interoperability compatibility version is at least
-    /// 'major'.
-    bool isCxxInteropCompatVersionAtLeast(unsigned major,
-                                          unsigned minor = 0) const {
-      return cxxInteropCompatVersion.isVersionAtLeast(major, minor);
+    /// check for `isLanguageModeAtLeast(LanguageMode::v5)`.
+    bool isLanguageModeAtLeast(LanguageMode mode) const {
+      return mode.isEffectiveIn(EffectiveLanguageVersion);
     }
 
     /// Sets the "_hasAtomicBitWidth" conditional.
@@ -923,6 +937,20 @@ namespace swift {
     /// Intended for debugging purposes only.
     unsigned WarnLongExpressionTypeChecking = 0;
 
+    /// If non-zero, warn when type-checking an expression uses more than
+    /// this many solver scopes.
+    ///
+    /// Intended for debugging purposes only. Unlike WarnLongExpressionTypeChecking,
+    /// this threshold is deterministic across machines.
+    unsigned WarnLongExpressionTypeCheckingScopes = 0;
+
+    /// If non-zero, warn when type-checking an expression uses more than
+    /// this many solver trail steps.
+    ///
+    /// Intended for debugging purposes only. Unlike WarnLongExpressionTypeChecking,
+    /// this threshold is deterministic across machines.
+    unsigned WarnLongExpressionTypeCheckingTrail = 0;
+
     /// If non-zero, abort the expression type checker if it takes more
     /// than this many seconds.
     unsigned ExpressionTimeoutThreshold = 0;
@@ -985,16 +1013,21 @@ namespace swift {
     /// Should be stored sorted.
     llvm::SmallVector<unsigned, 4> DebugConstraintSolverOnLines;
 
+    /// If non-zero, randomly shuffle disjunctions using this seed. For debugging.
+    unsigned ShuffleDisjunctionSeed = 0;
+
+    /// If non-zero, randomly shuffle disjunction choices using this seed. For
+    /// debugging
+    unsigned ShuffleDisjunctionChoicesSeed = 0;
+
+    /// If true, we will crash if the constraint solver found a valid solution
+    /// in diagnostic mode.
+    bool CrashOnValidSalvage = false;
+
     /// Triggers llvm fatal error if the typechecker tries to typecheck a decl
     /// or an identifier reference with any of the provided prefix names. This
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
-
-    /// Enable experimental operator designated types feature.
-    bool EnableOperatorDesignatedTypes = false;
-
-    /// Enable old constraint system performance hacks.
-    bool EnableConstraintSolverPerformanceHacks = false;
 
     /// See \ref FrontendOptions.PrintFullConvention
     bool PrintFullConvention = false;
@@ -1006,8 +1039,34 @@ namespace swift {
     /// eagerly typechecking source files after parsing.
     bool EnableLazyTypecheck = false;
 
+    /// Enables eager type-checking of declarations in macro expansions.
+    /// For testing purposes.
+    bool TypeCheckMacrosEagerly = false;
+
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;
+
+    /// Enable various older performance optimizations that have been subsumed
+    /// by subsequent improvements to the solver.
+    bool SolverEnablePerformanceHacks = false;
+
+    /// Enable the experimental "prepared overloads" optimization.
+    bool SolverEnablePreparedOverloads = true;
+
+    /// Enable generation of transitive conformance constraints.
+    bool SolverEnableTransitiveConformance = true;
+
+    /// Enable experimental optimization to speed up binding of type variables.
+    bool SolverEnableBindingOptimizations = true;
+
+    /// Enable experimental optimization to skip contradictory disjunction
+    /// choices.
+    bool SolverPruneDisjunctions = true;
+
+    /// Enable experimental optimization to skip operators defined in protocol
+    /// extensions if they are a refinement of a protocol requirement that also
+    /// appears in the disjunction.
+    bool SolverOptimizeOperatorDefaults = true;
   };
 
   /// Options for controlling the behavior of the Clang importer.
@@ -1042,6 +1101,10 @@ namespace swift {
 
     /// The bridging header PCH file.
     std::string BridgingHeaderPCH;
+
+    /// Whether the bridging header and PCH file are considered to be
+    /// internal imports.
+    bool BridgingHeaderIsInternal = false;
 
     /// When automatically generating a precompiled header from the bridging
     /// header, place it in this directory.
@@ -1100,7 +1163,8 @@ namespace swift {
     /// When set, import SPI_AVAILABLE symbols with Swift SPI attributes.
     bool EnableClangSPI = true;
 
-    /// When set, don't enforce warnings with -Werror.
+    /// When set, don't enforce warnings with -Werror, and disable PCH
+    /// validation.
     bool DebuggerSupport = false;
 
     /// Prefer the serialized preprocessed header over the one on disk.

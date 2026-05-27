@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -188,12 +188,12 @@ extension String {
     }
   }
 
-  internal static func _fromLargeUTF8Repairing(
+  internal static func _fromLargeUTF8Repairing<E: Error>(
     uninitializedCapacity capacity: Int,
     initializingWith initializer: (
       _ buffer: UnsafeMutableBufferPointer<UInt8>
-    ) throws -> Int
-  ) rethrows -> String {
+    ) throws(E) -> Int
+  ) throws(E) -> String {
     let result = try unsafe __StringStorage.create(
       uninitializedCodeUnitCapacity: capacity,
       initializingUncheckedUTF8With: initializer)
@@ -211,25 +211,55 @@ extension String {
       return unsafe repairUTF8(result.codeUnits, firstKnownBrokenRange: initialRange)
     }
   }
-
-  @usableFromInline
-  internal static func _uncheckedFromUTF8(
-    _ input: UnsafeBufferPointer<UInt8>
-  ) -> String {
-    return unsafe _uncheckedFromUTF8(input, isASCII: _allASCII(input))
-  }
-
+  
   @usableFromInline
   internal static func _uncheckedFromUTF8(
     _ input: UnsafeBufferPointer<UInt8>,
-    isASCII: Bool
+  ) -> String {
+    return unsafe _uncheckedFromUTF8(
+      input,
+      isASCII: _allASCII(input),
+      precalculatedUTF16Count: nil
+    )
+  }
+
+  internal static func _uncheckedFromUTF8(
+    _ input: UnsafeBufferPointer<UInt8>,
+    precalculatedUTF16Count utf16Count: Int?
+  ) -> String {
+    return unsafe _uncheckedFromUTF8(
+      input,
+      isASCII: _allASCII(input),
+      precalculatedUTF16Count: utf16Count
+    )
+  }
+  
+  @usableFromInline
+  internal static func _uncheckedFromUTF8(
+    _ input: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool,
+  ) -> String {
+    return unsafe _uncheckedFromUTF8(
+      input,
+      isASCII: isASCII,
+      precalculatedUTF16Count: nil
+    )
+  }
+
+  internal static func _uncheckedFromUTF8(
+    _ input: UnsafeBufferPointer<UInt8>,
+    isASCII: Bool,
+    precalculatedUTF16Count utf16Count: Int?
   ) -> String {
     if let smol = unsafe _SmallString(input) {
       return String(_StringGuts(smol))
     }
 
     let storage = unsafe __StringStorage.create(
-      initializingFrom: input, isASCII: isASCII)
+      initializingFrom: input,
+      isASCII: isASCII,
+      precalculatedUTF16Count: utf16Count
+    )
     return storage.asString
   }
 
@@ -247,29 +277,64 @@ extension String {
       initializingFrom: input, isASCII: isASCII)
     return storage.asString
   }
+  
+  internal static func _fromUTF16(
+    _ input: UnsafeBufferPointer<UInt16>,
+    repairing: Bool = true
+  ) -> (String, repairsMade: Bool)? {
+    if input.isEmpty { return ("", repairsMade: false) }
+    guard let (utf8Len, isASCII) = unsafe utf8Length(
+      of: input,
+      repairing: repairing
+    ) else {
+      return nil
+    }
+    var repairsMade = false
+    if utf8Len <= _SmallString.capacity {
+      let smol = unsafe _SmallString(initializingUTF8With: {
+        let (count, tmpRepairsMade) = unsafe transcodeUTF16ToUTF8(
+          UTF16CodeUnits: input,
+          intoKnownSufficientlyLarge: $0,
+          repairing: repairing
+        )
+        repairsMade = tmpRepairsMade
+        return count
+      })
+      return (String(_StringGuts(smol)), repairsMade: repairsMade)
+    }
+    let result = unsafe __StringStorage.create(
+      uninitializedCodeUnitCapacity: utf8Len,
+      precalculatedUTF16Count: input.count,
+      initializingUncheckedUTF8With: { buffer -> Int in
+        let (count, tmpRepairsMade) = unsafe transcodeUTF16ToUTF8(
+          UTF16CodeUnits: input,
+          intoKnownSufficientlyLarge: buffer,
+          repairing: repairing
+        )
+        repairsMade = tmpRepairsMade
+        return count
+      }
+    )
+    result._updateCountAndFlags(
+      newCount: result.count,
+      newIsASCII: isASCII,
+      precalculatedUTF16Count: input.count
+    )
+    return (result.asString, repairsMade: repairsMade)
+  }
 
   @usableFromInline
   internal static func _uncheckedFromUTF16(
     _ input: UnsafeBufferPointer<UInt16>
   ) -> String {
-    // TODO(String Performance): Attempt to form smol strings
-
-    // TODO(String performance): Skip intermediary array, transcode directly
-    // into a StringStorage space.
-    var contents: [UInt8] = []
-    contents.reserveCapacity(input.count)
-    let repaired = unsafe transcode(
-      input.makeIterator(),
-      from: UTF16.self,
-      to: UTF8.self,
-      stoppingOnError: false,
-      into: { contents.append($0) })
+    let (result, repaired) = unsafe _fromUTF16(input, repairing: true)!
     _internalInvariant(!repaired, "Error present")
-
-    return unsafe contents.withUnsafeBufferPointer { unsafe String._uncheckedFromUTF8($0) }
+    return result
   }
 
   @inline(never) // slow path
+  @_specialize(
+    where Input == UnsafeBufferPointer<UInt16>, Encoding == Unicode.UTF16)
   private static func _slowFromCodeUnits<
     Input: Collection,
     Encoding: Unicode.Encoding
@@ -293,7 +358,17 @@ extension String {
       into: { contents.append($0) })
     guard repair || !repaired else { return nil }
 
-    let str = unsafe contents.withUnsafeBufferPointer { unsafe String._uncheckedFromUTF8($0) }
+    let str:String
+    if Encoding.self == UTF16.self {
+      str = contents.withUnsafeBufferPointer {
+        unsafe String._uncheckedFromUTF8(
+          $0, precalculatedUTF16Count: input.count)
+      }
+    } else {
+      str = contents.withUnsafeBufferPointer {
+        unsafe String._uncheckedFromUTF8($0)
+      }
+    }
     return (str, repaired)
   }
 
@@ -311,7 +386,30 @@ extension String {
     repair: Bool
   ) -> (String, repairsMade: Bool)?
   where Input.Element == Encoding.CodeUnit {
-    guard _fastPath(encoding == Unicode.ASCII.self) else {
+    if encoding != Unicode.ASCII.self {
+      if encoding == Unicode.UTF16.self {
+        if let str = input.withContiguousStorageIfAvailable({ buffer in
+          unsafe _fromUTF16(
+            UnsafeRawBufferPointer(buffer).assumingMemoryBound(to: UInt16.self),
+            repairing: repair
+          )
+        }) {
+          return str
+        }
+#if !$Embedded
+        if let contigBytes = input as? _HasContiguousBytes,
+           contigBytes._providesContiguousBytesNoCopy {
+          if let str = contigBytes.withUnsafeBytes({ buffer in
+              unsafe _fromUTF16(
+                buffer.assumingMemoryBound(to: UInt16.self),
+                repairing: repair
+              )
+          }) {
+            return str
+          }
+        }
+#endif
+      }
       return _slowFromCodeUnits(input, encoding: encoding, repair: repair)
     }
 
@@ -345,7 +443,7 @@ extension String {
       return resultOrSlow(strOpt)
     }
 
-    return unsafe resultOrSlow(Array(input).withUnsafeBufferPointer {
+    return resultOrSlow(Array(input).withUnsafeBufferPointer {
         let buffer = unsafe UnsafeRawBufferPointer($0).bindMemory(to: UInt8.self)
         return unsafe String._fromASCIIValidating(buffer)
       })
@@ -378,7 +476,7 @@ extension String {
   @inline(never) // slow-path
   internal static func _copying(_ str: Substring) -> String {
     if _fastPath(str._wholeGuts.isFastUTF8) {
-      var new = unsafe str._wholeGuts.withFastUTF8(range: str._offsetRange) {
+      var new = str._wholeGuts.withFastUTF8(range: str._offsetRange) {
         unsafe String._uncheckedFromUTF8($0)
       }
 #if os(watchOS) && _pointerBitWidth(_32)
@@ -392,7 +490,7 @@ extension String {
 #endif
       return new
     }
-    return unsafe Array(str.utf8).withUnsafeBufferPointer {
+    return Array(str.utf8).withUnsafeBufferPointer {
       unsafe String._uncheckedFromUTF8($0)
     }
   }

@@ -166,22 +166,75 @@ using ReadonlyBytes = ReadonlySpan<unsigned char>;
 using Bytes = Span<unsigned char>;
 } // namespace rdar153081347
 
-// CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
-// CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
-// CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
-// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0, borrow address 1) @owned View
-// CHECK: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
-// CHECK: sil [clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @owned View
-// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (View, View) -> @lifetime(copy 0, copy 1) @owned View
-// CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
-// CHECK: sil [clang OtherView.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out OtherView
-// CHECK: sil [clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @owned View
-// CHECK: sil [clang copyView] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
-// CHECK: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned CaptureView
-// CHECK: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
-// CHECK: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
-// CHECK: sil [clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
-// CHECK: sil [clang moveOnlyId] {{.*}} : $@convention(c) (@in_guaranteed MoveOnly) -> @lifetime(borrow {{.*}}0) @out MoveOnly
+struct SWIFT_NONESCAPABLE NonEscapable {
+    const int *p;
+};
+
+template<typename T>
+struct HasAnonUnion {
+    union {
+        int known;
+        T unknown;
+    };
+};
+
+template<typename T>
+struct HasAnonStruct {
+    struct {
+        int known;
+        T unknown;
+    };
+};
+
+template<typename T>
+struct SWIFT_NONESCAPABLE NonEscapableHasAnonUnion {
+    union {
+        int known;
+        T unknown;
+    };
+};
+
+using HasAnonUnionNonEscapable = HasAnonUnion<NonEscapable>;
+using HasAnonStructNonEscapable = HasAnonStruct<NonEscapable>;
+using NonEscapableHasAnonUnionNonEscapable = NonEscapableHasAnonUnion<NonEscapable>;
+
+HasAnonUnionNonEscapable makeAnonUnionNonEscapable(const Owner &owner [[clang::lifetimebound]]) {
+    HasAnonUnionNonEscapable result;
+    result.unknown = {&owner.data};
+    return result;
+}
+
+HasAnonStructNonEscapable makeAnonStructNonEscapable(const Owner &owner [[clang::lifetimebound]]) {
+    return {1, &owner.data};
+}
+
+NonEscapableHasAnonUnionNonEscapable makeNonEscapableHasAnonUnionNonEscapable(
+                                        const Owner &owner [[clang::lifetimebound]]) {
+    NonEscapableHasAnonUnionNonEscapable result;
+    result.unknown = {&owner.data};
+    return result;
+}
+
+
+// CHECK: sil {{.*}}[clang makeOwner] {{.*}}: $@convention(c) () -> Owner
+// CHECK: sil {{.*}}[clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil {{.*}}[clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil {{.*}}[clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow address 0, borrow address 1) @owned View
+// CHECK: sil {{.*}}[clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK: sil {{.*}}[clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @owned View
+// CHECK: sil {{.*}}[clang getViewFromEither] {{.*}} : $@convention(c) (View, View) -> @lifetime(copy 0, copy 1) @owned View
+// CHECK: sil {{.*}}[clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
+// CHECK: sil {{.*}}[clang OtherView.init] {{.*}} : $@convention(c) (View) -> @lifetime(copy 0) @out OtherView
+// CHECK: sil {{.*}}[clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @owned View
+// CHECK: sil {{.*}}[clang copyView] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
+// CHECK: sil {{.*}}[clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned CaptureView
+// CHECK: sil {{.*}}[clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
+// CHECK: sil {{.*}}[clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
+// CHECK: sil {{.*}}[clang NS.getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned View
+// CHECK: sil {{.*}}[clang moveOnlyId] {{.*}} : $@convention(c) (@in_guaranteed MoveOnly) -> @lifetime(borrow {{.*}}0) @out MoveOnly
+// CHECK: sil {{.*}}[clang makeAnonUnionNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned HasAnonUnion<NonEscapable>
+// CHECK: sil {{.*}}[clang makeAnonStructNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned HasAnonStruct<NonEscapable>
+// CHECK: sil {{.*}}[clang makeNonEscapableHasAnonUnionNonEscapable] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow address 0) @owned NonEscapableHasAnonUnion<NonEscapable>
 
 //--- test.swift
 
@@ -215,3 +268,10 @@ func canImportMoveOnlyNonEscapable(_ x: borrowing MoveOnly) {
 }
 
 func testInheritedCtors(_ s: rdar153081347.Bytes) {}
+
+func anonymousUnionsAndStructs(_ v: borrowing View) {
+    let o = makeOwner()
+    let _ = makeAnonUnionNonEscapable(o)
+    let _ = makeAnonStructNonEscapable(o)
+    let _ = makeNonEscapableHasAnonUnionNonEscapable(o)
+}

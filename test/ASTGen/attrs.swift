@@ -4,8 +4,6 @@
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
-// RUN:   -enable-experimental-feature CDecl \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
@@ -15,8 +13,6 @@
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
-// RUN:   -enable-experimental-feature CDecl \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
@@ -29,8 +25,6 @@
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature Lifetimes \
 // RUN:   -enable-experimental-feature RawLayout \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
-// RUN:   -enable-experimental-feature CDecl \
 // RUN:   -enable-experimental-concurrency \
 // RUN:   -enable-experimental-move-only
 
@@ -40,8 +34,6 @@
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_Lifetimes
 // REQUIRES: swift_feature_RawLayout
-// REQUIRES: swift_feature_SymbolLinkageMarkers
-// REQUIRES: swift_feature_CDecl
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -99,8 +91,8 @@ func fn(_: Int) {}
 @_disallowFeatureSuppression(NoncopyableGenerics) public struct LoudlyNC<T: ~Copyable> {}
 
 @_cdecl("c_function_name") func cdeclUnderscore(x: Int) {}
-@cdecl(c_function_name_official) func cdecl(x: Int) {}
-@cdecl func cdeclDefault() {}
+@c(c_function_name_official) func cdecl(x: Int) {}
+@c func cdeclDefault() {}
 
 struct StaticProperties {
   dynamic var property: Int { return 1 }
@@ -143,7 +135,7 @@ class ExclusivityAttrClass {
 @_extern(c) func externCFn()
 
 struct SectionStruct {
-	@_section("__TEXT,__mysection") @_used func foo() {}
+	@section("__TEXT,__mysection") @used func foo() {}
 }
 
 protocol ImplementsProto {

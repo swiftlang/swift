@@ -38,13 +38,6 @@
 #define SWIFT_CONCURRENCY_TASK_TO_THREAD_MODEL 0
 #endif
 
-// Does the runtime integrate with libdispatch?
-#if defined(SWIFT_CONCURRENCY_USES_DISPATCH)
-#define SWIFT_CONCURRENCY_ENABLE_DISPATCH SWIFT_CONCURRENCY_USES_DISPATCH
-#else
-#define SWIFT_CONCURRENCY_ENABLE_DISPATCH 0
-#endif
-
 namespace swift {
 class DefaultActor;
 class TaskOptionRecord;
@@ -351,24 +344,11 @@ bool swift_taskGroup_isCancelled(TaskGroup *group);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_taskGroup_isEmpty(TaskGroup *group);
 
-/// DEPRECATED. swift_asyncLet_begin is used instead.
-/// Its Swift signature is
+/// Enter the scope of an async let binding, creating a child task of the
+/// current task to run the given function.
 ///
-/// \code
-/// func swift_asyncLet_start<T>(
-///     asyncLet: Builtin.RawPointer,
-///     options: Builtin.RawPointer?,
-///     operation: __owned @Sendable () async throws -> T
-/// )
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_asyncLet_start(AsyncLet *alet,
-                          TaskOptionRecord *options,
-                          const Metadata *futureResultType,
-                          void *closureEntryPoint, HeapObject *closureContext);
-
-/// Begin an async let child task.
-/// Its Swift signature is
+/// Behaves approximately like a Swift function with the following
+/// signature, except the generic argument is in a different position:
 ///
 /// \code
 /// func swift_asyncLet_start<T>(
@@ -378,6 +358,11 @@ void swift_asyncLet_start(AsyncLet *alet,
 ///     resultBuffer: Builtin.RawPointer
 /// )
 /// \endcode
+///
+/// Previous versions of the concurrency runtime also provided a
+/// \c swift_asyncLet_start which did not take a result buffer. This
+/// function was never used by a released version of the compiler,
+/// and it has been removed.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_asyncLet_begin(AsyncLet *alet,
                           TaskOptionRecord *options,
@@ -385,57 +370,12 @@ void swift_asyncLet_begin(AsyncLet *alet,
                           void *closureEntryPoint, HeapObject *closureContext,
                           void *resultBuffer);
 
-/// This matches the ABI of a closure `<T>(Builtin.RawPointer) async -> T`
-using AsyncLetWaitSignature =
-    SWIFT_CC(swiftasync)
-    void(OpaqueValue *,
-         SWIFT_ASYNC_CONTEXT AsyncContext *, AsyncTask *, Metadata *);
-
-/// DEPRECATED. swift_asyncLet_get is used instead.
-/// Wait for a non-throwing async-let to complete.
+/// Get the value of a non-throwing async let, awaiting the result
+/// if necessary.
 ///
-/// This can be called from any thread. Its Swift signature is
+/// This must be called from the parent task of the async let.
 ///
-/// \code
-/// func swift_asyncLet_wait(
-///     _ asyncLet: _owned Builtin.RawPointer
-/// ) async -> Success
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_asyncLet_wait(OpaqueValue *,
-                         SWIFT_ASYNC_CONTEXT AsyncContext *,
-                         AsyncLet *, TaskContinuationFunction *,
-                         AsyncContext *);
-
-/// DEPRECATED. swift_asyncLet_get_throwing is used instead.
-/// Wait for a potentially-throwing async-let to complete.
-///
-/// This can be called from any thread. Its Swift signature is
-///
-/// \code
-/// func swift_asyncLet_wait_throwing(
-///     _ asyncLet: _owned Builtin.RawPointer
-/// ) async throws -> Success
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_asyncLet_wait_throwing(OpaqueValue *,
-                                  SWIFT_ASYNC_CONTEXT AsyncContext *,
-                                  AsyncLet *,
-                                  ThrowingTaskFutureWaitContinuationFunction *,
-                                  AsyncContext *);
-
-/// DEPRECATED. swift_asyncLet_finish is used instead.
-/// Its Swift signature is
-///
-/// \code
-/// func swift_asyncLet_end(_ alet: Builtin.RawPointer)
-/// \endcode
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_asyncLet_end(AsyncLet *alet);
-
-/// Get the value of a non-throwing async-let, awaiting the result if necessary.
-///
-/// This can be called from any thread. Its Swift signature is
+/// Behaves like a Swift async function with the signature:
 ///
 /// \code
 /// func swift_asyncLet_get(
@@ -444,21 +384,31 @@ void swift_asyncLet_end(AsyncLet *alet);
 /// ) async
 /// \endcode
 ///
-/// \c result points at the variable storage for the binding. It is
-/// uninitialized until the first call to \c swift_asyncLet_get or
-/// \c swift_asyncLet_get_throwing. That first call initializes the storage
-/// with the result of the child task. Subsequent calls do nothing and leave
-/// the value in place.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_asyncLet_get(SWIFT_ASYNC_CONTEXT AsyncContext *,
-                        AsyncLet *,
-                        void *,
-                        TaskContinuationFunction *,
-                        AsyncContext *);
-
-/// Get the value of a throwing async-let, awaiting the result if necessary.
+/// except that it uses the special calling convention in which the
+/// continuation function, parent context, and child context are all
+/// passed in separately rather than being stored in the child context.
+/// The child async context has a fixed size of 5 * sizeof(void*).
 ///
-/// This can be called from any thread. Its Swift signature is
+/// \c resultBuffer must be the same result buffer that was passed to
+/// swift_asyncLet_begin. After asynchronous return, it is guaranteed
+/// to be initialized.
+///
+/// Previous versions of the concurrency runtime also provided a
+/// \c swift_asyncLet_wait which was meant to be paired with
+/// \c swift_asyncLet_start. This function was never used by
+/// a released version of the compiler, and it has been removed.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_asyncLet_get(SWIFT_ASYNC_CONTEXT AsyncContext *parentContext,
+                        AsyncLet *alet,
+                        void *resultBuffer,
+                        TaskContinuationFunction *continuation,
+                        AsyncContext *childContext);
+
+/// Get the value of a throwing async let, awaiting the result if necessary.
+///
+/// This must be called from the parent task of the async let.
+///
+/// Behaves like a Swift async function with the signature:
 ///
 /// \code
 /// func swift_asyncLet_get_throwing(
@@ -467,30 +417,61 @@ void swift_asyncLet_get(SWIFT_ASYNC_CONTEXT AsyncContext *,
 /// ) async throws
 /// \endcode
 ///
-/// \c result points at the variable storage for the binding. It is
-/// uninitialized until the first call to \c swift_asyncLet_get or
-/// \c swift_asyncLet_get_throwing. That first call initializes the storage
-/// with the result of the child task. Subsequent calls do nothing and leave
-/// the value in place. A pointer to the storage inside the child task is
-/// returned if the task completes successfully, otherwise the error from the
-/// child task is thrown.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_asyncLet_get_throwing(SWIFT_ASYNC_CONTEXT AsyncContext *,
-                                 AsyncLet *,
-                                 void *,
-                                 ThrowingTaskFutureWaitContinuationFunction *,
-                                 AsyncContext *);
-
-/// Exit the scope of an async-let binding. If the task is still running, it
-/// is cancelled, and we await its completion; otherwise, we destroy the
-/// value in the variable storage.
+/// except that it uses the special calling convention in which the
+/// continuation function, parent context, and child context are all
+/// passed in separately rather than being stored in the child context.
+/// The child async context has a fixed size of 5 * sizeof(void*).
 ///
-/// Its Swift signature is
+/// \c resultBuffer must be the same result buffer that was passed to
+/// swift_asyncLet_begin. After asynchronous return, it is guaranteed
+/// to be initialized unless the operation throws by passing an error
+/// to the continuation function.
+///
+/// Previous versions of the concurrency runtime also provided a
+/// \c swift_asyncLet_wait_throwing which was meant to be paired with
+/// \c swift_asyncLet_start. This function was never used by
+/// a released version of the compiler, and it has been removed.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_asyncLet_get_throwing(SWIFT_ASYNC_CONTEXT AsyncContext *parentContext,
+                                 AsyncLet *alet,
+                                 void *resultBuffer,
+                                 ThrowingTaskFutureWaitContinuationFunction *
+                                   continuation,
+                                 AsyncContext *childContext);
+
+/// Exit the scope of an async let binding that was created with
+/// swift_asyncLet_begin. If the child task is still running, it is
+/// cancelled, and the current task is suspended to await its completion.
+///
+/// This must be called from the parent task of the async let.
+///
+/// Behaves like a Swift async function with the signature:
 ///
 /// \code
 /// func swift_asyncLet_finish(_ asyncLet: Builtin.RawPointer,
 ///                            _ resultBuffer: Builtin.RawPointer) async
 /// \endcode
+///
+/// except that it uses the special calling convention in which the
+/// continuation function, parent context, and child context are all
+/// passed in separately rather than being stored in the child context.
+/// The child async context has a fixed size of 5 * sizeof(void*).
+///
+/// \c resultBuffer must be the same result buffer that was passed to
+/// swift_asyncLet_begin.
+///
+/// Prior to asynchronous return, the value in the result buffer is
+/// destroyed (if present) and any memory initially allocated for the
+/// task is deallocated. Because swift_asyncLet_begin potentially
+/// allocates memory on the parent task's task allocator, the call to
+/// this function must be properly paired with the begin.
+///
+/// The async let is invalid after this call and cannot be used again.
+///
+/// Previous versions of the concurrency runtime also provided a
+/// \c swift_asyncLet_end which was not asynchronous and was meant
+/// to be paired with \c swift_asyncLet_start. This function was never
+/// used by a released version of the compiler, and it has been removed.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
 void swift_asyncLet_finish(SWIFT_ASYNC_CONTEXT AsyncContext *,
                            AsyncLet *,
@@ -498,11 +479,13 @@ void swift_asyncLet_finish(SWIFT_ASYNC_CONTEXT AsyncContext *,
                            TaskContinuationFunction *,
                            AsyncContext *);
 
-/// Get the value of a non-throwing async-let, awaiting the result if necessary,
-/// and then destroy the child task. The result buffer is left initialized after
-/// returning.
+/// Get the value of a non-throwing async let binding that was created
+/// with \c swift_asyncLet_begin, awaiting the task's completion if
+/// necessary, and then destroy the task and the binding.
 ///
-/// This can be called from any thread. Its Swift signature is
+/// This must be called from the parent task of the async let.
+///
+/// Behaves like a Swift async function with the signature:
 ///
 /// \code
 /// func swift_asyncLet_get(
@@ -511,22 +494,34 @@ void swift_asyncLet_finish(SWIFT_ASYNC_CONTEXT AsyncContext *,
 /// ) async
 /// \endcode
 ///
-/// \c result points at the variable storage for the binding. It is
-/// uninitialized until the first call to \c swift_asyncLet_get or
-/// \c swift_asyncLet_get_throwing. The child task will be invalidated after
-/// this call, so the `async let` can not be gotten or finished afterward.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_asyncLet_consume(SWIFT_ASYNC_CONTEXT AsyncContext *,
-                            AsyncLet *,
-                            void *,
-                            TaskContinuationFunction *,
-                            AsyncContext *);
-
-/// Get the value of a throwing async-let, awaiting the result if necessary,
-/// and then destroy the child task. The result buffer is left initialized after
-/// returning.
+/// except that it uses the special calling convention in which the
+/// continuation function, parent context, and child context are all
+/// passed in separately rather than being stored in the child context.
+/// The child async context has a fixed size of 5 * sizeof(void*).
 ///
-/// This can be called from any thread. Its Swift signature is
+/// \c resultBuffer must be the same result buffer that was passed to
+/// swift_asyncLet_begin. After asynchronous return, this is guaranteed
+/// to be initialized.
+///
+/// The async let is invalid after this call and cannot be used again.
+/// Any memory initially allocated for the task is deallocated. Because
+/// \c swift_asyncLet_begin potentially allocates memory on the parent
+/// task's task allocator, the call to this function must be properly
+/// paired with the begin.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
+void swift_asyncLet_consume(SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+                            AsyncLet *alet,
+                            void *resultBuffer,
+                            TaskContinuationFunction *continuation,
+                            AsyncContext *callContext);
+
+/// Get the value of a throwing async let binding that was created
+/// with \c swift_asyncLet_begin, awaiting the task's completion if
+/// necessary, and then destroy the task and the binding.
+///
+/// This must be called from the parent task of the async let.
+///
+/// Behaves like a Swift async function with the signature:
 ///
 /// \code
 /// func swift_asyncLet_get_throwing(
@@ -535,18 +530,28 @@ void swift_asyncLet_consume(SWIFT_ASYNC_CONTEXT AsyncContext *,
 /// ) async throws
 /// \endcode
 ///
-/// \c result points at the variable storage for the binding. It is
-/// uninitialized until the first call to \c swift_asyncLet_get or
-/// \c swift_asyncLet_get_throwing. That first call initializes the storage
-/// with the result of the child task. Subsequent calls do nothing and leave
-/// the value in place. The child task will be invalidated after
-/// this call, so the `async let` can not be gotten or finished afterward.
+/// except that it uses the special calling convention in which the
+/// continuation function, parent context, and child context are all
+/// passed in separately rather than being stored in the child context.
+/// The child async context has a fixed size of 5 * sizeof(void*).
+///
+/// \c resultBuffer must be the same result buffer that was passed to
+/// swift_asyncLet_begin. After asynchronous return, it is guaranteed
+/// to be initialized unless the operation throws by passing an error
+/// to the continuation function.
+///
+/// The async let is invalid after this call and cannot be used again.
+/// Any memory initially allocated for the task is deallocated. Because
+/// \c swift_asyncLet_begin potentially allocates memory on the parent
+/// task's task allocator, the call to this function must be properly
+/// paired with the begin.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swiftasync)
-void swift_asyncLet_consume_throwing(SWIFT_ASYNC_CONTEXT AsyncContext *,
-                                     AsyncLet *,
-                                     void *,
-                                     ThrowingTaskFutureWaitContinuationFunction *,
-                                     AsyncContext *);
+void swift_asyncLet_consume_throwing(SWIFT_ASYNC_CONTEXT AsyncContext *callerContext,
+                                     AsyncLet *alet,
+                                     void *resultBuffer,
+                                     ThrowingTaskFutureWaitContinuationFunction *
+                                       continuation,
+                                     AsyncContext *callContext);
 
 /// Returns true if the currently executing AsyncTask has a
 /// 'TaskGroupTaskStatusRecord' present.
@@ -598,6 +603,26 @@ size_t swift_task_getJobFlags(AsyncTask* task);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_task_isCancelled(AsyncTask* task);
+
+/// This is an options enum that is used to pass flags to
+/// swift_task_isCancelledWithFlags. It is meant to be a flexible toggle.
+enum swift_task_is_cancelled_flag : uint64_t {
+  /// We aren't passing any flags.
+  /// Effectively this is a backwards compatible mode.
+  swift_task_is_cancelled_flag_None = 0x0,
+
+  /// Ignore any active cancellation shield and return the actual cancellation
+  /// state of the task.
+  swift_task_is_cancelled_flag_IgnoreCancellationShield = 0x1,
+};
+
+/// Check if the task is cancelled.
+///
+/// \param task The task to check cancellation status for.
+/// \param flags Flags controlling the behavior of the check.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_isCancelledWithFlags(AsyncTask* task,
+                                     swift_task_is_cancelled_flag flags);
 
 /// Returns the current priority of the task which is >= base priority of the
 /// task. This function does not exist in the base ABI of this library and must
@@ -715,6 +740,23 @@ void swift_task_localValuePop();
 /// \endcode
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_localsCopyTo(AsyncTask* target);
+
+/// Install a task cancellation shield in the current task.
+///
+/// Returns `true` if the shield was installed and we need to pop it when leaving the shielded scope.
+/// Returns `false` if the shield was not installed, because there was one already active.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_cancellationShieldPush();
+
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_task_cancellationShieldPop();
+
+/// Check if the current task has an active cancellation shield.
+///
+/// Returns `true` if a cancellation shield is currently active for the given task.
+/// Returns `false` if no shield is active.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+bool swift_task_hasActiveCancellationShield(AsyncTask *task);
 
 /// Switch the current task to a new executor if we aren't already
 /// running on a compatible executor.
@@ -1055,6 +1097,10 @@ void swift_task_reportUnexpectedExecutor(
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 JobPriority swift_task_getCurrentThreadPriority(void);
+
+// Runtime availability: Swift 6.4
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+const char *swift_task_getTaskName(AsyncTask* job);
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 const char *swift_task_getCurrentTaskName(void);

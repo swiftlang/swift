@@ -313,6 +313,43 @@ Dictionary
 ~~~~~~~~~~
 TBD.
 
+Fixed Storage Types (Span, MutableSpan, InlineArray)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The Swift standard library includes several types that provide fixed storage
+semantics: ``Span<Element>``, ``MutableSpan<Element>``, and
+``InlineArray<count, Element>``. Unlike Array, which may reallocate its storage
+during mutations, these types maintain fixed references to existing storage
+throughout their lifetime. This enables more aggressive optimizations by the
+SIL optimizer.
+
+**Span**: Provides a read-only view over a contiguous sequence of elements
+with fixed storage.
+**MutableSpan**: Provides a mutable view over a contiguous sequence of elements
+with fixed storage.
+**InlineArray**: Provides a fixed-size array that stores elements inline
+without separate heap allocation.
+
+The following semantic tags describe operations shared by these fixed storage
+types:
+
+fixed_storage.get_count() -> Int
+
+  Read the count. No elements are read. No state is written. Due to fixed
+  storage semantics, the count is immutable and can be aggressively cached by
+  the optimizer. This semantic is implemented by the ``count`` property in
+  Span, MutableSpan, and InlineArray.
+
+fixed_storage.check_index(position: Index)
+
+  Ensures ``position`` is within valid bounds of the fixed storage. Executes a
+  ``trap`` if ``!indices.contains(position)``. No elements are read. No state
+  is written. The fixed storage semantics allow the optimizer to hoist this
+  operation from loops without reasoning about memory aliasing or considering
+  storage mutations. This semantic is implemented by the ``_checkIndex``
+  method in Span, MutableSpan, and InlineArray.
+
+
 @_effects attribute
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

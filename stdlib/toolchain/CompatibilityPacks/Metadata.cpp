@@ -15,6 +15,8 @@
 //
 //===----------------------------------------------------------------------===//
 
+#define SWIFT_COMPATIBILITY_PACKS 1
+
 #include "../../public/runtime/MetadataCache.h"
 
 using namespace swift;
@@ -129,7 +131,7 @@ PackCacheEntry<PackType>::PackCacheEntry(
 static SimpleGlobalCache<PackCacheEntry<Metadata>,
                          MetadataPackTag> MetadataPacks;
 
-SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+SWIFT_RUNTIME_COMPATIBILITY SWIFT_CC(swift)
 const Metadata * const *
 swift_allocateMetadataPack(const Metadata * const *ptr, size_t count) {
   if (MetadataPackPointer(reinterpret_cast<uintptr_t>(ptr)).getLifetime()
@@ -147,7 +149,7 @@ swift_allocateMetadataPack(const Metadata * const *ptr, size_t count) {
 static SimpleGlobalCache<PackCacheEntry<WitnessTable>,
                          WitnessTablePackTag> WitnessTablePacks;
 
-SWIFT_RUNTIME_EXPORT SWIFT_CC(swift)
+SWIFT_RUNTIME_COMPATIBILITY SWIFT_CC(swift)
 const WitnessTable * const *
 swift_allocateWitnessTablePack(const WitnessTable * const *ptr, size_t count) {
   if (WitnessTablePackPointer(reinterpret_cast<uintptr_t>(ptr)).getLifetime()

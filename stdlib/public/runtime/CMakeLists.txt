@@ -36,6 +36,7 @@ set(swift_runtime_sources
     Array.cpp
     AutoDiffSupport.cpp
     Bincompat.cpp
+    Borrow.cpp
     BytecodeLayouts.cpp
     Casting.cpp
     CrashReporter.cpp
@@ -45,7 +46,6 @@ set(swift_runtime_sources
     EnvironmentVariables.cpp
     ErrorObjectCommon.cpp
     ErrorObjectNative.cpp
-    Errors.cpp
     ErrorDefaultImpls.cpp
     Exception.cpp
     Exclusivity.cpp
@@ -62,6 +62,7 @@ set(swift_runtime_sources
     ImageInspectionCOFF.cpp
     ImageInspectionStatic.cpp
     ImageInspectionWasm.cpp
+    RuntimeErrorReporting.cpp
     SymbolInfo.cpp
     KeyPaths.cpp
     KnownMetadata.cpp
@@ -76,12 +77,11 @@ set(swift_runtime_sources
     RefCount.cpp
     ReflectionMirror.cpp
     RuntimeInvocationsTracking.cpp
-    SwiftDtoa.cpp
     SwiftTLSContext.cpp
     ThreadingError.cpp
     Tracing.cpp
     AccessibleFunction.cpp
-    Win32.cpp)
+    WindowsUnicode.cpp)
 
 # We pull this in separately here because other dylibs will need it, but only
 # will have the __tsan_on_initialize called, and on Darwin, RTLD_NEXT can't be
@@ -93,7 +93,8 @@ set(swift_runtime_backtracing_sources
   Backtrace.cpp
   BacktraceUtils.cpp
   CrashHandlerMacOS.cpp
-  CrashHandlerLinux.cpp)
+  CrashHandlerLinux.cpp
+  CrashHandlerWindows.cpp)
 
 # Acknowledge that the following sources are known.
 set(LLVM_OPTIONAL_SOURCES

@@ -1,15 +1,15 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen \
+// RUN: %target-swift-frontend-dump-parse -enable-experimental-move-only -enable-experimental-feature ParserASTGen \
 // RUN:    | %sanitize-address > %t/astgen.ast
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only \
+// RUN: %target-swift-frontend-dump-parse -enable-experimental-move-only \
 // RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: not %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -parse-as-library -enable-experimental-feature ParserASTGen \
+// RUN: not %target-swift-frontend-dump-parse -enable-experimental-move-only -parse-as-library -enable-experimental-feature ParserASTGen \
 // RUN:    | %sanitize-address > %t/astgen.library.ast
-// RUN: not %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -parse-as-library \
+// RUN: not %target-swift-frontend-dump-parse -enable-experimental-move-only -parse-as-library \
 // RUN:    | %sanitize-address > %t/cpp-parser.library.ast
 
 // RUN: %diff -u %t/astgen.library.ast %t/cpp-parser.library.ast

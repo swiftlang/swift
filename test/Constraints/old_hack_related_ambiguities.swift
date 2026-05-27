@@ -160,8 +160,8 @@ do {
     var p: UnsafeMutableRawPointer { get { fatalError() } }
 
     func f(_ p: UnsafeMutableRawPointer) {
-      // The old hack (which is now removed) couldn't handle member references, only direct declaration references.
       guard let x = UnsafeMutablePointer<Double>(OpaquePointer(self.p)) else {
+        // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'UnsafeMutablePointer<Double>'}}
         return
       }
       _ = x
@@ -382,4 +382,114 @@ do {
       try await test(over: v, block: block) // Ok
     }
   }
+}
+
+// Calls with single unlabeled arguments shouldn't favor overloads that don't match on async.
+do {
+  struct V {
+    var data: Int = 0
+  }
+
+  func test(_: Int) -> Int { 42 }
+  func test(_: Int, v: Int = 42) async -> V? { nil }
+
+  func doAsync<T>(_ fn: () async -> T) async -> T { await fn() }
+
+  func computeAsync(v: Int) async {
+    let v1 = await test(v)
+    if let v1 {
+      _ = v1.data // Ok
+    }
+
+    let v2 = await doAsync { await test(v) }
+    if let v2 {
+      _ = v2.data // Ok
+    }
+
+    _ = await doAsync {
+      let v = await test(v)
+      if let v {
+        _ = v.data // Ok
+      }
+    }
+  }
+}
+
+do {
+  struct S {
+    func test() -> Int { 42 }
+    static func test(_: S...) {}
+
+    func doubleApply() {}
+    static func doubleApply(_: S) -> () -> Int { { 42 } }
+  }
+
+  func test(s: S) {
+    let res1 = S.test(s)
+    // expected-warning@-1 {{constant 'res1' inferred to have type '()', which may be unexpected}}
+    // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+    _ = res1
+
+    let useInstance = S.test(s)()
+    let _: Int = useInstance
+
+    let res2 = {
+      S.test(s)
+    }
+    let _: () -> Void = res2
+
+    let _ = { () async -> Void in
+      _ = 42
+      return S.test(s)
+    }
+
+    let res3 = S.doubleApply(s)
+    let _: () -> Int = res3
+
+    let res4 = S.doubleApply(s)()
+    let _: Int = res4
+
+    let res5 = { S.doubleApply(s)() }
+    let _: () -> Int = res5
+
+    let res6 = {
+      _ = 42
+      return S.doubleApply(s)
+    }
+    let _: () -> Int = res6()
+  }
+
+  func testAsyncContext(s: S) async {
+    let res1 = S.test(s)
+    // expected-warning@-1 {{constant 'res1' inferred to have type '()', which may be unexpected}}
+    // expected-note@-2 {{add an explicit type annotation to silence this warning}}
+    _ = res1
+
+    let res2 = S.doubleApply(s)
+    let _: () -> Int = res2
+
+    let res3 = S.doubleApply(s)()
+    let _: Int = res3
+  }
+}
+
+// 6.2 would reject this expression, even though it is valid
+func tooAggressiveShrink() {
+  let _ = [1 / 1].map { $0 / 1.0 }
+}
+
+// Another example rejected by 6.2 which we now accept as we should
+// https://forums.swift.org/t/strange-issue-with-custom-operator/85073
+struct X {}
+struct Y {}
+let x = X()
+
+func + (a: X, b: X) -> Y { Y() }
+func + (a: Y, b: Y) -> Y { Y() }
+
+func testCustomOperators() {
+  let y: Y = x + x
+  _ = x + x
+  _ = y + y
+  _ = (x + x) + (x + x)
 }

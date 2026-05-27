@@ -13,20 +13,22 @@
 #ifndef SWIFT_SILOPTIMIZER_ANALYSIS_COLDBLOCKS_H
 #define SWIFT_SILOPTIMIZER_ANALYSIS_COLDBLOCKS_H
 
-#include "llvm/ADT/DenseMap.h"
-#include "swift/SIL/SILValue.h"
+#include "DominanceAnalysis.h"
+
 #include "swift/Basic/FixedBitSet.h"
+#include "swift/SIL/SILValue.h"
+#include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "llvm/ADT/DenseMap.h"
 
 namespace swift {
 class DominanceAnalysis;
 class PostDominanceAnalysis;
 class SILBasicBlock;
 class CondBranchInst;
+class SILPassManager;
+class ColdBlockAnalysis;
 
 /// Cache a set of basic blocks that have been determined to be cold or hot.
-///
-/// This does not inherit from SILAnalysis because it is not worth preserving
-/// across passes.
 class ColdBlockInfo {
 public:
   // Represents the temperatures of edges flowing into a block.
@@ -49,6 +51,13 @@ public:
 
   using Energy = FixedBitSet<State::NumStates, State::Temperature>;
 
+  ColdBlockInfo(DominanceAnalysis *DA, PostDominanceAnalysis *PDA);
+
+  /// Is this basic block considered to be cold / rarely executed?
+  bool isCold(const SILBasicBlock *BB) const;
+
+  friend ColdBlockAnalysis;
+
 private:
   DominanceAnalysis *DA;
   PostDominanceAnalysis *PDA;
@@ -56,6 +65,8 @@ private:
   /// Each block in this map has been determined to be cold and/or warm.
   /// Make sure to always use the set/resetToCold methods to update this!
   llvm::DenseMap<const SILBasicBlock*, Energy> EnergyMap;
+
+  void analyze(SILFunction *F);
 
   // This is a cache and shouldn't be copied around.
   ColdBlockInfo(const ColdBlockInfo &) = delete;
@@ -76,13 +87,37 @@ private:
   void searchForExpectedValue(CondBranchInst *CondBranch);
 
   bool inferFromEdgeProfile(SILBasicBlock *BB);
+};
+
+/// A SILAnalysis that caches ColdBlockInfo per function, invalidated on
+/// control-flow changes. Depends on DominanceAnalysis and PostDominanceAnalysis.
+class ColdBlockAnalysis : public FunctionAnalysisBase<ColdBlockInfo> {
+  DominanceAnalysis *DA = nullptr;
+  PostDominanceAnalysis *PDA = nullptr;
 
 public:
-  ColdBlockInfo(DominanceAnalysis *DA, PostDominanceAnalysis *PDA);
+  ColdBlockAnalysis(SILModule *)
+      : FunctionAnalysisBase<ColdBlockInfo>(SILAnalysisKind::ColdBlock) {}
 
-  void analyze(SILFunction *F);
+  ColdBlockAnalysis(const ColdBlockAnalysis &) = delete;
+  ColdBlockAnalysis &operator=(const ColdBlockAnalysis &) = delete;
 
-  bool isCold(const SILBasicBlock *BB) const;
+  static SILAnalysisKind getAnalysisKind() {
+    return SILAnalysisKind::ColdBlock;
+  }
+
+  static bool classof(const SILAnalysis *S) {
+    return S->getKind() == SILAnalysisKind::ColdBlock;
+  }
+
+  virtual void initialize(SILPassManager *PM) override;
+
+  std::unique_ptr<ColdBlockInfo> newFunctionAnalysis(SILFunction *F) override;
+
+  virtual bool shouldInvalidate(SILAnalysis::InvalidationKind K) override {
+    return (K & InvalidationKind::BranchesAndInstructions) ||
+           DA->shouldInvalidate(K) || PDA->shouldInvalidate(K);
+  }
 };
 } // end namespace swift
 

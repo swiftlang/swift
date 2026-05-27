@@ -217,7 +217,7 @@ void EnumRawTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void EnumRawTypeRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -248,7 +248,7 @@ void ProtocolRequiresClassRequest::diagnoseCycle(DiagnosticEngine &diags) const 
 
 void ProtocolRequiresClassRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *proto = std::get<0>(getStorage());
-  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
+  diags.diagnose(proto, diag::through_decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ProtocolRequiresClassRequest::getCachedResult() const {
@@ -272,7 +272,7 @@ void ExistentialConformsToSelfRequest::diagnoseCycle(DiagnosticEngine &diags) co
 
 void ExistentialConformsToSelfRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *proto = std::get<0>(getStorage());
-  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
+  diags.diagnose(proto, diag::through_decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool> ExistentialConformsToSelfRequest::getCachedResult() const {
@@ -298,7 +298,7 @@ void HasSelfOrAssociatedTypeRequirementsRequest::diagnoseCycle(
 void HasSelfOrAssociatedTypeRequirementsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   auto *proto = std::get<0>(getStorage());
-  diags.diagnose(proto, diag::decl_declared_here_with_kind, proto);
+  diags.diagnose(proto, diag::through_decl_declared_here_with_kind, proto);
 }
 
 std::optional<bool>
@@ -331,7 +331,8 @@ void IsFinalRequest::cacheResult(bool value) const {
 
   // Add an attribute for printing
   if (value && !decl->getAttrs().hasAttribute<FinalAttr>())
-    decl->getAttrs().add(new (decl->getASTContext()) FinalAttr(/*Implicit=*/true));
+    decl->addAttribute(new (decl->getASTContext())
+                           FinalAttr(/*Implicit=*/true));
 }
 
 //----------------------------------------------------------------------------//
@@ -353,7 +354,8 @@ void IsDynamicRequest::cacheResult(bool value) const {
   // Add an attribute for printing
   if (value && !decl->getAttrs().hasAttribute<DynamicAttr>() &&
         ABIRoleInfo(decl).providesAPI())
-    decl->getAttrs().add(new (decl->getASTContext()) DynamicAttr(/*Implicit=*/true));
+    decl->addAttribute(new (decl->getASTContext())
+                           DynamicAttr(/*Implicit=*/true));
 }
 
 //----------------------------------------------------------------------------//
@@ -687,6 +689,9 @@ void swift::simple_display(llvm::raw_ostream &out,
   case FragileFunctionKind::BackDeploy:
     out << "backDeploy";
     return;
+  case FragileFunctionKind::EmbeddedAlwaysEmitIntoClient:
+    out << "embeddedAlwaysEmitIntoClient";
+    return;
   case FragileFunctionKind::None:
     out << "none";
     return;
@@ -833,9 +838,9 @@ RequiresOpaqueModifyCoroutineRequest::getCachedResult() const {
       return static_cast<bool>(
           storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine);
   } else {
-    if (storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed)
+    if (storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutineComputed)
       return static_cast<bool>(
-          storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine);
+          storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutine);
   }
   return std::nullopt;
 }
@@ -847,8 +852,8 @@ void RequiresOpaqueModifyCoroutineRequest::cacheResult(bool value) const {
     storage->LazySemanticInfo.RequiresOpaqueModifyCoroutineComputed = 1;
     storage->LazySemanticInfo.RequiresOpaqueModifyCoroutine = value;
   } else {
-    storage->LazySemanticInfo.RequiresOpaqueModify2CoroutineComputed = 1;
-    storage->LazySemanticInfo.RequiresOpaqueModify2Coroutine = value;
+    storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutineComputed = 1;
+    storage->LazySemanticInfo.RequiresOpaqueYieldingMutateCoroutine = value;
   }
 }
 
@@ -867,10 +872,9 @@ void IsAccessorTransparentRequest::cacheResult(bool value) const {
 
   // For interface printing, API diff, etc.
   if (value) {
-    auto &attrs = accessor->getAttrs();
-    if (!attrs.hasAttribute<TransparentAttr>()) {
+    if (!accessor->getAttrs().hasAttribute<TransparentAttr>()) {
       auto &ctx = accessor->getASTContext();
-      attrs.add(new (ctx) TransparentAttr(/*IsImplicit=*/true));
+      accessor->addAttribute(new (ctx) TransparentAttr(/*IsImplicit=*/true));
     }
   }
 }
@@ -1023,24 +1027,6 @@ void StructuralTypeRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 //----------------------------------------------------------------------------//
 // EnumRawValuesRequest computation.
 //----------------------------------------------------------------------------//
-
-bool EnumRawValuesRequest::isCached() const {
-  return std::get<1>(getStorage()) == TypeResolutionStage::Interface;
-}
-
-std::optional<evaluator::SideEffect>
-EnumRawValuesRequest::getCachedResult() const {
-  auto *ED = std::get<0>(getStorage());
-  if (ED->SemanticFlags.contains(EnumDecl::HasFixedRawValuesAndTypes))
-    return std::make_tuple<>();
-  return std::nullopt;
-}
-
-void EnumRawValuesRequest::cacheResult(evaluator::SideEffect) const {
-  auto *ED = std::get<0>(getStorage());
-  ED->SemanticFlags |= OptionSet<EnumDecl::SemanticInfoFlags>{
-      EnumDecl::HasFixedRawValues | EnumDecl::HasFixedRawValuesAndTypes};
-}
 
 void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
   // This request computes the raw type, and so participates in cycles involving
@@ -1222,11 +1208,16 @@ std::optional<Type> InterfaceTypeRequest::getCachedResult() const {
 void InterfaceTypeRequest::cacheResult(Type type) const {
   auto *decl = std::get<0>(getStorage());
   if (type) {
-    assert(!type->hasTypeVariable() && "Type variable in interface type");
-    assert(!type->is<InOutType>() && "Interface type must be materializable");
-    assert(!type->hasPrimaryArchetype() && "Archetype in interface type");
-    assert(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
+    ASSERT(!type->hasTypeVariable() && "Type variable in interface type");
+    ASSERT(!type->is<InOutType>() && "Interface type must be materializable");
+    ASSERT(!type->hasPrimaryArchetype() && "Archetype in interface type");
+    ASSERT(decl->getDeclContext()->isLocalContext() || !type->hasLocalArchetype() &&
            "Local archetype in interface type of non-local declaration");
+    // Placeholders are only permitted in closure parameters.
+    if (!(isa<ParamDecl>(decl) &&
+          isa<AbstractClosureExpr>(decl->getDeclContext()))) {
+      ASSERT(!type->hasPlaceholder() && "Placeholder in interface type");
+    }
   }
   decl->TypeAndAccess.setPointer(type);
 }
@@ -1300,15 +1291,6 @@ void swift::simple_display(llvm::raw_ostream &out,
     break;
   case ImplicitMemberAction::ResolveDecodable:
     out << "resolve Decodable.init(from:)";
-    break;
-  case ImplicitMemberAction::ResolveDistributedActor:
-    out << "resolve DistributedActor";
-    break;
-  case ImplicitMemberAction::ResolveDistributedActorID:
-    out << "resolve DistributedActor.id";
-    break;
-  case ImplicitMemberAction::ResolveDistributedActorSystem:
-    out << "resolve DistributedActor.actorSystem";
     break;
   }
 }
@@ -1421,7 +1403,7 @@ void ConformanceIsolationRequest::cacheResult(ActorIsolation result) const {
   auto conformance = std::get<0>(getStorage());
 
   // Common case: conformance is nonisolated.
-  if (result.isNonisolated()) {
+  if (result.isNonisolatedOrConcurrent()) {
     conformance->setComputedNonnisolated();
     return;
   }
@@ -1443,7 +1425,7 @@ void HasCircularInheritedProtocolsRequest::diagnoseCycle(
 void HasCircularInheritedProtocolsRequest::noteCycleStep(
     DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -1457,7 +1439,7 @@ void HasCircularRawValueRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 
 void HasCircularRawValueRequest::noteCycleStep(DiagnosticEngine &diags) const {
   auto *decl = std::get<0>(getStorage());
-  diags.diagnose(decl, diag::decl_declared_here_with_kind, decl);
+  diags.diagnose(decl, diag::through_decl_declared_here_with_kind, decl);
 }
 
 //----------------------------------------------------------------------------//
@@ -1649,6 +1631,25 @@ void ResolveTypeEraserTypeRequest::cacheResult(Type value) const {
     attr->TypeEraserExpr = TypeExpr::createImplicit(value,
                                                     value->getASTContext());
   }
+}
+
+//----------------------------------------------------------------------------//
+// ResolvePreInverseGenericsRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<Type> ResolvePreInverseGenericsRequest::getCachedResult() const {
+  auto *attr = std::get<1>(getStorage());
+  auto Ty = attr->ExceptType;
+  if (!Ty)
+    return std::nullopt;
+
+  return Ty;
+}
+
+void ResolvePreInverseGenericsRequest::cacheResult(Type Ty) const {
+  auto *attr = std::get<1>(getStorage());
+  assert(Ty && Ty->is<ProtocolCompositionType>());
+  attr->ExceptType = Ty;
 }
 
 //----------------------------------------------------------------------------//
@@ -1917,9 +1918,10 @@ SourceLoc MacroDefinitionRequest::getNearestLoc() const {
 
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
-  case CallerIsolationInheriting:
+  case NonisolatedNonsending:
   case ActorInstance:
   case Nonisolated:
+  case NonisolatedConcurrent:
   case NonisolatedUnsafe:
   case Unspecified:
     return false;
@@ -1933,8 +1935,9 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
-  case CallerIsolationInheriting:
+  case NonisolatedNonsending:
   case Nonisolated:
+  case NonisolatedConcurrent:
   case NonisolatedUnsafe:
   case Unspecified:
     return *this;
@@ -1954,7 +1957,7 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     os << "actor" << (asNoun ? " isolation" : "-isolated");
     break;
 
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedNonsending:
     os << "caller isolation inheriting"
        << (asNoun ? " isolation" : "-isolated");
     break;
@@ -1974,6 +1977,13 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     break;
 
   case ActorIsolation::Nonisolated:
+    os << "nonisolated";
+    break;
+
+  case ActorIsolation::NonisolatedConcurrent:
+    os << "@concurrent";
+    break;
+
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     os << "nonisolated";
@@ -1982,6 +1992,16 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     }
     break;
   }
+}
+
+StringRef ActorIsolation::printStringForDiagnostics(
+    ASTContext &ctx, StringRef openingQuotationMark, bool asNoun) const {
+  SmallString<64> str;
+  {
+    llvm::raw_svector_ostream os(str);
+    printForDiagnostics(os, openingQuotationMark, asNoun);
+  }
+  return ctx.getIdentifier(str).str();
 }
 
 void ActorIsolation::print(llvm::raw_ostream &os) const {
@@ -1995,11 +2015,14 @@ void ActorIsolation::print(llvm::raw_ostream &os) const {
       os << ". name: '" << vd->getBaseIdentifier() << "'";
     }
     return;
-  case CallerIsolationInheriting:
-    os << "caller_isolation_inheriting";
-    return;
   case Nonisolated:
     os << "nonisolated";
+    return;
+  case NonisolatedNonsending:
+    os << "nonisolated(nonsending)";
+    return;
+  case NonisolatedConcurrent:
+    os << "@concurrent";
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
@@ -2022,11 +2045,14 @@ void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
   case ActorInstance:
     os << "actor_instance";
     return;
-  case CallerIsolationInheriting:
-    os << "caller_isolation_inheriting";
-    return;
   case Nonisolated:
     os << "nonisolated";
+    return;
+  case NonisolatedNonsending:
+    os << "nonisolated(nonsending)";
+    return;
+  case NonisolatedConcurrent:
+    os << "@concurrent";
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
@@ -2081,11 +2107,12 @@ void swift::simple_display(
       }
       break;
 
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedNonsending:
       out << "isolated to isolation of caller";
       break;
 
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedConcurrent:
     case ActorIsolation::NonisolatedUnsafe:
       out << "nonisolated";
       if (state == ActorIsolation::NonisolatedUnsafe) {
@@ -2324,6 +2351,14 @@ ArgumentList *UnresolvedMacroReference::getArgs() const {
     return expansion->getArgs();
   if (auto *attr = pointer.dyn_cast<CustomAttr *>())
     return attr->getArgs();
+  llvm_unreachable("Unhandled case");
+}
+
+DeclContext *UnresolvedMacroReference::getDeclContext() const {
+  if (auto *expansion = pointer.dyn_cast<FreestandingMacroExpansion *>())
+    return expansion->getDeclContext();
+  if (auto *attr = pointer.dyn_cast<CustomAttr *>())
+    return attr->getOwner().getDeclContext();
   llvm_unreachable("Unhandled case");
 }
 
@@ -2761,6 +2796,7 @@ void LifetimeDependenceInfoRequest::cacheResult(
     }
     auto *eed = cast<EnumElementDecl>(decl);
     eed->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
+    return;
   }
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(result));
@@ -2861,4 +2897,60 @@ void AvailabilityDomainForDeclRequest::cacheResult(
   }
 
   decl->getASTContext().evaluator.cacheNonEmptyOutput(*this, std::move(domain));
+}
+
+//----------------------------------------------------------------------------//
+// IsCustomAvailabilityDomainPermanentlyEnabled computation.
+//----------------------------------------------------------------------------//
+std::optional<bool>
+IsCustomAvailabilityDomainPermanentlyEnabled::getCachedResult() const {
+  auto *domain = std::get<0>(getStorage());
+
+  if (domain->flags.isPermanentlyEnabledComputed)
+    return domain->flags.isPermanentlyEnabled;
+  return std::nullopt;
+}
+
+void IsCustomAvailabilityDomainPermanentlyEnabled::cacheResult(
+    bool isPermanentlyEnabled) const {
+  auto *domain = const_cast<CustomAvailabilityDomain *>(std::get<0>(getStorage()));
+
+  domain->flags.isPermanentlyEnabledComputed = true;
+  domain->flags.isPermanentlyEnabled = isPermanentlyEnabled;
+}
+
+//----------------------------------------------------------------------------//
+// ObjCKeyPathStringRequest caching.
+//----------------------------------------------------------------------------//
+
+std::optional<Expr *> ObjCKeyPathStringRequest::getCachedResult() const {
+  auto *KP = std::get<0>(getStorage());
+  if (!KP->ObjCStringLiteralExpr)
+    return std::nullopt;
+
+  return KP->ObjCStringLiteralExpr;
+}
+
+void ObjCKeyPathStringRequest::cacheResult(Expr *strExpr) const {
+  auto *KP = std::get<0>(getStorage());
+  ASSERT(strExpr);
+  ASSERT(!KP->ObjCStringLiteralExpr || KP->ObjCStringLiteralExpr == strExpr);
+  KP->ObjCStringLiteralExpr = strExpr;
+}
+
+//----------------------------------------------------------------------------//
+// DesugarForEachStmtRequest computation.
+//----------------------------------------------------------------------------//
+std::optional<BraceStmt *> DesugarForEachStmtRequest::getCachedResult() const {
+  auto *fes = std::get<0>(getStorage());
+  if (!fes->desugaredStmtAndComputed.getInt()) {
+    return std::nullopt;
+  }
+  return fes->desugaredStmtAndComputed.getPointer();
+}
+
+void DesugarForEachStmtRequest::cacheResult(BraceStmt *stmt) const {
+  auto *fes = std::get<0>(getStorage());
+  fes->desugaredStmtAndComputed.setInt(true);
+  fes->setDesugaredStmt(stmt);
 }

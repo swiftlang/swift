@@ -257,8 +257,13 @@ extension Hasher {
 @usableFromInline
 var _swift_stdlib_Hashing_parameters: _SwiftHashingParameters = {
   var seed0: UInt64 = 0, seed1: UInt64 = 0
+#if SWIFT_USE_EMBEDDED_SWIFT_PLATFORM
+  unsafe _swift_generateRandomHashSeed(&seed0, MemoryLayout<UInt64>.size)
+  unsafe _swift_generateRandomHashSeed(&seed1, MemoryLayout<UInt64>.size)
+#else
   unsafe swift_stdlib_random(&seed0, MemoryLayout<UInt64>.size)
   unsafe swift_stdlib_random(&seed1, MemoryLayout<UInt64>.size)
+#endif
   return .init(seed0: seed0, seed1: seed1, deterministic: false)
 }()
 #endif
@@ -350,7 +355,8 @@ public struct Hasher {
   /// - Parameter value: A value to add to the hasher.
   @inlinable
   @inline(__always)
-  public mutating func combine<H: Hashable>(_ value: H) {
+  @_preInverseGenerics
+  public mutating func combine<H: Hashable & ~Copyable & ~Escapable>(_ value: borrowing H) {
     value.hash(into: &self)
   }
 

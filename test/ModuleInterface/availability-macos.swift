@@ -13,26 +13,26 @@
 // CHECK-LABEL: public struct StructWithProperties
 public struct StructWithProperties {
   // CHECK:      @available(macOS, unavailable)
-  // CHECK-NEXT: public var unavailableComputed: Swift.Int {
+  // CHECK-NEXT: public var unavailableComputed: Swift::Int {
   // CHECK-NEXT:   get
   // CHECK-NEXT: }
   @available(macOS, unavailable)
   public var unavailableComputed: Int { 1 }
 
   // CHECK:      @available(macOS 51, *)
-  // CHECK-NEXT: public let introducedAtDeploymentStored: Swift.Int
+  // CHECK-NEXT: public let introducedAtDeploymentStored: Swift::Int
   @available(macOS 51, *)
   public let introducedAtDeploymentStored: Int = 1
 
   // CHECK:      @available(macOS 99, *)
-  // CHECK-NEXT: public var introducedAfterDeploymentComputed: Swift.Int {
+  // CHECK-NEXT: public var introducedAfterDeploymentComputed: Swift::Int {
   // CHECK-NEXT:   get
   // CHECK-NEXT: }
   @available(macOS 99, *)
   public var introducedAfterDeploymentComputed: Int { 1 }
 
   // CHECK:      @available(macOS, unavailable)
-  // CHECK-NEXT: public let introducedAtDeploymentSPIStored: Swift.Int
+  // CHECK-NEXT: public let introducedAtDeploymentSPIStored: Swift::Int
   @_spi_available(macOS 51, *)
   public let introducedAtDeploymentSPIStored: Int = 1
 }
@@ -55,12 +55,12 @@ public enum EnumWithAssociatedValues {
   case introducedAfterDeployment
 
   // CHECK:      @available(macOS, unavailable)
-  // CHECK-NEXT: case unavailableWithAssoc(Swift.Int)
+  // CHECK-NEXT: case unavailableWithAssoc(Swift::Int)
   @available(macOS, unavailable)
   case unavailableWithAssoc(Int)
 
   // CHECK:      @available(macOS 51, *)
-  // CHECK-NEXT: case introducedAtDeploymentWithAssoc(Swift.Int)
+  // CHECK-NEXT: case introducedAtDeploymentWithAssoc(Swift::Int)
   @available(macOS 51, *)
   case introducedAtDeploymentWithAssoc(Int)
 }

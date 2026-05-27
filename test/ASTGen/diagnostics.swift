@@ -1,6 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-typecheck-verify-swift -disable-availability-checking \
+// RUN: %target-typecheck-verify-swift \
+// RUN:   -target %target-swift-5.9-abi-triple \
 // RUN:   -enable-bare-slash-regex \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   -enable-experimental-feature DefaultIsolationPerFile
@@ -44,7 +45,7 @@ struct S {
 }
 
 struct ExpansionRequirementTest<each T> {}
-extension ExpansionRequirementTest where repeat each T == Int {} // expected-error {{same-element requirements are not yet supported}}
+extension ExpansionRequirementTest where repeat each T == Int {} // expected-error {{same-type requirements between packs and concrete types are not yet supported}}
 
 
 #warning("this is a warning") // expected-warning {{this is a warning}}

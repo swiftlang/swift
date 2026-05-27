@@ -32,6 +32,7 @@
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Bitstream/BitstreamWriter.h"
+#include "llvm/Support/Mutex.h"
 
 using namespace swift;
 using namespace clang::serialized_diags;
@@ -217,6 +218,39 @@ private:
                              DiagnosticKind Kind,
                              StringRef Text, const DiagnosticInfo &Info);
 };
+
+/// A thread-safe version of SerializedDiagnosticConsumer which
+/// serializes access to all public API of the consumer.
+class ThreadSafeSerializedDiagnosticConsumer
+    : public SerializedDiagnosticConsumer {
+private:
+  llvm::sys::SmartMutex<true> DiagnosticConsumerStateLock;
+
+public:
+  ThreadSafeSerializedDiagnosticConsumer(StringRef serializedDiagnosticsPath,
+                                         bool emitMacroExpansionFiles)
+      : SerializedDiagnosticConsumer(serializedDiagnosticsPath,
+                                     emitMacroExpansionFiles) {}
+
+  bool finishProcessing() override {
+    llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
+    // Note: this is only synchronized behind a log to ease debugging possible
+    // issues, this method must not be called more than once.
+    return SerializedDiagnosticConsumer::finishProcessing();
+  }
+
+  void informDriverOfIncompleteBatchModeCompilation() override {
+    llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
+    SerializedDiagnosticConsumer::
+        informDriverOfIncompleteBatchModeCompilation();
+  }
+
+  void handleDiagnostic(SourceManager &SM,
+                        const DiagnosticInfo &Info) override {
+    llvm::sys::SmartScopedLock<true> Lock(DiagnosticConsumerStateLock);
+    SerializedDiagnosticConsumer::handleDiagnostic(SM, Info);
+  }
+};
 } // end anonymous namespace
 
 namespace swift {
@@ -225,6 +259,13 @@ namespace serialized_diagnostics {
       StringRef outputPath, bool emitMacroExpansionFiles
   ) {
     return std::make_unique<SerializedDiagnosticConsumer>(
+        outputPath, emitMacroExpansionFiles);
+  }
+
+  std::unique_ptr<DiagnosticConsumer> createThreadSafeConsumer(
+      StringRef outputPath, bool emitMacroExpansionFiles
+  ) {
+    return std::make_unique<ThreadSafeSerializedDiagnosticConsumer>(
         outputPath, emitMacroExpansionFiles);
   }
 } // namespace serialized_diagnostics
@@ -335,10 +376,10 @@ unsigned SerializedDiagnosticConsumer::getEmitCategory(
 
 unsigned
 SerializedDiagnosticConsumer::emitDocumentationURL(const DiagnosticInfo &Info) {
-  if (Info.CategoryDocumentationURL.empty())
+  if (Info.getCategoryDocumentationURL().empty())
     return 0;
 
-  unsigned &recordID = State->Flags[Info.CategoryDocumentationURL];
+  unsigned &recordID = State->Flags[Info.getCategoryDocumentationURL()];
   if (recordID)
     return recordID;
 
@@ -347,9 +388,9 @@ SerializedDiagnosticConsumer::emitDocumentationURL(const DiagnosticInfo &Info) {
   RecordData Record;
   Record.push_back(RECORD_DIAG_FLAG);
   Record.push_back(recordID);
-  Record.push_back(Info.CategoryDocumentationURL.size());
+  Record.push_back(Info.getCategoryDocumentationURL().size());
   State->Stream.EmitRecordWithBlob(State->Abbrevs.get(RECORD_DIAG_FLAG), Record,
-                                   Info.CategoryDocumentationURL);
+                                   Info.getCategoryDocumentationURL());
   return recordID;
 }
 
@@ -600,9 +641,10 @@ emitDiagnosticMessage(SourceManager &SM,
   addLocToRecord(Loc, SM, filename, Record);
 
   // Emit the category.
-  if (!Info.Category.empty()) {
+  if (!Info.getCategoryName().empty()) {
     Record.push_back(
-        getEmitCategory(Info.Category, Info.CategoryDocumentationURL));
+        getEmitCategory(Info.getCategoryName(),
+                        Info.getCategoryDocumentationURL()));
   } else {
     Record.push_back(0);
   }

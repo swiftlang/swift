@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix concurrent- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -disable-availability-checking -verify -verify-additional-prefix ni- %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-upcoming-feature NonisolatedNonsendingByDefault
 
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
@@ -43,14 +43,16 @@ actor ProtectsNonSendable {
   nonisolated func testParameter(_ nsArg: NonSendableKlass) async {
     self.assumeIsolated { isolatedSelf in
       isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-concurrent-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-ni-note @-2 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 
   nonisolated func testParameterOutOfLine2(_ nsArg: NonSendableKlass) async {
     let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
       isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-concurrent-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-ni-note @-2 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
     self.assumeIsolated(closure)
     self.assumeIsolated(closure)
@@ -61,7 +63,8 @@ actor ProtectsNonSendable {
     doSomething(l, nsArg)
     self.assumeIsolated { isolatedSelf in
       isolatedSelf.ns = l // expected-warning {{sending 'l' risks causing data races}}
-      // expected-note @-1 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-concurrent-note @-1 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-ni-note @-2 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
   }
 
@@ -80,7 +83,8 @@ actor ProtectsNonSendable {
     // This is not safe since we use l later.
     self.assumeIsolated { isolatedSelf in
       isolatedSelf.ns = l // expected-warning {{sending 'l' risks causing data races}}
-      // expected-note @-1 {{'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-concurrent-note @-1 {{'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-ni-note @-2 {{'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
     }
 
     useValue(l) // expected-note {{access can happen concurrently}}

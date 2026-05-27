@@ -50,7 +50,7 @@ class ClangSyntaxPrinter {
 public:
   enum class LeadingTrivia { None, Comma };
 
-  ClangSyntaxPrinter(const ASTContext &Ctx, raw_ostream &os) : os(os), mangler(Ctx) {}
+  ClangSyntaxPrinter(ASTContext &Ctx, raw_ostream &os) : os(os), mangler(Ctx) {}
 
   /// Print a given identifier. If the identifer conflicts with a keyword, add a
   /// trailing underscore.

@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated
 
 struct MyType<TyA, TyB> { // expected-note {{generic struct 'MyType' declared here}}
   // expected-note @-1 {{arguments to generic parameter 'TyB' ('S' and 'Int') are expected to be equal}}
@@ -465,3 +465,36 @@ func testSugar(_ gx: GX<Int>, _ gy: GX<Int>.GY<Double>, gz: GX<Int>.GY<Double>.E
   let i2: Int = gy  // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>' (aka 'Array<Double>') to specified type 'Int'}}
   let i3: Int = gz // expected-error{{cannot convert value of type 'GX<Int>.GY<Double>.Element' (aka 'Double') to specified type 'Int'}}
 }
+
+func testLocalRequirementInference<T>(_ x: T, y: Int, s: S) {
+  typealias X<U: P> = (T, U) where T == U.A
+  func foo<V>(_ x: X<V>) {} // expected-note {{where 'V' = 'Int'}} expected-note {{where 'T' = 'T', 'V.A' = 'S.A' (aka 'Float')}}
+  foo((x, y)) // expected-error {{local function 'foo' requires that 'Int' conform to 'P'}}
+  foo((x, s)) // expected-error {{local function 'foo' requires the types 'T' and 'S.A' (aka 'Float') be equivalent}}
+}
+
+struct TestNestedRequirementInference<T> {
+  typealias X<U: P> = (T, U) where T == U.A
+  func foo<V>(_ x: X<V>) {} // expected-note {{where 'V' = 'Int'}} expected-note {{where 'T' = 'T', 'V.A' = 'S.A' (aka 'Float')}}
+  func bar(_ x: T, y: Int, s: S) {
+    foo((x, y)) // expected-error {{instance method 'foo' requires that 'Int' conform to 'P'}}
+    foo((x, s)) // expected-error {{instance method 'foo' requires the types 'T' and 'S.A' (aka 'Float') be equivalent}}
+  }
+}
+
+//
+// Nested self-referential generic typealiases
+// (similar to a pattern used for `Task.Handle` backwards compatibility)
+//
+
+extension X where T == Never, U == Never {
+  typealias SelfRef1 = X
+  typealias SelfRef2 = generic.X
+  typealias SelfRef3 = generic::X
+}
+
+func testSelfRefs(
+  _: X.SelfRef1<Int, Int>, // expected-error {{cannot specialize non-generic type 'X<Never, Never>'}}
+  _: X.SelfRef2<Int, Int>, // no-error
+  _: X.SelfRef3<Int, Int> // no-error
+) {}

@@ -20,6 +20,13 @@ case none
 case some(T)
 }
 
+struct MyArray<Element> {
+  let buffer: MyArrayBuffer
+}
+
+final class MyArrayBuffer {
+}
+
 sil [ossa] @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 sil [ossa] @owned_user : $@convention(thin) (@owned Builtin.NativeObject) -> ()
 sil [ossa] @get_owned_obj : $@convention(thin) () -> @owned Builtin.NativeObject
@@ -204,3 +211,59 @@ bb0(%1 : $*ContainsKlass):
   destroy_value %131
   unreachable
 }
+
+public struct Wrapper {
+  var _k: Klass
+}
+
+sil @get_wrapper : $@convention(thin) () -> @owned Wrapper
+sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+
+sil [ossa] @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass {
+bb0(%0 : @guaranteed $Wrapper):
+  %2 = struct_extract %0, #Wrapper._k
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @test_borrow_accessor_opt :
+// CHECK-NOT: copy_value
+// CHECK-LABEL: } // end sil function 'test_borrow_accessor_opt'
+sil [ossa] @test_borrow_accessor_opt : $@convention(thin) () -> () {
+bb0:
+  %1 = function_ref @get_wrapper : $@convention(thin) () -> @owned Wrapper
+  %2 = apply %1() : $@convention(thin) () -> @owned Wrapper
+  %3 = begin_borrow %2
+  %4 = function_ref @borrow_loadable_prop : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %5 = apply %4(%3) : $@convention(method) (@guaranteed Wrapper) -> @guaranteed Klass
+  %copy = copy_value %5
+  %6 = function_ref @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
+  %7 = apply %6(%copy) : $@convention(thin) (@guaranteed Klass) -> ()
+  destroy_value %copy
+  end_borrow %3
+  destroy_value %2
+  %10 = tuple ()
+  return %10
+}
+
+// CHECK-LABEL: sil [ossa] @test_deinit_barrier :
+// CHECK:         copy_value
+// CHECK-LABEL: } // end sil function 'test_deinit_barrier'
+sil [ossa] @test_deinit_barrier : $@convention(thin) () -> @owned AnyObject {
+bb0:
+  %0 = apply undef() : $@convention(thin) () -> @owned MyArray<AnyObject>
+  %1 = begin_borrow %0
+  %2 = struct_extract %1, #MyArray.buffer
+  %3 = copy_value %2
+  %4 = ref_tail_addr %2, $AnyObject
+  %5 = address_to_pointer %4 to $Builtin.RawPointer
+  end_borrow %1
+  destroy_value %0
+  %8 = pointer_to_address %5 to [strict] $*AnyObject
+  // This is load is a deinit-barrier because it loads from a pointer.
+  // Therefore the array buffer must not be destroyed earlier which means that the `copy_value` must be kept.
+  %9 = load [copy] %8
+  destroy_value %3
+  return %9
+}
+
+

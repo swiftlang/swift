@@ -115,25 +115,21 @@ SDKNodeRoot::SDKNodeRoot(SDKNodeInitInfo Info): SDKNode(Info, SDKNodeKind::Root)
   JsonFormatVer(Info.JsonFormatVer.has_value() ? *Info.JsonFormatVer : DIGESTER_JSON_DEFAULT_VERSION) {}
 
 SDKNodeDecl::SDKNodeDecl(SDKNodeInitInfo Info, SDKNodeKind Kind)
-      : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
-        MangledName(Info.MangledName), Loc(Info.Loc),
-        Location(Info.Location), ModuleName(Info.ModuleName),
-        DeclAttributes(Info.DeclAttrs),
-        SPIGroups(Info.SPIGroups),
-        IsImplicit(Info.IsImplicit),
-        IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
-        IsProtocolReq(Info.IsProtocolReq),
-        IsOverriding(Info.IsOverriding),
-        IsOpen(Info.IsOpen),
-        IsInternal(Info.IsInternal), IsABIPlaceholder(Info.IsABIPlaceholder),
-        IsFromExtension(Info.IsFromExtension),
-        ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
-        GenericSig(Info.GenericSig),
-        SugaredGenericSig(Info.SugaredGenericSig),
-        FixedBinaryOrder(Info.FixedBinaryOrder),
-        introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
-                       Info.IntrowatchOS, Info.IntrovisionOS, Info.Introswift}),
-        ObjCName(Info.ObjCName) {}
+    : SDKNode(Info, Kind), DKind(Info.DKind), Usr(Info.Usr),
+      MangledName(Info.MangledName), Loc(Info.Loc), Location(Info.Location),
+      ModuleName(Info.ModuleName), DeclAttributes(Info.DeclAttrs),
+      SPIGroups(Info.SPIGroups), IsImplicit(Info.IsImplicit),
+      IsStatic(Info.IsStatic), IsDeprecated(Info.IsDeprecated),
+      IsProtocolReq(Info.IsProtocolReq), IsOverriding(Info.IsOverriding),
+      IsOpen(Info.IsOpen), IsInternal(Info.IsInternal),
+      IsFromExtension(Info.IsFromExtension),
+      ReferenceOwnership(uint8_t(Info.ReferenceOwnership)),
+      GenericSig(Info.GenericSig), SugaredGenericSig(Info.SugaredGenericSig),
+      FixedBinaryOrder(Info.FixedBinaryOrder),
+      introVersions({Info.IntromacOS, Info.IntroiOS, Info.IntrotvOS,
+                     Info.IntrowatchOS, Info.IntrovisionOS, Info.Introswift,
+                     Info.IntroAnyAppleOS}),
+      ObjCName(Info.ObjCName) {}
 
 SDKNodeType::SDKNodeType(SDKNodeInitInfo Info, SDKNodeKind Kind):
   SDKNode(Info, Kind), TypeAttributes(Info.TypeAttrs),
@@ -159,10 +155,10 @@ SDKNodeDeclType::SDKNodeDeclType(SDKNodeInitInfo Info):
   HasMissingDesignatedInitializers(Info.HasMissingDesignatedInitializers),
   InheritsConvenienceInitializers(Info.InheritsConvenienceInitializers) {}
 
-SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info):
-  SDKNode(Info, SDKNodeKind::Conformance),
-  Usr(Info.Usr), MangledName(Info.MangledName),
-  IsABIPlaceholder(Info.IsABIPlaceholder) {}
+SDKNodeConformance::SDKNodeConformance(SDKNodeInitInfo Info)
+    : SDKNode(Info, SDKNodeKind::Conformance), Usr(Info.Usr),
+      MangledName(Info.MangledName),
+      IsMarkerProtocol(Info.IsMarkerProtocol) {}
 
 SDKNodeTypeWitness::SDKNodeTypeWitness(SDKNodeInitInfo Info):
   SDKNode(Info, SDKNodeKind::TypeWitness) {}
@@ -1120,8 +1116,7 @@ static StringRef calculateMangledName(SDKContext &Ctx, ValueDecl *VD) {
     return Ctx.buffer(attr->Name);
   }
   Mangle::ASTMangler NewMangler(VD->getASTContext());
-  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, true,
-                                    /*bool respectOriginallyDefinedIn*/true));
+  return Ctx.buffer(NewMangler.mangleAnyDecl(VD, /*addPrefix*/ true));
 }
 
 static StringRef calculateLocation(SDKContext &SDKCtx, Decl *D) {
@@ -1340,28 +1335,6 @@ std::optional<uint8_t> SDKContext::getFixedBinaryOrder(ValueDecl *VD) const {
   }
 }
 
-// check for if it has @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, *)
-static bool isABIPlaceHolder(Decl *D) {
-  llvm::SmallSet<PlatformKind, 4> Platforms;
-  for (auto attr : D->getSemanticAvailableAttrs()) {
-    if (attr.isPlatformSpecific() && attr.getIntroduced().has_value() &&
-        attr.getIntroduced()->getMajor() == 9999) {
-      Platforms.insert(attr.getPlatform());
-    }
-  }
-
-  // FIXME: [availability] This probably isn't correct now that visionOS exists
-  return Platforms.size() == 4;
-}
-
-static bool isABIPlaceholderRecursive(Decl *D) {
-  for (auto *CD = D; CD; CD = CD->getDeclContext()->getAsDecl()) {
-    if (isABIPlaceHolder(CD))
-      return true;
-  }
-  return false;
-}
-
 StringRef SDKContext::getPlatformIntroVersion(Decl *D, PlatformKind Kind) {
   if (!D)
     return StringRef();
@@ -1380,7 +1353,7 @@ StringRef SDKContext::getLanguageIntroVersion(Decl *D) {
   for (auto attr : D->getSemanticAvailableAttrs()) {
     auto domain = attr.getDomain();
 
-    if (domain.isSwiftLanguage() && attr.getIntroduced()) {
+    if (domain.isSwiftLanguageMode() && attr.getIntroduced()) {
       return buffer(attr.getIntroduced()->getAsString());
     }
   }
@@ -1460,25 +1433,24 @@ static bool isDeclaredInExtension(Decl *D) {
   return false;
 }
 
-SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D):
-      Ctx(Ctx), DKind(D->getKind()), Loc(D->getLoc()),
+SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, Decl *D)
+    : Ctx(Ctx), DKind(D->getKind()), Loc(D->getLoc()),
       Location(calculateLocation(Ctx, D)),
       ModuleName(D->getModuleContext()->getName().str()),
-      GenericSig(printGenericSignature(Ctx, D, /*Canonical*/Ctx.checkingABI())),
-      SugaredGenericSig(Ctx.checkingABI()?
-                        printGenericSignature(Ctx, D, /*Canonical*/false):
-                        StringRef()),
+      GenericSig(
+          printGenericSignature(Ctx, D, /*Canonical*/ Ctx.checkingABI())),
+      SugaredGenericSig(Ctx.checkingABI()
+                            ? printGenericSignature(Ctx, D, /*Canonical*/ false)
+                            : StringRef()),
       IntromacOS(Ctx.getPlatformIntroVersion(D, PlatformKind::macOS)),
       IntroiOS(Ctx.getPlatformIntroVersion(D, PlatformKind::iOS)),
       IntrotvOS(Ctx.getPlatformIntroVersion(D, PlatformKind::tvOS)),
       IntrowatchOS(Ctx.getPlatformIntroVersion(D, PlatformKind::watchOS)),
       IntrovisionOS(Ctx.getPlatformIntroVersion(D, PlatformKind::visionOS)),
       Introswift(Ctx.getLanguageIntroVersion(D)),
-      ObjCName(Ctx.getObjcName(D)),
-      InitKind(Ctx.getInitKind(D)),
-      IsImplicit(D->isImplicit()),
-      IsDeprecated(D->isDeprecated()),
-      IsABIPlaceholder(isABIPlaceholderRecursive(D)),
+      IntroAnyAppleOS(Ctx.getPlatformIntroVersion(D, PlatformKind::anyAppleOS)),
+      ObjCName(Ctx.getObjcName(D)), InitKind(Ctx.getInitKind(D)),
+      IsImplicit(D->isImplicit()), IsDeprecated(D->isDeprecated()),
       IsFromExtension(isDeclaredInExtension(D)),
       DeclAttrs(collectDeclAttributes(D)) {
   // Keep track of SPI group names
@@ -1503,18 +1475,16 @@ SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ImportDecl *ID):
 
 SDKNodeInitInfo::SDKNodeInitInfo(SDKContext &Ctx, ProtocolConformanceRef Conform):
     SDKNodeInitInfo(Ctx, Conform.getProtocol()) {
+  IsMarkerProtocol = Conform.getProtocol()->isMarkerProtocol();
   // The conformance can be conditional. The generic signature keeps track of
   // the requirements.
   if (Conform.isConcrete()) {
     auto *Concrete = Conform.getConcrete();
 
     GenericSig = printGenericSignature(Ctx, Concrete, Ctx.checkingABI());
-    SugaredGenericSig = Ctx.checkingABI() ?
-      printGenericSignature(Ctx, Concrete, false): StringRef();
-    // Whether this conformance is ABI placeholder depends on the decl context
-    // of this conformance.
-    IsABIPlaceholder = isABIPlaceholderRecursive(Concrete->getDeclContext()->
-                                                 getAsDecl());
+    SugaredGenericSig = Ctx.checkingABI()
+                            ? printGenericSignature(Ctx, Concrete, false)
+                            : StringRef();
   }
 }
 
@@ -1765,7 +1735,7 @@ SDKContext::shouldIgnore(Decl *D, const Decl* Parent) const {
     // Exclude decls with @_alwaysEmitIntoClient if we are checking ABI.
     // These decls are considered effectively public because they are usable
     // from inline, so we have to manually exclude them here.
-    if (D->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (D->isAlwaysEmittedIntoClient())
       return true;
   } else {
     if (D->isPrivateSystemDecl(false))
@@ -1988,7 +1958,7 @@ SwiftDeclCollector::addConformancesToTypeDecl(SDKNodeDeclType *Root,
   } else {
     // Avoid adding the same conformance twice.
     SmallPtrSet<ProtocolConformance*, 4> Seen;
-    for (auto &Conf: NTD->getAllConformances()) {
+    for (auto &Conf: NTD->getAllConformances(/*sorted=*/true)) {
       if (!Ctx.shouldIgnore(Conf->getProtocol()) && !Seen.count(Conf))
         Root->addConformance(constructConformanceNode(Conf));
       Seen.insert(Conf);
@@ -2009,7 +1979,7 @@ SwiftDeclCollector::SwiftDeclCollector(SDKContext &Ctx,
   }
   assert(!Modules.empty());
   for (auto M: Modules) {
-    llvm::SmallVector<Decl*, 512> Decls;
+    llvm::SmallVector<Decl*> Decls;
     swift::getTopLevelDeclsForDisplay(M, Decls);
     for (auto D : Decls) {
       if (Ctx.shouldIgnore(D))
@@ -2136,7 +2106,7 @@ void SDKNodeConformance::jsonize(json::Output &out) {
   SDKNode::jsonize(out);
   output(out, KeyKind::KK_usr, Usr);
   output(out, KeyKind::KK_mangledName, MangledName);
-  output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
+  output(out, KeyKind::KK_isMarkerProtocol, IsMarkerProtocol);
 }
 
 void SDKNodeDecl::jsonize(json::Output &out) {
@@ -2155,12 +2125,12 @@ void SDKNodeDecl::jsonize(json::Output &out) {
   output(out, KeyKind::KK_implicit, IsImplicit);
   output(out, KeyKind::KK_isOpen, IsOpen);
   output(out, KeyKind::KK_isInternal, IsInternal);
-  output(out, KeyKind::KK_isABIPlaceholder, IsABIPlaceholder);
   output(out, KeyKind::KK_intro_Macosx, introVersions.macos);
   output(out, KeyKind::KK_intro_iOS, introVersions.ios);
   output(out, KeyKind::KK_intro_tvOS, introVersions.tvos);
   output(out, KeyKind::KK_intro_watchOS, introVersions.watchos);
   output(out, KeyKind::KK_intro_swift, introVersions.swift);
+  output(out, KeyKind::KK_intro_anyAppleOS, introVersions.anyappleos);
   output(out, KeyKind::KK_objc_name, ObjCName);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_declAttributes).data(), DeclAttributes);
   out.mapOptional(getKeyContent(Ctx, KeyKind::KK_fixedbinaryorder).data(), FixedBinaryOrder);

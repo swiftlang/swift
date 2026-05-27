@@ -106,6 +106,9 @@ class ModuleFileSharedCore {
   /// Name to use in public facing diagnostics and documentation.
   StringRef PublicModuleName;
 
+  /// Section name to use for OSLog strings.
+  StringRef OSLogStringSectionName;
+
   /// The version of the Swift compiler used to produce swiftinterface
   /// this module is based on. This is the most precise version possible
   /// - a compiler tag or version if this is a development compiler.
@@ -113,9 +116,6 @@ class ModuleFileSharedCore {
 
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
-
-  /// \c true if this module was compiled with -enable-ossa-modules.
-  bool RequiresOSSAModules;
 
   /// An array of module names that are allowed to import this one.
   ArrayRef<StringRef> AllowableClientNames;
@@ -142,25 +142,23 @@ public:
 
     Dependency(StringRef path, StringRef spiGroups, bool isHeader,
                ImportFilterKind importControl, bool isScoped)
-        : RawPath(path),
-          RawSPIs(spiGroups),
+        : RawPath(path), RawSPIs(spiGroups),
           RawImportControl(rawControlFromKind(importControl)),
-          IsHeader(isHeader),
-          IsScoped(isScoped) {
+          IsHeader(isHeader), IsScoped(isScoped) {
       assert(llvm::popcount(static_cast<unsigned>(importControl)) == 1 &&
              "must be a particular filter option, not a bitset");
       assert(getImportControl() == importControl && "not enough bits");
     }
 
   public:
-   Dependency(StringRef path, StringRef spiGroups,
-              ImportFilterKind importControl, bool isScoped)
-       : Dependency(path, spiGroups, false, importControl, isScoped) {}
+    Dependency(StringRef path, StringRef spiGroups,
+               ImportFilterKind importControl, bool isScoped)
+        : Dependency(path, spiGroups, false, importControl, isScoped) {}
 
-   static Dependency forHeader(StringRef headerPath, bool exported) {
-     auto importControl =
-         exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
-     return Dependency(headerPath, StringRef(), true, importControl, false);
+    static Dependency forHeader(StringRef headerPath, bool exported) {
+      auto importControl =
+          exported ? ImportFilterKind::Exported : ImportFilterKind::Default;
+      return Dependency(headerPath, {}, true, importControl, false);
     }
 
     bool isExported() const {
@@ -313,6 +311,8 @@ private:
   std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
   std::unique_ptr<SerializedDeclFingerprintsTable> DeclFingerprints;
 
+  llvm::StringMap<AbstractTypeLayout> HiddenTypeLayouts;
+
   class ObjCMethodTableInfo;
   using SerializedObjCMethodTable =
     llvm::OnDiskIterableChainedHashTable<ObjCMethodTableInfo>;
@@ -421,11 +421,14 @@ private:
     /// Whether this module enabled strict memory safety.
     unsigned StrictMemorySafety : 1;
 
-    /// Whether this module used deferred code generation.
-    unsigned DeferredCodeGen : 1;
+    /// The code generation model used by this module.
+    unsigned CodeGenModel : 2;
 
-    // Explicitly pad out to the next word boundary.
-    unsigned : 1;
+    /// Whether this module used deferred code generation.
+    unsigned AggressiveCMOEnabled : 1;
+
+    /// Discriminator for library level (LibraryLevel enum).
+    unsigned LibraryLevel : 2;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -445,9 +448,9 @@ private:
       std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
       std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
       bool isFramework,
-      bool requiresOSSAModules,
       StringRef requiredSDK,
       std::optional<llvm::Triple> target,
+      std::optional<bool> isEmbedded,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -522,6 +525,11 @@ private:
   /// Returns false if there was an error.
   bool readIndexBlock(llvm::BitstreamCursor &cursor);
 
+  /// Reads the hidden-type layouts block, populating HiddenTypeLayouts.
+  ///
+  /// Returns false if there was an error.
+  bool readHiddenTypeLayoutsBlock(llvm::BitstreamCursor &cursor);
+
   /// Read an on-disk decl hash table stored in
   /// \c comment_block::DeclCommentListLayout format.
   std::unique_ptr<SerializedDeclCommentTable>
@@ -573,8 +581,6 @@ public:
   /// of the buffer, even if there's an error in loading.
   /// \param isFramework If true, this is treated as a framework module for
   /// linking purposes.
-  /// \param requiresOSSAModules If true, this requires dependent modules to be
-  /// compiled with -enable-ossa-modules.
   /// \param requiredSDK A string denoting the name of the currently-used SDK,
   /// to ensure that the loaded module was built with a compatible SDK.
   /// \param target The target triple of the current compilation for
@@ -587,15 +593,16 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleDocInputBuffer,
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
-       bool isFramework, bool requiresOSSAModules,
+       bool isFramework,
        StringRef requiredSDK, std::optional<llvm::Triple> target,
+       std::optional<bool> isEmbedded,
        PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiresOSSAModules, requiredSDK, target, info,
+        requiredSDK, target, isEmbedded, info,
         pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
@@ -675,9 +682,9 @@ public:
   }
 
   /// Get embedded bridging header.
-  std::string getEmbeddedHeader() const {
+  StringRef getEmbeddedHeader() const {
     // Don't include the '\0' in the end.
-    return importedHeaderInfo.contents.drop_back().str();
+    return importedHeaderInfo.contents.drop_back();
   }
 
   /// If the module-defining `.swiftinterface` file is an SDK-relative path,
@@ -699,7 +706,15 @@ public:
 
   bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
 
-  bool deferredCodeGen() const { return Bits.DeferredCodeGen; }
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.CodeGenModel);
+  }
+
+  bool isAggressiveCMOEnabled() const { return Bits.AggressiveCMOEnabled; }
+
+  LibraryLevel getLibraryLevel() const {
+    return LibraryLevel(Bits.LibraryLevel);
+  }
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///

@@ -53,9 +53,9 @@ public func testKeypath<V: ~Copyable>(m: consuming M<V>) {
   // expected-error@-1 {{key path cannot refer to noncopyable type 'M<V>'}}
 
   let b = Box(NC())
-  _ = b.with(\.data)
-  _ = b.with(\.next)
-  _ = b.with(\.next?.wrapped) // expected-error {{key path cannot refer to noncopyable type 'NC'}}
+  _ = b.with(\.data) // expected-error {{key path cannot refer to noncopyable type 'NC'}}
+  _ = b.with(\.next) // expected-error {{key path cannot refer to noncopyable type 'NC'}}
+  _ = b.with(\.next?.wrapped) // expected-error 2 {{key path cannot refer to noncopyable type 'NC'}}
   _ = b.with(\.next!.wrapped.data) // expected-error {{key path cannot refer to noncopyable type 'NC'}}
 }
 
@@ -67,4 +67,17 @@ func testKeypath2(_ someA: A) -> Int {
 func testAsFunc(_ someA: A) -> Int {
   let fn: (A) -> Int = \A.b.c.d // expected-error {{key path cannot refer to noncopyable type 'B'}}
   return fn(someA)
+}
+
+// https://github.com/swiftlang/swift/issues/84150
+func testKeyPathToFunctionConversion() {
+  struct HasID: ~Copyable {
+    let id: Int
+  }
+
+  func map(_ operation: (consuming HasID) -> Int) {}
+
+  map(\.id) // expected-error {{key path cannot refer to noncopyable type 'HasID'}}
+
+  let _: (consuming HasID) -> Int = \.id // expected-error {{key path cannot refer to noncopyable type 'HasID'}}
 }

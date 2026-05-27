@@ -17,6 +17,7 @@
 #ifndef SWIFT_MODULE_H
 #define SWIFT_MODULE_H
 
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AvailabilityDomain.h"
@@ -53,6 +54,7 @@ namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
   class ASTWalker;
+  enum class CodeGenerationModel: uint8_t;
   class CustomAvailabilityDomain;
   class Decl;
   class DeclAttribute;
@@ -345,8 +347,6 @@ private:
   /// \see EntryPointInfoTy
   EntryPointInfoTy EntryPointInfo;
 
-  AccessNotesFile accessNotes;
-
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
 
@@ -415,8 +415,9 @@ public:
   /// imports.
   ImplicitImportList getImplicitImports() const;
 
-  AccessNotesFile &getAccessNotes() { return accessNotes; }
-  const AccessNotesFile &getAccessNotes() const { return accessNotes; }
+  /// Retrieve the access notes to apply for the module, or \c nullptr if there
+  /// are no access notes.
+  const AccessNotesFile *getAccessNotes() const;
 
   /// Return whether the module was imported with resilience disabled. The
   /// debugger does this to access private fields.
@@ -481,6 +482,11 @@ public:
   /// Get the list of all modules this module declares a cross-import with.
   void getDeclaredCrossImportBystanders(
       SmallVectorImpl<Identifier> &bystanderNames);
+
+  /// Returns the name that should be used for this module in a module
+  /// selector. For separately-imported overlays, this will be the declaring
+  /// module's name.
+  Identifier getNameForModuleSelector();
 
   /// Retrieve the ABI name of the module, which is used for metadata and
   /// mangling.
@@ -711,6 +717,15 @@ public:
   /// Distribution level of the module.
   LibraryLevel getLibraryLevel() const;
 
+  /// The stored library level from deserialized module data.
+  /// Returns LibraryLevel::Other if no level was stored.
+  LibraryLevel getStoredLibraryLevel() const {
+    return LibraryLevel(Bits.ModuleDecl.StoredLibraryLevel);
+  }
+  void setStoredLibraryLevel(LibraryLevel level) {
+    Bits.ModuleDecl.StoredLibraryLevel = unsigned(level);
+  }
+
   /// Returns true if this module was or is being compiled for testing.
   bool hasIncrementalInfo() const { return Bits.ModuleDecl.HasIncrementalInfo; }
   void setHasIncrementalInfo(bool enabled = true) {
@@ -791,6 +806,17 @@ public:
   void setSerializePackageEnabled(bool flag = true) {
     Bits.ModuleDecl.SerializePackageEnabled = flag;
   }
+  // Returns true if aggressive cross-module-optimzation was enabled.
+  // Aggressive CMO assumes non-public types are accessible from outside the
+  // module (in contrast to default CMO which only assumes public types are
+  // accessible) .
+  bool isAggressiveCMOEnabled() const {
+    return Bits.ModuleDecl.AggressiveCMOEnabled;
+  }
+
+  void setAggressiveCMOEnabled(bool flag = true) {
+    Bits.ModuleDecl.AggressiveCMOEnabled = flag;
+  }
 
   /// Returns true if this module is a non-Swift module that was imported into
   /// Swift.
@@ -827,13 +853,13 @@ public:
     Bits.ModuleDecl.StrictMemorySafety = value;
   }
 
-  /// Whether this module uses deferred code generation.
-  bool deferredCodeGen() const {
-    return Bits.ModuleDecl.DeferredCodeGen;
+  /// The code generation model used by this module.
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.ModuleDecl.CodeGenModel);
   }
 
-  void setDeferredCodeGen(bool value = true) {
-    Bits.ModuleDecl.DeferredCodeGen = value;
+  void setCodeGenerationModel(CodeGenerationModel value) {
+    Bits.ModuleDecl.CodeGenModel = static_cast<unsigned>(value);
   }
 
   bool isObjCNameLookupCachePopulated() const {
@@ -858,6 +884,16 @@ public:
   /// `Foo.Bar.Baz`, and the given module is either `Foo` or `Foo.Bar`, this
   /// returns true.
   bool isSubmoduleOf(const ModuleDecl *M) const;
+
+private:
+  std::string CacheKey;
+
+  /// Storage for hidden-type layouts recorded via recordHiddenTypeLayout.
+  llvm::StringMap<AbstractTypeLayout> HiddenTypeLayouts;
+
+public:
+  void setCacheKey(const std::string &key) { CacheKey = key; }
+  StringRef getCacheKey() const { return CacheKey; }
 
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
@@ -966,6 +1002,10 @@ public:
                          const ModuleDecl *importedModule,
                          llvm::SmallSetVector<Identifier, 4> &spiGroups) const;
 
+  /// Returns true if any import of \p importedModule has the `@preconcurrency`
+  /// attribute.
+  bool isModuleImportedPreconcurrency(const ModuleDecl *importedModule) const;
+
   /// Finds the custom availability domain defined by this module with the
   /// given identifier and if one exists adds it to results.
   void
@@ -1049,11 +1089,15 @@ public:
   void
   getImportedModulesForLookup(SmallVectorImpl<ImportedModule> &imports) const;
 
-  /// Has \p module been imported via an '@_implementationOnly' import
-  /// instead of another kind of import?
+  /// Has \p module been imported via an '@_implementationOnly' import and
+  /// not by anything more visible?
   ///
-  /// This assumes that \p module was imported.
-  bool isImportedImplementationOnly(const ModuleDecl *module) const;
+  /// If \p assumeImported, assume that \p module was imported and avoid the
+  /// work to confirm it is imported at all. Transitive modules not reexported
+  /// are not considered imported here and may lead to false positive without
+  /// this setting.
+  bool isImportedImplementationOnly(const ModuleDecl *module,
+      bool assumeImported = true) const;
 
   /// Finds all top-level decls of this module.
   ///
@@ -1245,6 +1289,20 @@ public:
   void setAvailabilityDomains(const AvailabilityDomainMap &&map) {
     AvailabilityDomains = std::move(map);
   }
+
+  /// Record layout information for a hidden type used by this module in
+  /// some of its stored properties.
+  void recordHiddenTypeLayout(StringRef mangledName,
+                              const AbstractTypeLayout &layout);
+
+  /// Look up a previously-recorded hidden-type layout by mangled name.
+  std::optional<AbstractTypeLayout>
+  lookupHiddenTypeLayout(StringRef mangledName) const;
+
+  /// Return the recorded hidden-type layouts sorted by mangled name, for
+  /// reproducible serialization output.
+  SmallVector<std::pair<StringRef, AbstractTypeLayout>, 4>
+  getSortedHiddenTypeLayouts() const;
 
   static bool classof(const DeclContext *DC) {
     if (auto D = DC->getAsDecl())

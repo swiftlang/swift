@@ -273,9 +273,10 @@ public:
     // Substitute the underlying conformance of opaque type archetypes if we
     // should look through opaque archetypes.
     if (typeExpansionContext.shouldLookThroughOpaqueTypeArchetypes()) {
-      auto substType = IFS.withNewOptions(std::nullopt, [&] {
-        return selfType.subst(IFS)->getCanonicalType();
-      });
+      auto substType = IFS.withNewOptions(
+        SubstFlags::PreservePackExpansionLevel, [&] {
+          return selfType.subst(IFS)->getCanonicalType();
+        });
       if (substType->hasOpaqueArchetype()) {
         substConformance = substOpaqueTypesWithUnderlyingTypes(
             substConformance, typeExpansionContext);
@@ -418,6 +419,14 @@ public:
     CanType substObjectType = visit(origObjectType);
     return CanType(BoundGenericType::get(origType->getDecl(), Type(),
                                          substObjectType));
+  }
+
+  /// MoveOnlyWrappedTypes need to have their inner types substituted
+  /// by these rules.
+  CanType visitSILMoveOnlyWrappedType(CanSILMoveOnlyWrappedType origType) {
+    CanType origInnerType = origType->getInnerType();
+    CanType substInnerType = visit(origInnerType);
+    return CanType(SILMoveOnlyWrappedType::get(substInnerType));
   }
 
   /// Any other type would be a valid type in the AST. Just apply the

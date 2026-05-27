@@ -28,10 +28,13 @@ let RequestDone = "d"
 let RequestPointerSize = "p"
 
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+#if os(anyAppleOS)
 internal import MachO
 internal import Darwin
 internal import var Darwin.errno
+internal import var Darwin.stdout
+internal import var Darwin.stderr
+internal import var Darwin.stdin
 
 #if arch(x86_64) || arch(arm64)
 typealias MachHeader = mach_header_64

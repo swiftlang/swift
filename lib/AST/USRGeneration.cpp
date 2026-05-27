@@ -40,7 +40,8 @@ static inline StringRef getUSRSpacePrefix() {
 bool ide::printTypeUSR(Type Ty, raw_ostream &OS) {
   assert(!Ty->hasArchetype() && "cannot have contextless archetypes mangled.");
   Ty = Ty->getCanonicalType()->getRValueType();
-  Mangle::ASTMangler Mangler(Ty->getASTContext());
+  using namespace Mangle;
+  ASTMangler Mangler = ASTMangler::forUSR(Ty->getASTContext());
   OS << Mangler.mangleTypeAsUSR(Ty);
   return false;
 }
@@ -245,8 +246,9 @@ swift::SwiftUSRGenerationRequest::evaluate(Evaluator &evaluator,
   if (declIFaceTy.findIf([](Type t) -> bool { return t->is<ModuleType>(); }))
     return std::string();
 
-  Mangle::ASTMangler NewMangler(D->getASTContext());
-  return NewMangler.mangleDeclAsUSR(D, getUSRSpacePrefix());
+  using namespace Mangle;
+  ASTMangler NewMangler = ASTMangler::forUSR(D->getASTContext());
+  return NewMangler.mangleDeclWithPrefix(D, getUSRSpacePrefix());
 }
 
 std::string
@@ -375,7 +377,8 @@ bool ide::printAccessorUSR(const AbstractStorageDecl *D, AccessorKind AccKind,
     return printObjCUSRForAccessor(SD, AccKind, OS);
   }
 
-  Mangle::ASTMangler NewMangler(D->getASTContext());
+  using namespace Mangle;
+  ASTMangler NewMangler = ASTMangler::forUSR(D->getASTContext());
   std::string Mangled = NewMangler.mangleAccessorEntityAsUSR(AccKind,
                           SD, getUSRSpacePrefix(), SD->isStatic());
 

@@ -103,3 +103,54 @@ func bvcons_capture_escapelet(bv: consuming BV) -> ()->Int { // expected-error *
   let closure = { bv.c }
   return closure
 }
+
+// Higher-Order Function Tests
+
+@_lifetime(other: copy bv)
+func take_assign_inout_copy(bv: BV, other: inout BV, f: @_lifetime(other: copy bv) (_ bv: BV, _ other: inout BV) -> ()) {
+  f(bv, &other) // OK
+}
+
+@_lifetime(other: borrow bv)
+func take_assign_inout_borrow(bv: BV, other: inout BV, f: @_lifetime(other: borrow bv) (_ bv: BV, _ other: inout BV) -> ()) {
+  f(bv, &other) // OK
+}
+
+@_lifetime(bv: copy bv)
+@_lifetime(other: copy bv)
+func take_bvmut_assign_inout(bv: inout BV, other: inout BV,
+                             f: @_lifetime(bv: copy bv) @_lifetime(other: copy bv)
+                               (_ bv: inout BV, _ other: inout BV) -> ()) {
+  f(&bv, &other) // OK
+}
+
+struct NE2: ~Escapable {
+  let p: UnsafeRawPointer?
+}
+
+func getLocalPointer() -> UnsafeRawPointer? {
+  return nil
+}
+
+@_lifetime(oNE: copy ne)
+func succeed_transfer_ne(ne: consuming NE2, oNE: inout NE2, f: (NE2) -> NE2) {
+  oNE = f(ne) // OK
+}
+
+func fail_smuggle_ne(oNE: inout NE2, f: (NE2) -> NE2) {
+  // expected-error @-1 {{lifetime-dependent variable 'oNE' escapes its scope}}
+  let ne = NE2(p: getLocalPointer())
+  // expected-note @-1 {{it depends on the lifetime of this parent value}}
+  oNE = f(ne)
+  // expected-note @+1 {{this use causes the lifetime-dependent value to escape}}
+}
+
+@_lifetime(copy body)
+func copyClosureNE2(body: () -> NE2) -> NE2 {
+  body()
+}
+
+@_lifetime(borrow body)
+func borrowClosureNE2(body: () -> NE2) -> NE2 {
+  body()
+}

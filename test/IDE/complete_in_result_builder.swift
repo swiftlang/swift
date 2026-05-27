@@ -358,13 +358,12 @@ func testSwitchInResultBuilder() {
       Reduce2()
       Reduce2 { action in
         switch action {
-        case .#^SWITCH_IN_RESULT_BUILDER?xfail=rdar106720462^# alertDismissed:
+        case .#^SWITCH_IN_RESULT_BUILDER^# alertDismissed:
           return 0
         }
       }
     }
   }
-// SWITCH_IN_RESULT_BUILDER: Begin completions, 1 item
 // SWITCH_IN_RESULT_BUILDER-DAG: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: alertDismissed[#Action#];
 }
 

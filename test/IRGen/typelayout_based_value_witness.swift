@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
-// RUN: %target-swift-frontend -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize --check-prefix=OPT-%target-ptrauth
-// RUN: %target-swift-frontend -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
+// RUN: %target-swift-frontend -disable-availability-checking -enable-type-layout -primary-file %s -emit-ir | %FileCheck %s --check-prefix=CHECK
+// RUN: %target-swift-frontend -disable-availability-checking -enable-type-layout -primary-file %s -O -emit-ir | %FileCheck %s --check-prefix=OPT --check-prefix=OPT-%target-ptrsize --check-prefix=OPT-%target-ptrauth
+// RUN: %target-swift-frontend -disable-availability-checking -primary-file %s -emit-ir | %FileCheck %s --check-prefix=NOTL
 
 // REQUIRES: PTRSIZE=64
 
@@ -81,7 +81,7 @@ public enum ForwardEnum<T> {
 // CHECK: }
 
 
-// OPT: define{{.*}} void @"$s30typelayout_based_value_witness1AVwxx"(ptr noalias %object, ptr{{( nocapture)?}} readonly{{( captures\(none\))?}} %"A<T>")
+// OPT: define{{.*}} void @"$s30typelayout_based_value_witness1AVwxx"(ptr noalias %object, ptr readonly captures(none) %"A<T>")
 // OPT:   [[T_PARAM:%.*]] = getelementptr inbounds{{.*}} i8, ptr %"A<T>", i64 16
 // OPT:   [[T:%.*]] = load ptr, ptr [[T_PARAM]]
 // OPT:   [[VWT_ADDR:%.*]] = getelementptr inbounds i8, ptr [[T]], {{(i64|i32)}} -8
@@ -127,7 +127,7 @@ public enum ForwardEnum<T> {
 // OPT:   ret void
 // CHECK: }
 
-// OPT: define internal void @"$s30typelayout_based_value_witness2E3Owui"(ptr noalias{{( nocapture)?}} writeonly{{( captures\(none\))?}} %value, i32 %tag, ptr{{( nocapture)?}} readonly{{( captures\(none\))?}} %"E3<T>")
+// OPT: define internal void @"$s30typelayout_based_value_witness2E3Owui"(ptr noalias writeonly captures(none) %value, i32 %tag, ptr readonly captures(none) %"E3<T>")
 // OPT:  [[IS_EMPTY:%.*]] = icmp eq i32 {{%.*}}, 0
 // OPT:  br i1 [[IS_EMPTY]], label %empty-payload, label %non-empty-payload
 // OPT: }
@@ -155,4 +155,51 @@ public enum E3<T> {
   case empty
   case first(T)
   case second(T)
+}
+
+// Value types storing large InlineArray can have excessively large value witnesses #88579
+
+// CHECK:      define {{.*}} void @"$s30typelayout_based_value_witness2S1Vwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK:        [[CASEVAL:%[0-9]+]] = trunc i32 [[CASEID:%[0-9]+]] to i8
+// CHECK-NEXT:   store i8 [[CASEVAL]], ptr %value, align 1
+// CHECK-NOT:    memset
+// CHECK:      }
+struct S1 {
+  var a: InlineArray<1, Int8>
+}
+
+// CHECK:     define {{.*}} void @"$s30typelayout_based_value_witness4S16BVwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK-NOT:   memset
+// CHECK:     }
+struct S16B {
+  var a: InlineArray<16, Int8>
+}
+
+// CHECK:     define {{.*}} void @"$s30typelayout_based_value_witness4S17BVwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK:       memset
+// CHECK:     }
+struct S17B {
+  var a: InlineArray<17, Int8>
+}
+
+
+// CHECK:      define {{.*}} void @"$s30typelayout_based_value_witness3S10Vwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK:        [[CASEVAL:%[0-9]+]] = zext i32 [[CASEID:%[0-9]+]] to i64
+// CHECK-NEXT:   store i64 [[CASEVAL]], ptr %value, align 8
+// CHECK-NEXT:   [[PAYLOAD_BASE:%[0-9]+]] = getelementptr inbounds i8, ptr %value, i32 8
+// CHECK-NEXT:   call void @llvm.memset.p0.i64(ptr align 8 [[PAYLOAD_BASE]], i8 0, i64 72, i1 false)
+// CHECK:      }
+struct S10 {
+    var a: InlineArray<10, Int>
+}
+
+// CHECK:      define {{.*}} void @"$s30typelayout_based_value_witness4S100Vwst"(ptr noalias %value, i32 %whichCase, i32 %numEmptyCases, {{.*}}) {{.*}} {
+// CHECK:        entry:
+// CHECK:        [[CASEVAL:%[0-9]+]] = zext i32 [[CASEID:%[0-9]+]] to i64
+// CHECK-NEXT:   store i64 [[CASEVAL]], ptr %value, align 8
+// CHECK-NEXT:   [[PAYLOAD_BASE:%[0-9]+]] = getelementptr inbounds i8, ptr %value, i32 8
+// CHECK-NEXT:   call void @llvm.memset.p0.i64(ptr align 8 [[PAYLOAD_BASE]], i8 0, i64 792, i1 false)
+// CHECK:      }
+struct S100 {
+    var a: InlineArray<100, Int>
 }

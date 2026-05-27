@@ -1,6 +1,7 @@
 // RUN: %target-swift-emit-silgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -define-enabled-availability-domain EnabledDomain \
+// RUN:   -define-always-enabled-availability-domain AlwaysEnabledDomain \
 // RUN:   -define-disabled-availability-domain DisabledDomain \
 // RUN:   -define-dynamic-availability-domain DynamicDomain \
 // RUN:   | %FileCheck %s
@@ -12,6 +13,12 @@ public func availableInEnabledDomain() { }
 
 @available(EnabledDomain, unavailable)
 public func unavailableInEnabledDomain() { }
+
+@available(AlwaysEnabledDomain)
+public func availableInAlwaysEnabledDomain() { }
+
+@available(AlwaysEnabledDomain, unavailable)
+public func unavailableInAlwaysEnabledDomain() { }
 
 @available(DisabledDomain)
 public func availableInDisabledDomain() { }
@@ -62,6 +69,44 @@ public func testIfUnavailableEnabledDomain() {
   }
 }
 // CHECK: end sil function '$s4Test30testIfUnavailableEnabledDomainyyF'
+
+// CHECK-LABEL: sil{{.*}}$s4Test34testIfAvailableAlwaysEnabledDomainyyF : $@convention(thin) () -> ()
+public func testIfAvailableAlwaysEnabledDomain() {
+  // CHECK: bb0:
+  // CHECK:   [[PRED:%.*]] = integer_literal $Builtin.Int1, -1
+  // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
+
+  // CHECK: [[TRUE_BB]]:
+  // CHECK:   function_ref @$s4Test30availableInAlwaysEnabledDomainyyF
+
+  // CHECK: [[FALSE_BB]]:
+  // CHECK:   function_ref @$s4Test32unavailableInAlwaysEnabledDomainyyF
+  if #available(AlwaysEnabledDomain) {
+    availableInAlwaysEnabledDomain()
+  } else {
+    unavailableInAlwaysEnabledDomain()
+  }
+}
+// CHECK: end sil function '$s4Test34testIfAvailableAlwaysEnabledDomainyyF'
+
+// CHECK-LABEL: sil{{.*}}$s4Test36testIfUnavailableAlwaysEnabledDomainyyF : $@convention(thin) () -> ()
+public func testIfUnavailableAlwaysEnabledDomain() {
+  // CHECK: bb0:
+  // CHECK:   [[PRED:%.*]] = integer_literal $Builtin.Int1, 0
+  // CHECK:   cond_br [[PRED]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
+
+  // CHECK: [[TRUE_BB]]:
+  // CHECK:   function_ref @$s4Test32unavailableInAlwaysEnabledDomainyyF
+
+  // CHECK: [[FALSE_BB]]:
+  // CHECK:   function_ref @$s4Test30availableInAlwaysEnabledDomainyyF
+  if #unavailable(AlwaysEnabledDomain) {
+    unavailableInAlwaysEnabledDomain()
+  } else {
+    availableInAlwaysEnabledDomain()
+  }
+}
+// CHECK: end sil function '$s4Test36testIfUnavailableAlwaysEnabledDomainyyF'
 
 // CHECK-LABEL: sil{{.*}}$s4Test29testIfAvailableDisabledDomainyyF : $@convention(thin) () -> ()
 public func testIfAvailableDisabledDomain() {

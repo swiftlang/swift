@@ -21,5 +21,4 @@
    <FileRef location = "group:../../../../swift-system"></FileRef>
    <FileRef location = "group:../../../../swift-tools-support-core"></FileRef>
    <FileRef location = "group:../../../../swiftpm"></FileRef>
-   <FileRef location = "group:../../../../yams"></FileRef>
 </Workspace>

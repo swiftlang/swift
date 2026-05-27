@@ -234,6 +234,7 @@ where SubSequence: MutableCollection
   /// - Returns: The value returned from `body`, unless the collection doesn't
   ///   support contiguous storage, in which case the method ignores `body` and
   ///   returns `nil`.
+  @safe
   mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (_ buffer: inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R?
@@ -250,6 +251,7 @@ extension MutableCollection {
   }
 
   @inlinable
+  @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -379,8 +381,8 @@ extension MutableCollection {
   ///     var letters = Array("ABCdeFGhijkLMNOp")
   ///     let uppercaseRanges = letters.indices(where: { $0.isUppercase })
   ///     let rangeOfUppercase = letters.moveSubranges(uppercaseRanges, to: 10)
-  ///     // String(letters) == "dehiABCFGLMNOjkp"
-  ///     // rangeOfUppercase == 4..<13
+  ///     // String(letters) == "dehijABCFGLMNOkp"
+  ///     // rangeOfUppercase == 5..<14
   ///
   /// - Parameters:
   ///   - subranges: The subranges of the elements to move.

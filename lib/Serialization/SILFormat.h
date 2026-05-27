@@ -81,6 +81,22 @@ enum class KeyPathComputedComponentIdKindEncoding : uint8_t {
   DeclRef,
 };
 
+enum class ExtraStringFlavor : uint8_t {
+  /// asmname attributes
+  AsmName,
+  /// section attribute
+  Section,
+  /// wasm import module name for @_extern(wasm)
+  WasmImportModule,
+  /// wasm import field/name for @_extern(wasm)
+  WasmImportName,
+};
+
+enum class IsNestedEncoding : uint8_t {
+  IsNotNested,
+  IsNested,
+};
+
 /// The record types within the "sil-index" block.
 ///
 /// \sa SIL_INDEX_BLOCK_ID
@@ -107,6 +123,7 @@ namespace sil_index_block {
     SIL_PROPERTY_OFFSETS,
     SIL_DIFFERENTIABILITY_WITNESS_NAMES,
     SIL_DIFFERENTIABILITY_WITNESS_OFFSETS,
+    SIL_ASM_NAMES,
   };
 
   using ListLayout = BCGenericRecordLayout<
@@ -147,6 +164,8 @@ namespace sil_block {
     SIL_INST_NO_OPERAND,
     SIL_VTABLE,
     SIL_VTABLE_ENTRY,
+    SIL_VTABLE_CONFORMANCE_ENTRY,
+    SIL_VTABLE_NO_CONFORMANCE_ENTRY,
     SIL_GLOBALVAR,
     SIL_INIT_EXISTENTIAL,
     SIL_WITNESS_TABLE,
@@ -186,6 +205,7 @@ namespace sil_block {
     SIL_SOURCE_LOC_REF,
     SIL_DEBUG_VALUE_DELIMITER,
     SIL_DEBUG_VALUE,
+    SIL_EXTRA_STRING,
   };
 
   using SILInstNoOperandLayout = BCRecordLayout<
@@ -205,6 +225,16 @@ namespace sil_block {
     SILVTableEntryKindField,  // Kind
     BCFixed<1>, // NonOverridden
     BCArray<ValueIDField> // SILDeclRef
+  >;
+
+  using VTableConformanceEntry = BCRecordLayout<
+    SIL_VTABLE_CONFORMANCE_ENTRY,
+    ProtocolConformanceIDField // ID of conformance
+  >;
+
+  using VTableNoConformanceEntry = BCRecordLayout<
+    SIL_VTABLE_NO_CONFORMANCE_ENTRY,
+    DeclIDField  // ProtocolDecl
   >;
 
   using MoveOnlyDeinitLayout = BCRecordLayout<
@@ -295,8 +325,11 @@ namespace sil_block {
     BCFixed<1>,          // Is this a declaration.
     BCFixed<1>,          // Is this a let variable.
     BCFixed<1>,          // Is this marked as "used".
+    BCFixed<2>,          // code generation model
+    BCVBR<8>,            // # of trailing records
     TypeIDField,
-    DeclIDField
+    DeclIDField,
+    ModuleIDField        // Parent ModuleDecl *
   >;
 
   using DifferentiabilityWitnessLayout = BCRecordLayout<
@@ -377,9 +410,10 @@ namespace sil_block {
                      BCFixed<1>,  // hasCReferences
                      BCFixed<1>,  // markedAsUsed
                      BCFixed<3>,  // side effect info.
-                     BCVBR<8>,    // number of specialize attributes
+                     BCVBR<8>,    // number of trailing records
                      BCFixed<1>,  // has qualified ownership
                      BCFixed<1>,  // force weak linking
+                     BCFixed<2>,  // code generation model
                      BC_AVAIL_TUPLE, // availability for weak linking
                      BCFixed<1>,  // is dynamically replacable
                      BCFixed<1>,  // exact self class
@@ -416,6 +450,14 @@ namespace sil_block {
                      BCVBR<8>,          // argumentIndex
                      BCFixed<1>,        // argumentIndexValid
                      BCFixed<1>         // isDerived
+                     >;
+
+  /// Used for additional strings that can be associated with a record,
+  /// written out as records that trail
+  using SILExtraStringLayout =
+      BCRecordLayout<SIL_EXTRA_STRING,
+                     BCFixed<8>,    // string flavor
+                     BCBlob       // string data
                      >;
 
   // Has an optional argument list where each argument is a typed valueref.
@@ -523,7 +565,7 @@ namespace sil_block {
 
   // SIL instructions with one type. (alloc_stack)
   using SILOneTypeLayout = BCRecordLayout<SIL_ONE_TYPE, SILInstOpCodeField,
-                                          BCFixed<4>, // Optional attributes
+                                          BCFixed<5>, // Optional attributes
                                           TypeIDField, SILTypeCategoryField>;
 
   // SIL instructions with one typed valueref. (dealloc_stack, return)

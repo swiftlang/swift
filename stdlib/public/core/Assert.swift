@@ -163,8 +163,7 @@ public func precondition(
 ///     where `assertionFailure(_:file:line:)` is called.
 ///   - line: The line number to print along with `message`. The default is the
 ///     line number where `assertionFailure(_:file:line:)` is called.
-@inlinable
-@inline(__always)
+@_transparent
 #if $Embedded
 @_disfavoredOverload
 #endif
@@ -182,8 +181,7 @@ public func assertionFailure(
 }
 
 #if $Embedded
-@inlinable
-@inline(__always)
+@_transparent
 public func assertionFailure(
   _ message: @autoclosure () -> StaticString = StaticString(),
   file: StaticString = #file, line: UInt = #line

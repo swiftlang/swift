@@ -192,6 +192,20 @@ public:
     return ReadObjResult<T>(reinterpret_cast<const T *>(ptr), deleter);
   }
 
+  /// Resolves an indirect address at the given relative offset.
+  ///
+  /// \param address The base address which contains the relative offset.
+  /// \param offset The offset read.
+  /// \param directnessEncodedInOffset Whether the relative offset encodes the
+  /// directness as the last bit. Note that this is not the offset passed in as
+  /// a parameter, but whether the offset read at address would have the last
+  /// bit set.
+  virtual RemoteAddress
+  resolveIndirectAddressAtOffset(RemoteAddress address, uint64_t offset,
+                                 bool directnessEncodedInOffset) {
+    return address + offset;
+  }
+
   /// Attempts to read 'size' bytes from the given address in the remote process.
   ///
   /// Returns a pointer to the requested data and a function that must be called to

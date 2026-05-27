@@ -1,1 +1,5 @@
 // ABI additions for x86_64 only.
+
+// Float-to-String conversions were reimplemented in Swift
+// The legacy C entry points now look like newly introduced Swift functions
+Func _float80ToStringImpl(_:_:_:_:) is a new API without '@available'

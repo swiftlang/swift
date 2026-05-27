@@ -62,6 +62,40 @@ enum MyEnum<T> {
     case some2(T)
 }
 
+enum MyEnum2 {
+    case none
+    case sendable(SendableKlass)
+    case nonsendable(NonSendableKlass)
+}
+
+enum SendableEnum : @unchecked Sendable {
+    case none
+    case value(NonSendableKlass)
+}
+
+struct TupleMixed {
+  var tuple: (NonSendableKlass, SendableKlass)
+}
+
+struct TupleNonSendable {
+  var tuple: (NonSendableKlass, NonSendableKlass)
+}
+
+struct TupleSendable : @unchecked Sendable {
+  var tuple: (SendableKlass, SendableKlass)
+}
+
+struct TupleNestedMixed {
+  var tuple: ((NonSendableKlass, SendableKlass), SendableKlass)
+}
+
+@MainActor
+struct MainActorStruct : @unchecked Sendable {
+  var ns: NonSendableKlass
+  var s: SendableKlass
+  var nested: Struct2
+}
+
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
 sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
 sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
@@ -722,4 +756,500 @@ bb0(%arg : @owned $NonSendableKlass):
 
   %7 = tuple ()
   return %7 : $()
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// MARK: tuple_element_addr Tests - Testing projection through tuple elements //
+////////////////////////////////////////////////////////////////////////////////
+
+// Test: NonSendable tuple, extract NonSendable element
+// Expected: Look through both (operand and result are both non-Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on tuple_nonsendable_extract_nonsendable_0: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_stack $(NonSendableKlass, NonSendableKlass)
+// CHECK: end running test 1 of 1 on tuple_nonsendable_extract_nonsendable_0: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tuple_nonsendable_extract_nonsendable_0 : $@convention(thin) (@owned NonSendableKlass, @owned NonSendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $NonSendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %tuple_addr = alloc_stack $(NonSendableKlass, NonSendableKlass)
+  %tuple_val = tuple (%0 : $NonSendableKlass, %1 : $NonSendableKlass)
+  store %tuple_val to [init] %tuple_addr : $*(NonSendableKlass, NonSendableKlass)
+
+  %elem = tuple_element_addr %tuple_addr : $*(NonSendableKlass, NonSendableKlass), 0
+  debug_value [trace] %elem : $*NonSendableKlass
+
+  destroy_addr %tuple_addr : $*(NonSendableKlass, NonSendableKlass)
+  dealloc_stack %tuple_addr : $*(NonSendableKlass, NonSendableKlass)
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: NonSendable tuple, extract NonSendable element (index 1)
+// Expected: Look through both
+// CHECK-LABEL: begin running test 1 of 1 on tuple_nonsendable_extract_nonsendable_1: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_stack $(NonSendableKlass, NonSendableKlass)
+// CHECK: end running test 1 of 1 on tuple_nonsendable_extract_nonsendable_1: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tuple_nonsendable_extract_nonsendable_1 : $@convention(thin) (@owned NonSendableKlass, @owned NonSendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $NonSendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %tuple_addr = alloc_stack $(NonSendableKlass, NonSendableKlass)
+  %tuple_val = tuple (%0 : $NonSendableKlass, %1 : $NonSendableKlass)
+  store %tuple_val to [init] %tuple_addr : $*(NonSendableKlass, NonSendableKlass)
+
+  %elem = tuple_element_addr %tuple_addr : $*(NonSendableKlass, NonSendableKlass), 1
+  debug_value [trace] %elem : $*NonSendableKlass
+
+  destroy_addr %tuple_addr : $*(NonSendableKlass, NonSendableKlass)
+  dealloc_stack %tuple_addr : $*(NonSendableKlass, NonSendableKlass)
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Mixed tuple (NonSendable, Sendable), extract NonSendable element
+// Expected: Look through both (both are non-Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on tuple_mixed_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_stack $(NonSendableKlass, SendableKlass)
+// CHECK: end running test 1 of 1 on tuple_mixed_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tuple_mixed_extract_nonsendable : $@convention(thin) (@owned NonSendableKlass, @owned SendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %tuple_addr = alloc_stack $(NonSendableKlass, SendableKlass)
+  %tuple_val = tuple (%0 : $NonSendableKlass, %1 : $SendableKlass)
+  store %tuple_val to [init] %tuple_addr : $*(NonSendableKlass, SendableKlass)
+
+  %elem = tuple_element_addr %tuple_addr : $*(NonSendableKlass, SendableKlass), 0
+  debug_value [trace] %elem : $*NonSendableKlass
+
+  destroy_addr %tuple_addr : $*(NonSendableKlass, SendableKlass)
+  dealloc_stack %tuple_addr : $*(NonSendableKlass, SendableKlass)
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Mixed tuple (NonSendable, Sendable), extract Sendable element
+// Expected: Stop at projection (operand is non-Sendable, result is Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on tuple_mixed_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %5 = tuple_element_addr %2 : $*(NonSendableKlass, SendableKlass), 1
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_stack $(NonSendableKlass, SendableKlass)
+// CHECK: end running test 1 of 1 on tuple_mixed_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tuple_mixed_extract_sendable : $@convention(thin) (@owned NonSendableKlass, @owned SendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %tuple_addr = alloc_stack $(NonSendableKlass, SendableKlass)
+  %tuple_val = tuple (%0 : $NonSendableKlass, %1 : $SendableKlass)
+  store %tuple_val to [init] %tuple_addr : $*(NonSendableKlass, SendableKlass)
+
+  %elem = tuple_element_addr %tuple_addr : $*(NonSendableKlass, SendableKlass), 1
+  debug_value [trace] %elem : $*SendableKlass
+
+  destroy_addr %tuple_addr : $*(NonSendableKlass, SendableKlass)
+  dealloc_stack %tuple_addr : $*(NonSendableKlass, SendableKlass)
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Sendable tuple, extract Sendable element
+// CHECK-LABEL: begin running test 1 of 1 on tuple_sendable_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %5 = tuple_element_addr %2 : $*(SendableKlass, SendableKlass), 0
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_stack $(SendableKlass, SendableKlass)
+// CHECK: end running test 1 of 1 on tuple_sendable_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tuple_sendable_extract_sendable : $@convention(thin) (@owned SendableKlass, @owned SendableKlass) -> () {
+bb0(%0 : @owned $SendableKlass, %1 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %tuple_addr = alloc_stack $(SendableKlass, SendableKlass)
+  %tuple_val = tuple (%0 : $SendableKlass, %1 : $SendableKlass)
+  store %tuple_val to [init] %tuple_addr : $*(SendableKlass, SendableKlass)
+
+  %elem = tuple_element_addr %tuple_addr : $*(SendableKlass, SendableKlass), 0
+  debug_value [trace] %elem : $*SendableKlass
+
+  destroy_addr %tuple_addr : $*(SendableKlass, SendableKlass)
+  dealloc_stack %tuple_addr : $*(SendableKlass, SendableKlass)
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Nested tuple ((NonSendable, Sendable), Sendable), extract outer element 0
+// Expected: Look through (both tuple types are non-Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on tuple_nested_extract_tuple: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %5 = alloc_stack $((NonSendableKlass, SendableKlass), SendableKlass)
+// CHECK: end running test 1 of 1 on tuple_nested_extract_tuple: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tuple_nested_extract_tuple : $@convention(thin) (@owned NonSendableKlass, @owned SendableKlass, @owned SendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $SendableKlass, %2 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %inner = tuple (%0 : $NonSendableKlass, %1 : $SendableKlass)
+  %outer = tuple (%inner : $(NonSendableKlass, SendableKlass), %2 : $SendableKlass)
+  %tuple_addr = alloc_stack $((NonSendableKlass, SendableKlass), SendableKlass)
+  store %outer to [init] %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass)
+
+  %elem0 = tuple_element_addr %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass), 0
+  debug_value [trace] %elem0 : $*(NonSendableKlass, SendableKlass)
+
+  destroy_addr %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass)
+  dealloc_stack %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass)
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Nested tuple, extract through two levels to NonSendable
+// Expected: Look through all levels
+// CHECK-LABEL: begin running test 1 of 1 on tuple_nested_double_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %5 = alloc_stack $((NonSendableKlass, SendableKlass), SendableKlass)
+// CHECK: end running test 1 of 1 on tuple_nested_double_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tuple_nested_double_extract_nonsendable : $@convention(thin) (@owned NonSendableKlass, @owned SendableKlass, @owned SendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $SendableKlass, %2 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %inner = tuple (%0 : $NonSendableKlass, %1 : $SendableKlass)
+  %outer = tuple (%inner : $(NonSendableKlass, SendableKlass), %2 : $SendableKlass)
+  %tuple_addr = alloc_stack $((NonSendableKlass, SendableKlass), SendableKlass)
+  store %outer to [init] %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass)
+
+  %elem0 = tuple_element_addr %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass), 0
+  %elem0_0 = tuple_element_addr %elem0 : $*(NonSendableKlass, SendableKlass), 0
+  debug_value [trace] %elem0_0 : $*NonSendableKlass
+
+  destroy_addr %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass)
+  dealloc_stack %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass)
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Nested tuple, extract through two levels to Sendable
+// Expected: Stop at second projection (inner tuple is non-Sendable, extracted Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on tuple_nested_double_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %8 = tuple_element_addr %7 : $*(NonSendableKlass, SendableKlass), 1
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %5 = alloc_stack $((NonSendableKlass, SendableKlass), SendableKlass)
+// CHECK: end running test 1 of 1 on tuple_nested_double_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @tuple_nested_double_extract_sendable : $@convention(thin) (@owned NonSendableKlass, @owned SendableKlass, @owned SendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $SendableKlass, %2 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %inner = tuple (%0 : $NonSendableKlass, %1 : $SendableKlass)
+  %outer = tuple (%inner : $(NonSendableKlass, SendableKlass), %2 : $SendableKlass)
+  %tuple_addr = alloc_stack $((NonSendableKlass, SendableKlass), SendableKlass)
+  store %outer to [init] %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass)
+
+  %elem0 = tuple_element_addr %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass), 0
+  %elem0_1 = tuple_element_addr %elem0 : $*(NonSendableKlass, SendableKlass), 1
+  debug_value [trace] %elem0_1 : $*SendableKlass
+
+  destroy_addr %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass)
+  dealloc_stack %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass)
+  %r = tuple ()
+  return %r : $()
+}
+
+////////////////////////////////////////////////////////////////////////////
+// MARK: unchecked_enum_data_addr Tests - Testing enum payload extraction //
+////////////////////////////////////////////////////////////////////////////
+
+// Test: NonSendable enum, extract NonSendable payload
+// Expected: Look through (both non-Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on enum_nonsendable_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %1 = alloc_stack $MyEnum2
+// CHECK: end running test 1 of 1 on enum_nonsendable_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @enum_nonsendable_extract_nonsendable : $@convention(thin) (@owned NonSendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %enum_addr = alloc_stack $MyEnum2
+  %enum_val = enum $MyEnum2, #MyEnum2.nonsendable!enumelt, %0 : $NonSendableKlass
+  store %enum_val to [init] %enum_addr : $*MyEnum2
+
+  %payload = unchecked_take_enum_data_addr %enum_addr : $*MyEnum2, #MyEnum2.nonsendable!enumelt
+  debug_value [trace] %payload : $*NonSendableKlass
+
+  destroy_addr %payload : $*NonSendableKlass
+  dealloc_stack %enum_addr : $*MyEnum2
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: NonSendable enum, extract Sendable payload
+// Expected: Stop at projection (operand non-Sendable, result Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on enum_nonsendable_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %4 = unchecked_take_enum_data_addr %1 : $*MyEnum2, #MyEnum2.sendable!enumelt
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %1 = alloc_stack $MyEnum2
+// CHECK: end running test 1 of 1 on enum_nonsendable_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @enum_nonsendable_extract_sendable : $@convention(thin) (@owned SendableKlass) -> () {
+bb0(%0 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %enum_addr = alloc_stack $MyEnum2
+  %enum_val = enum $MyEnum2, #MyEnum2.sendable!enumelt, %0 : $SendableKlass
+  store %enum_val to [init] %enum_addr : $*MyEnum2
+
+  %payload = unchecked_take_enum_data_addr %enum_addr : $*MyEnum2, #MyEnum2.sendable!enumelt
+  debug_value [trace] %payload : $*SendableKlass
+
+  destroy_addr %payload : $*SendableKlass
+  dealloc_stack %enum_addr : $*MyEnum2
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Sendable enum (wrapping NonSendable), extract NonSendable payload
+// Expected: Stop at projection and mark as non-Sendable value (Sendable operand, non-Sendable result)
+// CHECK-LABEL: begin running test 1 of 1 on enum_sendable_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %4 = unchecked_take_enum_data_addr %1 : $*SendableEnum, #SendableEnum.value!enumelt
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %1 = alloc_stack $SendableEnum
+// CHECK: end running test 1 of 1 on enum_sendable_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @enum_sendable_extract_nonsendable : $@convention(thin) (@owned NonSendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %enum_addr = alloc_stack $SendableEnum
+  %enum_val = enum $SendableEnum, #SendableEnum.value!enumelt, %0 : $NonSendableKlass
+  store %enum_val to [init] %enum_addr : $*SendableEnum
+
+  %payload = unchecked_take_enum_data_addr %enum_addr : $*SendableEnum, #SendableEnum.value!enumelt
+  debug_value [trace] %payload : $*NonSendableKlass
+
+  destroy_addr %payload : $*NonSendableKlass
+  dealloc_stack %enum_addr : $*SendableEnum
+  %r = tuple ()
+  return %r : $()
+}
+
+///////////////////////////////////////////////////////////////////
+// MARK: Combined struct_element_addr + tuple_element_addr Tests //
+///////////////////////////////////////////////////////////////////
+
+// Test: Struct with tuple field, extract tuple then NonSendable element
+// Expected: Look through all (all non-Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on struct_tuple_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_stack $TupleMixed
+// CHECK: end running test 1 of 1 on struct_tuple_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @struct_tuple_extract_nonsendable : $@convention(thin) (@owned NonSendableKlass, @owned SendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %struct_addr = alloc_stack $TupleMixed
+  %tuple_val = tuple (%0 : $NonSendableKlass, %1 : $SendableKlass)
+  %struct_val = struct $TupleMixed (%tuple_val : $(NonSendableKlass, SendableKlass))
+  store %struct_val to [init] %struct_addr : $*TupleMixed
+
+  %tuple_addr = struct_element_addr %struct_addr : $*TupleMixed, #TupleMixed.tuple
+  %elem = tuple_element_addr %tuple_addr : $*(NonSendableKlass, SendableKlass), 0
+  debug_value [trace] %elem : $*NonSendableKlass
+
+  destroy_addr %struct_addr : $*TupleMixed
+  dealloc_stack %struct_addr : $*TupleMixed
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Struct with tuple field, extract tuple then Sendable element
+// Expected: Stop at tuple_element_addr (tuple is non-Sendable, element is Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on struct_tuple_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %7 = tuple_element_addr %6 : $*(NonSendableKlass, SendableKlass), 1
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = alloc_stack $TupleMixed
+// CHECK: end running test 1 of 1 on struct_tuple_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @struct_tuple_extract_sendable : $@convention(thin) (@owned NonSendableKlass, @owned SendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %struct_addr = alloc_stack $TupleMixed
+  %tuple_val = tuple (%0 : $NonSendableKlass, %1 : $SendableKlass)
+  %struct_val = struct $TupleMixed (%tuple_val : $(NonSendableKlass, SendableKlass))
+  store %struct_val to [init] %struct_addr : $*TupleMixed
+
+  %tuple_addr = struct_element_addr %struct_addr : $*TupleMixed, #TupleMixed.tuple
+  %elem = tuple_element_addr %tuple_addr : $*(NonSendableKlass, SendableKlass), 1
+  debug_value [trace] %elem : $*SendableKlass
+
+  destroy_addr %struct_addr : $*TupleMixed
+  dealloc_stack %struct_addr : $*TupleMixed
+  %r = tuple ()
+  return %r : $()
+}
+
+////////////////////////////////////////////////////////////////////////////////////
+// MARK: Deep Nesting Tests - Multiple levels of projections                     //
+////////////////////////////////////////////////////////////////////////////////////
+
+// Test: Struct -> Struct -> Struct, all NonSendable fields
+// Expected: Look through all levels
+// CHECK-LABEL: begin running test 1 of 1 on deep_struct_triple_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %1 = alloc_stack $Struct
+// CHECK: end running test 1 of 1 on deep_struct_triple_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @deep_struct_triple_nonsendable : $@convention(thin) (@owned Struct) -> () {
+bb0(%0 : @owned $Struct):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %struct_addr = alloc_stack $Struct
+  store %0 to [init] %struct_addr : $*Struct
+
+  %l1 = struct_element_addr %struct_addr : $*Struct, #Struct.struct2Let
+  %l2 = struct_element_addr %l1 : $*Struct2, #Struct2.nsLet
+  debug_value [trace] %l2 : $*NonSendableKlass
+
+  destroy_addr %struct_addr : $*Struct
+  dealloc_stack %struct_addr : $*Struct
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Struct -> Struct -> Sendable field (deep projection ending in Sendable)
+// Expected: Stop at first projection.
+// CHECK-LABEL: begin running test 1 of 1 on deep_struct_triple_to_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %4 = struct_element_addr %3 : $*Struct2, #Struct2.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %1 = alloc_stack $Struct
+// CHECK: end running test 1 of 1 on deep_struct_triple_to_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @deep_struct_triple_to_sendable : $@convention(thin) (@owned Struct) -> () {
+bb0(%0 : @owned $Struct):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %struct_addr = alloc_stack $Struct
+  store %0 to [init] %struct_addr : $*Struct
+
+  %l1 = struct_element_addr %struct_addr : $*Struct, #Struct.struct2Let
+  %l2 = struct_element_addr %l1 : $*Struct2, #Struct2.sLet
+  debug_value [trace] %l2 : $*SendableKlass
+
+  destroy_addr %struct_addr : $*Struct
+  dealloc_stack %struct_addr : $*Struct
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: Struct -> Tuple -> Struct (mixed projections)
+// Expected: Look through all (all non-Sendable)
+// CHECK-LABEL: begin running test 1 of 1 on mixed_struct_tuple_struct_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %6 = alloc_stack $TupleNestedMixed
+// CHECK: end running test 1 of 1 on mixed_struct_tuple_struct_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @mixed_struct_tuple_struct_nonsendable : $@convention(thin) (@owned NonSendableKlass, @owned SendableKlass, @owned SendableKlass) -> () {
+bb0(%0 : @owned $NonSendableKlass, %1 : @owned $SendableKlass, %2 : @owned $SendableKlass):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %inner = tuple (%0 : $NonSendableKlass, %1 : $SendableKlass)
+  %outer = tuple (%inner : $(NonSendableKlass, SendableKlass), %2 : $SendableKlass)
+  %struct_val = struct $TupleNestedMixed (%outer : $((NonSendableKlass, SendableKlass), SendableKlass))
+  %struct_addr = alloc_stack $TupleNestedMixed
+  store %struct_val to [init] %struct_addr : $*TupleNestedMixed
+
+  %tuple_addr = struct_element_addr %struct_addr : $*TupleNestedMixed, #TupleNestedMixed.tuple
+  %inner_tuple = tuple_element_addr %tuple_addr : $*((NonSendableKlass, SendableKlass), SendableKlass), 0
+  %elem = tuple_element_addr %inner_tuple : $*(NonSendableKlass, SendableKlass), 0
+  debug_value [trace] %elem : $*NonSendableKlass
+
+  destroy_addr %struct_addr : $*TupleNestedMixed
+  dealloc_stack %struct_addr : $*TupleNestedMixed
+  %r = tuple ()
+  return %r : $()
+}
+
+////////////////////////////////////
+// MARK: MainActor Isolated Tests //
+////////////////////////////////////
+
+// Test: MainActor struct as parameter, extract NonSendable field
+//
+// Should have MainActor as a base and non sendable field should be main actor
+// isolated.
+//
+// CHECK-LABEL: begin running test 1 of 1 on mainactor_struct_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: main actor-isolated].
+// CHECK:     Rep Value:   %1 = struct_element_addr %0 : $*MainActorStruct, #MainActorStruct.ns
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value: %0 = argument of bb0 : $*MainActorStruct
+// CHECK: end running test 1 of 1 on mainactor_struct_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @mainactor_struct_extract_nonsendable : $@convention(thin) @async (@in_guaranteed MainActorStruct) -> () {
+bb0(%0 : $*MainActorStruct):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %field = struct_element_addr %0 : $*MainActorStruct, #MainActorStruct.ns
+  debug_value [trace] %field : $*NonSendableKlass
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: MainActor struct as parameter, extract Sendable field
+// Expected: Sendable field, should have base pointing to MainActor struct
+// CHECK-LABEL: begin running test 1 of 1 on mainactor_struct_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %1 = struct_element_addr %0 : $*MainActorStruct, #MainActorStruct.s
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value: %0 = argument of bb0 : $*MainActorStruct
+// CHECK: end running test 1 of 1 on mainactor_struct_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @mainactor_struct_extract_sendable : $@convention(thin) @async (@in_guaranteed MainActorStruct) -> () {
+bb0(%0 : $*MainActorStruct):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %field = struct_element_addr %0 : $*MainActorStruct, #MainActorStruct.s
+  debug_value [trace] %field : $*SendableKlass
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: MainActor struct, extract nested struct then NonSendable field
+// Expected: We should stop at nested and mark that as main actor-isolated.
+// CHECK-LABEL: begin running test 1 of 1 on mainactor_struct_nested_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: main actor-isolated].
+// CHECK:     Rep Value:   %1 = struct_element_addr %0 : $*MainActorStruct, #MainActorStruct.nested
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value: %0 = argument of bb0 : $*MainActorStruct
+// CHECK: end running test 1 of 1 on mainactor_struct_nested_extract_nonsendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @mainactor_struct_nested_extract_nonsendable : $@convention(thin) @async (@in_guaranteed MainActorStruct) -> () {
+bb0(%0 : $*MainActorStruct):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %nested = struct_element_addr %0 : $*MainActorStruct, #MainActorStruct.nested
+  %field = struct_element_addr %nested : $*Struct2, #Struct2.nsLet
+  debug_value [trace] %field : $*NonSendableKlass
+
+  %r = tuple ()
+  return %r : $()
+}
+
+// Test: MainActor struct, extract nested struct then Sendable field
+// CHECK-LABEL: begin running test 1 of 1 on mainactor_struct_nested_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+// CHECK: Value:
+// CHECK: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value:   %2 = struct_element_addr %1 : $*Struct2, #Struct2.sLet
+// CHECK: Base:
+// CHECK: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: yes][region_value_kind: disconnected].
+// CHECK:     Rep Value: %0 = argument of bb0 : $*MainActorStruct
+// CHECK: end running test 1 of 1 on mainactor_struct_nested_extract_sendable: sil_regionanalysis_underlying_tracked_value with: @trace[0]
+sil [ossa] @mainactor_struct_nested_extract_sendable : $@convention(thin) @async (@in_guaranteed MainActorStruct) -> () {
+bb0(%0 : $*MainActorStruct):
+  specify_test "sil_regionanalysis_underlying_tracked_value @trace[0]"
+  %nested = struct_element_addr %0 : $*MainActorStruct, #MainActorStruct.nested
+  %field = struct_element_addr %nested : $*Struct2, #Struct2.sLet
+  debug_value [trace] %field : $*SendableKlass
+
+  %r = tuple ()
+  return %r : $()
 }

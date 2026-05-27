@@ -84,7 +84,7 @@ ERROR(unimplemented_generator_witnesses,none,
       "protocol conformance emission for generator coroutines is unimplemented",
       ())
 
-ERROR(exclusivity_access_required,none,
+GROUPED_ERROR(exclusivity_access_required,ExclusivityViolation,none,
       "overlapping accesses to %0, but "
       "%select{initialization|read|modification|deinitialization}1 requires "
       "exclusive access; "
@@ -92,18 +92,18 @@ ERROR(exclusivity_access_required,none,
               "consider calling MutableCollection.swapAt(_:_:)}2",
       (StringRef, unsigned, bool))
 
-ERROR(exclusivity_access_required_unknown_decl,none,
+GROUPED_ERROR(exclusivity_access_required_unknown_decl,ExclusivityViolation,none,
         "overlapping accesses, but "
         "%select{initialization|read|modification|deinitialization}0 requires "
         "exclusive access; consider copying to a local variable", (unsigned))
 
-ERROR(exclusivity_access_required_moveonly,none,
+GROUPED_ERROR(exclusivity_access_required_moveonly,ExclusivityViolation,none,
       "overlapping accesses to %0, but "
       "%select{initialization|read|modification|deinitialization}1 requires "
       "exclusive access",
       (StringRef, unsigned))
 
-ERROR(exclusivity_access_required_unknown_decl_moveonly,none,
+GROUPED_ERROR(exclusivity_access_required_unknown_decl_moveonly,ExclusivityViolation,none,
         "overlapping accesses, but "
         "%select{initialization|read|modification|deinitialization}0 requires "
         "exclusive access", (unsigned))
@@ -141,6 +141,10 @@ NOTE(function_declared_here,none,
 ERROR(deserialize_function_type_mismatch,Fatal,
       "type mismatch of function '%0', declared as %1 but used in a swift module as %2",
       (StringRef, Type, Type))
+
+ERROR(deserialize_function_linkage_mismatch,Fatal,
+      "linkage mismatch of function '%0', declared as %1 but expected as %2",
+      (StringRef, StringRef, StringRef))
 
 ERROR(without_actually_escaping_on_isolated_any,none,
       "withoutActuallyEscaping is currently unimplemented for '@isolated(any)' "
@@ -222,7 +226,7 @@ ERROR(ivar_not_initialized_at_implicit_superinit,none,
       (StringRef, bool))
 ERROR(ivar_not_initialized_by_init_accessor,none,
       "property %0 not initialized by init accessor",
-      (DeclName))
+      (StringRef))
 
 ERROR(noncopyable_dynamic_lifetime_unsupported,none,
       "conditional initialization or destruction of noncopyable types is not "
@@ -241,7 +245,7 @@ ERROR(use_of_self_before_fully_init,none,
 NOTE(stored_property_not_initialized,none,
      "'%0' not initialized", (StringRef))
 NOTE(isolated_property_initializer,none,
-     "%1 default value of '%0' cannot be used in a %2 initalizer",
+     "%1 default value of '%0' cannot be used in a %2 initializer",
      (StringRef, ActorIsolation, ActorIsolation))
 
 ERROR(selfinit_multiple_times,none,
@@ -378,32 +382,38 @@ ERROR(bad_attr_on_non_const_global,none,
       "global variable must be a compile-time constant to use %0 attribute", (StringRef))
 ERROR(global_must_be_compile_time_const,none,
       "global variable must be a compile-time constant", ())
-ERROR(embedded_cannot_specialize_class_method,none,
-      "classes cannot have a non-final, generic method %0 in embedded Swift", (DeclName))
-ERROR(embedded_cannot_specialize_witness_method,none,
-      "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
-ERROR(cannot_specialize_class,none,
-      "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
-ERROR(embedded_swift_existential_type,none,
-      "cannot use a value of protocol type %0 in embedded Swift", (Type))
-ERROR(embedded_swift_existential_protocol,none,
-      "cannot use a value of protocol type 'any %0' in embedded Swift", (StringRef))
-ERROR(embedded_swift_existential,none,
-      "cannot use a value of protocol type in embedded Swift", ())
 ERROR(perf_diag_existential_type,none,
       "cannot use a value of protocol type %0 in '@_noExistential' function", (Type))
 ERROR(perf_diag_existential,none,
       "cannot use a value of protocol type in '@_noExistential' function", ())
-ERROR(embedded_swift_value_deinit,none,
-      "cannot de-virtualize deinit of type %0", (Type))
-ERROR(embedded_swift_metatype_type,none,
+
+// Embedded Swift diagnostics
+GROUPED_ERROR(embedded_cannot_specialize_class_method,EmbeddedRestrictions,none,
+      "classes cannot have a non-final, generic method %0 in embedded Swift", (DeclName))
+GROUPED_ERROR(embedded_cannot_specialize_witness_method,EmbeddedRestrictions,none,
+      "a protocol type cannot contain a generic method %0 in embedded Swift", (DeclName))
+GROUPED_ERROR(cannot_specialize_class,EmbeddedRestrictions,none,
+      "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
+GROUPED_ERROR(embedded_swift_metatype_type,EmbeddedRestrictions,none,
       "cannot use metatype of type %0 in embedded Swift", (Type))
-ERROR(embedded_swift_metatype,none,
-      "cannot use metatype in embedded Swift", ())
-ERROR(embedded_swift_keypath,none,
+GROUPED_ERROR(embedded_swift_keypath,EmbeddedRestrictions,none,
       "cannot use key path in embedded Swift", ())
-ERROR(embedded_swift_dynamic_cast,none,
+GROUPED_ERROR(embedded_swift_dynamic_cast,EmbeddedRestrictions,none,
       "cannot do dynamic casting in embedded Swift", ())
+GROUPED_ERROR(embedded_capture_of_generic_value_with_deinit,EmbeddedRestrictions,none,
+      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
+GROUPED_ERROR(embedded_call_generic_function,EmbeddedRestrictions,none,
+      "cannot specialize generic function or default protocol method in this context", ())
+GROUPED_ERROR(embedded_call_generic_function_with_dynamic_self,EmbeddedRestrictions,none,
+      "cannot call an initializer or static method, which is defined as default protocol method, from a class method or initializer", ())
+NOTE(embedded_specialization_called_from,none,
+      "generic specialization called here", ())
+NOTE(embedded_existential_created,none,
+      "protocol type value created here", ())
+NOTE(embedded_constructor_called,none,
+      "instance of type created here", ())
+
+// no-allocations diagnostics
 ERROR(embedded_swift_allocating_type,none,
       "cannot use allocating type %0 in -no-allocations mode", (Type))
 ERROR(embedded_swift_allocating_coroutine,none,
@@ -412,28 +422,36 @@ ERROR(embedded_swift_allocating_closure,none,
       "cannot use escaping closures in -no-allocations mode", ())
 ERROR(embedded_swift_allocating,none,
       "cannot use allocating operation in -no-allocations mode", ())
-ERROR(embedded_capture_of_generic_value_with_deinit,none,
-      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
-ERROR(embedded_call_generic_function,none,
-      "cannot specialize generic function or default protocol method in this context", ())
-ERROR(embedded_call_generic_function_with_dynamic_self,none,
-      "cannot call an initializer or static method, which is defined as default protocol method, from a class method or initializer", ())
-NOTE(embedded_specialization_called_from,none,
-      "generic specialization called here", ())
-NOTE(embedded_existential_created,none,
-      "protocol type value created here", ())
-NOTE(embedded_constructor_called,none,
-      "instance of type created here", ())
+
 ERROR(wrong_linkage_for_serialized_function,none,
       "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
+
+// ManualOwnership diagnostics
+GROUPED_WARNING(manualownership_copy,SemanticCopies,none,
+      "implicit 'copy' happens here; please report this vague diagnostic as a bug", ())
+GROUPED_WARNING(manualownership_copy_happened,SemanticCopies,none,
+      "accessing %0 may produce a copy; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
+GROUPED_WARNING(manualownership_copy_demanded,SemanticCopies,none,
+      "independent copy of %0 is required here; write 'copy' to acknowledge or 'consume' to elide", (Identifier))
+GROUPED_WARNING(manualownership_copy_captured,SemanticCopies,none,
+      "closure capture of '%0' requires independent copy of it; write [%0 = copy %0] in the closure's capture list to acknowledge", (StringRef))
+
+GROUPED_WARNING(manualownership_exclusivity,DynamicExclusivity,none,
+      "exclusive access here will be checked at runtime; please report this vague diagnostic as a bug", ())
+GROUPED_WARNING(manualownership_exclusivity_named,DynamicExclusivity,none,
+      "accessing %0 here may incur runtime exclusivity check%1", (Identifier, StringRef))
 
 // 'transparent' diagnostics
 ERROR(circular_transparent,none,
       "inlining 'transparent' functions forms circular loop", ())
 NOTE(note_while_inlining,none,
      "while inlining here", ())
+
+// '@inline(always)' diagnostics
+ERROR(circular_inlineAlways,none,
+      "inlining '@inline(always)' functions forms circular loop", ())
 
 // Pre-specializations
 ERROR(cannot_prespecialize,none,
@@ -718,11 +736,15 @@ WARNING(warning_int_to_fp_inexact, none,
 // Flow-isolation diagnostics
 ERROR(isolated_after_nonisolated, none,
       "cannot access %kind1 here in "
-      "%select{nonisolated initializer|deinitializer}0",
-      (bool, const ValueDecl *))
+      "%select{%2 initializer|deinitializer}0",
+      (bool, const ValueDecl *, StringRef))
+ERROR(isolated_after_nonisolated_identifier, none,
+      "cannot access %1 here in "
+      "%select{%2 initializer|deinitializer}0",
+      (bool, Identifier, StringRef))
 NOTE(nonisolated_blame, none, "after %1%2 %3, "
-     "only nonisolated properties of 'self' can be accessed from "
-     "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName))
+     "only %4 properties of 'self' can be accessed from "
+     "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName, StringRef))
 ERROR(isolated_property_mutation_in_nonisolated_context,none,
       "actor-isolated %kind0 can not be %select{referenced|mutated}1 "
       "from a nonisolated context",
@@ -978,7 +1000,7 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 //===
 // Misc
 
-ERROR(regionbasedisolation_unknown_pattern, none,
+GROUPED_ERROR(regionbasedisolation_unknown_pattern, RegionIsolationUnknownPattern, none,
       "pattern that the region-based isolation checker does not understand how to check. Please file a bug",
       ())
 NOTE(regionbasedisolation_maybe_race, none,
@@ -1028,6 +1050,8 @@ NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
       "%select{%1 |}0%2 is captured by a %3 closure. %3 uses in closure may race against later %4 uses",
       (bool, StringRef, Identifier, StringRef, StringRef))
+NOTE(regionbasedisolation_named_isolated_closure_yields_race_mutable, none,
+     "%0 closure captures reference to mutable %1 which remains modifiable by %select{%3 code|code in the current task}2", (StringRef, Identifier, bool, StringRef))
 
 NOTE(regionbasedisolation_typed_use_after_sending, none,
       "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",
@@ -1058,7 +1082,7 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
      "causing races inbetween %0 uses and uses reachable from the callee",
      (StringRef, Type))
 
-ERROR(regionbasedisolation_typed_tns_passed_sending_closure, none,
+GROUPED_ERROR(regionbasedisolation_typed_tns_passed_sending_closure, SendingClosureRisksDataRace, none,
      "passing closure as a 'sending' parameter risks causing data races between %0 and concurrent execution of the closure",
      (StringRef))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value, none,
@@ -1068,17 +1092,26 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_
      "closure captures %0 which is accessible to code in the current task",
      (DeclName))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_boxed_value_task_isolated, none,
-     "closure captures reference to mutable %kind0 which is accessible to code in the current task",
+     "closure captures reference to mutable %kind0 which remains modifiable by code in the current task",
      (const ValueDecl *))
+GROUPED_ERROR(regionbasedisolation_sent_closure_captures_mutable_var, SendingRisksDataRace, none,
+     "closure passed as an argument to a 'sending' parameter captures reference to mutable %kind0 which is accessed later by code in the current task",
+     (const ValueDecl *))
+GROUPED_ERROR(regionbasedisolation_sent_closure_captures_value, SendingRisksDataRace, none,
+     "closure passed as an argument to a 'sending' parameter captures %0 which is accessed later by code in the current task",
+     (DeclName))
+GROUPED_ERROR(regionbasedisolation_sent_autoclosure_captures_mutable_var, SendingRisksDataRace, none,
+     "mutable %kind0 cannot be captured by 'sending' @autoclosure parameter because %0 is accessed later in the current task",
+     (const ValueDecl *))
+GROUPED_ERROR(regionbasedisolation_sent_autoclosure_captures_value, SendingRisksDataRace, none,
+     "%0 cannot be captured by 'sending' @autoclosure parameter because %0 is accessed later in the current task",
+     (DeclName))
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region, none,
      "closure captures %1 which is accessible to %0 code",
      (StringRef, DeclName))
 
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_multiple_value, none,
      "closure captures non-Sendable %0",
-     (DeclName))
-NOTE(regionbasedisolation_closure_captures, none,
-     "closure captures %0",
      (DeclName))
 NOTE(regionbasedisolation_closure_captures_actor, none,
      "closure captures %0 allowing access to %1 state within the closure",
@@ -1104,7 +1137,7 @@ NOTE(regionbasedisolation_isolated_conformance_introduced, none,
 
 // Error that is only used when the send non sendable emitter cannot discover any
 // information to give a better diagnostic.
-ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
+GROUPED_ERROR(regionbasedisolation_task_or_actor_isolated_sent, RegionIsolation, none,
       "task or actor-isolated value cannot be sent", ())
 
 //===
@@ -1113,19 +1146,19 @@ ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
 NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
      "'inout sending' parameter must be reinitialized before function exit with a non-actor-isolated value",
      ())
-ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, RegionIsolation, none,
       "'inout sending' parameter %0 cannot be %1 at end of function",
       (Identifier, StringRef))
 NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
       "%1 %0 risks causing races in between %1 uses and caller uses since caller assumes value is not actor isolated",
       (Identifier, StringRef))
-ERROR(regionbasedisolation_inout_sending_cannot_be_returned_param, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_returned_param, RegionIsolation, none,
       "'inout sending' parameter %0 cannot be returned",
       (Identifier))
-ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value, RegionIsolation, none,
       "%0 cannot be returned",
       (Identifier))
-ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value_result, none,
+GROUPED_ERROR(regionbasedisolation_inout_sending_cannot_be_returned_value_result, RegionIsolation, none,
       "result of %kind0 cannot be returned",
       (const ValueDecl *))
 NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_param, none,
@@ -1149,13 +1182,13 @@ NOTE(regionbasedisolation_inout_sending_cannot_be_returned_note_actor_return_val
 //===
 // Out Sending
 
-ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, none,
+GROUPED_ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, RegionIsolation, none,
       "returning a %1 %0 value as a 'sending' result risks causing data races",
       (Type, StringRef))
 NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type, none,
       "returning a %1 %0 value risks causing races since the caller assumes the value can be safely sent to other isolation domains",
       (Type, StringRef))
-ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, none,
+GROUPED_ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, RegionIsolation, none,
       "returning %1 %0 as a 'sending' result risks causing data races",
       (Identifier, StringRef))
 NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
@@ -1166,10 +1199,10 @@ NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
 // non-Sendable Results
 
 // Example: returning main-actor isolated result to a custom-actor isolated context risks causing data races
-ERROR(rbi_isolation_crossing_result, none,
+GROUPED_ERROR(rbi_isolation_crossing_result, RegionIsolation, none,
       "non-Sendable %0-typed result can not be returned from %1 %kind2 to %3 context",
       (Type, StringRef, const ValueDecl *, StringRef))
-ERROR(rbi_isolation_crossing_result_no_decl, none,
+GROUPED_ERROR(rbi_isolation_crossing_result_no_decl, RegionIsolation, none,
       "non-Sendable %0-typed result can not be returned from %1 function to %2 context",
       (Type, StringRef, StringRef))
 NOTE(rbi_non_sendable_nominal,none,
@@ -1184,9 +1217,47 @@ NOTE(rbi_add_generic_parameter_sendable_conformance,none,
      "consider making generic parameter %0 conform to the 'Sendable' protocol",
      (Type))
 
+GROUPED_ERROR(regionbasedisolation_inout_sending_in_same_region, RegionIsolation, none,
+      "'inout sending' parameters %0 and %1 can be potentially accessed from each other at function return risking data races in caller",
+      (Identifier, Identifier))
+NOTE(regionbasedisolation_inout_sending_in_same_region_note, none,
+     "caller function assumes on return that %0 and %1 cannot be used to access each other implying sending them to different isolation domains does not risk a data race", (Identifier, Identifier))
+
+//===
+// Merge Region Failure Error
+//
+
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_unknown, RegionIsolationCrossIsolationDataRace, none,
+      "allowing references between %select{%0|%1 %0}4 and %3 %2 risks causing data races",
+      (Identifier, StringRef, Identifier, StringRef, bool))
+NOTE(regionbasedisolation_merge_region_failure_error_unknown_note, none,
+     "%0 could become accessible to %3 code despite remaining accessible to %select{code in the current task|%1 code}4",
+     (Identifier, StringRef, Identifier, StringRef, bool))
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_assign, RegionIsolationCrossIsolationDataRace, none,
+      "assigning %select{%0|%1 %0}4 to %3 %2 risks causing data races",
+      (Identifier, StringRef, Identifier, StringRef, bool))
+NOTE(regionbasedisolation_merge_region_failure_error_assign_note, none,
+      "%0 could become accessible to %2 code despite remaining accessible to %select{code in the current task|%1 code}3",
+      (Identifier, StringRef, StringRef, bool))
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation, RegionIsolationCrossIsolationDataRace, none,
+      "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
+      (Identifier, StringRef, const ValueDecl *, StringRef, bool))
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_functionisolation_type, RegionIsolationCrossIsolationDataRace, none,
+      "passing %select{%0|%1 %0}4 to %3 %kind2 risks causing data races",
+      (Type, StringRef, const ValueDecl *, StringRef, bool))
+
+// We always put the potential task-isolated value first to simplify the note.
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_nonisolatedfunction, RegionIsolationCrossIsolationDataRace, none,
+      "passing %select{%0|%1 %0}5 and %3 %2 as arguments to %kind4 risks causing data races",
+      (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
+NOTE(regionbasedisolation_merge_region_failure_error_nonisolatedfunction_note, none,
+     "%2 could begin referencing %0 allowing concurrent access to %0 by %3 code and %select{code in the current task|%1 code}5", (Identifier, StringRef, Identifier, StringRef, const ValueDecl *, bool))
+
+GROUPED_ERROR(regionbasedisolation_merge_region_failure_error_cast, RegionIsolationCrossIsolationDataRace, none,
+      "casting %select{%0|%1 %0}4 to %3 %2 risks causing data races",
+      (Identifier, StringRef, Type, StringRef, bool))
+
 // Concurrency related diagnostics
-ERROR(cannot_find_executor_factory_type, none,
-      "the DefaultExecutorFactory type could not be found", ())
 ERROR(executor_factory_must_conform, none,
       "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
 
@@ -1196,7 +1267,7 @@ ERROR(executor_factory_must_conform, none,
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,
-      "deinit of non-copyable type not visible in the current module", ())
+      "deinit of non-copyable type %0 not visible in the current module", (Type))
 
 ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))
@@ -1223,8 +1294,24 @@ NOTE(lifetime_outside_scope_use, none,
 NOTE(lifetime_outside_scope_escape, none,
      "this use causes the lifetime-dependent value to escape", ())
 
+NOTE(implicit_function_note, none, "error in compiler-generated '%0'", (StringRef))
+
 ERROR(noncopyable_shared_case_block_unimplemented, none,
       "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
 
+
+/// Borrow and mutate accessors
+ERROR(invalid_borrow_accessor_return, none,
+      "invalid return value from a %0 accessor", (StringRef))
+NOTE(borrow_accessor_not_a_projection_note, none,
+     "%0 accessors can return stored properties, computed properties with "
+     "%0 accessors or global 'let' declarations",
+     (StringRef))
+ERROR(invalid_multiple_return_borrow_accessor, none,
+      "multiple return statements in borrow accessors are not yet supported",
+      ())
+ERROR(unsupported_borrow_abstraction, none,
+      "cannot witness borrow requirement for result type %0",
+      (Type))
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

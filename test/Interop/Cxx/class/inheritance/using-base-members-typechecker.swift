@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
+// RUN: %target-typecheck-verify-swift -verify-ignore-unrelated -verify-ignore-unknown -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
 // REQUIRES: swift_feature_ImportNonPublicCxxMembers
 
 import UsingBaseMembers
@@ -31,5 +31,9 @@ let o = OperatorBasePrivateInheritance()
 if Bool(fromCxx: o) {
   let _: Int32 = o.pointee
 } else if Bool(fromCxx: !o) {
-  // let _: Int32 = o[789] // FIXME: currently broken
+  let _: Int32 = o[789]
 }
+
+let _ = Bool(fromCxx: OperatorBaseProtectedInheritance()) // expected-error {{initializer 'init(fromCxx:)' requires that 'OperatorBaseProtectedInheritance' conform to 'CxxConvertibleToBool'}}
+
+let _ = Bool(fromCxx: ProtectedOperatorBoolMadePublic())

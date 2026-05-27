@@ -20,6 +20,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -82,19 +83,16 @@ bool swift::irgen::useDllStorage(const llvm::Triple &triple) {
 UniversalLinkageInfo::UniversalLinkageInfo(IRGenModule &IGM)
     : UniversalLinkageInfo(IGM.Triple, IGM.IRGen.hasMultipleIGMs(),
                            IGM.IRGen.Opts.ForcePublicLinkage,
-                           IGM.IRGen.Opts.InternalizeSymbols,
-                           IGM.IRGen.Opts.MergeableSymbols) {}
+                           IGM.IRGen.Opts.InternalizeSymbols) {}
 
 UniversalLinkageInfo::UniversalLinkageInfo(const llvm::Triple &triple,
                                            bool hasMultipleIGMs,
                                            bool forcePublicDecls,
-                                           bool isStaticLibrary,
-                                           bool mergeableSymbols)
+                                           bool isStaticLibrary)
     : IsELFObject(triple.isOSBinFormatELF()),
       IsMSVCEnvironment(triple.isWindowsMSVCEnvironment()),
       UseDLLStorage(useDllStorage(triple)), Internalize(isStaticLibrary),
-      HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls),
-      MergeableSymbols(mergeableSymbols) {}
+      HasMultipleIGMs(hasMultipleIGMs), ForcePublicDecls(forcePublicDecls) {}
 
 LinkEntity LinkEntity::forSILGlobalVariable(SILGlobalVariable *G,
                                             IRGenModule &IGM) {
@@ -411,6 +409,10 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
   }
 
   case Kind::SILFunction: {
+    auto asmName = getSILFunction()->asmName();
+    if (!asmName.empty())
+      return asmName.str();
+
     std::string Result(getSILFunction()->getName());
     if (isDynamicallyReplaceable()) {
       Result.append("TI");
@@ -468,8 +470,13 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
     return Result;
   }
 
-  case Kind::SILGlobalVariable:
+  case Kind::SILGlobalVariable: {
+    auto asmName = getSILGlobalVariable()->asmName();
+    if (!asmName.empty())
+      return asmName.str();
+
     return getSILGlobalVariable()->getName().str();
+  }
 
   case Kind::ReadOnlyGlobalObject:
     return getSILGlobalVariable()->getName().str() + "r";
@@ -585,6 +592,8 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
       return "_swift_coro_async_allocator";
     case CoroAllocatorKind::Malloc:
       return "_swift_coro_malloc_allocator";
+    case CoroAllocatorKind::TypedMalloc:
+      return "_swift_coro_typed_malloc_allocator";
     }
   }
   }
@@ -621,6 +630,22 @@ SILDeclRef LinkEntity::getSILDeclRef() const {
   return ref;
 }
 
+static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
+  // In embedded existenitals mode we generate lazy public metadata on demand
+  // which makes it non unique.
+  auto &langOpts = ty->getASTContext().LangOpts;
+  if (langOpts.hasFeature(Feature::Embedded)) {
+    if (auto nominal = ty->getAnyNominal()) {
+      if (SILDeclRef::declHasNonUniqueDefinition(nominal)) {
+        return true;
+      }
+    } else {
+      return true;
+    }
+  }
+  return false;
+}
+
 SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // For when `this` is a protocol conformance of some kind.
   auto getLinkageAsConformance = [&] {
@@ -649,6 +674,11 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   // Most type metadata depend on the formal linkage of their type.
   case Kind::ValueWitnessTable: {
     auto type = getType();
+
+    // In embedded existenitals mode we generate lazy public metadata on demand
+    // which makes it non unique.
+    if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(type))
+       return SILLinkage::Shared;
 
     // Builtin types, (), () -> () and so on are in the runtime.
     if (!type.getAnyNominal())
@@ -690,19 +720,38 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
     auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
-    case TypeMetadataAddress::FullMetadata:
+    case TypeMetadataAddress::FullMetadata: {
+      // In embedded existentials mode we generate lazy public metadata on
+      // demand which makes the full metadata non-unique. (The address-point
+      // alias still uses the formal declaration linkage so that it survives
+      // GlobalDCE under -internalize-at-link.)
+      if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(getType()))
+        return SILLinkage::Shared;
+
       // For imported types, the full metadata object is a candidate
       // for uniquing.
       if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
         return SILLinkage::Shared;
 
-      // Prespecialization of the same generic metadata may be requested 
+      // Prespecialization of the same generic metadata may be requested
       // multiple times within the same module, so it needs to be uniqued.
       if (nominal->isGenericContext())
         return SILLinkage::Shared;
 
+      // @export(interface) types have a unique definition in their defining
+      // module, so the FullMetadata must be externally linkable.
+      bool isEmbedded =
+        nominal->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+      if (isEmbedded) {
+        if (nominal->getEffectiveCodeGenerationModel()
+                == CodeGenerationModel::Interface) {
+          return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+        }
+      }
+
       // The full metadata object is private to the containing module.
       return SILLinkage::Private;
+    }
     case TypeMetadataAddress::AddressPoint: {
       return getSILLinkage(nominal
                            ? getDeclLinkage(nominal)
@@ -807,14 +856,14 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
     // With conditionally available substitutions, the opaque result type
     // descriptor has to be emitted into a client module when associated with
-    // `@_alwaysEmitIntoClient` declaration which means it's linkage
+    // always-emitted-into-client declaration which means it's linkage
     // has to be "shared".
     //
     // If we don't have conditionally available substitutions, we won't emit
     // the descriptor at all, but still make sure we report "shared" linkage
     // so that TBD files don't include a bogus symbol.
     auto *srcDecl = opaqueType->getNamingDecl();
-    if (srcDecl->getAttrs().hasAttribute<AlwaysEmitIntoClientAttr>())
+    if (srcDecl->isAlwaysEmittedIntoClient())
       return SILLinkage::Shared;
 
     return getSILLinkage(getDeclLinkage(opaqueType), forDefinition);
@@ -1111,11 +1160,16 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
   case Kind::TypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
     switch (getMetadataAddress()) {
-    case TypeMetadataAddress::FullMetadata:
+    case TypeMetadataAddress::FullMetadata: {
+      auto &langOpts = IGM.Context.LangOpts;
+      if (langOpts.hasFeature(Feature::Embedded)) {
+        return IGM.EmbeddedExistentialsMetadataStructTy;
+      }
       if (getType().getClassOrBoundGenericClass())
         return IGM.FullHeapMetadataStructTy;
       else
         return IGM.FullTypeMetadataStructTy;
+    }
     case TypeMetadataAddress::AddressPoint:
       return IGM.TypeMetadataStructTy;
     }
@@ -1437,12 +1491,24 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
       return true;
 
     auto assocConformance = getAssociatedConformance();
+
+    auto &ctx = getDecl()->getASTContext();
+    if (assocConformance.first->isEqual(ctx.TheSelfType))
+      return cast<ProtocolDecl>(assocConformance.second)->isWeakImported(module);
+
     auto *depMemTy = assocConformance.first->castTo<DependentMemberType>();
     return depMemTy->getAssocType()->isWeakImported(module);
   }
 
-  case Kind::BaseConformanceDescriptor:
+  case Kind::BaseConformanceDescriptor: {
+    auto baseProto = getAssociatedConformance().second;
+
+    // The base protocol might be reparented and less available.
+    if (baseProto->isWeakImported(module))
+      return true;
+
     return cast<ProtocolDecl>(getDecl())->isWeakImported(module);
+  }
 
   case Kind::TypeMetadata:
   case Kind::TypeMetadataAccessFunction: {
@@ -1749,7 +1815,15 @@ bool LinkEntity::hasNonUniqueDefinition() const {
       getKind() == Kind::ReadOnlyGlobalObject)
     return getSILGlobalVariable()->hasNonUniqueDefinition();
 
-  if (getKind() == Kind::TypeMetadata) {
+  if (getKind() == Kind::TypeMetadata ||
+      getKind() == Kind::ValueWitnessTable) {
+    // The address-point alias of type metadata is uniquely defined per
+    // binary even when the full metadata it references is shared, so it
+    // gets the formal declaration linkage rather than linkonce_odr.
+    if (getKind() == Kind::TypeMetadata &&
+        getMetadataAddress() == TypeMetadataAddress::AddressPoint)
+      return false;
+
     // For a nominal type, check its declaration.
     CanType type = getType();
     if (auto nominal = type->getAnyNominal()) {
@@ -1758,6 +1832,30 @@ bool LinkEntity::hasNonUniqueDefinition() const {
 
     // All other type metadata is nonuniqued.
     return true;
+  }
+
+  // In embedded Swift, witness tables are treated as having non-unique
+  // definitions (so they get linkonce_odr linkage) unless the underlying
+  // conformance was explicitly marked @export(interface).
+  if (getKind() == Kind::ProtocolWitnessTable) {
+    if (auto context = getDeclContextForEmission()) {
+      if (context->getParentModule()->getASTContext().LangOpts.hasFeature(
+              Feature::Embedded)) {
+        if (auto *normal = dyn_cast<NormalProtocolConformance>(
+                getProtocolConformance()->getRootConformance())) {
+          switch (normal->getEffectiveCodeGenerationModel()) {
+            case CodeGenerationModel::Interface:
+              return false;
+
+            case CodeGenerationModel::Implementation:
+            case CodeGenerationModel::Inlinable:
+              return true;
+          }
+        }
+
+        return true;
+      }
+    }
   }
 
   return false;

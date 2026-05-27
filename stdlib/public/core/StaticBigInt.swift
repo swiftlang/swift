@@ -150,7 +150,7 @@ extension StaticBigInt: CustomDebugStringConvertible {
     // Equivalent to `ceil(bitWidthExcludingSignBit / fourBitsPerHexDigit)`.
     // Underestimated for `-(16 ** y)` values (e.g. "-0x1", "-0x10", "-0x100").
     let capacity = indicator.utf8.count + (((bitWidth - 1) + 3) / 4)
-    var result = unsafe String(unsafeUninitializedCapacity: capacity) { utf8 in
+    var result = String(unsafeUninitializedCapacity: capacity) { utf8 in
 
       // Pre-initialize with zeros, ignoring extra capacity.
       var utf8 = unsafe utf8.prefix(capacity)
@@ -183,8 +183,9 @@ extension StaticBigInt: CustomDebugStringConvertible {
     }
 
     // Overwrite leading zeros with the "±0x" indicator.
-    if let upToIndex = result.firstIndex(where: { $0 != "0" }) {
-      result.replaceSubrange(..<upToIndex, with: indicator)
+    let zero: UnicodeScalar = "0"
+    if let upToIndex = result.unicodeScalars.firstIndex(where: { $0 != zero }) {
+      result = indicator + String(result.unicodeScalars[upToIndex...])
     } else {
       result = "+0x0"
     }

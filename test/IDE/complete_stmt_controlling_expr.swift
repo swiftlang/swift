@@ -413,7 +413,7 @@ func testSwitchCaseWhereExprIJ1(_ fooObject: FooStruct) {
 
 // WITH_I_INT_LOCAL: Decl[LocalVar]/Local: i[#Int#]{{; name=.+$}}
 
-// WITH_I_ERROR_LOCAL: Decl[LocalVar]/Local: i[#<<error type>>#]{{; name=.+$}}
+// WITH_I_ERROR_LOCAL: Decl[LocalVar]/Local: i[#_#]{{; name=.+$}}
 
 // WITH_J_INT: Decl[LocalVar]/Local: j[#Int#]{{; name=.+$}}
 

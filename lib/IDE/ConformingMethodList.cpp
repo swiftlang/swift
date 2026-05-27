@@ -11,7 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/IDE/ConformingMethodList.h"
-#include "ExprContextAnalysis.h"
+#include "ReadyForTypeCheckingCallback.h"
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -20,8 +20,8 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
 
@@ -30,7 +30,7 @@ using namespace ide;
 
 namespace {
 class ConformingMethodListCallbacks : public CodeCompletionCallbacks,
-                                      public DoneParsingCallback {
+                                      public ReadyForTypeCheckingCallback {
   ArrayRef<const char *> ExpectedTypeNames;
   ConformingMethodListConsumer &Consumer;
   SourceLoc Loc;
@@ -45,8 +45,8 @@ public:
   ConformingMethodListCallbacks(Parser &P,
                                 ArrayRef<const char *> ExpectedTypeNames,
                                 ConformingMethodListConsumer &Consumer)
-      : CodeCompletionCallbacks(P), DoneParsingCallback(),
-        ExpectedTypeNames(ExpectedTypeNames), Consumer(Consumer) {}
+      : CodeCompletionCallbacks(P), ExpectedTypeNames(ExpectedTypeNames),
+        Consumer(Consumer) {}
 
   // Only handle callbacks for suffix completions.
   // {
@@ -54,7 +54,7 @@ public:
   void completePostfixExpr(CodeCompletionExpr *E, bool hasSpace) override;
   // }
 
-  void doneParsing(SourceFile *SrcFile) override;
+  void readyForTypeChecking(SourceFile *SrcFile) override;
 };
 
 void ConformingMethodListCallbacks::completeDotExpr(CodeCompletionExpr *E,
@@ -101,7 +101,7 @@ public:
   ArrayRef<Result> getResults() const { return Results; }
 };
 
-void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
+void ConformingMethodListCallbacks::readyForTypeChecking(SourceFile *SrcFile) {
   if (!CCExpr || !CCExpr->getBase())
     return;
 
@@ -122,7 +122,7 @@ void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
   Type T = Res.Ty;
   WithSolutionSpecificVarTypesRAII VarType(Res.SolutionSpecificVarTypes);
 
-  if (!T || T->is<ErrorType>() || T->is<UnresolvedType>())
+  if (!T || T->is<ErrorType>())
     return;
 
   T = T->getRValueType();
@@ -134,7 +134,7 @@ void ConformingMethodListCallbacks::doneParsing(SourceFile *SrcFile) {
 
   auto interfaceTy = T;
   if (T->hasArchetype())
-    interfaceTy = interfaceTy->mapTypeOutOfContext();
+    interfaceTy = interfaceTy->mapTypeOutOfEnvironment();
 
   llvm::SmallPtrSet<ProtocolDecl*, 8> expectedProtocols;
   for (auto Name: ExpectedTypeNames) {

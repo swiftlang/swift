@@ -1415,27 +1415,29 @@ extension Array: RangeReplaceableCollection {
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return unsafe try withUnsafeMutableBufferPointer {
+    return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
   }
 
   @inlinable
+  @safe
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return unsafe try withUnsafeMutableBufferPointer {
+    return try withUnsafeMutableBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(&bufferPointer)
     }
   }
 
   @inlinable
+  @safe
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return unsafe try withUnsafeBufferPointer {
+    return try withUnsafeBufferPointer {
       (bufferPointer) -> R in
       return try unsafe body(bufferPointer)
     }
@@ -1509,6 +1511,7 @@ extension Array {
 }
 
 extension Array {
+#if !$Embedded
   /// Implementation preserved (for ABI reasons) for:
   /// Array(unsafeUninitializedCapacity:initializingWith:)
   /// and ContiguousArray(unsafeUninitializedCapacity:initializingWith:)
@@ -1520,11 +1523,14 @@ extension Array {
       _ buffer: inout UnsafeMutableBufferPointer<Element>,
       _ initializedCount: inout Int) throws -> Void
   ) rethrows {
-    try unsafe self.init(
-      _unsafeUninitializedCapacity: _unsafeUninitializedCapacity,
-      initializingWithTypedThrowsInitializer: initializer
+    self.init(
+      try unsafe ContiguousArray(
+        unsafeUninitializedCapacity: _unsafeUninitializedCapacity,
+        initializingWith: initializer
+      )
     )
   }
+#endif
 
   /// Implementation for:
   /// Array(unsafeUninitializedCapacity:initializingWith:)
@@ -1547,8 +1553,9 @@ extension Array {
     defer {
       // Update self.count even if initializer throws an error.
       _precondition(
-        initializedCount <= _unsafeUninitializedCapacity,
-        "Initialized count set to greater than specified capacity."
+        UInt(truncatingIfNeeded: initializedCount) <=
+        UInt(truncatingIfNeeded: _unsafeUninitializedCapacity),
+        "Initialized count must be in 0 ... _unsafeUninitializedCapacity."
       )
       unsafe _precondition(
         buffer.baseAddress == firstElementAddress,
@@ -1560,7 +1567,7 @@ extension Array {
     try unsafe initializer(&buffer, &initializedCount)
   }
 
-  /// Creates an array with the specified capacity, then calls the given
+  /// Creates an array with the specified capacity, and then calls the given
   /// closure with a buffer covering the array's uninitialized memory.
   ///
   /// Inside the closure, set the `initializedCount` parameter to the number of
@@ -1593,20 +1600,112 @@ extension Array {
       _ initializedCount: inout Int
     ) throws(E) -> Void
   ) throws(E) {
-    self = try unsafe Array(
-      _unsafeUninitializedCapacity: unsafeUninitializedCapacity,
-      initializingWithTypedThrowsInitializer: initializer
+    self.init(
+      try unsafe ContiguousArray(
+        unsafeUninitializedCapacity: unsafeUninitializedCapacity,
+        initializingWith: initializer
+      )
+    )
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Array {
+  /// Creates an array with the specified capacity, and then calls the given
+  /// closure with an output span covering the array's uninitialized memory.
+  ///
+  /// Inside the closure, initialize elements by appending to the `OutputSpan`.
+  /// The `OutputSpan` keeps track of memory's initialization state, ensuring
+  /// safety. Its `count` at the end of the closure will become the `count` of
+  /// the newly-initialized array.
+  ///
+  /// - Note: While the resulting array may have a capacity larger than the
+  ///   requested amount, the `OutputSpan` passed to the closure will cover
+  ///   exactly the number of elements requested.
+  ///
+  /// - Parameters:
+  ///   - capacity: The number of elements to allocate
+  ///     space for in the new array.
+  ///   - initializer: A closure that initializes the elements of the new array.
+  ///     - Parameters:
+  ///       - span: An `OutputSpan` covering uninitialized memory with
+  ///         space for the specified number of elements.
+  @_alwaysEmitIntoClient
+  public init<E: Error>(
+    capacity: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws(E) -> Void
+  ) throws(E) {
+    self.init(
+      try ContiguousArray(capacity: capacity, initializingWith: initializer)
     )
   }
 
+  /// Grows the array to have enough capacity for the specified number of
+  /// elements, then calls the closure with an output span covering the array's
+  /// uninitialized memory.
+  ///
+  /// Inside the closure, initialize elements by appending to `span`. It
+  /// ensures safety by keeping track of the initialization state of the memory
+  /// At the end of the closure, `span`'s `count` elements will have been
+  /// appended to the array.
+  ///
+  /// If the closure throws an error, the items appended until that point
+  /// will remain in the array.
+  ///
+  /// - Parameters:
+  ///   - uninitializedCount: The number of new elements the array should have
+  ///     space for.
+  ///   - initializer: A closure that initializes new elements.
+  ///     - Parameters:
+  ///       - span: An `OutputSpan` covering uninitialized memory with
+  ///         space for the specified number of additional elements.
+  @_alwaysEmitIntoClient
+  public mutating func append<E: Error>(
+    addingCapacity uninitializedCount: Int,
+    initializingWith initializer: (
+      _ span: inout OutputSpan<Element>
+    ) throws(E) -> Void
+  ) throws(E) {
+    _precondition(
+      uninitializedCount >= 0, "uninitializedCount must not be negative"
+    )
+    // Ensure uniqueness, mutability, and sufficient storage.
+    _reserveCapacityImpl(
+      minimumCapacity: self.count + uninitializedCount, growForAppend: true
+    )
+    let pointer = unsafe _buffer.mutableFirstElementAddress
+    let buffer = unsafe UnsafeMutableBufferPointer(
+      start: unsafe pointer.advanced(by: count),
+      count: uninitializedCount
+    )
+    var span = unsafe OutputSpan(buffer: buffer, initializedCount: 0)
+
+    defer {
+      let initializedCount = unsafe span.finalize(for: buffer)
+      span = OutputSpan()
+
+      // Update mutableCount even when `initializer` throws an error.
+      _buffer.mutableCount += initializedCount
+      _endMutation()
+    }
+
+    try initializer(&span)
+  }
+}
+
+extension Array {
   // Superseded by the typed-throws version of this function, but retained
   // for ABI reasons.
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
+  @safe
   internal func withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
-    return try unsafe _buffer.withUnsafeBufferPointer(body)
+    return try _buffer.withUnsafeBufferPointer(body)
   }
 
   /// Calls a closure with a pointer to the array's contiguous storage.
@@ -1639,15 +1738,25 @@ extension Array {
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_alwaysEmitIntoClient
+  @safe
   public func withUnsafeBufferPointer<R, E>(
     _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
-    return try unsafe _buffer.withUnsafeBufferPointer(body)
+    return try _buffer.withUnsafeBufferPointer(body)
   }
 
+  /// A span over the elements of this array.
+  ///
+  /// - Note: On Apple platforms, this property copies bridged `NSArray`
+  ///   instances into contiguous storage on first access and caches
+  ///   the result. Subsequent calls can reuse the cached copy.
+  ///
+  /// - Returns: A `Span` over the elements of this array.
+  ///
+  /// - Complexity: O(1) for native arrays, amortized O(1) for bridged arrays.
   @available(SwiftStdlib 6.2, *)
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_alwaysEmitIntoClient
     borrowing get {
 #if _runtime(_ObjC)
@@ -1740,6 +1849,7 @@ extension Array {
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
   // once we allocate noescape closures on the stack.
+  @safe
   public mutating func withUnsafeMutableBufferPointer<R, E>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
   ) throws(E) -> R {
@@ -1764,10 +1874,16 @@ extension Array {
     return try unsafe body(&inoutBufferPointer)
   }
 
+  /// A mutable span over the elements of this array.
+  ///
+  /// - Returns: A `MutableSpan` over the elements of this array.
+  ///
+  /// - Complexity: O(1) when the array's storage is uniquely referenced,
+  ///   O(*n*) otherwise.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       // _makeMutableAndUnique*() inserts begin_cow_mutation.
       // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.
@@ -1971,10 +2087,11 @@ extension Array {
   ///   execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
+  @safe
   public mutating func withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try unsafe self.withUnsafeMutableBufferPointer {
+    return try self.withUnsafeMutableBufferPointer {
       return try unsafe body(UnsafeMutableRawBufferPointer($0))
     }
   }
@@ -2007,10 +2124,11 @@ extension Array {
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
+  @safe
   public func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try unsafe self.withUnsafeBufferPointer {
+    return try self.withUnsafeBufferPointer {
       try unsafe body(UnsafeRawBufferPointer($0))
     }
   }
@@ -2157,3 +2275,44 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
 }
 
 extension Array: @unchecked Sendable where Element: Sendable { }
+
+extension Array {
+  /// Returns a boolean value indicating whether this array is identical to
+  /// `other`.
+  ///
+  /// Two array values are identical if there is no way to distinguish between
+  /// them.
+  /// 
+  /// For any values `a`, `b`, and `c`:
+  ///
+  /// - `a.isTriviallyIdentical(to: a)` is always `true`. (Reflexivity)
+  /// - `a.isTriviallyIdentical(to: b)` implies `b.isTriviallyIdentical(to: a)`.
+  /// (Symmetry)
+  /// - If `a.isTriviallyIdentical(to: b)` and `b.isTriviallyIdentical(to: c)`
+  /// are both `true`, then `a.isTriviallyIdentical(to: c)` is also `true`.
+  /// (Transitivity)
+  /// - If `a` and `b` are `Equatable`, then `a.isTriviallyIdentical(b)` implies
+  /// `a == b`. `a == b` does not imply `a.isTriviallyIdentical(b)`
+  ///
+  /// Values produced by copying the same value, with no intervening mutations,
+  /// compare as identical:
+  ///
+  /// ```swift
+  /// let d = c
+  /// print(c.isTriviallyIdentical(to: d))
+  /// // Prints true.
+  /// ```
+  ///
+  /// Comparing arrays this way
+  /// includes comparing implementation details that are normally hidden,
+  /// such as the memory location of any underlying array storage,
+  /// These details aren't considered when comparing for equality with the `==` operator.
+  /// Therefore, identical arrays are guaranteed to compare equal,
+  /// but not all equal arrays are identical.
+  ///
+  /// - Complexity: O(1)
+  @_alwaysEmitIntoClient
+  public func isTriviallyIdentical(to other: Self) -> Bool {
+    unsafe self._buffer.identity == other._buffer.identity
+  }
+}

@@ -36,6 +36,7 @@
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/Support/MemoryBuffer.h"
 
@@ -268,6 +269,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   CASOptions casOpts;
   SerializationOptions serializationOpts =
       CachedCI->getASTContext().SerializationOpts;
+  std::optional<clang::DarwinSDKInfo> SDKInfo;
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
                       symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags));
@@ -502,8 +504,7 @@ void IDEInspectionInstance::performNewOperation(
         CI->removeDiagnosticConsumer(DiagC);
     };
 
-    if (FileSystem != llvm::vfs::getRealFileSystem())
-      CI->getSourceMgr().setFileSystem(FileSystem);
+    CI->getSourceMgr().setFileSystem(FileSystem);
 
     Invocation.setIDEInspectionTarget(ideInspectionTargetBuffer, Offset);
 
@@ -517,7 +518,6 @@ void IDEInspectionInstance::performNewOperation(
     CI->getASTContext().CancellationFlag = CancellationFlag;
     registerIDERequestFunctions(CI->getASTContext().evaluator);
 
-    CI->loadAccessNotesIfNeeded();
     performImportResolution(CI->getMainModule());
 
     bool DidFindIDEInspectionTarget = CI->getIDEInspectionFile()

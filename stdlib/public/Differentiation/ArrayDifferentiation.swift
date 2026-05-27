@@ -157,7 +157,7 @@ where Element: AdditiveArithmetic & Differentiable {
     rhs: Array.DifferentiableView
   ) -> Array.DifferentiableView {
     if lhs.base.count == 0 {
-      return rhs
+      return Array.DifferentiableView(rhs.base.map { .zero - $0 })
     }
     if rhs.base.count == 0 {
       return lhs

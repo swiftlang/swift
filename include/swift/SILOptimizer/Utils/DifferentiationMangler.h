@@ -26,7 +26,7 @@ namespace Mangle {
 /// A mangler for generated differentiation functions.
 class DifferentiationMangler : public ASTMangler {
 public:
-  DifferentiationMangler(const ASTContext &Ctx) : ASTMangler(Ctx) {}
+  DifferentiationMangler(ASTContext &Ctx) : ASTMangler(Ctx) {}
   /// Returns the mangled name for a differentiation function of the given kind.
   std::string mangleAutoDiffFunction(StringRef originalName,
                                      Demangle::AutoDiffFunctionKind kind,

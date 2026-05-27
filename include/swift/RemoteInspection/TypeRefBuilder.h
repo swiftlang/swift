@@ -597,6 +597,9 @@ public:
     /// an external file.
     remote::ExternalTypeRefCache *ExternalTypeRefCache = nullptr;
 
+    /// Ensure all field descriptors are in the FieldTypeInfoCache.
+    void ensureAllFieldDescriptorsCached();
+
   public:
     ///
     /// Dumping typerefs, field declarations, builtin types, captures,
@@ -746,20 +749,18 @@ public:
     ConformanceCollectionResult collectAllConformances() {
       ConformanceCollectionResult result;
 
-      // The Fields section has gathered info on types that includes their
-      // mangled names. Use that to build a dictionary from a type's demangled
-      // name to its mangled name
+      ensureAllFieldDescriptorsCached();
+
+      Demangler dem;
+      // Build the demangled to mangled name map from the FieldTypeInfoCache.
       std::unordered_map<std::string, std::string> typeNameToManglingMap;
-      for (const auto &section : ReflectionInfos) {
-        for (auto descriptor : section.Field) {
-          TypeRefBuilder::ScopedNodeFactoryCheckpoint checkpoint(&Builder);
-          auto TypeRef = readTypeRef(descriptor, descriptor->MangledTypeName);
-          auto OptionalMangledTypeName = normalizeReflectionName(TypeRef);
-          auto TypeName = nodeToString(Builder.demangleTypeRef(TypeRef));
-          if (OptionalMangledTypeName.has_value()) {
-            typeNameToManglingMap[TypeName] = OptionalMangledTypeName.value();
-          }
-        }
+      for (const auto &entry : FieldTypeInfoCache) {
+        const std::string &mangledName = entry.first;
+        RemoteRef<FieldDescriptor> descriptor = entry.second;
+
+        auto node = dem.demangleType(mangledName);
+        auto demangledName = nodeToString(node);
+        typeNameToManglingMap[demangledName] = mangledName;
       }
 
       // Collect all conformances and aggregate them per-conforming-type.
@@ -962,6 +963,10 @@ public:
     return BuiltinFixedArrayTypeRef::create(*this, size, element);
   }
 
+  const TypeRef *createBuiltinBorrowType(const TypeRef *referent) {
+    return BuiltinBorrowTypeRef::create(*this, referent);
+  }
+
   // Construct a bound generic type ref along with the parent type info
   // The parent list contains every parent type with at least 1 generic
   // type parameter.
@@ -1103,6 +1108,24 @@ public:
     return createBoundGenericType(builtTypeDecl, args);
   }
 
+  const TypeRef *resolveUnderlyingOpaqueType(
+      remote::RemoteAddress descriptorAddr, unsigned ordinal,
+      llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> genericArgs) {
+    auto underlyingTy = OpaqueUnderlyingTypeReader(descriptorAddr, ordinal);
+    if (!underlyingTy)
+      return nullptr;
+
+    GenericArgumentMap subs;
+    for (unsigned d = 0, de = genericArgs.size(); d < de; ++d) {
+      auto argsForDepth = genericArgs[d];
+      for (unsigned i = 0, ie = argsForDepth.size(); i < ie; ++i) {
+        subs.insert({{d, i}, argsForDepth[i]});
+      }
+    }
+
+    return underlyingTy->subst(*this, subs);
+  }
+
   const TypeRef *
   resolveOpaqueType(NodePointer opaqueDescriptor,
                     llvm::ArrayRef<llvm::ArrayRef<const TypeRef *>> genericArgs,
@@ -1110,31 +1133,32 @@ public:
     // TODO: Produce a type ref for the opaque type if the underlying type isn't
     // available.
 
-    // Try to resolve to the underlying type, if we can.
+    // If we have a symbolic reference, extract the address use that
+    // to resolve the underlying type.
     if (opaqueDescriptor->getKind() ==
         Node::Kind::OpaqueTypeDescriptorSymbolicReference) {
       auto [address, space] = opaqueDescriptor->getRemoteAddress();
-      auto underlyingTy = OpaqueUnderlyingTypeReader(
-          remote::RemoteAddress(address, space), ordinal);
-
-      if (!underlyingTy)
-        return nullptr;
-
-      GenericArgumentMap subs;
-      for (unsigned d = 0, de = genericArgs.size(); d < de; ++d) {
-        auto argsForDepth = genericArgs[d];
-        for (unsigned i = 0, ie = argsForDepth.size(); i < ie; ++i) {
-          subs.insert({{d, i}, argsForDepth[i]});
-        }
-      }
-
-      return underlyingTy->subst(*this, subs);
+      return resolveUnderlyingOpaqueType(remote::RemoteAddress(address, space),
+                                         ordinal, genericArgs);
     }
 
-    auto mangling = mangleNode(opaqueDescriptor, SymbolicResolver(), Dem,
-                               getManglingFlavor());
+    // Otherwise, ask the memory reader for the address of the opaque type's
+    // descriptor's symbol. If the memory reader can provide it, use the
+    // symbol's address to resolve the underlying type.
+    auto *descriptorNode = Dem.createNode(Node::Kind::OpaqueTypeDescriptor);
+    descriptorNode->addChild(opaqueDescriptor, Dem);
+    auto *globalNode = Dem.createNode(Node::Kind::Global);
+    globalNode->addChild(descriptorNode, Dem);
+    auto mangling =
+        mangleNode(globalNode, SymbolicResolver(), Dem, getManglingFlavor());
     if (!mangling.isSuccess())
       return nullptr;
+
+    if (auto addr = OpaqueSymbolAddressReader(mangling.result().str())) {
+      if (auto *underlying =
+              resolveUnderlyingOpaqueType(addr, ordinal, genericArgs))
+        return underlying;
+    }
 
     // Otherwise, build a type ref that represents the opaque type.
     return OpaqueArchetypeTypeRef::create(*this, mangling.result(),
@@ -1517,6 +1541,8 @@ private:
           remote::RemoteAddress)>;
   using IntVariableReader =
       std::function<std::optional<uint64_t>(std::string, unsigned)>;
+  using SymbolAddressReader =
+      std::function<remote::RemoteAddress(const std::string &)>;
 
   /// The external type descriptor finder injected into this TypeRefBuilder, for
   /// lookup of descriptors outside of metadata.
@@ -1548,6 +1574,7 @@ private:
   PointerSymbolResolver OpaquePointerSymbolResolver;
   DynamicSymbolResolver OpaqueDynamicSymbolResolver;
   IntVariableReader OpaqueIntVariableReader;
+  SymbolAddressReader OpaqueSymbolAddressReader;
 
 public:
   template <typename Runtime>
@@ -1631,7 +1658,13 @@ public:
             }
           }
           return result;
-        }) {}
+        }),
+        OpaqueSymbolAddressReader(
+            [&reader](const std::string &symbol) -> remote::RemoteAddress {
+              if (auto R = reader.Reader)
+                return R->getSymbolAddress(symbol);
+              return remote::RemoteAddress();
+            }) {}
 
   Demangle::Node *demangleTypeRef(RemoteRef<char> string,
                                   bool useOpaqueTypeSymbolicReferences = true) {

@@ -16,6 +16,7 @@
 #include "swift/AST/Identifier.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/Version.h"
 #include "swift/Parse/ParseVersion.h"
@@ -28,6 +29,9 @@
 namespace swift {
 
 class ModuleFile;
+enum class CodeGenerationModel: uint8_t;
+struct ExplicitSwiftModuleMap;
+struct ExplicitClangModuleMap;
 enum class ResilienceStrategy : unsigned;
 
 namespace serialization {
@@ -50,9 +54,6 @@ enum class Status {
 
   /// The distribution channel doesn't match.
   ChannelIncompatible,
-
-  /// The module is required to be in OSSA, but is not.
-  NotInOSSA,
 
   /// The module file depends on another module that can't be loaded.
   MissingDependency,
@@ -86,6 +87,10 @@ enum class Status {
   /// The module file was built with a different SDK than the one in use
   /// to build the client.
   SDKMismatch,
+
+  /// The module file was built for embedded and is being used with a
+  /// non-embedded client, or vice-versa.
+  EmbeddedMismatch,
 };
 
 /// Returns the string for the Status enum.
@@ -129,6 +134,7 @@ class ExtendedValidationInfo {
   StringRef ModulePackageName;
   StringRef ExportAsName;
   StringRef PublicModuleName;
+  StringRef OSLogStringSectionName;
   CXXStdlibKind CXXStdlib;
   version::Version SwiftInterfaceCompilerVersion;
   struct {
@@ -147,7 +153,9 @@ class ExtendedValidationInfo {
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
     unsigned StrictMemorySafety: 1;
-    unsigned DeferredCodeGen: 1;
+    unsigned CodeGenModel: 2;
+    unsigned AggressiveCMOEnabled : 1;
+    unsigned LibraryLevel : 2;
   } Bits;
 
 public:
@@ -237,6 +245,11 @@ public:
   StringRef getPublicModuleName() const { return PublicModuleName; }
   void setPublicModuleName(StringRef name) { PublicModuleName = name; }
 
+  StringRef getOSLogStringSectionName() const { return OSLogStringSectionName; }
+  void setOSLogStringSectionName(StringRef name) {
+    OSLogStringSectionName = name;
+  }
+
   StringRef getExportAsName() const { return ExportAsName; }
   void setExportAsName(StringRef name) { ExportAsName = name; }
 
@@ -253,11 +266,25 @@ public:
     Bits.StrictMemorySafety = val;
   }
 
-  bool deferredCodeGen() const {
-    return Bits.DeferredCodeGen;
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.CodeGenModel);
   }
-  void setDeferredCodeGen(bool val = true) {
-    Bits.DeferredCodeGen = val;
+  void setCodeGenerationModel(CodeGenerationModel val) {
+    Bits.CodeGenModel = static_cast<unsigned>(val);
+  }
+
+  bool isAggressiveCMOEnabled() const {
+    return Bits.AggressiveCMOEnabled;
+  }
+  void setAggressiveCMOEnabled(bool val = true) {
+    Bits.AggressiveCMOEnabled = val;
+  }
+
+  LibraryLevel getLibraryLevel() const {
+    return LibraryLevel(Bits.LibraryLevel);
+  }
+  void setLibraryLevel(LibraryLevel level) {
+    Bits.LibraryLevel = unsigned(level);
   }
 
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
@@ -297,8 +324,6 @@ struct SearchPath {
 ///
 /// \param data A buffer containing the serialized AST. Result information
 /// refers directly into this buffer.
-/// \param requiresOSSAModules If true, necessitates the module to be
-/// compiled with -enable-ossa-modules.
 /// \param requiredSDK If not empty, only accept modules built with
 /// a compatible SDK. The StringRef represents the canonical SDK name.
 /// \param target The target triple of the current compilation for
@@ -309,13 +334,15 @@ struct SearchPath {
 /// \param[out] dependencies If present, will be populated with list of
 /// input files the module depends on, if present in INPUT_BLOCK.
 ValidationInfo validateSerializedAST(
-    StringRef data, bool requiresOSSAModules,
-    StringRef requiredSDK,
+    StringRef data, StringRef requiredSDK,
     ExtendedValidationInfo *extendedInfo = nullptr,
     SmallVectorImpl<SerializationOptions::FileDependency> *dependencies =
         nullptr,
     SmallVectorImpl<SearchPath> *searchPaths = nullptr,
-    std::optional<llvm::Triple> target = std::nullopt);
+    ExplicitSwiftModuleMap *explicitSwiftModuleMap = nullptr,
+    ExplicitClangModuleMap *explicitClangModuleMa = nullptr,
+    std::optional<llvm::Triple> target = std::nullopt,
+    std::optional<bool> isEmbedded = std::nullopt);
 
 /// Emit diagnostics explaining a failure to load a serialized AST.
 ///

@@ -363,7 +363,7 @@ protected:
     } else {
       Expr *buildBlockResult = buildBlockVarRef.get();
       // Otherwise, it's a top-level brace and we need to synthesize
-      // a call to `buildFialBlock` if supported.
+      // a call to `buildFinalBlock` if supported.
       if (builder.supports(ctx.Id_buildFinalResult, {Identifier()})) {
         buildBlockResult =
             builder.buildCall(resultLoc, ctx.Id_buildFinalResult,
@@ -650,7 +650,7 @@ protected:
         caseStmt->getCaseLabelItems(),
         caseStmt->hasUnknownAttr() ? caseStmt->getStartLoc() : SourceLoc(),
         caseStmt->getItemTerminatorLoc(), cloneBraceWith(body, newBody),
-        caseStmt->getCaseBodyVariablesOrEmptyArray(), caseStmt->isImplicit(),
+        caseStmt->getCaseBodyVariables(), caseStmt->isImplicit(),
         caseStmt->getFallthroughStmt());
 
     return std::make_pair(caseVarRef.get(), newCase);
@@ -730,12 +730,11 @@ protected:
     auto *newForEach = new (ctx)
         ForEachStmt(forEachStmt->getLabelInfo(), forEachStmt->getForLoc(),
                     forEachStmt->getTryLoc(), forEachStmt->getAwaitLoc(),
-                    forEachStmt->getUnsafeLoc(),
-                    forEachStmt->getPattern(), forEachStmt->getInLoc(),
-                    forEachStmt->getParsedSequence(),
+                    forEachStmt->getUnsafeLoc(), forEachStmt->getPattern(),
+                    forEachStmt->getInLoc(), forEachStmt->getSequence(),
                     forEachStmt->getWhereLoc(), forEachStmt->getWhere(),
                     cloneBraceWith(forEachStmt->getBody(), newBody),
-                    forEachStmt->isImplicit());
+                    forEachStmt->getDeclContext(), forEachStmt->isImplicit());
 
     // For a body of new `do` statement that holds updated `for-in` loop
     // and epilog that consists of a call to `buildArray` that forms the
@@ -771,6 +770,7 @@ protected:
   UNSUPPORTED_STMT(Fail)
   UNSUPPORTED_STMT(PoundAssert)
   UNSUPPORTED_STMT(Case)
+  UNSUPPORTED_STMT(Opaque)
 
 #undef UNSUPPORTED_STMT
 
@@ -956,7 +956,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
     options |= ConstraintSystemFlags::DebugConstraints;
 
   auto resultInterfaceTy = func->getResultInterfaceType();
-  auto resultContextType = func->mapTypeIntoContext(resultInterfaceTy);
+  auto resultContextType = func->mapTypeIntoEnvironment(resultInterfaceTy);
 
   // Determine whether we're inferring the underlying type for the opaque
   // result type of this function.
@@ -982,7 +982,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
   // parameters to appear in the result builder type, because
   // the result builder type will only be used inside the body
   // of this decl; it's not part of the interface type.
-  builderType = func->mapTypeIntoContext(builderType);
+  builderType = func->mapTypeIntoEnvironment(builderType);
 
   {
     auto result = cs.matchResultBuilder(
@@ -1053,9 +1053,7 @@ TypeChecker::applyResultBuilderBodyTransform(FuncDecl *func, Type builderType) {
 
     case SolutionResult::Kind::TooComplex:
       reportSolutionsToSolutionCallback(salvagedResult);
-      func->diagnose(diag::expression_too_complex)
-        .highlight(func->getBodySourceRange());
-      salvagedResult.markAsDiagnosed();
+      cs.diagnoseTooComplex(func->getLoc(), salvagedResult);
       return nullptr;
     }
 
@@ -1289,9 +1287,7 @@ bool AnyFunctionRef::bodyHasExplicitReturnStmt() const {
     return false;
   }
 
-  auto &ctx = getAsDeclContext()->getASTContext();
-  return evaluateOrDefault(ctx.evaluator,
-                           BraceHasExplicitReturnStmtRequest{body}, false);
+  return body->hasExplicitReturnStmt(getAsDeclContext()->getASTContext());
 }
 
 void AnyFunctionRef::getExplicitReturnStmts(

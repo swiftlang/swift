@@ -34,7 +34,9 @@ bb0(%0 : @owned $FileDescriptor):
 }
 
 // CHECK-LABEL: sil hidden [ossa] @fd_deinit2 :
-// CHECK: end_lifetime
+// CHECK:         %1 = drop_deinit
+// CHECK-NEXT:    %2 = destructure_struct %1
+// CHECK-NEXT:    debug_value
 // CHECK-LABEL: } // end sil function 'fd_deinit2'
 sil hidden [ossa] @fd_deinit2 : $@convention(method) (@owned FileDescriptor) -> () {
 bb0(%0 : @owned $FileDescriptor):

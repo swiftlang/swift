@@ -1,0 +1,33 @@
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -compute-side-effects -common-subexpression-elimination | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Obj {
+  var value: Int64
+}
+
+// A pure function returning @owned — must NOT be CSE'd in non-OSSA
+// because the second call's +1 refcount would be lost.
+sil [readnone] @make_obj : $@convention(thin) (Int64) -> @owned Obj
+
+// CHECK-LABEL: sil @owned_apply_must_not_cse :
+// CHECK: [[A:%[0-9]+]] = apply
+// CHECK: [[B:%[0-9]+]] = apply
+// CHECK: strong_release [[B]]
+// CHECK: strong_release [[A]]
+// CHECK-LABEL: } // end sil function 'owned_apply_must_not_cse'
+sil @owned_apply_must_not_cse : $@convention(thin) (Int64) -> () {
+bb0(%0 : $Int64):
+  %f = function_ref @make_obj : $@convention(thin) (Int64) -> @owned Obj
+  %a = apply %f(%0) : $@convention(thin) (Int64) -> @owned Obj
+  %b = apply %f(%0) : $@convention(thin) (Int64) -> @owned Obj
+  strong_release %b : $Obj
+  strong_release %a : $Obj
+  %r = tuple ()
+  return %r : $()
+}

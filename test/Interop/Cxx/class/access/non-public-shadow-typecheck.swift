@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -typecheck -verify -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
+// RUN: %target-swift-frontend %s -typecheck -verify -verify-ignore-unrelated -I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ImportNonPublicCxxMembers
 // REQUIRES: swift_feature_ImportNonPublicCxxMembers
 import NonPublicShadow
 

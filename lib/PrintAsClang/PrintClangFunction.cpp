@@ -21,6 +21,7 @@
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -52,48 +53,59 @@ getKnownTypeInfo(const TypeDecl *typeDecl, PrimitiveTypeMapping &typeMapping,
              : typeMapping.getKnownCTypeInfo(typeDecl);
 }
 
-bool isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
-                 OutputLanguageMode languageMode) {
+enum class KnownTypeKind { Known, KnownSIMD, Unknown };
+
+KnownTypeKind isKnownType(Type t, PrimitiveTypeMapping &typeMapping,
+                          OutputLanguageMode languageMode, ASTContext &ctx) {
   if (auto *typeAliasType = dyn_cast<TypeAliasType>(t.getPointer())) {
     auto aliasInfo =
         getKnownTypeInfo(typeAliasType->getDecl(), typeMapping, languageMode);
     if (aliasInfo != std::nullopt)
-      return true;
+      return aliasInfo->simd ? KnownTypeKind::KnownSIMD : KnownTypeKind::Known;
     return isKnownType(typeAliasType->getSinglyDesugaredType(), typeMapping,
-                       languageMode);
+                       languageMode, ctx);
   }
 
   const TypeDecl *typeDecl;
-  auto *tPtr = t->isOptional() ? t->getOptionalObjectType()->getDesugaredType()
-                               : t->getDesugaredType();
+  auto *tPtr = t->lookThroughSingleOptionalType()->getDesugaredType();
   if (auto *bgt = dyn_cast<BoundGenericStructType>(tPtr)) {
-    return bgt->isUnsafePointer() || bgt->isUnsafeMutablePointer();
+    return (bgt->isUnsafePointer() || bgt->isUnsafeMutablePointer())
+               ? KnownTypeKind::Known
+               : KnownTypeKind::Unknown;
   }
   if (auto *structType = dyn_cast<StructType>(tPtr)) {
     auto nullableInfo =
         getKnownTypeInfo(structType->getDecl(), typeMapping, languageMode);
     if (nullableInfo && nullableInfo->canBeNullable)
-      return true;
+      return nullableInfo->simd ? KnownTypeKind::KnownSIMD
+                                : KnownTypeKind::Known;
   }
   if (auto *classType = dyn_cast<ClassType>(tPtr)) {
-    return classType->getClassOrBoundGenericClass()->hasClangNode() &&
-           isa<clang::ObjCInterfaceDecl>(
-               classType->getClassOrBoundGenericClass()->getClangDecl());
+    return (classType->getClassOrBoundGenericClass()->hasClangNode())
+               ? KnownTypeKind::Known
+               : KnownTypeKind::Unknown;
   }
+  if (t->getAs<BuiltinVectorType>())
+    return typeMapping.getKnownSIMDTypeInfo(t, ctx) ? KnownTypeKind::KnownSIMD
+                                                    : KnownTypeKind::Unknown;
 
   if (auto *structDecl = t->getStructOrBoundGenericStruct())
     typeDecl = structDecl;
   else
-    return false;
-  return getKnownTypeInfo(typeDecl, typeMapping, languageMode) != std::nullopt;
+    return KnownTypeKind::Unknown;
+  return getKnownTypeInfo(typeDecl, typeMapping, languageMode) != std::nullopt
+             ? KnownTypeKind::Known
+             : KnownTypeKind::Unknown;
 }
 
-bool isKnownCxxType(Type t, PrimitiveTypeMapping &typeMapping) {
-  return isKnownType(t, typeMapping, OutputLanguageMode::Cxx);
+KnownTypeKind isKnownCxxType(Type t, PrimitiveTypeMapping &typeMapping,
+                             ASTContext &ctx) {
+  return isKnownType(t, typeMapping, OutputLanguageMode::Cxx, ctx);
 }
 
-bool isKnownCType(Type t, PrimitiveTypeMapping &typeMapping) {
-  return isKnownType(t, typeMapping, OutputLanguageMode::ObjC);
+KnownTypeKind isKnownCType(Type t, PrimitiveTypeMapping &typeMapping,
+                           ASTContext &ctx) {
+  return isKnownType(t, typeMapping, OutputLanguageMode::ObjC, ctx);
 }
 
 struct CFunctionSignatureTypePrinterModifierDelegate {
@@ -144,18 +156,18 @@ private:
   }
 
 public:
-  void printTypeName(const ASTContext &Context, raw_ostream &os) const {
+  void printTypeName(ASTContext &Context, raw_ostream &os) const {
     ClangSyntaxPrinter(Context, os).printClangTypeReference(typeDecl);
   }
 
   static void
   printGenericReturnScaffold(raw_ostream &os, StringRef templateParamName,
                              llvm::function_ref<void(StringRef)> bodyOfReturn) {
-    printReturnScaffold(nullptr, os, templateParamName, templateParamName,
+    printReturnScaffold(false, os, templateParamName, templateParamName,
                         bodyOfReturn);
   }
 
-  void printReturnScaffold(const ASTContext &Context, raw_ostream &os,
+  void printReturnScaffold(ASTContext &Context, raw_ostream &os,
                            llvm::function_ref<void(StringRef)> bodyOfReturn) {
     std::string fullQualifiedType;
     std::string typeName;
@@ -165,13 +177,19 @@ public:
       llvm::raw_string_ostream unqualTypeNameOS(typeName);
       unqualTypeNameOS << typeDecl->getName();
     }
-    printReturnScaffold(typeDecl, os, fullQualifiedType, typeName,
+    printReturnScaffold(isTrivial(typeDecl), os, fullQualifiedType, typeName,
                         bodyOfReturn);
+  }
+
+  static void
+  printSIMDReturnScaffold(StringRef simdTypeName, raw_ostream &os,
+                          llvm::function_ref<void(StringRef)> bodyOfReturn) {
+    printReturnScaffold(true, os, simdTypeName, simdTypeName, bodyOfReturn);
   }
 
 private:
   static void
-  printReturnScaffold(const clang::TagDecl *typeDecl, raw_ostream &os,
+  printReturnScaffold(bool isTrivial, raw_ostream &os,
                       StringRef fullQualifiedType, StringRef typeName,
                       llvm::function_ref<void(StringRef)> bodyOfReturn) {
     os << "alignas(alignof(" << fullQualifiedType << ")) char storage[sizeof("
@@ -180,7 +198,7 @@ private:
        << fullQualifiedType << " *>(storage);\n";
     bodyOfReturn("storage");
     os << ";\n";
-    if (isTrivial(typeDecl)) {
+    if (isTrivial) {
       // Trivial object can be just copied and not destroyed.
       os << "return *storageObjectPtr;\n";
       return;
@@ -270,7 +288,12 @@ public:
   visitExistentialType(ExistentialType *ty,
                        std::optional<OptionalTypeKind> optionalKind,
                        bool isInOutParam) {
-    if (ty->isObjCExistentialType()) {
+    bool hasSwiftSuperClass = false;
+    if (auto superClass = ty->getExistentialLayout().getSuperclass()) {
+      auto *CD = superClass->getClassOrBoundGenericClass();
+      hasSwiftSuperClass = !CD->isObjC();
+    }
+    if (ty->isObjCExistentialType() && !hasSwiftSuperClass) {
       declPrinter.withOutputStream(os).print(ty, optionalKind);
       if (isInOutParam) {
         os << " __strong";
@@ -465,14 +488,23 @@ public:
 
     auto args = BGT->getGenericArgs();
     assert(args.size() == 1);
-    llvm::SaveAndRestore<FunctionSignatureTypeUse> typeUseNormal(
-        typeUseKind, FunctionSignatureTypeUse::TypeReference);
-    // FIXME: We can definitely support pointers to known Clang types.
-    if (!isKnownCType(args.front(), typeMapping))
-      return ClangRepresentation(ClangRepresentation::unsupported);
-    auto partRepr = visitPart(args.front(), OTK_None, /*isInOutParam=*/false);
-    if (partRepr.isUnsupported())
-      return partRepr;
+    auto arg = args.front();
+    if (const auto *structDecl = arg->getStructOrBoundGenericStruct();
+        structDecl && structDecl->getClangDecl()) {
+      ClangTypeHandler handler(structDecl->getClangDecl());
+      if (!handler.isRepresentable())
+        return ClangRepresentation::unsupported;
+      handler.printTypeName(structDecl->getASTContext(), os);
+    } else {
+      llvm::SaveAndRestore<FunctionSignatureTypeUse> typeUseNormal(
+          typeUseKind, FunctionSignatureTypeUse::TypeReference);
+      if (isKnownCType(arg, typeMapping, BGT->getASTContext()) ==
+          KnownTypeKind::Unknown)
+        return ClangRepresentation(ClangRepresentation::unsupported);
+      auto partRepr = visitPart(arg, OTK_None, /*isInOutParam=*/false);
+      if (partRepr.isUnsupported())
+        return partRepr;
+    }
     if (isConst)
       os << " const";
     os << " *";
@@ -497,6 +529,10 @@ public:
   visitBoundGenericEnumType(BoundGenericEnumType *BGT,
                             std::optional<OptionalTypeKind> optionalKind,
                             bool isInOutParam) {
+    if (optionalKind == OTK_None) {
+      if (auto objTy = BGT->getOptionalObjectType())
+        return visitPart(objTy, OTK_Optional, isInOutParam);
+    }
     return visitValueType(BGT, BGT->getDecl(), optionalKind, isInOutParam,
                           BGT->getGenericArgs());
   }
@@ -577,9 +613,11 @@ DeclAndTypeClangFunctionPrinter::printClangFunctionReturnType(
 static void addABIRecordToTypeEncoding(llvm::raw_ostream &typeEncodingOS,
                                        clang::CharUnits offset,
                                        clang::CharUnits end, Type t,
-                                       PrimitiveTypeMapping &typeMapping) {
-  auto info =
-      typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
+                                       PrimitiveTypeMapping &typeMapping,
+                                       ASTContext &ctx) {
+  auto info = typeMapping.getKnownSIMDTypeInfo(t, ctx);
+  if (!info)
+    info = typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
   assert(info);
   typeEncodingOS << '_';
   for (char c : info->name) {
@@ -610,7 +648,8 @@ static std::string encodeTypeInfo(const T &abiTypeInfo,
   ClangSyntaxPrinter(moduleContext->getASTContext(), typeEncodingOS).printBaseName(moduleContext);
   abiTypeInfo.enumerateRecordMembers(
       [&](clang::CharUnits offset, clang::CharUnits end, Type t) {
-        addABIRecordToTypeEncoding(typeEncodingOS, offset, end, t, typeMapping);
+        addABIRecordToTypeEncoding(typeEncodingOS, offset, end, t, typeMapping,
+                                   moduleContext->getASTContext());
       });
   return std::move(typeEncodingOS.str());
 }
@@ -658,7 +697,8 @@ static bool printDirectReturnOrParamCType(
                                              clang::CharUnits end, Type t) {
         lastOffset = offset;
         ++Count;
-        addABIRecordToTypeEncoding(typeEncodingOS, offset, end, t, typeMapping);
+        addABIRecordToTypeEncoding(typeEncodingOS, offset, end, t, typeMapping,
+                                   emittedModule->getASTContext());
       }))
     return false;
   if (isResultType && Count == 0) {
@@ -670,7 +710,8 @@ static bool printDirectReturnOrParamCType(
   assert(Count > 0 && "missing return values");
 
   // FIXME: is this "prettyfying" logic sound for multiple return values?
-  if (isKnownCType(valueType, typeMapping) ||
+  if (isKnownCType(valueType, typeMapping, emittedModule->getASTContext()) ==
+          KnownTypeKind::Known ||
       (Count == 1 && lastOffset.isZero() && !valueType->hasTypeParameter() &&
        (valueType->isAnyClassReferenceType() ||
         isOptionalObjCExistential(valueType) ||
@@ -689,7 +730,10 @@ static bool printDirectReturnOrParamCType(
     abiTypeInfo.enumerateRecordMembers([&](clang::CharUnits offset,
                                            clang::CharUnits end, Type t) {
       auto info =
-          typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
+          typeMapping.getKnownSIMDTypeInfo(t, emittedModule->getASTContext());
+      if (!info)
+        info =
+            typeMapping.getKnownCTypeInfo(t->getNominalOrBoundGenericNominal());
       os << "  " << info->name;
       if (info->canBeNullable)
         os << " _Nullable";
@@ -765,7 +809,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
     ClangSyntaxPrinter(FD->getASTContext(), functionSignatureOS)
         .printNominalTypeOutsideMemberDeclTemplateSpecifiers(typeDecl);
   }
-  if (FD->isGeneric()) {
+  if (FD->hasGenericParamList()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
     if (!cxx_translation::isExposableToCxx(Signature))
       return ClangRepresentation::unsupported;
@@ -893,6 +937,15 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
   if (kind == FunctionSignatureKind::CFunctionProto) {
     // First, verify that the C++ param types are representable.
     for (auto param : *FD->getParameters()) {
+      // Consuming a non-copyable type is not supported, as the
+      // generated thunk would need to copy the parameter.
+      if (param->getSpecifier() == ParamDecl::Specifier::Consuming) {
+        if (auto *nominal =
+                param->getInterfaceType()->getNominalOrBoundGenericNominal()) {
+          if (!nominal->canBeCopyable())
+            return ClangRepresentation::unsupported;
+        }
+      }
       OptionalTypeKind optKind;
       Type objTy;
       std::tie(objTy, optKind) =
@@ -968,8 +1021,8 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
                     ->isAnyClassReferenceType());
           if (isConst)
             functionSignatureOS << "const ";
-          if (isKnownCType(param.getParamDecl().getInterfaceType(),
-                           typeMapping) ||
+          if (isKnownCType(param.getParamDecl().getInterfaceType(), typeMapping,
+                           FD->getASTContext()) != KnownTypeKind::Unknown ||
               (!param.getParamDecl().getInterfaceType()->hasTypeParameter() &&
                param.getParamDecl()
                    .getInterfaceType()
@@ -1085,7 +1138,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
     Type type, StringRef name, const ModuleDecl *moduleContext, bool isInOut,
     bool isIndirect, std::string directTypeEncoding, bool forceSelf) {
   auto namePrinter = [&]() { ClangSyntaxPrinter(moduleContext->getASTContext(), os).printIdentifier(name); };
-  if (!isKnownCxxType(type, typeMapping) &&
+  auto knownTypeKind =
+      isKnownCxxType(type, typeMapping, moduleContext->getASTContext());
+  if (knownTypeKind != KnownTypeKind::Known &&
       !hasKnownOptionalNullableCxxMapping(type)) {
     if (type->is<GenericTypeParamType>()) {
       os << "swift::" << cxx_synthesis::getCxxImplNamespaceName()
@@ -1120,21 +1175,21 @@ void DeclAndTypeClangFunctionPrinter::printCxxToCFunctionParameterUse(
           os << "::" << cxx_synthesis::getCxxImplNamespaceName()
              << "::swift_interop_passDirect_" << directTypeEncoding << '(';
         }
-        if (decl->hasClangNode()) {
-            if (!directTypeEncoding.empty())
-                os << "reinterpret_cast<const char *>(";
-            os << "swift::" << cxx_synthesis::getCxxImplNamespaceName()
-               << "::getOpaquePointer(";
-            namePrinter();
+        if (decl->hasClangNode() || knownTypeKind == KnownTypeKind::KnownSIMD) {
+          if (!directTypeEncoding.empty())
+            os << "reinterpret_cast<const char *>(";
+          os << "swift::" << cxx_synthesis::getCxxImplNamespaceName()
+             << "::getOpaquePointer(";
+          namePrinter();
+          os << ')';
+          if (!directTypeEncoding.empty())
             os << ')';
-            if (!directTypeEncoding.empty())
-                os << ')';
         } else {
-            ClangValueTypePrinter(os, cPrologueOS, interopContext)
-                .printParameterCxxToCUseScaffold(
-                    moduleContext,
-                    [&]() { printTypeImplTypeSpecifier(type, moduleContext); },
-                    namePrinter, forceSelf);
+          ClangValueTypePrinter(os, cPrologueOS, interopContext)
+              .printParameterCxxToCUseScaffold(
+                  moduleContext,
+                  [&]() { printTypeImplTypeSpecifier(type, moduleContext); },
+                  namePrinter, forceSelf);
         }
         if (!directTypeEncoding.empty())
           os << ')';
@@ -1226,7 +1281,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   if (typeDeclContext)
     ClangSyntaxPrinter(FD->getASTContext(), os).printNominalTypeOutsideMemberDeclInnerStaticAssert(
         typeDeclContext);
-  if (FD->isGeneric()) {
+  if (FD->hasGenericParamList()) {
     auto Signature = FD->getGenericSignature().getCanonicalSignature();
     ClangSyntaxPrinter(FD->getASTContext(), os).printGenericSignatureInnerStaticAsserts(Signature);
   }
@@ -1469,7 +1524,9 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
 
   // Values types are returned either direcly in their C representation, or
   // indirectly by a pointer.
-  if (!isKnownCxxType(resultTy, typeMapping) &&
+  auto knownTypeKind =
+      isKnownCxxType(resultTy, typeMapping, moduleContext->getASTContext());
+  if (knownTypeKind != KnownTypeKind::Known &&
       !hasKnownOptionalNullableCxxMapping(resultTy)) {
     if (const auto *gtpt = resultTy->getAs<GenericTypeParamType>()) {
       printGenericReturnSequence(os, gtpt, printCallToCFunc);
@@ -1506,6 +1563,16 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
           printCallToCFunc(/*firstParam=*/resultPointerName);
         }
       };
+      if (knownTypeKind == KnownTypeKind::KnownSIMD) {
+        if (auto *typeAliasType =
+                dyn_cast<TypeAliasType>(resultTy.getPointer())) {
+          auto info = getKnownTypeInfo(typeAliasType->getDecl(), typeMapping,
+                                       OutputLanguageMode::Cxx);
+          ClangTypeHandler::printSIMDReturnScaffold(info->name, os,
+                                                    valueTypeReturnThunker);
+          return;
+        }
+      }
       if (decl->hasClangNode()) {
         ClangTypeHandler handler(decl->getClangDecl());
         assert(handler.isRepresentable());
@@ -1593,27 +1660,6 @@ void DeclAndTypeClangFunctionPrinter::printCxxThunkBody(
   }
 }
 
-static bool checkDuplicatedMethodName(StringRef funcName,
-                                      const AccessorDecl *AD,
-                                      DeclAndTypePrinter &declAndTypePrinter,
-                                      raw_ostream &os) {
-  auto *&decl = declAndTypePrinter.getCxxDeclEmissionScope()
-                    .emittedAccessorMethodNames[funcName];
-
-  if (!decl) {
-    // This is the first time an accessor with this name has been emitted.
-    decl = AD;
-  } else if (decl != AD) {
-    // An accessor for another property had the same name.
-    os << "  // skip emitting accessor method for \'"
-       << AD->getStorage()->getBaseIdentifier().str() << "\'. \'" << funcName
-       << "\' already declared.\n";
-    return false;
-  }
-
-  return true;
-}
-
 void DeclAndTypeClangFunctionPrinter::printCxxMethod(
     DeclAndTypePrinter &declAndTypePrinter,
     const NominalTypeDecl *typeDeclContext, const AbstractFunctionDecl *FD,
@@ -1639,11 +1685,12 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
   if (result.isUnsupported())
     return;
 
+  printCxxReturnsRetainedAttribute(os, resultTy);
   declAndTypePrinter.printAvailability(os, FD);
   if (!isDefinition) {
     os << ";\n";
     if (result.isObjCxxOnly())
-      os << "#endif\n";
+      os << "#endif // defined(__OBJC__)\n";
     return;
   }
 
@@ -1656,7 +1703,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxMethod(
                     dispatchInfo);
   os << "  }\n";
   if (result.isObjCxxOnly())
-    os << "#endif\n";
+    os << "#endif // defined(__OBJC__)\n";
 }
 
 /// Returns true if the given property name like `isEmpty` can be remapped
@@ -1668,7 +1715,7 @@ static bool canRemapBoolPropertyNameDirectly(StringRef name) {
   return startsWithAndLonger("is") || startsWithAndLonger("has");
 }
 
-static std::string remapPropertyName(const AccessorDecl *accessor,
+std::string swift::remapPropertyName(const AccessorDecl *accessor,
                                      Type resultTy) {
   // For a getter or setter, go through the variable or subscript decl.
   StringRef propertyName =
@@ -1697,10 +1744,6 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
   assert(accessor->isSetter() || accessor->getParameters()->size() == 0);
   std::string accessorName = remapPropertyName(accessor, resultTy);
 
-  if (!checkDuplicatedMethodName(accessorName, accessor, declAndTypePrinter,
-                                 os))
-    return;
-
   os << "  ";
 
   FunctionSignatureModifiers modifiers;
@@ -1716,6 +1759,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxPropertyAccessorMethod(
       printFunctionSignature(accessor, signature, accessorName, resultTy,
                              FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  printCxxReturnsRetainedAttribute(os, resultTy);
   declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
@@ -1754,6 +1798,7 @@ void DeclAndTypeClangFunctionPrinter::printCxxSubscriptAccessorMethod(
       printFunctionSignature(accessor, signature, "operator []", resultTy,
                              FunctionSignatureKind::CxxInlineThunk, modifiers);
   assert(!result.isUnsupported() && "C signature should be unsupported too!");
+  printCxxReturnsRetainedAttribute(os, resultTy);
   declAndTypePrinter.printAvailability(os, accessor->getStorage());
   if (!isDefinition) {
     os << ";\n";
@@ -1852,13 +1897,27 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::getTypeRepresentation(
     PrimitiveTypeMapping &typeMapping,
     SwiftToClangInteropContext &interopContext, DeclAndTypePrinter &declPrinter,
     const ModuleDecl *emittedModule, Type ty) {
+  auto [it, inserted] = declPrinter.typeRepresentations.try_emplace(ty);
+  // If we already seen the type but do not have a representation yet assume
+  // representable for now. This can happen for recursive types like:
+  //
+  //    public enum E {
+  //      case foo([E?])
+  //    }
+  //
+  // We make a decision about these types when the function that first
+  // encountered them returns.
+  if (!inserted)
+    return it->second ? (*it->second) : ClangRepresentation::representable;
   CFunctionSignatureTypePrinterModifierDelegate delegate;
   CFunctionSignatureTypePrinter typePrinter(
       llvm::nulls(), llvm::nulls(), typeMapping, OutputLanguageMode::Cxx,
       interopContext, delegate, emittedModule, declPrinter,
       FunctionSignatureTypeUse::TypeReference);
-  return typePrinter.visit(ty, OptionalTypeKind::OTK_None,
-                           /*isInOutParam=*/false);
+  auto result = typePrinter.visit(ty, OptionalTypeKind::OTK_None,
+                                  /*isInOutParam=*/false);
+  declPrinter.typeRepresentations[ty] = result;
+  return result;
 }
 
 void DeclAndTypeClangFunctionPrinter::printTypeName(
@@ -1869,4 +1928,41 @@ void DeclAndTypeClangFunctionPrinter::printTypeName(
       delegate, moduleContext, declPrinter,
       FunctionSignatureTypeUse::TypeReference);
   typePrinter.visit(ty, std::nullopt, /*isInOut=*/false);
+}
+
+void DeclAndTypeClangFunctionPrinter::printCxxReturnsRetainedAttribute(
+    raw_ostream &os, Type resultTy) {
+  if (resultTy->isVoid())
+    return;
+
+  // A function returning NSString? generates a thunk returning `NSString
+  // *_Nullable`.
+  Type unwrapped = resultTy->lookThroughSingleOptionalType();
+
+  if (auto *classDecl = unwrapped->getClassOrBoundGenericClass()) {
+    if (classDecl->hasClangNode()) {
+      if (isa<clang::ObjCContainerDecl>(classDecl->getClangDecl())) {
+        os << " NS_RETURNS_RETAINED";
+        return;
+      }
+      if (classDecl->getForeignClassKind() == ClassDecl::ForeignKind::CFType) {
+        os << " CF_RETURNS_RETAINED";
+        return;
+      }
+      if (classDecl->isForeignReferenceType()) {
+        os << " SWIFT_RETURNS_RETAINED";
+        return;
+      }
+    }
+
+    // Swift class, no annotation.
+    return;
+  }
+
+  // ObjC existential types (id, etc.), the thunks use __bridge_transfer just
+  // like ObjC classes, so emit NS_RETURNS_RETAINED too.
+  if (unwrapped->isObjCExistentialType()) {
+    os << " NS_RETURNS_RETAINED";
+    return;
+  }
 }

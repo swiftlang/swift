@@ -1,0 +1,84 @@
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift %S/Inputs/Overflow.swift -parse-as-library -Onone %swift-debug-flags -o %t/Overflow.exe
+// RUN: %target-codesign %t/Overflow.exe
+// RUN: ! env SWIFT_BACKTRACE=enable=yes,cache=no %target-run %t/Overflow.exe > %t/Overflow.out 2>&1
+// RUN: %FileCheck %s --ignore-case < %t/Overflow.out
+// RUN: ! env SWIFT_BACKTRACE=preset=friendly,enable=yes,cache=no %target-run %t/Overflow.exe > %t/Friendly.out 2>&1
+// RUN: %FileCheck %s --ignore-case --check-prefix FRIENDLY < %t/Friendly.out
+
+// UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+// REQUIRES: executable_test
+// REQUIRES: backtracing
+// REQUIRES: OS=macosx || OS=linux-gnu || OS=windows-msvc
+
+// CHECK: *** Swift runtime failure: arithmetic overflow ***
+
+// CHECK: Thread 0 {{(".*" )?}}crashed:
+
+// CHECK:      0 [inlined] [system] 0x{{[0-9a-f]+}} Swift runtime failure: arithmetic overflow in Overflow.exe at {{.*[\\/]}}<compiler-generated>
+// CHECK-NEXT: 1                    0x{{[0-9a-f]+}} level5() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:22:5
+// CHECK-NEXT: 2 [ra]               0x{{[0-9a-f]+}} level4() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:16:3
+// CHECK-NEXT: 3 [ra]               0x{{[0-9a-f]+}} level3() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:12:3
+// CHECK-NEXT: 4 [ra]               0x{{[0-9a-f]+}} level2() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:8:3
+// CHECK-NEXT: 5 [ra]               0x{{[0-9a-f]+}} level1() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:4:3
+// CHECK-NEXT: 6 [ra]               0x{{[0-9a-f]+}} static Overflow.main() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:28:5
+// CHECK-NEXT: 7 [ra] [system]      0x{{[0-9a-f]+}} static Overflow.$main() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}<compiler-generated>
+// CHECK-NEXT: 8 [ra] [system]      0x{{[0-9a-f]+}} main + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift
+
+// CHECK: Registers:
+
+// CHECK: Images ({{[0-9]+}} omitted):
+
+// CHECK: {{0x[0-9a-f]+}}–{{0x[0-9a-f]+}}{{ +}}{{[0-9a-f]+|<no build ID>}}{{ +}}Overflow.exe{{ +}}{{.*[\\/]}}Overflow.exe
+
+// FRIENDLY: *** Swift runtime failure: arithmetic overflow ***
+
+// FRIENDLY: Thread 0 {{(".*" )?}}crashed:
+
+// FRIENDLY: 0 level5() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:22:5
+
+// FRIENDLY: 20|   print("About to overflow")
+// FRIENDLY-NEXT: 21|
+// FRIENDLY-NEXT: 22|   x -= 1
+// FRIENDLY-NEXT:   |     ^
+// FRIENDLY-NEXT: 23| }
+
+// FRIENDLY: 1 level4() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:16:3
+
+// FRIENDLY: 14|
+// FRIENDLY-NEXT: 15| func level4() {
+// FRIENDLY-NEXT: 16|   level5()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 17| }
+// FRIENDLY-NEXT: 18|
+
+// FRIENDLY: 2 level3() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:12:3
+
+// FRIENDLY: 10|
+// FRIENDLY-NEXT: 11| func level3() {
+// FRIENDLY-NEXT: 12|   level4()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT: 13| }
+// FRIENDLY-NEXT: 14|
+
+// FRIENDLY: 3 level2() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:8:3
+
+// FRIENDLY:  6|
+// FRIENDLY-NEXT:  7| func level2() {
+// FRIENDLY-NEXT:  8|   level3()
+// FRIENDLY-NEXT:   |   ^
+// FRIENDLY-NEXT:  9| }
+// FRIENDLY-NEXT: 10|
+
+// FRIENDLY: 4 level1() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift:4:3
+
+// FRIENDLY: 2|
+// FRIENDLY-NEXT: 3| func level1() {
+// FRIENDLY-NEXT: 4|   level2()
+// FRIENDLY-NEXT:  |   ^
+// FRIENDLY-NEXT: 5| }
+// FRIENDLY-NEXT: 6|
+
+// FRIENDLY: 5 static Overflow.main() + {{[0-9]+}} in Overflow.exe at {{.*[\\/]}}Overflow.swift
+

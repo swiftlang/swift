@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-expression-time-threshold=1
+// RUN: %target-typecheck-verify-swift -solver-scope-threshold=1000
 
 struct S {
   let a: Int

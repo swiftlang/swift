@@ -76,7 +76,7 @@ func consumingSwitchSubject3(ncp: consuming NCPair) {
     // CHECK:   [[FIELD_ACCESS:%.*]] = begin_access [deinit] [static] [no_nested_conflict] [[FIELD]]
     // CHECK:   cond_br {{.*}}, [[SOME_BB:bb[0-9]+]], [[NONE_BB:bb[0-9]+]]
     // CHECK: [[SOME_BB]]:
-    // CHECK:   [[PAYLOAD_ADDR:%.*]] = unchecked_take_enum_data_addr [[FIELD_ACCESS]]
+    // CHECK:   [[PAYLOAD_ADDR:%.*]] = unchecked_inplace_enum_data_addr [[FIELD_ACCESS]]
     // CHECK:   [[PAYLOAD:%.*]] = load [take] [[PAYLOAD_ADDR]]
     // CHECK:   apply {{.*}}({{.*}}, [[PAYLOAD]]) : ${{.*}} (@owned NC)
     // CHECK-NOT: destroy_addr

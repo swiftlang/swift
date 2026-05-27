@@ -27,14 +27,16 @@ using namespace swift;
 CustomAvailabilityDomain::Kind
 getCustomDomainKind(clang::FeatureAvailKind featureAvailKind) {
   switch (featureAvailKind) {
-  case clang::FeatureAvailKind::None:
-    llvm_unreachable("unexpected kind");
   case clang::FeatureAvailKind::Available:
     return CustomAvailabilityDomain::Kind::Enabled;
   case clang::FeatureAvailKind::Unavailable:
     return CustomAvailabilityDomain::Kind::Disabled;
   case clang::FeatureAvailKind::Dynamic:
     return CustomAvailabilityDomain::Kind::Dynamic;
+  case clang::FeatureAvailKind::AlwaysAvailable:
+    return CustomAvailabilityDomain::Kind::AlwaysEnabled;
+  default:
+    llvm::report_fatal_error("unexpected kind");
   }
 }
 
@@ -52,8 +54,16 @@ customDomainForClangDecl(ValueDecl *decl) {
   if (featureInfo.first.empty())
     return nullptr;
 
-  if (featureInfo.second.Kind == clang::FeatureAvailKind::None)
+  // Check that the domain has a supported availability kind.
+  switch (featureInfo.second.Kind) {
+  case clang::FeatureAvailKind::Available:
+  case clang::FeatureAvailKind::Unavailable:
+  case clang::FeatureAvailKind::Dynamic:
+  case clang::FeatureAvailKind::AlwaysAvailable:
+    break;
+  default:
     return nullptr;
+  }
 
   auto &ctx = decl->getASTContext();
   FuncDecl *predicate = nullptr;
@@ -91,18 +101,30 @@ AvailabilityDomain::forCustom(ValueDecl *decl) {
                            AvailabilityDomainForDeclRequest{decl}, {});
 }
 
+static AvailabilityDomain getSwiftRuntimeDomain(ASTContext &ctx) {
+  // If -enable-experimental-feature StandaloneSwiftAvailability is specified
+  // then forcibly separate platform and Swift runtime availability.
+  if (ctx.LangOpts.hasFeature(Feature::StandaloneSwiftAvailability))
+    return AvailabilityDomain::forStandaloneSwiftRuntime();
+
+  // FIXME: [runtime availability] Return the platform Swift runtime domain.
+
+  return AvailabilityDomain::forStandaloneSwiftRuntime();
+}
+
 std::optional<AvailabilityDomain>
 AvailabilityDomain::builtinDomainForString(StringRef string,
                                            const DeclContext *declContext) {
-  // This parameter is used in downstream forks, do not remove.
-  (void)declContext;
-
-  auto domain = llvm::StringSwitch<std::optional<AvailabilityDomain>>(string)
-                    .Case("*", AvailabilityDomain::forUniversal())
-                    .Case("swift", AvailabilityDomain::forSwiftLanguage())
-                    .Case("_PackageDescription",
-                          AvailabilityDomain::forPackageDescription())
-                    .Default(std::nullopt);
+  auto &ctx = declContext->getASTContext();
+  auto domain =
+      llvm::StringSwitch<std::optional<AvailabilityDomain>>(string)
+          .Case("*", AvailabilityDomain::forUniversal())
+          .Case("swift", AvailabilityDomain::forSwiftLanguageMode())
+          .Case("SwiftLanguageMode", AvailabilityDomain::forSwiftLanguageMode())
+          .Case("Swift", getSwiftRuntimeDomain(ctx))
+          .Case("_PackageDescription",
+                AvailabilityDomain::forPackageDescription())
+          .Default(std::nullopt);
 
   if (domain)
     return domain;
@@ -118,7 +140,8 @@ bool AvailabilityDomain::isVersioned() const {
   case Kind::Universal:
   case Kind::Embedded:
     return false;
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
+  case Kind::StandaloneSwiftRuntime:
   case Kind::PackageDescription:
   case Kind::Platform:
     return true;
@@ -136,13 +159,27 @@ bool AvailabilityDomain::isVersionValid(
   case Kind::Universal:
   case Kind::Embedded:
     llvm_unreachable("unexpected domain kind");
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
     return true;
+  case Kind::StandaloneSwiftRuntime:
+    // Swift 5.0 is the first ABI stable Swift runtime version.
+    if (version.getMajor() < 5)
+      return false;
+    return true;
+
   case Kind::Platform:
+    // If the platform kind corresponds to a specific OS, LLVM is the source of
+    // truth for version validity.
     if (auto osType = tripleOSTypeForPlatform(getPlatformKind()))
       return llvm::Triple::isValidVersionForOS(*osType, version);
+
+    // Unified versioning for Apple's operating systems starts at 26.0.
+    if (getPlatformKind() == PlatformKind::anyAppleOS)
+      return (version.getMajor() >= 26);
+
     return true;
+
   case Kind::Custom:
     return true;
   }
@@ -152,9 +189,10 @@ bool AvailabilityDomain::supportsContextRefinement() const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::Embedded:
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
     return false;
+  case Kind::StandaloneSwiftRuntime:
   case Kind::Platform:
   case Kind::Custom:
     return true;
@@ -165,24 +203,31 @@ bool AvailabilityDomain::supportsQueries() const {
   switch (getKind()) {
   case Kind::Universal:
   case Kind::Embedded:
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
     return false;
+  case Kind::StandaloneSwiftRuntime:
   case Kind::Platform:
   case Kind::Custom:
     return true;
   }
 }
 
-bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
+bool AvailabilityDomain::isActive(const ASTContext &ctx,
+                                  bool forTargetVariant) const {
   switch (getKind()) {
   case Kind::Universal:
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
   case Kind::PackageDescription:
   case Kind::Embedded:
     return true;
+  case Kind::StandaloneSwiftRuntime:
+    // FIXME: [runtime availability] Active either when
+    // StandaloneSwiftAvailability is enabled or the target supports a
+    // standalone Swift runtime.
+    return ctx.LangOpts.hasFeature(Feature::SwiftRuntimeAvailability);
   case Kind::Platform:
-    return isPlatformActive(getPlatformKind(), ctx.LangOpts);
+    return isPlatformActive(getPlatformKind(), ctx.LangOpts, forTargetVariant);
   case Kind::Custom:
     // For now, custom domains are always active but it's conceivable that in
     // the future someone might want to define a domain but leave it inactive.
@@ -190,11 +235,30 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   }
 }
 
-bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx) const {
+bool AvailabilityDomain::isActivePlatform(const ASTContext &ctx,
+                                          bool forTargetVariant) const {
   if (!isPlatform())
     return false;
 
-  return isActive(ctx);
+  return isActive(ctx, forTargetVariant);
+}
+
+bool AvailabilityDomain::mustBeSpecifiedAlone() const {
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::SwiftLanguageMode:
+  case Kind::PackageDescription:
+  case Kind::Embedded:
+  case Kind::Custom:
+    return true;
+  case Kind::StandaloneSwiftRuntime:
+  case Kind::Platform:
+    // Platform and Swift runtime availability specifications can appear
+    // together, e.g. `@available(Swift 6, macOS 15, iOS 18, *)`.
+    // If there are ever multiple disjoint groups of domains that may be
+    // specified together in the future, this will need to be re-designed.
+    return false;
+  }
 }
 
 static std::optional<llvm::VersionTuple>
@@ -204,10 +268,14 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
   case AvailabilityDomain::Kind::Embedded:
   case AvailabilityDomain::Kind::Custom:
     return std::nullopt;
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
     return ctx.LangOpts.EffectiveLanguageVersion;
   case AvailabilityDomain::Kind::PackageDescription:
     return ctx.LangOpts.PackageDescriptionVersion;
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+    if (!ctx.LangOpts.hasFeature(Feature::SwiftRuntimeAvailability))
+      return std::nullopt;
+    return ctx.LangOpts.MinSwiftRuntimeVersion;
   case AvailabilityDomain::Kind::Platform:
     if (domain.isActive(ctx))
       return ctx.LangOpts.getMinPlatformVersion();
@@ -217,8 +285,23 @@ getDeploymentVersion(const AvailabilityDomain &domain, const ASTContext &ctx) {
 
 std::optional<AvailabilityRange>
 AvailabilityDomain::getDeploymentRange(const ASTContext &ctx) const {
-  if (auto version = getDeploymentVersion(*this, ctx))
-    return AvailabilityRange{*version};
+  if (isVersioned()) {
+    if (auto version = getDeploymentVersion(*this, ctx))
+      return AvailabilityRange{*version};
+
+    return std::nullopt;
+  }
+
+  if (auto customDomain = getCustomDomain()) {
+    switch (customDomain->getKind()) {
+    case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+      return AvailabilityRange::alwaysAvailable();
+    case CustomAvailabilityDomain::Kind::Enabled:
+    case CustomAvailabilityDomain::Kind::Disabled:
+    case CustomAvailabilityDomain::Kind::Dynamic:
+      return std::nullopt;
+    }
+  }
   return std::nullopt;
 }
 
@@ -226,7 +309,10 @@ llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
   switch (getKind()) {
   case Kind::Universal:
     return "*";
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
+    // FIXME: [runtime availability] Render language mode diags differently.
+    return "Swift";
+  case Kind::StandaloneSwiftRuntime:
     return "Swift";
   case Kind::PackageDescription:
     return "PackageDescription";
@@ -243,8 +329,10 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
   switch (getKind()) {
   case Kind::Universal:
     return "*";
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
     return "swift";
+  case Kind::StandaloneSwiftRuntime:
+    return "Swift";
   case Kind::PackageDescription:
     return "_PackageDescription";
   case Kind::Embedded:
@@ -270,28 +358,51 @@ ModuleDecl *AvailabilityDomain::getModule() const {
   return nullptr;
 }
 
-bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
-  switch (getKind()) {
-  case Kind::Universal:
-    return true;
-  case Kind::SwiftLanguage:
-  case Kind::PackageDescription:
-  case Kind::Embedded:
-  case Kind::Custom:
-    return other == *this;
-  case Kind::Platform:
-    if (getPlatformKind() == other.getPlatformKind())
-      return true;
-    return inheritsAvailabilityFromPlatform(other.getPlatformKind(),
-                                            getPlatformKind());
+/// Returns true if `child` is a strict subset of `parent`.
+static bool domainIsStrictSubsetOf(const AvailabilityDomain &child,
+                                   const AvailabilityDomain &parent) {
+  switch (parent.getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+  case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::Embedded:
+    // These domains do not have any children in the lattice.
+    return false;
+  case AvailabilityDomain::Kind::Platform:
+    return inheritsAvailabilityFromPlatform(child.getPlatformKind(),
+                                            parent.getPlatformKind());
+  case AvailabilityDomain::Kind::Custom:
+    // Custom domains do not yet support inheritance relationships.
+    return false;
   }
+}
+
+bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
+  if (other == *this)
+    return true;
+  return domainIsStrictSubsetOf(other, *this);
+}
+
+bool AvailabilityDomain::isSupersetOf(const AvailabilityDomain &other) const {
+  if (other == *this)
+    return false;
+  return domainIsStrictSubsetOf(other, *this);
+}
+
+bool AvailabilityDomain::isRelated(const AvailabilityDomain &other) const {
+  if (other == *this)
+    return true;
+  return domainIsStrictSubsetOf(other, *this) ||
+         domainIsStrictSubsetOf(*this, other);
 }
 
 bool AvailabilityDomain::isRoot() const {
   switch (getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Embedded:
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
     return true;
   case AvailabilityDomain::Kind::Platform:
@@ -303,6 +414,7 @@ bool AvailabilityDomain::isRoot() const {
 }
 
 AvailabilityDomain AvailabilityDomain::getRootDomain() const {
+  // Currently, all non-platform domains are root domains.
   if (!isPlatform())
     return *this;
 
@@ -318,16 +430,154 @@ AvailabilityDomain AvailabilityDomain::getRootDomain() const {
   return *this;
 }
 
-const AvailabilityDomain
-AvailabilityDomain::getRemappedDomain(const ASTContext &ctx,
-                                      bool &didRemap) const {
+static std::optional<PlatformKind>
+getApplePlatformKindForTarget(const llvm::Triple &target) {
+  if (target.isMacOSX())
+    return PlatformKind::macOS;
+  if (target.isTvOS()) // Must be checked before isiOS.
+    return PlatformKind::tvOS;
+  if (target.isiOS())
+    return PlatformKind::iOS;
+  if (target.isWatchOS())
+    return PlatformKind::watchOS;
+  if (target.isXROS())
+    return PlatformKind::visionOS;
+
+  return std::nullopt;
+}
+
+std::optional<AvailabilityDomain>
+AvailabilityDomain::getRemappedDomainOrNull(const ASTContext &ctx) const {
   if (getPlatformKind() == PlatformKind::iOS &&
-      isPlatformActive(PlatformKind::visionOS, ctx.LangOpts)) {
-    didRemap = true;
+      isPlatformActive(PlatformKind::visionOS, ctx.LangOpts))
     return AvailabilityDomain::forPlatform(PlatformKind::visionOS);
+
+  if (getPlatformKind() == PlatformKind::anyAppleOS) {
+    if (auto applePlatformKind =
+            getApplePlatformKindForTarget(ctx.LangOpts.Target))
+      return AvailabilityDomain::forPlatform(*applePlatformKind);
+
+    return std::nullopt;
   }
 
-  return *this;
+  return std::nullopt;
+}
+
+static const clang::DarwinSDKInfo::RelatedTargetVersionMapping *
+getFallbackVersionMapping(const ASTContext &Ctx,
+                          clang::DarwinSDKInfo::OSEnvPair Kind) {
+  auto *SDKInfo = Ctx.getDarwinSDKInfo();
+  if (!SDKInfo)
+    return nullptr;
+  return SDKInfo->getVersionMapping(Kind);
+}
+
+static std::optional<clang::VersionTuple>
+getRemappedIntroducedVersionForFallbackPlatform(
+    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
+  const auto *Mapping = getFallbackVersionMapping(
+      Ctx, clang::DarwinSDKInfo::OSEnvPair(
+               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
+               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
+  if (!Mapping)
+    return std::nullopt;
+  return Mapping->mapIntroducedAvailabilityVersion(Version);
+}
+
+static std::optional<clang::VersionTuple>
+getRemappedDeprecatedObsoletedVersionForFallbackPlatform(
+    const ASTContext &Ctx, const llvm::VersionTuple &Version) {
+  const auto *Mapping = getFallbackVersionMapping(
+      Ctx, clang::DarwinSDKInfo::OSEnvPair(
+               llvm::Triple::IOS, llvm::Triple::UnknownEnvironment,
+               llvm::Triple::XROS, llvm::Triple::UnknownEnvironment));
+  if (!Mapping)
+    return std::nullopt;
+  return Mapping->mapDeprecatedObsoletedAvailabilityVersion(Version);
+}
+
+AvailabilityRange AvailabilityDomain::getRemappedRange(
+    AvailabilityDomain toDomain, const llvm::VersionTuple &version,
+    AvailabilityVersionKind versionKind, const ASTContext &ctx) const {
+  // Precondition: The target domain inherits from this domain.
+  DEBUG_ASSERT(contains(toDomain));
+
+  // Currently, the only visionOS requires remapping versions from iOS.
+  if (getPlatformKind() == PlatformKind::iOS &&
+      AvailabilityDomain::forPlatform(PlatformKind::visionOS)
+          .contains(toDomain)) {
+    std::optional<clang::VersionTuple> remappedVersion;
+    switch (versionKind) {
+    case AvailabilityVersionKind::Introduced:
+      remappedVersion =
+          getRemappedIntroducedVersionForFallbackPlatform(ctx, version);
+      break;
+    case AvailabilityVersionKind::Deprecated:
+    case AvailabilityVersionKind::Obsoleted:
+      remappedVersion =
+          getRemappedDeprecatedObsoletedVersionForFallbackPlatform(ctx,
+                                                                   version);
+      break;
+    }
+
+    if (remappedVersion)
+      return AvailabilityRange(*remappedVersion);
+  }
+
+  // If there isn't a special remapping rule, the default remapping is to keep
+  // the version as-is and we know this is valid because the target domain
+  // inherits from this domain.
+  return AvailabilityRange{version};
+}
+
+AvailabilityDomainAndRange AvailabilityDomain::getRemappedDomainAndRange(
+    const llvm::VersionTuple &version, AvailabilityVersionKind versionKind,
+    const ASTContext &ctx) const {
+  auto remappedDomain = getRemappedDomainOrNull(ctx);
+  if (!remappedDomain)
+    return {*this, AvailabilityRange{version}};
+
+  return {*remappedDomain,
+          getRemappedRange(*remappedDomain, version, versionKind, ctx)};
+}
+
+bool IsCustomAvailabilityDomainPermanentlyEnabled::evaluate(
+    Evaluator &evaluator, const CustomAvailabilityDomain *customDomain) const {
+  switch (customDomain->getKind()) {
+  case CustomAvailabilityDomain::Kind::Enabled:
+  case CustomAvailabilityDomain::Kind::Disabled:
+  case CustomAvailabilityDomain::Kind::Dynamic:
+    return false;
+
+  case CustomAvailabilityDomain::Kind::AlwaysEnabled:
+    break;
+  }
+
+  auto *domainDecl = customDomain->getDecl();
+  if (!domainDecl)
+    return false;
+
+  if (auto deprecatedAttr = domainDecl->getDeprecatedAttr()) {
+    if (deprecatedAttr->getDomain().isUniversal())
+      return true;
+  }
+
+  if (auto unavailableAttr = domainDecl->getUnavailableAttr()) {
+    if (unavailableAttr->getDomain().isUniversal())
+      return true;
+  }
+
+  return false;
+}
+
+bool AvailabilityDomain::isPermanentlyAlwaysEnabled() const {
+  if (auto *customDomain = getCustomDomain()) {
+    if (auto *domainDecl = customDomain->getDecl())
+      return evaluateOrDefault(
+          domainDecl->getASTContext().evaluator,
+          IsCustomAvailabilityDomainPermanentlyEnabled{customDomain}, false);
+  }
+  return false;
 }
 
 void AvailabilityDomain::print(llvm::raw_ostream &os) const {
@@ -337,7 +587,8 @@ void AvailabilityDomain::print(llvm::raw_ostream &os) const {
 AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:
-  case Kind::SwiftLanguage:
+  case Kind::SwiftLanguageMode:
+  case Kind::StandaloneSwiftRuntime:
   case Kind::PackageDescription:
   case Kind::Embedded:
   case Kind::Platform:
@@ -359,7 +610,8 @@ bool StableAvailabilityDomainComparator::operator()(
 
   switch (lhsKind) {
   case AvailabilityDomain::Kind::Universal:
-  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::SwiftLanguageMode:
+  case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::Embedded:
     return false;
@@ -381,8 +633,8 @@ CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name, Kind kind,
                                                    ModuleDecl *mod,
                                                    ValueDecl *decl,
                                                    FuncDecl *predicateFunc)
-    : name(name), kind(kind), mod(mod), decl(decl),
-      predicateFunc(predicateFunc) {
+    : name(name), mod(mod), decl(decl), predicateFunc(predicateFunc),
+      kind(kind) {
   ASSERT(!name.empty());
   ASSERT(mod);
   if (predicateFunc)
@@ -414,6 +666,8 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
 
   bool hasCustomAvailability =
       ctx.LangOpts.hasFeature(Feature::CustomAvailability);
+  bool hasSwiftRuntimeAvailability =
+      ctx.LangOpts.hasFeature(Feature::SwiftRuntimeAvailability);
 
   if (!domain) {
     auto domainString = identifier.str();
@@ -434,11 +688,42 @@ AvailabilityDomainOrIdentifier::lookUpInDeclContext(
     return std::nullopt;
   }
 
-  if (domain->isCustom() && !hasCustomAvailability &&
-      !declContext->isInSwiftinterface()) {
-    diags.diagnose(loc, diag::attr_availability_requires_custom_availability,
-                   *domain);
+  // The remaining diagnostics are suppressed in .swiftinterfaces.
+  if (declContext->isInSwiftinterface())
+    return domain;
+
+  // Use of custom domains requires the 'CustomAvailability' feature.
+  if (domain->isCustom() && !hasCustomAvailability) {
+    diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
+                   "CustomAvailability");
     return std::nullopt;
+  }
+
+  // Use of the 'Swift' domain requires the 'SwiftRuntimeAvailability' feature.
+  if (!hasSwiftRuntimeAvailability && domain->isStandaloneSwiftRuntime()) {
+    diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
+                   "SwiftRuntimeAvailability");
+    return std::nullopt;
+  }
+
+  if (domain->isSwiftLanguageMode()) {
+    // When the 'SwiftRuntimeAvailability' feature is enabled, the 'swift'
+    // domain spelling is deprecated in favor of 'SwiftLanguageMode'.
+    if (hasSwiftRuntimeAvailability && identifier.str() == "swift") {
+      diags
+          .diagnose(loc, diag::availability_domain_renamed, identifier,
+                    "SwiftLanguageMode")
+          .fixItReplace(SourceRange(loc), "SwiftLanguageMode");
+    }
+
+    // Use of the 'SwiftLanguageMode' domain spelling requires the
+    // 'SwiftRuntimeAvailability' feature.
+    if (!hasSwiftRuntimeAvailability &&
+        identifier.str() == "SwiftLanguageMode") {
+      diags.diagnose(loc, diag::availability_domain_requires_feature, *domain,
+                     "SwiftRuntimeAvailability");
+      return std::nullopt;
+    }
   }
 
   return domain;

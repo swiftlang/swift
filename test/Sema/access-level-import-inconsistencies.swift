@@ -19,18 +19,25 @@
 public struct LibType {}
 
 // RUN: %target-swift-frontend -typecheck %t/OneFile_AllExplicit.swift -I %t \
-// RUN:   -package-name package -verify
+// RUN:   -package-name package -verify -verify-additional-prefix noerror-
+// RUN: %target-swift-frontend -typecheck %t/OneFile_AllExplicit.swift -I %t \
+// RUN:   -package-name package -verify -verify-additional-prefix werror- \
+// RUN:   -Werror InconsistentImportAccess
 //--- OneFile_AllExplicit.swift
 public import Lib // expected-warning {{public import of 'Lib' was not used in public declarations or inlinable code}}
 // expected-note @-1 4 {{imported 'public' here}}
 package import Lib // expected-warning {{package import of 'Lib' was not used in package declarations}}
-// expected-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'package' access level will be ignored}}
+// expected-noerror-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'package' access level will be ignored}}
+// expected-werror-error @-2 {{module 'Lib' is imported as 'public' from the same file; this 'package' access level will be ignored}}
 internal import Lib
-// expected-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'internal' access level will be ignored}}
+// expected-noerror-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'internal' access level will be ignored}}
+// expected-werror-error @-2 {{module 'Lib' is imported as 'public' from the same file; this 'internal' access level will be ignored}}
 fileprivate import Lib
-// expected-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'fileprivate' access level will be ignored}}
+// expected-noerror-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'fileprivate' access level will be ignored}}
+// expected-werror-error @-2 {{module 'Lib' is imported as 'public' from the same file; this 'fileprivate' access level will be ignored}}
 private import Lib
-// expected-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'private' access level will be ignored}}
+// expected-noerror-warning @-1 {{module 'Lib' is imported as 'public' from the same file; this 'private' access level will be ignored}}
+// expected-werror-error @-2 {{module 'Lib' is imported as 'public' from the same file; this 'private' access level will be ignored}}
 
 // RUN: %target-swift-frontend -typecheck %t/ManyFiles_AllExplicit_File?.swift -I %t \
 // RUN:   -package-name package -verify

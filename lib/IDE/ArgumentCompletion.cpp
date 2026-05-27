@@ -18,6 +18,7 @@
 #include "swift/IDE/SelectedOverloadInfo.h"
 #include "swift/IDE/SignatureHelp.h"
 #include "swift/Sema/ConstraintSystem.h"
+#include "swift/Sema/TypeVariableType.h"
 #include "swift/Sema/IDETypeChecking.h"
 
 using namespace swift;
@@ -133,10 +134,12 @@ tryResolveDoubleAppliedFunction(CallExpr *OuterCall, const Solution &S) {
   if (!FuncRefInfo.isDoubleApply())
     return std::nullopt;
 
-  auto CalleeTy = Overload->adjustedOpenedType->getAs<AnyFunctionType>();
-  auto ResultTy = S.simplifyTypeForCodeCompletion(CalleeTy->getResult());
+  auto CalleeTy = S.simplifyTypeForCodeCompletion(Overload->adjustedOpenedType)
+                      ->getAs<AnyFunctionType>();
+  if (!CalleeTy)
+    return std::nullopt;
 
-  auto *FuncTy = ResultTy->getAs<AnyFunctionType>();
+  auto *FuncTy = CalleeTy->getResult()->getAs<AnyFunctionType>();
   if (!FuncTy)
     return std::nullopt;
 
@@ -199,7 +202,7 @@ void ArgumentTypeCheckCompletionCallback::sawSolutionImpl(const Solution &S) {
     }
   }
   if (ExpectedCallType &&
-      (ExpectedCallType->hasUnresolvedType() ||
+      (ExpectedCallType->hasError() ||
        ExpectedCallType->hasUnboundGenericType())) {
     ExpectedCallType = Type();
   }

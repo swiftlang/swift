@@ -42,6 +42,7 @@ add_library(swift_StringProcessing
   Regex/Core.swift
   Regex/ASTConversion.swift
   Regex/DSLTree.swift
+  Regex/DSLList.swift
   Regex/AnyRegexOutput.swift
   LiteralPrinter.swift
   MatchingOptions.swift
@@ -62,6 +63,8 @@ add_library(swift_StringProcessing
   Engine/Metrics.swift
   Engine/MECapture.swift
   ByteCodeGen.swift
+  ByteCodeGen+DSLList.swift
+  Optimizations/AutoPossessification.swift
   Utility/AsciiBitset.swift
   Utility/Traced.swift
   Utility/TypedIndex.swift
@@ -77,7 +80,8 @@ set_target_properties(swift_StringProcessing PROPERTIES
 
 target_link_libraries(swift_StringProcessing PRIVATE
     swift_RegexParser
-    swiftCore)
+    swiftCore
+    $<$<BOOL:${SwiftSwiftDirectRuntime_FOUND}>:swiftSwiftDirectRuntime>)
 
 install(TARGETS swift_StringProcessing
   ARCHIVE DESTINATION "${SwiftStringProcessing_INSTALL_LIBDIR}"
@@ -86,4 +90,5 @@ install(TARGETS swift_StringProcessing
 emit_swift_interface(swift_StringProcessing)
 install_swift_interface(swift_StringProcessing)
 
+generate_plist(swiftStringProcessing "${CMAKE_PROJECT_VERSION}" swift_StringProcessing)
 embed_manifest(swift_StringProcessing)

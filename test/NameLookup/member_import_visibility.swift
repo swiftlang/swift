@@ -2,14 +2,14 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/MemberImportVisibility/members_A.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t -package-name TestPackage %S/Inputs/MemberImportVisibility/members_B.swift
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_C.swift
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -verify-additional-prefix ambiguity-
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 6 -package-name TestPackage -verify-additional-prefix ambiguity-
-// RUN: %target-swift-frontend -typecheck %s -I %t -verify -swift-version 5 -package-name TestPackage -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -verify-ignore-unrelated -swift-version 5 -package-name TestPackage -verify-additional-prefix ambiguity-
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -verify-ignore-unrelated -swift-version 6 -package-name TestPackage -verify-additional-prefix ambiguity-
+// RUN: %target-swift-frontend -typecheck %s -I %t -verify -verify-ignore-unrelated -swift-version 5 -package-name TestPackage -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
 
 // REQUIRES: swift_feature_MemberImportVisibility
 
 import members_C
-// expected-member-visibility-note 20{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
+// expected-member-visibility-note 27{{add import of module 'members_B'}}{{1-1=internal import members_B\n}}
 
 
 func testExtensionMembers(x: X, y: Y<Z>) {
@@ -47,11 +47,11 @@ func testExtensionMembers(x: X, y: Y<Z>) {
   func takesKeyPath<T, U>(_ t: T, _ keyPath: KeyPath<T, U>) -> () { }
 
   takesKeyPath(x, \.propXinA)
-  takesKeyPath(x, \.propXinB) // expected-member-visibility-warning{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  takesKeyPath(x, \.propXinB) // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
   takesKeyPath(x, \.propXinC)
 
   takesKeyPath(x, \.propXinA.description)
-  takesKeyPath(x, \.propXinB.description) // expected-member-visibility-warning{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  takesKeyPath(x, \.propXinB.description) // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
   takesKeyPath(x, \.propXinC.description)
 }
 
@@ -66,27 +66,57 @@ func testOperatorMembers(x: X, y: Y<Z>) {
   _ = y <> y
 }
 
-extension X {
-  var testProperties: (Bool, Bool, Bool, Bool) {
-    return (
-      propXinA,
-      propXinB, // expected-member-visibility-error{{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
-      propXinB_package, // expected-member-visibility-error{{property 'propXinB_package' is not available due to missing import of defining module 'members_B}}
-      propXinC
-    )
-  }
+struct GenericType<T> { }
 
-  func testNestedTypes() {
+extension X {
+  var testPropertyInA: Bool { propXinA }
+  var testPropertyInB: Bool { propXinB } // expected-member-visibility-error {{property 'propXinB' is not available due to missing import of defining module 'members_B'}}
+  var testPropertyInB_package: Bool { propXinB_package } // expected-member-visibility-error{{property 'propXinB_package' is not available due to missing import of defining module 'members_B}}
+  var testPropertyInC: Bool { propXinC }
+
+  // This is not diagnosed in either mode (the property from the nearest scope is always preferred
+  var testAmbiguousProp: Bool { ambiguousProp }
+
+  func testTypeExpressions() {
     _ = NestedInA.self
     _ = NestedInB.self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = NestedInB_package.self // expected-member-visibility-error{{struct 'NestedInB_package' is not available due to missing import of defining module 'members_B'}}
+    _ = (NestedInB).self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+    _ = (NestedInA, NestedInB, NestedInC).self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+    _ = GenericType<NestedInB>.self // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
     _ = NestedInC.self
+    _ = AmbiguousNestedType.self // expected-ambiguity-error{{ambiguous use of 'AmbiguousNestedType'}}
   }
 
-  var nestedInA: NestedInA { fatalError() }
-  var nestedInB: NestedInB { fatalError() } // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
-  var nestedInB_package: NestedInB_package { fatalError() } // expected-member-visibility-error{{struct 'NestedInB_package' is not available due to missing import of defining module 'members_B'}}
-  var nestedInC: NestedInC { fatalError() }
+  var hasNestedInAType: NestedInA { fatalError() }
+  var hasNestedInBType: NestedInB { fatalError() } // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+  var hasNestedInB_packageType: NestedInB_package { fatalError() } // expected-member-visibility-error{{struct 'NestedInB_package' is not available due to missing import of defining module 'members_B'}}
+  var hasNestedInBTrivialTupleType: (NestedInB) { fatalError() } // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+  var hasTupleTypeContainingNestedInB: (NestedInA, NestedInB, NestedInC) { fatalError() } // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+  var hasNestedInBAsGenericTypeParameter: GenericType<NestedInB> { fatalError() } // expected-member-visibility-error{{struct 'NestedInB' is not available due to missing import of defining module 'members_B'}}
+  var hasNestedInCType: NestedInC { fatalError() }
+
+  func hasNestedInAInGenericReqs<T>(_ t: T) where T: ProtoNestedInA { }
+  func hasNestedInBInGenericReqs<T>(_ t: T) where T: ProtoNestedInB { } // expected-member-visibility-error{{protocol 'ProtoNestedInB' is not available due to missing import of defining module 'members_B'}}
+  func hasNestedInCInGenericReqs<T>(_ t: T) where T: ProtoNestedInC { }
+
+  func testMembersShadowingGlobals() {
+    shadowedByMemberOnXinA()
+    shadowedByMemberOnXinB() // expected-member-visibility-warning{{'shadowedByMemberOnXinB()' is deprecated}}
+    shadowedByMemberOnXinC()
+
+    _ = max(0, 1) // expected-ambiguity-error{{static member 'max' cannot be used on instance of type 'X'}}
+    // expected-ambiguity-error@-1{{cannot call value of non-function type 'Int'}}
+  }
+
+  static func testStaticMembersShadowingGlobals() {
+    shadowedByStaticMemberOnXinA()
+    shadowedByStaticMemberOnXinB() // expected-member-visibility-warning{{'shadowedByStaticMemberOnXinB()' is deprecated}}
+    shadowedByStaticMemberOnXinC()
+
+    _ = max(0, 1) // expected-ambiguity-error{{use of 'max' refers to instance method rather than global function 'max' in module 'Swift'}}
+    // expected-ambiguity-note@-1{{use 'Swift.' to reference the global function in module 'Swift'}}
+  }
 }
 
 extension X.NestedInA {}
@@ -94,7 +124,7 @@ extension X.NestedInB {} // expected-member-visibility-error{{struct 'NestedInB'
 extension X.NestedInB_package {} // expected-member-visibility-error{{struct 'NestedInB_package' is not available due to missing import of defining module 'members_B'}}
 extension X.NestedInC {}
 
-func testTopLevelTypes() {
+func testTypeExpressionsReferencingTopLevelTypes() {
   _ = EnumInA.self
   _ = EnumInB.self // expected-error{{cannot find 'EnumInB' in scope}}
   _ = EnumInB_package.self // expected-error{{cannot find 'EnumInB_package' in scope}}
@@ -107,7 +137,32 @@ class DerivedFromClassInC: DerivedClassInC {
   override func methodInC() {}
 }
 
-struct ConformsToProtocolInA: ProtocolInA {} // expected-member-visibility-error{{type 'ConformsToProtocolInA' does not conform to protocol 'ProtocolInA'}} expected-member-visibility-note {{add stubs for conformance}}
+struct ConformsToProtocolInA1: ProtocolInA1 {}
+
+// FIXME: Should diagnose import needed for defaultedRequirementInB().
+struct ConformsToProtocolInA2: ProtocolInA2 {}
+// expected-member-visibility-error@-1{{type 'ConformsToProtocolInA2' does not conform to protocol 'ProtocolInA2'}}
+// expected-member-visibility-note@-2{{add stubs for conformance}}
+
+struct ConformsToProtocolInA3: ProtocolInA3 {}
+struct ConformsToProtocolInA4: ProtocolInA4 {}
+struct ConformsToProtocolInC1: ProtocolInC1 {}
+struct ConformsToProtocolInC2: ProtocolInC2 {}
+
+struct ConformsToProtocolInC3: ProtocolInC3, EmptyProtocolInA {}
+// expected-member-visibility-error@-1{{type 'ConformsToProtocolInC3' does not conform to protocol 'ProtocolInB3'}}
+// expected-member-visibility-note@-2{{add stubs for conformance}}
+
+// FIXME: The missing import for WitnessedInB should be diagnosed (rdar://154237873)
+extension StructInA1: ProtocolWithAssociatedTypesInA {}
+// expected-warning@-1{{extension declares a conformance of imported type 'StructInA1' to imported protocol 'ProtocolWithAssociatedTypesInA'; this will not behave correctly if the owners of 'members_A' introduce this conformance in the future}}
+// expected-note@-2{{add '@retroactive' to silence this warning}}
+// expected-member-visibility-error@-3{{type 'StructInA1' does not conform to protocol 'ProtocolWithAssociatedTypesInA'}}
+// expected-member-visibility-note@-4{{add stubs for conformance}}{{55-55=\n    public typealias WitnessedInB = <#type#>\n}}
+
+extension StructInA2: @retroactive Hashable {
+  public func hash(into: inout Hasher) { }
+}
 
 func testInheritedMethods(
   a: BaseClassInA,
@@ -125,6 +180,29 @@ func testInheritedMethods(
   c.methodInC()
 
   a.overriddenMethod()
-  b.overriddenMethod() // expected-member-visibility-error{{instance method 'overriddenMethod()' is not available due to missing import of defining module 'members_B'}}
+  b.overriddenMethod()
   c.overriddenMethod()
+
+  a.overriddenInBMethod()
+  b.overriddenInBMethod()
+  c.overriddenInBMethod()
+}
+
+func testLeadingDotSyntax() {
+  func takesP<T: P>(_: T) { }
+  takesP(.zInA)
+  takesP(.zInB) // expected-member-visibility-error{{static property 'zInB' is not available due to missing import of defining module 'members_B'}}
+  takesP(.zInC)
+  takesP(.zAmbiguous)
+}
+
+func testConformanceMember(_ h1: HasEquatableMembers, _ h2: HasEquatableMembers) {
+  _ = h1.a == h2.a
+  // Technically, this references the EquatableInB.== member that hasn't been
+  // imported. However, the conformance of EquatableInB: Equatable is visible
+  // here because conformances are not yet subject to import visibility rules.
+  // As a result, the == requirement is technically visible and therefore there
+  // should be no diagnostic with MemberImportVisibility enabled.
+  _ = h1.b == h2.b
+  _ = h1.c == h2.c
 }

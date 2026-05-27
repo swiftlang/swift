@@ -37,6 +37,7 @@ set_property(DIRECTORY "${binary_dir}" PROPERTY EXCLUDE_FROM_ALL TRUE)
 set(SWIFT_SYNTAX_MODULES
   SwiftBasicFormat
   SwiftIfConfig
+  SwiftWarningControl
   SwiftParser
   SwiftParserDiagnostics
   SwiftDiagnostics
@@ -52,6 +53,10 @@ set(SWIFT_SYNTAX_MODULES
   # For swift-plugin-server
   SwiftLibraryPluginProvider
 )
+
+foreach(module ${SWIFT_SYNTAX_MODULES})
+  _add_swift_caching_compile_options(${module})
+endforeach()
 
 # Install shared runtime libraries
 if(CMAKE_SYSTEM_NAME MATCHES Windows)

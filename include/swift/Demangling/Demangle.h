@@ -117,6 +117,7 @@ enum class FunctionSigSpecializationParamKind : unsigned {
   InOutToOut = 8,
   ConstantPropKeyPath = 9,
   ConstantPropStruct = 10,
+  ClosurePropPreviousArg = 11,
 
   // Option Set Flags use bits 6-31. This gives us 26 bits to use for option
   // flags.
@@ -163,7 +164,9 @@ enum class SpecializationPass : uint8_t {
   GenericSpecializer,
   MoveDiagnosticInOutToOut,
   AsyncDemotion,
-  LAST = AsyncDemotion
+  PackSpecialization,
+  EmbeddedWitnessCallSpecialization,
+  LAST = EmbeddedWitnessCallSpecialization
 };
 
 constexpr uint8_t MAX_SPECIALIZATION_PASS = 10;
@@ -891,7 +894,7 @@ public:
 
   virtual ~NodePrinter() = default;
 
-  void printRoot(NodePointer root) {
+  virtual void printRoot(NodePointer root) {
     isValid = true;
     print(root, 0);
   }

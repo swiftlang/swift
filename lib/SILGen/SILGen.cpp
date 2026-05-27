@@ -64,9 +64,7 @@ SILGenModule::SILGenModule(SILModule &M, ModuleDecl *SM)
       FileIDsByFilePath(SM->computeFileIDMap(/*shouldDiagnose=*/true)) {
   const SILOptions &Opts = M.getOptions();
   if (!Opts.UseProfile.empty()) {
-    // FIXME: Create file system to read the profile. In the future, the vfs
-    // needs to come from CompilerInstance.
-    auto FS = llvm::vfs::getRealFileSystem();
+    auto FS = M.getASTContext().SourceMgr.getFileSystem();
     auto ReaderOrErr =
         llvm::IndexedInstrProfReader::create(Opts.UseProfile, *FS);
     if (auto E = ReaderOrErr.takeError()) {
@@ -385,20 +383,12 @@ static FuncDecl *lookupConcurrencyIntrinsic(ASTContext &C, StringRef name) {
       /*default=*/nullptr);
 }
 
-FuncDecl *SILGenModule::getAsyncLetStart() {
-  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLetStart");
-}
-
 FuncDecl *SILGenModule::getAsyncLetGet() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get");
 }
 
 FuncDecl *SILGenModule::getAsyncLetGetThrowing() {
   return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_get_throwing");
-}
-
-FuncDecl *SILGenModule::getFinishAsyncLet() {
-  return lookupConcurrencyIntrinsic(getASTContext(), "_asyncLet_finish");
 }
 
 FuncDecl *SILGenModule::getTaskFutureGet() {
@@ -535,24 +525,25 @@ Type SILGenModule::getConfiguredExecutorFactory() {
     mainType->lookupQualified(mainType,
                               DeclNameRef(identifier),
                               SourceLoc(),
-                              NL_RemoveNonVisible | NL_RemoveOverridden
-                              | NL_OnlyTypes | NL_ProtocolMembers,
+                              NL_RemoveNonVisible |
+                              NL_RemoveOverridden |
+                              NL_OnlyTypes |
+                              NL_RemoveAssociatedTypes |
+                              NL_ProtocolMembers,
                               decls);
     for (auto decl : decls) {
-      TypeDecl *typeDecl = dyn_cast<TypeDecl>(decl);
-      if (typeDecl) {
-        if (auto *nominalDecl = dyn_cast<NominalTypeDecl>(typeDecl)) {
-          return nominalDecl->getDeclaredType();
-        }
+      auto *genericDecl = cast<GenericTypeDecl>(decl);
 
-        if (isa<AssociatedTypeDecl>(typeDecl)) {
-          // We ignore associatedtype declarations; those with a default will
-          // turn into a `typealias` instead.
+      // Skip generic declarations.
+      if (genericDecl->hasGenericParamList())
+        continue;
+
+      // Skip typealiases with an unbound generic type as their underlying type.
+      if (auto *typeAliasDecl = dyn_cast<TypeAliasDecl>(genericDecl))
+        if (typeAliasDecl->getDeclaredInterfaceType()->is<UnboundGenericType>())
           continue;
-        }
 
-        return typeDecl->getDeclaredInterfaceType();
-      }
+      return genericDecl->getDeclaredInterfaceType();
     }
   }
 
@@ -673,10 +664,11 @@ SILGenModule::getKeyPathProjectionCoroutine(bool isReadAccess,
   auto env = sig.getGenericEnvironment();
 
   SILGenFunctionBuilder builder(*this);
-  fn = builder.createFunction(
-      SILLinkage::PublicExternal, functionName, functionTy, env,
-      /*location*/ std::nullopt, IsNotBare, IsNotTransparent, IsNotSerialized,
-      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
+  fn = builder.createFunction(SILLinkage::PublicExternal, functionName,
+                              functionTy, ActorIsolation::forUnspecified(), env,
+                              /*location*/ std::nullopt, IsNotBare,
+                              IsNotTransparent, IsNotSerialized, IsNotDynamic,
+                              IsNotDistributed, IsNotRuntimeAccessible);
 
   return fn;
 }
@@ -801,32 +793,6 @@ static bool isEmittedOnDemand(SILModule &M, SILDeclRef constant) {
   return false;
 }
 
-static ActorIsolation getActorIsolationForFunction(SILFunction &fn) {
-  if (auto constant = fn.getDeclRef()) {
-    if (constant.kind == SILDeclRef::Kind::Deallocator) {
-      // Deallocating destructor is always nonisolated. Isolation of the deinit
-      // applies only to isolated deallocator and destroyer.
-      return ActorIsolation::forNonisolated(false);
-    }
-
-    // If we have a closure expr, check if our type is
-    // nonisolated(nonsending). In that case, we use that instead.
-    if (auto *closureExpr = constant.getAbstractClosureExpr()) {
-      if (auto actorIsolation = closureExpr->getActorIsolation())
-        return actorIsolation;
-    }
-
-    // If we have actor isolation for our constant, put the isolation onto the
-    // function. If the isolation is unspecified, we do not return it.
-    if (auto isolation =
-            getActorIsolationOfContext(constant.getInnermostDeclContext()))
-      return isolation;
-  }
-
-  // Otherwise, return for unspecified.
-  return ActorIsolation::forUnspecified();
-}
-
 SILFunction *SILGenModule::getFunction(SILDeclRef constant,
                                        ForDefinition_t forDefinition) {
   // If we already emitted the function, return it.
@@ -853,7 +819,6 @@ SILFunction *SILGenModule::getFunction(SILDeclRef constant,
       });
 
   F->setDeclRef(constant);
-  F->setActorIsolation(getActorIsolationForFunction(*F));
 
   assert(F && "SILFunction should have been defined");
 
@@ -915,6 +880,8 @@ bool SILGenModule::shouldSkipDecl(Decl *D) {
 }
 
 void SILGenModule::visit(Decl *D) {
+  PrettyStackTraceDecl debugStack("silgen visitDecl", D);
+
   if (shouldSkipDecl(D))
     return;
 
@@ -1383,8 +1350,23 @@ void SILGenModule::preEmitFunction(SILDeclRef constant, SILFunction *F,
   // Initialize F with the constant we created for it.
   F->setDeclRef(constant);
 
-  // Set our actor isolation.
-  F->setActorIsolation(getActorIsolationForFunction(*F));
+  // Closures automatically infer [manual_ownership] based on outermost func.
+  //
+  // We need to add this constraint _prior_ to emitting the closure's body,
+  // because the output from SILGen slightly differs because of this constraint
+  // when it comes to the CopyExpr and SILMoveOnlyWrappedType usage.
+  //
+  // If ManualOwnership ends up subsuming those prior mechanisms for an
+  // explicit-copy mode, we can move this somewhere else, like postEmitFunction.
+  //
+  // FIXME: maybe this should happen in SILFunctionBuilder::getOrCreateFunction
+  if (getASTContext().LangOpts.hasFeature(Feature::ManualOwnership))
+    if (auto *ace = constant.getAbstractClosureExpr())
+      if (auto *dc = ace->getOutermostFunctionContext())
+        if (auto *decl = dc->getAsDecl())
+          if (!decl->isImplicit() &&
+              !decl->getAttrs().hasAttribute<NoManualOwnershipAttr>())
+            F->setPerfConstraints(PerformanceConstraints::ManualOwnership);
 
   LLVM_DEBUG(llvm::dbgs() << "lowering ";
              F->printName(llvm::dbgs());
@@ -1417,7 +1399,7 @@ void SILGenModule::postEmitFunction(SILDeclRef constant,
 
 void SILGenModule::emitDifferentiabilityWitnessesForFunction(
     SILDeclRef constant, SILFunction *F) {
-  // Visit `@derivative` attributes and generate SIL differentiability
+  // Visit `@differentiable` attributes and generate SIL differentiability
   // witnesses.
   // Skip if the SILDeclRef is a:
   // - Default argument generator function.
@@ -1446,33 +1428,6 @@ void SILGenModule::emitDifferentiabilityWitnessesForFunction(
       emitDifferentiabilityWitness(AFD, F, DifferentiabilityKind::Reverse,
                                    config, /*jvp*/ nullptr,
                                    /*vjp*/ nullptr, diffAttr);
-    }
-    for (auto *derivAttr : Attrs.getAttributes<DerivativeAttr>()) {
-      SILFunction *jvp = nullptr;
-      SILFunction *vjp = nullptr;
-      switch (derivAttr->getDerivativeKind()) {
-      case AutoDiffDerivativeFunctionKind::JVP:
-        jvp = F;
-        break;
-      case AutoDiffDerivativeFunctionKind::VJP:
-        vjp = F;
-        break;
-      }
-      auto *origAFD = derivAttr->getOriginalFunction(getASTContext());
-      auto origDeclRef =
-          SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
-      auto *origFn = getFunction(origDeclRef, NotForDefinition);
-      auto witnessGenSig =
-          autodiff::getDifferentiabilityWitnessGenericSignature(
-              origAFD->getGenericSignature(), AFD->getGenericSignature());
-      auto *resultIndices =
-        autodiff::getFunctionSemanticResultIndices(origAFD,
-                                                   derivAttr->getParameterIndices());
-      AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
-                            witnessGenSig);
-      emitDifferentiabilityWitness(origAFD, origFn,
-                                   DifferentiabilityKind::Reverse, config, jvp,
-                                   vjp, derivAttr);
     }
   };
   if (auto *accessor = dyn_cast<AccessorDecl>(AFD))
@@ -1517,7 +1472,7 @@ void SILGenModule::emitDifferentiabilityWitness(
     // we can serialize it (the original function itself might be HiddenExternal
     // in this case if we only have declaration without definition).
     auto linkage =
-        originalFunction->markedAsAlwaysEmitIntoClient()
+        originalFunction->isAlwaysEmitIntoClient()
             ? SILLinkage::PublicNonABI
             : stripExternalFromLinkage(originalFunction->getLinkage());
     diffWitness = SILDifferentiabilityWitness::createDefinition(
@@ -1567,10 +1522,12 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
 
   // If the declaration is exported as a C function, emit its native-to-foreign
   // thunk too, if it wasn't already forced.
-  if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {
-    auto thunk = SILDeclRef(AFD).asForeign();
-    if (!hasFunction(thunk))
-      emitNativeToForeignThunk(thunk);
+  if (auto cdeclAttr = AFD->getAttrs().getAttribute<CDeclAttr>()) {
+    if (cdeclAttr->Underscored) {
+      auto thunk = SILDeclRef(AFD).asForeign();
+      if (!hasFunction(thunk))
+        emitNativeToForeignThunk(thunk);
+    }
   }
 
   emitDistributedThunkForDecl(AFD);
@@ -1588,6 +1545,43 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
         SILDeclRef::BackDeploymentKind::Thunk);
     emitBackDeploymentThunk(thunk);
   }
+
+  // Emit differentiability witness for the function referenced in
+  // @derivative(of:) attribute registering current function as VJP / JVP.
+  // Differentiability witnesses for a function could originate either from its
+  // @differentiable attribute or from explicit @derivative(of:) attribute on
+  // the derivative. In the latter case the derivative itself might not be
+  // emitted, while original function is (e.g. original function is @inlineable,
+  // but derivative is @usableFromInline). Ensure the differentiability witness
+  // originating from @derivative(of:) is emitted even if we're not going to
+  // emit body of the derivative.
+  for (auto *derivAttr : AFD->getAttrs().getAttributes<DerivativeAttr>()) {
+      auto *f = getFunction(SILDeclRef(AFD), NotForDefinition);
+      SILFunction *jvp = nullptr, *vjp = nullptr;
+      switch (derivAttr->getDerivativeKind()) {
+      case AutoDiffDerivativeFunctionKind::JVP:
+        jvp = f;
+        break;
+      case AutoDiffDerivativeFunctionKind::VJP:
+        vjp = f;
+        break;
+      }
+      auto *origAFD = derivAttr->getOriginalFunction(getASTContext());
+      auto origDeclRef =
+          SILDeclRef(origAFD).asForeign(requiresForeignEntryPoint(origAFD));
+      auto *origFn = getFunction(origDeclRef, NotForDefinition);
+      auto witnessGenSig =
+          autodiff::getDifferentiabilityWitnessGenericSignature(
+              origAFD->getGenericSignature(), AFD->getGenericSignature());
+      auto *resultIndices =
+        autodiff::getFunctionSemanticResultIndices(origAFD,
+                                                   derivAttr->getParameterIndices());
+      AutoDiffConfig config(derivAttr->getParameterIndices(), resultIndices,
+                            witnessGenSig);
+      emitDifferentiabilityWitness(origAFD, origFn,
+                                   DifferentiabilityKind::Reverse, config, jvp,
+                                   vjp, derivAttr);
+    }
 }
 
 void SILGenModule::emitFunction(FuncDecl *fd) {
@@ -1599,7 +1593,7 @@ void SILGenModule::emitFunction(FuncDecl *fd) {
 
   if (shouldEmitFunctionBody(fd)) {
     Types.setCaptureTypeExpansionContext(SILDeclRef(fd), M);
-    emitOrDelayFunction(SILDeclRef(decl));
+    emitOrDelayFunction(SILDeclRef(decl, fd->hasOnlyCEntryPoint()));
   }
 }
 
@@ -1914,7 +1908,8 @@ SILFunction *SILGenModule::emitLazyGlobalInitializer(StringRef funcName,
 
   SILGenFunctionBuilder builder(*this);
   auto *f = builder.createFunction(
-      SILLinkage::Private, funcName, initSILType, nullptr, SILLocation(binding),
+      SILLinkage::Private, funcName, initSILType,
+      ActorIsolation::forUnspecified(), nullptr, SILLocation(binding),
       IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
       IsNotDistributed, IsNotRuntimeAccessible);
   f->setSpecialPurpose(SILFunction::Purpose::GlobalInitOnceFunction);
@@ -2084,7 +2079,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     // See the call to getClassFieldOffsetOffset() inside
     // emitKeyPathComponent().
     if (auto *parentClass = dyn_cast<ClassDecl>(decl->getDeclContext())) {
-      if (parentClass->isGeneric()) {
+      if (parentClass->isGenericContext()) {
         auto ancestry = parentClass->checkAncestry();
         if (ancestry.contains(AncestryFlags::ResilientOther))
           return false;
@@ -2096,7 +2091,7 @@ SILGenModule::canStorageUseStoredKeyPathComponent(AbstractStorageDecl *decl,
     auto componentObjTy = decl->getValueInterfaceType();
     if (auto genericEnv =
               decl->getInnermostDeclContext()->getGenericEnvironmentOfContext())
-      componentObjTy = genericEnv->mapTypeIntoContext(componentObjTy);
+      componentObjTy = genericEnv->mapTypeIntoEnvironment(componentObjTy);
     auto storageTy = M.Types.getSubstitutedStorageType(
         TypeExpansionContext::minimal(), decl, componentObjTy);
     auto opaqueTy = M.Types.getLoweredRValueType(

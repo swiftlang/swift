@@ -1,12 +1,14 @@
 // RUN: %target-swift-emit-irgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -define-enabled-availability-domain EnabledDomain \
+// RUN:   -define-always-enabled-availability-domain AlwaysEnabledDomain \
 // RUN:   -define-disabled-availability-domain DisabledDomain \
 // RUN:   -Onone | %FileCheck %s --check-prefixes=CHECK
 
 // RUN: %target-swift-emit-irgen -module-name Test %s -verify \
 // RUN:   -enable-experimental-feature CustomAvailability \
 // RUN:   -define-enabled-availability-domain EnabledDomain \
+// RUN:   -define-always-enabled-availability-domain AlwaysEnabledDomain \
 // RUN:   -define-disabled-availability-domain DisabledDomain \
 // RUN:   -O | %FileCheck %s --check-prefixes=CHECK
 
@@ -29,6 +31,17 @@ public func ifAvailableEnabledDomain() {
   }
 }
 
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test30ifAvailableAlwaysEnabledDomainyyF"()
+// CHECK: call swiftcc void @always()
+// CHECK-NOT: call swiftcc void @never()
+public func ifAvailableAlwaysEnabledDomain() {
+  if #available(AlwaysEnabledDomain) {
+    always()
+  } else {
+    never()
+  }
+}
+
 // CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test25ifAvailableDisabledDomainyyF"()
 // CHECK-NOT: call swiftcc void @never()
 // CHECK: call swiftcc void @always()
@@ -44,6 +57,17 @@ public func ifAvailableDisabledDomain() {
 // CHECK-NOT: call swiftcc void @never()
 // CHECK: call swiftcc void @always()
 public func ifUnavailableEnabledDomain() {
+  if #unavailable(EnabledDomain) {
+    never()
+  } else {
+    always()
+  }
+}
+
+// CHECK-LABEL: define {{.*}}swiftcc void @"$s4Test32ifUnavailableAlwaysEnabledDomainyyF"()
+// CHECK-NOT: call swiftcc void @never()
+// CHECK: call swiftcc void @always()
+public func ifUnavailableAlwaysEnabledDomain() {
   if #unavailable(EnabledDomain) {
     never()
   } else {

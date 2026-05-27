@@ -468,12 +468,12 @@ ClosureCloner::initCloned(SILOptFunctionBuilder &functionBuilder,
   assert(!orig->isGlobalInit() && "Global initializer cannot be cloned");
 
   auto *fn = functionBuilder.createFunction(
-      orig->getLinkage(), clonedName, clonedTy, orig->getGenericEnvironment(),
-      orig->getLocation(), orig->isBare(), IsNotTransparent, serialized,
-      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      orig->getEntryCount(), orig->isThunk(), orig->getClassSubclassScope(),
-      orig->getInlineStrategy(), orig->getEffectsKind(), orig,
-      orig->getDebugScope());
+      orig->getLinkage(), clonedName, clonedTy, orig->getActorIsolation(),
+      orig->getGenericEnvironment(), orig->getLocation(), orig->isBare(),
+      IsNotTransparent, serialized, IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, orig->getEntryCount(), orig->isThunk(),
+      orig->getClassSubclassScope(), orig->getInlineStrategy(),
+      orig->getEffectsKind(), orig, orig->getDebugScope());
   for (auto &attr : orig->getSemanticsAttrs())
     fn->addSemanticsAttr(attr);
   return fn;
@@ -562,6 +562,10 @@ SILFunction *ClosureCloner::constructClonedFunction(
   ClosureCloner cloner(funcBuilder, origF, serializedKind, clonedName,
                        promotableIndices, resilienceExpansion);
   cloner.populateCloned();
+
+  // The cloner may clone `unreachable` instructions. However, cloning a
+  // whole function  does not introduce any incomplete lifetimes.
+  cloner.getCloned()->setNeedCompleteLifetimes(false);
   return cloner.getCloned();
 }
 
@@ -588,6 +592,12 @@ void ClosureCloner::visitDebugValueInst(DebugValueInst *inst) {
       auto varInfo = *inst->getVarInfo();
       if (varInfo.Scope)
         varInfo.Scope = getOpScope(inst->getDebugScope());
+      // The promoted value is now an object, strip the op_deref.
+      // If there is no op_deref, the variable is unsalvageable and dropped.
+      // This should never happen, as it is invalid debug info.
+      if (!varInfo.DIExpr.startsWithDeref())
+        return;
+      varInfo.DIExpr.eraseElement(varInfo.DIExpr.element_begin());
       getBuilder().createDebugValue(inst->getLoc(), value, varInfo);
       return;
     }
@@ -1131,6 +1141,8 @@ public:
   // because we will peek though it's uses to find the actual mutation.
   RECURSIVE_INST_VISITOR(IsNotMutating, BeginAccess)
   RECURSIVE_INST_VISITOR(IsMutating, UncheckedTakeEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsMutating, UncheckedBorrowEnumDataAddr)
+  RECURSIVE_INST_VISITOR(IsNotMutating, UncheckedInPlaceEnumDataAddr)
 #undef RECURSIVE_INST_VISITOR
 
   bool visitCopyAddrInst(CopyAddrInst *cai) {
@@ -1473,9 +1485,25 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
       funcBuilder, pai, fri, promotableIndices, f->getResilienceExpansion());
   worklist.push_back(clonedFn);
 
+  SILFunction *origFn = fri->getReferencedFunction();
+  for (const auto *w : mod.lookUpDifferentiabilityWitnessesForFunction(
+         origFn->getName())) {
+    // @derivative(of:) attribute could only be applied at global scope, therefore
+    // local functions might not have custom derivatives registered
+    assert(!w->getJVP() && !w->getVJP() && "does not expect custom derivatives here");
+    auto linkage = stripExternalFromLinkage(clonedFn->getLinkage());
+    SILDifferentiabilityWitness::createDefinition(
+      mod, linkage, clonedFn,
+      w->getKind(), w->getParameterIndices(), w->getResultIndices(),
+      w->getDerivativeGenericSignature(),
+      /*jvp*/ nullptr, /*vjp*/ nullptr,
+      /*isSerialized*/ hasPublicVisibility(clonedFn->getLinkage()),
+      w->getAttribute());
+  }
+
   // Mark the original partial apply function as deletable if it doesn't have
   // uses later.
-  fri->getReferencedFunction()->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
+  origFn->addSemanticsAttr(semantics::DELETE_IF_UNUSED);
 
   // Initialize a SILBuilder and create a function_ref referencing the cloned
   // closure.
@@ -1496,7 +1524,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   unsigned opNo = 1;
   unsigned opCount = pai->getNumOperands() - pai->getNumTypeDependentOperands();
   SmallVector<SILValue, 16> args;
-  auto numIndirectResults = calleeConv.getNumIndirectSILResults();
+  auto numIndirectResults = calleeConv.getSILArgIndexOfFirstParam();
   llvm::DenseMap<SILValue, SILValue> capturedMap;
   llvm::SmallSet<SILValue, 16> newCaptures;
   for (; opNo != opCount; ++opNo) {
@@ -1532,7 +1560,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
     // alloc_box. Otherwise, it is on the specific iterated copy_value that we
     // started with.
     SILParameterInfo cpInfo = calleePInfo[index - numIndirectResults];
-    assert(calleeConv.getSILType(cpInfo, builder.getTypeExpansionContext()) ==
+    ASSERT(calleeConv.getSILType(cpInfo, builder.getTypeExpansionContext()) ==
                box->getType() &&
            "SILType of parameter info does not match type of parameter");
     releasePartialApplyCapturedArg(builder, pai->getLoc(), box, cpInfo);
@@ -1543,7 +1571,7 @@ processPartialApplyInst(SILOptFunctionBuilder &funcBuilder,
   auto *newPAI = builder.createPartialApply(
       pai->getLoc(), fnVal, pai->getSubstitutionMap(), args,
       pai->getCalleeConvention(), pai->getResultIsolation(),
-      pai->isOnStack());
+      pai->isOnStack(), pai->isStackAllocationNested());
   pai->replaceAllUsesWith(newPAI);
   pai->eraseFromParent();
   if (fri->use_empty()) {
@@ -1609,7 +1637,7 @@ namespace {
 class CapturePromotionPass : public SILModuleTransform {
   /// The entry point to the transformation.
   void run() override {
-    SmallVector<SILFunction *, 128> worklist;
+    SmallVector<SILFunction *, 8> worklist;
     for (auto &f : *getModule()) {
       if (f.wasDeserializedCanonical() || !f.hasOwnership())
         continue;

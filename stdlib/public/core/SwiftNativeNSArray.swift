@@ -53,6 +53,7 @@ internal class __SwiftNativeNSArrayWithContiguousStorage
   deinit {}
 
   // Operate on our contiguous storage
+  @_effects(releasenone)
   internal func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -179,7 +180,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
   @objc internal func getObjects(
     _ aBuffer: UnsafeMutablePointer<AnyObject>, range: _SwiftNSRange
   ) {
-    return unsafe contents.withContiguousStorageIfAvailable { objects in
+    return contents.withContiguousStorageIfAvailable { objects in
       //TODO: exceptions instead of preconditions, once that's possible
 
       _precondition(
@@ -213,7 +214,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
       return 0
     }
 
-    return unsafe contents.withContiguousStorageIfAvailable {
+    return contents.withContiguousStorageIfAvailable {
       objects in
       unsafe enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       unsafe enumerationState.itemsPtr =
@@ -379,6 +380,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
     _destroyBridgedStorage(_heapBufferBridged)
   }
 
+  @_effects(releasenone)
   internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
@@ -438,7 +440,8 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
 internal final class __SwiftDeferredStaticNSArray<Element>
   : __SwiftDeferredNSArray {
 
-  internal override func withUnsafeBufferOfObjects<R>(
+  @_effects(releasenone)
+  final internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {
     while true {
@@ -526,6 +529,7 @@ internal class __ContiguousArrayStorageBase
   }
   
 #if _runtime(_ObjC)
+  @_effects(releasenone)
   internal override func withUnsafeBufferOfObjects<R>(
     _ body: (UnsafeBufferPointer<AnyObject>) throws -> R
   ) rethrows -> R {

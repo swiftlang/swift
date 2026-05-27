@@ -76,7 +76,7 @@ extension ASTGenVisitor {
       let keypathExpr = self.generateObjCKeyPathExpr(freestandingMacroExpansion: node)
       return .generated(.expr(keypathExpr))
 
-    case .assert where ctx.langOptsHasFeature(.StaticAssert):
+    case .assert where ctx.langOpts.hasFeature(.StaticAssert):
       let assertStmtOpt = self.generatePoundAssertStmt(freestandingMacroExpansion: node)
       return .generated(assertStmtOpt.map({ .stmt($0.asStmt) }))
 
@@ -143,7 +143,7 @@ extension ASTGenVisitor {
   }
 
   func generatePoundAssertStmt(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedPoundAssertStmt? {
-    assert(self.ctx.langOptsHasFeature(.StaticAssert))
+    assert(self.ctx.langOpts.hasFeature(.StaticAssert))
     var args = node.arguments[...]
     let conditionExpr = self.generateConsumingAttrOption(args: &args, label: nil) { conditionNode in
       self.generate(expr: conditionNode)

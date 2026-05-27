@@ -479,7 +479,7 @@ private:
     if (decl->isSPI())
       return true;
 
-    return !isExported(decl);
+    return isExported(decl) != ExportedLevel::Exported;
   }
 
   /// Returns the source range which should be refined by declaration. This
@@ -847,7 +847,7 @@ private:
 
     switch (domain.getKind()) {
     case AvailabilityDomain::Kind::Embedded:
-    case AvailabilityDomain::Kind::SwiftLanguage:
+    case AvailabilityDomain::Kind::SwiftLanguageMode:
     case AvailabilityDomain::Kind::PackageDescription:
       // These domains don't support queries.
       llvm::report_fatal_error("unsupported domain");
@@ -869,11 +869,14 @@ private:
       return AvailabilityQuery::dynamic(variantSpec->getDomain(), primaryRange,
                                         variantRange);
 
+    case AvailabilityDomain::Kind::StandaloneSwiftRuntime:
+      return AvailabilityQuery::dynamic(domain, primaryRange, std::nullopt);
+
     case AvailabilityDomain::Kind::Platform:
-      // Platform checks are always dynamic. The SIL optimizer is responsible
-      // eliminating these checks when it can prove that they can never fail
-      // (due to the deployment target). We can't perform that analysis here
-      // because it may depend on inlining.
+      // Platform and Swift runtime checks are always dynamic. The SIL optimizer
+      // is responsible eliminating these checks when it can prove that they can
+      // never fail (due to the deployment target). We can't perform that
+      // analysis here because it may depend on inlining.
       return AvailabilityQuery::dynamic(domain, primaryRange, variantRange);
     case AvailabilityDomain::Kind::Custom:
       auto customDomain = domain.getCustomDomain();
@@ -881,6 +884,7 @@ private:
 
       switch (customDomain->getKind()) {
       case CustomAvailabilityDomain::Kind::Enabled:
+      case CustomAvailabilityDomain::Kind::AlwaysEnabled:
         return AvailabilityQuery::constant(domain, true);
       case CustomAvailabilityDomain::Kind::Disabled:
         return AvailabilityQuery::constant(domain, false);
@@ -997,6 +1001,7 @@ private:
 
     // Tracks if we're refining for availability or unavailability.
     std::optional<bool> isUnavailability = std::nullopt;
+    bool hasAnyNonAvailabilityCondition = false;
 
     for (StmtConditionElement element : cond) {
       auto *currentScope = getCurrentScope();
@@ -1004,10 +1009,7 @@ private:
 
       // If the element is not a condition, walk it in the current scope.
       if (element.getKind() != StmtConditionElement::CK_Availability) {
-        // Assume any condition element that is not a #available() can
-        // potentially be false, so conservatively make the false flow's
-        // refinement undefined since there is nothing we can prove about it.
-        falseFlowBuilder.setUndefined();
+        hasAnyNonAvailabilityCondition = true;
         element.walk(*this);
         continue;
       }
@@ -1092,15 +1094,28 @@ private:
           if (isUnavailability.value())
             continue;
 
-          DiagnosticEngine &diags = Context.Diags;
-          if (currentScope->getReason() != AvailabilityScope::Reason::Root) {
-            diags.diagnose(query->getLoc(),
-                           diag::availability_query_useless_enclosing_scope,
-                           domain.getNameForAttributePrinting());
-            diags.diagnose(
-                currentScope->getIntroductionLoc(),
-                diag::availability_query_useless_enclosing_scope_here);
+          if (currentScope->getReason() == AvailabilityScope::Reason::Root)
+            continue;
+
+          // Skip diagnosing useless availability in fragile functions with
+          // opaque result types since removing an availability check could
+          // change the ABI of the function and result in a miscompilation.
+          auto *dc = getCurrentDeclContext();
+          if (dc->getResilienceExpansion() == ResilienceExpansion::Minimal) {
+            if (auto decl = dc->getInnermostDeclarationDeclContext()) {
+              if (auto afd = dyn_cast<AbstractFunctionDecl>(decl)) {
+                if (afd->getOpaqueResultTypeDecl())
+                  continue;
+              }
+            }
           }
+
+          DiagnosticEngine &diags = Context.Diags;
+          diags.diagnose(query->getLoc(),
+                         diag::availability_query_useless_enclosing_scope,
+                         domain.getNameForAttributePrinting());
+          diags.diagnose(currentScope->getIntroductionLoc(),
+                         diag::availability_query_useless_enclosing_scope_here);
         }
 
         continue;
@@ -1120,44 +1135,53 @@ private:
       ++nestedCount;
     }
 
+    // Determine the availability context for the branch where the availability
+    // conditions hold. If there are any scopes on the stack, it will be the
+    // availability context for the scope at the top. Otherwise, no distinct
+    // context is introduced by the availability conditions.
+    std::optional<AvailabilityContext> trueRefinement = std::nullopt;
+    if (nestedCount > 0)
+      trueRefinement = getCurrentScope()->getAvailabilityContext();
+
+    // Pop the stack.
+    while (nestedCount-- > 0)
+      ContextStack.pop_back();
+
+    DEBUG_ASSERT(getCurrentScope() == startingScope);
+
+    // Determine availability for the branch where the availability conditions
+    // do not hold.
     auto startingContext = startingScope->getAvailabilityContext();
     auto falseFlowContext = falseFlowBuilder.constrainContext(startingContext);
 
-    // The version range for the false branch should never have any versions
-    // that weren't possible when the condition started evaluating.
+    // The availability context for the false flow should either be the same
+    // as the starting context or it should refine it. If not, there's a logic
+    // error.
     DEBUG_ASSERT(falseFlowContext.isContainedIn(startingContext));
 
     // If the starting availability context is not completely contained in the
     // false flow context then it must be the case that false flow context
-    // is strictly smaller than the starting context (because the false flow
-    // context *is* contained in the starting context), so we should introduce a
-    // new availability scope for the false flow.
+    // is strictly contained in the starting context. Introduce a new
+    // availability scope for the false flow in that case.
     std::optional<AvailabilityContext> falseRefinement = std::nullopt;
-    if (!startingScope->getAvailabilityContext().isContainedIn(
-            falseFlowContext)) {
+    if (!startingContext.isContainedIn(falseFlowContext))
       falseRefinement = falseFlowContext;
-    }
 
-    auto makeResult =
-        [isUnavailability](std::optional<AvailabilityContext> trueRefinement,
-                           std::optional<AvailabilityContext> falseRefinement) {
-          if (isUnavailability.has_value() && *isUnavailability) {
-            // If this is an unavailability check, invert the result.
-            return std::make_pair(falseRefinement, trueRefinement);
-          }
-          return std::make_pair(trueRefinement, falseRefinement);
-        };
+    // For #unavailable, the then/else semantics are inverted: the then branch
+    // executes when the availability condition is NOT met, and the else
+    // executes it IS met. So swap the refinements.
+    auto thenRefinement = trueRefinement;
+    auto elseRefinement = falseRefinement;
+    if (isUnavailability && *isUnavailability)
+      std::swap(thenRefinement, elseRefinement);
 
-    if (nestedCount == 0)
-      return makeResult(std::nullopt, falseRefinement);
+    // If there were any non-availability conditions in the if statement then
+    // the else branch cannot be refined at all because it can be reached
+    // regardless of any availability condition.
+    if (hasAnyNonAvailabilityCondition)
+      elseRefinement = std::nullopt;
 
-    AvailabilityScope *nestedScope = getCurrentScope();
-    while (nestedCount-- > 0)
-      ContextStack.pop_back();
-
-    assert(getCurrentScope() == startingScope);
-
-    return makeResult(nestedScope->getAvailabilityContext(), falseRefinement);
+    return {thenRefinement, elseRefinement};
   }
 
   /// Return the best active spec for the target platform or nullptr if no

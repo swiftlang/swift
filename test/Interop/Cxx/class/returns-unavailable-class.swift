@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-ide-test -print-module -module-to-print=CxxModule -I %t/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
 
-// RUN: %target-swift-frontend -typecheck -verify -I %t/Inputs -enable-experimental-cxx-interop %t/test.swift
+// RUN: %target-swift-frontend -typecheck -verify -verify-ignore-unrelated -I %t/Inputs -enable-experimental-cxx-interop %t/test.swift
 
 //--- Inputs/module.modulemap
 module CxxTypes {
@@ -38,11 +38,11 @@ public:
 };
 
 // CHECK: struct Struct {
-// CHECK-NEXT:   init()
 // CHECK-NEXT:   init(x: Int32, y: Int32)
-// CHECK-NEXT:   func returnsClassInTypesModules() -> Never
+// CHECK-NEXT:   init()
 // CHECK-NEXT:   var x: Int32
 // CHECK-NEXT:   var y: Int32
+// CHECK-NEXT:   func returnsClassInTypesModules() -> Never
 // CHECK-NEXT: }
 
 TemplateInTypesModule<int> funcWithClassInTypesModules();

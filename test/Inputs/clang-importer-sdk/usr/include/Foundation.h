@@ -90,6 +90,24 @@ __attribute__((availability(ios,introduced=8.0)))
 
 @end
 
+
+/// macCatalyst availability
+
+void availableOnIOSButUnavailableOnmacCatalyst() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(maccatalyst, unavailable)));
+void availableOnIOSButDeprecatedOnmacCatalyst() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(maccatalyst,  introduced=8.0, deprecated=9.0)));
+
+void unavailableOnIOS() __attribute__((availability(ios, unavailable)));
+void deprecatedOniOSButNotOnmacCatalyst() __attribute__((availability(ios, introduced=8.0, deprecated=9.0))) __attribute__((availability(maccatalyst, introduced=8.0)));
+
+void availableOnIOSButUnavailableOniOSAppExtension() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(ios_app_extension, unavailable)));
+void availableOnIOSButUnavailableOnmacCatalystAppExtension() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(maccatalyst_app_extension, unavailable)));
+void availableOnIOSAppExtensionButUnavailableOnmacCatalystAppExtension() __attribute__((availability(ios_application_extension, introduced=8.0))) __attribute__((availability(maccatalyst_app_extension, unavailable)));
+
+void availableOnIOSButDeprecatedOniOSAppExtension() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(ios_app_extension, introduced=8.0, deprecated=9.0)));
+void availableOnIOSButDeprecatedOnmacCatalystAppExtension() __attribute__((availability(ios, introduced=8.0))) __attribute__((availability(maccatalyst_app_extension, introduced=8.0, deprecated=9.0)));
+void availableOnIOSAppExtensionButDeprecatedOnmacCatalystAppExtension() __attribute__((availability(ios_application_extension, introduced=8.0))) __attribute__((availability(maccatalyst_app_extension, introduced=8.0, deprecated=9.0)));
+
+
 @class NSString, NSArray, NSDictionary, NSSet, NSEnumerator;
 
 @class NSMutableArray<ObjectType>;

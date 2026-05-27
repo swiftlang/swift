@@ -61,6 +61,7 @@ class VersionTuple;
 } // end namespace llvm
 
 namespace swift {
+class LangOptions;
 class SourceLoc;
 class SourceRange;
 class CharSourceRange;
@@ -450,6 +451,84 @@ struct BridgedSwiftClosure {
 
   BRIDGED_INLINE void operator()(const void *_Nullable);
 };
+
+//===----------------------------------------------------------------------===//
+// MARK: LangOptions
+//===----------------------------------------------------------------------===//
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedEndianness : size_t {
+  EndianLittle,
+  EndianBig,
+};
+
+class BridgedLangOptions {
+  const swift::LangOptions * _Nonnull LangOpts;
+
+public:
+  SWIFT_UNAVAILABLE("Use init(raw:) instead")
+  BRIDGED_INLINE BridgedLangOptions(const swift::LangOptions &langOpts);
+
+  SWIFT_UNAVAILABLE("Use '.raw' instead")
+  BRIDGED_INLINE const swift::LangOptions &unbridged() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  const void *_Nonnull getRaw() const { return LangOpts; }
+
+  SWIFT_COMPUTED_PROPERTY
+  unsigned getMajorLanguageVersion() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  unsigned getTargetPointerBitWidth() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  BridgedEndianness getTargetEndianness() const;
+
+  SWIFT_COMPUTED_PROPERTY
+  bool getAttachCommentsToDecls() const;
+};
+
+/// Key used when enumerating build configuration entries to the
+/// StaticBuildConfiguration initializer for an ASTContext.
+enum ENUM_EXTENSIBILITY_ATTR(closed) BuildConfigurationKey : size_t {
+  BCKCustomCondition,
+  BCKFeature,
+  BCKAttribute,
+  BCKTargetOSName,
+  BCKTargetArchitecture,
+  BCKTargetEnvironment,
+  BCKTargetRuntime,
+  BCKTargetPointerAuthenticationScheme,
+  BCKTargetObjectFileFormat
+};
+
+SWIFT_NAME("BridgedLangOptions.hasFeature(self:_:)")
+bool BridgedLangOptions_hasFeature(BridgedLangOptions cLangOpts,
+                                   BridgedFeature feature);
+
+SWIFT_NAME("BridgedLangOptions.getTargetAtomicBitWidths(self:_:)")
+SwiftInt BridgedLangOptions_getTargetAtomicBitWidths(BridgedLangOptions cLangOpts,
+                                                     SwiftInt* _Nullable * _Nonnull cComponents);
+
+SWIFT_NAME("BridgedLangOptions.getLanguageVersion(self:_:)")
+SwiftInt BridgedLangOptions_getLanguageVersion(BridgedLangOptions cLangOpts,
+                                               SwiftInt* _Nullable * _Nonnull cComponents);
+
+SWIFT_NAME("BridgedLangOptions.getCompilerVersion(self:_:)")
+SwiftInt BridgedLangOptions_getCompilerVersion(BridgedLangOptions cLangOpts,
+                                               SwiftInt* _Nullable * _Nonnull cComponents);
+
+/* Deallocate an array of Swift int values that was allocated in C++. */
+void deallocateIntBuffer(SwiftInt * _Nullable cComponents);
+
+/// Enumerate all of the key/value pairs for the build configuration by calling
+/// the given callback for each one.
+SWIFT_NAME("BridgedLangOptions.enumerateBuildConfigurationEntries(self:callbackContext:callback:)")
+void BridgedLangOptions_enumerateBuildConfigurationEntries(
+    BridgedLangOptions cLangOpts,
+    void * _Nonnull callbackContext,
+    void (* _Nonnull callback)(
+        BridgedLangOptions cLangOpts, void * _Nonnull callbackContext,
+        BuildConfigurationKey key, BridgedStringRef value));
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

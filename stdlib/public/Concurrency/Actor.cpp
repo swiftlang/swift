@@ -36,6 +36,7 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/DispatchShims.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/Exception.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
@@ -99,16 +100,6 @@ static bool shouldYieldThread() {
 
 namespace {
 
-/// An extremely silly class which exists to make pointer
-/// default-initialization constexpr.
-template <class T> struct Pointer {
-  T *Value;
-  constexpr Pointer() : Value(nullptr) {}
-  constexpr Pointer(T *value) : Value(value) {}
-  operator T *() const { return Value; }
-  T *operator->() const { return Value; }
-};
-
 /// A class which encapsulates the information we track about
 /// the current thread and active executor.
 class ExecutorTrackingInfo {
@@ -123,7 +114,7 @@ class ExecutorTrackingInfo {
   /// the right executor. It would make sense for that to be a
   /// separate thread-local variable (or whatever is most efficient
   /// on the target platform).
-  static SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                                  tls_key::concurrency_executor_tracking_info)
       ActiveInfoInThread;
 
@@ -200,7 +191,7 @@ public:
 class ActiveTask {
   /// A thread-local variable pointing to the active tracking
   /// information about the current thread, if any.
-  static SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>,
+  static SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>,
                                  tls_key::concurrency_task) Value;
 
 public:
@@ -212,16 +203,18 @@ public:
 };
 
 /// Define the thread-locals.
-SWIFT_THREAD_LOCAL_TYPE(Pointer<AsyncTask>, tls_key::concurrency_task)
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<AsyncTask>, tls_key::concurrency_task)
 ActiveTask::Value;
 
-SWIFT_THREAD_LOCAL_TYPE(Pointer<ExecutorTrackingInfo>,
+SWIFT_THREAD_LOCAL_TYPE(TLSPointer<ExecutorTrackingInfo>,
                         tls_key::concurrency_executor_tracking_info)
 ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
 
-void swift::runJobInEstablishedExecutorContext(Job *job) {
+void swift::runJobInEstablishedExecutorContext(Job *job,
+                                               SerialExecutorRef serialExecutor,
+                                               TaskExecutorRef taskExecutor) {
   _swift_tsan_acquire(job);
   SWIFT_TASK_DEBUG_LOG("Run job in established context %p", job);
 
@@ -237,11 +230,17 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     // current thread.  If the task suspends somewhere, it should
     // update the task status appropriately; we don't need to update
     // it afterwards.
-    task->flagAsRunning();
+    [[maybe_unused]]
+    uint32_t dispatchOpaquePriority = task->flagAsRunning();
 
-    auto traceHandle = concurrency::trace::job_run_begin(job);
+    auto traceHandle =
+        concurrency::trace::job_run_begin(job, serialExecutor, taskExecutor);
     task->runInFullyEstablishedContext();
     concurrency::trace::job_run_end(traceHandle);
+
+#if SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION
+    swift_dispatch_thread_reset_override_self(dispatchOpaquePriority);
+#endif
 
     assert(ActiveTask::get() == nullptr &&
            "active task wasn't cleared before suspending?");
@@ -353,7 +352,7 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 #endif
 }
 
-const char *swift_task_getTaskName(AsyncTask *task) {
+const char *swift::swift_task_getTaskName(AsyncTask *task) {
   if (!task) {
     return nullptr;
   }
@@ -426,6 +425,7 @@ __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
   return options;
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 // Shimming call to Swift runtime because Swift Embedded does not have
 // these symbols defined.
 const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
@@ -437,6 +437,7 @@ const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
   return nullptr;
 #endif
 }
+#endif
 
 // Determine the default effective executor checking mode, and apply environment
 // variable overrides of the executor checking mode.
@@ -450,6 +451,7 @@ swift_task_is_current_executor_flag swift_bincompat_selectDefaultIsCurrentExecut
   swift_task_is_current_executor_flag options =
       __swift_bincompat_useLegacyNonCrashingExecutorChecks();
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   // Potentially, override the platform detected mode, primarily used in tests.
   if (const char *modeStr =
           __swift_runtime_env_useLegacyNonCrashingExecutorChecks()) {
@@ -471,6 +473,7 @@ swift_task_is_current_executor_flag swift_bincompat_selectDefaultIsCurrentExecut
         options | swift_task_is_current_executor_flag::Assert);
     } // else, just use the platform detected mode
   } // no override, use the default mode
+#endif
 
   return options;
 }
@@ -740,6 +743,7 @@ swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
                                                isCurrentExecutorFlag);
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 /// Logging level for unexpected executors:
 /// 0 - no logging -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
 /// 1 - warn on each instance -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
@@ -784,11 +788,13 @@ static void checkUnexpectedExecutorLogLevel(void *context) {
   }
 #endif // SWIFT_STDLIB_HAS_ENVIRON
 }
+#endif
 
 SWIFT_CC(swift)
 void swift::swift_task_reportUnexpectedExecutor(
     const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
     uintptr_t line, SerialExecutorRef executor) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   SWIFT_TASK_DEBUG_LOG("CHECKING swift_task_reportUnexpectedExecutor %s", "");
   // Make sure we have an appropriate log level.
   static swift::once_t logLevelToken;
@@ -844,14 +850,12 @@ void swift::swift_task_reportUnexpectedExecutor(
         &details);
   }
 
-#if defined(_WIN32) && !SWIFT_CONCURRENCY_EMBEDDED
+#if defined(_WIN32)
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
-#elif !SWIFT_CONCURRENCY_EMBEDDED
+#else
   fputs(message, stderr);
   fflush(stderr);
-#else
-  puts(message);
 #endif
 #if SWIFT_STDLIB_HAS_ASL
 #pragma clang diagnostic push
@@ -866,6 +870,9 @@ void swift::swift_task_reportUnexpectedExecutor(
 
   if (isFatalError)
     abort();
+#else
+  swift_Concurrency_fatalError(0, "running on unexpected executor");
+#endif
 }
 
 /*****************************************************************************/
@@ -1487,9 +1494,11 @@ static DefaultActor *asAbstract(DefaultActorImpl *actor) {
   return reinterpret_cast<DefaultActor*>(actor);
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static NonDefaultDistributedActorImpl *asImpl(NonDefaultDistributedActor *actor) {
   return reinterpret_cast<NonDefaultDistributedActorImpl*>(actor);
 }
+#endif
 
 /*****************************************************************************/
 /******************** NEW DEFAULT ACTOR IMPLEMENTATION ***********************/
@@ -1856,14 +1865,18 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
         break;
       }
     } else {
+      auto taskExecutor = TaskExecutorRef::undefined();
       if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-        auto taskExecutor = task->getPreferredTaskExecutor();
+        taskExecutor = task->getPreferredTaskExecutor();
         trackingInfo.setTaskExecutor(taskExecutor);
       }
 
       // This thread is now going to follow the task on this actor.
       // It may hop off the actor
-      runJobInEstablishedExecutorContext(job);
+      runJobInEstablishedExecutorContext(
+          job,
+          SerialExecutorRef::forDefaultActor(asAbstract(currentActor)),
+          taskExecutor);
 
       // We could have come back from the job on a generic executor and not as
       // part of a default actor. If so, there is no more work left for us to do
@@ -1967,12 +1980,20 @@ void DefaultActorImpl::deallocate() {
 #endif
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
+static size_t
+getDistributedRemoteActorAllocSize(const ClassMetadata *metadata);
+#endif
+
 void DefaultActorImpl::deallocateUnconditional() {
   concurrency::trace::actor_deallocate(this);
 
 #if !SWIFT_CONCURRENCY_EMBEDDED
   auto metadata = cast<ClassMetadata>(this->metadata);
-  swift_deallocClassInstance(this, metadata->getInstanceSize(),
+  size_t deallocSize = isDistributedRemote() ?
+      getDistributedRemoteActorAllocSize(metadata)
+      : metadata->getInstanceSize();
+  swift_deallocClassInstance(this, deallocSize,
                              metadata->getInstanceAlignMask());
 #else
   // Embedded Swift's runtime doesn't actually use the size/mask values.
@@ -2198,6 +2219,7 @@ void DefaultActorImpl::releaseLock() {
 #endif
 
 SWIFT_CC(swift)
+SWIFT_RUNTIME_EXCEPTION_PERSONALITY
 static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
   ExecutorTrackingInfo trackingInfo;
 
@@ -2216,7 +2238,7 @@ static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
   trackingInfo.enterAndShadow(executor, taskExecutor);
 
   SWIFT_TASK_DEBUG_LOG("job %p", job);
-  runJobInEstablishedExecutorContext(job);
+  runJobInEstablishedExecutorContext(job, executor, taskExecutor);
 
   trackingInfo.leave();
 
@@ -2242,7 +2264,7 @@ static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
   trackingInfo.enterAndShadow(serialExecutor, taskExecutor);
 
   SWIFT_TASK_DEBUG_LOG("job %p", job);
-  runJobInEstablishedExecutorContext(job);
+  runJobInEstablishedExecutorContext(job, serialExecutor, taskExecutor);
 
   trackingInfo.leave();
 
@@ -2282,6 +2304,7 @@ void swift::swift_defaultActor_deallocate(DefaultActor *_actor) {
   asImpl(_actor)->deallocate();
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static bool isDefaultActorClass(const ClassMetadata *metadata) {
   assert(metadata->isTypeMetadata());
   while (true) {
@@ -2300,16 +2323,22 @@ static bool isDefaultActorClass(const ClassMetadata *metadata) {
     }
   }
 }
+#endif
 
 void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
 #if !SWIFT_CONCURRENCY_EMBEDDED
   auto metadata = cast<ClassMetadata>(actor->metadata);
+
   if (isDefaultActorClass(metadata))
     return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
 
-  swift_deallocObject(actor, metadata->getInstanceSize(),
+  size_t deallocSize = swift_distributed_actor_is_remote(actor) ?
+        getDistributedRemoteActorAllocSize(metadata)
+        : metadata->getInstanceSize();
+  swift_deallocObject(actor, deallocSize,
                       metadata->getInstanceAlignMask());
 #else
+  // TODO(distributed): Embedded should be able to handle remote actor references here
   return swift_defaultActor_deallocate(static_cast<DefaultActor*>(actor));
 #endif
 }
@@ -2393,6 +2422,13 @@ static bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
                             TaskExecutorRef currentTaskExecutor,
                             TaskExecutorRef newTaskExecutor) {
   if (currentSerialExecutor.getIdentity() != newSerialExecutor.getIdentity()) {
+    // If the target is the generic executor and the task has a preferred
+    // task executor whose identity matches our current serial executor,
+    // we're already running where task executor preference would switch to on enqueue.
+    if (newSerialExecutor.isGeneric() && newTaskExecutor.isDefined() &&
+        currentSerialExecutor.getIdentity() == newTaskExecutor.getIdentity()) {
+      return false;
+    }
     return true; // must switch, new isolation context
   }
 
@@ -2420,8 +2456,10 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
   // there and tail-call the task.  We don't want these frames to
   // potentially accumulate linearly.
   if (oldTracking) {
+    auto newTaskExecutor = task->getPreferredTaskExecutor();
     oldTracking->setActiveExecutor(executor);
-    oldTracking->setTaskExecutor(task->getPreferredTaskExecutor());
+    oldTracking->setTaskExecutor(newTaskExecutor);
+    concurrency::trace::task_switch_executor(task, executor, newTaskExecutor);
 
     return task->runInFullyEstablishedContext(); // 'return' forces tail call
   }
@@ -2495,14 +2533,31 @@ static void swift_task_switchImpl(SWIFT_ASYNC_CONTEXT AsyncContext *resumeContex
   SWIFT_TASK_DEBUG_LOG("Task %p can give up thread?", task);
   if (currentTaskExecutor.isUndefined() &&
       canGiveUpThreadForSwitch(trackingInfo, currentExecutor) &&
-      !shouldYieldThread() &&
-      tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
-    SWIFT_TASK_DEBUG_LOG(
-        "switch succeeded, task %p assumed thread for executor %p", task,
-        newExecutor.getIdentity());
+      !shouldYieldThread()) {
+#if SWIFT_CONCURRENCY_ACTORS_AS_LOCKS
+    // With actors-as-locks, tryAssumeThreadForSwitch always succeeds. We must
+    // give up the thread first, or else we may deadlock due to holding the old
+    // actor while trying to acquire the new one.
     giveUpThreadForSwitch(currentExecutor);
+    bool success = tryAssumeThreadForSwitch(newExecutor, newTaskExecutor);
+    assert(success);
+    SWIFT_TASK_DEBUG_LOG(
+        "switched to new actor, task %p assumed thread for executor %p", task,
+        newExecutor.getIdentity());
     // 'return' forces tail call
     return runOnAssumedThread(task, newExecutor, trackingInfo);
+#else
+    // Without actors-as-locks, tryAssumeThreadForSwitch can fail. Try it first,
+    // and give up the thread only if it succeeds.
+    if (tryAssumeThreadForSwitch(newExecutor, newTaskExecutor)) {
+      SWIFT_TASK_DEBUG_LOG(
+          "switch succeeded, task %p assumed thread for executor %p", task,
+          newExecutor.getIdentity());
+      giveUpThreadForSwitch(currentExecutor);
+      // 'return' forces tail call
+      return runOnAssumedThread(task, newExecutor, trackingInfo);
+    }
+#endif
   }
 
   // Otherwise, just asynchronously enqueue the task on the given
@@ -2721,6 +2776,8 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
   auto serialExecutorIdentity = serialExecutorRef.getIdentity();
   auto serialExecutorType = swift_getObjectType(serialExecutorIdentity);
   auto serialExecutorWtable = serialExecutorRef.getSerialExecutorWitnessTable();
+  concurrency::trace::job_enqueue_executor(job, serialExecutorRef,
+                                           TaskExecutorRef::undefined());
   _swift_task_enqueueOnExecutor(job, serialExecutorIdentity, serialExecutorType,
                                 serialExecutorWtable);
 #endif // SWIFT_CONCURRENCY_EMBEDDED
@@ -2758,28 +2815,55 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
 /***************************** DISTRIBUTED ACTOR *****************************/
 /*****************************************************************************/
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *_actor) {
   asImpl(_actor)->initialize();
+}
+
+/// Compute the minimal allocation size for a 'remote' distributed actor reference.
+///
+/// Remote distributed actors are proxy objects that only need storage for the
+/// `id`, `actorSystem`, and `unownedExecutor` fields. Any user-defined stored
+/// properties beyond those three are never initialized or accessed on a remote
+/// instance, so we can trim the allocation at the offset where the first
+/// user-defined field would begin.
+static size_t
+getDistributedRemoteActorAllocSize(const ClassMetadata *metadata) {
+  auto description = metadata->getDescription();
+  uint32_t numFields = description->NumFields;
+
+  assert(numFields >= 3 &&
+         "distributed actor must have at least id, actorSystem, and "
+         "unownedExecutor fields");
+
+  if (numFields >= 4) {
+    // The 4th field is the first user-defined stored property.
+    // Its offset marks the end of the synthesized fields,
+    // so it is exactly  how much storage we need.
+    const auto *fieldOffsets = metadata->getFieldOffsets();
+    return fieldOffsets[3];
+  }
+
+  // Only the three required fields exist, remote-ref and local instances have the same size.
+  return metadata->getInstanceSize();
 }
 
 OpaqueValue*
 swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
   const ClassMetadata *metadata = actorType->getClassObject();
 
-  // TODO(distributed): make this allocation smaller
-  // ==== Allocate the memory for the remote instance
+  // Use a smaller allocation that only covers the id and actorSystem fields,
+  // since remote proxies never access user-defined stored properties.
+  size_t allocSize = getDistributedRemoteActorAllocSize(metadata);
+  assert(allocSize <= metadata->getInstanceSize() && "Remote reference size was larger than a local instance size!?");
   HeapObject *alloc = swift_allocObject(metadata,
-                                        metadata->getInstanceSize(),
+                                        allocSize,
                                         metadata->getInstanceAlignMask());
 
-  // TODO: remove this memset eventually, today we only do this to not have
-  //       to modify the destructor logic, as releasing zeroes is no-op
-  memset(alloc + 1, 0, metadata->getInstanceSize() - sizeof(HeapObject));
+  // Zero the body so that the destructor can safely release fields without
+  // encountering uninitialized memory.
+  memset((void *)(alloc + 1), 0, allocSize - sizeof(HeapObject));
 
-  // TODO(distributed): a remote one does not have to have the "real"
-  //  default actor body, e.g. we don't need an executor at all; so
-  //  we can allocate more efficiently and only share the flags/status field
-  //  between the both memory representations
   // If it is a default actor, we reuse the same layout as DefaultActorImpl,
   // and store flags in the allocation directly as we initialize it.
   if (isDefaultActorClass(metadata)) {
@@ -2794,6 +2878,7 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
     return reinterpret_cast<OpaqueValue*>(actor);
   }
 }
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
 
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 #if !SWIFT_CONCURRENCY_EMBEDDED

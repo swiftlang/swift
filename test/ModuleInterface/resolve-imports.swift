@@ -6,7 +6,7 @@
 
 // CHECK: import Swift
 
-// CHECK: public func f() -> Swift.Int
+// CHECK: public func f() -> Swift::Int
 public func f() -> Int {}
 
 // Deliberate semantic errors to ensure private and internal declarations don't

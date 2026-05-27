@@ -76,5 +76,27 @@ int main() {
     assert(std::string(swiftStr) == "👨‍💻👩‍💻åäö");
   }
 
+  {
+    NSString* arabic_ns = @"طاب يومك";
+    auto swift_arabic = String::init(arabic_ns);
+    auto std_arabic = (std::string)swift_arabic;
+    assert(std_arabic == "طاب يومك");
+    
+    NSString* mixed_ns = @"Hello مرحبا World";
+    auto swift_mixed = String::init(mixed_ns);
+    auto std_mixed = (std::string)swift_mixed;
+    assert(std_mixed == "Hello مرحبا World");
+    
+    NSString* hebrew_ns = @"שלום עולם";
+    auto swift_hebrew = String::init(hebrew_ns);
+    auto std_hebrew = (std::string)swift_hebrew;
+    assert(std_hebrew == "שלום עולם");
+    
+    NSString* chinese_ns = @"你好世界";
+    auto swift_chinese = String::init(chinese_ns);
+    auto std_chinese = (std::string)swift_chinese;
+    assert(std_chinese == "你好世界");
+  }
+
   return 0;
 }

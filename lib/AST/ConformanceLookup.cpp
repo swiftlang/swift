@@ -30,6 +30,7 @@
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
@@ -37,6 +38,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
@@ -202,7 +204,7 @@ ProtocolConformanceRef swift::lookupConformance(Type type,
   // If we are recursively checking for implicit conformance of a nominal
   // type to a KnownProtocol, fail without evaluating this request. This
   // squashes cycles.
-  LookupConformanceInModuleRequest request{{type, protocol}};
+  LookupConformanceRequest request{{type, protocol}};
   if (auto kp = protocol->getKnownProtocolKind()) {
     if (auto nominal = type->getAnyNominal()) {
       ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
@@ -315,21 +317,17 @@ static bool isSendableFunctionType(EitherFunctionType eitherFnTy) {
 
 /// Whether the given function type conforms to Escapable.
 static bool isEscapableFunctionType(EitherFunctionType eitherFnTy) {
-//  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
-//    return !silFnTy->isNoEscape();
-//  }
-//
-// auto functionType = cast<const FunctionType *>(eitherFnTy);
-//
-//  // TODO: what about autoclosures?
-//  return !functionType->isNoEscape();
+  if (auto silFnTy = eitherFnTy.dyn_cast<const SILFunctionType *>()) {
+    return !silFnTy->isNoEscape();
+  }
+
+  auto functionType = cast<const AnyFunctionType *>(eitherFnTy);
+
+  return !functionType->isNoEscape();
 
   // FIXME: unify TypeBase::isNoEscape with TypeBase::isEscapable
   // LazyConformanceEmitter::visitDestroyValueInst chokes on these instructions
   // destroy_value %2 : $@convention(block) @noescape () -> ()
-  //
-  // Wrongly claim that all functions today conform to Escapable for now:
-  return true;
 }
 
 static bool isBitwiseCopyableFunctionType(EitherFunctionType eitherFnTy) {
@@ -487,6 +485,8 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
       ASTContext &ctx = protocol->getASTContext();
 
       // FixedArray is Sendable, Copyable, or Escapable if its element type is.
+      // FIXME: If the type arguments contain type variables, this should set
+      // up a proper conditional conformance.
       if (auto bfa = dyn_cast<BuiltinFixedArrayType>(builtinType)) {
         if (lookupConformance(bfa->getElementType(), protocol)) {
           return ProtocolConformanceRef(
@@ -494,6 +494,28 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
                                       BuiltinConformanceKind::Synthesized));
         }
         break;
+      }
+
+      if (auto bba = dyn_cast<BuiltinBorrowType>(builtinType)) {
+        // Borrow is always Copyable.
+        if (*kp == KnownProtocolKind::Copyable) {
+          return ProtocolConformanceRef(
+              ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
+        }
+        // Borrow is never Escapable.
+        if (*kp == KnownProtocolKind::Escapable) {
+          return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+        }
+
+        // Borrow is Sendable[Metatype] if its element type is.
+        // FIXME: If the type arguments contain type variables, this should set
+        // up a proper conditional conformance.
+        if (lookupConformance(bba->getReferentType(), protocol)) {
+          return ProtocolConformanceRef(
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
+        }
       }
     
       // All other builtin types are Sendable, SendableMetatype, Copyable, and
@@ -543,8 +565,8 @@ static ProtocolConformanceRef getPackTypeConformance(
 }
 
 ProtocolConformanceRef
-LookupConformanceInModuleRequest::evaluate(
-    Evaluator &evaluator, LookupConformanceDescriptor desc) const {
+LookupConformanceRequest::evaluate(Evaluator &evaluator,
+                                   LookupConformanceDescriptor desc) const {
   auto type = desc.Ty;
   auto *protocol = desc.PD;
   ASTContext &ctx = protocol->getASTContext();
@@ -609,10 +631,9 @@ LookupConformanceInModuleRequest::evaluate(
   if (type->isTypeVariableOrMember())
     return ProtocolConformanceRef::forAbstract(type, protocol);
 
-  // UnresolvedType is a placeholder for an unknown type used when generating
-  // diagnostics.  We consider it to conform to all protocols, since the
-  // intended type might have. Same goes for PlaceholderType.
-  if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
+  // PlaceholderType is a placeholder for an unknown type. We consider it to
+  // conform to all protocols, since the intended type might have.
+  if (type->is<PlaceholderType>())
     return ProtocolConformanceRef::forAbstract(type, protocol);
 
   // Pack types can conform to protocols.
@@ -961,7 +982,7 @@ bool TypeBase::isEscapable() {
 bool TypeBase::isEscapable(GenericSignature sig) {
   Type contextTy = this;
   if (sig) {
-    contextTy = sig.getGenericEnvironment()->mapTypeIntoContext(contextTy);
+    contextTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(contextTy);
   }
   return contextTy->isEscapable();
 }
@@ -979,7 +1000,7 @@ bool TypeBase::isBitwiseCopyable() {
 bool TypeBase::isBitwiseCopyable(GenericSignature sig) {
   Type contextTy = this;
   if (sig) {
-    contextTy = sig.getGenericEnvironment()->mapTypeIntoContext(contextTy);
+    contextTy = sig.getGenericEnvironment()->mapTypeIntoEnvironment(contextTy);
   }
   return contextTy->isBitwiseCopyable();
 }

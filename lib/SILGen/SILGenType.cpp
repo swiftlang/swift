@@ -205,7 +205,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
   SILGenFunctionBuilder builder(*this);
   auto thunk = builder.createFunction(
       SILLinkage::Private, name, overrideInfo.SILFnType,
-      genericEnv, loc,
+      ActorIsolation::forUnspecified(), genericEnv, loc,
       IsBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
       IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsThunk);
   thunk->setDebugScope(new (M) SILDebugScope(loc, thunk));
@@ -624,7 +624,7 @@ public:
     });
 
     // Emit the witness table for the base conformance if it is shared.
-    SGM.useConformance(ProtocolConformanceRef(conformance));
+    SGM.useConformance(nullptr, ProtocolConformanceRef(conformance));
   }
 
   Witness getWitness(ValueDecl *decl) {
@@ -695,7 +695,7 @@ public:
     auto assocConformance =
       Conformance->getAssociatedConformance(req.getAssociation(),
                                             req.getAssociatedRequirement());
-    SGM.useConformance(assocConformance);
+    SGM.useConformance(nullptr, assocConformance);
     Entries.push_back(SILWitnessTable::AssociatedConformanceWitness{
         req.getAssociation(), assocConformance});
   }
@@ -718,13 +718,20 @@ public:
 } // end anonymous namespace
 
 SILWitnessTable *
-SILGenModule::getWitnessTable(NormalProtocolConformance *conformance) {
+SILGenModule::getWitnessTable(RootProtocolConformance *conformance) {
   // If we've already emitted this witness table, return it.
   auto found = emittedWitnessTables.find(conformance);
   if (found != emittedWitnessTables.end())
     return found->second;
 
-  SILWitnessTable *table = SILGenConformance(*this, conformance).emit();
+  SILWitnessTable *table;
+
+  if (auto normal = dyn_cast<NormalProtocolConformance>(conformance)) {
+    table = SILGenConformance(*this, normal).emit();
+  } else {
+    auto self = cast<SelfProtocolConformance>(conformance);
+    table = emitSelfConformanceWitnessTable(self->getProtocol());
+  }
   emittedWitnessTables.insert({conformance, table});
 
   return table;
@@ -771,7 +778,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // The type of the witness thunk.
   auto reqtSubstTy = cast<AnyFunctionType>(
     reqtOrigTy->substGenericArgs(reqtSubMap)
-              ->mapTypeOutOfContext()
+              ->mapTypeOutOfEnvironment()
               ->getCanonicalType());
 
   // Rewrite the conformance in terms of the requirement environment's Self
@@ -787,7 +794,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (conformance.isConcrete()) {
     conformance = reqtSubMap.lookupConformance(M.getASTContext().TheSelfType,
                                                origConformance.getProtocol())
-        .mapConformanceOutOfContext();
+        .mapConformanceOutOfEnvironment();
     ASSERT(!conformance.isAbstract());
 
     manglingConformance = conformance.getConcrete();
@@ -821,7 +828,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
   if (auto accessor = dyn_cast<AccessorDecl>(requirement.getDecl())) {
     if (accessor->isCoroutine()) {
       witnessSubsForTypeLowering =
-        witness.getSubstitutions().mapReplacementTypesOutOfContext();
+        witness.getSubstitutions().mapReplacementTypesOutOfEnvironment();
       if (accessor->isRequirementWithSynthesizedDefaultImplementation())
         allowDuplicateThunk = true;
     }
@@ -863,20 +870,33 @@ SILFunction *SILGenModule::emitProtocolWitness(
   // setting on the theory that forcing inlining off should only
   // effect the user's function, not otherwise invisible thunks.
   Inline_t InlineStrategy = InlineDefault;
-  if (witnessRef.isAlwaysInline())
-    InlineStrategy = AlwaysInline;
+  if (witnessRef.isUnderscoredAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+  // We don't guarantee @inline(always) will inline devirtualized thunks. But we
+  // want to make an best-effort attempt to inline.
+  else if (witnessRef.isAlwaysInline())
+    InlineStrategy = HeuristicAlwaysInline;
+
 
   SILFunction *f = M.lookUpFunction(nameBuffer);
   if (allowDuplicateThunk && f)
     return f;
   ASSERT(!f);
 
+  // Distributed: Carry the distributed thunk kind from the requirement.
+  // Distributed accessors dispatch through the witness table at runtime,
+  // so `DeadFunctionElimination` must keep these entries alive even though
+  // they have no SIL callers.
+  auto thunkKind = requirement.isDistributedThunk() ? IsDistributedThunk : IsThunk;
+
   SILGenFunctionBuilder builder(*this);
   f = builder.createFunction(
-      linkage, nameBuffer, witnessSILFnType, genericEnv,
-      SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
+      linkage, nameBuffer, witnessSILFnType,
+      getSILFunctionTypeActorIsolation(reqtSubstTy, requirement, witnessRef),
+      genericEnv, SILLocation(witnessRef.getDecl()), IsNotBare, IsTransparent,
       serializedKind, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineStrategy);
+      ProfileCounter(), thunkKind, SubclassScope::NotApplicable,
+      InlineStrategy);
 
   f->setDebugScope(new (M)
                    SILDebugScope(RegularLocation(witnessRef.getDecl()), f));
@@ -909,11 +929,6 @@ SILFunction *SILGenModule::emitProtocolWitness(
                           witness.getEnterIsolation());
 
   emitLazyConformancesForFunction(f);
-
-  if (auto isolation = getSILFunctionTypeActorIsolation(
-          reqtSubstTy, requirement, witnessRef)) {
-    f->setActorIsolation(*isolation);
-  }
 
   return f;
 }
@@ -966,8 +981,8 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   SILGenFunctionBuilder builder(SGM);
   auto *f = builder.createFunction(
-      linkage, name, witnessSILFnType, genericEnv,
-      SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
+      linkage, name, witnessSILFnType, ActorIsolation::forUnspecified(),
+      genericEnv, SILLocation(requirement.getDecl()), IsNotBare, IsTransparent,
       IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
       ProfileCounter(), IsThunk, SubclassScope::NotApplicable, InlineDefault);
 
@@ -1011,7 +1026,7 @@ public:
       serialized(getConformanceSerializedKind(conformance)) {
   }
 
-  void emit() {
+  SILWitnessTable *emit() {
     PrettyStackTraceConformance trace("generating SIL witness table",
                                       conformance);
 
@@ -1019,7 +1034,7 @@ public:
     visitProtocolDecl(conformance->getProtocol());
 
     // Create the witness table.
-    (void) SILWitnessTable::create(SGM.M, linkage, serialized, conformance,
+    return SILWitnessTable::create(SGM.M, linkage, serialized, conformance,
                                    entries, /*conditional*/ {}, /*specialized=*/false);
   }
 
@@ -1049,9 +1064,9 @@ public:
 };
 }
 
-void SILGenModule::emitSelfConformanceWitnessTable(ProtocolDecl *protocol) {
+SILWitnessTable *SILGenModule::emitSelfConformanceWitnessTable(ProtocolDecl *protocol) {
   auto conformance = getASTContext().getSelfConformance(protocol);
-  SILGenSelfConformanceWitnessTable(*this, conformance).emit();
+  return SILGenSelfConformanceWitnessTable(*this, conformance).emit();
 }
 
 namespace {
@@ -1079,6 +1094,25 @@ public:
   void addProtocolConformanceDescriptor() { }
 
   void addOutOfLineBaseProtocol(ProtocolDecl *baseProto) {
+    // Check if there is a reparented base protocol conformance.
+    auto local = Proto->getLocalConformances();
+    for (auto conf : local) {
+      if (conf->getProtocol() != baseProto)
+        continue;
+
+      if (isa<SelfProtocolConformance>(conf))
+        continue;
+
+      ASSERT(conf->isReparented());
+      DefaultWitnesses.push_back(
+          SILWitnessTable::BaseProtocolWitness{baseProto, conf});
+
+      // Ensure the witness table is emitted for this conformance.
+      SGM.useConformance(/*inst=*/nullptr, ProtocolConformanceRef(conf));
+      return;
+    }
+
+    // Otherwise, there is no default conformance for this base protocol.
     addMissingDefault();
   }
 
@@ -1117,7 +1151,7 @@ public:
     if (!witness)
       return addMissingDefault();
 
-    Type witnessInContext = Proto->mapTypeIntoContext(witness);
+    Type witnessInContext = Proto->mapTypeIntoEnvironment(witness);
     auto entry = SILWitnessTable::AssociatedTypeWitness{
                                           assocType,
                                           witnessInContext->getCanonicalType()};
@@ -1157,9 +1191,9 @@ namespace {
 std::optional<AccessorKind>
 originalAccessorKindForReplacementKind(AccessorKind kind) {
   switch (kind) {
-  case AccessorKind::Read2:
+  case AccessorKind::YieldingBorrow:
     return {AccessorKind::Read};
-  case AccessorKind::Modify2:
+  case AccessorKind::YieldingMutate:
     return {AccessorKind::Modify};
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
@@ -1171,6 +1205,8 @@ originalAccessorKindForReplacementKind(AccessorKind kind) {
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Init:
+  case AccessorKind::Borrow:
+  case AccessorKind::Mutate:
     return std::nullopt;
   }
 }
@@ -1206,7 +1242,8 @@ public:
     if (!accessor) {
       return std::nullopt;
     }
-    // Specifically, read2 can replace _read and modify2 can replace _modify.
+    // Specifically, `yielding borrow` can replace _read and
+    // `yielding mutate` can replace _modify.
     auto originalKind =
         originalAccessorKindForReplacementKind(accessor->getAccessorKind());
     if (!originalKind) {
@@ -1274,9 +1311,10 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
           .SILFnType;
   auto loc = replacement.getAsRegularLocation();
   auto *function = builder.getOrCreateFunction(
-      loc, name, SILLinkage::Shared, replacementTy, IsBare, IsNotTransparent,
-      IsSerialized, IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible,
-      ProfileCounter(), IsNotThunk);
+      loc, name, SILLinkage::Shared, replacementTy,
+      ActorIsolation::forUnspecified(), IsBare, IsNotTransparent, IsSerialized,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(),
+      IsNotThunk);
 
   if (!function->empty())
     return function;
@@ -1347,7 +1385,7 @@ SILFunction *SILGenModule::emitDefaultOverride(SILDeclRef replacement,
   for (auto result : originalConvention.getDirectSILResults()) {
     auto ty = originalConvention.getSILType(
         result, function->getTypeExpansionContext());
-    ty = function->mapTypeIntoContext(ty);
+    ty = function->mapTypeIntoEnvironment(ty);
     directResultTypes.push_back(ty.getASTType());
   }
   SILType resultTy;
@@ -1441,7 +1479,10 @@ public:
         if (!SF || SF->Kind != SourceFileKind::Interface)
           SGM.emitDefaultWitnessTable(protocol);
       }
-      if (protocol->requiresSelfConformanceWitnessTable()) {
+
+      // Self-conformance witness tables are emitted lazily in Embedded Swift.
+      if (protocol->requiresSelfConformanceWitnessTable() &&
+          !SGM.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
         SGM.emitSelfConformanceWitnessTable(protocol);
       }
       return;

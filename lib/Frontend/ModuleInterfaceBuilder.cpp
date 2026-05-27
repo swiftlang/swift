@@ -310,7 +310,6 @@ std::error_code ExplicitModuleInterfaceBuilder::buildSwiftModuleFromInterface(
       return std::make_error_code(std::errc::not_supported);
     SerializationOpts.Dependencies = Deps;
   }
-  SerializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
   SILMod->setSerializeSILAction([&]() {
     // We don't want to serialize module docs in the cache -- they
@@ -436,7 +435,7 @@ bool ImplicitModuleInterfaceBuilder::buildSwiftModule(StringRef OutPath,
       diagnose(diag::interface_file_lock_timed_out, interfacePath);
     }
     // Clear the lock file so that future invocations can make progress.
-    Lock.unsafeMaybeUnlock();
+    Lock.unsafeUnlock();
     continue;
   }
   }
