@@ -88,6 +88,194 @@ static bool isStdSpanType(clang::QualType clangType) {
   return decl && decl->isInStdNamespace() && decl->getName() == "span";
 }
 
+// Walks a clang `Expr` tree that appears as a `__counted_by` /
+// `__sized_by` count expression and emits an equivalent Swift expression.
+// Returns true on success; on failure the partial output in `out` is
+// meaningless and callers must discard it.
+struct SwiftCountExprEmitter
+    : clang::ConstStmtVisitor<SwiftCountExprEmitter, bool> {
+  const clang::ASTContext &ctx;
+  llvm::raw_ostream &out;
+
+  SwiftCountExprEmitter(const clang::ASTContext &ctx, llvm::raw_ostream &out)
+      : ctx(ctx), out(out) {}
+
+  bool VisitDeclRefExpr(const clang::DeclRefExpr *e) {
+    out << e->getDecl()->getName();
+    return true;
+  }
+
+  bool VisitIntegerLiteral(const clang::IntegerLiteral *IL) {
+    const auto *bt = IL->getType()->getAs<clang::BuiltinType>();
+    if (!bt) return false;
+    bool isSigned = IL->getType()->isSignedIntegerType();
+    llvm::SmallString<20> valueStr;
+    IL->getValue().toString(valueStr, /*Radix=*/10, isSigned);
+    if (bt->getKind() == clang::BuiltinType::Int) {
+      out << valueStr;
+      return true;
+    }
+    auto swiftName = swiftBuiltinTypeName(bt);
+    if (!swiftName) {
+      DLOG("Unsupported integer literal type\n");
+      return false;
+    }
+    out << *swiftName << '(' << valueStr << ')';
+    return true;
+  }
+
+  bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) {
+    using CK = clang::CastKind;
+    switch (c->getCastKind()) {
+    case CK::CK_LValueToRValue:
+    case CK::CK_NoOp:
+    case CK::CK_ArrayToPointerDecay:
+    case CK::CK_FunctionToPointerDecay:
+      return Visit(c->getSubExpr());
+    case CK::CK_IntegralCast:
+    case CK::CK_BooleanToSignedIntegral:
+    case CK::CK_IntegralToBoolean:
+    case CK::CK_IntegralToFloating:
+    case CK::CK_FloatingToIntegral:
+    case CK::CK_FloatingCast: {
+      // Implicit casts get plain T(x) casts: trap instead of truncate
+      auto swiftName = swiftBuiltinTypeName(c->getType());
+      if (!swiftName) {
+        DLOG("Unsupported cast destination type\n");
+        return false;
+      }
+      out << *swiftName << '(';
+      if (!Visit(c->getSubExpr()))
+        return false;
+      out << ')';
+      return true;
+    }
+    default:
+      DLOG("Unsupported implicit cast kind\n");
+      return false;
+    }
+  }
+
+  bool VisitCStyleCastExpr(const clang::CStyleCastExpr *c) {
+    using CK = clang::CastKind;
+    auto kind = c->getCastKind();
+    switch (kind) {
+    case CK::CK_NoOp:
+    case CK::CK_LValueToRValue:
+      return Visit(c->getSubExpr());
+    case CK::CK_IntegralCast:
+    case CK::CK_BooleanToSignedIntegral:
+    case CK::CK_IntegralToBoolean:
+    case CK::CK_IntegralToFloating:
+    case CK::CK_FloatingToIntegral:
+    case CK::CK_FloatingCast: {
+      auto swiftName = swiftBuiltinTypeName(c->getType());
+      if (!swiftName) {
+        DLOG("Unsupported cast destination type\n");
+        return false;
+      }
+      out << *swiftName << '(';
+      // Mirror C's silent truncation on narrowing integer conversions for
+      // explicit casts.
+      if (isNarrowingIntCast(c))
+        out << "truncatingIfNeeded: ";
+      if (!Visit(c->getSubExpr()))
+        return false;
+      out << ')';
+      return true;
+    }
+    default:
+      DLOG("Unsupported C-style cast kind\n");
+      return false;
+    }
+  }
+
+  bool VisitParenExpr(const clang::ParenExpr *p) {
+    out << '(';
+    if (!Visit(p->getSubExpr())) return false;
+    out << ')';
+    return true;
+  }
+
+  bool VisitUnaryOperator(const clang::UnaryOperator *unop) {
+    llvm::StringRef op;
+    switch (unop->getOpcode()) {
+    case clang::UO_Plus:  op = "+"; break;
+    case clang::UO_Minus: op = "-"; break;
+    case clang::UO_Not:   op = "~"; break;
+    default:
+      DLOG("Unsupported unary operator\n");
+      return false;
+    }
+    out << op;
+    return Visit(unop->getSubExpr());
+  }
+
+  bool VisitBinaryOperator(const clang::BinaryOperator *binop) {
+    llvm::StringRef op;
+    switch (binop->getOpcode()) {
+    case clang::BO_Add: op = " + "; break;
+    case clang::BO_Sub: op = " - "; break;
+    case clang::BO_Mul: op = " * "; break;
+    case clang::BO_Div: op = " / "; break;
+    case clang::BO_Rem: op = " % "; break;
+    case clang::BO_Shl: op = " << "; break;
+    case clang::BO_Shr: op = " >> "; break;
+    case clang::BO_And: op = " & "; break;
+    case clang::BO_Or:  op = " | "; break;
+    case clang::BO_Xor: op = " ^ "; break;
+    default:
+      DLOG("Unsupported binary operator\n");
+      return false;
+    }
+    if (!Visit(binop->getLHS())) return false;
+    out << op;
+    return Visit(binop->getRHS());
+  }
+
+  bool VisitStmt(const clang::Stmt *) {
+    DLOG("Ignoring count parameter with unsupported expression\n");
+    return false;
+  }
+
+private:
+  bool isNarrowingIntCast(const clang::CastExpr *c) {
+    if (c->getCastKind() != clang::CK_IntegralCast) return false;
+    auto destTy = c->getType();
+    auto srcTy = c->getSubExpr()->getType();
+    if (!destTy->isIntegerType() || !srcTy->isIntegerType()) return false;
+    uint64_t srcBits = ctx.getTypeSize(srcTy);
+    uint64_t destBits = ctx.getTypeSize(destTy);
+    bool srcSigned = srcTy->isSignedIntegerType();
+    bool destSigned = destTy->isSignedIntegerType();
+    // Narrowing or same-width signedness change: plain T(x) traps in Swift on
+    // values that C would silently truncate, so use truncatingIfNeeded:.
+    return destBits < srcBits ||
+           (destBits == srcBits && srcSigned != destSigned);
+  }
+
+  std::optional<llvm::StringRef> swiftBuiltinTypeName(clang::QualType ty) {
+    const auto *bt = ty->getAs<clang::BuiltinType>();
+    if (!bt) return std::nullopt;
+    return swiftBuiltinTypeName(bt);
+  }
+
+  std::optional<llvm::StringRef>
+  swiftBuiltinTypeName(const clang::BuiltinType *bt) {
+    switch (bt->getKind()) {
+#define MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME) \
+    case clang::BuiltinType::CLANG_KIND: return llvm::StringRef(#SWIFT_NAME);
+#define MAP_BUILTIN_CCHAR_TYPE(CLANG_KIND, SWIFT_NAME) \
+    MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)
+#define MAP_BUILTIN_INTEGER_TYPE(CLANG_KIND, SWIFT_NAME) \
+    MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)
+#include "swift/ClangImporter/BuiltinMappedTypes.def"
+    default:
+      return std::nullopt;
+    }
+  }
+};
+
 struct SwiftifyInfoPrinter {
   static const ssize_t SELF_PARAM_INDEX = -2;
   static const ssize_t RETURN_VALUE_INDEX = -1;
@@ -187,8 +375,10 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     else
       out << "count";
     out << ": \"";
-    countExpr->printPretty(
-        out, {}, {ctx.getLangOpts()}); // TODO: map clang::Expr to Swift Expr
+    // Validation in SwiftifiableCAT guarantees this succeeds.
+    bool ok = SwiftCountExprEmitter(ctx, out).Visit(countExpr);
+    (void)ok;
+    ASSERT(ok && "count expression validated but failed to emit");
     out << "\")";
   }
 
@@ -248,68 +438,6 @@ private:
   }
 };
 
-struct CountedByExpressionValidator
-    : clang::ConstStmtVisitor<CountedByExpressionValidator, bool> {
-  bool VisitDeclRefExpr(const clang::DeclRefExpr *e) { return true; }
-
-  bool VisitIntegerLiteral(const clang::IntegerLiteral *IL) {
-    switch (IL->getType()->castAs<clang::BuiltinType>()->getKind()) {
-    case clang::BuiltinType::Char_S:
-    case clang::BuiltinType::Char_U:
-    case clang::BuiltinType::UChar:
-    case clang::BuiltinType::SChar:
-    case clang::BuiltinType::Short:
-    case clang::BuiltinType::UShort:
-    case clang::BuiltinType::UInt:
-    case clang::BuiltinType::Long:
-    case clang::BuiltinType::ULong:
-    case clang::BuiltinType::LongLong:
-    case clang::BuiltinType::ULongLong:
-      DLOG("Ignoring count parameter with non-portable integer literal\n");
-      return false;
-    default:
-      return true;
-    }
-  }
-
-  bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) {
-    return this->Visit(c->getSubExpr());
-  }
-  bool VisitParenExpr(const clang::ParenExpr *p) {
-    return this->Visit(p->getSubExpr());
-  }
-
-#define SUPPORTED_UNOP(UNOP) \
-  bool VisitUnary ## UNOP(const clang::UnaryOperator *unop) { \
-    return this->Visit(unop->getSubExpr()); \
-  }
-  SUPPORTED_UNOP(Plus)
-  SUPPORTED_UNOP(Minus)
-  SUPPORTED_UNOP(Not)
-#undef SUPPORTED_UNOP
-
-#define SUPPORTED_BINOP(BINOP) \
-  bool VisitBin ## BINOP(const clang::BinaryOperator *binop) { \
-    return this->Visit(binop->getLHS()) && this->Visit(binop->getRHS()); \
-  }
-  SUPPORTED_BINOP(Add)
-  SUPPORTED_BINOP(Sub)
-  SUPPORTED_BINOP(Div)
-  SUPPORTED_BINOP(Mul)
-  SUPPORTED_BINOP(Rem)
-  SUPPORTED_BINOP(Shl)
-  SUPPORTED_BINOP(Shr)
-  SUPPORTED_BINOP(And)
-  SUPPORTED_BINOP(Xor)
-  SUPPORTED_BINOP(Or)
-#undef SUPPORTED_BINOP
-
-  bool VisitStmt(const clang::Stmt *) {
-    DLOG("Ignoring count parameter with unsupported expression\n");
-    return false;
-  }
-};
-
 
 static Type ConcretePointeeType(Type swiftType) {
   Type nonnullType = swiftType->lookThroughSingleOptionalType();
@@ -351,10 +479,15 @@ static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
 static bool SwiftifiableCAT(const clang::ASTContext &ctx,
                             const clang::CountAttributedType *CAT,
                             Type swiftType) {
-  return CAT && CountedByExpressionValidator().Visit(CAT->getCountExpr()) &&
-    (CAT->isCountInBytes() ?
-       SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
-     : !ConcretePointeeType(swiftType).isNull());
+  if (!CAT) return false;
+  // Probe the emitter into a discardable buffer to determine support.
+  llvm::SmallString<128> tmp;
+  llvm::raw_svector_ostream tmpOS(tmp);
+  if (!SwiftCountExprEmitter(ctx, tmpOS).Visit(CAT->getCountExpr()))
+    return false;
+  return CAT->isCountInBytes()
+             ? SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
+             : !ConcretePointeeType(swiftType).isNull();
 }
 
 // Searches for template instantiations that are not behind type aliases.
