@@ -5320,12 +5320,12 @@ ERROR(implicit_async_super_init,none,
       "'super.init' is 'async' and requires an explicit call",
       ())
 
-WARNING(if_always_true,none,
+GROUPED_WARNING(if_always_true,UselessConditionalStatement,none,
         "'if' condition is always true", ())
-WARNING(while_always_true,none,
+GROUPED_WARNING(while_always_true,UselessConditionalStatement,none,
         "'while' condition is always true", ())
 
-WARNING(guard_always_succeeds,none,
+GROUPED_WARNING(guard_always_succeeds,UselessConditionalStatement,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
