@@ -285,10 +285,43 @@ private:
   }
 };
 
-static Type ConcretePointeeType(Type swiftType);
+static Type ConcretePointeeType(Type swiftType) {
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  PointerTypeKind PTK;
+  Type PointeeTy = nonnullType->getAnyPointerElementType(PTK);
+  if (PointeeTy && (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer))
+    return PointeeTy;
+  return Type();
+}
+
+// Don't try to transform any Swift types that _SwiftifyImport doesn't know how
+// to handle.
 static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
                                            Type swiftType,
-                                           const clang::CountAttributedType *CAT);
+                                           const clang::CountAttributedType *CAT) {
+  Type nonnullType = swiftType->lookThroughSingleOptionalType();
+  if (nonnullType->isOpaquePointer())
+    return true;
+  PointerTypeKind PTK;
+  if (!nonnullType->getAnyPointerElementType(PTK)) {
+    DLOG("Ignoring sized_by on non-pointer type\n");
+    return false;
+  }
+  if (PTK == PTK_UnsafeRawPointer || PTK == PTK_UnsafeMutableRawPointer)
+    return true;
+  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer) {
+    DLOG("Ignoring sized_by on Autoreleasing pointer\n");
+    CONDITIONAL_ASSERT(PTK == PTK_AutoreleasingUnsafeMutablePointer);
+    return false;
+  }
+  // We have a pointer to a type with a size. Verify that it is char-sized.
+  auto PtrT = CAT->getAs<clang::PointerType>();
+  auto PointeeT = PtrT->getPointeeType();
+  bool isByteSized = ctx.getTypeSizeInChars(PointeeT).isOne();
+  if (!isByteSized)
+    DLOG("Ignoring sized_by on non-byte-sized pointer\n");
+  return isByteSized;
+}
 
 struct SwiftifyInfoPrinter {
   static const ssize_t SELF_PARAM_INDEX = -2;
@@ -455,44 +488,6 @@ private:
   }
 };
 
-
-static Type ConcretePointeeType(Type swiftType) {
-  Type nonnullType = swiftType->lookThroughSingleOptionalType();
-  PointerTypeKind PTK;
-  Type PointeeTy = nonnullType->getAnyPointerElementType(PTK);
-  if (PointeeTy && (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer))
-    return PointeeTy;
-  return Type();
-}
-
-// Don't try to transform any Swift types that _SwiftifyImport doesn't know how
-// to handle.
-static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
-                                           Type swiftType,
-                                           const clang::CountAttributedType *CAT) {
-  Type nonnullType = swiftType->lookThroughSingleOptionalType();
-  if (nonnullType->isOpaquePointer())
-    return true;
-  PointerTypeKind PTK;
-  if (!nonnullType->getAnyPointerElementType(PTK)) {
-    DLOG("Ignoring sized_by on non-pointer type\n");
-    return false;
-  }
-  if (PTK == PTK_UnsafeRawPointer || PTK == PTK_UnsafeMutableRawPointer)
-    return true;
-  if (PTK != PTK_UnsafePointer && PTK != PTK_UnsafeMutablePointer) {
-    DLOG("Ignoring sized_by on Autoreleasing pointer\n");
-    CONDITIONAL_ASSERT(PTK == PTK_AutoreleasingUnsafeMutablePointer);
-    return false;
-  }
-  // We have a pointer to a type with a size. Verify that it is char-sized.
-  auto PtrT = CAT->getAs<clang::PointerType>();
-  auto PointeeT = PtrT->getPointeeType();
-  bool isByteSized = ctx.getTypeSizeInChars(PointeeT).isOne();
-  if (!isByteSized)
-    DLOG("Ignoring sized_by on non-byte-sized pointer\n");
-  return isByteSized;
-}
 
 // Searches for template instantiations that are not behind type aliases.
 // FIXME: make sure the generated code compiles for template
