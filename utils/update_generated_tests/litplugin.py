@@ -1,5 +1,6 @@
 import hashlib
 import re
+import shlex
 import subprocess
 from lit_support.split_file import SplitFileTarget
 
@@ -25,7 +26,7 @@ def _run_and_update(test_path, cmd):
     Returns (None, False) if the hash is unchanged and the file was not updated.
     Returns (None, True) if the file was updated.
     """
-    proc = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+    proc = subprocess.run(shlex.split(cmd), capture_output=True, text=True)
     if proc.returncode != 0:
         return (f"GENERATED-BY command failed:\n{proc.stderr}", False)
 
