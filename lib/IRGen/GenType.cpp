@@ -20,6 +20,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Types.h"
@@ -1430,6 +1431,55 @@ namespace {
       llvm_unreachable("should not call on an immovable opaque type");
     }
   };
+
+  /// A TypeInfo for a HiddenType placeholder. The placeholder stands in for a
+  /// real C-imported type whose identity has been elided from the importing
+  /// Layout is recovered from the defining module's HiddenTypeLayouts table.
+  ///
+  /// Address-only: clients lack the clang::RecordDecl required to derive a
+  /// correct register-passing schema for the hidden field, so values are
+  /// always passed indirectly. 
+  class TrivialHiddenTypeInfo final
+      : public IndirectTypeInfo<TrivialHiddenTypeInfo, FixedTypeInfo> {
+  public:
+    TrivialHiddenTypeInfo(llvm::Type *storage, Size size, Alignment align)
+      : IndirectTypeInfo(storage, size,
+                         SpareBitVector::getConstant(size.getValueInBits(),
+                                                     false),
+                         align,
+                         IsTriviallyDestroyable, IsBitwiseTakableAndBorrowable,
+                         IsCopyable,
+                         IsFixedSize, IsABIAccessible) {}
+
+    void assignWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                        SILType T, bool isOutlined) const override {
+      IGF.emitMemCpy(dest, src, getFixedSize());
+    }
+    void initializeWithCopy(IRGenFunction &IGF, Address dest, Address src,
+                            SILType T, bool isOutlined) const override {
+      IGF.emitMemCpy(dest, src, getFixedSize());
+    }
+    void destroy(IRGenFunction &IGF, Address addr, SILType T,
+                 bool isOutlined) const override {
+      // Trivial destructor under the plain-C assumption.
+    }
+
+    TypeLayoutEntry *
+    buildTypeLayoutEntry(IRGenModule &IGM, SILType T,
+                         bool useStructLayouts) const override {
+      if (!useStructLayouts)
+        return IGM.typeLayoutCache.getOrCreateTypeInfoBasedEntry(*this, T);
+      return IGM.typeLayoutCache.getOrCreateScalarEntry(
+          *this, T, ScalarKind::TriviallyDestroyable);
+    }
+
+    unsigned getFixedExtraInhabitantCount(IRGenModule &) const override {
+      return 0;
+    }
+    bool mayHaveExtraInhabitants(IRGenModule &) const override {
+      return false;
+    }
+  };
 } // end anonymous namespace
 
 /// Constructs a type info which performs simple loads and stores of
@@ -2402,8 +2452,19 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
     llvm_unreachable("should not be asking for the type info an IntegerType");
-  case TypeKind::Hidden:
-    llvm_unreachable("HiddenType should be resolved before IRGen sees it");
+  case TypeKind::Hidden: {
+    auto hidden = cast<HiddenType>(ty);
+    auto *defining = hidden->getDefiningModule();
+    assert(defining &&
+           "HiddenType must carry a defining module after deserialization");
+    auto layout = defining->lookupHiddenTypeLayout(hidden->getMangledName());
+    assert(layout &&
+           "no HIDDEN_TYPE_LAYOUTS_BLOCK entry for this mangled name");
+
+    auto *storage = llvm::ArrayType::get(IGM.Int8Ty, layout->size);
+    return new TrivialHiddenTypeInfo(storage, Size(layout->size),
+                              Alignment(layout->alignment));
+  }
   }
   }
   llvm_unreachable("bad type kind");

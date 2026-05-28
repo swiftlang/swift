@@ -180,6 +180,7 @@ public:
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
+  IGNORED_ATTR(HasHiddenStoredProperties)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
