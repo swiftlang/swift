@@ -27,9 +27,9 @@
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct1 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS: {{^}}  init(){{$}}
-// TAG_DECLS_AND_TYPEDEFS: {{^}}  init(x: Int32, y: Double){{$}}
-// TAG_DECLS_AND_TYPEDEFS: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}  init(x: CInt, y: CDouble){{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}  var x: CInt{{$}}
+// TAG_DECLS_AND_TYPEDEFS: {{^}}  var y: CDouble{{$}}
 // TAG_DECLS_AND_TYPEDEFS: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS:      /**
@@ -37,9 +37,9 @@
 // TAG_DECLS_AND_TYPEDEFS-NEXT: */
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStruct2 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: CInt, y: CDouble){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS:      /**
@@ -49,43 +49,43 @@
 
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}struct FooStructTypedef2 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: CInt, y: CDouble){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct3 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: CInt, y: CDouble){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct4 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: CInt, y: CDouble){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct5 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: CInt, y: CDouble){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // TAG_DECLS_AND_TYPEDEFS: {{^}}struct FooStruct6 {{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: Int32, y: Double){{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: Int32{{$}}
-// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: Double{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  init(x: CInt, y: CDouble){{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var x: CInt{{$}}
+// TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}  var y: CDouble{{$}}
 // TAG_DECLS_AND_TYPEDEFS-NEXT: {{^}}}{{$}}
 
 // Skip through unavailable typedefs when importing types.
 // TAG_DECLS_AND_TYPEDEFS: @available(*, unavailable, message: "use double")
-// TAG_DECLS_AND_TYPEDEFS-NEXT: typealias real_t = Double
-// TAG_DECLS_AND_TYPEDEFS-NEXT: func realSin(_ value: Double) -> Double
+// TAG_DECLS_AND_TYPEDEFS-NEXT: typealias real_t = CDouble
+// TAG_DECLS_AND_TYPEDEFS-NEXT: func realSin(_ value: CDouble) -> CDouble
 
 // NEGATIVE-NOT: typealias FooStructTypedef2
 
@@ -143,8 +143,8 @@
 // FOUNDATION:         static var tooMuchSoap: NSLaundromat.Error.Code { get }
 
 // CTYPESBITS-NOT: FooStruct1
-// CTYPESBITS: {{^}}typealias DWORD = Int32{{$}}
-// CTYPESBITS-NEXT: {{^}}var MY_INT: Int32 { get }{{$}}
+// CTYPESBITS: {{^}}typealias DWORD = CInt{{$}}
+// CTYPESBITS-NEXT: {{^}}var MY_INT: CInt { get }{{$}}
 // CTYPESBITS-NOT: FooStruct1
 
 // CHECK-NULLABILITY: func getId1() -> Any?
@@ -152,8 +152,8 @@
 // CHECK-NULLABILITY: class SomeClass {
 // CHECK-NULLABILITY:   class func methodA(_ obj: SomeClass?) -> Any{{$}}
 // CHECK-NULLABILITY:   func methodA(_ obj: SomeClass?) -> Any{{$}}
-// CHECK-NULLABILITY:   class func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> Any{{$}}
-// CHECK-NULLABILITY:   func methodB(_ block: ((Int32, Int32) -> Int32)? = nil) -> Any{{$}}
+// CHECK-NULLABILITY:   class func methodB(_ block: ((CInt, CInt) -> CInt)? = nil) -> Any{{$}}
+// CHECK-NULLABILITY:   func methodB(_ block: ((CInt, CInt) -> CInt)? = nil) -> Any{{$}}
 // CHECK-NULLABILITY:   func methodC() -> Any?
 // CHECK-NULLABILITY:   var property: Any?
 // CHECK-NULLABILITY:   func stringMethod() -> String{{$}}

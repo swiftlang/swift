@@ -8,9 +8,9 @@ import FromClang // NOTE: line offset = -4
 // The macro-generated interface we're looking up source info for
 // (this is more so for documentation than checking correctness)
 //
-// INTERFACE:      @_alwaysEmitIntoClient @_disfavoredOverload public func hasBufferOverload(_ p: UnsafeMutableBufferPointer<Int32>)
+// INTERFACE:      @_alwaysEmitIntoClient @_disfavoredOverload public func hasBufferOverload(_ p: UnsafeMutableBufferPointer<CInt>)
 // INTERFACE:      @{{_?}}lifetime(p: copy p)
-// INTERFACE-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func hasSpanOverload(_ p: inout MutableSpan<Int32>)
+// INTERFACE-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func hasSpanOverload(_ p: inout MutableSpan<CInt>)
 // RUN: %target-swift-ide-test \
 // RUN:   -print-module -module-to-print=FromClang -source-filename=x \
 // RUN:   -plugin-path %swift-plugin-dir -I %t/Inputs \

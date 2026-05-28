@@ -7,7 +7,7 @@
 // REQUIRES: OS=macosx
 
 // CHECK: {{^}}CFArrayCreateCopy(allocator: CFAllocator!, theArray: CFArray!) -> CFArray!{{$}}
-// CHECK: {{^}}FE_ALL_EXCEPT: Int32{{$}}
+// CHECK: {{^}}FE_ALL_EXCEPT: CInt{{$}}
 
 import Cocoa
 

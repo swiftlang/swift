@@ -6,104 +6,104 @@ class Foo : NSObject, __PrivProto {
   var __privValue: Any!
   class var __privClassValue: Any!
   func __noArgs()
-  func __oneArg(_ arg: Int32)
-  func __twoArgs(_ arg: Int32, other arg2: Int32)
+  func __oneArg(_ arg: CInt)
+  func __twoArgs(_ arg: CInt, other arg2: CInt)
   class func __withNoArgs() -> Self!
   @available(swift, obsoleted: 3, renamed: "__withNoArgs()")
   class func __fooWithNoArgs() -> Self!
-  convenience init!(__oneArg arg: Int32)
+  convenience init!(__oneArg arg: CInt)
   @available(*, unavailable, renamed: "init(__oneArg:)", message: "Not available in Swift")
-  class func __fooWithOneArg(_ arg: Int32) -> Self!
-  convenience init!(__twoArgs arg: Int32, other arg2: Int32)
+  class func __fooWithOneArg(_ arg: CInt) -> Self!
+  convenience init!(__twoArgs arg: CInt, other arg2: CInt)
   @available(*, unavailable, renamed: "init(__twoArgs:other:)", message: "Not available in Swift")
-  class func __fooWithTwoArgs(_ arg: Int32, other arg2: Int32) -> Self!
-  convenience init!(__ arg: Int32)
+  class func __fooWithTwoArgs(_ arg: CInt, other arg2: CInt) -> Self!
+  convenience init!(__ arg: CInt)
   @available(*, unavailable, renamed: "init(__:)", message: "Not available in Swift")
-  class func __foo(_ arg: Int32) -> Self!
+  class func __foo(_ arg: CInt) -> Self!
   func objectForKeyedSubscript(_ index: Any!) -> Any!
   func __setObject(_ object: Any!, forKeyedSubscript index: Any!)
-  func __objectAtIndexedSubscript(_ index: Int32) -> Any!
-  func setObject(_ object: Any!, atIndexedSubscript index: Int32)
+  func __objectAtIndexedSubscript(_ index: CInt) -> Any!
+  func setObject(_ object: Any!, atIndexedSubscript index: CInt)
   init()
 }
 class Bar : NSObject {
   init!()
   init!(__noArgs: ())
-  init!(__oneArg arg: Int32)
-  init!(__twoArgs arg: Int32, other arg2: Int32)
-  init!(__ arg: Int32)
+  init!(__oneArg arg: CInt)
+  init!(__twoArgs arg: CInt, other arg2: CInt)
+  init!(__ arg: CInt)
 }
 class __PrivFooSub : Foo {
-  convenience init!(__oneArg arg: Int32)
-  convenience init!(__twoArgs arg: Int32, other arg2: Int32)
-  convenience init!(__ arg: Int32)
+  convenience init!(__oneArg arg: CInt)
+  convenience init!(__twoArgs arg: CInt, other arg2: CInt)
+  convenience init!(__ arg: CInt)
   init()
 }
 func __privTest()
 struct S0 {
   init()
-  init(__privValue: Int32)
-  var __privValue: Int32
+  init(__privValue: CInt)
+  var __privValue: CInt
 }
 struct __PrivS1 {
   init()
-  init(value: Int32)
-  var value: Int32
+  init(value: CInt)
+  var value: CInt
 }
 struct __PrivS2 {
   init()
-  init(value: Int32)
-  var value: Int32
+  init(value: CInt)
+  var value: CInt
 }
 var __PrivAnonymousA: Int { get }
 struct E0 : Hashable, Equatable, RawRepresentable {
-  init(_ rawValue: UInt32)
-  init(rawValue: UInt32)
-  var rawValue: UInt32
-  typealias RawValue = UInt32
+  init(_ rawValue: CUnsignedInt)
+  init(rawValue: CUnsignedInt)
+  var rawValue: CUnsignedInt
+  typealias RawValue = CUnsignedInt
 }
 var __E0PrivA: E0 { get }
 struct __PrivE1 : Hashable, Equatable, RawRepresentable {
-  init(_ rawValue: UInt32)
-  init(rawValue: UInt32)
-  var rawValue: UInt32
-  typealias RawValue = UInt32
+  init(_ rawValue: CUnsignedInt)
+  init(rawValue: CUnsignedInt)
+  var rawValue: CUnsignedInt
+  typealias RawValue = CUnsignedInt
 }
 var __PrivE1A: __PrivE1 { get }
 struct __PrivE2 : Hashable, Equatable, RawRepresentable {
-  init(_ rawValue: UInt32)
-  init(rawValue: UInt32)
-  var rawValue: UInt32
-  typealias RawValue = UInt32
+  init(_ rawValue: CUnsignedInt)
+  init(rawValue: CUnsignedInt)
+  var rawValue: CUnsignedInt
+  typealias RawValue = CUnsignedInt
 }
 var __PrivE2A: __PrivE2 { get }
-enum __PrivNSEnum : Int {
-  init?(rawValue: Int)
-  var rawValue: Int { get }
-  typealias RawValue = Int
+enum __PrivNSEnum : CLong {
+  init?(rawValue: CLong)
+  var rawValue: CLong { get }
+  typealias RawValue = CLong
   case A
 }
-enum NSEnum : Int {
-  init?(rawValue: Int)
-  var rawValue: Int { get }
-  typealias RawValue = Int
+enum NSEnum : CLong {
+  init?(rawValue: CLong)
+  var rawValue: CLong { get }
+  typealias RawValue = CLong
   case __privA
   @available(swift, obsoleted: 3, renamed: "__privA")
   static var __PrivA: NSEnum { get }
   case B
 }
 struct __PrivNSOptions : OptionSet {
-  init(rawValue: Int)
-  let rawValue: Int
-  typealias RawValue = Int
+  init(rawValue: CLong)
+  let rawValue: CLong
+  typealias RawValue = CLong
   typealias Element = __PrivNSOptions
   typealias ArrayLiteralElement = __PrivNSOptions
   static var A: __PrivNSOptions { get }
 }
 struct NSOptions : OptionSet {
-  init(rawValue: Int)
-  let rawValue: Int
-  typealias RawValue = Int
+  init(rawValue: CLong)
+  let rawValue: CLong
+  typealias RawValue = CLong
   typealias Element = NSOptions
   typealias ArrayLiteralElement = NSOptions
   static var __privA: NSOptions { get }
@@ -118,4 +118,4 @@ typealias __PrivCFTypeRef = __PrivCFType
 typealias __PrivCFSub = __PrivCFType
 @available(swift, obsoleted: 3, renamed: "__PrivCFSub")
 typealias __PrivCFSubRef = __PrivCFSub
-typealias __PrivInt = Int32
+typealias __PrivInt = CInt

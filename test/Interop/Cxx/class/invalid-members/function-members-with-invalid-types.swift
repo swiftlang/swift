@@ -113,10 +113,10 @@ struct GoodStruct {
 //
 // NOTE-MISSING: func badVirtual(_: Never) -> Never
 //
-// CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
+// CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
 // NOTE-MISSING: func overloadsSameNumArgs(_: Never)
 //
-// CHECK-NEXT:   func overloadsDiffNumArgs(_: Int32, _: Int32)
+// CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
 // NOTE-MISSING: func overloadsDiffNumArgs(_: Never)
 //
 // CHECK-NEXT:   func __beginUnsafe() -> Never
@@ -130,8 +130,8 @@ struct DerivedGoodStruct : GoodStruct {};
 // CHECK-NEXT:   func badReturn() -> Never
 // CHECK-NEXT:   func getBad() -> Never
 // NOTE-MISSING: func badVirtual(_: Never) -> Never
-// CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
-// CHECK-NEXT:   func overloadsDiffNumArgs(_: Int32, _: Int32)
+// CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
+// CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
 // CHECK-NEXT:   func __beginUnsafe() -> Never
 // CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
@@ -147,8 +147,8 @@ struct UsingGoodStruct : GoodStruct {
 // CHECK-NEXT:   init()
 // CHECK-NEXT:   func badReturn() -> Never
 // CHECK-NEXT:   func getBad() -> Never
-// CHECK-NEXT:   func overloadsSameNumArgs(_: Int32)
-// CHECK-NEXT:   func overloadsDiffNumArgs(_: Int32, _: Int32)
+// CHECK-NEXT:   func overloadsSameNumArgs(_: CInt)
+// CHECK-NEXT:   func overloadsDiffNumArgs(_: CInt, _: CInt)
 // CHECK-NEXT:   func __beginUnsafe() -> Never
 // CHECK-NEXT:   func __endUnsafe() -> Never
 // CHECK-NEXT: }
