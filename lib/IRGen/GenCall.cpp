@@ -667,7 +667,7 @@ namespace {
     void expandCoroutineResult(bool forContinuation);
     void expandCoroutineContinuationParameters();
 
-    void addIndirectThrowingResult();
+    void maybeAddIndirectThrowingResult();
     llvm::Type *getErrorRegisterType();
   };
 } // end anonymous namespace
@@ -2247,28 +2247,40 @@ void SignatureExpansion::expandAsyncReturnType() {
   addErrorResult();
 }
 
-void SignatureExpansion::addIndirectThrowingResult() {
-  if (getSILFuncConventions().funcTy->hasErrorResult() &&
-      getSILFuncConventions().isTypedError()) {
-    auto resultType = getSILFuncConventions().getSILResultType(
-        IGM.getMaximalTypeExpansionContext());
-    auto &ti = IGM.getTypeInfo(resultType);
-    auto &native = ti.nativeReturnValueSchema(IGM);
+/// Does `funcTy`'s entry signature carry a trailing indirect typed-error
+/// pointer? Used by async signature expansion
+/// (maybeAddIndirectThrowingResult) to decide whether to emit the indirect
+/// error slot.
+static bool
+hasIndirectTypedErrorResultSlot(IRGenModule &IGM, CanSILFunctionType funcTy) {
+  if (!funcTy->hasErrorResult())
+    return false;
 
-    auto errorType = getSILFuncConventions().getSILErrorType(
-        IGM.getMaximalTypeExpansionContext());
-    const TypeInfo &errorTI = IGM.getTypeInfo(errorType);
-    auto &nativeError = errorTI.nativeReturnValueSchema(IGM);
+  SILFunctionConventions fnConv(funcTy, IGM.getSILModule());
+  if (!fnConv.isTypedError())
+    return false;
 
-    if (getSILFuncConventions().hasIndirectSILResults() ||
-        getSILFuncConventions().hasIndirectSILErrorResults() ||
-        native.requiresIndirect() ||
-        nativeError.shouldReturnTypedErrorIndirectly()) {
-      addOpaquePointerParameter();
-    }
-  }
+  // getTypeInfo crashes on unbound type parameters without an open generic
+  // context; open one for funcTy's signature (harmless if already nested).
+  GenericContextScope scope(IGM, funcTy->getInvocationGenericSignature());
+  auto resultType =
+      fnConv.getSILResultType(IGM.getMaximalTypeExpansionContext());
+  auto errorType =
+      fnConv.getSILErrorType(IGM.getMaximalTypeExpansionContext());
+  auto &native = IGM.getTypeInfo(resultType).nativeReturnValueSchema(IGM);
+  auto &nativeError = IGM.getTypeInfo(errorType).nativeReturnValueSchema(IGM);
 
+  return fnConv.hasIndirectSILResults() ||
+         fnConv.hasIndirectSILErrorResults() ||
+         native.requiresIndirect() ||
+         nativeError.shouldReturnTypedErrorIndirectly();
 }
+
+void SignatureExpansion::maybeAddIndirectThrowingResult() {
+  if (hasIndirectTypedErrorResultSlot(IGM, FnType))
+    addOpaquePointerParameter();
+}
+
 void SignatureExpansion::expandAsyncEntryType() {
   ResultIRType = IGM.VoidTy;
 
@@ -2314,6 +2326,10 @@ void SignatureExpansion::expandAsyncEntryType() {
     ParamIRTypes.push_back(IGM.SwiftContextPtrTy);
   }
 
+  // Maintaining easy thin/thick compatibility requires the context parameter to
+  // come last, so emit the indirect typed-error result before it.
+  maybeAddIndirectThrowingResult();
+
   // Context is next.
   if (hasSelfContext) {
     auto curLength = ParamIRTypes.size();
@@ -2354,8 +2370,6 @@ void SignatureExpansion::expandAsyncEntryType() {
       ParamIRTypes.push_back(IGM.RefCountedPtrTy);
     }
   }
-
-  addIndirectThrowingResult();
 
   // For now we continue to store the error result in the context to be able to
   // reuse non throwing functions.
@@ -3216,17 +3230,33 @@ public:
       }
     }
 
+    llvm::Value *contextPtr = CurCallee.getSwiftContext();
+    // Args[] is filled back-to-front, and swiftself is the last parameter, so
+    // write the context before the indirect error slot, or at the tail below
+    // if the callee has no indirect typed error.
+    auto maybeAddContextBeforeAsyncTypedError = [&] {
+      if (!contextPtr)
+        return;
+      assert(LastArgWritten > 0);
+      unsigned ctxIdx = --LastArgWritten;
+      Args[ctxIdx] = contextPtr;
+      IGF.IGM.addSwiftSelfAttributes(CurCallee.getMutableAttributes(), ctxIdx);
+      contextPtr = nullptr;
+    };
+
     // Add the indirect typed error result if we have one.
     SILFunctionConventions fnConv(fnType, IGF.getSILModule());
     if (fnType->hasErrorResult() && fnConv.isTypedError()) {
       // The invariant is that this is always zero-initialized, so we
       // don't need to do anything extra here.
       assert(LastArgWritten > 0);
+
       // Return the error indirectly.
       if (fnConv.hasIndirectSILErrorResults()) {
-          // We will set the value later when lowering the arguments.
-          setIndirectTypedErrorResultSlotArgsIndex(--LastArgWritten);
-          Args[LastArgWritten] = nullptr;
+        // We will set the value later when lowering the arguments.
+        maybeAddContextBeforeAsyncTypedError();
+        setIndirectTypedErrorResultSlotArgsIndex(--LastArgWritten);
+        Args[LastArgWritten] = nullptr;
       } else {
         auto silResultTy =
             fnConv.getSILResultType(IGF.IGM.getMaximalTypeExpansionContext());
@@ -3243,13 +3273,14 @@ public:
             fnConv.hasIndirectSILResults()) {
           // Return the error indirectly.
           auto buf = IGF.getCalleeTypedErrorResultSlot(silErrorTy);
+          maybeAddContextBeforeAsyncTypedError();
           Args[--LastArgWritten] = buf.getAddress();
         }
       }
     }
 
-    llvm::Value *contextPtr = CurCallee.getSwiftContext();
-    // Add the data pointer if we have one.
+    // Add the data pointer if we have one. (Skipped when the typed-error
+    // branch above already placed it ahead of the indirect error slot.)
     if (contextPtr) {
       assert(LastArgWritten > 0);
       Args[--LastArgWritten] = contextPtr;
