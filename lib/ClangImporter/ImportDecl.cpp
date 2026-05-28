@@ -4279,13 +4279,6 @@ namespace {
         return known2->second;
       }
 
-      if (name && name.isSimpleName()) {
-        assert(importedName.hasCustomName() &&
-               "imported function with simple name?");
-        // Just fill in empty argument labels.
-        name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
-      }
-
       if (name && name.getArgumentNames().size() != bodyParams->size()) {
         // We synthesized additional parameters so rebuild the DeclName.
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
@@ -4708,22 +4701,8 @@ namespace {
           if (auto updatedName =
                   Impl.importFullName(decl, Impl.CurrentVersion)) {
             auto *valueDecl = cast<ValueDecl>(method);
-            auto newName = updatedName.getDeclName();
-
-            // Mirror the name reconciliation in importFunctionDecl:
-            // rebuild compound name from the function's actual parameter list
-            // so it stays a valid function-decl name.
-            if (auto *fn = dyn_cast<AbstractFunctionDecl>(valueDecl);
-                fn && newName) {
-              if (newName.isSimpleName() || newName.getArgumentNames().size() !=
-                                                fn->getParameters()->size()) {
-                newName = DeclName(Impl.SwiftContext,
-                                   newName.getBaseName(), fn->getParameters());
-              }
-            }
-
-            if (valueDecl->getName() != newName)
-              valueDecl->setName(newName);
+            if (valueDecl->getName() != updatedName.getDeclName())
+              valueDecl->setName(updatedName.getDeclName());
           }
         }
       }
