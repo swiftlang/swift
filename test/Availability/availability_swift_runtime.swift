@@ -28,3 +28,29 @@ func alwaysAvailable() {
 func availableSwift6() {
   availableInSwift6_0Runtime()
 }
+
+@available(Swift, introduced: 5.0, obsoleted: 5.1)
+func obsoletedBeforeSwiftRuntime() {}
+// expected-note@-1 3{{'obsoletedBeforeSwiftRuntime()' was obsoleted in Swift 5.1}}
+
+func reachableUseStillDiagnosed() {
+  obsoletedBeforeSwiftRuntime()
+  // expected-error@-1 {{'obsoletedBeforeSwiftRuntime()' is unavailable in Swift}}
+}
+
+func useInUnreachableUnavailableBranch() {
+  if #unavailable(Swift 5.1) {
+    obsoletedBeforeSwiftRuntime()
+    // expected-error@-1 {{'obsoletedBeforeSwiftRuntime()' is unavailable in Swift}}
+    // FIXME: This error should be ignored https://github.com/swiftlang/swift/pull/88765
+  }
+}
+
+func useInUnreachableAvailableElseBranch() {
+  if #available(Swift 5.1, *) {
+  } else {
+    obsoletedBeforeSwiftRuntime()
+    // expected-error@-1 {{'obsoletedBeforeSwiftRuntime()' is unavailable in Swift}}
+    // FIXME: This error should be ignored https://github.com/swiftlang/swift/pull/88765
+  }
+}
