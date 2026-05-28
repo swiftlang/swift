@@ -2103,6 +2103,30 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       salvageTrivialInst(DbgInst, literal);
     }
   }
+
+  if (auto *ATPI = dyn_cast<AddressToPointerInst>(I)) {
+    SmallVector<Operand *, 4> debugUses(getDebugUses(ATPI));
+    for (Operand *U : debugUses) {
+      auto *DbgInst = cast<DebugValueInst>(U->getUser());
+      SILBasicBlock *debugBB =
+          DbgInst->getOrCreateDebugReconstructionBlock();
+      SILArgument *oldArg = debugBB->getArgument(0);
+
+      // Clone the address_to_pointer into the debug BB with an undef operand.
+      SILBuilder builder(debugBB->begin());
+      auto *newATPI = builder.createAddressToPointer(
+          DbgInst->getLoc(), SILUndef::get(ATPI->getOperand()),
+          ATPI->getType(), ATPI->needsStackProtection());
+      oldArg->replaceAllUsesWith(newATPI);
+
+      // Replace the block arg type and wire it into the instruction.
+      SILType addrTy = ATPI->getOperand()->getType();
+      auto *newArg = debugBB->replacePhiArgument(
+          0, addrTy, OwnershipKind::None);
+      newATPI->setOperand(newArg);
+      DbgInst->setOperand(ATPI->getOperand());
+    }
+  }
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {
