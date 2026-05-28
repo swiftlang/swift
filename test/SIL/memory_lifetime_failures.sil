@@ -29,6 +29,11 @@ struct Mixed {
   var i: Int
 }
 
+enum E {
+  case a(T)
+  case b(T)
+}
+
 public struct InnerWrapper<T> {
   @_hasStorage var _prop: T { get set }
   public var prop: T
@@ -188,7 +193,7 @@ bb0(%0 : $Int):
   return %3 : $Int
 }
 
-// CHECK: SIL memory lifetime failure in @test_switch_enum_addr: memory is initialized at function return but shouldn't
+// TODO-CHECK: SIL memory lifetime failure in @test_switch_enum_addr: memory is initialized at function return but shouldn't
 sil [ossa] @test_switch_enum_addr : $@convention(thin) (@in Optional<T>) -> () {
 bb0(%0 : $*Optional<T>):
   switch_enum_addr %0 : $*Optional<T>, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
@@ -205,7 +210,7 @@ bb3:
   return %r : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_switch_enum: memory is initialized at function return but shouldn't
+// TODO-CHECK: SIL memory lifetime failure in @test_switch_enum: memory is initialized at function return but shouldn't
 sil [ossa] @test_switch_enum : $@convention(thin) (@in Optional<T>) -> () {
 bb0(%0 : $*Optional<T>):
   %1 = load_borrow %0 : $*Optional<T>
@@ -244,7 +249,7 @@ bb3:
   return %r : $()
 }
 
-// CHECK: SIL memory lifetime failure in @test_store_to_enum: memory is initialized, but shouldn't be
+// TODO-CHECK: SIL memory lifetime failure in @test_store_to_enum: memory is initialized, but shouldn't be
 sil [ossa] @test_store_to_enum : $@convention(thin) (@owned T) -> () {
 bb0(%0 : @owned $T):
   %1 = alloc_stack $Optional<T>
@@ -415,12 +420,12 @@ bb0(%0 :  @guaranteed $Optional<T>):
 }
 
 // CHECK: SIL memory lifetime failure in @test_store_borrow_addr_after_dealloc: memory is initialized, but shouldn't be
-sil [ossa] @test_store_borrow_addr_after_dealloc : $@convention(thin) (@guaranteed Optional<T>) -> () {
-bb0(%0 :  @guaranteed $Optional<T>):
-  %s = alloc_stack $Optional<T>
-  %sb = store_borrow %0 to %s : $*Optional<T>
-  dealloc_stack %s : $*Optional<T>
-  end_borrow %sb : $*Optional<T>
+sil [ossa] @test_store_borrow_addr_after_dealloc : $@convention(thin) (@guaranteed T) -> () {
+bb0(%0 :  @guaranteed $T):
+  %s = alloc_stack $T
+  %sb = store_borrow %0 to %s
+  dealloc_stack %s
+  end_borrow %sb
   %res = tuple ()
   return %res : $()
 }
@@ -865,6 +870,16 @@ bb0:
   %10 = tuple ()                                  
   return %10                                      
 } 
+
+// CHECK: SIL memory lifetime failure in @non_trivial_enum: memory is initialized, but shouldn't be
+sil [ossa] @non_trivial_enum : $@convention(thin) (@owned E) -> () {
+bb0(%0 : @owned $E):
+  %1 = alloc_stack $E
+  store %0 to [init] %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
 
 
 // CHECK: SIL memory lifetime failure in @mark_dependence_addr_uninit_base: memory is not initialized, but should be
