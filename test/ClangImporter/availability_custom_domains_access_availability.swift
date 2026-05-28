@@ -382,10 +382,11 @@ extension PublicGenericStruct {
 }
 
 func testUnnecessaryIfAvailableStmt() {
+  // expected-warning@+3 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
+  // expected-warning@+1 {{'if' condition is always true}}{{3-+2:4=_ = 0}}
   if #available(Aral) {
-    // expected-warning@-1 {{availability domain 'Aral' is deprecated}}
-    // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
-    // expected-warning@-3 {{'if' condition is always true}}{{none}}
+    _ = 0
   }
 }
 
@@ -418,10 +419,10 @@ func testUnnecessaryIfUnavailableCompoundStmt() {
 }
 
 func testUnnecessaryGuardAvailableStmt() {
+  // expected-warning@+3 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
+  // expected-warning@+1 {{'guard' condition is always true}}{{1-+3:1=}}
   guard #available(Aral) else {
-    // expected-warning@-1 {{availability domain 'Aral' is deprecated}}
-    // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
-    // expected-warning@-3 {{'guard' condition is always true}}{{none}}
     return
   }
 }
@@ -440,5 +441,16 @@ func testUnnecessaryWhileAvailableStmt() {
     // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
     // expected-warning@-3 {{'while' condition is always true}}{{none}}
     break
+  }
+}
+
+func testUnnecessaryIfAvailableStmtWithElse() {
+  // expected-warning@+3 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
+  // expected-warning@+1 {{'if' condition is always true}}{{3-+4:4=_ = 0}}
+  if #available(Aral) {
+    _ = 0
+  } else {
+    _ = 1
   }
 }
