@@ -322,7 +322,7 @@ extension CaseInfo: TypeInfoSyntax {
 
   public var syntax: ExprSyntax {
     """
-    CaseInfo(name: \(stringlit(name)), associatedValues: \(arrSyntax(associatedValues, {optSyntax($0, stringlit)}))
+    CaseInfo(name: \(stringlit(name)), associatedValues: \(arrSyntax(associatedValues, {optSyntax($0, stringlit)})))
     """
   }
 }
