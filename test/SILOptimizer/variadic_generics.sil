@@ -192,3 +192,145 @@ bb0:
   return %ret : $()
 }
 
+// Dynamic pack index, all pack elements are the same type: pack element types
+// can be eliminated.
+
+// CHECK-LABEL: sil @test_dynamic_open_pack_element_single_type
+// CHECK:         [[TUPLE:%[0-9]+]] = alloc_stack $(Float, Float)
+// CHECK:         [[INDEX:%.*]] = dynamic_pack_index %0 of $Pack{Float, Float}
+// CHECK-NOT:     open_pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(Float, Float) as $*Float
+sil @test_dynamic_open_pack_element_single_type : $(Builtin.Word) -> () {
+bb0(%i : $Builtin.Word):
+  %tuple = alloc_stack $(Float, Float)
+  %fn = function_ref @tuple_pack_element : $@convention(thin) <each T> (Builtin.Word, @inout (repeat each T)) -> ()
+  apply %fn<Pack{Float, Float}>(%i, %tuple) : $@convention(thin) <each T> (Builtin.Word, @inout (repeat each T)) -> ()
+  dealloc_stack %tuple : $*(Float, Float)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_dynamic_open_pack_element_single_type_2
+// CHECK:         [[TUPLE:%[0-9]+]] = alloc_stack $(Int, Int)
+// CHECK:         [[INDEX:%.*]] = dynamic_pack_index %0 of $Pack{Int, Int}
+// CHECK-NOT:     open_pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPLE]] : $*(Int, Int) as $*Int
+sil @test_dynamic_open_pack_element_single_type_2 : $(Builtin.Word) -> () {
+bb0(%i : $Builtin.Word):
+  %tuple = alloc_stack $(Int, Int)
+  %fn = function_ref @tuple_pack_element : $@convention(thin) <each T> (Builtin.Word, @inout (repeat each T)) -> ()
+  apply %fn<Pack{Int, Int}>(%i, %tuple) : $@convention(thin) <each T> (Builtin.Word, @inout (repeat each T)) -> ()
+  dealloc_stack %tuple : $*(Int, Int)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil [ossa] [heuristic_always_inline] @tuple_pack_element_2 : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> () {
+bb0(%i: $Builtin.Word, %tupleT : $*(repeat each T), %tupleU : $*(repeat each U)):
+  %index = dynamic_pack_index %i of $Pack{repeat each T}
+  %tok = open_pack_element %index of <each A, each B where (repeat (each A, each B)): Any> at <Pack{repeat each T}, Pack{repeat each U}>, shape $each A, uuid "01234567-89AB-CDEF-0123-000000000013"
+  %0 = tuple_pack_element_addr %index of %tupleT : $*(repeat each T) as $*@pack_element("01234567-89AB-CDEF-0123-000000000013") A
+  %1 = tuple_pack_element_addr %index of %tupleU : $*(repeat each U) as $*@pack_element("01234567-89AB-CDEF-0123-000000000013") B
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_dynamic_open_pack_element_multiple_packs_1 : $@convention(thin) (Builtin.Word) -> () {
+// CHECK:         [[TUPT:%[0-9]+]] = alloc_stack $(Int, Int)
+// CHECK:         [[TUPU:%[0-9]+]] = alloc_stack $(Float, Float)
+// CHECK:         [[INDEX:%[0-9]+]] = dynamic_pack_index %0 of $Pack{Int, Int}
+// CHECK-NOT:     open_pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPT]] : $*(Int, Int) as $*Int
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPU]] : $*(Float, Float) as $*Float
+// CHECK-LABEL: } // end sil function 'test_dynamic_open_pack_element_multiple_packs_1'
+sil @test_dynamic_open_pack_element_multiple_packs_1 : $@convention(thin) (Builtin.Word) -> () {
+bb0(%i : $Builtin.Word):
+  %tupleT = alloc_stack $(Int, Int)
+  %tupleU = alloc_stack $(Float, Float)
+  %fn = function_ref @tuple_pack_element_2 : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  apply %fn<Pack{Int, Int}, Pack{Float, Float}>(%i, %tupleT, %tupleU) : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  dealloc_stack %tupleU : $*(Float, Float)
+  dealloc_stack %tupleT : $*(Int, Int)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_dynamic_open_pack_element_multiple_packs_2 : $@convention(thin) (Builtin.Word) -> () {
+// CHECK:         [[TUPT:%[0-9]+]] = alloc_stack $(Int, Float)
+// CHECK:         [[TUPU:%[0-9]+]] = alloc_stack $(Float, Float)
+// CHECK:         [[INDEX:%[0-9]+]] = dynamic_pack_index %0 of $Pack{Int, Float}
+// CHECK:         open_pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPT]] : $*(Int, Float) as $*@pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPU]] : $*(Float, Float) as $*@pack_element
+// CHECK-LABEL: } // end sil function 'test_dynamic_open_pack_element_multiple_packs_2'
+sil @test_dynamic_open_pack_element_multiple_packs_2 : $@convention(thin) (Builtin.Word) -> () {
+bb0(%i : $Builtin.Word):
+  %tupleT = alloc_stack $(Int, Float)
+  %tupleU = alloc_stack $(Float, Float)
+  %fn = function_ref @tuple_pack_element_2 : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  apply %fn<Pack{Int, Float}, Pack{Float, Float}>(%i, %tupleT, %tupleU) : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  dealloc_stack %tupleU : $*(Float, Float)
+  dealloc_stack %tupleT : $*(Int, Float)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_dynamic_open_pack_element_multiple_packs_3 : $@convention(thin) (Builtin.Word) -> () {
+// CHECK:         [[TUPT:%[0-9]+]] = alloc_stack $(Int, Int)
+// CHECK:         [[TUPU:%[0-9]+]] = alloc_stack $(Float, Int)
+// CHECK:         [[INDEX:%[0-9]+]] = dynamic_pack_index %0 of $Pack{Int, Int}
+// CHECK:         open_pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPT]] : $*(Int, Int) as $*@pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPU]] : $*(Float, Int) as $*@pack_element
+// CHECK-LABEL: } // end sil function 'test_dynamic_open_pack_element_multiple_packs_3'
+sil @test_dynamic_open_pack_element_multiple_packs_3 : $@convention(thin) (Builtin.Word) -> () {
+bb0(%i : $Builtin.Word):
+  %tupleT = alloc_stack $(Int, Int)
+  %tupleU = alloc_stack $(Float, Int)
+  %fn = function_ref @tuple_pack_element_2 : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  apply %fn<Pack{Int, Int}, Pack{Float, Int}>(%i, %tupleT, %tupleU) : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  dealloc_stack %tupleU : $*(Float, Int)
+  dealloc_stack %tupleT : $*(Int, Int)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_dynamic_open_pack_element_multiple_packs_4 : $@convention(thin) <each T, each U where (repeat (each T, each U)) : Any> (Builtin.Word) -> () {
+// CHECK:         [[TUPT:%[0-9]+]] = alloc_stack $(repeat each T)
+// CHECK:         [[TUPU:%[0-9]+]] = alloc_stack $(repeat each U)
+// CHECK:         [[INDEX:%[0-9]+]] = dynamic_pack_index %0 of $Pack{repeat each T}
+// CHECK:         open_pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPT]] : $*(repeat each T) as $*@pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPU]] : $*(repeat each U) as $*@pack_element
+// CHECK-LABEL: } // end sil function 'test_dynamic_open_pack_element_multiple_packs_4'
+sil @test_dynamic_open_pack_element_multiple_packs_4 : $@convention(thin) <each T, each U where (repeat (each T, each U)) : Any> (Builtin.Word) -> () {
+bb0(%i : $Builtin.Word):
+  %tupleT = alloc_stack $(repeat each T)
+  %tupleU = alloc_stack $(repeat each U)
+  %fn = function_ref @tuple_pack_element_2 : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  apply %fn<Pack{repeat each T}, Pack{repeat each U}>(%i, %tupleT, %tupleU) : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  dealloc_stack %tupleU : $*(repeat each U)
+  dealloc_stack %tupleT : $*(repeat each T)
+  %ret = tuple ()
+  return %ret : $()
+}
+
+// CHECK-LABEL: sil @test_dynamic_open_pack_element_multiple_packs_5 : $@convention(thin) <each T, each U where (repeat (each T, each U)) : Any> (Builtin.Word) -> () {
+// CHECK:         [[TUPT:%[0-9]+]] = alloc_stack $(Int, repeat each T)
+// CHECK:         [[TUPU:%[0-9]+]] = alloc_stack $(Float, repeat each U)
+// CHECK:         [[INDEX:%[0-9]+]] = dynamic_pack_index %0 of $Pack{Int, repeat each T}
+// CHECK:         open_pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPT]] : $*(Int, repeat each T) as $*@pack_element
+// CHECK:         tuple_pack_element_addr [[INDEX]] of [[TUPU]] : $*(Float, repeat each U) as $*@pack_element
+// CHECK-LABEL: } // end sil function 'test_dynamic_open_pack_element_multiple_packs_5'
+sil @test_dynamic_open_pack_element_multiple_packs_5 : $@convention(thin) <each T, each U where (repeat (each T, each U)) : Any> (Builtin.Word) -> () {
+bb0(%i : $Builtin.Word):
+  %tupleT = alloc_stack $(Int, repeat each T)
+  %tupleU = alloc_stack $(Float, repeat each U)
+  %fn = function_ref @tuple_pack_element_2 : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  apply %fn<Pack{Int, repeat each T}, Pack{Float, repeat each U}>(%i, %tupleT, %tupleU) : $@convention(thin) <each T, each U where (repeat (each T, each U)): Any> (Builtin.Word, @inout (repeat each T), @inout(repeat each U)) -> ()
+  dealloc_stack %tupleU : $*(Float, repeat each U)
+  dealloc_stack %tupleT : $*(Int, repeat each T)
+  %ret = tuple ()
+  return %ret : $()
+}
