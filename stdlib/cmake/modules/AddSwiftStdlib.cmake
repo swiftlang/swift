@@ -3827,6 +3827,29 @@ function(add_embedded_swift_target_library prefix library_name)
     set_property(TARGET ${prefix}-${mod}
                  PROPERTY OSX_ARCHITECTURES "${arch}")
 
+    # When archiving on a Windows host, MSVC's lib.exe defaults to the host
+    # machine type and refuses to archive .obj files of a different machine
+    # type (LNK1112). For -windows-msvc targets, force the librarian's
+    # /MACHINE: to match the per-target arch so cross-arch builds work.
+    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows"
+       AND "${triple}" MATCHES "-windows-msvc$")
+      set(_emblib_msvc_machine "")
+      if("${arch}" STREQUAL "i686" OR "${arch}" STREQUAL "i386")
+        set(_emblib_msvc_machine "X86")
+      elseif("${arch}" STREQUAL "x86_64")
+        set(_emblib_msvc_machine "X64")
+      elseif("${arch}" STREQUAL "aarch64" OR "${arch}" STREQUAL "arm64"
+             OR "${arch}" STREQUAL "arm64e")
+        set(_emblib_msvc_machine "ARM64")
+      elseif("${arch}" MATCHES "^arm")
+        set(_emblib_msvc_machine "ARM")
+      endif()
+      if(_emblib_msvc_machine)
+        set_property(TARGET ${prefix}-${mod} APPEND PROPERTY
+                     STATIC_LIBRARY_OPTIONS "/MACHINE:${_emblib_msvc_machine}")
+      endif()
+    endif()
+
     # Static archives whose target triple is ELF/EABI/wasm need a different
     # archiver when cross-built from a macOS host. embedded_amend_archive_
     # commands_on_darwin_host is a no-op for other targets/hosts, so it's
