@@ -14,6 +14,7 @@
 //===----------------------------------------------------------------------===//
 
 import SwiftSyntax
+import SwiftSyntaxBuilder
 
 public struct NominalTypeInfo {
   var name: String
@@ -163,7 +164,7 @@ extension LabeledExprListSyntax {
   }
 }
 
-extension NominalTypeInfo: FromSyntax {
+extension NominalTypeInfo: TypeInfoSyntax {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     guard let fcall = node.as(FunctionCallExprSyntax.self) else {
       throw TypeInfoParseError.expectedFunctionCall(got: node)
@@ -181,9 +182,15 @@ extension NominalTypeInfo: FromSyntax {
 
     return Self(name: parsed.0, kind: parsed.1, isUnsafe: parsed.2)
   }
+
+  public var syntax: ExprSyntax {
+    """
+    NominalTypeInfo(name: \(stringlit(name)), kind: \(kind.syntax), isUnsafe: \(boollit(isUnsafe)))
+    """
+  }
 }
 
-extension NominalTypeKind: FromSyntax {
+extension NominalTypeKind: TypeInfoSyntax {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     guard let fcall = node.as(FunctionCallExprSyntax.self) else {
       throw TypeInfoParseError.expectedFunctionCall(got: node)
@@ -204,9 +211,22 @@ extension NominalTypeKind: FromSyntax {
         names: ["structLike", "enumLike"], got: fcall.calledExpression)
     }
   }
+
+  public var syntax: ExprSyntax {
+    switch self {
+    case .enumLike(let e):
+      """
+      enumLike(\(e.syntax))
+      """
+    case .structLike(let s):
+      """
+      structLike(\(s.syntax))
+      """
+    }
+  }
 }
 
-extension StructTypeInfo: FromSyntax {
+extension StructTypeInfo: TypeInfoSyntax {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     guard let fcall = node.as(FunctionCallExprSyntax.self) else {
       throw TypeInfoParseError.expectedFunctionCall(got: node)
@@ -219,9 +239,15 @@ extension StructTypeInfo: FromSyntax {
       properties: try fcall.arguments.expect(
         .arrArg("properties", parser: StoredProperty.fromSyntax)))
   }
+
+  public var syntax: ExprSyntax {
+    """
+    StructTypeInfo(properties: \(arrSyntax(properties)))
+    """
+  }
 }
 
-extension EnumTypeInfo: FromSyntax {
+extension EnumTypeInfo: TypeInfoSyntax {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     guard let fcall = node.as(FunctionCallExprSyntax.self) else {
       throw TypeInfoParseError.expectedFunctionCall(got: node)
@@ -239,9 +265,15 @@ extension EnumTypeInfo: FromSyntax {
 
     return Self(isObjC: parsed.0, cases: parsed.1)
   }
+
+  public var syntax: ExprSyntax {
+    """
+    EnumTypeInfo(isObjC: \(boollit(isObjC)), cases: \(arrSyntax(cases)))
+    """
+  }
 }
 
-extension StoredProperty: FromSyntax {
+extension StoredProperty: TypeInfoSyntax {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     guard let fcall = node.as(FunctionCallExprSyntax.self) else {
       throw TypeInfoParseError.expectedFunctionCall(got: node)
@@ -261,9 +293,15 @@ extension StoredProperty: FromSyntax {
 
     return Self(name: parsed.0, typeName: parsed.1, isVar: parsed.2, isStatic: parsed.3)
   }
+
+  public var syntax: ExprSyntax {
+    """
+    StoredProperty(name: \(stringlit(name)), typeName: \(stringlit(typeName)), isVar: \(boollit(isVar)), isStatic: \(boollit(isStatic)))
+    """
+  }
 }
 
-extension CaseInfo: FromSyntax {
+extension CaseInfo: TypeInfoSyntax {
   public static func fromSyntax(node: ExprSyntax) throws -> Self {
     guard let fcall = node.as(FunctionCallExprSyntax.self) else {
       throw TypeInfoParseError.expectedFunctionCall(got: node)
@@ -281,13 +319,20 @@ extension CaseInfo: FromSyntax {
 
     return Self(name: parsed.0, associatedValues: parsed.1)
   }
+
+  public var syntax: ExprSyntax {
+    """
+    CaseInfo(name: \(stringlit(name)), associatedValues: \(arrSyntax(associatedValues, {optSyntax($0, stringlit)}))
+    """
+  }
 }
 
-public protocol FromSyntax {
+public protocol TypeInfoSyntax {
   static func fromSyntax(node: ExprSyntax) throws -> Self
+  var syntax: ExprSyntax { get }
 }
 
-extension FromSyntax {
+extension TypeInfoSyntax {
   public static func fromStringLit(strlit: StringLiteralExprSyntax) throws -> Self {
     guard let underlying = strlit.representedLiteralValue else {
       throw TypeInfoParseError.expectedStrLitAsInput(got: ExprSyntax(strlit))
@@ -300,5 +345,33 @@ extension FromSyntax {
       throw TypeInfoParseError.expectedStrLitAsInput(got: expr)
     }
     return try fromStringLit(strlit: strlit)
+  }
+}
+
+func stringlit(_ str: String) -> ExprSyntax {
+  ExprSyntax(StringLiteralExprSyntax(content: str))
+}
+
+func boollit(_ b: Bool) -> ExprSyntax {
+  ExprSyntax(BooleanLiteralExprSyntax(booleanLiteral: b))
+}
+
+func arrSyntax<T: TypeInfoSyntax>(_ values: [T]) -> ExprSyntax {
+  arrSyntax(values, \.syntax)
+}
+
+func arrSyntax<T>(_ values: [T], _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
+  ExprSyntax(ArrayExprSyntax(expressions: values.map(toSyntax)))
+}
+
+func optSyntax<T: TypeInfoSyntax>(_ value: T?) -> ExprSyntax {
+  optSyntax(value, \.syntax)
+}
+
+func optSyntax<T>(_ value: T?, _ toSyntax: (T) -> ExprSyntax) -> ExprSyntax {
+  if let value = value {
+    toSyntax(value)
+  } else {
+    "nil"
   }
 }
