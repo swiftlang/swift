@@ -327,7 +327,7 @@ extension CaseInfo: TypeInfoSyntax {
   }
 }
 
-public protocol TypeInfoSyntax {
+public protocol TypeInfoSyntax: Equatable {
   static func fromSyntax(node: ExprSyntax) throws -> Self
   var syntax: ExprSyntax { get }
 }
