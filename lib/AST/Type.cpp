@@ -439,14 +439,14 @@ Type ExistentialLayout::getSuperclass() const {
   return Type();
 }
 
-bool ExistentialLayout::needsExtendedShape(bool allowInverses) const {
+bool ExistentialLayout::needsExtendedShape(
+    InvertibleProtocolSet allowedInverses) const {
   if (!getParameterizedProtocols().empty())
     return true;
 
-  if (allowInverses && hasInverses())
-    return true;
-
-  return false;
+  // Would any inverses in this layout would be considered by the mangler?
+  allowedInverses.intersect(inverses);
+  return !allowedInverses.empty();
 }
 
 bool TypeBase::isObjCExistentialType() {

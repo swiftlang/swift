@@ -5143,7 +5143,6 @@ public:
   TRIVIAL_ATTR_PRINTER(Override, override)
   TRIVIAL_ATTR_PRINTER(Owned, owned)
   TRIVIAL_ATTR_PRINTER(Postfix, postfix)
-  TRIVIAL_ATTR_PRINTER(PreInverseGenerics, pre_inverse_generics)
   TRIVIAL_ATTR_PRINTER(Preconcurrency, preconcurrency)
   TRIVIAL_ATTR_PRINTER(Prefix, prefix)
   TRIVIAL_ATTR_PRINTER(PropertyWrapper, property_wrapper)
@@ -5501,6 +5500,12 @@ public:
     printFieldRaw(
         [&](auto &out) { Attr->getCommentRange().print(out, Ctx->SourceMgr); },
         Label::always("comment_range"));
+    printFoot();
+  }
+  void visitPreInverseGenericsAttr(PreInverseGenericsAttr *Attr, Label label) {
+    printCommon(Attr, "pre_inverse_generics_attr", label);
+    if (auto *tyR = Attr->getExceptTypeRepr())
+      printRec(tyR, Label::optional("except_repr"));
     printFoot();
   }
   void visitRawLayoutAttr(RawLayoutAttr *Attr, Label label) {
