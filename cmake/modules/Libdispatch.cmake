@@ -103,6 +103,7 @@ foreach(sdk ${SWIFT_SDKS})
   # See https://github.com/apple/swift/issues/54533 for more details.
   if(NOT "${sdk}" IN_LIST SWIFT_DARWIN_PLATFORMS AND
       NOT "${sdk}" STREQUAL "WASI" AND
+      NOT "${sdk}" STREQUAL "EMSCRIPTEN" AND
       NOT (SWIFT_LIBDISPATCH_USE_PACKAGE AND
            "${sdk}" STREQUAL "${SWIFT_HOST_VARIANT_SDK}"))
     list(APPEND DISPATCH_SDKS "${sdk}")
