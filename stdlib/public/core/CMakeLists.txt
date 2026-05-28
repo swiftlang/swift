@@ -516,12 +516,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib)
   add_dependencies(embedded-libraries embedded-stdlib)
 
-  set(SWIFT_ENABLE_REFLECTION OFF)
-  set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
-  set(SWIFT_STDLIB_STABLE_ABI OFF)
-  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
-  set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
-
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
@@ -529,24 +523,18 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(GET list 2 triple)
     
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
       set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
     endif()
-    set(swift_embedded_stdlib_extra_compile_flags)
-    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
-      list(APPEND swift_embedded_stdlib_extra_compile_flags "-D" "SWIFT_USE_EMBEDDED_SWIFT_PLATFORM")
-    endif()
     add_swift_target_library_single(
       embedded-stdlib-${mod}
       swiftCore
-      IS_STDLIB IS_STDLIB_CORE IS_FRAGILE
+      IS_STDLIB IS_STDLIB_CORE
       ${SWIFTLIB_EMBEDDED_SOURCES}
       GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
       SWIFT_COMPILE_FLAGS
-        ${swift_stdlib_compile_flags} ${swift_embedded_stdlib_extra_compile_flags}
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+        ${swift_stdlib_compile_flags}
       SDK "embedded"
       ARCHITECTURE "${arch}"
       FILE_DEPENDS ${swiftCore_common_dependencies}

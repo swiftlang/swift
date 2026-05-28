@@ -921,6 +921,40 @@ function(add_swift_target_library_single target name)
     endif()
   endif()
 
+  # For Embedded Swift, force a number of global stdlib feature toggles to
+  # OFF for this library build. Doing this here means callers don't have to
+  # repeat the same set of overrides in every CMakeLists.txt that builds an
+  # embedded library. The `set()`s are function-scoped and shadow the parent
+  # scope (and the CACHE), so they only affect this call and any helper
+  # functions invoked from it.
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_ENABLE_REFLECTION OFF)
+    set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
+    set(SWIFT_STDLIB_STABLE_ABI OFF)
+    set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
+    set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
+
+    # Embedded swiftmodules go into a single shared subdirectory; default
+    # MODULE_DIR to it when the caller didn't supply one explicitly.
+    if(NOT SWIFTLIB_SINGLE_MODULE_DIR)
+      set(SWIFTLIB_SINGLE_MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded")
+    endif()
+
+    # Embedded Swift libraries are always fragile.
+    set(SWIFTLIB_SINGLE_IS_FRAGILE TRUE)
+    set(SWIFTLIB_SINGLE_IS_FRAGILE_keyword "IS_FRAGILE")
+
+    # When the embedded platform abstraction layer is in use, define
+    # SWIFT_USE_EMBEDDED_SWIFT_PLATFORM for every embedded library build so
+    # that the platform-conditional code paths in the embedded stdlib and
+    # related libraries pick up the platform implementations.
+    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
+      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+        "-D" "SWIFT_USE_EMBEDDED_SWIFT_PLATFORM")
+    endif()
+  endif()
+
   if(NOT SWIFTLIB_SINGLE_SHARED AND
      NOT SWIFTLIB_SINGLE_STATIC AND
      NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY AND

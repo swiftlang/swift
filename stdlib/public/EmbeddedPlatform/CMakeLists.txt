@@ -36,7 +36,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     endif()
 
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
     if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
       set(SWIFT_SDK_embedded_ARCH_${mod}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
@@ -46,12 +45,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       embedded-posix-shim-${mod}
       swiftEmbeddedPlatformPOSIX
       STATIC
-      IS_FRAGILE
 
       EmbeddedPlatformPOSIX.swift
 
       SWIFT_COMPILE_FLAGS ${swift_stdlib_compile_flags} "-import-bridging-header" ${CMAKE_CURRENT_SOURCE_DIR}/swift/EmbeddedPlatform.h -enable-experimental-feature Extern -enable-experimental-feature AllowRuntimeSymbolDeclarations "-disable-bridging-pch"
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${mod}"
       DEPENDS embedded-stdlib-${mod}

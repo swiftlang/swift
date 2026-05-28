@@ -169,12 +169,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-synchronization)
   add_dependencies(embedded-libraries embedded-synchronization)
 
-  set(SWIFT_ENABLE_REFLECTION OFF)
-  set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
-  set(SWIFT_STDLIB_STABLE_ABI OFF)
-  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
-  set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
-
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)
@@ -187,7 +181,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     endif()
 
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
       set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
@@ -205,7 +198,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     add_swift_target_library_single(
       embedded-synchronization-${mod}
       swiftSynchronization
-      IS_FRAGILE
       
       ${SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES}
       
@@ -215,7 +207,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       SWIFT_COMPILE_FLAGS
         ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
 
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
       DEPENDS embedded-stdlib-${mod}

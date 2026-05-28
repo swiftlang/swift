@@ -21,7 +21,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     set(extra_c_compile_flags -nostdinc++)
 
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
     if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
       set(SWIFT_SDK_embedded_ARCH_${mod}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
@@ -31,7 +30,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       embedded-unicode-${mod}
       swiftUnicodeDataTables
       STATIC
-      IS_FRAGILE
 
       UnicodeData.cpp
       UnicodeEmoji.cpp
@@ -41,7 +39,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       UnicodeWord.cpp
 
       C_COMPILE_FLAGS ${extra_c_compile_flags}
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${mod}"
       DEPENDS embedded-stdlib-${mod}

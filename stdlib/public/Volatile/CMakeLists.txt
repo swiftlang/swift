@@ -31,7 +31,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(GET list 2 triple)
 
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
       set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
@@ -39,13 +38,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     add_swift_target_library_single(
       embedded-volatile-${mod}
       swift_Volatile
-      IS_SDK_OVERLAY IS_FRAGILE
+      IS_SDK_OVERLAY
 
       Volatile.swift
 
       SWIFT_COMPILE_FLAGS
         -parse-stdlib
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
       DEPENDS embedded-stdlib-${mod}
