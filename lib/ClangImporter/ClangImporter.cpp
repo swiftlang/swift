@@ -6485,11 +6485,10 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
     }
 
     auto out = FuncDecl::createImplicit(
-        context, fn->getStaticSpelling(), fn->getName(),
-        fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
-        fn->getThrownInterfaceType(),
+        context, fn->getStaticSpelling(), fn->getName(), fn->getNameLoc(),
+        fn->hasAsync(), fn->hasThrows(), fn->getThrownInterfaceType(),
         fn->getGenericParams(), fn->getParameters(),
-        fn->getResultInterfaceType(), newContext);
+        fn->getResultInterfaceType(), newContext, /*isSynthesized=*/true);
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
     inheritance.setUnavailableIfNecessary(decl, out);

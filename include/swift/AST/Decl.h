@@ -8633,13 +8633,12 @@ public:
                           ParameterList *BodyParams, TypeRepr *ResultTyR,
                           DeclContext *Parent);
 
-  static FuncDecl *createImplicit(ASTContext &Context,
-                                  StaticSpellingKind StaticSpelling,
-                                  DeclName Name, SourceLoc NameLoc, bool Async,
-                                  bool Throws, Type ThrownType,
-                                  GenericParamList *GenericParams,
-                                  ParameterList *BodyParams, Type FnRetType,
-                                  DeclContext *Parent);
+  static FuncDecl *
+  createImplicit(ASTContext &Context, StaticSpellingKind StaticSpelling,
+                 DeclName Name, SourceLoc NameLoc, bool Async, bool Throws,
+                 Type ThrownType, GenericParamList *GenericParams,
+                 ParameterList *BodyParams, Type FnRetType, DeclContext *Parent,
+                 bool isSynthesized = false);
 
   static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
                                   DeclName Name, SourceLoc NameLoc, bool Async,
