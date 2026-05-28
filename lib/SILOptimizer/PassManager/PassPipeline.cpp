@@ -925,6 +925,12 @@ SILPassPipelinePlan::getLoweringPassPipeline(const SILOptions &Options) {
   P.addThunkLowering();
   P.addLowerHopToActor(); // FIXME: earlier for more opportunities?
   P.addOwnershipModelEliminator();
+  // Workaround for the wasm backend's swiftcc parameter padding bug
+  // (issue #89320): rewrite async typed-throws thin_to_thick_function
+  // instructions on wasm into zero-capture partial_apply [on_stack].
+  // Runs after ownership elimination so dealloc_stack of the on-stack
+  // partial_apply is valid in lowered (non-OSSA) SIL. No-op off wasm.
+  P.addWasmAsyncT2TLowering();
   P.addAlwaysEmitConformanceMetadataPreservation();
   P.addIRGenPrepare();
 
