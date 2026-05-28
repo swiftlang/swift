@@ -228,9 +228,15 @@ struct SwiftCountExprEmitter
       DLOG("Unsupported binary operator\n");
       return false;
     }
+    // Always parenthesize binary operations: Swift and C disagree on the
+    // relative precedence of `<<`/`>>` vs `+`/`-` and `&` vs `+`/`-`, so
+    // unparenthesized output could change meaning across languages.
+    out << '(';
     if (!Visit(binop->getLHS())) return false;
     out << op;
-    return Visit(binop->getRHS());
+    if (!Visit(binop->getRHS())) return false;
+    out << ')';
+    return true;
   }
 
   bool VisitStmt(const clang::Stmt *) {
