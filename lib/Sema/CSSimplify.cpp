@@ -13293,6 +13293,22 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
       recordAnyTypeVarAsPotentialHole(func1);
       return SolutionKind::Solved;
     }
+
+    if (!isForCodeCompletion()) {
+      auto argsTy = simplifyType(func1)->castTo<FunctionType>();
+      // Short-circuit calls where all arguments are invalid, otherwise the
+      // solver would end up producing a solution for every overload which
+      // it cannot disambiguate which quickly turns into "too complex" situation.
+      if (argsTy->getNumParams() > 0 &&
+          llvm::all_of(argsTy->getParams(),
+                       [](const FunctionType::Param &param) {
+                         return param.getPlainType()->isPlaceholder();
+                       })) {
+        recordTypeVariablesAsHoles(func1);
+        recordTypeVariablesAsHoles(type2);
+        return SolutionKind::Solved;
+      }
+    }
   }
 
   TypeMatchOptions subflags = getDefaultDecompositionOptions(flags);
