@@ -183,6 +183,7 @@ option(SWIFT_EMBEDDED_STDLIB_BUILD_EXTRA_TARGET_TRIPLES_ONLY
 if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "wasi") AND
+  (NOT SWIFT_HOST_VARIANT STREQUAL "emscripten") AND
   (NOT SWIFT_HOST_VARIANT STREQUAL "windows"))
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
@@ -197,14 +198,32 @@ set(EMBEDDED_STDLIB_TARGET_TRIPLES)
 
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   if(SWIFT_WASI_SYSROOT_PATH)
-    # Also include none-wasm triples, which don't require a sysroot.
-    # Skip non-Wasm targets.
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "wasm32    wasm32-unknown-wasip1    wasm32-unknown-wasip1"
-      "wasm32    wasm32-unknown-none-wasm  wasm32-unknown-none-wasm"
-      "wasm64    wasm64-unknown-none-wasm  wasm64-unknown-none-wasm"
     )
-  else()
+  endif()
+
+  if(SWIFT_EMSCRIPTEN_SYSROOT_PATH)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "wasm32    wasm32-unknown-emscripten    wasm32-unknown-emscripten"
+    )
+  endif()
+
+  # Freestanding Wasm triples require no sysroot; they are always buildable
+  # whenever LLVM can target WebAssembly, regardless of which (if any)
+  # Wasm-hosted SDK sysroot is configured above.
+  if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
+    list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+      "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
+      "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
+    )
+  endif()
+
+  # Non-Wasm freestanding / bare-ELF triples are only added when no Wasm
+  # SDK sysroot is configured, matching the pre-existing convention that
+  # a Wasm-hosted cross-compile tree does not also produce Darwin/Linux
+  # embedded artefacts.
+  if(NOT SWIFT_WASI_SYSROOT_PATH AND NOT SWIFT_EMSCRIPTEN_SYSROOT_PATH)
     if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
       list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
         # arch    module_name               target triple
@@ -256,13 +275,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       )
     endif()
 
-    if("WebAssembly" IN_LIST LLVM_TARGETS_TO_BUILD)
-      list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
-        "wasm32    wasm32-unknown-none-wasm    wasm32-unknown-none-wasm"
-        "wasm64    wasm64-unknown-none-wasm    wasm64-unknown-none-wasm"
-      )
-    endif()
-
     if("AVR" IN_LIST LLVM_TARGETS_TO_BUILD)
       list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
         "avr  avr-none-none-elf    avr-none-none-elf"
@@ -271,7 +283,9 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
   endif()
 endif()
 
-if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND NOT SWIFT_WASI_SYSROOT_PATH)
+if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB
+   AND NOT SWIFT_WASI_SYSROOT_PATH
+   AND NOT SWIFT_EMSCRIPTEN_SYSROOT_PATH)
   if (SWIFT_HOST_VARIANT STREQUAL "linux")
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "${SWIFT_HOST_VARIANT_ARCH} ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu ${SWIFT_HOST_VARIANT_ARCH}-unknown-linux-gnu"
