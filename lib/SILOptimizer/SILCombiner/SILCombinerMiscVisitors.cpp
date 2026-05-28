@@ -1073,7 +1073,7 @@ SILInstruction *SILCombiner::visitUncheckedEnumDataAddrInstBase(
 
   if (onlyDestroys) {
     // Destroying whole non-copyable enums with a deinit would wrongly trigger calling its deinit.
-    if (tedai->getEnum()->getType().isValueTypeWithDeinit())
+    if (tedai->getEnum()->getType().isMoveOnly())
       return nullptr;
 
     // The unchecked_take_enum_data_addr is dead: remove it and replace all
