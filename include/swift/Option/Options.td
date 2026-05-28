@@ -641,6 +641,12 @@ def library_level_EQ : Joined<["-"], "library-level=">,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   Alias<library_level>;
 
+def ipi_clang_module : Separate<["-"], "ipi-clang-module">,
+  MetaVarName<"<name>">,
+  Flags<[HelpHidden, FrontendOption]>,
+  HelpText<"Mark a Clang module by name as project-internal (IPI). "
+           "Public imports of the named module will be diagnosed.">;
+
 def module_name : Separate<["-"], "module-name">,
   Flags<[FrontendOption, ModuleInterfaceOption,
          SwiftSymbolGraphExtractOption, SwiftSynthesizeInterfaceOption]>,
