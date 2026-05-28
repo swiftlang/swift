@@ -771,10 +771,12 @@ private extension MovableInstructions {
       }
     }
 
+    let phiOwnership: Ownership = firstStore.parentFunction.hasOwnership ? (firstStore.source.type.isTrivial(in: firstStore.parentFunction) ? .none : .owned) : .none
+
     var ssaUpdater = SSAUpdater(
       function: firstStore.parentFunction,
       type: firstStore.destination.type.objectType,
-      ownership: firstStore.source.ownership,
+      ownership: phiOwnership,
       context
     )
     
@@ -804,9 +806,9 @@ private extension MovableInstructions {
     }) else {
       return false
     }
-    
-    let ownership: LoadInst.LoadOwnership = firstStore.parentFunction.hasOwnership ? (firstStore.storeOwnership == .initialize ? .take : .trivial) : .unqualified
-    
+
+    let ownership: LoadInst.LoadOwnership = firstStore.parentFunction.hasOwnership ? (initialAddr.type.isTrivial(in: firstStore.parentFunction) ? .trivial : .take) : .unqualified
+
     let initialLoad = builder.createLoad(fromAddress: initialAddr, ownership: ownership)
     ssaUpdater.addAvailableValue(initialLoad, in: loop.preheader!)
     
