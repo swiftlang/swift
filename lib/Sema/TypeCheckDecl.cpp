@@ -3441,6 +3441,14 @@ bool DynamicMemberLookupSubscriptEligibility::diagnose(SubscriptDecl *decl) cons
       continue;
     }
 
+    // This is handled specially above; if it is set, we either should have
+    // diagnosed something already, or we'll diagnose something for a subsequent
+    // parameter, so just skip this one.
+    if (flags.containsOnly(
+        InvalidParameterFlag::DynamicMemberMissingArgumentLabel)) {
+      continue;
+    }
+
     auto *param = const_cast<ParamDecl *>(params->get(idx));
     if (flags & InvalidParameterFlag::DynamicMemberMissingParameterLabel) {
       // Technically, a `ParamDecl` can't have an argument label without a
