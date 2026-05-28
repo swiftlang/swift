@@ -176,7 +176,7 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
       out << "sizedBy";
     else
       out << "countedBy";
-    if (CAT->isOrNull())
+    if (CAT->isOrNull() && hasOrNullSupport())
       out << "OrNull";
     out << "(pointer: ";
     printParamOrReturn(pointerIndex);
@@ -224,6 +224,28 @@ private:
       out << ".return";
     else
       out << ".param(" << pointerIndex + 1 << ")";
+  }
+
+  // The common case will be that OrNull support exists, so cache positive
+  // result. For the rare case that we run against an old macro we can take the
+  // hit of checking multiple times.
+  bool hasOrNullSupportCached = false;
+  bool hasOrNullSupport() {
+    if (hasOrNullSupportCached)
+      return true;
+
+    auto *D = getKnownSingleDecl(SwiftContext, "_SwiftifyInfo");
+    auto *Enum = dyn_cast_or_null<EnumDecl>(D);
+    if (!Enum)
+      return false;
+    for (auto *Element :
+         Enum->lookupDirect(SwiftContext.getIdentifier("countedByOrNull"))) {
+      if (isa<EnumElementDecl>(Element)) {
+        hasOrNullSupportCached = true;
+        return true;
+      }
+    }
+    return false;
   }
 };
 
