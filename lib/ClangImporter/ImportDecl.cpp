@@ -482,6 +482,7 @@ void ClangImporter::Implementation::addSynthesizedTypealias(
   typealias->setUnderlyingType(underlyingType);
   typealias->setAccess(nominal->getFormalAccess());
   typealias->setImplicit();
+  typealias->setSynthesized();
 
   nominal->addMember(typealias);
 }
@@ -1902,6 +1903,7 @@ namespace {
                                         SourceLoc(), varName,
                                         enumDecl);
         rawValue->setImplicit();
+        rawValue->setSynthesized();
         rawValue->copyFormalAccessFrom(enumDecl);
         rawValue->setSetterAccess(AccessLevel::Private);
         rawValue->setInterfaceType(underlyingType);
@@ -5665,8 +5667,10 @@ namespace {
       // Mark class methods as static.
       if (decl->isClassMethod() || forceClassMethod)
         result->setStatic();
-      if (forceClassMethod)
+      if (forceClassMethod) {
         result->setImplicit();
+        result->setSynthesized();
+      }
 
       ClangImporter::Implementation::recordImplicitUnwrapForDecl(result, isIUO);
 
@@ -6137,6 +6141,7 @@ namespace {
             addObjCAttribute(result,
                             Impl.importIdentifier(decl->getIdentifier()));
             result->setImplicit();
+            result->setSynthesized();
             auto attr = AvailableAttr::createUniversallyUnavailable(
                 Impl.SwiftContext,
                 "This Objective-C protocol has only been forward-declared; "
@@ -6292,6 +6297,7 @@ namespace {
             auto result = createFakeClass(name, /* cacheResult */ true,
                                               /* inheritFromNSObject */ true);
             result->setImplicit();
+            result->setSynthesized();
             auto attr = AvailableAttr::createUniversallyUnavailable(
                 Impl.SwiftContext,
                 "This Objective-C class has only been forward-declared; "
@@ -7905,8 +7911,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   ClangImporter::Implementation::recordImplicitUnwrapForDecl(
       result, importedType.isImplicitlyUnwrapped());
 
-  if (implicit)
+  if (implicit) {
     result->setImplicit();
+    result->setSynthesized();
+  }
 
   // Set the kind of initializer.
   result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},

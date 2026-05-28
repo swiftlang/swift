@@ -2517,8 +2517,16 @@ bool ShouldPrintChecker::shouldPrint(const Decl *D,
   // Optionally skip these checks for extensions synthesized for '@_nonSendable'
   if (!Options.AlwaysPrintNonSendableExtensions || !isNonSendableExtension(D)) {
     if (Options.SkipImplicit && D->isImplicit()) {
-      const auto &IgnoreList = Options.TreatAsExplicitDeclList;
-      if (!llvm::is_contained(IgnoreList, D))
+      auto keepSynthesized = false;
+      if (Options.AlwaysPrintSynthesized) {
+        if (auto *VD = dyn_cast<ValueDecl>(D))
+          keepSynthesized = VD->isSynthesized();
+      }
+
+      auto keepAsExplicit =
+          llvm::is_contained(Options.TreatAsExplicitDeclList, D);
+
+      if (!keepSynthesized && !keepAsExplicit)
         return false;
     }
 

@@ -1960,6 +1960,14 @@ def print_fully_qualified_types : Flag<["-"], "print-fully-qualified-types">,
   Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
   HelpText<"Always print fully qualified type names">;
 
+def synthesize_interface_show :
+  Joined<["-"], "synthesize-interface-show=">,
+  Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
+  MetaVarName<"<options>">,
+  HelpText<"Comma-separated options controlling what gets printed.\n"
+           "Options: 'unavailable', 'implicit-attrs', 'qualified-types'.\n"
+           "Shorthands: 'all' (every option enabled), 'minimal' (default).">;
+
 // swift-symbolgraph-extract-only options
 def output_dir : Separate<["-"], "output-dir">,
   Flags<[NoDriverOption, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption,
@@ -1976,7 +1984,8 @@ def skip_synthesized_members: Flag<[ "-" ], "skip-synthesized-members">,
   HelpText<"Skip members inherited through classes or default implementations">;
 
 def minimum_access_level : Separate<["-"], "minimum-access-level">,
-  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption]>,
+  Flags<[NoDriverOption, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption]>,
   HelpText<"Include symbols with this access level or more">,
   MetaVarName<"<level>">;
 
