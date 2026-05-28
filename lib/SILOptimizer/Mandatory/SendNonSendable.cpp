@@ -2761,11 +2761,11 @@ public:
   InFlightDiagnostic diagnoseError(SourceLoc loc, Diag<T...> diag,
                                    U &&...args) {
     emittedErrorDiagnostic = true;
-    auto diag_ = getASTContext().Diags.diagnose(loc, diag,
-                                                std::forward<U>(args)...);
+    auto localDiag =
+        getASTContext().Diags.diagnose(loc, diag, std::forward<U>(args)...);
     if (downgradeToWarning)
-      return std::move(diag_.warnUntilLanguageMode(LanguageMode::future));
-    return std::move(diag_.warnUntilLanguageMode(LanguageMode::v6));
+      return std::move(localDiag.warnUntilLanguageMode(LanguageMode::future));
+    return std::move(localDiag.warnUntilLanguageMode(LanguageMode::v6));
   }
 
   template <typename... T, typename... U>
@@ -4022,6 +4022,20 @@ private:
   void emitUnknownPatternError() {
     EMIT_UNKNOWN_PATTERN_ERROR(IncompatibleRegionMergeErrorEmitter,
                                op->getUser(), getBehaviorLimit());
+  }
+
+  // Emit incompatible-region-merge diagnostics as warnings until the future
+  // language mode. This shadows the file-scope siloptimizer::diagnoseError
+  // (which wraps in warnUntilLanguageMode(v6)) so we do not double-wrap.
+  template <typename... T, typename... U>
+  InFlightDiagnostic diagnoseError(SILInstruction *inst, Diag<T...> diag,
+                                   U &&...args) {
+    auto &ctx = inst->getFunction()->getASTContext();
+    return std::move(
+        ctx.Diags
+            .diagnose(inst->getLoc().getSourceLoc(), diag,
+                      std::forward<U>(args)...)
+            .warnUntilLanguageMode(LanguageMode::future));
   }
 
   void emitUnknown();
