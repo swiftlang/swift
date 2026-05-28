@@ -652,3 +652,22 @@ struct SingleLens<T> {
 func testRecursiveSingleSubscript(_ x: SingleLens<SingleLens<SingleLens<SingleLens<[Int]>>>>) {
   _ = x[0]
 }
+
+// Make sure that coerceCallArguments doesn't crash when arity of the subscript doesn't match
+// that of the member found by the lookup.
+func testMultipleArguments() {
+  @dynamicMemberLookup
+  struct Entity<T> {
+    subscript<R>(dynamicMember keyPath: KeyPath<T, R>) -> R {
+      fatalError()
+    }
+  }
+
+  struct FuncEntity {
+    let implementation: (String, Int) -> Void
+  }
+
+  func test(e: Entity<FuncEntity>) {
+    e.implementation("ultimate question", 42)
+  }
+}

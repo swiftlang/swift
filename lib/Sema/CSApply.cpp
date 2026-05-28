@@ -28,6 +28,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -43,6 +44,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "clang/AST/DeclTemplate.h"
@@ -8463,8 +8465,16 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto *calleeLoc = cs.getConstraintLocator(calleeLocator);
   auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc);
   if (overload) {
-    auto *decl = overload->choice.getDeclOrNull();
-    callee = resolveConcreteDeclRef(decl, calleeLoc);
+    // If this is a call through an implicit `dynamicMember:` subscript,
+    // of a `@dynamicMemberLookup` type there is no callee because the
+    // call happens on a value returned by the subscript invocation and
+    // not necessary the member looked up.
+    if (overload->choice.isKeyPathDynamicMemberLookup()) {
+      callee = ConcreteDeclRef();
+    } else {
+      auto *decl = overload->choice.getDeclOrNull();
+      callee = resolveConcreteDeclRef(decl, calleeLoc);
+    }
   }
 
   // Make sure we have a function type that is callable. This helps ensure
