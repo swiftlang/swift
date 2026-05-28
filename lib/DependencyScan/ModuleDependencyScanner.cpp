@@ -210,7 +210,7 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     std::shared_ptr<llvm::cas::ObjectStore> CAS,
     std::shared_ptr<llvm::cas::ActionCache> ActionCache,
     DependencyScannerDiagnosticReporter &DiagnosticReporter,
-    llvm::PrefixMapper *Mapper)
+    llvm::PrefixMapper *Mapper, bool ShareClangCompilerInstance)
     : workerCompilerInvocation(
           std::make_unique<CompilerInvocation>(ScanCompilerInvocation)),
       workerSourceMgr(ScanASTContext.SourceMgr.getFileSystem()),
@@ -218,7 +218,8 @@ ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
           *globalScanningService.ClangScanningService,
           getClangScanningFS(globalScanningService, CAS, ScanASTContext)),
       CAS(CAS), ActionCache(ActionCache),
-      diagnosticReporter(DiagnosticReporter) {
+      diagnosticReporter(DiagnosticReporter),
+      ShareClangCompilerInstance(ShareClangCompilerInstance) {
   assert(globalScanningService.ClangScanningService->getCAS() == CAS &&
          "Need to be the same CAS instance");
   assert(globalScanningService.ClangScanningService->getActionCache() ==
@@ -327,8 +328,13 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
         &alreadySeenModules) {
   diagnosticReporter.registerNamedClangModuleQuery();
   auto clangModuleDependencies =
-      clangScanningTool.computeDependenciesByNameWithContext(
-          moduleName.str(), alreadySeenModules, lookupModuleOutput);
+      ShareClangCompilerInstance
+          ? clangScanningTool.computeDependenciesByNameWithContext(
+                moduleName.str(), alreadySeenModules, lookupModuleOutput)
+          : clangScanningTool.getModuleDependencies(
+                moduleName.str(), clangScanningModuleCommandLineArgs,
+                clangScanningWorkingDirectoryPath, alreadySeenModules,
+                lookupModuleOutput);
   if (!clangModuleDependencies) {
     llvm::handleAllErrors(
         clangModuleDependencies.takeError(),
@@ -549,17 +555,22 @@ ModuleDependencyScanner::create(SwiftDependencyScanningService &service,
           instance->getInvocation().getFrontendOptions().ParallelDependencyScan,
           instance->getInvocation()
               .getFrontendOptions()
+              .ShareClangCompilerInstance,
+          instance->getInvocation()
+              .getFrontendOptions()
               .EmitDependencyScannerRemarks));
 
-  auto initError = scanner->initializeWorkerClangScanningTool();
+  if (scanner->ShareClangCompilerInstance) {
+    auto initError = scanner->initializeWorkerClangScanningTool();
 
-  if (initError) {
-    llvm::handleAllErrors(
-        std::move(initError), [&](const llvm::StringError &E) {
-          instance->getDiags().diagnose(
-              SourceLoc(), diag::clang_dependency_scan_error, E.getMessage());
-        });
-    return std::make_error_code(std::errc::invalid_argument);
+    if (initError) {
+      llvm::handleAllErrors(
+          std::move(initError), [&](const llvm::StringError &E) {
+            instance->getDiags().diagnose(
+                SourceLoc(), diag::clang_dependency_scan_error, E.getMessage());
+          });
+      return std::make_error_code(std::errc::invalid_argument);
+    }
   }
 
   return scanner;
@@ -571,7 +582,7 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
     swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics,
-    bool ParallelScan, bool EmitScanRemarks)
+    bool ParallelScan, bool ShareClangCompilerInstance, bool EmitScanRemarks)
     : ScanCompilerInvocation(ScanCompilerInvocation),
       ScanASTContext(ScanASTContext),
       ScanDiagnosticReporter(Diagnostics, EmitScanRemarks),
@@ -585,7 +596,8 @@ ModuleDependencyScanner::ModuleDependencyScanner(
                      : 1),
       ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
       CAS(ScanningService.ClangScanningService->getCAS()),
-      ActionCache(ScanningService.ClangScanningService->getActionCache()) {
+      ActionCache(ScanningService.ClangScanningService->getActionCache()),
+      ShareClangCompilerInstance(ShareClangCompilerInstance) {
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
       ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;
@@ -610,12 +622,14 @@ ModuleDependencyScanner::ModuleDependencyScanner(
     Workers.emplace_front(std::make_unique<ModuleDependencyScanningWorker>(
         ScanningService, ScanCompilerInvocation, SILOptions, ScanASTContext,
         DependencyTracker, CAS, ActionCache, ScanDiagnosticReporter,
-        PrefixMapper.get()));
+        PrefixMapper.get(), ShareClangCompilerInstance));
 }
 
 ModuleDependencyScanner::~ModuleDependencyScanner() {
-  auto finError = finalizeWorkerClangScanningTool();
-  assert(!finError && "ClangScanningTool finalization must succeed.");
+  if (ShareClangCompilerInstance) {
+    auto finError = finalizeWorkerClangScanningTool();
+    assert(!finError && "ClangScanningTool finalization must succeed.");
+  }
 }
 
 llvm::Error ModuleDependencyScanner::initializeWorkerClangScanningTool() {

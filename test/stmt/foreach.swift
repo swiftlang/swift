@@ -406,3 +406,19 @@ func testInvalidContainerNotInScope(){
   // expected-error@-1 {{cannot find 'a' in scope}} 
   // expected-error@-2 {{cannot find 'b' in scope}}
 }
+
+// A Sequence conformance that is unconditionally unavailable. Previously this
+// crashed in DesugarForEachStmtRequest because the diagnostic path called
+// AvailabilityRange::getVersionString() on an unversioned constraint.
+struct UnavailableSeq {
+  func makeIterator() -> AnyIterator<Int> { AnyIterator { nil } }
+}
+
+@available(*, unavailable)
+extension UnavailableSeq: Sequence {}
+
+func testUnavailableSequenceConformance(seq: UnavailableSeq) {
+  for x in seq { // expected-error {{for-in loop requires 'UnavailableSeq' to conform to 'Sequence', but the conformance is unavailable}}
+    _ = x
+  }
+}

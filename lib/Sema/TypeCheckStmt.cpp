@@ -3560,11 +3560,19 @@ private:
     auto protoDecl = seqConformanceRef.getProtocol();
 
     auto domainAndRange = constraint.getDomainAndRange(ctx);
-    ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
-                       seqType, protoDecl,
-                       domainAndRange.getDomain().getNameForAttributePrinting(),
-                       domainAndRange.getRange().getVersionString());
-    fixAvailability(loc, dc, constraint.getFixItDomainAndRange(ctx), ctx);
+    auto domain = domainAndRange.getDomain();
+    auto range = domainAndRange.getRange();
+    if (domain.isVersioned() && range.hasMinimumVersion()) {
+      ctx.Diags.diagnose(loc, diag::for_loop_sequence_conformance_unavailable,
+                         seqType, protoDecl,
+                         domain.getNameForAttributePrinting(),
+                         range.getVersionString());
+      fixAvailability(loc, dc, constraint.getFixItDomainAndRange(ctx), ctx);
+    } else {
+      ctx.Diags.diagnose(
+          loc, diag::for_loop_sequence_conformance_unavailable_unconditionally,
+          seqType, protoDecl);
+    }
   }
 
   void buildMakeIteratorVar() {
