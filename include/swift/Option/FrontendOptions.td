@@ -317,6 +317,11 @@ def parallel_scan : Flag<["-"], "parallel-scan">,
 def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
    HelpText<"Perform dependency scanning in a single-threaded fashion.">;
 
+def no_clang_compiler_instance_sharing
+    : Flag<["-"], "no-clang-scanner-instance-sharing">,
+      HelpText<"Disable sharing of the Clang compiler instance across "
+               "dependency scans.">;
+
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Always run SIL copy propagation with lexical lifetimes to shorten object "
            "lifetimes while preserving variable lifetimes.">;
