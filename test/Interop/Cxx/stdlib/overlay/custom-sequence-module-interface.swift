@@ -17,15 +17,15 @@
 // CHECK: }
 
 // CHECK: struct SimpleArrayWrapperNullableIterators : CxxConvertibleToCollection, CxxBorrowingSequence {
-// CHECK:   typealias Element = Optional<UnsafePointer<Int32>>.Pointee
-// CHECK:   typealias RawIterator = UnsafePointer<Int32>?
+// CHECK:   typealias Element = Optional<UnsafePointer<CInt>>.Pointee
+// CHECK:   typealias RawIterator = UnsafePointer<CInt>?
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<SimpleArrayWrapperNullableIterators>
 // CHECK:   typealias Iterator = CxxIterator<SimpleArrayWrapperNullableIterators>
 // CHECK: }
 
 // CHECK: struct SimpleEmptySequence : CxxConvertibleToCollection, CxxBorrowingSequence {
-// CHECK:   typealias Element = Optional<UnsafePointer<Int32>>.Pointee
-// CHECK:   typealias RawIterator = UnsafePointer<Int32>?
+// CHECK:   typealias Element = Optional<UnsafePointer<CInt>>.Pointee
+// CHECK:   typealias RawIterator = UnsafePointer<CInt>?
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<SimpleEmptySequence>
 // CHECK:   typealias Iterator = CxxIterator<SimpleEmptySequence>
 // CHECK: }

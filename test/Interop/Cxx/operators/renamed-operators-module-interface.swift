@@ -2,7 +2,7 @@
 
 // CHECK: struct HasRenamedOperatorStar {
 // CHECK-NOT: prefix static func * (lhs: HasRenamedOperatorStar)
-// CHECK:   func dereference() -> UnsafePointer<Int32>
+// CHECK:   func dereference() -> UnsafePointer<CInt>
 // CHECK: }
 
 // CHECK: struct HasRenamedOperatorPlusPlus {

@@ -286,12 +286,12 @@ let strInterpolation = "This is a \(stringStr + "ing") interpolation"
 // CHECK4-NEXT: Int32{{$}}
 // CHECK4-NEXT: $ss5Int32VD
 // CHECK4-NEXT: Foo{{$}}
-// CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:s5Int32V">Int32</Type></Declaration>
-// CHECK4-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.struct usr="s:s5Int32V">Int32</ref.struct></decl.var.type></decl.var.global>
+// CHECK4-NEXT: <Declaration>var fooIntVar: <Type usr="s:s4CInta">CInt</Type></Declaration>
+// CHECK4-NEXT: <decl.var.global><syntaxtype.keyword>var</syntaxtype.keyword> <decl.name>fooIntVar</decl.name>: <decl.var.type><ref.typealias usr="s:s4CInta">CInt</ref.typealias></decl.var.type></decl.var.global>
 // CHECK4-NEXT: DOC COMMENT 
 // CHECK4-NEXT: Aaa. fooIntVar. Bbb. 
 // CHECK4-NEXT: DOC COMMENT XML
-// CHECK4-NEXT: <Variable file="{{[^"]+}}Foo.h" line="{{[0-9]+}}" column="{{[0-9]+}}"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: Int32</Declaration><Abstract><Para> Aaa. fooIntVar. Bbb.</Para></Abstract></Variable>
+// CHECK4-NEXT: <Variable file="{{[^"]+}}Foo.h" line="{{[0-9]+}}" column="{{[0-9]+}}"><Name>fooIntVar</Name><USR>c:@fooIntVar</USR><Declaration>var fooIntVar: CInt</Declaration><Abstract><Para> Aaa. fooIntVar. Bbb.</Para></Abstract></Variable>
 
 // RUN: %sourcekitd-test -req=cursor -pos=8:7 %s -- -F %S/../Inputs/libIDE-mock-sdk -I %t.tmp %s | %FileCheck -check-prefix=CHECK5 %s
 // CHECK5:      source.lang.swift.decl.function.free (8:6-8:19)

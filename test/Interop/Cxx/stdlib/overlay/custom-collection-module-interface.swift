@@ -3,8 +3,8 @@
 // REQUIRES: swift_feature_BorrowingSequence
 
 // CHECK: struct SimpleArrayWrapper : CxxRandomAccessCollection, CxxBorrowingSequence {
-// CHECK:   typealias Element = UnsafePointer<Int32>.Pointee
-// CHECK:   typealias RawIterator = UnsafePointer<Int32>
+// CHECK:   typealias Element = UnsafePointer<CInt>.Pointee
+// CHECK:   typealias RawIterator = UnsafePointer<CInt>
 // CHECK:   typealias BorrowingIterator = CxxBorrowingIterator<SimpleArrayWrapper>
 // CHECK:   typealias Iterator = CxxIterator<SimpleArrayWrapper>
 // CHECK: }

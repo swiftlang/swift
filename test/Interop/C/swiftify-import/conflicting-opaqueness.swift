@@ -37,8 +37,8 @@ struct container_t {
 // }}
 // expected-expansion@+7:75{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func fooWrapped(_ x: UnsafeMutablePointer<container_t>!, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func fooWrapped(_ x: UnsafeMutablePointer<container_t>!, _ p: UnsafeMutableBufferPointer<CInt>) {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe fooWrapped(x, p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -53,8 +53,8 @@ void foobar_release(foobar_ref x);
 
 // expected-expansion@+10:57{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func foobar(_ _foobar_param0: UnsafeMutableBufferPointer<Int32>, _ _foobar_param2: foobar_ref!) {|}}
-//   expected-remark@3{{macro content: |    let _foobar_param1 = Int32(exactly: _foobar_param0.count)!|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func foobar(_ _foobar_param0: UnsafeMutableBufferPointer<CInt>, _ _foobar_param2: foobar_ref!) {|}}
+//   expected-remark@3{{macro content: |    let _foobar_param1 = CInt(exactly: _foobar_param0.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe foobar(_foobar_param0.baseAddress, _foobar_param1, _foobar_param2)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -71,8 +71,8 @@ void foobar(int * __counted_by(len), int len, foobar_ref);
 
 // expected-expansion@+10:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bar(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bar(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<CInt>) {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe bar(x, p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -82,8 +82,8 @@ void foobar(int * __counted_by(len), int len, foobar_ref);
 void bar(struct qux *x, int * __counted_by(len) p, int len);
 // expected-expansion@+10:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func barReturn(_ p: UnsafeMutableBufferPointer<Int32>) -> UnsafeMutablePointer<qux>! {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func barReturn(_ p: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<qux>! {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe barReturn(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -101,8 +101,8 @@ struct qux * barReturn(int * __counted_by(len) p, int len);
 struct qux;
 // expected-expansion@+10:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func baz(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func baz(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<CInt>) {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe baz(x, p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -112,8 +112,8 @@ struct qux;
 void baz(struct qux *x, int * __counted_by(len) p, int len);
 // expected-expansion@+10:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bazReturn(_ p: UnsafeMutableBufferPointer<Int32>) -> UnsafeMutablePointer<qux>! {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bazReturn(_ p: UnsafeMutableBufferPointer<CInt>) -> UnsafeMutablePointer<qux>! {|}}
+//   expected-remark@3{{macro content: |    let len = CInt(exactly: p.count)!|}}
 //   expected-remark@4{{macro content: |    return unsafe bazReturn(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
@@ -160,16 +160,16 @@ func callFoo2(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMu
               _ zz: UnsafeMutablePointer<(UnsafeMutablePointer<qux>?, UnsafeMutablePointer<qux>?)>,
               _ p: UnsafeMutableBufferPointer<CInt>) {
   // expected-error@+2{{missing argument for parameter #3 in call}}
-  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
   unsafe foo(x, p)
   // expected-error@+2{{missing argument for parameter #3 in call}}
-  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
   unsafe fooIndirect(y, p)
   // expected-error@+2{{missing argument for parameter #3 in call}}
-  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
   unsafe fooIndirectCompleteArray(zz, p)
   // expected-error@+2{{missing argument for parameter #2 in call}}
-  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
   let _: UnsafeMutablePointer<qux> = unsafe fooReturn(p)
   unsafe fooWrapped(z, p)
 }
@@ -177,7 +177,7 @@ func callFoo2(_ x: UnsafeMutablePointer<qux>, _ y: UnsafeMutablePointer<UnsafeMu
 func callTestEnum2(_ x: UnsafeMutablePointer<fwd_declared_enum>,
                   _ p: UnsafeMutableBufferPointer<CInt>) {
   // expected-error@+2{{missing argument for parameter #3 in call}}
-  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<Int32>'}}
+  // expected-error@+1{{cannot convert value of type 'UnsafeMutableBufferPointer<CInt>' (aka 'UnsafeMutableBufferPointer<Int32>') to expected argument type 'UnsafeMutablePointer<CInt>' (aka 'UnsafeMutablePointer<Int32>')}}
   unsafe testEnum(x, p)
 }
 

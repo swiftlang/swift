@@ -4,15 +4,15 @@
 // CHECK: }
 
 // CHECK: struct MagicArray<CInt, _C{{.*}}_2> {
-// CHECK:   init(t: (Int32, Int32))
+// CHECK:   init(t: (CInt, CInt))
 // CHECK:   init()
-// CHECK:   var t: (Int32, Int32)
+// CHECK:   var t: (CInt, CInt)
 // CHECK: }
 
 // CHECK: struct MagicArray<CInt, _C{{.*}}_3> {
-// CHECK:   init(t: (Int32, Int32, Int32))
+// CHECK:   init(t: (CInt, CInt, CInt))
 // CHECK:   init()
-// CHECK:   var t: (Int32, Int32, Int32)
+// CHECK:   var t: (CInt, CInt, CInt)
 // CHECK: }
 
 // CHECK: typealias MagicIntPair = MagicArray<CInt, _C{{.*}}_2>

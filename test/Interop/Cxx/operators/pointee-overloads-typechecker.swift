@@ -120,11 +120,11 @@ vFRT_Const_NonConst.pointee = 67
 let vInt_FRT_Const_NonConst = Int_Template_FRT_Const_NonConst(42)
 let _: Int32 = vInt_FRT_Const_NonConst.pointee
 vInt_FRT_Const_NonConst.pointee = 4
-vInt_FRT_Const_NonConst.pointee = false // expected-error {{cannot assign value of type 'Bool' to type 'Int32'}}
-vInt_FRT_Const_NonConst.pointee = 4.2 // expected-error {{cannot assign value of type 'Double' to type 'Int32'}}
+vInt_FRT_Const_NonConst.pointee = false // expected-error {{cannot assign value of type 'Bool' to type 'CInt' (aka 'Int32')}}
+vInt_FRT_Const_NonConst.pointee = 4.2 // expected-error {{cannot assign value of type 'Double' to type 'CInt' (aka 'Int32')}}
 
 let vFloat_FRT_Const_NonConst = Double_Template_FRT_Const_NonConst(6.7)
 let _: Double = vFloat_FRT_Const_NonConst.pointee
 vFloat_FRT_Const_NonConst.pointee = 4
-vFloat_FRT_Const_NonConst.pointee = false // expected-error {{cannot assign value of type 'Bool' to type 'Double'}}
+vFloat_FRT_Const_NonConst.pointee = false // expected-error {{cannot assign value of type 'Bool' to type 'CDouble' (aka 'Double')}}
 vFloat_FRT_Const_NonConst.pointee = 4.2
