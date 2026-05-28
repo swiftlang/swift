@@ -103,6 +103,45 @@ bb0:
   return %r : $()
 }
 
+// When a tuple is removed and a debug_value with a reconstruction block
+// references it, salvageDebugInfo should prepend a tuple reconstruction
+// into the debug BB using the first element + undefs for the rest.
+// CHECK-LABEL: sil @salvage_tuple_with_debug_bb
+// CHECK: debug_value %0 : $Int64, let, name "x", type $Int64, transform {
+// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK:     %[[T:[0-9]+]] = tuple (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK:     %[[E:[0-9]+]] = tuple_extract %[[T]] : $(Int64, Int64), 0
+// CHECK:     return %[[E]] : $Int64
+// CHECK:   }
+// CHECK: return %0
+sil @salvage_tuple_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %t = tuple (%0 : $Int64, %1 : $Int64)
+  debug_value %t : $(Int64, Int64), let, name "x", type $Int64, transform {
+  bb0(%0 : $(Int64, Int64)):
+    %1 = tuple_extract %0 : $(Int64, Int64), 0
+    return %1 : $Int64
+  }
+  %e = tuple_extract %t : $(Int64, Int64), 0
+  return %e : $Int64
+}
+
+// When an empty tuple is removed, the debug_value should be fully salvaged
+// into a debug BB by cloning the tuple construction.
+// CHECK-LABEL: sil @salvage_empty_tuple
+// CHECK: debug_value undef : $(), let, name "e", transform {
+// CHECK:   bb0:
+// CHECK:     %[[T:[0-9]+]] = tuple ()
+// CHECK:     return %[[T]] : $()
+// CHECK:   }
+sil @salvage_empty_tuple : $@convention(thin) () -> () {
+bb0:
+  %t = tuple ()
+  debug_value %t : $(), let, name "e"
+  %r = tuple ()
+  return %r : $()
+}
+
 // This test verifies that splitAggregateLoad in CanonicalizeInstruction.cpp
 // salvages debug info attached to the loaded aggregate in optimized builds.
 //
