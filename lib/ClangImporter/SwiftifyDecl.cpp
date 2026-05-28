@@ -90,15 +90,18 @@ static bool isStdSpanType(clang::QualType clangType) {
 
 // Walks a clang `Expr` tree that appears as a `__counted_by` /
 // `__sized_by` count expression and emits an equivalent Swift expression.
-// Returns true on success; on failure the partial output in `out` is
-// meaningless and callers must discard it.
+// `Visit(expr)` returns true on success and the result can be retrieved via
+// `str()`.
 struct SwiftCountExprEmitter
     : clang::ConstStmtVisitor<SwiftCountExprEmitter, bool> {
   const clang::ASTContext &ctx;
-  llvm::raw_ostream &out;
+  llvm::SmallString<128> result;
+  llvm::raw_svector_ostream out;
 
-  SwiftCountExprEmitter(const clang::ASTContext &ctx, llvm::raw_ostream &out)
-      : ctx(ctx), out(out) {}
+  explicit SwiftCountExprEmitter(const clang::ASTContext &ctx)
+      : ctx(ctx), out(result) {}
+
+  llvm::StringRef str() const { return result; }
 
   bool VisitDeclRefExpr(const clang::DeclRefExpr *e) {
     out << e->getDecl()->getName();
@@ -282,6 +285,11 @@ private:
   }
 };
 
+static Type ConcretePointeeType(Type swiftType);
+static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
+                                           Type swiftType,
+                                           const clang::CountAttributedType *CAT);
+
 struct SwiftifyInfoPrinter {
   static const ssize_t SELF_PARAM_INDEX = -2;
   static const ssize_t RETURN_VALUE_INDEX = -1;
@@ -361,11 +369,21 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
                       llvm::StringMap<std::string> &typeMapping)
       : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl, typeMapping) {}
 
-  void printCountedBy(const clang::CountAttributedType *CAT,
+  bool printCountedBy(const clang::CountAttributedType *CAT,
+                      Type swiftType,
                       ssize_t pointerIndex) {
-    printSeparator();
-    clang::Expr *countExpr = CAT->getCountExpr();
+    // Step 1: check if we support this attribute
     bool isSizedBy = CAT->isCountInBytes();
+    if (isSizedBy
+            ? !SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
+            : ConcretePointeeType(swiftType).isNull())
+      return false;
+    SwiftCountExprEmitter emitter(ctx);
+    if (!emitter.Visit(CAT->getCountExpr()))
+      return false;
+
+    // Step 2: print - any early exit must occur before this point
+    printSeparator();
     out << ".";
     if (isSizedBy)
       out << "sizedBy";
@@ -376,16 +394,9 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
     out << "(pointer: ";
     printParamOrReturn(pointerIndex);
     out << ", ";
-    if (isSizedBy)
-      out << "size";
-    else
-      out << "count";
-    out << ": \"";
-    // Validation in SwiftifiableCAT guarantees this succeeds.
-    bool ok = SwiftCountExprEmitter(ctx, out).Visit(countExpr);
-    (void)ok;
-    ASSERT(ok && "count expression validated but failed to emit");
-    out << "\")";
+    out << (isSizedBy ? "size" : "count");
+    out << ": \"" << emitter.str() << "\")";
+    return true;
   }
 
   void printNonEscaping(int idx) {
@@ -481,19 +492,6 @@ static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
   if (!isByteSized)
     DLOG("Ignoring sized_by on non-byte-sized pointer\n");
   return isByteSized;
-}
-static bool SwiftifiableCAT(const clang::ASTContext &ctx,
-                            const clang::CountAttributedType *CAT,
-                            Type swiftType) {
-  if (!CAT) return false;
-  // Probe the emitter into a discardable buffer to determine support.
-  llvm::SmallString<128> tmp;
-  llvm::raw_svector_ostream tmpOS(tmp);
-  if (!SwiftCountExprEmitter(ctx, tmpOS).Visit(CAT->getCountExpr()))
-    return false;
-  return CAT->isCountInBytes()
-             ? SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
-             : !ConcretePointeeType(swiftType).isNull();
 }
 
 // Searches for template instantiations that are not behind type aliases.
@@ -695,8 +693,6 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
     return false;
   }
 
-  clang::ASTContext &clangASTContext = Self.getClangASTContext();
-
   const clang::Module *OwningModule = getOwningModule(ClangDecl);
   bool IsInBridgingHeader = MappedDecl->getModuleContext()->getName().str() == CLANG_HEADER_MODULE_NAME;
   ASSERT(OwningModule || IsInBridgingHeader);
@@ -811,8 +807,7 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                "free function mapped to instance method without swift_name??");
         Self.diagnose(HeaderLoc(swiftName->getLocation()),
                  diag::note_swift_name_instance_method);
-      } else if (SwiftifiableCAT(clangASTContext, CAT, swiftParamTy)) {
-        printer.printCountedBy(CAT, mappedIndex);
+      } else if (CAT && printer.printCountedBy(CAT, swiftParamTy, mappedIndex)) {
         DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
@@ -893,8 +888,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       return false;
     (void)printer.registerStdSpanTypeMapping(
         swiftReturnTy, clangReturnTy);
-    if (SwiftifiableCAT(clangASTContext, CAT, swiftReturnTy)) {
-      printer.printCountedBy(CAT, SwiftifyInfoPrinter::RETURN_VALUE_INDEX);
+    if (CAT && printer.printCountedBy(CAT, swiftReturnTy,
+                                       SwiftifyInfoPrinter::RETURN_VALUE_INDEX)) {
       DLOG("Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }

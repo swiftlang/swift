@@ -71,10 +71,10 @@ int * __counted_by_or_null(len) shared(int len, int * p __counted_by_or_null(len
 //   expected-experimental-remark@9{{macro content: |    }|}}
 //   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeMutablePointer<Int32>? = unsafe complexExpr(len, offset, len2, _pPtr.baseAddress)|}}
 //   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
-//   expected-experimental-remark@12{{macro content: |      precondition(len - offset == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")|}}
+//   expected-experimental-remark@12{{macro content: |      precondition((len - offset) == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")|}}
 //   expected-experimental-remark@13{{macro content: |      return MutableSpan<Int32>()|}}
 //   expected-experimental-remark@14{{macro content: |    }|}}
-//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(len - offset)), copying: ())|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int((len - offset))), copying: ())|}}
 //   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 int * __counted_by_or_null(len - offset) complexExpr(int len, int offset, int len2, int * p __counted_by_or_null(len2) __lifetimebound);
