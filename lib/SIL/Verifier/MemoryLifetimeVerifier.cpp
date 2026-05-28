@@ -625,6 +625,7 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
   // Collect the bits which we require to be set at function exits.
   Bits expectedReturnBits(locations.getNumLocations());
   Bits expectedThrowBits(locations.getNumLocations());
+  Bits expectedUnwindBits(locations.getNumLocations());
   for (SILArgument *arg : function->getArguments()) {
     SILFunctionArgument *funcArg = cast<SILFunctionArgument>(arg);
     switch (funcArg->getArgumentConvention()) {
@@ -632,6 +633,7 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
     case SILArgumentConvention::Indirect_In_Guaranteed:
       locations.setBits(expectedReturnBits, funcArg);
       locations.setBits(expectedThrowBits, funcArg);
+      locations.setBits(expectedUnwindBits, funcArg);
       break;
     case SILArgumentConvention::Indirect_Out:
       if (funcArg->isIndirectErrorResult()) {
@@ -670,24 +672,30 @@ void MemoryLifetimeVerifier::checkFunction(BitDataflow &dataFlow) {
     TermInst *term = bs.block.getTerminator();
     assert(bits == bs.data.exitSet || isa<TryApplyInst>(term));
     switch (term->getKind()) {
-      case SILInstructionKind::ReturnInst:
-      case SILInstructionKind::UnwindInst:
-        require(expectedReturnBits & ~bs.data.exitSet,
-          "indirect argument is not alive at function return", term);
-        require(bs.data.exitSet & ~expectedReturnBits & nonTrivialLocations,
-                "memory is initialized at function return but shouldn't be",
-                term,
-                /*excludeTrivialEnums*/ true);
-        break;
-      case SILInstructionKind::ThrowInst:
-        require(expectedThrowBits & ~bs.data.exitSet,
-          "indirect argument is not alive at throw", term);
-        require(bs.data.exitSet & ~expectedThrowBits & nonTrivialLocations,
-                "memory is initialized at throw but shouldn't be", term,
-                /*excludeTrivialEnums*/ true);
-        break;
-      default:
-        break;
+    case SILInstructionKind::ReturnInst:
+      require(expectedReturnBits & ~bs.data.exitSet,
+              "indirect argument is not alive at function return", term);
+      require(bs.data.exitSet & ~expectedReturnBits & nonTrivialLocations,
+              "memory is initialized at function return but shouldn't be", term,
+              /*excludeTrivialEnums*/ true);
+      break;
+    case SILInstructionKind::UnwindInst:
+      require(expectedUnwindBits & ~bs.data.exitSet,
+              "indirect argument is not alive at coroutine return", term);
+      require(bs.data.exitSet & ~expectedUnwindBits & nonTrivialLocations,
+              "memory is initialized at coroutine return but shouldn't be",
+              term,
+              /*excludeTrivialEnums*/ true);
+      break;
+    case SILInstructionKind::ThrowInst:
+      require(expectedThrowBits & ~bs.data.exitSet,
+              "indirect argument is not alive at throw", term);
+      require(bs.data.exitSet & ~expectedThrowBits & nonTrivialLocations,
+              "memory is initialized at throw but shouldn't be", term,
+              /*excludeTrivialEnums*/ true);
+      break;
+    default:
+      break;
     }
   }
 }
