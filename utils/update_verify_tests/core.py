@@ -81,6 +81,8 @@ class Diag:
         nested_lines,
         diag_content_raw=None,
         original_count_str=None,
+        fixits_raw_str="",
+        had_none_fixit_marker=False,
     ):
         self.prefix = prefix
         self.diag_content = diag_content
@@ -105,6 +107,12 @@ class Diag:
         self.nested_lines = nested_lines
         self.parent = None
         self.closer = None
+        self.fixits_raw_str = fixits_raw_str
+        self.had_none_fixit_marker = had_none_fixit_marker
+        # None means: no fix-it error reported for this diag, render
+        # fixits_raw_str as is. A list (possibly empty) means: replace the
+        # source fix-its with these exact marker strings.
+        self.actual_fixits = None
 
     def decrement_count(self):
         self.count -= 1
@@ -156,7 +164,22 @@ class Diag:
         # vs the new count to decide whether to keep self's original digit.
         self.count = other_diag.count
         self.category = other_diag.category
+        self.fixits_raw_str = other_diag.fixits_raw_str
+        self.had_none_fixit_marker = other_diag.had_none_fixit_marker
+        self.actual_fixits = other_diag.actual_fixits
         other_diag.count = 0
+
+    def _render_fixits(self):
+        if self.actual_fixits is None:
+            return self.fixits_raw_str
+        parts = list(self.actual_fixits)
+        if self.had_none_fixit_marker:
+            parts.append(
+                "{{none}}"
+            )  # keep {{none}}, it still means "no documentation-file" etc.
+        if not parts:
+            return ""
+        return " " + " ".join(parts)
 
     def render(self):
         assert self.count >= 0
@@ -210,7 +233,7 @@ class Diag:
                 # the C++ lexer reads them back literally.
                 # python trivia: raw strings can't end with a backslash
                 content_s = self.diag_content.replace("\\", "\\\\")
-            return base_s + "{{" + content_s + "}}"
+            return base_s + "{{" + content_s + "}}" + self._render_fixits()
 
 
 class ExpansionDiagClose:
@@ -232,15 +255,70 @@ expected_expansion_diag_re = re.compile(
 )
 expected_expansion_close_re = re.compile(r"//(\s*)\}\}")
 
+fixit_marker_re = re.compile(r"\{\{(?P<content>(?:[^}]|\}(?!\}))*)\}\}+")
+
+
+def consume_trailing_fixits(s):
+    """Pull `{{...}}` fix-it markers (and `{{none}}`) off the head of *s*.
+
+    Returns a tuple ``(raw_text, has_none_marker)``
+
+    Stops at the first non-fix-it marker (``{{documentation-file=...}}`` or
+    ``{{children:...}}``), leaving it in *s* — those carry their own state
+    and we don't want to clobber them when replacing fix-its.
+    """
+    pos = 0
+    last_consumed_end = 0
+    has_none = False
+    saw_any = False
+    while True:
+        ws_match = re.match(r"[ \t]*", s[pos:])
+        next_pos = pos + ws_match.end()
+        # `||` separates fix-it alternatives; only meaningful between markers.
+        if saw_any and s[next_pos : next_pos + 2] == "||":
+            next_pos += 2
+            ws_match2 = re.match(r"[ \t]*", s[next_pos:])
+            next_pos += ws_match2.end()
+        m = fixit_marker_re.match(s, next_pos)
+        if not m:
+            break
+        content = m.group("content")
+        if content.startswith("documentation-file=") or content.startswith(
+            "children:"
+        ):
+            break
+        if content == "none":
+            has_none = True
+        pos = m.end()
+        last_consumed_end = m.end()
+        saw_any = True
+    return (s[:last_consumed_end], has_none)
+
+
+def split_fixit_markers(s):
+    pos = 0
+    results = []
+    while pos < len(s):
+        ws_match = re.match(r"[ \t]*", s[pos:])
+        pos += ws_match.end()
+        if pos >= len(s):
+            break
+        m = fixit_marker_re.match(s, pos)
+        if not m:
+            break
+        results.append(m.group(0))
+        pos = m.end()
+    return results
+
 
 def parse_diag(line, filename, prefix, all_prefixes=False):
     s = line.content
-    ms = expected_diag_re.findall(s)
+    matches = list(expected_diag_re.finditer(s))
     matched_re = expected_diag_re
-    if not ms:
-        ms = expected_expansion_diag_re.findall(s)
+    if not matches:
+        matches = list(expected_expansion_diag_re.finditer(s))
         matched_re = expected_expansion_diag_re
-    if not ms:
+    if not matches:
         ms = expected_expansion_close_re.findall(s)
         if not ms:
             return None
@@ -250,10 +328,11 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
             )
         line.content = expected_expansion_close_re.sub("{{DIAG}}", s)
         return ExpansionDiagClose(ms[0], line)
-    if len(ms) > 1:
+    if len(matches) > 1:
         raise KnownException(
             f"multiple diags on line {filename}:{line.line_n}. Aborting due to missing implementation."
         )
+    m = matches[0]
     [
         ws_slash,
         check_prefix,
@@ -266,7 +345,7 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         count_s,
         ws_braces,
         diag_s,
-    ] = ms[0]
+    ] = m.groups()
     if check_prefix != prefix and check_prefix != "" and not all_prefixes:
         return None
     if not target_line_s or target_line_s == "@":
@@ -283,7 +362,13 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         is_absolute = True
     col = int(target_col_s[1:]) if target_col_s else None
     count = int(count_s) if count_s else 1
-    line.content = matched_re.sub("{{DIAG}}", s)
+    if matched_re is expected_diag_re:
+        fixits_raw_str, has_none_marker = consume_trailing_fixits(s[m.end() :])
+    else:
+        fixits_raw_str, has_none_marker = "", False
+    line.content = (
+        s[: m.start()] + "{{DIAG}}" + s[m.end() + len(fixits_raw_str) :]
+    )
 
     unescaped_diag_s = decode(
         encode(diag_s, "utf-8", "backslashreplace"), "unicode-escape"
@@ -303,6 +388,8 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         [],
         diag_content_raw=diag_s,
         original_count_str=count_s if count_s else None,
+        fixits_raw_str=fixits_raw_str,
+        had_none_fixit_marker=has_none_marker,
     )
 
 
@@ -553,6 +640,17 @@ def update_lines(
             )
         line.diag.decrement_count()
 
+    for diag_error in diag_errors:
+        if not isinstance(diag_error, FixitError):
+            continue
+        line_n = diag_error.line
+        line = orig_lines[line_n - 1]
+        if not line.diag:
+            raise KnownException(
+                f"{filename}:{line_n} - fix-it mismatch reported, but no expected-* directive parsed on that line"
+            )
+        line.diag.actual_fixits = diag_error.actual_fixits
+
     diag_errors.sort(reverse=True, key=lambda diag_error: diag_error.line)
     for diag_error in diag_errors:
         if not isinstance(diag_error, ExtraDiag) and not isinstance(
@@ -743,6 +841,20 @@ diag_produced_elsewhere_re = re.compile(
 )
 
 
+"""
+ex:
+test.swift:2:89: error: expected fix-it not seen; actual fix-it seen: {{3-8=_}}
+test.swift:2:89: error: expected fix-it not seen
+test.swift:2:89: error: expected no fix-its; actual fix-it seen: {{3-8=_}}
+test.swift:2:89: error: unexpected fix-it seen; actual fix-its seen: {{3-8=_}} {{9-10=x}}
+"""
+fixit_error_re = re.compile(
+    r"(\S+):(\d+):(\d+): error: "
+    r"(expected fix-it not seen|expected no fix-its|unexpected fix-it seen)"
+    r"(?:; actual fix-its? seen: (.*))?$"
+)
+
+
 class NotFoundDiag:
     def __init__(self, file, line, col, category, content, prefix):
         self.file = file
@@ -787,6 +899,25 @@ class NestedDiag:
 """
 
 
+class FixitError:
+    def __init__(self, file, line, col, actual_fixits):
+        self.file = file
+        self.line = line
+        self.col = col
+        self.actual_fixits = actual_fixits
+        # Sit alongside NotFoundDiag/ExtraDiag/NestedDiag; the per-file
+        # bucket sort needs these attrs even though they're unused here.
+        self.category = None
+        self.content = None
+        self.prefix = ""
+
+    def __str__(self):
+        return (
+            f"{self.file}:{self.line}:{self.col}: fix-it mismatch "
+            f"(actual: {' '.join(self.actual_fixits) or '<none>'})"
+        )
+
+
 def check_expectations(tool_output, prefix):
     """
     The entry point function.
@@ -810,9 +941,7 @@ def check_expectations(tool_output, prefix):
                 if i + n_extra_lines < len(tool_output):
                     next_line = tool_output[i + n_extra_lines]
                     if diag_expansion_note_re.match(next_line.strip()):
-                        dprint(
-                            f"expansion note (ignored): {next_line.strip()}"
-                        )
+                        dprint(f"expansion note (ignored): {next_line.strip()}")
                         n_extra_lines += 1
                 extra_lines = tool_output[i + 1 : i + n_extra_lines]
             elif not "error:" in line:
@@ -917,6 +1046,20 @@ def check_expectations(tool_output, prefix):
                         m.group(5),
                         diag.diag_content,
                         diag.prefix,
+                    )
+                )
+            elif m := fixit_error_re.match(line):
+                dprint(f"fix-it mismatch: {line.strip()}")
+                actual_fixits_str = m.group(5) or ""
+                n_extra = 4 if actual_fixits_str else 3
+                extra_lines = tool_output[i + 1 : i + n_extra]
+                dprint(f"extra lines: {extra_lines}")
+                curr.append(
+                    FixitError(
+                        m.group(1),
+                        int(m.group(2)),
+                        int(m.group(3)),
+                        split_fixit_markers(actual_fixits_str),
                     )
                 )
             else:
