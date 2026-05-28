@@ -109,7 +109,7 @@ extension UniqueArray where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension UniqueArray {
+extension UniqueArray where Element: Copyable {
   /// Copies the elements of a buffer to the end of this array.
   ///
   /// If the array does not have sufficient capacity to hold all items

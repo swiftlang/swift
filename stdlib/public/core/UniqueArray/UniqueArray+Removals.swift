@@ -12,18 +12,13 @@
 
 @available(SwiftStdlib 6.4, *)
 extension UniqueArray where Element: ~Copyable {
-  /// Removes all elements from the array, optionally preserving its
-  /// allocated capacity.
+  /// Removes all elements from the array, preserving its allocated capacity.
   ///
   /// - Complexity: O(*n*), where *n* is the original count of the array.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func removeAll(keepingCapacity keepCapacity: Bool = false) {
-    if keepCapacity {
-      _storage.removeAll()
-    } else {
-      _storage = _RigidArray(capacity: 0)
-    }
+  public mutating func removeAll() {
+    _storage.removeAll()
   }
 
   /// Removes and returns the last element of the array.

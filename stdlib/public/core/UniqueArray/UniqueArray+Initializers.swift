@@ -25,6 +25,13 @@ extension UniqueArray where Element: ~Copyable {
   public init(capacity: Int) {
     _storage = .init(capacity: capacity)
   }
+
+  /// Initializes a new unique array with the specified capacity and no elements.
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  public init(minimumCapacity: Int) {
+    self.init(capacity: minimumCapacity)
+  }
 }
 
 @available(SwiftStdlib 6.4, *)
