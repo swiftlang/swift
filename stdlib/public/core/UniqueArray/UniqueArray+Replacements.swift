@@ -303,7 +303,7 @@ extension UniqueArray where Element: Copyable {
   @_alwaysEmitIntoClient
   public mutating func replaceSubrange(
     _ subrange: Range<Int>,
-    copying newElements: __owned some Collection<Element>
+    copying newElements: consuming some Collection<Element>
   ) {
     // FIXME: Avoid moving the subsequent elements twice.
     let c = newElements.count

@@ -348,7 +348,7 @@ extension _RigidArray where Element: Copyable {
   @_alwaysEmitIntoClient
   internal mutating func replaceSubrange(
     _ subrange: Range<Int>,
-    copying newElements: __owned some Collection<Element>
+    copying newElements: consuming some Collection<Element>
   ) {
     _replaceSubrange(
       subrange,
