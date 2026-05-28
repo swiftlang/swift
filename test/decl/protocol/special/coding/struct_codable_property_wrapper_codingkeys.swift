@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -verify-ignore-unknown
+// RUN: %target-typecheck-verify-swift
 
 // https://github.com/swiftlang/swift/issues/88459
 // Circular reference when property wrapper default value references CodingKeys
