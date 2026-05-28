@@ -703,8 +703,11 @@ static void convertDirectToIndirectFunctionArgs(AddressLoweringState &pass) {
       arg->replaceAllUsesWith(load);
       assert(!pass.valueStorageMap.contains(arg));
 
-      arg = arg->getParent()->replaceFunctionArgument(
+      auto *oldArg = cast<SILFunctionArgument>(arg);
+      auto *newArg = arg->getParent()->replaceFunctionArgument(
           arg->getIndex(), addrType, OwnershipKind::None, arg->getDecl());
+      newArg->copyFlags(oldArg);
+      arg = newArg;
 
       assert(isa<LoadInst>(load) || isa<LoadBorrowInst>(load));
       load->setOperand(0, arg);

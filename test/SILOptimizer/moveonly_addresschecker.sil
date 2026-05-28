@@ -968,3 +968,33 @@ bb0(%0 : $*MyBufferView<T>):
   %t = tuple ()
   return %t : $()
 }
+
+public struct ContainerC {
+  var a: CopyableKlass
+  var b: CopyableKlass
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_copy_addr_through_wrapper_projection :
+// CHECK:         [[FIELD_A:%[^,]+]] = struct_element_addr {{%[^,]+}}, #ContainerC.a
+// CHECK:         [[UNWRAP:%[^,]+]] = moveonlywrapper_to_copyable_addr [[FIELD_A]]
+// CHECK:         copy_addr [[UNWRAP]] to [init]
+// CHECK-NOT:     copy_addr [take] [[UNWRAP]]
+// CHECK:         destroy_addr {{%[^,]+}} : $*@moveOnly ContainerC
+// CHECK-LABEL: } // end sil function 'test_copy_addr_through_wrapper_projection'
+sil hidden [ossa] @test_copy_addr_through_wrapper_projection : $@convention(thin) (@in ContainerC) -> @owned CopyableKlass {
+bb0(%0 : $*ContainerC):
+  %v = load [take] %0 : $*ContainerC
+  %wv = copyable_to_moveonlywrapper [owned] %v : $ContainerC
+  %1 = alloc_stack $@moveOnly ContainerC
+  %mark = mark_unresolved_non_copyable_value [consumable_and_assignable] %1 : $*@moveOnly ContainerC
+  store %wv to [init] %mark : $*@moveOnly ContainerC
+  %field_a = struct_element_addr %mark : $*@moveOnly ContainerC, #ContainerC.a
+  %field_a_unwrap = moveonlywrapper_to_copyable_addr %field_a : $*@moveOnly CopyableKlass
+  %result_slot = alloc_stack $CopyableKlass
+  copy_addr %field_a_unwrap to [init] %result_slot : $*CopyableKlass
+  %result = load [take] %result_slot : $*CopyableKlass
+  dealloc_stack %result_slot : $*CopyableKlass
+  destroy_addr %mark : $*@moveOnly ContainerC
+  dealloc_stack %1 : $*@moveOnly ContainerC
+  return %result : $CopyableKlass
+}

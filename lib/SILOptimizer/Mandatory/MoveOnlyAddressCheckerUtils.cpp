@@ -245,6 +245,7 @@
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OSSACompleteLifetime.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/Projection.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILArgumentConvention.h"
@@ -496,8 +497,14 @@ static bool visitScopeEndsRequiringInit(
 static bool isCopyableValue(SILValue value) {
   if (value->getType().isMoveOnly())
     return false;
-  if (isa<MoveOnlyWrapperToCopyableAddrInst>(value))
+  if (auto *unwrap = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(value)) {
+    // If the operand is an address projection (e.g. struct_element_addr),
+    // the copy reads only a subfield rather than the entire @noImplicitCopy
+    // storage — treat as a regular copyable read.
+    if (Projection::isAddressProjection(unwrap->getOperand()))
+      return true;
     return false;
+  }
   return true;
 }
 

@@ -2912,6 +2912,15 @@ bb0(%0 : @guaranteed $NCG<T>):
   return %4 : $()
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_no_implicit_copy_arg_flag_preserved :
+// CHECK:       bb0(%0 : @noImplicitCopy $*T):
+// CHECK-LABEL: } // end sil function 'test_no_implicit_copy_arg_flag_preserved'
+sil hidden [ossa] @test_no_implicit_copy_arg_flag_preserved : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @noImplicitCopy @guaranteed $T):
+  %1 = tuple ()
+  return %1 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @test_open_pack_element_dominance : $@convention(thin) <each T> (@pack_guaranteed Pack{repeat each T}, Builtin.Word) -> () {
 // CHECK:       bb0([[PACK:%[^,]+]] : 
 // CHECK-SAME:      [[RAW_INDEX:%[^,]+]] :
