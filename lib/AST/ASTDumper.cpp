@@ -5092,6 +5092,8 @@ public:
   TRIVIAL_ATTR_PRINTER(Frozen, frozen)
   TRIVIAL_ATTR_PRINTER(GKInspectable, gk_inspectable)
   TRIVIAL_ATTR_PRINTER(GlobalActor, global_actor)
+  TRIVIAL_ATTR_PRINTER(HasHiddenStoredProperties,
+                       has_hidden_stored_properties)
   TRIVIAL_ATTR_PRINTER(HasInitialValue, has_initial_value)
   TRIVIAL_ATTR_PRINTER(HasMissingDesignatedInitializers,
                        has_missing_designated_initializers)
