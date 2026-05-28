@@ -56,6 +56,53 @@ struct T {
   init(x: Builtin.Int32)
 }
 
+struct MyStruct {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+  init(x: Int64, y: Int64)
+}
+
+// When a struct is removed and a debug_value with a reconstruction block
+// references it, salvageDebugInfo should prepend a struct reconstruction
+// into the debug BB using the first field + undefs for the rest.
+// CHECK-LABEL: sil @salvage_struct_with_debug_bb
+// CHECK: debug_value %0 : $Int64, let, name "field_x", type $Int64, transform {
+// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK:     %[[S:[0-9]+]] = struct $MyStruct (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK:     %[[E:[0-9]+]] = struct_extract %[[S]] : $MyStruct, #MyStruct.x
+// CHECK:     return %[[E]] : $Int64
+// CHECK:   }
+// CHECK: return %0
+sil @salvage_struct_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %s = struct $MyStruct (%0 : $Int64, %1 : $Int64)
+  debug_value %s : $MyStruct, let, name "field_x", type $Int64, transform {
+  bb0(%0 : $MyStruct):
+    %1 = struct_extract %0 : $MyStruct, #MyStruct.x
+    return %1 : $Int64
+  }
+  %e = struct_extract %s : $MyStruct, #MyStruct.x
+  return %e : $Int64
+}
+
+public struct Empty {}
+
+// When an empty struct is removed, the debug_value should be fully salvaged
+// into a debug BB by cloning the struct construction.
+// CHECK-LABEL: sil @salvage_empty_struct
+// CHECK: debug_value undef : $Empty, let, name "e", transform {
+// CHECK:   bb0:
+// CHECK:     %[[S:[0-9]+]] = struct $Empty ()
+// CHECK:     return %[[S]] : $Empty
+// CHECK:   }
+sil @salvage_empty_struct : $@convention(thin) () -> () {
+bb0:
+  %s = struct $Empty ()
+  debug_value %s : $Empty, let, name "e"
+  %r = tuple ()
+  return %r : $()
+}
+
 // This test verifies that splitAggregateLoad in CanonicalizeInstruction.cpp
 // salvages debug info attached to the loaded aggregate in optimized builds.
 //

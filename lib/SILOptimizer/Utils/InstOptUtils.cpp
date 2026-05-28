@@ -1917,6 +1917,18 @@ void swift::endLifetimeAtLeakingBlocks(SILValue value,
       });
 }
 
+/// Clone a self-contained instruction (with no operands) into the debug
+/// reconstruction block of \p DbgInst, replacing the block argument.
+/// This uses the TrivialCloner, so its restrictions apply.
+static void salvageTrivialInst(DebugValueInst *DbgInst,
+                               SingleValueInstruction *inst) {
+  SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
+  SILValue cloned = inst->clone(&*debugBB->begin());
+  debugBB->getArgument(0)->replaceAllUsesWith(cloned);
+  debugBB->eraseArgument(0);
+  DbgInst->setOperand(SILUndef::get(DbgInst->getOperand()));
+}
+
 /// Create a new debug value from a store and a debug variable.
 static void transferStoreDebugValue(DebugVarCarryingInst DefiningInst,
                                     SILInstruction *SI,
@@ -1973,20 +1985,51 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   if (auto *STI = dyn_cast<StructInst>(I)) {
     auto STVal = STI->getResult(0);
     llvm::ArrayRef<VarDecl *> FieldDecls =
-      STI->getStructDecl()->getStoredProperties();
-    for (Operand *U : getDebugUses(STVal)) {
+        STI->getStructDecl()->getStoredProperties();
+    SmallVector<Operand *, 4> debugUses(getDebugUses(STVal));
+    for (Operand *U : debugUses) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
       auto VarInfo = DbgInst->getCompleteVarInfo();
-      for (VarDecl *FD : FieldDecls) {
-        SILDebugVariable NewVarInfo = VarInfo;
-        auto FieldVal = STI->getFieldValue(FD);
-        // Build the corresponding fragment DIExpression
-        auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
-        NewVarInfo.DIExpr.append(FragDIExpr);
 
-        // Create a new debug_value
-        SILBuilder(STI, DbgInst->getDebugScope())
-          .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+      if (STI->getElements().empty()) {
+        // Empty structs cannot use fragments, as they have no fields.
+        salvageTrivialInst(DbgInst, STI);
+      } else if (SILBasicBlock *debugBB = DbgInst->getDebugReconstructionBlock()) {
+        // Cannot combine debug reconstruction blocks and fragments.
+        // As debug_values and debug reconstruction blocks only support a
+        // single operand, only salvage one field (the first one).
+        SILValue fieldVal = STI->getOperand(0);
+        SILType structTy = STVal->getType();
+        SILArgument *oldArg = debugBB->getArgument(0);
+
+        // Create an all-undef struct instruction.
+        SILBuilder builder(debugBB->begin());
+        SmallVector<SILValue, 4> elements;
+        for (auto elt : STI->getElements())
+          elements.push_back(SILUndef::get(elt));
+        auto *newStructInst = builder.createStruct(
+            DbgInst->getLoc(), structTy, elements);
+        oldArg->replaceAllUsesWith(newStructInst);
+
+        // Replace the block arg and wire the operand.
+        auto *newArg = debugBB->replacePhiArgument(
+            0, fieldVal->getType(), OwnershipKind::None);
+        newStructInst->setOperand(0, newArg);
+        DbgInst->setOperand(fieldVal);
+      } else {
+        // Fragments are the only way to use multiple operands to reconstruct
+        // a variable, as debug values can only have a single operand.
+        for (VarDecl *FD : FieldDecls) {
+          SILDebugVariable NewVarInfo = VarInfo;
+          auto FieldVal = STI->getFieldValue(FD);
+          // Build the corresponding fragment DIExpression.
+          auto FragDIExpr = SILDebugInfoExpression::createFragment(FD);
+          NewVarInfo.DIExpr.append(FragDIExpr);
+          
+          // Create a new debug_value for each fragment.
+          SILBuilder(STI, DbgInst->getDebugScope())
+            .createDebugValue(DbgInst->getLoc(), FieldVal, NewVarInfo);
+        }
       }
     }
   }
@@ -2023,11 +2066,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
         continue;
       // Copy the literal into the reconstruction block, and set the operand
       // of the reconstruction block to undef.
-      SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
-      SILValue newLiteral = literal->clone(&*debugBB->begin());
-      debugBB->getArgument(0)->replaceAllUsesWith(newLiteral);
-      debugBB->eraseArgument(0);
-      DbgInst->setOperand(SILUndef::get(DbgInst->getOperand()));
+      salvageTrivialInst(DbgInst, literal);
     }
   }
 }
