@@ -3358,6 +3358,10 @@ ModuleLibraryLevelRequest::evaluate(Evaluator &evaluator,
 
   if (module->isNonSwiftModule()) {
     if (auto *underlying = module->findUnderlyingClangModule()) {
+      if (llvm::is_contained(ctx.LangOpts.IPIClangModuleNames,
+                             module->getName().str()))
+        return LibraryLevel::IPI;
+
       // Imported clangmodules are SPI if they are defined by a private
       // modulemap or from the PrivateFrameworks folder in the SDK.
       bool moduleIsSPI = underlying->ModuleMapIsPrivate ||
