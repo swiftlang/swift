@@ -682,6 +682,14 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
 
     // WASI's module map needs fixing
     result.requiresBuiltinHeadersInSystemModules = true;
+  } else if (triple.isOSEmscripten()) {
+    // Emscripten Mappings
+    libcFileMapping =
+      getLibcFileMapping(ctx, "emscripten-libc.modulemap", std::nullopt, vfs,
+                         suppressDiagnostic);
+
+    // Emscripten's module map needs fixing
+    result.requiresBuiltinHeadersInSystemModules = true;
   } else if (triple.isMusl()) {
     libcFileMapping =
       getLibcFileMapping(ctx, "musl.modulemap", StringRef("SwiftMusl.h"), vfs,

@@ -46,7 +46,7 @@ if(APPLE)
   set(SwiftCore_THREADING_PACKAGE_default "DARWIN")
   set(SwiftCore_ENABLE_PRESPECIALIZATION_default ON)
   set(SwiftCore_CONCURRENCY_GLOBAL_EXECUTOR_default "dispatch")
-elseif(ANDROID OR BSD OR LINUX OR WASI)
+elseif(ANDROID OR BSD OR LINUX OR WASI OR CMAKE_SYSTEM_NAME STREQUAL "Emscripten")
   set(SwiftCore_OBJECT_FORMAT_default "elf")
 
   set(SwiftCore_ENABLE_REFLECTION_default ON)
