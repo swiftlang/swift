@@ -1872,6 +1872,9 @@ endfunction()
 # SWIFT_MODULE_DEPENDS_WASI
 #   Swift modules this library depends on when built for WASI.
 #
+# SWIFT_MODULE_DEPENDS_EMSCRIPTEN
+#   Swift modules this library depends on when built for Emscripten.
+#
 # SWIFT_MODULE_DEPENDS_ANDROID
 #   Swift modules this library depends on when built for Android.
 #
@@ -1986,6 +1989,9 @@ endfunction()
 # SWIFT_SOURCES_DEPENDS_WASI
 #   Sources that are built when this library is being built for WASI
 #
+# SWIFT_SOURCES_DEPENDS_EMSCRIPTEN
+#   Sources that are built when this library is being built for Emscripten
+#
 # SWIFT_SOURCES_DEPENDS_WINDOWS
 #   Sources that are built when this library is being built for Windows
 #
@@ -2062,6 +2068,7 @@ function(add_swift_target_library name)
         SWIFT_MODULE_DEPENDS_OSX
         SWIFT_MODULE_DEPENDS_TVOS
         SWIFT_MODULE_DEPENDS_WASI
+        SWIFT_MODULE_DEPENDS_EMSCRIPTEN
         SWIFT_MODULE_DEPENDS_WATCHOS
         SWIFT_MODULE_DEPENDS_XROS
         SWIFT_MODULE_DEPENDS_WINDOWS
@@ -2083,6 +2090,7 @@ function(add_swift_target_library name)
         SWIFT_SOURCES_DEPENDS_CYGWIN
         SWIFT_SOURCES_DEPENDS_HAIKU
         SWIFT_SOURCES_DEPENDS_WASI
+        SWIFT_SOURCES_DEPENDS_EMSCRIPTEN
         SWIFT_SOURCES_DEPENDS_WINDOWS)
 
   cmake_parse_arguments(SWIFTLIB
@@ -2298,6 +2306,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "WASI")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WASI})
+    elseif(sdk STREQUAL "EMSCRIPTEN")
+      list(APPEND swiftlib_module_depends_flattened
+           ${SWIFTLIB_SWIFT_MODULE_DEPENDS_EMSCRIPTEN})
     elseif(sdk STREQUAL "WINDOWS")
       list(APPEND swiftlib_module_depends_flattened
            ${SWIFTLIB_SWIFT_MODULE_DEPENDS_WINDOWS})
@@ -2388,6 +2399,8 @@ function(add_swift_target_library name)
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_HAIKU})
     elseif(sdk STREQUAL "WASI")
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_WASI})
+    elseif(sdk STREQUAL "EMSCRIPTEN")
+      list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_EMSCRIPTEN})
     elseif(sdk STREQUAL "WINDOWS")
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_WINDOWS})
     endif()
@@ -3201,6 +3214,7 @@ function(add_swift_target_executable name)
     SWIFT_MODULE_DEPENDS_OSX
     SWIFT_MODULE_DEPENDS_TVOS
     SWIFT_MODULE_DEPENDS_WASI
+    SWIFT_MODULE_DEPENDS_EMSCRIPTEN
     SWIFT_MODULE_DEPENDS_WATCHOS
     SWIFT_MODULE_DEPENDS_WINDOWS
     SWIFT_MODULE_DEPENDS_FROM_SDK
@@ -3317,6 +3331,9 @@ function(add_swift_target_executable name)
     elseif(sdk STREQUAL "WASI")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_WASI})
+    elseif(sdk STREQUAL "EMSCRIPTEN")
+      list(APPEND swiftexe_module_depends_flattened
+        ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_EMSCRIPTEN})
     elseif(sdk STREQUAL "WINDOWS")
       list(APPEND swiftexe_module_depends_flattened
         ${SWIFTEXE_TARGET_SWIFT_MODULE_DEPENDS_WINDOWS})
