@@ -1796,10 +1796,6 @@ bool swift::_swift_class_isSubclass(const Metadata *subclass,
 }
 
 static std::optional<TypeLookupError>
-checkInvertibleRequirements(const Metadata *type,
-                              InvertibleProtocolSet ignored);
-
-static std::optional<TypeLookupError>
 checkGenericRequirement(
     const GenericRequirementDescriptor &req,
     llvm::SmallVectorImpl<const void *> &extraArguments,
@@ -2293,8 +2289,8 @@ checkInvertibleRequirementsStructural(const Metadata *type,
 /// Check that the given `type` meets all invertible protocol requirements
 /// that haven't been explicitly suppressed by `ignored`.
 std::optional<TypeLookupError>
-checkInvertibleRequirements(const Metadata *type, 
-                              InvertibleProtocolSet ignored) {
+swift::checkInvertibleRequirements(const Metadata *type,
+                                   InvertibleProtocolSet ignored) {
   auto contextDescriptor = type->getTypeContextDescriptor();
   if (!contextDescriptor)
     return checkInvertibleRequirementsStructural(type, ignored);

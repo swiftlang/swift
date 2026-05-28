@@ -3121,6 +3121,22 @@ struct swift_ptrauth_struct_context_descriptor(ContextDescriptor)
   const InvertibleProtocolSet *
   getInvertedProtocols() const;
 
+  /// Whether this type's primary definition is `~Protocol` and has no
+  /// conditional conformance to the protocol.
+  bool isUnconditionallySuppressing(InvertibleProtocolKind kind) const {
+    auto *inverted = getInvertedProtocols();
+    if (!inverted || !inverted->contains(kind))
+      return false;
+
+    if (auto *genericContext = getGenericContext()) {
+      if (genericContext->hasConditionalInvertedProtocols() &&
+          genericContext->getConditionalInvertedProtocols().contains(kind))
+        return false;
+    }
+
+    return true;
+  }
+
   /// Is this context part of a C-imported module?
   bool isCImportedContext() const;
 

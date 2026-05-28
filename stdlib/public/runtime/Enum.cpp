@@ -58,10 +58,16 @@ swift::swift_initEnumMetadataSingleCase(EnumMetadata *self,
                                         const TypeLayout *payloadLayout) {
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
 
+  bool isCopyable = payloadLayout->flags.isCopyable() &&
+                    !self->getDescription()->isUnconditionallySuppressing(
+                        InvertibleProtocolKind::Copyable);
+
   TypeLayout layout;
   layout.size = payloadLayout->size;
   layout.stride = payloadLayout->stride;
-  layout.flags = payloadLayout->flags.withEnumWitnesses(true);
+  layout.flags = payloadLayout->flags
+      .withCopyable(isCopyable)
+      .withEnumWitnesses(true);
   layout.extraInhabitantCount = payloadLayout->getNumExtraInhabitants();
 
   vwtable->publishLayout(layout);
@@ -75,10 +81,16 @@ static void swift_cvw_initEnumMetadataSingleCaseWithLayoutStringImpl(
   auto payloadLayout = payloadType->getTypeLayout();
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
 
+  bool isCopyable = payloadLayout->flags.isCopyable() &&
+                    !self->getDescription()->isUnconditionallySuppressing(
+                        InvertibleProtocolKind::Copyable);
+
   TypeLayout layout;
   layout.size = payloadLayout->size;
   layout.stride = payloadLayout->stride;
-  layout.flags = payloadLayout->flags.withEnumWitnesses(true);
+  layout.flags = payloadLayout->flags
+      .withCopyable(isCopyable)
+      .withEnumWitnesses(true);
   layout.extraInhabitantCount = payloadLayout->getNumExtraInhabitants();
 
   auto refCountBytes = _swift_refCountBytesForMetatype(payloadType);
@@ -146,13 +158,18 @@ swift::swift_initEnumMetadataSinglePayload(EnumMetadata *self,
   }
 
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
-  
+
+  bool isCopyable = payloadLayout->flags.isCopyable() &&
+                    !self->getDescription()->isUnconditionallySuppressing(
+                        InvertibleProtocolKind::Copyable);
+
   size_t align = payloadLayout->flags.getAlignment();
   bool isBT = payloadLayout->flags.isBitwiseTakable();
   TypeLayout layout;
   layout.size = size;
   layout.flags =
       payloadLayout->flags
+          .withCopyable(isCopyable)
           .withEnumWitnesses(true)
           .withInlineStorage(
               ValueWitnessTable::isValueInline(isBT, size, align));
@@ -249,12 +266,19 @@ static void swift_cvw_initEnumMetadataSinglePayloadWithLayoutStringImpl(
 
   auto vwtable = getMutableVWTableForInit(self, layoutFlags);
 
+  bool isCopyable = payloadLayout->flags.isCopyable() &&
+                    !self->getDescription()->isUnconditionallySuppressing(
+                        InvertibleProtocolKind::Copyable);
+
   size_t align = payloadLayout->flags.getAlignment();
   bool isBT = payloadLayout->flags.isBitwiseTakable();
   TypeLayout layout;
   layout.size = size;
-  layout.flags = payloadLayout->flags.withEnumWitnesses(true).withInlineStorage(
-      ValueWitnessTable::isValueInline(isBT, size, align));
+  layout.flags = payloadLayout->flags
+      .withCopyable(isCopyable)
+      .withEnumWitnesses(true)
+      .withInlineStorage(
+          ValueWitnessTable::isValueInline(isBT, size, align));
   layout.extraInhabitantCount = unusedExtraInhabitants;
   auto rawStride = llvm::alignTo(size, align);
   layout.stride = rawStride == 0 ? 1 : rawStride;
@@ -387,7 +411,7 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
                                      const TypeLayout * const *payloadLayouts) {
   // Accumulate the layout requirements of the payloads.
   size_t payloadSize = 0, alignMask = 0;
-  bool isPOD = true, isBT = true, isBB = true, isAFD = false;
+  bool isPOD = true, isBT = true, isBB = true, isAFD = false, isCopyable = true;
   for (unsigned i = 0; i < numPayloads; ++i) {
     const TypeLayout *payloadLayout = payloadLayouts[i];
     payloadSize
@@ -397,7 +421,14 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
     isBT &= payloadLayout->flags.isBitwiseTakable();
     isBB &= payloadLayout->flags.isBitwiseBorrowable();
     isAFD |= payloadLayout->flags.isAddressableForDependencies();
+    isCopyable &= payloadLayout->flags.isCopyable();
   }
+
+  // If the enum is unconditionally noncopyable, then it doesn't matter if the
+  // payloads are copyable.
+  if (isCopyable && enumType->getDescription()->isUnconditionallySuppressing(
+                        InvertibleProtocolKind::Copyable))
+    isCopyable = false;
   
   // Store the max payload size in the metadata.
   assignUnlessEqual(enumType->getPayloadSize(), payloadSize);
@@ -424,6 +455,7 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
                     ValueWitnessFlags()
                      .withAlignmentMask(alignMask)
                      .withPOD(isPOD)
+                     .withCopyable(isCopyable)
                      .withBitwiseTakable(isBT)
                      .withBitwiseBorrowable(isBB)
                      .withAddressableForDependencies(isAFD)
@@ -451,7 +483,7 @@ static void swift_cvw_initEnumMetadataMultiPayloadWithLayoutStringImpl(
 
   // Accumulate the layout requirements of the payloads.
   size_t payloadSize = 0, alignMask = 0;
-  bool isPOD = true, isBT = true, isBB = true, isAFD = false;
+  bool isPOD = true, isBT = true, isBB = true, isAFD = false, isCopyable = true;
 
   size_t payloadRefCountBytes = 0;
   for (unsigned i = 0; i < numPayloads; ++i) {
@@ -463,11 +495,18 @@ static void swift_cvw_initEnumMetadataMultiPayloadWithLayoutStringImpl(
     isBT &= payloadLayout->flags.isBitwiseTakable();
     isBB &= payloadLayout->flags.isBitwiseBorrowable();
     isAFD |= payloadLayout->flags.isAddressableForDependencies();
+    isCopyable &= payloadLayout->flags.isCopyable();
 
     payloadRefCountBytes += _swift_refCountBytesForMetatype(payloadLayouts[i]);
     // NUL terminator
     payloadRefCountBytes += sizeof(uint64_t);
   }
+
+  // If the enum is unconditionally noncopyable, then it doesn't matter if the
+  // payloads are copyable.
+  if (isCopyable && enumType->getDescription()->isUnconditionallySuppressing(
+                        InvertibleProtocolKind::Copyable))
+    isCopyable = false;
 
   // Store the max payload size in the metadata.
   assignUnlessEqual(enumType->getPayloadSize(), payloadSize);
@@ -561,6 +600,7 @@ static void swift_cvw_initEnumMetadataMultiPayloadWithLayoutStringImpl(
                     ValueWitnessFlags()
                      .withAlignmentMask(alignMask)
                      .withPOD(isPOD)
+                     .withCopyable(isCopyable)
                      .withBitwiseTakable(isBT)
                      .withBitwiseBorrowable(isBB)
                      .withAddressableForDependencies(isAFD)
