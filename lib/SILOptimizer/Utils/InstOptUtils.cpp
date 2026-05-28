@@ -2038,18 +2038,52 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   // are preserved.
   if (auto *TTI = dyn_cast<TupleInst>(I)) {
     auto TTVal = TTI->getResult(0);
-    for (Operand *U : getDebugUses(TTVal)) {
+    SmallVector<Operand *, 4> debugUses(getDebugUses(TTVal));
+    for (Operand *U : debugUses) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
       auto VarInfo = DbgInst->getCompleteVarInfo();
-      TupleType *TT = TTI->getTupleType();
-      for (auto i : indices(TT->getElements())) {
-        SILDebugVariable NewVarInfo = VarInfo;
-        auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(TT, i);
-        NewVarInfo.DIExpr.append(FragDIExpr);
 
-        // Create a new debug_value
-        SILBuilder(TTI, DbgInst->getDebugScope())
-          .createDebugValue(DbgInst->getLoc(), TTI->getElement(i), NewVarInfo);
+      // Empty tuple: clone into a debug BB and set operand to undef.
+      if (TTI->getElements().empty()) {
+        salvageTrivialInst(DbgInst, TTI);
+        continue;
+      }
+
+      if (SILBasicBlock *debugBB = DbgInst->getDebugReconstructionBlock()) {
+        // Cannot combine debug reconstruction blocks and fragments.
+        // Only salvage one element (the first one).
+        SILValue eltVal = TTI->getOperand(0);
+        SILType tupleTy = TTVal->getType();
+        SILArgument *oldArg = debugBB->getArgument(0);
+
+        // Create an all-undef tuple instruction.
+        SILBuilder builder(debugBB->begin());
+        SmallVector<SILValue, 4> elements;
+        for (auto elt : TTI->getElements())
+          elements.push_back(SILUndef::get(elt));
+        auto *tupleInst = builder.createTuple(
+            DbgInst->getLoc(), tupleTy, elements);
+        oldArg->replaceAllUsesWith(tupleInst);
+
+        // Replace the block arg and wire the operand.
+        auto *newArg = debugBB->replacePhiArgument(
+            0, eltVal->getType(), OwnershipKind::None);
+        tupleInst->setOperand(0, newArg);
+        // Update the debug_value operand.
+        DbgInst->setOperand(eltVal);
+      } else {
+        TupleType *TT = TTI->getTupleType();
+        for (auto i : indices(TT->getElements())) {
+          SILDebugVariable NewVarInfo = VarInfo;
+          auto FragDIExpr =
+              SILDebugInfoExpression::createTupleFragment(TT, i);
+          NewVarInfo.DIExpr.append(FragDIExpr);
+
+          // Create a new debug_value for each fragment.
+          SILBuilder(TTI, DbgInst->getDebugScope())
+              .createDebugValue(DbgInst->getLoc(), TTI->getElement(i),
+                                NewVarInfo);
+        }
       }
     }
   }
