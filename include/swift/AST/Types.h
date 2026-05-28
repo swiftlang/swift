@@ -8384,25 +8384,36 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
 ///
 /// HiddenType is never produced by type-checking user code. It is synthesized
 /// only on the serialization path and consumed by deserialization and IRGen.
+///
+/// Each HiddenType also carries the ModuleDecl it was emitted from (the
+/// "defining module"). That module's HiddenTypeLayouts table holds the
+/// AbstractTypeLayout entry that backs this placeholder; IRGen resolves the
+/// layout via that module.
 class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   StringRef MangledName;
+  ModuleDecl *DefiningModule;
 
-  HiddenType(StringRef mangledName, const ASTContext &ctx)
+  HiddenType(StringRef mangledName, ModuleDecl *definingModule,
+             const ASTContext &ctx)
       : TypeBase(TypeKind::Hidden, &ctx, RecursiveTypeProperties()),
-        MangledName(mangledName) {}
+        MangledName(mangledName), DefiningModule(definingModule) {}
 
 public:
-  static HiddenType *get(const ASTContext &ctx, StringRef mangledName);
+  static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
+                         ModuleDecl *definingModule);
 
   StringRef getMangledName() const { return MangledName; }
+  ModuleDecl *getDefiningModule() const { return DefiningModule; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getMangledName());
+    Profile(ID, getMangledName(), getDefiningModule());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName) {
+  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
+                      ModuleDecl *definingModule) {
     ID.AddString(mangledName);
+    ID.AddPointer(definingModule);
   }
 
   static bool classof(const TypeBase *T) {

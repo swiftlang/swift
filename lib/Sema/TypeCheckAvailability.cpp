@@ -342,6 +342,16 @@ bool ExportContext::encapsulatedAsHiddenStoredProperty(
       DC->getASTContext().recordTypeToHideWhenEmittingModule(
           nominal->getDeclaredInterfaceType()->getCanonicalType(),
           layout->mangledName);
+      auto *enclosingStruct =
+          dyn_cast_or_null<StructDecl>(DC->getInnermostTypeContext());
+      ASSERT(enclosingStruct &&
+             "encapsulated hidden stored property must be inside a struct");
+      if (!enclosingStruct->getAttrs()
+               .hasAttribute<HasHiddenStoredPropertiesAttr>()) {
+        auto &ctx = DC->getASTContext();
+        enclosingStruct->getAttrs().add(
+            new (ctx) HasHiddenStoredPropertiesAttr(/*IsImplicit=*/true));
+      }
       return true;
     }
   }
