@@ -486,6 +486,43 @@ bb0(%0 : $Int):
   return %13 : $()
 }
 
+sil [ossa] @test_trivial_enum_case1 : $@convention(thin) (@owned T) -> () {
+bb0(%0 : @owned $T):
+  %1 = alloc_stack $Optional<T>
+  inject_enum_addr %1, #Optional.none!enumelt
+  %3 = init_enum_data_addr %1, #Optional.some!enumelt
+  store %0 to [init] %3
+  destroy_addr %1
+  dealloc_stack %1
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @test_trivial_enum_case2 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  inject_enum_addr %0, #Optional.none!enumelt
+  %2 = alloc_stack $Optional<T>
+  copy_addr %0 to [init] %2
+  dealloc_stack %2
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
+
+sil [ossa] @test_trivial_enum_case3 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $Optional<T>
+  inject_enum_addr %0, #Optional.none!enumelt
+  %2 = alloc_stack $(Int, Optional<T>)
+  %3 = tuple_element_addr %2, 1
+  copy_addr %0 to [init] %3
+  dealloc_stack %2
+  dealloc_stack %0
+  %r = tuple ()
+  return %r
+}
+
 sil [ossa] @test_select_enum_addr : $@convention(thin) (@in_guaranteed Optional<T>) -> Builtin.Int1 {
 bb0(%0 : $*Optional<T>):
   %1 = integer_literal $Builtin.Int1, -1
