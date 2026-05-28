@@ -170,10 +170,15 @@ where Element: AdditiveArithmetic & Differentiable {
 
   @inlinable
   public subscript(_ index: Int) -> Element {
-    if index < base.count {
-      return base[index]
-    } else {
-      return Element.zero
+    get {
+      if index < base.count {
+        return base[index]
+      } else {
+        return Element.zero
+      }
+    }
+    _modify {
+      yield &base[index]
     }
   }
 }
@@ -226,6 +231,21 @@ extension Array where Element: Differentiable {
       return v[index]
     }
     return (self[index], differential)
+  }
+
+  @inlinable
+  @derivative(of: subscript._modify)
+  @yield_once
+  mutating func _vjpModify(index: Int) yields (inout Element) ->
+    @yield_once (inout TangentVector) yields (inout Element.TangentVector) -> ()
+  {
+    yield &self[index]
+
+    @yield_once
+    func pullback(_ v: inout TangentVector) yields (inout Element.TangentVector) -> () {
+      yield &v[index]
+    }
+    return pullback
   }
 
   @inlinable

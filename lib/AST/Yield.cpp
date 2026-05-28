@@ -92,6 +92,7 @@ SourceRange YieldList::getSourceRange() const {
 Type Yield::getInterfaceType(const FuncDecl *parent) const {
   // Figure out our position in parent's yield list
   size_t idx = std::distance(parent->getYields()->getArray().data(), this);
+  // This assertion will likely fail if Yield is not from this parent.
   ASSERT(idx < parent->getYields()->size());
 
   auto mutableParent = const_cast<FuncDecl *>(parent);

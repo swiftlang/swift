@@ -642,8 +642,6 @@ func testAccessorCoroutinesModify(_ x: HasCoroutineModifyAccessors) -> Float {
 func testBeginApplyActiveInoutArgument(array: [Float], x: Float) -> Float {
   var array = array
   // Array subscript assignment below calls `Array.subscript.modify`.
-  // expected-error @+2 {{expression is not differentiable}}  
-  // expected-note @+1 {{cannot differentiate functions that have not been marked '@differentiable' and that are defined in other files}}
   array[0] = x
   return array[0]
 }
@@ -679,8 +677,6 @@ func testBeginApplyActiveButInitiallyNonactiveInoutArgument(x: Float) -> Float {
   // `var array` is initially non-active.
   var array: [Float] = [0]
   // Array subscript assignment below calls `Array.subscript.modify`.
-  // expected-error @+2 {{expression is not differentiable}}  
-  // expected-note @+1 {{cannot differentiate functions that have not been marked '@differentiable' and that are defined in other files}}
   array[0] = x
   return array[0]
 }
