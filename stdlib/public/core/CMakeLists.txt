@@ -522,15 +522,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
   set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
 
-  # Under Embedded Swift, all stdlib APIs should be available always. Replace
-  # all availability macros with an empty expansion (`*`).
-  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
-  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
-    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
-  endforeach()
-  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
-
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
     list(GET list 0 arch)

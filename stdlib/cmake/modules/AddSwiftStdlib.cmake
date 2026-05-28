@@ -1047,8 +1047,22 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
     DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}")
 
+  # Compute the availability definitions to use for this library. Under
+  # Embedded Swift, all stdlib APIs should be available always, so replace
+  # all availability macros with an empty expansion (`*`). Otherwise, use
+  # the global SWIFT_STDLIB_AVAILABILITY_DEFINITIONS as-is.
+  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
+    set(SWIFTLIB_SINGLE_AVAILABILITY_DEFINITIONS)
+    foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+      string(REGEX REPLACE ":.*" ":*" replaced "${def}")
+      list(APPEND SWIFTLIB_SINGLE_AVAILABILITY_DEFINITIONS "${replaced}")
+    endforeach()
+  else()
+    set(SWIFTLIB_SINGLE_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS}")
+  endif()
+
   set(availability_macros)
-  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+  foreach(def ${SWIFTLIB_SINGLE_AVAILABILITY_DEFINITIONS})
     list(APPEND availability_macros "-Xfrontend -define-availability -Xfrontend \"${def}\"")
 
     if("${def}" MATCHES "SwiftStdlib .*")
