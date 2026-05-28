@@ -123,11 +123,6 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
 }
 
 ResultTests.test("Async Initialization") {
-#if os(WASI)
-  // FIXME: https://github.com/swiftlang/swift/issues/89155
-  // wasi-wasm32 traps in Result<T, any Error>'s value-witness copy
-  // after returning from the new Result.init(catching:) async.
-#else
   func asyncThrowing() async throws -> String {
     throw Err.err
   }
@@ -156,7 +151,6 @@ ResultTests.test("Async Initialization") {
   } catch {
     expectUnreachable()
   }
-#endif
 }
 
 ResultTests.test("Functional Transforms") {
