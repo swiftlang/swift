@@ -169,49 +169,32 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-synchronization)
   add_dependencies(embedded-libraries embedded-synchronization)
 
-  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
-    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
-    list(GET list 0 arch)
-    list(GET list 1 mod)
-    list(GET list 2 triple)
+  # wasm32 builds the full Synchronization library plus its wasm-specific
+  # mutex implementation.
+  add_embedded_swift_target_library(
+    embedded-synchronization
+    swiftSynchronization
 
-    # Disable the Synchronization library on AVR for now.
-    if("${arch}" MATCHES "avr")
-      continue()
-    endif()
+    ${SWIFT_SYNCHRONIZATION_SOURCES}
+    ${SWIFT_SYNCHRONIZATION_WASM_SOURCES}
 
-    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
-    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
-      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
-    endif()
+    GYB_SOURCES ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
+    SWIFT_COMPILE_FLAGS ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
+    ONLY_ARCH_REGEX "^wasm32$"
+    INSTALL_IN_COMPONENT stdlib
+  )
 
-    set(SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES)
+  # All other architectures get just the atomic sources. wasm32 is handled
+  # by the previous call; avr is unsupported.
+  add_embedded_swift_target_library(
+    embedded-synchronization
+    swiftSynchronization
 
-    if("${arch}" MATCHES "wasm32")
-      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_SOURCES})
-      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_WASM_SOURCES})
-    else()
-      list(APPEND SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES ${SWIFT_SYNCHRONIZATION_ATOMIC_SOURCES})
-    endif()
-      
-    add_swift_target_library_single(
-      embedded-synchronization-${mod}
-      swiftSynchronization
-      
-      ${SWIFT_SYNCHRONIZATION_EMBEDDED_SOURCES}
-      
-      GYB_SOURCES
-        ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
+    ${SWIFT_SYNCHRONIZATION_ATOMIC_SOURCES}
 
-      SWIFT_COMPILE_FLAGS
-        ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
-
-      SDK "embedded"
-      ARCHITECTURE "${arch}"
-      DEPENDS embedded-stdlib-${mod}
-      INSTALL_IN_COMPONENT stdlib
-      )
-    add_dependencies(embedded-synchronization embedded-synchronization-${mod})
-  endforeach()
+    GYB_SOURCES ${SWIFT_SYNCHRONIZATION_GYB_SOURCES}
+    SWIFT_COMPILE_FLAGS ${SWIFT_SYNCHRNOIZATION_SWIFT_FLAGS}
+    SKIP_ARCH_REGEX "^wasm32$" "^avr$"
+    INSTALL_IN_COMPONENT stdlib
+  )
 endif()

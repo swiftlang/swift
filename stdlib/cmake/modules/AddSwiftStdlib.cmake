@@ -3627,6 +3627,216 @@ function(add_swift_target_executable name)
   endforeach()
 endfunction()
 
+# Build an embedded Swift library across every entry of
+# EMBEDDED_STDLIB_TARGET_TRIPLES, calling add_swift_target_library_single()
+# for each target triple.
+#
+# For each entry "<arch> <mod> <triple>" the function:
+#   1. Sets per-target SWIFT_SDK_embedded_ARCH_${key}_{MODULE,TRIPLE,PATH},
+#      where ${key} is ${arch} by default or ${mod} when ARCHITECTURE_KEY mod
+#      is passed.
+#   2. Calls add_swift_target_library_single(<prefix>-${mod} <library_name> ...)
+#      forwarding the sources, flags, and other options provided by the caller.
+#      ARCHITECTURE is set to ${key} and SDK is set to "embedded".
+#   3. Adds the per-target library as a dependency of the umbrella custom
+#      target named <prefix> (which the caller is expected to have already
+#      created via add_custom_target).
+#
+# Unless IS_STDLIB_CORE is passed, "embedded-stdlib-${mod}" is automatically
+# prepended to DEPENDS so that the embedded swiftCore for that target is
+# built first.
+#
+# Usage:
+#   add_embedded_swift_target_library(<prefix> <library_name>
+#     [IS_STDLIB] [IS_STDLIB_CORE] [IS_SDK_OVERLAY]
+#     [PARTIAL_SOURCES_INTENDED]
+#     [INSTALL_BINARY]
+#     <sources>...
+#     [GYB_SOURCES <sources>...]
+#     [SWIFT_COMPILE_FLAGS <flags>...]
+#     [C_COMPILE_FLAGS <flags>...]
+#     [FILE_DEPENDS <files>...]
+#     [DEPENDS <targets>...]
+#     [SKIP_ARCH_REGEX <regex>...]
+#     [SKIP_MOD_REGEX <regex>...]
+#     [SKIP_TRIPLE_REGEX <regex>...]
+#     [ONLY_ARCH_REGEX <regex>...]
+#     [ONLY_MOD_REGEX <regex>...]
+#     [ONLY_TRIPLE_REGEX <regex>...]
+#     [ARCHITECTURE_KEY <arch|mod>]
+#     [INSTALL_IN_COMPONENT <component>])
+#
+# Embedded libraries are always built as STATIC, always have their target's
+# OSX_ARCHITECTURES property set to ${arch}, and always run through
+# embedded_amend_archive_commands_on_darwin_host (a no-op for hosts/targets
+# where it doesn't apply).
+#
+# SKIP_*_REGEX and ONLY_*_REGEX are both multi-valued. An entry is processed
+# only when *every* ONLY_*_REGEX category that has at least one pattern has
+# at least one match, AND no SKIP_*_REGEX pattern matches.
+function(add_embedded_swift_target_library prefix library_name)
+  cmake_parse_arguments(EMBLIB
+    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY"
+    "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
+    "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
+    ${ARGN})
+
+  translate_flag(${EMBLIB_IS_STDLIB}              "IS_STDLIB"
+                 EMBLIB_IS_STDLIB_keyword)
+  translate_flag(${EMBLIB_IS_STDLIB_CORE}         "IS_STDLIB_CORE"
+                 EMBLIB_IS_STDLIB_CORE_keyword)
+  translate_flag(${EMBLIB_IS_SDK_OVERLAY}         "IS_SDK_OVERLAY"
+                 EMBLIB_IS_SDK_OVERLAY_keyword)
+  translate_flag(${EMBLIB_PARTIAL_SOURCES_INTENDED} "PARTIAL_SOURCES_INTENDED"
+                 EMBLIB_PARTIAL_SOURCES_INTENDED_keyword)
+
+  if(NOT EMBLIB_ARCHITECTURE_KEY)
+    set(EMBLIB_ARCHITECTURE_KEY "arch")
+  elseif(NOT (EMBLIB_ARCHITECTURE_KEY STREQUAL "arch"
+              OR EMBLIB_ARCHITECTURE_KEY STREQUAL "mod"))
+    message(FATAL_ERROR
+      "ARCHITECTURE_KEY must be either 'arch' or 'mod' "
+      "(got '${EMBLIB_ARCHITECTURE_KEY}')")
+  endif()
+
+  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
+    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
+    list(GET list 0 arch)
+    list(GET list 1 mod)
+    list(GET list 2 triple)
+
+    # Apply caller-supplied filters. The entry is processed only when every
+    # non-empty ONLY_*_REGEX category has at least one match AND no
+    # SKIP_*_REGEX pattern matches.
+    set(_emblib_skip FALSE)
+    foreach(re ${EMBLIB_SKIP_ARCH_REGEX})
+      if("${arch}" MATCHES "${re}")
+        set(_emblib_skip TRUE)
+      endif()
+    endforeach()
+    foreach(re ${EMBLIB_SKIP_MOD_REGEX})
+      if("${mod}" MATCHES "${re}")
+        set(_emblib_skip TRUE)
+      endif()
+    endforeach()
+    foreach(re ${EMBLIB_SKIP_TRIPLE_REGEX})
+      if("${triple}" MATCHES "${re}")
+        set(_emblib_skip TRUE)
+      endif()
+    endforeach()
+
+    if(EMBLIB_ONLY_ARCH_REGEX)
+      set(_emblib_match FALSE)
+      foreach(re ${EMBLIB_ONLY_ARCH_REGEX})
+        if("${arch}" MATCHES "${re}")
+          set(_emblib_match TRUE)
+        endif()
+      endforeach()
+      if(NOT _emblib_match)
+        set(_emblib_skip TRUE)
+      endif()
+    endif()
+    if(EMBLIB_ONLY_MOD_REGEX)
+      set(_emblib_match FALSE)
+      foreach(re ${EMBLIB_ONLY_MOD_REGEX})
+        if("${mod}" MATCHES "${re}")
+          set(_emblib_match TRUE)
+        endif()
+      endforeach()
+      if(NOT _emblib_match)
+        set(_emblib_skip TRUE)
+      endif()
+    endif()
+    if(EMBLIB_ONLY_TRIPLE_REGEX)
+      set(_emblib_match FALSE)
+      foreach(re ${EMBLIB_ONLY_TRIPLE_REGEX})
+        if("${triple}" MATCHES "${re}")
+          set(_emblib_match TRUE)
+        endif()
+      endforeach()
+      if(NOT _emblib_match)
+        set(_emblib_skip TRUE)
+      endif()
+    endif()
+
+    if(_emblib_skip)
+      continue()
+    endif()
+
+    if(EMBLIB_ARCHITECTURE_KEY STREQUAL "mod")
+      set(arch_key "${mod}")
+    else()
+      set(arch_key "${arch}")
+    endif()
+
+    set(SWIFT_SDK_embedded_ARCH_${arch_key}_MODULE "${mod}")
+    set(SWIFT_SDK_embedded_ARCH_${arch_key}_TRIPLE "${triple}")
+    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+      set(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH
+          "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    endif()
+
+    # Non-core embedded libraries always need the embedded swiftCore for the
+    # same target to be built first.
+    set(per_target_depends ${EMBLIB_DEPENDS})
+    if(NOT EMBLIB_IS_STDLIB_CORE)
+      list(PREPEND per_target_depends "embedded-stdlib-${mod}")
+    endif()
+
+    add_swift_target_library_single(
+      ${prefix}-${mod}
+      ${library_name}
+      ${EMBLIB_IS_STDLIB_keyword}
+      ${EMBLIB_IS_STDLIB_CORE_keyword}
+      ${EMBLIB_IS_SDK_OVERLAY_keyword}
+      STATIC
+      ${EMBLIB_PARTIAL_SOURCES_INTENDED_keyword}
+      ${EMBLIB_UNPARSED_ARGUMENTS}
+      GYB_SOURCES ${EMBLIB_GYB_SOURCES}
+      SWIFT_COMPILE_FLAGS ${EMBLIB_SWIFT_COMPILE_FLAGS}
+      C_COMPILE_FLAGS ${EMBLIB_C_COMPILE_FLAGS}
+      SDK "embedded"
+      ARCHITECTURE "${arch_key}"
+      FILE_DEPENDS ${EMBLIB_FILE_DEPENDS}
+      DEPENDS ${per_target_depends}
+      INSTALL_IN_COMPONENT ${EMBLIB_INSTALL_IN_COMPONENT}
+    )
+
+    # Install the produced archive into lib/swift/embedded/${mod}/. Used by
+    # embedded libraries that produce a static archive consumed by clients
+    # at link time (e.g. swiftEmbeddedPlatformPOSIX, swiftUnicodeDataTables,
+    # swift_Concurrency).
+    if(EMBLIB_INSTALL_BINARY)
+      swift_install_in_component(
+        TARGETS ${prefix}-${mod}
+        DESTINATION "lib/swift/embedded/${mod}"
+        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
+      )
+      swift_install_in_component(
+        FILES "${SWIFTLIB_DIR}/embedded/${mod}/lib${library_name}.a"
+        DESTINATION "lib/swift/embedded/${mod}/"
+        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
+                    GROUP_READ GROUP_EXECUTE
+                    WORLD_READ WORLD_EXECUTE
+      )
+    endif()
+
+    # When building the per-target archive on macOS, point CMake at the
+    # specific architecture so it doesn't try to build a fat archive.
+    set_property(TARGET ${prefix}-${mod}
+                 PROPERTY OSX_ARCHITECTURES "${arch}")
+
+    # Static archives whose target triple is ELF/EABI/wasm need a different
+    # archiver when cross-built from a macOS host. embedded_amend_archive_
+    # commands_on_darwin_host is a no-op for other targets/hosts, so it's
+    # safe to call unconditionally — every embedded library is static.
+    embedded_amend_archive_commands_on_darwin_host(${prefix}-${mod} ${triple})
+
+    add_dependencies(${prefix} ${prefix}-${mod})
+  endforeach()
+endfunction()
+
 function(embedded_amend_archive_commands_on_darwin_host target triple)
   # This is a temporary solution while we work on porting the build
   # on the Embedded stdlib to the Runtime build system, where each platform
