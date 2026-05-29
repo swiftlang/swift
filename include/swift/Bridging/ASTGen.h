@@ -117,6 +117,12 @@ intptr_t swift_ASTGen_configuredRegions(
 void swift_ASTGen_freeConfiguredRegions(
     BridgedIfConfigClauseRangeInfo *_Nullable regions, intptr_t numRegions);
 
+/// In ASTGen-only mode, drive the canonical `#if` evaluation for this source
+/// file, emitting `canImport` diagnostics and populating the version cache
+/// before any analysis path consumes the configured-regions cache.
+void swift_ASTGen_evaluateConfiguredRegionsForDiagnostics(
+    BridgedASTContext astContext, void *_Nonnull sourceFile);
+
 swift::WarningGroupBehavior swift_ASTGen_warningGroupBehaviorAtPosition(
     void *_Nonnull sourceFile,
     BridgedASTContext astContext,

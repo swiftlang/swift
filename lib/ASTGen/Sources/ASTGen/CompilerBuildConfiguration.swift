@@ -28,16 +28,14 @@ extension BridgedASTContext {
 }
 
 /// Distinguishes the canonical, parser-driven evaluation of `#if canImport`
-/// from the side-effect-free re-derivations performed by later analyses.
+/// from the side-effect-free queries performed by later analyses.
 enum CanImportMode {
-  /// Canonical evaluation: run the live module-loader query, emit any
-  /// `cannot_find_module_version` diagnostic, and record the result in
-  /// `ASTContext::CanImportModuleVersions`. Use only at the canonical drive
-  /// site: the C++ parser's `EvaluateIfConditionRequest` path
-  /// (`evaluatePoundIfCondition`).
+  /// Run the live module-loader query, emit any
+  /// `cannot_find_module_version` diagnostics, and record the result in
+  /// `ASTContext::CanImportModuleVersions`.
   case driving
 
-  /// Side-effect-free re-derivation: answer from the module loaders without
+  /// Side-effect-free queries: answer from the module loaders without
   /// emitting diagnostics or mutating the version cache. Use for any analysis
   /// that re-derives `#if` activity after the canonical drive has run.
   case analyzing
@@ -51,8 +49,8 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   let sourceBuffer: UnsafeBufferPointer<UInt8>
 
   /// Selects whether `canImport(...)` performs the canonical, diagnostic-
-  /// emitting query or a side-effect-free re-derivation. Defaults to
-  /// `.analyzing` so that only the explicitly-marked canonical drive sites
+  /// emitting query or a side-effect-free query. Defaults to
+  /// `.analyzing` so that only the explicitly-marked effectful drive sites
   /// emit `canImport` diagnostics; every other walk re-derives `#if` activity
   /// without duplicating them.
   let canImportMode: CanImportMode
@@ -197,10 +195,10 @@ extension ExportedSourceFile {
       return _configuredRegions
     }
 
-    // Re-derive the regions in `.analyzing` mode: the parser's primary
+    // Compute the regions in `.analyzing` mode: the parser's primary
     // `EvaluateIfConditionRequest` path is the canonical `canImport` drive
     // that emits diagnostics and populates `CanImportModuleVersions`, so this
-    // secondary walk must not duplicate those side effects.
+    // secondary walk must not duplicate those effects.
     let configuration = CompilerBuildConfiguration(
       ctx: astContext,
       sourceBuffer: buffer,
@@ -211,6 +209,33 @@ extension ExportedSourceFile {
     _configuredRegions = regions
     return regions
   }
+
+  /// Perform the canonical evaluation of this file's `#if` directives for
+  /// ASTGen mode, where the C++ parser's `EvaluateIfConditionRequest`
+  /// never runs and would otherwise be the site that emits `canImport`
+  /// diagnostics and populates `CanImportModuleVersions`.
+  mutating func evaluateConfiguredRegionsForDiagnostics(astContext: BridgedASTContext) {
+    guard _configuredRegions == nil else {
+      return
+    }
+
+    _configuredRegions = syntax.configuredRegions(
+      in: CompilerBuildConfiguration(
+        ctx: astContext, sourceBuffer: buffer, canImportMode: .driving))
+  }
+}
+
+/// In ASTGen-only mode, perform the canonical `#if` evaluation for this source
+/// file, emitting `canImport` diagnostics and populating the version cache
+/// exactly once, before any analysis path consumes the configured-regions
+/// cache.
+@_cdecl("swift_ASTGen_evaluateConfiguredRegionsForDiagnostics")
+public func evaluateConfiguredRegionsForDiagnostics(
+  astContext: BridgedASTContext,
+  sourceFilePtr: UnsafeMutableRawPointer
+) {
+  let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
+  sourceFilePtr.pointee.evaluateConfiguredRegionsForDiagnostics(astContext: astContext)
 }
 
 /// Extract the #if clause range information for the given source file.

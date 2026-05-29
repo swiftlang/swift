@@ -381,6 +381,13 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   }
   swift_ASTGen_freeBridgedVirtualFiles(virtualFiles, numVirtualFiles);
 
+  // In ASTGen-only mode the C++ parser's EvaluateIfConditionRequest never runs,
+  // so this is the canonical evaluation of `#if` directives: emit `canImport`
+  // diagnostics and populate the version cache now, before any analysis path
+  // (parser diagnostics, AST building, fingerprinting) consumes the configured-
+  // regions cache.
+  swift_ASTGen_evaluateConfiguredRegionsForDiagnostics(Ctx, exportedSourceFile);
+
   // Emit parser diagnostics.
   (void)swift_ASTGen_emitParserDiagnostics(
       Ctx, &Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
