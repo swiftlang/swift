@@ -10173,7 +10173,7 @@ SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
       return nullptr;
     }
 
-    paramTy = layout.getSuperclass();
+    paramTy = layout.explicitSuperclass;
     if (!paramTy) {
       return nullptr;
     }

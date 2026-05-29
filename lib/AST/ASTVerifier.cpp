@@ -1780,7 +1780,7 @@ public:
           }
         }
         
-        auto superclass = erasedLayout.getSuperclass();
+        auto superclass = erasedLayout.explicitSuperclass;
         if (superclass
             && !superclass->isExactSuperclassOf(concreteTy)) {
           Out << "ErasureExpr from class to existential with a superclass "

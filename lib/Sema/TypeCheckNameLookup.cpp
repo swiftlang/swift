@@ -173,7 +173,8 @@ namespace {
       // pull out the superclass instead, and use that below.
       if (foundInType->isExistentialType()) {
         auto layout = foundInType->getExistentialLayout();
-        if (auto superclass = layout.getSuperclass()) {
+        // FIXME: This is broken, see the comment on that getter method.
+        if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass()) {
           conformingType = superclass;
         } else {
           // Non-subclass existential: don't need to look for further

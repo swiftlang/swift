@@ -9797,8 +9797,14 @@ ConstraintSystem::applySolution(Solution &solution,
     auto isValidType = [&](Type ty) {
       return !ty->hasError() && !ty->hasTypeVariableOrPlaceholder();
     };
-    for (auto &[_, type] : solution.typeBindings) {
-      ASSERT(isValidType(type) && "type binding has invalid type");
+    for (auto pair : solution.typeBindings) {
+      if (!isValidType(pair.second)) {
+        ABORT([&](llvm::raw_ostream &out) {
+          out << "Type binding has invalid type:\n";
+          pair.first->dump(out);
+          pair.second->dump(out);
+        });
+      }
     }
     for (auto &[_, type] : solution.nodeTypes) {
       ASSERT(isValidType(solution.simplifyType(type)) &&
