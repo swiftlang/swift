@@ -6311,9 +6311,8 @@ public:
                                 fieldIndexMutabilityUpdatePairs) const;
 
   using SILFieldIndexToSILTypeTransform = std::function<SILType(unsigned)>;
-  using SILFieldToSILTypeRange =
-      iterator_range<llvm::mapped_iterator<IntRange<unsigned>::iterator,
-                                           SILFieldIndexToSILTypeTransform>>;
+  using SILFieldToSILTypeRange = iterator_range<llvm::mapped_iterator<
+      IntRange<unsigned>::iterator, SILFieldIndexToSILTypeTransform, SILType>>;
 
   /// Returns a range of SILTypes that have been specialized correctly for use
   /// in the passed in SILFunction.
