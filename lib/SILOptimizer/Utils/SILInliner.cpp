@@ -109,6 +109,12 @@ class BeginApplySite {
 
   SmallVector<EndBorrowInst *, 2> EndBorrows;
 
+  // begin_borrow instructions introduced for owned values yielded @guaranteed.
+  // These need their borrow scopes completed when the coroutine is ended via
+  // end_borrow (rather than end_apply/abort_apply), because processTerminator
+  // does not emit end_borrow for them in that case.
+  SmallVector<BeginBorrowInst *, 2> guaranteedYields;
+
 public:
   BeginApplySite(BeginApplyInst *BeginApply, SILLocation Loc,
                  SILBuilder *Builder)
@@ -208,7 +214,6 @@ public:
       auto calleeYields = yield->getYieldedValues();
       auto callerYields = BeginApply->getYieldedValues();
       assert(calleeYields.size() == callerYields.size());
-      SmallVector<BeginBorrowInst *, 2> guaranteedYields;
       for (auto i : indices(calleeYields)) {
         auto remappedYield = getMappedValue(calleeYields[i]);
         // When owned values are yielded @guaranteed, the mapped value must be
@@ -320,7 +325,19 @@ public:
     // Complete lifetimes of all inlined values at the point where the `begin_apply`
     // is ended with an `end_borrow`.
     // See `SILInlineCloner::valuesToComplete`.
-    completeLifetimes(pm, ArrayRef(valuesToComplete), ArrayRef(endBorrowInsts));
+    //
+    // guaranteedYields (begin_borrow instructions for owned values yielded
+    // @guaranteed) are appended after all cloned values. completeLifetimes
+    // processes the list in reverse, so guaranteedYields are completed first
+    // (inserting end_borrow just before the dead-end point), and the owned
+    // bases are completed second (inserting destroy_value [dead_end] after the
+    // end_borrows).  This preserves the required borrow-before-destroy order.
+    llvm::SmallVector<SILValue, 32> allValuesToComplete(valuesToComplete.begin(),
+                                                        valuesToComplete.end());
+    for (auto *bbi : guaranteedYields)
+      allValuesToComplete.push_back(bbi);
+
+    completeLifetimes(pm, ArrayRef(allValuesToComplete), ArrayRef(endBorrowInsts));
 
     for (EndBorrowInst *endBorrow : EndBorrows) {
       endBorrow->eraseFromParent();
