@@ -3463,10 +3463,18 @@ function Build-mimalloc() {
 
   $HostSuffix = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
 
-  foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
-    Copy-Item `
-      -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" `
-      -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\"
+  $ToolchainRoots = @($Platform.ToolchainInstallRoot)
+  if ($IncludeNoAsserts) {
+    $ToolchainRoots += $Platform.NoAssertsToolchainInstallRoot
+  }
+
+  foreach ($ToolchainRoot in $ToolchainRoots) {
+    New-Item -ItemType Directory -Force "$ToolchainRoot\usr\bin" | Out-Null
+    foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
+      Copy-Item -Force `
+        -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" `
+        -Destination "$ToolchainRoot\usr\bin\"
+    }
   }
 }
 
