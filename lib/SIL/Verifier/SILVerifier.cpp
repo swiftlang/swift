@@ -95,9 +95,6 @@ static llvm::cl::opt<bool> VerifyDebugValueExpr("verify-debug-value-expr",
 static llvm::cl::opt<bool> SkipConvertEscapeToNoescapeAttributes(
     "verify-skip-convert-escape-to-noescape-attributes", llvm::cl::init(false));
 
-// Allow unit tests to gradually migrate toward -allow-critical-edges=false.
-static llvm::cl::opt<bool> AllowCriticalEdges("allow-critical-edges",
-                                              llvm::cl::init(true));
 extern llvm::cl::opt<bool> SILPrintDebugInfo;
 
 void swift::verificationFailure(
@@ -7257,13 +7254,7 @@ public:
       const TermInst *termInst = bb.getTerminator();
       VerifierErrorEmitterGuard guard(this, termInst);
 
-      if (isSILOwnershipEnabled() && F->hasOwnership()) {
-        requireNonCriticalSucc(termInst, "critical edges not allowed in OSSA");
-      }
-      // In Lowered SIL, they are allowed on conditional branches only.
-      if (!AllowCriticalEdges && !isa<CondBranchInst>(termInst)) {
-        requireNonCriticalSucc(termInst, "only cond_br critical edges allowed");
-      }
+      requireNonCriticalSucc(termInst, "critical edges not allowed");
     }
   }
 
