@@ -426,7 +426,7 @@ bool ExistentialLayout::requiresClass() const {
   return false;
 }
 
-Type ExistentialLayout::getSuperclass() const {
+Type ExistentialLayout::getExplicitSuperclassOrProtocolSuperclass() const {
   if (explicitSuperclass)
     return explicitSuperclass;
 
@@ -495,7 +495,7 @@ NominalTypeDecl *TypeBase::getAnyActor() {
   // Existential types: check for Actor protocol.
   if (isExistentialType()) {
     auto layout = getExistentialLayout();
-    if (auto superclass = layout.getSuperclass()) {
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass()) {
       if (auto actor = superclass->getAnyActor())
         return actor;
     }
@@ -2456,8 +2456,10 @@ Type TypeBase::getSuperclass(bool useArchetypes) {
     if (auto dynamicSelfTy = getAs<DynamicSelfType>())
       return dynamicSelfTy->getSelfType();
 
-    if (isExistentialType())
-      return getExistentialLayout().getSuperclass();
+    if (isExistentialType()) {
+    // FIXME: This is broken, see the comment on that getter method.
+      return getExistentialLayout().getExplicitSuperclassOrProtocolSuperclass();
+    }
 
     // No other types have superclasses.
     return Type();
@@ -4695,7 +4697,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::ProtocolComposition: {
     auto layout = type->getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
-    if (auto superclass = layout.getSuperclass())
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass())
       return superclass->getReferenceCounting();
     return ReferenceCounting::Unknown;
   }

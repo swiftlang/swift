@@ -148,7 +148,6 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   TaskLocal.swift
   TaskSleep.swift
   AsyncStreamBuffer.swift
-  AsyncStreamShims.swift
   AsyncStream.swift
   AsyncThrowingStream.swift
   Deque/_DequeBuffer.swift

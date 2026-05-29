@@ -726,34 +726,6 @@ ManagedValue Transform::transform(ManagedValue v,
                                         ctxt);
   }
 
-  // - upcasting class-constrained existentials or metatypes thereof
-  if (inputSubstType->isAnyExistentialType()) {
-    auto instanceType = inputSubstType;
-    while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(instanceType))
-      instanceType = metatypeType.getInstanceType();
-
-    auto layout = instanceType.getExistentialLayout();
-    if (layout.getSuperclass()) {
-      CanType openedType = ExistentialArchetypeType::getAny(inputSubstType)
-          ->getCanonicalType();
-      SILType loweredOpenedType = SGF.getLoweredType(openedType);
-
-      FormalEvaluationScope scope(SGF);
-
-      auto payload = SGF.emitOpenExistential(Loc, v,
-                                             loweredOpenedType,
-                                             AccessKind::Read);
-      payload = payload.ensurePlusOne(SGF, Loc);
-      return transform(payload,
-                       AbstractionPattern::getOpaque(),
-                       openedType,
-                       outputOrigType,
-                       outputSubstType,
-                       loweredResultTy,
-                       ctxt);
-    }
-  }
-
   // - T : Hashable to AnyHashable
   if (outputSubstType->isAnyHashable()) {
     auto *protocol = SGF.getASTContext().getProtocol(
@@ -765,6 +737,31 @@ ManagedValue Transform::transform(ManagedValue v,
     if (result.isInContext())
       return ManagedValue::forInContext();
     return std::move(result).getAsSingleValue(SGF, Loc);
+  }
+
+  // - upcasting class-constrained existentials or metatypes thereof
+  if (inputSubstType->isAnyExistentialType()) {
+    auto instanceType = inputSubstType;
+    while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(instanceType))
+      instanceType = metatypeType.getInstanceType();
+
+    CanType openedType = ExistentialArchetypeType::getAny(inputSubstType)
+        ->getCanonicalType();
+    SILType loweredOpenedType = SGF.getLoweredType(openedType);
+
+    FormalEvaluationScope scope(SGF);
+
+    auto payload = SGF.emitOpenExistential(Loc, v,
+                                           loweredOpenedType,
+                                           AccessKind::Read);
+    payload = payload.ensurePlusOne(SGF, Loc);
+    return transform(payload,
+                     AbstractionPattern::getOpaque(),
+                     openedType,
+                     outputOrigType,
+                     outputSubstType,
+                     loweredResultTy,
+                     ctxt);
   }
 
   // - T.TangentVector to Optional<T>.TangentVector

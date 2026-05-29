@@ -6205,7 +6205,9 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
     // Note that `allowMissing` is not propagated here because it
     // would result in a missing conformance if type is `& Sendable`
     // protocol composition. It's handled for type as a whole below.
-    if (auto superclass = layout.getSuperclass()) {
+    //
+    // FIXME: This is broken, see the comment on that getter method.
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass()) {
       auto conformance = lookupConformance(superclass, Proto,
                                            /*allowMissing=*/false);
       if (conformance)
