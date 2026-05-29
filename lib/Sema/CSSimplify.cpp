@@ -16709,7 +16709,19 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getFirstType(), constraint.getSecondType(),
         /*flags*/ std::nullopt, constraint.getLocator());
 
-  case ConstraintKind::Disjunction:
+  case ConstraintKind::Disjunction: {
+    if (shouldAttemptFixes()) {
+      auto *choice = constraint.getNestedConstraints()[0];
+      if (choice->getKind() == ConstraintKind::BindOverload) {
+        if (auto *choiceTy = choice->getFirstType()->getAs<TypeVariableType>()) {
+          auto resolvedTy = getFixedType(choiceTy);
+          if (resolvedTy && resolvedTy->isPlaceholder())
+            return SolutionKind::Solved;
+        }
+      }
+    }
+    LLVM_FALLTHROUGH;
+  }
   case ConstraintKind::Conjunction:
     // See {Dis, Con}junctionStep class in CSStep.cpp for solving
     return SolutionKind::Unsolved;
