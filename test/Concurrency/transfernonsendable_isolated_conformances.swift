@@ -93,7 +93,7 @@ actor CastTest<T, U : NonSendableProtocol, V : AnyObject, V2 : NonSendableKlassP
   func f() async -> NonSendableProtocol {
     guard let c = await cnx else { fatalError() } // expected-swift5-warning {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
     // expected-swift6-error @-1 {{non-Sendable type 'NonSendableKlass?' of property 'cnx' cannot exit main actor-isolated context}}
-    guard let q = c as? NonSendableProtocol else { fatalError() } // expected-swift5-warning {{casting value to type 'any NonSendableProtocol' could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races; this is an error in the Swift 6 language mode}}
+    guard let q = c as? NonSendableProtocol else { fatalError() } // expected-swift5-warning {{casting value to type 'any NonSendableProtocol' could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races; this will be an error in a future Swift language mode}}
     // expected-swift5-note @-1 {{'c' is exposed to main actor-isolated code}}
     // expected-swift5-note @-2 {{'q' is exposed to main actor-isolated code}}
     return q // expected-swift5-warning {{assignment could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races}}
@@ -102,7 +102,7 @@ actor CastTest<T, U : NonSendableProtocol, V : AnyObject, V2 : NonSendableKlassP
   func f2() async -> NonSendableProtocol {
     guard let c = await cnx2 else { fatalError() } // expected-swift5-warning {{non-Sendable type 'T?' of property 'cnx2' cannot exit main actor-isolated context}}
     // expected-swift6-error @-1 {{non-Sendable type 'T?' of property 'cnx2' cannot exit main actor-isolated context}}
-    guard let q = c as? NonSendableProtocol else { fatalError() } // expected-swift5-warning {{casting value to type 'any NonSendableProtocol' could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races; this is an error in the Swift 6 language mode}}
+    guard let q = c as? NonSendableProtocol else { fatalError() } // expected-swift5-warning {{casting value to type 'any NonSendableProtocol' could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races; this will be an error in a future Swift language mode}}
     // expected-swift5-note @-1 {{'c' is exposed to main actor-isolated code}}
     // expected-swift5-note @-2 {{'q' is exposed to main actor-isolated code}}
     return q // expected-swift5-warning {{assignment could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races}}
@@ -113,7 +113,7 @@ actor CastTest<T, U : NonSendableProtocol, V : AnyObject, V2 : NonSendableKlassP
     // expected-swift6-error @-1 {{non-Sendable type 'U?' of property 'cnx3' cannot exit main actor-isolated context}}
     guard let q = c as? NonSendableProtocol else { fatalError() } // expected-warning {{conditional cast from 'U' to 'any NonSendableProtocol' always succeeds}}
     // expected-swift5-note @-1 {{'q' is exposed to main actor-isolated code}}
-    return q // expected-swift5-warning {{assignment could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races; this is an error in the Swift 6 language mode}}
+    return q // expected-swift5-warning {{assignment could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races; this will be an error in a future Swift language mode}}
   }
 
   func g() async -> NonSendableProtocol {
@@ -139,7 +139,7 @@ actor CastTest<T, U : NonSendableProtocol, V : AnyObject, V2 : NonSendableKlassP
     // expected-swift6-error @-1 {{non-Sendable type 'U?' of property 'cnx3' cannot exit main actor-isolated context}}
     let q = c as! NonSendableProtocol // expected-warning {{forced cast from 'U' to 'any NonSendableProtocol' always succeeds; did you mean to use 'as'}}
     // expected-swift5-note @-1 {{'q' is exposed to main actor-isolated code}}
-    return q // expected-swift5-warning {{assignment could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races; this is an error in the Swift 6 language mode}}
+    return q // expected-swift5-warning {{assignment could allow for references between values exposed to main actor-isolated code and 'self'-isolated code risking data races; this will be an error in a future Swift language mode}}
   }
 
 
