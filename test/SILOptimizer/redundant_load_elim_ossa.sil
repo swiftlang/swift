@@ -141,6 +141,12 @@ public struct S {
   var e: Optional<String>
 }
 
+struct NC : ~Copyable {
+  let a: AnyObject
+  let b: Int
+
+  deinit
+}
 
 sil_global @total : $Int32
 
@@ -1752,5 +1758,41 @@ bb5:
   destroy_value %12
   %r = tuple ()
   return %r
+}
+
+// CHECK-LABEL: sil [ossa] @split_non_copyable_with_deinit :
+// CHECK:         [[DD:%.*]] = drop_deinit %0
+// CHECK-NEXT:     = destructure_struct [[DD]]
+// CHECK-LABEL: } // end sil function 'split_non_copyable_with_deinit'
+sil [ossa] @split_non_copyable_with_deinit : $@convention(thin) (@owned NC, @owned AnyObject) -> @owned AnyObject {
+bb0(%0 : @owned $NC, %1 : @owned $AnyObject):
+  %2 = alloc_stack $NC
+  store %0 to [init] %2
+  %4 = struct_element_addr %2, #NC.a
+  %5 = load [take] %4
+  store %1 to [init] %4
+  destroy_addr %2
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @split_non_copyable_assign_with_deinit :
+// CHECK:         destroy_addr %1
+// CHECK:         [[DD:%.*]] = drop_deinit %0
+// CHECK-NEXT:    ([[A:%.*]], [[B:%.*]]) = destructure_struct [[DD]]
+// CHECK:         [[BADDR:%.*]] = struct_element_addr %1 : $*NC, #NC.b
+// CHECK:         store [[B]] to [trivial] [[BADDR]]
+// CHECK:           = struct_element_addr %1 : $*NC, #NC.a
+// CHECK:         [[AADDR:%.*]] = struct_element_addr %1 : $*NC, #NC.a
+// CHECK:         store %2 to [init] [[AADDR]]
+// CHECK:         return [[A]]
+// CHECK-LABEL: } // end sil function 'split_non_copyable_assign_with_deinit'
+sil [ossa] @split_non_copyable_assign_with_deinit : $@convention(thin) (@owned NC, @inout NC, @owned AnyObject) -> @owned AnyObject {
+bb0(%0 : @owned $NC, %1 : $*NC, %2 : @owned $AnyObject):
+  store %0 to [assign] %1
+  %4 = struct_element_addr %1, #NC.a
+  %5 = load [take] %4
+  store %2 to [init] %4
+  return %5
 }
 
