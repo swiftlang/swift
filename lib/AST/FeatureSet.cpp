@@ -457,31 +457,17 @@ static bool usesFeatureIsolatedConformances(Decl *decl) {
   return false;
 }
 
-static bool usesFeatureConcurrencySyntaxSugar(Decl *decl) {
-  return false;
-}
+UNINTERESTING_FEATURE(ConcurrencySyntaxSugar)
 
 static bool usesFeatureCompileTimeValues(Decl *decl) {
   return decl->getAttrs().hasAttribute<ConstValAttr>() ||
          decl->getAttrs().hasAttribute<ConstInitializedAttr>();
 }
 
-static bool usesFeatureClosureBodyMacro(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinConcurrencyStackNesting(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinTaskCancellationShield(Decl *decl) {
-  return false;
-}
-
-static bool usesFeatureBuiltinAddTaskLocalValue(Decl *decl) {
-  return false;
-}
-
+UNINTERESTING_FEATURE(ClosureBodyMacro)
+UNINTERESTING_FEATURE(BuiltinConcurrencyStackNesting)
+UNINTERESTING_FEATURE(BuiltinTaskCancellationShield)
+UNINTERESTING_FEATURE(BuiltinAddTaskLocalValue)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
 UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
