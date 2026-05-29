@@ -22,6 +22,7 @@
 // for OptionalTypeKind
 #include "swift/AST/TypeRepr.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSet.h"
 
 namespace clang {
@@ -50,7 +51,7 @@ struct CxxDeclEmissionScope {
   /// The string holds a reason why the declaration is unrepresentable;
   /// empty string means the reason should be acqured from
   /// 'getDeclRepresentation'.
-  llvm::DenseMap<const ValueDecl *, std::string>
+  llvm::MapVector<const ValueDecl *, std::string>
       additionalUnrepresentableDeclarations;
   /// Records the C++ declaration names already emitted in this lexical scope.
   llvm::StringSet<> emittedDeclarationNames;
