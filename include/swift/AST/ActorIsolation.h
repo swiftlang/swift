@@ -227,7 +227,7 @@ public:
             .Case("nonisolated_unsafe", ActorIsolation::NonisolatedUnsafe)
             .Case("global_actor", ActorIsolation::GlobalActor)
             .Case("global_actor_unsafe", ActorIsolation::GlobalActor)
-            .Case("nonisolated_nonsending",
+            .Case("nonisolated(nonsending)",
                   ActorIsolation::NonisolatedNonsending)
             .Default(std::nullopt);
     if (kind == std::nullopt)

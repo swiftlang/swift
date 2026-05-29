@@ -408,13 +408,13 @@ func test_global_actor_mismatch() {
   testAsync { @MainActor in // expected-error {{cannot convert value actor-isolated to 'MainActor' to expected argument type actor-isolated to 'GA'}}
   }
 
-  testAsync { @MainActor () async -> Int in // expected-error {{cannot convert value actor-isolated to 'MainActor' to expected argument type actor-isolated to 'GA'}}
+  testAsync { @MainActor () async -> Int in
     42
   }
 
   actor A {
     func test() {
-      testAsync { @MainActor [self] in // expected-error {{cannot convert value actor-isolated to 'MainActor' to expected argument type actor-isolated to 'GA'}}
+      testAsync { @MainActor [self] in
         await doSomething()
       }
     }

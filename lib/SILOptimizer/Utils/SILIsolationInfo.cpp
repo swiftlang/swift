@@ -863,7 +863,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   /// Consider non-Sendable metatypes to be task-isolated, so they cannot cross
   /// into another isolation domain.
   if (auto *mi = dyn_cast<MetatypeInst>(inst)) {
-    if (mi->getFunction()->getActorIsolation()->isCallerIsolationInheriting()) {
+    if (mi->getFunction()->getActorIsolation().isNonisolatedNonsending()) {
       return SILIsolationInfo::getTaskIsolated(mi)
           .withNonisolatedNonsendingTaskIsolated(true);
     }
@@ -951,7 +951,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
           fArg->getFunction()->maybeGetIsolatedArgument())) {
     // See if the function is nonisolated(nonsending). In such a case, return
     // task isolated.
-    if (func->getActorIsolation().isNonisolatedNonsending()) {
+    if (fArg->getFunction()->getActorIsolation().isNonisolatedNonsending()) {
       return SILIsolationInfo::getTaskIsolated(fArg)
           .withNonisolatedNonsendingTaskIsolated(true)
           .withUnsafeNonIsolated(isClosureCapturedNonisolatedUnsafe);
@@ -981,11 +981,10 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     // code. In the case of a non-actor, we can only have an allocator that is
     // global-actor isolated, so we will never hit this code path.
     if (declRef.kind == SILDeclRef::Kind::Allocator) {
-      if (auto isolation = fArg->getFunction()->getActorIsolation()) {
-        if (isolation->isActorInstanceIsolated()) {
-          return SILIsolationInfo::getDisconnected(
-              false /*nonisolated(unsafe)*/);
-        }
+      auto isolation = fArg->getFunction()->getActorIsolation();
+      if (isolation.isActorInstanceIsolated()) {
+        return SILIsolationInfo::getDisconnected(
+            false /*nonisolated(unsafe)*/);
       }
     }
 
@@ -1114,7 +1113,7 @@ SILIsolationInfo SILIsolationInfo::getForCastConformances(
     // Otherwise, it's task-isolated.
     if (functionIsolation.isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
-          value, functionIsolation->getGlobalActor(), proto);
+          value, functionIsolation.getGlobalActor(), proto);
     }
 
     // Consider the cast to be task-isolated, because the runtime could find

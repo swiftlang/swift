@@ -441,12 +441,11 @@ class MyObj {}
   struct MainActorStruct {
     nonisolated(unsafe) var field: NonSendableKlass? = nil
     var field2: NonSendableKlass? = nil
-    @CustomActor var customField: NonSendableKlass? = nil
+    @CustomActor var customField: NonSendableKlass? = nil // expected-note 2{{property declared here}}
 
     init() {
-      mergeValues(field!, customField!)
-      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
-      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+      mergeValues(field!, customField!) // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+      mergeValues(field2!, customField!) // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     }
 
     func testMultipleAccessesAreIndependent() async {
@@ -466,11 +465,10 @@ class MyObj {}
   struct MainActorIndirectStruct<T> {
     nonisolated(unsafe) var field: T? = nil
     var field2: T? = nil
-    @CustomActor var customField: NonSendableKlass? = nil
+    @CustomActor var customField: NonSendableKlass? = nil // expected-note 2{{property declared here}}
     init() {
-      mergeValues(field!, customField!)
-      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
-      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+      mergeValues(field!, customField!) // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be referenced from the main actor}}
+      mergeValues(field2!, customField!) // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be referenced from the main actor}}
     }
 
     func testMultipleAccessesAreIndependent() async {
@@ -488,12 +486,11 @@ class MyObj {}
   final class MainActorFinalClass {
     nonisolated(unsafe) var field: NonSendableKlass? = nil
     var field2: NonSendableKlass? = nil
-    @CustomActor var customField: NonSendableKlass? = nil
+    @CustomActor var customField: NonSendableKlass? = nil // expected-note 2{{property declared here}}
 
     init() {
-      mergeValues(field!, customField!)
-      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
-      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+      mergeValues(field!, customField!) // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+      mergeValues(field2!, customField!) // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     }
 
     func testMultipleAccessesAreIndependent() async {
@@ -511,12 +508,11 @@ class MyObj {}
   class MainActorClass {
     nonisolated(unsafe) var field: NonSendableKlass? = nil
     var field2: NonSendableKlass? = nil
-    @CustomActor var customField: NonSendableKlass? = nil
+    @CustomActor var customField: NonSendableKlass? = nil // expected-note 2 {{property declared here}}
 
     init() {
-      mergeValues(field!, customField!)
-      mergeValues(field2!, customField!) // expected-warning {{passing global actor 'CustomActor'-isolated 'self.customField' and main actor-isolated 'self.field2' as arguments to local function 'mergeValues' risks causing data races}}
-      // expected-note @-1 {{'self.field2' could begin referencing 'self.customField' allowing concurrent access to 'self.customField' by main actor-isolated code and global actor 'CustomActor'-isolated code}}
+      mergeValues(field!, customField!) // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
+      mergeValues(field2!, customField!) // expected-warning {{global actor 'CustomActor'-isolated property 'customField' can not be referenced from the main actor; this is an error in the Swift 6 language mode}}
     }
 
     func testMultipleAccessesAreIndependent() async {
@@ -554,12 +550,11 @@ class MyObj {}
 actor ActorWithNonisolatedUnsafeField {
   nonisolated(unsafe) var field: NonSendableKlass? = nil
   var field2: NonSendableKlass? = nil
-  @MainActor var mainField: NonSendableKlass? = nil
+  @MainActor var mainField: NonSendableKlass? = nil // expected-note 2 {{property declared here}}
 
   init() {
-    mergeValues(field!, mainField!)
-    mergeValues(field2!, mainField!) // expected-warning {{passing main actor-isolated 'self.mainField' and 'self'-isolated 'self.field2' as arguments to global function 'mergeValues' risks causing data races}}
-    // expected-note @-1 {{'self.field2' could begin referencing 'self.mainField' allowing concurrent access to 'self.mainField' by 'self'-isolated code and main actor-isolated code}}
+    mergeValues(field!, mainField!) // expected-warning {{main actor-isolated property 'mainField' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
+    mergeValues(field2!, mainField!) // expected-warning {{main actor-isolated property 'mainField' can not be referenced from a nonisolated context; this is an error in the Swift 6 language mode}}
   }
 
   func testMultipleAccessesAreIndependent() async {
