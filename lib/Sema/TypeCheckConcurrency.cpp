@@ -127,6 +127,7 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
 
   // Otherwise, if it's an actor instance, then it depends on async-ness.
   switch (typeIso.getKind()) {
+  case ActorIsolation::GlobalActor:
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedConcurrent:
@@ -140,10 +141,6 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
   case ActorIsolation::Erased:
     llvm_unreachable("constructor cannot have erased isolation");
 
-  case ActorIsolation::GlobalActor:
-    return ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
-               StrictConcurrency::Complete &&
-           !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
     return !ctor->hasAsync(); // need flow-isolation for non-async.
   };
@@ -8758,30 +8755,18 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
   // It's only okay for the value to cross isolation boundaries if the property
   // type is Sendable. Note that if the init is a nonisolated actor init,
   // Sendable checking is already performed on arguments at the call-site.
-  if (auto *init = dyn_cast<ConstructorDecl>(fromDC)) {
-    // If strict concurrency is complete, we allow for users to initialize
-    // global actor non-Sendable types in initializers more aggressively through
-    // the usage of flow isolation.
-    if (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
-            StrictConcurrency::Complete &&
-        referencedActor && referencedActor->isSelf() &&
-        checkedByFlowIsolation(fromDC, *referencedActor, decl, declRefLoc,
-                               useKind))
-      return forSameConcurrencyDomain(declIsolation, options);
-
-    if ((declIsolation.isActorIsolated() && contextIsolation.isGlobalActor()) ||
-        declIsolation.isGlobalActor()) {
-
-      if (init->isDesignatedInit() && isStoredProperty(decl) &&
-          (!referencedActor || referencedActor->isSelf())) {
-        auto type = fromDC->mapTypeIntoEnvironment(decl->getInterfaceType());
-        if (!type->isSendableType()) {
-          // Treat the decl isolation as 'preconcurrency' to downgrade
-          // violations to warnings, because violating Sendable here is
-          // accepted by the Swift 5.9 compiler.
-          options |= Flags::CompatibilityDowngrade;
-          return forEntersActor(declIsolation, options);
-        }
+  if ((declIsolation.isActorIsolated() && contextIsolation.isGlobalActor()) ||
+      declIsolation.isGlobalActor()) {
+    auto *init = dyn_cast<ConstructorDecl>(fromDC);
+    if (init && init->isDesignatedInit() && isStoredProperty(decl) &&
+        (!referencedActor || referencedActor->isSelf())) {
+      auto type = fromDC->mapTypeIntoEnvironment(decl->getInterfaceType());
+      if (!type->isSendableType()) {
+        // Treat the decl isolation as 'preconcurrency' to downgrade violations
+        // to warnings, because violating Sendable here is accepted by the
+        // Swift 5.9 compiler.
+        options |= Flags::CompatibilityDowngrade;
+        return forEntersActor(declIsolation, options);
       }
     }
   }

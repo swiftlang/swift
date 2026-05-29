@@ -1895,7 +1895,10 @@ func mutableLocalCaptureDataRace() async {
   _ = x
 
   Task.detached { x = 1 }
-  // expected-warning @-1 {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current task}}
+  // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+  // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+  // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+  // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
 
   x = 2 // expected-note {{access can happen concurrently}}
 }
@@ -1904,7 +1907,11 @@ func mutableLocalCaptureDataRace2() async {
   var x = 0
   x = 0
 
-  Task.detached { x = 1 } // expected-warning {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'x' which is accessed later by code in the current task}}
+  Task.detached { x = 1 }
+  // expected-ni-warning @-1 {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+  // expected-ni-note @-2 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
+  // expected-ni-ns-warning @-3 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+  // expected-ni-ns-note @-4 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to static method 'detached(name:priority:operation:)' risks causing races in between local and caller code}}
 
   print(x) // expected-note {{access can happen concurrently}}
 }
@@ -2036,16 +2043,22 @@ func avoidThinkingClosureParameterIsSending() {
 enum RequireSrcWhenStoringEvenWhenSendable {
   func test<T: Sendable>(t: T) {
     var result: T = t
-    Task {
-      result = t // expected-warning {{closure passed as an argument to a 'sending' parameter captures reference to mutable var 'result' which is accessed later by code in the current task}}
+    Task { // expected-ni-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-ni-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+      // expected-ni-ns-warning @-2 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+      // expected-ni-ns-note @-3 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+      result = t
     }
     useValue(result) // expected-note {{access can happen concurrently}}
   }
 
   func test2() {
     var result: Any = 0
-    Task {
-      result = 0 // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'result' which is accessed later by code in the current task}}
+    Task { // expected-ni-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-ni-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+      // expected-ni-ns-warning @-2 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+      // expected-ni-ns-note @-3 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+      result = 0
     }
     useValue(result) // expected-note {{access can happen concurrently}}
   }
@@ -2056,8 +2069,11 @@ enum RequireSrcWhenStoringEvenWhenSendable {
 
   func test3<T: Initializable & SendableMetatype>(type: T.Type) {
     var result = type.init()
-    Task {
-      result = type.init() // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'result' which is accessed later by code in the current task}}
+    Task { // expected-ni-warning {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
+      // expected-ni-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+      // expected-ni-ns-warning @-2 {{sending value of non-Sendable type '@concurrent () async -> ()' risks causing data races}}
+      // expected-ni-ns-note @-3 {{Passing value of non-Sendable type '@concurrent () async -> ()' as a 'sending' argument to initializer 'init(name:priority:operation:)' risks causing races in between local and caller code}}
+      result = type.init()
     }
     useValue(result) // expected-note {{access can happen concurrently}}
   }
@@ -2399,31 +2415,3 @@ struct IndirectAssignTests {
   }
 }
 
-// rdar://169803154 - @MainActor async closure with for-try-await must not produce
-// spurious non-Sendable / unknown-pattern errors.  The constraint solver must honor
-// an explicit global actor on an async closure the same way it does for a sync one.
-@MainActor
-class rdar169803154_Klass {
-  init() {
-    _ = Task.detached { @MainActor in
-      _ = self
-      for try await x in rdar169803154_Seq.seq { _ = x }
-    }
-  }
-}
-
-enum rdar169803154_Seq {
-  static var seq: some AsyncSequence<Float, Error> {
-    AsyncThrowingStream(Float.self) { $0.finish() }
-  }
-}
-
-// Iterating over an existential sequence parameter in a nonisolated method on
-// an actor must not produce a false positive RBI error.
-actor ActorWithNonisolatedExistentialSequenceMethod {
-  nonisolated func process(sequence: any Sequence<Int>) {
-    for element in sequence {
-      _ = element
-    }
-  }
-}

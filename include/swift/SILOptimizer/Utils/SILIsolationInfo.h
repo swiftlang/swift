@@ -171,28 +171,24 @@ public:
   /// This forms a lattice of semantics. The lattice progresses from left ->
   /// right below:
   ///
-  ///                 ---> Task ----
-  ///                /              \
-  /// Disconnected --                --> Invalid
-  ///                \              /
-  ///                 ---> Actor ---
+  /// Unknown -> Disconnected -> Task -> Actor.
   ///
   enum Kind : uint8_t {
+    /// Unknown means no information. We error when merging on it.
+    Unknown,
+
     /// An entity with disconnected isolation can be freely sent into another
     /// isolation domain. These are associated with "use after send"
     /// diagnostics.
-    Disconnected = 0,
+    Disconnected,
 
     /// An entity that is in the same region as a task-isolated value. Cannot be
     /// sent into another isolation domain.
-    Task = 1,
+    Task,
 
     /// An entity that is in the same region as an actor-isolated value. Cannot
     /// be sent into another isolation domain.
-    Actor = 2,
-
-    /// Invalid means that we had information that did not work.
-    Invalid = 3,
+    Actor,
   };
 
   enum class Flag : uint8_t {
@@ -203,8 +199,7 @@ public:
     UnsafeNonIsolated = 0x1,
 
     /// If set, this means that this actor isolation is from an isolated
-    /// parameter and should be allowed to merge into a self parameter or an
-    /// implicit builtin actor.
+    /// parameter and should be allowed to merge into a self parameter.
     UnappliedIsolatedAnyParameter = 0x2,
 
     /// If set, this was a TaskIsolated value from a nonisolated(nonsending)
@@ -285,9 +280,9 @@ private:
       SILValue value, CanType sourceType, CanType destType);
 
 public:
-  SILIsolationInfo() : actorIsolation(), kind(Kind::Invalid), options(0) {}
+  SILIsolationInfo() : actorIsolation(), kind(Kind::Unknown), options(0) {}
 
-  operator bool() const { return kind != Kind::Invalid; }
+  operator bool() const { return kind != Kind::Unknown; }
 
   operator Kind() const { return getKind(); }
 
@@ -486,38 +481,30 @@ public:
 
   static SILIsolationInfo
   getActorInstanceIsolated(SILValue isolatedValue,
-                           const SILFunctionArgument *actorInstance,
-                           ProtocolDecl *isolatedConformance = nullptr) {
+                           const SILFunctionArgument *actorInstance) {
     assert(actorInstance);
     auto *varDecl =
         llvm::dyn_cast_if_present<VarDecl>(actorInstance->getDecl());
     if (!varDecl)
       return {};
-    return {isolatedValue,
-            actorInstance,
+    return {isolatedValue, actorInstance,
             actorInstance->isSelf()
                 ? ActorIsolation::forActorInstanceSelf(varDecl)
                 : ActorIsolation::forActorInstanceParameter(
-                      varDecl, actorInstance->getIndex()),
-            {},
-            isolatedConformance};
+                      varDecl, actorInstance->getIndex())};
   }
 
-  static SILIsolationInfo
-  getActorInstanceIsolated(SILValue isolatedValue, ActorInstance actorInstance,
-                           NominalTypeDecl *typeDecl,
-                           ProtocolDecl *isolatedConformance = nullptr) {
+  static SILIsolationInfo getActorInstanceIsolated(SILValue isolatedValue,
+                                                   ActorInstance actorInstance,
+                                                   NominalTypeDecl *typeDecl) {
     assert(actorInstance);
     if (!typeDecl->isAnyActor()) {
       assert(!swift::getActorIsolation(typeDecl).isGlobalActor() &&
              "Should have called getGlobalActorIsolated");
       return {};
     }
-    return {isolatedValue,
-            actorInstance,
-            ActorIsolation::forActorInstanceSelf(typeDecl),
-            {},
-            isolatedConformance};
+    return {isolatedValue, actorInstance,
+            ActorIsolation::forActorInstanceSelf(typeDecl)};
   }
 
   /// A special actor instance isolated for partial apply cases where we do not
@@ -678,12 +665,12 @@ public:
   SILDynamicMergedIsolationInfo(SILIsolationInfo innerInfo)
       : innerInfo(innerInfo) {}
 
-  /// Returns invalid only if both this isolation info and \p other are actor
+  /// Returns nullptr only if both this isolation info and \p other are actor
   /// isolated to incompatible actors.
-  [[nodiscard]] SILDynamicMergedIsolationInfo
+  [[nodiscard]] std::optional<SILDynamicMergedIsolationInfo>
   merge(SILIsolationInfo other) const;
 
-  [[nodiscard]] SILDynamicMergedIsolationInfo
+  [[nodiscard]] std::optional<SILDynamicMergedIsolationInfo>
   merge(SILDynamicMergedIsolationInfo other) const {
     return merge(other.getIsolationInfo());
   }

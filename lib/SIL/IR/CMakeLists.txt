@@ -1,6 +1,5 @@
 target_sources(swiftSIL PRIVATE
   AbstractionPattern.cpp
-  ActorIsolation.cpp
   ApplySite.cpp
   Bridging.cpp
   Linker.cpp

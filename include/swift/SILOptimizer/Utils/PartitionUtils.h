@@ -31,6 +31,8 @@
 #include <algorithm>
 #include <variant>
 
+#define DEBUG_TYPE "send-non-sendable"
+
 namespace swift {
 
 namespace PartitionPrimitives {
@@ -87,65 +89,6 @@ namespace swift {
 class Partition;
 class SendingOperandToStateMap;
 class RegionAnalysisValueMap;
-
-enum class RegionMergeReason : uint8_t {
-  Unknown = 0,
-
-  /// We are assigning src into dst but since src can not be overwritten
-  /// completely, we have to merge the whole region of src into dst
-  /// region. E.x.: a MainActor isolated struct with multiple fields where a
-  /// task-isolated value is merged into one of those fields.
-  Assign = 1,
-
-  /// dstRegionElt is a fake value used by an instruction without a result to
-  /// introduce ActorIsolation into a region of one of its
-  /// parameters. srcRegionElt is a value that is in a region with some other
-  /// incompatible isolation.
-  ///
-  /// E.x.:
-  ///
-  /// 1. Passing a task-isolated value to a MainActor isolated function that
-  /// does not have a result. In this case, the MainActor isolated function will
-  /// create a dstRegionElt that is an ActorIntroducingInst and merge it into
-  /// its operand's regions causing the error.
-  ///
-  /// 2. Casting a value using checked_cast_br_addr to a protocol that is
-  /// potentially an isolated conformance to a value with a conflicting
-  /// isolation.
-  ActorIntroducingInst = 2,
-
-  /// Regions are being merged as a result of capturing values in a
-  /// nonisolated closure. This occurs when a closure with no isolation
-  /// captures multiple values from different isolation domains.
-  ///
-  /// E.x.: A nonisolated closure capturing both a MainActor isolated value
-  /// and a task-isolated value.
-  NonisolatedClosure = 3,
-
-  /// Regions are being merged due to passing values to a compiler builtin
-  /// operation. Builtins do not cross isolation boundaries, so their operands
-  /// must be in compatible regions.
-  ///
-  /// E.x.: Passing values with incompatible isolation to a builtin operation.
-  Builtin = 4,
-
-  /// Regions are being merged due to calling a nonisolated function.
-  /// Nonisolated functions do not establish isolation boundaries, so their
-  /// parameters are merged with the result region.
-  ///
-  /// E.x.: Passing multiple arguments with incompatible isolation to a
-  /// nonisolated function.
-  NonisolatedFunction = 5,
-
-  /// Regions are being merged since we are performing some sort of cast. The
-  /// cast could result in a merge failure if the cast results in a value
-  /// isolated to an isolated conformance and the isolated conformance conflicts
-  /// with the isolation of the input value.
-  Cast = 6,
-
-  First = Assign,
-  Last = Cast,
-};
 
 /// The representative value of the equivalence class that makes up a tracked
 /// value.
@@ -479,7 +422,7 @@ struct SendingOperandState {
   /// The dynamic isolation info of the region of value when we sent.
   ///
   /// This will contain the isolated value if we found one.
-  std::optional<SILDynamicMergedIsolationInfo> isolationInfo;
+  SILDynamicMergedIsolationInfo isolationInfo;
 
   /// The dynamic isolation history at this point.
   IsolationHistory isolationHistory;
@@ -492,22 +435,6 @@ struct SendingOperandState {
 
   SendingOperandState(IsolationHistory history)
       : isolationInfo(), isolationHistory(history), isClosureCaptured(false) {}
-
-  bool merge(SILDynamicMergedIsolationInfo newIsolationInfo) {
-    if (!isolationInfo) {
-      isolationInfo = newIsolationInfo;
-      return true;
-    }
-    auto newIsolation = isolationInfo->merge(newIsolationInfo);
-    if (!newIsolation)
-      return false;
-    isolationInfo = newIsolation;
-    return true;
-  }
-
-  SILIsolationInfo getIsolationInfo() const {
-    return isolationInfo.value().getIsolationInfo();
-  }
 };
 
 class SendingOperandToStateMap {
@@ -630,41 +557,7 @@ public:
     /// element of the region that was captured by reference in a closure, we
     /// can ignore the use.
     RequireOfMutableBaseOfSendableValue,
-
-    // RegionMergeReason is packed into bits 2-4 (3 bits total).
-    // With 3 bits, we can represent 8 values (0-7).
-    RegionMergeReasonBitStart = 2,
-    RegionMergeReasonBitEnd = 5,
-
-#ifdef REGION_MERGE_REASON_DEF
-#error "REGION_MERGE_REASON_DEF already defined"
-#endif
-#define REGION_MERGE_REASON_DEF(NAME)                                          \
-  RegionMergeReason##NAME = uint8_t(RegionMergeReason::NAME)                   \
-                            << RegionMergeReasonBitStart
-    REGION_MERGE_REASON_DEF(Assign),
-    REGION_MERGE_REASON_DEF(ActorIntroducingInst),
-    REGION_MERGE_REASON_DEF(NonisolatedClosure),
-    REGION_MERGE_REASON_DEF(Builtin),
-    REGION_MERGE_REASON_DEF(NonisolatedFunction),
-#undef REGION_MERGE_REASON_DEF
-
-    // Mask = ((1 << number_of_bits) - 1) << first_bit
-    // With 3 bits starting at bit 2: ((1 << 3) - 1) << 2 = 7 << 2 = 0b11100
-    RegionMergeReasonMask = uint8_t(unsigned(1 << (RegionMergeReasonBitEnd -
-                                                   RegionMergeReasonBitStart)) -
-                                    1)
-                            << RegionMergeReasonBitStart,
-    RegionMergeReasonFirst = RegionMergeReasonAssign,
-    RegionMergeReasonLast = RegionMergeReasonNonisolatedFunction,
   };
-
-  static_assert((1 << unsigned(Flag::RegionMergeReasonBitStart)) <=
-                    unsigned(Flag::RegionMergeReasonFirst) &&
-                "Out of bit region");
-  static_assert((1 << unsigned(Flag::RegionMergeReasonBitEnd)) >
-                    uint8_t(Flag::RegionMergeReasonLast) &&
-                "Out of bit region");
   using Options = OptionSet<Flag>;
 
 private:
@@ -678,13 +571,12 @@ private:
 
   PartitionOpKind opKind;
 
-  uint8_t options;
+  Options options;
 
   // TODO: can the following declarations be merged?
   PartitionOp(PartitionOpKind opKind, Element arg1,
               SILInstruction *sourceInst = nullptr, Options options = {})
-      : source(sourceInst), opArg1(arg1), opKind(opKind),
-        options(options.toRaw()) {
+      : source(sourceInst), opArg1(arg1), opKind(opKind), options(options) {
     assert(((opKind != PartitionOpKind::Send &&
              opKind != PartitionOpKind::UndoSend) ||
             sourceInst) &&
@@ -693,8 +585,7 @@ private:
 
   PartitionOp(PartitionOpKind opKind, Element arg1, Operand *sourceOperand,
               Options options = {})
-      : source(sourceOperand), opArg1(arg1), opKind(opKind),
-        options(options.toRaw()) {
+      : source(sourceOperand), opArg1(arg1), opKind(opKind), options(options) {
     assert(((opKind != PartitionOpKind::Send &&
              opKind != PartitionOpKind::UndoSend) ||
             bool(sourceOperand)) &&
@@ -704,7 +595,7 @@ private:
   PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
               SILInstruction *sourceInst = nullptr, Options options = {})
       : source(sourceInst), opArg1(arg1), opArg2(arg2), opKind(opKind),
-        options(options.toRaw()) {
+        options(options) {
     assert(((opKind != PartitionOpKind::Send &&
              opKind != PartitionOpKind::UndoSend) ||
             sourceInst) &&
@@ -712,15 +603,12 @@ private:
   }
 
   PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2,
-              Operand *sourceOp = nullptr, Options options = {},
-              RegionMergeReason reason = RegionMergeReason::Unknown)
+              Operand *sourceOp = nullptr, Options options = {})
       : source(sourceOp), opArg1(arg1), opArg2(arg2), opKind(opKind),
         options(options) {
-    // Use the helper to put the reason in so we do not hard code it here.
-    setRegionMergeReason(reason);
     assert((opKind == PartitionOpKind::AssignDirect ||
             opKind == PartitionOpKind::Merge) &&
-           "Only supported for assign_direct, merge, and merge_failure");
+           "Only supported for assign_direct and merge");
   }
 
   PartitionOp(PartitionOpKind opKind, Element arg1, Element arg2, Element arg3,
@@ -775,10 +663,9 @@ public:
   }
 
   static PartitionOp Merge(Element destElement, Element srcElement,
-                           RegionMergeReason reason,
                            Operand *sourceOperand = nullptr) {
     return PartitionOp(PartitionOpKind::Merge, destElement, srcElement,
-                       sourceOperand, {}, reason);
+                       sourceOperand);
   }
 
   static PartitionOp Require(Element tgt, SILInstruction *sourceInst = nullptr,
@@ -806,7 +693,7 @@ public:
   bool operator==(const PartitionOp &other) const {
     return opKind == other.opKind && opArg1 == other.opArg1 &&
            opArg2 == other.opArg2 && opArg3 == other.opArg3 &&
-           source == other.source && options == other.options;
+           source == other.source;
   };
 
   bool operator<(const PartitionOp &other) const {
@@ -843,11 +730,7 @@ public:
       return *opArg3 < other.opArg3;
     }
 
-    if (source != other.source) {
-      return source < other.source;
-    }
-
-    return options < other.options;
+    return source < other.source;
   }
 
   PartitionOpKind getKind() const { return opKind; }
@@ -856,23 +739,7 @@ public:
   Element getOpArg2() const { return opArg2.value(); }
   Element getOpArg3() const { return opArg3.value(); }
 
-  /// Return options without merge failure reasons. Those are just stored
-  /// inline.
-  Options getOptions() const {
-    return Options(options & ~uint8_t(Flag::RegionMergeReasonMask));
-  }
-
-  RegionMergeReason getRegionMergeReason() const {
-    // Apply the mask and then shift over the final result.
-    return RegionMergeReason((options & uint8_t(Flag::RegionMergeReasonMask)) >>
-                             uint8_t(Flag::RegionMergeReasonBitStart));
-  }
-
-  void setRegionMergeReason(RegionMergeReason reason) {
-    // Mask out the old bits and shift in the new bits.
-    options = (options & ~uint8_t(Flag::RegionMergeReasonMask)) |
-              (uint8_t(reason) << unsigned(Flag::RegionMergeReasonBitStart));
-  }
+  Options getOptions() const { return options; }
 
   void getOpArgs(SmallVectorImpl<Element> &args) const {
     if (opArg1.has_value())
@@ -922,19 +789,15 @@ private:
   /// multi map here. The implication of this is that when we are performing
   /// dataflow we use a union operation to combine CFG elements and just take
   /// the first instruction that we see.
-  ///
-  /// NOTE: This should never be touched directly without canonicalizing!
   llvm::SmallMapVector<Region, SendingOperandSet *, 2> regionToSendingOpMap;
 
   /// Label each index with a non-negative (unsigned) label if it is associated
   /// with a valid region.
-  ///
-  /// NOTE: This should never be touched directly without canonicalizing!
   std::map<Element, Region> elementToRegionMap;
 
   /// Track a label that is guaranteed to be strictly larger than all in use,
   /// and therefore safe for use as a fresh label.
-  Region nextAvailableRegionNum = Region(0);
+  Region freshLabel = Region(0);
 
   /// An immutable data structure that we use to push/pop isolation history.
   IsolationHistory history;
@@ -984,7 +847,6 @@ public:
   }
 
   bool isTrackingElement(Element val) const {
-    // This is safe to perform without canonicalizing.
     return elementToRegionMap.count(val);
   }
 
@@ -1005,34 +867,16 @@ public:
   /// Assigns \p oldElt to the region associated with \p newElt.
   void assignElement(Element oldElt, Element newElt, bool updateHistory = true);
 
-  bool areElementsInSameRegion(Element firstElt, Element secondElt) {
-    canonicalize();
+  bool areElementsInSameRegion(Element firstElt, Element secondElt) const {
     return elementToRegionMap.at(firstElt) == elementToRegionMap.at(secondElt);
   }
 
-  Region getRegion(Element elt) {
-    canonicalize();
-    return elementToRegionMap.at(elt);
-  }
+  Region getRegion(Element elt) const { return elementToRegionMap.at(elt); }
 
   using iterator = std::map<Element, Region>::iterator;
-
-private:
   iterator begin() { return elementToRegionMap.begin(); }
   iterator end() { return elementToRegionMap.end(); }
-
-public:
-  /// Return an iterator over the element/range in this partition. Will
-  /// canonicalize the region if necessary to ensure that elements are matched
-  /// to their canonical region.
-  ///
-  /// NOTE: To work with iterators without canonicalizing, please use begin/end
-  /// directly. This should only be done internally to the Partition
-  /// implementation. We never want to expose
-  llvm::iterator_range<iterator> range() {
-    canonicalize();
-    return {begin(), end()};
-  }
+  llvm::iterator_range<iterator> range() { return {begin(), end()}; }
 
   void clearSendingOperandState() { regionToSendingOpMap.clear(); }
 
@@ -1091,11 +935,38 @@ public:
   /// Runs in quadratic time.
   static Partition join(const Partition &fst, Partition &snd);
 
+  /// Return a vector of the sent values in this partition.
+  std::vector<Element> getSentValues() const {
+    // For effeciency, this could return an iterator not a vector.
+    std::vector<Element> sentVals;
+    for (auto [i, _] : elementToRegionMap)
+      if (isSent(i))
+        sentVals.push_back(i);
+    return sentVals;
+  }
+
+  /// Return a vector of the non-sent regions in this partition, each
+  /// represented as a vector of values.
+  std::vector<std::vector<Element>> getNonSentRegions() const {
+    // For effeciency, this could return an iterator not a vector.
+    std::map<Region, std::vector<Element>> buckets;
+
+    for (auto [i, label] : elementToRegionMap)
+      buckets[label].push_back(i);
+
+    std::vector<std::vector<Element>> doubleVec;
+
+    for (auto [_, bucket] : buckets)
+      doubleVec.push_back(bucket);
+
+    return doubleVec;
+  }
+
   void dump_labels() const LLVM_ATTRIBUTE_USED {
     llvm::dbgs() << "Partition";
     if (canonical)
       llvm::dbgs() << "(canonical)";
-    llvm::dbgs() << "(fresh=" << nextAvailableRegionNum << "){";
+    llvm::dbgs() << "(fresh=" << freshLabel << "){";
     for (const auto &[i, label] : elementToRegionMap)
       llvm::dbgs() << "[" << i << ": " << label << "] ";
     llvm::dbgs() << "}\n";
@@ -1103,16 +974,7 @@ public:
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
-  /// Print out this partition.
-  ///
-  /// If passed in printRegionIsolation is expected to print to the passed in
-  /// stream a representation of the region and return true if it actually
-  /// printed anything. If it returns true, we will emit a ' :' afterwards. If
-  /// false, we will not emit anything. The suggestion would be to just print
-  /// for non-disconnected isolations.
-  void print(llvm::raw_ostream &os,
-             std::function<bool(llvm::raw_ostream &, Region)>
-                 printRegionIsolation = nullptr) const;
+  void print(llvm::raw_ostream &os) const;
 
   SWIFT_DEBUG_DUMPER(dumpVerbose()) { printVerbose(llvm::dbgs()); }
 
@@ -1126,30 +988,20 @@ public:
     return history.pushHistorySequenceBoundary(loc);
   }
 
-private:
-  /// Return region if we have it. Will canonicalize the partition b
-  std::optional<Region> maybeGetRegion(Element elt) {
-    canonicalize();
-    auto iter = elementToRegionMap.find(elt);
+  bool isSent(Element val) const {
+    auto iter = elementToRegionMap.find(val);
     if (iter == elementToRegionMap.end())
-      return {};
-    return iter->second;
-  }
-
-public:
-  bool isSent(Element val) {
-    if (auto r = maybeGetRegion(val))
-      return regionToSendingOpMap.count(*r);
-    return false;
+      return false;
+    return regionToSendingOpMap.count(iter->second);
   }
 
   /// Return the instruction that sent \p val's region or nullptr
   /// otherwise.
-  SendingOperandSet *getSentOperandSet(Element val) {
-    auto region = maybeGetRegion(val);
-    if (!region)
+  SendingOperandSet *getSentOperandSet(Element val) const {
+    auto iter = elementToRegionMap.find(val);
+    if (iter == elementToRegionMap.end())
       return nullptr;
-    auto iter2 = regionToSendingOpMap.find(*region);
+    auto iter2 = regionToSendingOpMap.find(iter->second);
     if (iter2 == regionToSendingOpMap.end())
       return nullptr;
     auto *set = iter2->second;
@@ -1161,9 +1013,8 @@ public:
   /// elementToRegionMap.
   ///
   /// Asserts when NDEBUG is set. Does nothing otherwise.
-  void validateRegionToSendingOpMapRegions() {
+  void validateRegionToSendingOpMapRegions() const {
 #ifndef NDEBUG
-    canonicalize();
     llvm::SmallSet<Region, 8> regions;
     for (auto [eltNo, regionNo] : elementToRegionMap) {
       regions.insert(regionNo);
@@ -1176,7 +1027,7 @@ public:
 
   /// Used only in assertions, check that Partitions promised to be canonical
   /// are actually canonical
-  bool is_canonical_correct();
+  bool is_canonical_correct() const;
 
   /// Merge the regions of two indices while maintaining canonicality. Returns
   /// the final region used.
@@ -1470,56 +1321,6 @@ public:
     }
   };
 
-  /// Error emitted when attempting to merge two regions with incompatible
-  /// isolation domains.
-  ///
-  /// This error is detected during partition evaluation when we try to merge
-  /// a source region into a destination region, but their isolation attributes
-  /// are incompatible (e.g., merging a task-isolated value into a MainActor-
-  /// isolated value).
-  ///
-  /// The error contains:
-  /// - srcRegionElt: An element from the source region being merged
-  /// - dstRegionElt: An element from the destination region (merge target)
-  /// - Isolation info for both regions
-  /// - Reason: Context about why the merge is happening (assign, function call,
-  ///   etc.), which enables emitting better diagnostics than just "a merge
-  ///   happened here". For example, we can say "cannot pass X to function Y"
-  ///   instead of "cannot merge region X into region Y".
-  struct IncompatibleRegionMergeError {
-    using Reason = RegionMergeReason;
-
-    const PartitionOp *op;
-
-    Element srcRegionElt;
-    SILDynamicMergedIsolationInfo srcIsolationRegionInfo;
-    Element dstRegionElt;
-    SILDynamicMergedIsolationInfo dstIsolationRegionInfo;
-    Reason reason;
-
-    IncompatibleRegionMergeError(
-        const PartitionOp &op, Element srcRegionElt,
-        SILDynamicMergedIsolationInfo srcIsolationRegionInfo,
-        Element dstRegionElt,
-        SILDynamicMergedIsolationInfo dstIsolationRegionInfo,
-        Reason reason = Reason::Unknown)
-        : op(&op), srcRegionElt(srcRegionElt),
-          srcIsolationRegionInfo(srcIsolationRegionInfo),
-          dstRegionElt(dstRegionElt),
-          dstIsolationRegionInfo(dstIsolationRegionInfo), reason(reason) {}
-
-    IncompatibleRegionMergeError(IncompatibleRegionMergeError &&other) =
-        default;
-    IncompatibleRegionMergeError &
-    operator=(IncompatibleRegionMergeError &&other) = default;
-
-    void print(llvm::raw_ostream &os, RegionAnalysisValueMap &valueMap) const;
-
-    SWIFT_DEBUG_DUMPER(dump(RegionAnalysisValueMap &valueMap)) {
-      print(llvm::dbgs(), valueMap);
-    }
-  };
-
 #define PARTITION_OP_ERROR(NAME)                                               \
   static_assert(!std::is_copy_constructible_v<NAME##Error>,                    \
                 #NAME " must not be copy constructable");                      \
@@ -1653,54 +1454,28 @@ public:
   /// The bool result is if it is captured by a closure element. That only is
   /// computed if \p sourceOp is non-null.
   std::optional<std::pair<SILDynamicMergedIsolationInfo, bool>>
-  getIsolationRegionInfo(Region region, Operand *sourceOp) {
+  getIsolationRegionInfo(Region region, Operand *sourceOp) const {
     bool isClosureCapturedElt = false;
-    std::optional<SILDynamicMergedIsolationInfo> isolationRegionInfo;
+    std::optional<SILDynamicMergedIsolationInfo> isolationRegionInfo =
+        SILDynamicMergedIsolationInfo();
 
     for (const auto &pair : p.range()) {
       if (pair.second == region) {
-        auto other = getIsolationRegionInfo(pair.first);
-        // If other is invalid, just return nil.
-        if (!bool(other))
+        isolationRegionInfo =
+            isolationRegionInfo->merge(getIsolationRegionInfo(pair.first));
+        if (!isolationRegionInfo)
           return {};
-
-        // Otherwise, if we haven't tracked any isolation region info
-        // yet... just assign our optional to that and continue.
-        if (!isolationRegionInfo.has_value()) {
-          isolationRegionInfo = other;
-          continue;
-        }
-
-        // If we have an isolation region info that is not invalid at this point
-        // in our accumulator and other should not be invalid either. Perform
-        // the merge.
-        assert(isolationRegionInfo.has_value() && bool(*isolationRegionInfo) &&
-               "Should have a valid, non-invalid isolation");
-        isolationRegionInfo = isolationRegionInfo->merge(other);
-
-        // Then check if as a result of merging, we now have an invalid value,
-        // return nil in such a case.
-        if (!bool(isolationRegionInfo.value()))
-          return {};
-
-        // Otherwise, gather if we have a closure capture.
         if (sourceOp) {
           isClosureCapturedElt |= isClosureCaptured(pair.first, sourceOp);
         }
       }
     }
 
-    // If we found any element in our region, we should have a value in our
-    // accumulator. This signals some sort of error. Return nil in such a case.
-    if (!isolationRegionInfo.has_value())
-      return {};
-
-    // Otherwise, return the value that we computed.
     return {{isolationRegionInfo.value(), isClosureCapturedElt}};
   }
 
   /// Overload of \p getIsolationRegionInfo without an Operand.
-  SILDynamicMergedIsolationInfo getIsolationRegionInfo(Region region) {
+  SILDynamicMergedIsolationInfo getIsolationRegionInfo(Region region) const {
     if (auto opt = getIsolationRegionInfo(region, nullptr))
       return opt->first;
     return SILDynamicMergedIsolationInfo();
@@ -1742,28 +1517,6 @@ public:
     return SILValue();
   }
 
-  /// If \p region is contains a sending indirect out parameter, return that.
-  std::optional<Element> findSendingOutParameterInRegion(Region region) const {
-    for (const auto &pair : p.range()) {
-      if (pair.second != region)
-        continue;
-      // See if we have an indirect out parameter...
-      if (asImpl().getSendingIndirectOutParameter(pair.first)) {
-        return pair.first;
-      }
-
-      // If this was not an out parameter, return {}.
-      return {};
-    }
-
-    // After going over our loop, if result is not SILValue(), then we found
-    // that our region is not disconnected due only to a single 'indirect out'
-    // parameter. If SILValue() then we had all disconnected values. If we found
-    // multiple non-disconnected things, we would have bailed earlier in the
-    // loop itself.
-    return {};
-  }
-  
   /// Given the region \p regionOfInOutSendingParam containing the 'inout
   /// sending' parameter \p firstInOutSendingParam, see if that region contains
   /// any other 'inout sending' parameters with greater element numbers than \p
@@ -1884,28 +1637,13 @@ public:
     if (shouldEmitVerboseLogging()) {
       REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "Applying: ";
                                        op.print(llvm::dbgs()));
-      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: "; p.print(
-          llvm::dbgs(), [&](llvm::raw_ostream &os, Region region) -> bool {
-            auto regionInfo = getIsolationRegionInfo(region);
-            if (regionInfo.isDisconnected())
-              return false;
-            regionInfo.printForOneLineLogging(op.getSourceInst()->getFunction(),
-                                              os);
-            return true;
-          }));
+      REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    Before: ";
+                                       p.print(llvm::dbgs()));
     }
     SWIFT_DEFER {
       if (shouldEmitVerboseLogging()) {
-        REGIONBASEDISOLATION_VERBOSE_LOG(
-            llvm::dbgs() << "    After:  ";
-            p.print(llvm::dbgs(), [&](llvm::raw_ostream &os, Region region) {
-              auto regionInfo = getIsolationRegionInfo(region);
-              if (regionInfo.isDisconnected())
-                return false;
-              regionInfo.printForOneLineLogging(
-                  op.getSourceInst()->getFunction(), os);
-              return true;
-            }));
+        REGIONBASEDISOLATION_VERBOSE_LOG(llvm::dbgs() << "    After:  ";
+                                         p.print(llvm::dbgs()));
       }
       assert(p.is_canonical_correct());
     };
@@ -1918,91 +1656,39 @@ public:
 
     switch (op.getKind()) {
     case PartitionOpKind::AssignDirect: {
-      auto destElement = op.getOpArg1();
-      auto srcElement = op.getOpArg2();
-      assert(p.isTrackingElement(srcElement) &&
+      assert(p.isTrackingElement(op.getOpArg2()) &&
              "Assign PartitionOp's source argument should be already tracked");
 
       // First emit any errors if we are assigning a non-disconnected thing into
       // a sending result.
       handleAssignNonDisconnectedIntoSendingResult(op);
 
-      // Check if our actual destElement is directly actor isolated in a way
-      // that does not match our srcElement's region. In that case, the memory
-      // itself is actor isolated and we have to emit an incompatible merge
-      // error.
-      auto destIsolation = getIsolationRegionInfo(destElement);
-      auto srcRegIsolation = getIsolationRegionInfo(p.getRegion(srcElement));
-      if (!srcRegIsolation.merge(destIsolation)) {
-        // If we are not tracking dest yet, we need to start tracking it. We do
-        // not need to do this in the general case since the assign will handle
-        // it. But since we are not assigning, we need to do this now.
-        if (!p.isTrackingElement(destElement)) {
-          p.trackNewElement(destElement);
-        }
-
-        // See if either of our elements are nonisolated(unsafe). In such a
-        // case, we need to avoid emitting the error. We still do not merge
-        // since regions can only have one isolation and we would break that
-        // invariant when looking at other values in the region that are not
-        // marked as nonisolated(unsafe).
-        if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
-          return;
-        return handleError(IncompatibleRegionMergeError(
-            op, srcElement, srcRegIsolation, destElement, destIsolation,
-            RegionMergeReason::Assign));
-      }
-
       // Then perform the actual assignment.
       //
       // NOTE: This does not emit any errors on purpose. We rely on requires and
       // other instructions to emit errors.
-      p.assignElement(destElement, srcElement);
+      p.assignElement(op.getOpArg1(), op.getOpArg2());
       return;
     }
     case PartitionOpKind::AssignIndirect: {
-      auto destElement = op.getOpArg1();
-      auto srcElement = op.getOpArg2();
-      assert(p.isTrackingElement(destElement) &&
+      assert(p.isTrackingElement(op.getOpArg1()) &&
              "Assign PartitionOp's dest argument should be already tracked");
-      assert(p.isTrackingElement(srcElement) &&
+      assert(p.isTrackingElement(op.getOpArg2()) &&
              "Assign PartitionOp's source argument should be already tracked");
 
       // First emit any errors if we are assigning a non-disconnected thing into
       // a sending result.
       handleAssignNonDisconnectedIntoSendingResult(op);
 
-      // Check if our actual destElement is directly actor isolated in a way
-      // that does not match our srcElement's region. In that case, the memory
-      // itself is actor isolated and we have to emit an incompatible merge
-      // error.
-      auto destIsolation = getIsolationRegionInfo(destElement);
-      auto srcRegIsolation = getIsolationRegionInfo(p.getRegion(srcElement));
-      if (!srcRegIsolation.merge(destIsolation)) {
-        // See if either of our elements are nonisolated(unsafe). In such a
-        // case, we need to avoid emitting the error. We still do not merge
-        // since regions can only have one isolation and we would break that
-        // invariant when looking at other values in the region that are not
-        // marked as nonisolated(unsafe).
-        if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
-          return;
-        return handleError(IncompatibleRegionMergeError(
-            op, srcElement, srcRegIsolation, destElement, destIsolation,
-            RegionMergeReason::Assign));
-      }
-
       // Create extra region for our dest and merge it into dest's region.
-      auto oldValueElement = op.getOpArg3();
-      p.trackNewElement(oldValueElement);
-      p.merge(destElement, oldValueElement);
+      p.trackNewElement(op.getOpArg3());
+      p.merge(op.getOpArg1(), op.getOpArg3());
 
       // Then perform the actual assignment.
       //
       // NOTE: This does not emit any errors on purpose. We rely on requires and
       // other instructions to emit errors.
-      p.assignElement(destElement, srcElement);
+      p.assignElement(op.getOpArg1(), op.getOpArg2());
       return;
     }
     case PartitionOpKind::AssignFresh: {
@@ -2072,7 +1758,9 @@ public:
       // Mark op.getOpArg1() as sent.
       SendingOperandState &state = operandToStateMap.get(op.getSourceOp());
       state.isClosureCaptured |= regionHasClosureCapturedElt;
-      if (!state.merge(sentRegionIsolation)) {
+      if (auto newInfo = state.isolationInfo.merge(sentRegionIsolation)) {
+        state.isolationInfo = *newInfo;
+      } else {
         handleError(UnknownCodePatternError(op));
       }
       assert(state.isolationInfo && "Cannot have unknown");
@@ -2090,39 +1778,19 @@ public:
       return;
     }
     case PartitionOpKind::Merge: {
-      auto destElement = op.getOpArg1();
-      auto srcElement = op.getOpArg2();
-      assert(p.isTrackingElement(destElement) &&
-             p.isTrackingElement(srcElement) &&
+      assert(p.isTrackingElement(op.getOpArg1()) &&
+             p.isTrackingElement(op.getOpArg2()) &&
              "Merge PartitionOp's arguments should already be tracked");
 
       // Emit an error if we are assigning a non-disconnected thing into a
       // sending result.
       handleAssignNonDisconnectedIntoSendingResult(op);
 
-      // Check if we can merge our two regions successfully. If we cannot, we
-      // need to emit an error and not perform the actual merge.
-      auto destRegIsolation = getIsolationRegionInfo(p.getRegion(destElement));
-      auto srcRegIsolation = getIsolationRegionInfo(p.getRegion(srcElement));
-      if (!destRegIsolation.merge(srcRegIsolation)) {
-        // See if either of our elements are nonisolated(unsafe). In such a
-        // case, we need to avoid emitting the error. We still do not merge
-        // since regions can only have one isolation and we would break that
-        // invariant when looking at other values in the region that are not
-        // marked as nonisolated(unsafe).
-        if (getIsolationRegionInfo(srcElement).isUnsafeNonIsolated() ||
-            getIsolationRegionInfo(destElement).isUnsafeNonIsolated())
-          return;
-        return handleError(IncompatibleRegionMergeError(
-            op, srcElement, srcRegIsolation, destElement, destRegIsolation,
-            op.getRegionMergeReason()));
-      }
-
       // Then perform the actual merge.
       //
       // NOTE: This does not emit any errors on purpose. We rely on requires and
       // other instructions to emit errors.
-      p.merge(srcElement, destElement);
+      p.merge(op.getOpArg1(), op.getOpArg2());
       return;
     }
     case PartitionOpKind::Require:
@@ -2139,8 +1807,9 @@ public:
              "Require PartitionOp's argument should already be tracked");
 
       // First check if the region of our 'inout sending' element has been
-      // sent. In that case, we emit a special error so that the user knows that
-      // they need to reinitialize the 'inout sending' parameter.
+      // sent. In that case, we emit a special use after free error so that the
+      // user knows that they need to reinitialize the 'inout sending'
+      // parameter.
       if (auto *sentOperandSet = p.getSentOperandSet(op.getOpArg1())) {
         for (auto sentOperand : sentOperandSet->data()) {
           handleError(InOutSendingNotInitializedAtExitError(op, op.getOpArg1(),
@@ -2200,8 +1869,6 @@ public:
         // exit error... check if our dynamic region isolation is not
         // disconnected since it is in the same region an out parameter. In that
         // case we want to emit a special 'cannot return value' error.
-        //
-        // This handles task-isolated captures.
         if (auto outParam =
                 findNonDisconnectedOutParameterInRegion(inoutSendingRegion)) {
           handleError(InOutSendingReturnedError(op, op.getOpArg1(),
@@ -2232,7 +1899,7 @@ public:
         return;
       }
 
-      // Finally we could still be returning a disconnected value in the same
+      // Finally We could still be returning a disconnected value in the same
       // region as an 'inout sending' parameter. We cannot allow that since the
       // caller considers 'inout sending' values to be in their own region on
       // function return. So it would assume that it could potentially send the
@@ -2247,21 +1914,6 @@ public:
         dynamicRegionIsolation = {isolation};
       }
 
-      // Then check if we have a sending out parameter. This will actually be
-      // disconnected unlike most other out parameters that are
-      // task-isolated. So it will look like we have a disconnected value, but
-      // we do not want to allow for an 'inout sending' parameter to also be
-      // returned as a 'sending' result since it would potentially allow for
-      // them to be send separately.
-      if (auto outParam =
-          findSendingOutParameterInRegion(inoutSendingRegion)) {
-        handleError(InOutSendingReturnedError(op, op.getOpArg1(),
-                                              outParam.value(),
-                                              dynamicRegionIsolation));
-        return;
-      }
-
-      // If we did not, then handle the direct return case.
       handleDirectReturn();
       return;
     }
@@ -2271,7 +1923,6 @@ public:
 
       // Then emit an unknown code pattern error.
       return handleError(UnknownCodePatternError(op));
-
     case PartitionOpKind::NonSendableIsolationCrossingResult: {
       // Then emit the error.
       return handleError(
@@ -2460,10 +2111,6 @@ struct PartitionOpEvaluatorBaseImpl : PartitionOpEvaluator<Subclass> {
   /// return that value.
   SILValue getIndirectOutParameter(Element elt) const { return {}; }
 
-  /// If \p elt maps to a representative that is a sending indirect out parameter,
-  /// return that value.
-  SILValue getSendingIndirectOutParameter(Element elt) const { return {}; }
-  
   /// If \p elt maps to a representative that is an 'inout sending' parameter
   /// that returns that value.
   SILValue getInOutSendingParameter(Element elt) const { return {}; }

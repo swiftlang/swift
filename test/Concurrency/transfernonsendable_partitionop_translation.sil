@@ -66,9 +66,6 @@ enum SendableEnum : @unchecked Sendable {
 protocol NonSendableProtocol {
 }
 
-protocol NonSendableClassProtocol : AnyObject {
-}
-
 class DerivedKlass : NonSendableKlass {}
 
 class KlassWithField {
@@ -600,30 +597,6 @@ bb0(%0 : @guaranteed $NonSendableKlass):
   %2 = init_existential_ref %1 : $NonSendableKlass : $NonSendableKlass, $AnyObject
   specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
   destroy_value %2
-  %r = tuple ()
-  return %r : $()
-}
-
-// When init_existential_ref has a formal concrete type with an opened archetype,
-// the fix merges the result into the operand regions instead of creating a new
-// isolated-conformance region.
-//
-// CHECK-LABEL: begin running test {{.*}} on test_init_existential_ref_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
-// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
-// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $any NonSendableClassProtocol
-// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
-// CHECK-NEXT:     Rep Value:   %1 = open_existential_ref %0 : $any NonSendableClassProtocol to $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self
-// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
-// CHECK-NEXT:     Rep Value:   %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
-// CHECK-NEXT: require %%1:   %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
-// CHECK-NEXT: require %%1:   %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
-// CHECK-NEXT: assign_direct %%2 = %%1:   %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
-// CHECK-NEXT: end running test {{.*}} on test_init_existential_ref_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
-sil [ossa] @test_init_existential_ref_opened_archetype : $@convention(thin) (@guaranteed any NonSendableClassProtocol) -> () {
-bb0(%0 : @guaranteed $any NonSendableClassProtocol):
-  %1 = open_existential_ref %0 : $any NonSendableClassProtocol to $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self
-  %2 = init_existential_ref %1 : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self : $@opened("00000000-0000-0000-0000-000000000021", any NonSendableClassProtocol) Self, $any NonSendableClassProtocol
-  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
   %r = tuple ()
   return %r : $()
 }
@@ -1512,7 +1485,7 @@ bb0(%0 : @guaranteed $NonSendableKlass, %1 : @owned $NonSendableKlass):
 // CHECK-NEXT: require %%0:   %7 = apply %6(%1, %0, %3) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @in NonSendableStruct) -> ()
 // CHECK-NEXT: require %%4:   %7 = apply %6(%1, %0, %3) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @in NonSendableStruct) -> ()
 // CHECK-NEXT: merge %%1 with %%0:   %7 = apply %6(%1, %0, %3) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @in NonSendableStruct) -> ()
-// CHECK-NEXT: merge %%1 with %%4:   %7 = apply %6(%1, %0, %3) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @in NonSendableStruct) -> ()
+// CHECK-NEXT: merge %%0 with %%4:   %7 = apply %6(%1, %0, %3) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @in NonSendableStruct) -> ()
 // CHECK-NEXT: end running test {{.*}} on test_apply_three_mixed_params: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_apply_three_mixed_params : $@convention(thin) (@guaranteed NonSendableKlass, @owned NonSendableKlass, @owned NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass, %1 : @owned $NonSendableKlass, %2 : @owned $NonSendableKlass):
@@ -1551,8 +1524,8 @@ bb0(%0 : @guaranteed $NonSendableKlass, %1 : @owned $NonSendableKlass, %2 : @own
 // CHECK-NEXT: require %%5:   %11 = apply %10(%1, %0, %4, %7) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @inout NonSendableStruct, @in_guaranteed NonSendableStruct) -> ()
 // CHECK-NEXT: require %%6:   %11 = apply %10(%1, %0, %4, %7) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @inout NonSendableStruct, @in_guaranteed NonSendableStruct) -> ()
 // CHECK-NEXT: merge %%1 with %%0:   %11 = apply %10(%1, %0, %4, %7) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @inout NonSendableStruct, @in_guaranteed NonSendableStruct) -> ()
-// CHECK-NEXT: merge %%1 with %%5:   %11 = apply %10(%1, %0, %4, %7) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @inout NonSendableStruct, @in_guaranteed NonSendableStruct) -> ()
-// CHECK-NEXT: merge %%1 with %%6:   %11 = apply %10(%1, %0, %4, %7) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @inout NonSendableStruct, @in_guaranteed NonSendableStruct) -> ()
+// CHECK-NEXT: merge %%0 with %%5:   %11 = apply %10(%1, %0, %4, %7) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @inout NonSendableStruct, @in_guaranteed NonSendableStruct) -> ()
+// CHECK-NEXT: merge %%5 with %%6:   %11 = apply %10(%1, %0, %4, %7) : $@convention(thin) (@owned NonSendableKlass, @guaranteed NonSendableKlass, @inout NonSendableStruct, @in_guaranteed NonSendableStruct) -> ()
 // CHECK-NEXT: end running test {{.*}} on test_apply_four_mixed_params: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
 sil [ossa] @test_apply_four_mixed_params : $@convention(thin) (@guaranteed NonSendableKlass, @owned NonSendableKlass, @owned NonSendableKlass, @owned NonSendableKlass) -> () {
 bb0(%0 : @guaranteed $NonSendableKlass, %1 : @owned $NonSendableKlass, %2 : @owned $NonSendableKlass, %3 : @owned $NonSendableKlass):
@@ -2067,7 +2040,10 @@ bb3:
 // CHECK-LABEL: begin running test {{.*}} on test_checked_cast_br: sil_regionanalysis_partitionoptranslation with: @instruction
 // CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
 // CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $AnyObject
+// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
+// CHECK-NEXT:     Rep Value: %2 = argument of bb1 : $NonSendableKlass
 // CHECK-NEXT: require %%0:   checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2
+// CHECK-NEXT: assign_direct %%1 = %%0:   checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2
 // CHECK-NEXT: end running test {{.*}} on test_checked_cast_br: sil_regionanalysis_partitionoptranslation with: @instruction
 sil [ossa] @test_checked_cast_br : $@convention(thin) (@owned AnyObject) -> () {
 bb0(%0 : @owned $AnyObject):
@@ -2079,58 +2055,6 @@ bb1(%casted : @owned $NonSendableKlass):
   br bb3
 
 bb2(%original : @owned $AnyObject):
-  destroy_value %original
-  br bb3
-
-bb3:
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: begin running test 1 of 1 on test_checked_cast_br_success_block: sil_regionanalysis_partitionoptranslation_block with: @block
-// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
-// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $AnyObject                 // user: %1
-// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
-// CHECK-NEXT:     Rep Value: %2 = argument of bb1 : $NonSendableKlass          // user: %3
-// CHECK-NEXT: assign_fresh %%1:   destroy_value %2 : $NonSendableKlass            // id: %3
-// CHECK-NEXT: merge %%1 with %%0:   checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2 // id: %1
-// CHECK-NEXT: end running test 1 of 1 on test_checked_cast_br_success_block: sil_regionanalysis_partitionoptranslation_block with: @block
-sil [ossa] @test_checked_cast_br_success_block : $@convention(thin) (@owned AnyObject) -> () {
-bb0(%0 : @owned $AnyObject):
-  checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2
-
-bb1(%casted : @owned $NonSendableKlass):
-  specify_test "sil_regionanalysis_partitionoptranslation_block @block"
-  destroy_value %casted
-  br bb3
-
-bb2(%original : @owned $AnyObject):
-  destroy_value %original
-  br bb3
-
-bb3:
-  %r = tuple ()
-  return %r : $()
-}
-
-// CHECK-LABEL: begin running test 1 of 1 on test_checked_cast_br_failure_block: sil_regionanalysis_partitionoptranslation_block with: @block
-// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: no][is_sendable: no][region_value_kind: task-isolated].
-// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $AnyObject                 // user: %1
-// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
-// CHECK-NEXT:     Rep Value: %5 = argument of bb2 : $AnyObject                 // user: %6
-// CHECK-NEXT: assign_fresh %%1:   destroy_value %5 : $AnyObject                   // id: %6
-// CHECK-NEXT: assign_direct %%1 = %%0:   checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2 // id: %1
-// CHECK-NEXT: end running test 1 of 1 on test_checked_cast_br_failure_block: sil_regionanalysis_partitionoptranslation_block with: @block
-sil [ossa] @test_checked_cast_br_failure_block : $@convention(thin) (@owned AnyObject) -> () {
-bb0(%0 : @owned $AnyObject):
-  checked_cast_br AnyObject in %0 : $AnyObject to NonSendableKlass, bb1, bb2
-
-bb1(%casted : @owned $NonSendableKlass):
-  destroy_value %casted
-  br bb3
-
-bb2(%original : @owned $AnyObject):
-  specify_test "sil_regionanalysis_partitionoptranslation_block @block"
   destroy_value %original
   br bb3
 
@@ -2421,35 +2345,6 @@ bb0(%0 : @guaranteed $NonSendableKlass):
   store %copy to [init] %addr
   destroy_addr %exist
   dealloc_stack %exist
-  %r = tuple ()
-  return %r : $()
-}
-
-// When init_existential_addr has a formal concrete type with an opened
-// archetype, the fix merges the result into the operand regions instead of
-// creating a new isolated-conformance region.
-//
-// CHECK-LABEL: begin running test {{.*}} on test_init_existential_addr_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
-// CHECK-NEXT: %%0: TrackableValue. State: TrackableValueState[id: 0][is_no_alias: yes][is_sendable: no][region_value_kind: task-isolated].
-// CHECK-NEXT:     Rep Value: %0 = argument of bb0 : $*any NonSendableProtocol
-// CHECK-NEXT: %%1: TrackableValue. State: TrackableValueState[id: 1][is_no_alias: yes][is_sendable: no][region_value_kind: disconnected].
-// CHECK-NEXT:     Rep Value:   %1 = alloc_stack $any NonSendableProtocol
-// CHECK-NEXT: %%2: TrackableValue. State: TrackableValueState[id: 2][is_no_alias: no][is_sendable: no][region_value_kind: disconnected].
-// CHECK-NEXT:     Rep Value:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
-// CHECK-NEXT: require %%1:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
-// CHECK-NEXT: require %%0:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
-// CHECK-NEXT: merge %%1 with %%0:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
-// CHECK-NEXT: assign_direct %%2 = %%1:   %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
-// CHECK-NEXT: end running test {{.*}} on test_init_existential_addr_opened_archetype: sil_regionanalysis_partitionoptranslation with: @instruction[-1]
-sil [ossa] @test_init_existential_addr_opened_archetype : $@convention(thin) (@in_guaranteed any NonSendableProtocol) -> () {
-bb0(%0 : $*any NonSendableProtocol):
-  %1 = alloc_stack $any NonSendableProtocol
-  %2 = open_existential_addr immutable_access %0 : $*any NonSendableProtocol to $*@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
-  %3 = init_existential_addr %1 : $*any NonSendableProtocol, $@opened("00000000-0000-0000-0000-000000000020", any NonSendableProtocol) Self
-  specify_test "sil_regionanalysis_partitionoptranslation @instruction[-1]"
-  copy_addr %2 to [init] %3
-  destroy_addr %1
-  dealloc_stack %1
   %r = tuple ()
   return %r : $()
 }

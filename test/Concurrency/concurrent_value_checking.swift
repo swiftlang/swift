@@ -45,7 +45,7 @@ actor A2 {
 
   nonisolated init(nonisoAsync value: NotConcurrent, _ c: Int) async {
     if c == 0 {
-      await self.init(valueAsync: value) // expected-warning {{passing 'value' to 'self'-isolated initializer 'init(valueAsync:)' risks causing data races}}
+      await self.init(valueAsync: value)
     } else {
       self.init(value: value)
     }

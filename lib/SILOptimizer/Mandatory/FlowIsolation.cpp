@@ -10,24 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
-#define DEBUG_TYPE "sil-flow-isolation"
+#define DEBUG_TYPE "flow-isolation"
 
 #include "DiagnosticHelpers.h"
 
+#include "swift/AST/Expr.h"
 #include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DiagnosticsSIL.h"
-#include "swift/AST/Expr.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
-#include "swift/SIL/BitDataflow.h"
-#include "swift/SIL/DebugUtils.h"
-#include "swift/SIL/OperandDatastructures.h"
-#include "swift/SILOptimizer/Analysis/RegionAnalysis.h"
-#include "swift/SILOptimizer/PassManager/Transforms.h"
-#include "swift/SILOptimizer/Utils/VariableNameUtils.h"
 #include "swift/Sema/Concurrency.h"
+#include "swift/SIL/ApplySite.h"
+#include "swift/SIL/BitDataflow.h"
+#include "swift/SIL/BasicBlockBits.h"
+#include "swift/SIL/DebugUtils.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SIL/OperandDatastructures.h"
 
 #include "llvm/Support/WithColor.h"
 
@@ -49,22 +47,6 @@ static SILFunction* getCallee(SILInstruction *someInst) {
     if (SILFunction *callee = apply.getCalleeFunction())
       return callee;
   return nullptr;
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic
-loggedDiagnoseErrorAndHighlight(const SILInstruction *inst, Diag<T...> diag,
-                                U &&...args) {
-  LLVM_DEBUG(llvm::dbgs() << "Emitting error at: " << *inst);
-  return diagnoseErrorAndHighlight(inst, std::move(diag), std::move(args)...);
-}
-
-template <typename... T, typename... U>
-static InFlightDiagnostic
-loggedDiagnoseNoteAndHighlight(const SILInstruction *inst, Diag<T...> diag,
-                               U &&...args) {
-  LLVM_DEBUG(llvm::dbgs() << "Emitting note at: " << *inst);
-  return diagnoseNoteAndHighlight(inst, std::move(diag), std::move(args)...);
 }
 
 //===----------------------------------------------------------------------===//
@@ -188,130 +170,6 @@ static bool isWithinDeinit(SILFunction *fn) {
 
 namespace {
 
-class IsolationInfoCache {
-  RegionAnalysisFunctionInfo *rafi;
-  llvm::DenseMap<std::pair<SILInstruction *, SILValue>,
-                 SILDynamicMergedIsolationInfo>
-      cache;
-
-  struct ComputeEvaluator final
-      : public PartitionOpEvaluatorBaseImpl<ComputeEvaluator> {
-    RegionAnalysisFunctionInfo *rafi;
-    ComputeEvaluator(RegionAnalysisFunctionInfo *rafi,
-                     Partition &workingPartition)
-        : PartitionOpEvaluatorBaseImpl(workingPartition,
-                                       rafi->getOperandSetFactory(),
-                                       rafi->getSendingOperandToStateMap()),
-          rafi(rafi) {}
-
-    SILIsolationInfo getIsolationRegionInfo(Element elt) const {
-      return rafi->getValueMap().getIsolationRegion(elt);
-    }
-
-    std::optional<Element> getElement(SILValue value) const {
-      auto trackableValue = rafi->getValueMap().getTrackableValue(value);
-      if (trackableValue.value.isSendable())
-        return {};
-      return trackableValue.value.getID();
-    }
-
-    regionanalysisimpl::TrackableValueLookupResult
-    lookupValue(SILValue value) const {
-      return rafi->getValueMap().getTrackableValue(value);
-    }
-
-    SILValue getRepresentative(SILValue value) const {
-      return rafi->getValueMap()
-          .getTrackableValue(value)
-          .value.getRepresentative()
-          .maybeGetValue();
-    }
-
-    SILDynamicMergedIsolationInfo getIsolation(Region reg) {
-      return PartitionOpEvaluator<ComputeEvaluator>::getIsolationRegionInfo(
-          reg);
-    }
-
-    RepresentativeValue getRepresentativeValue(Element element) const {
-      return rafi->getValueMap().getRepresentativeValue(element);
-    }
-
-    bool isClosureCaptured(Element elt, Operand *op) const {
-      auto iter = rafi->getValueMap().maybeGetRepresentative(elt);
-      if (!iter)
-        return false;
-      return rafi->isClosureCaptured(iter, op);
-    }
-  };
-
-public:
-  IsolationInfoCache(RegionAnalysisFunctionInfo *rafi) : rafi(rafi) {}
-
-  SILDynamicMergedIsolationInfo getIsolationInfoAtInst(SILInstruction *inst,
-                                                       SILValue value) const {
-    // If we are not in a supported function, just return invalid always.
-    if (!rafi->isSupportedFunction())
-      return {};
-
-    // First try_emplace with a default value.
-    auto *self = const_cast<IsolationInfoCache *>(this);
-    auto iter = self->cache.try_emplace({inst, value}, SILIsolationInfo());
-
-    // If we failed to insert, we already have a value... just return that.
-    if (!iter.second)
-      return iter.first->second;
-
-    // Otherwise, we need to find the actual isolation of the value.
-    auto blockState = rafi->getBlockState(inst->getParent());
-    if (blockState.isNull() || !blockState.get()->getLiveness()) {
-      // If our block state is null or we have a dead block, just return
-      // invalid.
-      iter.first->getSecond() = SILIsolationInfo();
-      return iter.first->getSecond();
-    }
-
-    // Grab its entry partition and setup an evaluator for the partition that
-    // has callbacks that emit diagnsotics...
-    Partition workingPartition = blockState.get()->getEntryPartition();
-    ComputeEvaluator eval(rafi, workingPartition);
-
-    // And then evaluate all of our partition ops on the entry partition until
-    // we hit our instruction.
-    auto partitionOps = blockState.get()->getPartitionOps();
-    while (!partitionOps.empty()) {
-      const auto &next = partitionOps.front();
-      if (next.getSourceInst() == inst)
-        break;
-      partitionOps = partitionOps.drop_front();
-      eval.apply(next);
-    }
-
-    // Now look up our trackable value lookup result.
-    auto lookupResult = eval.lookupValue(value);
-
-    // First see if our lookup result is Sendable...
-    if (lookupResult.value.isSendable()) {
-      // In such a case, see if we have a base value that is non-Sendable. If
-      // so, use its isolation.
-      if (auto base = lookupResult.base) {
-        auto isolation =
-            eval.getIsolation(workingPartition.getRegion(base->getID()));
-        iter.first->getSecond() = isolation;
-        return iter.first->getSecond();
-      }
-
-      // Otherwise, return an invalid isolation.
-      iter.first->getSecond() = SILIsolationInfo();
-      return iter.first->getSecond();
-    }
-
-    auto isolation = eval.getIsolation(
-        workingPartition.getRegion(lookupResult.value.getID()));
-    iter.first->getSecond() = isolation;
-    return iter.first->getSecond();
-  }
-};
-
 /// Carries the state of analysis for an entire SILFunction.
 class FunctionInfo : public BasicBlockData<BlockInfo> {
 private:
@@ -336,24 +194,16 @@ public:
   std::optional<std::pair<SILBasicBlock *, LatticeState::Kind>> normalReturn =
       std::nullopt;
 
-  RegionAnalysis *ra;
-  RegionAnalysisFunctionInfo *rafi;
-
-  IsolationInfoCache isolationInfoCache;
-
-  /// Indicates whether the SILFunction is (or contained in) a deinit.
+  /// indicates whether the SILFunction is (or contained in) a deinit.
   bool forDeinit;
 
-  // Use a worklist to track the uses left to be searched.
-  std::optional<OperandWorklist> worklist;
-
-  FunctionInfo(SILFunction *fn, RegionAnalysis *ra)
-      : BasicBlockData<BlockInfo>(fn), flow(fn, LatticeState::NumStates),
-        ra(ra), rafi(ra->get(fn)), isolationInfoCache(rafi),
-        forDeinit(isWithinDeinit(fn)), worklist(fn) {}
+  FunctionInfo(SILFunction *fn)
+      : BasicBlockData<BlockInfo>(fn), flow(fn, LatticeState::NumStates) {
+    forDeinit = isWithinDeinit(fn);
+  }
 
   // analyzes the function for uses of `self`.
-  void analyze(SILValue selfParam);
+  void analyze(const SILArgument* selfParam);
 
   // Solves the data-flow problem, assuming analysis has been performed.
   void solve();
@@ -406,7 +256,7 @@ public:
       return *(deferBlocks[someFn]);
 
     // otherwise, insert fresh info and retry.
-    deferBlocks.insert({someFn, std::make_unique<FunctionInfo>(someFn, ra)});
+    deferBlocks.insert({someFn, std::make_unique<FunctionInfo>(someFn)});
     return getOrCreateDeferInfo(someFn);
   }
 
@@ -426,91 +276,16 @@ public:
     return startingIsolation == LatticeState::Nonisolated;
   }
 
-  void lookThroughInst(SILInstruction *i) {
-    LLVM_DEBUG(llvm::dbgs() << "Looking through: " << *i);
-    worklist->pushResultOperandsIfNotVisited(i);
-  }
-
-  void lookThroughValue(SILValue v) {
-    LLVM_DEBUG(llvm::dbgs() << "Looking through: " << v);
-    worklist->pushResultOperandsIfNotVisited(v);
-  }
-
-  void markIgnored(SILInstruction *i) {
-    LLVM_DEBUG(llvm::dbgs() << "Ignoring: " << *i);
-  }
-
   /// Records that the instruction accesses an isolated property.
-  void markPropertyUse(Operand *i, bool isDefault = false) {
-    // If we have an actor isolated function and the isolation of our value at
-    // out user matches the function, we should not error.
-    //
-    // E.x.:
-    //
-    // @MainActor
-    // struct S {
-    //   @MainActor var x: NS
-    //   @CustomActor var y: NS
-    //
-    //   nonisolated func trigger() {}
-    //
-    //   @CustomActor init() {
-    //     x = NS()
-    //     y = NS()
-    //     trigger()
-    //     _ = x // Error here.
-    //     _ = y // But not here b/c y is @CustomActor.
-    //   }
-    //
-    auto funcIsolation = rafi->getFunction()->getActorIsolation();
-    if (funcIsolation.isActorIsolated()) {
-      // If our use is Non-Sendable, then we can rely on region isolation.
-      if (SILIsolationInfo::isNonSendable(i->get())) {
-        if (auto iso = isolationInfoCache.getIsolationInfoAtInst(i->getUser(),
-                                                                 i->get())) {
-          if (iso->isActorIsolated() &&
-              iso->getActorIsolation() == funcIsolation) {
-            LLVM_DEBUG(llvm::dbgs() << "isolated use that is safe b/c value is "
-                                       "isolated to same as constructor: "
-                                    << "Op Num. " << i->getOperandNumber()
-                                    << ". User: " << *i->getUser());
-            return;
-          }
-        }
-      } else {
-        // If our operand was Sendable, we may have our traversal at a
-        // projection. See if we can find a VarDecl for it.
-        if (auto *svi = dyn_cast<SingleValueInstruction>(i->getUser());
-            llvm::isa_and_present<StructElementAddrInst, RefElementAddrInst>(
-                svi)) {
-          Projection proj(svi);
-          if (auto *decl = proj.getVarDecl(svi->getOperand(0)->getType())) {
-            if (auto declIsolation = swift::getActorIsolation(decl);
-                declIsolation && declIsolation.isActorIsolated() &&
-                declIsolation == funcIsolation) {
-              LLVM_DEBUG(llvm::dbgs()
-                         << "isolated use that is safe b/c value is "
-                            "isolated to same as constructor. Op Num: "
-                         << i->getOperandNumber()
-                         << ". User: " << *i->getUser());
-              return;
-            }
-          }
-        }
-      }
-    }
-
-    LLVM_DEBUG(llvm::dbgs()
-               << (isDefault ? "Default pattern match. " : "")
-               << "Marking as isolated: OpNum: " << i->getOperandNumber()
-               << ". User: " << *i->getUser());
+  void markPropertyUse(Operand *i) {
+    LLVM_DEBUG(llvm::dbgs() << "marking as isolated: " << *i);
     auto &blockData = this->operator[](i->getParentBlock());
     blockData.propertyUses.insert(i);
   }
 
   /// Records that the instruction causes 'self' to become nonisolated.
   void markNonIsolated(SILInstruction *i) {
-    LLVM_DEBUG(llvm::dbgs() << "Marking as non-isolated: " << *i);
+    LLVM_DEBUG(llvm::dbgs() << "marking as non-isolated: " << *i);
     auto &blockData = this->operator[](i->getParent());
     blockData.nonisolatedUses.insert(i);
   }
@@ -672,10 +447,10 @@ describe(SILInstruction *blame) {
 
   // handle other non-call blames.
   switch (blame->getKind()) {
-  case SILInstructionKind::CopyValueInst:
-    return std::make_tuple("making a copy of", "", ctx.Id_self);
-  default:
-    return std::make_tuple("this use of", "", ctx.Id_self);
+    case SILInstructionKind::CopyValueInst:
+      return std::make_tuple("making a copy of", "", ctx.Id_self);
+    default:
+      return std::make_tuple("this use of", "", ctx.Id_self);
   }
 }
 
@@ -730,43 +505,22 @@ void BlockInfo::diagnoseAll(FunctionInfo &info, bool forDeinit,
       // Init accessor `setter` use.
       auto *accessor =
           cast<AccessorDecl>(callee->getLocation().getAsDeclContext());
-      loggedDiagnoseErrorAndHighlight(
-          use->getUser(),
-          diag::isolated_property_mutation_in_nonisolated_context,
-          accessor->getStorage(), accessor->isSetter())
+      diagnoseError(use,
+                    diag::isolated_property_mutation_in_nonisolated_context,
+                    accessor->getStorage(), accessor->isSetter())
           .warnUntilLanguageMode(LanguageMode::v6);
       continue;
     }
 
     auto *user = use->getUser();
-    StringRef isolation = "nonisolated";
-    auto functionIsolation = user->getFunction()->getActorIsolation();
-    if (functionIsolation.isActorIsolated()) {
-      SmallString<64> temp;
-      {
-        llvm::raw_svector_ostream os(temp);
-        functionIsolation.printForDiagnostics(os);
-      }
+    assert(isa<RefElementAddrInst>(user) &&
+           "only expecting one kind of instr.");
 
-      isolation =
-          user->getFunction()->getASTContext().getIdentifier(temp).str();
-    }
+    VarDecl *var = cast<RefElementAddrInst>(user)->getField();
 
-    if (auto *rfi = dyn_cast<RefElementAddrInst>(user)) {
-      loggedDiagnoseErrorAndHighlight(rfi, diag::isolated_after_nonisolated,
-                                      forDeinit, rfi->getField(), isolation)
-          .warnUntilLanguageMode(LanguageMode::v6);
-    } else if (auto *seai = dyn_cast<StructElementAddrInst>(user)) {
-      loggedDiagnoseErrorAndHighlight(seai, diag::isolated_after_nonisolated,
-                                      forDeinit, seai->getField(), isolation)
-          .warnUntilLanguageMode(LanguageMode::v6);
-    } else {
-      auto name = VariableNameInferrer::inferName(use->get());
-      loggedDiagnoseErrorAndHighlight(
-          user, diag::isolated_after_nonisolated_identifier, forDeinit, *name,
-          isolation)
-          .warnUntilLanguageMode(LanguageMode::v6);
-    }
+    diagnoseErrorAndHighlight(user, diag::isolated_after_nonisolated, forDeinit,
+                              var)
+        .warnUntilLanguageMode(LanguageMode::v6);
 
     // after <verb><adjective> <subject>, ... can't use self anymore, etc ...
     //   example:
@@ -775,8 +529,8 @@ void BlockInfo::diagnoseAll(FunctionInfo &info, bool forDeinit,
     StringRef adjective;
     DeclName subject;
     std::tie(verb, adjective, subject) = describe(blame);
-    loggedDiagnoseNoteAndHighlight(blame, diag::nonisolated_blame, forDeinit,
-                                   verb, adjective, subject, isolation);
+    diagnoseNoteAndHighlight(blame, diag::nonisolated_blame, forDeinit, verb,
+                             adjective, subject);
   }
 }
 
@@ -786,10 +540,12 @@ void BlockInfo::diagnoseAll(FunctionInfo &info, bool forDeinit,
 
 /// \returns true iff the access is concurrency-safe in a nonisolated context
 /// without an await.
-static bool accessIsConcurrencySafe(SILInstruction *inst, VarDecl *var) {
+static bool accessIsConcurrencySafe(ModuleDecl *module,
+                                    RefElementAddrInst *inst) {
+  VarDecl *var = inst->getField();
+
   // must be accessible from nonisolated.
-  return isLetAccessibleAnywhere(
-      inst->getFunction()->getModule().getSwiftModule(), var);
+  return isLetAccessibleAnywhere(module, var);
 }
 
 /// \returns true iff the ref_element_addr instruction is only used
@@ -825,18 +581,18 @@ static bool diagnoseNonSendableFromDeinit(RefElementAddrInst *inst) {
 /// required.
 /// \param selfParam the parameter of \c getFunction() that should be
 /// treated as \c self
-void FunctionInfo::analyze(SILValue selfParam) {
-  if (!selfParam) {
-    LLVM_DEBUG(llvm::dbgs() << "Analysis. Nullptr selfParam. Skipping!\n");
-    return;
-  }
+void FunctionInfo::analyze(const SILArgument *selfParam) {
+  assert(selfParam && "analyzing a function with no self?");
 
-  LLVM_DEBUG(llvm::dbgs() << "Analysis. Starting value: " << selfParam);
+  ModuleDecl *module = getFunction()->getModule().getSwiftModule();
+
+  // Use a worklist to track the uses left to be searched.
+  OperandWorklist worklist(getFunction());
 
   // Seed with direct users of `self`
-  worklist->pushResultOperandsIfNotVisited(selfParam);
+  worklist.pushResultOperandsIfNotVisited(selfParam);
 
-  while (Operand *operand = worklist->pop()) {
+  while (Operand *operand = worklist.pop()) {
     // A type-dependent use of `self` is an instruction that contains the
     // DynamicSelfType. These instructions do not access any protected
     // state.
@@ -937,37 +693,21 @@ void FunctionInfo::analyze(SILValue selfParam) {
         RefElementAddrInst *refInst = cast<RefElementAddrInst>(user);
 
         // skip auto-generated deinit accesses.
-        if (onlyDeinitAccess(refInst)) {
-          markIgnored(user);
+        if (onlyDeinitAccess(refInst))
           continue;
-        }
 
         // skip known-safe accesses.
-        if (accessIsConcurrencySafe(refInst, refInst->getField())) {
-          markIgnored(user);
+        if (accessIsConcurrencySafe(module, refInst))
           continue;
-        }
 
         // emit a diagnostic and skip if it's non-sendable in a deinit
-        if (forDeinit && diagnoseNonSendableFromDeinit(refInst)) {
-          markIgnored(user);
+        if (forDeinit && diagnoseNonSendableFromDeinit(refInst))
           continue;
-        }
 
         markPropertyUse(operand);
-        continue;
+        break;
       }
-      case SILInstructionKind::StructElementAddrInst: {
-        auto *seai = cast<StructElementAddrInst>(user);
 
-        if (accessIsConcurrencySafe(seai, seai->getField())) {
-          markIgnored(user);
-          continue;
-        }
-
-        markPropertyUse(operand);
-        continue;
-      }
       // Look through certian kinds of single-value instructions.
       case SILInstructionKind::CopyValueInst:
         // TODO: If we had some actual escape analysis information, we could
@@ -975,93 +715,29 @@ void FunctionInfo::analyze(SILValue selfParam) {
         // actually escape the function. We have to be conservative here
         // and assume it might.
         markNonIsolated(user);
-        continue;
+        break;
 
-      // Treat any load as a nonisolated use. (We are treating this as an
-      // escape).
-      case SILInstructionKind::LoadInst:
-      case SILInstructionKind::LoadBorrowInst:
-        markNonIsolated(user);
-        continue;
-
-      case SILInstructionKind::StoreInst:
-      case SILInstructionKind::StoreBorrowInst:
-      case SILInstructionKind::StoreUnownedInst:
-      case SILInstructionKind::StoreWeakInst:
-      case SILInstructionKind::CopyAddrInst: {
-        // If we are the dest of a copy addr inst, treat it as a property
-        // use. If we are the src of a copy addr inst, treat it as a nonisolated
-        // use.
-        if (operand->getOperandNumber() == CopyLikeInstruction::Src) {
-          markNonIsolated(user);
-          continue;
-        }
-        markPropertyUse(operand);
-        continue;
-      }
-      case SILInstructionKind::MarkUnresolvedMoveAddrInst:
-      case SILInstructionKind::MarkUnresolvedNonCopyableValueInst:
-      case SILInstructionKind::MarkUnresolvedReferenceBindingInst:
-      case SILInstructionKind::UncheckedRefCastInst:
-      case SILInstructionKind::UnconditionalCheckedCastInst:
-      case SILInstructionKind::UncheckedOwnershipConversionInst:
       case SILInstructionKind::BeginAccessInst:
       case SILInstructionKind::BeginBorrowInst:
       case SILInstructionKind::EndInitLetRefInst: {
-        lookThroughInst(user);
-        continue;
+        auto *svi = cast<SingleValueInstruction>(user);
+        worklist.pushResultOperandsIfNotVisited(svi);
+        break;
       }
 
-      case SILInstructionKind::BuiltinInst: {
-        auto *bi = cast<BuiltinInst>(user);
-        if (auto bk = bi->getBuiltinKind()) {
-          switch (*bk) {
-          case BuiltinValueKind::DestroyDefaultActor:
-          case BuiltinValueKind::InitializeDefaultActor:
-            markIgnored(user);
-            continue;
-          default:
-            break;
-          }
-        }
-        markPropertyUse(operand, true /*default*/);
-        continue;
+      case SILInstructionKind::BranchInst: {
+        auto *arg = cast<BranchInst>(user)->getArgForOperand(operand);
+        worklist.pushResultOperandsIfNotVisited(arg);
+        break;
       }
 
-      case SILInstructionKind::BranchInst:
-        lookThroughValue(cast<BranchInst>(user)->getArgForOperand(operand));
-        continue;
 
-        // We ignore return inst. We rely on the type checker to make sure that
-        // this is safe.
-      case SILInstructionKind::ReturnInst:
-        markIgnored(user);
-        continue;
-
-      case SILInstructionKind::DestroyAddrInst:
-      case SILInstructionKind::DestroyValueInst:
-      case SILInstructionKind::DeallocStackInst:
-      case SILInstructionKind::DebugValueInst:
-      case SILInstructionKind::EndBorrowInst:
-      case SILInstructionKind::EndAccessInst:
-      case SILInstructionKind::EndLifetimeInst:
-      case SILInstructionKind::ClassMethodInst:
-      case SILInstructionKind::ValueMetatypeInst:
-        markIgnored(user);
-        // Ignore these.
-        continue;
       default:
-#if false        
-        // Anything we do not understand mark as a property use to be
-        // conservative.
-        markPropertyUse(operand, true /*default*/);
-#else
-        // For now if we do not understand something, just ignore it to restore
-        // the previous behavior.
-        markIgnored(user);
-#endif
-        continue;
-      }
+        // don't follow this instruction.
+        LLVM_DEBUG(llvm::dbgs() << DEBUG_TYPE << " def-use walk skipping: "
+                       << *user);
+        break;
+    }
   }
 }
 
@@ -1185,46 +861,13 @@ void FunctionInfo::emitDiagnostics() {
 //                            MARK: Top Level Code
 //===----------------------------------------------------------------------===//
 
-/// If \p arg is not a metatype, just wrap it in a SILValue and return
-/// it. Otherwise, we need to go look for the alloc_stack that is storing self.
-static SILValue findSelf(const SILArgument *arg) {
-  if (!arg->getType().isMetatype())
-    return arg;
-  // Self will always be defined in the first block. So if we have a metatype,
-  // just walk the first block to find the stack, ref, box that contains it.
-  for (auto &ii : *arg->getParent()) {
-    // TODO: Can we for a non-copyable type use an alloc_box if it is captured?
-    if (auto *abi = dyn_cast<AllocStackInst>(&ii)) {
-      if (auto *decl = abi->getDecl(); decl && decl->isSelfParameter()) {
-        return abi;
-      }
-      continue;
-    }
-
-    if (auto *ari = dyn_cast<AllocRefInst>(&ii)) {
-      if (auto *decl = ari->getDecl(); decl && decl->isSelfParameter())
-        return ari;
-      continue;
-    }
-
-    if (auto *abi = dyn_cast<AllocBoxInst>(&ii)) {
-      if (auto *decl = abi->getDecl(); decl && decl->isSelfParameter())
-        return abi;
-      continue;
-    }
-  }
-  return SILValue();
-}
-
 /// Performs flow-sensitive actor-isolation checking on the given SILFunction.
-static void checkFlowIsolation(SILFunction *fn, RegionAnalysis *ra) {
+void checkFlowIsolation(SILFunction *fn) {
   assert(fn->hasSelfParam() && "cannot analyze without a self param!");
-  LLVM_DEBUG(llvm::dbgs() << "**** CHECKING FLOW ISOLATION: " << fn->getName()
-                          << '\n');
 
   // Step 1 -- Analyze uses of `self` within the function.
-  FunctionInfo info(fn, ra);
-  info.analyze(findSelf(fn->getSelfArgument()));
+  FunctionInfo info(fn);
+  info.analyze(fn->getSelfArgument());
 
   // Step 2 -- Initialize and solve the dataflow problem.
   info.solve();
@@ -1251,16 +894,13 @@ class FlowIsolation : public SILFunctionTransform {
     if (fn->wasDeserializedCanonical())
       return;
 
-    // Do not run on thunks. We trust those and there isn't a benefit to the
-    // user. Any issue there is a compiler bug.
-    if (fn->isThunk())
-      return;
-
     // Look for functions that use flow-isolation.
     if (auto *dc = fn->getDeclContext())
       if (auto *afd = dyn_cast_or_null<AbstractFunctionDecl>(dc->getAsDecl()))
         if (usesFlowSensitiveIsolation(afd))
-          checkFlowIsolation(fn, getAnalysis<RegionAnalysis>());
+          checkFlowIsolation(fn);
+
+    return;
   }
 
 }; // class
