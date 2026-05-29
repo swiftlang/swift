@@ -343,8 +343,10 @@ normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
 normalize_boolean_spelling(SWIFT_BUILD_REMOTE_MIRROR)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
-# Get 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
-set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+# Allow callers to pin the host SDK used by lit.site.cfg.in.
+if(NOT SWIFT_HOST_SDKROOT)
+  set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+endif()
 
 set(profdata_merge_worker
     "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")

@@ -469,6 +469,9 @@ namespace swift {
     /// Access or distribution level of the whole module being parsed.
     LibraryLevel LibraryLevel = LibraryLevel::Other;
 
+    /// Clang modules explicitly marked as IPI by the build system.
+    std::vector<std::string> IPIClangModuleNames;
+
     /// The name of the package this module belongs to.
     std::string PackageName;
 

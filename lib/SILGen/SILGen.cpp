@@ -475,6 +475,8 @@ FuncDecl *SILGenModule::getExit() {
     mostLikelyIdentifier = C.getIdentifier("Darwin");
   } else if (triple.isOSWASI()) {
     mostLikelyIdentifier = C.getIdentifier("SwiftWASILibc");
+  } else if (triple.isOSEmscripten()) {
+    mostLikelyIdentifier = C.getIdentifier("SwiftEmscriptenLibc");
   } else if (triple.isWindowsMSVCEnvironment()) {
     mostLikelyIdentifier = C.getIdentifier("ucrt");
   } else {
@@ -518,7 +520,9 @@ Type SILGenModule::getConfiguredExecutorFactory() {
   auto &ctx = getASTContext();
 
   // First look in the @main struct, if any
-  NominalTypeDecl *mainType = ctx.MainModule->getMainTypeDecl();
+  ModuleDecl *mainModule = ctx.MainModule;
+  NominalTypeDecl *mainType
+    = mainModule ? mainModule->getMainTypeDecl() : nullptr;
   if (mainType) {
     SmallVector<ValueDecl *, 1> decls;
     auto identifier = ctx.getIdentifier("DefaultExecutorFactory");

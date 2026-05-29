@@ -496,6 +496,7 @@ public:
 
   std::vector<std::unique_ptr<FieldRecordBase>> getFieldRecords() override {
     std::vector<std::unique_ptr<FieldRecordBase>> FieldRecords;
+    FieldRecords.reserve(FD->NumFields);
     for (auto &FieldRef : *FD.getLocalBuffer()) {
       FieldRecords.emplace_back(
           std::make_unique<FieldRecordImpl>(FD.getField(FieldRef), Builder));
@@ -529,8 +530,11 @@ bool TypeRefBuilder::getFieldTypeRefs(
   if (!Subs)
     return false;
 
+  auto FieldRecords = FD.getFieldRecords();
+  Fields.reserve(FieldRecords.size());
+
   int FieldValue = -1;
-  for (auto &Field : FD.getFieldRecords()) {
+  for (auto &Field : FieldRecords) {
     auto FieldName = Field->getFieldName();
     FieldValue += 1;
 

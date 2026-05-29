@@ -1128,6 +1128,16 @@ public:
   /// @_neverEmitIntoClient.
   bool isNeverEmittedIntoClient() const;
 
+  /// Compute the code generation model that is required for this declaration.
+  ///
+  /// This function applies the limitations of the compilation model to
+  /// determine if there's a code generation model that *must* be used for the
+  /// given declaration. For example, generic declarations must be
+  /// `@export(implementation)` in Embedded Swift, because it does not support
+  /// unspecialized generics.
+  std::optional<CodeGenerationModel>
+  getRequiredCodeGenerationModel() const;
+
   /// Compute the code generation model that was explicitly requested for
   /// this declaration.
   ///
@@ -8633,13 +8643,12 @@ public:
                           ParameterList *BodyParams, TypeRepr *ResultTyR,
                           DeclContext *Parent);
 
-  static FuncDecl *createImplicit(ASTContext &Context,
-                                  StaticSpellingKind StaticSpelling,
-                                  DeclName Name, SourceLoc NameLoc, bool Async,
-                                  bool Throws, Type ThrownType,
-                                  GenericParamList *GenericParams,
-                                  ParameterList *BodyParams, Type FnRetType,
-                                  DeclContext *Parent);
+  static FuncDecl *
+  createImplicit(ASTContext &Context, StaticSpellingKind StaticSpelling,
+                 DeclName Name, SourceLoc NameLoc, bool Async, bool Throws,
+                 Type ThrownType, GenericParamList *GenericParams,
+                 ParameterList *BodyParams, Type FnRetType, DeclContext *Parent,
+                 bool isSynthesized = false);
 
   static FuncDecl *createImported(ASTContext &Context, SourceLoc FuncLoc,
                                   DeclName Name, SourceLoc NameLoc, bool Async,

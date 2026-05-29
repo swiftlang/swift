@@ -1422,6 +1422,7 @@ SwiftDeclSynthesizer::makeEnumRawValueConstructor(EnumDecl *enumDecl) {
                               /*ThrownType=*/TypeLoc(), paramPL,
                               /*GenericParams=*/nullptr, enumDecl);
   ctorDecl->setImplicit();
+  ctorDecl->setSynthesized();
   ctorDecl->copyFormalAccessFrom(enumDecl);
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
   return ctorDecl;
@@ -2078,7 +2079,7 @@ FuncDecl *SwiftDeclSynthesizer::makeSuccessorFunc(FuncDecl *incrementFunc) {
   auto result = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None, name, SourceLoc(),
       /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(),
-      /*GenericParams*/ nullptr, params, returnTy, dc);
+      /*GenericParams*/ nullptr, params, returnTy, dc, /*isSynthesized=*/true);
 
   result->copyFormalAccessFrom(incrementFunc);
   result->setIsDynamic(false);
@@ -2420,9 +2421,10 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
 
   auto topLevelStaticFuncDecl = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None, opDeclName, SourceLoc(),
-      /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(), 
+      /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(),
       genericParamList, ParameterList::create(ctx, newParams),
-      operatorMethod->getResultInterfaceType(), parentCtx);
+      operatorMethod->getResultInterfaceType(), parentCtx,
+      /*isSynthesized=*/true);
 
   topLevelStaticFuncDecl->copyFormalAccessFrom(operatorMethod);
   topLevelStaticFuncDecl->setIsDynamic(false);

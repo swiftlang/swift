@@ -482,6 +482,7 @@ static bool usesFeatureBuiltinAddTaskLocalValue(Decl *decl) {
   return false;
 }
 
+UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
 UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
@@ -700,6 +701,16 @@ UNINTERESTING_FEATURE(BorrowingSequence)
 UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
 
 UNINTERESTING_FEATURE(DeriveConformancesViaMacros)
+
+static bool usesFeatureBorrowInout(Decl *decl) {
+  auto &ctx = decl->getASTContext();
+
+  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
+    decl = ext->getExtendedNominal();
+  }
+
+  return decl == ctx.getRefDecl() || decl == ctx.getMutableRefDecl();
+}
 
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet

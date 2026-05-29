@@ -321,6 +321,7 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableParameters>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature AddressableTypes>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowAndMutateAccessors>"
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-enable-experimental-feature BorrowInout>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
@@ -353,16 +354,25 @@ target_link_libraries(swiftCore
     swiftRuntimeCoreCMakeConfig)
 
 string(TOLOWER "${SwiftCore_OBJECT_FORMAT}" SwiftCore_OBJECT_FORMAT_lc)
+# Runtime clients need the Swift image-registration object on their link lines
+# (on COFF this supplies pSwiftImageConstructor and the .sw5* section ranges).
+# CMake propagates usage requirements for an OBJECT library that appears in an
+# INTERFACE_LINK_LIBRARIES chain, but it does not also add the object's payload to
+# the final link line. Keep the swiftrt target for its usage requirements, and
+# explicitly propagate the object payload through swiftCore's interface.
 if("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "elf")
   target_link_libraries(swiftCore INTERFACE
-    swiftrt)
+    swiftrt
+    $<TARGET_OBJECTS:swiftrt>)
 elseif("${SwiftCore_OBJECT_FORMAT_lc}" STREQUAL "coff")
   if(BUILD_SHARED_LIBS)
     target_link_libraries(swiftCore INTERFACE
-      swiftrt)
+      swiftrt
+      $<TARGET_OBJECTS:swiftrt>)
   else()
     target_link_libraries(swiftCore INTERFACE
-      swiftrtT)
+      swiftrtT
+      $<TARGET_OBJECTS:swiftrtT>)
   endif()
 endif()
 

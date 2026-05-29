@@ -15,7 +15,7 @@
 /// A 128-bit unsigned integer value type.
 @available(SwiftStdlib 6.0, *)
 @frozen
-public struct UInt128: Sendable {
+public struct UInt128: Sendable, BitwiseCopyable {
 #if _pointerBitWidth(_64) || arch(arm64_32)
   //  On 64-bit platforms (including arm64_32 and any similar targets with
   //  32b pointers but HW-backed 64b integers), the layout is simply that

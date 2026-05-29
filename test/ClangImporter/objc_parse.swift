@@ -159,7 +159,10 @@ func newConstruction(_ a: A, aproxy: AProxy) {
   b = B(forWorldDomination:())
   b = B(int: 17, andDouble : 3.14159)
   b = B.new(with: a)
-  B.alloc()._initFoo()
+  // SPI-prefixed init-family selectors like `-_initFoo` are imported as
+  // initializers; the leading underscore is preserved on the argument label
+  // to mark the SPI nature at the use site.
+  b = B(_foo: ())
   b.notAnInit()
 
   // init methods are not imported by themselves.

@@ -4231,8 +4231,19 @@ struct ParameterListInfo {
 public:
   ParameterListInfo() { }
 
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params);
   ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
                     const ValueDecl *paramOwner, bool skipCurriedSelf);
+
+  /// Constructs parameter information from the given set of parameters
+  /// that are associated with the given substituted declaration reference.
+  ///
+  /// Note that number of parameters doesn't necessary always match arity of the
+  /// parameter list because variadic generic parameters without arguments
+  /// are removed from the function type and multi-parameter matches are
+  /// flattened.
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                    bool skipCurriedSelf, ConcreteDeclRef declRef);
 
   /// Whether the parameter at the given index has a default argument.
   bool hasDefaultArgument(unsigned paramIdx) const;
@@ -4266,6 +4277,9 @@ public:
 
   /// Retrieve the number of parameters for which we have information.
   unsigned size() const { return defaultArguments.size(); }
+
+private:
+  void setFlagsFor(const ParamDecl *param, unsigned index);
 };
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -6311,9 +6325,8 @@ public:
                                 fieldIndexMutabilityUpdatePairs) const;
 
   using SILFieldIndexToSILTypeTransform = std::function<SILType(unsigned)>;
-  using SILFieldToSILTypeRange =
-      iterator_range<llvm::mapped_iterator<IntRange<unsigned>::iterator,
-                                           SILFieldIndexToSILTypeTransform>>;
+  using SILFieldToSILTypeRange = iterator_range<llvm::mapped_iterator<
+      IntRange<unsigned>::iterator, SILFieldIndexToSILTypeTransform, SILType>>;
 
   /// Returns a range of SILTypes that have been specialized correctly for use
   /// in the passed in SILFunction.
@@ -8384,25 +8397,36 @@ DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
 ///
 /// HiddenType is never produced by type-checking user code. It is synthesized
 /// only on the serialization path and consumed by deserialization and IRGen.
+///
+/// Each HiddenType also carries the ModuleDecl it was emitted from (the
+/// "defining module"). That module's HiddenTypeLayouts table holds the
+/// AbstractTypeLayout entry that backs this placeholder; IRGen resolves the
+/// layout via that module.
 class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
   friend class ASTContext;
 
   StringRef MangledName;
+  ModuleDecl *DefiningModule;
 
-  HiddenType(StringRef mangledName, const ASTContext &ctx)
+  HiddenType(StringRef mangledName, ModuleDecl *definingModule,
+             const ASTContext &ctx)
       : TypeBase(TypeKind::Hidden, &ctx, RecursiveTypeProperties()),
-        MangledName(mangledName) {}
+        MangledName(mangledName), DefiningModule(definingModule) {}
 
 public:
-  static HiddenType *get(const ASTContext &ctx, StringRef mangledName);
+  static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
+                         ModuleDecl *definingModule);
 
   StringRef getMangledName() const { return MangledName; }
+  ModuleDecl *getDefiningModule() const { return DefiningModule; }
 
   void Profile(llvm::FoldingSetNodeID &ID) {
-    Profile(ID, getMangledName());
+    Profile(ID, getMangledName(), getDefiningModule());
   }
-  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName) {
+  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
+                      ModuleDecl *definingModule) {
     ID.AddString(mangledName);
+    ID.AddPointer(definingModule);
   }
 
   static bool classof(const TypeBase *T) {

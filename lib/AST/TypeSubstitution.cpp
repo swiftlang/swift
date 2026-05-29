@@ -516,7 +516,8 @@ Type Type::subst(InFlightSubstitution &IFS) const {
 
 static Type getConcreteTypeForSuperclassTraversing(Type t) {
   if (t->isExistentialType()) {
-    return t->getExistentialLayout().getSuperclass();
+    // FIXME: This is broken, see the comment on that getter method.
+    return t->getExistentialLayout().getExplicitSuperclassOrProtocolSuperclass();
   } if (auto archetype = t->getAs<ArchetypeType>()) {
     return archetype->getSuperclass();
   } else if (auto dynamicSelfTy = t->getAs<DynamicSelfType>()) {

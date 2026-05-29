@@ -1409,6 +1409,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
+  Opts.IPIClangModuleNames = Args.getAllArgValues(OPT_ipi_clang_module);
+
   if (const Arg *A = Args.getLastArg(OPT_package_name)) {
     auto pkgName = A->getValue();
     if (StringRef(pkgName).empty())

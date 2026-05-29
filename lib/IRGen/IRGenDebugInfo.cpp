@@ -1981,11 +1981,16 @@ private:
     case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::BuiltinBorrow:
-    case TypeKind::Hidden:
       ABORT([&](llvm::raw_ostream &out) {
         out << "Don't know how to emit debug info for type:\n";
         BaseTy->dump(out);
       });
+
+    case TypeKind::Hidden: {
+      unsigned FwdDeclLine = 0;
+      return createOpaqueStruct(Scope, MangledName, MainFile, FwdDeclLine,
+                                SizeInBits, AlignInBits, Flags, MangledName);
+    }
 
     case TypeKind::BuiltinFixedArray: {
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
@@ -4115,7 +4120,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       // that corresponds with a funclet edge. This operation effectively sets
       // up the rest of the pipeline to be stupid and just emit the
       // llvm.dbg.value in the correct places. This is done by the SILOptimizer
-      // pass DebugInfoCanonicalizer.
+      // pass MovedAsyncVarDebugInfoPropagator.
       auto InsertBefore = Builder.GetInsertPoint();
       if (InsertBefore != ParentBlock->end()) {
         InsertPt = &*InsertBefore;

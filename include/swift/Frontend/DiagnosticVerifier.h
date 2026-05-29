@@ -79,6 +79,8 @@ struct CapturedDiagnosticInfo {
   unsigned Column;
   SmallVector<CapturedFixItInfo, 2> FixIts;
   std::string CategoryDocFile;
+  /// Names of the diagnostic group and its parent groups, leaf-first.
+  std::vector<std::string> GroupNames;
   // Original index into CapturedDiagnostics. Allows identifying it even as
   // elements get erased.
   size_t ID;
@@ -92,12 +94,14 @@ struct CapturedDiagnosticInfo {
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
                          SmallVector<CapturedFixItInfo, 2> FixIts,
-                         const std::string &categoryDocFile, size_t ID,
+                         const std::string &categoryDocFile,
+                         std::vector<std::string> groupNames, size_t ID,
                          std::optional<size_t> ParentIdx, bool HasChildren)
       : Message(Message), SourceBufferID(SourceBufferID),
         Classification(Classification), Loc(Loc), Line(Line), Column(Column),
-        FixIts(FixIts), CategoryDocFile(categoryDocFile), ID(ID),
-        ParentID(ParentIdx), HasChildren(HasChildren) {}
+        FixIts(FixIts), CategoryDocFile(categoryDocFile),
+        GroupNames(std::move(groupNames)), ID(ID), ParentID(ParentIdx),
+        HasChildren(HasChildren) {}
 };
 
 struct SMDiagnosticWithNotes {

@@ -1608,10 +1608,7 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
     ReferenceCounting refcounting = T->getReferenceCounting();
 
     llvm::PointerType *reprTy = nullptr;
-    if (auto superclass = layout.getSuperclass()) {
-      auto &superTI = IGM.getTypeInfoForUnlowered(superclass);
-      reprTy = cast<llvm::PointerType>(superTI.getStorageType());
-    } else if (refcounting == ReferenceCounting::Native) {
+    if (refcounting == ReferenceCounting::Native) {
       reprTy = IGM.RefCountedPtrTy;
     } else {
       reprTy = IGM.UnknownRefCountedPtrTy;

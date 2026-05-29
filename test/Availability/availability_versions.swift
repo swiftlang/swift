@@ -1974,3 +1974,25 @@ struct PropertyObservers {
   }
 
 }
+
+@available(macOS, introduced: 10, obsoleted: 14)
+func obsoletedBeforeDeploymentTarget() {}
+// expected-note@-1 {{'obsoletedBeforeDeploymentTarget()' was obsoleted in macOS 14}}
+
+func reachableUseStillDiagnosed() {
+  obsoletedBeforeDeploymentTarget()
+  // expected-error@-1 {{'obsoletedBeforeDeploymentTarget()' is unavailable in macOS}}
+}
+
+func useInUnreachableUnavailableBranch() {
+  if #unavailable(macOS 14) {
+    obsoletedBeforeDeploymentTarget()
+  }
+}
+
+func useInUnreachableAvailableElseBranch() {
+  if #available(macOS 14, *) {
+  } else {
+    obsoletedBeforeDeploymentTarget()
+  }
+}

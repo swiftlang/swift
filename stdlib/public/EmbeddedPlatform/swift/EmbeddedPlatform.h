@@ -41,6 +41,16 @@ typedef size_t __swift_size_t;
 #define EMBEDDED_SWIFT_NULLABLE
 #endif
 
+#if defined(__has_feature) && (__has_feature(bounds_attributes) || __has_feature(bounds_safety_attributes))
+#define EMBEDDED_SWIFT_COUNTED_BY(N) __attribute__((__counted_by__(N)))
+#define EMBEDDED_SWIFT_SIZED_BY(N) __attribute__((__sized_by__(N)))
+#define EMBEDDED_SWIFT_SINGLE __attribute__((__single__))
+#else
+#define EMBEDDED_SWIFT_COUNTED_BY(N)
+#define EMBEDDED_SWIFT_SIZED_BY(N)
+#define EMBEDDED_SWIFT_SINGLE
+#endif
+
 /**
  * Allocates memory and places the resulting pointer in `*memptr`.
  *
@@ -59,7 +69,7 @@ typedef size_t __swift_size_t;
  * 
  * This function can be implemented as a direct call to `posix_memalign`.
  */
-int _swift_alignedAllocate(void * EMBEDDED_SWIFT_NULLABLE * EMBEDDED_SWIFT_NONNULL memptr, __swift_size_t alignment, __swift_size_t size);
+int _swift_alignedAllocate(void * EMBEDDED_SWIFT_NULLABLE * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE memptr, __swift_size_t alignment, __swift_size_t size);
 
 /**
  * Frees the memory referenced by `ptr`.
@@ -101,23 +111,27 @@ void _swift_alignedFree(void * EMBEDDED_SWIFT_NONNULL ptr, __swift_size_t alignm
  * if the target platform does not support typed allocations.
  */
 void _swift_typedAllocate(
-    void *EMBEDDED_SWIFT_NULLABLE *EMBEDDED_SWIFT_NONNULL ptr,
+    void *EMBEDDED_SWIFT_NULLABLE *EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SINGLE ptr,
     __swift_size_t size, __swift_size_t alignment, unsigned long long typeId);
 
 /**
- * Writes a single character to standard output.
+ * Writes a sequence of UTF-8 code points to standard output.
  *
  * Parameters:
- *   - `c`: the character to write, which will be converted to an
- *     `unsigned char`.
+ *   - `chars`: the UTF-8 code points to standard output. It is not
+ *     NULL-terminated.
+ *   - `count`: the number of UTF-8 code points.
  *
- * Returns the character that was written.
+ * Returns the number of characters that were written.
  *
  * This function is required when using the Embedded Swift print() facilities.
  *
- * This function can be implemented as a direct call to `putchar`.
+ * This function can be implemented as a call to fwrite or printf with the
+ * specified number of code points.
  */
-int _swift_writeCharToStandardOutput(int c);
+int _swift_writeToStandardOutput(
+    const unsigned char * EMBEDDED_SWIFT_NULLABLE EMBEDDED_SWIFT_COUNTED_BY(count) chars,
+    __swift_size_t count);
 
 /**
  * Generates random bytes into the given buffer.
@@ -137,7 +151,7 @@ int _swift_writeCharToStandardOutput(int c);
  *
  * This function can be implemented as a direct call to `arc4random_buf`.
  */
-void _swift_generateRandom(void * EMBEDDED_SWIFT_NONNULL buffer, __swift_size_t nbytes);
+void _swift_generateRandom(void * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SIZED_BY(nbytes) buffer, __swift_size_t nbytes);
 
 /**
  * Generates random bytes intended for a hashing seed into the given buffer.
@@ -156,7 +170,7 @@ void _swift_generateRandom(void * EMBEDDED_SWIFT_NONNULL buffer, __swift_size_t 
  *
  * This function can be implemented as a direct call to `arc4random_buf`.
  */
-void _swift_generateRandomHashSeed(void * EMBEDDED_SWIFT_NONNULL buffer, __swift_size_t nbytes);
+void _swift_generateRandomHashSeed(void * EMBEDDED_SWIFT_NONNULL EMBEDDED_SWIFT_SIZED_BY(nbytes) buffer, __swift_size_t nbytes);
 
 /**
  * Retrieve a pointer that will be used to retain information needed for Swift's
@@ -206,5 +220,11 @@ void _swift_setExclusivityTLS(void * EMBEDDED_SWIFT_NULLABLE ptr);
  * function.
  */
 void _swift_exit(int code);
+
+#undef EMBEDDED_SWIFT_SINGLE
+#undef EMBEDDED_SWIFT_SIZED_BY
+#undef EMBEDDED_SWIFT_COUNTED_BY
+#undef EMBEDDED_SWIFT_NULLABLE
+#undef EMBEDDED_SWIFT_NONNULL
 
 #endif

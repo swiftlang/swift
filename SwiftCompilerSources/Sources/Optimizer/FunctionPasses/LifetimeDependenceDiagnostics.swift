@@ -30,6 +30,16 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   }
 }
 
+// @noescape functions cannot yet compose other types, but they can be wrapped in an arbitrary number of Optionals.
+extension AST.`Type` {
+  var fullyUnwrappedType: AST.`Type` {
+    if !self.isOptional {
+      return self
+    }
+    return self.genericArgumentsOfBoundGenericType[0].fullyUnwrappedType
+  }
+}
+
 /// Diagnostic pass.
 ///
 /// Find the roots of all non-escapable values in this function. All
@@ -44,7 +54,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
   log("\(function.convention)")
 
   for argument in function.arguments
-      where !argument.type.isEscapable(in: function)
+      where !argument.type.isEscapable(in: function) && !argument.type.rawType.fullyUnwrappedType.isLoweredFunction
   {
     // Indirect results are not checked here. Type checking ensures
     // that they have a lifetime dependence.
