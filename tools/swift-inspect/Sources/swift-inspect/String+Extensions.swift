@@ -22,12 +22,7 @@ extension DefaultStringInterpolation {
 
 enum Std {
   struct File: TextOutputStream {
-
-#if os(Android)
-    typealias File = OpaquePointer
-#else
     typealias File = UnsafeMutablePointer<FILE>
-#endif
 
     var underlying: File
 
