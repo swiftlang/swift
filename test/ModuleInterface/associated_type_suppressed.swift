@@ -70,7 +70,7 @@ public func ncIter2<T: P>(_ t: T) {
 // it's not assumed to be under the old feature, but it IS under the new one.
 
 // INTERFACE: public func ncIter3<T>(_ t: T) where T : assoc::P
-// SIL    @$s5assoc7ncIter3yyxAA1PRzlF :
+// SIL:   @$s5assoc7ncIter3yyxAA1PRzlF :
 public func ncIter3<T: P>(_ t: T) where T.Element: Copyable {}
 
 // INTERFACE: public func ncBoth<T>(_ t: T) where T : assoc::P, T.Element : ~Copyable
