@@ -191,7 +191,8 @@ OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction f
   ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
                            ApplySite(), origFunc, subs, origFunc->getSerializedKind(),
                            convertIndirectToDirect,
-                           /*dropUnusedArguments=*/false);
+                           /*dropUnusedArguments=*/false,
+                           isMandatory);
 
   if (!ReInfo.canBeSpecialized()) {
     return {nullptr};
