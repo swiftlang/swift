@@ -11716,19 +11716,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                                  alreadyDiagnosed, locator);
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
-      auto impact = 4;
+      auto impact = 5;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
         impact += 10;
-      }
-
-      auto *anchorExpr = getAsExpr(locator->getAnchor());
-      if (anchorExpr) {
-        // Increasing the impact for missing member in any argument position
-        // which may be less likely than other potential mistakes
-        if (getArgumentLocator(anchorExpr))
-          impact += 5;
       }
 
       if (recordFix(fix, impact))
