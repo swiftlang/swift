@@ -52,5 +52,4 @@ target_sources(swiftSILOptimizer PRIVATE
   MarkNeverWrittenMutableClosureBoxesAsImmutable.cpp
   RegionAnalysisInvalidationTransform.cpp
   DiagnosticDeadFunctionElimination.cpp
-  WasmAsyncT2TLowering.cpp
   OwnershipModelEliminator.cpp)
