@@ -533,15 +533,6 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   return block;
 }
 
-SILType DebugValueInst::getVarType() const {
-  if (HasAuxDebugVariableType)
-    return *getTrailingObjects<SILType>();
-  if (auto *debugBB = getDebugReconstructionBlock())
-    return cast<ReturnInst>(debugBB->getTerminator())
-        ->getOperand()->getType().getObjectType();
-  return getOperand()->getType().getObjectType();
-}
-
 bool DebugValueInst::isExprTypeValid() const {
   auto varInfo = getCompleteVarInfo();
 
