@@ -450,3 +450,30 @@ bb0(%0 : $*BorrowWrapper<T>, %1 : $*T, %2 : $@thin BorrowWrapper<T>.Type):
   %15 = tuple ()
   return %15
 }
+
+// rdar://177381648: error: lifetime-dependent variable escapes its scope
+//
+// Test that lifetime diagnostics are disabled for @noescape function arguments.
+// The diagnostics would fail here because the mark_dependence is on the conditionally unwrapped value.
+sil @noescape_to_escape_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+sil shared [serialized] [thunk] [ossa] @testNoEscapeBlockEscape : $@convention(thin) (@owned Optional<@noescape @callee_guaranteed () -> ()>) -> () {
+bb0(%0 : @owned $Optional<@noescape @callee_guaranteed () -> ()>):
+  switch_enum %0, case #Optional.some!enumelt: bb1, case #Optional.none!enumelt: bb2
+
+bb1(%3 : @owned $@noescape @callee_guaranteed () -> ()):
+  %4 = copy_value %3
+  %5 = function_ref @noescape_to_escape_thunk : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = partial_apply [callee_guaranteed] %5(%4) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %7 = mark_dependence [unresolved] %6 on %3
+  destroy_value %7
+  destroy_value %3
+  br bb3
+
+bb2:
+  br bb3
+
+bb3:
+  %tup = tuple ()
+  return %tup
+}
