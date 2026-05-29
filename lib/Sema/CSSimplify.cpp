@@ -13691,10 +13691,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
     auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));
     // Let's make this fix as high impact so if there is a function or member
-    // overload with e.g. argument-to-parameter type mismatches it would take
-    // a higher priority.
-    return recordFix(fix, /*impact=*/3) ? SolutionKind::Error
-                                         : SolutionKind::Solved;
+    // overload with e.g. argument-to-parameter type mismatches or missing/extra
+    // arguments it would take a higher priority.
+    return recordFix(fix, /*impact=*/4) ? SolutionKind::Error
+                                        : SolutionKind::Solved;
   }
 
   return result;
