@@ -698,6 +698,7 @@ static bool usesFeatureReparenting(Decl *decl) {
 UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
 UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
+UNINTERESTING_FEATURE(FlowIsolationGlobalActor)
 
 static bool usesFeatureBorrowInout(Decl *decl) {
   auto &ctx = decl->getASTContext();

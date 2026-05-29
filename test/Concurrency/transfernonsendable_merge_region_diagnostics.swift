@@ -1,9 +1,10 @@
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix named- %s -o /dev/null -parse-as-library -enable-upcoming-feature GlobalActorIsolatedTypesUsability
-// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -verify -verify-additional-prefix bare- %s -o /dev/null -parse-as-library -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -verify -verify-additional-prefix named- %s -o /dev/null -parse-as-library -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-experimental-feature FlowIsolationGlobalActor
+// RUN: %target-swift-frontend -emit-sil -strict-concurrency=complete -target %target-swift-5.1-abi-triple -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -verify -verify-additional-prefix bare- %s -o /dev/null -parse-as-library -enable-upcoming-feature GlobalActorIsolatedTypesUsability -enable-experimental-feature FlowIsolationGlobalActor
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
+// REQUIRES: swift_feature_FlowIsolationGlobalActor
 
 // This file exercises the *shape* of "incompatible region merge" diagnostics
 // produced by the region-isolation analysis. The points being tested:
