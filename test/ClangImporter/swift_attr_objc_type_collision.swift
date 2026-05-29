@@ -44,7 +44,7 @@ import Foundation
 // expected-no-diagnostics
 
 final class SwiftAttrCollisionUIActorSecondWitness: NSObject, SwiftAttrCollisionUIActorSecond {
-  func second(completionHandler: @escaping @MainActor @Sendable (Int32) -> Void) {}
+  func second(completionHandler: @MainActor @Sendable (Int32) -> Void) {}
 }
 
 //--- UIActorFirst.h
@@ -72,5 +72,5 @@ import Foundation
 // expected-no-diagnostics
 
 final class SwiftAttrCollisionSendableSecondWitness: NSObject, SwiftAttrCollisionSendableSecond {
-  func second(completionHandler: @escaping @Sendable (Int32) -> Void) {}
+  func second(completionHandler: @Sendable (Int32) -> Void) {}
 }
