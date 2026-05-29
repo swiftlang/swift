@@ -68,6 +68,7 @@
 #include "GenCall.h"
 #include "GenCast.h"
 #include "GenClass.h"
+#include "GenDecl.h"
 #include "GenEnum.h"
 #include "GenHeap.h"
 #include "GenMeta.h"
@@ -1672,6 +1673,17 @@ static bool isSpecializedConformance(ProtocolConformance *c) {
 #endif
 
       SILFunction *Func = entry.getMethodWitness().Witness;
+
+      // In Embedded Swift, a witness thunk's signature must be valid for
+      // embedded (only fully-specialized or class-bound generic parameters).
+      // Requirements that take unspecialized non-class-bound generics can't
+      // be dispatched through the witness table at runtime in embedded, so
+      // treat the slot as if dead-method elimination had removed it.
+      if (Func && IGM.Context.LangOpts.hasFeature(Feature::Embedded) &&
+          !hasValidSignatureForEmbedded(Func)) {
+        Func = nullptr;
+      }
+
       llvm::Constant *witness = nullptr;
       if (Func) {
         assert(Func->isAsync() == isAsyncRequirement);
