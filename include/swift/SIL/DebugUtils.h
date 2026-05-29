@@ -420,6 +420,23 @@ struct DebugVarCarryingInst : VarDeclCarryingInst {
     llvm_unreachable("covered switch");
   }
 
+  /// Like getVarInfo, but always includes the variable type.
+  /// For DebugValueInst, delegates to its getCompleteVarInfo().
+  /// For AllocStack/AllocBox, fills in the type from the element/address type.
+  std::optional<SILDebugVariable> getCompleteVarInfo() const {
+    switch (getKind()) {
+    case Kind::Invalid:
+      llvm_unreachable("Invalid?!");
+    case Kind::DebugValue:
+      return cast<DebugValueInst>(**this)->getCompleteVarInfo();
+    case Kind::AllocStack:
+      return cast<AllocStackInst>(**this)->getVarInfo(/*complete*/ true);
+    case Kind::AllocBox:
+      return cast<AllocBoxInst>(**this)->getVarInfo(/*complete*/ true);
+    }
+    llvm_unreachable("covered switch");
+  }
+
   void setDebugVarScope(const SILDebugScope *NewDS) {
     switch (getKind()) {
     case Kind::Invalid:
