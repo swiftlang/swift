@@ -4038,7 +4038,7 @@ function Get-SelectedSDKBuilds() {
 # search path. CMake consumers receive a -vfsoverlay from the target's PUBLIC
 # interface; SDK consumers do not and therefore need the physical headers.
 function Repair-SDKHeaders([string] $SDKRoot) {
-  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
+  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims", "_FoundationInternationalizationData")) {
     foreach ($ResourceType in ("swift", "swift_static")) {
       $ModuleDirectory = "$SDKRoot\usr\lib\$ResourceType\$Module"
       if (Test-Path $ModuleDirectory) {
