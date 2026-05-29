@@ -187,6 +187,7 @@ namespace {
 
 static constexpr StringLiteral fixitExpectationNoneString("none");
 static constexpr StringLiteral categoryDocFileSpecifier("documentation-file=");
+static constexpr StringLiteral groupNameSpecifier("group-name=");
 
 struct ExpectedDiagnosticInfo {
   // This specifies the full range of the "expected-foo {{}}" specifier.
@@ -232,6 +233,18 @@ struct ExpectedDiagnosticInfo {
   };
   std::optional<ExpectedDocumentationFile> DocumentationFile;
 
+  /// Represents a specifier of the form '{{group-name=GroupName}}'. Multiple
+  /// of these are allowed per expected diagnostic; the diagnostic must belong
+  /// to each named group.
+  struct ExpectedGroupName {
+    const char *StartLoc, *EndLoc; // The loc of the {{ and }}'s.
+    StringRef Name; // Name of expected diagnostic group.
+
+    ExpectedGroupName(const char *StartLoc, const char *EndLoc, StringRef Name)
+        : StartLoc(StartLoc), EndLoc(EndLoc), Name(Name) {}
+  };
+  std::vector<ExpectedGroupName> GroupNames;
+
   std::vector<ExpectedDiagnosticInfo> NestedDiags = {};
 
   ExpectedDiagnosticInfo(const char *ExpectedStart,
@@ -265,6 +278,14 @@ renderDocumentationFile(const std::string &documentationFile) {
   std::string Result;
   llvm::raw_string_ostream OS(Result);
   OS << "{{" << categoryDocFileSpecifier << documentationFile << "}}";
+  return OS.str();
+}
+
+/// Render the verifier syntax for a given diagnostic group name.
+static std::string renderGroupName(StringRef groupName) {
+  std::string Result;
+  llvm::raw_string_ostream OS(Result);
+  OS << "{{" << groupNameSpecifier << groupName << "}}";
   return OS.str();
 }
 
@@ -1030,6 +1051,15 @@ unsigned DiagnosticVerifier::parseExpectedDiagInfo(
       continue;
     }
 
+    // If this check starts with 'group-name=', check for a diagnostic group
+    // name instead of a fix-it. Multiple group-name specifiers are allowed.
+    if (CheckStr.starts_with(groupNameSpecifier)) {
+      // Trim 'group-name='.
+      StringRef name = CheckStr.substr(groupNameSpecifier.size());
+      Expected.GroupNames.push_back({OpenLoc, CloseLoc, name});
+      continue;
+    }
+
     // This wasn't a documentation file specifier, so it must be a fix-it.
     // Special case for specifying no fixits should appear.
     if (CheckStr == fixitExpectationNoneString) {
@@ -1304,6 +1334,53 @@ void DiagnosticVerifier::verifyDiagnostics(std::vector<ExpectedDiagnosticInfo> &
                    "expected documentation file not seen; actual documentation "
                    "file: " + actual, fix);
         }
+      }
+    }
+
+    // Verify each expected diagnostic group name. The diagnostic must belong
+    // to every named group; multiple {{group-name=...}} specifiers all have
+    // to match.
+    for (const auto &expectedGroup : expected.GroupNames) {
+      bool matched = llvm::any_of(
+          FoundDiagnostic.GroupNames,
+          [&](const std::string &name) { return name == expectedGroup.Name; });
+      if (matched)
+        continue;
+
+      // Filter actual group names to exclude those that match some other
+      // expected group name on this expectation, since those have already
+      // been accounted for.
+      std::vector<StringRef> remainingActual;
+      for (const auto &name : FoundDiagnostic.GroupNames) {
+        bool isExpected = llvm::any_of(
+            expected.GroupNames,
+            [&](const ExpectedDiagnosticInfo::ExpectedGroupName &eg) {
+              return eg.Name == name;
+            });
+        if (!isExpected)
+          remainingActual.push_back(name);
+      }
+
+      if (remainingActual.empty()) {
+        addError(expectedGroup.StartLoc, "expected group name not seen");
+      } else {
+        std::string actual;
+        llvm::raw_string_ostream OS(actual);
+        llvm::interleave(
+            remainingActual,
+            [&](StringRef name) { OS << renderGroupName(name); },
+            [&] { OS << ' '; });
+
+        auto replStartLoc =
+            llvm::SMLoc::getFromPointer(expectedGroup.StartLoc);
+        auto replEndLoc = llvm::SMLoc::getFromPointer(expectedGroup.EndLoc);
+        llvm::SMFixIt fix(llvm::SMRange(replStartLoc, replEndLoc),
+                          renderGroupName(remainingActual.front()));
+        addError(expectedGroup.StartLoc,
+                 "expected group name not seen; actual group name" +
+                     std::string(remainingActual.size() > 1 ? "s" : "") +
+                     ": " + OS.str(),
+                 fix);
       }
     }
 
@@ -1701,11 +1778,17 @@ void DiagnosticVerifier::handleDiagnostic(SourceManager &SM,
                                            Info.FormatArgs);
   }
 
+  std::vector<std::string> groupNames;
+  groupNames.reserve(Info.CategoryChain.size());
+  for (const auto &category : Info.CategoryChain)
+    groupNames.emplace_back(category.Name.str());
+
   DiagLoc loc(SM, this->SM, Info.Loc);
   CapturedDiagnostics.emplace_back(message, loc.bufferID, Info.Kind,
                                    loc.sourceLoc, loc.line, loc.column, fixIts,
                                    llvm::sys::path::stem(
-                                      Info.getCategoryDocumentationURL()).str());
+                                      Info.getCategoryDocumentationURL()).str(),
+                                   std::move(groupNames));
 }
 
 /// Once all diagnostics have been captured, perform verification.
