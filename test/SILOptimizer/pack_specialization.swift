@@ -3,9 +3,6 @@
 
 // REQUIRES: swift_in_compiler
 
-// Some tests started failing for 32-bit since #88914.
-// REQUIRES: PTRSIZE=64
-
 // When no witness methods are called on pack elements, all pack code can be fully eliminated.
 // CHECK: define {{.*}} { i32, ptr, double } @"$s19pack_specialization8copyPack2xsxxQp_txxQp_tRvzlFs5Int32V_SPys5Int16VGSdQP_Tg5Tf8xx_n"(i32 %0, ptr %1, double %2)
 // CHECK-NEXT: entry:
@@ -47,8 +44,8 @@ public func addTogetherCaller() -> Int32 {
 // CHECK:         ret double
 // CHECK: }
 
-// CHECK-LABEL: define {{.*}} { i64, double, i8 } @"$s19pack_specialization8addOneTo4argsxxQp_txxQp_tRvzSjRzlFSi_Sds4Int8VQP_Tg5Tf8xx_n"(i64 %0, double %1, i8 %2) {{.*}} {
-// CHECK:         @llvm.sadd.with.overflow.i64(i64 %0, i64 1)
+// CHECK-LABEL: define {{.*}} { i32, double, i8 } @"$s19pack_specialization8addOneTo4argsxxQp_txxQp_tRvzSjRzlFs5Int32V_Sds4Int8VQP_Tg5Tf8xx_n"(i32 %0, double %1, i8 %2) {{.*}} {
+// CHECK:         @llvm.sadd.with.overflow.i32(i32 %0, i32 1)
 // CHECK:         @llvm.sadd.with.overflow.i8(i8 %2, i8 1)
 // CHECK:         fadd double %1, 1.000000e+00
 // CHECK: }
@@ -61,12 +58,12 @@ public func addOneToCaller(y: Double) -> Double {
   return addOneTo(args: y)
 }
 
-public func addOneToMultiCaller(x: Int, y: Double, z: Int8) -> (Int, Double, Int8) {
+public func addOneToMultiCaller(x: Int32, y: Double, z: Int8) -> (Int32, Double, Int8) {
   return addOneTo(args: x, y, z)
 }
 
 // Iterating over multiple packs simultaneously.
-// CHECK: define {{.*}} { i64, i64 } @"$s19pack_specialization8zipPacks2xs2zsx_q_txQp_txxQp_q_xQptRvzRv_SzRzq_RhzSzR_r0_lFs5Int32V_s6UInt32VQP_s4Int8V_s5Int16VQPTg5Tf8xxx_n"(i32 %0, i32 %1, i8 %2, i16 %3)
+// CHECK: define {{.*}} @"$s19pack_specialization8zipPacks2xs2zsx_q_txQp_txxQp_q_xQptRvzRv_SzRzq_RhzSzR_r0_lFs5Int32V_s6UInt32VQP_s4Int8V_s5Int16VQPTg5Tf8xxx_n"(i32 %0, i32 %1, i8 %2, i16 %3)
 // CHECK-NOT: alloca
 // CHECK:   shl nsw i16 %3, 1
 // CHECK:   shl nuw i32 %1, 1
@@ -94,21 +91,24 @@ func numericOp<T: BinaryInteger>(_ x: T) -> T {
   }
 }
 
-// CHECK: define {{.*}} i64 @"$s19pack_specialization11numericLoopyxxQp_txxQpRvzSzRzlFs5Int32V_ADQP_Tg5Tf8xx_n"(i32 %0, i32 %1) {{.*}} {
-// CHECK: [[SP1:%[0-9]+]] = add nsw i32 %0, -1
-// CHECK: [[SP2:%[0-9]+]] = add nsw i32 %0, -2
-// CHECK: [[SP_RESULT:%[0-9]+]] = tail call {{.*}} @"$s19pack_specialization11numericLoopyxxQp_txxQpRvzSzRzlFs5Int32V_ADQP_Tg5Tf8xx_n"(i32 [[SP1]], i32 [[SP2]])
-// CHECK-NEXT: [[SP_RESULT1:%[^ ]+]] = trunc i64 [[SP_RESULT]] to i32
-// CHECK-NEXT: [[SP_RESULT2_64:%[^ ]+]] = lshr i64 [[SP_RESULT]], 32
-// CHECK-NEXT: [[SP_RESULT2:%[^ ]+]] = trunc nuw i64 [[SP_RESULT2_64]] to i32
-// CHECK: tail call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 [[SP_RESULT1]], i32 [[SP_RESULT2]])
-// CHECK: }
+// CHECK:       define {{.*}} @"$s19pack_specialization11numericLoopyxxQp_txxQpRvzSzRzlFs5Int32V_ADQP_Tg5Tf8xx_n"(i32 %0, i32 %1) {{.*}} {
+// CHECK-NOT:     alloca
+// CHECK:         add nsw i32 %0
+// CHECK-NEXT:    add nsw i32 %0
+// CHECK-NEXT:    tail call {{.*}} @"$s19pack_specialization11numericLoopyxxQp_txxQpRvzSzRzlFs5Int32V_ADQP_Tg5Tf8xx_n"
+// CHECK:         tail call { i32, i1 } @llvm.sadd.with.overflow.i32
+// CHECK-NOT:     alloca
+// CHECK:         add nsw i32 %1
+// CHECK-NEXT:    add nsw i32 %1
+// CHECK-NEXT:    tail call {{.*}} @"$s19pack_specialization11numericLoopyxxQp_txxQpRvzSzRzlFs5Int32V_ADQP_Tg5Tf8xx_n"
+// CHECK:         tail call { i32, i1 } @llvm.sadd.with.overflow.i32
+// CHECK:       }
 @inline(never)
 func numericLoop<each T: BinaryInteger>(_ xs: repeat each T) -> (repeat each T) {
   return (repeat numericOp(each xs))
 }
 
-// CHECK: define {{.*}} i64 @"$s19pack_specialization15callNumericLoops5Int32V_ADtyF"() {{.*}} {
+// CHECK: define {{.*}} @"$s19pack_specialization15callNumericLoops5Int32V_ADtyF"() {{.*}} {
 // CHECK: tail call
 // CHECK: }
 public func callNumericLoop() -> (Int32, Int32) {
@@ -117,8 +117,6 @@ public func callNumericLoop() -> (Int32, Int32) {
 
 // Issue #82000: Combining pointers and parameter packs.
 
-// CHECK: define {{.*}} i32 @"$s19pack_specialization12applyPointer5input2ops5Int32VSPyxGxQp_AFxxQpXEtRvzlF"(ptr noalias readonly captures(none) %0, ptr readonly captures(none) %1, ptr %2, i64 %3, ptr %"each T") {{.*}} {
-// CHECK: }
 public func applyPointer<each T>(input: repeat UnsafePointer<each T>, op: (repeat each T) -> Int32) -> Int32 {
   op(repeat (each input).pointee)
 }
@@ -133,8 +131,6 @@ public func test() -> Int32 {
     }
 }
 
-// CHECK: define {{.*}} i32 @"$s19pack_specialization11applyDirect5input2ops5Int32VxxQp_AFxxQpXEtRvzlF"(ptr noalias readonly captures(none) %0, ptr readonly captures(none) %1, ptr %2, i64 %3, ptr %"each T") {{.*}} {
-// CHECK: }
 public func applyDirect<each T>(input: repeat each T, op: (repeat each T) -> Int32) -> Int32 {
   op(repeat (each input))
 }
