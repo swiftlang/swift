@@ -482,6 +482,7 @@ static bool usesFeatureBuiltinAddTaskLocalValue(Decl *decl) {
   return false;
 }
 
+UNINTERESTING_FEATURE(BuiltinContinuationNonCopyableSuccess)
 UNINTERESTING_FEATURE(CompileTimeValuesPreview)
 UNINTERESTING_FEATURE(LiteralExpressions)
 UNINTERESTING_FEATURE(StrictMemorySafety)
