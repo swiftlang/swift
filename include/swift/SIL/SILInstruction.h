@@ -5665,6 +5665,12 @@ public:
     return getLoc().strippedForDebugVariable();
   }
 
+  /// Returns the effective variable type for this debug value.
+  /// If there is a stored type, returns that. If there is a debug
+  /// reconstruction block, returns its return type. Otherwise returns the
+  /// SSA operand type.
+  SILType getVarType() const;
+
   /// Return the debug variable information attached to this instruction.
   ///
   /// \param includeLoc If true (by default), always return a variable with
@@ -5687,7 +5693,7 @@ public:
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
     else if (includeType)
-      AuxVarType = getOperand()->getType().getObjectType();
+      AuxVarType = getVarType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
