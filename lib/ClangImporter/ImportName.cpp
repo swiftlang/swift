@@ -1716,6 +1716,21 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           swiftCtx, /*isSubscript=*/false,
           isa<clang::ClassTemplateSpecializationDecl>(D));
 
+      if (result.declName && result.declName.isSimpleName()) {
+        const clang::FunctionDecl *fnDecl = dyn_cast<clang::FunctionDecl>(D);
+        if (!fnDecl) {
+          if (auto *fnTemplate = dyn_cast<clang::FunctionTemplateDecl>(D))
+            fnDecl = fnTemplate->getAsFunction();
+        }
+        if (fnDecl) {
+          // Function-typed clang decls require a compound (non-simple) name.
+          SmallVector<Identifier, 4> emptyArgs(fnDecl->getNumParams(),
+                                               Identifier());
+          result.declName = DeclName(
+              swiftCtx, result.declName.getBaseName(), emptyArgs);
+        }
+      }
+
       // Handle globals treated as members.
       if (parsedName.isMember()) {
         // FIXME: Make sure this thing is global.
