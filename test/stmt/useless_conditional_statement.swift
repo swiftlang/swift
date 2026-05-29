@@ -1,9 +1,7 @@
-// RUN: %target-typecheck-verify-swift -verify-additional-prefix noerror-
-// RUN: %target-typecheck-verify-swift -verify-additional-prefix werror- -Werror UselessConditionalStatement
+// RUN: %target-typecheck-verify-swift
 
 func testUselessIfCondition(_ x: Int) {
-  // expected-noerror-warning@+2 {{'if' condition is always true}}{{none}}
-  // expected-werror-error@+1 {{'if' condition is always true}}{{none}}
+  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}}{{none}}
   if case _ = x {
     _ = 0
   } else {
@@ -12,8 +10,7 @@ func testUselessIfCondition(_ x: Int) {
 }
 
 func testUselessWhile(_ x: Int) {
-  // expected-noerror-warning@+2 {{'while' condition is always true}}{{none}}
-  // expected-werror-error@+1 {{'while' condition is always true}}{{none}}
+  // expected-warning@+1 {{'while' condition is always true}}{{group-name=UselessConditionalStatement}}{{none}}
   while case _ = x {
     _ = 0
     break
@@ -22,8 +19,7 @@ func testUselessWhile(_ x: Int) {
 }
 
 func testUselessGuard(_ x: Int) {
-  // expected-noerror-warning@+2 {{'guard' condition is always true, body is unreachable}}{{none}}
-  // expected-werror-error@+1 {{'guard' condition is always true, body is unreachable}}{{none}}
+  // expected-warning@+1 {{'guard' condition is always true, body is unreachable}}{{none}}
   guard case _ = x else {
     _ = 0
     return
