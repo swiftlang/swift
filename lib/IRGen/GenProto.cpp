@@ -39,6 +39,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Platform.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/IRGen/Linking.h"
@@ -2778,6 +2779,19 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   // Also, it is not a big benefit for LLVM to emit such witness tables.
   if (isAvailableExternally(wt->getLinkage()))
     return;
+
+  // In Embedded Swift, an `@export(interface)` conformance has a unique
+  // strong definition in the module that owns it. Importing modules must
+  // reference that definition externally rather than emit their own copy.
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    if (auto *normal =
+            dyn_cast<NormalProtocolConformance>(wt->getConformance())) {
+      if (normal->getExplicitCodeGenerationModel() ==
+              CodeGenerationModel::Interface &&
+          wt->getDeclContext()->getParentModule() != getSwiftModule())
+        return;
+    }
+  }
 
   // Ensure that relatively-referenced symbols for witness thunks are collocated
   // in the same LLVM module.
