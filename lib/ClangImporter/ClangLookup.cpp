@@ -53,6 +53,7 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
@@ -826,8 +827,8 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
       SwiftContext.evaluator, ForeignReferenceTypeInfoRequest({CXXRecord}), {});
   auto superclassClangDecl = frtInfo.getPrimarySuperclass();
 
-  llvm::SmallDenseMap<CXXOverloadArgTypes, std::pair<CXXOverload, CXXOverload>,
-                      1>
+  llvm::SmallMapVector<CXXOverloadArgTypes,
+                       std::pair<CXXOverload, CXXOverload>, 1>
       CXXSubscripts;
 
   auto overloads =
@@ -856,7 +857,8 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
   }
 
   llvm::SmallVector<SubscriptDecl *, 1> subscripts;
-  for (auto [CXXGetter, CXXSetter] : CXXSubscripts.values()) {
+  for (auto &[_, pair] : CXXSubscripts) {
+    auto [CXXGetter, CXXSetter] = pair;
     ASSERT((CXXGetter || CXXSetter) &&
            "subscript should have at least getter or setter");
 
