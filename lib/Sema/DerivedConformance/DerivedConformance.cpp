@@ -26,6 +26,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/QuotedString.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
@@ -134,10 +135,10 @@ bool DerivedConformance::derivesProtocolConformance(
         // conformance.
       case KnownDerivableProtocolKind::Equatable:
         return canDeriveEquatable(DC, Nominal);
-      
+
       case KnownDerivableProtocolKind::Comparable:
         return !enumDecl->hasPotentiallyUnavailableCaseValue()
-            && canDeriveComparable(DC, enumDecl); 
+            && canDeriveComparable(DC, enumDecl);
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -206,7 +207,7 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   auto knownProtocol = protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return;
-  
+
   if (*knownProtocol == KnownProtocolKind::Equatable) {
     tryDiagnoseFailedEquatableDerivation(DC, nominal);
   }
@@ -360,7 +361,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
     if (func->isOperator() && name.getBaseName() == "<")
       return getRequirement(KnownProtocolKind::Comparable);
-    
+
     if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
 
@@ -646,10 +647,10 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
 /// \p C The AST context.
 /// \p lhsExpr The first expression to compare for equality.
 /// \p rhsExpr The second expression to compare for equality.
-/// \p guardReturnValue The expression to return if the two sides are not equal 
+/// \p guardReturnValue The expression to return if the two sides are not equal
 GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
                                         Expr *lhsExpr,
-                                        Expr *rhsExpr, 
+                                        Expr *rhsExpr,
                                         Expr *guardReturnValue) {
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
@@ -676,7 +677,7 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
 /// returns `false`.
 /// \p C The AST context.
 /// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality. 
+/// \p rhsExpr The second expression to compare for equality.
 GuardStmt *DerivedConformance::returnFalseIfNotEqualGuard(ASTContext &C,
                                         Expr *lhsExpr,
                                         Expr *rhsExpr) {
@@ -714,7 +715,7 @@ GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
 /// returns lhs < rhs.
 /// \p C The AST context.
 /// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality. 
+/// \p rhsExpr The second expression to compare for equality.
 GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
                                         Expr *lhsExpr,
                                         Expr *rhsExpr) {
@@ -999,79 +1000,71 @@ bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
   return false;
 }
 
-/// Returns a string containing swift syntax describing the case \p  decl with
-/// relevant information.
-static std::string getCaseInfoString(const EnumElementDecl *decl) {
-  std::string res;
-  llvm::raw_string_ostream out(res);
+/// Prints a string containing swift syntax describing the case \p  decl with
+/// relevant information to \p out.
+static void printCaseInfo(llvm::raw_ostream &out, const EnumElementDecl *decl) {
   out << "CaseInfo(name: " << QuotedString(decl->getNameStr())
       << ", associatedValues: [";
-  if (decl->hasAssociatedValues()) {
-    auto payloadType = decl->getPayloadInterfaceType();
-    auto *tupleType = payloadType->getAs<TupleType>();
-    bool first = true;
-    for (const auto elem : tupleType->getElements()) {
-      if (!first) out << ", ";
-      first = false;
-      if (elem.hasName()) out << QuotedString(elem.getName().str());
-      else out << "nil";
-    }
-  }
+  llvm::interleaveComma(decl->getName().getArgumentNames(), out,
+                        [&](Identifier name) {
+                          if (name.empty()) {
+                            out << "nil";
+                          } else {
+                            printAsQuotedString(out, name.str());
+                          }
+                        });
   out << "])";
-  out.flush();
-  return res;
 }
 
-/// Returns a string containing swift syntax describing the enum \p
-/// decl with relevant information.
-static std::string getEnumTypeKindString(EnumDecl *decl) {
-  std::string res = "enumLike(EnumTypeInfo(isObjC: ";
-  res += decl->isObjC() ? "true" : "false";
-  res += ", cases: [";
-  auto elements = decl->getAllElements();
-  for (const auto *elem : elements) {
-    if (elem != elements.front()) res += ", ";
-    res += getCaseInfoString(elem);
-  }
-  res += "]))";
-  return res;
+/// Prints a string containing swift syntax describing the enum \p
+/// decl with relevant information to \p out.
+static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
+  out << "enumLike(EnumTypeInfo(isObjC: "
+      << (decl->isObjC() ? "true" : "false")
+      << ", cases: [";
+  llvm::interleaveComma(decl->getAllElements(), out,
+                        [&](const EnumElementDecl *elem) {
+                          printCaseInfo(out, elem);
+                        });
+  out << "]))";
 }
 
-/// Returns a string containing swift syntax describing the stored property \p
-/// decl with relevant information.
-static std::string getStoredPropertyString(const VarDecl *decl) {
+/// Prints a string containing swift syntax describing the stored property \p
+/// decl with relevant information to \p out.
+static void printStoredProperty(llvm::raw_ostream &out,
+                                const VarDecl *decl) {
   bool isVar = decl->getIntroducer() == VarDecl::Introducer::Var;
-  std::string res;
-  llvm::raw_string_ostream out(res);
   out << "StoredProperty(name: " << QuotedString(decl->getNameStr())
       << ", typeName: " << QuotedString(decl->getTypeInContext().getString())
-      << ", isVar: " << (isVar ? "true" : "false")
+      << ", isVar: "    << (isVar ? "true" : "false")
       << ", isStatic: " << (decl->isStatic() ? "true" : "false") << ")";
-  out.flush();
-  return res;
 }
 
-/// Returns a string containing swift syntax describing struct \p decl with
-/// relevant information.
-static std::string getStructTypeKindString(StructDecl *decl) {
-  std::string res = "structLike(StructTypeInfo(properties: [";
-  auto properties = decl->getStoredProperties();
-  for (const auto *prop: properties) {
-    if (prop != properties.front()) res += ", ";
-    res += getStoredPropertyString(prop);
+
+/// Prints a string containing swift syntax describing struct \p decl with
+/// relevant information to \p out.
+static void printStructTypeKind(llvm::raw_ostream &out, StructDecl *decl) {
+  out << "structLike(StructTypeInfo(properties: [";
+  llvm::interleaveComma(decl->getStoredProperties(), out,
+                        [&](const VarDecl *prop) {
+                          printStoredProperty(out, prop);
+                        });
+  out << "]))";
+}
+
+/// Prints a string containing swift syntax describing \p decl with relevant
+/// information to \p out. For the moment, only struct and enum types are supported.
+static void printNominalTypeKind(llvm::raw_ostream &out,
+                                 NominalTypeDecl *decl) {
+  if (auto *enumDecl = dyn_cast<EnumDecl>(decl)) {
+    printEnumTypeKind(out, enumDecl);
+    return;
   }
-  res += "]))";
-  return res;
-}
 
-/// Returns a string containing swift syntax describing \p decl with relevant
-/// information. For the moment, only struct and enum types are supported.
-static std::string getNominalTypeKindString(NominalTypeDecl *decl) {
-  if (auto *enumDecl = dyn_cast<EnumDecl>(decl))
-    return getEnumTypeKindString(enumDecl);
-
-  if (auto *structDecl = dyn_cast<StructDecl>(decl))
-    return getStructTypeKindString(structDecl);
+  if (auto *structDecl = dyn_cast<StructDecl>(decl)) {
+    printStructTypeKind(out, structDecl);
+    return;
+  }
 
   llvm_unreachable("todo");
 }
@@ -1083,8 +1076,8 @@ std::string swift::getNominalTypeInfoString(DerivedConformance &derived) {
   std::string res;
   llvm::raw_string_ostream out(res);
   out << "NominalTypeInfo(name: " << QuotedString(derived.Nominal->getNameStr())
-      << ", kind: " << getNominalTypeKindString(derived.Nominal)
-      << ", isUnsafe: " << (isUnsafe ? "true" : "false") << ")";
-  out.flush();
+      << ", kind: ";
+  printNominalTypeKind(out, derived.Nominal);
+  out << ", isUnsafe: " << (isUnsafe ? "true" : "false") << ")";
   return res;
 }
