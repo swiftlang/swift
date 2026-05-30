@@ -79,9 +79,17 @@ Globals:
   Type: DWORD
 - Name: CREATE_UNICODE_ENVIRONMENT
   Type: DWORD
+- Name: CS_DBLCLKS
+  Type: UINT
 - Name: CTRL_BREAK_EVENT
   Type: DWORD
+- Name: CTRL_CLOSE_EVENT
+  Type: DWORD
 - Name: CTRL_C_EVENT
+  Type: DWORD
+- Name: CTRL_LOGOFF_EVENT
+  Type: DWORD
+- Name: CTRL_SHUTDOWN_EVENT
   Type: DWORD
 - Name: CT_CTYPE3
   Type: DWORD
@@ -265,6 +273,8 @@ Globals:
   Type: DWORD
 - Name: ERROR_INVALID_TARGET_HANDLE
   Type: DWORD
+- Name: ERROR_IO_PENDING
+  Type: DWORD
 - Name: ERROR_LABEL_TOO_LONG
   Type: DWORD
 - Name: ERROR_LOCKED
@@ -285,6 +295,8 @@ Globals:
   Type: DWORD
 - Name: ERROR_NOT_ENOUGH_QUOTA
   Type: DWORD
+- Name: ERROR_NOT_FOUND
+  Type: DWORD
 - Name: ERROR_NOT_LOCKED
   Type: DWORD
 - Name: ERROR_NOT_SAME_DEVICE
@@ -295,9 +307,15 @@ Globals:
   Type: DWORD
 - Name: ERROR_NO_UNICODE_TRANSLATION
   Type: DWORD
+- Name: ERROR_OPERATION_ABORTED
+  Type: DWORD
 - Name: ERROR_OUTOFMEMORY
   Type: DWORD
 - Name: ERROR_PATH_NOT_FOUND
+  Type: DWORD
+- Name: ERROR_PIPE_BUSY
+  Type: DWORD
+- Name: ERROR_PIPE_CONNECTED
   Type: DWORD
 - Name: ERROR_SEEK_ON_DEVICE
   Type: DWORD
@@ -322,6 +340,8 @@ Globals:
 - Name: EVENT_ALL_ACCESS
   Type: DWORD
 - Name: EVENT_MODIFY_STATE
+  Type: DWORD
+- Name: EVENT_SYSTEM_FOREGROUND
   Type: DWORD
 - Name: EXCEPTION_DEBUG_EVENT
   Type: DWORD
@@ -413,6 +433,8 @@ Globals:
   Type: DWORD
 - Name: FIONBIO
   Type: int
+- Name: FOF_ALLOWUNDO
+  Type: FILEOP_FLAGS
 - Name: FOF_NOCONFIRMATION
   Type: FILEOP_FLAGS
 - Name: FOF_NOCONFIRMMKDIR
@@ -435,6 +457,8 @@ Globals:
   Type: DWORD
 - Name: FORMAT_MESSAGE_MAX_WIDTH_MASK
   Type: DWORD
+- Name: FO_DELETE
+  Type: UINT
 - Name: FROM_LEFT_1ST_BUTTON_PRESSED
   Type: DWORD
 - Name: FROM_LEFT_2ND_BUTTON_PRESSED
@@ -501,6 +525,8 @@ Globals:
   Type: DWORD
 - Name: INHERIT_PARENT_AFFINITY
   Type: DWORD
+- Name: INPUT_KEYBOARD
+  Type: DWORD
 - Name: INVALID_FILE_ATTRIBUTES
   Type: DWORD
 - Name: INVALID_HANDLE_VALUE
@@ -537,6 +563,10 @@ Globals:
   Type: DWORD
 - Name: JOB_OBJECT_LIMIT_WORKINGSET
   Type: DWORD
+- Name: KEYEVENTF_KEYUP
+  Type: DWORD
+- Name: KEY_CREATE_SUB_KEY
+  Type: REGSAM
 - Name: KEY_ENUMERATE_SUB_KEYS
   Type: REGSAM
 - Name: KEY_EVENT
@@ -546,6 +576,8 @@ Globals:
 - Name: KEY_QUERY_VALUE
   Type: REGSAM
 - Name: KEY_READ
+  Type: REGSAM
+- Name: KEY_SET_VALUE
   Type: REGSAM
 - Name: LANG_NEUTRAL
   Type: WORD
@@ -567,15 +599,23 @@ Globals:
   Type: DWORD
 - Name: LOGON_WITH_PROFILE
   Type: DWORD
+- Name: LWA_ALPHA
+  Type: DWORD
 - Name: MAX_PATH
   Type: DWORD
 - Name: MAX_SYM_NAME
   Type: ULONG
+- Name: MB_ICONERROR
+  Type: UINT
+- Name: MB_OK
+  Type: UINT
 - Name: MEM_COMMIT
   Type: DWORD
 - Name: MEM_RELEASE
   Type: DWORD
 - Name: MONITORINFOF_PRIMARY
+  Type: DWORD
+- Name: MONITOR_DEFAULTTONEAREST
   Type: DWORD
 - Name: MONITOR_DEFAULTTONULL
   Type: DWORD
@@ -632,6 +672,8 @@ Globals:
 - Name: PAGE_READWRITE
   Type: DWORD
 - Name: PFM_ALIGNMENT
+  Type: DWORD
+- Name: PIPE_ACCESS_DUPLEX
   Type: DWORD
 - Name: PIPE_ACCESS_INBOUND
   Type: DWORD
@@ -697,6 +739,8 @@ Globals:
   Type: DWORD
 - Name: REALTIME_PRIORITY_CLASS
   Type: DWORD
+- Name: REG_OPTION_NON_VOLATILE
+  Type: DWORD
 - Name: RIGHTMOST_BUTTON_PRESSED
   Type: DWORD
 - Name: RIGHT_ALT_PRESSED
@@ -710,6 +754,8 @@ Globals:
 - Name: RRF_RT_REG_SZ
   Type: DWORD
 - Name: RRF_ZEROONFAILURE
+  Type: DWORD
+- Name: SC_MANAGER_CONNECT
   Type: DWORD
 - Name: SECTION_EXTEND_SIZE
   Type: DWORD
@@ -729,6 +775,8 @@ Globals:
   Type: DWORD
 - Name: SEM_NOGPFAULTERRORBOX
   Type: UINT
+- Name: SERVICE_QUERY_CONFIG
+  Type: DWORD
 - Name: SE_DACL_PROTECTED
   Type: SECURITY_DESCRIPTOR_CONTROL
 - Name: SHIFT_PRESSED
@@ -774,6 +822,8 @@ Globals:
 - Name: SWP_NOSIZE
   Type: UINT
 - Name: SWP_NOZORDER
+  Type: UINT
+- Name: SWP_SHOWWINDOW
   Type: UINT
 - Name: SW_HIDE
   Type: WORD
@@ -827,6 +877,8 @@ Globals:
   Type: DWORD
 - Name: THREAD_SUSPEND_RESUME
   Type: DWORD
+- Name: TME_LEAVE
+  Type: DWORD
 - Name: TOKEN_QUERY
   Type: DWORD
 - Name: TOKEN_READ
@@ -873,9 +925,13 @@ Globals:
   Type: DWORD
 - Name: WINDOW_BUFFER_SIZE_EVENT
   Type: WORD
+- Name: WINEVENT_OUTOFCONTEXT
+  Type: DWORD
 - Name: WM_ACTIVATE
   Type: UINT
 - Name: WM_ACTIVATEAPP
+  Type: UINT
+- Name: WM_CLOSE
   Type: UINT
 - Name: WM_COMMAND
   Type: UINT
@@ -889,7 +945,11 @@ Globals:
   Type: UINT
 - Name: WM_DRAWITEM
   Type: UINT
+- Name: WM_ENTERIDLE
+  Type: UINT
 - Name: WM_ERASEBKGND
+  Type: UINT
+- Name: WM_GETICON
   Type: UINT
 - Name: WM_GETMINMAXINFO
   Type: UINT
@@ -899,11 +959,21 @@ Globals:
   Type: UINT
 - Name: WM_MEASUREITEM
   Type: UINT
+- Name: WM_NCHITTEST
+  Type: UINT
+- Name: WM_NCLBUTTONDOWN
+  Type: UINT
+- Name: WM_NCMOUSEMOVE
+  Type: UINT
+- Name: WM_NCRBUTTONUP
+  Type: UINT
 - Name: WM_PAINT
   Type: UINT
 - Name: WM_POWERBROADCAST
   Type: UINT
 - Name: WM_QUIT
+  Type: UINT
+- Name: WM_SETCURSOR
   Type: UINT
 - Name: WM_SETFONT
   Type: UINT
@@ -922,6 +992,8 @@ Globals:
 - Name: WS_CHILD
   Type: DWORD
 - Name: WS_CLIPSIBLINGS
+  Type: DWORD
+- Name: WS_EX_LAYERED
   Type: DWORD
 - Name: WS_HSCROLL
   Type: DWORD
