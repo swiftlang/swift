@@ -1679,21 +1679,223 @@ SILInstruction *SILCombiner::visitPackLengthInst(PackLengthInst *PLI) {
   return nullptr;
 }
 
-// Simplify `pack_element_get` where the index is a `dynamic_pack_index` with
-// a constant operand.
+// Simplify `dynamic_pack_index` with a constant operand to
+// `scalar_pack_index` when all users can handle the concrete index.
 //
 // Before:
 // %idx = integer_literal Builtin.Word, N
 // %pack_idx = dynamic_pack_index %Pack{Int, String, Float}, %idx
-// %pack_elt = pack_element_get %pack_value, %pack_idx, @element("...")
 //
 // After:
-// %pack_idx = scalar_pack_index %Pack{Int, String, Float}, N
-// %concrete_elt = pack_element_get %pack_value, %pack_idx, <<concrete type>>
-// %pack_elt = unchecked_addr_cast %concrete_elt, @element("...")
+// %pack_idx = scalar_pack_index N of $Pack{Int, String, Float}
+SILInstruction *
+SILCombiner::visitDynamicPackIndexInst(DynamicPackIndexInst *DPII) {
+  auto PackTy = DPII->getIndexedPackType();
+  if (PackTy->containsPackExpansionType())
+    return nullptr;
+
+  auto *Op = dyn_cast<IntegerLiteralInst>(DPII->getOperand());
+  if (!Op)
+    return nullptr;
+
+  if (Op->getValue().uge(PackTy->getNumElements()))
+    return nullptr;
+
+  unsigned Index = Op->getValue().getZExtValue();
+
+  // Verify all users are safe with a scalar index. The verifier requires that
+  // pack_element_set values match the concrete element type when using scalar
+  // indices, and open_pack_element introduces archetypes that violate this.
+  for (auto *use : DPII->getUses()) {
+    auto *user = use->getUser();
+    if (isa<PackElementGetInst>(user) || isa<TuplePackElementAddrInst>(user))
+      continue;
+    if (auto *PESI = dyn_cast<PackElementSetInst>(user)) {
+      auto expectedTy =
+          SILType::getPrimitiveAddressType(PackTy.getElementType(Index));
+      if (PESI->getValue()->getType() == expectedTy)
+        continue;
+    }
+    return nullptr;
+  }
+
+  return Builder.createScalarPackIndex(DPII->getLoc(), Index,
+                                       DPII->getIndexedPackType());
+}
+
+// Eliminate `open_pack_element` when the pack index resolves to a constant,
+// by substituting concrete element types for the opened element archetypes.
+// After this fires, visitDynamicPackIndexInst can convert the index to scalar.
+SILInstruction *
+SILCombiner::visitOpenPackElementInst(OpenPackElementInst *OPEI) {
+  // Resolve the component index.
+  unsigned componentIndex;
+  CanPackType indexedPackType;
+  if (auto *SPII = dyn_cast<ScalarPackIndexInst>(OPEI->getIndexOperand())) {
+    componentIndex = SPII->getComponentIndex();
+    indexedPackType = SPII->getIndexedPackType();
+  } else if (auto *DPII =
+                 dyn_cast<DynamicPackIndexInst>(OPEI->getIndexOperand())) {
+    auto PackTy = DPII->getIndexedPackType();
+    if (PackTy->containsPackExpansionType())
+      return nullptr;
+    auto *Op = dyn_cast<IntegerLiteralInst>(DPII->getOperand());
+    if (!Op)
+      return nullptr;
+    if (Op->getValue().uge(PackTy->getNumElements()))
+      return nullptr;
+    componentIndex = Op->getValue().getZExtValue();
+    indexedPackType = PackTy;
+  } else {
+    return nullptr;
+  }
+
+  // Verify all users of the token are instructions we can handle.
+  SmallVector<PackElementGetInst *, 4> packElementGets;
+  SmallVector<TuplePackElementAddrInst *, 4> tuplePackElementAddrs;
+  SmallVector<UncheckedAddrCastInst *, 4> uncheckedAddrCasts;
+  for (auto *use : OPEI->getUses()) {
+    if (auto *PEGI = dyn_cast<PackElementGetInst>(use->getUser())) {
+      packElementGets.push_back(PEGI);
+    } else if (auto *TPEAI =
+                   dyn_cast<TuplePackElementAddrInst>(use->getUser())) {
+      tuplePackElementAddrs.push_back(TPEAI);
+    } else if (auto *UACI = dyn_cast<UncheckedAddrCastInst>(use->getUser())) {
+      uncheckedAddrCasts.push_back(UACI);
+    } else {
+      return nullptr;
+    }
+  }
+
+  // Create a scalar pack index for the concrete-typed replacements.
+  Builder.setInsertionPoint(OPEI->getNextInstruction());
+  auto *newScalarIdx = Builder.createScalarPackIndex(
+      OPEI->getLoc(), componentIndex, indexedPackType);
+
+  // Replace each PackElementGetInst with a concrete-typed version.
+  for (auto *PEGI : packElementGets) {
+    auto PackTy = PEGI->getPackType();
+    if (PackTy->containsPackExpansionType())
+      return nullptr;
+    auto concreteElementTy =
+        SILType::getPrimitiveAddressType(PackTy.getElementType(componentIndex));
+
+    Builder.setInsertionPoint(PEGI);
+    auto *newPEGI = Builder.createPackElementGet(
+        PEGI->getLoc(), newScalarIdx, PEGI->getPack(), concreteElementTy);
+
+    replaceInstUsesWith(*PEGI, newPEGI);
+    eraseInstFromFunction(*PEGI);
+  }
+
+  // Replace each TuplePackElementAddrInst with tuple_element_addr.
+  for (auto *TPEAI : tuplePackElementAddrs) {
+    Builder.setInsertionPoint(TPEAI);
+    auto *TEAI = Builder.createTupleElementAddr(
+        TPEAI->getLoc(), TPEAI->getTuple(), componentIndex);
+
+    replaceInstUsesWith(*TPEAI, TEAI);
+    eraseInstFromFunction(*TPEAI);
+  }
+
+  // Replace each UncheckedAddrCastInst by substituting element archetypes
+  // with concrete types.
+  if (!uncheckedAddrCasts.empty()) {
+    auto *env = OPEI->getOpenedGenericEnvironment();
+    auto substFn = [&](SubstitutableType *type) -> Type {
+      auto *archetype = dyn_cast<ElementArchetypeType>(type);
+      if (!archetype)
+        return Type();
+      PackType *pack = nullptr;
+      env->forEachPackElementBinding(
+          [&](ElementArchetypeType *elementType, PackType *packSubst) {
+            if (elementType == archetype)
+              pack = packSubst;
+          });
+      if (!pack)
+        return Type();
+      return pack->getElementType(componentIndex);
+    };
+    auto conformanceFn = LookUpConformanceInModule();
+
+    for (auto *UACI : uncheckedAddrCasts) {
+      auto substTy = UACI->getType().subst(
+          Builder.getModule(), substFn, conformanceFn, CanGenericSignature(),
+          SubstFlags::SubstituteLocalArchetypes);
+      Builder.setInsertionPoint(UACI);
+      if (substTy == UACI->getOperand()->getType()) {
+        replaceInstUsesWith(*UACI, UACI->getOperand());
+      } else {
+        auto *newCast = Builder.createUncheckedAddrCast(
+            UACI->getLoc(), UACI->getOperand(), substTy);
+        replaceInstUsesWith(*UACI, newCast);
+      }
+      eraseInstFromFunction(*UACI);
+    }
+  }
+
+  return eraseInstFromFunction(*OPEI);
+}
+
+// Simplify `pack_element_get` when the index is a `scalar_pack_index`, or
+// when a `dynamic_pack_index` with a constant operand can be resolved.
+//
+// Case 1 (scalar index): The pack is a local alloc_pack — forward the value
+// stored by the matching pack_element_set.
+//
+// Case 2 (scalar or dynamic index): The element type is an archetype but can
+// be resolved to a concrete type from the pack type — create a new
+// pack_element_get with the concrete type and cast back.
 SILInstruction *SILCombiner::visitPackElementGetInst(PackElementGetInst *PEGI) {
+  if (auto *SPII = dyn_cast<ScalarPackIndexInst>(PEGI->getIndex())) {
+    // Forward through a local alloc_pack.
+    if (auto *AP = dyn_cast<AllocPackInst>(PEGI->getPack())) {
+      PackElementSetInst *matchingSet = nullptr;
+      for (auto *use : AP->getUses()) {
+        auto *PESI = dyn_cast<PackElementSetInst>(use->getUser());
+        if (!PESI)
+          continue;
+        auto *setIndex = dyn_cast<ScalarPackIndexInst>(PESI->getIndex());
+        if (!setIndex)
+          continue;
+        if (setIndex->getComponentIndex() != SPII->getComponentIndex())
+          continue;
+        if (matchingSet)
+          return nullptr;
+        matchingSet = PESI;
+      }
+
+      if (matchingSet) {
+        SILValue forwardedValue = matchingSet->getValue();
+        if (forwardedValue->getType() == PEGI->getType()) {
+          replaceInstUsesWith(*PEGI, forwardedValue);
+          return eraseInstFromFunction(*PEGI);
+        }
+      }
+    }
+
+    // Resolve to concrete element type.
+    auto PackTy = PEGI->getPackType();
+    if (PackTy->containsPackExpansionType())
+      return nullptr;
+
+    unsigned Index = SPII->getComponentIndex();
+    auto ElementTy =
+        SILType::getPrimitiveAddressType(PackTy.getElementType(Index));
+    if (ElementTy == PEGI->getElementType())
+      return nullptr;
+
+    auto *NewPEGI = Builder.createPackElementGet(PEGI->getLoc(), SPII,
+                                                 PEGI->getPack(), ElementTy);
+    return Builder.createUncheckedAddrCast(PEGI->getLoc(), NewPEGI,
+                                           PEGI->getElementType());
+  }
+
+  // Handle dynamic_pack_index with a constant operand by creating a local
+  // scalar index for this pack_element_get only (other users of the dynamic
+  // index, like open_pack_element or pack_element_set, keep the dynamic index).
   auto *DPII = dyn_cast<DynamicPackIndexInst>(PEGI->getIndex());
-  if (DPII == nullptr)
+  if (!DPII)
     return nullptr;
 
   auto PackTy = PEGI->getPackType();
@@ -1701,96 +1903,68 @@ SILInstruction *SILCombiner::visitPackElementGetInst(PackElementGetInst *PEGI) {
     return nullptr;
 
   auto *Op = dyn_cast<IntegerLiteralInst>(DPII->getOperand());
-  if (Op == nullptr)
+  if (!Op)
     return nullptr;
 
   if (Op->getValue().uge(PackTy->getNumElements()))
     return nullptr;
 
   unsigned Index = Op->getValue().getZExtValue();
-  auto *SPII = Builder.createScalarPackIndex(
-      DPII->getLoc(), Index, DPII->getIndexedPackType());
+  auto *SPII = Builder.createScalarPackIndex(DPII->getLoc(), Index,
+                                             DPII->getIndexedPackType());
 
-  auto ElementTy = SILType::getPrimitiveAddressType(
-      PEGI->getPackType().getElementType(Index));
-  auto *NewPEGI = Builder.createPackElementGet(
-      PEGI->getLoc(), SPII, PEGI->getPack(),
-      ElementTy);
-
-  return Builder.createUncheckedAddrCast(
-      PEGI->getLoc(), NewPEGI, PEGI->getElementType());
+  auto ElementTy =
+      SILType::getPrimitiveAddressType(PackTy.getElementType(Index));
+  auto *NewPEGI = Builder.createPackElementGet(PEGI->getLoc(), SPII,
+                                               PEGI->getPack(), ElementTy);
+  return Builder.createUncheckedAddrCast(PEGI->getLoc(), NewPEGI,
+                                         PEGI->getElementType());
 }
 
-// Simplify `tuple_pack_element_addr` where the index is a `dynamic_pack_index`
-//with a constant operand.
-//
-// Before:
-// %idx = integer_literal Builtin.Word, N
-// %pack_idx = dynamic_pack_index %Pack{Int, String, Float}, %idx
-// %tuple_elt = tuple_pack_element_addr %tuple_value, %pack_idx, @element("...")
-//
-// After:
-// %concrete_elt = tuple_element_addr %tuple_value, N
-// %tuple_elt = unchecked_addr_cast %concrete_elt, @element("...")
+// Eliminate dead alloc_pack instructions whose only users are
+// pack_element_set (dead stores), dealloc_pack, and debug instructions.
+SILInstruction *SILCombiner::visitAllocPackInst(AllocPackInst *AP) {
+  SmallVector<SILInstruction *, 8> toDelete;
+  for (auto *use : AP->getUses()) {
+    auto *user = use->getUser();
+    if (isa<PackElementSetInst>(user) || isa<DeallocPackInst>(user) ||
+        user->isDebugInstruction()) {
+      toDelete.push_back(user);
+    } else {
+      return nullptr;
+    }
+  }
+  for (auto *inst : toDelete)
+    eraseInstFromFunction(*inst);
+  return eraseInstFromFunction(*AP);
+}
+
+// Simplify `tuple_pack_element_addr` when the index is a `scalar_pack_index`
+// or a `dynamic_pack_index` with a constant operand.
 SILInstruction *
 SILCombiner::visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI) {
-  auto *DPII = dyn_cast<DynamicPackIndexInst>(TPEAI->getIndex());
-  if (DPII == nullptr)
+  unsigned Index;
+
+  if (auto *SPII = dyn_cast<ScalarPackIndexInst>(TPEAI->getIndex())) {
+    Index = SPII->getComponentIndex();
+  } else if (auto *DPII = dyn_cast<DynamicPackIndexInst>(TPEAI->getIndex())) {
+    auto PackTy = DPII->getIndexedPackType();
+    if (PackTy->containsPackExpansionType())
+      return nullptr;
+    auto *Op = dyn_cast<IntegerLiteralInst>(DPII->getOperand());
+    if (!Op)
+      return nullptr;
+    if (Op->getValue().uge(PackTy->getNumElements()))
+      return nullptr;
+    Index = Op->getValue().getZExtValue();
+  } else {
+    return nullptr;
+  }
+
+  auto tupleElementTy = TPEAI->getTuple()->getType().getTupleElementType(Index);
+  if (tupleElementTy != TPEAI->getType())
     return nullptr;
 
-  auto PackTy = DPII->getIndexedPackType();
-  if (PackTy->containsPackExpansionType())
-    return nullptr;
-
-  auto *Op = dyn_cast<IntegerLiteralInst>(DPII->getOperand());
-  if (Op == nullptr)
-    return nullptr;
-
-  if (Op->getValue().uge(PackTy->getNumElements()))
-    return nullptr;
-
-  unsigned Index = Op->getValue().getZExtValue();
-
-  auto *TEAI = Builder.createTupleElementAddr(
-      TPEAI->getLoc(), TPEAI->getTuple(), Index);
-  return Builder.createUncheckedAddrCast(
-      TPEAI->getLoc(), TEAI, TPEAI->getElementType());
-}
-
-// This is a hack. When optimizing a simple pack expansion expression which
-// forms a tuple from a pack, like `(repeat each t)`, after the above
-// peepholes we end up with:
-//
-// %src = unchecked_addr_cast %real_src, @element("...")
-// %dst = unchecked_addr_cast %real_dst, @element("...")
-// copy_addr %src, %dst
-//
-// Simplify this to
-//
-// copy_addr %real_src, %real_dst
-//
-// Assuming that %real_src and %real_dst have the same type.
-//
-// In this simple case, this eliminates the opened element archetype entirely.
-// However, a more principled peephole would be to transform an
-// open_pack_element with a scalar index by replacing all usages of the
-// element archetype with a concrete type.
-SILInstruction *
-SILCombiner::visitCopyAddrInst(CopyAddrInst *CAI) {
-  auto *Src = dyn_cast<UncheckedAddrCastInst>(CAI->getSrc());
-  auto *Dst = dyn_cast<UncheckedAddrCastInst>(CAI->getDest());
-
-  if (Src == nullptr || Dst == nullptr)
-    return nullptr;
-
-  if (Src->getType() != Dst->getType() ||
-      !Src->getType().is<ElementArchetypeType>())
-    return nullptr;
-
-  if (Src->getOperand()->getType() != Dst->getOperand()->getType())
-    return nullptr;
-
-  return Builder.createCopyAddr(
-      CAI->getLoc(), Src->getOperand(), Dst->getOperand(),
-      CAI->isTakeOfSrc(), CAI->isInitializationOfDest());
+  return Builder.createTupleElementAddr(TPEAI->getLoc(), TPEAI->getTuple(),
+                                        Index);
 }
