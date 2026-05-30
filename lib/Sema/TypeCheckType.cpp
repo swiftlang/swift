@@ -688,7 +688,8 @@ private:
   NeverNullType resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
                                         TypeResolutionOptions options);
   NeverNullType resolveSendingTypeRepr(SendingTypeRepr *repr,
-                                       TypeResolutionOptions options);
+                                       TypeResolutionOptions options,
+                                       TypeAttrSet *attrs);
   NeverNullType resolveNonisolatedNonsendingTypeRepr(NonisolatedNonsendingTypeRepr *repr,
                                               TypeResolutionOptions options);
   NeverNullType
@@ -2923,7 +2924,7 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::Isolated:
     return resolveIsolatedTypeRepr(cast<IsolatedTypeRepr>(repr), options);
   case TypeReprKind::Sending:
-    return resolveSendingTypeRepr(cast<SendingTypeRepr>(repr), options);
+    return resolveSendingTypeRepr(cast<SendingTypeRepr>(repr), options, /*attrs=*/nullptr);
   case TypeReprKind::NonisolatedNonsending:
     return resolveNonisolatedNonsendingTypeRepr(cast<NonisolatedNonsendingTypeRepr>(repr),
                                          options);
@@ -3753,6 +3754,10 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   // Packs
   } else if (auto packRepr = dyn_cast<PackTypeRepr>(repr)) {
     ty = resolvePackType(packRepr, options, &attrs);
+
+  // `sending`
+  } else if (auto *sendingRepr = dyn_cast<SendingTypeRepr>(repr)) {
+    ty = resolveSendingTypeRepr(sendingRepr, options, &attrs);
 
   // Otherwise, just resolve normally.
   } else {
@@ -5705,7 +5710,8 @@ TypeResolver::resolveIsolatedTypeRepr(IsolatedTypeRepr *repr,
 
 NeverNullType
 TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
-                                     TypeResolutionOptions options) {
+                                     TypeResolutionOptions options,
+                                     TypeAttrSet  *attrs) {
   if (options.is(TypeResolverContext::TupleElement)) {
     diagnoseInvalid(repr, repr->getSpecifierLoc(),
                     diag::sending_cannot_be_applied_to_tuple_elt);
@@ -5719,6 +5725,15 @@ TypeResolver::resolveSendingTypeRepr(SendingTypeRepr *repr,
     diagnoseInvalid(repr, repr->getSpecifierLoc(),
                     diag::sending_only_on_parameters_and_results);
     return ErrorType::get(getASTContext());
+  }
+
+  // Handles situations like `nonisolated(nonsending) sending @escaping ...`
+  if (attrs) {
+    auto *baseRepr = repr->getBase();
+    if (auto *attrRepr = dyn_cast<AttributedTypeRepr>(baseRepr)) {
+      baseRepr = attrs->accumulate(attrRepr);
+    }
+    return resolveAttributedType(baseRepr, options, *attrs);
   }
 
   // Return the type.
