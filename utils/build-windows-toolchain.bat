@@ -73,8 +73,8 @@ for %%I in (%TestsList%) do (
 set "TestArg=-Test !TestArg!"
 
 :: Build the packaging arguments (skipped for normal PRs and an added stage for toolchain PRs)
-set "PackagingArg=-SkipPackaging"
-if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Stage %PackageRoot%"
+set "PackagingArg="
+if not "%INCLUDE_PACKAGING%"=="" set "PackagingArg=-Package -Stage %PackageRoot%"
 
 :: Build the arguments related to Windows SDK builds
 set "WindowsSDKArgs=-Windows"
