@@ -1161,7 +1161,8 @@ public:
   ///
   /// \returns The imported declaration, or null if the macro could not be
   /// translated into Swift.
-  ValueDecl *importMacro(Identifier name, ClangNode macroNode);
+  ValueDecl *importMacro(Identifier name, ClangNode macroNode,
+                         const clang::IdentifierInfo *II = nullptr);
 
   /// Map a Clang identifier name to its imported Swift equivalent.
   StringRef getSwiftNameFromClangName(StringRef name);

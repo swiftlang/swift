@@ -15,6 +15,17 @@ Globals:
     SwiftName: '`class`'
   - Name: ANTGlobalValue5
     SwiftName: '`3test raw`'
+  - Name: APINOTES_TYPED_MACRO
+    Type: APINotesUnsigned
+  - Name: APINOTES_TYPED_MACRO_ALIAS_TARGET
+    Type: APINotesSigned
+  - Name: APINOTES_TYPED_MACRO_ALIAS
+    Type: APINotesUnsigned
+  - Name: APINOTES_RENAMED_MACRO
+    SwiftName: renamedMacroConstant
+  - Name: APINOTES_RETYPED_RENAMED_MACRO
+    SwiftName: retypedRenamedMacroConstant
+    Type: APINotesUnsigned
   - Name: will_be_private
     SwiftPrivate: true
 Tags:

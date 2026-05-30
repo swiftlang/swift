@@ -468,8 +468,13 @@ public:
       llvm::function_ref<bool(ImportedName, ImportNameVersion)> action);
 
   /// Imports the name of the given Clang macro into Swift.
-  Identifier importMacroName(const clang::IdentifierInfo *clangIdentifier,
-                             const clang::MacroInfo *macro);
+  ///
+  /// If APINotes provides a 'SwiftName:' for the macro, that name is used;
+  /// \p M allows module APINotes sidecars to be consulted in addition to
+  /// location-based notes.
+  Identifier importMacroName(const clang::IdentifierInfo *II,
+                             const clang::MacroInfo *MI,
+                             const clang::Module *M = nullptr);
 
   ASTContext &getContext() { return swiftCtx; }
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
