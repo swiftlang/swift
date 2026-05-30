@@ -2083,13 +2083,27 @@ void importer::addMacrosToLookupTable(SwiftLookupTable &table,
       }
 
       // Add this entry.
-      auto name = nameImporter.importMacroName(macro.first, info);
+      const clang::Module *Module =
+          moduleMacro ? moduleMacro->getOwningModule() : nullptr;
+      auto name = nameImporter.importMacroName(macro.first, info, Module);
       if (name.empty())
         return;
-      if (moduleMacro)
-        table.addEntry(name, moduleMacro, tu);
-      else
-        table.addEntry(name, info, tu);
+
+      auto addEntry = [&](Identifier entryName) {
+        if (moduleMacro)
+          table.addEntry(entryName, moduleMacro, tu);
+        else
+          table.addEntry(entryName, info, tu);
+      };
+
+      addEntry(name);
+
+      // If APINotes renamed this macro, also register it under its original C
+      // name so that a reference to the old name still resolves (to an
+      // unavailable redirect synthesized in importMacro).
+      auto rawName = nameImporter.getIdentifier(macro.first->getName());
+      if (!rawName.empty() && rawName != name)
+        addEntry(rawName);
     };
 
     ArrayRef<clang::ModuleMacro *> moduleMacros =
