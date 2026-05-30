@@ -1,0 +1,8 @@
+Name: InvalidMacroNames
+Globals:
+  - Name: OPERATOR_NAMED_MACRO
+    SwiftName: '+'
+  - Name: FUNCTION_NAMED_MACRO
+    SwiftName: 'functionNamedMacro()'
+  - Name: MEMBER_NAMED_MACRO
+    SwiftName: 'Container.memberNamedMacro'
