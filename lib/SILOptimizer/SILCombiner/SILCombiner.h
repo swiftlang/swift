@@ -291,7 +291,10 @@ public:
   visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *DFEI);
   
   SILInstruction *visitPackLengthInst(PackLengthInst *PLI);
+  SILInstruction *visitDynamicPackIndexInst(DynamicPackIndexInst *DPII);
+  SILInstruction *visitOpenPackElementInst(OpenPackElementInst *OPEI);
   SILInstruction *visitPackElementGetInst(PackElementGetInst *PEGI);
+  SILInstruction *visitAllocPackInst(AllocPackInst *AP);
   SILInstruction *visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI);
   SILInstruction *visitCopyAddrInst(CopyAddrInst *CAI);
 
