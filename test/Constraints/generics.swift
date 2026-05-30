@@ -921,10 +921,7 @@ func rdar79757320() {
     var value: String
   }
 
-  // FIXME: There has to be a way to propagate holes that makes it easy to suppress failures caused by missing members.
   _ = Container(value: Value(42).formatted(.S(a: .a, b: .b(0)))) // expected-error {{type 'R_79757320' has no member 'S'}}
-  // expected-error@-1 {{cannot infer contextual base in reference to member 'a'}}
-  // expected-error@-2 {{cannot infer contextual base in reference to member 'b'}}
 }
 
 protocol P_eaf0300ff7a {}
