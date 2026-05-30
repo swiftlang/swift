@@ -2254,11 +2254,6 @@ function Build-CMakeProject {
             # Swift requires COMDAT folding and de-duplication
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-Xlinker", "/OPT:REF", "-Xlinker", "/OPT:ICF")
           }
-
-          Add-FlagsDefine $Defines CMAKE_Swift_FLAGS $SwiftCompiler.Flags
-          # Workaround CMake 3.26+ enabling `-wmo` by default on release builds
-          Add-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELEASE "-O"
-          Add-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELWITHDEBINFO "-O"
         }
 
         Add-LinkerFlagsDefine $Defines @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF")
@@ -2337,22 +2332,17 @@ function Build-CMakeProject {
             # `-sysroot $AndroidSysroot` here.
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-sdk", $SwiftSDK, "-sysroot", $AndroidSysroot)
           }
-
-          Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @(
-            "-Xclang-linker", "-target", "-Xclang-linker", $Platform.Triple,
-            "-Xclang-linker", "--sysroot", "-Xclang-linker", $AndroidSysroot,
-            "-Xclang-linker", "-resource-dir", "-Xclang-linker", "${AndroidPrebuiltRoot}\lib\clang\$($(Get-AndroidNDK).ClangVersion)"
-          )
-
           if ($DebugInfo) {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS (& $SwiftCompiler.DebugFlags $DebugFormat)
           } else {
             Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @("-gnone")
           }
 
-          # Workaround CMake 3.26+ enabling `-wmo` by default on release builds
-          Add-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELEASE "-O"
-          Add-FlagsDefine $Defines CMAKE_Swift_FLAGS_RELWITHDEBINFO "-O"
+          Add-FlagsDefine $Defines CMAKE_Swift_FLAGS @(
+            "-Xclang-linker", "-target", "-Xclang-linker", $Platform.Triple,
+            "-Xclang-linker", "--sysroot", "-Xclang-linker", $AndroidSysroot,
+            "-Xclang-linker", "-resource-dir", "-Xclang-linker", "${AndroidPrebuiltRoot}\lib\clang\$($(Get-AndroidNDK).ClangVersion)"
+          )
         }
 
         if (($UseASM -and $Assembler.AssumeFunctional) -or ($UseC -and $CCompiler.AssumeFunctional) -or ($UseCXX -and $CXXCompiler.AssumeFunctional)) {
@@ -5116,9 +5106,13 @@ function Test-SourceKitLSP {
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Crypto)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib",
     "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib\libCCryptoBoringSSL.lib",
+    "-Xlinker", "$(Get-ProjectBinaryCache $BuildPlatform Crypto)\lib\libCCryptoBoringSSLShims.lib",
     # swift-asn1
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform ASN1)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform ASN1)\lib",
+    # swift-certificates
+    "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform Certificates)\swift",
+    "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform Certificates)\lib",
     # swift-package-manager
     "-Xswiftc", "-I$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\swift",
     "-Xlinker", "-L$(Get-ProjectBinaryCache $BuildPlatform PackageManager)\lib",
