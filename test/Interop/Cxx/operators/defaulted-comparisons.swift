@@ -1,6 +1,7 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -cxx-interoperability-mode=default -Xcc -std=c++20)
 
 // REQUIRES: executable_test
+// REQUIRES: std_compare
 
 import DefaultedComparisons
 import StdlibUnittest
