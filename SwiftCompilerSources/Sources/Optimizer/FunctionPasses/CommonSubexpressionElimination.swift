@@ -69,6 +69,9 @@ func runCSE(
   if context.needBreakInfiniteLoops {
     breakInfiniteLoops(in: function, context)
   }
+  if context.needCompleteLifetimes {
+    completeLifetimes(in: function, context)
+  }
 }
 
 // -----------------------------------------------------------------------
