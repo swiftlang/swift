@@ -469,6 +469,7 @@ add_dependencies(sdk-overlay wasilibc_modulemap)
 if(WINDOWS IN_LIST SWIFT_SDKS)
   swift_install_in_component(FILES
       ucrt.modulemap
+      WinSDK.apinotes
       vcruntime.apinotes
       vcruntime.modulemap
       winsdk_um.modulemap

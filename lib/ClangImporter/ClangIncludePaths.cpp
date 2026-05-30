@@ -550,6 +550,14 @@ void GetWindowsFileMappings(
                                                AuxiliaryFile);
 
     llvm::sys::path::remove_filename(WinSDKInjection);
+    llvm::sys::path::append(WinSDKInjection, "WinSDK.apinotes");
+    AuxiliaryFile = GetPlatformAuxiliaryFile("windows", "WinSDK.apinotes",
+                                             VFS, SearchPathOpts);
+    if (!AuxiliaryFile.empty())
+      fileMapping.redirectedFiles.emplace_back(std::string(WinSDKInjection),
+                                               AuxiliaryFile);
+
+    llvm::sys::path::remove_filename(WinSDKInjection);
     llvm::sys::path::remove_filename(WinSDKInjection);
     llvm::sys::path::append(WinSDKInjection, "shared", "module.modulemap");
     AuxiliaryFile = GetPlatformAuxiliaryFile(
