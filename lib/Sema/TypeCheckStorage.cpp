@@ -3441,6 +3441,13 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
                             wrapperVar->getSetterFormalAccess())
                  : var->getSetterFormalAccess());
 
+  // The property must be as available as both the wrapped property and
+  // the wrapper type's `projectedValue` property.
+  SmallVector<const Decl *, 2> asAvailableAs = {var};
+  if (wrapperVar)
+    asAvailableAs.push_back(wrapperVar);
+  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
+
   // Add the accessors we need.
   if (var->hasImplicitPropertyWrapper()) {
     // FIXME: This can have a setter, but we need a resolved type first

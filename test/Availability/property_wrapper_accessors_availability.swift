@@ -71,6 +71,47 @@ struct ModifyMoreAvailable<T> {
     }
 }
 
+@propertyWrapper
+struct UnrestrictedProjection<T> {
+    var wrappedValue: T {
+        get { fatalError() }
+        set { fatalError() }
+    }
+
+    var projectedValue: T {
+        get { fatalError() }
+        set { fatalError() }
+    }
+}
+
+@propertyWrapper
+struct ProjectedValueConditionallyAvailable<T> {
+    var wrappedValue: T {
+        get { fatalError() }
+        set { fatalError() }
+    }
+
+    @available(macOS 51, *)
+    var projectedValue: T {
+        get { fatalError() }
+        set { fatalError() }
+    }
+}
+
+@propertyWrapper
+struct ProjectedValueUnavailable<T> {
+    var wrappedValue: T {
+        get { fatalError() }
+        set { fatalError() }
+    }
+
+    @available(macOS, unavailable)
+    var projectedValue: T {
+        get { fatalError() }
+        set { fatalError() }
+    }
+}
+
 struct Butt {
     var modify_conditionally_available: Int {
         get { fatalError() }
@@ -90,6 +131,12 @@ struct Butt {
 
     @ModifyMoreAvailable
     var wrapped_modify_more_available: Int
+
+    @ProjectedValueConditionallyAvailable
+    var wrapped_projected_value_conditionally_available: Int
+
+    @ProjectedValueUnavailable
+    var wrapped_projected_value_unavailable: Int // expected-note 2 {{'$wrapped_projected_value_unavailable' has been explicitly marked unavailable here}}
 }
 
 func butt(x: inout Butt) { // expected-note * {{}}
@@ -103,12 +150,22 @@ func butt(x: inout Butt) { // expected-note * {{}}
     x.$wrapped_setter_more_available = 0
     x.$wrapped_modify_more_available = 0
 
+    _ = x.wrapped_projected_value_conditionally_available
+    _ = x.$wrapped_projected_value_conditionally_available // expected-error {{'$wrapped_projected_value_conditionally_available' is only available in macOS 51 or newer}} expected-note{{}}
+    x.$wrapped_projected_value_conditionally_available = 0 // expected-error {{'$wrapped_projected_value_conditionally_available' is only available in macOS 51 or newer}} expected-note{{}}
+
+    _ = x.wrapped_projected_value_unavailable
+    _ = x.$wrapped_projected_value_unavailable // expected-error {{'$wrapped_projected_value_unavailable' is unavailable in macOS}}
+    x.$wrapped_projected_value_unavailable = 0 // expected-error {{'$wrapped_projected_value_unavailable' is unavailable in macOS}}
+
     if #available(macOS 51, *) {
         x.modify_conditionally_available = 0
         x.wrapped_setter_conditionally_available = 0
         x.wrapped_modify_conditionally_available = 0
         x.$wrapped_setter_conditionally_available = 0
         x.$wrapped_modify_conditionally_available = 0
+        _ = x.$wrapped_projected_value_conditionally_available
+        x.$wrapped_projected_value_conditionally_available = 0
     }
 }
 
@@ -156,6 +213,9 @@ struct LessAvailable {
   @ModifyConditionallyAvailable
   var wrapped_modify_more_available: Int
 
+  @UnrestrictedProjection
+  var unrestricted_projection: Int
+
   var nested: Nested
 
   struct Nested {
@@ -164,30 +224,48 @@ struct LessAvailable {
 
     @ModifyConditionallyAvailable
     var wrapped_modify_more_available: Int
+
+    @UnrestrictedProjection
+    var unrestricted_projection: Int
   }
 }
 
 func testInferredAvailability(x: inout LessAvailable) { // expected-error {{'LessAvailable' is only available in macOS 51.0 or newer}} expected-note*{{}}
   x.wrapped_setter_more_available = 0 // expected-error {{setter for 'wrapped_setter_more_available' is only available in macOS 51 or newer}} expected-note{{}}
   x.wrapped_modify_more_available = 0 // expected-error {{setter for 'wrapped_modify_more_available' is only available in macOS 51 or newer}} expected-note{{}}
-  x.$wrapped_setter_more_available = 0 // expected-error {{setter for '$wrapped_setter_more_available' is only available in macOS 51 or newer}} expected-note{{}}
-  x.$wrapped_modify_more_available = 0 // expected-error {{setter for '$wrapped_modify_more_available' is only available in macOS 51 or newer}} expected-note{{}}
+  x.$wrapped_setter_more_available = 0 // expected-error {{'$wrapped_setter_more_available' is only available in macOS 51.0 or newer}} expected-note{{}}
+  x.$wrapped_modify_more_available = 0 // expected-error {{'$wrapped_modify_more_available' is only available in macOS 51.0 or newer}} expected-note{{}}
+
+  // The synthesized projection variable inherits availability from the
+  // wrapped property, so reads of the projection should also error.
+  _ = x.$wrapped_setter_more_available // expected-error {{'$wrapped_setter_more_available' is only available in macOS 51.0 or newer}} expected-note{{}}
+  _ = x.$wrapped_modify_more_available // expected-error {{'$wrapped_modify_more_available' is only available in macOS 51.0 or newer}} expected-note{{}}
+  _ = x.$unrestricted_projection // expected-error {{'$unrestricted_projection' is only available in macOS 51.0 or newer}} expected-note{{}}
+  x.$unrestricted_projection = 0 // expected-error {{'$unrestricted_projection' is only available in macOS 51.0 or newer}} expected-note{{}}
 
   x.nested.wrapped_setter_more_available = 0 // expected-error {{setter for 'wrapped_setter_more_available' is only available in macOS 51 or newer}} expected-note{{}}
   x.nested.wrapped_modify_more_available = 0 // expected-error {{setter for 'wrapped_modify_more_available' is only available in macOS 51 or newer}} expected-note{{}}
-  x.nested.$wrapped_setter_more_available = 0 // expected-error {{setter for '$wrapped_setter_more_available' is only available in macOS 51 or newer}} expected-note{{}}
-  x.nested.$wrapped_modify_more_available = 0 // expected-error {{setter for '$wrapped_modify_more_available' is only available in macOS 51 or newer}} expected-note{{}}
+  x.nested.$wrapped_setter_more_available = 0 // expected-error {{'$wrapped_setter_more_available' is only available in macOS 51.0 or newer}} expected-note{{}}
+  x.nested.$wrapped_modify_more_available = 0 // expected-error {{'$wrapped_modify_more_available' is only available in macOS 51.0 or newer}} expected-note{{}}
+  _ = x.nested.$unrestricted_projection // expected-error {{'$unrestricted_projection' is only available in macOS 51.0 or newer}} expected-note{{}}
+  x.nested.$unrestricted_projection = 0 // expected-error {{'$unrestricted_projection' is only available in macOS 51.0 or newer}} expected-note{{}}
 
   if #available(macOS 51.0, *) {
     x.wrapped_setter_more_available = 0
     x.wrapped_modify_more_available = 0
     x.$wrapped_setter_more_available = 0
     x.$wrapped_modify_more_available = 0
+    _ = x.$wrapped_setter_more_available
+    _ = x.$wrapped_modify_more_available
+    _ = x.$unrestricted_projection
+    x.$unrestricted_projection = 0
 
     x.nested.wrapped_setter_more_available = 0
     x.nested.wrapped_modify_more_available = 0
     x.nested.$wrapped_setter_more_available = 0
     x.nested.$wrapped_modify_more_available = 0
+    _ = x.nested.$unrestricted_projection
+    x.nested.$unrestricted_projection = 0
   }
 }
 
