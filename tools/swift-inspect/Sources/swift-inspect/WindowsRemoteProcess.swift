@@ -138,11 +138,8 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     self.processIdentifier = processId
     // Get process handle.
     guard let process =
-      OpenProcess(
-        DWORD(
-          PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION),
-        false,
-        processId) else {
+      OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ | PROCESS_VM_WRITE | PROCESS_VM_OPERATION,
+                  false, processId) else {
       return nil
     }
     self.process = process
@@ -284,7 +281,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
     let hMapFile = CreateFileMappingA(
       INVALID_HANDLE_VALUE,
       nil,
-      DWORD(PAGE_READWRITE),
+      PAGE_READWRITE,
       0,
       DWORD(bufSize),
       sharedMemoryName)
@@ -555,22 +552,21 @@ internal final class WindowsRemoteProcess: RemoteProcess {
             print("\(String(decodingCString: $0.baseAddress!, as: UTF16.self)) doesn't exist")
             return nil
           }
-          guard faAttributes.dwFileAttributes & DWORD(FILE_ATTRIBUTE_REPARSE_POINT) == 0 else {
+          guard faAttributes.dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT == 0 else {
             print("\(String(decodingCString: $0.baseAddress!, as: UTF16.self)) doesn't exist")
             return nil
           }
 
           let szLength = SIZE_T(Int(dwLength) * MemoryLayout<WCHAR>.size)
           guard let pAllocation =
-              VirtualAllocEx(self.process, nil, szLength,
-                             DWORD(MEM_COMMIT), DWORD(PAGE_READWRITE)) else {
+              VirtualAllocEx(self.process, nil, szLength, MEM_COMMIT, PAGE_READWRITE) else {
             print("VirtualAllocEx failed \(GetLastError())")
             return nil
           }
 
           if !WriteProcessMemory(self.process, pAllocation, $0.baseAddress, szLength, nil) {
             print("WriteProcessMemory failed \(GetLastError())")
-            _ = VirtualFreeEx(self.process, pAllocation, 0, DWORD(MEM_RELEASE))
+            _ = VirtualFreeEx(self.process, pAllocation, 0, MEM_RELEASE)
             return nil
           }
 
@@ -587,7 +583,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
                      from process: DWORD,
                      _ pfnFunction: LPTHREAD_START_ROUTINE) -> Bool {
     // Deallocate the dll path string in the remote process
-    if !VirtualFreeEx(self.process, pwszModule, 0, DWORD(MEM_RELEASE)) {
+    if !VirtualFreeEx(self.process, pwszModule, 0, MEM_RELEASE) {
       print("VirtualFreeEx failed: \(GetLastError())")
     }
 
@@ -629,7 +625,7 @@ internal final class WindowsRemoteProcess: RemoteProcess {
 
   private func modules(of dwProcessId: DWORD, _ closure: (MODULEENTRY32W, String) -> Void) {
     let hModuleSnapshot: HANDLE =
-      CreateToolhelp32Snapshot(DWORD(TH32CS_SNAPMODULE), dwProcessId)
+      CreateToolhelp32Snapshot(TH32CS_SNAPMODULE, dwProcessId)
     if hModuleSnapshot == INVALID_HANDLE_VALUE {
       print("CreateToolhelp32Snapshot failed \(GetLastError())")
       return
@@ -752,7 +748,7 @@ extension String {
 }
 
 func enumerateThreads(processIdentifier: DWORD, dwDesiredAccess: DWORD, _ block: (HANDLE) throws -> ()) throws {
-  let hThreadSnap = CreateToolhelp32Snapshot(DWORD(TH32CS_SNAPTHREAD), 0)
+  let hThreadSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0)
   if hThreadSnap == INVALID_HANDLE_VALUE {
     throw _Win32Error(functionName: "CreateToolhelp32Snapshot", error: GetLastError())
   }
