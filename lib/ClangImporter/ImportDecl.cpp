@@ -10937,10 +10937,10 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
 
     // FIXME: constructors are added eagerly, but shouldn't be
     // FIXME: subscripts are added eagerly, but shouldn't be
-    if (!isa<AccessorDecl>(member) && !isa<SubscriptDecl>(member) &&
-        !isa<ConstructorDecl>(member)) {
-      swiftDecl->addMember(member);
-    }
+    if (isa<AccessorDecl, SubscriptDecl, ConstructorDecl>(member))
+      continue;
+
+    swiftDecl->addMember(member);
   }
 
   // If this is a C++ record, look through the base classes too.
