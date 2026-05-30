@@ -1014,6 +1014,9 @@ std::string ASTMangler::mangleAnyDecl(const ValueDecl *decl, bool addPrefix) {
     beginManglingWithoutPrefix();
   }
   llvm::SaveAndRestore<bool> allowUnnamedRAII(AllowNamelessEntities, true);
+  // Honor @_preInverseGenerics, matching mangleEntity.
+  llvm::SaveAndRestore<InvertibleProtocolSet> inversesRAII(
+      AllowedInverses, inversesAllowed(decl));
 
   appendAnyDecl(decl);
 
