@@ -489,10 +489,6 @@ LEGACY_PASS(MarkNeverWrittenMutableClosureBoxesAsImmutable, "mark-never-written-
      "Mark never written mutable closure boxes as immutable")
 LEGACY_PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
-LEGACY_PASS(WasmAsyncT2TLowering, "wasm-async-t2t-lowering",
-     "On wasm targets, rewrite async typed-throws thin_to_thick_function "
-     "to zero-capture partial_apply [on_stack] to work around the "
-     "wasm backend's swiftcc parameter padding bug (issue #89320)")
 
 //===----------------------------------------------------------------------===//
 //

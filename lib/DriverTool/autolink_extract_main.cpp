@@ -253,6 +253,7 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       "-lFoundationXML",
       "-l_CFXMLInterface",
       "-l_FoundationCShims",
+      "-l_FoundationInternationalizationData",
       "-l_FoundationCollections",
       // Foundation support libs
       "-lcurl",

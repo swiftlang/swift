@@ -4257,13 +4257,6 @@ namespace {
         return known2->second;
       }
 
-      if (name && name.isSimpleName()) {
-        assert(importedName.hasCustomName() &&
-               "imported function with simple name?");
-        // Just fill in empty argument labels.
-        name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
-      }
-
       if (name && name.getArgumentNames().size() != bodyParams->size()) {
         // We synthesized additional parameters so rebuild the DeclName.
         name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
@@ -8579,6 +8572,44 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       if (classImplementsProtocol(superInterface, clangProto, true))
         continue;
 
+    auto hasExistingMethodWithSelector =
+        [&](clang::Selector sel, bool isInstance,
+            bool acceptPropertyAccessor) -> bool {
+      auto matches = [&](const clang::ObjCContainerDecl *container) -> bool {
+        auto *existing = isInstance ? container->getInstanceMethod(sel)
+                                    : container->getClassMethod(sel);
+        return existing &&
+               (acceptPropertyAccessor || !existing->isPropertyAccessor());
+      };
+
+      if (matches(interfaceDecl))
+        return true;
+
+      for (auto *category : interfaceDecl->known_categories()) {
+        if (!Impl.getClangSema().isVisible(category))
+          continue;
+        if (category != decl) {
+          auto *categoryModule = Impl.getClangModuleForDecl(category);
+          if (categoryModule != declModule &&
+              categoryModule != interfaceModule) {
+            // Also accept a category in a Clang module that is imported by
+            // the module that declares the conformance, since the concrete
+            // method is reachable through that module's imports.
+            auto *clangCategoryMod =
+                categoryModule ? categoryModule->getClangModule() : nullptr;
+            auto *clangDeclMod =
+                declModule ? declModule->getClangModule() : nullptr;
+            if (!clangCategoryMod || !clangDeclMod ||
+                !clangDeclMod->isModuleVisible(clangCategoryMod))
+              continue;
+          }
+        }
+        if (matches(category))
+          return true;
+      }
+      return false;
+    };
+
     auto importProtocolRequirement = [&](Decl *member) {
       // Skip compatibility stubs; there's no reason to mirror them.
       if (member->isUnavailableInCurrentSwiftVersion())
@@ -8594,28 +8625,9 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
         // name. (This also covers other properties with that same name.)
         // FIXME: We should still mirror the setter as a method if it's
         // not already there.
-        clang::Selector sel = objcProp->getGetterName();
-        if (interfaceDecl->getInstanceMethod(sel))
-          return;
-
-        bool inNearbyCategory =
-            std::any_of(interfaceDecl->known_categories_begin(),
-                        interfaceDecl->known_categories_end(),
-                        [=](const clang::ObjCCategoryDecl *category) -> bool {
-                          if (!Impl.getClangSema().isVisible(category)) {
-                            return false;
-                          }
-                          if (category != decl) {
-                            auto *categoryModule =
-                                Impl.getClangModuleForDecl(category);
-                            if (categoryModule != declModule &&
-                                categoryModule != interfaceModule) {
-                              return false;
-                            }
-                          }
-                          return category->getInstanceMethod(sel);
-                        });
-        if (inNearbyCategory)
+        if (hasExistingMethodWithSelector(objcProp->getGetterName(),
+                                          /*isInstance=*/true,
+                                          /*acceptPropertyAccessor=*/true))
           return;
 
         if (auto imported =
@@ -8638,6 +8650,17 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       auto objcMethod =
           dyn_cast_or_null<clang::ObjCMethodDecl>(member->getClangDecl());
       if (!objcMethod)
+        return;
+
+      // Don't mirror a method if there's an existing method visible that would
+      // witness the requirement.
+      //
+      // A property accessor doesn't count as an existing method for this
+      // purpose: the property only exposes the member via property syntax, so
+      // we still need the mirror in order to make method-call syntax available.
+      if (hasExistingMethodWithSelector(objcMethod->getSelector(),
+                                        objcMethod->isInstanceMethod(),
+                                        /*acceptPropertyAccessor=*/false))
         return;
 
       // For now, just remember that we saw this method.

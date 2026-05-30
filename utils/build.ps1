@@ -97,12 +97,11 @@ Default: @("X64","X86","ARM64")
 .PARAMETER Clean
 Remove selected build outputs before building.
 
-.PARAMETER SkipBuild
-Skip the build phase entirely. Useful for testing packaging or other post-build
-steps.
+.PARAMETER Toolchain
+Build the toolchain.
 
-.PARAMETER SkipPackaging
-Skip building the MSI installers and packaging. Useful for development builds.
+.PARAMETER Package
+Build the MSI installers and packaging.
 
 .PARAMETER Test
 An array of names of projects to run tests for. Use '*' to run all tests.
@@ -183,10 +182,12 @@ param
   [ValidateSet("dynamic", "static")]
   [string[]] $WindowsSDKLinkModes = @("dynamic", "static"),
 
+  # Build Phases
+  [switch] $Toolchain = $true,
+  [switch] $Package = $false,
+
   # Incremental Build Support
   [switch] $Clean,
-  [switch] $SkipBuild = $false,
-  [switch] $SkipPackaging = $false,
   [string[]] $Test = @(),
 
   [switch] $IncludeDS2 = $false,
@@ -1585,13 +1586,15 @@ function Get-Dependencies {
     }
     Install-PythonModules
 
-    if ($SkipBuild -and $SkipPackaging) { return }
+    # WiX is needed both for packaging and for extracting the pinned toolchain
+    # installer that bootstraps toolchain builds.
+    if ($Toolchain -or $Package) {
+      DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
+      Expand-ZipFile WiX-$($WiX.Version).zip -ExtractPath WiX-$($WiX.Version)
+      Write-Success "WiX $($WiX.Version)"
+    }
 
-    DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
-    Expand-ZipFile WiX-$($WiX.Version).zip -ExtractPath WiX-$($WiX.Version)
-    Write-Success "WiX $($WiX.Version)"
-
-    if ($SkipBuild) { return }
+    if (-not $Toolchain) { return }
 
     DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
 
@@ -1631,13 +1634,11 @@ function Get-Dependencies {
         # Check whether VsDevShell can already resolve the requested Windows SDK Version
         Invoke-IsolatingEnvVars { Invoke-VsDevShell $HostPlatform }
       } catch {
-        $Package = Microsoft.Windows.SDK.CPP
-
         Write-Output "Windows SDK $WinSDKVersion not found. Downloading from nuget.org ..."
-        Invoke-Program nuget install $Package -Version $WinSDKVersion -OutputDirectory $NugetRoot
+        Invoke-Program nuget install Microsoft.Windows.SDK.CPP -Version $WinSDKVersion -OutputDirectory $NugetRoot
 
         # Set to script scope so Invoke-VsDevShell can read it.
-        $script:CustomWinSDKRoot = "$NugetRoot\$Package.$WinSDKVersion\c"
+        $script:CustomWinSDKRoot = "$NugetRoot\Microsoft.Windows.SDK.CPP.$WinSDKVersion\c"
 
         # Install each required architecture package and move files under the base /lib directory.
         $Builds = $WindowsSDKBuilds.Clone()
@@ -1646,8 +1647,8 @@ function Get-Dependencies {
         }
 
         foreach ($Build in $Builds) {
-          Invoke-Program nuget install $Package.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
-          Copy-Directory "$NugetRoot\$Package.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
+          Invoke-Program nuget install Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName) -Version $WinSDKVersion -OutputDirectory $NugetRoot
+          Copy-Directory "$NugetRoot\Microsoft.Windows.SDK.CPP.$($Build.Architecture.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersion"
         }
       }
     }
@@ -3025,7 +3026,7 @@ function Set-WindowsSxSToolchainRuntime {
     throw "Set-WindowsSxSToolchainRuntime: BinaryDir '$BinaryDir' does not exist"
   }
   if (-not (Test-Path $RuntimeSourceDir)) {
-    # -SkipBuild may run before the runtime is installed.
+    # Running without -Toolchain may happen before the runtime is installed.
     Write-Warning "Set-WindowsSxSToolchainRuntime: RuntimeSourceDir '$RuntimeSourceDir' does not exist; skipping SxS bind"
     return
   }
@@ -3364,7 +3365,7 @@ function Test-Compilers([Hashtable] $Platform, [string] $Variant, [switch] $Test
     )
 
     # Prefer the platform SDK runtime.  The pre-staged bundle fallback keeps
-    # -SkipBuild usable when the install image is absent.
+    # running without -Toolchain usable when the install image is absent.
     $Stage2LibexecSwiftDir = [IO.Path]::Combine($BuildCMakeArgs.Bin, "libexec", "swift")
     $RuntimeSourceCandidates = @(
       $SwiftRuntime,
@@ -3463,10 +3464,18 @@ function Build-mimalloc() {
 
   $HostSuffix = if ($Platform -eq $KnownPlatforms["WindowsX64"]) { "" } else { "-arm64" }
 
-  foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
-    Copy-Item `
-      -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" `
-      -Destination "$($Platform.ToolchainInstallRoot)\usr\bin\"
+  $ToolchainRoots = @($Platform.ToolchainInstallRoot)
+  if ($IncludeNoAsserts) {
+    $ToolchainRoots += $Platform.NoAssertsToolchainInstallRoot
+  }
+
+  foreach ($ToolchainRoot in $ToolchainRoots) {
+    New-Item -ItemType Directory -Force "$ToolchainRoot\usr\bin" | Out-Null
+    foreach ($item in "mimalloc.dll", "mimalloc-redirect$HostSuffix.dll") {
+      Copy-Item -Force `
+        -Path "$BinaryCache\$($Platform.Triple)\mimalloc\bin\$item" `
+        -Destination "$ToolchainRoot\usr\bin\"
+    }
   }
 }
 
@@ -4030,7 +4039,7 @@ function Get-SelectedSDKBuilds() {
 # search path. CMake consumers receive a -vfsoverlay from the target's PUBLIC
 # interface; SDK consumers do not and therefore need the physical headers.
 function Repair-SDKHeaders([string] $SDKRoot) {
-  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims")) {
+  foreach ($Module in ("Block", "dispatch", "os", "_foundation_unicode", "_FoundationCShims", "_FoundationInternationalizationData")) {
     foreach ($ResourceType in ("swift", "swift_static")) {
       $ModuleDirectory = "$SDKRoot\usr\lib\$ResourceType\$Module"
       if (Test-Path $ModuleDirectory) {
@@ -5320,10 +5329,10 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
   # Parse each `*.wxi` once: EXE name -> package, and package -> declared SxS DLLs.
   $EXEToPackage   = @{}
   $PackageToSxS   = @{}
-  foreach ($Package in $PackageWxiFiles.Keys) {
-    $WxiPath = $PackageWxiFiles[$Package]
+  foreach ($Module in $PackageWxiFiles.Keys) {
+    $WxiPath = $PackageWxiFiles[$Module]
     if (-not (Test-Path $WxiPath)) {
-      Write-Warning "Stage-WindowsToolchainSxS: '$WxiPath' not found; package '$Package' will be omitted from cross-reference"
+      Write-Warning "Stage-WindowsToolchainSxS: '$WxiPath' not found; package '$Module' will be omitted from cross-reference"
       continue
     }
     $WxiText = Get-Content -Raw -LiteralPath $WxiPath
@@ -5336,7 +5345,7 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
     foreach ($M in $EXEMatches) {
       $EXEName = $M.Groups[1].Value + ".exe"
       if (-not $EXEToPackage.ContainsKey($EXEName)) {
-        $EXEToPackage[$EXEName] = $Package
+        $EXEToPackage[$EXEName] = $Module
       }
     }
     # Match the per-DLL SxS layout: `usr\bin\<basename>\<basename>.dll`.
@@ -5348,7 +5357,7 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
     foreach ($M in $SxSMatches) {
       [void]$Names.Add($M.Groups[1].Value)
     }
-    $PackageToSxS[$Package] = @($Names | Sort-Object)
+    $PackageToSxS[$Module] = @($Names | Sort-Object)
   }
 
   if (-not (Test-Path $RuntimeLocation)) {
@@ -5459,8 +5468,8 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
   foreach ($DLL in $DLLsToInject) {
     # Avoid `$Home`, which is a read-only PowerShell automatic variable.
     $OwningPackage = $null
-    foreach ($Package in $PackageOrder) {
-      $PackageEXEs = @($EXEToPackage.GetEnumerator() | Where-Object { $_.Value -eq $Package } | ForEach-Object { $_.Key })
+    foreach ($Module in $PackageOrder) {
+      $PackageEXEs = @($EXEToPackage.GetEnumerator() | Where-Object { $_.Value -eq $Module } | ForEach-Object { $_.Key })
       $Found = $false
       foreach ($EXE in $PackageEXEs) {
         $FullPath = Join-Path $BinDir $EXE
@@ -5469,7 +5478,7 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
           break
         }
       }
-      if ($Found) { $OwningPackage = $Package; break }
+      if ($Found) { $OwningPackage = $Module; break }
     }
     if ($OwningPackage) { $ExpectedPackage[$DLL] = $OwningPackage }
     else                { $ExpectedPackage[$DLL] = "(unattributed)" }
@@ -5479,12 +5488,12 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
   foreach ($DLL in $DLLsToInject) {
     $Want = $ExpectedPackage[$DLL]
     $WiXPackage = $null
-    foreach ($Package in $PackageToSxS.Keys) {
-      if ($PackageToSxS[$Package] -contains $DLL) {
+    foreach ($Key in $PackageToSxS.Keys) {
+      if ($PackageToSxS[$Key] -contains $DLL) {
         if ($WiXPackage) {
-          Write-Host -BackgroundColor DarkRed -ForegroundColor White "Stage-WindowsToolchainSxS: '$DLL' is declared in multiple package .wxi files ($WiXPackage, $Package)"
+          Write-Host -BackgroundColor DarkRed -ForegroundColor White "Stage-WindowsToolchainSxS: '$DLL' is declared in multiple package .wxi files ($WiXPackage, $Key)"
         } else {
-          $WiXPackage = $Package
+          $WiXPackage = $Key
         }
       }
     }
@@ -5494,10 +5503,10 @@ function Stage-WindowsToolchainSxS([Hashtable] $Platform,
       Write-Host -BackgroundColor DarkRed -ForegroundColor White "Stage-WindowsToolchainSxS: '$DLL' is declared in $WiXPackage.wxi but expected package is $Want.wxi"
     }
   }
-  foreach ($Package in $PackageToSxS.Keys) {
-    foreach ($DLL in $PackageToSxS[$Package]) {
+  foreach ($Key in $PackageToSxS.Keys) {
+    foreach ($DLL in $PackageToSxS[$Key]) {
       if (-not $ExpectedPackage.ContainsKey($DLL)) {
-        Write-Host -BackgroundColor DarkRed -ForegroundColor White "Stage-WindowsToolchainSxS: '$DLL' is declared in $Package.wxi but no toolchain EXE imports it"
+        Write-Host -BackgroundColor DarkRed -ForegroundColor White "Stage-WindowsToolchainSxS: '$DLL' is declared in $Key.wxi but no toolchain EXE imports it"
       }
     }
   }
@@ -5607,7 +5616,7 @@ if ($Clean) {
   }
 }
 
-if (-not $SkipBuild) {
+if ($Toolchain) {
   Remove-Item -Force -Recurse ([IO.Path]::Combine((Get-InstallDir $HostPlatform), "Platforms")) -ErrorAction Ignore
   if ($HostPlatform.OS -eq [OS]::Windows) {
     (@($HostPlatform) + @($WindowsSDKBuilds)) | ForEach-Object {
@@ -5908,7 +5917,7 @@ if ($Windows) {
   ).Count -gt 0
   # If -Windows rebuilds the host dynamic runtime, refresh the private SxS
   # copies after the final runtime image is in place.
-  if (-not $SkipBuild -and $RebuiltHostDynamicRuntime) {
+  if ($Toolchain -and $RebuiltHostDynamicRuntime) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{
@@ -5989,7 +5998,7 @@ if ($Android) {
   }
 }
 
-if (-not $SkipPackaging) {
+if ($Package) {
   Invoke-BuildStep Build-mimalloc $HostPlatform
   Invoke-BuildStep Patch-mimalloc $HostPlatform
   Invoke-BuildStep Build-Installer $HostPlatform
@@ -6000,7 +6009,7 @@ if ($Stage) {
 }
 
 if (-not $IsCrossCompiling) {
-  if ($SkipBuild -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
+  if (-not $Toolchain -and $HostPlatform.OS -eq [OS]::Windows -and $Test.Count -gt 0) {
     $HostSDKRoot = Get-SwiftSDK -OS $HostPlatform.OS
     $HostRuntimeBin = Resolve-SDKRuntimeBin $HostPlatform $HostSDKRoot
     Invoke-BuildStep Stage-WindowsToolchainSxS $HostPlatform @{

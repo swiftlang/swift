@@ -99,9 +99,11 @@ func test(x: X) {
   x.methodFromInterface()
   // expected-warning@-1 {{'methodFromInterface()' is deprecated: Interface.h}}
   x.methodFromVisibleCategory()
+  // expected-warning@-1 {{'methodFromVisibleCategory()' is deprecated: VisibleCategory.h}}
   _ = x.readonlyPropFromInterface
   // expected-warning@-1 {{'readonlyPropFromInterface' is deprecated: Interface.h}}
   _ = x.readonlyPropFromVisibleCategory
+  // expected-warning@-1 {{'readonlyPropFromVisibleCategory' is deprecated: VisibleCategory.h}}
   _ = x.readwritePropFromInterface
   // expected-warning@-1 {{'readwritePropFromInterface' is deprecated: Interface.h}}
   x.readwritePropFromInterface = 0
@@ -110,6 +112,7 @@ func test(x: X) {
   // expected-warning@-1 {{'methodAsPropertyWitnessFromInterface()' is deprecated: Interface.h}}
   _ = x.propAsMethodWitnessFromVisibleCategory()
   x.methodFromInterfaceCategory()
+  // expected-warning@-1 {{'methodFromInterfaceCategory()' is deprecated: Interface.h category}}
   _ = x.propFromInterfaceCategory
   // expected-warning@-1 {{'propFromInterfaceCategory' is deprecated: Interface.h category}}
   x.methodFromOtherCategory()
@@ -132,14 +135,7 @@ func test(x: X) {
 // CHECK-NEXT:   var propFromOtherCategory: Int32 { get }
 // CHECK-NEXT: }
 // CHECK-NEXT: extension X : Proto {
-// FIXME: should not be mirrored (rdar://166912341)
-// CHECK-NEXT:   var readonlyPropFromVisibleCategory: Int32 { get }
 // CHECK-NEXT:   var propFromOtherCategory: Int32 { get }
-// FIXME: should not be mirrored (rdar://166912341)
-// CHECK-NEXT:   func methodFromInterfaceCategory()
-// FIXME: should not be mirrored (rdar://166912341)
-// CHECK-NEXT:   func methodFromVisibleCategory()
-// FIXME: should not be mirrored (rdar://166912341)
 // CHECK-NEXT:   func propAsMethodWitnessFromVisibleCategory() -> Int32
 // CHECK-NEXT:   func methodFromOtherCategory()
 // CHECK-NEXT: }

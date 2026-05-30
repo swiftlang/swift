@@ -4231,8 +4231,19 @@ struct ParameterListInfo {
 public:
   ParameterListInfo() { }
 
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params);
   ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
                     const ValueDecl *paramOwner, bool skipCurriedSelf);
+
+  /// Constructs parameter information from the given set of parameters
+  /// that are associated with the given substituted declaration reference.
+  ///
+  /// Note that number of parameters doesn't necessary always match arity of the
+  /// parameter list because variadic generic parameters without arguments
+  /// are removed from the function type and multi-parameter matches are
+  /// flattened.
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                    bool skipCurriedSelf, ConcreteDeclRef declRef);
 
   /// Whether the parameter at the given index has a default argument.
   bool hasDefaultArgument(unsigned paramIdx) const;
@@ -4266,6 +4277,9 @@ public:
 
   /// Retrieve the number of parameters for which we have information.
   unsigned size() const { return defaultArguments.size(); }
+
+private:
+  void setFlagsFor(const ParamDecl *param, unsigned index);
 };
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -6311,9 +6325,8 @@ public:
                                 fieldIndexMutabilityUpdatePairs) const;
 
   using SILFieldIndexToSILTypeTransform = std::function<SILType(unsigned)>;
-  using SILFieldToSILTypeRange =
-      iterator_range<llvm::mapped_iterator<IntRange<unsigned>::iterator,
-                                           SILFieldIndexToSILTypeTransform>>;
+  using SILFieldToSILTypeRange = iterator_range<llvm::mapped_iterator<
+      IntRange<unsigned>::iterator, SILFieldIndexToSILTypeTransform, SILType>>;
 
   /// Returns a range of SILTypes that have been specialized correctly for use
   /// in the passed in SILFunction.

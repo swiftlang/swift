@@ -6337,7 +6337,9 @@ GenericEnvironment::forOpenedExistential(
   auto layout = existential->getExistentialLayout();
   auto properties = ArchetypeType::archetypeProperties(
       RecursiveTypeProperties::HasOpenedExistential,
-      layout.getProtocols(), layout.getSuperclass(), subs);
+      layout.getProtocols(),
+      layout.getExplicitSuperclassOrProtocolSuperclass(),
+      subs);
 
   auto arena = getArena(properties);
 
