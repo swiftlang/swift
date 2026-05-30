@@ -5643,6 +5643,11 @@ bool ConstraintSystem::repairFailures(
     if (isExpr<ErrorExpr>(anchor))
       return true;
 
+    if (getAsPattern<ExprPattern>(anchor)) {
+      if (lhs->isPlaceholder() || rhs->isPlaceholder())
+        return true;
+    }
+
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
     // - `ForceValueExpr` e.g. `foo.bar! = 42` where `bar` or `foo` are
@@ -7138,6 +7143,13 @@ bool ConstraintSystem::repairFailures(
 
     break;
   }
+
+  case ConstraintLocator::KeyPathDynamicMember: {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      return true;
+    break;
+  }
+
   default:
     break;
   }
@@ -13345,7 +13357,24 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     underlyingType =
         getFixedTypeRecursive(underlyingType, flags, /*wantRValue=*/true);
     if (underlyingType->isPlaceholder()) {
-      recordAnyTypeVarAsPotentialHole(func1);
+      if (isForCodeCompletion()) {
+        // In code completion mode it's important to attempt to infer as much
+        // type information as possible from the context, so let's delay placeholder
+        // propagation to give parameters a chance to be inferred from
+        // arguments and the result type a chance to be inferred from context.
+        recordAnyTypeVarAsPotentialHole(func1);
+      } else {
+        // In diagnostic mode, propagate function value placeholder to
+        // arguments and result. This helps to avoid recording extraneous
+        // fixes because generic parameters and leading-dot syntax arguments
+        // cannot be inferred in this case.
+        Type(func1).visit([&](Type componentTy) {
+          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+            if (!typeVar->getImpl().hasRepresentativeOrFixed())
+              assignFixedType(typeVar, underlyingType);
+          }
+        });
+      }
       return SolutionKind::Solved;
     }
 
