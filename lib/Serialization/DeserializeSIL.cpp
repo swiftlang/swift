@@ -4319,6 +4319,19 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
     return nullptr;
   }
 
+  // A SIL global variable that uses the Interface code generation model has a
+  // unique strong definition in its defining module. When deserialized into a
+  // different module, mark its linkage as externally available so that the
+  // importer references the defining module's symbol rather than emitting
+  // its own definition.
+  if (codeGenerationModel &&
+      static_cast<CodeGenerationModel>(codeGenerationModel - 1) ==
+          CodeGenerationModel::Interface &&
+      MF->getAssociatedModule() != SILMod.getSwiftModule()) {
+    linkage = addExternalToLinkage(*linkage);
+    IsDeclaration = true;
+  }
+
   VarDecl *globalDecl = nullptr;
   if (dID) {
     llvm::Expected<Decl *> d = MF->getDeclChecked(dID);
