@@ -3616,7 +3616,7 @@ namespace {
         // historically promoted to file scope (to mirror C's lookup rules).
         // We now place the primary import as a record member (matching C++),
         // but to keep existing C interop sources building we also synthesize a
-        // top-level alias forwarding to the qualified form.
+        // (deprecated) top-level alias forwarding to the qualified form.
         if (!Impl.SwiftContext.LangOpts.EnableCXXInterop &&
             isa<clang::RecordDecl>(clangEnum->getDeclContext()) &&
             !clangEnum->isScoped() && dc->isTypeContext()) {
@@ -3631,6 +3631,29 @@ namespace {
                     : ConstantConvertKind::None,
                 /*isStatic=*/false, decl, AccessLevel::Public);
             if (alias) {
+              if (auto *parentNominal = dc->getSelfNominalTypeDecl();
+                  parentNominal && parentNominal->hasName() &&
+                  !parentNominal->getName().str().starts_with("__Unnamed_")) {
+                // Only add deprecation notice on named parents (but not those
+                // with empty names that we've given a fake __Unnamed name)
+                StringRef msg =
+                    cast<clang::RecordDecl>(clangEnum->getDeclContext())
+                            ->isUnion()
+                        ? "nested C-style enums are imported as members of the "
+                          "enclosing union"
+                        : "nested C-style enums are imported as members of the "
+                          "enclosing struct";
+
+                llvm::SmallString<64> buf;
+                auto qualified = Impl.SwiftContext.AllocateCopy(
+                    (parentNominal->getName().str() + "." + name.str())
+                        .toStringRef(buf));
+
+                auto *attr = AvailableAttr::createUniversallyDeprecated(
+                    Impl.SwiftContext, msg, /*rename=*/qualified);
+                alias->getAttrs().add(attr);
+              }
+
               Impl.addAlternateDecl(result, alias);
             }
           }
