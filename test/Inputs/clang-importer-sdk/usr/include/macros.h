@@ -115,6 +115,12 @@
 #define DIVIDE_MIXED_TYPES  (INT64_MAX / UINT32_MAX) // Result = (2^31)LL
 #define DIVIDE_INVALID     (69 / 0) // Should skip. Divide by zero.
 
+typedef unsigned int TEST_DWORD;
+
+#define CAST_UNSIGNED_MINUS_ONE ((unsigned)-1)
+#define CAST_UNSIGNED_MINUS_TEN ((unsigned)-10)
+#define CAST_TYPEDEF_UNSIGNED_MINUS_ONE ((TEST_DWORD)-1)
+
 // Integer Comparisons.
 
 #define EQUAL_FALSE            (99 == 66)
