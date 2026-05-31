@@ -12610,6 +12610,18 @@ ActorIsolation swift::getActorIsolationOfContext(
   }
 
   if (auto *init = dyn_cast<Initializer>(dcToUse)) {
+    // The initializer of a 'lazy' stored property is emitted into the property's
+    // synthesized getter, which is isolated to the property. So unlike an
+    // ordinary stored-property default value -- whose required isolation is
+    // computed and validated separately, and which is reported as unspecified
+    // here -- the lazy initializer, and any closures within it, run with the
+    // lazy variable's actor isolation and should inherit it.
+    if (auto *pbi = dyn_cast<PatternBindingInitializer>(init)) {
+      if (auto *lazyVar = pbi->getInitializedLazyVar()) {
+        return getActorIsolation(lazyVar);
+      }
+    }
+
     // FIXME: force default argument initializers to report a meaningless
     // isolation in order to break a bunch of cycles with the way that
     // isolation is computed for them.
