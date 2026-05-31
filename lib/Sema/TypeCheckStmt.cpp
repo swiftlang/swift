@@ -818,6 +818,156 @@ ConcreteDeclRef TypeChecker::getReferencedDeclForHasSymbolCondition(Expr *E) {
   return ConcreteDeclRef();
 }
 
+/// Builds the dedented replacement text for the body of an `if` statement
+/// whose condition is always true, so that the body can replace the entire
+/// if statement.
+///
+/// The body content (between the open and close braces of the then branch) is
+/// extracted and each interior line is dedented by the difference between the
+/// body's leading indentation and the if statement's leading indentation. The
+/// first interior line has its leading indentation stripped entirely because
+/// the replacement text is inserted at the column where the `if` keyword
+/// originally appeared.
+static std::string buildDedentedIfBody(const SourceManager &SM,
+                                       SourceLoc ifStartLoc,
+                                       SourceLoc afterLBrace,
+                                       SourceLoc rBraceLoc) {
+  unsigned bufferID = SM.findBufferContainingLoc(ifStartLoc);
+  unsigned ifColumn = SM.getColumnInBuffer(ifStartLoc, bufferID);
+  unsigned ifIndent = ifColumn > 0 ? ifColumn - 1 : 0;
+
+  StringRef body =
+      SM.extractText(CharSourceRange(SM, afterLBrace, rBraceLoc), bufferID);
+
+  // For single-line bodies just trim the outer whitespace.
+  if (!body.contains('\n'))
+    return body.trim().str();
+
+  SmallVector<StringRef, 8> lines;
+  body.split(lines, '\n');
+
+  // `lines.front()` is the text between '{' and the first newline;
+  // `lines.back()` is the text between the final newline and '}'. Typically
+  // these are pure whitespace (code starts on a new line after '{' and '}' sits
+  // on its own line), in which case they are dropped. If either contains
+  // non-whitespace, the user placed code on the same line as a brace and we
+  // must preserve it.
+  bool firstHasContent = !lines.front().trim().empty();
+  bool lastHasContent = lines.size() > 1 && !lines.back().trim().empty();
+
+  ArrayRef<StringRef> contentLines(lines);
+  if (!firstHasContent)
+    contentLines = contentLines.drop_front();
+  if (!lastHasContent && !contentLines.empty())
+    contentLines = contentLines.drop_back();
+
+  if (contentLines.empty())
+    return "";
+  if (contentLines.size() == 1)
+    return contentLines.front().trim().str();
+
+  // Determine the body indentation from a line that wasn't adjacent to a brace,
+  // since brace-adjacent code has no meaningful leading indentation. Lines
+  // containing only whitespace are also skipped because their indentation is
+  // unreliable. Indentation is measured in characters, so mixing tabs and
+  // spaces between the if statement and its body will produce a visually
+  // misaligned result.
+  ArrayRef<StringRef> indentSource = contentLines;
+  if (firstHasContent)
+    indentSource = indentSource.drop_front();
+  if (lastHasContent && !indentSource.empty())
+    indentSource = indentSource.drop_back();
+
+  unsigned bodyIndent = 0;
+  for (StringRef line : indentSource) {
+    StringRef ltrimmed = line.ltrim();
+    if (!ltrimmed.empty()) {
+      bodyIndent = line.size() - ltrimmed.size();
+      break;
+    }
+  }
+
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  for (auto it : llvm::enumerate(contentLines)) {
+    unsigned i = it.index();
+    StringRef line = it.value();
+
+    // Brace-adjacent content has no meaningful leading/trailing whitespace;
+    // for interior lines, strip up to bodyIndent characters of leading space.
+    StringRef dedented;
+    if (i == 0 && firstHasContent) {
+      dedented = line.ltrim();
+    } else {
+      unsigned leading = line.size() - line.ltrim().size();
+      dedented = line.substr(std::min(leading, bodyIndent));
+    }
+    if (i + 1 == contentLines.size() && lastHasContent)
+      dedented = dedented.rtrim();
+
+    if (i > 0)
+      os << '\n';
+    if (i > 0 && !dedented.empty())
+      os.indent(ifIndent);
+    os << dedented;
+  }
+  return result;
+}
+
+/// Adds a fix-it to the always-true diagnostic for an `if` or `guard`
+/// statement, removing the now-redundant statement. For `if`, the body of
+/// the then branch replaces the whole statement; for `guard`, the entire
+/// statement is removed (its body is unreachable). For an `else if` branch,
+/// the inner `if` is replaced with just its body braces, turning
+/// `else if X { body } [else ...]` into `else { body }` and discarding any
+/// now-unreachable trailing branches. No fix-it is offered for `while`,
+/// since removing an always-true condition would produce an unconditional
+/// infinite loop, and none is offered for a labeled `if`, since the label
+/// may be referenced by `break`/`continue` inside the body.
+static void addFixItForUnnecessaryConditionalStmt(InFlightDiagnostic &inflight,
+                                                  LabeledConditionalStmt *stmt,
+                                                  bool isElseIfBranch,
+                                                  ASTContext &ctx) {
+  auto &SM = ctx.SourceMgr;
+
+  if (auto *ifStmt = dyn_cast<IfStmt>(stmt)) {
+    if (ifStmt->getLabelInfo())
+      return;
+
+    auto *thenBrace = ifStmt->getThenStmt();
+    SourceLoc lBraceLoc = thenBrace->getLBraceLoc();
+    SourceLoc rBraceLoc = thenBrace->getRBraceLoc();
+    if (lBraceLoc.isInvalid() || rBraceLoc.isInvalid())
+      return;
+
+    if (isElseIfBranch) {
+      // Replace the inner if-stmt with just the text of its then-body
+      // (braces included). This converts `else if X { body } [else ...]`
+      // into `else { body }` and drops any unreachable trailing branches.
+      auto bodyCharRange = CharSourceRange(
+          SM, lBraceLoc, Lexer::getLocForEndOfToken(SM, rBraceLoc));
+      StringRef bodyText = SM.extractText(bodyCharRange);
+      inflight.fixItReplace(
+          SourceRange(ifStmt->getStartLoc(), ifStmt->getEndLoc()),
+          bodyText.str());
+      return;
+    }
+
+    SourceLoc afterLBrace = Lexer::getLocForEndOfToken(SM, lBraceLoc);
+    std::string replacement =
+        buildDedentedIfBody(SM, ifStmt->getStartLoc(), afterLBrace, rBraceLoc);
+    inflight.fixItReplace(
+        SourceRange(ifStmt->getStartLoc(), ifStmt->getEndLoc()), replacement);
+    return;
+  }
+
+  if (auto *guardStmt = dyn_cast<GuardStmt>(stmt)) {
+    inflight.fixItRemove(
+        SourceRange(guardStmt->getStartLoc(), guardStmt->getEndLoc()));
+    return;
+  }
+}
+
 static bool typeCheckAvailableStmtConditionElement(StmtConditionElement &elt,
                                                    bool &isFalseable,
                                                    DeclContext *dc) {
@@ -945,10 +1095,13 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
 ///
 /// \param stmt The conditional statement to type-check, which will be modified
 /// in place.
+/// \param isElseIfBranch When \p stmt is the inner `if` of an `else if`
+/// branch. Affects the shape of the always-true fix-it.
 ///
 /// \returns true if an error occurred, false otherwise.
 static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
-                                           DeclContext *dc) {
+                                           DeclContext *dc,
+                                           bool isElseIfBranch = false) {
   bool hadError = false;
   bool hadAnyFalsable = false;
   auto cond = stmt->getCond();
@@ -959,9 +1112,9 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
 
   // If none of the statement's conditions can be false, diagnose.
   // FIXME: Also diagnose if none of the statements conditions can be true.
-  // FIXME: Offer a fix-it to remove the unreachable code.
   if (!stmt->isImplicit() && !hadAnyFalsable && !hadError) {
-    auto &diags = dc->getASTContext().Diags;
+    auto &ctx = dc->getASTContext();
+    auto &diags = ctx.Diags;
     Diag<> msg = diag::invalid_diagnostic;
     switch (stmt->getKind()) {
     case StmtKind::If:
@@ -976,7 +1129,8 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
     default:
       llvm_unreachable("unknown LabeledConditionalStmt kind");
     }
-    diags.diagnose(cond[0].getStartLoc(), msg);
+    auto inflight = diags.diagnose(cond[0].getStartLoc(), msg);
+    addFixItForUnnecessaryConditionalStmt(inflight, stmt, isElseIfBranch, ctx);
   }
 
   stmt->setCond(cond);
@@ -1051,6 +1205,11 @@ public:
   /// The BraceStmts that should be type-checked. This should always be `All`,
   /// unless we're lazy type-checking for e.g completion.
   BraceStmtChecking BraceChecking = BraceStmtChecking::All;
+
+  /// Whether the next \c IfStmt to be visited is the inner `if` of an
+  /// `else if` branch. Set by \c visitIfStmt before recursing into the
+  /// statement's else clause.
+  bool VisitingElseIfBranch = false;
 
   ASTContext &getASTContext() const { return Ctx; };
 
@@ -1442,16 +1601,23 @@ public:
   }
   
   Stmt *visitIfStmt(IfStmt *IS) {
-    typeCheckConditionForStatement(IS, DC);
+    bool isElseIfBranch = VisitingElseIfBranch;
+    typeCheckConditionForStatement(IS, DC, isElseIfBranch);
 
     auto sourceFile = DC->getParentSourceFile();
     checkLabeledStmtShadowing(getASTContext(), sourceFile, IS);
 
     auto *TS = IS->getThenStmt();
-    typeCheckStmt(TS);
+    {
+      llvm::SaveAndRestore<bool> save(VisitingElseIfBranch, false);
+      typeCheckStmt(TS);
+    }
     IS->setThenStmt(TS);
 
     if (auto *ES = IS->getElseStmt()) {
+      // The immediate `else` clause forms an `else if` chain when it is itself
+      // an `IfStmt`; mark that for the inner visit.
+      llvm::SaveAndRestore<bool> save(VisitingElseIfBranch, isa<IfStmt>(ES));
       typeCheckStmt(ES);
       IS->setElseStmt(ES);
     }
