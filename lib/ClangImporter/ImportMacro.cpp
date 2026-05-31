@@ -96,6 +96,18 @@ getTokenSpelling(ClangImporter::Implementation &impl, const clang::Token &tok) {
   return tokenSpelling;
 }
 
+static bool applyCUnsignedIntegerCastExpr(llvm::APSInt &Value,
+                                          clang::QualType Ty,
+                                          const clang::ASTContext &C) {
+  if (Ty.isNull() || !Ty->isIntegerType() || Ty->isBooleanType() ||
+      !Ty->isUnsignedIntegerOrEnumerationType())
+    return false;
+
+  Value = Value.extOrTrunc(C.getIntWidth(Ty));
+  Value.setIsUnsigned(true);
+  return true;
+}
+
 static ValueDecl *
 createMacroConstant(ClangImporter::Implementation &Impl,
                     const clang::MacroInfo *macro,
@@ -179,6 +191,8 @@ static ValueDecl *importNumericLiteral(ClangImporter::Implementation &Impl,
           value.flipAllBits();
         }
       }
+      applyCUnsignedIntegerCastExpr(value, castType,
+                                    Impl.getClangASTContext());
 
       // Make sure the destination type actually conforms to the builtin literal
       // protocol or is Bool before attempting to import, otherwise we'll crash
@@ -903,6 +917,16 @@ static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                                Diagnostic(diag::macro_not_imported, name.str()),
                                macro->getDefinitionLoc());
       return nullptr;
+    }
+
+    if (applyCUnsignedIntegerCastExpr(resultValue, castType,
+                                      impl.getClangASTContext())) {
+      resultSwiftType = impl.importTypeIgnoreIUO(
+          castType, ImportTypeKind::Value,
+          ImportDiagnosticAdder(impl, macro, macro->getDefinitionLoc()),
+          isInSystemModule(DC), Bridgeability::None, ImportTypeAttrs());
+      if (!resultSwiftType)
+        return nullptr;
     }
 
     return createMacroConstant(impl, macro, II, name, DC,
