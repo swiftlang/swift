@@ -57,7 +57,7 @@ public protocol WalkingPath : Equatable {
   /// Returns the merged path of this path and `with`.
   func merge(with: Self) -> Self
   
-  /// Pops the first path component if it is exactly of kind `kind` - not considering wildcards.
+  /// Pops the first path component if it is exactly of kind `kind`.
   ///
   /// Returns the index of the component and the new path or - if not matching - returns nil.
   /// Called for destructure instructions during down-walking and for aggregate instructions during up-walking.

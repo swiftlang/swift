@@ -249,11 +249,15 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
     return Self(bytes: b)
   }
 
-  /// Pops the first path component if it is exactly of kind `kind` - not considering wildcards.
+  /// Pops the first path component if it is exactly of kind `kind`.
   ///
   /// Returns the index of the component and the new path or - if not matching - returns nil.
   public func pop(kind: FieldKind) -> (index: Int, path: SmallProjectionPath)? {
     let (k, idx, newPath) = pop()
+    if k == .anyIndexedElement {
+      // Skip a non-constant index, because the index could be 0.
+      return newPath.pop(kind: kind)
+    }
     if k != kind { return nil }
     return (idx, newPath)
   }
@@ -725,6 +729,11 @@ let smallProjectionPathTest = Test("small_projection_path") {
     let p11 = SmallProjectionPath(.anyIndexedElement).push(.indexedElement, index: 1)
     let (k11, i11, p12) = p11.pop()
     assert(k11 == .anyIndexedElement && i11 == 0 && p12.isEmpty)
+
+    let p13 = SmallProjectionPath(.structField, index: 1).push(.anyIndexedElement)
+    let (i13, p14) = p13.pop(kind: .structField)!
+    assert(i13 == 1 && p14.isEmpty)
+    assert(p13.pop(kind: .indexedElement) == nil)
   }
 
   func parsing() {
