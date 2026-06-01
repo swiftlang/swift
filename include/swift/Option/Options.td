@@ -1582,6 +1582,9 @@ def Xcc : Separate<["-"], "Xcc">,
 def Xclang_linker : Separate<["-"], "Xclang-linker">, Flags<[HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to Clang when it is used for linking.">;
 
+def Xlinker_driver : Separate<["-"], "Xlinker-driver">, Flags<[HelpHidden]>,
+  MetaVarName<"<arg>">, HelpText<"Pass <arg> to the linker driver (clang, emcc, etc.) regardless of which one is in use.">;
+
 def Xllvm : Separate<["-"], "Xllvm">,
   Flags<[FrontendOption, HelpHidden]>,
   MetaVarName<"<arg>">, HelpText<"Pass <arg> to LLVM.">;
@@ -1964,8 +1967,8 @@ def synthesize_interface_show :
   Joined<["-"], "synthesize-interface-show=">,
   Flags<[NoDriverOption, SwiftSynthesizeInterfaceOption]>,
   MetaVarName<"<options>">,
-  HelpText<"Comma-separated options controlling what gets printed.\n"
-           "Options: 'unavailable', 'implicit-attrs', 'qualified-types'.\n"
+  HelpText<"Comma-separated options controlling what gets printed. "
+           "Options: 'unavailable', 'implicit-attrs', 'qualified-types'. "
            "Shorthands: 'all' (every option enabled), 'minimal' (default).">;
 
 // swift-symbolgraph-extract-only options
