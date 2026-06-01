@@ -5961,7 +5961,7 @@ static OverrideIsolationResult validOverrideIsolation(
   auto &ctx = declContext->getASTContext();
 
   // Normally we are checking if overriding declaration can be called by calling
-  // overriden declaration. But in case of destructors, overriden declaration is
+  // overridden declaration. But in case of destructors, overridden declaration is
   // always callable by definition and we are checking that subclass deinit can
   // call super deinit.
   bool isDtor = isa<DestructorDecl>(value);

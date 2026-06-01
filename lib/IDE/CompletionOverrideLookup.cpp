@@ -39,7 +39,7 @@ bool CompletionOverrideLookup::addAccessControl(
   //   #^COMPLETE^#
   // }
   //
-  // The formal access level for the overriden decl is internal, but it needs
+  // The formal access level for the overridden decl is internal, but it needs
   // to be public to satisfy the conformance. Check to see if there are any
   // requirements that demand public.
   AccessLevel Access = std::min(VD->getFormalAccess(), AccessOfContext);
