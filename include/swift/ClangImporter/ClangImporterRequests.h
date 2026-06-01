@@ -817,7 +817,6 @@ void simple_display(llvm::raw_ostream &out,
 SourceLoc
 extractNearestSourceLoc(const CxxRecordDeclDescriptor &desc);
 
-/// Uses ClangDirectLookup to find a named member inside of the given namespace.
 class CxxIteratorInfoRequest
     : public SimpleRequest<CxxIteratorInfoRequest,
                            std::optional<importer::CxxIteratorCategory>(

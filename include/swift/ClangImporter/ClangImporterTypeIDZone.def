@@ -19,7 +19,7 @@ SWIFT_REQUEST(ClangImporter, CXXNamespaceMemberLookup,
               TinyPtrVector<ValueDecl *>(CXXNamespaceMemberLookupDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangRecordMemberLookup,
-              Decl *(ClangRecordMemberLookupDescriptor), Uncached,
+              TinyPtrVector<ValueDecl *>(ClangRecordMemberLookupDescriptor), Uncached,
               NoLocationInfo)
 SWIFT_REQUEST(ClangImporter, ClangCategoryLookupRequest,
               llvm::TinyPtrVector<Decl *>(ClangCategoryLookupDescriptor), Uncached,
