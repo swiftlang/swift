@@ -2369,7 +2369,7 @@ public:
 
     if (base.isMetadata()) {
       return BuiltType(projectDependentMemberType(base.getMetadata()));
-    } else {
+    } else if (base.isMetadataPack()) {
       MetadataPackPointer basePack = base.getMetadataPack();
 
       llvm::SmallVector<const Metadata *, 4> packElts;
@@ -2380,6 +2380,8 @@ public:
 
       return BuiltType(swift_allocateMetadataPack(packElts.data(), packElts.size()));
     }
+
+    return TypeLookupError("Cannot create dependent member type with NULL base.");
   }
 
 #define REF_STORAGE(Name, ...)                                                 \
