@@ -118,6 +118,12 @@ module Upcast {
   requires cplusplus
 }
 
+module SuperStaticDispatch {
+  header "super-static-dispatch.h"
+  requires cplusplus
+  export *
+}
+
 module ImmortalFRTHashable {
   header "immortal-frt-hashable.h"
   requires cplusplus
