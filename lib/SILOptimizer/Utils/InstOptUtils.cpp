@@ -2018,20 +2018,21 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     }
   }
 
-  if (auto *IL = dyn_cast<IntegerLiteralInst>(I)) {
+  if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I)) {
+    auto *literal = cast<SingleValueInstruction>(I);
     // Rather than recreating new debug values, we update the existing ones.
     // The use list is mutated during iteration.
-    SmallVector<Operand *, 4> debugUses(getDebugUses(IL));
+    SmallVector<Operand *, 4> debugUses(getDebugUses(literal));
     for (Operand *U : debugUses) {
       auto *DbgInst = cast<DebugValueInst>(U->getUser());
       auto VarInfo = DbgInst->getVarInfo();
       if (!VarInfo)
         continue;
-      // Copy the integer literal into the reconstruction block, and set
-      // the operand to undef.
-      auto *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
-      auto *NewIL = IL->clone(&*debugBB->begin());
-      debugBB->getArgument(0)->replaceAllUsesWith(NewIL);
+      // Copy the literal into the reconstruction block, and set the operand
+      // of the reconstruction block to undef.
+      SILBasicBlock *debugBB = DbgInst->getOrCreateDebugReconstructionBlock();
+      SILValue newLiteral = literal->clone(&*debugBB->begin());
+      debugBB->getArgument(0)->replaceAllUsesWith(newLiteral);
       debugBB->eraseArgument(0);
       DbgInst->setOperand(SILUndef::get(DbgInst->getOperand()));
     }
@@ -2039,19 +2040,16 @@ void swift::salvageDebugInfo(SILInstruction *I) {
 }
 
 void swift::salvageLoadDebugInfo(LoadOperation load) {
-  for (Operand *debugUse : getDebugUses(load.getLoadInst())) {
-    // Create a new debug_value rather than reusing the old one so the
-    // SILBuilder adds 'expr(deref)' to account for the indirection.
+  // The use list is mutated during iteration.
+  SmallVector<Operand *, 4> debugUses(getDebugUses(load.getLoadInst()));
+  for (Operand *debugUse : debugUses) {
+    // Update the debug_value to use the loaded address.
     auto *debugInst = cast<DebugValueInst>(debugUse->getUser());
-    auto varInfo = debugInst->getVarInfo();
-    if (!varInfo)
-      continue;
-
-    // The new debug_value must be "hoisted" to the load to ensure that the
+    // The debug_value must be "hoisted" to the load to ensure that the
     // address is still valid.
-    SILBuilder(load.getLoadInst(), debugInst->getDebugScope())
-      .createDebugValueAddr(debugInst->getLoc(), load.getOperand(),
-                            varInfo.value());
+    debugInst->moveBefore(load.getLoadInst());
+    debugInst->setOperand(load.getOperand());
+    debugInst->prependDeref();
   }
 }
 

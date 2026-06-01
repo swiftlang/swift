@@ -36,7 +36,7 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
 
   // @_alwaysEmitIntoClient
   @inline(__always)
-  @lifetime(borrow start)
+  @_lifetime(borrow start)
   internal init(
     _unsafeAssumingValidUTF8 start: borrowing UnsafeRawPointer,
     _countAndFlags: UInt64
@@ -53,7 +53,7 @@ public struct UTF8Span: Copyable, ~Escapable, BitwiseCopyable {
   /// passed`, the contents must be ASCII, or else undefined behavior may
   /// result upon use.
   @unsafe
-  @lifetime(copy codeUnits)
+  @_lifetime(copy codeUnits)
   public init(
     unchecked codeUnits: Span<UInt8>,
     isKnownASCII: Bool = false
@@ -83,7 +83,7 @@ extension UTF8Span {
   /// The resulting UTF8Span has the same lifetime constraints as `codeUnits`.
   ///
   /// - Complexity: O(n)
-  @lifetime(copy codeUnits)
+  @_lifetime(copy codeUnits)
   public init(
     validating codeUnits: consuming Span<UInt8>
   ) throws(UTF8.ValidationError) {
@@ -91,7 +91,7 @@ extension UTF8Span {
   }
 
   // TODO: this doesn't need to be underscored, I don't think
-  @lifetime(copy codeUnits)
+  @_lifetime(copy codeUnits)
   internal init(
     _validating codeUnits: consuming Span<UInt8>
   ) throws(UTF8.ValidationError) {
@@ -113,7 +113,7 @@ extension UTF8Span {
   }
 
   // TODO: SPI?
-  @lifetime(copy codeUnits)
+  @_lifetime(copy codeUnits)
   internal init(
     _uncheckedAssumingValidUTF8 codeUnits: consuming Span<UInt8>,
     isKnownASCII: Bool,
@@ -199,7 +199,7 @@ extension UTF8Span {
   ///
   /// - Complexity: O(1)
   public var span: Span<UInt8> {
-    @lifetime(copy self)
+    @_lifetime(copy self)
     get {
       let newSpan = unsafe Span<UInt8>(_unchecked: _unsafeBaseAddress, count: self.count)
       return unsafe _overrideLifetime(newSpan, copying: self)
@@ -228,7 +228,7 @@ extension String {
 @available(SwiftStdlib 6.2, *)
 extension String {
 
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   private borrowing func _underlyingSpan() -> Span<UTF8.CodeUnit> {
 #if _runtime(_ObjC)
     // handle non-UTF8 Objective-C bridging cases here
@@ -266,7 +266,7 @@ extension String {
   ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var utf8Span: UTF8Span {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       unsafe UTF8Span(
         unchecked: _underlyingSpan(), isKnownASCII: _guts.isASCII
@@ -287,7 +287,7 @@ extension String {
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
     @_alwaysEmitIntoClient @inline(__always)
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       utf8Span
     }
@@ -311,7 +311,7 @@ extension String {
   ///   UTF-16 strings.
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       if _guts.isSmall, _guts.count > _SmallString.contiguousCapacity() {
         return nil
@@ -327,7 +327,7 @@ extension String {
 @available(SwiftStdlib 6.2, *)
 extension Substring {
 
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   private borrowing func _underlyingSpan() -> Span<UTF8.CodeUnit> {
 #if _runtime(_ObjC)
     // handle non-UTF8 Objective-C bridging cases here
@@ -388,7 +388,7 @@ extension Substring {
   ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var utf8Span: UTF8Span {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       unsafe UTF8Span(
         unchecked: _underlyingSpan(), isKnownASCII: base._guts.isASCII
@@ -429,7 +429,7 @@ extension Substring {
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
     @_alwaysEmitIntoClient @inline(__always)
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       utf8Span
     }
@@ -473,7 +473,7 @@ extension Substring {
   ///   strings.
   @available(SwiftStdlib 6.2, *)
   public var _utf8Span: UTF8Span? {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       if _wholeGuts.isSmall,
          _wholeGuts.count > _SmallString.contiguousCapacity() {

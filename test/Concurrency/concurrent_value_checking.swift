@@ -43,9 +43,9 @@ actor A2 {
     await self.init(valueAsync: value)
   }
 
-  nonisolated init(nonisoAsync value: NotConcurrent, _ c: Int) async {
+  nonisolated init(nonisoAsync value: NotConcurrent, _ c: Int) async { // expected-note {{'value' is exposed to code in the current task}}
     if c == 0 {
-      await self.init(valueAsync: value) // expected-warning {{passing 'value' to 'self'-isolated initializer 'init(valueAsync:)' risks causing data races}}
+      await self.init(valueAsync: value) // expected-warning {{passing 'value' to 'self'-isolated initializer 'init(valueAsync:)' could allow for references between values exposed to code in the current task and 'self'-isolated code risking data races}}
     } else {
       self.init(value: value)
     }

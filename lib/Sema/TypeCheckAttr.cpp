@@ -180,6 +180,7 @@ public:
 #define IGNORED_ATTR(X) void visit##X##Attr(X##Attr *) {}
   IGNORED_ATTR(AlwaysEmitIntoClient)
   IGNORED_ATTR(HasInitialValue)
+  IGNORED_ATTR(HasHiddenStoredProperties)
   IGNORED_ATTR(ClangImporterSynthesizedType)
   IGNORED_ATTR(Convenience)
   IGNORED_ATTR(Effects)
@@ -3830,21 +3831,19 @@ void AttributeChecker::visitExportAttr(ExportAttr *attr) {
   if (auto other = D->getAttrs().getAttribute<ExternAttr>())
     diagnoseAndRemoveAttr(attr, diag::attr_incompatible_with_attr, attr, other);
 
-  // In Embedded Swift, @export(interface) is not supported on generic types
-  // or on extensions of generic types: IRGen emits a unique strong definition
-  // of the type metadata / conformance witness tables, and per-specialization
-  // emission of those globals is not compatible with that.
+  // In Embedded Swift, @export(interface) is not supported on generic types,
+  // extensions of generic types, or generic functions: IRGen emits a unique
+  // strong definition of the type metadata / conformance witness tables /
+  // function, and per-specialization emission of those globals is not
+  // compatible with that.
   if (attr->exportKind == ExportKind::Interface &&
       Ctx.LangOpts.hasFeature(Feature::Embedded)) {
-    bool isGeneric = false;
-    if (auto *nominal = dyn_cast<NominalTypeDecl>(D))
-      isGeneric = nominal->isGenericContext();
-    else if (auto *ext = dyn_cast<ExtensionDecl>(D))
-      isGeneric = ext->isGenericContext();
-    if (isGeneric) {
-      diagnoseAndRemoveAttr(attr,
-                            diag::export_interface_on_generic_in_embedded_swift,
-                            D);
+    if (auto required = D->getRequiredCodeGenerationModel()) {
+      if (*required != CodeGenerationModel::Interface) {
+        diagnoseAndRemoveAttr(attr,
+                              diag::export_interface_on_generic_in_embedded_swift,
+                              D);
+      }
     }
   }
 }

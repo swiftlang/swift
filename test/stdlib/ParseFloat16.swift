@@ -229,6 +229,11 @@ tests.test("Decimal Floats") {
   expectParse("1e0", 1.0)
   expectParse("3.7e1", 37.0)
   expectParse("12.34e3", 12336.0)
+  expectParse("12.348e3", 12352.0)  // midway 12344 (odd) / 12352 (even)
+  expectParse("-12.34e3", -12336.0) // midway, negative
+  expectParse("1024.5", 1024.0)     // midway 1024 (even) / 1025 (odd), neg. exp
+  expectParse("1025.5", 1026.0)     // midway 1025 (odd) / 1026 (even), neg. exp
+  expectParse("32784", 32768.0)     // midway 32768 (even) / 32800 (odd)
   expectParse("-00.0047e5", -470.0)
   expectParse("2e0", 2.0)
   expectParse("1e1", 10.0)

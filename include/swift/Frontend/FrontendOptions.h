@@ -424,6 +424,10 @@ public:
   /// to filesystem modules in parallel.
   bool ParallelDependencyScan = true;
 
+  /// Whether the dependency scanning worker should share a single Clang
+  /// compiler instance across named module dependency queries.
+  bool ShareClangCompilerInstance = true;
+
   /// When performing an incremental build, ensure that cross-module incremental
   /// build metadata is available in any swift modules emitted by this frontend
   /// job.

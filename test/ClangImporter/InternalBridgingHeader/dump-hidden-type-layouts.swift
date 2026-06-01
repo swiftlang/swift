@@ -25,7 +25,7 @@
 // RUN:   -enable-experimental-feature AbstractStoredPropertyLayout \
 // RUN:   -typecheck -module-name Library \
 // RUN:   -dump-hidden-type-layouts \
-// RUN:   %t/Library.swift | %FileCheck --check-prefix=LOCAL %s
+// RUN:   %t/Library.swift | %FileCheck --check-prefix=LOCAL --check-prefix=LOCAL-%target-ptrsize %s
 
 // Imported case: Client imports Library but has no bridging header itself.
 // Library's hidden-type layouts must round-trip from the .swiftmodule's
@@ -36,7 +36,7 @@
 // RUN:   -typecheck -module-name Client \
 // RUN:   -I %t \
 // RUN:   -dump-hidden-type-layouts \
-// RUN:   %t/Client.swift | %FileCheck --check-prefix=IMPORTED %s
+// RUN:   %t/Client.swift | %FileCheck --check-prefix=IMPORTED --check-prefix=IMPORTED-%target-ptrsize %s
 
 //--- Utility.h
 typedef struct {
@@ -66,12 +66,14 @@ public struct S2 {
 }
 
 // LOCAL: Module: Library
-// LOCAL-NEXT: $sSo10BigWrappera: size=16, alignment=8, stride=16, bitwiseCopyable=true, opaque=false
+// LOCAL-64-NEXT: $sSo10BigWrappera: size=16, alignment=8, stride=16, bitwiseCopyable=true, opaque=false
+// LOCAL-32-NEXT: $sSo10BigWrappera: size=8, alignment=4, stride=8, bitwiseCopyable=true, opaque=false
 // LOCAL-NEXT: $sSo7Wrappera: size=4, alignment=4, stride=4, bitwiseCopyable=true, opaque=false
 
 //--- Client.swift
 import Library
 
 // IMPORTED: Module: Library
-// IMPORTED-NEXT: $sSo10BigWrappera: size=16, alignment=8, stride=16, bitwiseCopyable=true, opaque=false
+// IMPORTED-64-NEXT: $sSo10BigWrappera: size=16, alignment=8, stride=16, bitwiseCopyable=true, opaque=false
+// IMPORTED-32-NEXT: $sSo10BigWrappera: size=8, alignment=4, stride=8, bitwiseCopyable=true, opaque=false
 // IMPORTED-NEXT: $sSo7Wrappera: size=4, alignment=4, stride=4, bitwiseCopyable=true, opaque=false

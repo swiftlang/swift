@@ -64,6 +64,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:no-usage>
 - <doc:use-any-apple-os-availability>
 - <doc:useless-availability-check>
+- <doc:useless-conditional-statement>
 
 
 ## Topics
@@ -129,4 +130,5 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:no-usage>
 - <doc:use-any-apple-os-availability>
 - <doc:useless-availability-check>
+- <doc:useless-conditional-statement>
 - <doc:existential-member-access-limitations>

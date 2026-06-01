@@ -259,3 +259,6 @@ public extension Float {
 infix operator <==> : AssignmentPrecedence
 
 public func addingAnInverse<T: ~Copyable>(_ t: borrowing T) {}
+
+@_preInverseGenerics
+public func addingAnInversePreInverse<T: ~Copyable>(_ t: borrowing T) {}

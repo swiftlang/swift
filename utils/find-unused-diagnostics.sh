@@ -11,10 +11,15 @@ ALL_DIAGS=$(
     | sed -E 's/(ERROR|WARNING|NOTE|REMARK)\(([a-zA-Z0-9_]+),/\2/')
 
 # Now look for all potential identifiers in the (C++) source files.
+# Collapse newlines to spaces so the subsequent grep can match patterns like
+# `diag::\n    identifier` without needing `--null-data`. Older GNU grep
+# (e.g. 2.20 on Amazon Linux 2) has bugs in `--null-data` mode that drop
+# matches when the pattern can match a newline.
 CXX_SOURCES=$(find lib include tools -name \*.cpp -or -name \*.h)
 DIAGS_IN_CXX_SOURCES=$(
-    grep -E --only-matching --no-filename --null-data 'diag::\n?\s*[a-zA-Z0-9_]+' $CXX_SOURCES \
-    | tr '\0' '\n' \
+    cat $CXX_SOURCES \
+    | tr '\n' ' ' \
+    | grep -E --only-matching --no-filename 'diag::[[:space:]]*[a-zA-Z0-9_]+' \
     | sed -e 's/diag:://' -e 's/[[:space:]]//g')
 
 # Get potentially unused diags from C++ sources.

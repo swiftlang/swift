@@ -283,9 +283,11 @@ LANGUAGE_FEATURE(ClosureLifetimes, 0, "Support @_lifetime on function types")
 BASELINE_LANGUAGE_FEATURE(ExcludePrivateFromMemberwiseInit, 502, "Exclude private initialized properties from memberwise init")
 LANGUAGE_FEATURE(BuiltinMarkDependence, 0, "markDependence Builtin")
 LANGUAGE_FEATURE(BuiltinAddTaskLocalValue, 0, "addTaskLocalValue and removeTaskLocalValue builtins")
+LANGUAGE_FEATURE(BuiltinContinuationNonCopyableSuccess, 0, "Builtin.{resume,withUnsafe}*Continuation* relaxed to allow Success: ~Copyable")
 SUPPRESSIBLE_LANGUAGE_FEATURE(TildeSendable, 518, "~Sendable for explicitly marking non-Sendable types")
 LANGUAGE_FEATURE(SuppressedAssociatedTypesWithDefaults, 503, "Associated types that are ~Copyable and ~Escapable")
 LANGUAGE_FEATURE(SourceWarningControl, 522, "Source-level warning control with @diagnose")
+LANGUAGE_FEATURE(BorrowInout, 519, "Ref and MutableRef")
 
 // TEMPORARY: Never use this, because it is only meant to allow us to model
 // suppression of @c in Swift interfaces as a temporary measure.
@@ -614,6 +616,11 @@ EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 /// Allow stored properties of types from an internal bridging header in
 /// non-resilient modules. Layout will be encoded in the .swiftmodule.
 EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
+
+/// Defer checking of global-actor-isolated initializers (and the
+/// global-actor-isolated stored properties they access) from Sema to the
+/// SIL-level flow-isolation pass, allowing more programs to be accepted.
+EXPERIMENTAL_FEATURE(FlowIsolationGlobalActor, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

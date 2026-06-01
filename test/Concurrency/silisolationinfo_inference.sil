@@ -1356,7 +1356,7 @@ bb0(%0 : @guaranteed $MainActorIsolatedStruct):
 sil [ossa] @test_nonisolated_unsafe_field_override_struct_addr : $@convention(thin) (@in_guaranteed MainActorIsolatedStruct) -> () {
 bb0(%0 : $*MainActorIsolatedStruct):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*MainActorIsolatedStruct, let, name "self"
+  debug_value %0 : $*MainActorIsolatedStruct, let, name "self", expr op_deref
   %1 = struct_element_addr %0 : $*MainActorIsolatedStruct, #MainActorIsolatedStruct.nsNonisolatedUnsafe
   debug_value [trace] %1
   %9999 = tuple ()
@@ -1370,7 +1370,7 @@ bb0(%0 : $*MainActorIsolatedStruct):
 sil [ossa] @test_nonisolated_unsafe_field_override_generic_struct_addr : $@convention(thin) <T> (@in_guaranteed MainActorIsolatedGenericStruct<T>) -> () {
 bb0(%0 : $*MainActorIsolatedGenericStruct<T>):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*MainActorIsolatedGenericStruct<T>, let, name "self"
+  debug_value %0 : $*MainActorIsolatedGenericStruct<T>, let, name "self", expr op_deref
   %1 = struct_element_addr %0 : $*MainActorIsolatedGenericStruct<T>, #MainActorIsolatedGenericStruct.nsNonisolatedUnsafe
   debug_value [trace] %1
   %9999 = tuple ()
@@ -1384,7 +1384,7 @@ bb0(%0 : $*MainActorIsolatedGenericStruct<T>):
 sil [ossa] @test_nonisolated_unsafe_field_override_nonisolated_generic_struct_addr : $@convention(thin) <T> (@in_guaranteed NonisolatedGenericStruct<T>) -> () {
 bb0(%0 : $*NonisolatedGenericStruct<T>):
   specify_test "sil_isolation_info_inference @trace[0]"
-  debug_value %0 : $*NonisolatedGenericStruct<T>, let, name "self"
+  debug_value %0 : $*NonisolatedGenericStruct<T>, let, name "self", expr op_deref
   %1 = struct_element_addr %0 : $*NonisolatedGenericStruct<T>, #NonisolatedGenericStruct.nsNonisolatedUnsafe
   debug_value [trace] %1
   %9999 = tuple ()

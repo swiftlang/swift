@@ -2391,26 +2391,26 @@ Decl::getExplicitCodeGenerationModel() const {
 /// This accounts for limitations of the code generation model. For example,
 /// a generic declaration can only be treated as @export(implementation) in
 /// Embedded Swift, because there are no unspecialized generics.
-static std::optional<CodeGenerationModel>
-getRequiredCodeGenerationModel(const Decl *decl) {
-  bool isEmbedded = decl->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+std::optional<CodeGenerationModel>
+Decl::getRequiredCodeGenerationModel() const {
+  bool isEmbedded = getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
   // A generic declaration must be @export(implementation) in Embedded Swift.
-  auto dc = decl->getInnermostDeclContext();
+  auto dc = getInnermostDeclContext();
   if (auto sig = dc->getGenericSignatureOfContext()) {
     if (!sig->areAllParamsConcrete() && isEmbedded)
       return CodeGenerationModel::Implementation;
   }
 
   // Foreign types are always @export(implementation).
-  if (auto nominal = dyn_cast<NominalTypeDecl>(decl)) {
+  if (auto nominal = dyn_cast<NominalTypeDecl>(this)) {
     if (isa<ClangModuleUnit>(nominal->getModuleScopeContext()))
       return CodeGenerationModel::Implementation;
   }
 
   // Types must be @export(interface) in non-Embedded Swift, because the type
   // metadata symbols need to be unique.
-  if (isa<TypeDecl>(decl) && !isEmbedded)
+  if (isa<TypeDecl>(this) && !isEmbedded)
     return CodeGenerationModel::Interface;
 
   return std::nullopt;
@@ -2418,14 +2418,44 @@ getRequiredCodeGenerationModel(const Decl *decl) {
 
 CodeGenerationModel
 Decl::getEffectiveCodeGenerationModel() const {
+  // If there is a required code generation model, return that. This overrides
+  // any explicitly-written model, which is diagnosed in attribute checking.
+  if (auto required = getRequiredCodeGenerationModel())
+    return *required;
+
   // If there is an explicit attribute that specifies the model for this
   // declaration, use it.
   if (auto explicitModel = getExplicitCodeGenerationModel())
     return *explicitModel;
 
-  // If there is a required code generation model, return that.
-  if (auto required = getRequiredCodeGenerationModel(this))
-    return *required;
+  // A *synthesized* member of a nominal type or extension inherits its code
+  // generation model from the enclosing type/extension's *explicit* model,
+  // so that `@export(...)` on a type or extension controls the linkage of
+  // its compiler-synthesized members (e.g. derived `Equatable.==`, the
+  // implicit memberwise initializer). We deliberately do *not* propagate
+  // to user-written members — those can carry `@export(...)` directly if
+  // the author wants that linkage, and inheriting silently would surprise
+  // users who expect their explicit members to keep the default linkage.
+  //
+  // We only inherit when the member itself has effective public visibility,
+  // to avoid promoting internal/private members to public symbols in
+  // importing modules.
+  if (auto *valueDecl = dyn_cast<ValueDecl>(this)) {
+    if (valueDecl->isSynthesized()) {
+      AccessScope access =
+          valueDecl->getFormalAccessScope(
+              nullptr, /*treatUsableFromInlineAsPublic*/false,
+              /*ignoreImportAccessLevel*/false);
+      if (access.isPublic()) {
+        if (auto *parent = getDeclContext()->getAsDecl()) {
+          if (isa<NominalTypeDecl>(parent) || isa<ExtensionDecl>(parent)) {
+            if (auto parentModel = parent->getExplicitCodeGenerationModel())
+              return *parentModel;
+          }
+        }
+      }
+    }
+  }
 
   // Otherwise, apply the module-level default.
   return getModuleContext()->codeGenerationModel();
@@ -10143,7 +10173,7 @@ SubscriptDecl::getDynamicMemberParamTypeAsKeyPathType(Type paramTy) {
       return nullptr;
     }
 
-    paramTy = layout.getSuperclass();
+    paramTy = layout.explicitSuperclass;
     if (!paramTy) {
       return nullptr;
     }
@@ -11536,13 +11566,14 @@ FuncDecl *FuncDecl::createImplicit(ASTContext &Context,
                                    bool Throws, Type ThrownType,
                                    GenericParamList *GenericParams,
                                    ParameterList *BodyParams, Type FnRetType,
-                                   DeclContext *Parent) {
+                                   DeclContext *Parent, bool isSynthesized) {
   assert(FnRetType);
   auto *const FD = FuncDecl::createImpl(
       Context, SourceLoc(), StaticSpelling, SourceLoc(), Name, NameLoc, Async,
       SourceLoc(), Throws, SourceLoc(), TypeLoc::withoutLoc(ThrownType),
       GenericParams, Parent, ClangNode());
   FD->setImplicit();
+  FD->setSynthesized(isSynthesized);
   FD->setParameters(BodyParams);
   FD->setResultInterfaceType(FnRetType);
   return FD;

@@ -749,7 +749,7 @@ ClangTypeConverter::visitProtocolCompositionType(ProtocolCompositionType *type) 
     return getClangIdType(ClangASTContext);
 
   auto superclassTy = clangCtx.ObjCBuiltinIdTy;
-  if (auto layoutSuperclassTy = layout.getSuperclass()) {
+  if (auto layoutSuperclassTy = layout.getExplicitSuperclassOrProtocolSuperclass()) {
     auto clangTy = convert(layoutSuperclassTy);
     if (clangTy.isNull())
       return clang::QualType();

@@ -222,7 +222,8 @@ protected:
     SHARED_FIELD(DebugValueInst, uint8_t
                  poisonRefs : 1,
                  usesMoveableValueDebugInfo : 1,
-                 trace : 1);
+                 trace : 1,
+                 prependDeref : 1);
 
     SHARED_FIELD(AllocStackInst, uint8_t
                  dynamicLifetime : 1,

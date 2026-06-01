@@ -61,6 +61,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -519,9 +520,15 @@ void SILLinkerVisitor::visitGlobalAddrInst(GlobalAddrInst *GAI) {
   if (!Mod.getOptions().EmbeddedSwift)
     return;
 
-  // In Embedded Swift, we want to actually link globals from other modules too,
-  // so strip "external" from the linkage.
+  // In Embedded Swift, globals from other modules are normally materialized
+  // as definitions in the importing module (linkonce_odr at IRGen time), so
+  // strip "external" from their linkage. The exception is the Interface code
+  // generation model: those globals have a unique strong definition in their
+  // defining module, and the importer must reference them externally.
   SILGlobalVariable *G = GAI->getReferencedGlobal();
+  if (auto cgModel = G->codeGenerationModel())
+    if (*cgModel == CodeGenerationModel::Interface)
+      return;
   if (G->isDefinition())
     G->setLinkage(stripExternalFromLinkage(G->getLinkage()));
 }

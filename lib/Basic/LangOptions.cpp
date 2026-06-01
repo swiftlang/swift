@@ -486,7 +486,8 @@ void LangOptions::setHasAtomicBitWidth(llvm::Triple triple) {
 }
 
 static bool isMultiThreadedRuntime(llvm::Triple triple) {
-  if (triple.getOS() == llvm::Triple::WASI) {
+  if (triple.getOS() == llvm::Triple::WASI ||
+      triple.getOS() == llvm::Triple::Emscripten) {
     return triple.getEnvironmentName() == "threads";
   }
   if (triple.getOSName() == "none") {

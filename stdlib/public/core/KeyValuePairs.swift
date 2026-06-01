@@ -136,7 +136,7 @@ extension KeyValuePairs {
   @available(SwiftCompatibilitySpan 5.0, *)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     get {
       let rp = unsafe UnsafeRawPointer(_elements._buffer.firstElementAddress)
       let span = unsafe Span(

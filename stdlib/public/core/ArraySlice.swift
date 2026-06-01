@@ -1236,7 +1236,7 @@ extension ArraySlice {
   @available(SwiftCompatibilitySpan 5.0, *)
   @_alwaysEmitIntoClient
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       let (pointer, count) = unsafe (_buffer.firstElementAddress, _buffer.count)
       let span = unsafe Span(_unsafeStart: pointer, count: count)
@@ -1338,7 +1338,7 @@ extension ArraySlice {
   ///   O(*n*) otherwise.
   @_alwaysEmitIntoClient
   public var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       // _makeMutableAndUnique*() inserts begin_cow_mutation.
       // LifetimeDependence analysis inserts call to end_cow_mutation_addr since we cannot schedule it in the stdlib for mutableSpan property.

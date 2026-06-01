@@ -175,7 +175,8 @@ public:
 // In the case of a function, executable code is contained in the function
 // definition. In the case of a variable, executable code can be contained in
 // the initializer of the variable.
-clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
+clang::Decl *getDeclWithExecutableCode(clang::Sema &clangSema,
+                                       clang::Decl *decl) {
   if (auto fd = dyn_cast<clang::FunctionDecl>(decl)) {
     const clang::FunctionDecl *definition;
     if (fd->hasBody(definition)) {
@@ -185,6 +186,13 @@ clang::Decl *getDeclWithExecutableCode(clang::Decl *decl) {
     // If this is a potentially not-yet-instantiated template, we might
     // still have a body.
     if (fd->getTemplateInstantiationPattern())
+      return fd;
+
+    // If this is a defaulted comparison op, we will have body once we define
+    // it.
+    if (fd->isDefaulted() && !fd->isDeleted() &&
+        clangSema.getDefaultedComparisonKind(fd) !=
+            clang::Sema::DefaultedComparisonKind::None)
       return fd;
   } else if (auto vd = dyn_cast<clang::VarDecl>(decl)) {
     clang::VarDecl *initializingDecl = vd->getInitializingDeclaration();
@@ -206,9 +214,13 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
   if (!GlobalClangDecls.insert(decl->getCanonicalDecl()).second)
     return;
 
+  ClangModuleLoader *clangModuleLoader = Context.getClangModuleLoader();
+  auto &clangSema = clangModuleLoader->getClangSema();
+
   // Fast path for the case where `decl` doesn't contain executable code, so it
   // can't reference any other declarations that we would need to emit.
-  if (getDeclWithExecutableCode(const_cast<clang::Decl *>(decl)) == nullptr) {
+  if (getDeclWithExecutableCode(clangSema, const_cast<clang::Decl *>(decl)) ==
+      nullptr) {
     ClangCodeGen->HandleTopLevelDecl(
                           clang::DeclGroupRef(const_cast<clang::Decl*>(decl)));
     return;
@@ -241,10 +253,7 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
     stack.push_back(D);
   };
 
-  ClangModuleLoader *clangModuleLoader = Context.getClangModuleLoader();
   ClangDeclFinder refFinder(callback, clangModuleLoader);
-
-  auto &clangSema = clangModuleLoader->getClangSema();
 
   while (!stack.empty()) {
     auto *next = const_cast<clang::Decl *>(stack.pop_back_val());
@@ -265,11 +274,21 @@ void IRGenModule::emitClangDecl(const clang::Decl *decl) {
       // Make sure that this method is part of a class template specialization.
       if (fn->getTemplateInstantiationPattern())
         clangSema.InstantiateFunctionDefinition(fn->getLocation(), fn);
+
+      // Defaulted comparison operators (e.g. `operator== ... = default`) don't
+      // have a body until explicitly defined. Define them here.
+      if (fn->isDefaulted() && !fn->isDeleted() &&
+          !fn->doesThisDeclarationHaveABody()) {
+        auto DCK = clangSema.getDefaultedComparisonKind(fn);
+        if (DCK != clang::Sema::DefaultedComparisonKind::None)
+          clangSema.DefineDefaultedComparison(fn->getLocation(), fn, DCK);
+      }
     }
 
-    if (clang::Decl *executableDecl = getDeclWithExecutableCode(next)) {
-        refFinder.TraverseDecl(executableDecl);
-        next = executableDecl;
+    if (clang::Decl *executableDecl =
+            getDeclWithExecutableCode(clangSema, next)) {
+      refFinder.TraverseDecl(executableDecl);
+      next = executableDecl;
     }
 
     // Unfortunately, implicitly defined CXXDestructorDecls don't have a real

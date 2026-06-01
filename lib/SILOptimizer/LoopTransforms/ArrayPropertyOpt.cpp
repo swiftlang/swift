@@ -463,6 +463,7 @@ namespace {
 /// fixDomTree() could be part of SILCloner itself.
 class RegionCloner : public SILCloner<RegionCloner> {
   SILBasicBlock *StartBB;
+  SmallVector<SILPhiArgument *, 4> insertedPhis;
 
   friend class SILInstructionVisitor<RegionCloner>;
   friend class SILCloner<RegionCloner>;
@@ -483,6 +484,8 @@ public:
     updateSSAForm();
     return getOpBasicBlock(StartBB);
   }
+
+  ArrayRef<SILPhiArgument *> getInsertedPhis() const { return insertedPhis; }
 
 protected:
   /// Clone the dominator tree from the original region to the cloned region.
@@ -543,7 +546,7 @@ protected:
   }
 
   void updateSSAForm() {
-    SILSSAUpdater SSAUp;
+    SILSSAUpdater SSAUp(&insertedPhis);
     SmallVector<SingleValueInstruction *, 4> newProjections;
     SinkAddressProjections sinkProj(&newProjections);
 
@@ -591,11 +594,13 @@ class ArrayPropertiesSpecializer {
   DominanceInfo *DomTree;
   SILLoopAnalysis *LoopAnalysis;
   SILBasicBlock *HoistableLoopPreheader;
+  SILPassManager *PM;
 
 public:
   ArrayPropertiesSpecializer(DominanceInfo *DT, SILLoopAnalysis *LA,
-                             SILBasicBlock *Hoistable)
-      : DomTree(DT), LoopAnalysis(LA), HoistableLoopPreheader(Hoistable) {}
+                             SILBasicBlock *Hoistable, SILPassManager *PM)
+      : DomTree(DT), LoopAnalysis(LA), HoistableLoopPreheader(Hoistable),
+        PM(PM) {}
 
   void run() {
     specializeLoopNest();
@@ -752,6 +757,14 @@ void ArrayPropertiesSpecializer::specializeLoopNest() {
   RegionCloner Cloner(NewPreheader, *DomTree);
   auto *ClonedPreheader = Cloner.cloneRegion(ExitBlocks);
 
+  // The SSA updater may have inserted trivial phis (all incoming values
+  // identical) in loop-internal blocks when threading owned values to shared
+  // exit blocks.  Such trivial phis consume the original value at each
+  // predecessor branch, causing an OSSA over-consume when the original
+  // destroy_value is still present in dominated blocks.  Simplify them away
+  // before updateAllGuaranteedPhis builds the borrowed-from instructions.
+  replacePhisWithIncomingValues(PM, Cloner.getInsertedPhis());
+
   // Collect the array.props call that we will specialize on that we have
   // cloned in the cloned loop.
   SmallVector<ArraySemanticsCall, 16> ArrayPropCalls;
@@ -834,7 +847,7 @@ class SwiftArrayPropertyOptPass : public SILFunctionTransform {
 
       // Hoist the loop nests.
       for (auto &HoistableLoopNest : HoistableLoopNests)
-        ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest).run();
+        ArrayPropertiesSpecializer(DT, LA, HoistableLoopNest, getPassManager()).run();
 
       // Verify that no illegal critical edges were created.
       if (getFunction()->getModule().getOptions().VerifyAll)

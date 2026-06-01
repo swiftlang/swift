@@ -38,7 +38,7 @@ public struct MutableSpan<Element: ~Copyable>
   /// Create an empty span.
   @_alwaysEmitIntoClient
   @inline(__always)
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init() {
     unsafe _pointer = nil
     _count = 0
@@ -46,7 +46,7 @@ public struct MutableSpan<Element: ~Copyable>
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow start)
+  @_lifetime(borrow start)
   internal init(
     _unchecked start: UnsafeMutableRawPointer?,
     count: Int
@@ -66,7 +66,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow elements)
+  @_lifetime(borrow elements)
   internal init(
     _unchecked elements: UnsafeMutableBufferPointer<Element>
   ) {
@@ -76,7 +76,7 @@ extension MutableSpan where Element: ~Copyable {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     _unsafeElements buffer: UnsafeMutableBufferPointer<Element>
   ) {
@@ -92,7 +92,7 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @_alwaysEmitIntoClient
   @_transparent
-  @lifetime(borrow start)
+  @_lifetime(borrow start)
   public init(
     _unsafeStart start: UnsafeMutablePointer<Element>,
     count: Int
@@ -110,7 +110,7 @@ extension MutableSpan {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow elements)
+  @_lifetime(borrow elements)
   public init(
     _unsafeElements elements: borrowing Slice<UnsafeMutableBufferPointer<Element>>
   ) {
@@ -126,7 +126,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: UnsafeMutableRawBufferPointer
   ) {
@@ -148,7 +148,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow pointer)
+  @_lifetime(borrow pointer)
   public init(
     _unsafeStart pointer: UnsafeMutableRawPointer,
     byteCount: Int
@@ -163,7 +163,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
+  @_lifetime(borrow buffer)
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
@@ -234,7 +234,7 @@ extension MutableSpan where Element: ConvertibleFromBytes & ConvertibleToBytes {
 extension Span where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
-  @lifetime(borrow mutableSpan)
+  @_lifetime(borrow mutableSpan)
   public init(_mutableSpan mutableSpan: borrowing MutableSpan<Element>) {
     let pointer =
       unsafe mutableSpan._pointer?.assumingMemoryBound(to: Element.self)
@@ -254,7 +254,7 @@ extension MutableSpan where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   public var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       Span(_mutableSpan: self)
     }
@@ -267,7 +267,7 @@ extension RawSpan {
 
   @_alwaysEmitIntoClient
   @unsafe
-  @lifetime(borrow mutableSpan)
+  @_lifetime(borrow mutableSpan)
   public init<Element>(
     _mutableSpan mutableSpan: borrowing MutableSpan<Element>
   ) {
@@ -328,7 +328,7 @@ extension MutableSpan where Element: Copyable {
   @_transparent
   @unsafe
   public var bytes: RawSpan {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     borrowing get {
       unsafe RawSpan(_mutableSpan: self)
     }
@@ -350,7 +350,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   @_transparent
   @unsafe
   public var mutableBytes: MutableRawSpan {
-    @lifetime(&self)
+    @_lifetime(&self)
     mutating get {
       unsafe MutableRawSpan(_elements: &self)
     }
@@ -413,7 +413,7 @@ extension MutableSpan where Element: ~Copyable {
       return unsafe self[unchecked: position]
     }
     @_transparent
-    @lifetime(self: copy self)
+    @_lifetime(self: copy self)
     mutate {
       _checkIndex(position)
       return unsafe &self[unchecked: position]
@@ -438,7 +438,7 @@ extension MutableSpan where Element: ~Copyable {
     }
     @_transparent
     @_unsafeSelfDependentResult
-    @lifetime(self: copy self)
+    @_lifetime(self: copy self)
     mutate {
       let address = unsafe _unsafeAddressOfElement(unchecked: position)
       return unsafe &(UnsafeMutablePointer(address).pointee)
@@ -465,7 +465,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Parameter i: A valid index into this span.
   /// - Parameter j: A valid index into this span.
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func swapAt(_ i: Index, _ j: Index) {
     _precondition(indices.contains(Index(i)))
     _precondition(indices.contains(Index(j)))
@@ -480,7 +480,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Parameter j: A valid index into this span.
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func swapAt(unchecked i: Index, unchecked j: Index) {
     let ri = unsafe _unsafeAddressOfElement(unchecked: i)
     let pi = unsafe UnsafeMutablePointer<Element>(ri)
@@ -534,7 +534,7 @@ extension MutableSpan where Element: ~Copyable {
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
   @_transparent
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   @safe
   public mutating func withUnsafeMutableBufferPointer<
     E: Error, Result: ~Copyable
@@ -596,7 +596,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   //FIXME: mark closure parameter as non-escaping
   @_alwaysEmitIntoClient
   @_transparent
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   @safe
   public mutating func withUnsafeMutableBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeMutableRawBufferPointer) throws(E) -> Result
@@ -617,7 +617,7 @@ extension MutableSpan {
   ///
   /// - Parameter repeatedValue: The value to set for every element.
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func update(repeating repeatedValue: consuming Element) {
     guard !isEmpty else { return }
     unsafe _start().withMemoryRebound(to: Element.self, capacity: count) {
@@ -647,7 +647,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(_ bounds: Range<Index>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
@@ -674,7 +674,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(_ bounds: Range<Index>) -> Self {
     _mutatingExtracting(bounds)
   }
@@ -693,7 +693,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(_ bounds: Range<Index>) -> Self {
     _precondition(
       UInt(bitPattern: bounds.lowerBound) <= UInt(bitPattern: _count) &&
@@ -722,7 +722,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
@@ -750,7 +750,7 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(unchecked bounds: Range<Index>) -> Self {
     unsafe _mutatingExtracting(unchecked: bounds)
   }
@@ -772,7 +772,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
     let newStart = unsafe _pointer?.advanced(by: delta)
@@ -796,7 +796,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(
     _ bounds: some RangeExpression<Index>
   ) -> Self {
@@ -820,7 +820,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(
     _ bounds: some RangeExpression<Index>
   ) -> Self {
@@ -841,7 +841,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(
     _ bounds: some RangeExpression<Index>
   ) -> Self {
@@ -867,7 +867,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
@@ -897,7 +897,7 @@ extension MutableSpan where Element: ~Copyable {
   @unsafe
   @available(*, deprecated, renamed: "_mutatingExtracting(unchecked:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
@@ -921,7 +921,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @unsafe
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(
     unchecked bounds: ClosedRange<Index>
   ) -> Self {
@@ -943,7 +943,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(_: UnboundedRange) -> Self {
     unsafe _overrideLifetime(
       Self(_unchecked: _pointer, count: _count), mutating: &self
@@ -969,7 +969,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(_:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(_: UnboundedRange) -> Self {
     _mutatingExtracting(...)
   }
@@ -984,7 +984,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(_: UnboundedRange) -> Self {
     self
   }
@@ -1013,7 +1013,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(first maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
@@ -1044,7 +1044,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(first:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(first maxLength: Int) -> Self {
     _mutatingExtracting(first: maxLength)
   }
@@ -1065,7 +1065,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(first maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a prefix of negative length")
@@ -1094,7 +1094,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingLast k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
@@ -1125,7 +1125,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(droppingLast:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(droppingLast k: Int) -> Self {
     _mutatingExtracting(droppingLast: k)
   }
@@ -1145,7 +1145,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingLast k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
@@ -1176,7 +1176,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(last maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
@@ -1209,7 +1209,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(last:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(last maxLength: Int) -> Self {
     _mutatingExtracting(last: maxLength)
   }
@@ -1230,7 +1230,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(last maxLength: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
@@ -1261,7 +1261,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func _mutatingExtracting(droppingFirst k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
@@ -1294,7 +1294,7 @@ extension MutableSpan where Element: ~Copyable {
   /// - Complexity: O(1)
   @available(*, deprecated, renamed: "_mutatingExtracting(droppingFirst:)")
   @_alwaysEmitIntoClient
-  @lifetime(&self)
+  @_lifetime(&self)
   mutating public func extracting(droppingFirst k: Int) -> Self {
     _mutatingExtracting(droppingFirst: k)
   }
@@ -1314,7 +1314,7 @@ extension MutableSpan where Element: ~Copyable {
   ///
   /// - Complexity: O(1)
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   consuming public func _consumingExtracting(droppingFirst k: Int) -> Self {
 #if compiler(>=5.3) && hasFeature(SendableCompletionHandlers)
     _precondition(k >= 0, "Can't drop a negative number of elements")
@@ -1335,7 +1335,7 @@ extension MutableSpan where Element: ~Copyable {
 extension MutableSpan: BorrowingSequence where Element: ~Copyable {
   @available(SwiftStdlib 6.4, *)
   @inlinable
-  @lifetime(borrow self)
+  @_lifetime(borrow self)
   public func makeBorrowingIterator() -> SpanIterator<Element> {
     SpanIterator(self.span)
   }

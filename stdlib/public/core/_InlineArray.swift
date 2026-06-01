@@ -466,7 +466,7 @@ extension _InlineArray where Element: ~Copyable {
 extension _InlineArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal var span: Span<Element> {
-    @lifetime(borrow self)
+    @_lifetime(borrow self)
     @_transparent
     borrowing get {
       let span = unsafe Span(_unsafeStart: _protectedAddress, count: count)
@@ -476,7 +476,7 @@ extension _InlineArray where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
   internal var mutableSpan: MutableSpan<Element> {
-    @lifetime(&self)
+    @_lifetime(&self)
     @_transparent
     mutating get {
       let span = unsafe MutableSpan(

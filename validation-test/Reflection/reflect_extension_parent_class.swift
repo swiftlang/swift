@@ -13,7 +13,7 @@
 // REQUIRES: reflection_test_support
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: asan
-// UNSUPPORTED: remote_run
+// UNSUPPORTED: device_run
 
 // Verifies that reflection can resolve types declared inside a cross-module
 // extension — i.e., types whose parent (the extended type) lives in a

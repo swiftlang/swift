@@ -433,9 +433,9 @@ NormalProtocolConformance::getExplicitCodeGenerationModel() const {
   return std::nullopt;
 }
 
-static std::optional<CodeGenerationModel>
-getRequiredCodeGenerationModel(const NormalProtocolConformance *conformance) {
-  auto dc = conformance->getDeclContext();
+std::optional<CodeGenerationModel>
+NormalProtocolConformance::getRequiredCodeGenerationModel() const {
+  auto dc = getDeclContext();
   bool isEmbedded = dc->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 
   // A conformance in a generic context must be @export(implementation) in
@@ -446,7 +446,7 @@ getRequiredCodeGenerationModel(const NormalProtocolConformance *conformance) {
   }
 
   // Synthesized conformances are always @export(implementation).
-  if (conformance->isSynthesized())
+  if (isSynthesized())
     return CodeGenerationModel::Implementation;
 
   // Other conformances must be @export(interface) in non-Embedded Swift,
@@ -460,11 +460,11 @@ getRequiredCodeGenerationModel(const NormalProtocolConformance *conformance) {
 
 CodeGenerationModel
 NormalProtocolConformance::getEffectiveCodeGenerationModel() const {
+  if (auto required = getRequiredCodeGenerationModel())
+    return *required;
+
   if (auto explicitModel = getExplicitCodeGenerationModel())
     return *explicitModel;
-
-  if (auto required = getRequiredCodeGenerationModel(this))
-    return *required;
 
   // Otherwise, apply the module-level default.
   return getDeclContext()->getParentModule()->codeGenerationModel();
