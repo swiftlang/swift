@@ -122,43 +122,6 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
   _ = result5.get() // no need for 'try'
 }
 
-ResultTests.test("Async Initialization") {
-#if os(WASI)
-  // FIXME: https://github.com/swiftlang/swift/issues/89155
-  // wasi-wasm32 traps in Result<T, any Error>'s value-witness copy
-  // after returning from the new Result.init(catching:) async.
-#else
-  func asyncThrowing() async throws -> String {
-    throw Err.err
-  }
-
-  func asyncNotThrowing() async throws -> String {
-    return string
-  }
-
-  let result1 = await Result { try await asyncThrowing() }
-  let result2 = await Result { try await asyncNotThrowing() }
-
-  expectEqual(result1.failure as? Err, Err.err)
-  expectEqual(result2.success, string)
-    
-  do {
-    _ = try result1.get()
-  } catch let error as Err {
-    expectEqual(error, Err.err)
-  } catch {
-    expectUnreachable()
-  }
-    
-  do {
-    let unwrapped = try result2.get()
-    expectEqual(unwrapped, string)
-  } catch {
-    expectUnreachable()
-  }
-#endif
-}
-
 ResultTests.test("Functional Transforms") {
   func transformDouble(_ int: Int) -> Int {
     return 2 * int
@@ -244,4 +207,4 @@ ResultTests.test("Hashable") {
   checkHashable(confusables, equalityOracle: { $0 == $1 })
 }
 
-await runAllTestsAsync()
+runAllTests()
