@@ -42,10 +42,8 @@ void taskRegistryInsert(AsyncTask *task);
 /// Deregister a task. Must be called before swift_slowDealloc frees it.
 void taskRegistryRemove(AsyncTask *task);
 
-#if SWIFT_STDLIB_TASK_REGISTRY_TESTING
-/// Returns the count of currently registered tasks. For testing only.
-size_t swift_task_registryCount();
-#endif
+/// Returns the count of currently registered tasks. For testing and debugging.
+SWIFT_EXPORT_FROM(swift_Concurrency) size_t swift_task_registryCount();
 
 } // namespace swift
 

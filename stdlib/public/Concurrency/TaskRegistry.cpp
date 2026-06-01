@@ -51,7 +51,6 @@ void swift::taskRegistryRemove(AsyncTask *task) {
       "TaskRegistry: task %p destroyed without being registered\n", task);
 }
 
-#if SWIFT_STDLIB_TASK_REGISTRY_TESTING
 size_t swift::swift_task_registryCount() {
   LazyMutex::ScopedLock guard(RegistryLock);
   size_t count = 0;
@@ -59,6 +58,5 @@ size_t swift::swift_task_registryCount() {
     ++count;
   return count;
 }
-#endif
 
 #endif // !SWIFT_CONCURRENCY_EMBEDDED
