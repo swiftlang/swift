@@ -2191,7 +2191,7 @@ void swift::salvageDebugInfo(SILInstruction *I) {
   if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I))
     salvageNullaryInst(cast<SingleValueInstruction>(I));
 
-  if (isa<AddressToPointerInst>(I))
+  if (isa<AddressToPointerInst>(I) || isa<PointerToAddressInst>(I))
     salvageUnaryInst(cast<SingleValueInstruction>(I));
 }
 
