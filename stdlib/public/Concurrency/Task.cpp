@@ -26,6 +26,7 @@
 #include "TaskGroupPrivate.h"
 #include "TaskLocal.h"
 #include "TaskPrivate.h"
+#include "TaskRegistry.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
@@ -398,6 +399,10 @@ static void destroyTask(SWIFT_CONTEXT HeapObject *obj) {
   // swift_task_complete should have been run, which will have torn down
   // the task-local allocator.  There's actually nothing else to clean up
   // here.
+
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  taskRegistryRemove(task);
+#endif
 
   SWIFT_TASK_DEBUG_LOG("Destroyed task %p", task);
   swift_slowDealloc(task, 0, alignof(AsyncTask) - 1);
@@ -1194,6 +1199,10 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       taskCreateFlags.isDiscardingTask(),
       task->Flags.task_hasInitialTaskExecutorPreference(),
       taskName);
+
+#if !SWIFT_CONCURRENCY_EMBEDDED
+  taskRegistryInsert(task);
+#endif
 
   // Attach to the group, if needed.
   if (group) {
