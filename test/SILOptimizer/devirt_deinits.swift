@@ -85,6 +85,18 @@ struct StrWithoutDeinit: ~Copyable {
   let c = 27
 }
 
+public struct NC: ~Copyable {
+  var t: Int
+
+  deinit {}
+}
+
+public enum E<T>: ~Copyable {
+  case a(NC)
+  case b(NC)
+  case c(T)
+}
+
 // CHECK-LABEL: sil hidden [noinline] @$s4test2S3VfD :
 // CHECK:         [[D:%.*]] = function_ref @$s4test2S1VfD :
 // CHECK:         apply [[D]]
@@ -167,6 +179,12 @@ func testInlineArray(_ a: consuming InlineArray<3, S1>) {
   log("### testInlineArray")
 }
 
+// Check that the optimizer doesn't run into an DeinitDevirtualizer - Inliner loop.
+// CHECK-LABEL: sil @$s4test21enumWithDeinitPayload1eyAA1EOyxGn_tlF :
+// CHECK-NOT:   bb10
+// CHECK:       } // end sil function '$s4test21enumWithDeinitPayload1eyAA1EOyxGn_tlF'
+public func enumWithDeinitPayload<T>(e: consuming E<T>) {
+}
 
 
 @main
