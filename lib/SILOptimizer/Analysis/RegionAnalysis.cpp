@@ -765,8 +765,53 @@ TrackableValue RegionAnalysisValueMap::getTrackableValueHelper(
         iter.first->getSecond().removeFlag(TrackableValueFlag::isMayAlias);
       }
 
-      if (auto isolation = SILIsolationInfo::get(storage.base)) {
-        iter.first->getSecond().setIsolationRegionInfo(isolation);
+      // Determine whether this value is a non-Sendable field projected directly
+      // out of a Sendable aggregate (e.g. '.v' of an @unchecked Sendable struct
+      // 'W' stored on an actor). In that case the value was deliberately rooted
+      // as its own non-Sendable value by getUnderlyingTrackedValue (see
+      // AddressBaseComputingVisitor's Struct, Tuple, and Enum cases). Because
+      // it is reached *through* a Sendable value, it must not inherit the
+      // isolation of the underlying access base (e.g. the actor instance), so
+      // we skip the base-isolation inheritance below.
+      //
+      // NOTE: This is a check on the *operand* being Sendable, and a Sendable
+      // operand can be Sendable for two very different reasons:
+      //
+      //   1. It is @unchecked Sendable (an unchecked promise that its contents
+      //      may freely cross isolation boundaries). A field projected out of
+      //      it genuinely is disconnected.
+      //
+      //   2. It is global-actor isolated (global-actor-isolated value types are
+      //      implicitly Sendable). A field projected out of it is NOT
+      //      disconnected -- it is isolated to that global actor.
+      //
+      // Skipping the base-isolation inheritance is correct for *both* cases,
+      // and in particular does not lose the global-actor isolation of case 2.
+      // The reason is that the base isolation we skip here is the isolation of
+      // the *access base* (e.g. the enclosing actor instance), not the
+      // isolation of the field itself. A global-actor-isolated field carries
+      // its own isolation via its declaration, which is re-derived
+      // independently by the SILIsolationInfo::get(value) fallback at the end
+      // of this function (it runs precisely because we left the isolation
+      // region info unset here). So a global-actor field ends up global-actor
+      // isolated, while an
+      // @unchecked Sendable field -- which has no declared isolation -- has
+      // get(value) return nothing and so correctly ends up disconnected.
+      bool projectedOutOfSendableAggregate = false;
+      if (auto *svi = dyn_cast<SingleValueInstruction>(value)) {
+        if (isa<StructElementAddrInst, TupleElementAddrInst,
+                UncheckedEnumDataAddrInstBase>(svi)) {
+          SILValue op = svi->getOperand(0);
+          if (SILIsolationInfo::isSendable(op) &&
+              SILIsolationInfo::isNonSendable(value))
+            projectedOutOfSendableAggregate = true;
+        }
+      }
+
+      if (!projectedOutOfSendableAggregate) {
+        if (auto isolation = SILIsolationInfo::get(storage.base)) {
+          iter.first->getSecond().setIsolationRegionInfo(isolation);
+        }
       }
     }
   }

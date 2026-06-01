@@ -2360,3 +2360,272 @@ bb3:
   %9999 = tuple ()
   return %9999 : $()
 }
+
+////////////////////////////////////////////////////////////////////////////
+// MARK: Non-Sendable projection out of a Sendable aggregate              //
+//                                                                        //
+// SILIsolationInfo for a value projected out of an @unchecked Sendable   //
+// aggregate (at any depth) is disconnected/invalid, whereas a            //
+// non-Sendable field of a global-actor-isolated struct stays global-     //
+// actor-isolated. The deep cases additionally show that get() is         //
+// disconnected-by-default for plain projections (the actor field address //
+// is the only actor-isolated value), so region analysis -- not get() --  //
+// is what makes the actor's own nested storage actor-isolated.           //
+////////////////////////////////////////////////////////////////////////////
+
+struct SendableStructBox : @unchecked Sendable {
+  let ns: NonSendableKlass
+}
+enum SendableEnumBox : @unchecked Sendable {
+  case value(NonSendableKlass)
+}
+actor SendableBoxActor {
+  let sStructBox: SendableStructBox
+  let sEnumBox: SendableEnumBox
+}
+actor TailActor {}
+@MainActor class GAClass {}
+
+@MainActor struct GAStruct {
+  var ns: NonSendableKlass
+  var box: SendableStructBox
+}
+@MainActor struct GAGenericStruct<T> {
+  var field: T
+  var ns: NonSendableKlass
+  var box: SendableStructBox
+}
+@MainActor enum GAEnum {
+  case box(SendableStructBox)
+}
+@MainActor enum GAGenericEnum<T> {
+  case box(SendableStructBox)
+  case other(T)
+}
+
+// The actor's @unchecked Sendable field address is itself actor-isolated -- the
+// isolation that must NOT be propagated onto a value projected out of it.
+// CHECK-LABEL: begin running test 1 of 1 on iso_sendablebox_field_addr: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sStructBox
+// CHECK: Isolation: actor-isolated
+// CHECK: end running test 1 of 1 on iso_sendablebox_field_addr: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_sendablebox_field_addr : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sStructBox
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %1 : $*SendableStructBox
+  %r = tuple ()
+  return %r : $()
+}
+
+// Projecting the non-Sendable field out of the @unchecked Sendable struct:
+// disconnected.
+// CHECK-LABEL: begin running test 1 of 1 on iso_sendablebox_struct_element_addr: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on iso_sendablebox_struct_element_addr: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_sendablebox_struct_element_addr : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sStructBox
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// Projecting the @unchecked Sendable enum payload: invalid (no isolation).
+// CHECK-LABEL: begin running test 1 of 1 on iso_sendablebox_enum_data_addr: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = unchecked_take_enum_data_addr %1 : $*SendableEnumBox, #SendableEnumBox.value!enumelt
+// CHECK: Isolation: invalid
+// CHECK: end running test 1 of 1 on iso_sendablebox_enum_data_addr: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_sendablebox_enum_data_addr : $@convention(method) (@guaranteed SendableBoxActor) -> () {
+bb0(%0 : @guaranteed $SendableBoxActor):
+  %1 = ref_element_addr [immutable] %0 : $SendableBoxActor, #SendableBoxActor.sEnumBox
+  %2 = unchecked_take_enum_data_addr %1 : $*SendableEnumBox, #SendableEnumBox.value!enumelt
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// A directly-stored non-Sendable field of a @MainActor struct is
+// main-actor-isolated (isolation from its own declaration), concrete...
+// CHECK-LABEL: begin running test 1 of 1 on iso_globalactor_struct_direct_field: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = struct_element_addr %0 : $*GAStruct, #GAStruct.ns
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on iso_globalactor_struct_direct_field: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_globalactor_struct_direct_field : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $GAStruct
+  %1 = struct_element_addr %0 : $*GAStruct, #GAStruct.ns
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %1 : $*NonSendableKlass
+  dealloc_stack %0 : $*GAStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// ...and generic (address-only).
+// CHECK-LABEL: begin running test 1 of 1 on iso_globalactor_generic_struct_direct_field: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %1 : $*GAGenericStruct<T>, #GAGenericStruct.ns
+// CHECK: Isolation: main actor-isolated
+// CHECK: end running test 1 of 1 on iso_globalactor_generic_struct_direct_field: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_globalactor_generic_struct_direct_field : $@convention(thin) <T> (@in T) -> () {
+bb0(%arg : $*T):
+  %0 = alloc_stack $GAGenericStruct<T>
+  %1 = struct_element_addr %0 : $*GAGenericStruct<T>, #GAGenericStruct.ns
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %1 : $*NonSendableKlass
+  dealloc_stack %0 : $*GAGenericStruct<T>
+  destroy_addr %arg : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// But the property reached through an @unchecked Sendable field *nested inside*
+// a @MainActor struct is disconnected -- concrete...
+// CHECK-LABEL: begin running test 1 of 1 on iso_globalactor_struct_nested_box: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on iso_globalactor_struct_nested_box: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_globalactor_struct_nested_box : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $GAStruct
+  %1 = struct_element_addr %0 : $*GAStruct, #GAStruct.box
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  dealloc_stack %0 : $*GAStruct
+  %r = tuple ()
+  return %r : $()
+}
+
+// ...generic (address-only) struct...
+// CHECK-LABEL: begin running test 1 of 1 on iso_globalactor_generic_struct_nested_box: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %3 = struct_element_addr %2 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on iso_globalactor_generic_struct_nested_box: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_globalactor_generic_struct_nested_box : $@convention(thin) <T> (@in T) -> () {
+bb0(%arg : $*T):
+  %0 = alloc_stack $GAGenericStruct<T>
+  %1 = struct_element_addr %0 : $*GAGenericStruct<T>, #GAGenericStruct.box
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  dealloc_stack %0 : $*GAGenericStruct<T>
+  destroy_addr %arg : $*T
+  %r = tuple ()
+  return %r : $()
+}
+
+// ...generic (address-only) enum...
+// CHECK-LABEL: begin running test 1 of 1 on iso_globalactor_generic_enum_nested_box: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on iso_globalactor_generic_enum_nested_box: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_globalactor_generic_enum_nested_box : $@convention(thin) <T> (@in GAGenericEnum<T>) -> () {
+bb0(%0 : $*GAGenericEnum<T>):
+  %1 = unchecked_take_enum_data_addr %0 : $*GAGenericEnum<T>, #GAGenericEnum.box!enumelt
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  destroy_addr %1 : $*SendableStructBox
+  %r = tuple ()
+  return %r : $()
+}
+
+// ...and reached via ref_tail_addr off a global-actor class's own self.
+// CHECK-LABEL: begin running test 1 of 1 on iso_globalactor_class_tail_self_box: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on iso_globalactor_class_tail_self_box: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_globalactor_class_tail_self_box : $@convention(method) (@guaranteed GAClass) -> () {
+bb0(%0 : @guaranteed $GAClass):
+  %1 = ref_tail_addr [immutable] %0 : $GAClass, $SendableStructBox
+  %2 = struct_element_addr %1 : $*SendableStructBox, #SendableStructBox.ns
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %2 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: SILIsolationInfo::get at every level of a deep projection chain.
+//
+// get() assigns actor isolation only to the actor-field address itself; every
+// value projected out of it is disconnected by default -- including the
+// @unchecked Sendable boundary and everything below it, AND (see plain case)
+// the actor's own deeply-nested non-Sendable storage. This is why region
+// analysis cannot rely on get(value) alone: it roots values at their access
+// base and only stops inheriting that base's isolation at a Sendable boundary.
+//===----------------------------------------------------------------------===//
+
+struct Inner2 { let ns: NonSendableKlass }
+struct Inner { let inner2: Inner2 }
+struct DeepBox : @unchecked Sendable { let inner: Inner }
+struct PInner2 { let ns: NonSendableKlass }
+struct PInner { let inner2: PInner2 }
+struct POuter { let inner: PInner }
+
+actor DeepActor {
+  let deep: DeepBox
+  let plain: POuter
+}
+
+// a.deep.inner.inner2.ns : field address is actor-isolated; every projection
+// out of the @unchecked Sendable DeepBox is disconnected, at every depth.
+// CHECK-LABEL: begin running test 1 of 4 on iso_deep_levels: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %1 = ref_element_addr [immutable] %0 : $DeepActor, #DeepActor.deep
+// CHECK: Isolation: actor-isolated
+// CHECK: end running test 1 of 4 on iso_deep_levels: sil_isolation_info_inference with: @trace[0]
+// CHECK-LABEL: begin running test 2 of 4 on iso_deep_levels: sil_isolation_info_inference with: @trace[1]
+// CHECK: Input Value:   %2 = struct_element_addr %1 : $*DeepBox, #DeepBox.inner
+// CHECK: Isolation: disconnected
+// CHECK: end running test 2 of 4 on iso_deep_levels: sil_isolation_info_inference with: @trace[1]
+// CHECK-LABEL: begin running test 3 of 4 on iso_deep_levels: sil_isolation_info_inference with: @trace[2]
+// CHECK: Input Value:   %3 = struct_element_addr %2 : $*Inner, #Inner.inner2
+// CHECK: Isolation: disconnected
+// CHECK: end running test 3 of 4 on iso_deep_levels: sil_isolation_info_inference with: @trace[2]
+// CHECK-LABEL: begin running test 4 of 4 on iso_deep_levels: sil_isolation_info_inference with: @trace[3]
+// CHECK: Input Value:   %4 = struct_element_addr %3 : $*Inner2, #Inner2.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 4 of 4 on iso_deep_levels: sil_isolation_info_inference with: @trace[3]
+sil [ossa] @iso_deep_levels : $@convention(method) (@guaranteed DeepActor) -> () {
+bb0(%0 : @guaranteed $DeepActor):
+  %1 = ref_element_addr [immutable] %0 : $DeepActor, #DeepActor.deep
+  %2 = struct_element_addr %1 : $*DeepBox, #DeepBox.inner
+  %3 = struct_element_addr %2 : $*Inner, #Inner.inner2
+  %4 = struct_element_addr %3 : $*Inner2, #Inner2.ns
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %1 : $*DeepBox
+  specify_test "sil_isolation_info_inference @trace[1]"
+  debug_value [trace] %2 : $*Inner
+  specify_test "sil_isolation_info_inference @trace[2]"
+  debug_value [trace] %3 : $*Inner2
+  specify_test "sil_isolation_info_inference @trace[3]"
+  debug_value [trace] %4 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
+
+// a.plain.inner.inner2.ns : with NO @unchecked Sendable boundary, get() STILL
+// returns disconnected for the leaf -- demonstrating that get(value) is too
+// eager and is not the source of truth for region isolation (region analysis
+// roots this at the actor field and reports actor-isolated; see the companion
+// case in regionanalysis_trackable_value.sil).
+// CHECK-LABEL: begin running test 1 of 1 on iso_plain_deep_leaf: sil_isolation_info_inference with: @trace[0]
+// CHECK: Input Value:   %4 = struct_element_addr %3 : $*PInner2, #PInner2.ns
+// CHECK: Isolation: disconnected
+// CHECK: end running test 1 of 1 on iso_plain_deep_leaf: sil_isolation_info_inference with: @trace[0]
+sil [ossa] @iso_plain_deep_leaf : $@convention(method) (@guaranteed DeepActor) -> () {
+bb0(%0 : @guaranteed $DeepActor):
+  %1 = ref_element_addr [immutable] %0 : $DeepActor, #DeepActor.plain
+  %2 = struct_element_addr %1 : $*POuter, #POuter.inner
+  %3 = struct_element_addr %2 : $*PInner, #PInner.inner2
+  %4 = struct_element_addr %3 : $*PInner2, #PInner2.ns
+  specify_test "sil_isolation_info_inference @trace[0]"
+  debug_value [trace] %4 : $*NonSendableKlass
+  %r = tuple ()
+  return %r : $()
+}
