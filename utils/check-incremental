@@ -37,7 +37,7 @@ def compile_and_stat(compile_args, output_file):
 
     logFile = open(output_file + ".log", "w")
 
-    subprocess.check_call(compile_args, stderr=logFile)
+    subprocess.check_call(compile_args, stdout=logFile)
 
     logFile.close()
 
