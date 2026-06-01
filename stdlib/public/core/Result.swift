@@ -138,7 +138,7 @@ extension Result where Success: ~Copyable & ~Escapable {
   /// - Returns: A `Result` instance with the result of evaluating `transform`
   ///   as the new failure value if this instance represents a failure.
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public consuming func mapError<NewFailure>(
     _ transform: (Failure) -> NewFailure
   ) -> Result<Success, NewFailure> {
@@ -311,7 +311,7 @@ extension Result where Success: ~Copyable & ~Escapable {
   /// - Returns: The success value, if the instance represents a success.
   /// - Throws: The failure value, if the instance represents a failure.
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public consuming func get() throws(Failure) -> Success {
     switch consume self {
     case let .success(success):

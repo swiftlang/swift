@@ -1478,6 +1478,7 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMakeBorrow(BridgedValue referent) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createMakeAddrBorrow(BridgedValue referent) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createFixLifetime(BridgedValue operand) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDropDeinit(BridgedValue operand) const;
 
   SWIFT_IMPORT_UNSAFE void destroyCapturedArgs(BridgedInstruction partialApply) const;
 };

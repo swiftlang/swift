@@ -2745,9 +2745,18 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
 
   case DeclAttrKind::PreInverseGenerics: {
     TypeRepr *exceptType = nullptr;
+    Type resolvedExceptType;
     SourceLoc rParenLoc = Loc;
 
-    if (consumeIfAttributeLParen()) {
+    // The @_preInverseGenericsExceptCopyable spelling is a shorthand for
+    // @_preInverseGenerics(except: ~Copyable) to avoid condfails during the
+    // Span<~E> adoption.
+    //
+    // We inject the resolved 'except:' type directly into the attribute.
+    if (AttrName == "_preInverseGenericsExceptCopyable") {
+      resolvedExceptType = ProtocolCompositionType::getInverseOf(
+          Context, InvertibleProtocolKind::Copyable);
+    } else if (consumeIfAttributeLParen()) {
       if (Tok.getText() != "except" || peekToken().isNot(tok::colon)) {
         diagnose(Tok, diag::attr_pre_inverse_generics_expected_except);
         skipUntil(tok::r_paren);
@@ -2772,7 +2781,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (!DiscardAttribute)
       Attributes.add(new (Context) PreInverseGenericsAttr(
           AtLoc, SourceRange(AtLoc.isValid() ? AtLoc : Loc, rParenLoc),
-          exceptType));
+          exceptType, resolvedExceptType));
     break;
   }
 

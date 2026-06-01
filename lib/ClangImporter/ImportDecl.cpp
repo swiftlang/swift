@@ -482,6 +482,7 @@ void ClangImporter::Implementation::addSynthesizedTypealias(
   typealias->setUnderlyingType(underlyingType);
   typealias->setAccess(nominal->getFormalAccess());
   typealias->setImplicit();
+  typealias->setSynthesized();
 
   nominal->addMember(typealias);
 }
@@ -1607,6 +1608,14 @@ namespace {
       if (!SwiftType)
         return nullptr;
 
+      // While importing the underlying type, we may encounter this typedef
+      // again and thus may already have imported this typedef by this point.
+      // If so, reuse the cached result rather than creating a duplicate.
+      auto alreadyImported = Impl.ImportedDecls.find(
+          {Decl->getCanonicalDecl(), getVersion()});
+      if (alreadyImported != Impl.ImportedDecls.end())
+        return alreadyImported->second;
+
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
       auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
           Decl, importer::convertClangAccess(Decl->getAccess()),
@@ -1894,6 +1903,7 @@ namespace {
                                         SourceLoc(), varName,
                                         enumDecl);
         rawValue->setImplicit();
+        rawValue->setSynthesized();
         rawValue->copyFormalAccessFrom(enumDecl);
         rawValue->setSetterAccess(AccessLevel::Private);
         rawValue->setInterfaceType(underlyingType);
@@ -2474,6 +2484,14 @@ namespace {
 
       Impl.validateSwiftAttributes(decl);
       auto loc = Impl.importSourceLoc(decl->getLocation());
+
+      // Do not import std::promise.
+      if (decl->isInStdNamespace() && decl->getName() == "promise" &&
+          getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
+              CxxValueSemanticsKind::Copyable) {
+        return nullptr;
+      }
+
       if (recordHasReferenceSemantics(decl))
         result = Impl.createDeclWithClangNode<ClassDecl>(
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
@@ -2483,13 +2501,17 @@ namespace {
             decl, importer::convertClangAccess(decl->getAccess()), loc, name,
             loc, ArrayRef<InheritedEntry>(), nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
+      // We've written a partial entry into ImportedDecls so that nested
+      // member imports (especially those that recurse into us via
+      // VisitRecordDecl) can find this StructDecl/ClassDecl instead of
+      // looping. If we later decide to bail out and return nullptr, we need to
+      // erase the partial entry.
+      auto eraseCacheOnBailOut = [&] {
+        Impl.ImportedDecls.erase({decl->getCanonicalDecl(), getVersion()});
+      };
 
       if (getCxxValueSemanticsKind(decl->getTypeForDecl(), Impl) !=
           CxxValueSemanticsKind::Copyable) {
-        if (decl->isInStdNamespace() && decl->getName() == "promise") {
-          // Do not import std::promise.
-          return nullptr;
-        }
         result->addAttribute(new (Impl.SwiftContext)
                                  MoveOnlyAttr(/*Implicit=*/true));
         addSuppressedProtocol(result, KnownProtocolKind::Copyable);
@@ -2529,8 +2551,26 @@ namespace {
                                Impl.SwiftContext.AllocateCopy(
                                    base.getType().getAsString())),
                     base.getBeginLoc());
+                eraseCacheOnBailOut();
                 return nullptr;
               }
+            }
+          }
+
+          // If this is an inherited foreign reference type, check if it has a
+          // suitable superclass.
+          auto frtInfo = evaluateOrDefault(
+              Impl.SwiftContext.evaluator,
+              ForeignReferenceTypeInfoRequest({cxxRecordDecl}), {});
+          if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
+            if (auto baseDecl = cast_or_null<ClassDecl>(
+                    Impl.importDecl(primaryBase, getVersion()))) {
+              auto classResult = cast<ClassDecl>(result);
+              Type superclassType = baseDecl->getDeclaredInterfaceType();
+              classResult->setSuperclass(superclassType);
+              classResult->setInherited(
+                  Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
+                      TypeLoc::withoutLoc(superclassType)}));
             }
           }
         }
@@ -2669,6 +2709,7 @@ namespace {
                   Diagnostic(diag::nonescapable_member_of_escapable, false,
                              decl, nd->getName()),
                   decl->getLocation());
+              eraseCacheOnBailOut();
               return nullptr;
             }
           }
@@ -2951,8 +2992,10 @@ namespace {
       // If we need it, add an explicit "deinit" to this type.
       synthesizer.addExplicitDeinitIfRequired(result, decl);
 
-      if (!injectBridgingConversionsForRefCountedSmartPtrs(result))
+      if (!injectBridgingConversionsForRefCountedSmartPtrs(result)) {
+        eraseCacheOnBailOut();
         return nullptr;
+      }
 
       result->setMemberLoader(&Impl, 0);
       return result;
@@ -4054,7 +4097,15 @@ namespace {
 
       // We may have already imported this function decl while importing its
       // decl context. Check decl cache to make sure we don't import twice.
-      auto known = Impl.ImportedDecls.find({decl, getVersion()});
+      const clang::Decl *cacheKey;
+      if (funcTemplate)
+        // Function templates are cached under the FunctionTemplateDecl
+        // so use funcTemplate as cache key if set.
+        cacheKey = funcTemplate->getCanonicalDecl();
+      else
+        // Otherwise use decl's canonical decl, matching importDeclAndCacheImpl
+        cacheKey = decl->getCanonicalDecl();
+      auto known = Impl.ImportedDecls.find({cacheKey, getVersion()});
       if (known != Impl.ImportedDecls.end()) {
         return known->second;
       }
@@ -4201,16 +4252,9 @@ namespace {
 
       // We may have already imported this function decl while importing its
       // type signature. Check decl cache to make sure we don't import twice.
-      auto known2 = Impl.ImportedDecls.find({decl, getVersion()});
+      auto known2 = Impl.ImportedDecls.find({cacheKey, getVersion()});
       if (known2 != Impl.ImportedDecls.end()) {
         return known2->second;
-      }
-
-      if (name && name.isSimpleName()) {
-        assert(importedName.hasCustomName() &&
-               "imported function with simple name?");
-        // Just fill in empty argument labels.
-        name = DeclName(Impl.SwiftContext, name.getBaseName(), bodyParams);
       }
 
       if (name && name.getArgumentNames().size() != bodyParams->size()) {
@@ -5616,8 +5660,10 @@ namespace {
       // Mark class methods as static.
       if (decl->isClassMethod() || forceClassMethod)
         result->setStatic();
-      if (forceClassMethod)
+      if (forceClassMethod) {
         result->setImplicit();
+        result->setSynthesized();
+      }
 
       ClangImporter::Implementation::recordImplicitUnwrapForDecl(result, isIUO);
 
@@ -5652,7 +5698,22 @@ namespace {
 
       // Check whether there's some special method to import.
       if (!forceClassMethod) {
-        if (dc == Impl.importDeclContextOf(decl, decl->getDeclContext()))
+        // Don't cache when the accessor we're producing will be attached
+        // to a synthesized property (importObjCMethodAsEffectfulProp).
+        // In that case the property VarDecl is the user-facing decl and
+        // **it** (and not this accessor) is what the outer
+        // importDeclAndCacheImpl will cache under {canonical, version}.
+        //
+        // We detect this case by checking whether the storage's clang
+        // decl is the same ObjCMethodDecl we're importing; that's only
+        // true for the synthesized-from-method effectful-prop case, not
+        // for ordinary @property accessors (whose storage is the
+        // ObjCPropertyDecl).
+        bool isEffectfulPropAccessor =
+            accessorInfo &&
+            accessorInfo->Storage->getClangDecl() == decl;
+        if (!isEffectfulPropAccessor &&
+            dc == Impl.importDeclContextOf(decl, decl->getDeclContext()))
           Impl.ImportedDecls.try_emplace(
               {decl->getCanonicalDecl(), getVersion()}, result);
 
@@ -6073,6 +6134,7 @@ namespace {
             addObjCAttribute(result,
                             Impl.importIdentifier(decl->getIdentifier()));
             result->setImplicit();
+            result->setSynthesized();
             auto attr = AvailableAttr::createUniversallyUnavailable(
                 Impl.SwiftContext,
                 "This Objective-C protocol has only been forward-declared; "
@@ -6228,6 +6290,7 @@ namespace {
             auto result = createFakeClass(name, /* cacheResult */ true,
                                               /* inheritFromNSObject */ true);
             result->setImplicit();
+            result->setSynthesized();
             auto attr = AvailableAttr::createUniversallyUnavailable(
                 Impl.SwiftContext,
                 "This Objective-C class has only been forward-declared; "
@@ -7526,7 +7589,7 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
     return nullptr;
 
   Impl.importAttributes(getter, swiftGetter);
-  Impl.ImportedDecls[{getter, getVersion()}] = swiftGetter;
+  Impl.ImportedDecls[{getter->getCanonicalDecl(), getVersion()}] = swiftGetter;
   if (swift3GetterName)
     markAsVariant(swiftGetter, *swift3GetterName);
 
@@ -7540,7 +7603,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
       return nullptr;
 
     Impl.importAttributes(setter, swiftSetter);
-    Impl.ImportedDecls[{setter, getVersion()}] = swiftSetter;
+    Impl.ImportedDecls[{setter->getCanonicalDecl(), getVersion()}] =
+        swiftSetter;
     if (swift3SetterName)
       markAsVariant(swiftSetter, *swift3SetterName);
   }
@@ -7840,8 +7904,10 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
   ClangImporter::Implementation::recordImplicitUnwrapForDecl(
       result, importedType.isImplicitlyUnwrapped());
 
-  if (implicit)
+  if (implicit) {
     result->setImplicit();
+    result->setSynthesized();
+  }
 
   // Set the kind of initializer.
   result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},
@@ -8506,6 +8572,44 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       if (classImplementsProtocol(superInterface, clangProto, true))
         continue;
 
+    auto hasExistingMethodWithSelector =
+        [&](clang::Selector sel, bool isInstance,
+            bool acceptPropertyAccessor) -> bool {
+      auto matches = [&](const clang::ObjCContainerDecl *container) -> bool {
+        auto *existing = isInstance ? container->getInstanceMethod(sel)
+                                    : container->getClassMethod(sel);
+        return existing &&
+               (acceptPropertyAccessor || !existing->isPropertyAccessor());
+      };
+
+      if (matches(interfaceDecl))
+        return true;
+
+      for (auto *category : interfaceDecl->known_categories()) {
+        if (!Impl.getClangSema().isVisible(category))
+          continue;
+        if (category != decl) {
+          auto *categoryModule = Impl.getClangModuleForDecl(category);
+          if (categoryModule != declModule &&
+              categoryModule != interfaceModule) {
+            // Also accept a category in a Clang module that is imported by
+            // the module that declares the conformance, since the concrete
+            // method is reachable through that module's imports.
+            auto *clangCategoryMod =
+                categoryModule ? categoryModule->getClangModule() : nullptr;
+            auto *clangDeclMod =
+                declModule ? declModule->getClangModule() : nullptr;
+            if (!clangCategoryMod || !clangDeclMod ||
+                !clangDeclMod->isModuleVisible(clangCategoryMod))
+              continue;
+          }
+        }
+        if (matches(category))
+          return true;
+      }
+      return false;
+    };
+
     auto importProtocolRequirement = [&](Decl *member) {
       // Skip compatibility stubs; there's no reason to mirror them.
       if (member->isUnavailableInCurrentSwiftVersion())
@@ -8521,28 +8625,9 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
         // name. (This also covers other properties with that same name.)
         // FIXME: We should still mirror the setter as a method if it's
         // not already there.
-        clang::Selector sel = objcProp->getGetterName();
-        if (interfaceDecl->getInstanceMethod(sel))
-          return;
-
-        bool inNearbyCategory =
-            std::any_of(interfaceDecl->known_categories_begin(),
-                        interfaceDecl->known_categories_end(),
-                        [=](const clang::ObjCCategoryDecl *category) -> bool {
-                          if (!Impl.getClangSema().isVisible(category)) {
-                            return false;
-                          }
-                          if (category != decl) {
-                            auto *categoryModule =
-                                Impl.getClangModuleForDecl(category);
-                            if (categoryModule != declModule &&
-                                categoryModule != interfaceModule) {
-                              return false;
-                            }
-                          }
-                          return category->getInstanceMethod(sel);
-                        });
-        if (inNearbyCategory)
+        if (hasExistingMethodWithSelector(objcProp->getGetterName(),
+                                          /*isInstance=*/true,
+                                          /*acceptPropertyAccessor=*/true))
           return;
 
         if (auto imported =
@@ -8565,6 +8650,17 @@ void SwiftDeclConverter::importMirroredProtocolMembers(
       auto objcMethod =
           dyn_cast_or_null<clang::ObjCMethodDecl>(member->getClangDecl());
       if (!objcMethod)
+        return;
+
+      // Don't mirror a method if there's an existing method visible that would
+      // witness the requirement.
+      //
+      // A property accessor doesn't count as an existing method for this
+      // purpose: the property only exposes the member via property syntax, so
+      // we still need the mirror in order to make method-call syntax available.
+      if (hasExistingMethodWithSelector(objcMethod->getSelector(),
+                                        objcMethod->isInstanceMethod(),
+                                        /*acceptPropertyAccessor=*/false))
         return;
 
       // For now, just remember that we saw this method.
@@ -10211,19 +10307,41 @@ Decl *ClangImporter::Implementation::importDeclAndCacheImpl(
   startedImportingEntity();
   Decl *Result = importDeclImpl(ClangDecl, version, TypedefIsSuperfluous,
                                 HadForwardDeclaration);
-  if (!Result) {
-    ImportedDecls[{Canon, version}] = nullptr;
-    return nullptr;
-  }
 
-  if (TypedefIsSuperfluous) {
+  if (Result && TypedefIsSuperfluous) {
     SuperfluousTypedefs.insert(Canon);
     if (auto tagDecl = dyn_cast_or_null<clang::TagDecl>(Result->getClangDecl()))
       DeclsWithSuperfluousTypedefs.insert(tagDecl);
   }
 
-  if (!HadForwardDeclaration)
-    ImportedDecls[{Canon, version}] = Result;
+  if (!HadForwardDeclaration) {
+    auto it = ImportedDecls.try_emplace({Canon, version}, Result);
+    if (CONDITIONAL_ASSERT_enabled() && !it.second &&
+        Result != it.first->second) {
+      ABORT([&](auto &out) {
+        out << "Imported the same clang::Decl twice: '";
+        ClangDecl->getNameForDiagnostic(out, {{}}, true);
+        out << "' ";
+        ClangDecl->getSourceRange().print(out, Instance->getSourceManager());
+        if (ClangDecl != Canon) {
+          out << "\nCanonical clang::Decl: '";
+          Canon->getNameForDiagnostic(out, {{}}, true);
+          out << "' ";
+          Canon->getSourceRange().print(out, Instance->getSourceManager());
+        }
+        out << "\nImported as Swift Decl:\n";
+        if (Result)
+          Result->dump(out, 4);
+        else
+          out << "    (null)\n";
+        out << "\nPreviously imported as Swift Decl:\n";
+        if (it.first->second)
+          it.first->second->dump(out, 4);
+        else
+          out << "    (null)\n";
+      });
+    }
+  }
 
   if (!SuperfluousTypedefsAreTransparent && TypedefIsSuperfluous)
     return nullptr;
@@ -10768,6 +10886,11 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
   const clang::CXXRecordDecl *cxxRecord;
   if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) &&
       cxxRecord->isCompleteDefinition()) {
+    auto derivedInfo =
+        evaluateOrDefault(Impl.SwiftContext.evaluator,
+                          ForeignReferenceTypeInfoRequest({cxxRecord}), {});
+    auto superclassClangDecl = derivedInfo.getPrimarySuperclass();
+
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
         continue;
@@ -10782,6 +10905,13 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
         continue;
 
       auto *baseRecord = cast<clang::RecordType>(baseType)->getDecl();
+
+      // Skip cloning members from the base that is the Swift superclass;
+      // those members are reachable through the superclass chain.
+      if (superclassClangDecl && baseRecord->getCanonicalDecl() ==
+                                     superclassClangDecl->getCanonicalDecl())
+        continue;
+
       auto baseInheritance = ClangInheritanceInfo(inheritance, base);
       load(baseRecord, baseInheritance);
     }

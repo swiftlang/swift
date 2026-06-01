@@ -226,20 +226,48 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// in specific child tasks, the more specific (i.e. "deeper") binding is
   /// returned when the value is read.
   ///
+  /// The operation is guaranteed to execute in the calling context.
+  ///
   /// If the value is a reference type, it will be retained for the duration of
   /// the operation closure.
   ///
   /// If this method is called form a context where no current Swift concurrency task
   /// is available, a fallback thread-local is used to manage the task locals and
   /// all existing semantics of task-locals are upheld as-if a task was actually available.
+  @_alwaysEmitIntoClient
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  // ABI Note: @abi needed because the mangling otherwise conflicts with the
+  // legacy @_unsafeInheritExecutor declaration.
+  @abi(
+    nonisolated(nonsending) func withValueNonisolatedNonsending<R>(
+      _ valueDuringOperation: Value,
+      operation: nonisolated(nonsending) () async throws -> R,
+      file: String, line: UInt
+    ) async throws -> R
+  )
+  public nonisolated(nonsending) func withValue<R>(
+    _ valueDuringOperation: Value,
+    operation: nonisolated(nonsending) () async throws -> R,
+    file: String = #fileID, line: UInt = #line
+  ) async rethrows -> R {
+    return try await withValueImpl(
+      valueDuringOperation,
+      operation: operation,
+      file: file, line: line)
+  }
+
   @inlinable
   @discardableResult
   @available(SwiftStdlib 5.1, *)
   @backDeployed(before: SwiftStdlib 6.0)
-  public func withValue<R>(_ valueDuringOperation: Value,
-                           operation: () async throws -> R,
-                           isolation: isolated (any Actor)? = #isolation,
-                           file: String = #fileID, line: UInt = #line) async rethrows -> R {
+  @available(*, deprecated, message: "Prefer the 'nonisolated(nonsending)' overload with stricter execution on caller context semantics: withValue(_:operation:file:line:)")
+  public func withValue<R>( // for source compatibility
+    _ valueDuringOperation: Value,
+    operation: () async throws -> R,
+    isolation: isolated (any Actor)? = #isolation,
+    file: String = #fileID, line: UInt = #line
+  ) async rethrows -> R {
     return try await withValueImpl(
       valueDuringOperation,
       operation: operation,
@@ -283,6 +311,24 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
   /// calls to swift_task_de/alloc for the copy as follows:
   /// - withValue contains the compiler-emitted calls swift_task_de/alloc.
   /// - withValueImpl contains the calls to Builtin.{add,remove}TaskLocalValue
+  @_alwaysEmitIntoClient
+  @discardableResult
+  @available(SwiftStdlib 5.1, *)
+  internal nonisolated(nonsending) func withValueImpl<R>(
+    _ valueDuringOperation: __owned Value,
+    operation: nonisolated(nonsending) () async throws -> R,
+    file: String = #fileID, line: UInt = #line
+  ) async rethrows -> R {
+#if $BuiltinAddTaskLocalValue
+    let binding = Builtin.addTaskLocalValue(key, consume valueDuringOperation)
+    defer { Builtin.removeTaskLocalValue(binding) }
+#else
+    _taskLocalValuePush(key: key, value: consume valueDuringOperation)
+    defer { _taskLocalValuePop() }
+#endif
+    return try await operation()
+  }
+
   @inlinable
   @discardableResult
   @available(SwiftStdlib 5.1, *)
@@ -298,7 +344,6 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
     _taskLocalValuePush(key: key, value: consume valueDuringOperation)
     defer { _taskLocalValuePop() }
 #endif
-
     return try await operation()
   }
 

@@ -141,7 +141,9 @@ static bool isolatedConstructorRequiresFlowIsolation(ActorIsolation typeIso,
     llvm_unreachable("constructor cannot have erased isolation");
 
   case ActorIsolation::GlobalActor:
-    return ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    return ctor->getASTContext().LangOpts.hasFeature(
+               Feature::FlowIsolationGlobalActor) &&
+           ctor->getASTContext().LangOpts.StrictConcurrencyLevel >=
                StrictConcurrency::Complete &&
            !ctor->hasAsync();
   case ActorIsolation::ActorInstance:
@@ -5959,7 +5961,7 @@ static OverrideIsolationResult validOverrideIsolation(
   auto &ctx = declContext->getASTContext();
 
   // Normally we are checking if overriding declaration can be called by calling
-  // overriden declaration. But in case of destructors, overriden declaration is
+  // overridden declaration. But in case of destructors, overridden declaration is
   // always callable by definition and we are checking that subclass deinit can
   // call super deinit.
   bool isDtor = isa<DestructorDecl>(value);
@@ -8759,10 +8761,13 @@ ActorReferenceResult ActorReferenceResult::Builder::build() {
   // type is Sendable. Note that if the init is a nonisolated actor init,
   // Sendable checking is already performed on arguments at the call-site.
   if (auto *init = dyn_cast<ConstructorDecl>(fromDC)) {
-    // If strict concurrency is complete, we allow for users to initialize
-    // global actor non-Sendable types in initializers more aggressively through
-    // the usage of flow isolation.
-    if (fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
+    // When the FlowIsolationGlobalActor feature is enabled under complete
+    // strict concurrency, we allow users to initialize global actor
+    // non-Sendable types in initializers more aggressively by deferring the
+    // check to the SIL-level flow-isolation pass.
+    if (fromDC->getASTContext().LangOpts.hasFeature(
+            Feature::FlowIsolationGlobalActor) &&
+        fromDC->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete &&
         referencedActor && referencedActor->isSelf() &&
         checkedByFlowIsolation(fromDC, *referencedActor, decl, declRefLoc,

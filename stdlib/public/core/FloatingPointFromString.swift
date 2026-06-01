@@ -1,4 +1,3 @@
-
 //===--- FloatingPointFromString.swift -----------------------*- Swift -*-===//
 //
 // This source file is part of the Swift.org open source project
@@ -420,10 +419,16 @@ fileprivate enum ParseResult {
                firstUnparsedDigitOffset: UInt16,
                leadingDigitCount: UInt8,
                sign: FloatingPointSign)
-  case binary(significand: UInt64, exponent: Int16, sign: FloatingPointSign)
+  case binary(significand: UInt64,
+              significandHigh: UInt64,
+              exponent: Int16,
+              sign: FloatingPointSign)
   case zero(sign: FloatingPointSign)
   case infinity(sign: FloatingPointSign)
-  case nan(payload: UInt64, signaling: Bool, sign: FloatingPointSign)
+  case nan(payload: UInt64,
+           payloadHigh: UInt64,
+           signaling: Bool,
+           sign: FloatingPointSign)
   case failure
 }
 
@@ -450,35 +455,35 @@ fileprivate func hexFloat(
 ) -> ParseResult {
   var i = start + 2 // Skip leading '0x'
   let firstDigitOffset = i
-  let limit = UInt64(1) << 60
-  var significand: UInt64 = 0
+  var significand: _UInt128 = 0
 
   //
   // Digits before the binary point
   //
 
-  // Accumulate the most significant 64 bits...
-  while i < input.count && hexdigit(input[i]) < 16 && significand < limit {
+  // Accumulate the most significant 128 bits...
+  let limit = UInt64(1) << 60
+  while i < input.count && hexdigit(input[i]) < 16 && significand._high < limit {
     significand &<<= 4
-    significand += UInt64(hexdigit(input[i]))
+    significand |= _UInt128(hexdigit(input[i]))
     i += 1
   }
 
   // Initialize binary exponent to the number of bits we collected above
   // minus 1 (to match the IEEE 754 convention that keeps exactly one
   // bit to the immediate left of the binary point).
-  var binaryExponent = 64 - 1 - significand.leadingZeroBitCount
+  var binaryExponent = 128 - 1 - significand.leadingZeroBitCount
   var remainderNonZero = false
 
   // Including <4 bits from the next digit
-  if i < input.count && hexdigit(input[i]) < 16 && significand.leadingZeroBitCount > 0 {
+  if i < input.count && hexdigit(input[i]) < 16 && significand._high.leadingZeroBitCount > 0 {
     // Number of bits we can fill
-    let bits = significand.leadingZeroBitCount
+    let bits = significand._high.leadingZeroBitCount
     significand &<<= bits
     // Fill that many bits from the next digit
     let digit = hexdigit(input[i])
     let upperPartialDigit = digit >> (4 - bits)
-    significand += UInt64(upperPartialDigit)
+    significand |= _UInt128(upperPartialDigit)
     // Did we drop any non-zero bits?
     remainderNonZero = remainderNonZero || ((digit - (upperPartialDigit << (4 - bits))) != 0)
 
@@ -516,24 +521,24 @@ fileprivate func hexFloat(
         let digit = hexdigit(input[i])
         let upperZeros = digit.leadingZeroBitCount - 4
         binaryExponent -= upperZeros
-        significand = UInt64(digit)
+        significand = _UInt128(digit)
         i += 1
       }
     }
-    // Pack more bits into the accumulator (up to 60)
-    while i < input.count && hexdigit(input[i]) < 16 && significand < limit {
+    // Pack more bits into the accumulator (up to 124)
+    while i < input.count && hexdigit(input[i]) < 16 && significand._high < limit {
       significand &<<= 4
-      significand += UInt64(hexdigit(input[i]))
+      significand |= _UInt128(hexdigit(input[i]))
       i += 1
     }
-    // Part of the digit that would overflow our 64-bit accumulator
-    if i < input.count && hexdigit(input[i]) < 16 && significand.leadingZeroBitCount > 0 {
-      let bits = significand.leadingZeroBitCount
+    // Part of the digit that would overflow our 128-bit accumulator
+    if i < input.count && hexdigit(input[i]) < 16 && significand._high.leadingZeroBitCount > 0 {
+      let bits = significand._high.leadingZeroBitCount
       significand &<<= bits
       // Fill that many bits from the next digit
       let digit = hexdigit(input[i])
       let upperPartialDigit = digit >> (4 - bits)
-      significand += UInt64(upperPartialDigit)
+      significand |= _UInt128(upperPartialDigit)
       // Did we drop any non-zero bits?
       remainderNonZero = remainderNonZero || ((digit - (upperPartialDigit << (4 - bits))) != 0)
       i += 1
@@ -611,11 +616,9 @@ fileprivate func hexFloat(
   // Align the significand so the most-significant bit
   // is the MSbit of the accumulator.
   significand <<= significand.leadingZeroBitCount
-
-  // Narrow to the target format and compute a 0.64 fraction
+  // Narrow to the target format and compute a 0.128 fraction
   // for the rest
-  var targetSignificand = significand >> (64 - significantBits)
-
+  var targetSignificand = significand >> (128 - significantBits)
   // Folding in `remainderNonZero` here helps us distinguish
   // "1.00000000000000000000000000000000000000" (== 1.0) from
   // "1.00000000000000000000000000000000000001" (> 1.0)
@@ -623,25 +626,30 @@ fileprivate func hexFloat(
   // It is `true` if any bits that were too insignificant to store
   // were actually non-zero and might therefore cause the result to
   // be rounded up.
-  let significandFraction = (significand << significantBits) + (remainderNonZero ? 1 : 0)
+  var significandFraction = (significand << significantBits) + (remainderNonZero ? 1 : 0)
 
   // Round up if fraction is > 1/2 or == 1/2 with odd significand
-  if (significandFraction > 0x8000000000000000
-      || (significandFraction == 0x8000000000000000
-          && (targetSignificand & 1) == 1)) {
-    // Round up, test for overflow
-    targetSignificand += 1
-    if targetSignificand >= (UInt64(1) << targetFormat.significandBits) {
-      // Normal overflowed, need to renormalize
-      targetSignificand >>= 1
-      binaryExponent += 1
-    } else if (binaryExponent < targetFormat.minBinaryExponent
-               && targetSignificand >= (UInt64(1) << (targetFormat.significandBits - 1))) {
-      // Subnormal overflowed to normal
-      binaryExponent += 1
+  if significandFraction >> 127 == 1 { // >= 1/2
+    significandFraction <<= 1  // Clear sign to simplify following
+    if (significandFraction != 0 // > 1/2
+          || (significandFraction == 0 // == 1/2
+                && (targetSignificand & 1) == 1)) // odd significand
+    {
+      // Round up, test for overflow
+      targetSignificand += 1
+      if targetSignificand >= (_UInt128(1) << targetFormat.significandBits) {
+        // Normal overflowed, need to renormalize
+        targetSignificand >>= 1
+        binaryExponent += 1
+      } else if (binaryExponent < targetFormat.minBinaryExponent
+                   && targetSignificand >= (_UInt128(1) << (targetFormat.significandBits - 1))) {
+        // Subnormal overflowed to normal
+        binaryExponent += 1
+      }
     }
   }
-  return .binary(significand: targetSignificand,
+  return .binary(significand: targetSignificand._low,
+                 significandHigh: targetSignificand._high,
                  exponent: Int16(binaryExponent),
                  sign: sign)
 }
@@ -658,14 +666,14 @@ fileprivate func nan_payload(
   input: Span<UInt8>,
   start: Int,
   end: Int
-) -> UInt64? {
+) -> _UInt128? {
   if start == end {
     return 0
   }
   var p = start
 
   // Figure out what base we're using
-  var base: UInt64 = 10 // Decimal by default
+  var base: UInt = 10 // Decimal by default
   if p + 1 < end {
     if input[p] == 0x30 {
       if input[p + 1] == 0x78 { // '0x' => hex
@@ -679,14 +687,14 @@ fileprivate func nan_payload(
   }
   // Accumulate the payload, preserving only
   // the least-significant 64 bits.
-  var payload : UInt64 = 0
+  var payload : _UInt128 = 0
   for i in p..<end {
     let d = hexdigit(input[i])
     if d >= base {
       return nil
     }
-    payload &*= UInt64(base)
-    payload &+= UInt64(d)
+    payload &*= _UInt128(base)
+    payload &+= _UInt128(d)
   }
   return payload
 }
@@ -741,7 +749,11 @@ fileprivate func fastParse64(
   // Reject empty strings or grotesquely overlong ones
   // Among other concerns, we want to be sure that 32-bit and 16-bit
   // exponent calculations below don't overflow.
-  if input.count == 0 || input.count > 16384 {
+
+  // TODO: handle overlong input more carefully so we can
+  // use this to parse an FP number as a prefix of a much
+  // longer string
+  if input.count == 0 || input.count > 32000 {
     return .failure
   }
   // Is this positive or negative?
@@ -788,7 +800,9 @@ fileprivate func fastParse64(
   } else if first > 0x39 {
     // Starts with a non-digit (and non-'.')
     // Hexfloats, infinity, NaN are all at least 3 characters
-    if i &+ 3 > input.count { return .failure }
+    if i &+ 3 > input.count {
+      return .failure
+    }
     let second = input[i &+ 1]
     let third = input[i &+ 2]
     if (first | 0x20) == 0x69 { // 'i' or 'I'
@@ -813,11 +827,14 @@ fileprivate func fastParse64(
         // NaN
         if i &+ 3 == input.count {
           // Bare 'nan' with no payload
-          return .nan(payload: 0, signaling: false, sign: sign)
+          return .nan(payload: 0, payloadHigh: 0, signaling: false, sign: sign)
         } else if input[i &+ 3] == 0x28 && input[input.count &- 1] == 0x29 {
           // 'nan' with payload
           if let payload = nan_payload(input: input, start: i &+ 4, end: input.count &- 1) {
-            return .nan(payload: payload, signaling: false, sign: sign)
+            return .nan(payload: payload._low,
+                        payloadHigh: payload._high,
+                        signaling: false,
+                        sign: sign)
           }
         }
       }
@@ -828,11 +845,14 @@ fileprivate func fastParse64(
         // sNaN
         if i &+ 4 == input.count {
           // Bare 'snan' with no payload
-          return .nan(payload: 0, signaling: true, sign: sign)
+          return .nan(payload: 0, payloadHigh: 0, signaling: true, sign: sign)
         } else if input[i &+ 4] == 0x28 && input[input.count &- 1] == 0x29 {
           // 'snan' with payload
           if let payload = nan_payload(input: input, start: i &+ 5, end: input.count &- 1) {
-            return .nan(payload: payload, signaling: true, sign: sign)
+            return .nan(payload: payload._low,
+                        payloadHigh: payload._high,
+                        signaling: true,
+                        sign: sign)
           }
         }
       }
@@ -1290,8 +1310,8 @@ fileprivate func divideMPbyMP(
   numerator = unsafe Range(_uncheckedBounds: (lower: quotient_lsw, upper: quotient_msw))
 }
 
-// Multiply a multi-precision value by a UInt32
-fileprivate func multiplyMPByN(
+// Multiply a multi-precision value by a 32-bit value
+fileprivate func multiplyMPBy32(
   work: inout MutableSpan<MPWord>,
   range: inout Range<Int>,
   multiplier: UInt32
@@ -1313,12 +1333,14 @@ fileprivate func multiplyMPByN(
   range = range.lowerBound..<i
 }
 
-// Multiply a multi-precision value by a UInt128
-fileprivate func multiplyMPByN(
+// Multiply a multi-precision value by a value of at most 96 bits
+fileprivate func multiplyMPBy96(
   work: inout MutableSpan<MPWord>,
   range: inout Range<Int>,
   multiplier: _UInt128
 ) {
+  // Multiplier must be <= 96 bits so the efficient multiply loop works.
+  _internalInvariant(multiplier._high.leadingZeroBitCount >= 32)
   let bitsPerMPWord = MPWord.bitWidth
   var i = range.lowerBound
   var t = _UInt128(0)
@@ -1331,6 +1353,40 @@ fileprivate func multiplyMPByN(
   while t > 0 {
     unsafe work[unchecked: i] = MPWord(truncatingIfNeeded: t)
     t >>= bitsPerMPWord
+    i &+= 1
+  }
+  range = range.lowerBound..<i
+}
+
+// Multiply a multi-precision value by a 128-bit value
+fileprivate func multiplyMPBy128(
+  work: inout MutableSpan<MPWord>,
+  range: inout Range<Int>,
+  multiplier: _UInt128
+) {
+  let bitsPerMPWord = MPWord.bitWidth
+  var i = range.lowerBound
+  let a = _UInt128(multiplier._high)
+  let b = _UInt128(multiplier._low)
+  var u = _UInt128(0)
+  var l = _UInt128(0)
+  while i < range.upperBound {
+    let word = _UInt128(unsafe work[unchecked: i])
+    l &+= b &* word
+    u &+= a &* word
+    unsafe work[unchecked: i] = MPWord(truncatingIfNeeded: l)
+    l >>= bitsPerMPWord
+    let t = MPWord(truncatingIfNeeded: u)
+    u >>= bitsPerMPWord
+    l += _UInt128(t) << bitsPerMPWord
+    i &+= 1
+  }
+  while u != 0 || l != 0 {
+    unsafe work[unchecked: i] = MPWord(truncatingIfNeeded: l)
+    l >>= bitsPerMPWord
+    let t = MPWord(truncatingIfNeeded: u)
+    u >>= bitsPerMPWord
+    l += _UInt128(t) << bitsPerMPWord
     i &+= 1
   }
   range = range.lowerBound..<i
@@ -1434,7 +1490,7 @@ fileprivate func initMPFromDigits(
       batch = batch &* 10 &+ UInt32(digitChar &- 0x30)
       digitPos &+= 1
     }
-    multiplyMPByN(work: &work, range: &range, multiplier: unsafe powersOfTen[unchecked: batchSize])
+    multiplyMPBy32(work: &work, range: &range, multiplier: unsafe powersOfTen[unchecked: batchSize])
     addToMP(work: &work, range: &range, addend: batch)
     remainingDigitCount &-= batchSize
   }
@@ -1443,7 +1499,7 @@ fileprivate func initMPFromDigits(
   // summarize the digits beyond that with a single digit: zero if
   // all the extra digits are zero, else one.
   if summarizeDigitCount > 0 {
-    multiplyMPByN(work: &work, range: &range, multiplier: UInt32(10))
+    multiplyMPBy32(work: &work, range: &range, multiplier: UInt32(10))
     while summarizeDigitCount > 0 {
       let digit = unsafe input[unchecked: digitPos]
       if digit >= 0x30 { // Excludes '.' (0x2e)
@@ -1500,7 +1556,7 @@ fileprivate func multiplyByFiveToTheN(
   // gives a < 128-bit result
   while remainingPower >= 40 {
     let fiveToThe40 = _UInt128(high: 493038065, low: 14077307678380127585)
-    multiplyMPByN(work: &work, range: &range, multiplier: fiveToThe40)
+    multiplyMPBy96(work: &work, range: &range, multiplier: fiveToThe40)
     remainingPower &-= 40
   }
 
@@ -1508,50 +1564,120 @@ fileprivate func multiplyByFiveToTheN(
   // 5 ** 27 is the largest power of 5 that fits in 64 bits
   if remainingPower >= 27 {
     let fiveToThe27 = _UInt128(7450580596923828125)
-    multiplyMPByN(work: &work, range: &range, multiplier: fiveToThe27)
+    multiplyMPBy96(work: &work, range: &range, multiplier: fiveToThe27)
     remainingPower &-= 27
   }
 
   if remainingPower >= 14 {
     // We know 14 <= remainingPower < 27
     let next = unsafe powersOfFive_64[unchecked: remainingPower &- 14]
-    multiplyMPByN(work: &work, range: &range, multiplier: _UInt128(next))
+    multiplyMPBy96(work: &work, range: &range, multiplier: _UInt128(next))
   } else if remainingPower > 0 {
     // We know remainingPower < 14
     let next = unsafe powersOfFive_32[unchecked: remainingPower]
-    multiplyMPByN(work: &work, range: &range, multiplier: next)
+    multiplyMPBy32(work: &work, range: &range, multiplier: next)
   }
 }
 
-// Table of pre-computed multi-word powers of 5.  These are the
-// largest powers of 5 that it into successive numbers of 32-bit
-// words.  (For example, 5 ** 13 is the largest power that fits in 1
-// word, 5 ** 82 is the largest that fits in six words).  Each
-// constant is broken down into 32-bit components stored from LSW to
-// MSW, assuming that MPWord == UInt32.
+// Table of pre-computed multi-word powers of 5.  These are the largest powers
+// of 5 that it into the appropriate number of 32-bit words.  (For example, 5 **
+// 82 is the largest power that fits in six words, 5 ** 358 is the largest that
+// fits in 26 words).  Each constant is broken down into 32-bit components
+// stored from LSW to MSW, assuming that MPWord == UInt32.
 fileprivate let powersOfFive : _InlineArray<_, UInt32> = [
-  1220703125, // 5 ** 13
-  4195354525, 1734723475, // 5 ** 27
-  1520552677, 3503241150, 2465190328, // 5 ** 41
-  4148285293, 4294227171, 3487696741, 3503246160, // 5 ** 55
-  1377153393, 419140343, 3542739626, 1966161609, 995682444, // 5 ** 68
-  3638046937, 1807989461, 112486150, 1644435829, 286361822, 1414949856, // 5 ** 82
-  3776417409, 3833115195, 474402842, 2046101519, 1659368615, 1657637457, 2010764683, // 5 ** 96
-  1399551081, 2264871549, 2930733413, 271785330, 1503646741, 3175827184, 883420894, 2857468478, // 5 ** 110
-  3691486353, 2604572144, 3704384674, 3457541460, 101893061, 3173229722, 3228011613, 3028118404, 4060706939, // 5 ** 124
-  // In theory, this table could be extended with the following powers:
-  // 137, 151, 165, 179, 192, 206, 220, 234, 248, 261, 275,
-  // 289, 303, 316, 330, 344, 358, 372, 385, 399
-  // That would let us compute a power of 5 for any Double with
-  // one constant lookup from this table and one multi-precision multiplication.
-  // With a little fussing in the calculation below, we could economize by only
-  // storing every second entry in the above list; that would give us any
-  // Double with one constant lookup and two multiplications.
+  // 5 ** 27    8 bytes
+  0xfa10079d, 0x6765c793,
+
+  // 5 ** 82    24 bytes
+  0xd8d830d9, 0x6bc3bad5, 0x6b46706, 0x62041975, 0x111188de, 0x54566be0,
+
+  // 5 ** 137    40 bytes
+  0xe9a54365, 0xeace01d4, 0x66ab8840, 0x712c6b0c, 0xf4ba22cc, 0x271ddfa7,
+  0x3c8e29d4, 0x350324a5, 0x3924bf5d, 0x44ca8257,
+
+  // 5 ** 192    56 bytes
+  0xac815d01, 0xa9e17e1f, 0x6412e125, 0x769dbb7e, 0xf1b8a046, 0xfea73c80,
+  0xe6a2cf4c, 0x73add001, 0xd6388cec, 0xc3c46289, 0xfd1ec505, 0xa16ef894,
+  0x4e49d55a, 0x381c3de3,
+
+  // 5 ** 248    72 bytes
+  0x27af0a21, 0xda87f33, 0x31619b4a, 0x6f97eb72, 0x4bfd6ba0, 0x1a0be7a1,
+  0xaae036d0, 0x848566cf, 0xd92da06d, 0x2c115ac9, 0x9dd02b0, 0xde27f9c4,
+  0x368498b9, 0x611fe6a4, 0xeaa5334a, 0xfabaf3f, 0x92a40515, 0xe4d5e823,
+
+  // 5 ** 303    88 bytes
+  0xd818ff0d, 0x80a8ab58, 0xacb4e04a, 0xd82ee807, 0x7d52768c, 0x3f2f7c3c,
+  0xdb4fd779, 0x592b1ec0, 0x1a048818, 0x5bbdb420, 0xe941dd25, 0xd490df5a,
+  0xff592863, 0x5487f097, 0xdc1740fd, 0xd6898606, 0x1dea2bc7, 0xbe643f00,
+  0x8f54e6ba, 0xd3056025, 0x8396cffd, 0xbaa718e6,
+
+  // 5 ** 358    104 bytes
+  0x862d1b89, 0xa1501485, 0xbab666a2, 0xbadfcd89, 0x32068b7c, 0x134b9681,
+  0x1c01b213, 0xe780ce52, 0xd2d0b297, 0x824f79b9, 0x71f68fd1, 0xdae28649,
+  0x6ce8a49d, 0x93fb45d9, 0x984b8ec7, 0xbfdb631, 0x7d14bc8e, 0x6fe2bfb3,
+  0xa3041a5c, 0xdb7be437, 0x192edcb6, 0xba7ea880, 0xba4f93c8, 0x7e3766d,
+  0x4d642a92, 0x983ee842,
+
+  // The values below are only needed by Float80/Float128 and have been
+  // commented out to save 760 bytes.  Float80 still works correctly
+  // without them — `multiplyByFiveToTheN` just has more work to do for
+  // very large exponents.  If Float128 is ever supported and its
+  // performance becomes important, restore these (and bump
+  // `powersOfFive_maxPower` below from 358 to 633).
+  //
+  // Alternatively, we could speed things up by breaking here and having a
+  // second triangular table starting with 5^413 (30 words) and increasing by 30
+  // words for each successive value.  That would cost 6600 bytes and limit
+  // calls to multiplyByFiveToTheN to at most 5^412.
+
+  // 5 ** 413    120 bytes
+  // 0xc7418055, 0xe0fd09d8, 0x1f6fef06, 0xe0aa919a, 0x3a932696, 0xeefa64b7,
+  // 0x4ad4b5c1, 0xc7b36de4, 0x46739345, 0x4842174f, 0x18b983bc, 0xa98ab9ff,
+  // 0x97d0164c, 0xd7c61ef2, 0x1e75294b, 0xb45d0246, 0x9ad20a7d, 0x7d2b6dfa,
+  // 0xadf139f0, 0xa50a7cc6, 0x6f8b9285, 0xff5ca1c0, 0xab0bcbe, 0x32501df6,
+  // 0xed5227ea, 0x74628fef, 0x2c471432, 0xa2c33b1b, 0x29d341b6, 0x7c2e645e,
+
+  // 5 ** 468    136 bytes
+  // 0x663d5f31, 0xc852d43d, 0x628adfb8, 0x7532907f, 0x519a9fcf, 0xff6d61c3,
+  // 0xee47a4fb, 0x5364a40, 0x8307a5e7, 0xc51a19b6, 0x152115bd, 0xd64160ca,
+  // 0x5a7fc303, 0x4420c114, 0xb0472914, 0x4701c038, 0xa75d51fb, 0x9329af1e,
+  // 0xfd726810, 0x95a1fec8, 0x433b921e, 0xac637005, 0x4b769501, 0x97b6965a,
+  // 0x5c15ca6c, 0x2e3a3781, 0xa1c3722f, 0x9cee9acc, 0x243794ea, 0x98d384d2,
+  // 0x8f51a4f3, 0xfb591b83, 0x74dd9297, 0x654a3f98,
+
+  // 5 ** 523    152 bytes
+  // 0x9a8b26dd, 0xbf2c0cb0, 0x55574b71, 0xbaf1ae94, 0x909d4708, 0x3a0e3864,
+  // 0x96024957, 0x220c2ed9, 0x3c846d96, 0xa8f2eb24, 0x4c42f275, 0x2fbb514b,
+  // 0xc2c02b99, 0x2943f65a, 0x59784a24, 0x966b340, 0x8aa1aecc, 0x12c6b3ee,
+  // 0x694ef465, 0xde3eaa92, 0x232dffbe, 0xce590fe4, 0xacdaed02, 0xdb515c72,
+  // 0xed4346e1, 0x80a57e71, 0x62e788b1, 0xafbcf17e, 0x71c9d096, 0x71bf4008,
+  // 0x77961314, 0x3cc04087, 0xd031224e, 0x37315310, 0x24aba8bc, 0x42b158b6,
+  // 0x550880c, 0x529e5882,
+
+  // 5 ** 578    168 bytes
+  // 0x6ac93f19, 0xb0528df3, 0x1bd0d93b, 0x6887cf42, 0x16c95762, 0xe06cf811,
+  // 0xef6a19f0, 0xc9642ada, 0xd0281f3b, 0x95048fea, 0x8a90381, 0x8e351ad1,
+  // 0x57cfc253, 0x4c526792, 0xd12ead90, 0x22519d79, 0x886cfbcc, 0x492e7dd2,
+  // 0x62cd8fad, 0xc3a19bf6, 0x63cb573d, 0x96988013, 0x6f26d941, 0xe0e8f38b,
+  // 0xd543d024, 0x4312f15, 0xaec520f3, 0x29c4a0e0, 0xc8330daf, 0x9194ca21,
+  // 0x3f122fb9, 0xc39177e7, 0xeec85730, 0x966c77b2, 0xfb50bc61, 0x650a689e,
+  // 0x69260814, 0x3a4513bd, 0x9e62b35d, 0xbdb41cdb, 0xadf47696, 0x43638e41,
+
+  // 5 ** 633    184 bytes
+  // 0x560e14a5, 0xf6691422, 0x2c70055c, 0x5fc5dab3, 0xc8ad71e0, 0xa2bc1b0d,
+  // 0xc651c583, 0x7aa7847b, 0x2daed74b, 0xfe54e5a6, 0xa295aa36, 0x64026c31,
+  // 0x8712dcba, 0x9cca8c7d, 0x2be239e4, 0xd549bd5, 0xb48d5fa8, 0xaf5e76ed,
+  // 0x46811a6e, 0x78e4dec4, 0xad6da29a, 0x616c4a6e, 0x15a1974, 0x96f6c825,
+  // 0x1cd852b4, 0x6ab56842, 0xe45a6968, 0x75631650, 0xe5fc1f10, 0x2bca9511,
+  // 0x21c5300c, 0xab7e2dcf, 0xb61dde63, 0x6fd760e0, 0xe8c710c1, 0xde5ba724,
+  // 0xc57e501c, 0x497c1f1a, 0xee6cd3, 0xdd0175f2, 0xa199ce9f, 0x5a4b5d2,
+  // 0xbd6fa764, 0x9d58b359, 0xd4f4fb60, 0x36f774e8,
 ]
+fileprivate let powersOfFive_maxPower = 358
 
 // Build a multi-precision integer 5^n
 
-// This is obviously a performance bottleneck when parsing Float80
+// This is obviously a performance bottleneck when parsing Float80/128
 // values with large negative exponents, such as `1e-4000`.  But note
 // that the exponent here is not necessarily limited to the range of
 // the target format, which means we can in theory have performance
@@ -1571,6 +1697,7 @@ fileprivate func fiveToTheN(
     range = range.lowerBound..<(range.lowerBound &+ 1)
     return
   }
+
   if power <= 27 {
     // 14 <= Power <= 27 can be satisfied from the 64-bit table
     let t = unsafe powersOfFive_64[unchecked: power &- 14]
@@ -1580,25 +1707,34 @@ fileprivate func fiveToTheN(
     return
   }
 
-  // Otherwise, initialize with a multi-word value, then multiply
-  // to get the final exact value.
-  // The table of pre-computed values here supports a larger
-  // range of exponents than the original C version, while
-  // requiring only a small amount of fixed table storage.
-  let maxPower = 124 // Largest power supported by the table above
+  // Otherwise, initialize with a multi-word value from the table above,
+  // then multiply to get the final exact value.
+  let maxPower = powersOfFive_maxPower
   let clampedPower = power > maxPower ? maxPower : power
-  // We need to find the appropriate power of five from the table
-  // above.  First, how many words are in that?  (This formula
-  // has been verified experimentally for every input up to 399.)
-  let words = ((clampedPower &+ 1) &* 1189) >> 14
-  // The power in the above table with that many words
+  // We need to find the appropriate power of five from the table above.  This
+  // maps the power to the index of the largest power of 5 in the table no
+  // greater than the desired power.  The constants 595 and 15894 were chosen by
+  // exhaustive search to keep the result correct (no overshoot) and optimal
+  // (picks the largest valid index) for every clampedPower in [28, 633].
+  let index = (clampedPower &* 595 &- 15894) >> 15
+  // How many words in that item?
+  let words = index * 4 + 2
+  // The corresponding power of five
   let seedPower = (words &* 441) >> 5
-  // Find the starting offset of the constant in the table:
-  let startIndex = words &* (words &- 1) / 2 // Triangular numbers
+  // The offset where that item starts
+  let start = (index &* (index &- 1) / 2) * 4 + (index &* 2) // Triangular numbers
   for i in 0..<words {
-    unsafe work[unchecked: range.lowerBound &+ i] = unsafe powersOfFive[unchecked: startIndex &+ i]
+    unsafe work[unchecked: range.lowerBound &+ i] = unsafe powersOfFive[unchecked: start &+ i]
   }
   range = range.lowerBound..<(range.lowerBound &+ words)
+
+  // For very large Float80/Float128 exponents, the following call can account
+  // for up to 95% of the runtime.  E.g., "1e4900" initializes 5^633 above and
+  // then needs to make up 5^4267 with this call.  If performance for such large
+  // powers is ever a primary concern, we could expand the above logic with a
+  // larger range of precomputed powers or explore ways to speed up
+  // `multiplyByFiveToTheN` for large powers.  But for now, the increased code
+  // size isn't really justified.
   multiplyByFiveToTheN(work: &work, range: &range, power: power &- seedPower)
 }
 
@@ -1616,72 +1752,89 @@ fileprivate func bitCountMP(
   return totalBits &- emptyBitsInMSWord
 }
 
-// Returns a UInt64 with the most-significant
+// Returns a UInt128 with the most-significant
 // `count` bits from the multi-precision integer.
-
-// TODO: Float128 needs more than 64 bits. So to support Float128, we
-// would need a separate 128-bit version.
 @inline(never)
 fileprivate func mostSignificantBitsFrom(
   work: borrowing MutableSpan<MPWord>,
   range: Range<Int>,
   count: Int,
   remainderNonZero: Bool
-) -> UInt64 {
+) -> _UInt128 {
   let bitsPerMPWord = MPWord.bitWidth
 
   var i = range.upperBound &- 1
-  var t = unsafe UInt64(work[unchecked: i])
-  var remainderNonZero = remainderNonZero
+  let firstWord = unsafe work[unchecked: i]
+  let firstWordBits = bitsPerMPWord - firstWord.leadingZeroBitCount
+  var accumulator = _UInt128(firstWord)
+  var remainingBits = count
+  var fractionBits = 0
   var fraction = UInt64(0)
 
-  if _fastPath(i > range.lowerBound) {
-    t &<<= bitsPerMPWord
-    i &-= 1
-    t |= unsafe UInt64(work[unchecked: i])
+  if firstWordBits >= remainingBits {
+    accumulator &>>= firstWordBits - remainingBits
+    fractionBits = firstWordBits - remainingBits
+    fraction = UInt64((firstWord << (32 - fractionBits)) >> (32 - fractionBits))
+    remainingBits = 0
+  } else {
+    remainingBits -= firstWordBits
 
-    if i > range.lowerBound {
-      let extraBitCount = t.leadingZeroBitCount
-      t &<<= extraBitCount
+    // Fold full words into accumulator
+    while remainingBits >= bitsPerMPWord && i > range.lowerBound {
+      accumulator &<<= bitsPerMPWord
       i &-= 1
-      let nextWord = unsafe UInt64(work[unchecked: i])
+      accumulator |= unsafe _UInt128(work[unchecked: i])
+      remainingBits -= bitsPerMPWord
+    }
 
-      // TODO: For Float80, we need to compute fraction here so we
-      // can use these next bits for that
+    // Fold a partial word into accumulator
+    // Remainder goes into fraction
+    if remainingBits > 0 && i > range.lowerBound {
+      accumulator &<<= remainingBits
+      i &-= 1
+      let nextWord = unsafe work[unchecked: i]
+      accumulator |= _UInt128(nextWord &>> (32 &- remainingBits))
 
-      t |= nextWord &>> (32 &- extraBitCount)
-
-      if !remainderNonZero {
-        var extraBits = nextWord &<< (32 &+ extraBitCount)
-        while i > range.lowerBound {
-          i &-= 1
-          extraBits |= unsafe UInt64(work[unchecked: i])
-        }
-        remainderNonZero = (extraBits != 0)
-      }
+      fractionBits = 32 &- remainingBits
+      fraction = UInt64((nextWord &<< remainingBits) &>> remainingBits)
+      remainingBits = 0
     }
   }
 
-  t &<<= t.leadingZeroBitCount
-  let roundUpNonZero = unsafe UInt64(unsafeBitCast(remainderNonZero, to: UInt8.self))
+  // Ensure fraction isn't empty...
+  if i > range.lowerBound {
+    fraction &<<= 32
+    i &-= 1
+    fraction |= unsafe UInt64(work[unchecked: i])
+    fractionBits += 32
+  }
+  fraction &<<= 64 - fractionBits
 
-  // We special-case count == 0 here to avoid an extra
-  // arithmetic check below for t >>= 64 - count
+  // Make sure fraction bits after the first are non-zero if they should be...
+  // Bit 63 of `fraction` is the round-half bit; the rounding decision below
+  // only distinguishes `fraction > 0x8000…`, `fraction == 0x8000…`, and
+  // `fraction < 0x8000…`.  Any non-zero bit below position 63 will tip
+  // `fraction` strictly above 0x8000…, regardless of where it lands.
+  // That lets us fold trailing words and the remainder-non-zero flag in
+  // with a plain OR — we don't need to track their bit positions.
+  fraction |= unsafe UInt64(unsafeBitCast(remainderNonZero, to: UInt8.self))
+  while i > range.lowerBound {
+    i &-= 1
+    fraction |= unsafe UInt64(work[unchecked: i])
+  }
+
+  // Left-align the bits to the requested width
+  accumulator &<<= remainingBits
+
   if _slowPath(count == 0) {
-    return (t - 1 + roundUpNonZero) >> 63
-    // TODO: For Float80    } else if count == 64 {
+    // If count == 0, then value is zero, so we only care about rounding...
+    return unsafe _UInt128(unsafeBitCast(fraction > 0x8000000000000000, to: UInt8.self))
   }
 
-  fraction = t &<< count
-  t &>>= 64 &- count
-
-  if fraction == 0 {
-    return t
-  } else {
-    let roundUpOddSignificand = (t & 1)
-    let round = (fraction &- 1 &+ (roundUpNonZero | roundUpOddSignificand)) >> 63
-    return t &+ round
-  }
+  let greater = unsafe unsafeBitCast(fraction > 0x8000000000000000, to: UInt8.self)
+  let equal = unsafe unsafeBitCast(fraction == 0x8000000000000000, to: UInt8.self)
+  let roundUp = _UInt128(greater) | (_UInt128(equal) & accumulator)
+  return accumulator &+ roundUp
 }
 
 // Convert Decimal to Binary, with guaranteed correct results
@@ -1717,7 +1870,7 @@ fileprivate func slowDecimalToBinary(
   let significandWordsNeeded = (significandBitsNeeded &+ (bitsPerMPWord - 1)) / bitsPerMPWord
 
   var binaryExponent = 0
-  let targetSignificand: UInt64
+  let targetSignificand: _UInt128
 
   if decimalExponent >= 0 {
     // ================================================================
@@ -1751,15 +1904,21 @@ fileprivate func slowDecimalToBinary(
                      firstUnparsedDigitOffset: Int(firstUnparsedDigitOffset),
                      unparsedDigitCount: Int(unparsedDigitCount),
                      maxDecimalMidpointDigits: targetFormat.maxDecimalMidpointDigits)
-    // TODO: If `valueRange` at this point has 3 or fewer words
-    // (96 bits or less), then we should load that value into a
-    // local _UInt128, then overwrite `valueRange` with
-    // `fiveToTheN` and `multiplyMPByN()`.  That would be faster than
-    // using `multiplyByFiveToTheN()` for large exponents, since `fiveToTheN`
-    // is consistently faster.
 
-    // Multiply by 5^n
-    multiplyByFiveToTheN(work: &work, range: &valueRange, power: decimalExponent)
+    let sigBits = bitCountMP(work: work, range: valueRange)
+    if sigBits <= 128 && decimalExponent > 67 {
+      // For large exponents, fiveToTheN is much faster
+      // than multiplyByFiveToTheN.
+      let sig = mostSignificantBitsFrom(work: work,
+                                        range: valueRange,
+                                        count: sigBits,
+                                        remainderNonZero: false)
+      fiveToTheN(work: &work, range: &valueRange, power: decimalExponent)
+      multiplyMPBy128(work: &work, range: &valueRange, multiplier: sig)
+    } else {
+      // Multiply by 5^n
+      multiplyByFiveToTheN(work: &work, range: &valueRange, power: decimalExponent)
+    }
 
     let bits = bitCountMP(work: work, range: valueRange)
     binaryExponent = bits &+ decimalExponent &- 1
@@ -1769,7 +1928,7 @@ fileprivate func slowDecimalToBinary(
                                               count: targetFormat.significandBits,
                                               remainderNonZero: false)
 
-    if significand >= (UInt64(1) &<< targetFormat.significandBits) {
+    if significand >= (_UInt128(1) &<< targetFormat.significandBits) {
       significand >>= 1
       binaryExponent &+= 1
     }
@@ -1804,11 +1963,6 @@ fileprivate func slowDecimalToBinary(
     let denominatorWordsNeeded = exponentWordsNeeded
     let totalWordsNeeded = numeratorWordsNeeded &+ denominatorWordsNeeded
 
-    // TODO: Heap allocate if `work` isn't big enough
-    // TODO: For Float16/32/64, we always have a large enough work
-    // space on the stack.  If we ever try to support Float80/128,
-    // we may need to allow the caller to provide a smaller buffer
-    // and allocate temporarily on the heap for extreme inputs.
     precondition(totalWordsNeeded <= work.count)
 
     // Divide work buffer into Numerator storage followed by denominator storage
@@ -1865,7 +2019,7 @@ fileprivate func slowDecimalToBinary(
                                                 range: quotientRange,
                                                 count: targetFormat.significandBits,
                                                 remainderNonZero: remainderNonZero)
-      if significand >= (UInt64(1) &<< targetFormat.significandBits) {
+      if significand >= (_UInt128(1) &<< targetFormat.significandBits) {
         significand >>= 1
         binaryExponent &+= 1
       }
@@ -1889,7 +2043,7 @@ fileprivate func slowDecimalToBinary(
       // exponent.  Then we've transitioned from a subnormal to
       // a normal, so the extra overflow bit will naturally get
       // dropped, we just have to bump the exponent.
-      if significand >= (UInt64(1) &<< (targetFormat.significandBits &- 1)) {
+      if significand >= (_UInt128(1) &<< (targetFormat.significandBits &- 1)) {
         binaryExponent &+= 1
       }
       targetSignificand = significand
@@ -1899,7 +2053,8 @@ fileprivate func slowDecimalToBinary(
     }
   }
 
-  return .binary(significand: targetSignificand,
+  return .binary(significand: targetSignificand._low,
+                 significandHigh: targetSignificand._high,
                  exponent: Int16(truncatingIfNeeded: binaryExponent),
                  sign: sign)
 }
@@ -1984,6 +2139,7 @@ internal func parse_float16(_ span: Span<UInt8>) -> Optional<Float16> {
                  && upperSignificand == lowerSignificand) {
       // Normal with converged bounds
       parsed = .binary(significand: lowerSignificand,
+                       significandHigh: 0,
                        exponent: Int16(truncatingIfNeeded: binaryExponent),
                        sign: sign)
     } else {
@@ -2008,7 +2164,10 @@ internal func parse_float16(_ span: Span<UInt8>) -> Optional<Float16> {
 
   // Now we have either binary or a special form...
   switch parsed {
-  case .binary(significand: let sig, exponent: let binaryExponent, sign: let sign):
+  case .binary(significand: let sig,
+               significandHigh: _,
+               exponent: let binaryExponent,
+               sign: let sign):
     // Hex float or converted decimal
     // Parsers above give us the significand/exponent
     // already adjusted for subnormal, etc.
@@ -2031,7 +2190,10 @@ internal func parse_float16(_ span: Span<UInt8>) -> Optional<Float16> {
     } else {
       return Float16.infinity
     }
-  case .nan(payload: let payload, signaling: let signaling, sign: let sign):
+  case .nan(payload: let payload,
+            payloadHigh: _,
+            signaling: let signaling,
+            sign: let sign):
     let p = 255 & Float16.RawSignificand(truncatingIfNeeded: payload)
     if sign == .minus {
       return -Float16(nan: p, signaling: signaling)
@@ -2162,6 +2324,7 @@ internal func parse_float32(_ span: Span<UInt8>) -> Optional<Float32> {
                  && upperSignificand == lowerSignificand) {
       // Normal with converged bounds
       parsed = .binary(significand: lowerSignificand,
+                       significandHigh: 0,
                        exponent: Int16(truncatingIfNeeded: binaryExponent),
                        sign: sign)
     } else {
@@ -2186,7 +2349,10 @@ internal func parse_float32(_ span: Span<UInt8>) -> Optional<Float32> {
 
   // Now we have either binary or a special form...
   switch parsed {
-  case .binary(significand: let sig, exponent: let binaryExponent, sign: let sign):
+  case .binary(significand: let sig,
+               significandHigh: _,
+               exponent: let binaryExponent,
+               sign: let sign):
     // Hex float or converted decimal
     // Parsers above give us the significand/exponent
     // already adjusted for subnormal, etc.
@@ -2209,7 +2375,10 @@ internal func parse_float32(_ span: Span<UInt8>) -> Optional<Float32> {
     } else {
       return Float32.infinity
     }
-  case .nan(payload: let payload, signaling: let signaling, sign: let sign):
+  case .nan(payload: let payload,
+            payloadHigh: _,
+            signaling: let signaling,
+            sign: let sign):
     let p = 0x1fffff & Float32.RawSignificand(truncatingIfNeeded: payload)
     if sign == .minus {
       return -Float32(nan: p, signaling: signaling)
@@ -2440,6 +2609,7 @@ internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
     } else if (binaryExponent > targetFormat.minBinaryExponent
                  && upperSignificand == lowerSignificand) {
       parsed = .binary(significand: lowerSignificand,
+                       significandHigh: 0,
                        exponent: Int16(binaryExponent),
                        sign: sign)
     } else {
@@ -2472,7 +2642,10 @@ internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
 
   // Now we have either binary or a special form...
   switch parsed {
-  case .binary(significand: let sig, exponent: let binaryExponent, sign: let sign):
+  case .binary(significand: let sig,
+               significandHigh: _,
+               exponent: let binaryExponent,
+               sign: let sign):
     // Hex float or converted decimal
     // Parsers above give us the significand/exponent
     // already adjusted for subnormal, etc.
@@ -2495,7 +2668,10 @@ internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
     } else {
       return Float64.infinity
     }
-  case .nan(payload: let payload, signaling: let signaling, sign: let sign):
+  case .nan(payload: let payload,
+            payloadHigh: _,
+            signaling: let signaling,
+            sign: let sign):
     let p = 0x3ffffffffffff & Float64.RawSignificand(truncatingIfNeeded: payload)
     if sign == .minus {
       return -Float64(nan: p, signaling: signaling)
@@ -2506,5 +2682,248 @@ internal func parse_float64(_ span: Span<UInt8>) -> Optional<Float64> {
     return nil
   }
 }
+
+// ================================================================
+//
+// Float80
+//
+// ================================================================
+
+// Float80 is only available on Intel x86/x86_64 processors on certain operating systems
+// This matches the condition for the Float80 type
+
+#if !(os(Windows) || os(Android) || ($Embedded && !os(Linux) && !(os(macOS) || os(iOS) || os(watchOS) || os(tvOS)))) && (arch(i386) || arch(x86_64))
+
+// Caveat:  This function was called directly from inlineable
+// code until Feb 2020 (commit 4d0e2adbef4d changed this),
+// so it still needs to be exported with the same C-callable ABI
+// for as long as we support code compiled with Swift 5.3.
+
+@c(_swift_stdlib_strtold_clocale)
+@usableFromInline
+internal func _swift_stdlib_strtold_clocale(
+  _ cText: Optional<UnsafePointer<CChar>>,
+  _ output: Optional<UnsafeMutablePointer<Float80>>
+) -> Optional<UnsafePointer<CChar>>
+{
+  guard let cText = unsafe cText, let output = unsafe output else {
+    return unsafe cText
+  }
+
+  // i = strlen(cText)
+  var i = 0
+  while unsafe cText[i] != 0 {
+    i &+= 1
+  }
+
+  let charSpan = unsafe Span<UInt8>(_unchecked: cText, count: i)
+  let result = parse_float80(charSpan)
+  if let result {
+    unsafe output.pointee = result
+    return unsafe cText + i
+  } else {
+    return nil
+  }
+}
+
+internal func parse_float80(_ span: Span<UInt8>) -> Optional<Float80> {
+  let targetFormat = TargetFormat(
+    significandBits: 64,
+    minBinaryExponent: -16382,
+    maxBinaryExponent: 16383,
+    minDecimalExponent: -5000,
+    maxDecimalExponent: 5000,
+    maxDecimalMidpointDigits: 11515
+  )
+
+  // Verify the text format and parse the key pieces
+  var parsed = fastParse64(targetFormat: targetFormat, input: span)
+
+  // Note: Unlike Float32/Float64, we don't bother with the
+  // single-FP-operation or fixed-precision-interval fast paths here.
+  // Float80 is rarely used in performance-sensitive parsing, so the
+  // extra code size and maintenance cost isn't justified; every
+  // decimal input goes straight to the arbitrary-precision fallback.
+
+  // If we parsed a decimal, we need to convert it to binary
+  if case .decimal(digits: let digits,
+                   base10Exponent: let base10Exponent,
+                   unparsedDigitCount: let unparsedDigitCount,
+                   firstUnparsedDigitOffset: let firstUnparsedDigitOffset,
+                   leadingDigitCount: let leadingDigitCount,
+                   sign: let sign) = parsed {
+    var workStorage = _InlineArray<2500, MPWord>(repeating: MPWord(0))
+    var work = workStorage.mutableSpan
+    parsed = slowDecimalToBinary(targetFormat: targetFormat,
+                                 input: span,
+                                 work: &work,
+                                 digits: digits,
+                                 base10Exponent: base10Exponent,
+                                 unparsedDigitCount: unparsedDigitCount,
+                                 firstUnparsedDigitOffset: firstUnparsedDigitOffset,
+                                 leadingDigitCount: leadingDigitCount,
+                                 sign: sign)
+  }
+
+  // Now we have either binary or a special form...
+  switch parsed {
+  case .binary(significand: let significandBits,
+               significandHigh: _,
+               exponent: let binaryExponent,
+               sign: let sign):
+    // Hex float or converted decimal
+    // Parsers above give us the significand/exponent
+    // already adjusted for subnormal, etc.
+    // So the conversion here is simple:
+    let exponentBits = UInt(binaryExponent + 16383)
+    return Float80(sign: sign,
+                   exponentBitPattern: exponentBits,
+                   significandBitPattern: significandBits)
+  case .zero(sign: let sign):
+    // Literal zero or underflow
+    if sign == .minus {
+      return -Float80()
+    } else {
+      return Float80()
+    }
+  case .infinity(sign: let sign):
+    // Literal infinity or overflow
+    if sign == .minus {
+      return -Float80.infinity
+    } else {
+      return Float80.infinity
+    }
+  case .nan(payload: let payload,
+            payloadHigh: _,
+            signaling: let signaling,
+            sign: let sign):
+    let p = 0x1fffffffffffffff & payload
+    if sign == .minus {
+      return -Float80(nan: p, signaling: signaling)
+    } else {
+      return Float80(nan: p, signaling: signaling)
+    }
+  default:
+    return nil
+  }
+}
+
+#else
+
+// For "reasons known only to history", this symbol is exported
+// by the Swift runtime even on platforms where we
+// don't support Float80.  We should likely change that someday...
+
+@c(_swift_stdlib_strtold_clocale)
+@usableFromInline
+internal func _swift_stdlib_strtold_clocale(
+  _ cText: Optional<UnsafePointer<CChar>>,
+  _ output: Optional<UnsafeMutableRawPointer>
+) -> Optional<UnsafePointer<CChar>>
+{
+    fatalError("Float80 not supported on this platform")
+}
+
+#endif
+
+// ================================================================
+// ================================================================
+//
+// Float128
+//
+// ================================================================
+// ================================================================
+
+/*
+
+// Note: Float128 will be introduced after UInt128, so we can use UInt128
+// in the implementation here instead of _UInt128
+@available(...)
+internal func parse_float128(_ span: Span<UInt8>) -> Optional<Float128> {
+  let targetFormat = TargetFormat(
+    significandBits: 113,
+    minBinaryExponent: -16382,
+    maxBinaryExponent: 16383,
+    minDecimalExponent: -5000,
+    maxDecimalExponent: 5000,
+    maxDecimalMidpointDigits: 11550
+  )
+
+  // Verify the text format and parse the key pieces
+  var parsed = fastParse64(targetFormat: targetFormat, input: span)
+
+  // TODO: Add fast paths analogous to Float32/Float64 (single-FP-operation
+  // and fixed-precision-interval arithmetic).  Float128 will need 128-bit
+  // (or wider) fixed-precision arithmetic for the interval path; for the
+  // single-FP path, consider whether the existing exact-power-of-10 table
+  // can produce exact Float128 inputs over a useful range.
+
+  // If we parsed a decimal, we need to convert it to binary
+  if case .decimal(digits: let digits,
+                   base10Exponent: let base10Exponent,
+                   unparsedDigitCount: let unparsedDigitCount,
+                   firstUnparsedDigitOffset: let firstUnparsedDigitOffset,
+                   leadingDigitCount: let leadingDigitCount,
+                   sign: let sign) = parsed {
+    var workStorage = _InlineArray<2500, MPWord>(repeating: MPWord(0))
+    var work = workStorage.mutableSpan
+    parsed = slowDecimalToBinary(targetFormat: targetFormat,
+                                 input: span,
+                                 work: &work,
+                                 digits: digits,
+                                 base10Exponent: base10Exponent,
+                                 unparsedDigitCount: unparsedDigitCount,
+                                 firstUnparsedDigitOffset: firstUnparsedDigitOffset,
+                                 leadingDigitCount: leadingDigitCount,
+                                 sign: sign)
+  }
+
+  // Now we have either binary or a special form...
+  switch parsed {
+  case .binary(significand: let sigLo,
+               significandHigh: let sigHi,
+               exponent: let binaryExponent,
+               sign: let sign):
+    // Hex float or converted decimal
+    // Parsers above give us the significand/exponent
+    // already adjusted for subnormal, etc.
+    // So the conversion here is simple:
+    let exponentBits = UInt(binaryExponent + 16383)
+    let significandBits = UInt128(_low: sigLo, _high: sigHi)
+    return Float128(sign: sign,
+                    exponentBitPattern: exponentBits,
+                    significandBitPattern: significandBits)
+  case .zero(sign: let sign):
+    // Literal zero or underflow
+    if sign == .minus {
+      return -Float128()
+    } else {
+      return Float128()
+    }
+  case .infinity(sign: let sign):
+    // Literal infinity or overflow
+    if sign == .minus {
+      return -Float128.infinity
+    } else {
+      return Float128.infinity
+    }
+  case .nan(payload: let payload,
+            payloadHigh: let payloadHigh,
+            signaling: let signaling,
+            sign: let sign):
+    let payload = UInt128(_low: payload, _high: payloadHigh)
+    let p = 0x3fffffffffffffffffffffffffff & payload
+    if sign == .minus {
+      return -Float128(nan: p, signaling: signaling)
+    } else {
+      return Float128(nan: p, signaling: signaling)
+    }
+  default:
+    return nil
+  }
+}
+
+ */
+
 
 #endif // !_pointerBitWidth(_16)

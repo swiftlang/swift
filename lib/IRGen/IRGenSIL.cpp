@@ -59,6 +59,7 @@
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DIBuilder.h"
 #include "llvm/IR/DebugInfo.h"
+#include "llvm/IR/DebugInfoMetadata.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/InlineAsm.h"
 #include "llvm/IR/Instructions.h"
@@ -5812,6 +5813,11 @@ void IRGenSILFunction::visitRefTailAddrInst(RefTailAddrInst *i) {
 }
 
 static bool isInvariantAddress(SILValue v) {
+  // Debug reconstruction blocks have standalone block arguments with no
+  // predecessors, which confuses the access path walker.
+  if (v->getParentBlock()->isDebugReconstructionBlock())
+    return false;
+
   SILValue accessedAddress = getTypedAccessAddress(v);
   if (auto *ptrRoot = dyn_cast<PointerToAddressInst>(accessedAddress)) {
     return ptrRoot->isInvariant();
@@ -6166,6 +6172,39 @@ static bool InCoroContext(SILFunction &f, SILInstruction &i) {
   return f.isAsync() && !i.getDebugScope()->InlinedCallSite;
 }
 
+/// Salvage an LLVM instruction emitted within a debug reconstruction block.
+/// Most instructions are handled by llvm::salvageDebugInfo which encodes
+/// their effects into the DWARF expression, but some instructions, such as
+/// loads, need a special case.
+static void salvageDebugReconstructionInst(llvm::Instruction *I) {
+  if (auto *LI = dyn_cast<llvm::LoadInst>(I)) {
+    llvm::SmallVector<llvm::DbgVariableIntrinsic *, 1> DbgInsts;
+    llvm::SmallVector<llvm::DbgVariableRecord *, 2> DbgRecords;
+    llvm::findDbgUsers(DbgInsts, LI, &DbgRecords);
+    llvm::Value *Addr = LI->getPointerOperand();
+    for (llvm::DbgVariableRecord *DVR : DbgRecords) {
+      // Insert DW_OP_deref after each arg that references the load.
+      // This loop works the same way as llvm::salvageDebugInfoForDbgValues.
+      // It iterates over the inputs (`locations`) of the debug record (although
+      // there usually is only one), and when the input is this load instruction,
+      // the DIExpression is updated to add a deref to all uses.
+      auto locations = DVR->location_ops();
+      llvm::DIExpression *expr = DVR->getExpression();
+      auto locationIterator = find(locations, LI);
+      while (locationIterator != locations.end()) {
+        unsigned locationNo = std::distance(locations.begin(), locationIterator);
+        expr = llvm::DIExpression::appendOpsToArg(expr,
+                                                  {llvm::dwarf::DW_OP_deref}, locationNo);
+        locationIterator = std::find(std::next(locationIterator), locations.end(), LI);
+      }
+      DVR->replaceVariableLocationOp(LI, Addr);
+      DVR->setExpression(expr);
+    }
+    return;
+  }
+  llvm::salvageDebugInfo(*I);
+}
+
 void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   auto SILVal = i->getOperand();
   bool IsAddrVal = SILVal->getType().isAddress();
@@ -6207,17 +6246,6 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   }
 
   auto RealTy = SILTy.getASTType();
-  if (IsAddrVal && IsInCoro)
-    if (auto *PBI = dyn_cast<ProjectBoxInst>(i->getOperand())) {
-      // Usually debug info only ever describes the *result* of a projectBox
-      // call. To allow the debugger to display a boxed parameter of an async
-      // continuation object, however, the debug info can only describe the box
-      // itself and thus also needs to emit a box type for it so the debugger
-      // knows to call into Remote Mirrors to unbox the value.
-      RealTy = PBI->getOperand()->getType().getASTType();
-      assert(isa<SILBoxType>(RealTy));
-    }
-
   VarDecl *VD = i->getDecl();
   if (!VD) {
     // The source location of a DebugValueInst inserted by the SIL optimizer is
@@ -6277,10 +6305,27 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
 
     // Collect LLVM instructions emitted by the debug BB so we can salvage and
     // erase them after the debug record is emitted.
-    assert(BB == Builder.GetInsertBlock() && InsertPt == Builder.GetInsertPoint() && "DebugBB content must not affect control flow!");
-    auto Start = LastBefore ? std::next(LastBefore->getIterator()) : BB->begin();
+    assert(BB == Builder.GetInsertBlock() &&
+           InsertPt == Builder.GetInsertPoint() &&
+           "DebugBB content must not affect control flow!");
+    auto Start =
+        LastBefore ? std::next(LastBefore->getIterator()) : BB->begin();
     for (auto It = Start; It != InsertPt; ++It)
       DebugBBInsts.push_back(&*It);
+  } else if (getLoweredValue(SILVal).isBoxWithAddress()) {
+    // Special case for debug_values cloned from an alloc_box: Use the
+    // project_box address rather than the actual box.
+    auto &TI = getTypeInfo(SILVal->getType());
+    auto Addr = getLoweredValue(SILVal).getAddressOfBox();
+    auto *Storage = Addr.getAddress();
+
+    VarInfo->DIExpr.prependElements(
+        {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
+
+    Copy.emplace_back(emitShadowCopyIfNeeded(
+        Storage, TI.getStorageType(),
+        i->getDebugScope(), *VarInfo, IsAnonymous,
+        i->usesMoveableValueDebugInfo(), &VarInfo->DIExpr));
   } else if (IsAddrVal) {
     auto &TI = getTypeInfo(SILVal->getType());
     auto Addr = getLoweredAddress(SILVal);
@@ -6307,7 +6352,7 @@ void IRGenSILFunction::visitDebugValueInst(DebugValueInst *i) {
   // Erase any LLVM instructions emitted by the debug BB. They were only needed
   // to produce the dbg intrinsic; salvage converts references into DWARF exprs.
   for (auto *I : llvm::reverse(DebugBBInsts)) {
-    llvm::salvageDebugInfo(*I);
+    salvageDebugReconstructionInst(I);
     I->eraseFromParent();
   }
 }
@@ -7021,9 +7066,6 @@ void IRGenSILFunction::visitDeallocBoxInst(swift::DeallocBoxInst *i) {
 void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   assert(i->getBoxType()->getLayout()->getFields().size() == 1
          && "multi field boxes not implemented yet");
-  const TypeInfo &type = getTypeInfo(
-      getSILBoxFieldType(IGM.getMaximalTypeExpansionContext(), i->getBoxType(),
-                         IGM.getSILModule().Types, 0));
 
   // Derive name from SIL location.
   bool IsAnonymous = false;
@@ -7046,9 +7088,6 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
   if (i->getDebugScope()->getInlinedFunction()->isTransparent())
     return;
 
-  if (!Decl)
-    return;
-
   // FIXME: This is a workaround to not produce local variables for
   // capture list arguments like "[weak self]". The better solution
   // would be to require all variables to be described with a
@@ -7063,8 +7102,16 @@ void IRGenSILFunction::visitAllocBoxInst(swift::AllocBoxInst *i) {
       IGM.getMaximalTypeExpansionContext(),
       i->getBoxType(), IGM.getSILModule().Types, 0);
   auto RealType = SILTy.getASTType();
-  auto DbgTy =
-      DebugTypeInfo::getLocalVariable(Decl, RealType, type, IGM);
+  DebugTypeInfo DbgTy;
+  if (Decl) {
+    DbgTy = DebugTypeInfo::getLocalVariable(Decl, RealType, getTypeInfo(SILTy),
+                                            IGM);
+  } else if (!SILTy.hasArchetype() && !Name.empty()) {
+    // Handle the cases that read from a SIL file.
+    DbgTy = DebugTypeInfo::getFromTypeInfo(RealType, getTypeInfo(SILTy), IGM);
+  } else {
+    return;
+  }
 
   auto VarInfo = i->getVarInfo();
   if (!VarInfo)

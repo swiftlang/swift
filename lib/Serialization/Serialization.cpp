@@ -1198,7 +1198,7 @@ void Serializer::writeHeader() {
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
 
-      if (M->getName().is("OSLog")) {
+      if (M->getName().is("os")) {
         options_block::OSLogStringSectionNameLayout OSLogStringSectionName(Out);
         OSLogStringSectionName.emit(ScratchRecord,
                                     M->getASTContext().LangOpts.OSLogStringSectionName);
@@ -4870,7 +4870,8 @@ public:
     auto &ctx = var->getASTContext();
     if (auto mangledName = ctx.lookupTypeToHideWhenEmittingModule(
             ty->getCanonicalType())) {
-      ty = HiddenType::get(ctx, *mangledName);
+      ty = HiddenType::get(ctx, *mangledName,
+                           var->getDeclContext()->getParentModule());
     }
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)

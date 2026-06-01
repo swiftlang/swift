@@ -442,7 +442,8 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
         SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
         diagOpts.VerifyIgnoreUnknown, diagOpts.VerifyIgnoreUnrelated,
-        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.UseColor,
+        diagOpts.VerifyIgnoreMacroLocationNote, diagOpts.VerifyChildNotes,
+        diagOpts.UseColor,
         diagOpts.AdditionalDiagnosticVerifierPrefixes);
 
     addDiagnosticConsumer(DiagVerifier.get());
@@ -1155,6 +1156,8 @@ static bool shouldImportConcurrencyByDefault(const llvm::Triple &target) {
 #if SWIFT_IMPLICIT_CONCURRENCY_IMPORT
   if (target.isOSWASI())
     return true;
+  if (target.isOSEmscripten())
+    return true;
   if (target.isOSOpenBSD())
     return true;
   if (target.isOSFreeBSD())
@@ -1554,12 +1557,12 @@ ModuleDecl *CompilerInstance::getMainModule() const {
     if (Invocation.getLangOptions().hasFeature(Feature::StrictMemorySafety))
       MainModule->setStrictMemorySafety(true);
     if (Invocation.getLangOptions().hasFeature(Feature::Embedded)) {
-      bool isImplementation =
-          Invocation.getLangOptions().hasFeature(Feature::DeferredCodeGen);
-      MainModule->setCodeGenerationModel(
-          isImplementation ? CodeGenerationModel::Implementation
-                           : CodeGenerationModel::Inlinable);
+      CodeGenerationModel model =
+          Invocation.getLangOptions().CodeGenerationModelOverride
+              .value_or(CodeGenerationModel::Inlinable);
+      MainModule->setCodeGenerationModel(model);
     } else {
+      // CodeGenerationModelOverride is rejected at parse time outside Embedded.
       MainModule->setCodeGenerationModel(CodeGenerationModel::Interface);
     }
     if (Invocation.getSILOptions().CMOMode ==

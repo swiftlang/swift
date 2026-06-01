@@ -28,6 +28,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -43,6 +44,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/StringExtras.h"
+#include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/SolutionResult.h"
 #include "clang/AST/DeclTemplate.h"
@@ -431,6 +433,22 @@ static bool willHaveConfusingConsumption(Type type,
   default:
     return true;
   }
+}
+
+/// Check if this is an attempted downcast between two C++ foreign reference
+/// types, and diagnose if it is. This kind of downcasts is not supported yet.
+static bool diagnoseUnsupportedFRTDowncast(ASTContext &ctx, SourceLoc loc,
+                                           Type fromType, Type toType) {
+  auto fromUnderlying = fromType->lookThroughAllOptionalTypes();
+  auto toUnderlying = toType->lookThroughAllOptionalTypes();
+  if (fromUnderlying->isForeignReferenceType() &&
+      toUnderlying->isForeignReferenceType() &&
+      fromUnderlying->isBindableToSuperclassOf(toUnderlying)) {
+    ctx.Diags.diagnose(loc, diag::downcast_to_foreign_reference_type, fromType,
+                       toType);
+    return true;
+  }
+  return false;
 }
 
 namespace {
@@ -4192,6 +4210,10 @@ namespace {
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, CheckedCastContextKind::IsExpr, dc);
 
+      if (diagnoseUnsupportedFRTDowncast(ctx, expr->getLoc(),
+                                         fromType, toType))
+        return nullptr;
+
       switch (castKind) {
       case CheckedCastKind::Unresolved:
         expr->setCastKind(CheckedCastKind::ValueCast);
@@ -4632,6 +4654,11 @@ namespace {
 
       const auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, CheckedCastContextKind::ForcedCast, dc);
+
+      if (diagnoseUnsupportedFRTDowncast(ctx, expr->getLoc(),
+                                         fromType, toType))
+        return nullptr;
+
       switch (castKind) {
         /// Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -4709,6 +4736,11 @@ namespace {
 
       auto castKind = TypeChecker::typeCheckCheckedCast(
           fromType, toType, CheckedCastContextKind::ConditionalCast, dc);
+
+      if (diagnoseUnsupportedFRTDowncast(ctx, expr->getLoc(),
+                                         fromType, toType))
+        return nullptr;
+
       switch (castKind) {
       // Invalid cast.
       case CheckedCastKind::Unresolved:
@@ -6196,7 +6228,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
   // Determine whether this application has curried self.
   bool skipCurriedSelf = apply ? hasCurriedSelf(cs, callee, apply) : true;
   // Determine the parameter bindings.
-  ParameterListInfo paramInfo(params, callee.getDecl(), skipCurriedSelf);
+  ParameterListInfo paramInfo(params, skipCurriedSelf, callee);
 
   // If this application is an init(wrappedValue:) call that needs an injected
   // wrapped value placeholder, the first non-defaulted argument must be
@@ -8464,8 +8496,16 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   auto *calleeLoc = cs.getConstraintLocator(calleeLocator);
   auto overload = solution.getOverloadChoiceIfAvailable(calleeLoc);
   if (overload) {
-    auto *decl = overload->choice.getDeclOrNull();
-    callee = resolveConcreteDeclRef(decl, calleeLoc);
+    // If this is a call through an implicit `dynamicMember:` subscript,
+    // of a `@dynamicMemberLookup` type there is no callee because the
+    // call happens on a value returned by the subscript invocation and
+    // not necessary the member looked up.
+    if (overload->choice.isKeyPathDynamicMemberLookup()) {
+      callee = ConcreteDeclRef();
+    } else {
+      auto *decl = overload->choice.getDeclOrNull();
+      callee = resolveConcreteDeclRef(decl, calleeLoc);
+    }
   }
 
   // Make sure we have a function type that is callable. This helps ensure
@@ -9767,8 +9807,14 @@ ConstraintSystem::applySolution(Solution &solution,
     auto isValidType = [&](Type ty) {
       return !ty->hasError() && !ty->hasTypeVariableOrPlaceholder();
     };
-    for (auto &[_, type] : solution.typeBindings) {
-      ASSERT(isValidType(type) && "type binding has invalid type");
+    for (auto pair : solution.typeBindings) {
+      if (!isValidType(pair.second)) {
+        ABORT([&](llvm::raw_ostream &out) {
+          out << "Type binding has invalid type:\n";
+          pair.first->dump(out);
+          pair.second->dump(out);
+        });
+      }
     }
     for (auto &[_, type] : solution.nodeTypes) {
       ASSERT(isValidType(solution.simplifyType(type)) &&

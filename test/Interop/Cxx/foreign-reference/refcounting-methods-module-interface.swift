@@ -4,9 +4,7 @@
 // CHECK:   func doRetain()
 // CHECK:   func doRelease()
 // CHECK: }
-// CHECK: class DerivedRefCountedBox {
-// CHECK:   func doRetain()
-// CHECK:   func doRelease()
+// CHECK: class DerivedRefCountedBox : RefCountedBox {
 // CHECK: }
 
 // CHECK: class DerivedHasRelease {
@@ -25,7 +23,7 @@
 // CHECK:   func doRetainInBase()
 // CHECK: }
 
-// CHECK: class CRTPDerived {
+// CHECK: class CRTPDerived : CRTPBase<CRTPDerived> {
 // CHECK:   var value: Int32
 // CHECK: }
 
@@ -33,7 +31,7 @@
 // CHECK:   func doRetainVirtual()
 // CHECK:   func doReleaseVirtual()
 // CHECK: }
-// CHECK: class DerivedVirtualRetainRelease {
+// CHECK: class DerivedVirtualRetainRelease : VirtualRetainRelease {
 // CHECK:   func doRetainVirtual()
 // CHECK:   func doReleaseVirtual()
 // CHECK: }
@@ -42,7 +40,7 @@
 // CHECK:   func doRetainPure()
 // CHECK:   func doReleasePure()
 // CHECK: }
-// CHECK: class DerivedPureVirtualRetainRelease {
+// CHECK: class DerivedPureVirtualRetainRelease : PureVirtualRetainRelease {
 // CHECK:   func doRetainPure()
 // CHECK:   func doReleasePure()
 // CHECK:   var refCount: Int32

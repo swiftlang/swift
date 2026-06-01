@@ -817,13 +817,13 @@ private:
     }
   }
 
-  llvm::DITypeRefArray createParameterTypes(SILType SILTy) {
+  llvm::DITypeArray createParameterTypes(SILType SILTy) {
     if (!SILTy)
       return nullptr;
     return createParameterTypes(SILTy.castTo<SILFunctionType>());
   }
 
-  llvm::DITypeRefArray createParameterTypes(CanSILFunctionType FnTy) {
+  llvm::DITypeArray createParameterTypes(CanSILFunctionType FnTy) {
     SmallVector<llvm::Metadata *, 16> Parameters;
 
     GenericContextScope scope(IGM, FnTy->getInvocationGenericSignature());
@@ -1086,9 +1086,16 @@ private:
 
     bool IsTypeOriginallyDefinedIn = containsOriginallyDefinedIn(DbgTy.getType());
     bool IsCxxType = containsCxxType(DbgTy.getType());
+    // TODO: ASTDemangler drops LifetimeDependenceInfo (see ASTDemangler.cpp's
+    // "Handle LifetimeDependenceInfo here" TODO); until that TODO is closed,
+    // types containing function types with lifetime dependencies cannot
+    // round-trip. This exclusion is intentionally transitive.
+    bool ContainsLifetimeDependencies =
+        containsFunctionTypeWithLifetimeDependencies(DbgTy.getType());
     // There's no way to round trip when respecting @_originallyDefinedIn for a type.
     // TODO(https://github.com/apple/swift/issues/57699): We currently cannot round trip some C++ types.
-    if (!Opts.DisableRoundTripDebugTypes && !IsTypeOriginallyDefinedIn && !IsCxxType) {
+    if (!Opts.DisableRoundTripDebugTypes && !IsTypeOriginallyDefinedIn &&
+        !IsCxxType && !ContainsLifetimeDependencies) {
       // Make sure we can reconstruct mangled types for the debugger.
       auto &Ctx = Ty->getASTContext();
       Type Reconstructed = Demangle::getTypeForMangling(Ctx, SugaredName, Sig);
@@ -1974,11 +1981,16 @@ private:
     case TypeKind::Module:
     case TypeKind::BuiltinUnboundGeneric:
     case TypeKind::BuiltinBorrow:
-    case TypeKind::Hidden:
       ABORT([&](llvm::raw_ostream &out) {
         out << "Don't know how to emit debug info for type:\n";
         BaseTy->dump(out);
       });
+
+    case TypeKind::Hidden: {
+      unsigned FwdDeclLine = 0;
+      return createOpaqueStruct(Scope, MangledName, MainFile, FwdDeclLine,
+                                SizeInBits, AlignInBits, Flags, MangledName);
+    }
 
     case TypeKind::BuiltinFixedArray: {
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
@@ -2678,6 +2690,23 @@ private:
         }
       }
 
+      return false;
+    });
+  }
+
+  /// Returns true if the type contains a function type with lifetime
+  /// dependencies. ASTDemangler drops LifetimeDependenceInfo (see the
+  /// "Handle LifetimeDependenceInfo here" TODO in ASTDemangler.cpp), so
+  /// such types cannot round-trip through the demangler. Covers both
+  /// inferred and explicit dependencies via hasLifetimeDependencies(),
+  /// and both AST-level (AnyFunctionType) and SIL-level (SILFunctionType)
+  /// function type hierarchies.
+  bool containsFunctionTypeWithLifetimeDependencies(Type T) {
+    return T.findIf([](Type t) -> bool {
+      if (auto *fn = t->getAs<AnyFunctionType>())
+        return fn->hasLifetimeDependencies();
+      if (auto *silFn = t->getAs<SILFunctionType>())
+        return silFn->hasLifetimeDependencies();
       return false;
     });
   }
@@ -3701,20 +3730,6 @@ bool IRGenDebugInfoImpl::buildDebugInfoExpression(
     case SILDIExprOperator::Dereference:
       Operands.push_back(llvm::dwarf::DW_OP_deref);
       break;
-    case SILDIExprOperator::Plus:
-      Operands.push_back(llvm::dwarf::DW_OP_plus);
-      break;
-    case SILDIExprOperator::Minus:
-      Operands.push_back(llvm::dwarf::DW_OP_minus);
-      break;
-    case SILDIExprOperator::ConstUInt:
-      Operands.push_back(llvm::dwarf::DW_OP_constu);
-      Operands.push_back(*ExprOperand[1].getAsConstInt());
-      break;
-    case SILDIExprOperator::ConstSInt:
-      Operands.push_back(llvm::dwarf::DW_OP_consts);
-      Operands.push_back(*ExprOperand[1].getAsConstInt());
-      break;
     case SILDIExprOperator::INVALID:
       return false;
     }
@@ -4037,16 +4052,6 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
   // /always/ emit an llvm.dbg.value of undef.
   // If we have undef, always emit a llvm.dbg.value in the current position.
   if (isa<llvm::UndefValue>(Storage)) {
-    if (Expr->getNumElements() &&
-        (Expr->getElement(0) == llvm::dwarf::DW_OP_consts
-         || Expr->getElement(0) == llvm::dwarf::DW_OP_constu)) {
-      /// Convert `undef, expr op_consts:N:...` to `N, expr ...`
-      Storage = llvm::ConstantInt::get(
-          llvm::IntegerType::getInt64Ty(Builder.getContext()),
-          Expr->getElement(1));
-      Expr = llvm::DIExpression::get(Builder.getContext(),
-                                     Expr->getElements().drop_front(2));
-    }
     DBuilder.insertDbgValueIntrinsic(Storage, Var, Expr, DL, ParentBlock);
     return;
   }
@@ -4115,7 +4120,7 @@ void IRGenDebugInfoImpl::emitDbgIntrinsic(
       // that corresponds with a funclet edge. This operation effectively sets
       // up the rest of the pipeline to be stupid and just emit the
       // llvm.dbg.value in the correct places. This is done by the SILOptimizer
-      // pass DebugInfoCanonicalizer.
+      // pass MovedAsyncVarDebugInfoPropagator.
       auto InsertBefore = Builder.GetInsertPoint();
       if (InsertBefore != ParentBlock->end()) {
         InsertPt = &*InsertBefore;

@@ -4299,10 +4299,12 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
   TypeID TyID;
   DeclID dID;
   ModuleID parentModuleID;
-  unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed;
+  unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed,
+      codeGenerationModel;
   unsigned numTrailingRecords;
   SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
                                  IsDeclaration, IsLet, IsUsed,
+                                 codeGenerationModel,
                                  numTrailingRecords, TyID, dID,
                                  parentModuleID);
   if (TyID == 0) {
@@ -4315,6 +4317,19 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                             << " for SILGlobalVariable\n");
     return nullptr;
+  }
+
+  // A SIL global variable that uses the Interface code generation model has a
+  // unique strong definition in its defining module. When deserialized into a
+  // different module, mark its linkage as externally available so that the
+  // importer references the defining module's symbol rather than emitting
+  // its own definition.
+  if (codeGenerationModel &&
+      static_cast<CodeGenerationModel>(codeGenerationModel - 1) ==
+          CodeGenerationModel::Interface &&
+      MF->getAssociatedModule() != SILMod.getSwiftModule()) {
+    linkage = addExternalToLinkage(*linkage);
+    IsDeclaration = true;
   }
 
   VarDecl *globalDecl = nullptr;
@@ -4336,6 +4351,12 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
       std::nullopt, globalDecl);
   v->setLet(IsLet);
   v->setMarkedAsUsed(IsUsed);
+  if (codeGenerationModel) {
+    v->setCodeGenerationModel(
+        static_cast<CodeGenerationModel>(codeGenerationModel - 1));
+  } else {
+    v->setCodeGenerationModel(std::nullopt);
+  }
   globalVarOrOffset.set(v, true /*isFullyDeserialized*/);
   v->setDeclaration(IsDeclaration);
 
@@ -4926,8 +4947,10 @@ llvm::Expected<SILWitnessTable *>
   if (!maybeConformance)
     return maybeConformance.takeError();
 
-  auto theConformance = cast<RootProtocolConformance>(
-                          maybeConformance.get().getConcrete());
+  // Specialized witness tables can have a `SpecializedProtocolConformance`,
+  // not just a `RootProtocolConformance`. The downstream APIs accept any
+  // `ProtocolConformance *`.
+  auto *theConformance = maybeConformance.get().getConcrete();
 
   PrettyStackTraceConformance trace("deserializing SIL witness table for",
                                     theConformance);

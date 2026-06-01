@@ -3146,6 +3146,7 @@ struct BridgedASTType {
   BRIDGED_INLINE SwiftInt GenericTypeParam_getIndex() const;
   BRIDGED_INLINE swift::GenericTypeParamKind
   GenericTypeParam_getParamKind() const;
+  BRIDGED_INLINE bool Tuple_containsPackExpansionType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;
   BRIDGED_INLINE bool containsSILPackExpansionType() const;
   BRIDGED_INLINE bool isSILPackElementAddress() const;

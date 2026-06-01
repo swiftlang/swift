@@ -2973,13 +2973,16 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
   // function-conversion score to make sure this solution is worse than
   // an exact match.
   // FIXME: there may be a better way. see https://github.com/apple/swift/pull/62514
-  auto matchIfConversion = [&](bool isErasure = false) -> bool {
+  auto matchIfConversion = [&](bool isErasure = false,
+                               bool shouldIncreaseScore = true) -> bool {
     // We generally require a conversion here, but allow some lassitude
     // if we're doing witness-matching.
     if (kind < ConstraintKind::Subtype &&
         !(isErasure && isWitnessMatching(locator)))
       return false;
-    increaseScore(SK_FunctionConversion, locator);
+
+    if (shouldIncreaseScore)
+      increaseScore(SK_FunctionConversion, locator);
     return true;
   };
 
@@ -3041,7 +3044,40 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     // For synchronous: Thunk would call the function without
     // a hop.
     case FunctionTypeIsolation::Kind::NonIsolated:
-      return matchIfConversion();
+      // When a nonisolated/@concurrent closure is passed to a
+      // nonisolated(nonsending) parameter the solver has to be conservative
+      // and produce a conversion that could be dissolved by actor
+      // isolation checker when it determines that nonisolated(nonsending)
+      // could be assumed onto the closure direct (i.e. when there are no
+      // isolated captures involved), so let's not increase a score unless
+      // closure states it's isolation explicitly to avoid picking a subpar
+      // solution.
+      bool shouldIncreaseScore = true;
+      if (func1->isAsync()) {
+        auto *expr = locator.trySimplifyToExpr();
+
+        if (expr)
+          expr = expr->getSemanticsProvidingExpr();
+
+        if (auto *cast = getAsExpr<ExplicitCastExpr>(expr))
+          expr = cast->getSubExpr();
+
+        // Look through captures, we only care about the closure itself.
+        if (auto *captureList = getAsExpr<CaptureListExpr>(expr))
+          expr = captureList->getClosureBody();
+
+        if (auto *closure = getAsExpr<ClosureExpr>(expr)) {
+          shouldIncreaseScore =
+              closure->getAttrs().hasAttribute<ConcurrentAttr>();
+        }
+      } else {
+        // Converting a sync function to nonisolated(nonsending) async one
+        // doesn't require a thunk.
+        shouldIncreaseScore = false;
+      }
+
+      return matchIfConversion(
+          /*isErasure=*/false, shouldIncreaseScore);
     }
     llvm_unreachable("bad kind");
 
@@ -8152,17 +8188,23 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
 
     // Special implicit nominal conversions.
     if (!type1->is<LValueType>()) {
-      // Array -> Array.
       if (desugar1->isArray() && desugar2->isArray()) {
-        conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
-      // Dictionary -> Dictionary.
+        // Array -> Array.
+        auto elementType = type1->getArrayElementType();
+        if (!elementType->isForeignReferenceType())
+          conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
       } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::DictionaryUpcast);
-      // Set -> Set.
+        // Dictionary -> Dictionary.
+        auto keyValueTypes = *isDictionaryType(desugar1);
+        if (!keyValueTypes.first->isForeignReferenceType() &&
+            !keyValueTypes.second->isForeignReferenceType())
+          conversionsOrFixes.push_back(
+              ConversionRestrictionKind::DictionaryUpcast);
       } else if (isSetType(desugar1) && isSetType(desugar2)) {
-        conversionsOrFixes.push_back(
-          ConversionRestrictionKind::SetUpcast);
+        // Set -> Set.
+        auto elementType = *isSetType(desugar1);
+        if (!elementType->isForeignReferenceType())
+          conversionsOrFixes.push_back(ConversionRestrictionKind::SetUpcast);
       }
     }
   }

@@ -530,15 +530,35 @@ DiagnosticSerializer::deserializeFile(const SerializedFile &File) {
   auto FileName = remapFilePath(File.FileName);
 
   if (!File.ContentCASID.empty()) {
-    auto ID = CAS.parseID(File.ContentCASID);
-    if (!ID)
-      return ID.takeError();
+    auto getContentFromCAS = [this](StringRef FileName, StringRef ContentCASID)
+        -> llvm::Expected<std::unique_ptr<llvm::MemoryBuffer>> {
+      auto ID = CAS.parseID(ContentCASID);
+      if (!ID)
+        return ID.takeError();
+      auto IDRef = CAS.getReference(*ID);
+      if (!IDRef)
+        return nullptr;
 
-    auto Proxy = CAS.getProxy(*ID);
-    if (!Proxy)
-      return Proxy.takeError();
+      std::optional<llvm::cas::ObjectProxy> Proxy;
+      if (llvm::Error E = CAS.getProxyIfExists(*IDRef).moveInto(Proxy))
+        return E;
+      if (!Proxy)
+        return nullptr;
 
-    auto Content = Proxy->getMemoryBuffer(FileName);
+      return Proxy->getMemoryBuffer(FileName);
+    };
+
+    std::unique_ptr<llvm::MemoryBuffer> Content;
+    if (llvm::Error E =
+            getContentFromCAS(FileName, File.ContentCASID).moveInto(Content))
+      return E;
+    if (!Content) {
+      // Fallback to reading the file from the filesystem.
+      auto MBOrErr = llvm::MemoryBuffer::getFile(FileName);
+      if (!MBOrErr)
+        return llvm::createFileError(FileName, MBOrErr.getError());
+      Content = std::move(*MBOrErr);
+    }
     return SrcMgr.addNewSourceBuffer(std::move(Content));
   }
 

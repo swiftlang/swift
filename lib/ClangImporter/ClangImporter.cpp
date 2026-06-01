@@ -67,11 +67,15 @@
 #include "clang/Basic/LangStandard.h"
 #include "clang/Basic/MacroBuilder.h"
 #include "clang/Basic/Module.h"
+#include "clang/Basic/Sanitizers.h"
 #include "clang/Basic/Specifiers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CAS/CASOptions.h"
 #include "clang/CAS/IncludeTree.h"
 #include "clang/CodeGen/ObjectFilePCHContainerWriter.h"
+#include "clang/Driver/Compilation.h"
+#include "clang/Driver/Driver.h"
+#include "clang/Driver/ToolChain.h"
 #include "clang/Frontend/CompilerInvocation.h"
 #include "clang/Frontend/FrontendActions.h"
 #include "clang/Frontend/FrontendOptions.h"
@@ -494,6 +498,27 @@ static inline bool isPCHFilenameExtension(StringRef path) {
     .ends_with(file_types::getExtension(file_types::TY_PCH));
 }
 
+/// Returns the set of sanitizers Clang's driver considers supported for
+/// \p triple.
+static clang::SanitizerMask
+getClangSupportedSanitizers(const llvm::Triple &triple) {
+  clang::DiagnosticOptions diagOpts;
+  auto diagIDs = llvm::makeIntrusiveRefCnt<clang::DiagnosticIDs>();
+  clang::DiagnosticsEngine clangDiags(diagIDs, diagOpts,
+                                      new clang::IgnoringDiagConsumer(),
+                                      /*ShouldOwnClient=*/true);
+  clang::driver::Driver driver("clang", triple.str(), clangDiags);
+  driver.setCheckInputsExist(false);
+  std::string targetArg = "--target=" + triple.str();
+  llvm::SmallVector<const char *, 8> argv = {
+      "clang", targetArg.c_str(), "-fsyntax-only", "-x", "c", "swift.c"};
+  std::unique_ptr<clang::driver::Compilation> compilation(
+      driver.BuildCompilation(argv));
+  if (!compilation)
+    return {};
+  return compilation->getDefaultToolChain().getSupportedSanitizers();
+}
+
 void importer::getNormalInvocationArguments(
     std::vector<std::string> &invocationArgStrs, ASTContext &ctx,
     bool ignoreClangTarget) {
@@ -825,18 +850,30 @@ void importer::getNormalInvocationArguments(
   if (!LangOpts.DisableSafeInteropWrappers)
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 
-  if (ctx.SILOpts.Sanitizers & SanitizerKind::Address)
-    invocationArgStrs.push_back("-fsanitize=address");
-  if (ctx.SILOpts.Sanitizers & SanitizerKind::Thread)
-    invocationArgStrs.push_back("-fsanitize=thread");
-  if (ctx.SILOpts.Sanitizers & SanitizerKind::Undefined)
-    invocationArgStrs.push_back("-fsanitize=undefined");
-  if (ctx.SILOpts.Sanitizers & SanitizerKind::MemTagStack) {
-    invocationArgStrs.push_back("-fsanitize=memtag-stack");
-    invocationArgStrs.push_back("-Xclang");
-    invocationArgStrs.push_back("-target-feature");
-    invocationArgStrs.push_back("-Xclang");
-    invocationArgStrs.push_back("+mte");
+  // Forward sanitizer flags to the Clang importer so C++ code imported by it
+  // gets the same instrumentation as the Swift code. Only forward sanitizers
+  // that Clang's driver considers supported for this triple; otherwise Clang
+  // would error out with "unsupported option '-fsanitize=...' for target ...".
+  auto &enabledSanitizers = ctx.SILOpts.Sanitizers;
+  if (enabledSanitizers) {
+    clang::SanitizerMask clangSupported = getClangSupportedSanitizers(triple);
+    if ((enabledSanitizers & SanitizerKind::Address) &&
+        (clangSupported & clang::SanitizerKind::Address))
+      invocationArgStrs.push_back("-fsanitize=address");
+    if ((enabledSanitizers & SanitizerKind::Thread) &&
+        (clangSupported & clang::SanitizerKind::Thread))
+      invocationArgStrs.push_back("-fsanitize=thread");
+    if ((enabledSanitizers & SanitizerKind::Undefined) &&
+        (clangSupported & clang::SanitizerKind::Undefined))
+      invocationArgStrs.push_back("-fsanitize=undefined");
+    if ((enabledSanitizers & SanitizerKind::MemTagStack) &&
+        (clangSupported & clang::SanitizerKind::MemtagStack)) {
+      invocationArgStrs.push_back("-fsanitize=memtag-stack");
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back("-target-feature");
+      invocationArgStrs.push_back("-Xclang");
+      invocationArgStrs.push_back("+mte");
+    }
   }
 }
 
@@ -2249,7 +2286,7 @@ ClangImporter::cloneCompilerInstanceForPrecompiling() {
                                     /*ShouldOwnClient=*/false);
   clonedInstance->createSourceManager();
   clonedInstance->setTarget(&Impl.Instance->getTarget());
-  clonedInstance->setOutputBackend(Impl.SwiftContext.OutputBackend);
+  clonedInstance->setOutputManager(Impl.SwiftContext.OutputBackend);
 
   return clonedInstance;
 }
@@ -6448,11 +6485,10 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
     }
 
     auto out = FuncDecl::createImplicit(
-        context, fn->getStaticSpelling(), fn->getName(),
-        fn->getNameLoc(), fn->hasAsync(), fn->hasThrows(),
-        fn->getThrownInterfaceType(),
+        context, fn->getStaticSpelling(), fn->getName(), fn->getNameLoc(),
+        fn->hasAsync(), fn->hasThrows(), fn->getThrownInterfaceType(),
         fn->getGenericParams(), fn->getParameters(),
-        fn->getResultInterfaceType(), newContext);
+        fn->getResultInterfaceType(), newContext, /*isSynthesized=*/true);
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
     inheritance.setUnavailableIfNecessary(decl, out);
@@ -8091,7 +8127,7 @@ ClangImporter::createEmbeddedBridgingHeaderCacheKey(
                    "ChainedHeaderIncludeTree -> EmbeddedHeaderIncludeTree");
 }
 
-llvm::SmallVector<ValueDecl *, 1>
+TinyPtrVector<ValueDecl *>
 importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
   // If the name is empty, don't try to find any decls.
   if (name.empty())
@@ -8099,21 +8135,31 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
 
   auto &ctx = decl->getASTContext();
   auto clangDecl = decl->getClangDecl();
-  llvm::SmallVector<ValueDecl *, 1> results;
 
   if (name.consume_front(".")) {
     // Look for a member of decl instead of a global.
     if (name.empty())
       return {};
+
     auto declName = DeclName(ctx.getIdentifier(name));
-    auto swiftLookupResults = decl->lookupDirect(declName);
-    if (!swiftLookupResults.empty())
-      return SmallVector<ValueDecl *, 1>(swiftLookupResults.begin(),
-                                         swiftLookupResults.end());
-    auto allResults = evaluateOrDefault(
-        ctx.evaluator, ClangRecordMemberLookup({decl, declName}), {});
-    return SmallVector<ValueDecl *, 1>(allResults.begin(), allResults.end());
+    NominalTypeDecl *searchDecl = decl;
+    while (searchDecl) {
+      auto swiftLookupResults = searchDecl->lookupDirect(declName);
+      if (!swiftLookupResults.empty())
+        return swiftLookupResults;
+
+      auto allResults = evaluateOrDefault(
+          ctx.evaluator, ClangRecordMemberLookup({searchDecl, declName}), {});
+      if (!allResults.empty())
+        return allResults;
+
+      auto classDecl = dyn_cast<ClassDecl>(searchDecl);
+      searchDecl = classDecl ? classDecl->getSuperclassDecl() : nullptr;
+    }
+    return {};
   }
+
+  SmallVector<ValueDecl *, 1> results;
 
   auto *clangMod = clangDecl->getOwningModule();
   if (clangMod && clangMod->isSubModule())
@@ -8137,7 +8183,7 @@ importer::getValueDeclsForName(NominalTypeDecl *decl, StringRef name) {
                        [&](ValueDecl *decl) { return !decl->getClangDecl(); });
     results.erase(newEnd, results.end());
   }
-  return results;
+  return TinyPtrVector<ValueDecl *>(ArrayRef(results));
 }
 
 /// Is this a pointer or a reference to a foreign reference type.
@@ -8737,8 +8783,7 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   if (name == "immortal")
     return {CustomRefCountingOperationResult::immortal, nullptr, name};
 
-  llvm::SmallVector<ValueDecl *, 1> results =
-      getValueDeclsForName(const_cast<ClassDecl*>(swiftDecl), name);
+  auto results = getValueDeclsForName(const_cast<ClassDecl *>(swiftDecl), name);
   if (results.size() == 1)
     return {CustomRefCountingOperationResult::foundOperation, results.front(),
             name};

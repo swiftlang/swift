@@ -4468,9 +4468,6 @@ ERROR(attr_pre_inverse_generics_invalid_except,none,
 WARNING(attr_pre_inverse_generics_except_all,none,
       "'@_preInverseGenerics' that excepts all inverse constraints is "
       "equivalent to not using the attribute", ())
-WARNING(attr_pre_inverse_generics_on_extension,none,
-      "'@_preInverseGenerics' has no effect on an extension; place it on "
-      "individual members instead", ())
 
 // lazy
 ERROR(lazy_not_on_let,none,
@@ -5268,7 +5265,7 @@ ERROR(capture_across_type_decl,none,
       "scope",
       (const NominalTypeDecl *, const ValueDecl *))
 
-ERROR(isolated_any_conversion_to_synchronous_func,none,
+GROUPED_ERROR(isolated_any_conversion_to_synchronous_func,ConversionFromIsolatedAnyToSynchronous,none,
       "converting @isolated(any) function of type %0 to synchronous function type %1 is not allowed",
       (Type, Type))
 
@@ -5323,12 +5320,12 @@ ERROR(implicit_async_super_init,none,
       "'super.init' is 'async' and requires an explicit call",
       ())
 
-WARNING(if_always_true,none,
+GROUPED_WARNING(if_always_true,UselessConditionalStatement,none,
         "'if' condition is always true", ())
-WARNING(while_always_true,none,
+GROUPED_WARNING(while_always_true,UselessConditionalStatement,none,
         "'while' condition is always true", ())
 
-WARNING(guard_always_succeeds,none,
+GROUPED_WARNING(guard_always_succeeds,UselessConditionalStatement,none,
         "'guard' condition is always true, body is unreachable", ())
 
 
@@ -6612,6 +6609,9 @@ ERROR(invalid_ownership_incompatible_class,none,
 ERROR(invalid_ownership_incompatible_foreign_reference_type,none,
       "%0 is incompatible with 'weak' references, because it is a foreign reference type",
       (Type))
+ERROR(downcast_to_foreign_reference_type,none,
+      "downcast from %0 to %1 is not supported for foreign reference types",
+      (Type, Type))
 ERROR(invalid_ownership_with_optional,none,
       "%0 variable cannot have optional type", (ReferenceOwnership))
 ERROR(invalid_ownership_not_optional,none,
@@ -7384,9 +7384,10 @@ ERROR(availability_inout_accessor_only_in, none,
 ERROR(availability_query_required_for_platform, none,
       "condition required for target platform '%0'", (StringRef))
 
-WARNING(availability_query_useless_enclosing_scope, none,
-        "unnecessary check for '%0'; enclosing scope ensures guard "
-        "will always be true", (StringRef))
+GROUPED_WARNING(availability_query_useless_enclosing_scope,
+                UselessAvailabilityCheck, none,
+                "unnecessary check for '%0'; enclosing scope ensures guard "
+                "will always be true", (StringRef))
 
 NOTE(availability_query_useless_enclosing_scope_here, none,
      "enclosing scope here", ())
@@ -8364,9 +8365,6 @@ ERROR(conformance_macro,none,
       "conformance macros are replaced by extension macros",
       ())
 
-ERROR(experimental_macro,none,
-      "macro %0 is experimental",
-      (DeclName))
 ERROR(experimental_closure_body_macro,none,
       "function body macros on closures is experimental",
       ())
@@ -8512,12 +8510,6 @@ ERROR(inverse_conditional_must_be_fully_explicit,none,
         "conditional conformance to %0 must explicitly "
         "state whether %1 is required to conform to %2 or not",
         (const ProtocolDecl *, Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_non_requirement_explicit,none,
-     "specify that the conformance does not require %0 to conform to %1",
-     (Type, const ProtocolDecl *))
-NOTE(make_inverse_conditional_requirement_explicit,none,
-     "specify that the conformance requires %0 to conform to %1",
-     (Type, const ProtocolDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
@@ -8596,6 +8588,11 @@ ERROR(for_loop_sequence_conformance_unavailable,none,
       "only available in %2 %3 or newer",
       (Type, ProtocolDecl *, StringRef, StringRef))
 
+ERROR(for_loop_sequence_conformance_unavailable_unconditionally,none,
+      "for-in loop requires %0 to conform to %1, "
+      "but the conformance is unavailable",
+      (Type, ProtocolDecl *))
+
 //------------------------------------------------------------------------------
 // MARK: Init accessors
 //------------------------------------------------------------------------------
@@ -8665,16 +8662,9 @@ ERROR(lifetime_dependence_duplicate_param_id, none,
 ERROR(lifetime_dependence_cannot_use_kind, none,
       "invalid use of %0 lifetime dependence for %1 ownership",
       (StringRef, StringRef))
-ERROR(lifetime_dependence_cannot_use_parsed_scoped_consuming, none,
-      "invalid use of scoped lifetime dependence with consuming ownership",
-      ())
 ERROR(lifetime_dependence_only_on_function_method_init_result, none,
       "lifetime dependence specifiers may only be used on result of "
        "functions, methods, initializers", ())
-ERROR(lifetime_dependence_ctor_non_self_or_nil_return, none,
-      "expected 'nil' or 'self' as return values in an initializer with "
-      "lifetime dependent specifiers",
-       ())
 ERROR(lifetime_dependence_cannot_be_applied_to_tuple_elt, none,
       "lifetime dependence specifiers cannot be applied to tuple elements", ())
 ERROR(lifetime_dependence_contextual_keyword_conflict_name, none,
@@ -8708,10 +8698,6 @@ NOTE(lifetime_escapable_source_requires_escapable_note, none,
      "use '@_lifetime(%0%1)' instead", (StringRef, StringRef))
 ERROR(lifetime_dependence_unknown_type, none,
       "lifetime dependence checking failed due to unknown %0 type", (StringRef))
-
-ERROR(borrow_inout_experimental,none,
-      "'%0' is an experimental feature",
-      (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: Lifetime Dependence Requirements
@@ -9282,10 +9268,6 @@ GROUPED_WARNING(perf_hint_closure_returns_array,ReturnTypeImplicitCopy,none,
                 "Performance: closure returns a%select{ dictionary|n array}0, leading to implicit copies. "
                 "Consider using an 'inout' parameter instead.", (bool))
 
-GROUPED_WARNING(perf_hint_param_expects_existential,ExistentialType,none,
-                "Performance: %0 expects an existential, leading to heap allocation, reference counting, "
-                "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
-                (const ParamDecl*))
 GROUPED_WARNING(perf_hint_func_returns_existential,ExistentialType,none,
                 "Performance: %0 returns an existential, leading to heap allocation, reference counting, "
                 "and dynamic dispatch. Consider using generic constraints or concrete types instead.",
@@ -9318,7 +9300,7 @@ ERROR(unsafe_self_dependent_result_attr_on_invalid_decl,none,
 REMARK(macro_expansion_line, none, "macro content: |%0|", (StringRef))
 
 GROUPED_WARNING(oslog_missing_string_section,OSLog,none,
-                "global variable 'osLogStringSectionName' is missing from the OSLog module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
+                "global variable 'osLogStringSectionName' is missing from the 'os' module; defaulting to '__TEXT,__oslogstring,cstring_literals'", ())
 GROUPED_ERROR(oslog_string_section_not_literal,OSLog,none,
               "global variable 'osLogStringSectionName' requires a string literal initializer", ())
 

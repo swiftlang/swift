@@ -5626,16 +5626,13 @@ class DebugValueInst final
 
   DebugValueInst(SILDebugLocation DebugLoc, SILValue Operand,
                  SILDebugVariable Var, PoisonRefs_t poisonRefs,
-                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace);
+                 UsesMoveableValueDebugInfo_t operandWasMoved, bool trace,
+                 bool prependDeref);
   static DebugValueInst *create(SILDebugLocation DebugLoc, SILValue Operand,
                                 SILModule &M, SILDebugVariable Var,
                                 PoisonRefs_t poisonRefs,
                                 UsesMoveableValueDebugInfo_t operandWasMoved,
                                 bool trace);
-  static DebugValueInst *createAddr(SILDebugLocation DebugLoc, SILValue Operand,
-                                    SILModule &M, SILDebugVariable Var,
-                                    UsesMoveableValueDebugInfo_t wasMoved,
-                                    bool trace);
 
   SIL_DEBUG_VAR_SUPPLEMENT_TRAILING_OBJS_IMPL()
 
@@ -5705,6 +5702,16 @@ public:
     llvm::ArrayRef<SILDIExprElement> DIExprElements(
         getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
 
+    // Make a temporary copy to prepend a deref. This is safe as
+    // SILDebugVariable contains a copy of the expression.
+    llvm::SmallVector<SILDIExprElement, 4> DIExprCopy;
+    if (hasDeref()) {
+      DIExprCopy.push_back(SILDIExprElement::createOperator(
+          SILDIExprOperator::Dereference));
+      DIExprCopy.append(DIExprElements.begin(), DIExprElements.end());
+      DIExprElements = DIExprCopy;
+    }
+
     return VarInfo.get(getDecl(), getTrailingObjects<char>(), AuxVarType,
                        VarDeclLoc, VarDeclScope, DIExprElements);
   }
@@ -5736,9 +5743,18 @@ public:
     return DVI && DVI->hasAddrVal()? DVI : nullptr;
   }
 
-  /// Whether the attached di-expression (if there is any) starts
-  /// with `op_deref`.
-  bool exprStartsWithDeref() const;
+  /// Whether this debug value has a DIExpr with a deref. If this instruction
+  /// has a debug reconstruction block, this returns false.
+  bool hasDeref() const {
+    return sharedUInt8().DebugValueInst.prependDeref;
+  }
+
+  /// Prepends a deref operator to this debug_value in place.
+  /// This must be called when the operand is changed from an object type to
+  /// an address type (when moved to the stack, for example).
+  /// If a reconstruction block exists, a load is added at the beginning.
+  /// Otherwise, it will be prepended to the DIExpr.
+  void prependDeref();
 
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)

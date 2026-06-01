@@ -1631,10 +1631,6 @@ bool SILParser::parseSILDebugInfoExpression(SILDebugInfoExpression &DIExpr) {
   static const SILDIExprOperator AllOps[] = {
     SILDIExprOperator::Dereference,
     SILDIExprOperator::Fragment,
-    SILDIExprOperator::Plus,
-    SILDIExprOperator::Minus,
-    SILDIExprOperator::ConstUInt,
-    SILDIExprOperator::ConstSInt,
     SILDIExprOperator::TupleFragment
   };
 
@@ -7811,6 +7807,7 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   StringRef asmName;
   StringRef section;
   bool isLet = false;
+  std::optional<CodeGenerationModel> codeGenerationModel;
 
   SILParser State(P);
   if (parseSILLinkage(GlobalLinkage, P) ||
@@ -7818,9 +7815,9 @@ bool SILParserState::parseSILGlobal(Parser &P) {
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
                            nullptr, nullptr, nullptr, &isMarkedAsUsed, &asmName,
-                           &section, &isLet, nullptr, nullptr, nullptr, nullptr,
+                           &section, &isLet, nullptr, &codeGenerationModel,
                            nullptr, nullptr, nullptr, nullptr, nullptr, nullptr,
-                           nullptr, State, M) ||
+                           nullptr, nullptr, nullptr, State, M) ||
       P.parseToken(tok::at_sign, diag::expected_sil_value_name) ||
       P.parseIdentifier(GlobalName, NameLoc, /*diagnoseDollarPrefix=*/false,
                         diag::expected_sil_value_name) ||
@@ -7849,6 +7846,8 @@ bool SILParserState::parseSILGlobal(Parser &P) {
   GV->setMarkedAsUsed(isMarkedAsUsed);
   GV->setAsmName(asmName);
   GV->setSection(section);
+  if (codeGenerationModel)
+    GV->setCodeGenerationModel(codeGenerationModel);
 
   // Parse static initializer if exists.
   if (State.P.consumeIf(tok::equal) && State.P.consumeIf(tok::l_brace)) {

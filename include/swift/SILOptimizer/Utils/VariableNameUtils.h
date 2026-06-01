@@ -136,6 +136,15 @@ private:
   /// If set, a diagnostic should do a 'root' is defined here error.
   SILValue rootValue;
 
+  /// The source location of the first (leaf-most) component pushed onto
+  /// \c variableNamePath. Since we walk use->def, the first push corresponds
+  /// to the deepest projection in the access path -- e.g., for "self.x.y"
+  /// this is the loc of the projection producing `y`. This is useful for
+  /// diagnostics that want the source location of the leaf access rather
+  /// than the root variable's location (which for a stored property accessed
+  /// in an init can be on the `init` keyword, far from the access).
+  SourceLoc firstNameProvidingLoc;
+
   /// The final string we computed.
   SmallString<64> &resultingString;
 
@@ -223,6 +232,24 @@ public:
   static std::optional<std::pair<Identifier, SILValue>>
   inferNameAndRoot(SILValue value);
 
+  /// Like \c inferName, but additionally returns the source location of the
+  /// first (leaf-most) component pushed onto the name path -- i.e., the
+  /// deepest projection in the access path. For "self.x.y" this is the loc
+  /// of the SILValue projecting `y`. Useful when a diagnostic wants the
+  /// source location of the leaf access rather than the root variable's
+  /// location.
+  ///
+  /// Returns std::nullopt if no name could be inferred. The returned
+  /// SourceLoc may be invalid when the inferred name has no associated
+  /// providing source location (e.g., a single-component name coming
+  /// directly from a debug_value with no usable loc).
+  static std::optional<std::pair<Identifier, SourceLoc>>
+  inferNameAndFirstPathComponent(SILValue value);
+
+  /// Returns the source location whose name was first pushed onto the name
+  /// path during the walk. See \c firstNameProvidingLoc for details.
+  SourceLoc getFirstNameProvidingLoc() const { return firstNameProvidingLoc; }
+
   /// Given a specific decl \p d, come up with a name for it.
   ///
   /// This is used internally for translating all decls to names. This is
@@ -232,6 +259,15 @@ public:
 
 private:
   void drainVariableNamePath();
+
+  /// Push \p name onto the variable name path, recording \p providingLoc
+  /// as the first name-providing source location if none has been recorded
+  /// yet.
+  void pushPathComponent(StringRef name, SourceLoc providingLoc) {
+    variableNamePath.push_back(name);
+    if (firstNameProvidingLoc.isInvalid())
+      firstNameProvidingLoc = providingLoc;
+  }
 
   /// Finds the SILValue that either provides the direct debug information or
   /// that has a debug_value user that provides the name of the value.

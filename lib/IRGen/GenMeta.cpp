@@ -5727,9 +5727,9 @@ void irgen::emitLazyClassMetadata(IRGenModule &IGM, CanType classTy) {
   // lazily emitting their own copy.
   if (IGM.isEmbeddedWithExistentials()) {
     if (auto *classDecl = classTy->getClassOrBoundGenericClass()) {
-      if (auto model = classDecl->getExplicitCodeGenerationModel())
-        if (*model == CodeGenerationModel::Interface)
-          return;
+      if (classDecl->getEffectiveCodeGenerationModel()
+              == CodeGenerationModel::Interface)
+        return;
     }
   }
 
@@ -7911,8 +7911,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
       if (auto invertible = protocol->getInvertibleProtocolKind()) {
         ++metadata.NumRequirements;
 
-        InvertibleProtocolSet mask(0xFFFF);
-        mask.remove(*invertible);
+        auto mask = InvertibleProtocolSet::allExcept(*invertible);
 
         auto flags = GenericRequirementFlags(
             GenericRequirementKind::InvertedProtocols,

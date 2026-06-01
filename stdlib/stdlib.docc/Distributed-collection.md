@@ -14,18 +14,18 @@ that runs across multiple computers.
 
 You use three main parts when writing code with distributed actors:
 
-- Swift language support for distributed actors, and building Distributed/RPC systems integrated into the language. 
+- Swift language support for distributed actors and for building distributed or RPC systems integrated into the language.
   For more information,
   see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
 
 - The Distributed module, which includes the types and protocols you need
-  to declare and use distribute actors.
+  to declare and use distributed actors.
   For example, it has
   protocols to which distributed actors and distributed actor systems conform,
   and structures that encapsulate information about calls to a distributed actor.
 
-- A *distributed actor system*, also called a cluster runtime,
-  provides an implementation of the ``Distributed/DistributedActorSystem`` protocol
+- A *distributed actor system* provides an implementation of the
+  ``Distributed/DistributedActorSystem`` protocol
   and coordinates between the cluster's nodes.
   A distributed actor is always part of some distributed actor system;
   that distributed actor system handles the serialization and networking
@@ -39,31 +39,28 @@ You use three main parts when writing code with distributed actors:
 
 [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
 [tspl]: https://docs.swift.org/swift-book/
-[runtime]: https://github.com/apple/swift-distributed-actors/
+[cluster]: https://github.com/apple/swift-distributed-actors/
 
 ## Topics
 
-
-### Articles
-
-- <doc:implementing-a-custom-distributed-actor-system>
-
-### Distributed Actors
+### Distributed actors
 
 - ``Distributed/DistributedActor``
-- ``Distributed/DistributedActorSystem``
 - ``Distributed/Resolvable()``
 - ``Distributed/buildDefaultDistributedRemoteActorExecutor(_:)``
 
-### Remote Calls
+### Distributed actor system
 
+- <doc:implementing-a-custom-distributed-actor-system>
+- ``Distributed/DistributedActorSystem``
 - ``Distributed/RemoteCallTarget``
 - ``Distributed/RemoteCallArgument``
 - ``Distributed/DistributedTargetInvocationEncoder``
 - ``Distributed/DistributedTargetInvocationDecoder``
 - ``Distributed/DistributedTargetInvocationResultHandler``
 
-### Local Testing
+
+### Local testing
 
 - ``Distributed/LocalTestingDistributedActorSystem``
 - ``Distributed/LocalTestingActorID``

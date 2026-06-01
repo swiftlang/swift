@@ -345,11 +345,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   // Everything else cares about the (rvalue) argument.
 
-  case BuiltinValueKind::CancelAsyncTask: {
-    emitTaskCancel(IGF, args.claimNext());
-    return;
-  }
-
   case BuiltinValueKind::ConvertTaskToJob: {
     auto task = args.claimNext();
     // The job object starts at the beginning of the task.

@@ -3740,8 +3740,15 @@ ConformanceChecker::checkActorIsolation(ValueDecl *requirement,
         // and associated types within the conformance can both resolve.
         auto reqGenEnv = requirement->getInnermostDeclContext()
                              ->getGenericEnvironmentOfContext();
-        auto reqSubs = Conformance->getType()->getMemberSubstitutionMap(
-            requirement, reqGenEnv);
+        // Map the conformance's type into its generic environment so that any
+        // conformer-introduced type parameters appearing in the substituted
+        // parameter type are archetypes carrying their conformer-side
+        // constraints (rather than bare interface-type generic parameters,
+        // which `lookupConformance` treats as trivially conforming).
+        Type mappedConformanceType =
+            DC->mapTypeIntoEnvironment(Conformance->getType());
+        auto reqSubs =
+            mappedConformanceType->getMemberSubstitutionMap(requirement, reqGenEnv);
         diagnoseNonSendableTypesInReference(
             /*base=*/nullptr, ConcreteDeclRef(requirement, reqSubs),
             requirement->getInnermostDeclContext(), requirement->getLoc(),
@@ -6198,7 +6205,9 @@ TypeChecker::containsProtocol(Type T, ProtocolDecl *Proto,
     // Note that `allowMissing` is not propagated here because it
     // would result in a missing conformance if type is `& Sendable`
     // protocol composition. It's handled for type as a whole below.
-    if (auto superclass = layout.getSuperclass()) {
+    //
+    // FIXME: This is broken, see the comment on that getter method.
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass()) {
       auto conformance = lookupConformance(superclass, Proto,
                                            /*allowMissing=*/false);
       if (conformance)

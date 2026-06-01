@@ -18,6 +18,7 @@
 #include "ArgsToFrontendOptionsConverter.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/LanguageMode.h"
 #include "swift/Basic/Platform.h"
@@ -141,31 +142,6 @@ void CompilerInvocation::setDefaultPrebuiltCacheIfNecessary() {
   auto pair = ((StringRef)FrontendOpts.PrebuiltModuleCachePath).split(anchor);
   FrontendOpts.BackupModuleInterfaceDir =
     (llvm::Twine(pair.first) + "preferred-interfaces" + pair.second).str();
-}
-
-void CompilerInvocation::setDefaultBlocklistsIfNecessary() {
-  if (!LangOpts.BlocklistConfigFilePaths.empty())
-    return;
-  if (SearchPathOpts.RuntimeResourcePath.empty())
-    return;
-  // XcodeDefault.xctoolchain/usr/lib/swift
-  SmallString<64> blocklistDir{SearchPathOpts.RuntimeResourcePath};
-  // XcodeDefault.xctoolchain/usr/lib
-  llvm::sys::path::remove_filename(blocklistDir);
-  // XcodeDefault.xctoolchain/usr
-  llvm::sys::path::remove_filename(blocklistDir);
-  // XcodeDefault.xctoolchain/usr/local/lib/swift/blocklists
-  llvm::sys::path::append(blocklistDir, "local", "lib", "swift", "blocklists");
-  std::error_code EC;
-  if (llvm::sys::fs::is_directory(blocklistDir)) {
-    for (llvm::sys::fs::directory_iterator F(blocklistDir, EC), FE;
-         F != FE; F.increment(EC)) {
-      StringRef ext = llvm::sys::path::extension(F->path());
-      if (ext.ends_with(".yml") || ext.ends_with(".yaml")) {
-        LangOpts.BlocklistConfigFilePaths.push_back(F->path());
-      }
-    }
-  }
 }
 
 void CompilerInvocation::setDefaultInProcessPluginServerPathIfNecessary() {
@@ -831,6 +807,15 @@ parseStrictConcurrency(StringRef value) {
       .Default(std::nullopt);
 }
 
+static std::optional<swift::CodeGenerationModel>
+parseCodeGenerationModel(StringRef value) {
+  return llvm::StringSwitch<std::optional<swift::CodeGenerationModel>>(value)
+      .Case("interface", swift::CodeGenerationModel::Interface)
+      .Case("implementation", swift::CodeGenerationModel::Implementation)
+      .Case("inlinable", swift::CodeGenerationModel::Inlinable)
+      .Default(std::nullopt);
+}
+
 static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
                          DiagnosticEngine &Diags,
                          const FrontendOptions &FrontendOpts) {
@@ -872,9 +857,8 @@ static bool ParseCASArgs(CASOptions &Opts, ArgList &Args,
   return false;
 }
 
-static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
-                                    DiagnosticEngine &Diags,
-                                    const FrontendOptions &FrontendOpts) {
+bool swift::parseFeatureArgs(LangOptions &Opts, llvm::opt::ArgList &Args,
+                             DiagnosticEngine &Diags) {
   using namespace options;
 
   bool HadError = false;
@@ -902,7 +886,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     // separately.
     if (argValue.starts_with("StrictConcurrency") ||
         argValue.starts_with("AvailabilityMacro=") ||
-        argValue.starts_with("RequiresObjC=")) {
+        argValue.starts_with("RequiresObjC=") ||
+        argValue.starts_with("CodeGenerationModel=")) {
       if (isEnableFeatureFlag)
         psuedoFeatures.push_back(argValue);
       continue;
@@ -1054,6 +1039,26 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (featureName->starts_with("RequiresObjC")) {
       auto modules = featureName->split("=").second;
       modules.split(Opts.ModulesRequiringObjC, ",");
+    }
+
+    if (featureName->starts_with("CodeGenerationModel=")) {
+      auto value = featureName->split("=").second;
+
+      if (!Opts.hasFeature(Feature::Embedded)) {
+        Diags.diagnose(SourceLoc(),
+                       diag::code_generation_model_requires_embedded);
+        HadError = true;
+        continue;
+      }
+
+      if (auto model = parseCodeGenerationModel(value)) {
+        Opts.CodeGenerationModelOverride = *model;
+      } else {
+        Diags.diagnose(SourceLoc(), diag::invalid_code_generation_model,
+                       value);
+        HadError = true;
+      }
+      continue;
     }
   }
 
@@ -1363,7 +1368,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableExperimentalStringProcessing = true;
   }
 
-  if (ParseEnabledFeatureArgs(Opts, Args, Diags, FrontendOpts))
+  if (parseFeatureArgs(Opts, Args, Diags))
     HadError = true;
 
   // SuppressedAssociatedTypesWithDefaults is now always-on by default.
@@ -1403,6 +1408,8 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
       }
     }
   }
+
+  Opts.IPIClangModuleNames = Args.getAllArgValues(OPT_ipi_clang_module);
 
   if (const Arg *A = Args.getLastArg(OPT_package_name)) {
     auto pkgName = A->getValue();
@@ -2747,6 +2754,7 @@ static bool ParseDiagnosticArgs(DiagnosticOptions &Opts, ArgList &Args,
   Opts.VerifyIgnoreUnknown |= Args.hasArg(OPT_verify_ignore_unknown);
   Opts.VerifyIgnoreUnrelated |= Args.hasArg(OPT_verify_ignore_unrelated);
   Opts.VerifyIgnoreMacroLocationNote |= Args.hasArg(OPT_verify_ignore_macro_note);
+  Opts.VerifyChildNotes |= Args.hasArg(OPT_verify_child_notes);
   Opts.SkipDiagnosticPasses |= Args.hasArg(OPT_disable_diagnostic_passes);
   Opts.ShowDiagnosticsAfterFatalError |=
     Args.hasArg(OPT_show_diagnostics_after_fatal);
@@ -4440,7 +4448,6 @@ bool CompilerInvocation::parseArgs(
   updateRuntimeLibraryPaths(SearchPathOpts, FrontendOpts, LangOpts, SDKInfo);
   updateImplicitFrameworkSearchPaths(SearchPathOpts, LangOpts, SDKInfo);
   setDefaultPrebuiltCacheIfNecessary();
-  setDefaultBlocklistsIfNecessary();
   setDefaultInProcessPluginServerPathIfNecessary();
 
   // Now that we've parsed everything, setup some inter-option-dependent state.

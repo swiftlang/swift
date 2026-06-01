@@ -186,6 +186,8 @@ def verify_ignore_unrelated: Flag<["-"], "verify-ignore-unrelated">,
   HelpText<"Allow diagnostics in files outside those with expected diagnostics in verify mode">;
 def verify_ignore_macro_note: Flag<["-"], "verify-ignore-macro-note">,
   HelpText<"Skip verifying notes about macro location">;
+def verify_child_notes: Flag<["-"], "verify-child-notes">,
+  HelpText<"Verify child notes in child diagnostics blocks">;
 def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
   MetaVarName<"<module-name>">,
   HelpText<"Verify the generic signatures in the given module">;
@@ -314,6 +316,11 @@ def parallel_scan : Flag<["-"], "parallel-scan">,
    HelpText<"Perform dependency scanning in-parallel.">;
 def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
    HelpText<"Perform dependency scanning in a single-threaded fashion.">;
+
+def no_clang_compiler_instance_sharing
+    : Flag<["-"], "no-clang-scanner-instance-sharing">,
+      HelpText<"Disable sharing of the Clang compiler instance across "
+               "dependency scans.">;
 
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Always run SIL copy propagation with lexical lifetimes to shorten object "

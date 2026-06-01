@@ -311,38 +311,7 @@ static bool isSingleSwiftRefcounted(SILModule &M,
   if (isa<SILBoxType>(Ty))
     return true;
   
-  // Is the type a Swift-refcounted class?
-  // For a generic type, consider its superclass constraint, if any.
-  auto ClassTy = Ty;
-  if (auto archety = dyn_cast<ArchetypeType>(Ty)) {
-    if (auto superclass = Ty->getSuperclass()) {
-      ClassTy = superclass->getCanonicalType();
-    }
-  }
-  // For an existential type, consider its superclass constraint, if it carries
-  // no witness tables.
-  if (Ty->isAnyExistentialType()) {
-    auto layout = Ty->getExistentialLayout();
-    // Must be no protocol constraints that aren't @objc or @_marker.
-    if (layout.containsSwiftProtocol) {
-      return false;
-    }
-    
-    // The Error existential has its own special layout.
-    if (layout.isErrorExistential()) {
-      return false;
-    }
-    
-    // We can look at the superclass constraint, if any, to see if it's
-    // Swift-refcounted.
-    if (!layout.getSuperclass()) {
-      return false;
-    }
-    ClassTy = layout.getSuperclass()->getCanonicalType();
-  }
-  
-  // TODO: Does the base class we found have fully native Swift ancestry,
-  // so we can use Swift native refcounting on it?
+  // FIXME: Draw the rest of the horse.
   return false;
 }
 

@@ -8,6 +8,10 @@ func bare<T: ~Copyable>(_ t: borrowing T) {}
 @_preInverseGenerics(except: ~Copyable)
 func exceptCopyable<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 
+// Shorthand alias for `@_preInverseGenerics(except: ~Copyable)`.
+@_preInverseGenericsExceptCopyable
+func exceptCopyableShorthand<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
+
 @_preInverseGenerics(except: ~Escapable)
 func exceptEscapable<T: ~Copyable & ~Escapable>(_ t: borrowing T) {}
 
@@ -30,11 +34,3 @@ func bad2() {}
 // positive protocol (not inverted)
 @_preInverseGenerics(except: Copyable) // expected-error {{'except' argument to '@_preInverseGenerics' must consist only of inverse constraints such as '~Copyable' or '~Escapable'}}
 func bad3() {}
-
-// Warning: attribute on extension has no effect
-struct S<T: ~Copyable>: ~Copyable {}
-
-@_preInverseGenerics // expected-warning {{'@_preInverseGenerics' has no effect on an extension; place it on individual members instead}}
-extension S where T: ~Copyable {
-  func extMethod() {}
-}

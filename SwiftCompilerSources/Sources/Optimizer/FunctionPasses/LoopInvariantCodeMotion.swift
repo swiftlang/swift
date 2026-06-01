@@ -764,21 +764,19 @@ private extension MovableInstructions {
       return false
     }
 
-    // We currently don't support split `load [take]`, i.e. `load [take]` which does _not_ load all
-    // non-trivial fields of the initial value.
+    // We currently don't support split `load [take]`.
     for case let load as LoadInst in loadsAndStores {
-      if load.loadOwnership == .take,
-         let path = accessPath.getProjection(to: load.address.accessPath),
-         !firstStore.destination.type.isProjectingEntireNonTrivialMembers(path: path, in: load.parentFunction)
-      {
+      if load.loadOwnership == .take, load.address.accessPath != accessPath {
         return false
       }
     }
 
+    let phiOwnership: Ownership = firstStore.parentFunction.hasOwnership ? (firstStore.source.type.isTrivial(in: firstStore.parentFunction) ? .none : .owned) : .none
+
     var ssaUpdater = SSAUpdater(
       function: firstStore.parentFunction,
       type: firstStore.destination.type.objectType,
-      ownership: firstStore.source.ownership,
+      ownership: phiOwnership,
       context
     )
     
@@ -808,9 +806,9 @@ private extension MovableInstructions {
     }) else {
       return false
     }
-    
-    let ownership: LoadInst.LoadOwnership = firstStore.parentFunction.hasOwnership ? (firstStore.storeOwnership == .initialize ? .take : .trivial) : .unqualified
-    
+
+    let ownership: LoadInst.LoadOwnership = firstStore.parentFunction.hasOwnership ? (initialAddr.type.isTrivial(in: firstStore.parentFunction) ? .trivial : .take) : .unqualified
+
     let initialLoad = builder.createLoad(fromAddress: initialAddr, ownership: ownership)
     ssaUpdater.addAvailableValue(initialLoad, in: loop.preheader!)
     
@@ -861,7 +859,7 @@ private extension MovableInstructions {
       }
     
       let builder = Builder(before: loadInst, context)
-      let projection = if loadInst.loadOwnership == .copy {
+      let projection = if loadInst.loadOwnership == .copy || loadInst.loadOwnership == .trivial {
         rootVal.createProjectionAndCopy(path: projectionPath, builder: builder)
       } else {
         rootVal.createProjection(path: projectionPath, builder: builder)
@@ -927,35 +925,6 @@ private extension MovableInstructions {
       worklist.pushSuccessors(of: inst)
     }
     return true
-  }
-}
-
-private extension Type {
-  func isProjectingEntireNonTrivialMembers(path: SmallProjectionPath, in function: Function) -> Bool {
-    let (kind, index, subPath) = path.pop()
-    switch kind {
-    case .root:
-      return true
-    case .structField:
-      guard let fields = getNominalFields(in: function) else {
-        return false
-      }
-      for (fieldIdx, fieldType) in fields.enumerated() {
-        if fieldIdx != index && !fieldType.isTrivial(in: function) {
-          return false
-        }
-      }
-      return fields[index].isProjectingEntireNonTrivialMembers(path: subPath, in: function)
-    case .tupleField:
-      for (elementIdx, elementType) in tupleElements.enumerated() {
-        if elementIdx != index && !elementType.isTrivial(in: function) {
-          return false
-        }
-      }
-      return tupleElements[index].isProjectingEntireNonTrivialMembers(path: subPath, in: function)
-    default:
-      fatalError("path is not materializable")
-    }
   }
 }
 

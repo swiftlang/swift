@@ -1063,7 +1063,6 @@ visitResumeThrowingContinuationThrowing(BuiltinInst *bi, StringRef attr) {
 
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, TaskRunInline)
 
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CancelAsyncTask)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, InitializeDefaultActor)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyDefaultActor)
 

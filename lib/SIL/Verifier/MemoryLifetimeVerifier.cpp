@@ -145,9 +145,7 @@ public:
   MemoryLifetimeVerifier(SILFunction *function, CalleeCache *calleeCache,
                          DeadEndBlocks *deadEndBlocks)
       : function(function), calleeCache(calleeCache),
-        deadEndBlocks(deadEndBlocks),
-        locations(/*handleNonTrivialProjections*/ true,
-                  /*handleTrivialLocations*/ true) {}
+        deadEndBlocks(deadEndBlocks) {}
 
   /// The main entry point to verify the lifetime of all memory locations in
   /// the function.

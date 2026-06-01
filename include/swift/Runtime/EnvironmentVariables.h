@@ -19,6 +19,7 @@
 
 #include "swift/Threading/Once.h"
 #include "swift/shims/Visibility.h"
+#include <optional>
 
 namespace swift {
 namespace runtime {
@@ -34,6 +35,7 @@ using boolean = bool;
 using string = const char *;
 using uint8 = uint8_t;
 using uint32 = uint32_t;
+using optional_uint8 = std::optional<uint8_t>;
 } // namespace types
 
 // Declare backing variables.

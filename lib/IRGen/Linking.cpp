@@ -718,14 +718,16 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     if (isForcedShared())
       return SILLinkage::Shared;
 
-    // In embedded existenitals mode we generate lazy public metadata on demand
-    // which makes it non unique.
-    if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(getType()))
-      return SILLinkage::Shared;
-
     auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata: {
+      // In embedded existentials mode we generate lazy public metadata on
+      // demand which makes the full metadata non-unique. (The address-point
+      // alias still uses the formal declaration linkage so that it survives
+      // GlobalDCE under -internalize-at-link.)
+      if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(getType()))
+        return SILLinkage::Shared;
+
       // For imported types, the full metadata object is a candidate
       // for uniquing.
       if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
@@ -740,11 +742,10 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
       // module, so the FullMetadata must be externally linkable.
       bool isEmbedded =
         nominal->getASTContext().LangOpts.hasFeature(Feature::Embedded);
-      if (isEmbedded && !nominal->isGenericContext()) {
-        if (auto model = nominal->getExplicitCodeGenerationModel()) {
-          if (*model == CodeGenerationModel::Interface) {
-            return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
-          }
+      if (isEmbedded) {
+        if (nominal->getEffectiveCodeGenerationModel()
+                == CodeGenerationModel::Interface) {
+          return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
         }
       }
 
@@ -1816,6 +1817,13 @@ bool LinkEntity::hasNonUniqueDefinition() const {
 
   if (getKind() == Kind::TypeMetadata ||
       getKind() == Kind::ValueWitnessTable) {
+    // The address-point alias of type metadata is uniquely defined per
+    // binary even when the full metadata it references is shared, so it
+    // gets the formal declaration linkage rather than linkonce_odr.
+    if (getKind() == Kind::TypeMetadata &&
+        getMetadataAddress() == TypeMetadataAddress::AddressPoint)
+      return false;
+
     // For a nominal type, check its declaration.
     CanType type = getType();
     if (auto nominal = type->getAnyNominal()) {
@@ -1835,10 +1843,16 @@ bool LinkEntity::hasNonUniqueDefinition() const {
               Feature::Embedded)) {
         if (auto *normal = dyn_cast<NormalProtocolConformance>(
                 getProtocolConformance()->getRootConformance())) {
-          if (auto model = normal->getExplicitCodeGenerationModel())
-            if (*model == CodeGenerationModel::Interface)
+          switch (normal->getEffectiveCodeGenerationModel()) {
+            case CodeGenerationModel::Interface:
               return false;
+
+            case CodeGenerationModel::Implementation:
+            case CodeGenerationModel::Inlinable:
+              return true;
+          }
         }
+
         return true;
       }
     }

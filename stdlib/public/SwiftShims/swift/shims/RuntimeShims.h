@@ -39,7 +39,7 @@ void *_swift_objCMirrorSummary(const void * nsObject);
 
 // _swift_stdlib_strto{d,f,f16}_clocale were reimplemented in
 // Swift in Dec 2025.  See FloatingPointFromString.swift
-// _swift_stdlib_strtold_clocale was not reimplemented at that time.
+// _swift_stdlib_strtold_clocale was reimplemented in May 2026.
 
 /// Call strtold_l with the C locale, swapping argument and return
 /// types so we can operate on Float80.

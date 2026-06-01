@@ -88,7 +88,6 @@ struct DerivedVirtualRetainRelease : VirtualRetainRelease {
 
 struct PureVirtualRetainRelease {
   int value;
-  mutable int refCount = 1;
   SWIFT_RETURNS_RETAINED
   PureVirtualRetainRelease(int value) : value(value) {}
 

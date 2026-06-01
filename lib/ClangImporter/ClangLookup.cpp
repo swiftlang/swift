@@ -53,6 +53,7 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
+#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/iterator_range.h"
@@ -387,6 +388,17 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     for (const auto *valueDecl : result)
       foundMethodNames.insert(valueDecl->getName());
 
+    // If this FRT class has a single FRT superclass, skip looking up members
+    // from that base: they are reachable via the Swift superclass chain
+    // instead.
+    const clang::RecordDecl *superclassClangDecl = nullptr;
+    if (!inheritance) {
+      auto derivedInfo = evaluateOrDefault(
+          ctx.evaluator, ForeignReferenceTypeInfoRequest({cxxRecord}), {});
+      if (auto primaryBase = derivedInfo.getPrimarySuperclass())
+        superclassClangDecl = primaryBase;
+    }
+
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
         continue;
@@ -399,6 +411,10 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         continue;
 
       auto *baseRecord = baseType->getAs<clang::RecordType>()->getDecl();
+
+      if (superclassClangDecl && baseRecord->getCanonicalDecl() ==
+                                     superclassClangDecl->getCanonicalDecl())
+        continue;
 
       if (importer::isSymbolicCircularBase(cxxRecord, baseRecord))
         // Skip circular bases to avoid unbounded recursion
@@ -588,13 +604,12 @@ static auto filterMethodOverloads(clang::LookupResult &R,
 
 /// Imports a C++ \a method to a Swift \a struct as a non-inherited member when
 /// \a access is AS_none, or an inherited member with effective \a access
-/// otherwise. Marks the method as unavailable with \a unavailabilityMsg.
+/// otherwise.
 ///
 /// Helper for the lookupAndImport* functions.
-static FuncDecl *importUnavailableMethod(ClangImporter::Implementation &Impl,
-                                         CXXOverload overload,
-                                         NominalTypeDecl *Struct,
-                                         StringRef unavailabilityMsg) {
+static FuncDecl *importUnderlyingFunction(ClangImporter::Implementation &Impl,
+                                          CXXOverload overload,
+                                          NominalTypeDecl *Struct) {
   Decl *imported;
   if (auto *ftd = overload.method->getDescribedFunctionTemplate())
     imported = Impl.importDecl(ftd, Impl.CurrentVersion);
@@ -608,7 +623,6 @@ static FuncDecl *importUnavailableMethod(ClangImporter::Implementation &Impl,
         Impl.importBaseMemberDecl(func, Struct, inheritance));
   if (!func)
     return nullptr;
-  Impl.markUnavailable(func, unavailabilityMsg);
   return func;
 }
 
@@ -669,19 +683,19 @@ ClangImporter::Implementation::lookupAndImportPointeeAndOperatorStar(
   FuncDecl *getter = nullptr, *setter = nullptr;
 
   if (CXXSetter) {
-    setter = importUnavailableMethod(*this, CXXSetter, Struct,
-                                     "use .pointee property");
+    setter = importUnderlyingFunction(*this, CXXSetter, Struct);
     if (!setter)
       return {};
+    markUnavailable(setter, "use .pointee property");
   }
 
   if (CXXGetter == CXXSetter) {
     getter = setter;
   } else if (CXXGetter) {
-    getter = importUnavailableMethod(*this, CXXGetter, Struct,
-                                     "use .pointee property");
+    getter = importUnderlyingFunction(*this, CXXGetter, Struct);
     if (!getter)
       return {};
+    markUnavailable(getter, "use .pointee property");
   }
 
   SwiftDeclSynthesizer synth{*this};
@@ -755,10 +769,10 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportSuccessor(
   if (!CXXMethod)
     return nullptr;
 
-  auto *incr = importUnavailableMethod(*this, CXXMethod, Struct,
-                                       "use .pointee property");
+  auto *incr = importUnderlyingFunction(*this, CXXMethod, Struct);
   if (!incr)
     return nullptr;
+  markUnavailable(incr, "use .successor()");
 
   SwiftDeclSynthesizer synth{*this};
   auto *succ = synth.makeSuccessorFunc(incr);
@@ -806,8 +820,15 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
   if (!R.has_value())
     return {};
 
-  llvm::SmallDenseMap<CXXOverloadArgTypes, std::pair<CXXOverload, CXXOverload>,
-                      1>
+  // If this FRT class has a single FRT superclass, inherited overloads whose
+  // declaring class is that superclass (or a Clang base of it) are reachable
+  // via the Swift superclass chain and should not be synthesized here again.
+  auto frtInfo = evaluateOrDefault(
+      SwiftContext.evaluator, ForeignReferenceTypeInfoRequest({CXXRecord}), {});
+  auto superclassClangDecl = frtInfo.getPrimarySuperclass();
+
+  llvm::SmallMapVector<CXXOverloadArgTypes,
+                       std::pair<CXXOverload, CXXOverload>, 1>
       CXXSubscripts;
 
   auto overloads =
@@ -816,6 +837,14 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
     if (overload.method->isVolatile() ||
         overload.method->getRefQualifier() == clang::RQ_RValue)
       continue;
+
+    if (superclassClangDecl) {
+      auto methodParent = overload.method->getParent();
+      if (methodParent != CXXRecord &&
+          (methodParent == superclassClangDecl ||
+           superclassClangDecl->isDerivedFrom(methodParent)))
+        continue;
+    }
 
     auto retTy = overload.method->getReturnType();
     auto isSetter = (retTy->isAnyPointerType() || retTy->isReferenceType()) &&
@@ -828,7 +857,8 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
   }
 
   llvm::SmallVector<SubscriptDecl *, 1> subscripts;
-  for (auto [CXXGetter, CXXSetter] : CXXSubscripts.values()) {
+  for (auto &[_, pair] : CXXSubscripts) {
+    auto [CXXGetter, CXXSetter] = pair;
     ASSERT((CXXGetter || CXXSetter) &&
            "subscript should have at least getter or setter");
 
@@ -865,10 +895,10 @@ ClangImporter::Implementation::lookupAndImportSubscripts(
       if (!overload)
         return nullptr;
 
-      auto *swiftFunc =
-          importUnavailableMethod(*this, overload, Struct, "use subscript");
+      auto *swiftFunc = importUnderlyingFunction(*this, overload, Struct);
       if (!swiftFunc)
         return nullptr;
+      markUnavailable(swiftFunc, "use subscript");
 
       auto name = swiftFunc->getBaseName();
       ASSERT(!name.isSpecial() &&
@@ -1025,8 +1055,13 @@ FuncDecl *ClangImporter::Implementation::lookupAndImportOperatorBool(
   }
   CXXRecord->addDecl(Method);
 
-  auto *func = importUnavailableMethod(*this, {Method, clang::AS_none}, Struct,
-                                       "use Bool(fromCxx:)");
+  auto *func =
+      importUnderlyingFunction(*this, {Method, clang::AS_none}, Struct);
+  if (!func)
+    return nullptr;
+  auto *depr = AvailableAttr::createUniversallyDeprecated(SwiftContext,
+                                                          "use Bool(fromCxx:)");
+  func->addAttribute(depr);
   markMemberSynthesizedPerType(func);
   importAttributes(OpBool, func);
 

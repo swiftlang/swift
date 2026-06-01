@@ -1373,3 +1373,11 @@ struct InaccessibleAndInvalidCandidate {
   // expected-resilient-error@-2 {{'@dynamicMemberLookup' requires 'subscript(dynamicMember:)' to be as accessible as its enclosing type}}
   subscript(dynamicMember x: Int) -> Void { () }
 }
+
+// Don't crash if a missing argument label is followed by some other invalid
+// parameter.
+@dynamicMemberLookup class InvalidParameterAfterMissingLabel {
+  subscript(_: String, _: DoesNotExist) -> Int { fatalError() }
+  // expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}
+  // expected-error@-2 {{'@dynamicMemberLookup' requires parameter to have a default value}}
+}

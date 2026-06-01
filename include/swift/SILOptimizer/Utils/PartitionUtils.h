@@ -1402,6 +1402,9 @@ public:
     /// parameter of a actor isolated method... this is that actor isolation.
     SILDynamicMergedIsolationInfo isolationInfo;
 
+    /// If set, the emitter should downgrade this error to a warning.
+    bool downgradeToWarning = false;
+
     InOutSendingReturnedError(const PartitionOp &op,
                               Element inoutSendingElement,
                               Element returnedValue,
@@ -2255,9 +2258,10 @@ public:
       // them to be send separately.
       if (auto outParam =
           findSendingOutParameterInRegion(inoutSendingRegion)) {
-        handleError(InOutSendingReturnedError(op, op.getOpArg1(),
-                                              outParam.value(),
-                                              dynamicRegionIsolation));
+        InOutSendingReturnedError error(op, op.getOpArg1(), outParam.value(),
+                                       dynamicRegionIsolation);
+        error.downgradeToWarning = true;
+        handleError(std::move(error));
         return;
       }
 

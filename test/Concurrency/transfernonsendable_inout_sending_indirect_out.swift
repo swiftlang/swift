@@ -125,14 +125,14 @@ func takeSendingClosureThrowing<T>(_ fn: (inout sending NonSendableKlass) throws
 
 // The closure { $0 } directly returns the inout sending parameter via sending @out.
 func testSendingClosureReturnsInOutSendingParam() {
-  let _ = takeSendingClosure { $0 } // expected-error {{'inout sending' parameter '$0' cannot be returned}}
+  let _ = takeSendingClosure { $0 } // expected-warning {{'inout sending' parameter '$0' cannot be returned}}
   // expected-note @-1 {{returning 'inout sending' parameter '$0' risks concurrent access as caller assumes '$0' and result can be sent to different isolation domains}}
 }
 
 // Same pattern but with an explicit closure body.
 func testSendingClosureExplicitReturn() {
   let _ = takeSendingClosure { (x: inout sending NonSendableKlass) -> NonSendableKlass in
-    return x // expected-error {{'inout sending' parameter 'x' cannot be returned}}
+    return x // expected-warning {{'inout sending' parameter 'x' cannot be returned}}
     // expected-note @-1 {{returning 'inout sending' parameter 'x' risks concurrent access as caller assumes 'x' and result can be sent to different isolation domains}}
   }
 }
@@ -141,7 +141,7 @@ func testSendingClosureExplicitReturn() {
 func testSendingClosureReturnsDerivedValue() {
   let _ = takeSendingClosure { (x: inout sending NonSendableKlass) -> NonSendableKlass in
     let y = x
-    return y // expected-error {{'y' cannot be returned}}
+    return y // expected-warning {{'y' cannot be returned}}
     // expected-note @-1 {{returning 'y' risks concurrent access to 'inout sending' parameter 'x' as caller assumes 'x' and result can be sent to different isolation domains}}
   }
 }
@@ -157,7 +157,7 @@ func testSendingClosureReturnsFreshValue() {
 func testSendingClosureAssignsOverButStillReturnsIt() {
   let _ = takeSendingClosure { (state: inout sending NonSendableKlass) -> NonSendableKlass in
     state = NonSendableKlass()
-    return state // expected-error {{'inout sending' parameter 'state' cannot be returned}}
+    return state // expected-warning {{'inout sending' parameter 'state' cannot be returned}}
     // expected-note @-1 {{returning 'inout sending' parameter 'state' risks concurrent access as caller assumes 'state' and result can be sent to different isolation domains}}
   }
 }
@@ -179,7 +179,7 @@ func testSendingClosureAssignsToCapture() {
 
 // A function returning 'sending some Any' has an indirect @out sending result in SIL.
 func returnInOutSendingViaSendingOpaqueResult(_ x: inout sending NonSendableKlass) -> sending some Any {
-  return x // expected-error {{'inout sending' parameter 'x' cannot be returned}}
+  return x // expected-warning {{'inout sending' parameter 'x' cannot be returned}}
   // expected-note @-1 {{returning 'inout sending' parameter 'x' risks concurrent access as caller assumes 'x' and result can be sent to different isolation domains}}
 }
 
@@ -192,7 +192,7 @@ func returnInOutSendingGenericSending<T: AnyObject>(_ x: inout sending T) -> sen
 // Returning a derived value through sending indirect out.
 func returnDerivedViaSendingOpaqueResult(_ x: inout sending NonSendableKlass) -> sending some Any {
   let y = x
-  return y // expected-error {{'y' cannot be returned}}
+  return y // expected-warning {{'y' cannot be returned}}
   // expected-note @-1 {{returning 'y' risks concurrent access to 'inout sending' parameter 'x' as caller assumes 'x' and result can be sent to different isolation domains}}
 }
 

@@ -1725,3 +1725,31 @@ public typealias TestGenericAliasWhereClausePkg<T> = T where T: PackageProto // 
 
 package typealias PackageTestGenericAlias<T: PrivateProto> = T // expected-warning {{type alias should not be declared package because its generic parameter uses a private type}}
 package typealias PackageTestGenericAliasWhereClause<T> = T where T: PrivateProto // expected-warning {{type alias should not be declared package because its generic requirement uses a private type}}
+
+// The effective access of a member of an extension should be bounded by the
+// effective access of every type enclosing the extended type, not just the
+// formal access of the extended type itself.
+
+internal struct InternalOuterStruct {
+  public struct PublicInnerStruct {}
+}
+
+extension InternalOuterStruct.PublicInnerStruct {
+  public func publicMethodWithPublicParam(_ x: PublicStruct) {}
+  public func publicMethodWithPackageParam(_ x: PackageStruct) {}
+  public func publicMethodWithInternalParam(_ x: InternalStruct) {}
+  public func publicMethodWithPrivateParam(_ x: PrivateStruct) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  public func publicMethodWithFilePrivateParam(_ x: FilePrivateStruct) {} // expected-error {{method cannot be declared public because its parameter uses a fileprivate type}}
+}
+
+extension InternalOuterStruct {
+  public struct PublicInnerStructInExtension {}
+}
+
+extension InternalOuterStruct.PublicInnerStructInExtension {
+  public func publicMethodWithPublicParam(_ x: PublicStruct) {}
+  public func publicMethodWithPackageParam(_ x: PackageStruct) {}
+  public func publicMethodWithInternalParam(_ x: InternalStruct) {}
+  public func publicMethodWithPrivateParam(_ x: PrivateStruct) {} // expected-error {{method cannot be declared public because its parameter uses a private type}}
+  public func publicMethodWithFilePrivateParam(_ x: FilePrivateStruct) {} // expected-error {{method cannot be declared public because its parameter uses a fileprivate type}}
+}
