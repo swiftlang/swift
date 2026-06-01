@@ -24,7 +24,6 @@
 #include "GenCall.h"
 #include "GenClass.h"
 #include "GenDecl.h"
-#include "GenExistential.h"
 #include "GenMeta.h"
 #include "GenOpaque.h"
 #include "GenPointerAuth.h"
@@ -37,9 +36,7 @@
 #include "LoadableTypeInfo.h"
 #include "ScalarPairTypeInfo.h"
 #include "swift/ABI/MetadataValues.h"
-#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
-#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ExtInfo.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
@@ -141,6 +138,65 @@ struct ArgumentDecoderInfo {
   Callee getCallee() const;
 };
 
+/// Get the user-declared `distributed func` (or computed-property accessor)
+/// given an arbitrary `AbstractFunctionDecl`. The caller may already hold
+/// the original decl, the synthesized regular distributed thunk, or an
+/// `AccessorDecl` of a distributed property; this helper normalizes all
+/// three to the original distributed declaration.
+///
+/// Cases:
+///   1. Accessor of a distributed property -- return the accessor itself
+///      (the original "distributed func" view of the property's getter);
+///      `nullptr` if the storage is not distributed.
+///   2. Already the original `distributed func` (not a thunk) -- return it
+///      as-is; `nullptr` if the decl isn't actually distributed.
+///   3. The synthesized regular distributed thunk -- walk back to the
+///      original via name+identity match in the enclosing nominal:
+///      `original->getDistributedThunk() == thunkOrFunc`. `nullptr` if
+///      no matching original is found (shouldn't happen for valid input).
+static AbstractFunctionDecl *
+findOriginalDistributedFuncDecl(AbstractFunctionDecl *thunkOrFunc) {
+  // Case 1: distributed-property accessor.
+  if (auto *accessor = dyn_cast<AccessorDecl>(thunkOrFunc))
+    return accessor->getStorage()->isDistributed() ? accessor : nullptr;
+
+  // Case 2: already the original distributed func.
+  if (!thunkOrFunc->isDistributedThunk())
+    return thunkOrFunc->isDistributed() ? thunkOrFunc : nullptr;
+
+  // Case 3: synthesized regular distributed thunk; recover its original.
+  if (auto *nominal = thunkOrFunc->getDeclContext()->getSelfNominalTypeDecl()) {
+    for (auto *member : nominal->lookupDirect(thunkOrFunc->getName())) {
+      auto *afd = dyn_cast<AbstractFunctionDecl>(member);
+      if (afd && afd->isDistributed() &&
+          !afd->isDistributedThunk() &&
+          afd->getDistributedThunk() == thunkOrFunc)
+        return afd;
+    }
+  }
+  return nullptr;
+}
+
+/// Recover the user-declared distributed target's 'resolvable proxy
+/// adapter' thunk (`$__resolvableProxyAdapter_$_*`) given the regular
+/// distributed thunk decl the accessor was generated for. Returns null
+/// when the target needs no such thunk (i.e. it has no `@Resolvable`
+/// parameter or result).
+static FuncDecl *
+findResolvableProxyAdapterThunkDecl(AbstractFunctionDecl *thunkOrFunc) {
+  // Computed distributed property: route through the storage (var).
+  if (auto *accessor = dyn_cast<AccessorDecl>(thunkOrFunc)) {
+    auto *storage = accessor->getStorage();
+    if (!storage->isDistributed())
+      return nullptr;
+    return storage->getDistributedResolvableProxyAdapterThunk();
+  }
+
+  auto *original = findOriginalDistributedFuncDecl(thunkOrFunc);
+  return original ? original->getDistributedResolvableProxyAdapterThunk()
+                  : nullptr;
+}
+
 struct AccessorTarget {
 private:
   IRGenFunction &IGF;
@@ -148,14 +204,25 @@ private:
 
   CanSILFunctionType Type;
 
+  /// When non-null, the accessor body dispatches through this SIL function
+  /// instead of \c Target's SIL function. The accessor's record/linking
+  /// name still comes from \c Target. Whoever constructs us decides why
+  /// the dispatch differs (today: `@Resolvable` resolvable-proxy-adapter
+  /// thunk).
+  SILFunction *DispatchTo = nullptr;
+
   mutable std::optional<WitnessMetadata> Witness;
 
 public:
-  AccessorTarget(IRGenFunction &IGF, ThunkOrRequirement target)
-      : IGF(IGF), Target(target) {
+  AccessorTarget(IRGenFunction &IGF, ThunkOrRequirement target,
+                 SILFunction *dispatchTo)
+      : IGF(IGF), Target(target), DispatchTo(dispatchTo) {
     if (auto *thunk = target.dyn_cast<SILFunction *>()) {
-      Type = thunk->getLoweredFunctionType();
+      // Use the dispatch target's lowered type so argument decoding,
+      // result handling, etc. all speak its signature.
+      Type = (DispatchTo ? DispatchTo : thunk)->getLoweredFunctionType();
     } else {
+      assert(!DispatchTo && "no dispatch redirect on protocol requirements");
       auto *requirement = cast<AbstractFunctionDecl *>(target);
       Type = IGF.IGM.getSILTypes().getConstantFunctionType(
           IGF.IGM.getMaximalTypeExpansionContext(),
@@ -169,11 +236,10 @@ public:
     return cast<AbstractFunctionDecl *>(Target);
   }
 
-  /// The user-declared `distributed func` this accessor was generated for.
-  AbstractFunctionDecl *getAbstractFunctionDecl() const {
-    if (auto *thunk = Target.dyn_cast<SILFunction *>())
-      return thunk->getDeclRef().getAbstractFunctionDecl();
-    return cast<AbstractFunctionDecl *>(Target);
+  /// The SIL function the accessor was generated for, when one exists.
+  /// Null when the accessor is being emitted for a protocol requirement.
+  SILFunction *getThunk() const {
+    return Target.dyn_cast<SILFunction *>();
   }
 
   CanSILFunctionType getType() const { return Type; }
@@ -216,6 +282,7 @@ class DistributedAccessor {
 
 public:
   DistributedAccessor(IRGenFunction &IGF, ThunkOrRequirement target,
+                      SILFunction *dispatchTo,
                       CanSILFunctionType accessorTy);
 
   CanSILFunctionType getTargetType() const { return Target.getType(); }
@@ -229,13 +296,8 @@ private:
   /// Load an argument value from the given decoder \c decoder
   /// to the given explosion \c arguments. Information describing
   /// the type of argument comes from runtime metadata.
-  ///
-  /// If \p resolvableStub is non-null, the parameter is a `some P` / `any P`
-  /// for a `@Resolvable protocol`, and we must substitute the parameter with
-  /// its correct proxy type `$P`.
   void decodeArgument(unsigned argumentIdx, const ArgumentDecoderInfo &decoder,
                       llvm::Value *argumentType, const SILParameterInfo &param,
-                      NominalTypeDecl *resolvableStub,
                       Explosion &arguments);
 
   void lookupWitnessTables(llvm::Value *value,
@@ -381,8 +443,23 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
   if (!f->isDeclaration())
     return;
 
+  // Pick the SIL function to dispatch through. Default = the linked thunk;
+  // if the target has a `@Resolvable` 'resolvable proxy adapter' thunk
+  // (`$__resolvableProxyAdapter_$_<base>`), dispatch there instead so the
+  // accessor speaks `$P` end-to-end and no IR-level existential boxing /
+  // result-buffer juggling is needed. The linking identity (the symbol
+  // emitted into the accessor record) stays the regular thunk's name.
+  SILFunction *dispatchTo = nullptr;
+  if (auto *thunk = target.dyn_cast<SILFunction *>()) {
+    if (auto *afd = thunk->getDeclRef().getAbstractFunctionDecl()) {
+      if (auto *adapter = findResolvableProxyAdapterThunkDecl(afd))
+        dispatchTo = getSILModule().lookUpFunction(SILDeclRef(adapter));
+    }
+  }
+
   IRGenFunction IGF(*this, f);
-  auto accessor = DistributedAccessor(IGF, target, getAccessorType(*this));
+  auto accessor =
+      DistributedAccessor(IGF, target, dispatchTo, getAccessorType(*this));
   accessor.emit();
 
   // Mark the accessor function and its async function pointer as used
@@ -404,8 +481,10 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
 
 DistributedAccessor::DistributedAccessor(IRGenFunction &IGF,
                                          ThunkOrRequirement target,
+                                         SILFunction *dispatchTo,
                                          CanSILFunctionType accessorTy)
-    : IGM(IGF.IGM), IGF(IGF), Target(IGF, target), AccessorType(accessorTy),
+    : IGM(IGF.IGM), IGF(IGF), Target(IGF, target, dispatchTo),
+      AccessorType(accessorTy),
       AsyncLayout(getAsyncContextLayout(IGM, AccessorType, AccessorType,
                                         SubstitutionMap())) {
   if (IGM.DebugInfo)
@@ -454,33 +533,40 @@ void DistributedAccessor::decodeArguments(const ArgumentDecoderInfo &decoder,
 
     llvm::Value *argumentTy = IGF.Builder.CreateLoad(typeLoc, "arg_type");
 
-    // === @Resolvable protocol param override
-    // If the user-declared parameter type is `some P` / `any P` for a
-    // `@Resolvable protocol`, the wire-level type is the remote proxy stub `$P`.
+    // === @Resolvable protocol param: override runtime-loaded metadata
+    // The wire decoder is invoked with `argumentTy` taken from the runtime's
+    // argument-types buffer, which `__getParameterTypeInfo` populates by
+    // demangling the regular distributed thunk's mangled name. That mangling
+    // still names `any P` / `some P`, neither of which conforms to Codable.
     //
-    // Override the runtime-loaded metadata so `decodeNextArgument<$P>()`
-    // deserializes a `$P` which will correctly `$P.resolve(id:using:)`
-    // the serialized actor identity.
-    NominalTypeDecl *replacedParamTy = nullptr;
-    if (auto *funcDecl = Target.getAbstractFunctionDecl()) {
-      auto *params = funcDecl->getParameters();
-      if (i < params->size()) {
-        Type paramTy = params->get(i)->getInterfaceType();
-        if (auto *env = funcDecl->getGenericEnvironment())
-          paramTy = env->mapTypeIntoEnvironment(paramTy);
+    // The caller-side thunk records the argument as the proxy stub `$P`
+    // (see `deriveBodyDistributed_thunk` in CodeSynthesisDistributedActor.cpp),
+    // so the value on the wire really is a `$P`. Substitute the wire-supplied
+    // metadata with a compile-time reference to `$P` so `decodeNextArgument<$P>`
+    // sees a Codable-conforming type.
+    if (auto *thunk = Target.getThunk()) {
+      if (auto *funcDecl = findOriginalDistributedFuncDecl(
+              thunk->getDeclRef().getAbstractFunctionDecl())) {
+        auto *params = funcDecl->getParameters();
+        if (i < params->size()) {
+          Type origParamTy = params->get(i)->getInterfaceType();
+          if (auto *env = funcDecl->getGenericEnvironment())
+            origParamTy = env->mapTypeIntoEnvironment(origParamTy);
 
-        if (auto match = findDistributedResolvableExistentialOrOpaqueProtocol(paramTy)) {
-          if (auto *stub = getDistributedActorStub(match.proto)) {
-            replacedParamTy = stub;
-            auto stubTy = stub->getDeclaredInterfaceType()->getCanonicalType();
-            argumentTy = IGF.emitTypeMetadataRef(stubTy);
+          if (auto match = findDistributedResolvableExistentialOrOpaqueProtocol(
+                  origParamTy)) {
+            if (auto *stub = getDistributedResolvableProtocolStubDecl(match.proto)) {
+              auto stubTy =
+                  stub->getDeclaredInterfaceType()->getCanonicalType();
+              argumentTy = IGF.emitTypeMetadataRef(stubTy);
+            }
           }
         }
       }
     }
 
     // Decode and load argument value using loaded type metadata.
-    decodeArgument(i, decoder, argumentTy, param, replacedParamTy, arguments);
+    decodeArgument(i, decoder, argumentTy, param, arguments);
   }
 }
 
@@ -488,7 +574,6 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
                                          const ArgumentDecoderInfo &decoder,
                                          llvm::Value *argumentType,
                                          const SILParameterInfo &param,
-                                         NominalTypeDecl *resolvableStub,
                                          Explosion &arguments) {
   auto &paramInfo = IGM.getTypeInfo(param.getSILStorageInterfaceType());
   // TODO: `emitLoad*` would actually load value witness table every
@@ -566,70 +651,6 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
     IGF.Builder.emitBlock(contBB);
     // Reset value of the slot back to `null`
     IGF.Builder.CreateStore(nullError, calleeErrorSlot);
-  }
-
-  // === Resolvable existential boxing
-  // If the parameter is a `@Resolvable` resolvable existential (`any P`), the
-  // wire payload was decoded as a `$P` actor but the user function
-  // expects the parameter as an existential `any P`. Wrap the decoded actor
-  // reference into the existential and pass it according to the parameter's
-  // convention.
-  auto userParamSILTy = param.getSILStorageInterfaceType();
-  if (resolvableStub && userParamSILTy.isAnyExistentialType()) {
-    auto stubCanTy =
-        resolvableStub->getDeclaredInterfaceType()->getCanonicalType();
-    auto stubSILTy = SILType::getPrimitiveObjectType(stubCanTy);
-
-    // Load the $P reference from the decode buffer.
-    auto refPtrTy =
-        llvm::PointerType::get(IGM.getLLVMContext(), /*AddrSpace=*/0);
-    auto refSlotPtr = IGF.Builder.CreateBitCast(resultAddr, refPtrTy);
-    Address refSlot(refSlotPtr, IGM.getStorageType(stubSILTy),
-                    IGM.getPointerAlignment());
-    llvm::Value *stubRef = IGF.Builder.CreateLoad(refSlot, "stub_ref");
-
-    // Look up conformances of $P to each protocol carried by the existential.
-    SmallVector<ProtocolConformanceRef, 2> conformances;
-    auto layout = userParamSILTy.getASTType()->getExistentialLayout();
-    for (auto *proto : layout.getProtocols()) {
-      conformances.push_back(lookupConformance(stubCanTy, proto));
-    }
-
-    // Build the existential explosion (instance + witness table pointers).
-    Explosion existExplosion;
-    emitClassExistentialContainer(IGF, existExplosion,
-                                  userParamSILTy.getObjectType(), stubRef,
-                                  stubCanTy, stubSILTy, conformances);
-
-    switch (param.getConvention()) {
-    case ParameterConvention::Direct_Guaranteed:
-    case ParameterConvention::Direct_Unowned:
-    case ParameterConvention::Direct_Owned: {
-      // Pass the exploded existential components (class ref + witness tables) directly.
-      existExplosion.transferInto(arguments, existExplosion.size());
-      return;
-    }
-    case ParameterConvention::Indirect_In_CXX:
-    case ParameterConvention::Indirect_In:
-    case ParameterConvention::Indirect_In_Guaranteed: {
-      // Materialize the existential in a stack buffer and pass its address.
-      auto &existTI = IGM.getTypeInfo(userParamSILTy.getObjectType());
-      auto existAlloca = existTI.allocateStack(
-          IGF, userParamSILTy.getObjectType(), "any_resolvable_param");
-      cast<LoadableTypeInfo>(existTI).initialize(IGF, existExplosion,
-                                                 existAlloca.getAddress(),
-                                                 /*isOutlined=*/false);
-      AllocatedArguments.push_back(existAlloca);
-      arguments.add(existAlloca.getAddress().getAddress());
-      return;
-    }
-    case ParameterConvention::Indirect_Inout:
-    case ParameterConvention::Indirect_InoutAliasable:
-    case ParameterConvention::Pack_Guaranteed:
-    case ParameterConvention::Pack_Owned:
-    case ParameterConvention::Pack_Inout:
-      llvm_unreachable("unsupported convention for resolvable existential");
-    }
   }
 
   switch (param.getConvention()) {
@@ -825,40 +846,6 @@ void DistributedAccessor::emit() {
   auto directResultTy = targetConv.getSILResultType(expansionContext);
   const auto &directResultTI = IGM.getTypeInfo(directResultTy);
 
-  // === `@Resolvable protocol` result
-  // The caller's result buffer is sized for `$P` (one class ref word), but the
-  // target returns `any P` (existential: class ref + witness tables). Allocate
-  // a temp existential-sized buffer, emit the result there, then copy just the
-  // class ref into the real result buffer.
-  bool isResolvableExistResult = false;
-  NominalTypeDecl *resolvableResultStub = nullptr;
-  llvm::Value *resolvableExistTempBuf = nullptr;
-
-  if (auto *funcDecl = Target.getAbstractFunctionDecl()) {
-    if (auto *func = dyn_cast<FuncDecl>(funcDecl)) {
-    Type declaredResult = func->getResultInterfaceType();
-    if (auto *env = func->getGenericEnvironment())
-      declaredResult = env->mapTypeIntoEnvironment(declaredResult);
-    if (!declaredResult->isVoid()) {
-      if (auto match =
-              findDistributedResolvableExistentialOrOpaqueProtocol(declaredResult)) {
-        if (auto *stub = getDistributedActorStub(match.proto)) {
-          isResolvableExistResult = true;
-          resolvableResultStub = stub;
-          auto existAlign = directResultTI.getBestKnownAlignment();
-          auto &existTIFixed = cast<FixedTypeInfo>(directResultTI);
-          auto existSizeVal = IGM.getSize(existTIFixed.getFixedSize());
-          auto tempAlloca =
-              IGF.emitDynamicAlloca(IGM.Int8Ty, existSizeVal, existAlign);
-          resolvableExistTempBuf = IGF.Builder.CreateBitCast(
-              tempAlloca.getAddress().getAddress(), IGM.PtrTy);
-          AllocatedArguments.push_back(tempAlloca);
-        }
-      }
-    }
-    }
-  }
-
   Explosion arguments;
 
   unsigned numAsyncContextParams =
@@ -905,8 +892,7 @@ void DistributedAccessor::emit() {
     // conform to protocols), there could be only a single indirect result type
     // associated with distributed method.
     assert(targetConv.getNumIndirectSILResults() == 1);
-    arguments.add(isResolvableExistResult ? resolvableExistTempBuf
-                                          : typedResultBuffer);
+    arguments.add(typedResultBuffer);
   }
 
   // There is always at least one parameter associated with accessor - `self`
@@ -975,35 +961,10 @@ void DistributedAccessor::emit() {
     // indirect result (e.g. large struct) it result buffer would be passed
     // as an argument.
     {
-      llvm::Value *destBuf =
-          isResolvableExistResult ? resolvableExistTempBuf : typedResultBuffer;
-      Address resultAddr(destBuf, directResultTI.getStorageType(),
+      Address resultAddr(typedResultBuffer, directResultTI.getStorageType(),
                          directResultTI.getBestKnownAlignment());
       emission->emitToMemory(resultAddr, cast<LoadableTypeInfo>(directResultTI),
                              /*isOutlined=*/false);
-    }
-
-    // == `@Resolvable protocol` result: copy class ref from existential temp buf to result buf
-    if (isResolvableExistResult && resolvableExistTempBuf) {
-      auto stubCanTy =
-          resolvableResultStub->getDeclaredInterfaceType()->getCanonicalType();
-      auto stubSILTy = SILType::getPrimitiveObjectType(stubCanTy);
-
-      auto refPtrTy = llvm::PointerType::get(IGM.getLLVMContext(), /*AddrSpace=*/0);
-
-      auto existPtrBitcast =
-          IGF.Builder.CreateBitCast(resolvableExistTempBuf, refPtrTy);
-      llvm::Value *classRef = IGF.Builder.CreateLoad(
-          Address(existPtrBitcast, IGM.getStorageType(stubSILTy),
-                  IGM.getPointerAlignment()),
-          "result_actor_ref");
-
-      auto resultPtrBitcast =
-          IGF.Builder.CreateBitCast(typedResultBuffer, refPtrTy);
-      IGF.Builder.CreateStore(
-          classRef,
-          Address(resultPtrBitcast, IGM.getStorageType(stubSILTy),
-                  IGM.getPointerAlignment()));
     }
 
     // Both accessor and distributed method are always `async throws`
@@ -1028,15 +989,19 @@ FunctionPointer AccessorTarget::getPointerToTarget(llvm::Value *actorSelf) {
   auto &IGM = IGF.IGM;
 
   if (auto *thunk = Target.dyn_cast<SILFunction *>()) {
-    auto fpKind = classifyFunctionPointerKind(thunk);
+    // Dispatch through the explicit redirect when present (decided by the
+    // caller in `IRGenModule::emitDistributedTargetAccessor`), otherwise
+    // through `Target`'s SIL function directly.
+    SILFunction *callee = DispatchTo ? DispatchTo : thunk;
+    auto fpKind = classifyFunctionPointerKind(callee);
     auto signature = IGM.getSignature(Type, fpKind);
 
     auto *fnPtr = llvm::ConstantExpr::getBitCast(
-        IGM.getAddrOfAsyncFunctionPointer(thunk), IGM.PtrTy);
+        IGM.getAddrOfAsyncFunctionPointer(callee), IGM.PtrTy);
 
     return FunctionPointer::forDirect(
         FunctionPointer::Kind(Type), fnPtr,
-        IGM.getAddrOfSILFunction(thunk, NotForDefinition), signature);
+        IGM.getAddrOfSILFunction(callee, NotForDefinition), signature);
   }
 
   auto *requirementDecl = cast<AbstractFunctionDecl *>(Target);

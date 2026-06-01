@@ -571,6 +571,32 @@ bool swift::checkDistributedFunction(AbstractFunctionDecl *func) {
                            false); // no error if cycle
 }
 
+/// Emit a fix-it suggesting to constrain the `@Resolvable` \p resolvableProto's
+/// `Self.ActorSystem` to the enclosing actor's system type (or a placeholder
+/// when no concrete enclosing system is known).
+static void emitResolvableProtocolMissingActorSystemFixit(
+    ProtocolDecl *resolvableProto, Type enclosingSystemTy) {
+  auto fixItLoc = resolvableProto->getBraces().Start;
+  if (!fixItLoc.isValid())
+    return;
+
+  llvm::SmallString<64> fixIt;
+  fixIt += " where Self.ActorSystem == ";
+  if (enclosingSystemTy && !enclosingSystemTy->hasError() &&
+      !enclosingSystemTy->is<GenericTypeParamType>() &&
+      !enclosingSystemTy->is<ArchetypeType>()) {
+    fixIt += enclosingSystemTy->getString();
+  } else {
+    fixIt += "<#ActorSystem#>";
+  }
+  fixIt += " ";
+  resolvableProto
+      ->diagnose(
+          diag::distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system_fixit,
+          resolvableProto->getName())
+      .fixItInsert(fixItLoc, fixIt);
+}
+
 bool CheckDistributedFunctionRequest::evaluate(
     Evaluator &evaluator, AbstractFunctionDecl *func) const {
   if (auto *accessor = dyn_cast<AccessorDecl>(func)) {
@@ -603,10 +629,8 @@ bool CheckDistributedFunctionRequest::evaluate(
       // --- Check parameters for 'SerializationRequirement' conformance
       auto paramTy = func->mapTypeIntoEnvironment(param->getInterfaceType());
 
-      // --- Special case: `param: some/any P` where P is a `@Resolvable protocol`
-      // Wire format encodes the actor's `id` (a Codable ActorID`),
-      // so the existential/opaque does not really need to conform to the serialization requirement.
-      bool skipCodableCheck = false;
+      // --- Special case: `param: some/any P` where P is a `@Resolvable protocol`.
+      bool skipSerializationRequirementCheck = false;
       auto resolvableMatch = findDistributedResolvableExistentialOrOpaqueProtocol(paramTy);
       if (resolvableMatch.isAmbiguous) {
         func->diagnose(
@@ -627,28 +651,8 @@ bool CheckDistributedFunctionRequest::evaluate(
               diag::distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system,
               param->getArgumentName(), param->getInterfaceType(), func,
               resolvableProto->getName());
-
-          // Fix-it: insert ` where Self.ActorSystem == <EnclosingSystem>`.
-          // We use the enclosing actor's `ActorSystem` if it is known and concrete,
-          // otherwise we emit just the placeholder.
-          auto fixItLoc = resolvableProto->getBraces().Start;
-          if (fixItLoc.isValid()) {
-            llvm::SmallString<64> fixIt;
-            fixIt += " where Self.ActorSystem == ";
-            if (enclosingSystemTy && !enclosingSystemTy->hasError() &&
-                !enclosingSystemTy->is<GenericTypeParamType>() &&
-                !enclosingSystemTy->is<ArchetypeType>()) {
-              fixIt += enclosingSystemTy->getString();
-            } else {
-              fixIt += "<#ActorSystem#>";
-            }
-            fixIt += " ";
-            resolvableProto
-                ->diagnose(
-                    diag::distributed_actor_func_param_resolvable_protocol_no_concrete_actor_system_fixit,
-                    resolvableProto->getName())
-                .fixItInsert(fixItLoc, fixIt);
-          }
+          emitResolvableProtocolMissingActorSystemFixit(resolvableProto,
+                                                       enclosingSystemTy);
           return true;
         }
 
@@ -667,17 +671,17 @@ bool CheckDistributedFunctionRequest::evaluate(
           return true;
         }
 
-        // Skip the codable-conformance checks for this parameter;
+        // Skip the serialization-requirement check for this parameter;
         // We know it is a distributed actor protocol on the same actor system.
         // We also know that it is a `@Resolvable protocol` and `any/some P`,
         // which does itself not conform to e.g. `Codable`
-        skipCodableCheck = true;
+        skipSerializationRequirementCheck = true;
       }
 
-      if (!skipCodableCheck) {
+      if (!skipSerializationRequirementCheck) {
         auto srl = serializationReqType->getExistentialLayout();
         for (auto req: srl.getProtocols()) {
-          if (checkConformance(paramTy, req).isInvalid()) {
+          if (!checkConformance(paramTy, req)) {
             auto diag = func->diagnose(
                 diag::distributed_actor_func_param_not_codable,
                 param->getArgumentName(), param->getInterfaceType(), func,

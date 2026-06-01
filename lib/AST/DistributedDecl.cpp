@@ -211,7 +211,7 @@ Type swift::getDistributedActorIDType(NominalTypeDecl *actor) {
   return getAssociatedTypeOfDistributedSystemOfActor(actor, C.Id_ActorID);
 }
 
-Identifier swift::getDistributedActorStubName(ProtocolDecl *proto) {
+Identifier swift::getDistributedResolvableProtocolStubName(ProtocolDecl *proto) {
   if (!proto)
     return Identifier();
 
@@ -228,7 +228,7 @@ Identifier swift::getDistributedActorStubName(ProtocolDecl *proto) {
       llvm::Twine("$", proto->getNameStr()).toStringRef(buf));
 }
 
-NominalTypeDecl *swift::getDistributedActorStub(ProtocolDecl *proto) {
+NominalTypeDecl *swift::getDistributedResolvableProtocolStubDecl(ProtocolDecl *proto) {
   if (!proto)
     return nullptr;
 
@@ -250,7 +250,7 @@ NominalTypeDecl *swift::getDistributedActorStub(ProtocolDecl *proto) {
   // Users cannot declare $-prefixed names, so we are confident this is the synthesized type.
   SmallVector<ValueDecl *, 4> results;
   proto->getModuleContext()->lookupValue(
-    getDistributedActorStubName(proto), NLKind::QualifiedLookup, results);
+    getDistributedResolvableProtocolStubName(proto), NLKind::QualifiedLookup, results);
 
   for (auto *result : results) {
     auto *classDecl = dyn_cast<ClassDecl>(result);
@@ -275,7 +275,7 @@ swift::findDistributedResolvableExistentialOrOpaqueProtocol(Type T) {
     return match;
 
   auto recordMatch = [&](ProtocolDecl *p) {
-    if (getDistributedActorStub(p)) {
+    if (getDistributedResolvableProtocolStubDecl(p)) {
       if (match.proto && match.proto != p) {
         match.isAmbiguous = true;
       } else {
@@ -1570,6 +1570,35 @@ AbstractFunctionDecl::getDistributedThunk() const {
   return evaluateOrDefault(
       getASTContext().evaluator,
       GetDistributedThunkRequest{mutableThis},
+      nullptr);
+}
+
+FuncDecl *AbstractStorageDecl::getDistributedResolvableProxyAdapterThunk() const {
+  if (!isDistributed())
+    return nullptr;
+
+  auto mutableThis = const_cast<AbstractStorageDecl *>(this);
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedResolvableProxyAdapterThunkRequest{mutableThis}, nullptr);
+}
+
+FuncDecl *
+AbstractFunctionDecl::getDistributedResolvableProxyAdapterThunk() const {
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+
+  // For an accessor, get the Storage (VarDecl) and get the thunk off it.
+  if (auto accessor = dyn_cast<AccessorDecl>(mutableThis)) {
+    auto Storage = accessor->getStorage();
+    return Storage->getDistributedResolvableProxyAdapterThunk();
+  }
+
+  if (!isDistributed())
+    return nullptr;
+
+  return evaluateOrDefault(
+      getASTContext().evaluator,
+      GetDistributedResolvableProxyAdapterThunkRequest{mutableThis},
       nullptr);
 }
 

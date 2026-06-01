@@ -4863,7 +4863,7 @@ void ASTMangler::appendDistributedThunk(
     auto M = thunk->getModuleContext();
 
     SmallVector<ValueDecl *, 1> stubClassLookupResults;
-    Context.lookupInModule(M, getDistributedActorStubName(P).str(),
+    Context.lookupInModule(M, getDistributedResolvableProtocolStubName(P).str(),
                            stubClassLookupResults);
 
     assert(stubClassLookupResults.size() <= 1 && "Found multiple distributed stub types!");

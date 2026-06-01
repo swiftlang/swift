@@ -125,6 +125,20 @@ void SILGenModule::emitDistributedThunkForDecl(
                          getFunction(thunk, ForDefinition));
 }
 
+void SILGenModule::emitDistributedResolvableProxyAdapterThunkForDecl(
+    AbstractFunctionDecl *afd) {
+  FuncDecl *thunkDecl = afd->getDistributedResolvableProxyAdapterThunk();
+
+  if (!thunkDecl || !thunkDecl->hasBody() || thunkDecl->isBodySkipped())
+    return;
+
+  // Unlike the regular distributed thunk, the resolvable proxy adapter thunk
+  // is a plain `nonisolated(nonsending)` function, so it is referenced by
+  // an ordinary SILDeclRef (not `.asDistributed()`).
+  auto ref = SILDeclRef(thunkDecl);
+  emitFunctionDefinition(ref, getFunction(ref, ForDefinition));
+}
+
 void SILGenModule::emitBackDeploymentThunk(SILDeclRef thunk) {
   // Thunks are always emitted by need, so don't need delayed emission.
   assert(thunk.isBackDeploymentThunk() && "back deployment thunks only");

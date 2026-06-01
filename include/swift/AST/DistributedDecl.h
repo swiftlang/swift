@@ -69,15 +69,13 @@ Type getDistributedActorSystemType(NominalTypeDecl *actor);
 /// Determine the `ID` type for the given actor.
 Type getDistributedActorIDType(NominalTypeDecl *actor);
 
-/// If `P` is a `@Resolvable protocol`, return the generated stub type `$P`.
-NominalTypeDecl *getDistributedActorStub(ProtocolDecl *proto);
+/// If `P` is a `@Resolvable protocol`, return the stub type `$P`.
+NominalTypeDecl *getDistributedResolvableProtocolStubDecl(ProtocolDecl *proto);
 
 /// Synthesize the identifier `$<name>` of the `@Resolvable`-generated stub
 /// peer of the given distributed-actor protocol.
-Identifier getDistributedActorStubName(ProtocolDecl *proto);
+Identifier getDistributedResolvableProtocolStubName(ProtocolDecl *proto);
 
-/// Reverse lookup result when given a type and looking for the
-/// @Resolvable protocol it was generated from.
 struct ResolvableProtocolMatch {
   /// The matched protocol P, whose `@Resolvable` macro generated stub type `$P`.
   ProtocolDecl *proto = nullptr;
