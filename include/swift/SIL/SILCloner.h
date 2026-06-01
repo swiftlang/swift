@@ -3197,6 +3197,28 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
   auto newIndexValue = getOpValue(Inst->getIndexOperand());
   auto origEnv = Inst->getOpenedGenericEnvironment();
 
+  auto registerConcreteReplacements =
+      [&](const llvm::SmallDenseMap<CanType, CanType, 4> &elementReplacements) {
+        // Build a SubstitutionMap for the full opened element signature that
+        // maps outer params via origContextSubs and element params to concrete
+        // types.
+        auto genericSig = origEnv->getGenericSignature();
+        auto newContextSubs =
+            getOpSubstitutionMap(origEnv->getOuterSubstitutions());
+        auto subsMap = SubstitutionMap::get(
+            genericSig,
+            [&](SubstitutableType *type) -> Type {
+              auto *gp = cast<GenericTypeParamType>(type);
+              auto canGP = gp->getCanonicalType();
+              auto it = elementReplacements.find(canGP);
+              if (it != elementReplacements.end())
+                return it->second;
+              return Type(type).subst(newContextSubs);
+            },
+            LookUpConformanceInModule());
+        registerConcreteLocalArchetypeMapping(origEnv, subsMap);
+      };
+
   // If the structural pack index is statically known, and the pack element at
   // that index is scalar, we can resolve element archetypes to concrete types
   // and eliminate this instruction entirely.
@@ -3232,26 +3254,67 @@ void SILCloner<ImplClass>::visitOpenPackElementInst(
           elementReplacements[interfaceTy] = element->getCanonicalType();
         });
 
-    // Build a SubstitutionMap for the full opened element signature that
-    // maps outer params via origContextSubs and element params to concrete
-    // types.
-    auto genericSig = origEnv->getGenericSignature();
-    auto newContextSubs =
-        getOpSubstitutionMap(origEnv->getOuterSubstitutions());
-    auto subsMap = SubstitutionMap::get(
-        genericSig,
-        [&](SubstitutableType *type) -> Type {
-          auto *gp = cast<GenericTypeParamType>(type);
-          auto canGP = gp->getCanonicalType();
-          auto it = elementReplacements.find(canGP);
-          if (it != elementReplacements.end())
-            return it->second;
-          return Type(type).subst(newContextSubs);
-        },
-        LookUpConformanceInModule());
-    registerConcreteLocalArchetypeMapping(origEnv, subsMap);
+    registerConcreteReplacements(elementReplacements);
     return;
   }
+
+  // If, for each opened pack, every element is the same concrete type, we can
+  // resolve each element archetype to that single type, even when the pack
+  // index is dynamic.
+  bool replacedWithSingleElement = [&] {
+    bool allPacksHaveOneConcreteType = true;
+    llvm::SmallDenseMap<CanType, CanType, 4> elementReplacements;
+
+    origEnv->forEachPackElementBinding(
+        [&](ElementArchetypeType *elementArchetype, PackType *origPack) {
+          if (!allPacksHaveOneConcreteType)
+            return;
+
+          CanPackType pack =
+              cast<PackType>(getOpASTType(origPack->getCanonicalType()));
+
+          // No pack elements: There is no single type to register for
+          // substitution.
+          if (pack.getElementTypes().size() == 0) {
+            allPacksHaveOneConcreteType = false;
+            return;
+          }
+
+          auto firstElement = pack.getElementType(0);
+          if (firstElement->is<PackExpansionType>()) {
+            allPacksHaveOneConcreteType = false;
+            return;
+          }
+
+          // We only need to check whether the other elements of the pack are
+          // equal to the first. We know the first element is not a pack
+          // expansion, so this will catch any of them, as well as other
+          // concrete types.
+          if (llvm::any_of(pack.getElementTypes().slice(1),
+                           [&](const auto &elementType) {
+                             return elementType != firstElement;
+                           })) {
+            allPacksHaveOneConcreteType = false;
+            return;
+          }
+
+          // All pack elements have the same concrete type as the first:
+          // register that type as the replacement for this pack's element
+          // archetype.
+          auto interfaceTy =
+              elementArchetype->getInterfaceType()->getCanonicalType();
+          elementReplacements[interfaceTy] = firstElement;
+        });
+
+    if (!allPacksHaveOneConcreteType)
+      return false;
+
+    registerConcreteReplacements(elementReplacements);
+    return true;
+  }();
+
+  if (replacedWithSingleElement)
+    return;
 
   // We need to make a new opened-element environment.  This is *not*
   // a refinement of the contextual environment of the new insertion

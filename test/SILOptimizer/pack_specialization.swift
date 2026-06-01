@@ -142,3 +142,30 @@ public func applyDirect<each T>(input: repeat each T, op: (repeat each T) -> Int
 public func testDirect() -> Int32 {
     applyDirect(input: 27, 27) { ($0 + $1) }
 }
+
+// Eliminating @pack_element types when a pack loop cannot be unrolled.
+// This only works if every element of the pack is the same type.
+//
+// This test produces a loop with 33 iterations, exceeding the upper bound in
+// the LoopUnroll pass.
+
+
+func addTogetherInlinable<each A: Numeric>(xs: repeat each A) -> (repeat each A) {
+  return (repeat (each xs + each xs))
+}
+
+// CHECK:         define {{.*}} void @"$s19pack_specialization13addTogether33s5Int32V_A32DtyF"(ptr {{.*}} sret(<{ %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V, %Ts5Int32V }>) {{.*}} %0) {{.*}} {
+// CHECK:           [[INPUT_PACK:%[0-9]+]] =  alloca [33 x ptr]
+// CHECK-COUNT-33:  alloca %Ts5Int32V
+// CHECK:           store ptr {{.*}}, ptr [[INPUT_PACK]]
+// CHECK:           [[DYN_IDX:%[0-9]+]] = phi
+// CHECK-NEXT:      [[DYN_ADDR:%[0-9]+]] = getelementptr {{.*}} [[INPUT_PACK]]
+// CHECK-NEXT:      [[ELEM_ADDR:%[0-9]+]] = load ptr, ptr [[DYN_ADDR]]
+// CHECK-NEXT:      [[ELEM:%[0-9]+]] = load i32, ptr [[ELEM_ADDR]]
+// CHECK-NEXT:      [[DOUBLED:%[0-9]+]] = call { i32, i1 } @llvm.sadd.with.overflow.i32(i32 [[ELEM]], i32 [[ELEM]])
+// CHECK-NOT:       @llvm.sadd.with.overflow.i32
+// CHECK:         }
+
+public func addTogether33() -> (Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32, Int32) {
+  return addTogetherInlinable(xs: 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33)
+}
