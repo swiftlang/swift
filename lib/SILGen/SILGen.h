@@ -446,7 +446,8 @@ public:
       ResilienceExpansion expansion, unsigned &baseOperand,
       bool &needsGenericContext, SubstitutionMap subs, ValueDecl *decl,
       ArrayRef<ProtocolConformanceRef> indexHashables, CanType baseTy,
-      DeclContext *useDC, bool forPropertyDescriptor, bool isApplied = false);
+      DeclContext *useDC, bool forPropertyDescriptor, bool isApplied = false,
+      Type resolvedComponentType = Type());
 
   /// Emit all differentiability witnesses for the given function, visiting its
   /// `@differentiable` and `@derivative` attributes.
