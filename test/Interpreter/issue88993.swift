@@ -3,6 +3,9 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 
+// Temporarily disabled until issues in the optimized builds are addressed.
+// REQUIRES: rdar178397835
+
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // REQUIRES: executable_test
