@@ -13305,6 +13305,14 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
         // arguments and result. This helps to avoid recording extraneous
         // fixes because generic parameters and leading-dot syntax arguments
         // cannot be inferred in this case.
+        //
+        // Note that `recordTypeVariablesAsHoles` is not used here because
+        // an existing hole from a function value is propagated to
+        // arguments/result instead of creating a direct one per type variable
+        // like that method would do, this is an important distinction later on,
+        // when solver decides whether to add a fix or not when a hole is
+        // subsequently propagated to other locations like leading-dot syntax
+        // base or literals.
         Type(func1).visit([&](Type componentTy) {
           if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
             if (!typeVar->getImpl().hasRepresentativeOrFixed())
