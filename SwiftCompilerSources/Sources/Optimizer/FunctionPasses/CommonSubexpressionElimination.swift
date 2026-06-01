@@ -284,7 +284,7 @@ private func processLazyPropertyGetters(
     context.erase(instruction: sei)
   }
 
-  if (context.needFixStackNesting) {
+  if context.needFixStackNesting {
     context.fixStackNesting(in: function)
   }
 }
@@ -611,7 +611,8 @@ struct InstructionReference: Hashable {
   let hash: Int
 
   /// Returns `nil` if `inst` is not eligible for CSE.
-  init?(inst: Instruction, runsOnHighLevelSil: Bool = false, calleeAnalysis: CalleeAnalysis? = nil) {
+  init?(inst: Instruction, runsOnHighLevelSil: Bool = false, calleeAnalysis: CalleeAnalysis? = nil)
+  {
     guard
       let h = getHash(
         of: inst,
