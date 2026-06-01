@@ -663,10 +663,16 @@ bool DebugValueInst::isExprTypeValid() const {
       break;
     case SILDIExprOperator::Fragment: {
       auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
+      auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
+      if (!FieldParent ||
+          RunningType.getNominalOrBoundGenericNominal() != FieldParent)
+        return false;
       RunningType = RunningType.getFieldType(Field, F);
       break;
     }
     case SILDIExprOperator::TupleFragment: {
+      if (!Operand.args()[0].getAsType()->isEqual(RunningType.getASTType()))
+        return false;
       unsigned Idx = Operand.args()[1].getAsConstInt().value();
       RunningType = RunningType.getTupleElementType(Idx);
       break;
