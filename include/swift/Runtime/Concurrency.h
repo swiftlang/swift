@@ -858,6 +858,14 @@ bool swift_executor_isComplexEquality(SerialExecutorRef ref);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 uint64_t swift_task_getJobTaskId(Job *job);
 
+/// Return the 64bit TaskID of the currently-executing AsyncTask,
+/// or 0 if there is no current task. This is more efficient than getting
+/// the task object to Swift and then getting the ID from it.
+///
+/// Available: Swift 6.5
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+uint64_t swift_task_getCurrentTaskId(void);
+
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 
 /// Enqueue the given job on the main executor.
