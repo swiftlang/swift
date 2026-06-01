@@ -62,9 +62,10 @@ static bool allUsesInSameBlock(AllocStackInst *ASI) {
 //                     MemoryLocations members
 //===----------------------------------------------------------------------===//
 
-MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx) :
+MemoryLocations::Location::Location(SILValue val, bool isTrivial, unsigned index, int parentIdx) :
       representativeValue(val),
-      parentIdx(parentIdx) {
+      parentIdx(parentIdx),
+      isTrivial(isTrivial) {
   assert(((parentIdx >= 0) ==
           (isa<StructElementAddrInst>(val) || isa<TupleElementAddrInst>(val) ||
            isa<InitEnumDataAddrInst>(val) ||
@@ -79,13 +80,19 @@ MemoryLocations::Location::Location(SILValue val, unsigned index, int parentIdx)
   setBitAndResize(selfAndParents, index);
 }
 
-void MemoryLocations::Location::updateFieldCounters(SILType ty, int increment) {
+void MemoryLocations::Location::updateFieldCounters(SILType ty, int increment, MemoryLocations *locations) {
   SILFunction *function = representativeValue->getFunction();
-  if (!ty.isEmpty(*function)) {
-    numFieldsNotCoveredBySubfields += increment;
-    if (!ty.isTrivial(*function))
-      numNonTrivialFieldsNotCovered += increment;
+  if (ty.isEmpty(*function))
+    return;
+
+  numFieldsNotCoveredBySubfields += increment;
+  if (locations->isTrivial(ty, function)
+      // Make sure if the parent is trivial (e.g. an enum with a trivial case),
+      // all sub-locations are also trivial.
+      || isTrivial) {
+    return;
   }
+  numNonTrivialFieldsNotCovered += increment;
 }
 
 static SILValue getBaseValue(SILValue addr) {
@@ -199,7 +206,7 @@ void MemoryLocations::analyzeLocation(SILValue loc) {
     return;
 
   unsigned currentLocIdx = locations.size();
-  locations.push_back(Location(loc, currentLocIdx));
+  locations.push_back(Location(loc, isTrivial(loc->getType(), function), currentLocIdx));
   SmallVector<SILValue, 8> collectedVals;
   SubLocationMap subLocationMap;
   if (!analyzeLocationUsesRecursively(loc, currentLocIdx, collectedVals,
@@ -415,7 +422,8 @@ bool MemoryLocations::analyzeAddrProjection(
     SingleValueInstruction *projection, unsigned parentLocIdx,unsigned fieldNr,
     SmallVectorImpl<SILValue> &collectedVals, SubLocationMap &subLocationMap) {
 
-  if (projection->getType().isEmpty(*projection->getFunction()))
+  SILFunction *f = projection->getFunction();
+  if (projection->getType().isEmpty(*f))
     return false;
 
   auto key = std::make_pair(parentLocIdx, fieldNr);
@@ -424,7 +432,11 @@ bool MemoryLocations::analyzeAddrProjection(
     subLocIdx = locations.size();
     assert(subLocIdx > 0);
     subLocationMap[key] = subLocIdx;
-    locations.push_back(Location(projection, subLocIdx, parentLocIdx));
+    bool trivial = isTrivial(projection->getType(), f)
+                   // Make sure if the parent is trivial (e.g. an enum with a trivial case),
+                   // all sub-locations are also trivial.
+                   || locations[parentLocIdx].isTrivial;
+    locations.push_back(Location(projection, trivial, subLocIdx, parentLocIdx));
 
     Location &parentLoc = locations[parentLocIdx];
     locations.back().selfAndParents |= parentLoc.selfAndParents;
@@ -438,7 +450,7 @@ bool MemoryLocations::analyzeAddrProjection(
 
     initFieldsCounter(parentLoc);
     assert(parentLoc.numFieldsNotCoveredBySubfields >= 1);
-    parentLoc.updateFieldCounters(projection->getType(), -1);
+    parentLoc.updateFieldCounters(projection->getType(), -1, this);
 
     if (parentLoc.numFieldsNotCoveredBySubfields == 0) {
       int idx = (int)parentLocIdx;
@@ -496,15 +508,74 @@ void MemoryLocations::initFieldsCounter(Location &loc) {
     SILModule &module = function->getModule();
     for (VarDecl *field : decl->getStoredProperties()) {
       loc.updateFieldCounters(
-          ty.getFieldType(field, module, TypeExpansionContext(*function)), +1);
+          ty.getFieldType(field, module, TypeExpansionContext(*function)), +1, this);
     }
     return;
   }
   if (auto tupleTy = ty.getAs<TupleType>()) {
     for (unsigned idx = 0, end = tupleTy->getNumElements(); idx < end; ++idx) {
-      loc.updateFieldCounters(ty.getTupleElementType(idx), +1);
+      loc.updateFieldCounters(ty.getTupleElementType(idx), +1, this);
     }
     return;
   }
-  loc.updateFieldCounters(ty, +1);
+  loc.updateFieldCounters(ty, +1, this);
+}
+
+bool MemoryLocations::isTrivial(SILType type, SILFunction *inFunction) {
+  auto iter = trivialTypes.find(type);
+  if (iter != trivialTypes.end())
+    return iter->second;
+
+  bool trivial = computeIsTrivial(type, inFunction);
+  trivialTypes[type] = trivial;
+  return trivial;
+}
+
+bool MemoryLocations::computeIsTrivial(SILType type, SILFunction *inFunction) {
+
+  if (inFunction->getTypeProperties(type).isInfinite()) {
+    return type.isTrivial(*inFunction);
+  }
+
+  if (auto tupleTy = type.getAs<TupleType>()) {
+    // A tuple is trivial if all elements are trivial.
+    for (unsigned idx = 0, num = tupleTy->getNumElements(); idx < num; ++idx) {
+      if (!isTrivial(type.getTupleElementType(idx), inFunction))
+        return false;
+    }
+    return true;
+  }
+
+  if (StructDecl *structDecl = type.getStructOrBoundGenericStruct()) {
+    if (structDecl->isResilient(inFunction->getModule().getSwiftModule(),
+                                inFunction->getResilienceExpansion())) {
+      return false;
+    }
+
+    // A struct is trivial if all elements are trivial.
+    TypeExpansionContext typeEx = inFunction->getTypeExpansionContext();
+    for (VarDecl *field : structDecl->getStoredProperties()) {
+      if (!isTrivial(type.getFieldType(field, inFunction->getModule(), typeEx), inFunction))
+        return false;
+    }
+    return true;
+  }
+
+  if (type.isFunction()) {
+    return true;
+  }
+
+  if (EnumDecl *enumDecl = type.getEnumOrBoundGenericEnum()) {
+    // An enum is trivial if _any_ case is trivial.
+    for (EnumElementDecl *caseDecl : enumDecl->getAllElements()) {
+      if (!caseDecl->hasAssociatedValues())
+        return true;
+
+      if (isTrivial(type.getEnumElementType(caseDecl, inFunction), inFunction))
+        return true;
+    }
+    // fall-through
+  }
+
+  return type.isTrivial(*inFunction);
 }

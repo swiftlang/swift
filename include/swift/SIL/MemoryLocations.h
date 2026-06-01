@@ -139,6 +139,13 @@ public:
     /// \endcode
     int parentIdx;
 
+    /// True if this location should be trated as "trivial" location.
+    /// This may differ from the location's type `isTrivial` property:
+    /// Conservatively treat enums and functions as trivial (even if their types
+    /// are not trivial). Memory locations of such types can be missing destroys
+    /// in case the enum is in fact a trivial case (like `Optional.none`).
+    bool isTrivial;
+
     /// Returns true if the location with index \p idx is this location or a
     /// sub location of this location.
     bool isSubLocation(unsigned idx) const {
@@ -163,9 +170,9 @@ public:
     /// -1 means: not yet initialized.
     int numNonTrivialFieldsNotCovered = -1;
 
-    Location(SILValue val, unsigned index, int parentIdx = -1);
+    Location(SILValue val, bool isTrivial, unsigned index, int parentIdx = -1);
 
-    void updateFieldCounters(SILType ty, int increment);
+    void updateFieldCounters(SILType ty, int increment, MemoryLocations *locations);
   };
 
 private:
@@ -194,6 +201,9 @@ private:
 
   /// If true, also analyze trivial memory locations.
   bool handleTrivialLocations;
+  
+  /// Cache for the `isTrivial` flags.
+  llvm::DenseMap<SILType, bool> trivialTypes;
 
 public:
   MemoryLocations(bool handleNonTrivialProjections, bool handleTrivialLocations) :
@@ -308,6 +318,12 @@ private:
 
   /// Calculates Location::numFieldsNotCoveredBySubfields
   void initFieldsCounter(Location &loc);
+
+  /// Returns true if the `type` should be treated as trivial type.
+  /// See `Location::isTrivial`.
+  bool isTrivial(SILType type, SILFunction *inFunction);
+
+  bool computeIsTrivial(SILType type, SILFunction *inFunction);
 };
 
 } // end swift namespace
