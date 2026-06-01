@@ -570,21 +570,23 @@ bool SILPassManager::breakBeforeRunning(StringRef fnName,
 }
 
 void SILPassManager::dumpPassInfo(const char *Title, SILTransform *Tr,
-                                  SILFunction *F, int passIdx, bool skipNewline) {
-  llvm::dbgs() << "  " << Title << " #" << NumPassesRun
+                                  SILFunction *F, int passIdx, bool skipNewline,
+                                  llvm::raw_ostream &os) {
+  os << "  " << Title << " #" << NumPassesRun
                << ", stage " << StageName << ", pass";
   if (passIdx >= 0)
-    llvm::dbgs() << ' ' << passIdx;
-  llvm::dbgs() << ": " << Tr->getID() << " (" << Tr->getTag() << ")";
+    os << ' ' << passIdx;
+  os << ": " << Tr->getID() << " (" << Tr->getTag() << ")";
   if (F)
-    llvm::dbgs() << ", Function: " << F->getName();
+    os << ", Function: " << F->getName();
   if (!skipNewline)
-    llvm::dbgs() << '\n';
+    os << '\n';
 }
 
 void SILPassManager::dumpPassInfo(const char *Title, unsigned TransIdx,
-                                  SILFunction *F, bool skipNewline) {
-  dumpPassInfo(Title, Transformations[TransIdx], F, (int)TransIdx, skipNewline);
+                                  SILFunction *F, bool skipNewline,
+                                  llvm::raw_ostream &os) {
+  dumpPassInfo(Title, Transformations[TransIdx], F, (int)TransIdx, skipNewline, os);
 }
 
 bool SILPassManager::isMandatoryFunctionPass(SILFunctionTransform *sft) {
@@ -765,8 +767,8 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     llvm::MD5::MD5Result result;
     md5Stream.final(result);
 
-    dumpPassInfo("MD5", TransIdx, F, /*skipNewline=*/ true);
-    llvm::dbgs() << " = " << result << "\n";
+    dumpPassInfo("MD5", TransIdx, F, /*skipNewline=*/ true, llvm::outs());
+    llvm::outs() << " = " << result << "\n";
   }
 
   if (numRepeats > 1)
@@ -954,8 +956,8 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
     llvm::MD5::MD5Result result;
     md5Stream.final(result);
 
-    dumpPassInfo("MD5", TransIdx, /*function=*/ nullptr, /*skipNewline=*/ true);
-    llvm::dbgs() << " = " << result << "\n";
+    dumpPassInfo("MD5", TransIdx, /*function=*/ nullptr, /*skipNewline=*/ true, llvm::outs());
+    llvm::outs() << " = " << result << "\n";
   }
 
   // If this pass invalidated anything, print and verify.
@@ -1032,7 +1034,7 @@ void SILPassManager::execute() {
     llvm::MD5::MD5Result result;
     md5Stream.final(result);
 
-    llvm::dbgs() << "Initial " << StageName << " MD5 = " << result << "\n";
+    llvm::outs() << "Initial " << StageName << " MD5 = " << result << "\n";
   }
 
   // Run the transforms by alternating between function transforms and
