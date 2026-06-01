@@ -468,7 +468,7 @@ private:
       StringRef readLegacyTypeInfoPath =
           instance.getInvocation().getIRGenOptions().ReadLegacyTypeInfoPath;
       if (!readLegacyTypeInfoPath.empty()) {
-        // If legacy layout is specifed, just need to track that file.
+        // If legacy layout is specified, just need to track that file.
         if (tracker->trackFile(readLegacyTypeInfoPath))
           commandline.push_back("-read-legacy-type-info-path=" +
                                 scanner.remapPath(readLegacyTypeInfoPath));
