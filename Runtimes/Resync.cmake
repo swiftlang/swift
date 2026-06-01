@@ -139,6 +139,7 @@ message(STATUS "Android modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT
 copy_files(public/Platform Overlay/Android/clang
   FILES
     android.modulemap
+    _stdio.apinotes
     posix_filesystem.apinotes
     spawn.apinotes
     SwiftAndroidNDK.h
