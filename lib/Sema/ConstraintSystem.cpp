@@ -2651,16 +2651,41 @@ static bool diagnoseAmbiguity(
     return primaryFix.second->diagnose(*primaryFix.first);
   }
 
+  // Group the fixes by (kind, locator). If *every* group is shared by all
+  // viable solutions, the solutions differ only in their overload choice and
+  // not in the fixes they require, so the ambiguity is spurious: diagnose the
+  // shared fixes instead of falling back to a generic overload ambiguity
+  // diagnostic. This handles cases where each solution carries more than one
+  // distinct fix (e.g. a mutating member on an immutable base together with an
+  // optional that must be unwrapped). When some fix is specific to a subset of
+  // the solutions the ambiguity is genuine and keeps its candidate-listing
+  // diagnostic.
   {
-    auto fixKind = aggregateFix.front().second->getKind();
-    if (llvm::all_of(
-            aggregateFix, [&](const std::pair<const Solution *,
-                                              const ConstraintFix *> &entry) {
-              auto &fix = entry.second;
-              return fix->getKind() == fixKind && fix->getLocator() == locator;
-            })) {
-      auto *primaryFix = aggregateFix.front().second;
-      if (primaryFix->diagnoseForAmbiguity(aggregateFix))
+    llvm::MapVector<std::pair<FixKind, ConstraintLocator *>,
+                    SmallVector<std::pair<const Solution *,
+                                          const ConstraintFix *>,
+                                4>>
+        fixesByKind;
+
+    for (const auto &entry : aggregateFix) {
+      auto *fix = entry.second;
+      fixesByKind[{fix->getKind(), fix->getLocator()}].push_back(entry);
+    }
+
+    bool allShared = llvm::all_of(fixesByKind, [&](const auto &entry) {
+      llvm::SmallPtrSet<const Solution *, 4> affectedSolutions;
+      for (const auto &fix : entry.second)
+        affectedSolutions.insert(fix.first);
+      return affectedSolutions.size() == solutions.size();
+    });
+
+    if (allShared) {
+      bool diagnosedCommonFix = false;
+      for (auto &entry : fixesByKind)
+        diagnosedCommonFix |=
+            entry.second.front().second->diagnoseForAmbiguity(entry.second);
+
+      if (diagnosedCommonFix)
         return true;
     }
   }
