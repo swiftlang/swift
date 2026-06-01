@@ -31,7 +31,18 @@ func testit() {
   Delta().main()
 }
 
+protocol P {}
+
+final class C: P {}
+
+@inline(never)
+func test2() -> [P] {
+  let a: [AnyObject?] = [ C(), C(), ]
+  return a.compactMap { $0 as? P }
+}
+
 testit()
+test2()
 
 // CHECK: ok
 print("ok")
