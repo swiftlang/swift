@@ -52,7 +52,7 @@ class PolyglotAPIVisitor : public clang::ConstDeclVisitor<PolyglotAPIVisitor> {
       Json.attribute("debug", "note: findPropertyDecl path");
       return prop;
     } else if (decl->isOverriding()) {
-      // Look for inherited decls being overriden.
+      // Look for inherited decls being overridden.
       Json.attribute("debug", "note: isOverriding path");
       auto overridens = SmallVector<const clang::ObjCMethodDecl*>();
       decl->getOverriddenMethods(overridens);
