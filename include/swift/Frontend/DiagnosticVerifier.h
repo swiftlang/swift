@@ -78,17 +78,20 @@ struct CapturedDiagnosticInfo {
   unsigned Column;
   SmallVector<CapturedFixItInfo, 2> FixIts;
   std::string CategoryDocFile;
+  /// Names of the diagnostic group and its parent groups, leaf-first.
+  std::vector<std::string> GroupNames;
 
   CapturedDiagnosticInfo(llvm::SmallString<128> Message,
                          std::optional<unsigned> SourceBufferID,
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
                          SmallVector<CapturedFixItInfo, 2> FixIts,
-                         const std::string &categoryDocFile)
+                         const std::string &categoryDocFile,
+                         std::vector<std::string> groupNames)
       : Message(Message), SourceBufferID(SourceBufferID),
         Classification(Classification), Loc(Loc), Line(Line), Column(Column),
-        FixIts(FixIts), CategoryDocFile(categoryDocFile) {
-  }
+        FixIts(FixIts), CategoryDocFile(categoryDocFile),
+        GroupNames(std::move(groupNames)) {}
 };
 /// This class implements support for -verify mode in the compiler.  It
 /// buffers up diagnostics produced during compilation, then checks them
