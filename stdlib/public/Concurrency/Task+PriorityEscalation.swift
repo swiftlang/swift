@@ -44,7 +44,7 @@ extension Task {
   ///   - newPriority: the new priority the task should continue executing on
   @available(SwiftStdlib 6.2, *)
   public func escalatePriority(to newPriority: TaskPriority) {
-    _taskEscalate(self._task, newPriority: newPriority.rawValue)
+    unsafe _taskEscalate(_AsyncTask(self._task), newPriority: newPriority.rawValue)
   }
 }
 
@@ -77,7 +77,7 @@ extension UnsafeCurrentTask {
   ///   - newPriority: the new priority the task should continue executing on
   @available(SwiftStdlib 6.2, *)
   public func escalatePriority(to newPriority: TaskPriority) {
-    unsafe _taskEscalate(self._task, newPriority: newPriority.rawValue)
+    unsafe _taskEscalate(self._rawTask, newPriority: newPriority.rawValue)
   }
 }
 

@@ -135,6 +135,9 @@ Func pthread_main_np() is a new API without '@available'
 Func TaskLocal.get() has been renamed to Func __abi_get()
 Func TaskLocal.get() has mangled name changing from '_Concurrency.TaskLocal.get() -> A' to '_Concurrency.TaskLocal.__abi_get() -> A'
 
+Func _taskIsCancelled(_:) has mangled name changing from '_Concurrency._taskIsCancelled(Builtin.NativeObject) -> Swift.Bool' to '_Concurrency._taskIsCancelled(_Concurrency._AsyncTask) -> Swift.Bool'
+Func _taskIsCancelled(_:) has parameter 0 type change from Builtin.NativeObject to _Concurrency._AsyncTask
+
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)
 
 
