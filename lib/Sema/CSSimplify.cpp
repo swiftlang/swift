@@ -5643,6 +5643,11 @@ bool ConstraintSystem::repairFailures(
     if (isExpr<ErrorExpr>(anchor))
       return true;
 
+    if (getAsPattern<ExprPattern>(anchor)) {
+      if (lhs->isPlaceholder() || rhs->isPlaceholder())
+        return true;
+    }
+
     // This could be:
     // - `InOutExpr` used with r-value e.g. `foo(&x)` where `x` is a `let`.
     // - `ForceValueExpr` e.g. `foo.bar! = 42` where `bar` or `foo` are
@@ -7138,6 +7143,13 @@ bool ConstraintSystem::repairFailures(
 
     break;
   }
+
+  case ConstraintLocator::KeyPathDynamicMember: {
+    if (lhs->isPlaceholder() || rhs->isPlaceholder())
+      return true;
+    break;
+  }
+
   default:
     break;
   }
@@ -11716,19 +11728,11 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyMemberConstraint(
                                                  alreadyDiagnosed, locator);
 
       auto instanceTy = baseObjTy->getMetatypeInstanceType();
-      auto impact = 4;
+      auto impact = 5;
       // Impact is higher if the base type is any function type
       // because function types can't have any members other than self
       if (instanceTy->is<AnyFunctionType>()) {
         impact += 10;
-      }
-
-      auto *anchorExpr = getAsExpr(locator->getAnchor());
-      if (anchorExpr) {
-        // Increasing the impact for missing member in any argument position
-        // which may be less likely than other potential mistakes
-        if (getArgumentLocator(anchorExpr))
-          impact += 5;
       }
 
       if (recordFix(fix, impact))
@@ -13353,8 +13357,49 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     underlyingType =
         getFixedTypeRecursive(underlyingType, flags, /*wantRValue=*/true);
     if (underlyingType->isPlaceholder()) {
-      recordAnyTypeVarAsPotentialHole(func1);
+      if (isForCodeCompletion()) {
+        // In code completion mode it's important to attempt to infer as much
+        // type information as possible from the context, so let's delay placeholder
+        // propagation to give parameters a chance to be inferred from
+        // arguments and the result type a chance to be inferred from context.
+        recordAnyTypeVarAsPotentialHole(func1);
+      } else {
+        // In diagnostic mode, propagate function value placeholder to
+        // arguments and result. This helps to avoid recording extraneous
+        // fixes because generic parameters and leading-dot syntax arguments
+        // cannot be inferred in this case.
+        //
+        // Note that `recordTypeVariablesAsHoles` is not used here because
+        // an existing hole from a function value is propagated to
+        // arguments/result instead of creating a direct one per type variable
+        // like that method would do, this is an important distinction later on,
+        // when solver decides whether to add a fix or not when a hole is
+        // subsequently propagated to other locations like leading-dot syntax
+        // base or literals.
+        Type(func1).visit([&](Type componentTy) {
+          if (auto *typeVar = componentTy->getAs<TypeVariableType>()) {
+            if (!typeVar->getImpl().hasRepresentativeOrFixed())
+              assignFixedType(typeVar, underlyingType);
+          }
+        });
+      }
       return SolutionKind::Solved;
+    }
+
+    if (!isForCodeCompletion()) {
+      auto argsTy = simplifyType(func1)->castTo<FunctionType>();
+      // Short-circuit calls where all arguments are invalid, otherwise the
+      // solver would end up producing a solution for every overload which
+      // it cannot disambiguate which quickly turns into "too complex" situation.
+      if (argsTy->getNumParams() > 0 &&
+          llvm::all_of(argsTy->getParams(),
+                       [](const FunctionType::Param &param) {
+                         return param.getPlainType()->isPlaceholder();
+                       })) {
+        recordTypeVariablesAsHoles(func1);
+        recordTypeVariablesAsHoles(type2);
+        return SolutionKind::Solved;
+      }
     }
   }
 
@@ -13675,10 +13720,10 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
     auto *fix = RemoveInvalidCall::create(*this, getConstraintLocator(locator));
     // Let's make this fix as high impact so if there is a function or member
-    // overload with e.g. argument-to-parameter type mismatches it would take
-    // a higher priority.
-    return recordFix(fix, /*impact=*/3) ? SolutionKind::Error
-                                         : SolutionKind::Solved;
+    // overload with e.g. argument-to-parameter type mismatches or missing/extra
+    // arguments it would take a higher priority.
+    return recordFix(fix, /*impact=*/4) ? SolutionKind::Error
+                                        : SolutionKind::Solved;
   }
 
   return result;
@@ -16693,7 +16738,19 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
         constraint.getFirstType(), constraint.getSecondType(),
         /*flags*/ std::nullopt, constraint.getLocator());
 
-  case ConstraintKind::Disjunction:
+  case ConstraintKind::Disjunction: {
+    if (shouldAttemptFixes()) {
+      auto *choice = constraint.getNestedConstraints()[0];
+      if (choice->getKind() == ConstraintKind::BindOverload) {
+        if (auto *choiceTy = choice->getFirstType()->getAs<TypeVariableType>()) {
+          auto resolvedTy = getFixedType(choiceTy);
+          if (resolvedTy && resolvedTy->isPlaceholder())
+            return SolutionKind::Solved;
+        }
+      }
+    }
+    LLVM_FALLTHROUGH;
+  }
   case ConstraintKind::Conjunction:
     // See {Dis, Con}junctionStep class in CSStep.cpp for solving
     return SolutionKind::Unsolved;

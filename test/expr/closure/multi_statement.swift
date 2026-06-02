@@ -339,7 +339,6 @@ func test_unknown_refs_in_tilde_operator() {
   let _: (E) -> Void = {
     if case .test(unknown) = $0 {
       // expected-error@-1 2 {{cannot find 'unknown' in scope}}
-      // expected-error@-2 {{type 'E' has no member 'test'}}
     }
   }
 }
