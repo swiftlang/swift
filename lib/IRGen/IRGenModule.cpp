@@ -1559,13 +1559,19 @@ void IRGenModule::constructInitialFnAttributes(
   // Add/remove MinSize based on the appropriate setting.
   if (FuncOptMode == OptimizationMode::NotSet)
     FuncOptMode = IRGen.Opts.OptMode;
-  if (FuncOptMode == OptimizationMode::ForSize) {
+
+  if (FuncOptMode > OptimizationMode::NoOptimization) {
     Attrs.addAttribute(llvm::Attribute::OptimizeForSize);
+  } else {
+    Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
+  }
+
+  if (FuncOptMode == OptimizationMode::ForSize) {
     Attrs.addAttribute(llvm::Attribute::MinSize);
   } else {
     Attrs.removeAttribute(llvm::Attribute::MinSize);
-    Attrs.removeAttribute(llvm::Attribute::OptimizeForSize);
   }
+
   if (stackProtector == StackProtectorMode::StackProtector) {
     Attrs.addAttribute(llvm::Attribute::StackProtectReq);
     Attrs.addAttribute("stack-protector-buffer-size", llvm::utostr(8));
