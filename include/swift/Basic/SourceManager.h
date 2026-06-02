@@ -73,7 +73,6 @@ public:
 
     /// A macro declaration synthesized by the compiler
     SyntheticMacro,
-    // TODO: Handle all macro roles ?
   } kind;
 
   static StringRef kindToString(GeneratedSourceInfo::Kind kind) {
