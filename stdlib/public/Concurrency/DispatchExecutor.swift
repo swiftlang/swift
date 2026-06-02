@@ -138,6 +138,42 @@ enum DispatchClockID: CInt {
   case walltime = 3
 }
 
+@_unavailableInEmbedded
+extension ContinuousClock {
+  func timestamp(for instant: Instant)
+    -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
+  {
+    let (seconds, nanoseconds) = durationComponents(for: instant._value)
+    return (clockID: .continuous, seconds: seconds, nanoseconds: nanoseconds)
+  }
+
+  func durationComponents(for duration: Duration)
+    -> (seconds: Int64, nanoseconds: Int64)
+  {
+    let (seconds, attoseconds) = duration.components
+    let nanoseconds = attoseconds / 1_000_000_000
+    return (seconds: seconds, nanoseconds: nanoseconds)
+  }
+}
+
+@_unavailableInEmbedded
+extension SuspendingClock {
+  func timestamp(for instant: Instant)
+    -> (clockID: _ClockID, seconds: Int64, nanoseconds: Int64)
+  {
+    let (seconds, nanoseconds) = durationComponents(for: instant._value)
+    return (clockID: .suspending, seconds: seconds, nanoseconds: nanoseconds)
+  }
+
+  func durationComponents(for duration: Duration)
+    -> (seconds: Int64, nanoseconds: Int64)
+  {
+    let (seconds, attoseconds) = duration.components
+    let nanoseconds = attoseconds / 1_000_000_000
+    return (seconds: seconds, nanoseconds: nanoseconds)
+  }
+}
+
 fileprivate func clamp(_ components: (seconds: Int64, attoseconds: Int64))
   -> (seconds: Int64, attoseconds: Int64) {
   if components.seconds < 0

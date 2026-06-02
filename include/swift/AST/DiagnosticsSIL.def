@@ -1289,6 +1289,8 @@ NOTE(rbi_merge_failure_value_note_bare, none,
 // Concurrency related diagnostics
 ERROR(executor_factory_must_conform, none,
       "the DefaultExecutorFactory does not conform to 'ExecutorFactory'", ())
+ERROR(cannot_find_schedule_task_resumption, none,
+      "the _scheduleTaskResumption function could not be found", ())
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Misc Diagnostics

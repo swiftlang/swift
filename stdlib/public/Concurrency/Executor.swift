@@ -187,6 +187,39 @@ public protocol SchedulingExecutor: Executor {
 }
 
 #if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+/// A helper function that we use to schedule task resumption.
+/// This is used from emitBuiltinSuspend()
+@available(StdlibDeploymentTarget 9999, *)
+// TODO: When all of this is no longer SPI, we should be able to inline
+//       this into client code.
+// @export(implementation)
+// @transparent
+func _scheduleTaskResumption<E: SchedulingExecutor, C: Clock>(
+  _ continuation: Builtin.RawUnsafeContinuation,
+  on executor: E,
+  resume at: FireTime<C>,
+  tolerance: C.Duration?,
+  clock: C,
+  onSchedule: (consuming JobCancellationToken) -> ()
+) {
+  let job = _taskCreateNullaryContinuationJob(
+    priority: Int(Task.currentPriority.rawValue),
+    continuation: continuation
+  )
+
+  let token = executor.enqueue(
+    ExecutorJob(context: job),
+    run: at,
+    clock: clock,
+    tolerance: tolerance,
+    onCancellation: .executeImmediately
+  )
+
+  onSchedule(consume token)
+}
+#endif
+
+#if !$Embedded && !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 9999, *)
 extension SchedulingExecutor {

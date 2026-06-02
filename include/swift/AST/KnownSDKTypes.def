@@ -1,4 +1,4 @@
-//===--- KnownSDKTypes.def - Common SDK types -----------------------------===//
+//===--- KnownSDKTypes.def - Common SDK types -------------------*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -50,6 +50,8 @@ KNOWN_SDK_TYPE_DECL(Concurrency, SerialExecutor, NominalTypeDecl, 0)
 KNOWN_SDK_TYPE_DECL(Concurrency, UnownedSerialExecutor, NominalTypeDecl, 0)
 
 KNOWN_SDK_TYPE_DECL(Concurrency, TaskLocal, ClassDecl, 1)
+KNOWN_SDK_TYPE_DECL(Concurrency, FireTime, EnumDecl, 1)
+KNOWN_SDK_TYPE_DECL(Concurrency, JobCancellationToken, StructDecl, 0)
 
 // Distributed actors
 KNOWN_SDK_TYPE_DECL(Distributed, DistributedActor, ProtocolDecl, 0)

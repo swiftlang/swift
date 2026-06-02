@@ -569,6 +569,9 @@ public:
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
 
+  // Retrieve the _Concurrency._scheduleTaskSuspension intrinsic.
+  FuncDecl *getScheduleTaskResumption();
+
   /// Get the configured ExecutorFactory type.
   Type getConfiguredExecutorFactory();
 

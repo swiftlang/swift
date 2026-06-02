@@ -275,6 +275,70 @@ struct CountGenericParameters {
   }
 };
 
+/// A synthesizer which substitutes a generic parameter list
+template <class TypeS, class... ParamS>
+struct GenericSubstitutionSynthesizer {
+  TypeS Type;
+  VariadicSynthesizerStorage<ParamS...> Params;
+};
+template <class TypeS, class... ParamS>
+GenericSubstitutionSynthesizer<TypeS, ParamS...>
+_substituteGenerics(TypeS type, ParamS... params) {
+  return {type, {params...}};
+}
+
+template <class S>
+Type synthesizeGenericParam(SynthesisContext &SC, S s) {
+  return synthesizeType(SC, s);
+}
+
+struct CollectGenericParameters {
+  SynthesisContext &SC;
+  SmallVectorImpl<Type> &Params;
+
+  template <class S>
+  void operator()(const S &s) const {
+    Params.push_back(synthesizeGenericParam(SC, s));
+  }
+};
+
+template <class TypeS, class... ParamS>
+inline Type synthesizeType(
+  SynthesisContext &SC,
+  GenericSubstitutionSynthesizer<TypeS, ParamS...> S) {
+  SmallVector<Type, sizeof...(ParamS)> newArgs;
+  S.Params.visit(CollectGenericParameters{SC, newArgs});
+
+  auto baseType = synthesizeType(SC, S.Type);
+  auto newType = BoundGenericType::get(
+    baseType->getNominalOrBoundGenericNominal(),
+    baseType->getNominalParent(),
+    newArgs
+  );
+
+  return newType;
+}
+
+/// A synthesizer which generates a dependent member type
+template <class TypeS>
+struct DependentMemberTypeSynthesizer {
+  TypeS BaseType;
+  ProtocolDecl *Protocol;
+  Identifier Name;
+};
+template <class TypeS>
+DependentMemberTypeSynthesizer<TypeS>
+_dependentMemberType(TypeS baseType, ProtocolDecl *proto, Identifier name) {
+  return {baseType, proto, name};
+}
+
+template <class TypeS>
+inline Type synthesizeType(SynthesisContext &SC,
+                           DependentMemberTypeSynthesizer<TypeS> S) {
+  auto assocType = S.Protocol->getAssociatedType(S.Name);
+  return DependentMemberType::get(synthesizeType(SC, S.BaseType), assocType);
+}
+
 } // end anonymous namespace
 
 static const char * const GenericParamNames[] = {
@@ -887,20 +951,6 @@ makeTuple(const Gs & ...elementGenerators) {
         elementGenerators.build(builder)...
       };
       return TupleType::get(elts, builder.Context);
-    }
-  };
-}
-
-template <class... Gs>
-static BuiltinFunctionBuilder::LambdaGenerator
-makeBoundGenericType(NominalTypeDecl *decl,
-                     const Gs & ...argumentGenerators) {
-  return {
-    [=](BuiltinFunctionBuilder &builder) -> Type {
-      Type args[] = {
-        argumentGenerators.build(builder)...
-      };
-      return BoundGenericType::get(decl, Type(), args);
     }
   };
 }
@@ -2287,6 +2337,31 @@ static ValueDecl *getHopToActor(ASTContext &ctx, Identifier id) {
   return builder.build(id);
 }
 
+static ValueDecl *getSuspend(ASTContext &ctx, Identifier id) {
+  BuiltinFunctionBuilder builder(ctx);
+
+  return getBuiltinFunction(
+    ctx, id, _async(_thin),
+    _generics(_unrestricted,
+              _unrestricted,
+              _conformsTo(_typeparam(0), _schedulingExecutor),
+              _conformsTo(_typeparam(1), _clock)),
+    _parameters(_label("on", _typeparam(0)),
+                _label("until",
+                       _substituteGenerics(_fireTime, _typeparam(1))),
+                _label("tolerance",
+                       _optional(
+                         _dependentMemberType(_typeparam(1),
+                           ctx.getProtocol(KnownProtocolKind::Clock),
+                           ctx.getIdentifier("Duration")))),
+                _label("clock", _typeparam(1)),
+                _label("onSchedule", 
+                       _function(_noescape(_thick), _void,
+                                 _parameters(
+                                   _consuming(_jobCancellationToken))))),
+    _void);
+}
+
 static ValueDecl *getFlowSensitiveSelfIsolation(
   ASTContext &ctx, Identifier id, bool isDistributed
 ) {
@@ -3534,6 +3609,9 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
 
   case BuiltinValueKind::HopToActor:
     return getHopToActor(Context, Id);
+
+  case BuiltinValueKind::Suspend:
+    return getSuspend(Context, Id);
 
   case BuiltinValueKind::FlowSensitiveSelfIsolation:
     return getFlowSensitiveSelfIsolation(Context, Id, false);

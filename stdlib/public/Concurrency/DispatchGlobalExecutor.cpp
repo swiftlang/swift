@@ -445,13 +445,6 @@ uintptr_t swift_dispatchEnqueueWithDeadline(
 
   dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
 
-  // If this isn't an AsyncTask, we *can't* use a Dispatch Source,
-  // so in that case it just won't be cancellable.
-  if (swift_job_getKind(job) != SwiftTaskJobKind) {
-    dispatch_after_f(when, queue, (void *)job, &__swift_run_job);
-    return 0;
-  }
-
   uint64_t leeway;
   if (tnsec == -1) {
     // This means "no leeway specified"; we used to call dispatch_after() in

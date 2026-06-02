@@ -516,6 +516,11 @@ FuncDecl *SILGenModule::getExit() {
   return exitFunction;
 }
 
+FuncDecl *SILGenModule::getScheduleTaskResumption() {
+  return lookupConcurrencyIntrinsic(getASTContext(), 
+                                    "_scheduleTaskResumption");
+}
+
 Type SILGenModule::getConfiguredExecutorFactory() {
   auto &ctx = getASTContext();
 
