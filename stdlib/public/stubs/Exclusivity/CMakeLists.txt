@@ -4,30 +4,74 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-exclusivity)
   add_dependencies(embedded-libraries embedded-exclusivity)
 
-  foreach(impl ${EMBEDDED_SWIFT_EXCLUSIVITY_IMPLEMENTATIONS})
-    add_custom_target(embedded-exclusivity-${impl})
-    add_dependencies(embedded-exclusivity embedded-exclusivity-${impl})
+  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
+    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
+    list(GET list 0 arch)
+    list(GET list 1 mod)
+    list(GET list 2 triple)
 
-    # C11 thread-local does not work with -none- triples.
-    set(per_impl_skip_triple)
-    if("${impl}" STREQUAL "C11ThreadLocal")
-      list(APPEND per_impl_skip_triple "-none-")
+    if("${mod}" MATCHES "-windows-msvc$")
+      continue()
     endif()
 
-    add_embedded_swift_target_library(
-      embedded-exclusivity-${impl}
-      swiftExclusivity${impl}
-      PARTIAL_SOURCES_INTENDED
-      INSTALL_BINARY
+    if("${arch}" MATCHES "avr")
+      continue()
+    endif()
 
-      ${impl}.cpp
+    if (SWIFT_HOST_VARIANT STREQUAL "linux")
+      set(extra_c_compile_flags -ffreestanding)
+    elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
+      set(extra_c_compile_flags -ffreestanding)
+    endif()
+    list(APPEND extra_c_compile_flags -nostdinc++)
 
-      C_COMPILE_FLAGS -nostdinc++
-      SKIP_MOD_REGEX "-windows-msvc$"
-      SKIP_ARCH_REGEX "avr"
-      SKIP_TRIPLE_REGEX ${per_impl_skip_triple}
-      ARCHITECTURE_KEY mod
-      INSTALL_IN_COMPONENT stdlib
-    )
+    set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
+    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+      set(SWIFT_SDK_embedded_ARCH_${mod}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    endif()
+
+    foreach(impl ${EMBEDDED_SWIFT_EXCLUSIVITY_IMPLEMENTATIONS})
+      # C11 thread-local does not work with -none- triples.
+      if ("${impl}" MATCHES "C11ThreadLocal")
+        if("${triple}" MATCHES "-none-")
+            continue()
+        endif()
+      endif()
+
+      add_swift_target_library_single(
+        embedded-exclusivity-${impl}-${mod}
+        swiftExclusivity${impl}
+        STATIC
+        IS_FRAGILE
+        PARTIAL_SOURCES_INTENDED
+
+        ${impl}.cpp
+
+        C_COMPILE_FLAGS ${extra_c_compile_flags}
+        MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+        SDK "embedded"
+        ARCHITECTURE "${mod}"
+        DEPENDS embedded-stdlib-${mod}
+        INSTALL_IN_COMPONENT stdlib
+        )
+      swift_install_in_component(
+        TARGETS embedded-exclusivity-${impl}-${mod}
+        DESTINATION "lib/swift/embedded/${mod}"
+        COMPONENT "stdlib"
+        )
+      swift_install_in_component(
+        FILES "${SWIFTLIB_DIR}/embedded/${mod}/libswiftExclusivity${impl}.a"
+        DESTINATION "lib/swift/embedded/${mod}/"
+        COMPONENT "stdlib"
+        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
+        )
+      set_property(TARGET embedded-exclusivity-${impl}-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+      embedded_amend_archive_commands_on_darwin_host(embedded-exclusivity-${impl}-${mod} ${triple})
+
+      add_dependencies(embedded-exclusivity embedded-exclusivity-${impl}-${mod})
+    endforeach()
   endforeach()
 endif()

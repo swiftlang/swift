@@ -39,18 +39,46 @@ if(NOT DEFINED SWIFT_BUILD_CLANG_OVERLAYS_SKIP_BUILTIN_FLOAT OR NOT SWIFT_BUILD_
   if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     add_custom_target(embedded-builtin_float)
     add_dependencies(embedded-libraries embedded-builtin_float)
+  
+    set(SWIFT_ENABLE_REFLECTION OFF)
+    set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
+    set(SWIFT_STDLIB_STABLE_ABI OFF)
+    set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
+    set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
 
-    add_embedded_swift_target_library(
-      embedded-builtin_float
-      swift_Builtin_float
-
-      GYB_SOURCES
-        ${BUILTIN_FLOAT_GYB_SOURCES}
-
-      SWIFT_COMPILE_FLAGS
-        ${BUILTIN_FLOAT_SWIFT_FLAGS}
-
-      INSTALL_IN_COMPONENT stdlib
-    )
+    foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
+      string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
+      list(GET list 0 arch)
+      list(GET list 1 mod)
+      list(GET list 2 triple)
+  
+      set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
+      set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+      set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+      if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+        set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+      endif()
+      add_swift_target_library_single(
+        embedded-builtin_float-${mod}
+        swift_Builtin_float
+        ONLY_SWIFTMODULE
+        IS_FRAGILE
+        
+        ${BUILTIN_FLOAT_SOURCES}
+        GYB_SOURCES
+          ${BUILTIN_FLOAT_GYB_SOURCES}
+  
+        SWIFT_COMPILE_FLAGS
+          ${BUILTIN_FLOAT_SWIFT_FLAGS}
+          -Xcc -ffreestanding -enable-experimental-feature Embedded
+  
+        MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+        SDK "embedded"
+        ARCHITECTURE "${arch}"
+        DEPENDS embedded-stdlib-${mod}
+        INSTALL_IN_COMPONENT stdlib
+        )
+      add_dependencies(embedded-builtin_float embedded-builtin_float-${mod})
+    endforeach()
   endif()
 endif()

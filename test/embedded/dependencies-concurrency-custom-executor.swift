@@ -19,7 +19,6 @@ _clock_gettime
 _exit
 _free
 _malloc
-_memcpy
 _memmove
 _memset
 _memset_s
