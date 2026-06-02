@@ -13,7 +13,9 @@
 #include "swift/Parse/ParseVersion.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/Basic/Assertions.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/Support/FormatVariadic.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 using namespace swift::version;
@@ -137,9 +139,19 @@ std::optional<Version> VersionParser::parseCompilerVersionString(
   }
 
   if (CV.Components.size() > 5) {
-    if (Diags)
-      Diags->diagnose(Loc, diag::compiler_version_too_many_components);
-    isValidVersion = false;
+    // Highlight the trailing dotted components that are about to be dropped,
+    // starting at the period that precedes the first ignored component.
+    auto trailingStart =
+        SplitComponents[5].second.Start.getAdvancedLoc(-1);
+    auto trailingEnd = SplitComponents.back().second.End;
+    CV.Components.truncate(5);
+    if (Diags) {
+      SmallString<32> truncated;
+      llvm::raw_svector_ostream(truncated) << CV;
+      Diags->diagnose(Loc, diag::compiler_version_too_many_components,
+                      truncated.str())
+          .highlightChars(trailingStart, trailingEnd);
+    }
   }
 
   // In the beginning, '_compiler_version(string-literal)' was designed for a

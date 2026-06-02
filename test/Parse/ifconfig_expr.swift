@@ -142,8 +142,12 @@ func canImportVersioned() {
 #if canImport(A, _version: 2.2.2.2)
   let a = 1
 #endif
-  
-#if canImport(A, _version: 2.2.2.2.2) // expected-warning {{trailing components of version '2.2.2.2' are ignored}}
+
+#if canImport(A, _version: 2.2.2.2.2)
+  let a = 1
+#endif
+
+#if canImport(A, _version: 2.2.2.2.2.2) // expected-warning {{trailing components of version '2.2.2.2.2' are ignored}}
   let a = 1
 #endif
 
