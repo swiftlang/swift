@@ -1,0 +1,1 @@
+#define SOME_NUMERIC_CONSTANT 42
