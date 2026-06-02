@@ -439,7 +439,7 @@ protocol BoundsCheckedThunkBuilder {
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax
   // `let <count> = ...` bindings that extract the length of a buffer to compare the rest to.
   func buildBasicBoundsExtractions() throws -> [CodeBlockItemSyntax.Item]
-  // compare counts against ones extracted from buildBasicBoundsExtractions to make sure
+  // Compare counts against ones extracted from buildBasicBoundsExtractions to make sure
   // all buffers sharing a count use the same count.
   func buildBasicBoundsChecks() throws -> [CodeBlockItemSyntax.Item]
   // buildCompoundBoundsChecks performs bounds checks of count expressions that contain operations.
@@ -1565,6 +1565,12 @@ func setLifetimeDependencies(
 // entries, pick one entry to be the count extractor and mark the rest as
 // checkers. The extractor binds `let <count> = <param>.count`. The checkers
 // emit a bounds-check against <count>.
+// If all entries have an Optional type, the extractor will involve all of them,
+// like so: `let <count> = p1?.count ?? p2?.count ?? p3?.count ?? 0`. However
+// `p1` in this case is still marked as the extractor while the others are
+// checkers: if `p1` is non-nil, `count` is equal to `p1!.count`, but if `p1`
+// is nil, it shouldn't be bounds checked anyways. So we can always skip that
+// bounds check.
 func assignSharedCountExtraction(_ args: inout [ParamInfo], _ funcDecl: FunctionParts) {
   // key: index of count parameter (compound expressions not handled here)
   // value: index of pointer parameter
@@ -1582,7 +1588,6 @@ func assignSharedCountExtraction(_ args: inout [ParamInfo], _ funcDecl: Function
   for (_, argIndices) in sharers where argIndices.count >= 2 {
     struct SharerInfo {
       let argIdx: Int
-      let paramName: TokenSyntax
       let isNullable: Bool
     }
     let infos: [SharerInfo] = argIndices.compactMap { argIdx in
@@ -1591,7 +1596,6 @@ func assignSharedCountExtraction(_ args: inout [ParamInfo], _ funcDecl: Function
       let param = getParam(funcDecl, pi - 1)
       return SharerInfo(
         argIdx: argIdx,
-        paramName: param.name,
         isNullable: countedBy.isOrNull && param.type.is(OptionalTypeSyntax.self)
       )
     }

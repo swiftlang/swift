@@ -38,6 +38,7 @@
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Module.h"
+#include <optional>
 
 using namespace swift;
 using namespace importer;
@@ -226,13 +227,10 @@ private:
       out << ".param(" << pointerIndex + 1 << ")";
   }
 
-  // The common case will be that OrNull support exists, so cache positive
-  // result. For the rare case that we run against an old macro we can take the
-  // hit of checking multiple times.
-  bool hasOrNullSupportCached = false;
+  std::optional<bool> hasOrNullSupportCached = std::nullopt;
   bool hasOrNullSupport() {
-    if (hasOrNullSupportCached)
-      return true;
+    if (hasOrNullSupportCached.has_value())
+      return hasOrNullSupportCached.value();
 
     auto *D = getKnownSingleDecl(SwiftContext, "_SwiftifyInfo");
     auto *Enum = dyn_cast_or_null<EnumDecl>(D);
@@ -245,6 +243,7 @@ private:
         return true;
       }
     }
+    hasOrNullSupportCached = false;
     return false;
   }
 };
