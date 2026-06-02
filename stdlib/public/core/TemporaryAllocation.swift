@@ -212,10 +212,6 @@ internal func _fallBackToHeapAllocation<R: ~Copyable, E: Error>(
 /// initializing the buffer pointer before it is used _and_ for deinitializing
 /// it before returning, but deallocation is automatic.
 ///
-/// The implementation may allocate a larger buffer pointer than is strictly
-/// necessary to contain `byteCount` bytes. The behavior of a program that
-/// attempts to access any such additional storage is undefined.
-///
 /// The buffer pointer passed to `body` (as well as any pointers to elements in
 /// the buffer) must not escape. It will be deallocated when `body` returns and
 /// cannot be used afterward.
@@ -367,10 +363,6 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable, E: Error>(
 /// in an unspecified, uninitialized state. `body` is responsible for
 /// initializing the buffer pointer before it is used _and_ for deinitializing
 /// it before returning, but deallocation is automatic.
-///
-/// The implementation may allocate a larger buffer pointer than is strictly
-/// necessary to contain `capacity` values of type `type`. The behavior of a
-/// program that attempts to access any such additional storage is undefined.
 ///
 /// The buffer pointer passed to `body` (as well as any pointers to elements in
 /// the buffer) must not escape. It will be deallocated when `body` returns and
