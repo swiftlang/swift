@@ -401,8 +401,7 @@ extension StoredProperty: TypeInfoSyntax {
       .stringArg("name"),
       .stringArg("typeName"),
       .boolArg("isVar"),
-      .boolArg("isStatic"),
-    )
+      .boolArg("isStatic"))
 
     return Self(name: parsed.0, typeName: parsed.1, isVar: parsed.2, isStatic: parsed.3)
   }
