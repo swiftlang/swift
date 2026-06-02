@@ -881,9 +881,17 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   // to the delegating initializer is a metatype. Thus, we perform a
   // load_borrow. And move from WillSharedBorrowSelf -> DidSharedBorrowSelf.
   if (SelfInitDelegationState == SILGenFunction::WillSharedBorrowSelf) {
-    assert(C.isGuaranteedPlusZeroOk() &&
-           "This should only be called if guaranteed plus zero is ok");
     SelfInitDelegationState = SILGenFunction::DidSharedBorrowSelf;
+    // If guaranteed plus zero is not ok, we are accessing self in a way that is
+    // illegal before the delegating initializer is called (e.g. passing a
+    // stored property as an argument to self.init). Return an owned copy so
+    // that definite initialization diagnoses the misuse instead of crashing,
+    // mirroring the DidExclusiveBorrowSelf handling below.
+    if (!C.isGuaranteedPlusZeroOk()) {
+      const auto &typeLowering = getTypeLowering(addr->getType());
+      ManagedValue result = emitLoad(loc, addr, typeLowering, C, IsNotTake);
+      return RValue(*this, loc, refType, result);
+    }
     ManagedValue result =
         B.createLoadBorrow(loc, ManagedValue::forBorrowedAddressRValue(addr));
     return RValue(*this, loc, refType, result);
@@ -892,8 +900,13 @@ RValue SILGenFunction::emitRValueForSelfInDelegationInit(SILLocation loc,
   // If we are already in the did shared borrow self state, just return the
   // shared borrow value.
   if (SelfInitDelegationState == SILGenFunction::DidSharedBorrowSelf) {
-    assert(C.isGuaranteedPlusZeroOk() &&
-           "This should only be called if guaranteed plus zero is ok");
+    // As above, fall back to an owned copy when guaranteed plus zero is not ok
+    // so that definite initialization can diagnose the illegal use of self.
+    if (!C.isGuaranteedPlusZeroOk()) {
+      const auto &typeLowering = getTypeLowering(addr->getType());
+      ManagedValue result = emitLoad(loc, addr, typeLowering, C, IsNotTake);
+      return RValue(*this, loc, refType, result);
+    }
     ManagedValue result =
         B.createLoadBorrow(loc, ManagedValue::forBorrowedAddressRValue(addr));
     return RValue(*this, loc, refType, result);
