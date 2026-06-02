@@ -481,12 +481,14 @@ void ArgsToFrontendOptionsConverter::handleDebugCrashGroupArguments() {
       debugFailWithAssertion();
     } else if (Opt.matches(OPT_debug_crash_immediately)) {
       debugFailWithCrash();
-    } else if (Opt.matches(OPT_debug_assert_after_parse)) {
+    } else if (Opt.matches(OPT_debug_assert_after_type_checking) ||
+               Opt.matches(OPT_debug_assert_after_parse)) {
       // Set in FrontendOptions
-      Opts.CrashMode = FrontendOptions::DebugCrashMode::AssertAfterParse;
-    } else if (Opt.matches(OPT_debug_crash_after_parse)) {
+      Opts.CrashMode = FrontendOptions::DebugCrashMode::AssertAfterTypeChecking;
+    } else if (Opt.matches(OPT_debug_crash_after_type_checking) ||
+               Opt.matches(OPT_debug_crash_after_parse)) {
       // Set in FrontendOptions
-      Opts.CrashMode = FrontendOptions::DebugCrashMode::CrashAfterParse;
+      Opts.CrashMode = FrontendOptions::DebugCrashMode::CrashAfterTypeChecking;
     } else {
       llvm_unreachable("Unknown debug_crash_Group option!");
     }
