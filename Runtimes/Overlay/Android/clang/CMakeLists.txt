@@ -34,6 +34,7 @@ install(FILES
   SwiftBionic.h
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/${SwiftOverlay_PLATFORM_SUBDIR}/${SwiftOverlay_ARCH_SUBDIR})
 install(FILES
+  _stdio.apinotes
   posix_filesystem.apinotes
   spawn.apinotes
   DESTINATION ${CMAKE_INSTALL_LIBDIR}/swift/apinotes)

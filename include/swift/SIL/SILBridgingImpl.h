@@ -3082,6 +3082,10 @@ BridgedInstruction BridgedBuilder::createFixLifetime(BridgedValue operand) const
   return {unbridged().createFixLifetime(regularLoc(), operand.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createDropDeinit(BridgedValue operand) const {
+  return {unbridged().createDropDeinit(regularLoc(), operand.getSILValue())};
+}
+
 //===----------------------------------------------------------------------===//
 //                            BridgedBasicBlockSet
 //===----------------------------------------------------------------------===//

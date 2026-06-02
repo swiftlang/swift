@@ -316,6 +316,8 @@ static void insertDebugValueBefore(SILInstruction *insertPt,
   if (!debugVar) {
     return;
   }
+  ASSERT(!debugVar.hasDebugReconstructionBlock() &&
+         "Unexpected debug reconstruction block in Mandatory Pass");
   auto varInfo = debugVar.getVarInfo();
   if (!varInfo) {
     return;

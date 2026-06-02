@@ -2791,6 +2791,19 @@ void IRGenModule::emitSILWitnessTable(SILWitnessTable *wt) {
   if (isAvailableExternally(wt->getLinkage()))
     return;
 
+  // In Embedded Swift, an `@export(interface)` conformance has a unique
+  // strong definition in the module that owns it. Importing modules must
+  // reference that definition externally rather than emit their own copy.
+  if (Context.LangOpts.hasFeature(Feature::Embedded)) {
+    if (auto *normal =
+            dyn_cast<NormalProtocolConformance>(wt->getConformance())) {
+      if (normal->getEffectiveCodeGenerationModel() ==
+              CodeGenerationModel::Interface &&
+          wt->getDeclContext()->getParentModule() != getSwiftModule())
+        return;
+    }
+  }
+
   // Ensure that relatively-referenced symbols for witness thunks are collocated
   // in the same LLVM module.
   IRGen.ensureRelativeSymbolCollocation(*wt);

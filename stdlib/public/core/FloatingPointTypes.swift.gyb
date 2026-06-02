@@ -137,6 +137,11 @@ extension ${Self}: CustomDebugStringConvertible {
 ${Availability(bits)}
 extension ${Self}: TextOutputStreamable {
   public func write<Target>(to target: inout Target) where Target: TextOutputStream {
+    if isNaN {
+      // Match `description`.
+      target.write("nan")
+      return
+    }
     var buffer = _InlineArray<64, UTF8.CodeUnit>(repeating: 0x30)
     var span = buffer.mutableSpan
     let textRange = _Float${bits}ToASCII(value: self, buffer: &span)

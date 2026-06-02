@@ -100,7 +100,7 @@ parse_optional_uint8(const char *name, const char *value,
 static uint8_t parse_uint8(const char *name, const char *value,
                            uint8_t defaultValue) {
   auto result = parse_optional_uint8(name, value, std::nullopt);
-  if (!result)
+  if (!result && value)
     swift::warning(RuntimeErrorFlagNone,
                    "Warning: cannot parse value %s=%s, defaulting to %u.\n",
                    name, value, defaultValue);

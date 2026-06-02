@@ -180,6 +180,7 @@ set(SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES
   PlatformExecutorWindows.swift
   PlatformExecutorOpenBSD.swift
   PlatformExecutorFreeBSD.swift
+  Result+AsyncInit.swift
 )
 
 set(SWIFT_RUNTIME_CONCURRENCY_NONEMBEDDED_C_SOURCES

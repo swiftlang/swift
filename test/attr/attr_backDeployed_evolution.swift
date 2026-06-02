@@ -131,6 +131,12 @@ if isV2OrLater() {
 // CHECK-BD: client: trivial
 trivial()
 
+// A back deployed function with a nested function emits a copy of the nested
+// function into the client; verify the right copy runs (rdar://105137047).
+// CHECK-ABI: library: trivialWithNestedFunc
+// CHECK-BD: client: trivialWithNestedFunc
+trivialWithNestedFunc()
+
 precondition(try! pleaseThrow(false))
 do {
   _ = try pleaseThrow(true)

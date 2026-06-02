@@ -1,8 +1,17 @@
 import sys
 import re
 from codecs import encode, decode
+from collections import namedtuple
 
 DEBUG = False
+
+
+# Whitespace slots inside a single `// expected-X{{...}}` directive. Stored
+# verbatim from parse so render reproduces the source byte-for-byte:
+#
+#   //{slash}expected-{category}{re}{at}{@+N}{:M}{count}{N}{braces}{{...}}
+Whitespace = namedtuple("Whitespace", ["slash", "at", "count", "braces"])
+DEFAULT_WHITESPACE = Whitespace(slash=" ", at="", count="", braces="")
 
 
 def dprint(*args):
@@ -70,9 +79,18 @@ class Diag:
         whitespace_strings,
         is_from_source_file,
         nested_lines,
+        diag_content_raw=None,
+        original_count_str=None,
     ):
         self.prefix = prefix
         self.diag_content = diag_content
+        # Raw text from {{...}} preserved for round-trip rendering. None for
+        # synthesized diags (which fall through to escape-on-render).
+        self.diag_content_raw = diag_content_raw
+        # The count digit as written in source ("", "1", "2", ...) or None if
+        # absent. Frozen at parse time and never mutated. render() preserves it
+        # iff the current count value still equals what was written.
+        self.original_count_str = original_count_str
         self.category = category
         self.parsed_target_line_n = parsed_target_line_n
         self.line_is_absolute = line_is_absolute
@@ -133,9 +151,11 @@ class Diag:
         assert not other_diag.is_re and not self.is_re
         self.line_is_absolute = False
         self.diag_content = other_diag.diag_content
+        self.diag_content_raw = other_diag.diag_content_raw
+        # original_count_str is deliberately not copied: render keys off it
+        # vs the new count to decide whether to keep self's original digit.
         self.count = other_diag.count
         self.category = other_diag.category
-        self.count = other_diag.count
         other_diag.count = 0
 
     def render(self):
@@ -152,30 +172,45 @@ class Diag:
                 line_location_s = (
                     f"@{self.relative_target()}"  # the minus sign is implicit
                 )
-        count_s = "" if self.count == 1 else f"{self.count}"
-        re_s = "-re" if self.is_re else ""
-        if self.whitespace_strings:
-            whitespace1_s = self.whitespace_strings[0]
-            whitespace2_s = self.whitespace_strings[1]
+        # If the source had an explicit digit and the count value still equals
+        # what was written, preserve the original (e.g. "1" stays "1").
+        original_count = (
+            int(self.original_count_str) if self.original_count_str else 1
+        )
+        if self.count == original_count and self.original_count_str is not None:
+            count_s = self.original_count_str
+        elif self.count != 1:
+            count_s = str(self.count)
         else:
-            whitespace1_s = " "
-            whitespace2_s = ""
-        if count_s and not whitespace2_s:
-            whitespace2_s = " "  # required to parse correctly
-        elif not count_s and whitespace2_s == " ":
-            """Don't emit a weird extra space.
-            However if the whitespace is something other than the
-            standard single space, let it be to avoid disrupting manual formatting.
-            """
-            whitespace2_s = ""
+            count_s = ""
+        re_s = "-re" if self.is_re else ""
+        ws = self.whitespace_strings or DEFAULT_WHITESPACE
         col_s = f":{self.col()}" if self.col() else ""
-        base_s = f"//{whitespace1_s}expected-{self.prefix}{self.category}{re_s}{line_location_s}{col_s}{whitespace2_s}{count_s}"
+        # Col-only forms (`@:N`) need the leading "@" even with no line offset,
+        # otherwise the verifier would see `:N` as part of the message slot.
+        if col_s and not line_location_s:
+            line_location_s = "@"
+        # Smush prevention: if a count is being newly added (no original digit)
+        # and there's no ws between location and count, force a separator so
+        # the C++ verifier doesn't read "@+1" + "2" as "@+12".
+        ws_count = ws.count
+        if count_s and not ws_count and self.original_count_str is None:
+            ws_count = " "
+        base_s = (
+            f"//{ws.slash}expected-{self.prefix}{self.category}{re_s}"
+            f"{ws.at}{line_location_s}{col_s}{ws_count}{count_s}{ws.braces}"
+        )
         if self.category == "expansion":
             return base_s + "{{"
         else:
-            # python trivia: raw strings can't end with a backslash
-            escaped_diag_s = self.diag_content.replace("\\", "\\\\")
-            return base_s + "{{" + escaped_diag_s + "}}"
+            if self.diag_content_raw is not None:
+                content_s = self.diag_content_raw
+            else:
+                # Synthesized from a verifier message; escape backslashes so
+                # the C++ lexer reads them back literally.
+                # python trivia: raw strings can't end with a backslash
+                content_s = self.diag_content.replace("\\", "\\\\")
+            return base_s + "{{" + content_s + "}}"
 
 
 class ExpansionDiagClose:
@@ -190,10 +225,10 @@ class ExpansionDiagClose:
 
 
 expected_diag_re = re.compile(
-    r"//(\s*)expected-([a-zA-Z-]*)(note|warning|error|remark)(-re)?(@[+-]?\d+)?(:\d+)?(\s*)(\d+)?\{\{(.*)\}\}"
+    r"//(\s*)expected-([a-zA-Z0-9-]*)(note|warning|error|remark)(-re)?(\s*?)(@[+-]?\d+|@(?=:))?(:\d+)?(\s*)(\d+)?(\s*)\{\{(.*?)\}\}"
 )
 expected_expansion_diag_re = re.compile(
-    r"//(\s*)expected-([a-zA-Z-]*)(expansion)(-re)?(@[+-]?\d+)(:\d+)(\s*)(\d+)?\{\{(.*)"
+    r"//(\s*)expected-([a-zA-Z0-9-]*)(expansion)(-re)?(\s*?)(@[+-]?\d+|@(?=:))(:\d+)(\s*)(\d+)?(\s*)\{\{(.*?)"
 )
 expected_expansion_close_re = re.compile(r"//(\s*)\}\}")
 
@@ -220,19 +255,21 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
             f"multiple diags on line {filename}:{line.line_n}. Aborting due to missing implementation."
         )
     [
-        whitespace1_s,
+        ws_slash,
         check_prefix,
         category_s,
         re_s,
+        ws_at,
         target_line_s,
         target_col_s,
-        whitespace2_s,
+        ws_count,
         count_s,
+        ws_braces,
         diag_s,
     ] = ms[0]
     if check_prefix != prefix and check_prefix != "" and not all_prefixes:
         return None
-    if not target_line_s:
+    if not target_line_s or target_line_s == "@":
         target_line_n = 0
         is_absolute = False
     elif target_line_s.startswith("@+"):
@@ -261,9 +298,11 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         count,
         line,
         bool(re_s),
-        [whitespace1_s, whitespace2_s],
+        Whitespace(slash=ws_slash, at=ws_at, count=ws_count, braces=ws_braces),
         True,
         [],
+        diag_content_raw=diag_s,
+        original_count_str=count_s if count_s else None,
     )
 
 
@@ -365,15 +404,13 @@ def add_diag(
 
     whitespace_strings = None
     if prev_line.diag:
-        whitespace_strings = (
-            prev_line.diag.whitespace_strings.copy()
-            if prev_line.diag.whitespace_strings
-            else None
-        )
+        whitespace_strings = prev_line.diag.whitespace_strings
         if prev_line.diag == nested_context:
             if not whitespace_strings:
-                whitespace_strings = [" ", "", ""]
-            whitespace_strings[0] += "  "
+                whitespace_strings = DEFAULT_WHITESPACE
+            whitespace_strings = whitespace_strings._replace(
+                slash=whitespace_strings.slash + "  "
+            )
 
     new_diag = Diag(
         prefix,
@@ -397,6 +434,9 @@ def add_diag(
 
 def remove_dead_diags(lines, prefix):
     for line in lines.copy():
+        if line not in lines:
+            # Already removed by an earlier take(); skip.
+            continue
         if not line.diag:
             continue
         if line.diag.category == "expansion":
@@ -408,10 +448,11 @@ def remove_dead_diags(lines, prefix):
                     line.diag.count = 0
         if line.diag.count != 0:
             continue
-        if line.render() == "":
-            remove_line(line, lines)
-        else:
-            assert line.diag.is_from_source_file
+        # Try absorbing a same-category sibling first so the dead diag's
+        # formatting (whitespace, original_count_str) survives a content
+        # rewrite. Nested expansion diags have no target, so skip.
+        took = False
+        if line.diag.target is not None:
             for other_diag in line.diag.target.targeting_diags:
                 if (
                     other_diag.is_from_source_file
@@ -421,9 +462,15 @@ def remove_dead_diags(lines, prefix):
                     continue
                 if other_diag.is_re or line.diag.is_re:
                     continue
+                assert line.diag.is_from_source_file
                 line.diag.take(other_diag)
                 remove_line(other_diag.line, lines)
+                took = True
                 break
+        if took:
+            continue
+        if line.render() == "":
+            remove_line(line, lines)
 
 
 def fold_expansions(lines):
@@ -532,7 +579,7 @@ def update_lines(
         if isinstance(diag_error, NestedDiag):
             if not diag.closer:
                 whitespace = (
-                    diag.whitespace_strings[0]
+                    diag.whitespace_strings.slash
                     if diag.whitespace_strings
                     else " "
                 )

@@ -65,3 +65,31 @@ bb0(%0 : $Int64, %1 : $Int64):
   // CHECK-MEM2REG-SAME: type $MyStruct, expr op_fragment:#MyStruct.y
   return %0 : $Int64, loc "sroa.swift":11:5, scope 2
 } // end sil function 'foo'
+
+sil_scope 3 { loc "sroa.swift":20:6 parent @sroa_kills_debug_reconstruction_block : $@convention(thin) (Int64, Int64) -> Int64 }
+
+// CHECK-SROA-LABEL: sil {{.+}} @sroa_kills_debug_reconstruction_block
+// When a debug_value has a reconstruction block, SROA cannot append fragments.
+// Instead it kills the operand (replaces with undef) and preserves the block.
+// CHECK-SROA: debug_value undef : $MyStruct, let, name "ptr", type $Builtin.RawPointer, transform {
+// CHECK-SROA:   bb0:
+// CHECK-SROA:     address_to_pointer undef : $*MyStruct to $Builtin.RawPointer
+// CHECK-SROA:     return
+// CHECK-SROA:   }
+sil hidden @sroa_kills_debug_reconstruction_block : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %4 = alloc_stack $MyStruct, var, name "my_struct", loc "sroa.swift":21:9, scope 3
+  debug_value %4 : $*MyStruct, let, name "ptr", type $Builtin.RawPointer, transform {
+  bb0(%0 : $*MyStruct):
+    %1 = address_to_pointer %0 : $*MyStruct to $Builtin.RawPointer
+    return %1 : $Builtin.RawPointer
+  }, loc "sroa.swift":22:10, scope 3
+  %5 = struct_element_addr %4 : $*MyStruct, #MyStruct.x, loc "sroa.swift":23:17, scope 3
+  store %0 to %5 : $*Int64, loc "sroa.swift":23:17, scope 3
+  %7 = struct_element_addr %4 : $*MyStruct, #MyStruct.y, loc "sroa.swift":24:17, scope 3
+  store %1 to %7 : $*Int64, loc "sroa.swift":24:17, scope 3
+  %9 = struct_element_addr %4 : $*MyStruct, #MyStruct.x, loc "sroa.swift":25:10, scope 3
+  %10 = load %9 : $*Int64, loc "sroa.swift":25:10, scope 3
+  dealloc_stack %4 : $*MyStruct, loc "sroa.swift":21:9, scope 3
+  return %10 : $Int64, loc "sroa.swift":26:5, scope 3
+}

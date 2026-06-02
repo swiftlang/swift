@@ -1595,3 +1595,29 @@ bb0:
   dealloc_stack %0
   return %8
 }
+
+// CHECK-LABEL: Escape information for escaping_array_element:
+// CHECK:        -    :   %2 = alloc_ref [stack] [tail_elems $OneF * %1 : $Builtin.Word] $X
+// CHECK:       return[]:   %7 = alloc_ref $F
+// CHECK:       End function escaping_array_element
+sil [ossa] @escaping_array_element : $@convention(thin) (Builtin.Word) -> @owned F {
+bb0(%0 : $Builtin.Word):
+  specify_test "escape_info"
+  %1 = integer_literal $Builtin.Word, 2
+  %2 = alloc_ref [stack] [tail_elems $OneF * %1] $X
+  %3 = begin_borrow %2
+  %4 = ref_tail_addr %3, $OneF
+  %5 = integer_literal $Builtin.Word, 1
+  %6 = index_addr %4, %5
+  %7 = alloc_ref $F
+  %10 = struct $OneF (%7)
+  store %10 to [init] %6
+  %30 = index_addr [stack_protection] %4, %0
+  %31 = load [copy] %30
+  %32 = destructure_struct %31
+  end_borrow %3
+  dealloc_ref %2
+  dealloc_stack_ref %2
+  return %32
+}
+
