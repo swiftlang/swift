@@ -3375,11 +3375,13 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       }
     }
 
-    if (!consumeIf(tok::r_paren)) {
+    SourceLoc rParenLoc;
+    if (!consumeIf(tok::r_paren, rParenLoc)) {
       diagnose(Loc, diag::attr_expected_rparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
       return makeParserSuccess();
     }
+    AttrRange = SourceRange(Loc, rParenLoc);
 
     if (!DiscardAttribute)
       Attributes.add(new (Context) DiagnoseAttr(*DiagGroupID, *BehaviorSpecifier,
