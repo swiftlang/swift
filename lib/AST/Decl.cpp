@@ -437,6 +437,13 @@ DeclAttributes Decl::getSemanticAttrs() const {
   return getAttrs();
 }
 
+void Decl::applyFileDefaults() {
+  if (!ApplyFileDefaultsRequest::appliesTo(this))
+    return;
+  (void)evaluateOrDefault(getASTContext().evaluator,
+                          ApplyFileDefaultsRequest{this}, {});
+}
+
 void Decl::attachParsedAttrs(DeclAttributes attrs) {
   ASSERT(getAttrs().isEmpty() && "attaching when there are already attrs?");
 

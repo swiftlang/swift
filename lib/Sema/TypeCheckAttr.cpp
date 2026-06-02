@@ -9322,9 +9322,25 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
     std::optional<DeclAttrKind> seen;
     for (auto *attr : UD->getSpecifiedAttributes()) {
       // It shouldn't be possible to get here with multiple attributes (it
-      // shouldn't parse), but make sure.
-      ASSERT(!seen && "'using' should only have one specified attribute");
+      // shouldn't parse), but make sure. @available can end up being multiple
+      // attributes though.
+      ASSERT((!seen || (seen == DeclAttrKind::Available &&
+                        attr->getKind() == DeclAttrKind::Available)) &&
+             "'using' should only have one specified attribute");
       seen = attr->getKind();
+
+      if (isa<DiagnoseAttr>(attr)) {
+        // `@diagnose` is handled via the swift-syntax region tree.
+        continue;
+      }
+
+      // TODO: call validation when it exists! For example, validate the
+      // the structure of `@available`, if we do it for normal attrs.
+
+      if (auto *availAttr = dyn_cast<AvailableAttr>(attr)) {
+        result.availability.push_back(availAttr);
+        continue;
+      }
 
       auto setDefaultIsolation = [&](DefaultIsolation isolation) {
         if (result.isolation) {
@@ -9383,4 +9399,56 @@ FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
   }
 
   return result;
+}
+
+bool ApplyFileDefaultsRequest::appliesTo(const Decl *decl) {
+  auto *dc = decl->getDeclContext();
+  return dc->isModuleScopeContext() &&
+         (isa<ValueDecl>(decl) || isa<ExtensionDecl>(decl)) &&
+         dc->getParentSourceFile();
+}
+
+evaluator::SideEffect ApplyFileDefaultsRequest::evaluate(Evaluator &evaluator,
+                                                         Decl *decl) const {
+  // Decl::applyFileDefaults() gates on appliesTo() before requesting, but
+  // nobody should call without checking to not waste time and cache.
+  //
+  // TODO: Would this be better served by a new `precondition` API for requests?
+  if (!appliesTo(decl)) {
+    DEBUG_ASSERT(false && "ApplyFileDefaultsRequest on a decl that can't have "
+                          "file defaults; caller should have checked");
+    return {};
+  }
+
+  // Known to exist thanks to appliesTo.
+  auto *file = decl->getDeclContext()->getParentSourceFile();
+  auto defaults = file->getFileDefaults();
+  if (defaults.availability.empty())
+    return {};
+
+  auto &ctx = decl->getASTContext();
+  auto &attrs = decl->getAttrs();
+
+  // Put defaults on the tail of the linked list, so explicit attrs take
+  // priority. With no attrs, use \c add to set the head.
+
+  DeclAttribute *tail = nullptr;
+  for (auto *existing : attrs)
+    tail = existing;
+
+  auto append = [&](DeclAttribute *attr) {
+    if (tail)
+      *tail->getMutableNext() = attr;
+    else
+      attrs.add(attr);
+    tail = attr;
+  };
+
+  // We append in reverse, since printing will reverse again, to get the printed
+  // order and priority order to correctly reflect the top to bottom order of
+  // the file-level defaults.
+  for (auto *attr : llvm::reverse(defaults.availability))
+    append(attr->clone(ctx, /*implicit=*/true));
+
+  return {};
 }

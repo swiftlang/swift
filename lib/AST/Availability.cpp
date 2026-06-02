@@ -296,6 +296,12 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
   if (!abiRole.providesAPI() && abiRole.getCounterpart())
     return abiRole.getCounterpart()->getSemanticAvailableAttrs(includeInactive);
 
+  // Apply file defaults for availability attributes.
+  const_cast<Decl *>(this)->applyFileDefaults();
+
+  // We assume all requests that add attributes as a side effect have been made.
+  // Requesting ExpandMemberAttributeMacros or similar would be a cycle though,
+  // since it inspects availability as part of the request
   return SemanticAvailableAttributes(getAttrs(), this, includeInactive);
 }
 

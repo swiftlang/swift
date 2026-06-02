@@ -1079,6 +1079,11 @@ public:
   /// attribute macro expansion.
   DeclAttributes getSemanticAttrs() const;
 
+  /// If this is a top-level value declaration or extension, materialize any
+  /// applicable file-level `using` defaults onto this declaration. Otherwise do
+  /// nothing.
+  void applyFileDefaults();
+
   /// Set this declaration's attributes to the specified attribute list,
   /// applying any post-processing logic appropriate for attributes parsed
   /// from source code.
@@ -10037,7 +10042,8 @@ public:
     if (SpecifiedAttributes.isEmpty())
       return UsingLoc;
     // Head is most recently inserted, last in source order, and there
-    // should only be one.
+    // should only be one except for @available where each synthetic
+    // attribute should point to the same attribute.
     auto endLoc = (*SpecifiedAttributes.begin())->getEndLoc();
     if (endLoc.isInvalid())
       return UsingLoc;

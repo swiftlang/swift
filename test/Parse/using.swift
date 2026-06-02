@@ -25,9 +25,6 @@ do { // expected-note 2 {{first non-import declaration here}}
 }
 
 using @diagnose(StrictMemorySafety, as: error) // expected-error {{'using' must appear before any non-import declaration}}
-// TODO: support @diagnose
-// expected-error@-2:8 {{attribute @diagnose is not valid in a 'using' declaration}}
-// expected-note@-3:8 {{'using' supports '@MainActor', 'nonisolated', '@available', and '@diagnose'}}
 
 // We have a tailored diagnostic for global actors that aren't MainActor.
 @globalActor

@@ -389,7 +389,7 @@ void CompletionLookup::addImportModuleNames() {
 
 void CompletionLookup::addUsingSpecifiers() {
   for (auto specifier :
-       {"@MainActor", "nonisolated"}) {
+       {"@MainActor", "nonisolated", "@available", "@diagnose"}) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Keyword, SemanticContextKind::None);
     Builder.addTextChunk(specifier);

@@ -33,6 +33,7 @@ class PersistentParserState;
 struct SourceFileExtras;
 class Token;
 class UsingDecl;
+class AvailableAttr;
 enum class DefaultIsolation : uint8_t;
 
 /// The set of `using ...` defaults declared at the top of a source file.
@@ -43,6 +44,8 @@ struct FileDefaults {
   };
   /// `std::nullopt` when there is no file-level default isolation.
   std::optional<Isolation> isolation;
+
+  llvm::SmallVector<AvailableAttr *, 2> availability;
 };
 
 /// Kind of import affecting how a decl can be reexported.
@@ -709,7 +712,8 @@ public:
   }
 
   /// Retrieve the file-level defaults declared via top-level `using ...`
-  /// declarations, including default actor isolation.
+  /// declarations, including default actor isolation and any default
+  /// `@available` attributes.
   FileDefaults getFileDefaults() const;
 
   SWIFT_DEBUG_DUMP;

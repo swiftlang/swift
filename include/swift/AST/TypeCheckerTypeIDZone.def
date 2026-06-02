@@ -662,6 +662,10 @@ SWIFT_REQUEST(TypeChecker, FileDefaultsRequest,
               FileDefaults(const SourceFile *),
               Cached, NoLocationInfo)
 
+SWIFT_REQUEST(TypeChecker, ApplyFileDefaultsRequest,
+              evaluator::SideEffect(Decl *),
+              Cached, NoLocationInfo)
+
 SWIFT_REQUEST(TypeChecker, BindExtensionsRequest,
               evaluator::SideEffect(ModuleDecl *),
               Cached, NoLocationInfo)

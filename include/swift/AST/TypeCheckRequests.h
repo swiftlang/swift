@@ -5586,6 +5586,31 @@ public:
   bool isCached() const { return true; }
 };
 
+/// Materializes file-level `using @available(...)` defaults onto \p decl's
+/// attribute list by tail-appending implicit clones of each applicable
+/// availability attr. Must only be called on top-level value decls and
+/// extensions.
+class ApplyFileDefaultsRequest
+    : public SimpleRequest<ApplyFileDefaultsRequest,
+                           evaluator::SideEffect(Decl *),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect evaluate(Evaluator &evaluator, Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+
+  /// Whether file-level defaults can apply to `decl`: it must be a top-level
+  /// value or extension with a source file. Checking this is cheaper than
+  /// needlessly requesting.
+  static bool appliesTo(const Decl *decl);
+};
+
 /// Performs extension binding for all of the extensions in a module.
 class BindExtensionsRequest
     : public SimpleRequest<BindExtensionsRequest,
