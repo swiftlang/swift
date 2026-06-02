@@ -1725,3 +1725,17 @@ class BaseForFailableOverrideInit {
 class DerivedFailableOverrideInit: BaseForFailableOverrideInit {
   override init?(fail: String) {} // expected-error {{'super.init' isn't called on all paths before returning from initializer}}
 }
+
+// https://github.com/swiftlang/swift/issues/88991 - passing an uninitialized
+// stored property as an argument to self.init used to crash in SILGen instead
+// of diagnosing the use of self before the delegating initializer is called.
+class SelfInitArgument {
+  let value: Int
+  init(_ value: Int) {
+    self.value = value
+  }
+
+  convenience init() {
+    self.init(value) // expected-error {{'self' used before 'self.init' call or assignment to 'self'}}
+  }
+}
