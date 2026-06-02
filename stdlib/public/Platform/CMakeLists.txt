@@ -486,11 +486,13 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     set(triple "wasm32-unknown-wasip1")
 
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${triple}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     add_swift_target_library_single(
       embedded-stdlib-platform-${triple}
       swiftWASILibc
-      IS_STDLIB
+      ONLY_SWIFTMODULE
+      IS_STDLIB IS_FRAGILE
         ${swift_platform_sources}
         POSIXError.swift
 
@@ -502,8 +504,10 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
         -enable-experimental-feature Embedded
         -Xfrontend -emit-empty-object-file
 
+      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
+      ARCHITECTURE_SUBDIR_NAME "${triple}"
       DEPENDS embedded-stdlib-${triple} wasilibc_modulemap
       INSTALL_IN_COMPONENT sdk-overlay
     )

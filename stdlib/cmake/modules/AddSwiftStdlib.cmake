@@ -158,9 +158,6 @@ function(_add_target_variant_c_compile_link_flags)
     list(APPEND result "-DSWIFT_LIBC_IS_MUSL")
   endif()
 
-  if("${CFLAGS_SDK}" STREQUAL "embedded")
-    list(APPEND result "-ffreestanding")
-  endif()
 
   if("${CFLAGS_SDK}" STREQUAL "ANDROID")
     # Make sure the Android NDK lld is used.
@@ -748,6 +745,7 @@ endfunction()
 #     [DONT_EMBED_BITCODE]
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
+#     [ONLY_SWIFTMODULE]
 #     [NO_SWIFTMODULE]
 #     [IS_SDK_OVERLAY]
 #     [IS_FRAGILE]
@@ -809,6 +807,9 @@ endfunction()
 # IS_STDLIB_CORE
 #   Compile as the standard library core.
 #
+# ONLY_SWIFTMODULE
+#   Do not build either static or shared, build just the .swiftmodule.
+#
 # NO_SWIFTMODULE
 #   Only build either static or shared, and skip the .swiftmodule.
 #
@@ -838,6 +839,7 @@ function(add_swift_target_library_single target name)
         OBJECT_LIBRARY
         SHARED
         STATIC
+        ONLY_SWIFTMODULE
         NO_SWIFTMODULE
         NO_LINK_NAME
         INSTALL_WITH_SHARED
@@ -912,53 +914,13 @@ function(add_swift_target_library_single target name)
   precondition(SWIFTLIB_SINGLE_ARCHITECTURE MESSAGE "Should specify an architecture")
   precondition(SWIFTLIB_SINGLE_INSTALL_IN_COMPONENT MESSAGE "INSTALL_IN_COMPONENT is required")
   if (NOT SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME)
-    if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
-      # For Embedded Swift, use the whole module triple for the subdirectory.
-      set(SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_MODULE}")
-    else()
-      # The architecture itself suffices for non-Embedded Swift.
-      set(SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME "${SWIFTLIB_SINGLE_ARCHITECTURE}")
-    endif()
-  endif()
-
-  # For Embedded Swift, force a number of global stdlib feature toggles to
-  # OFF for this library build. Doing this here means callers don't have to
-  # repeat the same set of overrides in every CMakeLists.txt that builds an
-  # embedded library. The `set()`s are function-scoped and shadow the parent
-  # scope (and the CACHE), so they only affect this call and any helper
-  # functions invoked from it.
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
-    set(SWIFT_ENABLE_REFLECTION OFF)
-    set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
-    set(SWIFT_STDLIB_STABLE_ABI OFF)
-    set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
-    set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
-
-    # Embedded swiftmodules go into a single shared subdirectory; default
-    # MODULE_DIR to it when the caller didn't supply one explicitly.
-    if(NOT SWIFTLIB_SINGLE_MODULE_DIR)
-      set(SWIFTLIB_SINGLE_MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded")
-    endif()
-
-    # Embedded Swift libraries are always fragile.
-    set(SWIFTLIB_SINGLE_IS_FRAGILE TRUE)
-    set(SWIFTLIB_SINGLE_IS_FRAGILE_keyword "IS_FRAGILE")
-
-    # When the embedded platform abstraction layer is in use, define
-    # SWIFT_USE_EMBEDDED_SWIFT_PLATFORM for every embedded library build so
-    # that the platform-conditional code paths in the embedded stdlib and
-    # related libraries pick up the platform implementations.
-    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
-        "-D" "SWIFT_USE_EMBEDDED_SWIFT_PLATFORM")
-    endif()
+    set(SWIFTLIB_SINGLE_ARCHITECTURE_SUBDIR_NAME "${SWIFTLIB_SINGLE_ARCHITECTURE}")
   endif()
 
   if(NOT SWIFTLIB_SINGLE_SHARED AND
      NOT SWIFTLIB_SINGLE_STATIC AND
      NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY AND
-     NOT "${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
+     NOT SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
   endif()
@@ -1018,8 +980,8 @@ function(add_swift_target_library_single target name)
     set(libkind SHARED)
   elseif(SWIFTLIB_SINGLE_STATIC)
     set(libkind STATIC)
-  elseif("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
-    set(libkind STATIC)
+  elseif(SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
+    set(libkind NONE)
   else()
     message(FATAL_ERROR
         "Either SHARED, STATIC, or OBJECT_LIBRARY must be specified")
@@ -1062,16 +1024,6 @@ function(add_swift_target_library_single target name)
       -libc;${SWIFT_STDLIB_MSVC_RUNTIME_LIBRARY})
   endif()
 
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
-      # Flags required to build embedded libraries
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xcc;-ffreestanding;-enable-experimental-feature;Embedded)
-
-      # Embedded Swift builds with empty object files by default. Everything
-      # is emitted into the client.
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -Xfrontend;-emit-empty-object-file)
-      list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS -enable-experimental-feature;CodeGenerationModel=implementation)
-  endif()
-
   # Define availability macros.
   deployment_version(DEPLOYMENT_VERSION
     SDK "${SWIFTLIB_SINGLE_SDK}"
@@ -1081,22 +1033,8 @@ function(add_swift_target_library_single target name)
     DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
     DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}")
 
-  # Compute the availability definitions to use for this library. Under
-  # Embedded Swift, all stdlib APIs should be available always, so replace
-  # all availability macros with an empty expansion (`*`). Otherwise, use
-  # the global SWIFT_STDLIB_AVAILABILITY_DEFINITIONS as-is.
-  if("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
-    set(SWIFTLIB_SINGLE_AVAILABILITY_DEFINITIONS)
-    foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-      string(REGEX REPLACE ":.*" ":*" replaced "${def}")
-      list(APPEND SWIFTLIB_SINGLE_AVAILABILITY_DEFINITIONS "${replaced}")
-    endforeach()
-  else()
-    set(SWIFTLIB_SINGLE_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS}")
-  endif()
-
   set(availability_macros)
-  foreach(def ${SWIFTLIB_SINGLE_AVAILABILITY_DEFINITIONS})
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
     list(APPEND availability_macros "-Xfrontend -define-availability -Xfrontend \"${def}\"")
 
     if("${def}" MATCHES "SwiftStdlib .*")
@@ -1204,6 +1142,7 @@ function(add_swift_target_library_single target name)
       ${SWIFTLIB_SINGLE_IS_STDLIB_CORE_keyword}
       ${SWIFTLIB_SINGLE_IS_SDK_OVERLAY_keyword}
       ${SWIFTLIB_SINGLE_IS_FRAGILE_keyword}
+      ${SWIFTLIB_SINGLE_ONLY_SWIFTMODULE_keyword}
       ${SWIFTLIB_SINGLE_NO_SWIFTMODULE_keyword}
       ${embed_bitcode_arg}
       ${SWIFTLIB_SINGLE_STATIC_keyword}
@@ -1280,6 +1219,15 @@ function(add_swift_target_library_single target name)
   if(libkind STREQUAL "SHARED")
     list(APPEND INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS
          ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS_SHARED_ONLY})
+  endif()
+
+  if (SWIFTLIB_SINGLE_ONLY_SWIFTMODULE)
+    add_custom_target("${target}"
+      DEPENDS "${swift_module_dependency_target}")
+    if(TARGET "${install_in_component}")
+      add_dependencies("${install_in_component}" "${target}")
+    endif()
+    return()
   endif()
 
   add_library("${target}" ${libkind}
@@ -1773,10 +1721,6 @@ function(add_swift_target_library_single target name)
         ${SWIFTLIB_SINGLE_PRIVATE_LINK_LIBRARIES})
   endif()
 
-  if ("${SWIFTLIB_SINGLE_SDK}" STREQUAL "embedded")
-    embedded_amend_archive_commands_on_darwin_host(${target} "${SWIFT_SDK_embedded_ARCH_${SWIFTLIB_SINGLE_ARCHITECTURE}_TRIPLE}")
-  endif()
-
   # NOTE(compnerd) use the C linker language to invoke `clang` rather than
   # `clang++` as we explicitly link against the C++ runtime.  We were previously
   # actually passing `-nostdlib++` to avoid the C++ runtime linkage.
@@ -1852,6 +1796,7 @@ endfunction()
 #     [IS_STDLIB]
 #     [IS_STDLIB_CORE]
 #     [IS_OSLOG]
+#     [ONLY_SWIFTMODULE]
 #     [NO_SWIFTMODULE]
 #     [INSTALL_WITH_SHARED]
 #     INSTALL_IN_COMPONENT comp
@@ -1967,6 +1912,9 @@ endfunction()
 # IS_OSLOG
 #   Treat the library as OSLog library.
 #
+# ONLY_SWIFTMODULE
+#   Do not build either static or shared, build just the .swiftmodule.
+#
 # NO_SWIFTMODULE
 #   Only build either static or shared, and skip the .swiftmodule.
 #
@@ -2059,6 +2007,7 @@ function(add_swift_target_library name)
         IS_OSLOG
         IS_SWIFT_ONLY
         NOSWIFTRT
+        ONLY_SWIFTMODULE
         NO_SWIFTMODULE
         OBJECT_LIBRARY
         SHARED
@@ -2687,6 +2636,7 @@ function(add_swift_target_library name)
         ${SWIFTLIB_IS_STDLIB_CORE_keyword}
         ${SWIFTLIB_IS_SDK_OVERLAY_keyword}
         ${SWIFTLIB_NOSWIFTRT_keyword}
+        ${SWIFTLIB_ONLY_SWIFTMODULE_keyword}
         ${SWIFTLIB_NO_SWIFTMODULE_keyword}
         DARWIN_INSTALL_NAME_DIR "${SWIFTLIB_DARWIN_INSTALL_NAME_DIR}"
         INSTALL_IN_COMPONENT "${SWIFTLIB_INSTALL_IN_COMPONENT}"
@@ -3624,239 +3574,6 @@ function(add_swift_target_executable name)
       endforeach()
     endif()
 
-  endforeach()
-endfunction()
-
-# Build an embedded Swift library across every entry of
-# EMBEDDED_STDLIB_TARGET_TRIPLES, calling add_swift_target_library_single()
-# for each target triple.
-#
-# For each entry "<arch> <mod> <triple>" the function:
-#   1. Sets per-target SWIFT_SDK_embedded_ARCH_${key}_{MODULE,TRIPLE,PATH},
-#      where ${key} is ${arch} by default or ${mod} when ARCHITECTURE_KEY mod
-#      is passed.
-#   2. Calls add_swift_target_library_single(<prefix>-${mod} <library_name> ...)
-#      forwarding the sources, flags, and other options provided by the caller.
-#      ARCHITECTURE is set to ${key} and SDK is set to "embedded".
-#   3. Adds the per-target library as a dependency of the umbrella custom
-#      target named <prefix> (which the caller is expected to have already
-#      created via add_custom_target).
-#
-# Unless IS_STDLIB_CORE is passed, "embedded-stdlib-${mod}" is automatically
-# prepended to DEPENDS so that the embedded swiftCore for that target is
-# built first.
-#
-# Usage:
-#   add_embedded_swift_target_library(<prefix> <library_name>
-#     [IS_STDLIB] [IS_STDLIB_CORE] [IS_SDK_OVERLAY]
-#     [PARTIAL_SOURCES_INTENDED]
-#     [INSTALL_BINARY]
-#     <sources>...
-#     [GYB_SOURCES <sources>...]
-#     [SWIFT_COMPILE_FLAGS <flags>...]
-#     [C_COMPILE_FLAGS <flags>...]
-#     [FILE_DEPENDS <files>...]
-#     [DEPENDS <targets>...]
-#     [SKIP_ARCH_REGEX <regex>...]
-#     [SKIP_MOD_REGEX <regex>...]
-#     [SKIP_TRIPLE_REGEX <regex>...]
-#     [ONLY_ARCH_REGEX <regex>...]
-#     [ONLY_MOD_REGEX <regex>...]
-#     [ONLY_TRIPLE_REGEX <regex>...]
-#     [ARCHITECTURE_KEY <arch|mod>]
-#     [INSTALL_IN_COMPONENT <component>])
-#
-# Embedded libraries are always built as STATIC, always have their target's
-# OSX_ARCHITECTURES property set to ${arch}, and always run through
-# embedded_amend_archive_commands_on_darwin_host (a no-op for hosts/targets
-# where it doesn't apply).
-#
-# SKIP_*_REGEX and ONLY_*_REGEX are both multi-valued. An entry is processed
-# only when *every* ONLY_*_REGEX category that has at least one pattern has
-# at least one match, AND no SKIP_*_REGEX pattern matches.
-function(add_embedded_swift_target_library prefix library_name)
-  cmake_parse_arguments(EMBLIB
-    "IS_STDLIB;IS_STDLIB_CORE;IS_SDK_OVERLAY;PARTIAL_SOURCES_INTENDED;INSTALL_BINARY"
-    "INSTALL_IN_COMPONENT;ARCHITECTURE_KEY"
-    "GYB_SOURCES;SWIFT_COMPILE_FLAGS;C_COMPILE_FLAGS;FILE_DEPENDS;DEPENDS;SKIP_ARCH_REGEX;SKIP_MOD_REGEX;SKIP_TRIPLE_REGEX;ONLY_ARCH_REGEX;ONLY_MOD_REGEX;ONLY_TRIPLE_REGEX"
-    ${ARGN})
-
-  translate_flag(${EMBLIB_IS_STDLIB}              "IS_STDLIB"
-                 EMBLIB_IS_STDLIB_keyword)
-  translate_flag(${EMBLIB_IS_STDLIB_CORE}         "IS_STDLIB_CORE"
-                 EMBLIB_IS_STDLIB_CORE_keyword)
-  translate_flag(${EMBLIB_IS_SDK_OVERLAY}         "IS_SDK_OVERLAY"
-                 EMBLIB_IS_SDK_OVERLAY_keyword)
-  translate_flag(${EMBLIB_PARTIAL_SOURCES_INTENDED} "PARTIAL_SOURCES_INTENDED"
-                 EMBLIB_PARTIAL_SOURCES_INTENDED_keyword)
-
-  if(NOT EMBLIB_ARCHITECTURE_KEY)
-    set(EMBLIB_ARCHITECTURE_KEY "arch")
-  elseif(NOT (EMBLIB_ARCHITECTURE_KEY STREQUAL "arch"
-              OR EMBLIB_ARCHITECTURE_KEY STREQUAL "mod"))
-    message(FATAL_ERROR
-      "ARCHITECTURE_KEY must be either 'arch' or 'mod' "
-      "(got '${EMBLIB_ARCHITECTURE_KEY}')")
-  endif()
-
-  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
-    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
-    list(GET list 0 arch)
-    list(GET list 1 mod)
-    list(GET list 2 triple)
-
-    # Apply caller-supplied filters. The entry is processed only when every
-    # non-empty ONLY_*_REGEX category has at least one match AND no
-    # SKIP_*_REGEX pattern matches.
-    set(_emblib_skip FALSE)
-    foreach(re ${EMBLIB_SKIP_ARCH_REGEX})
-      if("${arch}" MATCHES "${re}")
-        set(_emblib_skip TRUE)
-      endif()
-    endforeach()
-    foreach(re ${EMBLIB_SKIP_MOD_REGEX})
-      if("${mod}" MATCHES "${re}")
-        set(_emblib_skip TRUE)
-      endif()
-    endforeach()
-    foreach(re ${EMBLIB_SKIP_TRIPLE_REGEX})
-      if("${triple}" MATCHES "${re}")
-        set(_emblib_skip TRUE)
-      endif()
-    endforeach()
-
-    if(EMBLIB_ONLY_ARCH_REGEX)
-      set(_emblib_match FALSE)
-      foreach(re ${EMBLIB_ONLY_ARCH_REGEX})
-        if("${arch}" MATCHES "${re}")
-          set(_emblib_match TRUE)
-        endif()
-      endforeach()
-      if(NOT _emblib_match)
-        set(_emblib_skip TRUE)
-      endif()
-    endif()
-    if(EMBLIB_ONLY_MOD_REGEX)
-      set(_emblib_match FALSE)
-      foreach(re ${EMBLIB_ONLY_MOD_REGEX})
-        if("${mod}" MATCHES "${re}")
-          set(_emblib_match TRUE)
-        endif()
-      endforeach()
-      if(NOT _emblib_match)
-        set(_emblib_skip TRUE)
-      endif()
-    endif()
-    if(EMBLIB_ONLY_TRIPLE_REGEX)
-      set(_emblib_match FALSE)
-      foreach(re ${EMBLIB_ONLY_TRIPLE_REGEX})
-        if("${triple}" MATCHES "${re}")
-          set(_emblib_match TRUE)
-        endif()
-      endforeach()
-      if(NOT _emblib_match)
-        set(_emblib_skip TRUE)
-      endif()
-    endif()
-
-    if(_emblib_skip)
-      continue()
-    endif()
-
-    if(EMBLIB_ARCHITECTURE_KEY STREQUAL "mod")
-      set(arch_key "${mod}")
-    else()
-      set(arch_key "${arch}")
-    endif()
-
-    set(SWIFT_SDK_embedded_ARCH_${arch_key}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_ARCH_${arch_key}_TRIPLE "${triple}")
-    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
-      set(SWIFT_SDK_embedded_ARCH_${arch_key}_PATH
-          "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
-    endif()
-
-    # Non-core embedded libraries always need the embedded swiftCore for the
-    # same target to be built first.
-    set(per_target_depends ${EMBLIB_DEPENDS})
-    if(NOT EMBLIB_IS_STDLIB_CORE)
-      list(PREPEND per_target_depends "embedded-stdlib-${mod}")
-    endif()
-
-    add_swift_target_library_single(
-      ${prefix}-${mod}
-      ${library_name}
-      ${EMBLIB_IS_STDLIB_keyword}
-      ${EMBLIB_IS_STDLIB_CORE_keyword}
-      ${EMBLIB_IS_SDK_OVERLAY_keyword}
-      STATIC
-      ${EMBLIB_PARTIAL_SOURCES_INTENDED_keyword}
-      ${EMBLIB_UNPARSED_ARGUMENTS}
-      GYB_SOURCES ${EMBLIB_GYB_SOURCES}
-      SWIFT_COMPILE_FLAGS ${EMBLIB_SWIFT_COMPILE_FLAGS}
-      C_COMPILE_FLAGS ${EMBLIB_C_COMPILE_FLAGS}
-      SDK "embedded"
-      ARCHITECTURE "${arch_key}"
-      FILE_DEPENDS ${EMBLIB_FILE_DEPENDS}
-      DEPENDS ${per_target_depends}
-      INSTALL_IN_COMPONENT ${EMBLIB_INSTALL_IN_COMPONENT}
-    )
-
-    # Install the produced archive into lib/swift/embedded/${mod}/. Used by
-    # embedded libraries that produce a static archive consumed by clients
-    # at link time (e.g. swiftEmbeddedPlatformPOSIX, swiftUnicodeDataTables,
-    # swift_Concurrency).
-    if(EMBLIB_INSTALL_BINARY)
-      swift_install_in_component(
-        TARGETS ${prefix}-${mod}
-        DESTINATION "lib/swift/embedded/${mod}"
-        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
-      )
-      swift_install_in_component(
-        FILES "${SWIFTLIB_DIR}/embedded/${mod}/lib${library_name}.a"
-        DESTINATION "lib/swift/embedded/${mod}/"
-        COMPONENT "${EMBLIB_INSTALL_IN_COMPONENT}"
-        PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE
-                    GROUP_READ GROUP_EXECUTE
-                    WORLD_READ WORLD_EXECUTE
-      )
-    endif()
-
-    # When building the per-target archive on macOS, point CMake at the
-    # specific architecture so it doesn't try to build a fat archive.
-    set_property(TARGET ${prefix}-${mod}
-                 PROPERTY OSX_ARCHITECTURES "${arch}")
-
-    # When archiving on a Windows host, MSVC's lib.exe defaults to the host
-    # machine type and refuses to archive .obj files of a different machine
-    # type (LNK1112). For -windows-msvc targets, force the librarian's
-    # /MACHINE: to match the per-target arch so cross-arch builds work.
-    if(CMAKE_HOST_SYSTEM_NAME STREQUAL "Windows"
-       AND "${triple}" MATCHES "-windows-msvc$")
-      set(_emblib_msvc_machine "")
-      if("${arch}" STREQUAL "i686" OR "${arch}" STREQUAL "i386")
-        set(_emblib_msvc_machine "X86")
-      elseif("${arch}" STREQUAL "x86_64")
-        set(_emblib_msvc_machine "X64")
-      elseif("${arch}" STREQUAL "aarch64" OR "${arch}" STREQUAL "arm64"
-             OR "${arch}" STREQUAL "arm64e")
-        set(_emblib_msvc_machine "ARM64")
-      elseif("${arch}" MATCHES "^arm")
-        set(_emblib_msvc_machine "ARM")
-      endif()
-      if(_emblib_msvc_machine)
-        set_property(TARGET ${prefix}-${mod} APPEND PROPERTY
-                     STATIC_LIBRARY_OPTIONS "/MACHINE:${_emblib_msvc_machine}")
-      endif()
-    endif()
-
-    # Static archives whose target triple is ELF/EABI/wasm need a different
-    # archiver when cross-built from a macOS host. embedded_amend_archive_
-    # commands_on_darwin_host is a no-op for other targets/hosts, so it's
-    # safe to call unconditionally — every embedded library is static.
-    embedded_amend_archive_commands_on_darwin_host(${prefix}-${mod} ${triple})
-
-    add_dependencies(${prefix} ${prefix}-${mod})
   endforeach()
 endfunction()
 
