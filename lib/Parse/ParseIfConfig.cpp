@@ -116,15 +116,24 @@ static llvm::VersionTuple getCanImportVersion(ArgumentList *args,
     return result;
   }
 
-  // VersionTuple supports a maximum of 4 components.
-  ssize_t excessComponents = verText.count('.') - 3;
+  // VersionTuple supports a maximum of 5 components.
+  ssize_t excessComponents = verText.count('.') - 4;
   if (excessComponents > 0) {
+    auto originalSize = verText.size();
     do {
       verText = verText.rsplit('.').first;
     } while (--excessComponents > 0);
     if (D) {
+      // Highlight the trailing dotted components that are about to be dropped,
+      // starting at the period that precedes the first ignored component.
+      SourceLoc verStart = isa<StringLiteralExpr>(subE)
+                               ? subE->getStartLoc().getAdvancedLoc(1)
+                               : subE->getStartLoc();
+      SourceLoc trailingStart = verStart.getAdvancedLoc(verText.size());
+      SourceLoc trailingEnd = verStart.getAdvancedLoc(originalSize);
       D->diagnose(subE->getLoc(), diag::canimport_version_too_many_components,
-                  verText);
+                  verText)
+          .highlightChars(trailingStart, trailingEnd);
     }
   }
 
