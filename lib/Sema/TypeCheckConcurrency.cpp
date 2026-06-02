@@ -5314,13 +5314,10 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true) {
 }
 
 /// Determine the default isolation for the given declaration context.
+///
+/// Only the module-level setting (`-default-isolation`) is returned here.
+/// File-level `using` defaults are inferred in `ActorIsolationRequest`.
 static DefaultIsolation getDefaultIsolationForContext(const DeclContext *dc) {
-  // Check whether there is a file-specific setting.
-  if (auto *sourceFile = dc->getParentSourceFile()) {
-    if (auto defaultIsolationInFile = sourceFile->getDefaultIsolation())
-      return defaultIsolationInFile.value();
-  }
-
   // If we're in the main module, check the language option.
   ASTContext &ctx = dc->getASTContext();
   if (dc->getParentModule() == ctx.MainModule)
@@ -5536,7 +5533,7 @@ getIsolationFromConformances(NominalTypeDecl *nominal) {
       break;
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedConcurrent:
-      if (inferredIsolation.source.kind == IsolationSource::Kind::Explicit &&
+      if (inferredIsolation.source.effectivelyExplicit() &&
           explicitNonisolatedIsSpecial(nominal)) {
         if (!foundIsolation) {
           // We found an explicitly 'nonisolated' protocol.
@@ -6176,6 +6173,50 @@ static bool sendableConformanceRequiresNonisolated(NominalTypeDecl *nominal) {
   return requiresNonisolated;
 }
 
+/// Determine the isolation that this `decl` would have, if it does not have an
+/// explicit isolation attribute. This should be called only if
+/// `computeActorIsolationFromAttributes` did not find an explicit isolation.
+static std::optional<InferredActorIsolation>
+computeFileDefaultActorIsolation(Decl *decl) {
+  // Accessors share their isolation with their storage decl.
+  if (isa<AccessorDecl>(decl))
+    return {};
+
+  // Actors have their own isolation; a global actor cannot apply.
+  if (auto *cls = dyn_cast<ClassDecl>(decl))
+    if (cls->isAnyActor())
+      return {};
+
+  if (!(isa<NominalTypeDecl>(decl) || isa<ExtensionDecl>(decl) ||
+        isa<AbstractStorageDecl>(decl) || isa<AbstractFunctionDecl>(decl)))
+    return {};
+
+  if (!decl->getDeclContext()->isModuleScopeContext())
+    return {};
+
+  auto *dc = decl->getDeclContext();
+  if (auto *sf = dc->getParentSourceFile()) {
+    if (auto defaultIsolation = sf->getFileDefaults().isolation) {
+      ASTContext &ctx = decl->getASTContext();
+      ActorIsolation isolation;
+      switch (defaultIsolation->kind) {
+      case DefaultIsolation::MainActor:
+        isolation = ActorIsolation::forGlobalActor(
+            ctx.getMainActorType()->mapTypeOutOfEnvironment());
+        break;
+      case DefaultIsolation::Nonisolated:
+        isolation = ActorIsolation::forNonisolated(/*unsafe=*/false);
+        break;
+      }
+      return InferredActorIsolation{
+          isolation, IsolationSource(defaultIsolation->source,
+                                     IsolationSource::FileDefault)};
+    }
+  }
+
+  return {};
+}
+
 /// Determine the default isolation and isolation source for this declaration,
 /// which may still be overridden by other inference rules.
 static std::tuple<InferredActorIsolation, ValueDecl *,
@@ -6597,7 +6638,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
       // Instance stored properties of a nominal type cannot be inferred
       // non-isolated; they take their type's isolation.
       if (auto var = dyn_cast<VarDecl>(value)) {
-        if (!var->isStatic() && var->hasStorage())
+        if (!var->isStatic() && var->hasStorage() &&
+            var->getDeclContext()->getSelfNominalTypeDecl())
           return ActorIsolation::forUnspecified().withPreconcurrency(
               inferred.preconcurrency());
       }
@@ -6633,6 +6675,10 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
 
     return inferred;
   };
+
+  if (auto inferred = computeFileDefaultActorIsolation(value)) {
+    return {inferredIsolation(inferred->isolation), inferred->source};
+  }
 
   // If this is an accessor, use the actor isolation of its storage
   // declaration. All of the logic for FuncDecls below only applies to
@@ -6854,12 +6900,20 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   return defaultIsolation;
 }
 
-/// Compute the actor isolation of an extension.
+/// Compute the actor isolation of an extension. A file-level default is treated
+/// as if the modifier were written on the extension without an explicit
+/// isolation attribute (SE-0478).
 static InferredActorIsolation
 computeExtensionActorIsolation(ExtensionDecl *ext) {
   if (auto attrIsolation = getIsolationFromAttributes(ext)) {
     return {*attrIsolation,
             IsolationSource(/*source=*/nullptr, IsolationSource::Explicit)};
+  }
+
+  if (auto inferred = computeFileDefaultActorIsolation(ext)) {
+    // Attach the file-default isolation for printing and serialization.
+    addAttributesForActorIsolation(ext, inferred->isolation);
+    return *inferred;
   }
 
   return InferredActorIsolation::forUnspecified();
@@ -6870,7 +6924,7 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     llvm::PointerUnion<ValueDecl *, ExtensionDecl *> declOrExtension) const {
   // Extensions don't participate in most value-decl isolation rules (isolated
   // parameters, overrides, witnessed requirements, ...). Their isolation is
-  // inferred from attributes.
+  // inferred from attributes and file-level defaults.
   if (auto *ext = declOrExtension.dyn_cast<ExtensionDecl *>())
     return computeExtensionActorIsolation(ext);
 
@@ -6930,8 +6984,9 @@ bool HasIsolatedSelfRequest::evaluate(
   }
 
   // Check whether the default isolation was overridden by any attributes on
-  // this declaration, or by its extension context.
-  // Checking inferred actor isolation would be a cycle!
+  // this declaration, or by its extension context (explicitly or via a
+  // file-level default). Checking `value`s inferred actor isolation would be a
+  // cycle!
   auto attrIsolation = getIsolationFromAttributes(value);
   if (!attrIsolation) {
     if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
@@ -7090,43 +7145,6 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
   }
 
   return requiredIsolation;
-}
-
-std::optional<DefaultIsolation>
-DefaultIsolationInSourceFileRequest::evaluate(Evaluator &evaluator,
-                                              const SourceFile *file) const {
-  llvm::SmallVector<Decl *> usingDecls;
-  llvm::copy_if(file->getTopLevelDecls(), std::back_inserter(usingDecls),
-                [](Decl *D) { return isa<UsingDecl>(D); });
-
-  if (usingDecls.empty())
-    return std::nullopt;
-
-  std::optional<std::pair<Decl *, DefaultIsolation>> isolation;
-
-  auto setIsolation = [&isolation](Decl *D, DefaultIsolation newIsolation) {
-    if (isolation) {
-      D->diagnose(diag::invalid_redecl_of_file_isolation);
-      isolation->first->diagnose(diag::invalid_redecl_of_file_isolation_prev);
-      return;
-    }
-
-    isolation = std::make_pair(D, newIsolation);
-  };
-
-  for (auto *D : usingDecls) {
-    switch (cast<UsingDecl>(D)->getSpecifier()) {
-    case UsingSpecifier::MainActor:
-      setIsolation(D, DefaultIsolation::MainActor);
-      break;
-    case UsingSpecifier::Nonisolated:
-      setIsolation(D, DefaultIsolation::Nonisolated);
-      break;
-    }
-  }
-
-  return isolation.has_value() ? std::optional(isolation->second)
-                               : std::nullopt;
 }
 
 void swift::checkOverrideActorIsolation(ValueDecl *value) {
@@ -9082,7 +9100,7 @@ ActorIsolation swift::inferConformanceIsolation(
     // isolated conformance depending on default isolation and on the extension
     // itself.
     if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-      // If there's an isolation-related attribute on the
+      // If there's an isolation-related attribute or file-level default on the
       // extension, use it.
       // TODO: Could some of this logic be rolled into extension inference?
       // NOTE: Future types of extension isolation inference might need to be

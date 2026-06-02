@@ -32,7 +32,18 @@ class GeneratedSourceInfo;
 class PersistentParserState;
 struct SourceFileExtras;
 class Token;
+class UsingDecl;
 enum class DefaultIsolation : uint8_t;
+
+/// The set of `using ...` defaults declared at the top of a source file.
+struct FileDefaults {
+  struct Isolation {
+    DefaultIsolation kind;
+    UsingDecl *source;
+  };
+  /// `std::nullopt` when there is no file-level default isolation.
+  std::optional<Isolation> isolation;
+};
 
 /// Kind of import affecting how a decl can be reexported.
 ///
@@ -697,10 +708,9 @@ public:
     DelayedParserState = std::move(state);
   }
 
-  /// Retrieve default action isolation to be used for this source file.
-  /// It's determine based on on top-level `using <<isolation>>` declaration
-  /// found in the file.
-  std::optional<DefaultIsolation> getDefaultIsolation() const;
+  /// Retrieve the file-level defaults declared via top-level `using ...`
+  /// declarations, including default actor isolation.
+  FileDefaults getFileDefaults() const;
 
   SWIFT_DEBUG_DUMP;
   void

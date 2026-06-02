@@ -2157,6 +2157,10 @@ void IsolationSource::printForDiagnostics(
     os << "explicit isolation";
     return;
 
+  case IsolationSource::FileDefault:
+    os << "file-level default isolation";
+    return;
+
   case IsolationSource::None:
     os << "unspecified isolation";
     return;

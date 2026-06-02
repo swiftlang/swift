@@ -9295,3 +9295,92 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
 
   return ctx.AllocateCopy(results);
 }
+
+FileDefaults FileDefaultsRequest::evaluate(Evaluator &evaluator,
+                                           const SourceFile *file) const {
+  auto &ctx = file->getASTContext();
+  FileDefaults result;
+
+  std::optional<Decl *> firstNonImportDecl;
+
+  for (auto *D : file->getTopLevelDecls()) {
+    auto *UD = dyn_cast<UsingDecl>(D);
+    if (!UD) {
+      if (!firstNonImportDecl && !isa<ImportDecl>(D)) {
+        firstNonImportDecl = D;
+      }
+      continue;
+    }
+
+    if (firstNonImportDecl) {
+      UD->diagnose(diag::using_decl_must_precede_other_decls);
+      firstNonImportDecl.value()->diagnose(
+          diag::using_decl_must_precede_other_decls_previous);
+      // TODO: emit a fix-it
+    }
+
+    std::optional<DeclAttrKind> seen;
+    for (auto *attr : UD->getSpecifiedAttributes()) {
+      // It shouldn't be possible to get here with multiple attributes (it
+      // shouldn't parse), but make sure.
+      ASSERT(!seen && "'using' should only have one specified attribute");
+      seen = attr->getKind();
+
+      auto setDefaultIsolation = [&](DefaultIsolation isolation) {
+        if (result.isolation) {
+          UD->diagnose(diag::invalid_redecl_of_file_isolation);
+          result.isolation.value().source->diagnose(
+              diag::invalid_redecl_of_file_isolation_prev);
+        } else {
+          result.isolation = {isolation, UD};
+        }
+      };
+
+      if (isa<NonisolatedAttr>(attr)) {
+        setDefaultIsolation(DefaultIsolation::Nonisolated);
+        continue;
+      }
+
+      if (auto *custom = dyn_cast<CustomAttr>(attr)) {
+        auto type = evaluateOrDefault(
+            ctx.evaluator,
+            CustomAttrTypeRequest{custom, UD->getDeclContext(),
+                                  CustomAttrTypeKind::GlobalActor},
+            Type());
+        if (type) {
+          if (type->hasError()) {
+            // CustomAttrTypeRequest already produced an error. Instead of
+            // piling on, we can attach a note.
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::using_decl_invalid_attribute_note);
+            continue;
+          }
+
+          if (type->isEqual(ctx.getMainActorType())) {
+            setDefaultIsolation(DefaultIsolation::MainActor);
+            continue;
+          }
+
+          auto *nominal = type->getAnyNominal();
+          if (nominal && nominal->isGlobalActor()) {
+            // Some non MainActor global actor, diagnose.
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::invalid_actor_for_file_isolation, type);
+            ctx.Diags.diagnose(attr->getLocation(),
+                               diag::invalid_actor_for_file_isolation_note);
+            continue;
+          }
+        }
+        // Not a global actor (some other illegal attribute) so fall through to
+        // the generic diagnostic.
+      }
+
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::using_decl_invalid_attribute, attr);
+      ctx.Diags.diagnose(attr->getLocation(),
+                         diag::using_decl_invalid_attribute_note);
+    }
+  }
+
+  return result;
+}

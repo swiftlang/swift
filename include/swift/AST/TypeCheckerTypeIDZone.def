@@ -658,8 +658,8 @@ SWIFT_REQUEST(TypeChecker, SemanticAvailabilitySpecRequest,
               (const AvailabilitySpec *, const DeclContext *),
               SeparatelyCached, NoLocationInfo)
 
-SWIFT_REQUEST(TypeChecker, DefaultIsolationInSourceFileRequest,
-              std::optional<DefaultIsolation>(const SourceFile *),
+SWIFT_REQUEST(TypeChecker, FileDefaultsRequest,
+              FileDefaults(const SourceFile *),
               Cached, NoLocationInfo)
 
 SWIFT_REQUEST(TypeChecker, BindExtensionsRequest,

@@ -1865,28 +1865,15 @@ bool ImportDecl::isAccessLevelImplicit() const {
   return true;
 }
 
-UsingDecl::UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
-                     UsingSpecifier specifier, DeclContext *parent)
+UsingDecl::UsingDecl(SourceLoc usingLoc, DeclAttributes specifiedAttributes,
+                     DeclContext *parent)
     : Decl(DeclKind::Using, parent), UsingLoc(usingLoc),
-      SpecifierLoc(specifierLoc) {
-  Bits.UsingDecl.Specifier = static_cast<unsigned>(specifier);
-  assert(getSpecifier() == specifier &&
-         "not enough bits in UsingDecl flags for specifier");
-}
-
-std::string UsingDecl::getSpecifierName() const {
-  switch (getSpecifier()) {
-  case UsingSpecifier::MainActor:
-    return "@MainActor";
-  case UsingSpecifier::Nonisolated:
-    return "nonisolated";
-  }
-}
+      SpecifiedAttributes(specifiedAttributes) {}
 
 UsingDecl *UsingDecl::create(ASTContext &ctx, SourceLoc usingLoc,
-                             SourceLoc specifierLoc, UsingSpecifier specifier,
+                             DeclAttributes specifiedAttributes,
                              DeclContext *parent) {
-  return new (ctx) UsingDecl(usingLoc, specifierLoc, specifier, parent);
+  return new (ctx) UsingDecl(usingLoc, specifiedAttributes, parent);
 }
 
 void NominalTypeDecl::setConformanceLoader(LazyMemberLoader *lazyLoader,

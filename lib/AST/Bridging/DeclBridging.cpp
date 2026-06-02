@@ -594,14 +594,12 @@ BridgedImportDecl BridgedImportDecl_createParsed(
                             std::move(builder).get());
 }
 
-BridgedUsingDecl
-BridgedUsingDecl_createParsed(BridgedASTContext cContext,
-                              BridgedDeclContext cDeclContext,
-                              SourceLoc usingKeywordLoc, SourceLoc specifierLoc,
-                              BridgedUsingSpecifier specifier) {
+BridgedUsingDecl BridgedUsingDecl_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    SourceLoc usingKeywordLoc, BridgedDeclAttributes cSpecifiedAttributes) {
   ASTContext &ctx = cContext.unbridged();
-  return UsingDecl::create(ctx, usingKeywordLoc, specifierLoc,
-                           static_cast<UsingSpecifier>(specifier),
+  return UsingDecl::create(ctx, usingKeywordLoc,
+                           cSpecifiedAttributes.unbridged(),
                            cDeclContext.unbridged());
 }
 

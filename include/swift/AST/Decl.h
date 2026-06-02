@@ -66,6 +66,7 @@ class PointerAuthQualifier;
 namespace swift {
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
+  class ActorIsolation;
   class ApplyExpr;
   class AvailabilityRange;
   class AvailabilityDomain;
@@ -283,16 +284,6 @@ enum class MemberwiseInitKind {
   /// initialized variables. This only exists for migration purposes, and will
   /// be removed in a future language mode.
   Compatibility
-};
-
-enum class UsingSpecifier : uint8_t {
-  MainActor,
-  Nonisolated,
-  LastSpecifier = Nonisolated,
-};
-enum : unsigned {
-  NumUsingSpecifierBits =
-      countBitsUsed(static_cast<unsigned>(UsingSpecifier::LastSpecifier))
 };
 
 /// Diagnostic printing of \c SelfAccessKind.
@@ -874,10 +865,6 @@ protected:
 
     /// The number of elements in this path.
     NumPathElements : 8
-  );
-
-  SWIFT_INLINE_BITFIELD(UsingDecl, Decl, NumUsingSpecifierBits,
-    Specifier : NumUsingSpecifierBits
   );
 
   SWIFT_INLINE_BITFIELD(ExtensionDecl, Decl, 4+1,
@@ -10035,23 +10022,30 @@ class UsingDecl : public Decl {
   friend class Decl;
 
 private:
-  SourceLoc UsingLoc, SpecifierLoc;
+  SourceLoc UsingLoc;
 
-  UsingDecl(SourceLoc usingLoc, SourceLoc specifierLoc,
-            UsingSpecifier specifier, DeclContext *parent);
+  DeclAttributes SpecifiedAttributes;
+
+  UsingDecl(SourceLoc usingLoc, DeclAttributes specifiedAttributes,
+            DeclContext *parent);
 
 public:
-  UsingSpecifier getSpecifier() const {
-    return static_cast<UsingSpecifier>(Bits.UsingDecl.Specifier);
-  }
-
-  std::string getSpecifierName() const;
+  DeclAttributes getSpecifiedAttributes() const { return SpecifiedAttributes; }
 
   SourceLoc getLocFromSource() const { return UsingLoc; }
-  SourceRange getSourceRange() const { return {UsingLoc, SpecifierLoc}; }
+  SourceRange getSourceRange() const {
+    if (SpecifiedAttributes.isEmpty())
+      return UsingLoc;
+    // Head is most recently inserted, last in source order, and there
+    // should only be one.
+    auto endLoc = (*SpecifiedAttributes.begin())->getEndLoc();
+    if (endLoc.isInvalid())
+      return UsingLoc;
+    return {UsingLoc, endLoc};
+  }
 
   static UsingDecl *create(ASTContext &ctx, SourceLoc usingLoc,
-                           SourceLoc specifierLoc, UsingSpecifier specifier,
+                           DeclAttributes specifiedAttributes,
                            DeclContext *parent);
 
   static bool classof(const Decl *D) { return D->getKind() == DeclKind::Using; }

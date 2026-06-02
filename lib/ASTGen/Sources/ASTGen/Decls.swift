@@ -1135,22 +1135,31 @@ extension ASTGenVisitor {
 
 extension ASTGenVisitor {
   func generate(usingDecl node: UsingDeclSyntax) -> BridgedUsingDecl? {
-    var specifier: BridgedUsingSpecifier? = nil
+    var attrs = BridgedDeclAttributes()
+    var addedAny = false
 
     switch node.specifier {
     case .attribute(let attr):
-      if let identifier = attr.attributeName.as(IdentifierTypeSyntax.self),
-         identifier.name.tokenKind == .identifier("MainActor") {
-        specifier = .mainActor
+      self.generateDeclAttribute(attribute: attr) { bridgedAttr in
+        attrs.add(bridgedAttr)
+        addedAny = true
       }
     case .modifier(let modifier):
-      if case .identifier("nonisolated") = modifier.tokenKind {
-        specifier = .nonisolated
+      guard case .identifier("nonisolated") = modifier.tokenKind else {
+        self.diagnose(.invalidDefaultSpecifier(node.specifier))
+        return nil
       }
+      let nonisolatedAttr = BridgedNonisolatedAttr.createParsed(
+        self.ctx,
+        atLoc: nil,
+        range: self.generateSourceRange(modifier),
+        modifier: .none
+      )
+      attrs.add(nonisolatedAttr.asDeclAttribute)
+      addedAny = true
     }
-
-    guard let specifier else {
-      self.diagnose(.invalidDefaultIsolationSpecifier(node.specifier))
+    guard addedAny else {
+      self.diagnose(.invalidDefaultSpecifier(node.specifier))
       return nil
     }
 
@@ -1158,8 +1167,7 @@ extension ASTGenVisitor {
       self.ctx,
       declContext: self.declContext,
       usingKeywordLoc: self.generateSourceLoc(node.usingKeyword),
-      specifierLoc: self.generateSourceLoc(node.specifier),
-      specifier: specifier
+      specifiedAttributes: attrs
     )
   }
 }

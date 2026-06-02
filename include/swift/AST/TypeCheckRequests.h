@@ -71,6 +71,7 @@ class PreInverseGenericsAttr;
 class TrailingWhereClause;
 class TypeAliasDecl;
 class TypeLoc;
+class UsingDecl;
 class Witness;
 class TypeResolution;
 struct TypeWitnessAndDecl;
@@ -5566,9 +5567,12 @@ public:
   void cacheResult(std::optional<SemanticAvailabilitySpec> value) const;
 };
 
-class DefaultIsolationInSourceFileRequest
-    : public SimpleRequest<DefaultIsolationInSourceFileRequest,
-                           std::optional<DefaultIsolation>(const SourceFile *),
+/// Gathers the file-level defaults declared by `using ...` at the top of a
+/// source file, and diagnoses any issues that would affect results. Other
+/// validation in `visitUsingDecl` instead.
+class FileDefaultsRequest
+    : public SimpleRequest<FileDefaultsRequest,
+                           FileDefaults(const SourceFile *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -5576,8 +5580,7 @@ public:
 private:
   friend SimpleRequest;
 
-  std::optional<DefaultIsolation> evaluate(Evaluator &evaluator,
-                                           const SourceFile *file) const;
+  FileDefaults evaluate(Evaluator &evaluator, const SourceFile *file) const;
 
 public:
   bool isCached() const { return true; }
