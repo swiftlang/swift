@@ -3588,7 +3588,7 @@ static ManagedValue emitKeyPathRValueBase(SILGenFunction &subSGF,
 
   // If base is a metatype, it cannot be opened as an existential or upcasted
   // from a class.
-  if (baseType->is<MetatypeType>())
+  if (baseType->is<AnyMetatypeType>())
     return paramSubstValue;
   
   // Pop open an existential container base.
@@ -4896,7 +4896,7 @@ KeyPathPatternComponent SILGenModule::emitKeyPathComponentForDecl(
       if (!var->getDeclContext()->isTypeContext()) {
         componentTy = var->getInterfaceType()->getCanonicalType();
       } else if (var->getDeclContext()->getSelfProtocolDecl() &&
-                 baseTy->isExistentialType()) {
+                 baseTy->isAnyExistentialType()) {
         componentTy = var->getValueInterfaceType()->getCanonicalType();
         ASSERT(!componentTy->hasTypeParameter());
       } else {
