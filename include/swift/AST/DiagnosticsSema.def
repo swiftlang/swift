@@ -728,6 +728,9 @@ ERROR(expr_keypath_application_root_type_mismatch, none,
       (Type, Type))
 ERROR(expr_swift_keypath_anyobject_root,none,
       "the root type of a Swift key path cannot be 'AnyObject'", ())
+ERROR(expr_keypath_protocol_metatype_static_member,none,
+      "key path cannot refer to static member %0 of protocol type %1",
+      (DeclNameRef, Type))
 ERROR(expr_keypath_multiparam_func_conversion, none,
       "cannot convert key path into a multi-argument function type %0", (Type))
 ERROR(cannot_convert_type_to_keypath_subscript_index,none,
