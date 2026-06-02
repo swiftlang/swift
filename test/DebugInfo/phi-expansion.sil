@@ -12,7 +12,11 @@ struct Mystruct {
 // CHECK-LABEL: sil @test_simple
 // CHECK:   br bb3(%{{[0-9]*}} : $Int)
 // CHECK: bb3(%[[PHI:[0-9]*]] : $Int):
-// CHECK:   debug_value %[[PHI]] : $Int, let, name "pos", type $Mystruct, expr op_fragment:#Mystruct.i
+// CHECK:   debug_value %[[PHI]] : $Int, let, name "pos", transform {
+// CHECK:     bb0(%[[BBARG:[0-9]*]] : $Int):
+// CHECK:       %[[STRUCT:[0-9]*]] = struct $Mystruct (%[[BBARG]] : $Int, undef : $Int)
+// CHECK:       return %[[STRUCT]] : $Mystruct
+// CHECK:   }
 // CHECK: } // end sil function 'test_simple'
 
 sil @test_simple : $@convention(thin) (Mystruct, Mystruct) -> Int {

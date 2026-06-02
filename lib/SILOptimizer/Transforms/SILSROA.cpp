@@ -303,13 +303,22 @@ void SROAMemoryUseAnalyzer::chopUpAlloca(std::vector<AllocStackInst *> &Worklist
     }
   }
 
-  for (auto *Operand : getDebugUses(SILValue(AI))) {
+  SmallVector<Operand *, 4> debugUses(getDebugUses(SILValue(AI)));
+  for (auto *Operand : debugUses) {
     SILInstruction *User = Operand->getUser();
     auto *DVI = dyn_cast<DebugValueInst>(User);
     assert(DVI && "getDebugUses should only return DebugValueInst");
     SILBuilder B(DVI, DVI->getDebugScope());
     SILDebugVariable DVIVarInfo = DVI->getCompleteVarInfo();
 
+    // Cannot add a fragment to a value that has a debug reconstruction block.
+    // Instead, a debug reconstruction block could be created to reconstruct the
+    // variable from the different allocations, but a debug_value can only have
+    // one operand.
+    if (DVI->getDebugReconstructionBlock()) {
+      DVI->killOperand();
+      continue;
+    }
     for (size_t i : indices(NewAllocations)) {
       auto *NewAI = NewAllocations[i];
       SILDebugVariable VarInfo = DVIVarInfo;

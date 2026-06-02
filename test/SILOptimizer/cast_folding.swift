@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -Xllvm -sil-print-transform-blocks=false -Xllvm -sil-disable-pass=function-signature-opts -emit-sil %s | %FileCheck %s
 
 // We want to check two things here:
 // - Correctness
@@ -548,9 +548,10 @@ func test20_1() -> Bool {
 
 // CHECK-LABEL: sil hidden [noinline] @$s12cast_folding8test20_2SbyF : $@convention(thin) () -> Bool
 // CHECK: bb0
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 func test20_2() -> Bool {
     return cast20(U())
@@ -934,9 +935,10 @@ public func test40b() -> Bool {
 
 // CHECK-LABEL: sil [noinline] @$s12cast_folding7test40c{{[_0-9a-zA-Z]*}}F
 // CHECK: bb0
-// CHECK-NEXT: %0 = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: %1 = struct $Bool
-// CHECK-NEXT: return %1
+// CHECK-NEXT: debug_value
+// CHECK-NEXT: %1 = integer_literal $Builtin.Int1, 0
+// CHECK-NEXT: %2 = struct $Bool
+// CHECK-NEXT: return %2
 @inline(never)
 public func test40c() -> Bool {
   return cast40((1, S()))

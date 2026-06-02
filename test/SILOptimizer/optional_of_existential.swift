@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -module-name=test -Xllvm -sil-print-types -emit-sil -primary-file %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -module-name=test -Xllvm -sil-print-types -Xllvm -sil-print-transform-blocks=false -emit-sil -primary-file %s | %FileCheck %s
 
 protocol P { associatedtype A = Int }
 protocol Q : P {}
@@ -17,6 +17,7 @@ struct X : Q {
 
 // CHECK-LABEL: sil hidden @$s4test1XV0A2MeSiSgvg : $@convention(method) (X) -> Optional<Int> {
 // CHECK:      bb0(%0 : $X):
+// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   debug_value
 // CHECK-NEXT:   integer_literal ${{.*}}, 0
 // CHECK-NEXT:   struct $Int

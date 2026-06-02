@@ -442,6 +442,13 @@ public:
       return;
     if (VarInfo->Type)
       VarInfo->Type = getOpType(*VarInfo->Type);
+    // Remap types embedded in the debug info expression, within op_tuple_fragment.
+    for (auto &Elt : VarInfo->DIExpr.elements()) {
+      if (auto Ty = Elt.getAsType()) {
+        Elt = SILDIExprElement::createType(
+            getOpASTType(Ty->getCanonicalType()));
+      }
+    }
     // Don't remap locations for debug values.
     if (VarInfo->Scope)
       VarInfo->Scope = getOpScope(VarInfo->Scope);

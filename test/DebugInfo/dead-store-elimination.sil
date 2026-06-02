@@ -7,6 +7,12 @@ sil_stage canonical
 import Swift
 import Builtin
 
+struct MyStruct {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+  init(x: Int64, y: Int64)
+}
+
 // We should be able to replace the local store with a debug_value.
 // The dead store elimination pass is written in Swift, and should call
 // salvage debug info when removing the store.
@@ -23,4 +29,49 @@ bb0:
   %4 = tuple ()
   dealloc_stack %0 : $*Int64
   return %4 : $()
+}
+
+// When a debug_value has a reconstruction block with a load, stripDeref
+// should remove the load and change the block arg to object type.
+// CHECK-LABEL: @dse_salvage_store_strip_deref_load
+// CHECK: debug_value %0 : $MyStruct, let, name "field", type $Int64, transform {
+// CHECK:   bb0(%[[ARG:[0-9]+]] : $MyStruct):
+// CHECK:     struct_extract %[[ARG]] : $MyStruct, #MyStruct.x
+// CHECK:     return
+// CHECK:   }
+sil hidden @dse_salvage_store_strip_deref_load : $@convention(thin) (MyStruct) -> () {
+bb0(%0 : $MyStruct):
+  %alloc = alloc_stack $MyStruct
+  debug_value %alloc : $*MyStruct, let, name "field", type $Int64, transform {
+  bb0(%0 : $*MyStruct):
+    %1 = load %0 : $*MyStruct
+    %2 = struct_extract %1 : $MyStruct, #MyStruct.x
+    return %2 : $Int64
+  }
+  store %0 to %alloc : $*MyStruct
+  %r = tuple ()
+  dealloc_stack %alloc : $*MyStruct
+  return %r : $()
+}
+
+// When a debug_value has a reconstruction block with no load (e.g.
+// address_to_pointer), stripDeref cannot salvage and calls killOperand.
+// CHECK-LABEL: @dse_salvage_store_strip_deref_kill
+// CHECK: debug_value undef : $MyStruct, let, name "ptr", type $Builtin.RawPointer, transform {
+// CHECK:   bb0:
+// CHECK:     address_to_pointer undef : $*MyStruct to $Builtin.RawPointer
+// CHECK:     return
+// CHECK:   }
+sil hidden @dse_salvage_store_strip_deref_kill : $@convention(thin) (MyStruct) -> () {
+bb0(%0 : $MyStruct):
+  %alloc = alloc_stack $MyStruct
+  debug_value %alloc : $*MyStruct, let, name "ptr", type $Builtin.RawPointer, transform {
+  bb0(%0 : $*MyStruct):
+    %1 = address_to_pointer %0 : $*MyStruct to $Builtin.RawPointer
+    return %1 : $Builtin.RawPointer
+  }
+  store %0 to %alloc : $*MyStruct
+  %r = tuple ()
+  dealloc_stack %alloc : $*MyStruct
+  return %r : $()
 }

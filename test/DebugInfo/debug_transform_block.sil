@@ -5,9 +5,17 @@ sil_stage canonical
 import Builtin
 import Swift
 
+struct MyStruct {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+  init(x: Int64, y: Int64)
+}
+
 sil_scope 1 { loc "file.swift":1:6 parent @test_transform_const : $@convention(thin) () -> () }
 sil_scope 2 { loc "file.swift":5:6 parent @test_transform_add : $@convention(thin) (Builtin.Int64) -> () }
 sil_scope 3 { loc "file.swift":10:6 parent @test_transform_multi : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 4 { loc "file.swift":15:6 parent @test_transform_struct_extract : $@convention(thin) (Int64) -> () }
+sil_scope 5 { loc "file.swift":20:6 parent @test_transform_tuple_extract : $@convention(thin) (Int64) -> () }
 
 // CHECK-LABEL: define {{.*}} @test_transform_const
 sil @test_transform_const : $@convention(thin) () -> () {
@@ -62,6 +70,56 @@ bb0(%arg : $Builtin.Int64):
   return %r : $(), loc "file.swift":12:3, scope 3
 }
 
+// CHECK-LABEL: define {{.*}} @test_transform_struct_extract
+sil @test_transform_struct_extract : $@convention(thin) (Int64) -> () {
+bb0(%arg : $Int64):
+// struct + struct_extract of the same field should cancel out.
+// CHECK: #dbg_value(i64 %0, ![[VAR4:[0-9]+]]
+  debug_value %arg : $Int64, let, name "x", transform {
+  bb0(%0 : $Int64):
+    %1 = struct $MyStruct (%0 : $Int64, undef : $Int64)
+    %2 = struct_extract %1 : $MyStruct, #MyStruct.x
+    return %2 : $Int64
+  }, loc "file.swift":16:3, scope 4
+// struct + struct_extract of a different field should yield undef.
+// CHECK: #dbg_value(i64 undef, ![[VAR5:[0-9]+]]
+  debug_value %arg : $Int64, let, name "y", transform {
+  bb0(%0 : $Int64):
+    %1 = struct $MyStruct (%0 : $Int64, undef : $Int64)
+    %2 = struct_extract %1 : $MyStruct, #MyStruct.y
+    return %2 : $Int64
+  }, loc "file.swift":18:3, scope 4
+  %r = tuple ()
+  return %r : $(), loc "file.swift":17:3, scope 4
+}
+
+// CHECK-LABEL: define {{.*}} @test_transform_tuple_extract
+sil @test_transform_tuple_extract : $@convention(thin) (Int64) -> () {
+bb0(%arg : $Int64):
+// tuple + tuple_extract of the same element should cancel out.
+// CHECK: #dbg_value(i64 %0, ![[VAR6:[0-9]+]]
+  debug_value %arg : $Int64, let, name "x", transform {
+  bb0(%0 : $Int64):
+    %1 = tuple (%0 : $Int64, undef : $Int64)
+    %2 = tuple_extract %1 : $(Int64, Int64), 0
+    return %2 : $Int64
+  }, loc "file.swift":21:3, scope 5
+// tuple + tuple_extract of the undef element should yield undef.
+// CHECK: #dbg_value(i64 undef, ![[VAR7:[0-9]+]]
+  debug_value %arg : $Int64, let, name "y", transform {
+  bb0(%0 : $Int64):
+    %1 = tuple (%0 : $Int64, undef : $Int64)
+    %2 = tuple_extract %1 : $(Int64, Int64), 1
+    return %2 : $Int64
+  }, loc "file.swift":23:3, scope 5
+  %r = tuple ()
+  return %r : $(), loc "file.swift":24:3, scope 5
+}
+
 // CHECK-DAG: ![[VAR1]] = !DILocalVariable(name: "x"
 // CHECK-DAG: ![[VAR2]] = !DILocalVariable(name: "y"
 // CHECK-DAG: ![[VAR3]] = !DILocalVariable(name: "z"
+// CHECK-DAG: ![[VAR4]] = !DILocalVariable(name: "x"
+// CHECK-DAG: ![[VAR5]] = !DILocalVariable(name: "y"
+// CHECK-DAG: ![[VAR6]] = !DILocalVariable(name: "x"
+// CHECK-DAG: ![[VAR7]] = !DILocalVariable(name: "y"

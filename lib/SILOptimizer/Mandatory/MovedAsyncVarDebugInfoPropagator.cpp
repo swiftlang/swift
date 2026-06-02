@@ -118,6 +118,8 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
 
   SILBuilderWithScope builder(std::next(insertPt->getIterator()));
   builder.setCurrentDebugScope(original->getDebugScope());
+  ASSERT(!original.hasDebugReconstructionBlock() &&
+         "Unexpected debug reconstruction block in Onone-only Pass");
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
       *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);
@@ -130,6 +132,8 @@ static SILInstruction *cloneDebugValue(DebugVarCarryingInst original,
 
   SILBuilderWithScope builder(&block->front());
   builder.setCurrentDebugScope(original->getDebugScope());
+  ASSERT(!original.hasDebugReconstructionBlock() &&
+         "Unexpected debug reconstruction block in Onone-only Pass");
   return builder.createDebugValue(
       original->getLoc(), original.getOperandForDebugValueClone(),
       *original.getVarInfo(), DontPoisonRefs, UsesMoveableValueDebugInfo);

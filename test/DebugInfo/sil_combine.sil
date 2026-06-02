@@ -18,7 +18,7 @@ enum MP {
 // CHECK-LABEL: sil @expand_alloc_stack_of_enum_without_take
 // CHECK:        [[A:%[0-9]+]] = alloc_stack $S
 // CHECK-NOT:      name "a"
-// CHECK-NEXT:   debug_value undef : $*MP, let, name "a", expr op_deref:op_fragment:#C.x
+// CHECK-NEXT:   debug_value undef : $*MP, let, name "a", type $C, expr op_deref:op_fragment:#C.x
 // CHECK-NEXT:   debug_value undef : $*MP, let, name "b"
 // CHECK:      bb1:
 // CHECK-NEXT:   store %0 to [[A]]
@@ -30,7 +30,7 @@ enum MP {
 sil @expand_alloc_stack_of_enum_without_take : $@convention(method) (S) -> () {
 bb0(%0 : $S):
   %1 = alloc_stack $MP
-  debug_value %1 : $*MP, let, name "a", expr op_deref:op_fragment:#C.x
+  debug_value %1 : $*MP, let, name "a", type $C, expr op_deref:op_fragment:#C.x
   debug_value %1 : $*MP, let, name "b", expr op_deref
   cond_br undef, bb1, bb2
 bb1:
@@ -54,6 +54,92 @@ bb3:
 struct T {
   @_hasStorage let x: Builtin.Int32 { get }
   init(x: Builtin.Int32)
+}
+
+struct MyStruct {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+  init(x: Int64, y: Int64)
+}
+
+// When a struct is removed and a debug_value with a reconstruction block
+// references it, salvageDebugInfo should prepend a struct reconstruction
+// into the debug BB using the first field + undefs for the rest.
+// CHECK-LABEL: sil @salvage_struct_with_debug_bb
+// CHECK: debug_value %0 : $Int64, let, name "field_x", type $Int64, transform {
+// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK:     %[[S:[0-9]+]] = struct $MyStruct (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK:     %[[E:[0-9]+]] = struct_extract %[[S]] : $MyStruct, #MyStruct.x
+// CHECK:     return %[[E]] : $Int64
+// CHECK:   }
+// CHECK: return %0
+sil @salvage_struct_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %s = struct $MyStruct (%0 : $Int64, %1 : $Int64)
+  debug_value %s : $MyStruct, let, name "field_x", type $Int64, transform {
+  bb0(%0 : $MyStruct):
+    %1 = struct_extract %0 : $MyStruct, #MyStruct.x
+    return %1 : $Int64
+  }
+  %e = struct_extract %s : $MyStruct, #MyStruct.x
+  return %e : $Int64
+}
+
+public struct Empty {}
+
+// When an empty struct is removed, the debug_value should be fully salvaged
+// into a debug BB by cloning the struct construction.
+// CHECK-LABEL: sil @salvage_empty_struct
+// CHECK: debug_value undef : $Empty, let, name "e", transform {
+// CHECK:   bb0:
+// CHECK:     %[[S:[0-9]+]] = struct $Empty ()
+// CHECK:     return %[[S]] : $Empty
+// CHECK:   }
+sil @salvage_empty_struct : $@convention(thin) () -> () {
+bb0:
+  %s = struct $Empty ()
+  debug_value %s : $Empty, let, name "e"
+  %r = tuple ()
+  return %r : $()
+}
+
+// When a tuple is removed and a debug_value with a reconstruction block
+// references it, salvageDebugInfo should prepend a tuple reconstruction
+// into the debug BB using the first element + undefs for the rest.
+// CHECK-LABEL: sil @salvage_tuple_with_debug_bb
+// CHECK: debug_value %0 : $Int64, let, name "x", type $Int64, transform {
+// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK:     %[[T:[0-9]+]] = tuple (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK:     %[[E:[0-9]+]] = tuple_extract %[[T]] : $(Int64, Int64), 0
+// CHECK:     return %[[E]] : $Int64
+// CHECK:   }
+// CHECK: return %0
+sil @salvage_tuple_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %t = tuple (%0 : $Int64, %1 : $Int64)
+  debug_value %t : $(Int64, Int64), let, name "x", type $Int64, transform {
+  bb0(%0 : $(Int64, Int64)):
+    %1 = tuple_extract %0 : $(Int64, Int64), 0
+    return %1 : $Int64
+  }
+  %e = tuple_extract %t : $(Int64, Int64), 0
+  return %e : $Int64
+}
+
+// When an empty tuple is removed, the debug_value should be fully salvaged
+// into a debug BB by cloning the tuple construction.
+// CHECK-LABEL: sil @salvage_empty_tuple
+// CHECK: debug_value undef : $(), let, name "e", transform {
+// CHECK:   bb0:
+// CHECK:     %[[T:[0-9]+]] = tuple ()
+// CHECK:     return %[[T]] : $()
+// CHECK:   }
+sil @salvage_empty_tuple : $@convention(thin) () -> () {
+bb0:
+  %t = tuple ()
+  debug_value %t : $(), let, name "e"
+  %r = tuple ()
+  return %r : $()
 }
 
 // This test verifies that splitAggregateLoad in CanonicalizeInstruction.cpp
