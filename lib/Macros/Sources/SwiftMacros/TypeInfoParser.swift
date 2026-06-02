@@ -202,6 +202,13 @@ struct ArgInfo<T> {
   }
 }
 
+func arityOf<each T>(_ args: repeat each T) -> Int {
+  var n = 0
+  func increment<U>(_: U) { n += 1 }
+  _ = (repeat increment(each args))
+  return n
+}
+
 extension LabeledExprListSyntax {
 
   /// Given a LabeledExprListSyntax and a variable number of argument infos,
@@ -210,14 +217,10 @@ extension LabeledExprListSyntax {
   func expect<each ArgType>(
     _ infos: repeat ArgInfo<each ArgType>
   ) throws -> (repeat each ArgType) {
+    print("Inside expect")
     // Building the list of arguments syntax
     var lst = self.map { $0 }
-
-    // How many arguments to expect
-    var count = 0
-    for _ in repeat each infos {
-      count += 1
-    }
+    let count = arityOf(repeat each infos)
 
     // Throw if there is a count mismatch, no need to try parsing anything.
     if count != lst.count {
