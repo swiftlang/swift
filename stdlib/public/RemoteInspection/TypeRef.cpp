@@ -1705,15 +1705,21 @@ public:
 
   const TypeRef *
   visitProtocolCompositionTypeRef(const ProtocolCompositionTypeRef *PC) {
+    // Visit every member of the composition. The protocols are either
+    // NominalTypeRef or ObjCProtocolTypeRef and substituting them is a no-op,
+    // but visit them anyway so this visitor stays exhaustive.
+    std::vector<const TypeRef *> Protocols;
+    for (auto *Protocol : PC->getProtocols())
+      Protocols.push_back(visit(Protocol));
+
     // The "superclass" of a protocol composition is its class bound
     // (the `C` in `(C & P)`), not a parent class in an inheritance chain.
-    if (auto *Superclass = PC->getSuperclass()) {
-      auto *NewSuperclass = visit(Superclass);
-      return ProtocolCompositionTypeRef::create(Builder, PC->getProtocols(),
-                                                NewSuperclass,
-                                                PC->hasExplicitAnyObject());
-    }
-    return PC;
+    const TypeRef *Superclass = nullptr;
+    if (PC->getSuperclass())
+      Superclass = visit(PC->getSuperclass());
+
+    return ProtocolCompositionTypeRef::create(Builder, Protocols, Superclass,
+                                              PC->hasExplicitAnyObject());
   }
 
   const TypeRef *visitMetatypeTypeRef(const MetatypeTypeRef *M) {
