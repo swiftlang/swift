@@ -1801,28 +1801,12 @@ public:
   void checkDebugVariable(SILInstruction *inst) {
     std::optional<SILDebugVariable> varInfo;
     if (auto di = DebugVarCarryingInst(inst))
-      varInfo = di.getVarInfo();
+      varInfo = di.getCompleteVarInfo();
 
     if (!varInfo)
       return;
 
-    // Retrieve debug variable type
-    SILType SSAType;
-    switch (inst->getKind()) {
-    case SILInstructionKind::AllocStackInst:
-    case SILInstructionKind::AllocBoxInst:
-      // TODO: unwrap box for AllocBox
-      SSAType = inst->getResult(0)->getType().getObjectType();
-      break;
-    case SILInstructionKind::DebugValueInst:
-      SSAType = inst->getOperand(0)->getType();
-      break;
-    default:
-      llvm_unreachable("impossible instruction kind");
-    }
-    
-    SILType DebugVarTy = varInfo->Type ? *varInfo->Type :
-      SSAType.getObjectType();
+    SILType DebugVarTy = *varInfo->Type;
 
     auto *debugScope = inst->getDebugScope();
     if (varInfo->ArgNo)

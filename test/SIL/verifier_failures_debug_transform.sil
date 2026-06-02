@@ -11,6 +11,8 @@ sil_scope 1 { parent @test_type_mismatch : $@convention(thin) () -> () }
 sil_scope 2 { parent @test_arg_type_mismatch : $@convention(thin) (Builtin.Int64) -> () }
 sil_scope 3 { parent @test_deref_mismatch : $@convention(thin) () -> () }
 sil_scope 4 { parent @test_no_transform_type_mismatch : $@convention(thin) (Builtin.Int32) -> () }
+sil_scope 5 { parent @test_fragment_wrong_parent : $@convention(thin) (Builtin.Int64) -> () }
+sil_scope 6 { parent @test_tuple_fragment_type_mismatch : $@convention(thin) (Builtin.Int64) -> () }
 
 // The transform block returns Builtin.Int32 but the fragment narrows to
 // Builtin.Int64.
@@ -65,6 +67,28 @@ bb0:
 sil @test_no_transform_type_mismatch : $@convention(thin) (Builtin.Int32) -> () {
 bb0(%arg : $Builtin.Int32):
   debug_value %arg : $Builtin.Int32, let, name "x", type $Int64, expr op_fragment:#Int64._value
+  %r = tuple ()
+  return %r : $()
+}
+
+// Fragment field doesn't belong to the running type (Int32._value used on Int64).
+// CHECK-LABEL: Begin Error in function test_fragment_wrong_parent
+// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK-LABEL: End Error in function test_fragment_wrong_parent
+sil @test_fragment_wrong_parent : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%arg : $Builtin.Int64):
+  debug_value %arg : $Builtin.Int64, let, name "x", type $Int64, expr op_fragment:#Int32._value
+  %r = tuple ()
+  return %r : $()
+}
+
+// TupleFragment type doesn't match running type.
+// CHECK-LABEL: Begin Error in function test_tuple_fragment_type_mismatch
+// CHECK:       SIL verification failed: debug_value type chain should hold
+// CHECK-LABEL: End Error in function test_tuple_fragment_type_mismatch
+sil @test_tuple_fragment_type_mismatch : $@convention(thin) (Builtin.Int64) -> () {
+bb0(%arg : $Builtin.Int64):
+  debug_value %arg : $Builtin.Int64, let, name "x", type $(Int64, Int64), expr op_tuple_fragment:$(Int32, Int32):0:op_fragment:#Int64._value
   %r = tuple ()
   return %r : $()
 }
