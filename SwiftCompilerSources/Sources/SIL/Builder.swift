@@ -880,6 +880,11 @@ public struct Builder {
     let fixLifetime = bridged.createFixLifetime(operand.bridged)
     return notifyNew(fixLifetime.getAs(FixLifetimeInst.self))
   }
+
+  public func createDropDeinit(of value: Value) -> DropDeinitInst {
+    let dropDeinit = bridged.createDropDeinit(value.bridged)
+    return notifyNew(dropDeinit.getAs(DropDeinitInst.self))
+  }
 }
 
 //===----------------------------------------------------------------------===//
