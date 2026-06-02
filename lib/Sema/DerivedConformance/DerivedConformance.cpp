@@ -24,7 +24,10 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/QuotedString.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "llvm/ADT/STLExtras.h"
+#include "llvm/Support/raw_ostream.h"
 
 using namespace swift;
 
@@ -995,4 +998,86 @@ bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
   }
 
   return false;
+}
+
+/// Prints a string containing swift syntax describing the case \p  decl with
+/// relevant information to \p out.
+static void printCaseInfo(llvm::raw_ostream &out, const EnumElementDecl *decl) {
+  out << "CaseInfo(name: " << QuotedString(decl->getNameStr())
+      << ", associatedValues: [";
+  llvm::interleaveComma(decl->getName().getArgumentNames(), out,
+                        [&](Identifier name) {
+                          if (name.empty()) {
+                            out << "nil";
+                          } else {
+                            printAsQuotedString(out, name.str());
+                          }
+                        });
+  out << "])";
+}
+
+/// Prints a string containing swift syntax describing the enum \p
+/// decl with relevant information to \p out.
+static void printEnumTypeKind(llvm::raw_ostream &out, EnumDecl *decl) {
+  out << "enumLike(EnumTypeInfo(isObjC: "
+      << (decl->isObjC() ? "true" : "false")
+      << ", cases: [";
+  llvm::interleaveComma(decl->getAllElements(), out,
+                        [&](const EnumElementDecl *elem) {
+                          printCaseInfo(out, elem);
+                        });
+  out << "]))";
+}
+
+/// Prints a string containing swift syntax describing the stored property \p
+/// decl with relevant information to \p out.
+static void printStoredProperty(llvm::raw_ostream &out,
+                                const VarDecl *decl) {
+  bool isVar = decl->getIntroducer() == VarDecl::Introducer::Var;
+  out << "StoredProperty(name: " << QuotedString(decl->getNameStr())
+      << ", typeName: " << QuotedString(decl->getTypeInContext().getString())
+      << ", isVar: "    << (isVar ? "true" : "false")
+      << ", isStatic: " << (decl->isStatic() ? "true" : "false") << ")";
+}
+
+
+/// Prints a string containing swift syntax describing struct \p decl with
+/// relevant information to \p out.
+static void printStructTypeKind(llvm::raw_ostream &out, StructDecl *decl) {
+  out << "structLike(StructTypeInfo(properties: [";
+  llvm::interleaveComma(decl->getStoredProperties(), out,
+                        [&](const VarDecl *prop) {
+                          printStoredProperty(out, prop);
+                        });
+  out << "]))";
+}
+
+/// Prints a string containing swift syntax describing \p decl with relevant
+/// information to \p out. For the moment, only struct and enum types are supported.
+static void printNominalTypeKind(llvm::raw_ostream &out,
+                                 NominalTypeDecl *decl) {
+  if (auto *enumDecl = dyn_cast<EnumDecl>(decl)) {
+    printEnumTypeKind(out, enumDecl);
+    return;
+  }
+
+  if (auto *structDecl = dyn_cast<StructDecl>(decl)) {
+    printStructTypeKind(out, structDecl);
+    return;
+  }
+
+  llvm_unreachable("todo");
+}
+
+std::string swift::getNominalTypeInfoString(DerivedConformance &derived) {
+  bool isUnsafe =
+      derived.Conformance->getExplicitSafety() == ExplicitSafety::Unsafe;
+
+  std::string res;
+  llvm::raw_string_ostream out(res);
+  out << "NominalTypeInfo(name: " << QuotedString(derived.Nominal->getNameStr())
+      << ", kind: ";
+  printNominalTypeKind(out, derived.Nominal);
+  out << ", isUnsafe: " << (isUnsafe ? "true" : "false") << ")";
+  return res;
 }
