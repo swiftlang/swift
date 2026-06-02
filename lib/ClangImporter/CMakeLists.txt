@@ -36,6 +36,7 @@ add_swift_host_library(swiftClangImporter STATIC
 target_link_libraries(swiftClangImporter PRIVATE
   swiftAST
   swiftParse
+  clangOptions
   clangTooling)
 
 target_link_libraries(swiftClangImporter INTERFACE
