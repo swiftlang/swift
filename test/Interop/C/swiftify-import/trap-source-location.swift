@@ -9,8 +9,12 @@
 // RUN:   -Xfrontend -validate-tbd-against-ir=none -o %t/test -target %target-swift-6.2-abi-triple
 // RUN: %target-codesign %t/test
 
-// RUN: not --crash env SWIFT_BACKTRACE=enable=no %target-run %t/test interop 2>&1 | %FileCheck %s --check-prefix CLANG
-// RUN: not --crash env SWIFT_BACKTRACE=enable=no %target-run %t/test         2>&1 | %FileCheck %s --check-prefix SWIFT
+// RUN: env SWIFT_BACKTRACE=enable=no %{python} %S/../../../Inputs/not.py "%target-run %t/test interop" 2>&1 | %FileCheck %s --check-prefix CLANG
+// RUN: env SWIFT_BACKTRACE=enable=no %{python} %S/../../../Inputs/not.py "%target-run %t/test"         2>&1 | %FileCheck %s --check-prefix SWIFT
+
+// NOTE: not.py is used above instead of "not --crash" because simctl's exit
+// status doesn't reflect whether its child process crashed or not. So "not
+// --crash %target-run ..." always fails when testing for the iOS Simulator.
 
 // Trigger Optional unwrapping inside a macro by passing a default Span to a safe wrapper
 // where the underlying function does not accept null pointers - the base pointer of the
