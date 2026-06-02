@@ -294,12 +294,25 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
   add_custom_target(embedded-concurrency)
   add_dependencies(embedded-libraries embedded-concurrency)
 
+  set(SWIFT_ENABLE_REFLECTION OFF)
+  set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
+  set(SWIFT_STDLIB_STABLE_ABI OFF)
+  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
   set(SWIFT_CONCURRENCY_USES_DISPATCH FALSE)
   set(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY TRUE)
   set(SWIFT_STDLIB_TRACING FALSE)
   set(SWIFT_STDLIB_HAS_ENVIRON FALSE)
   set(SWIFT_STDLIB_HAS_ASL FALSE)
   list(APPEND LLVM_OPTIONAL_SOURCES ExecutorImpl.cpp)
+
+  # Under Embedded Swift, all stdlib APIs should be available always. Replace
+  # all availability macros with an empty expansion (`*`).
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
+  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
+    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
+    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
+  endforeach()
+  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
 
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
     string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
@@ -359,6 +372,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     set(SWIFT_SDK_embedded_THREADING_PACKAGE none)
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_MODULE "${mod}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
     set(SWIFT_SDK_embedded_ARCH_${mod}_TRIPLE "${triple}")
     if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
@@ -372,7 +386,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       embedded-concurrency-${mod}
       swift_Concurrency
       STATIC
-      IS_STDLIB
+      IS_STDLIB IS_FRAGILE
 
       ${SWIFT_RUNTIME_CONCURRENCY_C_SOURCES}
       ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_SOURCES}
@@ -382,14 +396,17 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
         ${SWIFT_CONCURRENCY_GYB_SOURCES}
 
       SWIFT_COMPILE_FLAGS
-        ${extra_swift_compile_flags}
+        ${extra_swift_compile_flags} -enable-experimental-feature Embedded
         -parse-stdlib -DSWIFT_CONCURRENCY_EMBEDDED
+        -Xfrontend -emit-empty-object-file
         ${SWIFT_RUNTIME_CONCURRENCY_SWIFT_FLAGS}
       C_COMPILE_FLAGS
         ${extra_c_compile_flags} ${SWIFT_RUNTIME_CONCURRENCY_C_FLAGS} -DSWIFT_CONCURRENCY_EMBEDDED=1 -DSWIFT_RUNTIME_EMBEDDED=1
         -ffunction-sections -fdata-sections -fno-exceptions -fno-cxx-exceptions -fno-unwind-tables
+      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${arch}"
+      ARCHITECTURE_SUBDIR_NAME "${mod}"
       DEPENDS embedded-stdlib-${mod}
       INSTALL_IN_COMPONENT stdlib
       )
@@ -409,6 +426,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       set_property(TARGET embedded-concurrency-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
     endif()
 
+    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-${mod} ${triple})
+
     add_dependencies(embedded-concurrency embedded-concurrency-${mod})
 
     # lib/swift/embedded/<triple>/libswift_ConcurrencyDefaultExecutor.a
@@ -416,10 +435,12 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       embedded-concurrency-default-executor-${mod}
       swift_ConcurrencyDefaultExecutor
       STATIC
+      IS_FRAGILE
 
       CooperativeGlobalExecutor.cpp
 
       C_COMPILE_FLAGS ${extra_c_compile_flags}
+      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
       SDK "embedded"
       ARCHITECTURE "${mod}"
       DEPENDS embedded-stdlib-${mod}
@@ -437,6 +458,8 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE WORLD_READ WORLD_EXECUTE
       )
     set_property(TARGET embedded-concurrency-default-executor-${mod} PROPERTY OSX_ARCHITECTURES "${arch}")
+
+    embedded_amend_archive_commands_on_darwin_host(embedded-concurrency-default-executor-${mod} ${triple})
 
     add_dependencies(embedded-concurrency embedded-concurrency-default-executor-${mod})
   endforeach()
