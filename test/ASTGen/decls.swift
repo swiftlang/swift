@@ -51,6 +51,7 @@ Int {
   return 0
 }
 
+@diagnose(StrictMemorySafety, as: error)
 func test2(y: Int = 0, oi: Int? = nil) -> Int {
   let x =
     y
