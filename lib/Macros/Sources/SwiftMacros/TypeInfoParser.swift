@@ -217,7 +217,6 @@ extension LabeledExprListSyntax {
   func expect<each ArgType>(
     _ infos: repeat ArgInfo<each ArgType>
   ) throws -> (repeat each ArgType) {
-    print("Inside expect")
     // Building the list of arguments syntax
     var lst = self.map { $0 }
     let count = arityOf(repeat each infos)
