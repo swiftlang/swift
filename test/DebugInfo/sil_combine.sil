@@ -18,8 +18,18 @@ enum MP {
 // CHECK-LABEL: sil @expand_alloc_stack_of_enum_without_take
 // CHECK:        [[A:%[0-9]+]] = alloc_stack $S
 // CHECK-NOT:      name "a"
-// CHECK-NEXT:   debug_value undef : $*MP, let, name "a", type $C, expr op_deref:op_fragment:#C.x
-// CHECK-NEXT:   debug_value undef : $*MP, let, name "b"
+// CHECK-NEXT:   debug_value [[A]] : $*S, let, name "a", type $C, expr op_fragment:#C.x, transform {
+// CHECK:          bb0(%[[ARG1:[0-9]+]] : $*S):
+// CHECK:            %[[LOAD1:[0-9]+]] = load %[[ARG1]] : $*S
+// CHECK:            %[[ENUM1:[0-9]+]] = enum $MP, #MP.A!enumelt, %[[LOAD1]] : $S
+// CHECK:            return %[[ENUM1]] : $MP
+// CHECK:        }
+// CHECK:        debug_value [[A]] : $*S, let, name "b", transform {
+// CHECK:          bb0(%[[ARG2:[0-9]+]] : $*S):
+// CHECK:            %[[LOAD2:[0-9]+]] = load %[[ARG2]] : $*S
+// CHECK:            %[[ENUM2:[0-9]+]] = enum $MP, #MP.A!enumelt, %[[LOAD2]] : $S
+// CHECK:            return %[[ENUM2]] : $MP
+// CHECK:        }
 // CHECK:      bb1:
 // CHECK-NEXT:   store %0 to [[A]]
 // CHECK:      bb2:
