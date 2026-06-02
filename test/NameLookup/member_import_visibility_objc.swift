@@ -32,7 +32,8 @@ func test(x: X) {
   // expected-no-member-visibility-warning@-1 {{'overriddenInOverlayForC()' is deprecated: Categories_C.swift}}
   // expected-member-visibility-warning@-2 {{'overriddenInOverlayForC()' is deprecated: Categories_A.h}}
   x.witnessesObjCConformanceRequirementInC()
-  // expected-warning@-1 {{'witnessesObjCConformanceRequirementInC()' is deprecated: Categories_A.h}}
+  // expected-no-member-visibility-warning@-1 {{'witnessesObjCConformanceRequirementInC()' is deprecated: Categories_A.h}}
+  // expected-member-visibility-warning@-2 {{'witnessesObjCConformanceRequirementInC()' is deprecated: Categories_A.h}}
   x.fromSubmoduleOfD() // expected-member-visibility-error {{instance method 'fromSubmoduleOfD()' is not available due to missing import of defining module 'Categories_D'}}
   x.fromBridgingHeader()
   x.overridesCategoryMethodOnNSObject()
