@@ -49,6 +49,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:module-self-import>
 - <doc:oslog>
 - <doc:option-obsoleted-by-module-selectors>
+- <doc:public-import-of-project-internal-module>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
 - <doc:semantic-copies>
@@ -107,6 +108,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:property-wrapper-requirements>
 - <doc:conformance-isolation>
 - <doc:protocol-type-non-conformance>
+- <doc:public-import-of-project-internal-module>
 - <doc:result-builder-methods>
 - <doc:spi-import-ignored>
 - <doc:semantic-copies>

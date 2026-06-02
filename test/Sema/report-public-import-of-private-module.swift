@@ -134,12 +134,6 @@ import LocalClang // expected-error{{private module 'LocalClang' is imported pub
 // RUN: -sdk %t/sdk -module-cache-path %t -F %t/sdk/System/Library/PrivateFrameworks/ \
 // RUN:   -I %t -module-name Client
 
-/// Expect error when building from a swiftinterface that imports an IPI module.
-// RUN: not %target-swift-typecheck-module-from-interface(%t/IPIClient.private.swiftinterface) \
-// RUN:   -I %t -module-cache-path %t -module-name IPIClient 2>&1 \
-// RUN:   | %FileCheck %s --check-prefix CHECK-IPI-INTERFACE
-// CHECK-IPI-INTERFACE: Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'IPIClient'
-
 //--- Client.private.swiftinterface
 // swift-interface-format-version: 1.0
 // swift-compiler-version: Swift version 5.8-dev effective-4.1.50
@@ -152,13 +146,6 @@ import PublicClang_Private
 import FullyPrivateClang
 import LocalClang
 @_exported import MainLib
-
-//--- IPIClient.private.swiftinterface
-// swift-interface-format-version: 1.0
-// swift-compiler-version: Swift version 5.8-dev effective-4.1.50
-// swift-module-flags: -swift-version 4 -module-name IPIClient -library-level api
-
-import IPISwift
 
 // RUN: %target-swift-frontend -typecheck -sdk %t/sdk %t/InternalImports.swift \
 // RUN:   -module-name MainLib -module-cache-path %t \
@@ -234,10 +221,10 @@ public import PrivateSwift // expected-error{{private module 'PrivateSwift' is i
 public func ipiFunc() {}
 
 //--- IPIFromAPI.swift
-import IPISwift // expected-error {{Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'MainLib'}}
+import IPISwift // expected-warning {{Project internal module 'IPISwift' cannot be imported publicly because 'MainLib' has '-library-level api'}}
 
 //--- IPIFromSPI.swift
-import IPISwift // expected-error {{Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'MainLib'}}
+import IPISwift // expected-warning {{Project internal module 'IPISwift' cannot be imported publicly because 'MainLib' has '-library-level spi'}}
 
 //--- IPIFromIPI.swift
 import IPISwift
@@ -255,10 +242,10 @@ internal import IPISwift
 package import IPISwift
 
 //--- IPIExportedImport.swift
-@_exported import IPISwift // expected-error {{Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'MainLib'}}
+@_exported import IPISwift // expected-warning {{Project internal module 'IPISwift' cannot be imported publicly because 'MainLib' has '-library-level api'}}
 
 //--- IPIExplicitlyPublic.swift
-public import IPISwift // expected-error {{Project internal module 'IPISwift' cannot be imported publicly from non-internal module 'MainLib'}}
+public import IPISwift // expected-warning {{Project internal module 'IPISwift' cannot be imported publicly because 'MainLib' has '-library-level api'}}
 // expected-warning @-1 {{public import of 'IPISwift' was not used in public declarations or inlinable code}}
 
 //--- IPIBareImportIIBD.swift
@@ -288,8 +275,8 @@ import IPISwift
 // RUN:   -ipi-clang-module PublicClang -ipi-clang-module FullyPrivateClang
 
 //--- ClangIPIFromAPI.swift
-import PublicClang // expected-error {{Project internal module 'PublicClang' cannot be imported publicly from non-internal module 'MainLib'}}
-import FullyPrivateClang // expected-error {{Project internal module 'FullyPrivateClang' cannot be imported publicly from non-internal module 'MainLib'}}
+import PublicClang // expected-warning {{Project internal module 'PublicClang' cannot be imported publicly because 'MainLib' has '-library-level api'}}
+import FullyPrivateClang // expected-warning {{Project internal module 'FullyPrivateClang' cannot be imported publicly because 'MainLib' has '-library-level api'}}
 
 //--- ClangIPIUnlisted.swift
 import PublicClang
@@ -300,9 +287,3 @@ import PublicClang
 //--- ClangIPINonPublic.swift
 @_implementationOnly import PublicClang
 internal import FullyPrivateClang
-
-//--- ClangIPIFromPath.swift
-import PublicClang // expected-error {{Project internal module 'PublicClang' cannot be imported publicly from non-internal module 'MainLib'}}
-
-//--- ClangIPIPathMiss.swift
-import PublicClang
