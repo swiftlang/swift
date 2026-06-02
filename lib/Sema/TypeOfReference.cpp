@@ -1791,6 +1791,47 @@ Type ConstraintSystem::getMemberReferenceTypeFromOpenedType(
     // For a static member referenced through a metatype or an instance
     // member referenced through an instance, strip off the 'self'.
     type = type->castTo<FunctionType>()->getResult();
+
+    // For an initializer of a non-class type, the result type baked into the
+    // function type is the canonical nominal type (struct/enum). If the base
+    // metatype carries typealias sugar, resugar any occurrence of the nominal
+    // in the function's result so the constraint system records the type
+    // written in source.
+    if (isa<ConstructorDecl>(value) && !baseObjTy->isCanonical()) {
+      if (auto *fnTy = type->getAs<FunctionType>()) {
+        auto *baseDecl = baseObjTy->getAnyNominal();
+        Type newResult = fnTy->getResult().transformRec(
+            [&](TypeBase *t) -> std::optional<Type> {
+              // Concrete match against the base (e.g. `init() -> Self` for a
+              // non-generic struct, after self has been stripped).
+              if (t->isCanonical() && Type(t)->isEqual(baseObjTy))
+                return baseObjTy;
+
+              // Generic Self: the result has the constructed nominal with the
+              // opened type variables for the struct's own generic params as
+              // its arguments. Once those bind through the metatype-self
+              // matching they will exactly produce baseObjTy's underlying, so
+              // it is safe to substitute eagerly. Restricting to the case
+              // where every arg is a type variable avoids resugaring an
+              // unrelated literal occurrence like `init() -> Generic<Int>`.
+              if (auto *bgt = dyn_cast<BoundGenericType>(t)) {
+                if (baseDecl && bgt->getDecl() == baseDecl) {
+                  bool allTypeVars =
+                      llvm::all_of(bgt->getGenericArgs(), [](Type arg) {
+                        return arg->is<TypeVariableType>();
+                      });
+                  if (allTypeVars)
+                    return baseObjTy;
+                }
+              }
+              return std::nullopt;
+            });
+        if (newResult.getPointer() != fnTy->getResult().getPointer()) {
+          type = FunctionType::get(fnTy->getParams(), newResult,
+                                   fnTy->getExtInfo());
+        }
+      }
+    }
   } else {
     // For an unbound instance method reference, replace the 'Self'
     // parameter with the base type.
