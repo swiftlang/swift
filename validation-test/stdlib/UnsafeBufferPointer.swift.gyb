@@ -119,6 +119,31 @@ ${SelfName}TestSuite.test("rebasing") {
 %   end # Mutable
 }
 
+${SelfName}TestSuite.test("_checkBounds(_: Range) helper")
+.require(.minimumStdlib(.stdlib_6_4))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+%   if IsRaw:
+  let allocated = UnsafeMutableRawBufferPointer.allocate(byteCount: 20, alignment: 8)
+  let buffer = ${SelfType}(allocated)
+%   else:
+  let allocated = UnsafeMutableBufferPointer<Float>.allocate(capacity: 20)
+%     if IsMutable:
+  let buffer = allocated
+%     else:
+  let buffer = ${SelfType}(allocated)
+%     end
+%   end
+  defer { allocated.deallocate() }
+
+  expectFalse(buffer._checkBounds(-15 ..< -5))
+  expectFalse(buffer._checkBounds( -5 ..< 5))
+  expectTrue( buffer._checkBounds(  5 ..< 15))
+  expectFalse(buffer._checkBounds( 15 ..< 25))
+  expectFalse(buffer._checkBounds( 25 ..< 35))
+}
+
 % if not IsMutable:
 ${SelfName}TestSuite.test("rebasingInvalidNonMutableSlice")
 .require(.crashTesting)
