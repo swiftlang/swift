@@ -83,6 +83,10 @@ void simple_display(
     llvm::raw_ostream &out,
     const llvm::PointerUnion<const TypeDecl *, const ExtensionDecl *> &value);
 
+void simple_display(
+    llvm::raw_ostream &out,
+    const llvm::PointerUnion<ValueDecl *, ExtensionDecl *> &value);
+
 void simple_display(llvm::raw_ostream &out, ASTContext *ctx);
 
 /// Emulates the following enum with associated values:
@@ -1676,18 +1680,21 @@ public:
 };
 
 /// Determine the actor isolation for the given declaration.
-class ActorIsolationRequest :
-    public SimpleRequest<ActorIsolationRequest,
-                         InferredActorIsolation(ValueDecl *),
-                         RequestFlags::Cached> {
+class ActorIsolationRequest
+    : public SimpleRequest<
+          ActorIsolationRequest,
+          InferredActorIsolation(
+              llvm::PointerUnion<ValueDecl *, ExtensionDecl *>),
+          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
 
 private:
   friend SimpleRequest;
 
-  InferredActorIsolation evaluate(Evaluator &evaluator,
-                                  ValueDecl *value) const;
+  InferredActorIsolation evaluate(
+      Evaluator &evaluator,
+      llvm::PointerUnion<ValueDecl *, ExtensionDecl *> declOrExtension) const;
 
 public:
   // Caching

@@ -436,9 +436,15 @@ struct InferredActorIsolation {
 /// Determine how the given value declaration is isolated.
 ActorIsolation getActorIsolation(ValueDecl *value);
 
+/// Determine how the given extension is isolated.
+ActorIsolation getActorIsolation(ExtensionDecl *ext);
+
 /// Infer the actor isolation of the given declaration, including
 /// the source of isolation inference.
 InferredActorIsolation getInferredActorIsolation(ValueDecl *value);
+
+/// Infer the actor isolation of the given extension.
+InferredActorIsolation getInferredActorIsolation(ExtensionDecl *ext);
 
 /// Trampoline for AbstractClosureExpr::getActorIsolation.
 ActorIsolation

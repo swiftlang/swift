@@ -6019,8 +6019,8 @@ static std::optional<unsigned> getIsolatedParamIndex(ValueDecl *value) {
   return std::nullopt;
 }
 
-static bool belongsToActor(ValueDecl *value) {
-  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl()) {
+static bool belongsToActor(Decl *decl) {
+  if (auto nominal = decl->getDeclContext()->getSelfNominalTypeDecl()) {
     return nominal->isAnyActor();
   }
   return false;
@@ -6059,33 +6059,36 @@ static void checkDeclWithIsolatedParameter(ValueDecl *value) {
 }
 
 /// If `@preconcurrency` attribute can be used on this declaration, apply it.
-static void markAsPreconcurrencyIfApplicable(ValueDecl *value) {
+static void markAsPreconcurrencyIfApplicable(Decl *decl) {
   // If there is one already, nothing more to do.
-  if (value->getAttrs().hasAttribute<PreconcurrencyAttr>())
+  if (decl->getAttrs().hasAttribute<PreconcurrencyAttr>())
     return;
 
   if (!DeclAttribute::canAttributeAppearOnDecl(DeclAttrKind::Preconcurrency,
-                                               value))
+                                               decl))
     return;
 
   auto *preconcurrency =
-      new (value->getASTContext()) PreconcurrencyAttr(/*IsImplicit=*/true);
-  value->addAttribute(preconcurrency);
+      new (decl->getASTContext()) PreconcurrencyAttr(/*IsImplicit=*/true);
+  decl->addAttribute(preconcurrency);
 }
 
-static void addAttributesForActorIsolation(ValueDecl *value,
+/// Attach implicit attributes representing \p isolation onto \p decl. For
+/// global-actor and nonisolated forms this synthesizes the corresponding
+/// `CustomAttr` or `NonisolatedAttr` directly on the decl's attribute list.
+static void addAttributesForActorIsolation(Decl *decl,
                                            ActorIsolation isolation) {
-  ASTContext &ctx = value->getASTContext();
+  ASTContext &ctx = decl->getASTContext();
   switch (isolation) {
   case ActorIsolation::NonisolatedNonsending:
-    value->addAttribute(new (ctx) NonisolatedAttr(
+    decl->addAttribute(new (ctx) NonisolatedAttr(
         /*atLoc=*/{}, /*range=*/{}, NonIsolatedModifier::NonSending,
         /*implicit=*/true));
     break;
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedConcurrent:
   case ActorIsolation::NonisolatedUnsafe: {
-    value->addAttribute(NonisolatedAttr::createImplicit(
+    decl->addAttribute(NonisolatedAttr::createImplicit(
         ctx, isolation == ActorIsolation::NonisolatedUnsafe
                  ? NonIsolatedModifier::Unsafe
                  : NonIsolatedModifier::None));
@@ -6093,12 +6096,12 @@ static void addAttributesForActorIsolation(ValueDecl *value,
   }
   case ActorIsolation::GlobalActor: {
     auto typeExpr = TypeExpr::createImplicit(isolation.getGlobalActor(), ctx);
-    auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner*/ value,
+    auto attr = CustomAttr::create(ctx, SourceLoc(), typeExpr, /*owner=*/decl,
                                    /*implicit=*/true);
-    value->addAttribute(attr);
+    decl->addAttribute(attr);
 
     if (isolation.preconcurrency())
-      markAsPreconcurrencyIfApplicable(value);
+      markAsPreconcurrencyIfApplicable(decl);
 
     break;
   }
@@ -6106,12 +6109,12 @@ static void addAttributesForActorIsolation(ValueDecl *value,
       llvm_unreachable("cannot add attributes for erased isolation");
     case ActorIsolation::ActorInstance: {
       // Nothing to do. Default value for actors.
-      assert(belongsToActor(value));
+      assert(belongsToActor(decl));
       break;
     }
     case ActorIsolation::Unspecified: {
       // Nothing to do. Default value for non-actors.
-      assert(!belongsToActor(value));
+      assert(!belongsToActor(decl));
       break;
     }
     }
@@ -6591,7 +6594,8 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedConcurrent:
     case ActorIsolation::NonisolatedUnsafe:
-      // Stored properties cannot be non-isolated, so don't infer it.
+      // Instance stored properties of a nominal type cannot be inferred
+      // non-isolated; they take their type's isolation.
       if (auto var = dyn_cast<VarDecl>(value)) {
         if (!var->isStatic() && var->hasStorage())
           return ActorIsolation::forUnspecified().withPreconcurrency(
@@ -6789,14 +6793,12 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
     bool onlyGlobal =
         *memberPropagation == MemberIsolationPropagation::GlobalActor;
 
-    // If the declaration is in an extension that has one of the isolation
-    // attributes, use that.
+    // If the declaration is in an extension that has isolation use that.
     if (auto ext = dyn_cast<ExtensionDecl>(value->getDeclContext())) {
-      if (auto isolationFromAttr = getIsolationFromAttributes(ext)) {
-        return {
-          inferredIsolation(*isolationFromAttr, onlyGlobal),
-          IsolationSource(ext, IsolationSource::Explicit)
-        };
+      auto extIsolation = getInferredActorIsolation(ext);
+      if (!extIsolation.isolation.isUnspecified()) {
+        return {inferredIsolation(extIsolation.isolation, onlyGlobal),
+                extIsolation.source};
       }
     }
 
@@ -6852,8 +6854,27 @@ static InferredActorIsolation computeActorIsolation(Evaluator &evaluator,
   return defaultIsolation;
 }
 
-InferredActorIsolation ActorIsolationRequest::evaluate(Evaluator &evaluator,
-                                                       ValueDecl *value) const {
+/// Compute the actor isolation of an extension.
+static InferredActorIsolation
+computeExtensionActorIsolation(ExtensionDecl *ext) {
+  if (auto attrIsolation = getIsolationFromAttributes(ext)) {
+    return {*attrIsolation,
+            IsolationSource(/*source=*/nullptr, IsolationSource::Explicit)};
+  }
+
+  return InferredActorIsolation::forUnspecified();
+}
+
+InferredActorIsolation ActorIsolationRequest::evaluate(
+    Evaluator &evaluator,
+    llvm::PointerUnion<ValueDecl *, ExtensionDecl *> declOrExtension) const {
+  // Extensions don't participate in most value-decl isolation rules (isolated
+  // parameters, overrides, witnessed requirements, ...). Their isolation is
+  // inferred from attributes.
+  if (auto *ext = declOrExtension.dyn_cast<ExtensionDecl *>())
+    return computeExtensionActorIsolation(ext);
+
+  auto *value = cast<ValueDecl *>(declOrExtension);
   const auto inferredIsolation = computeActorIsolation(evaluator, value);
 
   auto &ctx = value->getASTContext();
@@ -6909,12 +6930,14 @@ bool HasIsolatedSelfRequest::evaluate(
   }
 
   // Check whether the default isolation was overridden by any attributes on
-  // this declaration.
+  // this declaration, or by its extension context.
+  // Checking inferred actor isolation would be a cycle!
   auto attrIsolation = getIsolationFromAttributes(value);
-  // ... or its extension context.
   if (!attrIsolation) {
     if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-      attrIsolation = getIsolationFromAttributes(ext);
+      auto extIsolation = getInferredActorIsolation(ext).isolation;
+      if (!extIsolation.isUnspecified())
+        attrIsolation = extIsolation;
     }
   }
   if (attrIsolation) {
@@ -9059,9 +9082,14 @@ ActorIsolation swift::inferConformanceIsolation(
     // isolated conformance depending on default isolation and on the extension
     // itself.
     if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
-      // If there's an isolation-related attribute on the extension, use it.
-      if (auto attrIsolation = getIsolationFromAttributes(ext))
-        return *attrIsolation;
+      // If there's an isolation-related attribute on the
+      // extension, use it.
+      // TODO: Could some of this logic be rolled into extension inference?
+      // NOTE: Future types of extension isolation inference might need to be
+      // excluded here to not apply to conformances!
+      auto inferredExtIsolation = getInferredActorIsolation(ext);
+      if (!inferredExtIsolation.isolation.isUnspecified())
+        return inferredExtIsolation.isolation;
 
       // If we're defaulting to main-actor isolation, use that.
       if (getDefaultIsolationForContext(dc) == DefaultIsolation::MainActor) {

@@ -12606,12 +12606,22 @@ ActorIsolation swift::getActorIsolation(ValueDecl *value) {
   return getInferredActorIsolation(value).isolation;
 }
 
+ActorIsolation swift::getActorIsolation(ExtensionDecl *ext) {
+  return getInferredActorIsolation(ext).isolation;
+}
+
 InferredActorIsolation
 swift::getInferredActorIsolation(ValueDecl *value) {
   auto &ctx = value->getASTContext();
   return evaluateOrDefault(
       ctx.evaluator, ActorIsolationRequest{value},
       InferredActorIsolation::forUnspecified());
+}
+
+InferredActorIsolation swift::getInferredActorIsolation(ExtensionDecl *ext) {
+  auto &ctx = ext->getASTContext();
+  return evaluateOrDefault(ctx.evaluator, ActorIsolationRequest{ext},
+                           InferredActorIsolation::forUnspecified());
 }
 
 ActorIsolation swift::getActorIsolationOfContext(

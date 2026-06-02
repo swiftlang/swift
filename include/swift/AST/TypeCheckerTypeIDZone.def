@@ -177,7 +177,8 @@ SWIFT_REQUEST(TypeChecker, GlobalActorAttributeRequest,
                   llvm::PointerUnion<Decl *, ClosureExpr *>),
               SeparatelyCached | SplitCached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ActorIsolationRequest,
-              ActorIsolationState(ValueDecl *),
+              ActorIsolationState(
+                  llvm::PointerUnion<ValueDecl *, ExtensionDecl *>),
               Cached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, HasIsolatedSelfRequest,
               bool(ValueDecl *),
