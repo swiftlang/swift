@@ -502,6 +502,46 @@ void DebugValueInst::prependDeref() {
   load->setOperand(newArg);
 }
 
+void DebugValueInst::stripDeref() {
+  // If we have an undef, nothing to do.
+  if (isa<SILUndef>(getOperand()))
+    return;
+  if (!ReconstructionBlock) {
+    ASSERT(hasDeref() && "Cannot strip deref without one!");
+    sharedUInt8().DebugValueInst.prependDeref = false;
+    return;
+  }
+
+  // Replace all uses of the operand with undef.
+  // Load users are salvaged to use the direct value.
+  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILType objType = oldArg->getType().getObjectType();
+  SILValue undefAddr = SILUndef::get(oldArg);
+  SmallVector<LoadInst *, 16> loads;
+  while (!oldArg->use_empty()) {
+    Operand *use = *oldArg->use_begin();
+    SILInstruction *user = use->getUser();
+    use->set(undefAddr);
+    // Only load users of the operand can be salvaged.
+    if (auto *load = dyn_cast<LoadInst>(user)) {
+      loads.push_back(load);
+    }
+  }
+
+  // If there are no loads, this operand is no longer used. Kill it.
+  if (loads.empty())
+    return killOperand();
+
+  // Otherwise, replace the arguments and all uses
+  SILArgument *newArg =
+      ReconstructionBlock->replacePhiArgument(0, objType, OwnershipKind::None);
+
+  for (LoadInst *load : loads) {
+    load->replaceAllUsesWith(newArg);
+    load->eraseFromParent();
+  }
+}
+
 SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   if (ReconstructionBlock)
     return ReconstructionBlock;
@@ -531,6 +571,49 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   builder.createReturn(getLoc(), retVal);
   ReconstructionBlock = block;
   return block;
+}
+
+void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
+  auto *srcBB = src->getDebugReconstructionBlock();
+  if (!srcBB)
+    return;
+  auto *newBB = getFunction()->createEmptyDebugReconstructionBlock();
+  setDebugReconstructionBlock(newBB);
+  DebugBasicBlockCloner(*getFunction()).clone(srcBB, newBB);
+}
+
+void DebugValueInst::killOperand() {
+  if (isa<SILUndef>(getOperand())) {
+    // Already undef: no operand to kill.
+    return;
+  }
+
+  // Use the object type because we may be stripping the deref.
+  SILValue undef =
+      SILUndef::get(getFunction(), getOperand()->getType().getObjectType());
+  setOperand(undef);
+
+  // Strip prependDeref.
+  // The stored DIExpr only contains fragments, which we want to keep.
+  sharedUInt8().DebugValueInst.prependDeref = false;
+
+  // Rather than completely removing the debug reconstruction block, remove its
+  // argument, as a part of the variable might be constant and recoverable.
+  if (auto bb = getDebugReconstructionBlock()) {
+    ASSERT(bb->getNumArguments() == 1);
+    auto argument = bb->getArgument(0);
+    argument->replaceAllUsesWithUndef();
+    bb->eraseArgument(0);
+  }
+}
+
+SILType DebugValueInst::getVarType() const {
+  if (HasAuxDebugVariableType)
+    return *getTrailingObjects<SILType>();
+  if (auto *debugBB = getDebugReconstructionBlock())
+    return cast<ReturnInst>(debugBB->getTerminator())
+        ->getOperand()->getType().getObjectType();
+  return getOperand()->getType().getObjectType();
 }
 
 bool DebugValueInst::isExprTypeValid() const {
@@ -580,10 +663,16 @@ bool DebugValueInst::isExprTypeValid() const {
       break;
     case SILDIExprOperator::Fragment: {
       auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
+      auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
+      if (!FieldParent ||
+          RunningType.getNominalOrBoundGenericNominal() != FieldParent)
+        return false;
       RunningType = RunningType.getFieldType(Field, F);
       break;
     }
     case SILDIExprOperator::TupleFragment: {
+      if (!Operand.args()[0].getAsType()->isEqual(RunningType.getASTType()))
+        return false;
       unsigned Idx = Operand.args()[1].getAsConstInt().value();
       RunningType = RunningType.getTupleElementType(Idx);
       break;

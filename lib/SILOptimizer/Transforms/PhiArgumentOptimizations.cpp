@@ -408,14 +408,33 @@ bool PhiExpansionPass::optimizeArg(SILPhiArgument *initialArg) {
     }
   
     for (DebugValueInst *dvi : debugValueUsers) {
-      // Recreate the debug_value with a fragment.
-      SILBuilder B(dvi, dvi->getDebugScope());
-      SILDebugVariable var = *dvi->getVarInfo();
-      if (!var.Type)
-        var.Type = initialArg->getType();
-      var.DIExpr.append(SILDebugInfoExpression::createFragment(field));
-      B.createDebugValue(dvi->getLoc(), dvi->getOperand(), var);
-      dvi->eraseFromParent();
+      // Build a debug reconstruction block that rebuilds the struct from
+      // the single known field, using undef for the remaining fields.
+      SILBasicBlock *debugBB = dvi->getOrCreateDebugReconstructionBlock();
+      SILType structType = initialArg->getType();
+      StructDecl *structDecl = structType.getStructOrBoundGenericStruct();
+      SILFunction *fn = dvi->getFunction();
+
+      // Create the struct with all-undef operands first.
+      unsigned fieldIdx = 0;
+      SmallVector<SILValue, 4> structFields;
+      for (VarDecl *FD : structDecl->getStoredProperties()) {
+        if (FD == field)
+          fieldIdx = structFields.size();
+        SILType fieldTy = structType.getFieldType(FD, fn);
+        structFields.push_back(SILUndef::get(fn, fieldTy));
+      }
+
+      StructInst *structVal =
+          SILBuilder(&debugBB->front())
+              .createStruct(dvi->getLoc(), structType, structFields);
+
+      // Replace the known field operand with the new phi argument.
+      SILArgument *oldArg = debugBB->getArgument(0);
+      oldArg->replaceAllUsesWith(structVal);
+      SILPhiArgument *newArg = debugBB->replacePhiArgument(
+          0, newType, OwnershipKind::None);
+      structVal->setOperand(fieldIdx, newArg);
     }
     for (StructExtractInst *sei : structExtractUsers) {
       sei->replaceAllUsesWith(sei->getOperand());

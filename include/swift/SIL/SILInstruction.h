@@ -5665,6 +5665,12 @@ public:
     return getLoc().strippedForDebugVariable();
   }
 
+  /// Returns the effective variable type for this debug value.
+  /// If there is a stored type, returns that. If there is a debug
+  /// reconstruction block, returns its return type. Otherwise returns the
+  /// SSA operand type.
+  SILType getVarType() const;
+
   /// Return the debug variable information attached to this instruction.
   ///
   /// \param includeLoc If true (by default), always return a variable with
@@ -5687,7 +5693,7 @@ public:
     if (HasAuxDebugVariableType)
       AuxVarType = *getTrailingObjects<SILType>();
     else if (includeType)
-      AuxVarType = getOperand()->getType().getObjectType();
+      AuxVarType = getVarType();
 
     if (hasAuxDebugLocation())
       VarDeclLoc = *getTrailingObjects<SILLocation>();
@@ -5756,6 +5762,14 @@ public:
   /// Otherwise, it will be prepended to the DIExpr.
   void prependDeref();
 
+  /// Removes a deref operator to this debug_value in place.
+  /// This must be called when the operand is changed from an address type to
+  /// an object type (when moved from the stack to a register, for example).
+  /// If a reconstruction block exists, a load is removed at the beginning. If
+  /// there is no load at the beginning, the operand is killed, marking the
+  /// variable as optimized away.
+  void stripDeref();
+
   /// Validates the type chain of the DIExpr.
   /// Starting from VarType, narrows through fragments (outermost first)
   /// and checks that the result matches the SSA operand type, and that there
@@ -5779,6 +5793,9 @@ public:
     ReconstructionBlock = BB;
   }
 
+  /// Clones the reconstruction block from \p src onto this debug value.
+  void cloneReconstructionBlockFrom(DebugValueInst *src);
+
   /// Returns a variable reconstruction basic block for this debug value.
   /// If this debug value has no debug reconstruction block, a new one is
   /// created and attached to this instruction.
@@ -5787,6 +5804,13 @@ public:
   /// If this debug_value has an undef operand, the reconstruction block
   /// has no arguments and returns undef directly.
   SILBasicBlock *getOrCreateDebugReconstructionBlock();
+
+  /// Drops the operand from this debug value.
+  /// This function must be called by passes whenever the operand of this debug
+  /// value is no longer valid and cannot be salvaged.
+  /// This will replace the operand with an undef, and clear any DIExpr or debug
+  /// reconstruction block.
+  void killOperand();
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds
