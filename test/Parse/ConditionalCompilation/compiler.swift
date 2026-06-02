@@ -46,3 +46,14 @@
   foo bar
  #endif
 #endif
+
+#if compiler(>=4.1.0.0.0)
+ let _: Int = 1
+#else
+ // There should be no error here.
+ foo bar
+#endif
+
+#if compiler(>=4.1.0.0.0.0) // expected-warning {{trailing components of version '4.1.0.0.0' are ignored}}
+ let _: Int = 1
+#endif
