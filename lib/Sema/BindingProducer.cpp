@@ -487,6 +487,16 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
           cs, keyPathRoot->getImpl().getLocator());
       return std::make_pair(fix, defaultImpact);
     } else {
+      // If there are other fixes around this generic parameter (or its use
+      // site), let's increase impact of the default to prioritize solutions
+      // with fewer fixes.
+      if (llvm::any_of(cs.getFixes(), [&](const ConstraintFix *fix) {
+            return fix->getAnchor() == dstLocator->getAnchor() ||
+                   fix->getAnchor() == srcLocator->getAnchor();
+          })) {
+        defaultImpact += 3;
+      }
+
       auto path = dstLocator->getPath();
       // Drop `generic parameter` locator element so that all missing
       // generic parameters related to the same path can be coalesced later.
