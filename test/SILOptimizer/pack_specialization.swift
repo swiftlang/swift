@@ -121,8 +121,8 @@ public func applyPointer<each T>(input: repeat UnsafePointer<each T>, op: (repea
   op(repeat (each input).pointee)
 }
 
-// CHECK: define {{.*}} i32 @"$s19pack_specialization4tests5Int32VyF"() {{.*}} {
-// CHECK-NEXT: "$s19pack_specialization4tests5Int32VyFADSPyADGXEfU_.exit":
+// CHECK:      define {{.*}} i32 @"$s19pack_specialization4tests5Int32VyF"() {{.*}} {
+// CHECK-NEXT: entry:
 // CHECK-NEXT:   ret i32 54
 // CHECK-NEXT: }
 public func test() -> Int32 {
@@ -135,7 +135,7 @@ public func applyDirect<each T>(input: repeat each T, op: (repeat each T) -> Int
   op(repeat (each input))
 }
 
-// CHECK: define {{.*}} i32 @"$s19pack_specialization10testDirects5Int32VyF"() {{.*}} {
+// CHECK:      define {{.*}} i32 @"$s19pack_specialization10testDirects5Int32VyF"() {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   ret i32 54
 // CHECK-NEXT: }
