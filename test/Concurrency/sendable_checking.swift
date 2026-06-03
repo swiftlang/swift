@@ -291,11 +291,11 @@ final class NonSendable {
   func call() async {
     await update()
     // expected-tns-warning @-1 {{sending 'self' risks causing data races}}
-    // expected-tns-note @-2 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-tns-note @-2 {{sending 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated code and code in the current isolation context}}
 
     await self.update()
     // expected-tns-warning @-1 {{sending 'self' risks causing data races}}
-    // expected-tns-note @-2 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-tns-note @-2 {{sending 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated code and code in the current isolation context}}
 
     _ = await x
     // expected-warning@-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
@@ -463,15 +463,15 @@ func preconcurrencyContext(_: @escaping @Sendable () -> Void) {}
 struct DowngradeForPreconcurrency {
   func capture(completion: @escaping @MainActor () -> Void) {
     preconcurrencyContext {
-        Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-            completion() // expected-tns-note {{closure captures 'completion' which is accessible to code in the current task}}
+        Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+            completion() // expected-tns-note {{closure captures 'completion' which is accessible to code in the current isolation context}}
         // expected-warning@-1 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in a '@Sendable' closure}}
         // expected-warning@-2 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in an isolated closure}}
         // expected-note@-3 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         // expected-warning@-4 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
         // expected-note@-5 {{calls to parameter 'completion' from outside of its actor context are implicitly asynchronous}}
-        // expected-complete-and-tns-warning @-7 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-        // expected-complete-and-tns-note @-7 {{closure captures 'completion' which is accessible to code in the current task}}
+        // expected-complete-and-tns-warning @-7 {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+        // expected-complete-and-tns-note @-7 {{closure captures 'completion' which is accessible to code in the current isolation context}}
       }
     }
   }

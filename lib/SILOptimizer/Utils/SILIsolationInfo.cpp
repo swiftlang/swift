@@ -1489,7 +1489,7 @@ void SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn,
     os << " code";
     return;
   case Task:
-    os << "code in the current task";
+    os << "code in the current isolation context";
     return;
   }
 }

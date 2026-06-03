@@ -67,23 +67,23 @@ actor A2 {
 func testActorCreation(value: NotConcurrent) async {
   _ = A2(value: value)
   // expected-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(value:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'value' to actor-isolated initializer 'init(value:)' risks causing data races between actor-isolated code and code in the current isolation context}}
 
   _ = await A2(valueAsync: value)
   // expected-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(valueAsync:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'value' to actor-isolated initializer 'init(valueAsync:)' risks causing data races between actor-isolated code and code in the current isolation context}}
 
   _ = A2(delegatingSync: value)
   // expected-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(delegatingSync:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'value' to actor-isolated initializer 'init(delegatingSync:)' risks causing data races between actor-isolated code and code in the current isolation context}}
 
   _ = await A2(delegatingAsync: value, 9)
   // expected-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(delegatingAsync:_:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'value' to actor-isolated initializer 'init(delegatingAsync:_:)' risks causing data races between actor-isolated code and code in the current isolation context}}
 
   _ = await A2(nonisoAsync: value, 3)
   // expected-warning @-1 {{sending 'value' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'value' to actor-isolated initializer 'init(nonisoAsync:_:)' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'value' to actor-isolated initializer 'init(nonisoAsync:_:)' risks causing data races between actor-isolated code and code in the current isolation context}}
 }
 
 extension A1 {
@@ -397,20 +397,20 @@ extension NotConcurrent {
   func f() { }
 
   func test() {
-    Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      f() // expected-note {{closure captures 'self' which is accessible to code in the current task}}
+    Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+      f() // expected-note {{closure captures 'self' which is accessible to code in the current isolation context}}
     }
 
-    Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      self.f() // expected-note {{closure captures 'self' which is accessible to code in the current task}}
+    Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+      self.f() // expected-note {{closure captures 'self' which is accessible to code in the current isolation context}}
     }
 
-    Task { [self] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      f() // expected-note {{closure captures 'self' which is accessible to code in the current task}}
+    Task { [self] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+      f() // expected-note {{closure captures 'self' which is accessible to code in the current isolation context}}
     }
 
-    Task { [self] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-      self.f() // expected-note {{closure captures 'self' which is accessible to code in the current task}}
+    Task { [self] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+      self.f() // expected-note {{closure captures 'self' which is accessible to code in the current isolation context}}
     }
   }
 }
