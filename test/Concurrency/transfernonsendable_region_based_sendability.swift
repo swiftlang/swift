@@ -78,7 +78,7 @@ func test_arg_nonconsumable(a : A, ns_arg : NonSendable) async {
 
   // Not safe to consume an arg.
   await a.foo(ns_arg); // expected-warning {{sending 'ns_arg' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'ns_arg' to actor-isolated instance method 'foo' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'ns_arg' to actor-isolated instance method 'foo' risks causing data races between actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-2 {{passing argument of non-Sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
   // Check for no duplicate warnings once self is "consumed"
@@ -413,7 +413,7 @@ class C_NonSendable {
 
     // this is a cross-isolation call that captures non-Sendable self, so it should not be permitted
     await a.foo(captures_self) // expected-warning {{sending 'captures_self' risks causing data races}}
-    // expected-note @-1 {{sending task-isolated 'captures_self' to actor-isolated instance method 'foo' risks causing data races between actor-isolated and task-isolated uses}}
+    // expected-note @-1 {{sending 'captures_self' to actor-isolated instance method 'foo' risks causing data races between actor-isolated code and code in the current isolation context}}
     // expected-complete-warning @-2 {{passing argument of non-Sendable type '() -> ()' into actor-isolated context may introduce data races}}
     // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }

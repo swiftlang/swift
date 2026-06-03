@@ -28,9 +28,9 @@ The compiler diagnoses the capture of `self` in the task closure:
 | class MyModel {
 |   func perform() {
 |     Task {
-|     `- error: passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure
+|     `- error: passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure
 |       self.update()
-|            `- note: closure captures 'self' which is accessible to code in the current task
+|            `- note: closure captures 'self' which is accessible to code in the current isolation context
 |     }
 |   }
 ```

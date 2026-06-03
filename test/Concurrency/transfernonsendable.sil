@@ -219,7 +219,7 @@ bb0(%0 : @guaranteed $NonSendableStruct):
   %2 = struct_extract %0 : $NonSendableStruct, #NonSendableStruct.ns
   %3 = copy_value %2 : $NonSendableKlass
   return %3 : $NonSendableKlass // expected-warning {{sending 'myname.ns' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'myname.ns' cannot be a 'sending' result. task-isolated uses may race with caller uses}}
+  // expected-note @-1 {{'myname.ns' cannot be a 'sending' result. Code in the current task may race with caller uses}}
 }
 
 sil [ossa] @synchronous_returns_transferring_globalactor_struct_structextract : $@convention(method) (@guaranteed MainActorIsolatedStruct) -> @sil_sending @owned NonSendableKlass {
