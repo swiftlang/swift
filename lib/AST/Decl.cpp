@@ -959,7 +959,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
     return nullptr;
   }
 
-  auto clangModule = clangImporter->getClangOwningModule(decl->getClangDecl());
+  auto clangModule = clangImporter->getClangOwningModule(decl->getClangNode());
   if (!clangModule)
     return nullptr;
 
