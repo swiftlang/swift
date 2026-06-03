@@ -303,18 +303,15 @@ struct CollectGenericParameters {
 };
 
 template <class TypeS, class... ParamS>
-inline Type synthesizeType(
-  SynthesisContext &SC,
-  GenericSubstitutionSynthesizer<TypeS, ParamS...> S) {
+inline Type synthesizeType(SynthesisContext &SC,
+                           GenericSubstitutionSynthesizer<TypeS, ParamS...> S) {
   SmallVector<Type, sizeof...(ParamS)> newArgs;
   S.Params.visit(CollectGenericParameters{SC, newArgs});
 
   auto baseType = synthesizeType(SC, S.Type);
-  auto newType = BoundGenericType::get(
-    baseType->getNominalOrBoundGenericNominal(),
-    baseType->getNominalParent(),
-    newArgs
-  );
+  auto newType =
+      BoundGenericType::get(baseType->getNominalOrBoundGenericNominal(),
+                            baseType->getNominalParent(), newArgs);
 
   return newType;
 }
@@ -2341,25 +2338,22 @@ static ValueDecl *getSuspend(ASTContext &ctx, Identifier id) {
   BuiltinFunctionBuilder builder(ctx);
 
   return getBuiltinFunction(
-    ctx, id, _async(_thin),
-    _generics(_unrestricted,
-              _unrestricted,
-              _conformsTo(_typeparam(0), _schedulingExecutor),
-              _conformsTo(_typeparam(1), _clock)),
-    _parameters(_label("on", _typeparam(0)),
-                _label("until",
-                       _substituteGenerics(_fireTime, _typeparam(1))),
-                _label("tolerance",
-                       _optional(
-                         _dependentMemberType(_typeparam(1),
-                           ctx.getProtocol(KnownProtocolKind::Clock),
-                           ctx.getIdentifier("Duration")))),
-                _label("clock", _typeparam(1)),
-                _label("onSchedule", 
-                       _function(_noescape(_thick), _void,
-                                 _parameters(
-                                   _consuming(_jobCancellationToken))))),
-    _void);
+      ctx, id, _async(_thin),
+      _generics(_unrestricted, _unrestricted,
+                _conformsTo(_typeparam(0), _schedulingExecutor),
+                _conformsTo(_typeparam(1), _clock)),
+      _parameters(
+          _label("on", _typeparam(0)),
+          _label("until", _substituteGenerics(_fireTime, _typeparam(1))),
+          _label("tolerance",
+                 _optional(_dependentMemberType(
+                     _typeparam(1), ctx.getProtocol(KnownProtocolKind::Clock),
+                     ctx.getIdentifier("Duration")))),
+          _label("clock", _typeparam(1)),
+          _label("onSchedule",
+                 _function(_noescape(_thick), _void,
+                           _parameters(_consuming(_jobCancellationToken))))),
+      _void);
 }
 
 static ValueDecl *getFlowSensitiveSelfIsolation(

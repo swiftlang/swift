@@ -1915,9 +1915,10 @@ static ManagedValue emitBuiltinHopToActor(SILGenFunction &SGF, SILLocation loc,
   return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
 }
 
-static ManagedValue emitBuiltinSuspend(
-  SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
-  ArrayRef<ManagedValue> args, SGFContext C) {
+static ManagedValue emitBuiltinSuspend(SILGenFunction &SGF, SILLocation loc,
+                                       SubstitutionMap subs,
+                                       ArrayRef<ManagedValue> args,
+                                       SGFContext C) {
   auto voidTy = SGF.getASTContext().TheEmptyTupleType;
   auto voidTySIL = SGF.getLoweredType(voidTy);
   auto resumeBuf = SGF.emitTemporaryAllocation(loc, voidTySIL);
@@ -1930,48 +1931,44 @@ static ManagedValue emitBuiltinSuspend(
   // an error message if we find ourselves in this mess.
   if (!helper) {
     SGF.SGM.diagnose(loc, diag::cannot_find_schedule_task_resumption);
-    return ManagedValue::forObjectRValueWithoutOwnership(SGF.emitEmptyTuple(loc));
+    return ManagedValue::forObjectRValueWithoutOwnership(
+        SGF.emitEmptyTuple(loc));
   }
 
   // Capture the current continuation
   SILValue continuation = SGF.B.createGetAsyncContinuationAddr(
-    loc, resumeBuf, voidTy, /*throws=*/false
-  );
+      loc, resumeBuf, voidTy, /*throws=*/false);
 
   // Generate a call to _scheduleTaskResumption(); note that we need to
   // use indirect arguments here for the actual call for arguments that
   // are generic-dependent.
   auto ensureIndirect = [&](ManagedValue v) -> ManagedValue {
-    if (v.getType().isAddress()) return v;
+    if (v.getType().isAddress())
+      return v;
     return v.materialize(SGF, loc);
   };
 
-  ManagedValue contMV 
-    = ManagedValue::forObjectRValueWithoutOwnership(continuation);
+  ManagedValue contMV =
+      ManagedValue::forObjectRValueWithoutOwnership(continuation);
   SmallVector<ManagedValue, 6> helperArgs{
-    contMV,
-    args[0],                 // executor: E
-    args[1],                 // FireTime<C>
-    ensureIndirect(args[2]), // C.Duration?
-    args[3],                 // clock: C
-    args[4]                  // closure
+      contMV,
+      args[0],                 // executor: E
+      args[1],                 // FireTime<C>
+      ensureIndirect(args[2]), // C.Duration?
+      args[3],                 // clock: C
+      args[4]                  // closure
   };
 
-  auto helperSubs = SubstitutionMap::get(
-    helper->getGenericSignature(),
-    subs.getReplacementTypes(),
-    LookUpConformanceInModule()
-  );
+  auto helperSubs = SubstitutionMap::get(helper->getGenericSignature(),
+                                         subs.getReplacementTypes(),
+                                         LookUpConformanceInModule());
 
-  SGF.emitApplyOfLibraryIntrinsic(
-    loc, helper, helperSubs, helperArgs, C
-  );
-  
+  SGF.emitApplyOfLibraryIntrinsic(loc, helper, helperSubs, helperArgs, C);
+
   // Suspend execution
   SILBasicBlock *resumeBlock = SGF.createBasicBlock();
-  SGF.B.createAwaitAsyncContinuation(
-    loc, continuation, resumeBlock, /*errorBB=*/nullptr
-  );
+  SGF.B.createAwaitAsyncContinuation(loc, continuation, resumeBlock,
+                                     /*errorBB=*/nullptr);
 
   // Ensure we're on the correct executor after resumption
   SGF.B.emitBlock(resumeBlock);

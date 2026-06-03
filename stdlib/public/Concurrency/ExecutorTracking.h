@@ -17,9 +17,9 @@
 #ifndef SWIFT_CONCURRENCY_EXECUTOR_TRACKING_H
 #define SWIFT_CONCURRENCY_EXECUTOR_TRACKING_H
 
+#include "VoucherSupport.h"
 #include "swift/ABI/Task.h"
 #include "swift/Threading/ThreadLocalStorage.h"
-#include "VoucherSupport.h"
 
 namespace swift {
 
@@ -91,19 +91,13 @@ public:
     TaskExecutor = newExecutor;
   }
 
-  bool allowsSwitching() const {
-    return AllowsSwitching;
-  }
+  bool allowsSwitching() const { return AllowsSwitching; }
 
   /// Disallow switching in this tracking context.  This should only
   /// be set on a new tracking info, before any jobs are run in it.
-  void disallowSwitching() {
-    AllowsSwitching = false;
-  }
+  void disallowSwitching() { AllowsSwitching = false; }
 
-  static ExecutorTrackingInfo *current() {
-    return ActiveInfoInThread.get();
-  }
+  static ExecutorTrackingInfo *current() { return ActiveInfoInThread.get(); }
 
   void leave() {
     voucherManager.leave();
@@ -120,9 +114,7 @@ class ActiveTask {
 public:
   static void set(AsyncTask *task) { Value.set(task); }
   static AsyncTask *get() { return Value.get(); }
-  static AsyncTask *swap(AsyncTask *newTask) {
-    return Value.swap(newTask);
-  }
+  static AsyncTask *swap(AsyncTask *newTask) { return Value.swap(newTask); }
 };
 
 } // namespace swift

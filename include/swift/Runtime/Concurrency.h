@@ -674,11 +674,10 @@ swift_task_createNullaryContinuationJob(
     AsyncTask *continuation);
 
 /// Create a ScheduledContinuationJob from a continuation.
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-ScheduledContinuationJob*
-swift_task_createScheduledContinuationJob(
-    size_t priority,
-    AsyncTask *continuation);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) ScheduledContinuationJob
+    *swift_task_createScheduledContinuationJob(size_t priority,
+                                               AsyncTask *continuation);
 
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift)
@@ -1019,8 +1018,8 @@ void swift_job_run_on_serial_and_task_executor(Job *job,
 /// this function is generally unsafe.
 ///
 /// Runtime availability: SwiftStdlib 9999
-SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_job_destroy(Job *job);
+SWIFT_EXPORT_FROM(swift_Concurrency)
+SWIFT_CC(swift) void swift_job_destroy(Job *job);
 
 /// Return the current thread's active task reference.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)

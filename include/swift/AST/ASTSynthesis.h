@@ -92,14 +92,14 @@ inline Type synthesizeType(SynthesisContext &SC,
     }
   case _schedulingExecutor:
     return SC.Context.getProtocol(KnownProtocolKind::SchedulingExecutor)
-      ->getDeclaredInterfaceType();
+        ->getDeclaredInterfaceType();
   case _fireTime:
     return SC.Context.getFireTimeType();
   case _jobCancellationToken:
     return SC.Context.getJobCancellationTokenType();
   case _clock:
     return SC.Context.getProtocol(KnownProtocolKind::Clock)
-      ->getDeclaredInterfaceType();
+        ->getDeclaredInterfaceType();
   case _actor:
     return SC.Context.getProtocol(KnownProtocolKind::Actor)
       ->getDeclaredInterfaceType();

@@ -232,8 +232,8 @@ private:
 
 public:
   ScheduledContinuationJob(JobPriority priority, AsyncTask *continuation)
-    : Job({JobKind::ScheduledContinuation, priority}, &process),
-      Continuation(continuation) {}
+      : Job({JobKind::ScheduledContinuation, priority}, &process),
+        Continuation(continuation) {}
 
   SWIFT_CC(swiftasync)
   static void process(Job *job);

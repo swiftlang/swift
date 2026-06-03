@@ -517,8 +517,7 @@ FuncDecl *SILGenModule::getExit() {
 }
 
 FuncDecl *SILGenModule::getScheduleTaskResumption() {
-  return lookupConcurrencyIntrinsic(getASTContext(), 
-                                    "_scheduleTaskResumption");
+  return lookupConcurrencyIntrinsic(getASTContext(), "_scheduleTaskResumption");
 }
 
 Type SILGenModule::getConfiguredExecutorFactory() {

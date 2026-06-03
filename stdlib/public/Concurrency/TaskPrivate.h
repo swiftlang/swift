@@ -1089,9 +1089,10 @@ inline uint32_t AsyncTask::flagAsRunning() {
       newStatus = newStatus.withoutStoredPriorityEscalation();
       newStatus = newStatus.withoutEnqueued();
 
-      if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
-               /* success */ std::memory_order_acquire,
-               /* failure */ std::memory_order_relaxed)) {
+      if (_private()._status().compare_exchange_weak(
+              oldStatus, newStatus,
+              /* success */ std::memory_order_acquire,
+              /* failure */ std::memory_order_relaxed)) {
         newStatus.traceStatusChanged(this, oldStatus, true);
         adoptTaskVoucher(this);
         swift_task_enterThreadLocalContext(

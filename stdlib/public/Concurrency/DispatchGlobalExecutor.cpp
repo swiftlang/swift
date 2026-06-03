@@ -82,8 +82,7 @@ class JobSourceCache {
   __swift_job_source_blob *cache_head;
 
 public:
-
-  JobSourceCache(): lock(), cache_head(nullptr) {}
+  JobSourceCache() : lock(), cache_head(nullptr) {}
 
   struct __swift_job_source *allocate(dispatch_source_t source, SwiftJob *job) {
     __swift_job_source_blob *blob;
@@ -96,8 +95,7 @@ public:
 
     if (!blob) {
       blob = (__swift_job_source_blob *)swift_slowAlloc(
-        sizeof(__swift_job_source_blob), 0
-      );
+          sizeof(__swift_job_source_blob), 0);
     }
 
     blob->source.refcount.store(1, std::memory_order_release);
@@ -110,8 +108,7 @@ public:
   void put_back(struct __swift_job_source *source) {
     dispatch_release(source->source);
 
-    __swift_job_source_blob *blob
-      = (__swift_job_source_blob *)source;
+    __swift_job_source_blob *blob = (__swift_job_source_blob *)source;
 
     lock.lock();
     blob->next = cache_head;
@@ -127,28 +124,26 @@ public:
 static std::atomic<uint32_t> jobSourceShard;
 static JobSourceCache jobSourceCaches[JOB_CACHE_SHARDS];
 
-static struct __swift_job_source *
-job_source_create(dispatch_source_t source, SwiftJob *job) {
-  uint32_t shard = jobSourceShard.fetch_add(1, std::memory_order_relaxed)
-    % JOB_CACHE_SHARDS;
+static struct __swift_job_source *job_source_create(dispatch_source_t source,
+                                                    SwiftJob *job) {
+  uint32_t shard =
+      jobSourceShard.fetch_add(1, std::memory_order_relaxed) % JOB_CACHE_SHARDS;
   return jobSourceCaches[shard].allocate(source, job);
 }
 
-static void
-job_source_release(struct __swift_job_source *source) {
+static void job_source_release(struct __swift_job_source *source) {
   uint32_t refs = source->refcount.fetch_sub(1, std::memory_order_acq_rel);
 
   assert(refs != 0);
 
   if (refs == 1) {
-    uint32_t shard = jobSourceShard.fetch_add(1, std::memory_order_relaxed)
-      % JOB_CACHE_SHARDS;
+    uint32_t shard = jobSourceShard.fetch_add(1, std::memory_order_relaxed) %
+                     JOB_CACHE_SHARDS;
     jobSourceCaches[shard].put_back(source);
   }
 }
 
-static void
-job_source_retain(struct __swift_job_source *source) {
+static void job_source_retain(struct __swift_job_source *source) {
   source->refcount.fetch_add(1, std::memory_order_acq_rel);
 }
 
@@ -389,8 +384,7 @@ platform_time(uint64_t nsec) {
 #endif
 #endif
 
-static inline uint64_t
-deadline_from_sec_nsec(long long sec, long long nsec) {
+static inline uint64_t deadline_from_sec_nsec(long long sec, long long nsec) {
   uint64_t deadline;
   if (sec < 0 || (sec == 0 && nsec < 0))
     deadline = 0;
@@ -401,8 +395,8 @@ deadline_from_sec_nsec(long long sec, long long nsec) {
   return deadline;
 }
 
-static inline dispatch_time_t
-clock_and_value_to_time(int clock, long long sec, long long nsec) {
+static inline dispatch_time_t clock_and_value_to_time(int clock, long long sec,
+                                                      long long nsec) {
   uint64_t deadline = deadline_from_sec_nsec(sec, nsec);
   uint64_t value = platform_time((uint64_t)deadline);
   if (value >= DISPATCH_TIME_MAX_VALUE) {
@@ -424,15 +418,11 @@ clock_and_value_to_time(int clock, long long sec, long long nsec) {
   __builtin_unreachable();
 }
 
-extern "C" SWIFT_CC(swift)
-uintptr_t swift_dispatchEnqueueWithDeadline(
-  bool global,
-  long long sec,
-  long long nsec,
-  long long tsec,
-  long long tnsec,
-  int clock, SwiftJob *job
-) {
+extern "C" SWIFT_CC(swift) uintptr_t
+    swift_dispatchEnqueueWithDeadline(bool global, long long sec,
+                                      long long nsec, long long tsec,
+                                      long long tnsec, int clock,
+                                      SwiftJob *job) {
   assert(job && "no job provided");
 
   SwiftJobPriority priority = swift_job_getPriority(job);
@@ -477,20 +467,20 @@ uintptr_t swift_dispatchEnqueueWithDeadline(
     leeway = delta / 15;
   } else if (tsec < 0 || (tsec == 0 && tnsec < 0))
     leeway = 0;
-  else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway)
-           || __builtin_add_overflow(tnsec, leeway, &leeway)) {
+  else if (__builtin_mul_overflow(tsec, NSEC_PER_SEC, &leeway) ||
+           __builtin_add_overflow(tnsec, leeway, &leeway)) {
     leeway = UINT64_MAX;
   }
 
   dispatch_source_t source =
-    dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
+      dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);
   dispatch_source_set_timer(source, when, DISPATCH_TIME_FOREVER, leeway);
 
   struct __swift_job_source *jobSource = job_source_create(source, job);
 
   dispatch_set_context(source, jobSource);
-  dispatch_source_set_event_handler_f(source,
-    (dispatch_function_t)&_swift_run_job_leeway);
+  dispatch_source_set_event_handler_f(
+      source, (dispatch_function_t)&_swift_run_job_leeway);
 
   job_source_retain(jobSource);
   dispatch_activate(source);
@@ -498,8 +488,7 @@ uintptr_t swift_dispatchEnqueueWithDeadline(
   return (uintptr_t)jobSource;
 }
 
-extern "C" SWIFT_CC(swift)
-SwiftJob *swift_dispatchCancel(uintptr_t source) {
+extern "C" SWIFT_CC(swift) SwiftJob *swift_dispatchCancel(uintptr_t source) {
   if (source) {
     struct __swift_job_source *jobSource = (struct __swift_job_source *)source;
     SwiftJob *job = jobSource->job.exchange(nullptr, std::memory_order_acq_rel);
@@ -512,8 +501,7 @@ SwiftJob *swift_dispatchCancel(uintptr_t source) {
   return nullptr;
 }
 
-extern "C" SWIFT_CC(swift)
-void swift_dispatchReleaseSource(uintptr_t source) {
+extern "C" SWIFT_CC(swift) void swift_dispatchReleaseSource(uintptr_t source) {
   if (source) {
     struct __swift_job_source *jobSource = (struct __swift_job_source *)source;
 
