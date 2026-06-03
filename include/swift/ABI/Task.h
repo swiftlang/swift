@@ -78,6 +78,13 @@ extern const HeapMetadata *jobHeapMetadataPtr;
 extern const HeapMetadata *taskHeapMetadataPtr;
 
 /// A schedulable job.
+///
+/// In general, the header fields of a Job that is currently enqueued
+/// must not be mutated. The executor owns that memory and expects
+/// it to be immutable or (in the case of the schedule-private
+/// storage) under its control until it dequeues the job. Once the
+/// executor calls swift_job_run, the job regains ownership of the
+/// header fields and is generally permitted to change them again.
 class alignas(2 * alignof(void*)) Job :
   // For async-let tasks, the refcount bits are initialized as "immortal"
   // because such a task is allocated with the parent's stack allocator.
@@ -99,9 +106,13 @@ public:
     DispatchQueueIndex = DispatchHasLongObjectHeader ? 0 : 1,
   };
 
-  // Reserved for the use of the scheduler. Since Task stealers
-  // allow a Task to be intrusively enqueued at any point of its
-  // lifecycle, this data must never be used by the runtime.
+  // This field is reserved for the use of the scheduler between:
+  // - When someone passes the job to the executor's enqueue
+  // - When the executor either enqueues the job to
+  //   another executor or passes it to swift_job_run
+  // Note that this is tied to the lifecycle of the Job. If
+  // this Job is a Task, this field may still be reserved for
+  // the Job's executor at any time in the Task's lifecycle
   void *SchedulerPrivate[2];
 
   /// WARNING: DO NOT MOVE.
@@ -302,6 +313,31 @@ struct ResultTypeInfo {
 ///
 /// * The future fragment is dynamic in size, based on the future result type
 ///   it can hold, and thus must be the *last* fragment.
+///
+/// Since Tasks are often repeatedly enqueued as Jobs, some extra care must
+/// be taken with them because of the runtime's use of TaskStealer Jobs.
+/// When a Task's priority is increased while it is enqueued, the runtime
+/// will enqueue a Job with the higher priority on the same executor to
+/// try to take over the responsibility of running the task. Because the
+/// Task may have started running on behalf of a TaskStealer Job, the Task
+/// object (considered as a Job) may still be enqueued on some executor
+/// even while the Task is logically running, suspended, or complete.
+/// This also means that regular enqueues to resume the Task may enqueue a
+/// TaskStealer Job instead and enqueues to escalate priority may enqueue
+/// the Task's Job if it is available. So while code that's acting on
+/// behalf of the current running Task is free to assume exclusive access
+/// to most of the Task structure, it cannot generally modify the Task's Job
+/// header unless it knows that the Task object is not presently enqueued
+/// as a Job this way. (This is tracked dynamically in the task status.)
+///
+/// However, an important exception to that rule exists for the task resume
+/// function and context. Importantly, these fields are not directly accessed by
+/// executors. Tasks and task stealer jobs coordinate so that only one of them
+/// will advance the task at once. This coordination establishes a rule that any
+/// outstanding jobs (possibly including the Task itself) that were enqueued
+/// for previous suspensions of the task will never actually start running
+/// long enough to access these fields. As a result, code running on behalf
+/// of the current task can freely set the resume fields before suspending.
 class AsyncTask : public Job {
 public:
   // On 32-bit targets, there is a word of tail padding remaining
@@ -419,33 +455,42 @@ public:
     return ResumeTask(ResumeContext); // 'return' forces tail call
   }
 
+  // An exclusion value is a token that represents if a Job is allowed
+  // to invoke a Task. It generally shouldn't be observed or manipulated
+  // outside of tryStartRunning and swift_task_enqueueSelfOrStealer
+  struct ExclusionValue {
+    uint8_t value;
+
+    bool operator==(ExclusionValue const &other) const noexcept {
+      return value == other.value;
+    }
+    bool operator!=(ExclusionValue const &other) const noexcept {
+      return value != other.value;
+    }
+  };
+
   enum InvokeFlags : uint32_t {
     InvokeFlagsFromTask = 0x00,
     InvokeFlagsFromStealer = 0x01,
   };
-  /// Flag that this task is now running. This can update the priority
-  /// stored in the job flags if the priority has been escalated.
+  /// Try to flag that the current thread is going to run this task.
+  /// If there are multiple jobs trying to run the task, this requires
+  /// claiming the right to run the task, which can fail if another job
+  /// wins the race. This may also require increasing changing the priority
+  /// of the current thread, if the current task executor supports that.
   ///
-  /// Generally this should be done immediately after updating ActiveTask.
+  /// Generally, this should be done immediately after updating ActiveTask.
   ///
-  /// A task can become running either by first being enqueued, or directly
-  /// from being suspended. There is a separate function for each of these
-  /// scenarios, `flagAsRunningFromSuspended` and `flagAsRunningFromEnqueued`.
+  /// allowedExclusionValue is the local exclusion value of the Job invoking
+  /// this Task. For the Task's Job, this is LocalStealerExclusionValue from
+  /// the Task's private data. For a TaskStealer Job, this is ExclusionValue.
   ///
-  /// flagAsRunningFromEnqueued can be invoked from 2 contexts - from
-  /// the intrusively linked Task itself or from a Task Stealer. As such,
-  /// it needs to be failable such that only the Job with the correct
-  /// allowedExclusionValue invokes the task successfully. If we failed
-  /// to transition the Task to running, the remaining setup needs
-  /// to short-circuit and the task cannot be invoked by the caller.
+  /// invokeFlags is what type of Job is invoking this
+  /// Task. It's either InvokeFlagsFromTask for the Task's
+  /// Job or InvokeFlagsFromStealer for a TaskStealer Job.
   ///
-  /// flagAsRunningFromEnqueued's invokeFlags argument lets us know which
-  /// context we are being called from which informs further decisions
-  /// about lifetime management and future enqueue semantics of the task.
-  ///
-  /// The first return value represents the aforementioned failure to
-  /// transition the Task to running where the execution of this step of the
-  /// Task was stolen. If this return is false, the caller should not finish
+  /// The first (bool) return value is the sucess of this call.
+  /// If this return value is false, the caller should not finish
   /// establishing the context to run the Task and must not run the Task.
   ///
   /// The second return value is an opaque value used to restore the state of
@@ -453,9 +498,14 @@ public:
   /// executor or the caller of Task.immediate). When flagAsRunning succeeds,
   /// Dispatch is the default executor, and priority escalation is enabled,
   /// this value must be passed to swift_dispatch_thread_reset_override_self.
+  ///
+  /// This function is for when the task starts running after fully suspending.
+  /// If a task starts to suspend itself, but then finds out that it didn't
+  /// need to, it should instead call resumeRunningAfterFailedSuspend,
+  /// which avoids a lot of the extra complexity of this operation.
   std::pair<bool, uint32_t>
-  flagAsRunningFromEnqueued(uint8_t allowedExclusionValue,
-                            InvokeFlags invokeFlags = InvokeFlagsFromTask);
+  tryStartRunning(ExclusionValue allowedExclusionValue,
+                  InvokeFlags invokeFlags = InvokeFlagsFromTask);
   /// A task can have the following states:
   ///   * suspended: In this state, a task is considered not runnable
   ///   * enqueued: In this state, a task is considered runnable
@@ -472,15 +522,15 @@ public:
   ///
   /// The methods below are how a task switches from one state to another.
 
-  /// This variant of flagAsRunning may be called if you are resuming
-  /// immediately after suspending. That is, you are on the same thread,
-  /// you have not enqueued onto any executor, and you have not called
+  /// This variant may be called if you are resuming immediately
+  /// after suspending. That is, you are on the same thread, you
+  /// have not enqueued onto any executor, and you have not called
   /// swift_dispatch_thread_reset_override_self or done any other
   /// cleanup work. This is intended for situations such as awaiting
   /// where you may mark yourself as suspended but find out during
   /// atomic state update that you may actually resume immediately.
-  void
-  flagAsRunningFromSuspended(InvokeFlags invokeFlags = InvokeFlagsFromTask);
+  void resumeRunningAfterFailedSuspend(
+      InvokeFlags invokeFlags = InvokeFlagsFromTask);
 
   /// Flag that this task is now suspended with information about what it is
   /// waiting on.

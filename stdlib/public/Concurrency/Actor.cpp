@@ -221,14 +221,14 @@ ExecutorTrackingInfo::ActiveInfoInThread;
 SWIFT_ALWAYS_INLINE
 static inline void taskInvokeWithExclusionValue(
     AsyncTask *task, SerialExecutorRef serialExecutor,
-    TaskExecutorRef taskExecutor, uint8_t allowedStealerExclusionValue,
+    TaskExecutorRef taskExecutor,
+    AsyncTask::ExclusionValue allowedStealerExclusionValue,
     AsyncTask::InvokeFlags invokeFlags = AsyncTask::InvokeFlagsFromTask) {
   // Update the task status to say that it's running on the current
   // thread.  If the task suspends somewhere, it should update the
   // task status appropriately; we don't need to update it afterwards.
   [[maybe_unused]] auto [mayRun, dispatchOpaquePriority] =
-      task->flagAsRunningFromEnqueued(allowedStealerExclusionValue,
-                                      invokeFlags);
+      task->tryStartRunning(allowedStealerExclusionValue, invokeFlags);
   if (mayRun) {
     // Update the active task in the current thread.
     auto oldTask = ActiveTask::swap(task);
@@ -2777,9 +2777,9 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
 #ifndef NDEBUG
   [[maybe_unused]]
   auto _taskExecutorRef = TaskExecutorRef::fromTaskExecutorPreference(job);
-  SWIFT_TASK_DEBUG_LOG("enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
-                       serialExecutorRef.getIdentity(),
-                       _taskExecutorRef.getIdentity());
+  SWIFT_TASK_DEBUG_LOG(
+      "enqueue job %p on serial serialExecutor %p, taskExecutor = %p", job,
+      serialExecutorRef.getIdentity(), taskExecutorRef.getIdentity());
 #endif
 
   assert(job && "no job provided");

@@ -1821,7 +1821,7 @@ reevaluate_if_taskgroup_has_results:;
     // We're going back to running the task, so if we suspended before,
     // we need to flag it as running again.
     if (hasSuspended) {
-      waitingTask->flagAsRunningFromSuspended();
+      waitingTask->resumeRunningAfterFailedSuspend();
     }
 
     // Success! We are allowed to poll.
