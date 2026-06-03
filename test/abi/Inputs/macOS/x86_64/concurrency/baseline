@@ -1159,6 +1159,7 @@ _swift_task_cancel
 _swift_task_cancel_group_child_tasks
 _swift_task_create
 _swift_task_createNullaryContinuationJob
+_swift_task_createScheduledContinuationJob
 _swift_task_create_common
 _swift_task_currentPriority
 _swift_task_dealloc

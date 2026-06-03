@@ -15,6 +15,10 @@
 import Dispatch
 import StdlibUnittest
 @_spi(ExperimentalScheduling) import _Concurrency
+import Synchronization
+
+@available(SwiftStdlib 9999, *)
+let enqueueCount = Atomic<Int>(0)
 
 @available(SwiftStdlib 6.3, *)
 actor MyActor {
@@ -30,6 +34,7 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
   }
 
   public func enqueue(_ _job: consuming ExecutorJob) {
+    enqueueCount.add(1, ordering: .relaxed)
     let job = UnownedJob(_job)
     DispatchQueue.main.async {
       job.runSynchronously(on: self.asUnownedTaskExecutor())
@@ -101,6 +106,16 @@ final class TestExecutor: TaskExecutor, SchedulingExecutor, @unchecked Sendable 
 
     tests.test("Task.sleep on an actor") {
       await MyActor().doSleep()
+    }
+
+    tests.test("Task.sleep does not enqueue") {
+      let oldEnqueueCount = enqueueCount.load(ordering: .relaxed)
+
+      try! await Task.sleep(for: .seconds(0.1))
+
+      let newEnqueueCount = enqueueCount.load(ordering: .relaxed)
+
+      assert(oldEnqueueCount == newEnqueueCount)
     }
 
     await runAllTestsAsync()

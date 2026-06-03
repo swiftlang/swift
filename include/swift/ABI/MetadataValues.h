@@ -2694,6 +2694,7 @@ enum class JobKind : size_t {
   DefaultActorOverride,
   NullaryContinuation,
   IsolatedDeinit,
+  ScheduledContinuation,
 };
 
 /// The priority of a job.  Higher priorities are larger values.

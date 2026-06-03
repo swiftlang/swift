@@ -673,6 +673,13 @@ swift_task_createNullaryContinuationJob(
     size_t priority,
     AsyncTask *continuation);
 
+/// Create a ScheduledContinuationJob from a continuation.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+ScheduledContinuationJob*
+swift_task_createScheduledContinuationJob(
+    size_t priority,
+    AsyncTask *continuation);
+
 SWIFT_EXPORT_FROM(swift_Concurrency)
 SWIFT_CC(swift)
 void swift_task_deinitOnExecutor(void *object, DeinitWorkFunction *work,

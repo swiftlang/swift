@@ -1964,7 +1964,7 @@ static ManagedValue emitBuiltinSuspend(
   );
 
   SGF.emitApplyOfLibraryIntrinsic(
-    loc, helper, helperSubs, helperArgs, SGFContext()
+    loc, helper, helperSubs, helperArgs, C
   );
   
   // Suspend execution

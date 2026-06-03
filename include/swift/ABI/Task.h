@@ -222,6 +222,27 @@ public:
   }
 };
 
+/// This is similar to NullaryContinuationJob, but with the twist that the
+/// target continuation may be executed inline (rather than enqueued for
+/// later execution), assuming the current executor is compatible.
+class ScheduledContinuationJob : public Job {
+
+private:
+  AsyncTask *Continuation;
+
+public:
+  ScheduledContinuationJob(JobPriority priority, AsyncTask *continuation)
+    : Job({JobKind::ScheduledContinuation, priority}, &process),
+      Continuation(continuation) {}
+
+  SWIFT_CC(swiftasync)
+  static void process(Job *job);
+
+  static bool classof(const Job *job) {
+    return job->Flags.getKind() == JobKind::ScheduledContinuation;
+  }
+};
+
 /// Describes type information and offers value methods for an arbitrary concrete
 /// type in a way that's compatible with regular Swift and embedded Swift. In
 /// regular Swift, just holds a Metadata pointer and dispatches to the value

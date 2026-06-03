@@ -17,11 +17,11 @@ import Swift
 // of availability problems.  However, we can use a similar implementation,
 // and all we actually need here is a single compare-exchange primitive.
 @available(StdlibDeploymentTarget 9999, *)
-@_rawLayout(like: SleepCancellationState)
+@_rawLayout(like: UInt32)
 @_staticExclusiveOnly
 struct AtomicSleepCancellationState: @unchecked Sendable, ~Copyable {
-  var _address: UnsafeMutablePointer<SleepCancellationState> {
-    unsafe UnsafeMutablePointer<SleepCancellationState>(_rawAddress)
+  var _address: UnsafeMutablePointer<UInt32> {
+    unsafe UnsafeMutablePointer<UInt32>(_rawAddress)
   }
 
   var _rawAddress: Builtin.RawPointer {
@@ -29,7 +29,7 @@ struct AtomicSleepCancellationState: @unchecked Sendable, ~Copyable {
   }
 
   init(_ initialValue: consuming SleepCancellationState) {
-    unsafe _address.initialize(to: initialValue)
+    unsafe _address.initialize(to: initialValue.rawValue)
   }
 
   deinit {
@@ -75,8 +75,8 @@ extension Task where Success == Never, Failure == Never {
         await Builtin.suspend(on: executor,
                               until: .after(.nanoseconds(duration)),
                               tolerance: nil,
-                              clock: .continuous) { 
-          (_: consuming JobCancellationToken) -> () in 
+                              clock: .continuous) {
+          (_: consuming JobCancellationToken) -> () in
           // Do nothing
         }
         return

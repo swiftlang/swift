@@ -348,6 +348,7 @@ void swift_dispatchEnqueueGlobal(SwiftJob *job) {
 static void _swift_run_job_leeway(struct __swift_job_source *jobSource) {
   SwiftJob *job = jobSource->job.exchange(nullptr, std::memory_order_acq_rel);
   job_source_release(jobSource);
+
   if (job)
     __swift_run_job(job);
 }
@@ -388,8 +389,8 @@ platform_time(uint64_t nsec) {
 #endif
 #endif
 
-static inline dispatch_time_t
-clock_and_value_to_time(int clock, long long sec, long long nsec) {
+static inline uint64_t
+deadline_from_sec_nsec(long long sec, long long nsec) {
   uint64_t deadline;
   if (sec < 0 || (sec == 0 && nsec < 0))
     deadline = 0;
@@ -397,6 +398,12 @@ clock_and_value_to_time(int clock, long long sec, long long nsec) {
       || __builtin_add_overflow(nsec, deadline, &deadline)) {
     deadline = UINT64_MAX;
   }
+  return deadline;
+}
+
+static inline dispatch_time_t
+clock_and_value_to_time(int clock, long long sec, long long nsec) {
+  uint64_t deadline = deadline_from_sec_nsec(sec, nsec);
   uint64_t value = platform_time((uint64_t)deadline);
   if (value >= DISPATCH_TIME_MAX_VALUE) {
     return DISPATCH_TIME_FOREVER;
@@ -460,15 +467,8 @@ uintptr_t swift_dispatchEnqueueWithDeadline(
     int64_t nanos;
     swift_get_time(&seconds, &nanos, (swift_clock_id)clock);
 
-    uint64_t now;
-    if (__builtin_mul_overflow(seconds, NSEC_PER_SEC, &now)
-        || __builtin_add_overflow(nanos, now, &now))
-      now = UINT64_MAX;
-
-    uint64_t deadline;
-    if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
-        || __builtin_add_overflow(nsec, deadline, &deadline))
-      now = UINT64_MAX;
+    uint64_t now = deadline_from_sec_nsec(seconds, nanos);
+    uint64_t deadline = deadline_from_sec_nsec(sec, nsec);
 
     uint64_t delta;
     if (__builtin_sub_overflow(deadline, now, &delta))

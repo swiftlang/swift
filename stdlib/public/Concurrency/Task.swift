@@ -1153,6 +1153,10 @@ internal func _taskBasePriority(_ task: _AsyncTask) -> UInt8
 @_silgen_name("swift_task_createNullaryContinuationJob")
 func _taskCreateNullaryContinuationJob(priority: Int, continuation: Builtin.RawUnsafeContinuation) -> Builtin.Job
 
+@available(StdlibDeploymentTarget 9999, *)
+@_silgen_name("swift_task_createScheduledContinuationJob")
+func _taskCreateScheduledContinuationJob(priority: Int, continuation: Builtin.RawUnsafeContinuation) -> Builtin.Job
+
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @_silgen_name("swift_task_isCurrentExecutor")
@@ -1163,6 +1167,11 @@ func _taskIsCurrentExecutor(_ executor: Builtin.Executor) -> Bool
 @usableFromInline
 internal func _taskIsCurrentExecutor(
   executor: Builtin.Executor, flags: UInt64) -> Bool
+
+@_silgen_name("_swift_makeCancellationError")
+internal func _makeCancellationError() -> Error {
+  return CancellationError()
+}
 
 @available(SwiftStdlib 6.2, *)
 extension GlobalActor {

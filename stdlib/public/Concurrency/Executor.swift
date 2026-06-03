@@ -202,7 +202,7 @@ func _scheduleTaskResumption<E: SchedulingExecutor, C: Clock>(
   clock: C,
   onSchedule: (consuming JobCancellationToken) -> ()
 ) {
-  let job = _taskCreateNullaryContinuationJob(
+  let job = _taskCreateScheduledContinuationJob(
     priority: Int(Task.currentPriority.rawValue),
     continuation: continuation
   )
