@@ -1959,6 +1959,61 @@ void swift::salvageStoreDebugInfo(SILInstruction *SI,
   }
 }
 
+/// Transfer debug info associated with pack_element_set instruction \p PESI to
+/// a new `debug_value` instruction before \p PESI is deleted.
+///
+/// If the pack_element_set uses a scalar_pack_index, and the associated pack
+/// type contains no pack expansions, we can treat the pack as a tuple for the
+/// purposes of debug info. This allows us to salvage the associated debug
+/// information by creating a debug_value referring to the pack_element_set's
+/// value operand as a tuple fragment, using the index from scalar_pack_index.
+///
+/// If the pack contains exactly one element, treat it as the entire value of
+/// the pack; do not introduce a 1-element tuple.
+static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
+  auto *SPII = dyn_cast_or_null<ScalarPackIndexInst>(PESI->getIndex());
+  if (!SPII)
+    return;
+
+  auto *API = dyn_cast_or_null<AllocPackInst>(PESI->getPack());
+  if (!API)
+    return;
+
+  auto packType = API->getPackType();
+
+  if (packType->containsPackExpansionType())
+    return;
+
+  SILType silType;
+  TupleType *tupleType = nullptr;
+
+  if (packType.getElementTypes().size() == 1) {
+    silType = PESI->getFunction()->getLoweredType(packType.getElementType(0));
+  } else {
+    llvm::SmallVector<TupleTypeElt, 4> tupleElements;
+    for (const auto &elementType : packType.getElementTypes()) {
+      tupleElements.push_back(elementType);
+    }
+    tupleType = swift::TupleType::get(tupleElements, packType->getASTContext());
+
+    silType = PESI->getFunction()->getLoweredType(tupleType);
+  }
+
+  for (Operand *U : getDebugUses(API)) {
+    auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    auto VarInfo = DbgInst->getCompleteVarInfo();
+    VarInfo.Type = silType;
+    VarInfo.Scope = API->getDebugScope();
+    if (tupleType) {
+      auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(
+          tupleType, SPII->getComponentIndex());
+      VarInfo.DIExpr.append(FragDIExpr);
+    }
+    SILBuilder(PESI, API->getDebugScope())
+        .createDebugValue(DbgInst->getLoc(), PESI->getValue(), VarInfo);
+  }
+}
+
 // TODO: this currently fails to notify the pass with notifyNewInstruction.
 //
 // TODO: whenever a debug_value is inserted at a new location, check that no
@@ -1977,6 +2032,9 @@ void swift::salvageDebugInfo(SILInstruction *I) {
       salvageStoreDebugInfo(SI, SI->getSrc(), DestVal);
     for (Operand *U : getDebugUses(SI))
       transferStoreDebugValue(U->getUser(), SI, SI->getSrc());
+  }
+  if (auto *PESI = dyn_cast<PackElementSetInst>(I)) {
+    salvagePackElementSetDebugInfo(PESI);
   }
   // If a `struct` SIL instruction is "unwrapped" and removed,
   // for instance, in favor of using its enclosed value directly,

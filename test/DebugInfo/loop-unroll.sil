@@ -1,0 +1,118 @@
+// RUN: %target-sil-opt -sil-print-debuginfo -loop-unroll -verify %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+// Check that the compiler clones the scope for each loop iteration when an
+// instruction with debug information uses a @pack_element opened within the
+// loop body.
+struct A {
+}
+
+// CHECK: sil_scope [[FIRST_SCOPE:[0-9]+]] { loc "file.swift":1:1 parent @pack_element_debug_info_clone_scopes
+// CHECK: sil_scope [[SECOND_SCOPE:[0-9]+]] { loc "file.swift":1:1 parent @pack_element_debug_info_clone_scopes
+sil_scope 1 { loc "file.swift":1:1 parent @pack_element_debug_info_clone_scopes : $@convention(thin) () -> () }
+
+// CHECK-LABEL: sil @pack_element_debug_info_clone_scopes : $@convention(thin) () -> () {
+// CHECK: alloc_stack {{.*}} scope [[FIRST_SCOPE]]
+// CHECK: alloc_stack {{.*}} scope [[SECOND_SCOPE]]
+// CHECK-LABEL: } // end sil function 'pack_element_debug_info_clone_scopes'
+sil @pack_element_debug_info_clone_scopes : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ %pack = alloc_pack $Pack{A, A}
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %index = dynamic_pack_index %4 of $Pack{A, A}
+  %opened = open_pack_element %index of <each Z> at <Pack{A, A}>, shape $each Z, uuid "A8C5CF80-5AAD-11F1-A304-929C59BC796A"
+  %alloca = alloc_stack $@pack_element("A8C5CF80-5AAD-11F1-A304-929C59BC796A") each Z, var, name "x", scope 1
+  dealloc_stack %alloca
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_slt_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb2, bb3
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ dealloc_pack %pack
+ %8 = tuple()
+ return %8 : $()
+}
+
+// CHECK: sil_scope [[ONLY_SCOPE:[0-9]+]] { loc "file.swift":1:1 parent @pack_element_debug_info_clone_scopes_unused
+sil_scope 2 { loc "file.swift":1:1 parent @pack_element_debug_info_clone_scopes_unused : $@convention(thin) () -> () }
+
+// CHECK-LABEL: sil @pack_element_debug_info_clone_scopes_unused : $@convention(thin) () -> () {
+// CHECK: alloc_stack {{.*}} scope [[ONLY_SCOPE]]
+// CHECK: alloc_stack {{.*}} scope [[ONLY_SCOPE]]
+// CHECK-LABEL: } // end sil function 'pack_element_debug_info_clone_scopes_unused'
+sil @pack_element_debug_info_clone_scopes_unused : $@convention(thin) () -> () {
+bb0:
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ %pack = alloc_pack $Pack{A, A}
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %index = dynamic_pack_index %4 of $Pack{A, A}
+  %opened = open_pack_element %index of <each Z> at <Pack{A, A}>, shape $each Z, uuid "A8C5CF80-5AAD-11F1-A304-929C59BC796B"
+  %alloca = alloc_stack $A, var, name "x", scope 2
+  dealloc_stack %alloca
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_slt_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb2, bb3
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ dealloc_pack %pack
+ %8 = tuple()
+ return %8 : $()
+}
+
+
+// CHECK: sil_scope [[ONLY_SCOPE:[0-9]+]] { loc "file.swift":1:1 parent @pack_element_debug_info_clone_scopes_hoisted
+sil_scope 3 { loc "file.swift":1:1 parent @pack_element_debug_info_clone_scopes_hoisted : $@convention(thin) (Builtin.Word) -> () }
+
+// CHECK-LABEL: sil @pack_element_debug_info_clone_scopes_hoisted : $@convention(thin) (Builtin.Word) -> () {
+// CHECK: alloc_stack {{.*}} scope [[ONLY_SCOPE]]
+// CHECK: alloc_stack {{.*}} scope [[ONLY_SCOPE]]
+// CHECK-LABEL: } // end sil function 'pack_element_debug_info_clone_scopes_hoisted'
+sil @pack_element_debug_info_clone_scopes_hoisted : $@convention(thin) (Builtin.Word) -> () {
+bb0(%idx : $Builtin.Word):
+ %0 = integer_literal $Builtin.Word, 0
+ %1 = integer_literal $Builtin.Word, 1
+ %2 = integer_literal $Builtin.Word, 2
+ %3 = integer_literal $Builtin.Int1, 1
+ %pack = alloc_pack $Pack{A, A}
+ %index = dynamic_pack_index %idx of $Pack{A, A}
+ %opened = open_pack_element %index of <each Z> at <Pack{A, A}>, shape $each Z, uuid "A8C5CF80-5AAD-11F1-A304-929C59BC796C"
+ br bb1(%0 : $Builtin.Word)
+
+bb1(%4 : $Builtin.Word):
+  %alloca = alloc_stack $@pack_element("A8C5CF80-5AAD-11F1-A304-929C59BC796C") each Z, var, name "x", scope 3
+  dealloc_stack %alloca
+  %5 = builtin "sadd_with_overflow_Word"(%4 : $Builtin.Word, %1 : $Builtin.Word, %3 : $Builtin.Int1) : $(Builtin.Word, Builtin.Int1)
+  %6 = tuple_extract %5 : $(Builtin.Word, Builtin.Int1), 0
+  %7 = builtin "cmp_slt_Word"(%6 : $Builtin.Word, %2 : $Builtin.Word) : $Builtin.Int1
+  cond_br %7, bb2, bb3
+
+bb2:
+  br bb1(%6 : $Builtin.Word)
+
+bb3:
+ dealloc_pack %pack
+ %8 = tuple()
+ return %8 : $()
+}
