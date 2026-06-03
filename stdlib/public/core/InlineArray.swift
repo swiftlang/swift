@@ -532,7 +532,7 @@ extension InlineArray where Element: ~Copyable {
     @_transparent
     @_unsafeSelfDependentResult
     borrow {
-      Builtin.borrowAt(unsafe (_protectedAddress + i)._rawValue)
+      unsafe (_protectedAddress + i).pointee
     }
 
     @_transparent

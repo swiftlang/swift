@@ -238,7 +238,8 @@ extension OutputSpan where Element: ~Copyable {
   public subscript(unchecked index: Index) -> Element {
     @_unsafeSelfDependentResult
     borrow {
-      Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: index))
+      unsafe UnsafePointer<Element>(
+        _unsafeAddressOfElement(unchecked: index)).pointee
     }
     @_unsafeSelfDependentResult
     @_lifetime(self: copy self)
