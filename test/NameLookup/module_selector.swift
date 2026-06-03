@@ -125,7 +125,6 @@ extension B: @retroactive main::Equatable {
       self = main::B(value: .main::min)
       // expected-error@-1 {{'B' is not imported through module 'main'}}
       // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{14-18=ModuleSelectorTestingKit}}
-      // expected-error@-3 {{cannot infer contextual base in reference to member 'main::min'}}
 
       self = B.main::init(value: .min)
       // expected-error@-1 {{'init(value:)' is not imported through module 'main'}}
@@ -284,7 +283,6 @@ extension D: @retroactive Swift::Equatable {
       self = Swift::D(value: .Swift::min)
       // expected-error@-1 {{'D' is not imported through module 'Swift'}}
       // expected-note@-2 {{did you mean module 'ModuleSelectorTestingKit'?}} {{14-19=ModuleSelectorTestingKit}}
-      // expected-error@-3 {{cannot infer contextual base in reference to member 'Swift::min'}}
 
       self = D.Swift::init(value: .min)
       // expected-error@-1 {{'init(value:)' is not imported through module 'Swift'}}

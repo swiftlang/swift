@@ -12,9 +12,7 @@ let c: -Int // expected-error {{expected type}}
             // expected-error@-1 {{consecutive statements on a line must be separated by ';'}}
             // expected-error@-2 {{unary operator '-' cannot be applied to an operand of type 'Int.Type'}}
 
-struct Generic<T> {} // expected-note {{'T' declared as parameter to type 'Generic'}}
-                     // expected-note@-1 {{'T' declared as parameter to type 'Generic'}}
-
+struct Generic<T> {}
 extension Generic where T == 123 {} // expected-error {{cannot constrain type parameter 'T' to be integer '123'}}
 
 extension Generic where T == -123 {} // expected-error {{cannot constrain type parameter 'T' to be integer '-123'}}
@@ -25,15 +23,11 @@ extension Generic where T == -Int {} // expected-error {{expected type}}
 let d = Generic<123>.self // expected-error {{cannot use value type '123' for generic argument 'T'}}
 
 // FIXME: This should at least be parsable...?
-let e = Generic<-123>.self // expected-error {{generic parameter 'T' could not be inferred}}
-                           // expected-error@-1 {{missing whitespace between '<' and '-' operators}}
-                           // expected-error@-2 {{'>' is not a postfix unary operator}}
-                           // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}}
+let e = Generic<-123>.self // expected-error {{missing whitespace between '<' and '-' operators}}
+                           // expected-error@-1 {{'>' is not a postfix unary operator}}
 
-let f = Generic<-Int>.self // expected-error {{generic parameter 'T' could not be inferred}}
-                           // expected-error@-1 {{missing whitespace between '<' and '-' operators}}
-                           // expected-error@-2 {{'>' is not a postfix unary operator}}
-                           // expected-note@-3 {{explicitly specify the generic arguments to fix this issue}}
+let f = Generic<-Int>.self // expected-error {{missing whitespace between '<' and '-' operators}}
+                           // expected-error@-1 {{'>' is not a postfix unary operator}}
 
 let g: 123.Type // expected-error {{consecutive statements on a line must be separated by ';'}}
                 // expected-error@-1 {{expected type}}

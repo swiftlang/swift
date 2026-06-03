@@ -88,7 +88,7 @@ do {
   }
 }
 
-_ = { x in // expected-error {{cannot infer type of closure parameter 'x' without a type annotation}}
+_ = { x in // expected-error {{unable to infer closure type without a type annotation}}
   let _: Undefined = Swift.type(of: x)
   // expected-error@-1 {{cannot find type 'Undefined' in scope}}
 }
