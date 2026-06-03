@@ -469,6 +469,10 @@ bool memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal);
 /// the \p derived derived conformance for the \p requirement requirement.
 ValueDecl *deriveRequirementViaMacro(DerivedConformance &derived,
                                      ValueDecl *requirement, StringRef code);
+  
+/// Get a string describing the nominal type we are deriving a conformance
+/// for by producing valid swift syntax.
+std::string getNominalTypeInfoString(DerivedConformance &derived);
 
 } // namespace swift
 

@@ -24,16 +24,37 @@ add_swift_target_library(swift_Volatile ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_S
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-volatile)
   add_dependencies(embedded-libraries embedded-volatile)
+  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
+    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
+    list(GET list 0 arch)
+    list(GET list 1 mod)
+    list(GET list 2 triple)
 
-  add_embedded_swift_target_library(
-    embedded-volatile
-    swift_Volatile
-    IS_SDK_OVERLAY
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
+      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
+    endif()
+    add_swift_target_library_single(
+      embedded-volatile-${mod}
+      swift_Volatile
+      ONLY_SWIFTMODULE
+      IS_SDK_OVERLAY IS_FRAGILE
 
-    Volatile.swift
+      Volatile.swift
 
-    SWIFT_COMPILE_FLAGS
-      -parse-stdlib
-    INSTALL_IN_COMPONENT stdlib
-  )
+      SWIFT_COMPILE_FLAGS
+        -Xcc -ffreestanding -enable-experimental-feature Embedded
+        -parse-stdlib
+      C_COMPILE_FLAGS
+        -ffreestanding
+      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+      SDK "embedded"
+      ARCHITECTURE "${arch}"
+      DEPENDS embedded-stdlib-${mod}
+      INSTALL_IN_COMPONENT stdlib
+      )
+    add_dependencies(embedded-volatile embedded-volatile-${mod})
+  endforeach()
 endif()

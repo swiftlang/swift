@@ -170,7 +170,8 @@ func rdar20142523() {
 // <rdar://problem/21080030> Bad diagnostic for invalid method call in boolean expression: (_, ExpressibleByIntegerLiteral)' is not convertible to 'ExpressibleByIntegerLiteral
 func rdar21080030() {
   var s = "Hello"
-  if s.count() == 0 {} // expected-error {{cannot call value of non-function type 'Int'}}
+  if s.count() == 0 {} // expected-error {{missing argument for parameter 'where' in call}}
+  // expected-error@-1 {{generic parameter 'E' could not be inferred}}
 }
 
 // <rdar://problem/21248136> QoI: problem with return type inference mis-diagnosed as invalid arguments
@@ -1536,7 +1537,8 @@ func issue63746() {
 }
 
 func rdar86611718(list: [Int]) {
-  String(list.count()) // expected-error {{cannot call value of non-function type 'Int'}}
+  String(list.count()) // expected-error {{missing argument for parameter 'where' in call}}
+  // expected-error@-1 {{generic parameter 'E' could not be inferred}}
 }
 
 // rdar://108977234 - failed to produce diagnostic when argument to AnyHashable parameter doesn't conform to Hashable protocol
