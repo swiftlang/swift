@@ -137,17 +137,17 @@ func testNeverTransfer(_ x: PreCUncheckedNonSendableKlass) async {
 func testNeverTransferExplicit(_ x: PreCUncheckedExplicitlyNonSendableKlass) async {
   transferArg(x)
   // expected-swift-5-warning @-1 {{sending 'x' risks causing data races}}
-  // expected-swift-5-note @-2 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-swift-5-note @-2 {{'x' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
   // expected-swift-6-warning @-3 {{sending 'x' risks causing data races}}
-  // expected-swift-6-note @-4 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-swift-6-note @-4 {{'x' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
 }
 
 func testNeverTransferNormal(_ x: PostCUncheckedNonSendableKlass) async {
   transferArg(x)
   // expected-swift-5-warning @-1 {{sending 'x' risks causing data races}}
-  // expected-swift-5-note @-2 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-swift-5-note @-2 {{'x' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
   // expected-swift-6-error @-3 {{sending 'x' risks causing data races}}
-  // expected-swift-6-note @-4 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-swift-6-note @-4 {{'x' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
 }
 
 // Inexact match => normal behavior.
@@ -165,9 +165,9 @@ func testNeverTransferInexactMatch(_ x: (PreCUncheckedNonSendableKlass, PreCUnch
 func testNeverTransferInexactMatchExplicit(_ x: (PreCUncheckedExplicitlyNonSendableKlass, PreCUncheckedExplicitlyNonSendableKlass)) async {
   transferArg(x)
   // expected-swift-5-warning @-1 {{sending 'x' risks causing data races}}
-  // expected-swift-5-note @-2 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-swift-5-note @-2 {{'x' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
   // expected-swift-6-warning @-3 {{sending 'x' risks causing data races}}
-  // expected-swift-6-note @-4 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-swift-6-note @-4 {{'x' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
 }
 
 ////////////////////////////////////////
@@ -248,37 +248,37 @@ extension MyActor {
 // what the importing user wanted and change swift 6 to warn and swift 5 to
 // warn.
 func taskIsolatedCaptureInSendingClosureLiteral(_ x: PreCUncheckedExplicitlyNonSendableKlass) {
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 
-  takeClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  takeClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 
-  takeClosureAndParam(PreCUncheckedExplicitlyNonSendableKlass()) { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  takeClosureAndParam(PreCUncheckedExplicitlyNonSendableKlass()) { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 
   let y = (x, x)
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(y) // expected-note {{closure captures 'y' which is accessible to code in the current task}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(y) // expected-note {{closure captures 'y' which is accessible to code in the current isolation context}}
   }
 
   let z = (x, y)
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
     print(y, z) // expected-note @:11 {{closure captures non-Sendable 'y'}}
     // expected-note @-1:14 {{closure captures non-Sendable 'z'}}
   }
 
   let w = PreCUncheckedExplicitlyNonSendableKlassPair(lhs: x, rhs: x)
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(w) // expected-note {{closure captures 'w' which is accessible to code in the current task}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(w) // expected-note {{closure captures 'w' which is accessible to code in the current isolation context}}
   }
 
   let u = Pair(lhs: x, rhs: x)
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(u) // expected-note {{closure captures 'u' which is accessible to code in the current task}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(u) // expected-note {{closure captures 'u' which is accessible to code in the current isolation context}}
   }
 }
 
@@ -321,44 +321,44 @@ extension MyActor {
 
 // Since this is a swift 6 class, we emit the full error.
 func taskIsolatedCaptureInSendingClosureLiteral(_ x: PostCUncheckedNonSendableKlass) {
-  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 
-  takeClosure { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  takeClosure { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 
-  takeClosureAndParam(PostCUncheckedNonSendableKlass()) { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  takeClosureAndParam(PostCUncheckedNonSendableKlass()) { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 
   let y = (x, x)
-  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(y) // expected-note {{closure captures 'y' which is accessible to code in the current task}}
+  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(y) // expected-note {{closure captures 'y' which is accessible to code in the current isolation context}}
   }
 
   let z = (x, y)
-  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
     print(y, z) // expected-note @:11 {{closure captures non-Sendable 'y'}}
     // expected-note @-1:14 {{closure captures non-Sendable 'z'}}
   }
 
   let w = PostCUncheckedNonSendableKlassPair(lhs: x, rhs: x)
-  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(w) // expected-note {{closure captures 'w' which is accessible to code in the current task}}
+  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(w) // expected-note {{closure captures 'w' which is accessible to code in the current isolation context}}
   }
 
   let u = Pair(lhs: x, rhs: x)
-  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(u) // expected-note {{closure captures 'u' which is accessible to code in the current task}}
+  Task { // expected-swift-6-error {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    // expected-swift-5-warning @-1 {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(u) // expected-note {{closure captures 'u' which is accessible to code in the current isolation context}}
   }
 }
 

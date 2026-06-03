@@ -288,19 +288,19 @@ final class NonSendable {
     value = "update"
   }
 
-  func call() async { // expected-tns-note 2 {{'self' is exposed to code in the current task}}
+  func call() async { // expected-tns-note 2 {{'self' is exposed to code in the current isolation context}}
     await update()
     // expected-tns-warning @-1 {{sending 'self' risks causing data races}}
-    // expected-tns-note @-2 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-tns-note @-2 {{sending 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated code and code in the current isolation context}}
 
     await self.update()
     // expected-tns-warning @-1 {{sending 'self' risks causing data races}}
-    // expected-tns-note @-2 {{sending task-isolated 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-tns-note @-2 {{sending 'self' to main actor-isolated instance method 'update()' risks causing data races between main actor-isolated code and code in the current isolation context}}
 
-    _ = await x // expected-tns-warning {{passing 'self' to main actor-isolated getter for property 'x' could allow for references between values exposed to code in the current task and main actor-isolated code risking data races}}
+    _ = await x // expected-tns-warning {{passing 'self' to main actor-isolated getter for property 'x' could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
     // expected-warning@-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
 
-    _ = await self.x // expected-tns-warning {{passing 'self' to main actor-isolated getter for property 'x' could allow for references between values exposed to code in the current task and main actor-isolated code risking data races}}
+    _ = await self.x // expected-tns-warning {{passing 'self' to main actor-isolated getter for property 'x' could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
       // expected-warning@-1 {{non-Sendable type 'NonSendable' cannot be sent into main actor-isolated context in call to property 'x'}}
   }
 
@@ -463,15 +463,15 @@ func preconcurrencyContext(_: @escaping @Sendable () -> Void) {}
 struct DowngradeForPreconcurrency {
   func capture(completion: @escaping @MainActor () -> Void) {
     preconcurrencyContext {
-        Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-            completion() // expected-tns-note {{closure captures 'completion' which is accessible to code in the current task}}
+        Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+            completion() // expected-tns-note {{closure captures 'completion' which is accessible to code in the current isolation context}}
         // expected-warning@-1 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in a '@Sendable' closure}}
         // expected-warning@-2 {{capture of 'completion' with non-Sendable type '@MainActor () -> Void' in an isolated closure}}
         // expected-note@-3 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         // expected-warning@-4 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}
         // expected-note@-5 {{calls to parameter 'completion' from outside of its actor context are implicitly asynchronous}}
-        // expected-complete-and-tns-warning @-7 {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-        // expected-complete-and-tns-note @-7 {{closure captures 'completion' which is accessible to code in the current task}}
+        // expected-complete-and-tns-warning @-7 {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+        // expected-complete-and-tns-note @-7 {{closure captures 'completion' which is accessible to code in the current isolation context}}
       }
     }
   }
@@ -479,7 +479,7 @@ struct DowngradeForPreconcurrency {
   var x: NonSendable
   func createStream() -> AsyncStream<NonSendable> {
     AsyncStream<NonSendable> {
-      self.x // expected-tns-warning {{assignment could allow for references between values exposed to code in the current task and main actor-isolated code risking data races}}
+      self.x // expected-tns-warning {{assignment could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
       // expected-tns-note @-1 {{'self.x.some' is exposed to main actor-isolated code}}
       // expected-warning @-2 {{main actor-isolated property 'x' cannot be accessed from outside of the actor; this is an error in the Swift 6 language mode}} {{7-7=await }}
       // expected-warning @-3 {{non-Sendable type 'NonSendable' of property 'x' cannot exit main actor-isolated context; this is an error in the Swift 6 language mode}}

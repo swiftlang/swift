@@ -155,7 +155,7 @@ func testNonStrongTransferDoesntMerge() async {
 func testTransferringParameter_canTransfer(_ x: sending NonSendableKlass, _ y: NonSendableKlass) async {
   await transferToMain(x)
   await transferToMain(y) // expected-warning {{sending 'y' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func testTransferringParameter_cannotTransferTwice(_ x: sending NonSendableKlass, _ y: NonSendableKlass) async {
@@ -433,12 +433,12 @@ func taskIsolatedInsideError(_ x: @escaping @MainActor () async -> ()) {
 }
 
 // Make sure we error here on only the second since x by being assigned a part
-// of y becomes task-isolated
+// of y becomes accessible to code in the current isolation context
 func testMergeWithTaskIsolated(_ x: sending NonSendableKlass, y: NonSendableKlass) async {
   await transferToMain(x)
   x = y
   await transferToMain(x) // expected-warning {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 @MainActor func testMergeWithActorIsolated(_ x: sending NonSendableKlass, y: NonSendableKlass) async {
@@ -476,37 +476,37 @@ func testNoCrashWhenSendingNoEscapeClosure() async {
 //////////////////////
 
 func taskIsolatedCaptureInSendingClosureLiteral(_ x: NonSendableKlass) {
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
     {
-      print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+      print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
     }()
   }
 
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    { // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    { // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
       print($0)
     }(x)
   }
 
-  takeClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  takeClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 
-  takeClosureAndParam(NonSendableKlass()) { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  takeClosureAndParam(NonSendableKlass()) { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 
   let y = (x, x)
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(y) // expected-note {{closure captures 'y' which is accessible to code in the current task}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    print(y) // expected-note {{closure captures 'y' which is accessible to code in the current isolation context}}
   }
 
   let z = (x, y)
-  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
     print(y, z) // expected-note @:11 {{closure captures non-Sendable 'y'}}
     // expected-note @-1:14 {{closure captures non-Sendable 'z'}}
   }

@@ -166,10 +166,10 @@ func testSendingClosureAssignsToCapture() {
   let m2 = NonSendableKlass()
   let _ = takeSendingClosure { (state: inout sending NonSendableKlass) -> NonSendableKlass in
     state = m2
-    return state // expected-error {{returning task-isolated 'state' as a 'sending' result risks causing data races}}
-    // expected-note @-1 {{returning task-isolated 'state' risks causing data races since the caller assumes that 'state' can be safely sent to other isolation domains}}
-    // expected-error @-2 {{'inout sending' parameter 'state' cannot be task-isolated at end of function}}
-    // expected-note @-3 {{task-isolated 'state' risks causing races in between task-isolated uses and caller uses since caller assumes value is not actor isolated}}
+    return state // expected-error {{returning 'state' as a 'sending' result risks causing data races}}
+    // expected-note @-1 {{returning 'state' risks causing data races since the caller assumes that 'state' can be safely sent to other isolation domains}}
+    // expected-error @-2 {{'inout sending' parameter 'state' is accessible to code in the current isolation context at end of function}}
+    // expected-note @-3 {{'state' risks causing races in between code in the current isolation context and caller uses since caller assumes value is not actor isolated}}
   }
 }
 

@@ -29,12 +29,12 @@ func testIsolationError() async {
 
 func testTransferArgumentError(_ x: NonSendableType) async {
   await transferToMain(x) // expected-error {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 func testPassArgumentAsTransferringParameter(_ x: NonSendableType) async {
   transferValue(x) // expected-error {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{task-isolated 'x' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note @-1 {{'x' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
 }
 
 func testAssignmentIntoTransferringParameter(_ x: sending NonSendableType) async {
@@ -60,7 +60,7 @@ func testIsolationCrossingDueToCapture() async {
 func testIsolationCrossingDueToCaptureParameter(_ x: NonSendableType) async {
   let _ = { @MainActor in
     print(x) // expected-error {{sending 'x' risks causing data races}}
-    // expected-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
+    // expected-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against code in the current isolation context}}
   }
   useValue(x)
 }

@@ -20,14 +20,14 @@ func acceptMetaOnMainActor<T>(_: T.Type) { }
 nonisolated func staticCallThroughMetaSmuggled<T: Q>(_: T.Type) {
   let x: Q.Type = T.self
   Task.detached { // expected-warning{{risks causing data races}}
-    x.g() // expected-note{{closure captures 'x' which is accessible to code in the current task}}
+    x.g() // expected-note{{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 }
 
 nonisolated func passMetaSmuggled<T: Q>(_: T.Type) {
   let x: Q.Type = T.self
   Task.detached { // expected-warning{{risks causing data races}}
-    acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
+    acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 }
 
@@ -79,8 +79,8 @@ nonisolated func passSendableToMainActorSmuggledAny<T: Sendable>(_: T.Type) asyn
 // -------------------------------------------------------------------------
 nonisolated func passMetaSmuggledAnyFromExistential(_ pqT: (P & Q).Type) {
   let x: P.Type = pqT
-  Task.detached { // expected-warning{{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
+  Task.detached { // expected-warning{{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
+    acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current isolation context}}
   }
 }
 
@@ -155,14 +155,14 @@ func dynamicCastingExistential(
 ) {
   if let s1p = s1 as? any P { // expected-note{{isolated conformance to protocol 'P' can be introduced here}}
     acceptSendingP(s1p) // expected-warning{{sending 's1p' risks causing data races}}
-    // expected-note@-1{{task-isolated 's1p' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+    // expected-note@-1{{'s1p' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
   } else {
     print(s1)
   }
 
   if let s2p = s2 as? any AnyObject & P { // expected-note{{isolated conformance to protocol 'P' can be introduced here}}
     acceptSendingAnyObjectP(s2p) // expected-warning{{sending 's2p' risks causing data races}}
-    // expected-note@-1{{task-isolated 's2p' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+    // expected-note@-1{{'s2p' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
   } else {
     print(s2)
   }
@@ -193,14 +193,14 @@ func dynamicCastingGeneric(
 ) {
   if let s1p = s1 as? any P { // expected-note{{isolated conformance to protocol 'P' can be introduced here}}
     acceptSendingP(s1p) // expected-warning{{sending 's1p' risks causing data races}}
-    // expected-note@-1{{task-isolated 's1p' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+    // expected-note@-1{{'s1p' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
   } else {
     print(s1)
   }
 
   if let s2p = s2 as? any AnyObject & P { // expected-note{{isolated conformance to protocol 'P' can be introduced here}}
     acceptSendingAnyObjectP(s2p) // expected-warning{{sending 's2p' risks causing data races}}
-    // expected-note@-1{{task-isolated 's2p' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+    // expected-note@-1{{'s2p' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
   } else {
     print(s2)
   }
@@ -246,11 +246,11 @@ func forceCastingExistential(
 ) {
   let s1p = s1 as! any P // expected-note{{isolated conformance to protocol 'P' can be introduced here}}
   acceptSendingP(s1p) // expected-warning{{sending 's1p' risks causing data races}}
-  // expected-note@-1{{task-isolated 's1p' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note@-1{{'s1p' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
 
   let s2p = s2 as! any AnyObject & P // expected-note{{isolated conformance to protocol 'P' can be introduced here}}
   acceptSendingAnyObjectP(s2p) // expected-warning{{sending 's2p' risks causing data races}}
-  // expected-note@-1{{task-isolated 's2p' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note@-1{{'s2p' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
 }
 
 @MainActor func forceCastingExistentialGood(
@@ -270,11 +270,11 @@ func forceCastingGeneric(
 ) {
   let s1p = s1 as! any P // expected-note{{isolated conformance to protocol 'P' can be introduced here}}
   acceptSendingP(s1p) // expected-warning{{sending 's1p' risks causing data races}}
-  // expected-note@-1{{task-isolated 's1p' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note@-1{{'s1p' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
 
   let s2p = s2 as! any AnyObject & P // expected-note{{isolated conformance to protocol 'P' can be introduced here}}
   acceptSendingAnyObjectP(s2p) // expected-warning{{sending 's2p' risks causing data races}}
-  // expected-note@-1{{task-isolated 's2p' is passed as a 'sending' parameter; Uses in callee may race with later task-isolated uses}}
+  // expected-note@-1{{'s2p' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
 }
 
 @MainActor func forceCastingGenericMainActor(
