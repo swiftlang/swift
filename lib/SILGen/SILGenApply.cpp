@@ -6029,8 +6029,30 @@ CallEmission CallEmission::forApplyExpr(SILGenFunction &SGF, ApplyExpr *e) {
                          call->isNoAsync());
 
     // For an implicitly-async call, record the target of the actor hop.
-    if (auto target = call->isImplicitlyAsync())
+    if (auto target = call->isImplicitlyAsync()) {
       emission.setImplicitlyAsync(target);
+    } else {
+      // If we are emitting a call to an `async` variant of an ObjC completion
+      // handler API, we need to hop at the call site because there is no
+      // `async` function that is going to hop in its body. Such calls are
+      // referencing a sync variant with a special completion handler
+      // synthesized the compiler and the isolation context has to be
+      // established beforehand.
+      //
+      // This is specific to global-actor isolated functions because by default
+      // async variants are `nonisolated(nonsending)` and won't switch
+      // isolation.
+      auto callee = call->getCalledValue(/*skipFunctionConversions=*/true);
+      if (auto *F = dyn_cast_or_null<FuncDecl>(callee)) {
+        if (F->getForeignAsyncConvention()) {
+          if (auto crossing = call->getIsolationCrossing()) {
+            auto calleeIsolation = crossing->getCalleeIsolation();
+            if (calleeIsolation.isGlobalActor())
+              emission.setImplicitlyAsync(calleeIsolation);
+          }
+        }
+      }
+    }
   }
 
   return emission;
