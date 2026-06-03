@@ -672,3 +672,38 @@ bb0(%0 : $*EmptyNC):
   return %1
 }
 
+// CHECK-LABEL: sil [ossa] @trivial_load_of_addr_cast :
+// CHECK:       bb0(%0 : $*Builtin.Int64):
+// CHECK-NEXT:    [[L:%.*]] = load [trivial] %0 : $*Builtin.Int64
+// CHECK-NEXT:    [[C:%.*]] = unchecked_trivial_bit_cast [[L]] : $Builtin.Int64 to $Int64
+// CHECK-NEXT:    return [[C]] : $Int64
+// CHECK:       } // end sil function 'trivial_load_of_addr_cast'
+sil [ossa] @trivial_load_of_addr_cast : $@convention(thin) (@inout Builtin.Int64) -> Int64 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Int64
+  %2 = load [trivial] %1 : $*Int64
+  return %2 : $Int64
+}
+
+// Different sizes: Builtin.Int64 (8 bytes) to Builtin.Int8 (1 byte) — don't optimize.
+// CHECK-LABEL: sil [ossa] @dont_trivial_load_of_addr_cast_different_sizes :
+// CHECK:         %1 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Builtin.Int8
+// CHECK:       } // end sil function 'dont_trivial_load_of_addr_cast_different_sizes'
+sil [ossa] @dont_trivial_load_of_addr_cast_different_sizes : $@convention(thin) (@inout Builtin.Int64) -> Builtin.Int8 {
+bb0(%0 : $*Builtin.Int64):
+  %1 = unchecked_addr_cast %0 : $*Builtin.Int64 to $*Builtin.Int8
+  %2 = load [trivial] %1 : $*Builtin.Int8
+  return %2 : $Builtin.Int8
+}
+
+// Non-trivial source type: class B — don't optimize.
+// CHECK-LABEL: sil [ossa] @dont_trivial_load_of_addr_cast_nontrivial_source :
+// CHECK:         %1 = unchecked_addr_cast %0 : $*B to $*Builtin.Int64
+// CHECK:       } // end sil function 'dont_trivial_load_of_addr_cast_nontrivial_source'
+sil [ossa] @dont_trivial_load_of_addr_cast_nontrivial_source : $@convention(thin) (@inout B) -> Builtin.Int64 {
+bb0(%0 : $*B):
+  %1 = unchecked_addr_cast %0 : $*B to $*Builtin.Int64
+  %2 = load [trivial] %1 : $*Builtin.Int64
+  return %2 : $Builtin.Int64
+}
+

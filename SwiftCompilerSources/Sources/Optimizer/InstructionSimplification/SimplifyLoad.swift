@@ -32,6 +32,9 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
     if replaceLoadOfEmptyType(context) {
       return
     }
+    if replaceTrivialLoadOfAddrCast(context) {
+      return
+    }
     if tryRemoveAddressCast(context) {
       return
     }
@@ -177,6 +180,37 @@ extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
 
     let emptyValue = createEmptyAggregate(ofType: type, before: self, context)
     replace(with: emptyValue, context)
+    return true
+  }
+
+  /// Replaces a `load [trivial]` from an `unchecked_addr_cast` between two trivial types:
+  /// ```
+  ///   %1 = unchecked_addr_cast %0 : $*SrcType to $*DstType
+  ///   %2 = load [trivial] %1
+  /// ```
+  /// with a load from the original address followed by a value cast:
+  /// ```
+  ///   %1 = load [trivial] %0 : $*SrcType
+  ///   %2 = unchecked_trivial_bit_cast %1 to $DstType
+  /// ```
+  private func replaceTrivialLoadOfAddrCast(_ context: SimplifyContext) -> Bool {
+    guard loadOwnership == .trivial,
+          let addrCast = address as? UncheckedAddrCastInst,
+          addrCast.type != addrCast.fromAddress.type,
+          addrCast.fromAddress.type.objectType.isTrivial(in: parentFunction),
+          let fromSize = addrCast.fromAddress.type.objectType.getStaticSize(context: context),
+          let toSize = addrCast.type.objectType.getStaticSize(context: context),
+          fromSize == toSize,
+          let fromAlignment = addrCast.fromAddress.type.objectType.getStaticAlignment(context: context),
+          let toAlignment = addrCast.type.objectType.getStaticAlignment(context: context),
+          fromAlignment == toAlignment
+    else {
+      return false
+    }
+    let builder = Builder(before: self, context)
+    let newLoad = builder.createLoad(fromAddress: addrCast.fromAddress, ownership: .trivial)
+    let cast = builder.createUncheckedTrivialBitCast(from: newLoad, to: type)
+    replace(with: cast, context)
     return true
   }
 
