@@ -91,7 +91,7 @@ namespace swift {
 struct TestContentSectionBounds;
 
 /// Register a test content section for use by Swift Testing.
-/// 
+///
 /// \param sectionBounds A structure describing the test content section being
 ///   registered.
 SWIFT_RUNTIME_EXPORT void swift_elf_registerTestContent(
