@@ -245,7 +245,7 @@ let _: Int?? = try? optProducer?.produceInt() // good
 
 let _: Int? = try? optProducer?.produceIntNoThrowing() // expected-error {{cannot assign value of type 'Int??' to type 'Int?'}}
 // expected-note@-1 {{arguments to generic parameter 'Wrapped' ('Int?' and 'Int') are expected to be equal}}
-let _: Int?? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}
+let _: Int?? = try? optProducer?.produceIntNoThrowing() // expected-warning {{no calls to throwing functions occur within 'try' expression}}{{16-21=}}
 
 let _: Int? = (try? optProducer?.produceAny()) as? Int // good
 let _: Int? = try? optProducer?.produceAny() as? Int // expected-error {{value of optional type 'Int??' not unwrapped; did you mean to use 'try!' or chain with '?'?}}

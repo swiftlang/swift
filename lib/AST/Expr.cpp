@@ -1050,6 +1050,14 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   llvm_unreachable("Unhandled ExprKind in switch.");
 }
 
+SourceRange AnyTryExpr::getTrySourceRange() const {
+  if (auto *forceTry = dyn_cast<ForceTryExpr>(this))
+    return SourceRange(getTryLoc(), forceTry->getExclaimLoc());
+  if (auto *optionalTry = dyn_cast<OptionalTryExpr>(this))
+    return SourceRange(getTryLoc(), optionalTry->getQuestionLoc());
+  return SourceRange(getTryLoc(), getTryLoc());
+}
+
 //===----------------------------------------------------------------------===//
 // Support methods for Exprs.
 //===----------------------------------------------------------------------===//
