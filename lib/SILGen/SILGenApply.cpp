@@ -6152,38 +6152,6 @@ RValue SILGenFunction::emitApply(
     }
   }
 
-  // If there's a foreign error or async parameter, fill it in.
-  ManagedValue errorTemp;
-  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
-    unsigned completionIndex = foreignAsync->completionHandlerParamIndex();
-
-    // Ram the emitted completion into the argument list, over the placeholder
-    // we left during the first pass.
-    auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
-
-    // We have already lowered foreign self/moved it into position at this
-    // point, so we know that self will be back.
-    ManagedValue self;
-    if (substFnType->hasSelfParam()) {
-      self = args.back();
-    }
-
-    auto origFormalType = *calleeTypeInfo.origFormalType;
-    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
-        *this, origFormalType, self, loc);
-  }
-  if (auto foreignError = calleeTypeInfo.foreign.error) {
-    unsigned errorParamIndex =
-        foreignError->getErrorParameterIndex();
-
-    // Ram the emitted error into the argument list, over the placeholder
-    // we left during the first pass.
-    auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
-
-    std::tie(errorTemp, errorArgSlot) =
-        resultPlan->emitForeignErrorArgument(*this, loc).value();
-  }
-
   // Emit the raw application.
   GenericSignature genericSig =
     fn.getType().castTo<SILFunctionType>()->getInvocationGenericSignature();
@@ -6261,6 +6229,38 @@ RValue SILGenFunction::emitApply(
     // own executor afterward, since the callee could have made arbitrary hops
     // out of our isolation domain.
     breadcrumb = ExecutorBreadcrumb(true);
+  }
+
+  // If there's a foreign error or async parameter, fill it in.
+  ManagedValue errorTemp;
+  if (auto foreignAsync = calleeTypeInfo.foreign.async) {
+    unsigned completionIndex = foreignAsync->completionHandlerParamIndex();
+
+    // Ram the emitted completion into the argument list, over the placeholder
+    // we left during the first pass.
+    auto &completionArgSlot = const_cast<ManagedValue &>(args[completionIndex]);
+
+    // We have already lowered foreign self/moved it into position at this
+    // point, so we know that self will be back.
+    ManagedValue self;
+    if (substFnType->hasSelfParam()) {
+      self = args.back();
+    }
+
+    auto origFormalType = *calleeTypeInfo.origFormalType;
+    completionArgSlot = resultPlan->emitForeignAsyncCompletionHandler(
+        *this, origFormalType, self, loc);
+  }
+  if (auto foreignError = calleeTypeInfo.foreign.error) {
+    unsigned errorParamIndex =
+        foreignError->getErrorParameterIndex();
+
+    // Ram the emitted error into the argument list, over the placeholder
+    // we left during the first pass.
+    auto &errorArgSlot = const_cast<ManagedValue &>(args[errorParamIndex]);
+
+    std::tie(errorTemp, errorArgSlot) =
+        resultPlan->emitForeignErrorArgument(*this, loc).value();
   }
 
   SILValue rawDirectResult;
