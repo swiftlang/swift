@@ -2177,6 +2177,13 @@ void swift::salvageDebugInfo(SILInstruction *I) {
     }
   }
 
+  if (auto *EI = dyn_cast<EnumInst>(I)) {
+    if (EI->hasOperand())
+      salvageUnaryInst(EI);
+    else
+      salvageNullaryInst(EI);
+  }
+
   if (isa<IntegerLiteralInst>(I) || isa<FloatLiteralInst>(I))
     salvageNullaryInst(cast<SingleValueInstruction>(I));
 

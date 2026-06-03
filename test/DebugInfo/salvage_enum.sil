@@ -1,0 +1,52 @@
+// RUN: %target-sil-opt -sil-print-types %s -sil-combine -sil-print-debuginfo | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+// This test uses SILCombine's SimplifyUncheckedEnumData.swift for the payload
+// case (enum + unchecked_enum_data).
+// For the no payload case, it is DCE'd.
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+sil_scope 1 { loc "test.swift":1:1 parent @test_salvage_enum_with_payload : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 }
+sil_scope 2 { loc "test.swift":2:1 parent @test_salvage_enum_no_payload : $@convention(thin) () -> Builtin.Int64 }
+
+// CHECK-LABEL: sil @test_salvage_enum_with_payload
+// CHECK:       bb0([[VAL:%[0-9]+]] : $Builtin.Int64):
+// CHECK:         debug_value [[VAL]] : $Builtin.Int64, let, name "value", transform {
+// CHECK:           bb0([[ARG:%[0-9]+]] : $Builtin.Int64):
+// CHECK:             [[STRUCT:%[0-9]+]] = struct $Int64 ([[ARG]] : $Builtin.Int64)
+// CHECK:             [[ENUM:%[0-9]+]] = enum $Optional<Int64>, #Optional.some!enumelt, [[STRUCT]] : $Int64
+// CHECK:             return [[ENUM]] : $Optional<Int64>
+// CHECK:         }
+// CHECK:         return [[VAL]]
+// CHECK-LABEL: } // end sil function 'test_salvage_enum_with_payload'
+sil @test_salvage_enum_with_payload : $@convention(thin) (Builtin.Int64) -> Builtin.Int64 {
+bb0(%0 : $Builtin.Int64):
+  %1 = struct $Int64 (%0)
+  %2 = enum $Optional<Int64>, #Optional.some!enumelt, %1
+  debug_value %2, let, name "value", loc "test.swift":1:1, scope 1
+  %4 = unchecked_enum_data %2, #Optional.some!enumelt
+  %5 = struct_extract %4, #Int64._value
+  return %5
+}
+
+// CHECK-LABEL: sil @test_salvage_enum_no_payload
+// CHECK:       bb0:
+// CHECK:         debug_value undef : $Optional<Int64>, let, name "empty", transform {
+// CHECK:           bb0:
+// CHECK:             [[NONE:%[0-9]+]] = enum $Optional<Int64>, #Optional.none!enumelt
+// CHECK:             return [[NONE]] : $Optional<Int64>
+// CHECK:         }
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_salvage_enum_no_payload'
+sil @test_salvage_enum_no_payload : $@convention(thin) () -> Builtin.Int64 {
+bb0:
+  %0 = enum $Optional<Int64>, #Optional.none!enumelt
+  debug_value %0, let, name "empty", loc "test.swift":2:1, scope 2
+  %2 = integer_literal $Builtin.Int64, 0
+  return %2
+}
