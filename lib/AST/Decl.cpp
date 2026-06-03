@@ -1222,6 +1222,11 @@ bool Decl::hasExplicitIsolationAttribute() const {
     }
   }
 
+  if (auto concurrentAttr = getAttrs().getAttribute<ConcurrentAttr>()) {
+    if (!concurrentAttr->isImplicit())
+      return true;
+  }
+
   if (auto globalActorAttr = getGlobalActorAttr()) {
     if (!globalActorAttr->first->isImplicit())
       return true;
