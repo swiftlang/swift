@@ -2517,6 +2517,58 @@ entry(%t : @guaranteed $T):
   return %retval : $()
 }
 
+// In a function whose only exit is `unreachable`, every block is dead-end.
+// The dealloc for an opaque value defined in an outer-loop body must still
+// be placed on the outer-loop back-edge, because that block flows into the
+// outer-loop header — a join point with the pre-loop predecessor where the
+// alloc is not live.
+// Skipping the dealloc on the back-edge breaks stack-state consistency at the header.
+//
+// CHECK-LABEL: sil hidden [ossa] @test_dead_end_outer_back_edge :
+// CHECK:       bb0:
+// CHECK-NEXT:    br [[OUTER_HEADER:bb[0-9]+]]
+// CHECK:       [[OUTER_HEADER]]:
+// CHECK-NEXT:    cond_br {{.*}}, [[OUTER_BODY:bb[0-9]+]], {{bb[0-9]+}}
+// CHECK:       [[OUTER_BODY]]:
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         apply undef<T>([[STK]])
+// CHECK-NEXT:    br [[INNER_HEADER:bb[0-9]+]]
+// CHECK:       [[INNER_HEADER]]:
+// CHECK-NEXT:    cond_br {{.*}}, [[INNER_BODY:bb[0-9]+]], [[OUTER_BACK:bb[0-9]+]]
+// CHECK:       [[OUTER_BACK]]:
+// CHECK-NEXT:    destroy_addr [[STK]]
+// CHECK-NEXT:    dealloc_stack [[STK]]
+// CHECK-NEXT:    br [[OUTER_HEADER]]
+// CHECK:       [[INNER_BODY]]:
+// CHECK-NEXT:    apply undef<T>([[STK]])
+// CHECK-NEXT:    br [[INNER_HEADER]]
+// CHECK-LABEL: } // end sil function 'test_dead_end_outer_back_edge'
+sil hidden [ossa] @test_dead_end_outer_back_edge : $@convention(thin) <T> () -> () {
+bb0:
+  br bb1
+
+bb1:
+  cond_br undef, bb_outer_body, bb_unreachable
+
+bb_outer_body:
+  %v = apply undef<T>() : $@convention(thin) <τ_0_0> () -> @out τ_0_0
+  br bb_inner_header
+
+bb_inner_header:
+  cond_br undef, bb_inner_body, bb_outer_back
+
+bb_inner_body:
+  %use = apply undef<T>(%v) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> ()
+  br bb_inner_header
+
+bb_outer_back:
+  destroy_value %v : $T
+  br bb1
+
+bb_unreachable:
+  unreachable
+}
+
 enum PairEnum<T> {
   case it(T, T)
 }
@@ -2939,6 +2991,44 @@ bb0(%c : @owned $Klass):
   destroy_value %closure : $@callee_guaranteed (@inout Int) -> (@out Int)
   %retval = tuple ()
   return %retval : $()
+}
+
+// Phi-arg storage for an opaque enum constructed inside a loop must stay
+// outside the loop. `sinkToUses` skips sinking the phi's alloc_stack
+// when the sink target is inside a loop containing the alloc, since
+// the matching dealloc is placed based on the alloc's pre-sink location.
+// CHECK-LABEL: sil hidden [ossa] @test_phi_inside_loop :
+// CHECK:       bb0(%0 : $*T):
+// CHECK-NEXT:    [[STK:%[^,]+]] = alloc_stack $Optional<T>
+// CHECK-NEXT:    br [[HEADER:bb[0-9]+]]
+// CHECK:       [[HEADER]]:
+// CHECK-NEXT:    cond_br
+// CHECK:       [[EXIT:bb[0-9]+]]:
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-NEXT:    return
+// CHECK:       [[LATCH:bb[0-9]+]]:
+// CHECK:         destroy_addr [[STK]]
+// CHECK-NEXT:    br [[HEADER]]
+// CHECK-LABEL: } // end sil function 'test_phi_inside_loop'
+sil hidden [ossa] @test_phi_inside_loop : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : @guaranteed $T):
+  br bb1
+
+bb1:
+  cond_br undef, bb2, bb_exit
+
+bb2:
+  %v = copy_value %0 : $T
+  %some = enum $Optional<T>, #Optional.some!enumelt, %v : $T
+  br bb3(%some : $Optional<T>)
+
+bb3(%phi : @owned $Optional<T>):
+  destroy_value %phi : $Optional<T>
+  br bb1
+
+bb_exit:
+  %r = tuple ()
+  return %r : $()
 }
 
 // CHECK-LABEL: sil hidden [ossa] @test_store_1 : {{.*}} {
