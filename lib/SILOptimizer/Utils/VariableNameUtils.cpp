@@ -356,9 +356,107 @@ constexpr StringLiteral UnknownDeclString = "<unknown decl>";
 
 } // namespace
 
+/// Helper that names the result of a call. Looks through partial_apply and
+/// closure-forming / conversion instructions on the callee to recover the
+/// underlying function reference, and recovers the call's self value (directly
+/// or as captured by a partial_apply) so the result can be named 'self.member'.
+///
+/// Holds a back-reference to its owning inferrer so it can push path components
+/// and (in the future) stash state across queries.
+struct VariableNameInferrer::CallResultNamer {
+  VariableNameInferrer &owner;
+
+  explicit CallResultNamer(VariableNameInferrer &owner) : owner(owner) {}
+
+  /// The call (apply / try_apply / begin_apply) that produces \p value, if
+  /// any. 'apply' and 'begin_apply' produce their result as the defining
+  /// instruction; a 'try_apply' delivers its result as the normal successor's
+  /// block argument, so look through the terminator in that case.
+  static FullApplySite getCallProducing(SILValue value) {
+    if (auto *inst = value->getDefiningInstruction())
+      return FullApplySite::isa(inst);
+    if (auto *arg = dyn_cast<SILArgument>(value))
+      if (auto *term = arg->getTerminatorForResult())
+        return FullApplySite::isa(term);
+    return FullApplySite();
+  }
+
+  /// Strip closure-forming / conversion / ownership-forwarding instructions
+  /// from a callee value (everything except partial_apply itself).
+  static SILValue stripCalleeConversions(SILValue v) {
+    while (isa<ThinToThickFunctionInst>(v) || isa<ConvertFunctionInst>(v) ||
+           isa<ConvertEscapeToNoEscapeInst>(v) || isa<CopyValueInst>(v) ||
+           isa<BeginBorrowInst>(v) || isa<MoveValueInst>(v)) {
+      v = cast<SingleValueInstruction>(v)->getOperand(0);
+    }
+    return v;
+  }
+
+  /// The user-facing name of the function/method invoked by \p call, or an
+  /// empty StringRef if one cannot be determined. Looks through an
+  /// immediately-invoked partial_apply to the underlying function reference.
+  StringRef getCalleeName(FullApplySite call) const {
+    SILValue callee = stripCalleeConversions(call.getCallee());
+    while (auto *pai = dyn_cast<PartialApplyInst>(callee))
+      callee = stripCalleeConversions(pai->getCallee());
+
+    // A dynamically dispatched method (class_method, witness_method, ...): use
+    // the referenced member's name (which also handles accessors).
+    if (auto *mi = dyn_cast<MethodInst>(callee))
+      return getNameFromDecl(mi->getMember().getDecl());
+
+    // A direct call: prefer the referenced function's own decl name.
+    if (auto *f = dyn_cast<FunctionRefBaseInst>(callee)) {
+      auto *fn = f->getInitiallyReferencedFunction();
+      if (auto declRef = fn->getDeclRef())
+        if (auto *decl = declRef.getDecl())
+          return getNameFromDecl(decl);
+      // Fall back to the SILFunction's name (e.g. for SIL-only declarations
+      // that carry no AST decl).
+      return fn->getName();
+    }
+
+    return StringRef();
+  }
+
+  /// The self value associated with \p call, if any: either the call's own
+  /// self argument (a direct method call) or, when the callee is a
+  /// partial_apply that captured self, that captured self. Self is always the
+  /// last parameter, so a non-empty partial_apply of a method captures it as
+  /// its last applied argument.
+  SILValue getCalleeSelfValue(FullApplySite call) const {
+    if (call.hasSelfArgument())
+      return call.getSelfArgument();
+    SILValue callee = stripCalleeConversions(call.getCallee());
+    if (auto *pai = dyn_cast<PartialApplyInst>(callee)) {
+      ApplySite site(pai);
+      if (site.getSubstCalleeType()->hasSelfParam() &&
+          site.getNumArguments() >= 1)
+        return site.getArgument(site.getNumArguments() - 1);
+    }
+    return SILValue();
+  }
+
+  /// If \p call can be named, push the callee (member) name and return its
+  /// self value so the walk continues into it -- producing 'self.member'.
+  /// Returns SILValue() if there is no name or no self.
+  SILValue nameThroughSelf(FullApplySite call) {
+    auto name = getCalleeName(call);
+    if (name.empty())
+      return SILValue();
+    auto self = getCalleeSelfValue(call);
+    if (!self)
+      return SILValue();
+    owner.pushPathComponent(name, call.getLoc().getSourceLoc());
+    return self;
+  }
+};
+
 SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     SILValue searchValue, ValueSet &visitedValues) {
   assert(searchValue);
+
+  CallResultNamer namer(*this);
 
   while (true) {
     assert(searchValue);
@@ -580,43 +678,26 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       }
     }
 
-    auto getNamePathComponentFromCallee = [&](FullApplySite call) -> SILValue {
-      // Use the name of the property being accessed if we can get to it.
-      if (call.getSubstCalleeType()->hasSelfParam()) {
-        if (auto *f = dyn_cast<FunctionRefBaseInst>(call.getCallee())) {
-          if (auto dc = f->getInitiallyReferencedFunction()->getDeclContext()) {
-            pushPathComponent(getNameFromDecl(dc->getAsDecl()),
-                              call.getLoc().getSourceLoc());
-            return call.getSelfArgument();
-          }
-        }
+    // Name a call result (apply / try_apply / begin_apply). Read/modify
+    // (begin_apply) accessors are always looked through; other calls only when
+    // InferSelfThroughAllAccessors is set.
+    if (auto fas = CallResultNamer::getCallProducing(searchValue)) {
+      bool isBeginApply = isa<BeginApplyInst>(fas.getInstruction());
+      if (isBeginApply ||
+          options.contains(Flag::InferSelfThroughAllAccessors)) {
+        if (auto name = namer.getCalleeName(fas); !name.empty()) {
+          pushPathComponent(name, fas.getLoc().getSourceLoc());
 
-        if (auto *mi = dyn_cast<MethodInst>(call.getCallee())) {
-          pushPathComponent(getNameFromDecl(mi->getMember().getDecl()),
-                            call.getLoc().getSourceLoc());
-          return call.getSelfArgument();
-        }
-      }
-
-      return SILValue();
-    };
-
-    // Read or modify accessor.
-    if (auto bai = dyn_cast_or_null<BeginApplyInst>(
-            searchValue->getDefiningInstruction())) {
-      if (auto selfParam = getNamePathComponentFromCallee(bai)) {
-        searchValue = selfParam;
-        continue;
-      }
-    }
-
-    if (options.contains(Flag::InferSelfThroughAllAccessors)) {
-      if (auto *inst = searchValue->getDefiningInstruction()) {
-        if (auto fas = FullApplySite::isa(inst)) {
-          if (auto selfParam = getNamePathComponentFromCallee(fas)) {
-            searchValue = selfParam;
+          // If there is a self value (directly, or captured by a
+          // partial_apply), continue into it to produce 'self.member'.
+          if (auto self = namer.getCalleeSelfValue(fas)) {
+            searchValue = self;
             continue;
           }
+
+          // Otherwise treat the result as the root, naming it after the
+          // callee.
+          return searchValue;
         }
       }
     }
@@ -625,7 +706,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     if (searchValue->isBorrowAccessorResult()) {
       if (auto fas =
               FullApplySite::isa(searchValue->getDefiningInstruction())) {
-        if (auto selfParam = getNamePathComponentFromCallee(fas)) {
+        if (auto selfParam = namer.nameThroughSelf(fas)) {
           searchValue = selfParam;
           continue;
         }
@@ -646,8 +727,7 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
       }
 
       if (addressorInvocation) {
-        if (auto selfParam =
-                getNamePathComponentFromCallee(addressorInvocation)) {
+        if (auto selfParam = namer.nameThroughSelf(addressorInvocation)) {
           searchValue = selfParam;
           continue;
         }

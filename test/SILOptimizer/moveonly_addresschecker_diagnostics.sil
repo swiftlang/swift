@@ -656,7 +656,7 @@ bb0(%0 : $*NonTrivialStruct, %1 : $*NonTrivialStructPair):
   %5 = function_ref @nontrivialstruct_borrow : $@convention(method) (@in_guaranteed NonTrivialStructPair) -> @guaranteed_address NonTrivialStruct
   %6 = apply %5(%3) : $@convention(method) (@in_guaranteed NonTrivialStructPair) -> @guaranteed_address NonTrivialStruct
   %7 = mark_unresolved_non_copyable_value [no_consume_or_assign] %6 : $*NonTrivialStruct
-  // expected-error @-1 {{'unknown' is borrowed and cannot be consumed}}
+  // expected-error @-1 {{'self.nontrivialstruct_borrow' is borrowed and cannot be consumed}}
   copy_addr %7 to [init] %0 : $*NonTrivialStruct
   // expected-note @-1 {{consumed here}}
   %9 = tuple ()
