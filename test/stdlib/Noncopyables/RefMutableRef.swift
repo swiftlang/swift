@@ -118,7 +118,7 @@ suite.test("Sendability")
   func isSendable<T: ~Copyable & ~Escapable>(_: T.Type) -> Bool { false }
   func isSendable<T: Sendable & ~Copyable & ~Escapable>(_: T.Type) -> Bool { true }
 
-  expectTrue(isSendable(Ref<MutableRawSpan>.self))
+  expectTrue(isSendable(Ref<Int>.self))
   expectTrue(isSendable(MutableRef<Int>.self))
 
   expectFalse(isSendable(Ref<UnsafeMutableRawPointer>.self))
