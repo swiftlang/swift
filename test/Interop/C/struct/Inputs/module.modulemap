@@ -19,6 +19,10 @@ module NoncopyableStructs {
   header "noncopyable-struct.h"
 }
 
+module NoncopyableMethod {
+  header "noncopyable-method.h"
+}
+
 module ReturnForeignReference {
   header "return-foreign-reference.h"
 }
