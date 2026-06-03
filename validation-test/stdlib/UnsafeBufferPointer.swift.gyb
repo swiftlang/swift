@@ -120,7 +120,7 @@ ${SelfName}TestSuite.test("rebasing") {
 }
 
 ${SelfName}TestSuite.test("_checkBounds(_: Range) helper")
-.require(.minimumStdlib(.stdlib_6_4))
+.require(.stdlib_6_4)
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
 
@@ -170,7 +170,7 @@ ${SelfName}TestSuite.test("rebasingInvalidNonMutableSlice")
 
 % end
 ${SelfName}TestSuite.test("rebasingInvalidMutableSlice")
-.require(.minimumStdlib(.stdlib_6_4))
+.require(.stdlib_6_4)
 .require(.crashTesting)
 .code {
   guard #available(SwiftStdlib 6.4, *) else { return }
