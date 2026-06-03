@@ -66,7 +66,6 @@ class PointerAuthQualifier;
 namespace swift {
   enum class AccessSemantics : unsigned char;
   class AccessorDecl;
-  class ActorIsolation;
   class ApplyExpr;
   class AvailabilityRange;
   class AvailabilityDomain;
