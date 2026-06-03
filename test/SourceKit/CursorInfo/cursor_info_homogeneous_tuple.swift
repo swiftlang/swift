@@ -24,13 +24,13 @@ func labeledTuple(_ x: (a: Int, b: Int, c: Int, d: Int, e: Int)) {}
 func heterogeneousTuple(_ x: (Int, Int, Int, Int, String)) {}
 
 // CHECK_HOMOGENEOUS_PARAM: <Declaration>func homogeneousParam(_ x: (<Type usr="s:Si">Int</Type> /* ... repeated 5 times ... */))</Declaration>
-// CHECK_HOMOGENEOUS_PARAM: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>homogeneousParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><tuple>(<ref.struct usr="s:Si">Int</ref.struct> /* ... repeated 5 times ... */)</tuple></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
+// CHECK_HOMOGENEOUS_PARAM: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>homogeneousParam</decl.name>(<decl.var.parameter><decl.var.parameter.argument_label>_</decl.var.parameter.argument_label> <decl.var.parameter.name>x</decl.var.parameter.name>: <decl.var.parameter.type><tuple>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element> /* ... repeated 5 times ... */)</tuple></decl.var.parameter.type></decl.var.parameter>)</decl.function.free>
 
 // CHECK_HOMOGENEOUS_RETURN: <Declaration>func homogeneousReturn() -&gt; (<Type usr="s:Si">Int</Type> /* ... repeated 5 times ... */)</Declaration>
-// CHECK_HOMOGENEOUS_RETURN: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>homogeneousReturn</decl.name>() -&gt; <decl.function.returntype><tuple>(<ref.struct usr="s:Si">Int</ref.struct> /* ... repeated 5 times ... */)</tuple></decl.function.returntype></decl.function.free>
+// CHECK_HOMOGENEOUS_RETURN: <decl.function.free><syntaxtype.keyword>func</syntaxtype.keyword> <decl.name>homogeneousReturn</decl.name>() -&gt; <decl.function.returntype><tuple>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element> /* ... repeated 5 times ... */)</tuple></decl.function.returntype></decl.function.free>
 
 // CHECK_HOMOGENEOUS_GLOBAL: <Declaration>let homogeneousGlobal: (<Type usr="s:Si">Int</Type> /* ... repeated 5 times ... */)</Declaration>
-// CHECK_HOMOGENEOUS_GLOBAL: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>homogeneousGlobal</decl.name>: <decl.var.type><tuple>(<ref.struct usr="s:Si">Int</ref.struct> /* ... repeated 5 times ... */)</tuple></decl.var.type></decl.var.global>
+// CHECK_HOMOGENEOUS_GLOBAL: <decl.var.global><syntaxtype.keyword>let</syntaxtype.keyword> <decl.name>homogeneousGlobal</decl.name>: <decl.var.type><tuple>(<tuple.element><tuple.element.type><ref.struct usr="s:Si">Int</ref.struct></tuple.element.type></tuple.element> /* ... repeated 5 times ... */)</tuple></decl.var.type></decl.var.global>
 
 // CHECK_SMALL: <Declaration>func smallTuple(_ x: (<Type usr="s:Si">Int</Type>, <Type usr="s:Si">Int</Type>, <Type usr="s:Si">Int</Type>, <Type usr="s:Si">Int</Type>))</Declaration>
 

@@ -793,54 +793,54 @@ void TupleTypeRepr::printImpl(ASTPrinter &Printer,
   Printer.callPrintStructurePre(PrintStructureKind::TupleType);
   SWIFT_DEFER { Printer.printStructurePost(PrintStructureKind::TupleType); };
 
-  Printer << "(";
-
   unsigned NumElements = Bits.TupleTypeRepr.NumElements;
 
   // Compact printing for homogeneous unlabeled tuples with 5+ elements.
-  // Mirrors the compaction in TypePrinter::visitTupleType, but operates 
-  // on the syntactic TypeRepr rather than the resolved Type. Two 
-  // unlabeled elements are considered homogeneous if their printed 
-  // forms match exactly. This is stricter than the Type-based check, 
-  // which uses isEqual and coalesces differently-sugared-but-equal 
-  // types. The stricter form is appropriate here since the TypeRepr 
-  // path appears in contexts where resolved types are not available.
+  // We rely on the resolved `TupleType` threaded through `PrintOptions` 
+  // by `ASTPrinter::printTypeLoc()` so we can compare element types 
+  // using `Type::isEqual()`, matching the criterion used on the `Type` 
+  // printing path in `TypePrinter::visitTupleType()`.
   if (Opts.PrintHomogeneousTuplesCompactly && NumElements > 4) {
-    bool AllUnlabeled = true;
-    for (unsigned i = 0; i != NumElements; ++i) {
-      if (!getElementName(i).empty() || isNamedParameter(i)) {
-        AllUnlabeled = false;
-        break;
-      }
-    }
-
-    if (AllUnlabeled) {
-      SmallString<32> FirstStr;
-      {
-        llvm::raw_svector_ostream OS(FirstStr);
-        StreamPrinter SP(OS);
-        printTypeRepr(getElementType(0), SP, Opts);
-      }
-
-      bool IsHomogeneous = true;
-      for (unsigned i = 1; i != NumElements; ++i) {
-        SmallString<32> EltStr;
-        llvm::raw_svector_ostream OS(EltStr);
-        StreamPrinter SP(OS);
-        printTypeRepr(getElementType(i), SP, Opts);
-        if (StringRef(EltStr) != StringRef(FirstStr)) {
-          IsHomogeneous = false;
-          break;
+    if (auto *ResolvedTuple = Opts.CurrentTupleTypeReprResolvedType) {
+      auto ResolvedElts = ResolvedTuple->getElements();
+      if (ResolvedElts.size() == NumElements) {
+        Type FirstEltType = ResolvedElts[0].getType();
+        bool IsHomogeneous = true;
+        for (unsigned i = 0; i != NumElements; ++i) {
+          if (isNamedParameter(i) || !getElementName(i).empty() ||
+              !ResolvedElts[i].getType()->isEqual(FirstEltType)) {
+            IsHomogeneous = false;
+            break;
+          }
         }
-      }
 
-      if (IsHomogeneous) {
-        printTypeRepr(getElementType(0), Printer, Opts);
-        Printer << " /* ... repeated " << NumElements << " times ... */)";
-        return;
+        if (IsHomogeneous) {
+          // Clear the resolved-type field for the element print so a 
+          // nested `TupleTypeRepr` cannot incorrectly inherit this 
+          // tuple's resolved type.
+          PrintOptions::OverrideScope scope(Opts);
+          OVERRIDE_PRINT_OPTION_UNCONDITIONAL(
+              scope, CurrentTupleTypeReprResolvedType, nullptr);
+
+          Printer << "(";
+          Printer.callPrintStructurePre(PrintStructureKind::TupleElement);
+          printTypeRepr(getElementType(0), Printer, Opts);
+          Printer.printStructurePost(PrintStructureKind::TupleElement);
+          Printer << " /* ... repeated " << NumElements << " times ... */)";
+          return;
+        }
       }
     }
   }
+
+  // Clear the outer-tuple resolved type for the duration of element 
+  // prints, so a nested `TupleTypeRepr` doesn't pick up this tuple's 
+  // `TupleType`.
+  PrintOptions::OverrideScope scope(Opts);
+  OVERRIDE_PRINT_OPTION_UNCONDITIONAL(
+    scope, CurrentTupleTypeReprResolvedType, nullptr);
+
+  Printer << "(";
 
   for (unsigned i = 0, e = NumElements; i != e; ++i) {
     if (i) Printer << ", ";

@@ -38,6 +38,7 @@ class TypeBase;
 class DeclContext;
 class Type;
 class ModuleDecl;
+class TupleType;
 enum class DeclAttrKind : unsigned;
 class DeclAttribute;
 class CustomAttr;
@@ -659,6 +660,15 @@ public:
   /// (e.g. `(Int /* ... repeated 5 times ... */)` instead of 
   /// `(Int, Int, Int, Int, Int)`).
   bool PrintHomogeneousTuplesCompactly = false;
+
+  /// When non-`null`, this is the resolved type corresponding to the 
+  /// `TupleTypeRepr` about to be printed in the `TypeRepr` path. 
+  ///  
+  /// This is set transiently by the printer when delegating to a 
+  /// `TupleTypeRepr`'s print method, so printing has access to resolved 
+  /// types when deciding whether to coalesce a homogeneous tuple, 
+  /// matching the criterion used by the `Type` printing path.
+  TupleType *CurrentTupleTypeReprResolvedType = nullptr;
 
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
