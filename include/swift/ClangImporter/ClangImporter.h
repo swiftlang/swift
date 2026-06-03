@@ -698,6 +698,7 @@ public:
                                   ClangInheritanceInfo inheritance) override;
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+  FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl) override;
   ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
 
