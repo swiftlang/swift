@@ -20,6 +20,7 @@ import json
 import os
 import platform
 import re
+import shlex
 import signal
 import subprocess
 import sys
@@ -934,7 +935,10 @@ def main_normal():
     shell.makedirs(invocation.workspace.build_root)
 
     # Compute a ninja wrapper that invokes cache-build-session for
-    # incremental builds outside the build-script daemon.  
+    # incremental builds outside the build-script daemon. The wrapper also
+    # exports the caching-related environment variables that build-script
+    # itself sets on os.environ, so a direct `ninja` invocation for an
+    # incremental rebuild picks up the same caching configuration.
     if args.enable_caching and toolchain.ninja is not None:
         cc_dir = os.path.dirname(toolchain.cc)
         cache_session = os.path.join(cc_dir, 'cache-build-session')
@@ -943,9 +947,36 @@ def main_normal():
                 SWIFT_BUILD_ROOT, args.build_subdir,
                 'build-utils', 'ninja')
             shell.makedirs(os.path.dirname(wrapper_path))
+
+            # Caching environment defaults to bake into the wrapper. Each
+            # var is set with `if [ -z "$VAR" ]; then export VAR=...; fi`
+            # so values already present in the caller's environment (e.g.
+            # when build-script itself invokes the wrapper) are preserved.
+            cache_env = [
+                ('LLVM_CACHE_CAS_PATH', args.caching_cas_path),
+            ]
+            if args.caching_plugin_path:
+                cache_env.append(
+                    ('LLVM_CACHE_PLUGIN_PATH', args.caching_plugin_path))
+            if args.caching_plugin_option:
+                cache_env.append((
+                    'LLVM_CACHE_PLUGIN_OPTIONS',
+                    ':'.join(args.caching_plugin_option)))
+            if args.caching_prefix_map:
+                cache_env.append((
+                    'LLVM_CACHE_PREFIX_MAPS',
+                    SWIFT_SOURCE_ROOT + '=/^src'))
+
             with open(wrapper_path, 'w') as f:
                 f.write('#!/bin/sh\n')
                 f.write('# Auto-generated ninja wrapper for cached builds.\n')
+                for name, value in cache_env:
+                    # Only set the default if the caller hasn't already
+                    # provided a value, so build-script's own exports win.
+                    f.write('if [ -z "${}" ]; then\n'.format(name))
+                    f.write('    export {}={}\n'.format(
+                        name, shlex.quote(value)))
+                    f.write('fi\n')
                 f.write('if [ -n "$CLANG_CACHE_SCAN_DAEMON_SOCKET_PATH" ]; then\n')
                 f.write('  exec "{}" "$@"\n'.format(toolchain.ninja))
                 f.write('else\n')
