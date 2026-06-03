@@ -21,7 +21,7 @@
 //      back to the merge site, or to the func keyword for SILFunctionArgument)
 //      trips the verifier.
 //
-//   3. The task-isolated side renders as "code in the current task" instead
+//   3. The task-isolated side renders as "code in the current isolation context" instead
 //      of "task-isolated code", matching the rest of the diagnostic suite.
 //
 //   4. The isolatedfn primary has two variants: a named form that embeds the
@@ -36,7 +36,7 @@
 // notes from one of two note diagnostics. The matrix below records, per
 // emitter, which RegionMergeReason dispatches to it, which scenarios in this
 // file exercise it, and which isolation-string variants
-// (cross-actor vs "code in the current task") are covered. The unknown-pattern
+// (cross-actor vs "code in the current isolation context") are covered. The unknown-pattern
 // fallback companion lives in transfernonsendable_merge_region_checker_failures.swift.
 //
 //   emitter / primary diag                  | reason(s)                    | covered by                  | iso variants
@@ -108,12 +108,12 @@ struct TwoIsolatedFields {
 }
 
 /////////////////////////////////////////////////////////////////////
-// MARK: isolated callee + task-isolated source ("code in the current task")
+// MARK: isolated callee + task-isolated source ("code in the current isolation context")
 /////////////////////////////////////////////////////////////////////
 
 // A nonisolated method on a non-Sendable class invoking a @MainActor getter
 // on `self`. `self` is task-isolated -- the merge primary should render this
-// side as "code in the current task". The `self` value note anchors at the
+// side as "code in the current isolation context". The `self` value note anchors at the
 // `func call` token (col 8) because `self` is a SILFunctionArgument and we
 // resolve to the parameter decl loc.
 //
@@ -121,11 +121,11 @@ struct TwoIsolatedFields {
 // follow-up assignment-merge so the diagnostics here focus on the isolatedfn
 // case.
 final class TaskIsolatedSelfTest { // expected-note {{class 'TaskIsolatedSelfTest' does not conform to the 'Sendable' protocol}}
-  func call() async { // expected-named-note@:8 {{'self' is exposed to code in the current task}}
-                      // expected-bare-note@-1:8 {{value is exposed to code in the current task}}
+  func call() async { // expected-named-note@:8 {{'self' is exposed to code in the current isolation context}}
+                      // expected-bare-note@-1:8 {{value is exposed to code in the current isolation context}}
     _ = await x
-    // expected-named-warning @-1 {{passing 'self' to main actor-isolated getter for property 'x' could allow for references between values exposed to code in the current task and main actor-isolated code risking data races}}
-    // expected-bare-warning @-2 {{passing value to main actor-isolated getter for property 'x' could allow for references between values exposed to code in the current task and main actor-isolated code risking data races}}
+    // expected-named-warning @-1 {{passing 'self' to main actor-isolated getter for property 'x' could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
+    // expected-bare-warning @-2 {{passing value to main actor-isolated getter for property 'x' could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
     // expected-warning @-3 {{non-Sendable type 'TaskIsolatedSelfTest' cannot be sent into main actor-isolated context in call to property 'x'; this is an error in the Swift 6 language mode}}
   }
 
@@ -183,7 +183,7 @@ struct TupleMerge {
 }
 
 /////////////////////////////////////////////////////////////////
-// MARK: assign — task-isolated source side ("code in the current task")
+// MARK: assign — task-isolated source side ("code in the current isolation context")
 /////////////////////////////////////////////////////////////////
 
 // AsyncStream<Element>.init(_:) takes a @Sendable closure executed in a task
@@ -199,7 +199,7 @@ final class TaskAssignTest {
   var stored: NonSendableKlass = NonSendableKlass()
   func makeStream() -> AsyncStream<NonSendableKlass> {
     AsyncStream<NonSendableKlass> {
-      self.stored // expected-warning {{assignment could allow for references between values exposed to code in the current task and main actor-isolated code risking data races}}
+      self.stored // expected-warning {{assignment could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
       // expected-named-note @-1 {{'self.stored.some' is exposed to main actor-isolated code}}
       // expected-bare-note @-2 {{value is exposed to main actor-isolated code}}
       // expected-warning @-3 {{main actor-isolated property 'stored' cannot be accessed from outside of the actor; this is an error in the Swift 6 language mode}}

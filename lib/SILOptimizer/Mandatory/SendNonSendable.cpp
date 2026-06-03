@@ -262,7 +262,7 @@ static SourceLoc preciseSourceLocForValue(SILValue value) {
 /// Emit a per-value note describing one side of an incompatible region merge.
 /// \p ownIso is the isolation of \p value (the textual rendering used when the
 /// value is *not* task-isolated). \p ownIsTaskIsolated drives a `%select` that
-/// renders "code in the current task" instead of "X-isolated code" for the
+/// renders "code in the current isolation context" instead of "X-isolated code" for the
 /// task-isolated case, matching the wording used elsewhere in the diagnostic
 /// suite.
 ///
@@ -1000,7 +1000,8 @@ public:
         SILIsolationInfo::printActorIsolationForDiagnostics(
             getFunction(), isolationCrossing.getCallerIsolation());
 
-    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected() ||
+                          namedValuesIsolationInfo.isTaskIsolated();
     if (auto callee = getSendingCallee()) {
       diagnoseNote(
           loc, diag::regionbasedisolation_named_info_send_yields_race_callee,
@@ -1032,7 +1033,8 @@ public:
     auto callerIsolationStr =
         SILIsolationInfo::printActorIsolationForDiagnostics(
             getFunction(), isolationCrossing.getCallerIsolation());
-    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected() ||
+                          namedValuesIsolationInfo.isTaskIsolated();
 
     diagnoseNote(loc,
                  diag::regionbasedisolation_named_info_send_yields_race_callee,
@@ -1212,11 +1214,13 @@ public:
     auto callerIsolationStr =
         SILIsolationInfo::printActorIsolationForDiagnostics(
             getFunction(), isolationCrossing.getCallerIsolation());
-    bool isDisconnected = namedValuesIsolationInfo.isDisconnected();
+    bool isDisconnected = namedValuesIsolationInfo.isDisconnected() ||
+                          namedValuesIsolationInfo.isTaskIsolated();
+    bool isTaskIsolated = namedValuesIsolationInfo.isTaskIsolated();
     diagnoseNote(loc,
                  diag::regionbasedisolation_named_isolated_closure_yields_race,
                  isDisconnected, descriptiveKindStr, name, calleeIsolationStr,
-                 callerIsolationStr);
+                 callerIsolationStr, isTaskIsolated);
     emitRequireInstDiagnostics();
   }
 
@@ -1834,11 +1838,13 @@ public:
       diagnoseNote(
           loc,
           diag::regionbasedisolation_typed_sendneversendable_via_arg_callee,
-          descriptiveKindStr, inferredType, calleeIsolationStr, callee.value());
+          descriptiveKindStr, inferredType, calleeIsolationStr, callee.value(),
+          getIsolationRegionInfo()->isTaskIsolated());
     } else {
       diagnoseNote(loc,
                    diag::regionbasedisolation_typed_sendneversendable_via_arg,
-                   descriptiveKindStr, inferredType, calleeIsolationStr);
+                   descriptiveKindStr, inferredType, calleeIsolationStr,
+                   getIsolationRegionInfo()->isTaskIsolated());
     }
   }
 
@@ -1854,11 +1860,13 @@ public:
     auto callerIsolationStr =
         SILIsolationInfo::printActorIsolationForDiagnostics(
             getFunction(), crossing.getCallerIsolation());
-    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected() ||
+                          getIsolationRegionInfo()->isTaskIsolated();
+    bool isTaskIsolated = getIsolationRegionInfo()->isTaskIsolated();
     diagnoseNote(loc,
                  diag::regionbasedisolation_named_isolated_closure_yields_race,
                  isDisconnected, descriptiveKindStr, name, calleeIsolationStr,
-                 callerIsolationStr);
+                 callerIsolationStr, isTaskIsolated);
   }
 
   void
@@ -2049,7 +2057,8 @@ public:
         getIsolationRegionInfo().printForDiagnostics(getFunction());
 
     diagnoseNote(loc, diag::regionbasedisolation_named_send_nt_asynclet_capture,
-                 name, descriptiveKindStr);
+                 name, descriptiveKindStr,
+                 getIsolationRegionInfo()->isTaskIsolated());
   }
 
   void emitNamedIsolation(SILLocation loc, Identifier name,
@@ -2061,17 +2070,19 @@ public:
     auto calleeIsolationStr =
         SILIsolationInfo::printActorIsolationForDiagnostics(
             getFunction(), isolationCrossing.getCalleeIsolation());
-    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected() ||
+                          getIsolationRegionInfo()->isTaskIsolated();
+    bool isTaskIsolated = getIsolationRegionInfo()->isTaskIsolated();
 
     if (auto callee = getSendingCallee()) {
       diagnoseNote(loc,
                    diag::regionbasedisolation_named_send_never_sendable_callee,
                    isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
-                   callee.value(), descriptiveKindStr);
+                   callee.value(), descriptiveKindStr, isTaskIsolated);
     } else {
       diagnoseNote(loc, diag::regionbasedisolation_named_send_never_sendable,
                    isDisconnected, name, descriptiveKindStr, calleeIsolationStr,
-                   descriptiveKindStr);
+                   descriptiveKindStr, isTaskIsolated);
     }
   }
 
@@ -2081,19 +2092,24 @@ public:
 
     auto descriptiveKindStr =
         getIsolationRegionInfo().printForDiagnostics(getFunction());
-    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
+    bool isTaskIsolated = getIsolationRegionInfo()->isTaskIsolated();
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected() ||
+                          isTaskIsolated;
     auto diag = diag::regionbasedisolation_named_send_into_sending_param;
-    diagnoseNote(loc, diag, isDisconnected, descriptiveKindStr, varName);
+    diagnoseNote(loc, diag, isDisconnected, descriptiveKindStr, varName,
+                 isTaskIsolated);
   }
 
   void emitNamedSendingReturn(SILLocation loc, Identifier varName) {
     emitNamedOnlyError(loc, varName);
     auto descriptiveKindStr =
         getIsolationRegionInfo().printForDiagnostics(getFunction());
-    bool isDisconnected = getIsolationRegionInfo().isDisconnected();
+    bool isTaskIsolated = getIsolationRegionInfo()->isTaskIsolated();
+    bool isDisconnected = getIsolationRegionInfo().isDisconnected() ||
+                          isTaskIsolated;
     auto diag = diag::regionbasedisolation_named_nosend_send_into_result;
     diagnoseNote(loc, diag, isDisconnected, descriptiveKindStr, varName,
-                 descriptiveKindStr);
+                 descriptiveKindStr, isTaskIsolated);
   }
 
 private:
@@ -3346,13 +3362,15 @@ void InOutSendingNotDisconnectedAtExitDiagnosticEmitter::emit() {
   diagnoseError(
       functionExitingInst,
       diag::regionbasedisolation_inout_sending_cannot_be_actor_isolated,
-      *varName, descriptiveKindStr)
+      *varName, descriptiveKindStr,
+      actorIsolatedRegionInfo->isTaskIsolated())
       .limitBehaviorIf(getBehaviorLimit());
 
   diagnoseNote(
       functionExitingInst,
       diag::regionbasedisolation_inout_sending_cannot_be_actor_isolated_note,
-      *varName, descriptiveKindStr);
+      *varName, descriptiveKindStr,
+      actorIsolatedRegionInfo->isTaskIsolated());
 }
 
 //===----------------------------------------------------------------------===//
@@ -3505,6 +3523,7 @@ void AssignNeverSendableIntoSendingResultDiagnosticEmitter::emit() {
   // Then emit the note with greater context.
   auto descriptiveKindStr =
       isolatedValueIsolationRegionInfo.printForDiagnostics(getFunction());
+  bool isTaskIsolated = isolatedValueIsolationRegionInfo->isTaskIsolated();
 
   // Grab the var name if we can find it.
   if (auto varName = VariableNameInferrer::inferName(srcOperand->get())) {
@@ -3550,14 +3569,14 @@ void AssignNeverSendableIntoSendingResultDiagnosticEmitter::emit() {
     diagnoseError(
         srcOperand,
         diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_named,
-        *varName, descriptiveKindStr)
+        *varName, descriptiveKindStr, isTaskIsolated)
         .limitBehaviorIf(getConcurrencyDiagnosticBehavior());
 
     diagnoseNote(
         srcOperand,
         diag::
             regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named,
-        *varName, descriptiveKindStr);
+        *varName, descriptiveKindStr, isTaskIsolated);
     return;
   }
 
@@ -3566,13 +3585,13 @@ void AssignNeverSendableIntoSendingResultDiagnosticEmitter::emit() {
   diagnoseError(
       srcOperand,
       diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_type,
-      type, descriptiveKindStr)
+      type, descriptiveKindStr, isTaskIsolated)
       .limitBehaviorIf(getConcurrencyDiagnosticBehavior());
 
   diagnoseNote(
       srcOperand,
       diag::regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type,
-      type, descriptiveKindStr);
+      type, descriptiveKindStr, isTaskIsolated);
   diagnoseNote(srcOperand, diag::regionbasedisolation_type_is_non_sendable,
                type);
 }

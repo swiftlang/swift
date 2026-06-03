@@ -100,7 +100,7 @@ func withCheckedContinuation_4a() async {
   let x = await withCheckedContinuation { continuation in
     continuation.resume(returning: y)
     // expected-error @-1 {{sending 'y' risks causing data races}}
-    // expected-note @-2 {{task-isolated 'y' is passed as a 'sending' parameter}}
+    // expected-note @-2 {{'y' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
     useValue(y)
   }
   await useValueAsync(x)
@@ -229,7 +229,7 @@ func withUnsafeContinuation_4a() async {
   let x = await withUnsafeContinuation { continuation in
     continuation.resume(returning: y)
     // expected-error @-1 {{sending 'y' risks causing data races}}
-    // expected-note @-2 {{task-isolated 'y' is passed as a 'sending' parameter}}
+    // expected-note @-2 {{'y' is passed as a 'sending' parameter; Uses in callee may race with code in the current isolation context}}
     useValue(y)
   }
   await useValueAsync(x)
