@@ -19,6 +19,7 @@
 #define SWIFT_BASIC_LANGOPTIONS_H
 
 #include "swift/Basic/CXXStdlibKind.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Feature.h"
 #include "swift/Basic/FunctionBodySkipping.h"
 #include "swift/Basic/LLVM.h"
@@ -450,9 +451,6 @@ namespace swift {
     bool EnableDeserializationSafety =
       ::getenv("SWIFT_ENABLE_DESERIALIZATION_SAFETY");
 
-    /// Disable injecting deserializes module paths into the explict module map.
-    bool DisableDeserializationOfExplicitPaths = false;
-
     /// Attempt to recover for imported modules with broken modularization
     /// in an unsafe way. Currently applies only to xrefs where the target
     /// decl moved to a different module that is already loaded.
@@ -470,6 +468,9 @@ namespace swift {
 
     /// Access or distribution level of the whole module being parsed.
     LibraryLevel LibraryLevel = LibraryLevel::Other;
+
+    /// Clang modules explicitly marked as IPI by the build system.
+    std::vector<std::string> IPIClangModuleNames;
 
     /// The name of the package this module belongs to.
     std::string PackageName;
@@ -665,6 +666,11 @@ namespace swift {
     /// in their module map.
     llvm::SmallVector<StringRef> ModulesRequiringObjC;
 
+    /// User override for the main module's code generation model, set by
+    /// `-enable-experimental-feature CodeGenerationModel=<value>`. Only
+    /// honored in Embedded Swift; rejected at parse time outside Embedded.
+    std::optional<CodeGenerationModel> CodeGenerationModelOverride;
+
     /// Whether to ignore checks that a module is resilient during
     /// type-checking, SIL verification, and IR emission,
     bool BypassResilienceChecks = false;
@@ -686,6 +692,10 @@ namespace swift {
 #else
     bool RestrictNonProductionExperimentalFeatures = false;
 #endif
+
+    /// The section and segment name to use for OSLog strings.
+    mutable std::string OSLogStringSectionName =
+        "__TEXT,__oslogstring,cstring_literals";
 
     bool isConcurrencyModelTaskToThread() const {
       return ActiveConcurrencyModel == ConcurrencyModel::TaskToThread;
@@ -930,6 +940,20 @@ namespace swift {
     /// Intended for debugging purposes only.
     unsigned WarnLongExpressionTypeChecking = 0;
 
+    /// If non-zero, warn when type-checking an expression uses more than
+    /// this many solver scopes.
+    ///
+    /// Intended for debugging purposes only. Unlike WarnLongExpressionTypeChecking,
+    /// this threshold is deterministic across machines.
+    unsigned WarnLongExpressionTypeCheckingScopes = 0;
+
+    /// If non-zero, warn when type-checking an expression uses more than
+    /// this many solver trail steps.
+    ///
+    /// Intended for debugging purposes only. Unlike WarnLongExpressionTypeChecking,
+    /// this threshold is deterministic across machines.
+    unsigned WarnLongExpressionTypeCheckingTrail = 0;
+
     /// If non-zero, abort the expression type checker if it takes more
     /// than this many seconds.
     unsigned ExpressionTimeoutThreshold = 0;
@@ -1017,6 +1041,10 @@ namespace swift {
     /// Allow request evalutation to perform type checking lazily, instead of
     /// eagerly typechecking source files after parsing.
     bool EnableLazyTypecheck = false;
+
+    /// Enables eager type-checking of declarations in macro expansions.
+    /// For testing purposes.
+    bool TypeCheckMacrosEagerly = false;
 
     /// Disable the component splitter phase of the expression type checker.
     bool SolverDisableSplitter = false;

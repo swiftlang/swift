@@ -165,12 +165,20 @@ public:
     return is("+") || is("-") || is("*") || is("/") || is("%");
   }
 
+  bool isOverflowArithmeticOperator() const {
+    return is("&+") || is("&-") || is("&*");
+  }
+
   bool isBitwiseOperator() const {
     return is("~") || is("&") || is("|") || is("^");
   }
 
   bool isShiftOperator() const {
     return is("<<") || is(">>");
+  }
+
+  bool isMaskingShiftOperator() const {
+    return is("&<<") || is("&>>");
   }
 
   // Returns whether this is a standard comparison operator,

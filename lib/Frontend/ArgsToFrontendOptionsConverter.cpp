@@ -165,6 +165,8 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.ParallelDependencyScan = Args.hasFlag(OPT_parallel_scan,
                                              OPT_no_parallel_scan,
                                              true);
+  Opts.ShareClangCompilerInstance =
+      !Args.hasArg(OPT_no_clang_compiler_instance_sharing);
   Opts.GenReproducer |= Args.hasArg(OPT_gen_reproducer);
   Opts.GenReproducerDir = Args.getLastArgValue(OPT_gen_reproducer_dir);
 
@@ -203,6 +205,12 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.CompilerDebuggingOpts.DumpClangLookupTables |=
       Args.hasArg(OPT_dump_clang_lookup_tables);
+
+  Opts.CompilerDebuggingOpts.DumpAbstractLayout |=
+      Args.hasArg(OPT_dump_abstract_layout);
+
+  Opts.CompilerDebuggingOpts.DumpHiddenTypeLayouts |=
+      Args.hasArg(OPT_dump_hidden_type_layouts);
 
   Opts.CheckOnoneSupportCompleteness = Args.hasArg(OPT_check_onone_completeness);
 
@@ -709,6 +717,8 @@ ArgsToFrontendOptionsConverter::determineRequestedAction(const ArgList &args) {
     return FrontendOptions::ActionType::TypecheckModuleFromInterface;
   if (Opt.matches(OPT_emit_supported_arguments))
     return FrontendOptions::ActionType::PrintArguments;
+  if (Opt.matches(OPT_emit_polyglot_ast))
+    return FrontendOptions::ActionType::EmitPolyglotAST;
   llvm_unreachable("Unhandled mode option");
 }
 

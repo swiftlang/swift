@@ -126,8 +126,8 @@ public struct WrapOverloadedMethods {
 }
 
 // CHECK: WrapOverloadedMethods final {
-// CHECK: SWIFT_INLINE_THUNK void method
-// CHECK-SAME: (swift::Int x) const SWIFT_SYMBOL("s:7Methods014WrapOverloadedA0V6methodyySiF");
+// CHECK: SWIFT_INLINE_THUNK void method(swift::Int x) const
+// CHECK: SWIFT_INLINE_THUNK void method(float x) const
 // CHECK-NEXT: private:
 
 public struct WrapOverloadedMethodsSibling {

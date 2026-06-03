@@ -38,8 +38,8 @@
 using namespace swift;
 
 static SingleRawComment::CommentKind getCommentKind(StringRef Comment) {
-  assert(Comment.size() >= 2);
-  assert(Comment[0] == '/');
+  if (Comment.size() < 2 || Comment[0] != '/')
+    return SingleRawComment::CommentKind::OrdinaryLine;
 
   if (Comment[1] == '/') {
     if (Comment.size() < 3)
@@ -49,14 +49,15 @@ static SingleRawComment::CommentKind getCommentKind(StringRef Comment) {
       return SingleRawComment::CommentKind::LineDoc;
     }
     return SingleRawComment::CommentKind::OrdinaryLine;
-  } else {
-    assert(Comment[1] == '*');
-    assert(Comment.size() >= 4);
-    if (Comment[2] == '*') {
-      return SingleRawComment::CommentKind::BlockDoc;
-    }
-    return SingleRawComment::CommentKind::OrdinaryBlock;
   }
+
+  if (Comment[1] != '*' || Comment.size() < 4)
+    return SingleRawComment::CommentKind::OrdinaryLine;
+
+  if (Comment[2] == '*') {
+    return SingleRawComment::CommentKind::BlockDoc;
+  }
+  return SingleRawComment::CommentKind::OrdinaryBlock;
 }
 
 SingleRawComment::SingleRawComment(CharSourceRange Range,
@@ -149,6 +150,15 @@ RawComment RawCommentRequest::evaluate(Evaluator &eval, const Decl *D) const {
       SmallVector<SingleRawComment, 4> SRCs;
       for (const auto &Range : CachedLocs->DocRanges) {
         if (Range.isValid()) {
+          // Validate the extracted text looks like a comment before using it.
+          // If the source file has been modified since the .swiftsourceinfo was
+          // generated, the stored byte offset may point to non-comment content.
+          auto Text = ctx.SourceMgr.extractText(Range);
+          if (Text.size() < 2 || Text[0] != '/') {
+            // Stale .swiftsourceinfo; fall through to .swiftdoc below.
+            SRCs.clear();
+            break;
+          }
           SRCs.push_back({Range, ctx.SourceMgr});
         } else {
           // if we've run into an invalid range, don't bother trying to load

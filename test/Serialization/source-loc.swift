@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_source_loc.swift -experimental-serialize-debug-info -O -g
-// RUN: llvm-bcanalyzer %t/def_source_loc.swiftmodule | %FileCheck %s --check-prefix=SIL
+// RUN: %llvm-bcanalyzer %t/def_source_loc.swiftmodule | %FileCheck %s --check-prefix=SIL
 // RUN: %target-swift-frontend -module-name source_loc -g -emit-sil -I %t %s | %FileCheck %s
 
 // SIL-NOT: UnknownCode

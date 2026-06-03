@@ -106,6 +106,9 @@ class ModuleFileSharedCore {
   /// Name to use in public facing diagnostics and documentation.
   StringRef PublicModuleName;
 
+  /// Section name to use for OSLog strings.
+  StringRef OSLogStringSectionName;
+
   /// The version of the Swift compiler used to produce swiftinterface
   /// this module is based on. This is the most precise version possible
   /// - a compiler tag or version if this is a development compiler.
@@ -308,6 +311,8 @@ private:
   std::unique_ptr<SerializedDeclMemberNamesTable> DeclMemberNames;
   std::unique_ptr<SerializedDeclFingerprintsTable> DeclFingerprints;
 
+  llvm::StringMap<AbstractTypeLayout> HiddenTypeLayouts;
+
   class ObjCMethodTableInfo;
   using SerializedObjCMethodTable =
     llvm::OnDiskIterableChainedHashTable<ObjCMethodTableInfo>;
@@ -416,11 +421,14 @@ private:
     /// Whether this module enabled strict memory safety.
     unsigned StrictMemorySafety : 1;
 
-    /// Whether this module used deferred code generation.
-    unsigned DeferredCodeGen : 1;
+    /// The code generation model used by this module.
+    unsigned CodeGenModel : 2;
 
-    // Explicitly pad out to the next word boundary.
-    unsigned : 1;
+    /// Whether this module used deferred code generation.
+    unsigned AggressiveCMOEnabled : 1;
+
+    /// Discriminator for library level (LibraryLevel enum).
+    unsigned LibraryLevel : 2;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -442,6 +450,7 @@ private:
       bool isFramework,
       StringRef requiredSDK,
       std::optional<llvm::Triple> target,
+      std::optional<bool> isEmbedded,
       serialization::ValidationInfo &info, PathObfuscator &pathRecoverer);
 
   /// Change the status of the current module.
@@ -516,6 +525,11 @@ private:
   /// Returns false if there was an error.
   bool readIndexBlock(llvm::BitstreamCursor &cursor);
 
+  /// Reads the hidden-type layouts block, populating HiddenTypeLayouts.
+  ///
+  /// Returns false if there was an error.
+  bool readHiddenTypeLayoutsBlock(llvm::BitstreamCursor &cursor);
+
   /// Read an on-disk decl hash table stored in
   /// \c comment_block::DeclCommentListLayout format.
   std::unique_ptr<SerializedDeclCommentTable>
@@ -581,13 +595,14 @@ public:
        std::unique_ptr<llvm::MemoryBuffer> moduleSourceInfoInputBuffer,
        bool isFramework,
        StringRef requiredSDK, std::optional<llvm::Triple> target,
+       std::optional<bool> isEmbedded,
        PathObfuscator &pathRecoverer,
        std::shared_ptr<const ModuleFileSharedCore> &theModule) {
     serialization::ValidationInfo info;
     auto *core = new ModuleFileSharedCore(
         std::move(moduleInputBuffer), std::move(moduleDocInputBuffer),
         std::move(moduleSourceInfoInputBuffer), isFramework,
-        requiredSDK, target, info,
+        requiredSDK, target, isEmbedded, info,
         pathRecoverer);
     if (!moduleInterfacePath.empty()) {
       ArrayRef<char> path;
@@ -691,7 +706,15 @@ public:
 
   bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
 
-  bool deferredCodeGen() const { return Bits.DeferredCodeGen; }
+  CodeGenerationModel codeGenerationModel() const {
+    return static_cast<CodeGenerationModel>(Bits.CodeGenModel);
+  }
+
+  bool isAggressiveCMOEnabled() const { return Bits.AggressiveCMOEnabled; }
+
+  LibraryLevel getLibraryLevel() const {
+    return LibraryLevel(Bits.LibraryLevel);
+  }
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///

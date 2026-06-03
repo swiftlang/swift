@@ -7,6 +7,7 @@
 import A
 
 // CHECK:        "modulePath": "escaped.swiftmodule",
+// CHECK-NEXT:   "libraryLevel":
 // CHECK-NEXT:   "sourceFiles": [
 // CHECK-NEXT:      "{{.*}}\\test\\ScanDependencies\\escaped.swift"
 // CHECK-NEXT:   ],

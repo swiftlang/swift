@@ -23,6 +23,7 @@
 #include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
@@ -47,7 +48,6 @@
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
-#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -6590,87 +6590,12 @@ static void diagnoseMissingMemberImports(const Expr *E, const DeclContext *DC) {
   const_cast<Expr *>(E)->walk(walker);
 }
 
-static bool isReturningSharedFRT(const clang::NamedDecl *ND,
-                                 clang::QualType &outReturnType,
-                                 ASTContext &Ctx) {
-  if (auto *CD = dyn_cast<clang::CXXConstructorDecl>(ND))
-    outReturnType =
-        CD->getParent()->getTypeForDecl()->getCanonicalTypeUnqualified();
-  else if (auto *FD = dyn_cast<clang::FunctionDecl>(ND))
-    outReturnType = FD->getReturnType();
-  else if (auto *MD = dyn_cast<clang::ObjCMethodDecl>(ND))
-    outReturnType = MD->getReturnType();
-  else
-    return false;
-
-  clang::QualType pointeeType = outReturnType;
-  if (outReturnType->isPointerType() || outReturnType->isReferenceType())
-    pointeeType = outReturnType->getPointeeType();
-
-  const auto *recordDecl = pointeeType->getAsRecordDecl();
-  if (!recordDecl)
-    return false;
-
-  if (importer::hasImmortalAttrs(recordDecl))
-    return false;
-
-  auto info = evaluateOrDefault(
-      Ctx.evaluator, ForeignReferenceTypeInfoRequest({recordDecl}), {});
-  return info.isReference();
-}
-
-static bool shouldDiagnoseMissingReturnsRetained(const clang::NamedDecl *ND,
-                                                 clang::QualType retType,
-                                                 ASTContext &Ctx) {
-
-  auto attrInfo = importer::ReturnOwnershipInfo(ND);
-  if (attrInfo.hasRetainAttr())
-    return false;
-
-  if (importer::matchSwiftAttrOnRecordPtr<bool>(
-          retType, {{"returned_as_unretained_by_default", true}}))
-    return false;
-
-  if (isa<clang::ObjCMethodDecl>(ND))
-    // All ObjCMethods can be annotated with ownership attrs
-    return true;
-
-  if (auto *FD = dyn_cast<clang::FunctionDecl>(ND)) {
-    if (isa<clang::CXXDeductionGuideDecl>(FD))
-      // Deduction guides don't need ownership attrs because they aren't
-      // functions.
-      return false;
-
-    if (const auto *methodDecl = dyn_cast<clang::CXXMethodDecl>(FD)) {
-      if (isa<clang::CXXDestructorDecl>(methodDecl))
-        // Ownership attrs are not yet supported for dtors if FRTs
-        return false;
-
-      if (methodDecl->isOverloadedOperator())
-        // Ownership attrs are not yet supported for overloaded operators
-        return false;
-
-      if (!methodDecl->isUserProvided())
-        // Implicitly defined methods don't need ownership attrs since users
-        // can't annotate them.
-        return false;
-    }
-
-    return true;
-  }
-
-  // Decls that aren't functions or ObjCMethods don't need ownership attrs.
-  return false;
-}
-
-// Diagnose calls to imported C++ functions that return `SWIFT_SHARED_REFERENCE`
-// types without explicit ownership annotations SWIFT_RETURNS_(UN)RETAINED
 static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
   class DiagnoseWalker : public BaseDiagnosticWalker {
-    ASTContext &Ctx;
+    ClangModuleLoader *ClangLoader;
 
   public:
-    explicit DiagnoseWalker(ASTContext &ctx) : Ctx(ctx) {}
+    explicit DiagnoseWalker(ClangModuleLoader *CML) : ClangLoader(CML) {}
 
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       if (!E)
@@ -6684,34 +6609,17 @@ static void diagnoseCxxFunctionCalls(const Expr *E, const DeclContext *DC) {
       if (!func)
         return Action::Continue(E);
 
-      auto *clangDecl = func->getClangDecl();
-      if (!clangDecl)
-        return Action::Continue(E);
-
-      auto *ND = dyn_cast<clang::NamedDecl>(clangDecl);
-      if (!ND)
-        return Action::Continue(E);
-
-      clang::QualType retType;
-      if (!isReturningSharedFRT(ND, retType, Ctx))
-        return Action::Continue(E);
-
-      if (shouldDiagnoseMissingReturnsRetained(ND, retType, Ctx)) {
-        Ctx.Diags.diagnose(CE->getLoc(),
-                           diag::warn_unannotated_cxx_func_returning_frt, func);
-
-        SourceLoc diagnosticLoc = func->getLoc();
-        ASSERT(diagnosticLoc.isValid());
-        Ctx.Diags.diagnose(diagnosticLoc,
-                           diag::note_unannotated_cxx_func_returning_frt, func);
-      }
+      if (isa_and_nonnull<clang::NamedDecl>(func->getClangDecl()))
+        ClangLoader->checkCalledClangFunction(func, CE->getLoc());
 
       return Action::Continue(E);
     }
   };
 
-  DiagnoseWalker walker(DC->getASTContext());
-  const_cast<Expr *>(E)->walk(walker);
+  if (auto *Loader = DC->getASTContext().getClangModuleLoader()) {
+    DiagnoseWalker walker(Loader);
+    const_cast<Expr *>(E)->walk(walker);
+  }
 }
 
 //===----------------------------------------------------------------------===//

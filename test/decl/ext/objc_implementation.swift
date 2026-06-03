@@ -430,7 +430,6 @@ protocol EmptySwiftProto {}
 
 @objc(OwnershipTests) @implementation extension ObjCClass {
   func consumingMismatchMethod(_ param: consuming Any?) {
-    // expected-error@-1 {{instance method 'consumingMismatchMethod' has a parameter ownership modifier that does not match the declaration in the header}}
   }
   func consumingMismatchMethod2(_ param: Any?) {
     // expected-error@-1 {{instance method 'consumingMismatchMethod2' has a parameter ownership modifier that does not match the declaration in the header}}

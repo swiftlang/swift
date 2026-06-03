@@ -143,11 +143,41 @@ import lifetime_underscored_dependence
 // CHECK: @inlinable public func takeCopierUnannotated(f: (consuming lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView) {}
 
 // CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: typealias LabelledNE2NE = @_lifetime(copy ne) (_ ne: lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
+// CHECK-NEXT: #endif
+
+// CHECK-NEXT: typealias InferredNE2NE = (lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
+
+// CHECK-NEXT: typealias InferredLabelledNE2NE = (_ ne: lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: typealias NamedLifetimeType = @_lifetime(copy ne) (_ ne: lifetime_underscored_dependence::AnotherView, _ ne2: lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
+// CHECK-NEXT: #endif
+
+// CHECK-NEXT: typealias InferredLifetimeType = (_ ne: lifetime_underscored_dependence::AnotherView, lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: typealias ImmortalLifetimeType = @_lifetime(immortal) (_ ne: lifetime_underscored_dependence::AnotherView, _ ne2: lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: typealias CapturesLifetimeType = @_lifetime(captures) (_ ne: lifetime_underscored_dependence::AnotherView, _ ne2: lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: typealias MixedLifetimeType = @_lifetime(copy ne0) (_ ne0: lifetime_underscored_dependence::AnotherView, _ neio: inout lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: typealias NestedLifetimeType = @_lifetime(neo: copy ne0, copy neo) (_ nei: inout lifetime_underscored_dependence::AnotherView, _ ne0: lifetime_underscored_dependence::AnotherView, _ neo: inout lifetime_underscored_dependence::AnotherView) -> (_ ne1: lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
+// CHECK-NEXT: #endif
+
+// CHECK: #if compiler(>=5.3) && $ClosureLifetimes
 // CHECK-NEXT: public typealias ExplicitNestedType = @_lifetime(copy ne0) @_lifetime(ne1: copy ne0, copy ne1) ((lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView, _ ne0: consuming lifetime_underscored_dependence::AnotherView, _ ne1: inout lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView
 // CHECK-NEXT: #endif
 
 // CHECK: #if compiler(>=5.3) && $ClosureLifetimes
-// CHECK-NEXT: @inlinable public func takeExplicitNestedType(f: @_lifetime(copy ne0) @_lifetime(ne1: copy ne0, copy ne1) ((lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView, _ ne0: consuming lifetime_underscored_dependence::AnotherView, _ ne1: inout lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView) {} 
+// CHECK-NEXT: @inlinable public func takeExplicitNestedType(f: lifetime_underscored_dependence::ExplicitNestedType) {}
 // CHECK-NEXT: #endif
 
 // CHECK: #if compiler(>=5.3) && $Lifetimes
@@ -205,3 +235,35 @@ import lifetime_underscored_dependence
 // CHECK-NEXT: #if compiler(>=5.3) && $ClosureLifetimes
 // CHECK-NEXT: @inlinable public func takeWriteBorrower(f: @_lifetime(&a) (_ a: inout lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView) {}
 // CHECK-NEXT: #endif
+
+// CHECK-NEXT: #if compiler(>=5.3) && $Lifetimes
+// CHECK-NEXT: @inlinable public func takeClosureImplicitDependence(f: () -> lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView {
+// CHECK-NEXT:   f()
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: @inlinable public func takeClosureImplicitDependence(f: () -> lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView {
+// CHECK-NEXT:   f()
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+
+// CHECK-NEXT: #if compiler(>=5.3) && $Lifetimes
+// CHECK-NEXT: @_lifetime(f)
+// CHECK-NEXT: @inlinable public func takeClosureImplicitDependenceKind(f: () -> lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView {
+// CHECK-NEXT:   f()
+// CHECK-NEXT: }
+// CHECK-NEXT: #else
+// CHECK-NEXT: @lifetime(f)
+// CHECK-NEXT: @inlinable public func takeClosureImplicitDependenceKind(f: () -> lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView {
+// CHECK-NEXT:   f()
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+
+// CHECK:      #if compiler(>=5.3) && $ClosureLifetimes
+// CHECK-NEXT: @inlinable public func takeTakeImplicitCopyClosure(g: @_lifetime(copy f) (_ f: () -> lifetime_underscored_dependence::AnotherView) -> lifetime_underscored_dependence::AnotherView) {
+// CHECK-NEXT: }
+// CHECK-NEXT: #endif
+
+// CHECK:      @inlinable public func callTTICC() {
+// CHECK-NEXT:   takeTakeImplicitCopyClosure(g: takeClosureImplicitDependenceKind)
+// CHECK-NEXT:   takeTakeImplicitCopyClosure(g: takeClosureImplicitDependence)
+// CHECK-NEXT: }

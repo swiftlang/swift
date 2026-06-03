@@ -27,7 +27,7 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 internal import Darwin
 #elseif os(Windows)
 internal import ucrt
@@ -64,7 +64,7 @@ protocol CompressedStream {
 
 // .. Compression library bindings .............................................
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 private var lzmaHandle = dlopen("liblzma.dylib", RTLD_LAZY)
 private var zlibHandle = dlopen("libz.dylib", RTLD_LAZY)
 private var zstdHandle = dlopen("libzstd.dylib", RTLD_LAZY)
@@ -331,7 +331,7 @@ struct LZMAStream: CompressedStream {
 
 // .. Image Sources ............................................................
 
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 fileprivate func decompress<S: CompressedStream>(
   stream: S,
   source: ImageSource,
@@ -357,7 +357,7 @@ fileprivate func decompress<S: CompressedStream>(
   output.used(bytes: Int(totalBytes))
 }
 
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 fileprivate func decompressChunked<S: CompressedStream>(
   stream: S,
   source: ImageSource,
@@ -392,7 +392,7 @@ fileprivate func decompressChunked<S: CompressedStream>(
   )
 }
 
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 extension ImageSource {
   @_specialize(kind: full, where Traits == Elf32Traits)
   @_specialize(kind: full, where Traits == Elf64Traits)

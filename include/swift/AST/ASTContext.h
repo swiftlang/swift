@@ -23,18 +23,12 @@
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/ProtocolConformanceOptions.h"
-#include "swift/AST/SILOptions.h"
-#include "swift/AST/SearchPathOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeAlignments.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/BlockList.h"
-#include "swift/Basic/CASOptions.h"
-#include "swift/Basic/LangOptions.h"
 #include "swift/Basic/Located.h"
 #include "swift/Basic/Malloc.h"
-#include "swift/Serialization/SerializationOptions.h"
-#include "swift/SymbolGraphGen/SymbolGraphOptions.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/Basic/DarwinSDKInfo.h"
 #include "llvm/ADT/ArrayRef.h"
@@ -77,6 +71,7 @@ namespace swift {
   class AvailabilityRange;
   class BoundGenericType;
   class BuiltinTupleDecl;
+  class CASOptions;
   class ClangModuleLoader;
   class ClangNode;
   class ClangTypeConverter;
@@ -100,6 +95,7 @@ namespace swift {
   class LazyContextData;
   class LazyIterableDeclContextData;
   class LazyMemberLoader;
+  class LangOptions;
   struct MacroDiscriminatorContext;
   class ModuleInterfaceChecker;
   class PatternBindingDecl;
@@ -107,13 +103,14 @@ namespace swift {
   class PluginLoader;
   class SourceFile;
   class SourceLoc;
+  class SerializationOptions;
+  class SILOptions;
   struct TemplateInstantiationError;
   class Type;
   class TypeVariableType;
   class TupleType;
   class FunctionType;
   class ArchetypeType;
-  class Identifier;
   class InheritedNameSet;
   class ModuleDecl;
   class PackageUnit;
@@ -142,6 +139,7 @@ namespace swift {
   class DiagnosticEngine;
   struct RawComment;
   class DocComment;
+  class SearchPathOptions;
   class SILBoxType;
   class SILTransform;
   class TypeAliasDecl;
@@ -163,6 +161,10 @@ namespace rewriting {
 
 namespace ide {
   class TypeCheckCompletionCallback;
+}
+
+namespace symbolgraphgen {
+  struct SymbolGraphOptions;
 }
 
 /// Lists the set of "known" Foundation entities that are used in the
@@ -761,6 +763,12 @@ public:
   /// promises to return non-null.
   bool hasArrayLiteralIntrinsics() const;
 
+  /// Retrieve the declaration of Swift.CGFloat.init(_: Double).
+  ConcreteDeclRef getCGFloatInitDecl() const;
+
+  /// Retrieve the declaration of Swift.Double.init(_: CGFloat).
+  ConcreteDeclRef getDoubleInitDecl() const;
+
   /// Retrieve the declaration of Swift.Bool.init(_builtinBooleanLiteral:)
   ConcreteDeclRef getBoolBuiltinInitDecl() const;
 
@@ -1080,6 +1088,12 @@ public:
 
   ExplicitSwiftModuleMap *getExplicitSwiftModuleMap();
   ExplicitClangModuleMap *getExplicitClangModuleMap();
+
+  /// Look up the library level for a module from the explicit module map.
+  /// \param isClang Whether to look in the Clang module map (true) or the
+  ///                Swift module map (false).
+  std::optional<LibraryLevel>
+  getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang);
 
   /// Adds a module loader to this AST context.
   ///
@@ -1486,6 +1500,16 @@ public:
   /// Increments \c NumTypoCorrections then checks this against the limit in
   /// the language options.
   bool shouldPerformTypoCorrection();
+
+  /// Record that, when emitting the current module, references to \p type in
+  /// stored properties of public types should be substituted with a
+  /// \c HiddenType carrying \p mangledName.
+  void recordTypeToHideWhenEmittingModule(CanType type, StringRef mangledName);
+
+  /// If \p type was recorded as needing to be hidden when emitting the current
+  /// module, return its mangled name; otherwise return \c std::nullopt.
+  std::optional<StringRef>
+  lookupTypeToHideWhenEmittingModule(CanType type) const;
 
 private:
   friend class IntrinsicInfo;

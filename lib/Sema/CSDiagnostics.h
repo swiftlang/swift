@@ -1523,6 +1523,7 @@ private:
   /// If missing arguments come from a closure,
   /// let's produce tailored diagnostics.
   bool diagnoseClosure(const ClosureExpr *closure);
+  bool diagnoseClosure(const ClosureExpr *closure, FunctionType *expectedType);
 
   /// Diagnose a single missing argument to a buildBlock call.
   bool diagnoseMissingResultBuilderElement() const;
@@ -1807,6 +1808,20 @@ public:
         BaseType(resolveType(baseType)->getRValueType()) {}
 
   Type getBaseType() const { return BaseType; }
+
+  bool diagnoseAsError() override;
+};
+
+class InvalidProtocolMetatypeStaticMemberRefInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+  Type BaseType;
+
+public:
+  InvalidProtocolMetatypeStaticMemberRefInKeyPath(
+      const Solution &solution, Type baseType, ValueDecl *member,
+      ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator),
+        BaseType(resolveType(baseType)->getRValueType()) {}
 
   bool diagnoseAsError() override;
 };

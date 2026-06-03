@@ -94,8 +94,6 @@ void emitTaskRunInline(IRGenFunction &IGF, SubstitutionMap subs,
                        llvm::Value *result, llvm::Value *closure,
                        llvm::Value *closureContext);
 
-void emitTaskCancel(IRGenFunction &IGF, llvm::Value *task);
-
 llvm::Value *maybeAddEmbeddedSwiftResultTypeInfo(IRGenFunction &IGF,
                                                  llvm::Value *taskOptions,
                                                  CanType formalResultType);

@@ -4,6 +4,8 @@
 // RUN:     -o /dev/null \
 // RUN: 2>&1 | %FileCheck %s
 
+import Builtin
+
 sil_stage canonical
 
 class C {}
@@ -37,4 +39,32 @@ entry(%c: @owned $C):
   destroy_value %c
   %retval = tuple ()
   return %retval
+}
+
+sil @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> Builtin.Int1
+
+// Ensure SIL verification does not hang.
+// CHECK-LABEL: begin running test {{.*}} on phi_cycle_partial_apply
+// CHECK-LABEL: end running test {{.*}} on phi_cycle_partial_apply
+sil [ossa] @phi_cycle_partial_apply : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  specify_test "partial_apply_print_on_stack_lifetime_ends %pa"
+
+  %callee = function_ref @borrowC : $@convention(thin) (@guaranteed C) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %callee(%c) : $@convention(thin) (@guaranteed C) -> ()
+  %use_fn = function_ref @useClosure : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> Builtin.Int1
+  br loop(%pa : $@noescape @callee_guaranteed () -> ())
+
+loop(%phi : @owned $@noescape @callee_guaranteed () -> ()):
+  %cond = apply %use_fn(%phi) : $@convention(thin) (@noescape @callee_guaranteed () -> ()) -> Builtin.Int1
+  cond_br %cond, loop_back, exit
+
+loop_back:
+  br loop(%phi : $@noescape @callee_guaranteed () -> ())
+
+exit:
+  destroy_value %phi : $@noescape @callee_guaranteed () -> ()
+  destroy_value %c : $C
+  %retval = tuple ()
+  return %retval : $()
 }

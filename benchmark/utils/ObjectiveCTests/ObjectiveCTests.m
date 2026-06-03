@@ -175,6 +175,8 @@
   
   cornucopiaOfStrings = [NSArray arrayWithObjects: tagged, tagged2, notTagged, notTagged2, notTaggedLonger, nonASCII, nonASCII2, nonASCIIOther, longNonASCII, noCopyLongASCII, noCopyLongNonASCII, constantASCII, constantNonASCII
                          , taggableCustom, nonTaggableCustom, taggableFastCustom, nonTaggableFastCustom, taggableUnicodeCustom, nonTaggableUnicodeCustom, nil];
+  cornucopiaOfStringsNoCustom = [NSArray arrayWithObjects: tagged, tagged2, notTagged, notTagged2, notTaggedLonger, nonASCII, nonASCII2, nonASCIIOther, longNonASCII, noCopyLongASCII, noCopyLongNonASCII, constantASCII, constantNonASCII
+                         , taggableFastCustom, nonTaggableFastCustom, taggableUnicodeCustom, nonTaggableUnicodeCustom, nil];
   bridgedStrings = inBridgedStrings;
 }
 
@@ -193,6 +195,22 @@
 - (void)testIsEqualToString2 {
   for (NSString *str1 in bridgedStrings) {
     for (NSString *str2 in cornucopiaOfStrings) {
+      @autoreleasepool {
+        for (int i = 0; i < 20; i++) {
+          [str1 isEqualToString: str2];
+        }
+      }
+    }
+  }
+}
+
+// CustomString not having any fast accessors causes it to dominate the run time
+// of `testIsEqualToString2` in a way that incentivizes making net-negative
+// changes to avoid having to look at its contents. This exists to counteract
+// that incorrect incentive.
+- (void)testIsEqualToString2NoCustom {
+  for (NSString *str1 in bridgedStrings) {
+    for (NSString *str2 in cornucopiaOfStringsNoCustom) {
       @autoreleasepool {
         for (int i = 0; i < 20; i++) {
           [str1 isEqualToString: str2];

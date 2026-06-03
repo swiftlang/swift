@@ -241,6 +241,11 @@ swiftscan_module_info_get_details(swiftscan_dependency_info_t info) {
   return info->details;
 }
 
+swiftscan_library_level_t
+swiftscan_module_info_get_library_level(swiftscan_dependency_info_t info) {
+  return info->library_level;
+}
+
 //=== Link Library Info query APIs ---------------------------------------===//
 
 swiftscan_string_ref_t

@@ -16,6 +16,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/Types.h"
+#include "swift/SIL/Dominance.h"
+#include "swift/SIL/SILInstruction.h"
 #define DEBUG_TYPE "loadable-address"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
@@ -35,9 +38,11 @@
 #include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/SILOptimizer/Utils/CompileTimeInterpolationUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
+#include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallSet.h"
@@ -125,6 +130,30 @@ static bool isLargeLoadableType(GenericEnvironment *GenericEnv, SILType t,
   }
 
   if (canType.getAnyGeneric() || t.is<BuiltinFixedArrayType>()) {
+    assert(t.isObject() && "Expected only two categories: address and object");
+    assert(!canType->hasTypeParameter());
+    const TypeInfo &TI = Mod.getTypeInfoForLowered(canType);
+    auto &nativeSchemaOrigParam = TI.nativeParameterValueSchema(Mod);
+    return nativeSchemaOrigParam.requiresIndirect();
+  }
+  return false;
+}
+
+/// Check if a type is a large loadable tuple type that requires indirect
+/// passing according to the native calling convention.
+static bool isLargeLoadableTupleType(GenericEnvironment *GenericEnv, SILType t,
+                                     irgen::IRGenModule &Mod) {
+  if (t.isAddress() || t.isClassOrClassMetatype()) {
+    return false;
+  }
+
+  auto canType = t.getASTType();
+  if (canType->hasTypeParameter()) {
+    assert(GenericEnv && "Expected a GenericEnv");
+    canType = GenericEnv->mapTypeIntoEnvironment(canType)->getCanonicalType();
+  }
+
+  if (isa<TupleType>(canType)) {
     assert(t.isObject() && "Expected only two categories: address and object");
     assert(!canType->hasTypeParameter());
     const TypeInfo &TI = Mod.getTypeInfoForLowered(canType);
@@ -256,6 +285,13 @@ static bool modNonFuncTypeResultType(GenericEnvironment *genEnv,
   auto singleResult = loweredTy->getSingleResult();
   auto resultStorageType = singleResult.getSILStorageInterfaceType();
   if (isLargeLoadableType(genEnv, resultStorageType, Mod)) {
+    return true;
+  }
+  // For borrow accessors (guaranteed results), also handle large tuple types.
+  // We can't transform large loadable tuples for other functions, because of
+  // ABI differences.
+  if (singleResult.getConvention() == ResultConvention::Guaranteed &&
+      isLargeLoadableTupleType(genEnv, resultStorageType, Mod)) {
     return true;
   }
   return false;
@@ -584,6 +620,10 @@ struct StructLoweringState {
   SmallVector<YieldInst *, 8> modYieldInsts;
   // All destroy_value instrs should be replaced with _addr version
   SmallVector<SILInstruction *, 16> destroyValueInstsToMod;
+  // All make_borrow instrs that should be converted to make_addr_borrow
+  SmallVector<MakeBorrowInst *, 16> makeBorrowInstsToMod;
+  // All dereference_borrow instrs that should be converted to dereference_addr_borrow
+  SmallVector<DereferenceBorrowInst *, 16> dereferenceBorrowInstsToMod;
   // All debug instructions.
   // to be modified *only if* the operands are used in "real" instructions
   SmallVector<DebugValueInst *, 16> debugInstsToMod;
@@ -653,6 +693,8 @@ protected:
   void visitReturnInst(ReturnInst *instr);
   void visitYieldInst(YieldInst *instr);
   void visitDeallocInst(DeallocStackInst *instr);
+  void visitMakeBorrowInst(MakeBorrowInst *instr);
+  void visitDereferenceBorrowInst(DereferenceBorrowInst *instr);
   void visitInstr(SILInstruction *instr);
 };
 } // end anonymous namespace
@@ -692,7 +734,10 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::RefElementAddrInst:
       case SILInstructionKind::BeginAccessInst:
       case SILInstructionKind::InitEnumDataAddrInst:
-      case SILInstructionKind::EnumInst: {
+      case SILInstructionKind::EnumInst:
+      case SILInstructionKind::MakeAddrBorrowInst:
+      case SILInstructionKind::DereferenceAddrBorrowInst:
+      case SILInstructionKind::DereferenceBorrowAddrInst: {
         // TODO Any more instructions to add here?
         visitResultTyInst(cast<SingleValueInstruction>(currIns));
         break;
@@ -755,6 +800,16 @@ void LargeValueVisitor::mapValueStorage() {
       case SILInstructionKind::DeallocStackInst: {
         auto *DI = cast<DeallocStackInst>(currIns);
         visitDeallocInst(DI);
+        break;
+      }
+      case SILInstructionKind::MakeBorrowInst: {
+        auto *MBI = cast<MakeBorrowInst>(currIns);
+        visitMakeBorrowInst(MBI);
+        break;
+      }
+      case SILInstructionKind::DereferenceBorrowInst: {
+        auto *DBI = cast<DereferenceBorrowInst>(currIns);
+        visitDereferenceBorrowInst(DBI);
         break;
       }
       default: {
@@ -933,6 +988,18 @@ void LargeValueVisitor::visitStructExtractInst(StructExtractInst *instr) {
   }
 }
 
+void LargeValueVisitor::visitMakeBorrowInst(MakeBorrowInst *instr) {
+  SILValue operand = instr->getOperand();
+
+  // Value borrows of large types must be changed into address borrows, since
+  // IRGen will use the address representation.
+  if (pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
+                               operand->getType().getObjectType())) {
+    pass.makeBorrowInstsToMod.push_back(instr);
+    return;
+  }
+}
+
 void LargeValueVisitor::visitRetainInst(RetainValueInst *instr) {
   for (Operand &operand : instr->getAllOperands()) {
     if (std::find(pass.largeLoadableArgs.begin(), pass.largeLoadableArgs.end(),
@@ -971,6 +1038,17 @@ void LargeValueVisitor::visitDestroyValueInst(DestroyValueInst *instr) {
   }
 }
 
+void LargeValueVisitor::
+visitDereferenceBorrowInst(DereferenceBorrowInst *instr) {
+  // Value borrows of large types must be changed into address borrows, since
+  // IRGen will use the address representation.
+  if (pass.isLargeLoadableType(pass.F->getLoweredFunctionType(),
+                               instr->getType().getObjectType())) {
+    pass.dereferenceBorrowInstsToMod.push_back(instr);
+    return;
+  }
+}
+
 void LargeValueVisitor::visitResultTyInst(SingleValueInstruction *instr) {
   SILType currSILType = instr->getType().getObjectType();
   SILType newSILType = pass.getNewSILType(pass.F->getLoweredFunctionType(),
@@ -978,8 +1056,7 @@ void LargeValueVisitor::visitResultTyInst(SingleValueInstruction *instr) {
   if (currSILType != newSILType) {
     pass.resultTyInstsToMod.insert(instr);
   }
-  auto *SEI = dyn_cast<StructExtractInst>(instr);
-  if (SEI) {
+  if (auto *SEI = dyn_cast<StructExtractInst>(instr)) {
     visitStructExtractInst(SEI);
   } else {
     visitInstr(instr);
@@ -1217,6 +1294,24 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddr(
       }
       break;
     }
+    case SILInstructionKind::MakeBorrowInst: {
+      auto *instToInsert = cast<MakeBorrowInst>(userIns);
+      if (std::find(pass.makeBorrowInstsToMod.begin(),
+                    pass.makeBorrowInstsToMod.end(),
+                    instToInsert) == pass.makeBorrowInstsToMod.end()) {
+        pass.makeBorrowInstsToMod.push_back(instToInsert);
+      }
+      break;
+    }
+    case SILInstructionKind::DereferenceBorrowInst: {
+      auto *instToInsert = cast<DereferenceBorrowInst>(userIns);
+      if (std::find(pass.dereferenceBorrowInstsToMod.begin(),
+                    pass.dereferenceBorrowInstsToMod.end(),
+                    instToInsert) == pass.dereferenceBorrowInstsToMod.end()) {
+        pass.dereferenceBorrowInstsToMod.push_back(instToInsert);
+      }
+      break;
+    }
     default:
       llvm_unreachable("Unexpected instruction");
     }
@@ -1355,6 +1450,18 @@ void LoadableStorageAllocation::replaceLoadWithCopyAddrForModifiable(
     case SILInstructionKind::SwitchEnumInst: {
       auto *instToInsert = cast<SwitchEnumInst>(userIns);
       pass.switchEnumInstsToMod.push_back(instToInsert);
+      usesToMod.push_back(use);
+      break;
+    }
+    case SILInstructionKind::MakeBorrowInst: {
+      auto *instToInsert = cast<MakeBorrowInst>(userIns);
+      pass.makeBorrowInstsToMod.push_back(instToInsert);
+      usesToMod.push_back(use);
+      break;
+    }
+    case SILInstructionKind::DereferenceBorrowInst: {
+      auto *instToInsert = cast<DereferenceBorrowInst>(userIns);
+      pass.dereferenceBorrowInstsToMod.push_back(instToInsert);
       usesToMod.push_back(use);
       break;
     }
@@ -1522,7 +1629,7 @@ void LoadableStorageAllocation::convertApplyResults() {
         continue;
       }
       auto resultStorageType = origSILFunctionType->getAllResultsInterfaceType();
-      if (!pass.isLargeLoadableType(origSILFunctionType, resultStorageType)) {
+      if (!modNonFuncTypeResultType(genEnv, origSILFunctionType, pass.Mod)) {
         // Make sure it contains a function type
         auto numFuncTy = llvm::count_if(origSILFunctionType->getResults(),
             [](const SILResultInfo &origResult) {
@@ -1728,7 +1835,7 @@ private:
                          SmallVectorImpl<SILInstruction *> &Delete);
   bool recreateUncheckedEnumDataInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
-  bool recreateUncheckedTakeEnumDataAddrInst(SILInstruction &I,
+  bool recreateUncheckedEnumDataAddrInst(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
   bool fixStoreToBlockStorageInstr(SILInstruction &I,
                          SmallVectorImpl<SILInstruction *> &Delete);
@@ -1746,8 +1853,8 @@ private:
   llvm::SetVector<BuiltinInst *> builtinInstrs;
   llvm::SetVector<LoadInst *> loadInstrsOfFunc;
   llvm::SetVector<UncheckedEnumDataInst *> uncheckedEnumDataOfFunc;
-  llvm::SetVector<UncheckedTakeEnumDataAddrInst *>
-      uncheckedTakeEnumDataAddrOfFunc;
+  llvm::SetVector<UncheckedEnumDataAddrInstBase *>
+      uncheckedEnumDataAddrOfFunc;
   llvm::SetVector<StoreInst *> storeToBlockStorageInstrs;
   llvm::SetVector<SILInstruction *> modApplies;
   llvm::MapVector<SILInstruction *, SILValue> allApplyRetToAllocMap;
@@ -1792,11 +1899,9 @@ static void rewriteUsesOfScalar(StructLoweringState &pass, SILValue address,
       createOutlinedCopyCall(copyBuilder, address, dest, pass);
       storeUser->eraseFromParent();
     } else if (auto *dbgInst = dyn_cast<DebugValueInst>(user)) {
-      SILBuilder dbgBuilder(dbgInst, dbgInst->getDebugScope());
-      // Rewrite the debug_value to point to the variable in the alloca.
-      dbgBuilder.createDebugValueAddr(dbgInst->getLoc(), address,
-                                      *dbgInst->getVarInfo());
-      dbgInst->eraseFromParent();
+      // Update the debug_value to point to the variable in the alloca.
+      dbgInst->setOperand(address);
+      dbgInst->prependDeref();
     }
   }
 }
@@ -1992,20 +2097,18 @@ static SILValue createCopyOfEnum(StructLoweringState &pass,
   return alloc;
 }
 
-static void createResultTyInstrAndLoad(LoadableStorageAllocation &allocator,
-                                       SingleValueInstruction *instr,
+static void createStructElementAddrInstrAndLoad(LoadableStorageAllocation &allocator,
+                                       StructExtractInst *instr,
                                        StructLoweringState &pass) {
   bool updateResultTy = pass.resultTyInstsToMod.count(instr) != 0;
   if (updateResultTy) {
     pass.resultTyInstsToMod.remove(instr);
   }
   SILBuilderWithScope builder(instr);
-  auto *currStructExtractInst = dyn_cast<StructExtractInst>(instr);
-  assert(currStructExtractInst && "Expected StructExtractInst");
   SingleValueInstruction *newInstr = builder.createStructElementAddr(
-      currStructExtractInst->getLoc(), currStructExtractInst->getOperand(),
-      currStructExtractInst->getField(),
-      currStructExtractInst->getType().getAddressType());
+      instr->getLoc(), instr->getOperand(),
+      instr->getField(),
+      instr->getType().getAddressType());
   // Load the struct element then see if we can get rid of the load:
   LoadInst *loadArg = nullptr;
   if (!pass.F->hasOwnership()) {
@@ -2025,6 +2128,137 @@ static void createResultTyInstrAndLoad(LoadableStorageAllocation &allocator,
 
   allocator.replaceLoad(loadArg);
 
+  if (updateResultTy) {
+    pass.resultTyInstsToMod.insert(newInstr);
+  }
+}
+
+static SILValue getMakeAddrBorrowOperand(SILBuilder &builder,
+                                         MakeBorrowInst *orig) {
+  // This doesn't support OSSA yet. That isn't typically a problem since this
+  // pass currently only runs during IRGen preparation.
+  auto &fn = builder.getFunction();
+  assert(!fn.hasOwnership());
+
+  auto loc = orig->getLoc();
+  auto operand = orig->getOperand();
+  
+  // If the operand was already spilled to an address by the pass, then use
+  // it as is.
+  if (operand->getType().isAddress()) {
+    return operand;
+  }
+
+  // If the operand is a load or load_borrow of a memory location, borrow that
+  // original address.
+  if (auto load = dyn_cast<LoadInst>(operand)) {
+    return load->getOperand();
+  }
+  if (auto lb = dyn_cast<LoadBorrowInst>(operand)) {
+    return lb->getOperand();
+  }
+
+  // Otherwise, this value is local, and can be spilled to a local stack
+  // allocation.
+  AllocStackInst *stack;
+  {
+    SavedInsertionPointRAII save(builder);
+
+    SmallVector<SILValue, 4> typeDependentOperands;
+    if (operand->getType().hasLocalArchetype()) {
+      operand->getType().getASTType().visit([&](CanType t) {
+          if (auto localArchetype = dyn_cast<LocalArchetypeType>(t)) {
+            typeDependentOperands.push_back(
+                  fn.getModule().getRootLocalArchetypeDef(localArchetype, &fn));
+          }
+        });
+    }
+
+    // If the operand is not type-dependent at all, then we can insert the stack
+    // allocation in the entry block.
+    if (typeDependentOperands.empty()) {
+      builder.setInsertionPoint(&*fn.begin()->begin());
+    }
+    // Otherwise, find the earliest block dominated by all of the dependent
+    // operands.
+    else {
+      auto insertPoint = typeDependentOperands.front()->getNextInstruction();
+
+      // TODO: If there are multiple type dependencies, find the point at
+      // which all of the type dependent operands join together.
+      builder.setInsertionPoint(insertPoint);
+    }
+    stack = builder.createAllocStack(loc, operand->getType());
+  }
+  
+  builder.createStore(loc, operand, stack, StoreOwnershipQualifier::Unqualified);
+
+  // Insert balancing dealloc_stacks.
+  DominanceInfo domTree(&fn);
+  SmallVector<SILBasicBlock *, 4> domBoundary;
+  computeDominatedBoundaryBlocks(stack->getParentBlock(), &domTree, domBoundary);
+
+  for (auto *boundBlock : domBoundary) {
+    SavedInsertionPointRAII save(builder);
+
+    builder.setInsertionPoint(boundBlock->getTerminator());
+    builder.createDeallocStack(loc, stack);
+  }
+
+  StackNesting::fixNesting(&fn);
+  
+  return stack;
+}
+
+static void createMakeAddrBorrow(LoadableStorageAllocation &allocator,
+                                 MakeBorrowInst *instr,
+                                 StructLoweringState &pass) {
+  bool updateResultTy = pass.resultTyInstsToMod.count(instr) != 0;
+  if (updateResultTy) {
+    pass.resultTyInstsToMod.remove(instr);
+  }
+
+  SILBuilderWithScope builder(instr);
+  auto operand = getMakeAddrBorrowOperand(builder, instr);
+  SingleValueInstruction *newInstr = builder.createMakeAddrBorrow(
+      instr->getLoc(), operand);
+
+  // `make_addr_borrow` produces a `Borrow<T>` by-value, like `make_borrow`,
+  // so it is a drop-in replacement.
+  instr->replaceAllUsesWith(newInstr);
+  instr->getParent()->erase(instr);
+
+  if (updateResultTy) {
+    pass.resultTyInstsToMod.insert(newInstr);
+  }
+}
+
+static void
+createDereferenceAddrBorrowAndLoad(LoadableStorageAllocation &allocator,
+                                   DereferenceBorrowInst *instr,
+                                   StructLoweringState &pass) {
+  bool updateResultTy = pass.resultTyInstsToMod.count(instr) != 0;
+  if (updateResultTy) {
+    pass.resultTyInstsToMod.remove(instr);
+  }
+
+  SILBuilderWithScope builder(instr);
+  auto *newInstr = builder.createDereferenceAddrBorrow(
+      instr->getLoc(), instr->getOperand());
+  
+  // Load the borrowed value and then see if we can get rid of the load.
+  SingleValueInstruction *loadArg;
+  if (!pass.F->hasOwnership()) {
+    loadArg = builder.createLoad(newInstr->getLoc(), newInstr,
+                                 LoadOwnershipQualifier::Unqualified);
+  } else {
+    loadArg = builder.createLoadBorrow(newInstr->getLoc(), newInstr);
+  }
+  instr->replaceAllUsesWith(loadArg);
+  instr->getParent()->erase(instr);
+
+  // TODO: Try to eliminate the load_borrow
+  
   if (updateResultTy) {
     pass.resultTyInstsToMod.insert(newInstr);
   }
@@ -2058,7 +2292,7 @@ static void rewriteFunction(StructLoweringState &pass,
             newSILType = newSILType.getAddressType();
           }
 
-          auto *newArg = argBuilder.createUncheckedTakeEnumDataAddr(
+          auto *newArg = argBuilder.createUncheckedEnumDataAddrForTake(
               instr->getLoc(), copiedValue, decl, newSILType.getAddressType());
           arg->replaceAllUsesWith(newArg);
           currBB->eraseArgument(0);
@@ -2093,7 +2327,17 @@ static void rewriteFunction(StructLoweringState &pass,
 
     while (!pass.structExtractInstsToMod.empty()) {
       auto *instr = pass.structExtractInstsToMod.pop_back_val();
-      createResultTyInstrAndLoad(allocator, instr, pass);
+      createStructElementAddrInstrAndLoad(allocator, instr, pass);
+    }
+
+    while (!pass.makeBorrowInstsToMod.empty()) {
+      auto *instr = pass.makeBorrowInstsToMod.pop_back_val();
+      createMakeAddrBorrow(allocator, instr, pass);
+    }
+
+    while (!pass.dereferenceBorrowInstsToMod.empty()) {
+      auto *instr = pass.dereferenceBorrowInstsToMod.pop_back_val();
+      createDereferenceAddrBorrowAndLoad(allocator, instr, pass);
     }
 
     while (!pass.applies.empty()) {
@@ -2179,11 +2423,7 @@ static void rewriteFunction(StructLoweringState &pass,
       } else {
         assert(currOperand->getType().isAddress() &&
                "Expected an address type");
-        // SILBuilderWithScope skips over metainstructions.
-        SILBuilder debugBuilder(instr, instr->getDebugScope());
-        debugBuilder.createDebugValueAddr(instr->getLoc(), currOperand,
-                                          *instr->getVarInfo());
-        instr->getParent()->erase(instr);
+        instr->prependDeref();
       }
     }
   }
@@ -2261,6 +2501,21 @@ static void rewriteFunction(StructLoweringState &pass,
           newSILType.getAddressType());
       break;
     }
+    case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst: {
+      auto *convInstr = cast<UncheckedInPlaceEnumDataAddrInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedInPlaceEnumDataAddr(
+          Loc, convInstr->getOperand(), convInstr->getElement(),
+          newSILType.getAddressType());
+      break;
+    }
+    case SILInstructionKind::UncheckedBorrowEnumDataAddrInst: {
+      auto *convInstr = cast<UncheckedBorrowEnumDataAddrInst>(instr);
+      newInstr = resultTyBuilder.createUncheckedBorrowEnumDataAddr(
+          Loc, convInstr->getEnum(), convInstr->getScratch(),
+          convInstr->getElement(),
+          newSILType.getAddressType());
+      break;
+    }
     case SILInstructionKind::InitEnumDataAddrInst: {
       auto *convInstr = cast<InitEnumDataAddrInst>(instr);
       newInstr = resultTyBuilder.createInitEnumDataAddr(
@@ -2295,6 +2550,12 @@ static void rewriteFunction(StructLoweringState &pass,
           convInstr->hasOperand() ? convInstr->getOperand() : SILValue();
       newInstr = resultTyBuilder.createEnum(
           Loc, operand, convInstr->getElement(), newSILType.getObjectType());
+      break;
+    }
+    case SILInstructionKind::DereferenceBorrowAddrInst: {
+      auto dbaInstr = cast<DereferenceBorrowAddrInst>(instr);
+      newInstr = resultTyBuilder.createDereferenceBorrowAddr(
+          Loc, dbaInstr->getOperand());
       break;
     }
     default:
@@ -2711,8 +2972,8 @@ void LoadableByAddress::recreateSingleApply(
     }
     auto newApply = applyBuilder.createPartialApply(
         castedApply->getLoc(), callee, applySite.getSubstitutionMap(), callArgs,
-        partialApplyConvention, resultIsolation, castedApply->isOnStack());
-    newApply->setStackAllocationIsNested(castedApply->isStackAllocationNested());
+        partialApplyConvention, resultIsolation, castedApply->isOnStack(),
+        castedApply->isStackAllocationNested());
     castedApply->replaceAllUsesWith(newApply);
     break;
   }
@@ -2783,30 +3044,49 @@ bool LoadableByAddress::recreateUncheckedEnumDataInstr(
   return false;
 }
 
-bool LoadableByAddress::recreateUncheckedTakeEnumDataAddrInst(
+bool LoadableByAddress::recreateUncheckedEnumDataAddrInst(
     SILInstruction &I, SmallVectorImpl<SILInstruction *> &Delete) {
-  auto *enumInstr = dyn_cast<UncheckedTakeEnumDataAddrInst>(&I);
-  if (!enumInstr || !uncheckedTakeEnumDataAddrOfFunc.count(enumInstr))
+  auto *enumInstr = dyn_cast<UncheckedEnumDataAddrInstBase>(&I);
+  if (!enumInstr || !uncheckedEnumDataAddrOfFunc.count(enumInstr))
     return false;
+
   SILBuilderWithScope enumBuilder(enumInstr);
+
+  auto recreateInst = [&](SILType newTy) -> UncheckedEnumDataAddrInstBase* {
+    switch (enumInstr->getKind()) {
+    case SILInstructionKind::UncheckedTakeEnumDataAddrInst:
+      return enumBuilder.createUncheckedTakeEnumDataAddr(
+        enumInstr->getLoc(), enumInstr->getEnum(), enumInstr->getElement(),
+        newTy);
+    case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst:
+      return enumBuilder.createUncheckedInPlaceEnumDataAddr(
+        enumInstr->getLoc(), enumInstr->getEnum(), enumInstr->getElement(),
+        newTy);
+    case SILInstructionKind::UncheckedBorrowEnumDataAddrInst: {
+      auto b = cast<UncheckedBorrowEnumDataAddrInst>(enumInstr);
+      return enumBuilder.createUncheckedBorrowEnumDataAddr(
+        b->getLoc(), b->getEnum(), b->getScratch(), b->getElement(),
+        newTy);
+    }
+    default:
+      llvm_unreachable("not an enum_data_addr inst");
+    }
+  };
+  
   SILFunction *F = enumInstr->getFunction();
   IRGenModule *currIRMod = getIRGenModule()->IRGen.getGenModule(F);
   SILType origType = enumInstr->getType();
   GenericEnvironment *genEnv = getSubstGenericEnvironment(F);
   SILType newType = MapperCache.getNewSILType(genEnv, origType, *currIRMod);
-  auto caseTy = enumInstr->getOperand()->getType().getEnumElementType(
+  auto caseTy = enumInstr->getEnum()->getType().getEnumElementType(
       enumInstr->getElement(), F->getModule(), TypeExpansionContext(*F));
   SingleValueInstruction *newInstr = nullptr;
   if (caseTy != origType.getObjectType()) {
-    auto *takeEnum = enumBuilder.createUncheckedTakeEnumDataAddr(
-        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-        caseTy.getAddressType());
+    auto *takeEnum = recreateInst(caseTy.getAddressType());
     newInstr = enumBuilder.createUncheckedAddrCast(
         enumInstr->getLoc(), takeEnum, newType.getAddressType());
   } else {
-    newInstr = enumBuilder.createUncheckedTakeEnumDataAddr(
-        enumInstr->getLoc(), enumInstr->getOperand(), enumInstr->getElement(),
-        newType.getAddressType());
+    newInstr = recreateInst(newType.getAddressType());
   }
   enumInstr->replaceAllUsesWith(newInstr);
   Delete.push_back(enumInstr);
@@ -3206,8 +3486,8 @@ void LoadableByAddress::run() {
           loadInstrsOfFunc.insert(LI);
         } else if (auto *UED = dyn_cast<UncheckedEnumDataInst>(&I)) {
           uncheckedEnumDataOfFunc.insert(UED);
-        } else if (auto *UED = dyn_cast<UncheckedTakeEnumDataAddrInst>(&I)) {
-          uncheckedTakeEnumDataAddrOfFunc.insert(UED);
+        } else if (auto *UED = dyn_cast<UncheckedEnumDataAddrInstBase>(&I)) {
+          uncheckedEnumDataAddrOfFunc.insert(UED);
         } else if (auto *SI = dyn_cast<StoreInst>(&I)) {
           auto dest = SI->getDest();
           if (isa<ProjectBlockStorageInst>(dest)) {
@@ -3315,7 +3595,7 @@ void LoadableByAddress::run() {
           continue;
         else if (recreateUncheckedEnumDataInstr(I, Delete))
           continue;
-        else if (recreateUncheckedTakeEnumDataAddrInst(I, Delete))
+        else if (recreateUncheckedEnumDataAddrInst(I, Delete))
           continue;
         else if (recreateLoadInstr(I, Delete))
           continue;
@@ -4253,7 +4533,7 @@ protected:
       builder.createStore(enumData->getLoc(), opd, opdAddr,
                           StoreOwnershipQualifier::Unqualified);
     }
-    auto extractAddr = builder.createUncheckedTakeEnumDataAddr(
+    auto extractAddr = builder.createUncheckedEnumDataAddrForTake(
         enumData->getLoc(), opdAddr, enumData->getElement(),
         enumData->getType().getAddressType());
     assignment.mapValueToAddress(origValue, extractAddr);
@@ -4498,10 +4778,9 @@ protected:
       assignment.markForDeletion(dbg);
       return;
     }
-    auto builder = assignment.getBuilder(dbg->getIterator());
     SILValue addr = assignment.getAddressForValue(dbg->getOperand());
-    builder.createDebugValueAddr(dbg->getLoc(), addr, *dbg->getVarInfo());
-    assignment.markForDeletion(dbg);
+    dbg->setOperand(addr);
+    dbg->prependDeref();
   }
 
   void visitRetainValueInst(RetainValueInst *r) {
@@ -4600,7 +4879,7 @@ protected:
 
       SILBuilder caseBuilder = assignment.getBuilder(caseBB->begin());
       auto *caseAddr =
-        caseBuilder.createUncheckedTakeEnumDataAddr(loc, destructibleAddress,
+        caseBuilder.createUncheckedEnumDataAddrForTake(loc, destructibleAddress,
                                            caseDecl,
                                            caseArg->getType().getAddressType());
 
@@ -4664,8 +4943,9 @@ protected:
     auto addr = assignment.createAllocStack(enumData->getOperand()->getType());
     builder.createCopyAddr(enumData->getLoc(), opdAddr, addr, IsTake,
                            IsInitialization);
-    // TODO: we could omit the copy if this is the only user of the operand.
-    auto extractAddr = builder.createUncheckedTakeEnumDataAddr(
+    // TODO: we could omit the copy if this is the only user of the operand,
+    // or we can use a nondestructive in-place projection.
+    auto extractAddr = builder.createUncheckedEnumDataAddrForTake(
         loc, addr, enumData->getElement(),
         enumData->getType().getAddressType());
     auto newVal = builder.createLoad(loc, extractAddr,

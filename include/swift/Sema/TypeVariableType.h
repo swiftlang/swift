@@ -249,7 +249,7 @@ public:
       impl = &nextTV->getImpl();
     }
 
-    if (impl == this || !trail || trail->isUndoActive())
+    if (impl == this || !trail || trail->isClosed())
       return result;
 
     // Perform path compression.
@@ -418,7 +418,7 @@ private:
     ENTRY(TVO_CanBindToInOut, "inout");
     ENTRY(TVO_CanBindToNoEscape, "noescape");
     ENTRY(TVO_CanBindToHole, "hole");
-    ENTRY(TVO_PrefersSubtypeBinding, "");
+    ENTRY(TVO_PrefersSubtypeBinding, "prefer subtype");
     ENTRY(TVO_CanBindToPack, "pack");
     ENTRY(TVO_PackExpansion, "pack expansion");
     }

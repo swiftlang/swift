@@ -209,7 +209,7 @@ extension ASTGenVisitor {
       let bridgedIntExpr = self.generate(integerLiteralExpr: intLitExpr)
       bridgedIntExpr.setNegative(loc: self.generateSourceLoc(op))
       bridgedArgumentExpr = bridgedIntExpr.asExpr
-    } else if case .integerLiteralExpr(let intExprNode) = node.as(ExprSyntaxEnum.self) {
+    } else if case .integerLiteralExpr(_) = node.as(ExprSyntaxEnum.self) {
       bridgedArgumentExpr = self.generate(expr: node)
     } else if ctx.langOpts.hasFeature(.LiteralExpressions) {
       bridgedArgumentExpr = self.generate(expr: node)

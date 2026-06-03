@@ -140,6 +140,42 @@ entry:
   return %retval : $()
 }
 
+class C {}
+
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_load_from_pointer: is_deinit_barrier
+// CHECK:  load
+// CHECK:  true
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_load_from_pointer: is_deinit_barrier
+sil [ossa] @test_load_from_pointer : $@convention(thin) (@guaranteed C) -> Int32 {
+bb0(%0 : @guaranteed $C):
+  %1 = ref_tail_addr %0, $Int32
+  %2 = address_to_pointer %1 to $Builtin.RawPointer
+  %3 = pointer_to_address %2 to $*Int32
+  specify_test "is_deinit_barrier @instruction"
+  %4 = load [trivial] %3
+  return %4
+}
+
+// CHECK-LABEL: begin running test 1 of {{[0-9]+}} on test_load_borrow_from_pointer: is_deinit_barrier
+// CHECK:  load_borrow
+// CHECK:  true
+// CHECK-LABEL: end running test 1 of {{[0-9]+}} on test_load_borrow_from_pointer: is_deinit_barrier
+// CHECK-LABEL: begin running test 2 of {{[0-9]+}} on test_load_borrow_from_pointer: is_deinit_barrier
+// CHECK:  end_borrow
+// CHECK:  true
+// CHECK-LABEL: end running test 2 of {{[0-9]+}} on test_load_borrow_from_pointer: is_deinit_barrier
+sil [ossa] @test_load_borrow_from_pointer : $@convention(thin) (@in_guaranteed C) -> () {
+bb0(%0 : $*C):
+  %1 = address_to_pointer %0 to $Builtin.RawPointer
+  %2 = pointer_to_address %1 to $*C
+  specify_test "is_deinit_barrier @instruction"
+  %3 = load_borrow %2
+  specify_test "is_deinit_barrier @instruction"
+  end_borrow %3
+  %r = tuple ()
+  return %r
+}
+
 // CHECK-LABEL: begin running test {{.*}} on rdar120656227: is_deinit_barrier
 // CHECK:       builtin "int_memmove_RawPointer_RawPointer_Int64"
 // CHECK:       true

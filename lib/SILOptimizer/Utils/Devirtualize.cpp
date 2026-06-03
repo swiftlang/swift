@@ -531,7 +531,7 @@ replaceApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc, Apply
   // guaranteed value, so this cast cannot generate borrow scopes and it can be
   // used anywhere the original oldAI was used.
   auto castRes = castValueToABICompatibleType(
-    &builder, pm, loc, newAI, newAI->getType(), oldAI->getType(), /*usePoints*/ {});
+      &builder, pm, loc, newAI, newAI->getType(), oldAI->getType());
 
   oldAI->replaceAllUsesWith(castRes.first);
   return {newAI, castRes.second};
@@ -592,7 +592,7 @@ replaceTryApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc, Tr
     // borrow scopes and it can be used anywhere the original oldAI was
     // used--usePoints are not required.
     std::tie(resultValue, std::ignore) = castValueToABICompatibleType(
-        &builder, pm, loc, resultValue, newResultTy, oldResultTy, /*usePoints*/ {});
+        &builder, pm, loc, resultValue, newResultTy, oldResultTy);
     builder.createBranch(loc, normalBB, {resultValue});
   }
 
@@ -624,16 +624,10 @@ replaceBeginApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc,
   for (auto i : indices(oldYields)) {
     auto oldYield = oldYields[i];
     auto newYield = newYields[i];
-    // Insert any end_borrow if the yielded value before the token's uses.
-    SmallVector<SILInstruction *, 4> users(
-      makeUserIteratorRange(oldYield->getUses()));
-    if (!users.empty()) {
-      auto yieldCastRes = castValueToABICompatibleType(
-        &builder, pm, loc, newYield, newYield->getType(), oldYield->getType(),
-        users);
-      oldYield->replaceAllUsesWith(yieldCastRes.first);
-      changedCFG |= yieldCastRes.second;
-    }
+    auto yieldCastRes = castValueToABICompatibleType(
+        &builder, pm, loc, newYield, newYield->getType(), oldYield->getType());
+    oldYield->replaceAllUsesWith(yieldCastRes.first);
+    changedCFG |= yieldCastRes.second;
   }
 
   if (newArgBorrows.empty())
@@ -668,8 +662,7 @@ replacePartialApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc
   // A non-guaranteed cast needs no usePoints.
   assert(newPAI->getOwnershipKind() != OwnershipKind::Guaranteed);
   auto castRes = castValueToABICompatibleType(
-    &builder, pm, loc, newPAI, newPAI->getType(), oldPAI->getType(),
-    /*usePoints*/ {});
+      &builder, pm, loc, newPAI, newPAI->getType(), oldPAI->getType());
   oldPAI->replaceAllUsesWith(castRes.first);
 
   return {newPAI, castRes.second};
@@ -809,19 +802,23 @@ bool swift::canDevirtualizeClassMethod(FullApplySite applySite, ClassDecl *cd,
     return false;
   }
 
-  // A narrow fix for https://github.com/swiftlang/swift/issues/79318
-  // to make sure that uses of distributed requirement witnesses are
-  // not devirtualized because that results in a loss of the ad-hoc
-  // requirement infomation in the re-created substitution map.
-  //
-  // We have a similar check in `canSpecializeFunction` which presents
-  // specialization for exactly the same reason.
-  //
-  // TODO: A better way to fix this would be to record the ad-hoc conformance
-  // requirement in `RequirementEnvironment` and adjust IRGen to handle it.
   if (f->hasLocation()) {
     if (auto *funcDecl =
             dyn_cast_or_null<FuncDecl>(f->getLocation().getAsDeclContext())) {
+      // Do not devirtualize distributed functions.
+      if (funcDecl->isDistributed())
+        return false;
+
+      // A narrow fix for https://github.com/swiftlang/swift/issues/79318
+      // to make sure that uses of distributed requirement witnesses are
+      // not devirtualized because that results in a loss of the ad-hoc
+      // requirement information in the re-created substitution map.
+      //
+      // We have a similar check in `canSpecializeFunction` which prevents
+      // specialization for exactly the same reason.
+      //
+      // TODO: A better way to fix this would be to record the ad-hoc conformance
+      //       requirement in `RequirementEnvironment` and adjust IRGen to handle it.
       if (funcDecl->isDistributedWitnessWithAdHocSerializationRequirement())
         return false;
     }
@@ -882,8 +879,8 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
   for (auto resultTy : substConv.getIndirectSILResultTypes(
            applySite.getFunction()->getTypeExpansionContext())) {
     auto castRes = castValueToABICompatibleType(
-        &builder, pm, loc, *indirectResultArgIter, indirectResultArgIter->getType(),
-        resultTy, {applySite.getInstruction()});
+        &builder, pm, loc, *indirectResultArgIter,
+        indirectResultArgIter->getType(), resultTy);
     newArgs.push_back(castRes.first);
     changedCFG |= castRes.second;
     ++indirectResultArgIter;
@@ -893,9 +890,8 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
     auto errorArgs = applySite.getIndirectSILErrorResults();
     ASSERT(errorArgs.size() == 1);
     SILValue errorArg = errorArgs[0];
-    auto castRes = castValueToABICompatibleType(
-        &builder, pm, loc, errorArg, errorArg->getType(),
-        errorTy, {applySite.getInstruction()});
+    auto castRes = castValueToABICompatibleType(&builder, pm, loc, errorArg,
+                                                errorArg->getType(), errorTy);
     newArgs.push_back(castRes.first);
     changedCFG |= castRes.second;
   }
@@ -913,10 +909,8 @@ swift::devirtualizeClassMethod(SILPassManager *pm, FullApplySite applySite,
       arg = borrowBuilder.createBeginBorrow(loc, arg);
       newArgBorrows.push_back(arg);
     }
-    auto argCastRes =
-      castValueToABICompatibleType(&builder, pm, loc, arg,
-                                   paramArgIter->getType(), paramType,
-                                   {applySite.getInstruction()});
+    auto argCastRes = castValueToABICompatibleType(
+        &builder, pm, loc, arg, paramArgIter->getType(), paramType);
 
     newArgs.push_back(argCastRes.first);
     changedCFG |= argCastRes.second;
@@ -1187,8 +1181,7 @@ devirtualizeWitnessMethod(SILPassManager *pm, ApplySite applySite, SILFunction *
         borrowedArgs.push_back(arg);
       }
       auto argCastRes = castValueToABICompatibleType(
-        &argBuilder, pm, applySite.getLoc(), arg, arg->getType(), paramType,
-        applySite.getInstruction());
+          &argBuilder, pm, applySite.getLoc(), arg, arg->getType(), paramType);
       arg = argCastRes.first;
       changedCFG |= argCastRes.second;
     }

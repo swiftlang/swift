@@ -217,7 +217,6 @@ bb0(%0 : $*NonLoadableErr):
   %7 = alloc_stack $Int
   apply [nothrow] %5<NonLoadableErr>(%7, %6, %0) : $@convention(thin) <τ_0_0 where τ_0_0 : Error> (@in_guaranteed τ_0_0) -> (@out Int, @error_indirect τ_0_0)
   dealloc_stack %7 : $*Int
-  destroy_addr %6 : $*NonLoadableErr
   dealloc_stack %6 : $*NonLoadableErr
   %11 = tuple ()
   return %11 : $()

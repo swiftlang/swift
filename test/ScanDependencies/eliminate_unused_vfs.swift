@@ -38,6 +38,7 @@ import F
 // CHECK: "mainModuleName": "deps"
 /// --------Main module
 // CHECK-LABEL: "modulePath": "deps.swiftmodule",
+// CHECK-NEXT: "libraryLevel":
 // CHECK-NEXT: sourceFiles
 // CHECK-NEXT: test.swift
 // CHECK-NEXT: ],

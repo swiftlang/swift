@@ -117,7 +117,7 @@ class MemoryLifetimeVerifier {
   /// Helper function to set bits for function arguments and returns.
   void setFuncOperandBits(BlockState &state, Operand &op,
                           SILArgumentConvention convention,
-                          bool isTryApply);
+                          SILInstruction *applyInst);
 
   /// Perform all checks in the function after the data flow has been computed.
   void checkFunction(BitDataflow &dataFlow);
@@ -145,9 +145,7 @@ public:
   MemoryLifetimeVerifier(SILFunction *function, CalleeCache *calleeCache,
                          DeadEndBlocks *deadEndBlocks)
       : function(function), calleeCache(calleeCache),
-        deadEndBlocks(deadEndBlocks),
-        locations(/*handleNonTrivialProjections*/ true,
-                  /*handleTrivialLocations*/ true) {}
+        deadEndBlocks(deadEndBlocks) {}
 
   /// The main entry point to verify the lifetime of all memory locations in
   /// the function.
@@ -232,13 +230,8 @@ bool MemoryLifetimeVerifier::isTrivialEnumSuccessor(SILBasicBlock *block,
   } else if (auto *switchEnumAddr = dyn_cast<SwitchEnumAddrInst>(term)) {
     elem = switchEnumAddr->getUniqueCaseForDestination(succ);
     enumTy = switchEnumAddr->getOperand()->getType();
-  } else if (auto *switchValue = dyn_cast<SwitchValueInst>(term)) {
-    auto destCase = switchValue->getUniqueCaseForDestination(succ);
-    assert(destCase.has_value());
-    auto caseValue =
-        cast<IntegerLiteralInst>(switchValue->getCase(*destCase).first);
-    auto testValue = dyn_cast<IntegerLiteralInst>(switchValue->getOperand());
-    return testValue ? testValue->getValue() != caseValue->getValue() : true;
+  } else if (isa<SwitchValueInst>(term)) {
+    return true;
   } else {
     return false;
   }
@@ -312,7 +305,7 @@ void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, Operand
       addr = errorLoc->representativeValue;
 
     if (applyMayRead(argOp, addr)) {
-      reportError("memory is not initialized, but should be",
+      reportError("argument memory is not initialized, but should be",
                   errorLocIdx, argOp->getUser());
     }
   }
@@ -487,8 +480,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
         ApplySite AS(&I);
         for (Operand &op : I.getAllOperands()) {
           if (AS.isArgumentOperand(op)) {
-            setFuncOperandBits(state, op, AS.getCaptureConvention(op),
-                              isa<TryApplyInst>(&I));
+            setFuncOperandBits(state, op, AS.getCaptureConvention(op), &I);
           }
         }
         break;
@@ -529,8 +521,7 @@ void MemoryLifetimeVerifier::initDataflowInBlock(SILBasicBlock *block,
       case SILInstructionKind::YieldInst: {
         auto *YI = cast<YieldInst>(&I);
         for (Operand &op : YI->getAllOperands()) {
-          setFuncOperandBits(state, op, YI->getArgumentConventionForOperand(op),
-                             /*isTryApply=*/ false);
+          setFuncOperandBits(state, op, YI->getArgumentConventionForOperand(op), &I);
         }
         break;
       }
@@ -587,19 +578,30 @@ void MemoryLifetimeVerifier::setBitsOfPredecessor(Bits &getSet, Bits &killSet,
   }
 }
 
+static bool isNoThrowApply(SILInstruction *applyInst) {
+  if (auto *apply = dyn_cast<ApplyInst>(applyInst)) {
+    return apply->isNonThrowing();
+  }
+  return false;
+}
+
 void MemoryLifetimeVerifier::setFuncOperandBits(BlockState &state, Operand &op,
                                         SILArgumentConvention convention,
-                                        bool isTryApply) {
+                                        SILInstruction *applyInst) {
   switch (convention) {
     case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Indirect_In:
       killBits(state, op.get());
       break;
     case SILArgumentConvention::Indirect_Out:
+      // An `apply [nothrow]` does not initialize the indirect error result.
+      if (ApplySite(applyInst).isIndirectErrorResultOperand(op) && isNoThrowApply(applyInst))
+        break;
+
       // try_apply is special, because an @out result is only initialized
       // in the normal-block, but not in the throw-block.
       // We handle the @out result of try_apply in setBitsOfPredecessor.
-      if (!isTryApply)
+      if (!isa<TryApplyInst>(applyInst))
         genBits(state, op.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:
@@ -795,19 +797,12 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
           requireBitsSet(bits, I.getOperand(0), &I);
         break;
       case SILInstructionKind::UncheckedTakeEnumDataAddrInst: {
-        // Note that despite the name, unchecked_take_enum_data_addr does _not_
-        // "take" the payload of the Swift.Optional enum. This is a terrible
-        // hack in SIL.
         auto enumInst = cast<UncheckedTakeEnumDataAddrInst>(&I);
-        // For some enums, projecting the enum data requires masking out
-        // embedded tag bits, which invalidates the value as an enum.
-        if (enumInst->isDestructive()) {
-          SILValue enumAddr = enumInst->getOperand();
-          int enumIdx = locations.getLocationIdx(enumAddr);
-          if (enumIdx >= 0)
-            requireBitsSet(bits, enumAddr, &I);
-          requireNoStoreBorrowLocation(enumAddr, &I);
-        }
+        SILValue enumAddr = enumInst->getOperand();
+        int enumIdx = locations.getLocationIdx(enumAddr);
+        if (enumIdx >= 0)
+          requireBitsSet(bits, enumAddr, &I);
+        requireNoStoreBorrowLocation(enumAddr, &I);
         break;
       }
       case SILInstructionKind::DestroyAddrInst: {
@@ -954,6 +949,8 @@ void MemoryLifetimeVerifier::checkFuncArgument(Bits &bits, Operand &argumentOp,
     case SILArgumentConvention::Indirect_Out:
       requireBitsClear(bits & locations.getNonTrivialLocations(),
                        argumentOp.get(), applyInst);
+      if (ApplySite(applyInst).isIndirectErrorResultOperand(argumentOp) && isNoThrowApply(applyInst))
+        break;
       locations.setBits(bits, argumentOp.get());
       break;
     case SILArgumentConvention::Indirect_In_Guaranteed:

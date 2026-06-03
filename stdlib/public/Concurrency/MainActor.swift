@@ -36,8 +36,13 @@ import Swift
   }
 }
 #else
-/// A singleton actor whose executor is equivalent to the main
-/// dispatch queue.
+/// A global actor whose executor is equivalent to the main thread.
+///
+/// - Note: For additional information about the main actor,
+/// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
+///
+/// [concurrency]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/concurrency/#The-Main-Actor
+/// [tspl]: https://docs.swift.org/swift-book/documentation/the-swift-programming-language/
 @available(SwiftStdlib 5.1, *)
 @globalActor public final actor MainActor: GlobalActor {
   public static let shared = MainActor()
@@ -163,7 +168,7 @@ extension MainActor {
   }
 }
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(visionOS)
+#if os(anyAppleOS)
 @_extern(c, "pthread_main_np")
 @usableFromInline
 internal func pthread_main_np() -> CInt

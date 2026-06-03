@@ -41,7 +41,7 @@ bb1:
   return %15 : $()
 
 bb2:
-  %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
+  %19 = unchecked_inplace_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
   copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }
@@ -79,7 +79,7 @@ bb2:
   br bb1
 
 bb3:
-  %19 = unchecked_take_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
+  %19 = unchecked_inplace_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
   copy_addr [take] %19 to [init] %2 : $*CustomStringConvertible
   br bb1
 }
@@ -267,4 +267,32 @@ bb2:
 bb22:
   inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.none!enumelt
   br bb2
+}
+
+// CHECK-LABEL: sil [ossa] @convert_inject_enum_addr_switch_enum_addr_default_block
+// CHECK-NOT: switch_enum_addr
+// CHECK: } // end sil function 'convert_inject_enum_addr_switch_enum_addr_default_block'
+sil [ossa] @convert_inject_enum_addr_switch_enum_addr_default_block : $@convention(thin) (@in AnyObject, @in_guaranteed CustomStringConvertible) -> () {
+bb0(%0 : $*AnyObject, %1 : $*CustomStringConvertible):
+  %3 = alloc_stack $Optional<CustomStringConvertible>
+  %4 = init_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
+  unconditional_checked_cast_addr AnyObject in %0 : $*AnyObject to CustomStringConvertible in %4 : $*CustomStringConvertible
+  inject_enum_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
+  switch_enum_addr %3 : $*Optional<CustomStringConvertible>, case #Optional.some!enumelt: bb1, default bb2
+
+bb1:
+  %19 = unchecked_inplace_enum_data_addr %3 : $*Optional<CustomStringConvertible>, #Optional.some!enumelt
+  destroy_addr %19 : $*CustomStringConvertible
+  copy_addr %1 to [init] %19 : $*CustomStringConvertible
+  destroy_addr %19 : $*CustomStringConvertible
+  dealloc_stack %3 : $*Optional<CustomStringConvertible>
+  br bb3
+
+bb2:
+  dealloc_stack %3 : $*Optional<CustomStringConvertible>
+  br bb3
+
+bb3:
+  %r = tuple ()
+  return %r : $()
 }

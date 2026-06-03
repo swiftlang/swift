@@ -618,7 +618,7 @@ class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
 public:
   DisjunctionStep(
       ConstraintSystem &cs,
-      std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>> &disjunction,
+      std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>> disjunction,
       SmallVectorImpl<Solution> &solutions)
       : DisjunctionStep(cs, disjunction.first, disjunction.second, solutions) {}
 
@@ -884,8 +884,13 @@ public:
     if (HadFailure)
       restoreBestScore();
 
-    if (OuterTimeRemaining)
-      CS.Timer.emplace(CS, *OuterTimeRemaining);
+    if (OuterTimeRemaining) {
+      const auto &opts = CS.getASTContext().TypeCheckerOpts;
+      CS.Timer.emplace(CS, *OuterTimeRemaining,
+                       opts.WarnLongExpressionTypeChecking,
+                       opts.WarnLongExpressionTypeCheckingScopes,
+                       opts.WarnLongExpressionTypeCheckingTrail);
+    }
   }
 
   StepResult resume(bool prevFailed) override;

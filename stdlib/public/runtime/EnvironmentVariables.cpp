@@ -29,12 +29,6 @@ using namespace swift;
 
 namespace {
 
-// This is required to make the macro machinery work correctly; we can't
-// declare a VARIABLE(..., const char *, ...) because then the token-pasted
-// names won't work properly.  It *does* mean that if you want to use std::string
-// somewhere in this file, you'll have to fully qualify the name.
-typedef const char *string;
-
 // Require all environment variable names to start with SWIFT_
 static constexpr bool hasSwiftPrefix(const char *str) {
   const char prefix[] = "SWIFT_";
@@ -51,7 +45,8 @@ static constexpr bool hasSwiftPrefix(const char *str) {
 
 // Value parsers. Add new functions named parse_<type> to accommodate more
 // debug variable types.
-static bool parse_bool(const char *name, const char *value, bool defaultValue) {
+static bool parse_boolean(const char *name, const char *value,
+                          bool defaultValue) {
   if (!value)
     return defaultValue;
   switch (value[0]) {
@@ -75,17 +70,14 @@ static bool parse_bool(const char *name, const char *value, bool defaultValue) {
   }
 }
 
-static uint8_t parse_uint8_t(const char *name,
-                             const char *value,
-                             uint8_t defaultValue) {
+static std::optional<uint8_t>
+parse_optional_uint8(const char *name, const char *value,
+                     std::optional<uint8_t> defaultValue) {
   if (!value)
     return defaultValue;
   char *end;
   long n = strtol(value, &end, 0);
   if (*end != '\0') {
-    swift::warning(RuntimeErrorFlagNone,
-                   "Warning: cannot parse value %s=%s, defaulting to %u.\n",
-                   name, value, defaultValue);
     return defaultValue;
   }
 
@@ -105,9 +97,18 @@ static uint8_t parse_uint8_t(const char *name,
   return n;
 }
 
-static uint32_t parse_uint32_t(const char *name,
-                               const char *value,
-                               uint32_t defaultValue) {
+static uint8_t parse_uint8(const char *name, const char *value,
+                           uint8_t defaultValue) {
+  auto result = parse_optional_uint8(name, value, std::nullopt);
+  if (!result && value)
+    swift::warning(RuntimeErrorFlagNone,
+                   "Warning: cannot parse value %s=%s, defaulting to %u.\n",
+                   name, value, defaultValue);
+  return result.value_or(defaultValue);
+}
+
+static uint32_t parse_uint32(const char *name, const char *value,
+                             uint32_t defaultValue) {
   if (!value)
     return defaultValue;
   char *end;
@@ -135,9 +136,8 @@ static uint32_t parse_uint32_t(const char *name,
   return n;
 }
 
-static string parse_string(const char *name,
-                           const char *value,
-                           string defaultValue) {
+static const char *parse_string(const char *name, const char *value,
+                                const char *defaultValue) {
   if (!value || value[0] == 0)
     return strdup(defaultValue);
   return strdup(value);
@@ -164,11 +164,13 @@ void printHelp(const char *extra) {
 
 } // end anonymous namespace
 
-// Define backing variables.
+swift::runtime::environment::EnvironmentVariableState
+    swift::runtime::environment::environmentVariableState = {
 #define VARIABLE(name, type, defaultValue, help)                               \
-  type swift::runtime::environment::name##_variable = defaultValue;            \
-  bool swift::runtime::environment::name##_isSet_variable = false;
+  /* name##_variable        = */ defaultValue,                                 \
+  /* name##_isSet_variable  = */ false,
 #include "EnvironmentVariables.def"
+};
 
 // Initialization code.
 swift::once_t swift::runtime::environment::initializeToken;
@@ -202,8 +204,8 @@ static void platformInitialize(void *context) {
 #define SYSPROP_PREFIX "debug.org.swift.runtime."
 #define VARIABLE(name, type, defaultValue, help)                \
   if (__system_property_get(SYSPROP_PREFIX #name, buffer)) {    \
-    swift::runtime::environment::name##_isSet_variable = true;  \
-    swift::runtime::environment::name##_variable =              \
+    environmentVariableState.name##_isSet_variable = true;      \
+    environmentVariableState.name##_variable =                  \
         parse_##type(#name, buffer, defaultValue);              \
   }
 #include "EnvironmentVariables.def"
@@ -228,30 +230,29 @@ void swift::runtime::environment::initialize(void *context) {
 
   bool SWIFT_DEBUG_HELP_variable = false;
 
-  // Placeholder variable, we never use the result but the macros want to write
-  // to it.
-  bool SWIFT_DEBUG_HELP_isSet_variable = false;
-  (void)SWIFT_DEBUG_HELP_isSet_variable; // Silence warnings about unused vars.
   for (char **var = ENVIRON; *var; var++) {
     // Immediately skip anything without a SWIFT_ prefix.
     if (strncmp(*var, "SWIFT_", 6) != 0)
       continue;
 
     bool foundVariable = false;
-    // Check each defined variable in turn, plus SWIFT_DEBUG_HELP. Variables are
-    // parsed by functions named parse_<type> above. An unknown type will
-    // produce an error that parse_<unknown-type> doesn't exist. Add new parsers
-    // above.
+    // Handle SWIFT_DEBUG_HELP separately since it's not in the .def file.
+    if (strncmp(*var, "SWIFT_DEBUG_HELP=",
+                strlen("SWIFT_DEBUG_HELP=")) == 0) {
+      SWIFT_DEBUG_HELP_variable = parse_boolean(
+          "SWIFT_DEBUG_HELP", *var + strlen("SWIFT_DEBUG_HELP="), false);
+      foundVariable = true;
+    }
+    // Check each defined variable in turn. Variables are parsed by functions
+    // named parse_<type> above. An unknown type will produce an error that
+    // parse_<unknown-type> doesn't exist. Add new parsers above.
 #define VARIABLE(name, type, defaultValue, help)                               \
   if (strncmp(*var, #name "=", strlen(#name "=")) == 0) {                      \
-    name##_variable =                                                          \
+    environmentVariableState.name##_variable =                                 \
         parse_##type(#name, *var + strlen(#name "="), defaultValue);           \
-    name##_isSet_variable = true;                                              \
+    environmentVariableState.name##_isSet_variable = true;                     \
     foundVariable = true;                                                      \
   }
-    // SWIFT_DEBUG_HELP is not in the variables list. Parse it like the other
-    // variables.
-    VARIABLE(SWIFT_DEBUG_HELP, bool, false, )
 #include "EnvironmentVariables.def"
 
     // Flag unknown SWIFT_DEBUG_ variables to catch misspellings. We don't flag
@@ -283,15 +284,16 @@ void swift::runtime::environment::initialize(void *context) {
   do {                                                                         \
     const char *name##_string = getenv(#name);                                 \
     if (name##_string)                                                         \
-      name##_isSet_variable = true;                                            \
-    name##_variable = parse_##type(#name, name##_string, defaultValue);        \
+      environmentVariableState.name##_isSet_variable = true;                   \
+    environmentVariableState.name##_variable =                                 \
+        parse_##type(#name, name##_string, defaultValue);                      \
   } while (0);
 #include "EnvironmentVariables.def"
 
   platformInitialize(context);
 
   // Print help if requested.
-  if (parse_bool("SWIFT_DEBUG_HELP", getenv("SWIFT_DEBUG_HELP"), false))
+  if (parse_boolean("SWIFT_DEBUG_HELP", getenv("SWIFT_DEBUG_HELP"), false))
     printHelp("Using getenv to read variables. Unknown SWIFT_DEBUG_ variables "
               "will not be flagged.");
 }
@@ -322,4 +324,8 @@ SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverr
 
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskSlabAllocator() {
   return runtime::environment::SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR();
+}
+
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyTracingSubsystem() {
+  return runtime::environment::SWIFT_CONCURRENCY_TRACING_SUBSYSTEM();
 }

@@ -1,6 +1,6 @@
 // Integer generic expression interface printingEnum case raw value expressions
 // REQUIRES: swift_feature_LiteralExpressions
-// RUN: %target-swift-frontend -emit-module -module-name IntegerGenericExpressionInterface -emit-module-interface-path %t/IntegerGenericExpressionInterface.swiftinterface -enable-library-evolution -swift-version 5 -disable-availability-checking -disable-experimental-parser-round-trip %s -enable-experimental-feature LiteralExpressions
+// RUN: %target-swift-frontend -emit-module -module-name IntegerGenericExpressionInterface -emit-module-interface-path %t/IntegerGenericExpressionInterface.swiftinterface -enable-library-evolution -swift-version 5 -disable-availability-checking %s -enable-experimental-feature LiteralExpressions
 
 // RUN: %FileCheck %s < %t/IntegerGenericExpressionInterface.swiftinterface
 

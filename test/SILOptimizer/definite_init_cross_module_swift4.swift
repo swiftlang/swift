@@ -75,7 +75,9 @@ extension ImmutablePoint {
 
   init(other: ImmutablePoint, xx: Double) {
     self.x = xx // expected-warning {{initializer for struct 'ImmutablePoint' must use "self.init(...)" or "self = ..." because it is not in module 'OtherModule'}}
-    self = other // expected-error {{immutable value 'self.x' may only be initialized once}}
+    // A subsequent whole-self overwrite is now permitted: it replaces the
+    // entire value, rather than re-initializing the already-written `let`.
+    self = other
   }
 
   init(other: ImmutablePoint, x: Double, cond: Bool) {

@@ -281,7 +281,7 @@ function(setup_lit_args ARGS_VAR_OUT tested_sdk test_results_dir resource_dir_ov
   endif()
 
   execute_process(COMMAND
-      $<TARGET_FILE:Python3::Interpreter> "-c" "import psutil"
+      "${Python3_EXECUTABLE}" "-c" "import psutil"
       RESULT_VARIABLE python_psutil_status
       TIMEOUT 1 # second
       ERROR_QUIET)
@@ -343,8 +343,10 @@ normalize_boolean_spelling(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
 normalize_boolean_spelling(SWIFT_BUILD_REMOTE_MIRROR)
 is_build_type_optimized("${SWIFT_STDLIB_BUILD_TYPE}" SWIFT_OPTIMIZED)
 
-# Get 'SWIFT_HOST_SDKROOT' for lit.site.cfg.in
-set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+# Allow callers to pin the host SDK used by lit.site.cfg.in.
+if(NOT SWIFT_HOST_SDKROOT)
+  set(SWIFT_HOST_SDKROOT "${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_ARCH_${SWIFT_HOST_VARIANT_ARCH}_PATH}")
+endif()
 
 set(profdata_merge_worker
     "${CMAKE_CURRENT_SOURCE_DIR}/../utils/profdata_merge/main.py")
@@ -399,12 +401,6 @@ foreach(SDK ${SWIFT_SDKS})
       set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}${VARIANT_SUFFIX}")
       set(validation_test_bin_dir
           "${CMAKE_CURRENT_BINARY_DIR}/../validation-test${VARIANT_SUFFIX}")
-
-      if(LLVM_ENABLE_LIBXML2)
-        set(SWIFT_HAVE_LIBXML2 TRUE)
-      else()
-        set(SWIFT_HAVE_LIBXML2 FALSE)
-      endif()
 
       set(VARIANT_EXTERNAL_EMBEDDED_PLATFORM FALSE)
       set(VARIANT_EXTERNAL_EMBEDDED_DEVICE)

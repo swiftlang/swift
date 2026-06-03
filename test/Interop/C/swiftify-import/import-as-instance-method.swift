@@ -3,6 +3,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+// FIXME: enable -eager-macro-checking once imported functions with FRTs inherit FRT availability rdar://175799573
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -enable-experimental-feature SafeInteropWrappers -strict-memory-safety \
 // RUN:    -verify -verify-additional-file %t%{fs-sep}Inputs%{fs-sep}instance.h %t/test.swift -I %bridging-path -DVERIFY
 // RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -o %t/Test.swiftmodule -I %t%{fs-sep}Inputs -strict-memory-safety \
@@ -110,7 +111,7 @@ module Instance {
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public mutating func basic(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -125,7 +126,7 @@ public mutating func basic(_ p: inout MutableSpan<Int32>) {
 @available(swift, obsoleted: 3, renamed: "A.basic(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func basic(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -140,7 +141,7 @@ public func basic(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<Int32>) 
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public mutating func bar(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -155,7 +156,7 @@ public mutating func bar(_ p: inout MutableSpan<Int32>) {
 @available(swift, obsoleted: 3, renamed: "A.bar(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func renamed(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -170,7 +171,7 @@ public func renamed(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<Int32>
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func constSelf(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -185,7 +186,7 @@ public func constSelf(_ p: inout MutableSpan<Int32>) {
 @available(swift, obsoleted: 3, renamed: "A.constSelf(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func constSelf(_ a: UnsafePointer<A>!, _ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -200,7 +201,7 @@ public func constSelf(_ a: UnsafePointer<A>!, _ p: inout MutableSpan<Int32>) {
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func valSelf(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -215,7 +216,7 @@ public func valSelf(_ p: inout MutableSpan<Int32>) {
 @available(swift, obsoleted: 3, renamed: "A.valSelf(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func valSelf(_ a: A, _ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -244,9 +245,9 @@ public func lifetimeBoundSelf(_ a: A, _ len: Int32) -> MutableSpan<Int32> {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-public func refSelf(_ p: inout MutableSpan<Int32>) {
+public final func refSelf(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -261,7 +262,7 @@ public func refSelf(_ p: inout MutableSpan<Int32>) {
 @available(swift, obsoleted: 3, renamed: "C.refSelf(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func refSelf(_ c: C!, _ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -274,9 +275,9 @@ public func refSelf(_ c: C!, _ p: inout MutableSpan<Int32>) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
-public func refSelf(_ p: inout MutableSpan<Int32>) {
+public final func refSelf(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -291,7 +292,7 @@ public func refSelf(_ p: inout MutableSpan<Int32>) {
 @available(swift, obsoleted: 3, renamed: "D.refSelf(self:_:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func refSelfCF(_ d: D!, _ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -306,7 +307,7 @@ public func refSelfCF(_ d: D!, _ p: inout MutableSpan<Int32>) {
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func nonescaping(_ p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -347,7 +348,7 @@ public func createA(_ p: UnsafeMutableBufferPointer<Int32>) -> UnsafeMutablePoin
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public /*not inherited*/ init!(pointerA2 p: inout MutableSpan<Int32>) {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -362,7 +363,7 @@ public /*not inherited*/ init!(pointerA2 p: inout MutableSpan<Int32>) {
 @available(swift, obsoleted: 3, renamed: "A.init(countA2:pointerA2:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(p: copy p) @_disfavoredOverload
 public func createA2(_ p: inout MutableSpan<Int32>) -> UnsafeMutablePointer<A>! {
     let len = Int32(exactly: p.count)!
-    let _pPtr = unsafe p.withUnsafeMutableBufferPointer {
+    let _pPtr = p.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -375,7 +376,7 @@ public func createA2(_ p: inout MutableSpan<Int32>) -> UnsafeMutablePointer<A>! 
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public /*not inherited*/ convenience init!(pointerC p: UnsafeMutableBufferPointer<Int32>) {
+public /*not inherited*/ final convenience init!(pointerC p: UnsafeMutableBufferPointer<Int32>) {
     let len = Int32(exactly: p.count)!
     unsafe self.init(countC: len, pointerC: p.baseAddress!)
 }

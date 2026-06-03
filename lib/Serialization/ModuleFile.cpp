@@ -266,6 +266,11 @@ Status ModuleFile::associateWithFileContext(FileUnit *file, SourceLoc diagLoc,
   Status status = Status::Valid;
 
   ModuleDecl *M = file->getParentModule();
+
+  // Propagate any deserialized hidden-type layouts onto the AST.
+  for (auto &entry : Core->HiddenTypeLayouts)
+    M->recordHiddenTypeLayout(entry.getKey(), entry.getValue());
+
   // The real (on-disk) name of the module should be checked here as that's the
   // actually loaded module. In case module aliasing is used when building the main
   // module, e.g. -module-name MyModule -module-alias Foo=Bar, the loaded module
@@ -431,6 +436,7 @@ ModuleFile::getModuleName(ASTContext &Ctx, StringRef modulePath,
       "", "", std::move(newBuf), nullptr, nullptr,
       /*isFramework=*/isFramework,
       Ctx.LangOpts.SDKName, Ctx.LangOpts.Target,
+      Ctx.LangOpts.hasFeature(Feature::Embedded),
       Ctx.SearchPathOpts.DeserializedPathRecoverer, loadedModuleFile);
   Name = loadedModuleFile->Name.str();
   return std::move(moduleBuf.get());
@@ -600,6 +606,10 @@ void ModuleFile::getImportDecls(SmallVectorImpl<Decl *> &Results) {
           TopLevelModule->lookupQualified(
               TopLevelModule, DeclNameRef(ScopeID),
               SourceLoc(), NL_QualifiedDefault, Decls);
+          // Skip macro until `import macro` is implemented.
+          llvm::erase_if(Decls, [](ValueDecl *VD) {
+            return isa<MacroDecl>(VD);
+          });
           std::optional<ImportKind> FoundKind =
               ImportDecl::findBestImportKind(Decls);
           assert(FoundKind.has_value() &&

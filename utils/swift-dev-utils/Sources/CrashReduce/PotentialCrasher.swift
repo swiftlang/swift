@@ -26,7 +26,7 @@ struct PotentialCrasher: Hashable {
     self.annotatedBuffers = buffers
   }
 
-  init(
+  private init(
     path: AbsolutePath, options: Reproducer.Options, buffers: [Buffer],
     annotatedBuffers: [Buffer]? = nil
   ) {
@@ -36,8 +36,29 @@ struct PotentialCrasher: Hashable {
     self.annotatedBuffers = annotatedBuffers ?? buffers
   }
 
-  init(_ input: FuzzerInput, options: Reproducer.Options) {
-    self.init(path: input.path, options: options, buffers: input.buffers)
+  init(
+    _ input: FuzzerInput, options: Reproducer.Options,
+    annotatedBuffers: [Buffer]? = nil
+  ) {
+    var extraArgs = input.header.extraArgs
+    // -typecheck doesn't support emitting modules + completion doesn't support
+    // any auxiliary outputs.
+    if options.kind == .typecheck || options.kind == .complete {
+      for i in extraArgs.indices where i + 1 < extraArgs.count {
+        guard let opt = extraArgs[i].value else { continue }
+        if options.kind == .typecheck,
+           opt.starts(with: "-emit-module") ||
+            opt.starts(with: "-emit-private-module") {
+          extraArgs.removeSubrange(i ... (i + 1))
+        } else if options.kind == .complete, opt.starts(with: "-emit") {
+          extraArgs.removeSubrange(i ... (i + 1))
+        }
+      }
+    }
+    self.init(
+      path: input.path, options: options.withExtraArgs(extraArgs),
+      buffers: input.buffers, annotatedBuffers: annotatedBuffers
+    )
   }
 
   static func typecheck(_ input: FuzzerInput) -> Self {
@@ -62,10 +83,7 @@ struct PotentialCrasher: Hashable {
     var buffers = input.buffers
     if reqs.isEmpty {
       if buffers.contains(where: { $0.code.text.contains(#"#^"#)} ) {
-        return Self(
-          path: input.path, options: .complete, buffers: buffers,
-          annotatedBuffers: buffers
-        )
+        return Self(input, options: .complete)
       }
       return nil
     }
@@ -95,10 +113,9 @@ struct PotentialCrasher: Hashable {
     if buffers.count == 1 {
       buffers = annotatedBuffers
     }
-    return Self(
-      path: input.path, options: .complete, buffers: buffers,
-      annotatedBuffers: annotatedBuffers
-    )
+    var input = input
+    input.buffers = buffers
+    return Self(input, options: .complete, annotatedBuffers: annotatedBuffers)
   }
 
   static func custom(
@@ -137,14 +154,14 @@ struct PotentialCrasher: Hashable {
     return result
   }
 
-  var hasSolverLimits: Bool {
-    options.withSolverLimits
+  func withExtraArgs(_ extraArgs: [Command.Argument]) -> Self {
+    var result = self
+    result.options = result.options.withExtraArgs(extraArgs)
+    return result
   }
 
-  func withLanguageMode(_ value: Int?) -> Self {
-    var result = self
-    result.options.languageMode = value
-    return result
+  var hasSolverLimits: Bool {
+    options.withSolverLimits
   }
 
   func withDeterministic(_ value: Bool = true) -> Self {

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %S/Inputs/convention_c_function.swift
-// RUN: llvm-bcanalyzer %t/convention_c_function.swiftmodule | %FileCheck -check-prefix=CHECK-BCANALYZER %s
+// RUN: %llvm-bcanalyzer %t/convention_c_function.swiftmodule | %FileCheck -check-prefix=CHECK-BCANALYZER %s
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -I %t %s | %FileCheck %s
 
 import convention_c_function

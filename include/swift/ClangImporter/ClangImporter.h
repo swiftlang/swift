@@ -204,14 +204,19 @@ public:
   /// \param swiftPCHHash A hash of Swift's various options in a compiler
   /// invocation, used to create a unique Bridging PCH if requested.
   ///
+  /// \param casidForPCH The CASID for the PCH buffer, used to create CASID
+  /// reference to PCH in debug info.
+  ///
   /// \param tracker The object tracking files this compilation depends on.
   ///
   /// \returns a new Clang module importer, or null (with a diagnostic) if
   /// an error occurred.
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx, const IRGenOptions *IRGenOpts = nullptr,
-         std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         bool ignoreFileMapping = false);
+         StringRef swiftPCHHash = "", std::string casidForPCH = "",
+         DependencyTracker *tracker = nullptr, bool ignoreFileMapping = false,
+         std::shared_ptr<llvm::cas::ObjectStore> CAS = nullptr,
+         std::shared_ptr<llvm::cas::ActionCache> Cache = nullptr);
 
   static std::string getClangSystemOverlayFile(const SearchPathOptions &Opts);
 
@@ -373,6 +378,11 @@ public:
   /// accepting ValueDecls only.
   void lookupBridgingHeaderDecls(llvm::function_ref<bool(ClangNode)> filter,
                                 llvm::function_ref<void(Decl*)> receiver) const;
+
+  /// Write a coarse grain AST to \p OS in JSON format with the information
+  /// needed for @implementation conversion of the target Objective-C
+  /// implementation file.
+  void printPolyglotAST(StringRef Filename, raw_ostream &OS);
 
   /// Look for declarations from a particular header. The header may be part of
   /// a clang module or included from the bridging header.
@@ -621,7 +631,7 @@ public:
   /// \param isExplicit true if the PCH filename was passed directly
   /// with -import-objc-header option.
   getPCHFilename(const ClangImporterOptions &ImporterOptions,
-                 StringRef SwiftPCHHash, bool &isExplicit);
+                 StringRef SwiftPCHHash, bool &isExplicit) const;
 
   const clang::Type *parseClangFunctionType(StringRef type,
                                             SourceLoc loc) const override;
@@ -647,6 +657,8 @@ public:
 
   bool isCXXMethodMutating(const clang::CXXMethodDecl *method) override;
 
+  bool isCxxMoveOnlyType(const clang::CXXRecordDecl *decl) override;
+
   bool isUnsafeCXXMethod(const FuncDecl *func) override;
 
   FuncDecl *getDefaultArgGenerator(const clang::ParmVarDecl *param) override;
@@ -662,7 +674,8 @@ public:
 
   FuncDecl *getAvailabilityDomainPredicate(const clang::VarDecl *var) override;
 
-  bool isAnnotatedWith(const clang::CXXMethodDecl *method, StringRef attr);
+  static bool isAnnotatedWith(const clang::CXXMethodDecl *method,
+                              StringRef attr);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///
@@ -685,7 +698,11 @@ public:
                                   ClangInheritanceInfo inheritance) override;
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl) override;
+  ValueDecl *getCalledBaseCxxMethod(const ValueDecl *decl) override;
   bool isMemberSynthesizedPerType(const ValueDecl *decl) override;
+
+  void checkCalledClangFunction(const ValueDecl *funcDecl,
+                                SourceLoc callSiteLoc) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -721,7 +738,7 @@ bool isCompletionHandlerParamName(StringRef paramName);
 namespace importer {
 /// Returns true if the given C/C++ reference type uses "immortal"
 /// retain/release functions.
-bool hasImmortalAttrs(const clang::RecordDecl *decl);
+bool hasAnyImmortalAttr(const clang::RecordDecl *decl);
 
 struct ReturnOwnershipInfo {
   ReturnOwnershipInfo(const clang::NamedDecl *decl);
@@ -761,6 +778,12 @@ bool isCxxConstReferenceType(const clang::Type *type);
 /// Determine whether the given Clang record declaration has an attribute that
 /// makes it import as a reference types. Does not check its bases, if any.
 bool hasImportReferenceAttr(const clang::RecordDecl *decl);
+
+/// Determine whether the given Clang record declaration has the
+/// swift_attr("import_opaque_pointer") attribute, which causes any pointer
+/// to this type to be imported as OpaquePointer regardless of whether the
+/// struct definition is complete.
+bool hasImportAsOpaquePointerAttr(const clang::RecordDecl *decl);
 
 /// Determine whether this typedef is a CF type.
 bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
@@ -849,73 +872,14 @@ matchSwiftAttr(const clang::Decl *decl,
   return std::nullopt;
 }
 
-/// Like `matchSwiftAttr`, but also searches C++ base classes.
-///
-/// \param decl The Clang declaration to inspect.
-/// \param patterns List of (attribute name, value) pairs.
-/// \returns The matched value from this decl or its bases, or `std::nullopt`.
-template <typename T>
-std::optional<T> matchSwiftAttrConsideringInheritance(
-    const clang::Decl *decl,
-    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
-  if (!decl)
-    return std::nullopt;
-
-  if (auto match = matchSwiftAttr<T>(decl, patterns))
-    return match;
-
-  if (const auto *recordDecl = llvm::dyn_cast<clang::CXXRecordDecl>(decl)) {
-    std::optional<T> result;
-    if (recordDecl->isCompleteDefinition()) {
-      recordDecl->forallBases([&](const clang::CXXRecordDecl *base) -> bool {
-        if (auto baseMatch = matchSwiftAttr<T>(base, patterns)) {
-          result = baseMatch;
-          return false;
-        }
-
-        return true;
-      });
-
-      return result;
-    }
-  }
-
-  return std::nullopt;
-}
-
-/// Matches a `swift_attr("...")` on the record type pointed to by the given
-/// Clang type, searching base classes if it's a C++ class.
-///
-/// \param type A Clang pointer or reference type.
-/// \param patterns List of attribute name-value pairs to match.
-/// \returns Matched value or std::nullopt.
-template <typename T>
-std::optional<T> matchSwiftAttrOnRecordPtr(
-    const clang::QualType &type,
-    llvm::ArrayRef<std::pair<llvm::StringRef, T>> patterns) {
-  clang::QualType pointeeType;
-  if (const auto *ptrType = type->getAs<clang::PointerType>()) {
-    pointeeType = ptrType->getPointeeType();
-  } else if (const auto *refType = type->getAs<clang::ReferenceType>()) {
-    pointeeType = refType->getPointeeType();
-  } else {
-    return std::nullopt;
-  }
-
-  if (const auto *recordDecl = pointeeType->getAsRecordDecl()) {
-    return matchSwiftAttrConsideringInheritance<T>(recordDecl, patterns);
-  }
-  return std::nullopt;
-}
-
-/// Determines the C++ reference ownership convention for the return value
+/// Determines the foreign reference ownership convention for the return value
 /// using `SWIFT_RETURNS_(UN)RETAINED` on the API; falls back to
 /// `SWIFT_RETURNED_AS_(UN)RETAINED_BY_DEFAULT` on the pointee record type.
 ///
 /// \param decl The Clang function or method declaration to inspect.
 /// \returns Matched `ResultConvention`, or `std::nullopt` if none applies.
 std::optional<ResultConvention>
-getCxxRefConventionWithAttrs(const clang::Decl *decl);
+getOwnershipOfReturnedFRT(const clang::NamedDecl *decl);
 
 enum class RefCountedPtrError {
   NotAnnotated,

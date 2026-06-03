@@ -549,8 +549,6 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                            Type builderType);
 
-bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
-
 void collectReferencedGenericParams(Type ty, SmallPtrSet<CanType, 4> &referenced);
 
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
@@ -1154,7 +1152,6 @@ void checkFunctionEffects(AbstractFunctionDecl *D);
 void checkInitializerEffects(Initializer *I, Expr *E);
 void checkCallerSideDefaultArgumentEffects(DeclContext *I, Expr *E);
 void checkEnumElementEffects(EnumElementDecl *D, Expr *expr);
-void checkPropertyWrapperEffects(PatternBindingDecl *binding, Expr *expr);
 
 /// Whether the given expression can throw, and if so, the thrown type.
 std::optional<Type> canThrow(ASTContext &ctx, Expr *expr);
@@ -1316,32 +1313,6 @@ diag::RequirementKind getProtocolRequirementKind(ValueDecl *Requirement);
 /// `dynamicallyCall(withKeywordArguments:)`.
 bool isValidDynamicCallableMethod(FuncDecl *decl,
                                   bool hasKeywordArguments);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)`.
-bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
-                                         bool ignoreLabel = false);
-
-/// Returns true if the given subscript method is an valid implementation of
-/// the `subscript(dynamicMember:)` requirement for @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter that conforms to
-/// `ExpressibleByStringLiteral` protocol.
-bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
-                                      bool ignoreLabel = false);
-
-/// Returns the KeyPath parameter type for a valid implementation of
-/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
-/// @dynamicMemberLookup.
-/// The method is given to be defined as `subscript(dynamicMember:)` which
-/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
-///
-/// Returns null if the given subscript is not a valid dynamic member lookup
-/// implementation.
-BoundGenericType *
-getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
-                                     bool ignoreLabel = false);
 
 /// Compute the wrapped value type for the given property that has attached
 /// property wrappers, when the backing storage is known to have the given type.
@@ -1547,6 +1518,11 @@ void recordRequiredImportAccessLevelForDecl(const ValueDecl *decl,
 /// Report imports that are marked public but are not used in API.
 void diagnoseUnnecessaryPublicImports(SourceFile &SF);
 
+/// Returns true if a diagnostic ought to be emitted for any explicit reference
+/// to decl made from within the given DeclContext.
+bool shouldDiagnoseMissingImportForMember(const ValueDecl *decl,
+                                          const DeclContext *dc);
+
 /// Emit or delay a diagnostic that suggests adding a missing import that is
 /// necessary to bring \p decl into scope in the containing source file. If
 /// delayed, the diagnostic will instead be emitted after type checking the
@@ -1564,7 +1540,7 @@ void diagnoseMissingImports(SourceFile &sf);
 // protocol should be used, thus enabling Borrowing iteration for a given
 // sequence type.
 bool shouldUseBorrowingSequence(ASTContext &ctx, Type seqTy, bool isAsync,
-                                SourceLoc loc);
+                                SourceLoc loc, DeclContext *dc);
 
 } // end namespace swift
 

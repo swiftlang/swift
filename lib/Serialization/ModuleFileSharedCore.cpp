@@ -228,9 +228,24 @@ static bool readOptionsBlock(llvm::BitstreamCursor &cursor,
     case options_block::STRICT_MEMORY_SAFETY:
       extendedInfo.setStrictMemorySafety(true);
       break;
-    case options_block::DEFERRED_CODE_GEN:
-      extendedInfo.setDeferredCodeGen(true);
+    case options_block::CODE_GENERATION_MODEL:
+      unsigned codeGenModel;
+      options_block::CodeGenerationModelLayout::readRecord(scratch, codeGenModel);
+      extendedInfo.setCodeGenerationModel(
+          static_cast<CodeGenerationModel>(codeGenModel));
       break;
+    case options_block::OSLOG_STRING_SECTION_NAME:
+      extendedInfo.setOSLogStringSectionName(blobData);
+      break;
+    case options_block::AGGRESSIVE_CMO:
+      extendedInfo.setAggressiveCMOEnabled(true);
+      break;
+    case options_block::LIBRARY_LEVEL: {
+      unsigned rawLevel;
+      options_block::LibraryLevelLayout::readRecord(scratch, rawLevel);
+      extendedInfo.setLibraryLevel(LibraryLevel(rawLevel));
+      break;
+    }
     default:
       // Unknown options record, possibly for use by a future version of the
       // module format.
@@ -247,6 +262,7 @@ static ValidationInfo validateControlBlock(
     bool requiresRevisionMatch,
     StringRef requiredSDK,
     std::optional<llvm::Triple> target,
+    std::optional<bool> isEmbedded,
     ExtendedValidationInfo *extendedInfo,
     PathObfuscator &pathRecoverer) {
   // The control block is malformed until we've at least read a major version
@@ -282,6 +298,13 @@ static ValidationInfo validateControlBlock(
         }
         if (!readOptionsBlock(cursor, scratch, *extendedInfo, pathRecoverer)) {
           result.status = Status::Malformed;
+          return result;
+        }
+
+        // Validate extended options.
+        if (isEmbedded &&
+            extendedInfo->isEmbeddedSwiftModule() != *isEmbedded) {
+          result.status = Status::EmbeddedMismatch;
           return result;
         }
       } else {
@@ -670,6 +693,7 @@ std::string serialization::StatusToString(Status S) {
   case Status::TargetIncompatible: return "TargetIncompatible";
   case Status::TargetTooNew: return "TargetTooNew";
   case Status::SDKMismatch: return "SDKMismatch";
+  case Status::EmbeddedMismatch: return "EmbeddedMismatch";
   }
   llvm_unreachable("The switch should cover all cases");
 }
@@ -686,7 +710,8 @@ ValidationInfo serialization::validateSerializedAST(
     SmallVectorImpl<SearchPath> *searchPaths,
     ExplicitSwiftModuleMap *explicitSwiftModuleMap,
     ExplicitClangModuleMap *explicitClangModuleMap,
-    std::optional<llvm::Triple> target) {
+    std::optional<llvm::Triple> target,
+    std::optional<bool> isEmbedded) {
   ValidationInfo result;
 
   // Check 32-bit alignment.
@@ -728,7 +753,7 @@ ValidationInfo serialization::validateSerializedAST(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
           /*requiresRevisionMatch=*/true,
-          requiredSDK, target,
+          requiredSDK, target, isEmbedded,
           extendedInfo, localObfuscator);
       if (result.status != Status::Valid)
         return result;
@@ -1100,6 +1125,74 @@ bool ModuleFileSharedCore::readIndexBlock(llvm::BitstreamCursor &cursor) {
   return false;
 }
 
+bool ModuleFileSharedCore::readHiddenTypeLayoutsBlock(
+    llvm::BitstreamCursor &cursor) {
+  if (llvm::Error Err = cursor.EnterSubBlock(HIDDEN_TYPE_LAYOUTS_BLOCK_ID)) {
+    consumeError(std::move(Err));
+    return false;
+  }
+
+  SmallVector<uint64_t, 8> scratch;
+  StringRef blobData;
+
+  while (!cursor.AtEndOfStream()) {
+    Expected<llvm::BitstreamEntry> maybeEntry = cursor.advance();
+    if (!maybeEntry) {
+      consumeError(maybeEntry.takeError());
+      return false;
+    }
+    llvm::BitstreamEntry entry = maybeEntry.get();
+    switch (entry.Kind) {
+    case llvm::BitstreamEntry::EndBlock:
+      return true;
+
+    case llvm::BitstreamEntry::Error:
+      return false;
+
+    case llvm::BitstreamEntry::SubBlock:
+      // Unexpected sub-block; skip for forward compatibility.
+      if (cursor.SkipBlock())
+        return false;
+      break;
+
+    case llvm::BitstreamEntry::Record: {
+      scratch.clear();
+      blobData = {};
+      Expected<unsigned> maybeKind =
+          cursor.readRecord(entry.ID, scratch, &blobData);
+      if (!maybeKind) {
+        consumeError(maybeKind.takeError());
+        return false;
+      }
+      unsigned kind = maybeKind.get();
+      if (kind != hidden_type_layouts_block::HIDDEN_TYPE_LAYOUT) {
+        // Unknown record kind, ignore for forward compatibility.
+        break;
+      }
+      if (scratch.size() < 5)
+        return false;
+
+      AbstractTypeLayout layout;
+      layout.size = scratch[0];
+      layout.alignment = scratch[1];
+      layout.stride = scratch[2];
+      layout.bitwiseCopyable = scratch[3] != 0;
+      layout.isOpaque = scratch[4] != 0;
+      layout.mangledName = blobData.str();
+
+      // StringMap owns its keys (copies blobData). If a duplicate entry
+      // appears the module is malformed.
+      auto result = HiddenTypeLayouts.try_emplace(blobData, std::move(layout));
+      if (!result.second)
+        return false;
+      break;
+    }
+    }
+  }
+
+  return false;
+}
+
 std::unique_ptr<ModuleFileSharedCore::SerializedDeclCommentTable>
 ModuleFileSharedCore::readDeclCommentTable(ArrayRef<uint64_t> fields,
                                  StringRef blobData) const {
@@ -1281,6 +1374,7 @@ bool ModuleFileSharedCore::readModuleDocIfPresent(PathObfuscator &pathRecoverer)
           docCursor, scratch, {SWIFTDOC_VERSION_MAJOR, SWIFTDOC_VERSION_MINOR},
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*isEmbedded*/std::nullopt,
           /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
@@ -1426,6 +1520,7 @@ bool ModuleFileSharedCore::readModuleSourceInfoIfPresent(PathObfuscator &pathRec
           {SWIFTSOURCEINFO_VERSION_MAJOR, SWIFTSOURCEINFO_VERSION_MINOR},
           /*requiresRevisionMatch*/false,
           /*requiredSDK*/StringRef(), /*target*/std::nullopt,
+          /*isEmbedded*/std::nullopt,
           /*extendedInfo*/nullptr, pathRecoverer);
       if (info.status != Status::Valid)
         return false;
@@ -1505,6 +1600,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
     bool isFramework,
     StringRef requiredSDK,
     std::optional<llvm::Triple> target,
+    std::optional<bool> isEmbedded,
     serialization::ValidationInfo &info, PathObfuscator &pathRecoverer)
     : ModuleInputBuffer(std::move(moduleInputBuffer)),
       ModuleDocInputBuffer(std::move(moduleDocInputBuffer)),
@@ -1555,7 +1651,7 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       info = validateControlBlock(
           cursor, scratch,
           {SWIFTMODULE_VERSION_MAJOR, SWIFTMODULE_VERSION_MINOR},
-          /*requiresRevisionMatch=*/true, requiredSDK, target,
+          /*requiresRevisionMatch=*/true, requiredSDK, target, isEmbedded,
           &extInfo, pathRecoverer);
       if (info.status != Status::Valid) {
         error(info.status);
@@ -1584,13 +1680,18 @@ ModuleFileSharedCore::ModuleFileSharedCore(
       Bits.AllowNonResilientAccess = extInfo.allowNonResilientAccess();
       Bits.SerializePackageEnabled = extInfo.serializePackageEnabled();
       Bits.StrictMemorySafety = extInfo.strictMemorySafety();
-      Bits.DeferredCodeGen = extInfo.deferredCodeGen();
+      Bits.CodeGenModel =
+          static_cast<unsigned>(extInfo.codeGenerationModel());
+      Bits.AggressiveCMOEnabled = extInfo.isAggressiveCMOEnabled();
+      Bits.LibraryLevel = unsigned(extInfo.getLibraryLevel());
       MiscVersion = info.miscVersion;
       SDKVersion = info.sdkVersion;
       ModuleABIName = extInfo.getModuleABIName();
       ModulePackageName = extInfo.getModulePackageName();
       ModuleExportAsName = extInfo.getExportAsName();
       PublicModuleName = extInfo.getPublicModuleName();
+      OSLogStringSectionName = extInfo.getOSLogStringSectionName();
+      
       SwiftInterfaceCompilerVersion =
           extInfo.getSwiftInterfaceCompilerVersion();
 
@@ -1862,6 +1963,14 @@ ModuleFileSharedCore::ModuleFileSharedCore(
 
     case INDEX_BLOCK_ID: {
       if (!hasValidControlBlock || !readIndexBlock(cursor)) {
+        info.status = error(Status::Malformed);
+        return;
+      }
+      break;
+    }
+
+    case HIDDEN_TYPE_LAYOUTS_BLOCK_ID: {
+      if (!readHiddenTypeLayoutsBlock(cursor)) {
         info.status = error(Status::Malformed);
         return;
       }

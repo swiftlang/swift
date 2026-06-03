@@ -86,6 +86,7 @@ public struct UnownedJob: Sendable {
 
   /// The priority of this job.
   @available(StdlibDeploymentTarget 5.9, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   public var priority: JobPriority {
     let raw: UInt8
     if #available(StdlibDeploymentTarget 6.3, *) {
@@ -329,7 +330,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   /// Returns the result of executing the closure.
   @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
-  public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
+  @safe public func withUnsafeExecutorPrivateData<R, E>(body: (UnsafeMutableRawBufferPointer) throws(E) -> R) throws(E) -> R {
     let base = unsafe _jobGetExecutorPrivateData(self.context)
     let size = unsafe 2 * MemoryLayout<OpaquePointer>.stride
     return unsafe try body(UnsafeMutableRawBufferPointer(start: base,
@@ -903,9 +904,12 @@ public nonisolated(nonsending) func withUnsafeContinuation<T>(
   }
 }
 
+/// Source-compatibility overload; replaced by
+/// ``withUnsafeContinuation(_:)``.
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
 @unsafe
+@_disfavoredOverload
 @available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
 public func withUnsafeContinuation<T>( // source-compatibility overload
   isolation: isolated (any Actor)?,
@@ -962,6 +966,22 @@ public nonisolated(nonsending) func withUnsafeThrowingContinuation<T, E>(
 public nonisolated(nonsending) func withUnsafeThrowingContinuation<T>(
   _ fn: (UnsafeContinuation<T, Error>) -> Void
 ) async throws(Error) -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation {
+    unsafe fn(UnsafeContinuation<T, Error>($0))
+  }
+}
+
+/// Source-compatibility overload; replaced by
+/// ``withUnsafeThrowingContinuation(_:)``.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@unsafe
+@_disfavoredOverload
+@available(*, deprecated, message: "Replaced by nonisolated(nonsending) overload")
+public func withUnsafeThrowingContinuation<T>( // source-compatibility overload
+  isolation: isolated (any Actor)?,
+  _ fn: (UnsafeContinuation<T, Error>) -> Void
+) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
     unsafe fn(UnsafeContinuation<T, Error>($0))
   }

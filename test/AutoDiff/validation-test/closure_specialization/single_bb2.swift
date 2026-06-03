@@ -12,13 +12,7 @@
 
 // RUN: %target-swift-frontend -emit-sil %s -O -o %t/out.sil
 
-// TODO: Re-enable these tests once we have OSSA throughout the pipeline.
-//       AutoDiff Closure Specialization pass runs twice, but at the second
-//       run we currently do not perform any transformation because ownership
-//       eliminator is run before. Disabled tests below rely on the second
-//       pass run performing transformation, so they currently fail.
-//       https://github.com/swiftlang/swift/issues/84920
-// TODO: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
+// RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK4
 
 // RUN: cat %t/out.sil | %FileCheck %s --check-prefix=CHECK5
 
@@ -37,6 +31,7 @@ AutoDiffClosureSpecSingleBBTests.testWithLeakChecking("Test4") {
   }
 
   // CHECK4-LABEL: {{^}}// reverse-mode derivative of test4 #1 (_:)
+  // CHECK4-NEXT: {{^}}// Isolation: nonisolated
   // CHECK4-NEXT:  sil private @$s3outyycfU_5test4L_yS2fFTJrSpSr : $@convention(thin) (Float) -> (Float, @owned @callee_guaranteed (Float) -> Float) {
   // CHECK4:         %[[#D9:]] = function_ref @$s3outyycfU_5test4L_yS2fFTJpSpSr128$s3outyycfU_6doubleL_yS2fFTJpSpSr067$sSf16_DifferentiationE7_vjpAdd3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_Tf1nc_n0c12U_6squareL_yefg7Sr073$si1_j4E12_l16Multiply3lhs3rhsn1_o1_pq1_rs1_tu2U_eV2_nS2fTf1ncc_n : $@convention(thin) (Float, Float, Float) -> Float
   // CHECK4:         %[[#D10:]] = partial_apply [callee_guaranteed] %[[#D9]](%[[#]], %[[#]]) : $@convention(thin) (Float, Float, Float) -> Float
@@ -64,6 +59,7 @@ AutoDiffClosureSpecSingleBBTests.testWithLeakChecking("Test4") {
 
 AutoDiffClosureSpecSingleBBTests.testWithLeakChecking("Test5") {
   // CHECK5-LABEL: {{^}}// reverse-mode derivative of test5 #1 (_:_:)
+  // CHECK5-NEXT: {{^}}// Isolation: nonisolated
   // CHECK5-NEXT:  sil private @$s3outyycfU0_5test5L_ySaySfGAC_SftFTJrSSpSr : $@convention(thin) (@guaranteed Array<Float>, Float) -> (@owned Array<Float>, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, Float)) {
   // CHECK5:         %[[#E79:]] = function_ref @$s3outyycfU0_5test5L_ySaySfGAC_SftFTJpSSpSr073$sSf16_DifferentiationE12_vjpMultiply3lhs3rhsSf5value_Sf_SftSfc8pullbacktj1_k5FZSf_K6SfcfU_S2f0cd1_ef1_g16Subtract3lhs3rhsi1_j1_klj1_km1_kN2U_Tf1ncncn_n : $@convention(thin) (@guaranteed Array<Float>.DifferentiableView, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), Float, Float) -> (@owned Array<Float>.DifferentiableView, Float)
   // CHECK5:         %[[#E80:]] = partial_apply [callee_guaranteed] %[[#E79]](%[[#]], %[[#]], %[[#]], %[[#]]) : $@convention(thin) (@guaranteed Array<Float>.DifferentiableView, @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), @owned @callee_guaranteed (@guaranteed Array<Float>.DifferentiableView) -> (@owned Array<Float>.DifferentiableView, @owned Array<Float>.DifferentiableView), Float, Float) -> (@owned Array<Float>.DifferentiableView, Float)

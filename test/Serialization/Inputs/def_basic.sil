@@ -858,8 +858,8 @@ enum MaybeAddressOnlyPair {
   case Left(Q)
 }
 
-// CHECK-LABEL: sil public_external [transparent] @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
-sil [transparent] [serialized] @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
+// CHECK-LABEL: sil public_external [transparent] @test_switch_enum_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+sil [transparent] [serialized] @test_switch_enum_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
 bb0(%0 : $*MaybeAddressOnlyPair):
   // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt: bb
   switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt: bb2
@@ -870,6 +870,47 @@ bb1:
 bb2:
   // CHECK: unchecked_take_enum_data_addr [[ENUM]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
   %q = unchecked_take_enum_data_addr %0 : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil public_external [transparent] @test_switch_enum_addr_inplace : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+sil [transparent] [serialized] @test_switch_enum_addr_inplace : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
+bb0(%0 : $*MaybeAddressOnlyPair):
+  // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt: bb
+  switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  // CHECK: unchecked_inplace_enum_data_addr [[ENUM]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
+  %q = unchecked_inplace_enum_data_addr %0 : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil public_external [transparent] @test_switch_enum_addr_borrow : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+sil [transparent] [serialized] @test_switch_enum_addr_borrow : $@convention(thin) (@in MaybeAddressOnlyPair) -> () {
+bb0(%0 : $*MaybeAddressOnlyPair):
+  // CHECK: switch_enum_addr [[ENUM:%.*]] : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb{{.*}}, case #MaybeAddressOnlyPair.Left!enumelt: bb
+  switch_enum_addr %0 : $*MaybeAddressOnlyPair, case #MaybeAddressOnlyPair.Neither!enumelt: bb1, case #MaybeAddressOnlyPair.Left!enumelt: bb2
+
+bb1:
+  br bb3
+
+bb2:
+  // CHECK: [[SCRATCH:%.*]] = alloc_stack $MaybeAddressOnlyPair
+  %s = alloc_stack $MaybeAddressOnlyPair
+  // CHECK: unchecked_borrow_enum_data_addr [[ENUM]] : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt in [[SCRATCH]]
+  %q = unchecked_borrow_enum_data_addr %0 : $*MaybeAddressOnlyPair, #MaybeAddressOnlyPair.Left!enumelt in %s
+  dealloc_stack %s
   br bb3
 
 bb3:
@@ -1591,8 +1632,10 @@ bb0:
   %89 = function_ref @test_tail_addr : $@convention(thin) (@owned Class1, Builtin.Word) -> @owned Class1
   %90 = function_ref @test_cow_mutation : $@convention(thin) (@owned Class1) -> @owned Class1
   %91 = function_ref @closure_test : $@convention(thin) () -> ()
-  %97 = function_ref @test_switch_union : $@convention(thin) (MaybePair) -> ()
-  %99 = function_ref @test_switch_union_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+  %92 = function_ref @test_switch_union : $@convention(thin) (MaybePair) -> ()
+  %93 = function_ref @test_switch_enum_addr : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+  %94 = function_ref @test_switch_enum_addr_inplace : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
+  %95 = function_ref @test_switch_enum_addr_borrow : $@convention(thin) (@in MaybeAddressOnlyPair) -> ()
   %101 = function_ref @test_switch_value : $@convention(thin) (Builtin.Word) -> ()
   %103 = function_ref @test_init_existential : $@convention(thin) (Spoon) -> @out Bendable
   %105 = function_ref @test_existential_ref : $@convention(thin) (ConcreteClass) -> ClassP

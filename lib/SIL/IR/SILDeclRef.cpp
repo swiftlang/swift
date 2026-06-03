@@ -19,6 +19,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILLinkage.h"
@@ -1211,48 +1212,23 @@ bool SILDeclRef::declHasNonUniqueDefinition(const ValueDecl *decl) {
   if (!decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
     return false;
 
-  // If the declaration is marked as never being emitted into the client, it
-  // has a unique definition.
-  if (decl->isNeverEmittedIntoClient())
-    return false;
-
-  /// Always-emit-into-client means that we have a non-unique definition.
-  if (decl->isAlwaysEmittedIntoClient())
-    return true;
-
-  // If the declaration is marked in a manner that indicates that other
-  // systems will expect it to have a symbol, then it has a unique definition.
-  // There are a few cases here.
-
-  // - @implementation explicitly says that we are implementing something to
-  // be called from another language, so call it non-unique.
-  if (decl->isObjCImplementation())
-    return false;
-
-  // - @c / @_cdecl / @objc / @_expose expect to be called from another
-  // language if the symbol itself would be visible.
-  if (declExposedToForeignLanguage(decl) &&
-      decl->getFormalAccess() >= AccessLevel::Internal) {
-    return false;
-  }
-
-  // - @section and @used imply that external tools will look for this symbol.
-  if (decl->getAttrs().hasAttribute<SectionAttr>() ||
-      decl->getAttrs().hasAttribute<UsedAttr>()) {
-    return false;
-  }
-
   auto module = decl->getModuleContext();
   auto &ctx = module->getASTContext();
 
-  /// With deferred code generation, declarations are emitted as late as
-  /// possible, so they must have non-unique definitions.
-  if (module->deferredCodeGen())
+  switch (decl->getEffectiveCodeGenerationModel()) {
+  case CodeGenerationModel::Implementation:
+    /// When deferring all code generation, declarations are emitted as late
+    /// as possible, so they must have non-unique definitions.
     return true;
 
-  // If the declaration is not from the main module, treat its definition as
-  // non-unique.
-  return module != ctx.MainModule && ctx.MainModule;
+  case CodeGenerationModel::Inlinable:
+    // If the declaration is not from the main module, treat its definition as
+    // non-unique.
+    return module != ctx.MainModule && ctx.MainModule;
+
+  case CodeGenerationModel::Interface:
+    return false;
+  }
 }
 
 bool SILDeclRef::isForeignToNativeThunk() const {
@@ -2070,10 +2046,34 @@ ActorIsolation SILDeclRef::getActorIsolation() const {
   // If we have a stored property initializer for a VarDecl with an explicit
   // isolation, match that explicit isolation.
   if (isStoredPropertyInitializer()) {
-    if (auto isolation = swift::getActorIsolation(cast<VarDecl>(getDecl()));
-        isolation &&  isolation.isGlobalActor())
-      return isolation;
+    return cast<VarDecl>(getDecl())->getInitializerIsolation();
   }
 
-  return getActorIsolationOfContext(getInnermostDeclContext());
+  auto isolation = getActorIsolationOfContext(getInnermostDeclContext());
+  if (!isolation.isUnspecified())
+    return isolation;
+
+  // Local computed variable accessors get their isolation from the context.
+  //
+  // TODO: This is a narrow fix for region-based isolation, a proper fix here
+  // would be to set isolation correctly on the variable itself during
+  // type-checking, but that requires significant changes to support closures
+  // because their local declarations are currently type-checked during CSApply.
+  if (auto *accessor = getAccessorDecl()) {
+    auto *dc = accessor->getDeclContext();
+    if (dc->isLocalContext()) {
+      auto contextIsolation =
+          getActorIsolationOfContext(accessor->getDeclContext());
+
+      if (contextIsolation.isNonisolatedOrConcurrent() ||
+          contextIsolation.isNonisolatedNonsending())
+        return accessor->isAsync()
+                   ? ActorIsolation::forNonisolatedConcurrent()
+                   : ActorIsolation::forNonisolated(/*unsafe=*/false);
+
+      return contextIsolation;
+    }
+  }
+
+  return isolation;
 }

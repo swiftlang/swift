@@ -143,7 +143,7 @@ void NonisolatedNonsendingByDefaultMigrationTarget::diagnose() const {
       isNonisolated = isolation.get<FunctionTypeIsolation>().isNonIsolated();
     } else {
       auto isolation = this->isolation.get<ActorIsolation>();
-      isNonisolated = isolation.isNonisolated() || isolation.isUnspecified();
+      isNonisolated = isolation.isNonisolatedOrConcurrent() || isolation.isUnspecified();
     }
 
     if (!isNonisolated) {

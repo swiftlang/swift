@@ -645,6 +645,17 @@ PrintTests.test("Printable_Float") {
   expectNaN("snan(0xffff)", Float(nan: 65535, signaling: true))
   expectNaN("-snan(0xffff)", -Float(nan: 65535, signaling: true))
   expectNaN("snan(0x1fffff)", Float(bitPattern: 0x7fbf_ffff))
+  // Streamed, interpolated, and printed forms should always match "nan".
+  do {
+    let value = -Float(nan: 65535, signaling: true)
+    var streamed = ""
+    value.write(to: &streamed)
+    expectEqual("nan", streamed)
+    expectEqual("nan", "\(value)")
+    var printed = ""
+    print(value, terminator: "", to: &printed)
+    expectEqual("nan", printed)
+  }
 
   // Every power of 10 should print with only a single digit '1'
 #if arch(arm)

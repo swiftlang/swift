@@ -29,6 +29,7 @@
 // CHECK-NEXT: },
 // CHECK-NEXT: {
 // CHECK-NEXT:   "modulePath": "test.swiftmodule"
+// CHECK-NEXT:   "libraryLevel":
 // CHECK-NEXT:   "sourceFiles": [
 // CHECK-NEXT:   "{{.*}}{{/|\\}}module_deps_cross_import_of_binary_module.swift.tmp{{/|\\}}test.swift"
 // CHECK-NEXT:   ]

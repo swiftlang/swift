@@ -201,7 +201,7 @@ WARNING(ignoring_option_requires_option,none,
         "ignoring %0 (requires %1)", (StringRef, StringRef))
 WARNING(warn_ignore_option_overridden_by,none,
         "ignoring %0 (overridden by %1)", (StringRef, StringRef))
-WARNING(ignoring_option_obsolete_module_selectors,none,
+GROUPED_WARNING(ignoring_option_obsolete_module_selectors,OptionObsoletedByModuleSelectors,none,
         "ignoring '%0'; this option has been obsoleted by module selectors "
         "(add '-disable-module-selectors-in-module-interface' to restore "
         "original behavior)",
@@ -410,7 +410,7 @@ ERROR(error_opt_invalid_mapping, none,
 ERROR(invalid_vfs_overlay_file,none,
       "invalid virtual overlay file '%0'", (StringRef))
 
-WARNING(module_interface_scoped_import_unsupported,none,
+GROUPED_WARNING(module_interface_scoped_import_unsupported,UnsupportedScopedImport,none,
         "scoped imports are not yet supported in module interfaces",
         ())
 WARNING(warn_unsupported_module_interface_swift_version,none,
@@ -427,13 +427,6 @@ ERROR(unsupported_version_of_module_interface,none,
       (StringRef, llvm::VersionTuple))
 ERROR(error_opening_explicit_module_file,none,
       "failed to open explicit Swift module: %0", (StringRef))
-WARNING(warning_module_shadowing_may_break_module_interface,none,
-        "public %0 %1 shadows module %2, which may cause failures when "
-        "importing %3 or its clients in some configurations; please rename "
-        "either the %0 %1 or the module %2, or see "
-        "https://github.com/apple/swift/issues/56573 for workarounds",
-        (DescriptiveDeclKind, FullyQualified<Type>,
-        /*shadowedModule=*/ModuleDecl *, /*interfaceModule*/ModuleDecl *))
 REMARK(rebuilding_module_from_interface,none,
        "rebuilding module '%0' from interface '%1'", (StringRef, StringRef))
 NOTE(sdk_version_pbm_version,none,
@@ -507,6 +500,8 @@ REMARK(matching_output_produced,none,
 // Caching related diagnostics
 GROUPED_ERROR(error_caching_no_cas_fs, CompilationCaching, none,
     "caching is enabled without CAS file-system options, input is not immutable", ())
+GROUPED_ERROR(error_option_incompatible, CompilationCaching, none,
+    "'%0' is incompatible with '%1'", (StringRef, StringRef))
 
 REMARK(replay_output, none, "replay output file '%0': key '%1'", (StringRef, StringRef))
 REMARK(output_cache_miss, none, "cache miss for input file '%0': key '%1'", (StringRef, StringRef))
@@ -584,8 +579,6 @@ ERROR(layout_string_instantiation_without_layout_strings,none,
 
 ERROR(evolution_with_embedded,none,
       "Library evolution cannot be enabled with embedded Swift.", ())
-ERROR(embedded_existentials_without_embedded,none,
-      "EmbeddedExistentials requires enabling embedded Swift.", ())
 ERROR(wmo_with_embedded,none,
       "Whole module optimization (wmo) must be enabled with embedded Swift.", ())
 ERROR(objc_with_embedded,none,
@@ -608,6 +601,15 @@ ERROR(error_invalid_clang_header_access_level, none,
 
 ERROR(experimental_not_supported_in_production,none,
       "experimental feature '%0' cannot be enabled in production compiler",
+      (StringRef))
+
+ERROR(code_generation_model_requires_embedded,none,
+      "experimental feature 'CodeGenerationModel' can only be used in "
+      "Embedded Swift mode", ())
+
+ERROR(invalid_code_generation_model,none,
+      "invalid value '%0' for experimental feature 'CodeGenerationModel'; "
+      "expected 'interface', 'implementation', or 'inlinable'",
       (StringRef))
 
 GROUPED_WARNING(command_line_conflicts_with_strict_safety,StrictMemorySafety,none,

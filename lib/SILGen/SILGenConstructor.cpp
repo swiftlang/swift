@@ -420,6 +420,22 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
 
   auto subs = getSubstitutionsForPropertyInitializer(decl, decl);
 
+  /// If the stored property has an attached result builder and its
+  /// type is not a function type, the argument is a noescape closure
+  /// that needs to be called.
+  auto emitResultBuilderCallIfNeeded = [&](VarDecl *field, RValue &&arg) -> RValue {
+    if (field->getResultBuilderType()) {
+      if (!field->getValueInterfaceType()
+              ->lookThroughAllOptionalTypes()->is<AnyFunctionType>()) {
+        auto resultTy = cast<FunctionType>(arg.getType()).getResult();
+        arg = SGF.emitMonomorphicApply(
+            Loc, std::move(arg).getAsSingleValue(SGF, Loc), {}, resultTy,
+            resultTy, ApplyOptions(), std::nullopt, std::nullopt);
+      }
+    }
+    return std::move(arg);
+  };
+
   // If we have an indirect return slot, initialize it in-place.
   if (resultSlot) {
     auto elti = elements.begin(), eltEnd = elements.end();
@@ -490,19 +506,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
         FullExpr scope(SGF.Cleanups, field->getParentPatternBinding());
 
         RValue arg = std::move(*elti);
-
-        // If the stored property has an attached result builder and its
-        // type is not a function type, the argument is a noescape closure
-        // that needs to be called.
-        if (field->getResultBuilderType()) {
-          if (!field->getValueInterfaceType()
-                  ->lookThroughAllOptionalTypes()->is<AnyFunctionType>()) {
-            auto resultTy = cast<FunctionType>(arg.getType()).getResult();
-            arg = SGF.emitMonomorphicApply(
-                Loc, std::move(arg).getAsSingleValue(SGF, Loc), {}, resultTy,
-                resultTy, ApplyOptions(), std::nullopt, std::nullopt);
-          }
-        }
+        arg = emitResultBuilderCallIfNeeded(field, std::move(arg));
 
         maybeEmitPropertyWrapperInitFromValue(SGF, Loc, field, subs,
                                               std::move(arg))
@@ -577,6 +581,7 @@ static void emitImplicitValueConstructor(SILGenFunction &SGF,
       assert(elti != eltEnd && "number of args does not match number of fields");
       (void)eltEnd;
       value = std::move(*elti);
+      value = emitResultBuilderCallIfNeeded(field, std::move(value));
       ++elti;
     } else {
       // Otherwise, use its initializer.
@@ -641,9 +646,10 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
 
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedConcurrent:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::GlobalActor:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedNonsending:
     return false;
   }
 }
@@ -1042,7 +1048,8 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     }
 
     selfValue = B.createAllocRefDynamic(Loc, allocArg, selfTy,
-                                        useObjCAllocation, false, {}, {});
+                                        useObjCAllocation, false,
+                                        StackAllocationIsNested, {}, {});
   } else {
     assert(ctor->isDesignatedInit());
     // For a designated initializer, we know that the static type being
@@ -1050,6 +1057,7 @@ void SILGenFunction::emitClassConstructorAllocator(ConstructorDecl *ctor) {
     // initializer.
     F.setIsExactSelfClass(IsExactSelfClass);
     selfValue = B.createAllocRef(Loc, selfTy, useObjCAllocation, false, false,
+                                 StackAllocationIsNested,
                                  ArrayRef<SILType>(), ArrayRef<SILValue>());
   }
   args.push_back(selfValue);
@@ -1618,8 +1626,9 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     // 'nonisolated' expressions can be evaluated from anywhere
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedConcurrent:
     case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::CallerIsolationInheriting:
+    case ActorIsolation::NonisolatedNonsending:
       break;
 
     case ActorIsolation::Erased:
@@ -1847,7 +1856,7 @@ void SILGenFunction::emitInitAccessor(AccessorDecl *accessor) {
 
   emitEpilog(accessor);
 
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 void SILGenFunction::emitPropertyWrappedFieldInitAccessor(
@@ -1957,5 +1966,5 @@ void SILGenFunction::emitPropertyWrappedFieldInitAccessor(
 
   // Emit epilog/cleanups
   emitEpilog(Loc);
-  mergeCleanupBlocks();
+  finalizeEmission();
 }

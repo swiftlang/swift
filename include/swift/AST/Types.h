@@ -164,8 +164,8 @@ public:
     /// This type contains an Error type without an underlying original type.
     HasBareError         = 0x100,
 
-    /// This type contains a DependentMemberType.
-    HasDependentMember   = 0x200,
+    /// Whether this type contains a JoinType or MeetType.
+    HasJoinOrMeet        = 0x200,
 
     /// This type contains an OpaqueTypeArchetype.
     HasOpaqueArchetype   = 0x400,
@@ -238,10 +238,6 @@ public:
   /// Does this type contain an error without an original type?
   bool hasBareError() const { return Bits & HasBareError; }
 
-  /// Does this type contain a dependent member type, possibly with a
-  /// non-type parameter base, such as a type variable or concrete type?
-  bool hasDependentMember() const { return Bits & HasDependentMember; }
-
   /// Does a type with these properties structurally contain an
   /// opened existential archetype?
   bool hasOpenedExistential() const { return Bits & HasOpenedExistential; }
@@ -286,6 +282,8 @@ public:
 
   bool isUnsafe() const { return Bits & IsUnsafe; }
 
+  bool hasJoinOrMeet() const { return Bits & HasJoinOrMeet; }
+
   /// Does a type with these properties structurally contain a
   /// parameterized existential type?
   bool hasParameterizedExistential() const {
@@ -315,11 +313,6 @@ public:
   /// Remove the HasTypeParameter property from this set.
   void removeHasTypeParameter() {
     Bits &= ~HasTypeParameter;
-  }
-
-  /// Remove the HasDependentMember property from this set.
-  void removeHasDependentMember() {
-    Bits &= ~HasDependentMember;
   }
 
   /// Remove the IsUnsafe property from this set.
@@ -414,7 +407,7 @@ class alignas(1 << TypeAlignInBits) TypeBase
 
 protected:
   enum { NumAFTExtInfoBits = 16 };
-  enum { NumSILExtInfoBits = 14 };
+  enum { NumSILExtInfoBits = 15 };
 
   // clang-format off
   union { uint64_t OpaqueBits;
@@ -823,6 +816,10 @@ public:
     return getRecursiveProperties().hasParameterizedExistential();
   }
 
+  /// Determine whether the type involves the 'join' or 'meet' type, produced by
+  /// the algorithms in lib/Sema/Subtyping.cpp.
+  bool hasJoinOrMeet() const { return getRecursiveProperties().hasJoinOrMeet(); }
+
   /// Determine whether the type involves a local archetype from the given
   /// environment.
   bool hasLocalArchetypeFromEnvironment(GenericEnvironment *env) const;
@@ -958,12 +955,6 @@ public:
   /// Whether this is a top-level ErrorType without an underlying original
   /// type, i.e prints as `_`.
   bool isBareErrorType() const;
-
-  /// Does this type contain a dependent member type, possibly with a
-  /// non-type parameter base, such as a type variable or concrete type?
-  bool hasDependentMember() const {
-    return getRecursiveProperties().hasDependentMember();
-  }
 
   /// Whether this type represents a generic constraint.
   bool isConstraintType() const;
@@ -1409,6 +1400,11 @@ public:
   /// For a ReferenceStorageType like @unowned, this returns the referent.
   /// Otherwise, it returns the type itself.
   Type getReferenceStorageReferent();
+
+  /// Replace all type variables and placeholders in the type with ErrorType.
+  /// This is necessary in a small number of cases where we need to ensure that
+  /// a type isn't solver allocated, for e.g diagnostic printing.
+  Type replaceTypeVariablesAndPlaceholdersWithErrors();
 
   /// Assumes this is a nominal type. Returns a substitution map that sends each
   /// generic parameter of the declaration's generic signature to the corresponding
@@ -4235,8 +4231,19 @@ struct ParameterListInfo {
 public:
   ParameterListInfo() { }
 
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params);
   ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
                     const ValueDecl *paramOwner, bool skipCurriedSelf);
+
+  /// Constructs parameter information from the given set of parameters
+  /// that are associated with the given substituted declaration reference.
+  ///
+  /// Note that number of parameters doesn't necessary always match arity of the
+  /// parameter list because variadic generic parameters without arguments
+  /// are removed from the function type and multi-parameter matches are
+  /// flattened.
+  ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                    bool skipCurriedSelf, ConcreteDeclRef declRef);
 
   /// Whether the parameter at the given index has a default argument.
   bool hasDefaultArgument(unsigned paramIdx) const;
@@ -4270,6 +4277,9 @@ public:
 
   /// Retrieve the number of parameters for which we have information.
   unsigned size() const { return defaultArguments.size(); }
+
+private:
+  void setFlagsFor(const ParamDecl *param, unsigned index);
 };
 
 /// Turn a param list into a symbolic and printable representation that does not
@@ -5492,6 +5502,9 @@ public:
   bool isSendable() const { return getExtInfo().isSendable(); }
   bool isUnimplementable() const { return getExtInfo().isUnimplementable(); }
   bool isAsync() const { return getExtInfo().isAsync(); }
+  bool hasNonisolatedNonsendingIsolation() const {
+    return getExtInfo().hasNonisolatedNonsendingIsolation();
+  }
   bool hasErasedIsolation() const { return getExtInfo().hasErasedIsolation(); }
   SILFunctionTypeIsolation getIsolation() const {
     return getExtInfo().getIsolation();
@@ -6312,9 +6325,8 @@ public:
                                 fieldIndexMutabilityUpdatePairs) const;
 
   using SILFieldIndexToSILTypeTransform = std::function<SILType(unsigned)>;
-  using SILFieldToSILTypeRange =
-      iterator_range<llvm::mapped_iterator<IntRange<unsigned>::iterator,
-                                           SILFieldIndexToSILTypeTransform>>;
+  using SILFieldToSILTypeRange = iterator_range<llvm::mapped_iterator<
+      IntRange<unsigned>::iterator, SILFieldIndexToSILTypeTransform, SILType>>;
 
   /// Returns a range of SILTypes that have been specialized correctly for use
   /// in the passed in SILFunction.
@@ -8019,6 +8031,42 @@ public:
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(PlaceholderType, Type)
 
+/// A type to represent a type join between a type variable and a concrete type.
+///
+/// For now, this is a singleton type that does not store the constituent parts
+/// of the join. If we want, we can add this in the future, in service of
+/// diagnostics for example.
+class JoinType final : public TypeBase {
+  friend class ASTContext;
+  JoinType(const ASTContext &C)
+    : TypeBase(TypeKind::Join, &C, RecursiveTypeProperties::HasJoinOrMeet) {}
+public:
+  // The singleton instance of this type is ASTContext::TheJoinType.
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Join;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(JoinType, Type)
+
+/// A type to represent a type meet between a type variable and a concrete type.
+///
+/// For now, this is a singleton type that does not store the constituent parts
+/// of the meet. If we want, we can add this in the future, in service of
+/// diagnostics for example.
+class MeetType final : public TypeBase {
+  friend class ASTContext;
+  MeetType(const ASTContext &C)
+    : TypeBase(TypeKind::Meet, &C, RecursiveTypeProperties::HasJoinOrMeet) {}
+public:
+  // The singleton instance of this type is ASTContext::TheMeetType.
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Meet;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(MeetType, Type)
+
 /// PackType - The type of a pack of arguments provided to a
 /// \c PackExpansionType to guide the pack expansion process.
 ///
@@ -8340,6 +8388,52 @@ public:
   const ASTContext &getASTContext() { return Context; }
 };
 DEFINE_EMPTY_CAN_TYPE_WRAPPER(IntegerType, Type)
+
+/// A placeholder type for a stored-property field whose real type has been
+/// elided from a serialized module because it was imported via an internal
+/// bridging header. The type carries the mangled name of the original type,
+/// which is used for deduplication and (eventually) for recovering the real
+/// type when the client has access to the defining header.
+///
+/// HiddenType is never produced by type-checking user code. It is synthesized
+/// only on the serialization path and consumed by deserialization and IRGen.
+///
+/// Each HiddenType also carries the ModuleDecl it was emitted from (the
+/// "defining module"). That module's HiddenTypeLayouts table holds the
+/// AbstractTypeLayout entry that backs this placeholder; IRGen resolves the
+/// layout via that module.
+class HiddenType final : public TypeBase, public llvm::FoldingSetNode {
+  friend class ASTContext;
+
+  StringRef MangledName;
+  ModuleDecl *DefiningModule;
+
+  HiddenType(StringRef mangledName, ModuleDecl *definingModule,
+             const ASTContext &ctx)
+      : TypeBase(TypeKind::Hidden, &ctx, RecursiveTypeProperties()),
+        MangledName(mangledName), DefiningModule(definingModule) {}
+
+public:
+  static HiddenType *get(const ASTContext &ctx, StringRef mangledName,
+                         ModuleDecl *definingModule);
+
+  StringRef getMangledName() const { return MangledName; }
+  ModuleDecl *getDefiningModule() const { return DefiningModule; }
+
+  void Profile(llvm::FoldingSetNodeID &ID) {
+    Profile(ID, getMangledName(), getDefiningModule());
+  }
+  static void Profile(llvm::FoldingSetNodeID &ID, StringRef mangledName,
+                      ModuleDecl *definingModule) {
+    ID.AddString(mangledName);
+    ID.AddPointer(definingModule);
+  }
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Hidden;
+  }
+};
+DEFINE_EMPTY_CAN_TYPE_WRAPPER(HiddenType, Type)
 
 /// getASTContext - Return the ASTContext that this type belongs to.
 inline ASTContext &TypeBase::getASTContext() const {

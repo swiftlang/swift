@@ -30,7 +30,7 @@ sil @guaranteed_swift_array_user : $@convention(thin) <τ_0_0> (@guaranteed Arra
 // CHECK:   switch_enum_addr [[CAST_TMP]] : $*Optional<Array<String>>, case #Optional.some!enumelt: [[SUCCESS_TRAMPOLINE_BB:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCCESS_TRAMPOLINE_BB]]:
-// CHECK:   [[PROJ_ENUM:%.*]] = unchecked_take_enum_data_addr [[CAST_TMP]]
+// CHECK:   [[PROJ_ENUM:%.*]] = unchecked_inplace_enum_data_addr [[CAST_TMP]]
 // CHECK:   copy_addr [take] [[PROJ_ENUM]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_TMP]]
 // CHECK:   br [[SUCCESS_BB:bb[0-9]+]]
@@ -102,7 +102,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_TMP]] : $*Optional<Array<String>>, case #Optional.some!enumelt: [[SUCCESS_TRAMPOLINE_BB:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL_BB:bb[0-9]+]]
 //
 // CHECK: [[SUCCESS_TRAMPOLINE_BB]]:
-// CHECK:   [[PROJ_ENUM:%.*]] = unchecked_take_enum_data_addr [[CAST_TMP]]
+// CHECK:   [[PROJ_ENUM:%.*]] = unchecked_inplace_enum_data_addr [[CAST_TMP]]
 // CHECK:   copy_addr [take] [[PROJ_ENUM]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_TMP]]
 // CHECK:   br [[SUCCESS_BB:bb[0-9]+]]
@@ -173,7 +173,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_TMP]] : $*Optional<Array<String>>, case #Optional.some!enumelt: [[SUCCESS_TRAMPOLINE_BB:bb[0-9]+]], case #Optional.none!enumelt: [[FAIL_BB]]
 //
 // CHECK: [[SUCCESS_TRAMPOLINE_BB]]:
-// CHECK:   [[PROJ_ENUM:%.*]] = unchecked_take_enum_data_addr [[CAST_TMP]]
+// CHECK:   [[PROJ_ENUM:%.*]] = unchecked_inplace_enum_data_addr [[CAST_TMP]]
 // CHECK:   copy_addr [take] [[PROJ_ENUM]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_TMP]]
 // CHECK:   br [[SUCCESS_BB]]
@@ -251,7 +251,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<String>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -317,7 +317,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<String>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   strong_release [[CASTED_INPUT]]
@@ -386,7 +386,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<String>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -457,7 +457,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Array<Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -523,7 +523,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Array<Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   strong_release [[CASTED_INPUT]]
@@ -592,7 +592,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Array<Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -663,7 +663,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Dictionary<AnyHashable, Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -729,7 +729,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Dictionary<AnyHashable, Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   strong_release [[CASTED_INPUT]]
@@ -798,7 +798,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Dictionary<AnyHashable, Any>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -869,7 +869,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Set<AnyHashable>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]
@@ -935,7 +935,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Set<AnyHashable>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   strong_release [[CASTED_INPUT]]
@@ -1004,7 +1004,7 @@ bb4:
 // CHECK:   switch_enum_addr [[CAST_RESULT]] : $*Optional<Set<AnyHashable>>, case #Optional.some!enumelt: [[COND_CAST_SUCC:bb[0-9]+]], case #Optional.none!enumelt: [[COND_CAST_FAIL:bb[0-9]+]]
 //
 // CHECK: [[COND_CAST_SUCC]]:
-// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_take_enum_data_addr [[CAST_RESULT]]
+// CHECK:   [[UNWRAPPED_CAST_RESULT:%.*]] = unchecked_inplace_enum_data_addr [[CAST_RESULT]]
 // CHECK:   copy_addr [take] [[UNWRAPPED_CAST_RESULT]] to [init] [[OUTPUT]]
 // CHECK:   dealloc_stack [[CAST_RESULT]]
 // CHECK:   destroy_addr [[OUTPUT]]

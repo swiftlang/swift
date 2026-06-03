@@ -36,6 +36,7 @@
 #include "swift/Runtime/Casting.h"
 #include "swift/Runtime/DispatchShims.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/Exception.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Threading/Mutex.h"
 #include "swift/Threading/Once.h"
@@ -211,7 +212,9 @@ ExecutorTrackingInfo::ActiveInfoInThread;
 
 } // end anonymous namespace
 
-void swift::runJobInEstablishedExecutorContext(Job *job) {
+void swift::runJobInEstablishedExecutorContext(Job *job,
+                                               SerialExecutorRef serialExecutor,
+                                               TaskExecutorRef taskExecutor) {
   _swift_tsan_acquire(job);
   SWIFT_TASK_DEBUG_LOG("Run job in established context %p", job);
 
@@ -230,7 +233,8 @@ void swift::runJobInEstablishedExecutorContext(Job *job) {
     [[maybe_unused]]
     uint32_t dispatchOpaquePriority = task->flagAsRunning();
 
-    auto traceHandle = concurrency::trace::job_run_begin(job);
+    auto traceHandle =
+        concurrency::trace::job_run_begin(job, serialExecutor, taskExecutor);
     task->runInFullyEstablishedContext();
     concurrency::trace::job_run_end(traceHandle);
 
@@ -348,7 +352,7 @@ JobPriority swift::swift_task_getCurrentThreadPriority() {
 #endif
 }
 
-const char *swift_task_getTaskName(AsyncTask *task) {
+const char *swift::swift_task_getTaskName(AsyncTask *task) {
   if (!task) {
     return nullptr;
   }
@@ -421,6 +425,7 @@ __swift_bincompat_useLegacyNonCrashingExecutorChecks() {
   return options;
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 // Shimming call to Swift runtime because Swift Embedded does not have
 // these symbols defined.
 const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
@@ -432,6 +437,7 @@ const char *__swift_runtime_env_useLegacyNonCrashingExecutorChecks() {
   return nullptr;
 #endif
 }
+#endif
 
 // Determine the default effective executor checking mode, and apply environment
 // variable overrides of the executor checking mode.
@@ -445,6 +451,7 @@ swift_task_is_current_executor_flag swift_bincompat_selectDefaultIsCurrentExecut
   swift_task_is_current_executor_flag options =
       __swift_bincompat_useLegacyNonCrashingExecutorChecks();
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
   // Potentially, override the platform detected mode, primarily used in tests.
   if (const char *modeStr =
           __swift_runtime_env_useLegacyNonCrashingExecutorChecks()) {
@@ -466,6 +473,7 @@ swift_task_is_current_executor_flag swift_bincompat_selectDefaultIsCurrentExecut
         options | swift_task_is_current_executor_flag::Assert);
     } // else, just use the platform detected mode
   } // no override, use the default mode
+#endif
 
   return options;
 }
@@ -735,6 +743,7 @@ swift_task_isCurrentExecutorImpl(SerialExecutorRef expectedExecutor) {
                                                isCurrentExecutorFlag);
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 /// Logging level for unexpected executors:
 /// 0 - no logging -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
 /// 1 - warn on each instance -- will be IGNORED when Swift6 mode of isCurrentExecutor is used
@@ -779,11 +788,13 @@ static void checkUnexpectedExecutorLogLevel(void *context) {
   }
 #endif // SWIFT_STDLIB_HAS_ENVIRON
 }
+#endif
 
 SWIFT_CC(swift)
 void swift::swift_task_reportUnexpectedExecutor(
     const unsigned char *file, uintptr_t fileLength, bool fileIsASCII,
     uintptr_t line, SerialExecutorRef executor) {
+#if !SWIFT_CONCURRENCY_EMBEDDED
   SWIFT_TASK_DEBUG_LOG("CHECKING swift_task_reportUnexpectedExecutor %s", "");
   // Make sure we have an appropriate log level.
   static swift::once_t logLevelToken;
@@ -839,14 +850,12 @@ void swift::swift_task_reportUnexpectedExecutor(
         &details);
   }
 
-#if defined(_WIN32) && !SWIFT_CONCURRENCY_EMBEDDED
+#if defined(_WIN32)
 #define STDERR_FILENO 2
   _write(STDERR_FILENO, message, strlen(message));
-#elif !SWIFT_CONCURRENCY_EMBEDDED
+#else
   fputs(message, stderr);
   fflush(stderr);
-#else
-  puts(message);
 #endif
 #if SWIFT_STDLIB_HAS_ASL
 #pragma clang diagnostic push
@@ -861,6 +870,9 @@ void swift::swift_task_reportUnexpectedExecutor(
 
   if (isFatalError)
     abort();
+#else
+  swift_Concurrency_fatalError(0, "running on unexpected executor");
+#endif
 }
 
 /*****************************************************************************/
@@ -1482,9 +1494,11 @@ static DefaultActor *asAbstract(DefaultActorImpl *actor) {
   return reinterpret_cast<DefaultActor*>(actor);
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static NonDefaultDistributedActorImpl *asImpl(NonDefaultDistributedActor *actor) {
   return reinterpret_cast<NonDefaultDistributedActorImpl*>(actor);
 }
+#endif
 
 /*****************************************************************************/
 /******************** NEW DEFAULT ACTOR IMPLEMENTATION ***********************/
@@ -1851,14 +1865,18 @@ static void defaultActorDrain(DefaultActorImpl *actor) {
         break;
       }
     } else {
+      auto taskExecutor = TaskExecutorRef::undefined();
       if (AsyncTask *task = dyn_cast<AsyncTask>(job)) {
-        auto taskExecutor = task->getPreferredTaskExecutor();
+        taskExecutor = task->getPreferredTaskExecutor();
         trackingInfo.setTaskExecutor(taskExecutor);
       }
 
       // This thread is now going to follow the task on this actor.
       // It may hop off the actor
-      runJobInEstablishedExecutorContext(job);
+      runJobInEstablishedExecutorContext(
+          job,
+          SerialExecutorRef::forDefaultActor(asAbstract(currentActor)),
+          taskExecutor);
 
       // We could have come back from the job on a generic executor and not as
       // part of a default actor. If so, there is no more work left for us to do
@@ -1962,8 +1980,10 @@ void DefaultActorImpl::deallocate() {
 #endif
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static size_t
 getDistributedRemoteActorAllocSize(const ClassMetadata *metadata);
+#endif
 
 void DefaultActorImpl::deallocateUnconditional() {
   concurrency::trace::actor_deallocate(this);
@@ -2199,6 +2219,7 @@ void DefaultActorImpl::releaseLock() {
 #endif
 
 SWIFT_CC(swift)
+SWIFT_RUNTIME_EXCEPTION_PERSONALITY
 static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
   ExecutorTrackingInfo trackingInfo;
 
@@ -2217,7 +2238,7 @@ static void swift_job_runImpl(Job *job, SerialExecutorRef executor) {
   trackingInfo.enterAndShadow(executor, taskExecutor);
 
   SWIFT_TASK_DEBUG_LOG("job %p", job);
-  runJobInEstablishedExecutorContext(job);
+  runJobInEstablishedExecutorContext(job, executor, taskExecutor);
 
   trackingInfo.leave();
 
@@ -2243,7 +2264,7 @@ static void swift_job_run_on_serial_and_task_executorImpl(Job *job,
   trackingInfo.enterAndShadow(serialExecutor, taskExecutor);
 
   SWIFT_TASK_DEBUG_LOG("job %p", job);
-  runJobInEstablishedExecutorContext(job);
+  runJobInEstablishedExecutorContext(job, serialExecutor, taskExecutor);
 
   trackingInfo.leave();
 
@@ -2283,6 +2304,7 @@ void swift::swift_defaultActor_deallocate(DefaultActor *_actor) {
   asImpl(_actor)->deallocate();
 }
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 static bool isDefaultActorClass(const ClassMetadata *metadata) {
   assert(metadata->isTypeMetadata());
   while (true) {
@@ -2301,6 +2323,7 @@ static bool isDefaultActorClass(const ClassMetadata *metadata) {
     }
   }
 }
+#endif
 
 void swift::swift_defaultActor_deallocateResilient(HeapObject *actor) {
 #if !SWIFT_CONCURRENCY_EMBEDDED
@@ -2399,6 +2422,13 @@ static bool mustSwitchToRun(SerialExecutorRef currentSerialExecutor,
                             TaskExecutorRef currentTaskExecutor,
                             TaskExecutorRef newTaskExecutor) {
   if (currentSerialExecutor.getIdentity() != newSerialExecutor.getIdentity()) {
+    // If the target is the generic executor and the task has a preferred
+    // task executor whose identity matches our current serial executor,
+    // we're already running where task executor preference would switch to on enqueue.
+    if (newSerialExecutor.isGeneric() && newTaskExecutor.isDefined() &&
+        currentSerialExecutor.getIdentity() == newTaskExecutor.getIdentity()) {
+      return false;
+    }
     return true; // must switch, new isolation context
   }
 
@@ -2426,8 +2456,10 @@ static void runOnAssumedThread(AsyncTask *task, SerialExecutorRef executor,
   // there and tail-call the task.  We don't want these frames to
   // potentially accumulate linearly.
   if (oldTracking) {
+    auto newTaskExecutor = task->getPreferredTaskExecutor();
     oldTracking->setActiveExecutor(executor);
-    oldTracking->setTaskExecutor(task->getPreferredTaskExecutor());
+    oldTracking->setTaskExecutor(newTaskExecutor);
+    concurrency::trace::task_switch_executor(task, executor, newTaskExecutor);
 
     return task->runInFullyEstablishedContext(); // 'return' forces tail call
   }
@@ -2744,6 +2776,8 @@ static void swift_task_enqueueImpl(Job *job, SerialExecutorRef serialExecutorRef
   auto serialExecutorIdentity = serialExecutorRef.getIdentity();
   auto serialExecutorType = swift_getObjectType(serialExecutorIdentity);
   auto serialExecutorWtable = serialExecutorRef.getSerialExecutorWitnessTable();
+  concurrency::trace::job_enqueue_executor(job, serialExecutorRef,
+                                           TaskExecutorRef::undefined());
   _swift_task_enqueueOnExecutor(job, serialExecutorIdentity, serialExecutorType,
                                 serialExecutorWtable);
 #endif // SWIFT_CONCURRENCY_EMBEDDED
@@ -2781,6 +2815,7 @@ void swift::swift_executor_escalate(SerialExecutorRef executor, AsyncTask *task,
 /***************************** DISTRIBUTED ACTOR *****************************/
 /*****************************************************************************/
 
+#if !SWIFT_CONCURRENCY_EMBEDDED
 void swift::swift_nonDefaultDistributedActor_initialize(NonDefaultDistributedActor *_actor) {
   asImpl(_actor)->initialize();
 }
@@ -2843,6 +2878,7 @@ swift::swift_distributedActor_remote_initialize(const Metadata *actorType) {
     return reinterpret_cast<OpaqueValue*>(actor);
   }
 }
+#endif // !SWIFT_CONCURRENCY_EMBEDDED
 
 bool swift::swift_distributed_actor_is_remote(HeapObject *_actor) {
 #if !SWIFT_CONCURRENCY_EMBEDDED

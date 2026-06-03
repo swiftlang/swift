@@ -163,10 +163,30 @@ static void copyUnmanagedFieldContents(OpaqueValue *destContainer, const Metadat
   type->vw_initializeWithCopy(destContainer, fieldData);
 }
 
+/// Whether `type` should be treated as Copyable for Mirror's purposes. The VWT
+/// bit alone is unreliable for conditionally-Copyable types whose layout does
+/// not depend on their generic args (they share one VWT across instantiations).
+static bool isCopyableForReflection(const Metadata *type) {
+  if (!type->getValueWitnesses()->flags.isCopyable())
+    return false;
+  auto *descriptor = type->getTypeContextDescriptor();
+  if (!descriptor || !descriptor->hasInvertibleProtocols())
+    return true;
+  auto mask = InvertibleProtocolSet::allExcept(
+      InvertibleProtocolKind::Copyable);
+  return !checkInvertibleRequirements(type, mask).has_value();
+}
+
 static AnyReturn copyFieldContents(OpaqueValue *fieldData,
                                         const FieldType fieldType) {
   Any outValue;
   auto *type = fieldType.getType();
+
+  if (!isCopyableForReflection(type)) {
+    outValue.Type = &METADATA_SYM(EMPTY_TUPLE_MANGLING);
+    return AnyReturn(outValue);
+  }
+
   outValue.Type = type;
   auto ownership = fieldType.getReferenceOwnership();
   auto *destContainer = type->allocateBoxForExistentialIn(&outValue.Buffer);
@@ -619,6 +639,15 @@ struct EnumImpl : ReflectionMirrorImpl {
 
     auto *caseName = getInfo(&tag, &payloadType, &indirect);
 
+    *outName = caseName;
+    *outFreeFunc = nullptr;
+
+    if (!isCopyableForReflection(type)) {
+      Any result;
+      result.Type = &METADATA_SYM(EMPTY_TUPLE_MANGLING);
+      return AnyReturn(result);
+    }
+
     // Copy the enum itself so that we can project the data without destroying
     // the original.
     Any enumCopy;
@@ -641,10 +670,7 @@ struct EnumImpl : ReflectionMirrorImpl {
       const HeapObject *owner = *reinterpret_cast<HeapObject * const *>(value);
       value = swift_projectBox(const_cast<HeapObject *>(owner));
     }
-    
-    *outName = caseName;
-    *outFreeFunc = nullptr;
-    
+
     Any result;
 
     result.Type = payloadType;

@@ -260,8 +260,8 @@ extension ApplySite {
                                                 capturedArguments: newArguments,
                                                 calleeConvention: partialAp.calleeConvention,
                                                 hasUnknownResultIsolation: partialAp.hasUnknownResultIsolation,
-                                                isOnStack: partialAp.isOnStack)
-      newApply.isNested = partialAp.isNested
+                                                isOnStack: partialAp.isOnStack,
+                                                isNested:  partialAp.isNested)
       partialAp.replace(with: newApply, context)
 
     case let tryApply as TryApplyInst:
@@ -669,11 +669,28 @@ extension StoreInst {
     let builder = Builder(after: self, context)
     let type = source.type
     if type.isStruct {
-      if (type.nominal as! StructDecl).hasUnreferenceableStorage {
+      let structDecl = type.nominal as! StructDecl
+      if structDecl.hasUnreferenceableStorage {
         return
       }
       if parentFunction.hasOwnership && source.ownership != .none {
-        let destructure = builder.createDestructureStruct(struct: source)
+        let v: Value
+        if structDecl.valueTypeDestructor != nil {
+          if storeOwnership == .assign {
+            // We must not drop the original (implicit) destroy of the `store [assign]`.
+            // Therefore replace the `store [assign]` with a `destroy_addr` - `store [init]` pair
+            // and then split the `store [init]`.
+            builder.createDestroyAddr(address: destination)
+            let initStore = builder.createStore(source: source, destination: destination, ownership: .initialize)
+            context.erase(instruction: self)
+            initStore.trySplit(context)
+            return
+          }
+          v = builder.createDropDeinit(of: source)
+        } else {
+          v = source
+        }
+        let destructure = builder.createDestructureStruct(struct: v)
         for (fieldIdx, fieldValue) in destructure.results.enumerated() {
           let destFieldAddr = builder.createStructElementAddr(structAddress: destination, fieldIndex: fieldIdx)
           builder.createStore(source: fieldValue, destination: destFieldAddr, ownership: splitOwnership(for: fieldValue))
@@ -930,7 +947,7 @@ private struct EscapesToValueVisitor : EscapeVisitor {
     if operand.value == target.value && path.projectionPath.mayOverlap(with: target.path) {
       return .abort
     }
-    if operand.instruction is ReturnInstruction {
+    if operand.instruction.isReturnInstruction {
       // Anything which is returned cannot escape to an instruction inside the function.
       return .ignore
     }

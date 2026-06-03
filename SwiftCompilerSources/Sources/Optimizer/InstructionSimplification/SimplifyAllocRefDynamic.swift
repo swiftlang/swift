@@ -39,7 +39,7 @@ extension AllocRefDynamicInst : OnoneSimplifiable {
     }
 
     let builder = Builder(before: self, context)
-    let newAlloc = builder.createAllocRef(type, isObjC: self.isObjC, canAllocOnStack: self.canAllocOnStack, isBare: false,
+    let newAlloc = builder.createAllocRef(type, isObjC: self.isObjC, canAllocOnStack: self.canAllocOnStack, isBare: false, isNested: self.isStackAllocationNested,
       tailAllocatedTypes: self.tailAllocatedTypes, tailAllocatedCounts: Array(self.tailAllocatedCounts.values))
     
     let result: Value

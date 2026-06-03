@@ -29,6 +29,7 @@
 
 #include <sys/mman.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
@@ -126,6 +127,7 @@ ssize_t safe_write(int fd, const void *buf, size_t len) {
 }
 
 CrashInfo crashInfo;
+int maxFdToClose = 1024;
 
 const int signalsToHandle[] = {
   SIGQUIT,
@@ -192,6 +194,11 @@ _swift_installCrashHandler()
     }
   }
 
+  // Read the per-process open-file limit once, for use in closeFds()
+  struct rlimit rl;
+  if (getrlimit(RLIMIT_NOFILE, &rl) == 0)
+    maxFdToClose = (int)rl.rlim_cur;
+
   return 0;
 }
 
@@ -213,11 +220,22 @@ tgkill(int tgid, int tid, int sig) {
   return syscall(SYS_tgkill, tgid, tid, sig);
 }
 
+#ifndef SYS_close_range
+#define SYS_close_range 436
+#endif
+
 #define CLOSE_RANGE_UNSHARE 0x2
 #define CLOSE_RANGE_CLOEXEC 0x4
 
 static int _close_range(unsigned int first, unsigned int last, int flags) {
-  return syscall(SYS_close_range, first, last, flags);
+  if (syscall(SYS_close_range, first, last, flags) == 0)
+    return 0;
+  if (errno != ENOSYS)
+    return -1;
+  for (unsigned int i = first; i <= last; i++) {
+    close(i);
+  }
+  return 0;
 }
 
 void
@@ -246,15 +264,7 @@ handle_fatal_signal(int signum,
   for (unsigned n = 0; n < lengthof(signalsToHandle); ++n)
     reset_signal(signalsToHandle[n]);
 
-  // Fill in crash info
-  crashInfo.crashing_thread = self.tid;
-  crashInfo.signal = signum;
-  crashInfo.fault_address = (uint64_t)pinfo->si_addr;
-
-  // Start the memory server
-  int fd = memserver_start();
-
-  // Display a progress message
+  // Find the program counter
   void *pc = 0;
   ucontext_t *ctx = (ucontext_t *)uctx;
 
@@ -272,12 +282,31 @@ handle_fatal_signal(int signum,
 #endif
 #endif
 
+  // Fill in crash info
+  crashInfo.crashing_thread = self.tid;
+  crashInfo.signal = signum;
+  switch (signum) {
+  case SIGILL:
+  case SIGFPE:
+  case SIGSEGV:
+  case SIGBUS:
+  case SIGTRAP:
+    crashInfo.fault_address = (uint64_t)pinfo->si_addr;
+    break;
+  default:
+    crashInfo.fault_address = (uint64_t)pc;
+  }
+
+  // Start the memory server
+  int fd = memserver_start();
+
+  // Display a progress message
   _swift_displayCrashMessage(signum, pc);
 
   if (_swift_backtraceSettings.closeFds) {
     closeFds(fd);
   }
-  
+
   // Actually start the backtracer
   if (!_swift_spawnBacktracer(&crashInfo, fd)) {
     const char *message = _swift_backtraceSettings.color == OnOffTty::On
@@ -690,7 +719,6 @@ sigjmp_buf memserver_fault_buf;
 pid_t memserver_pid;
 
 #define MIN_FD_TO_CLOSE 3
-#define MAX_FD_TO_CLOSE ~0
 
 void
 closeFds(int memserver_master_fd) {
@@ -700,24 +728,15 @@ closeFds(int memserver_master_fd) {
   // Otherwise we close all file descriptors after stderr except the end of
   // the pipe used by swift-backtrace.
 
-  int keepOpen1 = memserver_master_fd;
-  int keepOpen2 = memserver_fd;
+  int keepOpen1 = memserver_master_fd < memserver_fd
+    ? memserver_master_fd : memserver_fd;
+  int keepOpen2 = memserver_master_fd < memserver_fd
+    ? memserver_fd : memserver_master_fd;
 
-  if (keepOpen2 > keepOpen1+1) {
-    _close_range(MIN_FD_TO_CLOSE, keepOpen1-1, 0);
+  _close_range(MIN_FD_TO_CLOSE, keepOpen1-1, 0);
+  if (keepOpen2 > keepOpen1+1)
     _close_range(keepOpen1+1, keepOpen2-1, 0);
-    _close_range(keepOpen2+1, MAX_FD_TO_CLOSE, 0);
-  } else if (keepOpen2+1 < keepOpen1) {
-    _close_range(MIN_FD_TO_CLOSE, keepOpen2-1, 0);
-    _close_range(keepOpen2+1, keepOpen1-1, 0);
-    _close_range(keepOpen1+1, MAX_FD_TO_CLOSE, 0);
-  } else {
-    // the file descriptors are adjacent
-    int fd1 = keepOpen2 > keepOpen1 ? keepOpen1 : keepOpen2;
-    int fd2 = keepOpen2 > keepOpen1 ? keepOpen2 : keepOpen1;
-    _close_range(MIN_FD_TO_CLOSE, fd1-1, 0);
-    _close_range(fd2+1, MAX_FD_TO_CLOSE, 0);    
-  }
+  _close_range(keepOpen2+1, maxFdToClose, 0);
 }
 
 int

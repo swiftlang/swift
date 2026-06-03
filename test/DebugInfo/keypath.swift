@@ -8,7 +8,7 @@ public struct Gen<Value> {
 
 // This used to assert.
 
-// CHECK: distinct !DISubprogram(linkageName: "$sSly7ElementQz5IndexQzcipSMRzSHADRQlxxTK", {{.*}} flags: DIFlagArtificial
+// CHECK: distinct !DISubprogram({{.*}}linkageName: "$sSly7ElementQz5IndexQzcipSMRzSHADRQlxxTK", {{.*}} spFlags: DISPFlagDefinition
 extension Gen where Value : MutableCollection, Value.Index : Hashable {
     public var dontAssert: Int {
         var i = value.startIndex

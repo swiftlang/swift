@@ -25,6 +25,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/SIL/SILArgument.h"
@@ -727,8 +728,13 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     break;
     
   case SILStage::Lowered:
-    llvm_unreachable("cannot deserialize into a module that has entered "
-                     "Lowered stage");
+    // Allow declarations to be loaded from IRGen. This can happen if IRGen
+    // loads a SIL Vtable from the modulefile.
+    if (!declarationOnly) {
+      llvm_unreachable("cannot deserialize into a module that has entered "
+                       "Lowered stage");
+    }
+    break;
   }
   
   if (FID == 0)
@@ -797,6 +803,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences,
       markedAsUsed, effect, numAttrs, hasQualifiedOwnership, isWeakImported,
+      codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo;
@@ -806,6 +813,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       isWithoutActuallyEscapingThunk, specialPurpose, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, markedAsUsed,
       effect, numAttrs, hasQualifiedOwnership, isWeakImported,
+      codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
@@ -976,6 +984,11 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
     fn->setOptimizationMode(OptimizationMode(optimizationMode));
     fn->setPerfConstraints((PerformanceConstraints)perfConstr);
     fn->setIsAlwaysWeakImported(isWeakImported);
+    if (codeGenerationModel) {
+      fn->setCodeGenerationModel(static_cast<CodeGenerationModel>(codeGenerationModel - 1));
+    } else {
+      fn->setCodeGenerationModel(std::nullopt);
+    }
     fn->setClassSubclassScope(SubclassScope(subclassScope));
     fn->setHasCReferences(bool(hasCReferences));
     fn->setMarkedAsUsed(bool(markedAsUsed));
@@ -2213,6 +2226,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     unsigned Flags = ListOfValues[0];
     bool isObjC = (bool)(Flags & 1);
     bool canAllocOnStack = (bool)((Flags >> 1) & 1);
+    bool isBare = (bool)((Flags >> 2) & 1);
+    auto isNested = StackAllocationIsNested_t((bool) ((Flags >> 3) & 1));
     SILType ClassTy =
         getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
     SmallVector<SILValue, 4> Counts;
@@ -2236,12 +2251,12 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                                           ListOfValues[i], MetadataType);
       ResultInst = Builder.createAllocRefDynamic(Loc, MetadataOp, ClassTy,
                                                  isObjC, canAllocOnStack,
+                                                 isNested,
                                                  TailTypes, Counts);
     } else {
       assert(i == NumVals);
-      bool isBare = (bool)((Flags >> 2) & 1);
       ResultInst = Builder.createAllocRef(Loc, ClassTy, isObjC, canAllocOnStack, isBare,
-                                          TailTypes, Counts);
+                                          isNested, TailTypes, Counts);
     }
     break;
   }
@@ -2363,12 +2378,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
       IsNestedEncoding((flags >> 0) & 1) == IsNestedEncoding::IsNested);
 
     // FIXME: Why the arbitrary order difference in IRBuilder type argument?
-    auto PAI = Builder.createPartialApply(
+    ResultInst = Builder.createPartialApply(
         Loc, FnVal, Substitutions, Args,
-        closureTy->getCalleeConvention(), closureTy->getIsolation(), onStack);
-    PAI->setStackAllocationIsNested(isNested);
-
-    ResultInst = PAI;
+        closureTy->getCalleeConvention(), closureTy->getIsolation(), onStack,
+        isNested);
     break;
   }
   case SILInstructionKind::BuiltinInst: {
@@ -3571,6 +3584,36 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         ResultTy);
     break;
   }
+  case SILInstructionKind::UncheckedInPlaceEnumDataAddrInst: {
+    // Use SILOneValueOneOperandLayout.
+    EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
+    SILType OperandTy =
+        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn);
+    SILType ResultTy = OperandTy.getEnumElementType(
+        Elt, SILMod, Builder.getTypeExpansionContext());
+    ResultInst = Builder.createUncheckedInPlaceEnumDataAddr(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID2, OperandTy), Elt,
+        ResultTy);
+    break;
+  }
+  case SILInstructionKind::UncheckedBorrowEnumDataAddrInst: {
+    // Use SILOneTypeValuesLayout.
+    EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ListOfValues[0]));
+
+    SILType EnumTy =
+        getSILType(MF->getType(ListOfValues[1]), (SILValueCategory)ListOfValues[2], Fn);
+    SILValue Enum = getLocalValue(Builder.maybeGetFunction(), ListOfValues[3],
+                                  EnumTy);
+    
+    SILType ScratchTy =
+        getSILType(MF->getType(ListOfValues[4]), (SILValueCategory)ListOfValues[5], Fn);
+    SILValue Scratch = getLocalValue(Builder.maybeGetFunction(), ListOfValues[6],
+                                  ScratchTy);
+
+    ResultInst = Builder.createUncheckedBorrowEnumDataAddr(
+        Loc, Enum, Scratch, Elt);
+    break;
+  }
   case SILInstructionKind::InjectEnumAddrInst: {
     // Use SILOneValueOneOperandLayout.
     EnumElementDecl *Elt = cast<EnumElementDecl>(MF->getDecl(ValID));
@@ -4115,6 +4158,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, markedAsUsed,
       effect, numSpecAttrs, hasQualifiedOwnership, isWeakImported,
+      codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo;
@@ -4124,6 +4168,7 @@ bool SILDeserializer::hasSILFunction(StringRef Name,
       isWithoutActuallyEscapingThunk, isGlobal, inlineStrategy,
       optimizationMode, perfConstr, subclassScope, hasCReferences, markedAsUsed,
       effect, numSpecAttrs, hasQualifiedOwnership, isWeakImported,
+      codeGenerationModel,
       LIST_VER_TUPLE_PIECES(available), isDynamic, isExactSelfClass,
       isDistributed, isRuntimeAccessible, forceEnableLexicalLifetimes,
       onlyReferencedByDebugInfo, funcTyID, replacedFunctionID,
@@ -4254,10 +4299,12 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
   TypeID TyID;
   DeclID dID;
   ModuleID parentModuleID;
-  unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed;
+  unsigned rawLinkage, serializedKind, IsDeclaration, IsLet, IsUsed,
+      codeGenerationModel;
   unsigned numTrailingRecords;
   SILGlobalVarLayout::readRecord(scratch, rawLinkage, serializedKind,
                                  IsDeclaration, IsLet, IsUsed,
+                                 codeGenerationModel,
                                  numTrailingRecords, TyID, dID,
                                  parentModuleID);
   if (TyID == 0) {
@@ -4270,6 +4317,19 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
     LLVM_DEBUG(llvm::dbgs() << "invalid linkage code " << rawLinkage
                             << " for SILGlobalVariable\n");
     return nullptr;
+  }
+
+  // A SIL global variable that uses the Interface code generation model has a
+  // unique strong definition in its defining module. When deserialized into a
+  // different module, mark its linkage as externally available so that the
+  // importer references the defining module's symbol rather than emitting
+  // its own definition.
+  if (codeGenerationModel &&
+      static_cast<CodeGenerationModel>(codeGenerationModel - 1) ==
+          CodeGenerationModel::Interface &&
+      MF->getAssociatedModule() != SILMod.getSwiftModule()) {
+    linkage = addExternalToLinkage(*linkage);
+    IsDeclaration = true;
   }
 
   VarDecl *globalDecl = nullptr;
@@ -4291,6 +4351,12 @@ SILGlobalVariable *SILDeserializer::readGlobalVar(StringRef Name,
       std::nullopt, globalDecl);
   v->setLet(IsLet);
   v->setMarkedAsUsed(IsUsed);
+  if (codeGenerationModel) {
+    v->setCodeGenerationModel(
+        static_cast<CodeGenerationModel>(codeGenerationModel - 1));
+  } else {
+    v->setCodeGenerationModel(std::nullopt);
+  }
   globalVarOrOffset.set(v, true /*isFullyDeserialized*/);
   v->setDeclaration(IsDeclaration);
 
@@ -4490,6 +4556,37 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     MF->fatal(maybeKind.takeError());
   kind = maybeKind.get();
 
+  std::vector<SILVTable::ConformanceEntry> conformances;
+
+  while (kind == SIL_VTABLE_CONFORMANCE_ENTRY || kind == SIL_VTABLE_NO_CONFORMANCE_ENTRY) {
+    if (kind == SIL_VTABLE_NO_CONFORMANCE_ENTRY) {
+      DeclID protoId;
+      VTableNoConformanceEntry::readRecord(scratch, protoId);
+      ProtocolDecl *proto = cast<ProtocolDecl>(MF->getDecl(protoId));
+      conformances.push_back(proto);
+    } else {
+      ASSERT(kind == SIL_VTABLE_CONFORMANCE_ENTRY);
+      ProtocolConformanceID conformanceId;
+      VTableConformanceEntry::readRecord(scratch, conformanceId);
+      auto conformance = MF->getConformance(conformanceId);
+      conformances.push_back(conformance.getConcrete());
+    }
+
+    // Fetch the next record.
+    scratch.clear();
+    maybeEntry = SILCursor.advance(AF_DontPopBlockAtEnd);
+    if (!maybeEntry)
+      MF->fatal(maybeEntry.takeError());
+    entry = maybeEntry.get();
+    if (entry.Kind == llvm::BitstreamEntry::EndBlock)
+      // EndBlock means the end of this VTable.
+      break;
+    maybeKind = SILCursor.readRecord(entry.ID, scratch);
+    if (!maybeKind)
+      MF->fatal(maybeKind.takeError());
+    kind = maybeKind.get();
+  }
+
   std::vector<SILVTable::Entry> vtableEntries;
   // Another SIL_VTABLE record means the end of this VTable.
   while (kind == SIL_VTABLE_ENTRY) {
@@ -4535,6 +4632,10 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
       SerializedKind_t(Serialized),
       vtableEntries);
   vTableOrOffset.set(vT, true /*isFullyDeserialized*/);
+
+  for (auto cEntry : conformances) {
+    vT->appendConformance(cEntry);
+  }
 
   if (Callback) Callback->didDeserialize(MF->getAssociatedModule(), vT);
   return vT;
@@ -4846,8 +4947,10 @@ llvm::Expected<SILWitnessTable *>
   if (!maybeConformance)
     return maybeConformance.takeError();
 
-  auto theConformance = cast<RootProtocolConformance>(
-                          maybeConformance.get().getConcrete());
+  // Specialized witness tables can have a `SpecializedProtocolConformance`,
+  // not just a `RootProtocolConformance`. The downstream APIs accept any
+  // `ProtocolConformance *`.
+  auto *theConformance = maybeConformance.get().getConcrete();
 
   PrettyStackTraceConformance trace("deserializing SIL witness table for",
                                     theConformance);

@@ -792,3 +792,39 @@ swift::checkDominates(SILBasicBlock *sourceBlock, SILBasicBlock *destBlock) {
   return reaches;
 }
 #endif
+
+//===----------------------------------------------------------------------===//
+//                             findLoopHeaders
+//===----------------------------------------------------------------------===//
+
+void swift::findLoopHeaders(
+    SILFunction &Fn,
+    llvm::SmallPtrSet<SILBasicBlock *, 32> &LoopHeaders) {
+  LoopHeaders.clear();
+  BasicBlockSet Visited(&Fn);
+  BasicBlockSet InDFSStack(&Fn);
+  SmallVector<std::pair<SILBasicBlock *, SILBasicBlock::succ_iterator>, 16>
+      DFSStack;
+
+  auto *EntryBB = &Fn.front();
+  DFSStack.push_back(std::make_pair(EntryBB, EntryBB->succ_begin()));
+  Visited.insert(EntryBB);
+  InDFSStack.insert(EntryBB);
+
+  while (!DFSStack.empty()) {
+    auto &D = DFSStack.back();
+    if (D.second == D.first->succ_end()) {
+      DFSStack.pop_back();
+      InDFSStack.erase(D.first);
+    } else {
+      SILBasicBlock *NextSucc = *(D.second);
+      ++D.second;
+      if (Visited.insert(NextSucc)) {
+        InDFSStack.insert(NextSucc);
+        DFSStack.push_back(std::make_pair(NextSucc, NextSucc->succ_begin()));
+      } else if (InDFSStack.contains(NextSucc)) {
+        LoopHeaders.insert(NextSucc);
+      }
+    }
+  }
+}

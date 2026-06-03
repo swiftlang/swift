@@ -580,6 +580,18 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  bool hasAddressResult() const {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->hasAddressResult();
+    case ApplySiteKind::BeginApplyInst:
+    case ApplySiteKind::TryApplyInst:
+    case ApplySiteKind::PartialApplyInst:
+      return false;
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
@@ -944,19 +956,8 @@ public:
            getNumIndirectSILErrorResults();
   }
 
-  std::optional<ActorIsolation> getActorIsolation() const {
-    if (auto isolation = getIsolationCrossing();
-        isolation && isolation->getCalleeIsolation())
-      return isolation->getCalleeIsolation();
-    auto *calleeFunction = getCalleeFunction();
-    if (!calleeFunction)
-      return {};
-    return calleeFunction->getActorIsolation();
-  }
-
-  bool isCallerIsolationInheriting() const {
-    auto isolation = getActorIsolation();
-    return isolation && isolation->isCallerIsolationInheriting();
+  bool isNonisolatedNonsending() const {
+    return getSubstCalleeType()->hasNonisolatedNonsendingIsolation();
   }
 
   static FullApplySite getFromOpaqueValue(void *p) { return FullApplySite(p); }

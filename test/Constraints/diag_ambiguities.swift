@@ -116,3 +116,8 @@ func test_diagnose_deepest_ambiguity() {
     }
   }
 }
+
+// FIXME: `(Int, Int) -> Int` seems like it would be a better match, also we ought
+// to only emit this diagnostic once (https://github.com/swiftlang/swift/issues/88910).
+let unappliedResultMismatch: (Int, Int) -> Double = (+)
+// expected-error@-1 2{{cannot convert value of type '(Double) -> Double' to specified type '(Int, Int) -> Double'}}

@@ -17,11 +17,11 @@
 
 import Swift
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(anyAppleOS)
 internal import BacktracingImpl.OS.Darwin
 #endif
 
-#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+#if os(anyAppleOS)
 internal import Darwin
 #elseif os(Windows)
 internal import ucrt
@@ -32,8 +32,23 @@ internal import Musl
 #endif
 internal import BacktracingImpl.Runtime
 
+@available(BacktracingDT 6.2, *)
+struct SimpleImageRef: SymbolLoader.Image {
+  var name: String?
+  var path: String?
+  var uuid: [UInt8]?
+  var age: UInt32?
+
+  init(name: String?, path: String?, uniqueID: [UInt8]?) {
+    self.name = name
+    self.path = path
+    self.uuid = uniqueID
+    self.age = nil
+  }
+}
+
 /// A symbolicated backtrace
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 public struct SymbolicatedBacktrace: CustomStringConvertible {
   /// The `Backtrace` from which this was constructed
   public var backtrace: Backtrace
@@ -202,7 +217,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     /// For instance, the `start` function from `dyld` on macOS is a system
     /// function, and we don't need to display it under normal circumstances.
     public var isSystemFunction: Bool {
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if os(anyAppleOS)
       if rawName == "start", imageName == "dyld" {
         return true
       }
@@ -318,7 +333,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     self.frames = frames
   }
 
-  #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(anyAppleOS)
   private enum macOSSymbolicationError: Error {
     case invalidUUID
   }
@@ -497,7 +512,7 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
 
     switch symbolicationPlatform {
     case .Darwin:
-      #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+      #if os(anyAppleOS)
       withSymbolicator(images: theImages,
                       useSymbolCache: options.contains(.useSymbolCache)) {
         symbolicator in
@@ -615,8 +630,6 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
       }
 
     case .Windows:
-      let cache = PeImageCache.threadLocal
-
       for frame in backtrace.frames {
         let address = frame.adjustedProgramCounter
         if let imageNdx = theImages.indexOfImage(at: address) {
@@ -628,20 +641,22 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
                                       offset: 0,
                                       sourceLocation: nil)
 
-          if let imagePath = symbolLocator.find(image: theImages[imageNdx]),
-             let image = cache.lookup(path: imagePath) {
-            let symbolSource = symbolLocator.findSymbols(for: image)
-            let relativeAddress = ImageSource.Address(
-              address - theImages[imageNdx].baseAddress
-            ) + image.baseAddress
-            if let theSymbol = lookupSymbol(symbolSource: symbolSource,
-                                            image: imageNdx,
-                                            named: name,
-                                            frame: frame,
-                                            address: relativeAddress,
-                                            options: options) {
-              symbol = theSymbol
-            }
+          let imageRef = SimpleImageRef(
+            name: theImages[imageNdx].name,
+            path: theImages[imageNdx].path,
+            uniqueID: theImages[imageNdx].uniqueID
+          )
+          let symbolSource = symbolLocator.findSymbols(for: imageRef)
+          let relativeAddress = ImageSource.Address(
+            address - theImages[imageNdx].baseAddress
+          )
+          if let theSymbol = lookupSymbol(symbolSource: symbolSource,
+                                          image: imageNdx,
+                                          named: name,
+                                          frame: frame,
+                                          address: relativeAddress,
+                                          options: options) {
+            symbol = theSymbol
           }
 
           frames.append(Frame(captured: frame, symbol: symbol))

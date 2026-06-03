@@ -34,14 +34,16 @@ internal extension S1 {
 // CHECK-NEXT:   "name": "Copyable",
 // CHECK-NEXT:   "printedName": "Copyable",
 // CHECK-NEXT:   "usr": "s:s8CopyableP",
-// CHECK-NEXT:   "mangledName": "$ss8CopyableP"
+// CHECK-NEXT:   "mangledName": "$ss8CopyableP",
+// CHECK-NEXT:   "isMarkerProtocol": true
 // CHECK-NEXT: },
 // CHECK-NEXT: {
 // CHECK-NEXT:   "kind": "Conformance",
 // CHECK-NEXT:   "name": "Escapable",
 // CHECK-NEXT:   "printedName": "Escapable",
 // CHECK-NEXT:   "usr": "s:s9EscapableP",
-// CHECK-NEXT:   "mangledName": "$ss9EscapableP"
+// CHECK-NEXT:   "mangledName": "$ss9EscapableP",
+// CHECK-NEXT:   "isMarkerProtocol": true
 // CHECK-NEXT: },
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "kind": "Conformance",

@@ -706,6 +706,7 @@ extension String {
   ///     string.
   /// - Returns: The first word break strictly following `i` in the string.
   @available(StdlibDeploymentTarget 5.7, *)
+  @diagnose(UselessAvailabilityCheck, as: ignored)
   public func _wordIndex(after i: String.Index) -> String.Index {
     guard #available(StdlibDeploymentTarget 6.3, *) else {
       fatalError("Unreachable")
@@ -724,7 +725,7 @@ extension _StringGuts {
   @_effects(releasenone)
   internal func _nextUTF8WordIndex(after index: Index) -> Index {
     _internalInvariant(self.isFastUTF8)
-    let result = unsafe self.withFastUTF8 { utf8 in
+    let result = self.withFastUTF8 { utf8 in
       var offset = index._encodedOffset
       let first = unsafe _decodeScalar(utf8, startingAt: offset)
       offset &+= first.scalarLength

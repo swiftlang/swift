@@ -316,6 +316,8 @@ static void insertDebugValueBefore(SILInstruction *insertPt,
   if (!debugVar) {
     return;
   }
+  ASSERT(!debugVar.hasDebugReconstructionBlock() &&
+         "Unexpected debug reconstruction block in Mandatory Pass");
   auto varInfo = debugVar.getVarInfo();
   if (!varInfo) {
     return;
@@ -1137,7 +1139,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     }
   }
 
-  if (isa<UncheckedTakeEnumDataAddrInst>(stripAccessMarkers(operand))) {
+  if (isa<UncheckedEnumDataAddrInstBase>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding enum projection as init!\n");
     return true;
@@ -1150,6 +1152,35 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding strict-marked alloc_stack as init!\n");
     return true;
+  }
+
+  // SILGen sometimes emits two stacked `mark_unresolved_non_copyable_value`s
+  // on the same underlying address — an outer mark whose check kind permits
+  // initialization (e.g. `[consumable_and_assignable]` or
+  // `[initable_but_not_consumable]`) gates the init store, and an inner
+  // `[no_consume_or_assign]` mark layered on top gates the binding's reads.
+  // This is what's emitted for, among other things, a captured `let` of a
+  // noncopyable type initialized in conditional branches before the
+  // capturing closure runs. When checking the inner mark, the outer mark's
+  // init store has already happened, so the inner mark sees an initialized
+  // address.
+  if (auto *parentMark =
+          dyn_cast<MarkUnresolvedNonCopyableValueInst>(operand)) {
+    switch (parentMark->getCheckKind()) {
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::
+        ConsumableAndAssignable:
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::
+        InitableButNotConsumable:
+      LLVM_DEBUG(llvm::dbgs()
+                 << "Adding stacked mark over init-permitting parent as "
+                    "init!\n");
+      return true;
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::Invalid:
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign:
+    case MarkUnresolvedNonCopyableValueInst::CheckKind::
+        AssignableButNotConsumable:
+      break;
+    }
   }
 
   // Assume a strict-checked value initialized before the check.
@@ -1656,13 +1687,21 @@ shouldVisitAsEndPointUse(Operand *op) {
       return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUser;
     }
   }
+  // A borrow/mutate accessor apply with an address result should be treated
+  // as an endpoint use. The result address will have its own
+  // mark_unresolved_non_copyable_value that will be checked separately.
+  if (auto fas = FullApplySite::isa(op->getUser())) {
+    if (fas.hasAddressResult()) {
+      return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUser;
+    }
+  }
   // A drop_deinit consumes the deinit bit.
   if (isa<DropDeinitInst>(op->getUser())) {
     return TransitiveAddressWalkerTransitiveUseVisitation::BothUserAndUses;
   }
   // An unchecked_take_enum_data_addr consumes all bits except the remaining
   // element's.
-  if (isa<UncheckedTakeEnumDataAddrInst>(op->getUser())) {
+  if (isa<UncheckedEnumDataAddrInstBase>(op->getUser())) {
     return TransitiveAddressWalkerTransitiveUseVisitation::BothUserAndUses;
   }
   return TransitiveAddressWalkerTransitiveUseVisitation::OnlyUses;
@@ -1726,18 +1765,34 @@ struct CopiedLoadBorrowEliminationVisitor
 
       case OperandOwnership::ForwardingConsume:
       case OperandOwnership::DestroyingConsume: {
-        if (auto *dvi = dyn_cast<DestroyValueInst>(nextUse->getUser())) {
-          auto value = dvi->getOperand();
-          auto *pai = dyn_cast_or_null<PartialApplyInst>(
-              value->getDefiningInstruction());
-          if (pai && pai->isOnStack()) {
-            // A destroy_value of an on_stack partial apply isn't actually a
-            // consuming use--it closes a borrow scope.
-            continue;
+        // The closure value from an on-stack partial_apply is borrowed on
+        // behalf of its captures, so its lifetime-ending uses close a borrow
+        // scope rather than consuming the captured value. If the use is a
+        // `convert_function` (forwarding consume, e.g., stripping
+        // `@Sendable` from a `@MainActor`-isolated closure), push its uses
+        // onto the worklist so the terminating destroy is visited.
+        auto *user = nextUse->getUser();
+        if (auto *cfi = dyn_cast<ConvertFunctionInst>(user)) {
+          for (auto *use : cfi->getUses()) {
+            useWorklist.push_back(use);
           }
+          continue;
         }
-        // We can only hit this if our load_borrow was copied.
-        llvm_unreachable("We should never hit this");
+        // Otherwise, walk backward through any convert_function chain to
+        // verify the use is closing the borrow scope of an on-stack
+        // partial_apply.
+        SILValue value = nextUse->get();
+        while (auto *cfi = dyn_cast_or_null<ConvertFunctionInst>(
+                   value->getDefiningInstruction())) {
+          value = cfi->getOperand();
+        }
+        auto *pai = dyn_cast_or_null<PartialApplyInst>(
+            value->getDefiningInstruction());
+        if (!pai || !pai->isOnStack()) {
+          // We can only hit this if our load_borrow was copied.
+          llvm_unreachable("We should never hit this");
+        }
+        continue;
       }
       case OperandOwnership::GuaranteedForwarding: {
         SmallVector<SILValue, 8> forwardedValues;
@@ -1821,12 +1876,11 @@ shouldEmitPartialMutationErrorForType(SILType ty, NominalTypeDecl *nominal,
   if (nominal->getModuleContext() == fn->getModule().getSwiftModule())
     return std::nullopt;
 
-  // It's defined in another module and used here; it has to be visible.
-  assert(nominal
-             ->getFormalAccessScope(
-                 /*useDC=*/fn->getDeclContext(),
-                 /*treatUsableFromInlineAsPublic=*/true)
-             .isPublicOrPackage());
+  // It's defined in another module and used here, so we've established the
+  // type is visible. Historically the access scope was expected to be public
+  // or package; with `InternalImportsByDefault` a public type reached via an
+  // internal import has `Internal` scope in the importing module, which is
+  // also valid.
 
   // Partial mutation is supported only for frozen/fixed-layout types from
   // other modules.
@@ -2676,6 +2730,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
   }
 
+
   if (auto *pas = dyn_cast<PartialApplyInst>(user)) {
     if (auto *fArg = dyn_cast<SILFunctionArgument>(
             stripAccessMarkers(markedValue->getOperand()))) {
@@ -2823,15 +2878,10 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
 
 #ifndef NDEBUG
   if (user->mayWriteToMemory()) {
-    // TODO: `unchecked_take_enum_addr` should inherently be understood as
-    // non-side-effecting when it's nondestructive.
-    auto ue = dyn_cast<UncheckedTakeEnumDataAddrInst>(user);
-    if (!ue || ue->isDestructive()) {
-      llvm::errs() << "Found a write classified as a liveness use?!\n";
-      llvm::errs() << "Use: " << *user;
-      user->getFunction()->dump();
-      llvm_unreachable("standard failure");
-    }
+    llvm::errs() << "Found a write classified as a liveness use?!\n";
+    llvm::errs() << "Use: " << *user;
+    user->getFunction()->dump();
+    llvm_unreachable("standard failure");
   }
 #endif
   for (auto leafRange : leafRanges) {

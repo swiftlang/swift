@@ -585,7 +585,9 @@ extension String {
     self.init()
     _print_unlocked(instance, &self)
   }
+}
 
+extension String {
   // These overloads serve as fast paths for init(describing:), but they 
   // also preserve source compatibility for clients which accidentally  
   // used init(stringInterpolationSegment:) through constructs like 
@@ -725,7 +727,10 @@ extension String {
   {
     self = instance.description
   }
+}
 
+@_unavailableInEmbedded
+extension String {
   /// Creates a string with a detailed representation of the given value,
   /// suitable for debugging.
   ///

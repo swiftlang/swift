@@ -3,7 +3,12 @@
 // Make sure that specifying '-working-directory' does not actually cause the
 // working directory of the process to be affected.
 
-// RUN: %sourcekitd-test -req=open -print-raw-response %s -- %s -working-directory %t > /dev/null
+// Make sure that the implicit AST build kicked off by 'open' has the right
+// FileSystem. Do a diagnostics request to ensure the AST is built before
+// sourcekitd-test exits.
+// RUN: %sourcekitd-test -req=open -print-raw-response %s -- %s -working-directory %t == \
+// RUN:   -req=diags %s -print-raw-response -- %s -working-directory %t > /dev/null
+
 // RUN: %sourcekitd-test \
 // RUN:   -req=open -req-opts=syntactic_only=1 -print-raw-response %s -- %s -working-directory %t == \
 // RUN:   -req=edit -offset=0 -length=1 -replace="//" %s == \

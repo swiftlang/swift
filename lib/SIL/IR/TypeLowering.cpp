@@ -360,6 +360,7 @@ namespace {
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
     IMPL(Integer, Trivial)
+    IMPL(Hidden, Trivial)
 
 #undef IMPL
 
@@ -2602,6 +2603,15 @@ namespace {
         return handleAddressOnly(structType, properties);
       }
 
+      // Force address-only when the struct has hidden stored properties from
+      // an internal bridging header.
+      if (D->getAttrs().hasAttribute<HasHiddenStoredPropertiesAttr>()) {
+        properties.setAddressOnly();
+        properties.setNonTrivial();
+        properties.setLexical(IsLexical);
+        return handleAddressOnly(structType, properties);
+      }
+
       if (D->isCxxNonTrivial()) {
         properties.setDefinitelyAddressableForDependencies();
         properties.setAddressOnly();
@@ -3456,6 +3466,11 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           if (isa<SILPackType>(ty) || isa<PackExpansionType>(ty))
             return true;
 
+          // A HiddenType placeholder is a leaf with no inner structure to
+          // walk
+          if (isa<HiddenType>(ty))
+            return true;
+
           auto *nominal = ty.getAnyNominal();
           // Only pack-related non-nominal aggregates may be responsible for
           // non-conformance; walk into the rest.
@@ -3502,6 +3517,12 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
           // The error type doesn't conform but is trivial (case (8)).
           if (isa<ErrorType>(ty))
+            return false;
+
+          // A HiddenType placeholder stands in for a C-imported type whose
+          // identity has been elided from the client's view. It can be
+          // trivial without explicit conformance to BitwiseCopyable.
+          if (isa<HiddenType>(ty))
             return false;
 
           // These show up in the context of non-conforming variadic generics
@@ -4169,6 +4190,7 @@ static CanAnyFunctionType getPropertyWrappedFieldInitAccessorInterfaceType(
     CanType selfType = wrappedProperty->getDeclContext()
                            ->getSelfInterfaceType()
                            ->getCanonicalType();
+    selfType = sig.getReducedType(selfType);
     // Create the self param
     params.emplace_back(
         selfType, Identifier(),
@@ -5248,6 +5270,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
   // have an error result.
   if (fnTy1->hasErrorResult() != fnTy2->hasErrorResult() &&
       (fnTy1->isAsync() || fnTy2->isAsync()))
+    return ABIDifference::NeedsThunk;
+
+  // A synchronous function requires a thunk to be treated as an asynchronous
+  // function. An async function cannot be called synchronously just by adding a
+  // thunk and hopefully doesn't get here.
+  if (!fnTy1->isAsync() && fnTy2->isAsync())
     return ABIDifference::NeedsThunk;
 
   for (unsigned i = 0, e = fnTy1->getParameters().size(); i < e; ++i) {

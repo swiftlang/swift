@@ -1,0 +1,6 @@
+// {"kind":"complete","original":"b2c0bc09","signature":"swift::ide::CodeCompletionStringBuilder::addCallArgumentPatterns(llvm::ArrayRef<swift::AnyFunctionType::Param>, llvm::ArrayRef<swift::ParamDecl const*>, swift::DeclContext const*, swift::GenericSignature, swift::ide::DefaultArgumentOutputMode, bool)","signatureAssert":"Assertion failed: (declParams.empty() || typeParams.size() == declParams.size()), function addCallArgumentPatterns","signatureNext":"CompletionLookup::addConstructorCall"}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-filename %s
+struct a<b, each c {
+  init(repeat each c) {
+    a < b
+    >#^^#

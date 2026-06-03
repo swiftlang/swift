@@ -166,7 +166,8 @@ static bool isPlatformActiveForTarget(PlatformKind Platform,
       return Target.isDriverKit();
     case PlatformKind::Swift:
     case PlatformKind::anyAppleOS:
-      return Target.isOSDarwin();
+      return Target.isMacOSX() || Target.isiOS() || Target.isWatchOS() ||
+             Target.isTvOS() || Target.isXROS();
     case PlatformKind::OpenBSD:
       return Target.isOSOpenBSD();
     case PlatformKind::FreeBSD:
@@ -193,7 +194,7 @@ bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                                    ForRuntimeQuery);
 }
 
-static PlatformKind platformForTriple(const llvm::Triple &triple,
+PlatformKind swift::platformForTriple(const llvm::Triple &triple,
                                       bool enableAppExtensionRestrictions) {
   if (triple.isMacOSX()) {
     return (enableAppExtensionRestrictions

@@ -395,11 +395,11 @@ protocol P {
   var goodP: Int { yielding borrow set } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
 
   var badP: Int { yielding borrow yielding mutate } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
-                                                    //expected-error@-1{{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
+                                                    //expected-error@-1{{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}}
 
   subscript(goodS goodS: Int) -> Int { yielding borrow set } //expected-disabled-error{{accessor_requires_coroutine_accessors}}
 
   subscript(badS badS: Int) -> Int { yielding borrow yielding mutate }  //expected-disabled-error{{accessor_requires_coroutine_accessors}}
-                                                    //expected-error@-1{{expected 'get', 'yielding borrow', or 'set' in a protocol property}}
+                                                    //expected-error@-1{{expected 'get', 'yielding borrow', 'borrow', 'set' or 'mutate' in a protocol property}}
 
 }

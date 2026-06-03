@@ -7,6 +7,7 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  SimplifyAllocPack.swift
   SimplifyAllocRefDynamic.swift
   SimplifyAllocStack.swift
   SimplifyApply.swift
@@ -25,6 +26,7 @@ swift_compiler_sources(Optimizer
   SimplifyDebugStep.swift
   SimplifyDestroyValue.swift
   SimplifyDestructure.swift
+  SimplifyDifferentiableFunction.swift
   SimplifyEndCOWMutationAddr.swift
   SimplifyExplicitCopy.swift
   SimplifyFixLifetime.swift
@@ -34,6 +36,7 @@ swift_compiler_sources(Optimizer
   SimplifyLoad.swift
   SimplifyLoadBorrow.swift
   SimplifyMarkDependence.swift
+  SimplifyMoveValue.swift
   SimplifyPartialApply.swift
   SimplifyPointerToAddress.swift
   SimplifyRefCasts.swift
@@ -44,8 +47,10 @@ swift_compiler_sources(Optimizer
   SimplifySwitchEnum.swift
   SimplifyTuple.swift
   SimplifyTupleExtract.swift
+  SimplifyTuplePackElementAddr.swift
   SimplifyTypeValue.swift
   SimplifyUncheckedAddrCast.swift
   SimplifyUncheckedEnumData.swift
+  SimplifyUncheckedOwnershipConversion.swift
   SimplifyValueToBridgeObject.swift
   SimplifyWitnessMethod.swift)

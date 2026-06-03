@@ -120,6 +120,8 @@ struct MatchCallArgumentResult {
       Bindings.push_back({i});
     return {TrailingClosureMatching::Forward, Bindings, std::nullopt};
   }
+
+  void dump(llvm::raw_ostream &out);
 };
 
 /// Provides information about the application of a function argument to a
@@ -337,6 +339,14 @@ struct CaseLabelItemInfo {
   Expr *guardExpr;
 };
 
+struct ImplicitCallAsFunctionInfo {
+  /// The implicit `callAsFunction` member.
+  UnresolvedDotExpr *Member;
+  /// The new set of arguments for the base expression that the `callAsFunction`
+  /// will be applied on top of, i.e the non-trailing arguments.
+  ArgumentList *BaseArgs;
+};
+
 /// A complete solution to a constraint system.
 ///
 /// A solution to a constraint system consists of type variable bindings to
@@ -492,9 +502,9 @@ public:
   /// constructions) to the argument lists for the call to that locator.
   llvm::DenseMap<ConstraintLocator *, ArgumentList *> argumentLists;
 
-  /// The set of implicitly generated `.callAsFunction` root expressions.
-  llvm::DenseMap<ConstraintLocator *, UnresolvedDotExpr *>
-      ImplicitCallAsFunctionRoots;
+  /// The info for implicitly generated `.callAsFunction` expressions.
+  llvm::DenseMap<ConstraintLocator *, ImplicitCallAsFunctionInfo>
+      ImplicitCallAsFunctions;
 
   /// The set of conformances synthesized during solving (i.e. for
   /// ad-hoc distributed `SerializationRequirement` conformances).

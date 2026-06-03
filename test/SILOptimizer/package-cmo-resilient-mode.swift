@@ -14,7 +14,7 @@
 // RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -Xllvm -sil-print-types -emit-sil -O %t/main.swift -o %t/Main-res.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK-MAIN-COMMON,CHECK-MAIN-RES < %t/Main-res.sil
 
-// RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck %s --check-prefix=CHECK-BC
+// RUN: %llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck %s --check-prefix=CHECK-BC
 // CHECK-BC: SERIALIZE_PACKAGE_ENABLED
 
 // RUN: rm -rf %t/Lib.swiftmodule

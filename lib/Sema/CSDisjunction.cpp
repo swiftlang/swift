@@ -386,15 +386,13 @@ bool ConstraintSystem::simplifyAppliedOverloadsImpl(
         });
 
     // If this is an operator application and all of the arguments are holes,
-    // let's disable all but one overload to make sure holes don't cause
-    // performance problems because hole could be bound to any type.
+    // let's disable disjunction by binding type variable that represents it
+    // to a hole.
     //
     // Non-operator calls are exempted because they have fewer overloads,
     // and it's possible to filter them based on labels.
     if (allHoles && isOperatorDisjunction(disjunction)) {
-      auto choices = disjunction->getNestedConstraints();
-      for (auto *choice : choices.slice(1))
-        choice->setDisabled();
+      recordTypeVariablesAsHoles(fnTypeVar);
     }
   }
 
@@ -516,9 +514,7 @@ retry_after_fail:
         }
 
         // Determine the type that this choice will have.
-        Type choiceType = getEffectiveOverloadType(
-            constraint->getLocator(), choice, /*allowMembers=*/true,
-            constraint->getDeclContext());
+        Type choiceType = constraint->getEffectiveOverloadType();
         if (!choiceType) {
           hasUnhandledConstraints = true;
           return true;
@@ -717,10 +713,7 @@ static void forEachDisjunctionChoice(
     if (!decl)
       continue;
 
-    Type overloadType = cs.getEffectiveOverloadType(
-        disjunction->getLocator(), choice,
-        /*allowMembers=*/true, constraint->getDeclContext());
-
+    Type overloadType = constraint->getEffectiveOverloadType();
     if (!overloadType || !overloadType->is<FunctionType>())
       continue;
 
@@ -843,14 +836,6 @@ void SolverDisjunction::pruneDisjunction(ConstraintSystem &cs,
           llvm::errs() << "\n";
         }
         return;
-      }
-
-      // This is important for SIMD operators in particular because
-      // a lot of their overloads have same-type requires to a concrete
-      // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
-      if (genericSig) {
-        overloadType = overloadType->getReducedType(genericSig)
-                           ->castTo<FunctionType>();
       }
 
       ConflictReason reason;

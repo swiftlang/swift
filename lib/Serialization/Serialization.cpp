@@ -888,10 +888,12 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(options_block, ALLOW_NON_RESILIENT_ACCESS);
   BLOCK_RECORD(options_block, SERIALIZE_PACKAGE_ENABLED);
   BLOCK_RECORD(options_block, STRICT_MEMORY_SAFETY);
-  BLOCK_RECORD(options_block, DEFERRED_CODE_GEN);
+  BLOCK_RECORD(options_block, CODE_GENERATION_MODEL);
+  BLOCK_RECORD(options_block, AGGRESSIVE_CMO);
   BLOCK_RECORD(options_block, CXX_STDLIB_KIND);
   BLOCK_RECORD(options_block, PUBLIC_MODULE_NAME);
   BLOCK_RECORD(options_block, SWIFT_INTERFACE_COMPILER_VERSION);
+  BLOCK_RECORD(options_block, LIBRARY_LEVEL);
 
   BLOCK(INPUT_BLOCK);
   BLOCK_RECORD(input_block, IMPORTED_MODULE);
@@ -962,6 +964,8 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_INST_NO_OPERAND);
   BLOCK_RECORD(sil_block, SIL_VTABLE);
   BLOCK_RECORD(sil_block, SIL_VTABLE_ENTRY);
+  BLOCK_RECORD(sil_block, SIL_VTABLE_CONFORMANCE_ENTRY);
+  BLOCK_RECORD(sil_block, SIL_VTABLE_NO_CONFORMANCE_ENTRY);
   BLOCK_RECORD(sil_block, SIL_GLOBALVAR);
   BLOCK_RECORD(sil_block, SIL_INIT_EXISTENTIAL);
   BLOCK_RECORD(sil_block, SIL_WITNESS_TABLE);
@@ -1096,7 +1100,22 @@ void Serializer::writeHeader() {
     Channel.emit(ScratchRecord, version::getCurrentCompilerChannel());
 
     {
-      llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID, 4);
+      // OPTIONS_BLOCK needs an abbrev-code width wide enough to encode
+      // every BCRecordLayout it allocates: 4 reserved IDs plus one per
+      // record kind. If this fires, widen the code size below.
+      constexpr unsigned OptionsBlockCodeSize = 6;
+      constexpr unsigned ReservedAbbrevs =
+        llvm::bitc::FIRST_APPLICATION_ABBREV;
+      constexpr unsigned MaxUserAbbrevsInOptionsBlock =
+        options_block::LAST_RECORD_KIND_MARKER - 1;
+      static_assert(
+        ReservedAbbrevs + MaxUserAbbrevsInOptionsBlock <=
+            (1u << OptionsBlockCodeSize),
+        "OPTIONS_BLOCK abbrev-code size is too small to hold an "
+        "abbreviation for every record kind; widen "
+        "kOptionsBlockCodeSize.");
+      llvm::BCBlockRAII restoreBlock(Out, OPTIONS_BLOCK_ID,
+                                    OptionsBlockCodeSize);
 
       options_block::IsSIBLayout IsSIB(Out);
       IsSIB.emit(ScratchRecord, Options.IsSIB);
@@ -1179,6 +1198,12 @@ void Serializer::writeHeader() {
         PublicModuleName.emit(ScratchRecord, publicModuleName.str());
       }
 
+      if (M->getName().is("os")) {
+        options_block::OSLogStringSectionNameLayout OSLogStringSectionName(Out);
+        OSLogStringSectionName.emit(ScratchRecord,
+                                    M->getASTContext().LangOpts.OSLogStringSectionName);
+      }
+
       version::Version compilerVersion = M->getSwiftInterfaceCompilerVersion();
       if (!compilerVersion.empty()) {
         options_block::SwiftInterfaceCompilerVersionLayout Version(Out);
@@ -1201,9 +1226,9 @@ void Serializer::writeHeader() {
         StrictMemorySafety.emit(ScratchRecord);
       }
 
-      if (M->deferredCodeGen()) {
-        options_block::DeferredCodeGenLayout DeferredCodeGen(Out);
-        DeferredCodeGen.emit(ScratchRecord);
+      {
+        options_block::CodeGenerationModelLayout codeGenModel(Out);
+        codeGenModel.emit(ScratchRecord, static_cast<unsigned>(M->codeGenerationModel()));
       }
 
       if (M->hasCxxInteroperability()) {
@@ -1214,6 +1239,15 @@ void Serializer::writeHeader() {
         options_block::CXXStdlibKindLayout CXXStdlibKind(Out);
         CXXStdlibKind.emit(ScratchRecord,
                            static_cast<uint8_t>(M->getCXXStdlibKind()));
+      }
+
+      options_block::LibraryLevelLayout LibLevel(Out);
+      LibLevel.emit(ScratchRecord,
+                    unsigned(M->getASTContext().LangOpts.LibraryLevel));
+
+      if (M->isAggressiveCMOEnabled()) {
+        options_block::AggressiveCMOEnabledLayout AggressiveCMOEnabled(Out);
+        AggressiveCMOEnabled.emit(ScratchRecord);
       }
 
       if (Options.SerializeOptionsForDebugging) {
@@ -1338,20 +1372,6 @@ static void flattenImportPath(const ImportedModule &import,
   outStream << accessPathElem.Item.str();
 }
 
-/// Heuristic to detect a path like "llvmcas://12345ABCDE"
-static bool isURI(StringRef path) { return path.contains("://"); }
-static StringRef getFileName(StringRef path) {
-  if (isURI(path))
-    return path;
-  return llvm::sys::path::filename(path);
-}
-
-static StringRef getDirectory(StringRef path) {
-  if (isURI(path))
-    return path;
-  return llvm::sys::path::parent_path(path);
-}
-
 static llvm::SmallString<1024>
 flattenModuleMapEntry(StringRef name,
                       const ExplicitSwiftModuleInputInfo &info) {
@@ -1359,10 +1379,11 @@ flattenModuleMapEntry(StringRef name,
   {
     llvm::raw_svector_ostream s(out);
     s << name << '\0';
-    s << getFileName(info.modulePath) << '\0';
+    s << llvm::sys::path::filename(info.modulePath) << '\0';
     s << info.moduleAlias.value_or("") << '\0';
-    s << getFileName(info.moduleDocPath.value_or("")) << '\0';
-    s << getFileName(info.moduleSourceInfoPath.value_or("")) << '\0';
+    s << llvm::sys::path::filename(info.moduleDocPath.value_or("")) << '\0';
+    s << llvm::sys::path::filename(info.moduleSourceInfoPath.value_or(""))
+      << '\0';
     s << info.moduleCacheKey.value_or("") << '\0';
     s << '\0'; // clangModuleMap
     if (info.headerDependencyPaths)
@@ -1379,12 +1400,12 @@ flattenModuleMapEntry(StringRef name,
   {
     llvm::raw_svector_ostream s(out);
     s << name << '\0';
-    s << getFileName(info.modulePath) << '\0';
+    s << llvm::sys::path::filename(info.modulePath) << '\0';
     s << info.moduleAlias.value_or("") << '\0';
     s << '\0'; // moduleDocPath
     s << '\0'; // moduleSourceInfoPath
     s << info.moduleCacheKey.value_or("") << '\0';
-    s << getFileName(info.moduleMapPath) << '\0';
+    s << llvm::sys::path::filename(info.moduleMapPath) << '\0';
   }
   return out;
 }
@@ -1437,7 +1458,7 @@ void Serializer::writeInputBlock() {
   llvm::DenseMap<StringRef, unsigned> dependencyDirectories;
 
   auto getOrCreateDependencyDir = [&](llvm::StringRef path) -> unsigned {
-    StringRef directoryName = getDirectory(path);
+    StringRef directoryName = llvm::sys::path::parent_path(path);
     unsigned &dependencyDirectoryIndex = dependencyDirectories[directoryName];
     if (!dependencyDirectoryIndex) {
       // This name must be newly-added. Give it a new ID (and skip 0).
@@ -1451,7 +1472,8 @@ void Serializer::writeInputBlock() {
     unsigned dependencyDirectoryIndex = getOrCreateDependencyDir(dep.getPath());
     FileDependency.emit(ScratchRecord, dep.getSize(), getRawModTimeOrHash(dep),
                         dep.isHashBased(), dep.isSDKRelative(),
-                        dependencyDirectoryIndex, getFileName(dep.getPath()));
+                        dependencyDirectoryIndex,
+                        llvm::sys::path::filename(dep.getPath()));
   }
 
   if (!Options.ModuleInterface.empty())
@@ -1670,7 +1692,8 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
-  CASE(CallerIsolationInheriting)
+  CASE(NonisolatedConcurrent)
+  CASE(NonisolatedNonsending)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(Erased)
@@ -2041,6 +2064,7 @@ void Serializer::writeLocalNormalProtocolConformance(
   switch (auto isolation = conformance->getIsolation()) {
   case swift::ActorIsolation::Unspecified:
   case swift::ActorIsolation::Nonisolated:
+  case swift::ActorIsolation::NonisolatedConcurrent:
     break;
 
   case swift::ActorIsolation::GlobalActor:
@@ -2050,7 +2074,7 @@ void Serializer::writeLocalNormalProtocolConformance(
   case swift::ActorIsolation::ActorInstance:
   case swift::ActorIsolation::NonisolatedUnsafe:
   case swift::ActorIsolation::Erased:
-  case swift::ActorIsolation::CallerIsolationInheriting:
+  case swift::ActorIsolation::NonisolatedNonsending:
     llvm_unreachable("Conformances cannot have this kind of isolation");
   }
 
@@ -2845,7 +2869,8 @@ void Serializer::writeLifetimeDependencies(
     LifetimeDependenceLayout::emitRecord(
         Out, ScratchRecord, abbrCode, info.getTargetIndex(),
         info.getParamIndicesLength(), info.hasImmortalSpecifier(),
-        info.isFromAnnotation(), info.hasInheritLifetimeParamIndices(),
+        info.isFromAnnotation(), info.hasCaptures(),
+        info.hasInheritLifetimeParamIndices(),
         info.hasScopeLifetimeParamIndices(), info.hasAddressableParamIndices(),
         paramIndices);
     paramIndices.clear();
@@ -3037,7 +3062,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::ClangImporterSynthesizedType:
     case DeclAttrKind::PrivateImport:
     case DeclAttrKind::AllowFeatureSuppression:
-    case DeclAttrKind::Warn:
+    case DeclAttrKind::Diagnose:
       llvm_unreachable("cannot serialize attribute");
 
 #define SIMPLE_DECL_ATTR(_, CLASS, ...)                                        \
@@ -3048,6 +3073,20 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     return;                                                                    \
   }
 #include "swift/AST/DeclAttr.def"
+
+    case DeclAttrKind::PreInverseGenerics: {
+      auto *attr = cast<PreInverseGenericsAttr>(DA);
+      auto abbrCode =
+          S.DeclTypeAbbrCodes[PreInverseGenericsDeclAttrLayout::Code];
+      auto exceptType = attr->getResolvedExceptType(D);
+      if (S.skipTypeIfInvalid(exceptType, attr->getExceptTypeRepr()))
+        return;
+
+      auto typeID = S.addTypeRef(exceptType);
+      PreInverseGenericsDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(), typeID);
+      return;
+    }
 
     case DeclAttrKind::ABI: {
       auto *theAttr = cast<ABIAttr>(DA);
@@ -4824,6 +4863,16 @@ public:
 
     unsigned numBackingProperties = 0;
     Type ty = var->getInterfaceType();
+    // If Sema marked this stored property's type as one to hide on emission
+    // swap in a HiddenType placeholder carrying just the mangled name. Clients of
+    // the emitted .swiftmodule will deserialize the HiddenType instead of the
+    // real type, breaking the link to the internal bridging-header dependency.
+    auto &ctx = var->getASTContext();
+    if (auto mangledName = ctx.lookupTypeToHideWhenEmittingModule(
+            ty->getCanonicalType())) {
+      ty = HiddenType::get(ctx, *mangledName,
+                           var->getDeclContext()->getParentModule());
+    }
     SmallVector<TypeID, 2> arrayFields;
     for (auto accessor : accessors.Decls)
       arrayFields.push_back(S.addDeclRef(accessor));
@@ -5749,7 +5798,7 @@ public:
                                   S.addTypeRef(ty->getOriginalType()));
       return;
     }
-    llvm_unreachable("should not serialize an ErrorType");
+    ABORT("should not serialize an ErrorType");
   }
 
   void visitPlaceholderType(const PlaceholderType *) {
@@ -5760,28 +5809,26 @@ public:
           cast<ErrorType>(ErrorType::get(S.getASTContext()).getPointer()));
       return;
     }
-    llvm_unreachable("should not serialize a PlaceholderType");
+    ABORT("should not serialize a PlaceholderType");
   }
 
-  void visitModuleType(const ModuleType *) {
-    llvm_unreachable("modules are currently not first-class values");
-  }
+#define UNSUPPORTED_TYPE(type)                                                  \
+    void visit##type##Type(const type##Type *t) {                               \
+      ABORT([&](llvm::raw_ostream &out) {                                       \
+        out << "Don't know how to serialize this kind of type:\n";              \
+        t->dump(out);                                                           \
+      });                                                                       \
+    }
 
-  void visitInOutType(const InOutType *) {
-    llvm_unreachable("inout types are only used in function type parameters");
-  }
+  UNSUPPORTED_TYPE(Module)
+  UNSUPPORTED_TYPE(InOut)
+  UNSUPPORTED_TYPE(LValue)
+  UNSUPPORTED_TYPE(TypeVariable)
+  UNSUPPORTED_TYPE(ErrorUnion)
+  UNSUPPORTED_TYPE(Join)
+  UNSUPPORTED_TYPE(Meet)
 
-  void visitLValueType(const LValueType *) {
-    llvm_unreachable("lvalue types are only used in function bodies");
-  }
-
-  void visitTypeVariableType(const TypeVariableType *) {
-    llvm_unreachable("type variables should not escape the type checker");
-  }
-
-  void visitErrorUnionType(const ErrorUnionType *) {
-    llvm_unreachable("error union types do not persist in the AST");
-  }
+#undef UNSUPPORTED_TYPE
 
   void visitLocatableType(const LocatableType *LT) {
     visit(LT->getSinglyDesugaredType());
@@ -6228,7 +6275,7 @@ public:
         S.Out, S.ScratchRecord, abbrCode, fnTy->isSendable(),
         fnTy->isAsync(), stableCoroutineKind, stableCalleeConvention,
         stableRepresentation, fnTy->isPseudogeneric(), fnTy->isNoEscape(),
-        fnTy->isUnimplementable(), fnTy->hasErasedIsolation(),
+        fnTy->isUnimplementable(), fnTy->getIsolation().getKind(),
         stableDiffKind, fnTy->hasErrorResult(),
         fnTy->getParameters().size(),
         fnTy->getNumYields(), fnTy->getNumResults(),
@@ -6365,6 +6412,14 @@ public:
     IntegerTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                   integer->isNegative(),
                                   integer->getDigitsText());
+  }
+
+  void visitHiddenType(const HiddenType *hidden) {
+    using namespace decls_block;
+
+    unsigned abbrCode = S.DeclTypeAbbrCodes[HiddenTypeLayout::Code];
+    HiddenTypeLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                 hidden->getMangledName());
   }
 };
 
@@ -6567,6 +6622,7 @@ void Serializer::writeAllDeclsAndTypes() {
   registerDeclTypeAbbr<PackTypeLayout>();
   registerDeclTypeAbbr<SILPackTypeLayout>();
   registerDeclTypeAbbr<IntegerTypeLayout>();
+  registerDeclTypeAbbr<HiddenTypeLayout>();
   registerDeclTypeAbbr<InlineArrayTypeLayout>();
 
   registerDeclTypeAbbr<ErrorFlagLayout>();
@@ -7401,6 +7457,25 @@ void SerializerBase::writeToStream(raw_ostream &os) {
   os.flush();
 }
 
+void Serializer::writeHiddenTypeLayoutsBlock() {
+  auto layouts = M->getSortedHiddenTypeLayouts();
+  if (layouts.empty())
+    return;
+
+  BCBlockRAII block(Out, HIDDEN_TYPE_LAYOUTS_BLOCK_ID, /*abbrev width=*/3);
+  hidden_type_layouts_block::HiddenTypeLayoutLayout HiddenTypeLayoutRecord(Out);
+  for (auto &entry : layouts) {
+    StringRef name = entry.first;
+    const AbstractTypeLayout &layout = entry.second;
+    HiddenTypeLayoutRecord.emit(
+        ScratchRecord,
+        layout.size, layout.alignment, layout.stride,
+        layout.bitwiseCopyable ? 1u : 0u,
+        layout.isOpaque ? 1u : 0u,
+        name);
+  }
+}
+
 SerializerBase::SerializerBase(ArrayRef<unsigned char> signature,
                                ModuleOrSourceFile DC) {
   for (unsigned char byte : signature)
@@ -7426,6 +7501,7 @@ void Serializer::writeToStream(
     S.writeInputBlock();
     S.writeSIL(SILMod);
     S.writeAST(DC);
+    S.writeHiddenTypeLayoutsBlock();
 
     if (S.hadError)
       S.getASTContext().Diags.diagnose(SourceLoc(), diag::serialization_failed,

@@ -57,8 +57,7 @@ public:
   InputFile(StringRef name, bool isPrimary,
             llvm::MemoryBuffer *buffer = nullptr)
       : InputFile(name, isPrimary, buffer,
-                  file_types::lookupTypeForExtension(
-                      llvm::sys::path::extension(name))) {}
+                  file_types::lookupTypeFromFilename(name)) {}
 
   /// Constructs an input file from the provided data.
   InputFile(StringRef name, bool isPrimary, llvm::MemoryBuffer *buffer,

@@ -208,7 +208,7 @@ extension _StringGuts {
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
     _internalInvariant(i < endIndex._encodedOffset)
     if isFastUTF8 {
-      let fast = unsafe withFastUTF8 { utf8 in
+      let fast = withFastUTF8 { utf8 in
         if i &+ 1 == utf8.count { return true }
         let pair = unsafe UnsafeRawPointer(
           utf8.baseAddress.unsafelyUnwrapped
@@ -231,7 +231,7 @@ extension _StringGuts {
       return _foreignOpaqueCharacterStride(startingAt: i)
     }
 
-    let nextIdx = unsafe withFastUTF8 { utf8 in
+    let nextIdx = withFastUTF8 { utf8 in
       nextBoundary(startingAt: i) { j in
         _internalInvariant(j >= 0)
         guard j < utf8.count else { return nil }
@@ -257,7 +257,7 @@ extension _StringGuts {
       return i
     }
     if isFastUTF8 {
-      let fast = unsafe withFastUTF8 { utf8 in
+      let fast = withFastUTF8 { utf8 in
         let pair = unsafe UnsafeRawPointer(
           utf8.baseAddress.unsafelyUnwrapped
         ).loadUnaligned(fromByteOffset: i &- 2, as: UInt16.self)
@@ -279,7 +279,7 @@ extension _StringGuts {
       return _foreignOpaqueCharacterStride(endingAt: i)
     }
 
-    let previousIdx = unsafe withFastUTF8 { utf8 in
+    let previousIdx = withFastUTF8 { utf8 in
       previousBoundary(endingAt: i) { j in
         _internalInvariant(j <= utf8.count)
         guard j > 0 else { return nil }
@@ -308,7 +308,7 @@ extension _StringGuts {
       return _foreignOpaqueCharacterStride(endingAt: i, in: bounds)
     }
 
-    let previousIdx = unsafe withFastUTF8 { utf8 in
+    let previousIdx = withFastUTF8 { utf8 in
       previousBoundary(endingAt: i) { j in
         _internalInvariant(j <= bounds.upperBound)
         guard j > bounds.lowerBound else { return nil }

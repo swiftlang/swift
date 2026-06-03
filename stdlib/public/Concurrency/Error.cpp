@@ -15,18 +15,27 @@
 
 #include "Error.h"
 
-// swift::fatalError is not exported from libswiftCore and not shared, so define another
-// internal function instead.
+#if SWIFT_CONCURRENCY_EMBEDDED
+/// In Embedded Swift, this entrypoint is provided to produce a fatal error. It
+/// allows hooking of the fatal error operation at the Swift level and avoids
+/// any dependencies on the C standard library to abort.
+extern "C" SWIFT_NORETURN void _swift_fatalError(const char *message);
+#endif
+
+// swift::fatalError is not exported from libswiftCore and not shared, so define
+// another internal function instead. In Embedded Swift, we do have a
+// `swift_fatalError` that we can call with a string. It does not formatting,
+// however.
 SWIFT_NORETURN
 SWIFT_VFORMAT(2)
 void swift::swift_Concurrency_fatalErrorv(uint32_t flags, const char *format,
                                           va_list val) {
 #if !SWIFT_CONCURRENCY_EMBEDDED
   vfprintf(stderr, format, val);
-#else
-  vprintf(format, val);
-#endif
   abort();
+#else
+  _swift_fatalError(format);
+#endif
 }
 
 SWIFT_NORETURN

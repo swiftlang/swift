@@ -41,7 +41,7 @@ public func myFunc(_ ptr: UnsafeBufferPointer<CInt>?) {
 @_alwaysEmitIntoClient @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc2(_ ptr: inout MutableSpan<CInt>?) {
     let len = CInt(exactly: ptr?.count ?? 0)!
-    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+    let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -57,13 +57,13 @@ public func myFunc2(_ ptr: inout MutableSpan<CInt>?) {
 public func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) {
     let len = CInt(exactly: ptr?.count ?? 0)!
     let len2 = CInt(exactly: ptr2?.count ?? 0)!
-    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+    let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr)
     }
-    let _ptr2Ptr = unsafe ptr2?.withUnsafeMutableBufferPointer {
+    let _ptr2Ptr = ptr2?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
@@ -78,7 +78,7 @@ public func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<C
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_disfavoredOverload
 public func myFunc4(_ ptr: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
     let len = CInt(exactly: ptr?.count ?? 0)!
-    let _ptrPtr = unsafe ptr?.withUnsafeMutableBufferPointer {
+    let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {

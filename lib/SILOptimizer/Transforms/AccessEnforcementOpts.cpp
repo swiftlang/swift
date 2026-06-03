@@ -990,6 +990,10 @@ canMergeBegin(PostDominanceInfo *postDomTree,
   return true;
 }
 
+static bool isDirectBaseAccess(BeginAccessInst *beginAccess) {
+  return beginAccess->getSource() == getAccessBase(beginAccess->getSource());
+}
+
 static bool
 canMerge(PostDominanceInfo *postDomTree,
          const llvm::DenseMap<SILBasicBlock *, SCCInfo> &blockToSCCMap,
@@ -998,6 +1002,17 @@ canMerge(PostDominanceInfo *postDomTree,
   // introducing new conflicts that were previously ignored. Merging read/modify
   // will require additional data flow information.
   if (childIns->getAccessKind() != parentIns->getAccessKind())
+    return false;
+
+  // 'parentIns' and 'childIns' have the same AccessStorage, but their address
+  // operands may originate from a different chain of address projections or
+  // address casts. 'mergeAccesses()' simply replaces all uses of 'childInst'
+  // with 'parentIns' rather than rematerializing those address projections or
+  // casts. Therefore, filter out access scopes unless they directly use the
+  // access base. It is unexpected for dynamic access to be on a projection, but
+  // it can result from optimization and inlining. And even though this pass
+  // will probably convert them to static accesses, they remain in the worklist.
+  if (!isDirectBaseAccess(childIns) || !isDirectBaseAccess(parentIns))
     return false;
 
   if (!canMergeBegin(postDomTree, blockToSCCMap, parentIns, childIns))
@@ -1159,7 +1174,7 @@ struct AccessEnforcementOpts : public SILFunctionTransform {
       invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
 
     // Perform the access merging
-    // The inital version of the optimization requires a postDomTree
+    // The initial version of the optimization requires a postDomTree
     PostDominanceAnalysis *postDomAnalysis =
         getAnalysis<PostDominanceAnalysis>();
     PostDominanceInfo *postDomTree = postDomAnalysis->get(F);

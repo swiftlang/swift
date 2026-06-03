@@ -23,7 +23,7 @@ If you're a compiler/stdlib engineer, this invocation builds LLVM, Swift, instal
 tools, and also builds WasmKit to execute stdlib tests:
 
 ```
-./utils/build-script --build-wasm-stdlib --wasmkit --build-embedded-stdlib --build-embedded-stdlib-cross-compiling \
+./utils/build-script --build-wasi-stdlib --wasmkit --build-embedded-stdlib --build-embedded-stdlib-cross-compiling \
   --install-swift --install-llvm \
   '--llvm-install-components=llvm-ar;llvm-nm;llvm-ranlib;llvm-cov;llvm-profdata;llvm-objdump;llvm-objcopy;llvm-symbolizer;IndexStore;clang;clang-resource-headers;builtins;runtimes;clangd;libclang;dsymutil;LTO;clang-features-file;lld' \
   --sccache
@@ -40,30 +40,30 @@ cd build/Ninja-RelWithDebInfoAssert
 Then run the compiler and stdlib test suite via `ninja` (assuming your host is arm64 macOS, adjust paths accordingly otherwise):
 
 ```
-PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
-  ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasmstdlib-macosx-arm64
+PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
+  ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
 ```
 
 Filter to a subset of tests you'd like to run with `LIT_FILTER`. Here's an example to run only tests with `embedded` in their file path:
 
 ```
-LIT_FILTER='(embedded)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
-  ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasmstdlib-macosx-arm64
+LIT_FILTER='(embedded)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
+  ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
 ```
 
 Filter out tests you don't want to run with `LIT_FILTER_OUT`. Here's an example that excludes tests containing `KeyPath` in their file path:
 
 ```
-LIT_FILTER_OUT='(KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
-  ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasmstdlib-macosx-arm64
+LIT_FILTER_OUT='(KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
+  ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
 ```
 
 Values passed to these environment variables are regular expressions, thus to exclude both `embedded` and `KeyPath`
 use `|` regex operator:
 
 ```
-LIT_FILTER_OUT='(embedded|KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$PATH" \
-  ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasmstdlib-macosx-arm64
+LIT_FILTER_OUT='(embedded|KeyPath)' PATH="$(pwd)/wasmkit-macosx-arm64/bin:$(pwd)/llvm-macosx-arm64/bin:$(pwd)/swift-macosx-arm64/bin:$PATH" \
+  ninja check-swift-wasi-wasm32-custom check-swift-embedded-wasi -C wasistdlib-macosx-arm64
 ```
 
 
@@ -73,7 +73,7 @@ The [Swift SDK](https://github.com/swiftlang/swift-evolution/blob/main/proposals
 for WebAssembly is built and tested using the following command (exclude `--sccache` if it's not installed or build caching is not needed):
 
 ```bash
-./utils/build-script --sccache --build-wasm-stdlib --wasmkit --install-llvm --install-swift --swiftpm --install-swiftpm \
+./utils/build-script --sccache --build-wasi-stdlib --wasmkit --install-llvm --install-swift --swiftpm --install-swiftpm \
   --llbuild --install-llbuild --swift-testing --install-swift-testing \
   --swift-testing-macros --install-swift-testing-macros --build-embedded-stdlib --build-embedded-stdlib-cross-compiling \
   '--llvm-install-components=llvm-ar;llvm-nm;llvm-ranlib;llvm-cov;llvm-profdata;llvm-objdump;llvm-objcopy;llvm-symbolizer;IndexStore;clang;clang-resource-headers;builtins;runtimes;clangd;libclang;dsymutil;LTO;clang-features-file;lld'
@@ -92,16 +92,18 @@ swift sdk install ../swift-sdk-generator/Bundles/swift-DEVELOPMENT-SNAPSHOT_wasm
 
 ## Building Swift SDK for WebAssembly without building the compiler
 
-Building the Swift compiler is a time-consuming process. If you only want to build the Swift standard library
-with pre-built Swift compiler, you can use the following command:
+Building the Swift compiler is a time-consuming process. If you have a pre-built Swift compiler that's sufficiently recent and you only want to build the Swift standard library
+with this pre-built Swift compiler, you can use the following command:
 
 ```console
 $ SWIFT_TOOLS_PATH=path/to/swift-development-snapshot/usr/bin
+$ export PATH=$SWIFT_TOOLS_PATH:$PATH
 $ ./utils/build-script \
     --skip-build-llvm \
     --skip-build-swift \
     --skip-build-cmark \
-    --build-wasm-stdlib \
+    --build-wasi-stdlib \
+    --skip-test-wasi-stdlib \
     --native-swift-tools-path="$SWIFT_TOOLS_PATH" \
     --native-clang-tools-path="$SWIFT_TOOLS_PATH" \
     --native-llvm-tools-path="$SWIFT_TOOLS_PATH"

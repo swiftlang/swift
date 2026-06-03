@@ -3014,7 +3014,7 @@ static bool requiresCorrespondingUnderscoredCoroutineAccessorImpl(
   }
 
   // Non-exported storage has no ABI to keep stable.
-  if (isExported(storage) == ExportedLevel::None)
+  if (isExported(storage) != ExportedLevel::Exported)
     return false;
 
   // The non-underscored accessor is not present, the underscored accessor
@@ -3433,8 +3433,20 @@ static VarDecl *synthesizePropertyWrapperProjectionVar(
   // Determine the access level for the property.
   property->overwriteAccess(var->getFormalAccess());
 
-  // Determine setter access.
-  property->overwriteSetterAccess(var->getSetterFormalAccess());
+  // Determine setter access. `projectedValue` setter could be less
+  // accessible than the variable itself and vice versa, we need to
+  // account for that and take the less permitting access of the two.
+  property->overwriteSetterAccess(
+      wrapperVar ? std::min(var->getSetterFormalAccess(),
+                            wrapperVar->getSetterFormalAccess())
+                 : var->getSetterFormalAccess());
+
+  // The property must be as available as both the wrapped property and
+  // the wrapper type's `projectedValue` property.
+  SmallVector<const Decl *, 2> asAvailableAs = {var};
+  if (wrapperVar)
+    asAvailableAs.push_back(wrapperVar);
+  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
 
   // Add the accessors we need.
   if (var->hasImplicitPropertyWrapper()) {

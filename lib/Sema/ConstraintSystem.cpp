@@ -17,10 +17,10 @@
 //===----------------------------------------------------------------------===//
 #include "swift/Sema/ConstraintSystem.h"
 #include "CSDiagnostics.h"
+#include "MiscDiagnostics.h"
 #include "OpenedExistentials.h"
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
-#include "TypeCheckEmbedded.h"
 #include "TypeCheckMacros.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
@@ -31,6 +31,7 @@
 #include "swift/AST/MacroDefinition.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/AST/SILOptions.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeTransform.h"
 #include "swift/AST/Types.h"
@@ -112,17 +113,20 @@ bool ConstraintSystem::isTooComplex(size_t solutionMemory) {
   return false;
 }
 
-ExpressionTimer::ExpressionTimer(ConstraintSystem &CS, unsigned thresholdInSecs)
+ComplexityTracker::ComplexityTracker(ConstraintSystem &CS,
+                                     unsigned thresholdInSecs,
+                                     unsigned warnTimeLimitInMillis,
+                                     unsigned warnScopeLimit,
+                                     unsigned warnTrailLimit)
     : CS(CS),
       StartTime(llvm::TimeRecord::getCurrentTime()),
       ThresholdInSecs(thresholdInSecs),
+      WarnTimeLimitInMillis(warnTimeLimitInMillis),
+      WarnScopeLimit(warnScopeLimit),
+      WarnTrailLimit(warnTrailLimit),
       PrintWarning(true) {}
 
-unsigned ExpressionTimer::getWarnLimit() const {
-  return CS.getASTContext().TypeCheckerOpts.WarnLongExpressionTypeChecking;
-}
-
-ExpressionTimer::~ExpressionTimer() {
+ComplexityTracker::~ComplexityTracker() {
   auto elapsed = getElapsedProcessTimeInFractionalSeconds();
   unsigned elapsedMS = static_cast<unsigned>(elapsed * 1000);
   auto &ctx = CS.getASTContext();
@@ -140,16 +144,35 @@ ExpressionTimer::~ExpressionTimer() {
   if (!PrintWarning)
     return;
 
-  const auto WarnLimit = getWarnLimit();
-
-  if (WarnLimit == 0 || elapsedMS < WarnLimit)
-    return;
-
-  if (range.Start.isValid()) {
+  // Time-based warning (non-deterministic).
+  if (WarnTimeLimitInMillis > 0 && elapsedMS >= WarnTimeLimitInMillis &&
+      range.Start.isValid()) {
     ctx.Diags
         .diagnose(range.Start, diag::debug_long_expression, elapsedMS,
-                  WarnLimit)
+                  WarnTimeLimitInMillis)
         .highlight(range);
+  }
+
+  // Scope-based warning (deterministic).
+  if (WarnScopeLimit > 0) {
+    unsigned numScopes = CS.getNumSolverScopes();
+    if (numScopes > WarnScopeLimit && range.Start.isValid()) {
+      ctx.Diags
+          .diagnose(range.Start, diag::debug_long_expression_scopes,
+                    numScopes, WarnScopeLimit)
+          .highlight(range);
+    }
+  }
+
+  // Trail-based warning (deterministic).
+  if (WarnTrailLimit > 0) {
+    unsigned numSteps = CS.getNumTrailSteps();
+    if (numSteps > WarnTrailLimit && range.Start.isValid()) {
+      ctx.Diags
+          .diagnose(range.Start, diag::debug_long_expression_trail,
+                    numSteps, WarnTrailLimit)
+          .highlight(range);
+    }
   }
 }
 
@@ -186,17 +209,22 @@ void ConstraintSystem::startExpressionTimer() {
   const auto &opts = getASTContext().TypeCheckerOpts;
   unsigned timeout = opts.ExpressionTimeoutThreshold;
 
-  // If either the timeout is set, or we're asked to emit warnings,
-  // start the timer. Otherwise, don't start the timer, it's needless
-  // overhead.
+  // If either the timeout is set, we're asked to emit warnings, or we're
+  // asked to debug expression type-checking times, start the tracker.
+  // Otherwise, don't start the tracker, it's needless overhead.
   if (timeout == 0) {
-    if (opts.WarnLongExpressionTypeChecking == 0)
+    if (opts.WarnLongExpressionTypeChecking == 0 &&
+        opts.WarnLongExpressionTypeCheckingScopes == 0 &&
+        opts.WarnLongExpressionTypeCheckingTrail == 0 &&
+        !opts.DebugTimeExpressions)
       return;
 
-    timeout = ExpressionTimer::NoLimit;
+    timeout = ComplexityTracker::NoLimit;
   }
 
-  Timer.emplace(*this, timeout);
+  Timer.emplace(*this, timeout, opts.WarnLongExpressionTypeChecking,
+                opts.WarnLongExpressionTypeCheckingScopes,
+                opts.WarnLongExpressionTypeCheckingTrail);
 }
 
 void ConstraintSystem::incrementScopeCounter() {
@@ -1077,7 +1105,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
 
   if (auto depMemType = type->getAs<DependentMemberType>()) {
     auto baseTy = depMemType->getBase();
-    if (!baseTy->hasTypeVariable() && !baseTy->hasDependentMember())
+    if (!baseTy->hasTypeVariable())
       return type;
 
     // FIXME: Perform a more limited simplification?
@@ -1415,7 +1443,16 @@ FunctionType::ExtInfo ClosureEffectsRequest::evaluate(
 
   if (throws || async) {
     if (expr->getThrowsLoc().isValid() && !expr->getExplicitThrownTypeRepr())
-      diagnoseUntypedThrowsInEmbedded(expr, expr->getThrowsLoc());
+      diagnoseUntypedThrows(expr, expr->getThrowsLoc());
+
+    // If we don't have the concurrency library, reject the use of 'async'.
+    ASTContext &ctx = expr->getASTContext();
+    if (async &&
+        !ctx.getLoadedModule(ctx.Id_Concurrency) &&
+        !ctx.SILOpts.ParseStdlib) {
+      ctx.Diags.diagnose(expr->getAsyncLoc(),
+                         diag::no_concurrency_module, "async");
+    }
 
     return ASTExtInfoBuilder()
       .withThrows(throws, /*FIXME:*/Type())
@@ -1927,7 +1964,7 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(resultBuilderTransformed) +
          size_in_bytes(appliedPropertyWrappers) +
          size_in_bytes(argumentLists) +
-         size_in_bytes(ImplicitCallAsFunctionRoots) +
+         size_in_bytes(ImplicitCallAsFunctions) +
          size_in_bytes(SynthesizedConformances);
   // clang-format on
 
@@ -1970,6 +2007,16 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   auto *decl = getDeclOrNull();
   if (!decl || !decl->isImplicitlyUnwrappedOptional())
     return std::nullopt;
+
+  // A variable or parameter spelled with an IUO type (`x: T!`) is always an
+  // IUO value; only functions and subscripts can carry an IUO on the return.
+  // Short-circuit here so we don't force the declaration's interface type.
+  // Doing so while the solver is mid-closure can re-enter
+  // `typeCheckPatternBinding` from outside the closure's own type-check
+  // context and trip the assertion in `TypeChecker::typeCheckBinding` (see
+  // https://github.com/swiftlang/swift/issues/88530).
+  if (isa<VarDecl>(decl))
+    return IUOReferenceKind::Value;
 
   // If this isn't an IUO return () -> T!, it's an IUO value.
   if (!decl->getInterfaceType()->is<AnyFunctionType>())
@@ -2015,6 +2062,10 @@ SolutionResult ConstraintSystem::salvage() {
 
     // Solve the system.
     solveImpl(viable);
+
+    // We have to keep solverState around for diagnoseAmbiguityWithFixes(),
+    // but we should not record any more changes from this point on.
+    state.Trail.close();
 
     // If we hit a threshold, we're done.
     if (isTooComplex(viable))
@@ -2686,7 +2737,7 @@ static bool diagnoseAmbiguity(
 
       auto emitGeneralFoundCandidateNote = [&]() {
         // Emit a general "found candidate" note
-        if (decl->getLoc().isInvalid()) {
+        if (decl->getLoc(/*SerializedOK=*/false).isInvalid()) {
           if (candidateTypes.insert(type->getCanonicalType()).second)
             DE.diagnose(getLoc(commonAnchor), diag::found_candidate_type, type);
         } else {
@@ -4020,8 +4071,8 @@ ConstraintSystem::getArgumentInfoLocator(ConstraintLocator *locator) {
   if (auto *UME = getAsExpr<UnresolvedMemberExpr>(anchor))
     return getConstraintLocator(UME);
 
-  // All implicit x[dynamicMember:] subscript calls can share the same argument
-  // list.
+  // All implicit `x[dynamicMember:...]` subscript calls can share the same
+  // argument list.
   if (locator->findLast<LocatorPathElt::ImplicitDynamicMemberSubscript>()) {
     return getConstraintLocator(
         ASTNode(), LocatorPathElt::ImplicitDynamicMemberSubscript());
@@ -4089,37 +4140,6 @@ Solution::getConversionRestriction(CanType type1, CanType type2) const {
     return restriction->second;
   return std::nullopt;
 }
-
-#ifndef NDEBUG
-/// Given an apply expr, returns true if it is expected to have a direct callee
-/// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
-static bool shouldHaveDirectCalleeOverload(const CallExpr *callExpr) {
-  auto *fnExpr = callExpr->getDirectCallee();
-
-  // An apply of an apply/subscript doesn't have a direct callee.
-  if (isa<ApplyExpr>(fnExpr) || isa<SubscriptExpr>(fnExpr))
-    return false;
-
-  // Applies of closures don't have callee overloads.
-  if (isa<ClosureExpr>(fnExpr))
-    return false;
-
-  // No direct callee for a try!/try?.
-  if (isa<ForceTryExpr>(fnExpr) || isa<OptionalTryExpr>(fnExpr))
-    return false;
-
-  // If we have an intermediate cast, there's no direct callee.
-  if (isa<ExplicitCastExpr>(fnExpr))
-    return false;
-
-  // No direct callee for a ternary expr.
-  if (isa<TernaryExpr>(fnExpr))
-    return false;
-
-  // Assume that anything else would have a direct callee.
-  return true;
-}
-#endif
 
 ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
   if (auto *expr = getAsExpr(node)) {
@@ -4212,9 +4232,6 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
       if (metaTy->getInstanceType()->is<TupleType>())
         return std::nullopt;
     }
-
-    assert(!shouldHaveDirectCalleeOverload(call) &&
-             "Should we have resolved a callee for this?");
   }
 
   // Try to resolve the function type by loading lvalues and looking through
@@ -4682,22 +4699,6 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
   auto *argList = ArgumentList::forImplicitSingle(ctx, ctx.Id_erasing, expr);
   return CallExpr::createImplicit(
       ctx, TypeExpr::createImplicit(typeEraser, ctx), argList);
-}
-
-/// If an UnresolvedDotExpr, SubscriptMember, etc has been resolved by the
-/// constraint system, return the decl that it references.
-ValueDecl *ConstraintSystem::findResolvedMemberRef(ConstraintLocator *locator) {
-  // See if we have a resolution for this member.
-  auto overload = findSelectedOverloadFor(locator);
-  if (!overload)
-    return nullptr;
-
-  // We only want to handle the simplest decl binding.
-  auto choice = overload->choice;
-  if (choice.getKind() != OverloadChoiceKind::Decl)
-    return nullptr;
-
-  return choice.getDecl();
 }
 
 void SyntacticElementTargetKey::dump() const { dump(llvm::errs()); }
@@ -5213,7 +5214,8 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       switch (getActorIsolation(choice.getDecl())) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
-      case ActorIsolation::CallerIsolationInheriting:
+      case ActorIsolation::NonisolatedConcurrent:
+      case ActorIsolation::NonisolatedNonsending:
       case ActorIsolation::NonisolatedUnsafe:
         break;
 
@@ -5354,4 +5356,24 @@ bool constraints::isResultBuilderMethodReference(ASTContext &ctx,
   return llvm::any_of(builderMethods, [&](const Identifier &methodId) {
     return UDE->getName().compare(DeclNameRef(methodId)) == 0;
   });
+}
+
+bool constraints::isGenericOnlyOverThrownType(AbstractFunctionDecl *func) {
+  // If a function has been converted to typed throws, let's ignore it
+  // when it's generic only over a thrown type now just like we would
+  // regular `throws` version.
+  auto thrownType = func->getThrownInterfaceType();
+  if (!thrownType || !thrownType->hasTypeParameter())
+    return false;
+
+  // If there is only one generic parameter, check if it appears
+  // inside of thrown type i.e. `throws(E)` or `throws(MyError<E>)`.
+
+  auto genericParams = func->getGenericParams();
+  if (genericParams->size() != 1)
+    return false;
+
+  auto paramTy = genericParams->getParams().front()->getDeclaredInterfaceType();
+  return thrownType.findIf(
+      [&paramTy](Type type) { return type->isEqual(paramTy); });
 }

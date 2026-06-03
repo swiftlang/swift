@@ -20,17 +20,17 @@
 
 #include "swift/AST/Import.h"
 #include "swift/AST/LinkLibrary.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/CXXStdlibKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/LangOptions.h"
 #include "swift/Serialization/Validation.h"
-#include "clang/CAS/CASOptions.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningService.h"
 #include "clang/Tooling/DependencyScanning/DependencyScanningTool.h"
 #include "clang/Tooling/DependencyScanning/ModuleDepCollector.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/CAS/CASConfiguration.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/StringSaver.h"
 #include <optional>
@@ -283,6 +283,10 @@ public:
   /// ModuleDependencyInfo is finalized (with all transitive dependencies
   /// and inputs).
   bool finalized;
+
+  /// The library level of this module (API, SPI, IPI, or Other),
+  /// computed during dependency scanning.
+  LibraryLevel libraryLevel = LibraryLevel::Other;
 };
 
 struct CommonSwiftTextualModuleDependencyDetails {
@@ -921,6 +925,10 @@ public:
   bool isFinalized() const { return storage->finalized; }
   void setIsFinalized(bool isFinalized) { storage->finalized = isFinalized; }
 
+  /// The library level of this module, as determined during scanning.
+  LibraryLevel getLibraryLevel() const { return storage->libraryLevel; }
+  void setLibraryLevel(LibraryLevel level) { storage->libraryLevel = level; }
+
   /// For a Source dependency, register a `Testable` import
   void addTestableImport(ImportPath::Module module);
 
@@ -1061,8 +1069,8 @@ class SwiftDependencyScanningService {
   /// StringSaver for data matching the life-time of ScanningService.
   llvm::StringSaver Saver;
 
-  /// The CASOption created the Scanning Service if used.
-  std::optional<clang::CASOptions> CASOpts;
+  /// The CAS configuration created the Scanning Service if used.
+  std::optional<llvm::cas::CASConfiguration> CASConfig;
 
   /// The persistent Clang dependency scanner service
   std::optional<clang::tooling::dependencies::DependencyScanningService>
@@ -1084,6 +1092,13 @@ public:
 
   /// Allocate string inside ScanningService.
   StringRef save(StringRef str);
+
+  /// Get clang scanning service.
+  const clang::tooling::dependencies::DependencyScanningService &
+  getClangScanningService() const {
+    assert(ClangScanningService);
+    return *ClangScanningService;
+  }
 
 private:
   /// Enforce clients not being allowed to query this cache directly, it must be

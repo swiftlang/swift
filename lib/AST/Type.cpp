@@ -270,9 +270,12 @@ bool CanType::isReferenceTypeImpl(CanType type, const GenericSignatureImpl *sig,
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:
+  case TypeKind::Join:
+  case TypeKind::Meet:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -423,7 +426,7 @@ bool ExistentialLayout::requiresClass() const {
   return false;
 }
 
-Type ExistentialLayout::getSuperclass() const {
+Type ExistentialLayout::getExplicitSuperclassOrProtocolSuperclass() const {
   if (explicitSuperclass)
     return explicitSuperclass;
 
@@ -437,14 +440,14 @@ Type ExistentialLayout::getSuperclass() const {
   return Type();
 }
 
-bool ExistentialLayout::needsExtendedShape(bool allowInverses) const {
+bool ExistentialLayout::needsExtendedShape(
+    InvertibleProtocolSet allowedInverses) const {
   if (!getParameterizedProtocols().empty())
     return true;
 
-  if (allowInverses && hasInverses())
-    return true;
-
-  return false;
+  // Would any inverses in this layout would be considered by the mangler?
+  allowedInverses.intersect(inverses);
+  return !allowedInverses.empty();
 }
 
 bool TypeBase::isObjCExistentialType() {
@@ -492,7 +495,7 @@ NominalTypeDecl *TypeBase::getAnyActor() {
   // Existential types: check for Actor protocol.
   if (isExistentialType()) {
     auto layout = getExistentialLayout();
-    if (auto superclass = layout.getSuperclass()) {
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass()) {
       if (auto actor = superclass->getAnyActor())
         return actor;
     }
@@ -1310,7 +1313,8 @@ bool TypeBase::isCGFloat() {
 
 bool TypeBase::isStdlibInteger() {
   return isInt() || isInt8() || isInt16() || isInt32() || isInt64() ||
-         isUInt() || isUInt8() || isUInt16() || isUInt32() || isUInt64();
+         isInt128() || isUInt() || isUInt8() || isUInt16() || isUInt32() ||
+         isUInt64() || isUInt128();
 }
 
 bool TypeBase::isStdlibFloat() {
@@ -1472,6 +1476,31 @@ Type TypeBase::withCovariantResultType() {
                            fnType->getExtInfo());
 }
 
+Type TypeBase::replaceTypeVariablesAndPlaceholdersWithErrors() {
+  if (!hasTypeVariableOrPlaceholder())
+    return Type(this);
+
+  struct Transform : public TypeTransform<Transform> {
+    Transform(ASTContext &ctx) : TypeTransform(ctx) {}
+
+    std::optional<Type> transform(TypeBase *ty, TypePosition) {
+      if (!ty->hasTypeVariableOrPlaceholder())
+        return ty;
+
+      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
+        return ErrorType::get(ctx);
+
+      return std::nullopt;
+    }
+    std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
+      // Fold away the sendable dependence if present, the function type will
+      // just become non-Sendable.
+      return std::make_pair(Type(), false);
+    }
+  };
+  return Transform(getASTContext()).doIt(this, TypePosition::Invariant);
+}
+
 /// Whether this parameter accepts an unlabeled trailing closure argument
 /// using the more-restrictive forward-scan rule.
 static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
@@ -1498,10 +1527,7 @@ static bool allowsUnlabeledTrailingClosureParameter(const ParamDecl *param) {
   return paramType->is<AnyFunctionType>();
 }
 
-ParameterListInfo::ParameterListInfo(
-    ArrayRef<AnyFunctionType::Param> params,
-    const ValueDecl *paramOwner,
-    bool skipCurriedSelf) {
+ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params) {
   defaultArguments.resize(params.size());
   propertyWrappers.resize(params.size());
   implicitSelfCapture.resize(params.size());
@@ -1509,7 +1535,13 @@ ParameterListInfo::ParameterListInfo(
   alwaysInheritActorContext.resize(params.size());
   variadicGenerics.resize(params.size());
   sendingParameters.resize(params.size());
+  acceptsUnlabeledTrailingClosures.resize(params.size());
+}
 
+ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                                     const ValueDecl *paramOwner,
+                                     bool skipCurriedSelf)
+    : ParameterListInfo(params) {
   // No parameter owner means no parameter list means no default arguments
   // - hand back the zeroed bitvector.
   //
@@ -1539,46 +1571,67 @@ ParameterListInfo::ParameterListInfo(
   if (params.size() != paramList->size())
     return;
 
-  // Now we have enough information to determine which parameters accept
-  // unlabeled trailing closures.
-  acceptsUnlabeledTrailingClosures.resize(params.size());
-
   // Note which parameters have default arguments and/or accept unlabeled
   // trailing closure arguments with the forward-scan rule.
   for (auto i : range(0, params.size())) {
-    auto param = paramList->get(i);
-    if (param->isDefaultArgument()) {
-      defaultArguments.set(i);
-    }
+    setFlagsFor(paramList->get(i), i);
+  }
+}
 
-    if (allowsUnlabeledTrailingClosureParameter(param)) {
-      acceptsUnlabeledTrailingClosures.set(i);
-    }
+ParameterListInfo::ParameterListInfo(ArrayRef<AnyFunctionType::Param> params,
+                                     bool skipCurriedSelf,
+                                     ConcreteDeclRef declRef)
+  : ParameterListInfo(params) {
+  if (!declRef || params.empty())
+    return;
 
-    if (param->hasExternalPropertyWrapper()) {
-      propertyWrappers.set(i);
-    }
+  auto *decl = declRef.getDecl();
+  if (decl->hasCurriedSelf() && !skipCurriedSelf)
+    return;
 
-    if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>()) {
-      implicitSelfCapture.set(i);
-    }
+  auto *paramList = decl->getParameterList();
+  if (!paramList)
+    return;
 
-    if (auto *attr =
-            param->getAttrs().getAttribute<InheritActorContextAttr>()) {
-      if (attr->isAlways()) {
-        alwaysInheritActorContext.set(i);
-      } else {
-        inheritActorContext.set(i);
-      }
+  auto subs = declRef.getSubstitutions();
+  for (auto i : indices(params)) {
+    if (auto *param = subs ? getParameterAt(declRef, i) : paramList->get(i)) {
+      setFlagsFor(param, i);
     }
+  }
+}
 
-    if (param->getInterfaceType()->is<PackExpansionType>()) {
-      variadicGenerics.set(i);
-    }
+void ParameterListInfo::setFlagsFor(const ParamDecl *param, unsigned index) {
+  if (param->isDefaultArgument()) {
+    defaultArguments.set(index);
+  }
 
-    if (param->isSending()) {
-      sendingParameters.set(i);
+  if (allowsUnlabeledTrailingClosureParameter(param)) {
+    acceptsUnlabeledTrailingClosures.set(index);
+  }
+
+  if (param->hasExternalPropertyWrapper()) {
+    propertyWrappers.set(index);
+  }
+
+  if (param->getAttrs().hasAttribute<ImplicitSelfCaptureAttr>()) {
+    implicitSelfCapture.set(index);
+  }
+
+  if (auto *attr = param->getAttrs().getAttribute<InheritActorContextAttr>()) {
+    if (attr->isAlways()) {
+      alwaysInheritActorContext.set(index);
+    } else {
+      inheritActorContext.set(index);
     }
+  }
+
+  if (param->getInterfaceType()->is<PackExpansionType>()) {
+    variadicGenerics.set(index);
+  }
+
+  if (param->isSending()) {
+    sendingParameters.set(index);
   }
 }
 
@@ -1684,8 +1737,7 @@ Type TypeBase::replaceSelfParameterType(Type newSelf) {
 Type TypeBase::getMetatypeInstanceType() {
   if (auto existentialMetaType = getAs<ExistentialMetatypeType>())
     return existentialMetaType->getExistentialInstanceType();
-
-  if (auto metaTy = getAs<AnyMetatypeType>())
+  else if (auto metaTy = getAs<MetatypeType>())
     return metaTy->getInstanceType();
 
   return this;
@@ -1825,7 +1877,17 @@ CanType TypeBase::computeCanonicalType() {
   case TypeKind::TypeVariable:
   case TypeKind::Placeholder:
   case TypeKind::BuiltinTuple:
-    llvm_unreachable("these types are always canonical");
+  case TypeKind::SILBlockStorage:
+  case TypeKind::SILBox:
+  case TypeKind::SILFunction:
+  case TypeKind::SILToken:
+  case TypeKind::SILMoveOnlyWrapped:
+  case TypeKind::Join:
+  case TypeKind::Meet:
+    ABORT([&](llvm::raw_ostream &out) {
+      out << "Should be already canonical:\n";
+      dump(out);
+    });
 
 #define SUGARED_TYPE(id, parent) \
   case TypeKind::id: \
@@ -1970,14 +2032,6 @@ CanType TypeBase::computeCanonicalType() {
     assert(Result->isCanonical());
     break;
   }
-
-  case TypeKind::SILBlockStorage:
-  case TypeKind::SILBox:
-  case TypeKind::SILFunction:
-  case TypeKind::SILToken:
-  case TypeKind::SILMoveOnlyWrapped:
-    llvm_unreachable("SIL-only types are always canonical!");
-
   case TypeKind::ProtocolComposition: {
     auto *PCT = cast<ProtocolCompositionType>(this);
     SmallVector<Type, 4> CanProtos;
@@ -2426,8 +2480,10 @@ Type TypeBase::getSuperclass(bool useArchetypes) {
     if (auto dynamicSelfTy = getAs<DynamicSelfType>())
       return dynamicSelfTy->getSelfType();
 
-    if (isExistentialType())
-      return getExistentialLayout().getSuperclass();
+    if (isExistentialType()) {
+    // FIXME: This is broken, see the comment on that getter method.
+      return getExistentialLayout().getExplicitSuperclassOrProtocolSuperclass();
+    }
 
     // No other types have superclasses.
     return Type();
@@ -3869,7 +3925,6 @@ RecursiveTypeProperties ArchetypeType::archetypeProperties(
   if (superclass) {
     auto superclassProps = superclass->getRecursiveProperties();
     superclassProps.removeHasTypeParameter();
-    superclassProps.removeHasDependentMember();
     properties |= superclassProps;
   }
 
@@ -4666,7 +4721,7 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::ProtocolComposition: {
     auto layout = type->getExistentialLayout();
     assert(layout.requiresClass() && "Opaque existentials don't use refcounting");
-    if (auto superclass = layout.getSuperclass())
+    if (auto superclass = layout.getExplicitSuperclassOrProtocolSuperclass())
       return superclass->getReferenceCounting();
     return ReferenceCounting::Unknown;
   }
@@ -4720,9 +4775,12 @@ ReferenceCounting TypeBase::getReferenceCounting() {
   case TypeKind::BuiltinTuple:
   case TypeKind::ErrorUnion:
   case TypeKind::Integer:
+  case TypeKind::Hidden:
   case TypeKind::BuiltinUnboundGeneric:
   case TypeKind::BuiltinFixedArray:
   case TypeKind::BuiltinBorrow:
+  case TypeKind::Join:
+  case TypeKind::Meet:
 #define REF_STORAGE(Name, ...) \
   case TypeKind::Name##Storage:
 #include "swift/AST/ReferenceStorage.def"
@@ -4748,7 +4806,6 @@ static RecursiveTypeProperties getBoxRecursiveProperties(
   for (auto &field : Layout->getFields()) {
     auto fieldProps = field.getLoweredType()->getRecursiveProperties();
     fieldProps.removeHasTypeParameter();
-    fieldProps.removeHasDependentMember();
     props |= fieldProps;
   }
   for (auto replacementType : subMap.getReplacementTypes()) {

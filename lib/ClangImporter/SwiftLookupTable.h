@@ -105,9 +105,8 @@ struct SerializedSwiftName {
     if (Kind == DeclBaseName::Kind::Normal) {
       assert(RHS.Kind == DeclBaseName::Kind::Normal);
       return Name == RHS.Name;
-    } else {
-      return true;
     }
+    return true;
   }
 };
 
@@ -281,7 +280,7 @@ const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MAJOR = 1;
 /// Lookup table minor version number.
 ///
 /// When the format changes IN ANY WAY, this number should be incremented.
-const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 21; // add both safe and unsafe names of C++ methods
+const uint16_t SWIFT_LOOKUP_TABLE_VERSION_MINOR = 22; // Remove __convertToBool()
 
 /// A lookup table that maps Swift names to the set of Clang
 /// declarations with that particular name.

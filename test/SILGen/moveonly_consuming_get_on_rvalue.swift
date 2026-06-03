@@ -1,7 +1,8 @@
-// RUN: %target-swift-emit-silgen -module-name test -enable-experimental-feature Lifetimes %s | %FileCheck %s
-// RUN: %target-swift-emit-sil -module-name test -enable-experimental-feature Lifetimes %s -sil-verify-all
+// RUN: %target-swift-emit-silgen -module-name test -enable-experimental-feature UnderscoreOwned -enable-experimental-feature Lifetimes %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -module-name test -enable-experimental-feature UnderscoreOwned -enable-experimental-feature Lifetimes %s -sil-verify-all
 
 // REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_UnderscoreOwned
 
 // Test that calling a consuming accessor on a noncopyable rvalue passes the owned value directly
 // instead of initiating a borrow scope and copying the value within it.
@@ -47,7 +48,7 @@ struct AddressOnlyNC: ~Copyable {
 // CHECK:       switch_enum_addr [[ENUM_ADDR:%.*]], case #Optional.some!enumelt: [[BB:bb[0-9]+]]
 // CHECK:       [[BB]]:
 // CHECK-NOT:     copy_addr {{%.*}} to
-// CHECK:         [[TAKEN:%.*]] = unchecked_take_enum_data_addr [[ENUM_ADDR]]
+// CHECK:         [[TAKEN:%.*]] = unchecked_inplace_enum_data_addr [[ENUM_ADDR]]
 // CHECK:         = apply {{%.*}}([[TAKEN]])
 // CHECK:       } // end sil function
 func consume_address() {

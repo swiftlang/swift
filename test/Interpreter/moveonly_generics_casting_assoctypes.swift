@@ -1,8 +1,8 @@
-// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypes)
-// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypes)
+// RUN: %target-run-simple-swift(-Xfrontend -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypesWithDefaults)
+// RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -enable-experimental-feature SuppressedAssociatedTypesWithDefaults)
 
 // REQUIRES: executable_test
-// REQUIRES: swift_feature_SuppressedAssociatedTypes
+// REQUIRES: swift_feature_SuppressedAssociatedTypesWithDefaults
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime

@@ -94,7 +94,7 @@
 // RUN:   -explicit-swift-module-map-file @%t/map2.casid @%t/User.cmd %t/user.swift \
 // RUN:   -emit-module -o %t/User.swiftmodule
 
-// RUN: llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User.swiftmodule | %FileCheck %s --check-prefix CHECK-NO-HEADER
 // CHECK-NO-HEADER-NOT: <IMPORTED_HEADER
 
 /// Importing binary module with bridging header for a cached build while also importing a bridging header.
@@ -159,7 +159,7 @@
 // RUN:   -emit-module -o %t/User3.swiftmodule
 
 /// Verify the encoded here is just the `-import-objc-header` option.
-// RUN: llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
+// RUN: %llvm-bcanalyzer -dump %t/User3.swiftmodule | %FileCheck %s --check-prefix CHECK-HEADER
 // CHECK-HEADER: <IMPORTED_HEADER
 // CHECK-HEADER-SAME: Bridging3.h
 

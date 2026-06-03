@@ -14,7 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#if os(anyAppleOS)
 
 import Swift
 
@@ -38,7 +38,7 @@ fileprivate func getSysCtlString(_ name: String) -> String? {
   }
 }
 
-@available(Backtracing 6.2, *)
+@available(BacktracingDT 6.2, *)
 extension ImageMap {
 
   private static let platform = {
@@ -129,4 +129,4 @@ extension ImageMap {
 
 }
 
-#endif // os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+#endif // os(anyAppleOS)

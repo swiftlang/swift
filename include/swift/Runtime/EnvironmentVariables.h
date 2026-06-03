@@ -19,6 +19,7 @@
 
 #include "swift/Threading/Once.h"
 #include "swift/shims/Visibility.h"
+#include <optional>
 
 namespace swift {
 namespace runtime {
@@ -28,15 +29,23 @@ void initialize(void *);
 
 extern swift::once_t initializeToken;
 
-// Define a typedef "string" in swift::runtime::environment to make string
-// environment variables work
+// Types that can be used for environment variables.
+namespace types {
+using boolean = bool;
 using string = const char *;
+using uint8 = uint8_t;
+using uint32 = uint32_t;
+using optional_uint8 = std::optional<uint8_t>;
+} // namespace types
 
-// Declare backing variables.
+struct EnvironmentVariableState {
 #define VARIABLE(name, type, defaultValue, help)                               \
-  extern type name##_variable;                                                 \
-  extern bool name##_isSet_variable;
+  types::type name##_variable;                                                 \
+  bool name##_isSet_variable;
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
+};
+
+extern EnvironmentVariableState environmentVariableState;
 
 // Define getter functions. This creates one function with the same name as the
 // variable which returns the value set for that variable, and second function
@@ -44,13 +53,13 @@ using string = const char *;
 // set at all, to allow detecting when the variable was explicitly set to the
 // same value as the default.
 #define VARIABLE(name, type, defaultValue, help)                               \
-  inline type name() {                                                         \
+  inline swift::runtime::environment::types::type name() {                     \
     swift::once(initializeToken, initialize, nullptr);                         \
-    return name##_variable;                                                    \
+    return environmentVariableState.name##_variable;                           \
   }                                                                            \
   inline bool name##_isSet() {                                                 \
     swift::once(initializeToken, initialize, nullptr);                         \
-    return name##_isSet_variable;                                              \
+    return environmentVariableState.name##_isSet_variable;                     \
   }
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
 
@@ -69,6 +78,10 @@ SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyIsCurrentExecutorLegacyModeOverr
 // Wrapper around SWIFT_DEBUG_ENABLE_TASK_SLAB_ALLOCATOR that the Concurrency
 // library can call.
 SWIFT_RUNTIME_STDLIB_SPI bool concurrencyEnableTaskSlabAllocator();
+
+// Wrapper around SWIFT_CONCURRENCY_TRACING_SUBSYSTEM that the Concurrency
+// library can call.
+SWIFT_RUNTIME_STDLIB_SPI const char *concurrencyTracingSubsystem();
 
 } // end namespace environment
 } // end namespace runtime

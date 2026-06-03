@@ -17,7 +17,7 @@
 
 // 2. Make sure the prebuilt module we built has SomeCModule.h as a dependency.
 
-// RUN: llvm-bcanalyzer -dump %t/PrebuiltModuleCache/ExportedLib.swiftmodule | grep 'FILE_DEPENDENCY.*SomeCModule.h'
+// RUN: %llvm-bcanalyzer -dump %t/PrebuiltModuleCache/ExportedLib.swiftmodule | grep 'FILE_DEPENDENCY.*SomeCModule.h'
 
 // 3. Typecheck this file, which imports SdkLib, which imports ExportedLib.
 //    Because ExportedLib is prebuilt, we expect a forwarding module for
@@ -39,11 +39,11 @@
 // 6. Make sure the dependencies from the forwarding module make it into the
 //    cached module.
 
-// RUN: llvm-bcanalyzer -dump %t/ModuleCache/SdkLib-*.swiftmodule | grep 'FILE_DEPENDENCY.*SomeCModule.h'
+// RUN: %llvm-bcanalyzer -dump %t/ModuleCache/SdkLib-*.swiftmodule | grep 'FILE_DEPENDENCY.*SomeCModule.h'
 
 // 7. Make sure the prebuilt ExportedLib module did NOT get propagated to SdkLib.
 
-// RUN: llvm-bcanalyzer -dump %t/ModuleCache/SdkLib-*.swiftmodule | not grep 'FILE_DEPENDENCY.*PrebuiltModuleCache'
+// RUN: %llvm-bcanalyzer -dump %t/ModuleCache/SdkLib-*.swiftmodule | not grep 'FILE_DEPENDENCY.*PrebuiltModuleCache'
 
 // 8. Make sure we re-build the SdkLib module if one of the dependencies changes its mtime (but not its hash).
 //    This will ensure we recorded the forwarding module's dependencies, not the prebuilt.

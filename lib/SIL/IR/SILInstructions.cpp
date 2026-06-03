@@ -219,7 +219,7 @@ AllocStackInst::AllocStackInst(
     IsFromVarDecl_t isFromVarDecl,
     UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo)
     : InstructionBase(Loc, elementType.getAddressType()),
-      SILDebugVariableSupplement(Var ? Var->DIExpr.getNumElements() : 0,
+      SILDebugVariableSupplement(0,
                                  Var ? Var->Type.has_value() : false,
                                  Var ? Var->Loc.has_value() : false,
                                  Var ? Var->Scope != nullptr : false),
@@ -241,7 +241,7 @@ AllocStackInst::AllocStackInst(
       Var, getTrailingObjects<char>(), getTrailingObjects<SILType>(),
       getTrailingObjects<SILLocation>(),
       getTrailingObjects<const SILDebugScope *>(),
-      getTrailingObjects<SILDIExprElement>());
+      nullptr);
 
   assert(sharedUInt32().AllocStackInst.numOperands ==
              TypeDependentOperands.size() &&
@@ -265,6 +265,13 @@ AllocStackInst *AllocStackInst::create(SILDebugLocation Loc,
       Var->Scope = nullptr;
     if (Var->Type == elementType)
       Var->Type = {};
+    if (Var->DIExpr) {
+      // alloc_stack cannot carry a DIExpression.
+      // Strip a single implied op_deref. Anything else is an error.
+      assert(Var->DIExpr.getNumElements() == 1 && Var->DIExpr.startsWithDeref()
+             && "alloc_stack cannot have a DIExpr; use debug_value instead");
+      Var->DIExpr = {};
+    }
   }
   SmallVector<SILValue, 8> TypeDependentOperands;
   collectTypeDependentOperands(TypeDependentOperands, F,
@@ -317,11 +324,13 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
                                    SILDebugLocation Loc,
                                    SILType ObjectType,
                                    bool objc, bool canBeOnStack, bool isBare,
+                                   StackAllocationIsNested_t isNested,
                                    ArrayRef<SILType> ElementTypes)
     : AllocationInst(Kind, Loc, ObjectType) {
   sharedUInt8().AllocRefInstBase.objC = objc;
   sharedUInt8().AllocRefInstBase.onStack = canBeOnStack;
   sharedUInt8().AllocRefInstBase.isBare = isBare;
+  sharedUInt8().AllocRefInstBase.isNested = bool(isNested);
   sharedUInt8().AllocRefInstBase.numTailTypes = ElementTypes.size();
   assert(sharedUInt8().AllocRefInstBase.numTailTypes ==
          ElementTypes.size() && "Truncation");
@@ -331,6 +340,7 @@ AllocRefInstBase::AllocRefInstBase(SILInstructionKind Kind,
 AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                    SILType ObjectType,
                                    bool objc, bool canBeOnStack, bool isBare,
+                                   StackAllocationIsNested_t isNested,
                                    ArrayRef<SILType> ElementTypes,
                                    ArrayRef<SILValue> ElementCountOperands) {
   assert(ElementTypes.size() == ElementCountOperands.size());
@@ -342,13 +352,14 @@ AllocRefInst *AllocRefInst::create(SILDebugLocation Loc, SILFunction &F,
                                                         ElementTypes.size());
   auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefInst));
   return ::new (Buffer) AllocRefInst(Loc, F, ObjectType, objc, canBeOnStack, isBare,
-                                     ElementTypes, AllOperands);
+                                     isNested, ElementTypes, AllOperands);
 }
 
 AllocRefDynamicInst *
 AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
                             SILValue metatypeOperand, SILType ty, bool objc,
                             bool canBeOnStack,
+                            StackAllocationIsNested_t isNested,
                             ArrayRef<SILType> ElementTypes,
                             ArrayRef<SILValue> ElementCountOperands) {
   SmallVector<SILValue, 8> AllOperands(ElementCountOperands.begin(),
@@ -359,8 +370,8 @@ AllocRefDynamicInst::create(SILDebugLocation DebugLoc, SILFunction &F,
                                                         ElementTypes.size());
   auto Buffer = F.getModule().allocateInst(Size, alignof(AllocRefDynamicInst));
   return ::new (Buffer)
-      AllocRefDynamicInst(DebugLoc, ty, objc, canBeOnStack, ElementTypes,
-                          AllOperands);
+      AllocRefDynamicInst(DebugLoc, ty, objc, canBeOnStack, isNested,
+                          ElementTypes, AllOperands);
 }
 
 bool AllocRefDynamicInst::isDynamicTypeDeinitAndSizeKnownEquivalentToBaseType() const {
@@ -427,7 +438,7 @@ SILType AllocBoxInst::getAddressType() const {
 DebugValueInst::DebugValueInst(
     SILDebugLocation DebugLoc, SILValue Operand, SILDebugVariable Var,
     PoisonRefs_t poisonRefs,
-    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace)
+    UsesMoveableValueDebugInfo_t usesMoveableValueDebugInfo, bool trace, bool prependDeref)
     : UnaryInstructionBase(DebugLoc, Operand),
       SILDebugVariableSupplement(Var.DIExpr.getNumElements(),
                                  Var.Type.has_value(), Var.Loc.has_value(),
@@ -440,6 +451,8 @@ DebugValueInst::DebugValueInst(
   if (usesMoveableValueDebugInfo || Operand->getType().isMoveOnly())
     setUsesMoveableValueDebugInfo();
   setTrace(trace);
+  if (prependDeref)
+    this->prependDeref();
 }
 
 DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
@@ -455,32 +468,232 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
     Var.Scope = nullptr;
   if (Var.Type == Operand->getType().getObjectType())
     Var.Type = {};
+  // Use the prependDeref bit rather than storing it in the DIExpr.
+  bool prependDeref = Var.DIExpr.startsWithDeref();
+  if (prependDeref) {
+    Var.DIExpr.eraseElement(Var.DIExpr.element_begin());
+  }
   void *buf = allocateDebugVarCarryingInst<DebugValueInst>(M, Var);
   return ::new (buf)
-    DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace);
+    DebugValueInst(DebugLoc, Operand, Var, poisonRefs, wasMoved, trace, prependDeref);
 }
 
-DebugValueInst *
-DebugValueInst::createAddr(SILDebugLocation DebugLoc, SILValue Operand,
-                           SILModule &M, SILDebugVariable Var,
-                           UsesMoveableValueDebugInfo_t wasMoved, bool trace) {
-  // For alloc_stack, debug_value is used to annotate the associated
-  // memory location, so we shouldn't attach op_deref.
-  if (!isa<AllocStackInst>(Operand))
-    Var.DIExpr.prependElements(
-      {SILDIExprElement::createOperator(SILDIExprOperator::Dereference)});
-  return DebugValueInst::create(DebugLoc, Operand, M, Var, DontPoisonRefs,
-                                wasMoved, trace);
+void DebugValueInst::prependDeref() {
+  ASSERT(!hasDeref() && "Debug value cannot have two derefs!");
+  if (!ReconstructionBlock) {
+    sharedUInt8().DebugValueInst.prependDeref = true;
+    return;
+  }
+  // If we have an undef, the reconstruction block shouldn't have an argument.
+  // Nothing to do.
+  if (isa<SILUndef>(getOperand()))
+    return;
+
+  // If we have a reconstruction block, add a load at the beginning.
+  SILBuilder builder(ReconstructionBlock->begin());
+  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILType addrType = oldArg->getType().getAddressType();
+  SILValue undefAddress = SILUndef::get(getFunction(), addrType);
+  LoadInst *load = builder.createLoad(getLoc(), undefAddress,
+                                      LoadOwnershipQualifier::Unqualified);
+  oldArg->replaceAllUsesWith(load);
+  SILArgument *newArg =
+      ReconstructionBlock->replacePhiArgument(0, addrType, OwnershipKind::None);
+  load->setOperand(newArg);
 }
 
-bool DebugValueInst::exprStartsWithDeref() const {
-  if (!NumDIExprOperands)
+void DebugValueInst::stripDeref() {
+  // If we have an undef, nothing to do.
+  if (isa<SILUndef>(getOperand()))
+    return;
+  if (!ReconstructionBlock) {
+    ASSERT(hasDeref() && "Cannot strip deref without one!");
+    sharedUInt8().DebugValueInst.prependDeref = false;
+    return;
+  }
+
+  // Replace all uses of the operand with undef.
+  // Load users are salvaged to use the direct value.
+  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  SILType objType = oldArg->getType().getObjectType();
+  SILValue undefAddr = SILUndef::get(oldArg);
+  SmallVector<LoadInst *, 16> loads;
+  while (!oldArg->use_empty()) {
+    Operand *use = *oldArg->use_begin();
+    SILInstruction *user = use->getUser();
+    use->set(undefAddr);
+    // Only load users of the operand can be salvaged.
+    if (auto *load = dyn_cast<LoadInst>(user)) {
+      loads.push_back(load);
+    }
+  }
+
+  // If there are no loads, this operand is no longer used. Kill it.
+  if (loads.empty())
+    return killOperand();
+
+  // Otherwise, replace the arguments and all uses
+  SILArgument *newArg =
+      ReconstructionBlock->replacePhiArgument(0, objType, OwnershipKind::None);
+
+  for (LoadInst *load : loads) {
+    load->replaceAllUsesWith(newArg);
+    load->eraseFromParent();
+  }
+}
+
+SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
+  if (ReconstructionBlock)
+    return ReconstructionBlock;
+
+  // Create a new no-op reconstruction block.
+  auto *block = getFunction()->createEmptyDebugReconstructionBlock();
+  SILBuilder builder(block);
+
+  SILValue operand = getOperand();
+  SILValue retVal;
+  if (isa<SILUndef>(operand)) {
+    // No arguments, return the same undef directly.
+    retVal = operand;
+  } else if (hasDeref()) {
+    // Convert the deref to a load.
+    SILArgument *arg = block->createPhiArgument(
+        operand->getType().getAddressType(), OwnershipKind::None);
+    retVal = builder.createLoad(getLoc(), arg,
+                                LoadOwnershipQualifier::Unqualified);
+  } else {
+    // Add a block argument matching the operand type.
+    retVal = block->createPhiArgument(operand->getType(), OwnershipKind::None);
+  }
+  // If the prependDeref flag was set, reset it, including in the undef case.
+  sharedUInt8().DebugValueInst.prependDeref = false;
+
+  builder.createReturn(getLoc(), retVal);
+  ReconstructionBlock = block;
+  return block;
+}
+
+void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
+  auto *srcBB = src->getDebugReconstructionBlock();
+  if (!srcBB)
+    return;
+  auto *newBB = getFunction()->createEmptyDebugReconstructionBlock();
+  setDebugReconstructionBlock(newBB);
+  DebugBasicBlockCloner(*getFunction()).clone(srcBB, newBB);
+}
+
+void DebugValueInst::killOperand() {
+  if (isa<SILUndef>(getOperand())) {
+    // Already undef: no operand to kill.
+    return;
+  }
+
+  // Use the object type because we may be stripping the deref.
+  SILValue undef =
+      SILUndef::get(getFunction(), getOperand()->getType().getObjectType());
+  setOperand(undef);
+
+  // Strip prependDeref.
+  // The stored DIExpr only contains fragments, which we want to keep.
+  sharedUInt8().DebugValueInst.prependDeref = false;
+
+  // Rather than completely removing the debug reconstruction block, remove its
+  // argument, as a part of the variable might be constant and recoverable.
+  if (auto bb = getDebugReconstructionBlock()) {
+    ASSERT(bb->getNumArguments() == 1);
+    auto argument = bb->getArgument(0);
+    argument->replaceAllUsesWithUndef();
+    bb->eraseArgument(0);
+  }
+}
+
+SILType DebugValueInst::getVarType() const {
+  if (HasAuxDebugVariableType)
+    return *getTrailingObjects<SILType>();
+  if (auto *debugBB = getDebugReconstructionBlock())
+    return cast<ReturnInst>(debugBB->getTerminator())
+        ->getOperand()->getType().getObjectType();
+  return getOperand()->getType().getObjectType();
+}
+
+bool DebugValueInst::isExprTypeValid() const {
+  auto varInfo = getCompleteVarInfo();
+
+  // Ignore trace debug values.
+  if (hasTrace())
+    return true;
+
+  SILFunction *F = getFunction();
+  if (!F)
     return false;
 
-  llvm::ArrayRef<SILDIExprElement> DIExprElements(
-      getTrailingObjects<SILDIExprElement>(), NumDIExprOperands);
-  return DIExprElements.front().getAsOperator()
-          == SILDIExprOperator::Dereference;
+  SILType valueType = getOperand()->getType();
+
+  // Special case: a DebugValueInst with an alloc_box operand is equivalent to
+  // the alloc_box.
+  if (auto *box = dyn_cast<AllocBoxInst>(getOperand()))
+    if (varInfo.DIExpr.elements().empty() &&
+        getDebugReconstructionBlock() == nullptr &&
+        varInfo.Type == box->getAddressType().getObjectType())
+      return true;
+
+  // Transform: debug BB transforms the SSA value to its return type.
+  if (auto *debugBB = getDebugReconstructionBlock()) {
+    if (debugBB->getNumArguments() > 0) {
+      if (debugBB->getNumArguments() > 1)
+        return false;
+      if (debugBB->getArgument(0)->getType() != valueType)
+        return false;
+    }
+    // Cannot have both an op_deref and a debug reconstruction block.
+    if (hasDeref())
+      return false;
+    auto *terminator = cast<ReturnInst>(debugBB->getTerminator());
+    valueType = terminator->getOperand()->getType();
+  }
+
+  // Fragments are in the opposite direction, process from right to left.
+  SILType RunningType = *varInfo.Type;
+  unsigned derefCount = 0;
+
+  for (const SILDIExprOperand &Operand : varInfo.DIExpr.operands()) {
+    switch (Operand.getOperator()) {
+    case SILDIExprOperator::Dereference:
+      ++derefCount;
+      break;
+    case SILDIExprOperator::Fragment: {
+      auto *Field = cast<VarDecl>(Operand.args()[0].getAsDecl());
+      auto *FieldParent = Field->getDeclContext()->getSelfNominalTypeDecl();
+      if (!FieldParent ||
+          RunningType.getNominalOrBoundGenericNominal() != FieldParent)
+        return false;
+      RunningType = RunningType.getFieldType(Field, F);
+      break;
+    }
+    case SILDIExprOperator::TupleFragment: {
+      if (!Operand.args()[0].getAsType()->isEqual(RunningType.getASTType()))
+        return false;
+      unsigned Idx = Operand.args()[1].getAsConstInt().value();
+      RunningType = RunningType.getTupleElementType(Idx);
+      break;
+    }
+    default:
+      // Invalid operator
+      return false;
+    }
+  }
+
+  // There must be as many op_derefs as SIL type indirection levels.
+  // SIL only supports one level of indirection, so op_deref too.
+  if (derefCount != valueType.isAddress())
+    return false;
+
+  // The op_deref must be stored in the prependDeref bit.
+  if (derefCount != hasDeref())
+    return false;
+
+  return RunningType.removingMoveOnlyWrapper() ==
+         valueType.getObjectType().removingMoveOnlyWrapper();
 }
 
 VarDecl *DebugValueInst::getDecl() const {
@@ -745,6 +958,7 @@ PartialApplyInst::PartialApplyInst(
     SILDebugLocation Loc, SILValue Callee, SILType SubstCalleeTy,
     SubstitutionMap Subs, ArrayRef<SILValue> Args,
     ArrayRef<SILValue> TypeDependentOperands, SILType ClosureType,
+    StackAllocationIsNested_t IsNested,
     const GenericSpecializationInformation *SpecializationInfo)
     // FIXME: the callee should have a lowered SIL function type, and
     // PartialApplyInst
@@ -752,15 +966,15 @@ PartialApplyInst::PartialApplyInst(
     // type.
     : InstructionBase(Loc, Callee, SubstCalleeTy, Subs, Args,
                       TypeDependentOperands, SpecializationInfo, ClosureType) {
-  sharedUInt8().PartialApplyInst.isNested = true;
+  sharedUInt8().PartialApplyInst.isNested = uint8_t(IsNested);
 }
 
 PartialApplyInst *PartialApplyInst::create(
     SILDebugLocation Loc, SILValue Callee, ArrayRef<SILValue> Args,
     SubstitutionMap Subs, ParameterConvention calleeConvention,
     SILFunctionTypeIsolation resultIsolation, SILFunction &F,
-    const GenericSpecializationInformation *SpecializationInfo,
-    OnStackKind onStack) {
+    const GenericSpecializationInformation *specializationInfo,
+    OnStackKind onStack, StackAllocationIsNested_t isNested) {
   SILType SubstCalleeTy = Callee->getType().substGenericArgs(
       F.getModule(), Subs, F.getTypeExpansionContext());
 
@@ -777,7 +991,7 @@ PartialApplyInst *PartialApplyInst::create(
   return ::new(Buffer) PartialApplyInst(Loc, Callee, SubstCalleeTy,
                                         Subs, Args,
                                         TypeDependentOperands, ClosureType,
-                                        SpecializationInfo);
+                                        isNested, specializationInfo);
 }
 
 TryApplyInstBase::TryApplyInstBase(SILInstructionKind kind,
@@ -2441,7 +2655,7 @@ PackPackIndexInst *PackPackIndexInst::create(SILFunction &F,
                                              unsigned componentStartIndex,
                                              SILValue indexWithinComponent,
                                              CanPackType packType) {
-  assert(componentStartIndex < packType->getNumElements() &&
+  assert(componentStartIndex <= packType->getNumElements() &&
          "component start index is out of bounds for indexed-into pack type");
   // TODO: assert that the shapes are similar?
 

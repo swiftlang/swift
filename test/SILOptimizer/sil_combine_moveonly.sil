@@ -48,6 +48,12 @@ enum NonCopyableForwardingEnum : ~Copyable {
   deinit
 }
 
+enum NonCopyableWithoutDeinit: ~Copyable {
+  case a(S)
+  case b(S)
+  case c(Int)
+}
+
 sil @getWrappedValue : $@convention(thin) <T> (@in_guaranteed Wrapper<T>) -> @out T
 
 // Test that a release_value is not removed for a struct-with-deinit.
@@ -212,6 +218,19 @@ bb0(%0 : $*MaybeFileDescriptor):
   return %r : $()
 }
 
+// CHECK-LABEL: sil @dont_fold_destroy_of_take_non_copyable_enum :
+// CHECK:       bb0(%0 : $*NonCopyableWithoutDeinit):
+// CHECK-NEXT:    %1 = unchecked_take_enum_data_addr %0
+// CHECK-NEXT:    destroy_addr %1
+// CHECK:       } // end sil function 'dont_fold_destroy_of_take_non_copyable_enum'
+sil @dont_fold_destroy_of_take_non_copyable_enum : $@convention(thin) (@in NonCopyableWithoutDeinit) -> () {
+bb0(%0 : $*NonCopyableWithoutDeinit):
+  %1 = unchecked_take_enum_data_addr %0, #NonCopyableWithoutDeinit.a!enumelt
+  destroy_addr %1
+  %r = tuple ()
+  return %r : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_move_mark_dependence_out_of_scope :
 // CHECK:         mark_dependence
 // CHECK-NEXT:    end_borrow
@@ -227,5 +246,45 @@ bb0(%0 : $Int, %1 : $*Span<Element>):
 
 bb1:
   return %5
+}
+
+struct MoveOnlyPair : ~Copyable {
+  @_hasStorage var a: Int { get set }
+  @_hasStorage var b: Int { get set }
+}
+
+enum MoveOnlyTrivialPayloadEnum : ~Copyable {
+  case payload(Int)
+  case empty
+}
+
+// CHECK-LABEL: sil [ossa] @dont_delete_dead_unchecked_enum_data_moveonly :
+// CHECK:         unchecked_enum_data
+// CHECK-LABEL: } // end sil function 'dont_delete_dead_unchecked_enum_data_moveonly'
+sil [ossa] @dont_delete_dead_unchecked_enum_data_moveonly : $@convention(thin) (@owned MoveOnlyTrivialPayloadEnum) -> () {
+bb0(%0 : @owned $MoveOnlyTrivialPayloadEnum):
+  %1 = unchecked_enum_data %0, #MoveOnlyTrivialPayloadEnum.payload!enumelt
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_delete_dead_destructure_struct_moveonly_trivial :
+// CHECK:         destructure_struct
+// CHECK-LABEL: } // end sil function 'dont_delete_dead_destructure_struct_moveonly_trivial'
+sil [ossa] @dont_delete_dead_destructure_struct_moveonly_trivial : $@convention(thin) (@owned MoveOnlyPair) -> () {
+bb0(%0 : @owned $MoveOnlyPair):
+  (%1, %2) = destructure_struct %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @dont_delete_dead_unchecked_value_cast_moveonly :
+// CHECK:         unchecked_value_cast
+// CHECK-LABEL: } // end sil function 'dont_delete_dead_unchecked_value_cast_moveonly'
+sil [ossa] @dont_delete_dead_unchecked_value_cast_moveonly : $@convention(thin) (@owned MoveOnlyPair) -> () {
+bb0(%0 : @owned $MoveOnlyPair):
+  %1 = unchecked_value_cast %0 to $(Int, Int)
+  %r = tuple ()
+  return %r
 }
 

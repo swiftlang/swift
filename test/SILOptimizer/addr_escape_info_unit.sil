@@ -1042,4 +1042,55 @@ bb0(%0 : $Int):
   return %7
 }
 
+struct Inner {
+  @_hasStorage var value: Builtin.NativeObject
+}
 
+struct Outer {
+  @_hasStorage var inner: Inner
+}
+
+// CHECK-LABEL: Address escape information for test_struct_element_addr_aliases_with_store_borrow:
+// CHECK:       pair 0 - 1
+// CHECK-NEXT:    %{{.*}} = struct_element_addr %{{.*}} : $*Outer, #Outer.inner
+// CHECK-NEXT:    %{{.*}} = store_borrow %{{.*}} to %{{.*}} : $*Outer
+// CHECK-NEXT:  may alias
+// CHECK:       End function test_struct_element_addr_aliases_with_store_borrow
+sil [ossa] @test_struct_element_addr_aliases_with_store_borrow : $@convention(thin) (@guaranteed Outer) -> () {
+bb0(%0 : @guaranteed $Outer):
+  specify_test "address_escape_info"
+  %1 = alloc_stack $Outer
+  %sb = store_borrow %0 to %1 : $*Outer
+  %addr = struct_element_addr %sb : $*Outer, #Outer.inner
+  fix_lifetime %addr : $*Inner
+  fix_lifetime %sb : $*Outer
+  end_borrow %sb : $*Outer
+  dealloc_stack %1 : $*Outer
+  %ret = tuple ()
+  return %ret : $()
+}
+
+sil @get_inner_addr : $@convention(thin) (@in_guaranteed Outer) -> @guaranteed_address Inner
+
+sil @use_inner : $@convention(thin) (@guaranteed Inner) -> ()
+
+// CHECK-LABEL: Address escape information for test_guaranteed_address_aliases_with_in_guaranteed:
+// CHECK:       pair 0 - 1
+// CHECK-NEXT:    %{{.*}} = apply %{{.*}}(%{{.*}}) : $@convention(thin) (@in_guaranteed Outer) -> @guaranteed_address Inner
+// CHECK-NEXT:    %{{.*}} = store_borrow %{{.*}} to %{{.*}} : $*Outer
+// CHECK-NEXT:  may alias
+// CHECK:       End function test_guaranteed_address_aliases_with_in_guaranteed
+sil [ossa] @test_guaranteed_address_aliases_with_in_guaranteed : $@convention(thin) (@guaranteed Outer) -> () {
+bb0(%0 : @guaranteed $Outer):
+  specify_test "address_escape_info"
+  %1 = alloc_stack $Outer
+  %sb = store_borrow %0 to %1 : $*Outer
+  %get_fn = function_ref @get_inner_addr : $@convention(thin) (@in_guaranteed Outer) -> @guaranteed_address Inner
+  %addr = apply %get_fn(%sb) : $@convention(thin) (@in_guaranteed Outer) -> @guaranteed_address Inner
+  fix_lifetime %addr : $*Inner
+  fix_lifetime %sb : $*Outer
+  end_borrow %sb : $*Outer
+  dealloc_stack %1 : $*Outer
+  %ret = tuple ()
+  return %ret : $()
+}

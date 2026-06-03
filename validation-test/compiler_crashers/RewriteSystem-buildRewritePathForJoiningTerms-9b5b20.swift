@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::rewriting::RewriteSystem::buildRewritePathForJoiningTerms(swift::rewriting::MutableTerm, swift::rewriting::MutableTerm, swift::rewriting::RewritePath*) const","signatureAssert":"Assertion failed: (lhsTerm == rhsTerm), function buildRewritePathForJoiningTerms"}
+// {"kind":"typecheck","signature":"swift::rewriting::RewriteSystem::buildRewritePathForJoiningTerms(swift::rewriting::MutableTerm, swift::rewriting::MutableTerm, swift::rewriting::RewritePath*) const","signatureAssert":"Assertion failed: (lhsTerm == rhsTerm), function buildRewritePathForJoiningTerms","signatureNext":"RewriteSystem::processTypeDifference"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a : b
   protocol c {

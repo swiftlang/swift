@@ -8,6 +8,10 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: OS=macosx
+// REQUIRES: concurrency
+// REQUIRES: optimized_stdlib
+
+import _Concurrency
 
 public protocol P { }
 struct S: P { }

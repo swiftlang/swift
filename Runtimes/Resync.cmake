@@ -139,6 +139,7 @@ message(STATUS "Android modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT
 copy_files(public/Platform Overlay/Android/clang
   FILES
     android.modulemap
+    _stdio.apinotes
     posix_filesystem.apinotes
     spawn.apinotes
     SwiftAndroidNDK.h
@@ -173,6 +174,22 @@ copy_files(public/Platform Overlay/Linux/glibc
     Platform.swift
     TiocConstants.swift
     tgmath.swift.gyb)
+
+# WASI Overlay
+message(STATUS "WASI[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/WASILibc")
+copy_files(public/Platform Overlay/WASI/WASILibc
+  FILES
+    Platform.swift
+    POSIXError.swift
+    tgmath.swift.gyb
+    TiocConstants.swift
+    WASILibc.swift.gyb)
+
+message(STATUS "WASI modulemaps[${StdlibSources}/Platform] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/WASI/clang")
+copy_files(public/Platform Overlay/WASI/clang
+  FILES
+    SwiftWASILibc.apinotes
+    wasi-libc.modulemap)
 
 # Windows Overlay
 message(STATUS "WinSDK[${StdlibSources}/public/Windows] -> ${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/WinSDK")

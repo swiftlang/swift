@@ -661,6 +661,8 @@ struct ASTContext::Implementation {
   llvm::DenseMap<CanType, SILMoveOnlyWrappedType *> SILMoveOnlyWrappedTypes;
   llvm::FoldingSet<SILBoxType> SILBoxTypes;
   llvm::FoldingSet<IntegerType> IntegerTypes;
+  llvm::FoldingSet<HiddenType> HiddenTypes;
+  llvm::DenseMap<CanType, StringRef> TypesToHideWhenEmittingModule;
   llvm::DenseMap<BuiltinIntegerWidth, BuiltinIntegerType*> BuiltinIntegerTypes;
   llvm::DenseMap<unsigned, BuiltinUnboundGenericType*> BuiltinUnboundGenericTypes;
   llvm::FoldingSet<BuiltinVectorType> BuiltinVectorTypes;
@@ -680,6 +682,10 @@ struct ASTContext::Implementation {
 
   /// The set of unique custom availability domains.
   llvm::FoldingSet<CustomAvailabilityDomain> CustomAvailabilityDomains;
+
+  /// The most specific platform AvailabilityDomain that corresponds to the
+  /// compilation's `-target`.
+  std::optional<AvailabilityDomain> TargetAvailabilityDomain;
 
   /// A cache of information about whether particular nominal types
   /// are representable in a foreign language.
@@ -1768,6 +1774,48 @@ ConcreteDeclRef ASTContext::getRegexInitDecl(Type regexType) const {
   return ConcreteDeclRef(foundDecl, subs);
 }
 
+
+static ConcreteDeclRef getCGFloatOrDoubleInitDecl(
+    ASTContext &ctx, Type fromType, Type toType) {
+  if (!toType || !fromType)
+    return ConcreteDeclRef();
+
+  // OK: Implicit conversion, no module selector to drop here.
+  DeclNameRef initRef(ctx, /*module selector=*/Identifier(),
+                      DeclBaseName::createConstructor(), { Identifier() });
+
+  auto *toDecl = toType->getAnyNominal();
+  SmallVector<ValueDecl *, 2> candidates;
+
+  // Using the nominal type as the declaration context bypasses access
+  // control. But there is only going to be one overload that exactly
+  // with no label and the right argument type.
+  toDecl->lookupQualified(toDecl, initRef, SourceLoc(),
+                          NL_QualifiedDefault, candidates);
+
+  for (auto *candidate : candidates) {
+    auto *ctor = cast<ConstructorDecl>(candidate);
+    auto fnType = ctor->getMethodInterfaceType()->castTo<FunctionType>();
+    if (fnType->getNumParams() == 1 &&
+        fnType->getParams()[0] == AnyFunctionType::Param(fromType) &&
+        fnType->getResult()->isEqual(toType)) {
+      return ConcreteDeclRef(ctor);
+    }
+  }
+
+  return ConcreteDeclRef();
+}
+
+ConcreteDeclRef ASTContext::getCGFloatInitDecl() const {
+  return getCGFloatOrDoubleInitDecl(const_cast<ASTContext &>(*this),
+                                    getDoubleType(), getCGFloatType());
+}
+
+ConcreteDeclRef ASTContext::getDoubleInitDecl() const {
+  return getCGFloatOrDoubleInitDecl(const_cast<ASTContext &>(*this),
+                                    getCGFloatType(), getDoubleType());
+}
+
 static
 FuncDecl *getBinaryComparisonOperatorIntDecl(const ASTContext &C, StringRef op,
                                              FuncDecl *&cached) {
@@ -2220,6 +2268,31 @@ ExplicitClangModuleMap *ASTContext::getExplicitClangModuleMap() {
   if (getImpl().TheExplicitSwiftModuleLoader)
     return getImpl().TheExplicitSwiftModuleLoader->getExplicitClangModuleMap();
   return nullptr;
+}
+
+std::optional<LibraryLevel>
+ASTContext::getExplicitModuleLibraryLevel(StringRef moduleName, bool isClang) {
+  auto getLevelStr = [&](auto *map) -> const std::optional<std::string> * {
+    if (!map)
+      return nullptr;
+    auto it = map->find(moduleName);
+    if (it == map->end())
+      return nullptr;
+    return &it->getValue().libraryLevel;
+  };
+
+  const std::optional<std::string> *levelStr =
+      isClang ? getLevelStr(getExplicitClangModuleMap())
+              : getLevelStr(getExplicitSwiftModuleMap());
+
+  if (!levelStr || !*levelStr)
+    return std::nullopt;
+
+  return llvm::StringSwitch<LibraryLevel>(**levelStr)
+      .Case("api", LibraryLevel::API)
+      .Case("spi", LibraryLevel::SPI)
+      .Case("ipi", LibraryLevel::IPI)
+      .Default(LibraryLevel::Other);
 }
 
 void ASTContext::addModuleLoader(std::unique_ptr<ModuleLoader> loader,
@@ -3689,37 +3762,12 @@ void LocatableType::Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
 // Simple accessors.
 Type ErrorType::get(const ASTContext &C) { return C.TheErrorType; }
 
-static Type replacingTypeVariablesAndPlaceholders(Type ty) {
-  if (!ty || !ty->hasTypeVariableOrPlaceholder())
-    return ty;
-
-  struct Transform : public TypeTransform<Transform> {
-    Transform(ASTContext &ctx) : TypeTransform(ctx) {}
-
-    std::optional<Type> transform(TypeBase *ty, TypePosition) {
-      if (!ty->hasTypeVariableOrPlaceholder())
-        return ty;
-
-      if (isa<TypeVariableType>(ty) || isa<PlaceholderType>(ty))
-        return ErrorType::get(ctx);
-
-      return std::nullopt;
-    }
-    std::pair<Type, /*sendable*/ bool> transformSendableDependentType(Type ty) {
-      // Fold away the sendable dependence if present, the function type will
-      // just become non-Sendable.
-      return std::make_pair(Type(), false);
-    }
-  };
-  return Transform(ty->getASTContext()).doIt(ty, TypePosition::Invariant);
-}
-
 Type ErrorType::get(Type originalType) {
   // The original type is only used for printing/debugging, and we don't support
   // solver-allocated ErrorTypes. As such, fold any type variables and
   // placeholders into ErrorTypes. If we have a top-level one, we can return
   // that directly.
-  originalType = replacingTypeVariablesAndPlaceholders(originalType);
+  originalType = originalType->replaceTypeVariablesAndPlaceholdersWithErrors();
   if (isa<ErrorType>(originalType.getPointer()))
     return originalType;
 
@@ -3833,6 +3881,48 @@ IntegerType *IntegerType::get(StringRef value, bool isNegative,
 
   ctx.getImpl().IntegerTypes.InsertNode(intType, insertPos);
   return intType;
+}
+
+HiddenType *HiddenType::get(const ASTContext &ctx, StringRef mangledName,
+                            ModuleDecl *definingModule) {
+  llvm::FoldingSetNodeID id;
+  HiddenType::Profile(id, mangledName, definingModule);
+
+  void *insertPos;
+  if (auto *hidden =
+          ctx.getImpl().HiddenTypes.FindNodeOrInsertPos(id, insertPos)) {
+    return hidden;
+  }
+
+  auto nameCopy = ctx.AllocateCopy(mangledName);
+
+  auto *hidden = new (ctx, AllocationArena::Permanent)
+      HiddenType(nameCopy, definingModule, ctx);
+
+  ctx.getImpl().HiddenTypes.InsertNode(hidden, insertPos);
+  return hidden;
+}
+
+void ASTContext::recordTypeToHideWhenEmittingModule(CanType type,
+                                                    StringRef mangledName) {
+  // Allocate a stable copy so the StringRef survives even if the caller's
+  // storage for the mangled name is later moved or freed.
+  auto nameCopy = AllocateCopy(mangledName);
+  auto result =
+      getImpl().TypesToHideWhenEmittingModule.try_emplace(type, nameCopy);
+  if (!result.second) {
+    ASSERT(result.first->second == nameCopy &&
+           "conflicting hide-on-emit mangled names for the same type");
+  }
+}
+
+std::optional<StringRef>
+ASTContext::lookupTypeToHideWhenEmittingModule(CanType type) const {
+  auto &map = getImpl().TypesToHideWhenEmittingModule;
+  auto it = map.find(type);
+  if (it == map.end())
+    return std::nullopt;
+  return it->second;
 }
 
 BuiltinIntegerType *BuiltinIntegerType::get(BuiltinIntegerWidth BitWidth,
@@ -5426,9 +5516,9 @@ SILFunctionType::SILFunctionType(
 
   if (!ext.getLifetimeDependencies().empty()) {
     NumLifetimeDependencies = ext.getLifetimeDependencies().size();
-    memcpy(getMutableLifetimeDependenceInfo().data(),
-           ext.getLifetimeDependencies().data(),
-           NumLifetimeDependencies * sizeof(LifetimeDependenceInfo));
+    auto src = ext.getLifetimeDependencies();
+    std::uninitialized_copy(src.begin(), src.end(),
+                            getMutableLifetimeDependenceInfo().begin());
   }
 #ifndef NDEBUG
   if (ext.getRepresentation() == Representation::WitnessMethod)
@@ -5581,6 +5671,16 @@ CanSILFunctionType SILFunctionType::get(
   assert(!ext.isPseudogeneric() || genericSig ||
          coroutineKind != SILCoroutineKind::None);
 
+  // Make sure that the invariant that `nonisolated(nonsending)` function
+  // always has an implicit leading parameter is maintained.
+#ifndef NDEBUG
+  if (ext.hasNonisolatedNonsendingIsolation()) {
+    assert(llvm::any_of(params, [](const auto &param) {
+      return param.hasOption(SILParameterInfo::Flag::ImplicitLeading);
+    }));
+  }
+#endif
+
   patternSubs = patternSubs.getCanonical();
   invocationSubs = invocationSubs.getCanonical();
 
@@ -5647,7 +5747,6 @@ CanSILFunctionType SILFunctionType::get(
   // revisit this.
   if (genericSig || patternSubs) {
     properties.removeHasTypeParameter();
-    properties.removeHasDependentMember();
   }
 
   auto outerSubs = genericSig ? invocationSubs : patternSubs;
@@ -5817,7 +5916,6 @@ InOutType *InOutType::get(Type objectTy) {
 
 DependentMemberType *DependentMemberType::get(Type base, Identifier name) {
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(name);
@@ -5836,7 +5934,6 @@ DependentMemberType *DependentMemberType::get(Type base,
                                               AssociatedTypeDecl *assocType) {
   assert(assocType && "Missing associated type");
   auto properties = base->getRecursiveProperties();
-  properties |= RecursiveTypeProperties::HasDependentMember;
   auto arena = getArena(properties);
 
   llvm::PointerUnion<Identifier, AssociatedTypeDecl *> stored(assocType);
@@ -6240,7 +6337,9 @@ GenericEnvironment::forOpenedExistential(
   auto layout = existential->getExistentialLayout();
   auto properties = ArchetypeType::archetypeProperties(
       RecursiveTypeProperties::HasOpenedExistential,
-      layout.getProtocols(), layout.getSuperclass(), subs);
+      layout.getProtocols(),
+      layout.getExplicitSuperclassOrProtocolSuperclass(),
+      subs);
 
   auto arena = getArena(properties);
 
@@ -6881,7 +6980,7 @@ ASTContext::getOpenedExistentialSignature(Type type) {
   collector.addOpenedExistential(gen.Shape);
   existentialSig.OpenedSig = buildGenericSignature(
       *this, collector.OuterSig, collector.Params, collector.Requirements,
-      /*allowInverses=*/true).getCanonicalSignature();
+      ExpandDefaults).getCanonicalSignature();
 
   // Stash the `Self` type.
   existentialSig.SelfType =
@@ -6909,7 +7008,7 @@ ASTContext::getOpenedElementSignature(CanGenericSignature baseGenericSig,
   collector.addOpenedElement(shapeClass);
   auto elementSig = buildGenericSignature(
       *this, collector.OuterSig, collector.Params, collector.Requirements,
-      /*allowInverses=*/false).getCanonicalSignature();
+      DefaultRequirementOptions()).getCanonicalSignature();
 
   sigs[key] = elementSig;
   return elementSig;
@@ -6984,7 +7083,7 @@ ASTContext::getOverrideGenericSignature(const NominalTypeDecl *baseNominal,
   auto genericSig = buildGenericSignature(*this, derivedNominalSig,
                                           std::move(addedGenericParams),
                                           std::move(addedRequirements),
-                                          /*allowInverses=*/false);
+                                          DefaultRequirementOptions());
   getImpl().overrideSigCache.insert(std::make_pair(key, genericSig));
   return genericSig;
 }
@@ -7490,13 +7589,21 @@ ValueOwnership swift::asValueOwnership(ParameterOwnership o) {
   llvm_unreachable("exhaustive switch");
 }
 
-AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
-  auto platform = swift::targetPlatform(LangOpts);
+static AvailabilityDomain
+targetAvailabilityDomainForPlatform(PlatformKind platform) {
   if (platform != PlatformKind::none)
     return AvailabilityDomain::forPlatform(platform);
 
   // Fall back to the universal domain for triples without a platform.
   return AvailabilityDomain::forUniversal();
+}
+
+AvailabilityDomain ASTContext::getTargetAvailabilityDomain() const {
+  if (!getImpl().TargetAvailabilityDomain) {
+    getImpl().TargetAvailabilityDomain =
+        targetAvailabilityDomainForPlatform(swift::targetPlatform(LangOpts));
+  }
+  return *getImpl().TargetAvailabilityDomain;
 }
 
 GenericSignature &

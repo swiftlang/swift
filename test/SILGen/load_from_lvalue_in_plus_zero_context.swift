@@ -23,7 +23,7 @@ func test(a: A) {
   // CHECK:   cond_br [[HASVALUE]], [[SOME:bb[0-9]+]],
   //
   // CHECK: [[SOME]]:
-  // CHECK:   [[C_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[C_TEMP]]
+  // CHECK:   [[C_PAYLOAD:%.*]] = unchecked_inplace_enum_data_addr [[C_TEMP]]
   // -- This must be a copy, since we'll immediately destroy the value in the
   //    temp buffer
   // CHECK:   [[LOAD:%.*]] = load [copy] [[C_PAYLOAD]]

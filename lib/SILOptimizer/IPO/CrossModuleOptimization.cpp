@@ -350,9 +350,9 @@ static bool isSerializeCandidate(SILFunction *F, SILOptions options) {
 
 bool CrossModuleOptimization::isReferenceSerializeCandidate(SILFunction *F, 
                                                             SILOptions options) {
+  if (isSerializedWithRightKind(F->getModule(), F))
+    return true;
   if (isPackageCMOEnabled(F->getModule().getSwiftModule())) {
-    if (isSerializedWithRightKind(F->getModule(), F))
-      return true;
     return hasPublicOrPackageVisibility(F->getLinkage(),
                                         /*includePackage*/ true);
   }
@@ -513,6 +513,11 @@ bool CrossModuleOptimization::canSerializeFunction(
   // it to true at the end of this function.
   canSerializeFlags[function] = false;
 
+  // We can't serialize a function that explicitly opted out of being
+  // serialized.
+  if (function->isNeverEmitIntoClient())
+    return false;
+
   if (everything) {
     canSerializeFlags[function] = true;
     return true;
@@ -556,7 +561,14 @@ bool CrossModuleOptimization::canSerializeFunction(
   // or should at least increase the size limit.
   bool skipSizeLimitCheck = isPackageCMOEnabled(M.getSwiftModule());
 
-  if (!conservative) {
+  int sizeLimit = CMOFunctionSizeLimit;
+
+  if (conservative) {
+    // Even in conservative mode we want to serialize most generic functions,
+    // except they are large (for code size reasons).
+    if (function->getLoweredFunctionType()->isPolymorphic())
+      sizeLimit = sizeLimit * 20;
+  } else {
     // The basic heuristic: serialize all generic functions, because it makes a
     // huge difference if generic functions can be specialized or not.
     if (function->getLoweredFunctionType()->isPolymorphic())
@@ -566,12 +578,11 @@ bool CrossModuleOptimization::canSerializeFunction(
   }
 
   if (!skipSizeLimitCheck) {
-    // Also serialize "small" non-generic functions.
     int size = 0;
     for (SILBasicBlock &block : *function) {
       for (SILInstruction &inst : block) {
         size += (int)instructionInlineCost(inst);
-        if (size >= CMOFunctionSizeLimit)
+        if (size >= sizeLimit)
           return false;
       }
     }
@@ -757,6 +768,10 @@ bool CrossModuleOptimization::canSerializeDecl(NominalTypeDecl *decl) {
 }
 
 bool CrossModuleOptimization::canSerializeGlobal(SILGlobalVariable *global) {
+  // If we are prevented from serializing this global, don't.
+  if (global->codeGenerationModel() == CodeGenerationModel::Interface)
+    return false;
+
   // Check for referenced functions in the initializer.
   for (const SILInstruction &initInst : *global) {
     if (auto *FRI = dyn_cast<FunctionRefInst>(&initInst)) {
@@ -1045,9 +1060,10 @@ void CrossModuleOptimization::makeDeclUsableFromInline(ValueDecl *decl) {
   if (decl->getEffectiveAccess() >= AccessLevel::Package)
     return;  
 
-  // In Embedded Swift every ValueDecl is usableFromInline. (see
-  // ValueDecl::isUsableFromInline.
-  if (decl->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  // In Embedded Swift every ValueDecl is "usableFromInline". There is code that
+  // makes sure that the ABI linkage is public.
+  if (decl->getASTContext().LangOpts.hasFeature(Feature::Embedded) ||
+      decl->getModuleContext()->isAggressiveCMOEnabled())
     return;
 
   // This function should not be called in Package CMO mode.

@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"8e2479db","signature":"swift::checkConformance(swift::Type, swift::ProtocolDecl*, bool)","signatureAssert":"Assertion failed: (!type->hasTypeParameter() && \"must take a contextual type. if you really are ok with an \" \"indefinite answer (and usually YOU ARE NOT), then consider whether \" \"you really, definitely are ok with an indefinite answer, and \" \"use `checkConformanceWithoutContext` instead\"), function checkConformance"}
+// {"kind":"typecheck","original":"8e2479db","signature":"swift::checkConformance(swift::Type, swift::ProtocolDecl*, bool)","signatureAssert":"Assertion failed: (!type->hasTypeParameter() && \"must take a contextual type. if you really are ok with an \" \"indefinite answer (and usually YOU ARE NOT), then consider whether \" \"you really, definitely are ok with an indefinite answer, and \" \"use `checkConformanceWithoutContext` instead\"), function checkConformance","signatureNext":"TypeChecker::conformsToKnownProtocol"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 protocol a<b, c> {
   associatedtype b

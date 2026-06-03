@@ -1,4 +1,4 @@
-// {"kind":"typecheck","original":"1806b993","signature":"swift::constraints::ConstraintSystem::diagnoseAmbiguityWithFixes(llvm::SmallVectorImpl<swift::constraints::Solution>&)"}
+// {"kind":"typecheck","original":"1806b993","signature":"swift::constraints::ConstraintSystem::diagnoseAmbiguityWithFixes(llvm::SmallVectorImpl<swift::constraints::Solution>&)","signatureNext":"ConstraintSystem::salvage"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 func a<each b >(repeat inout each b) -> (repeat each b
 ( ;

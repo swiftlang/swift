@@ -30,6 +30,16 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
   }
 }
 
+// @noescape functions cannot yet compose other types, but they can be wrapped in an arbitrary number of Optionals.
+extension AST.`Type` {
+  var fullyUnwrappedType: AST.`Type` {
+    if !self.isOptional {
+      return self
+    }
+    return self.genericArgumentsOfBoundGenericType[0].fullyUnwrappedType
+  }
+}
+
 /// Diagnostic pass.
 ///
 /// Find the roots of all non-escapable values in this function. All
@@ -44,7 +54,7 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
   log("\(function.convention)")
 
   for argument in function.arguments
-      where !argument.type.isEscapable(in: function)
+      where !argument.type.isEscapable(in: function) && !argument.type.rawType.fullyUnwrappedType.isLoweredFunction
   {
     // Indirect results are not checked here. Type checking ensures
     // that they have a lifetime dependence.
@@ -70,21 +80,6 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
       // need to set this flag during diagnostics because, for escapable types, mark_dependence [unresolved] will all be
       // settled during an early LifetimeNormalization pass.
       markDep.settleToEscaping(context)
-      continue
-    }
-    if let apply = instruction as? FullApplySite, !apply.hasResultDependence {
-      // Handle ~Escapable results that do not have a lifetime dependence. This includes implicit initializers, calls to
-      // closures, and @_unsafeNonescapableResult.
-      apply.resultOrYields.forEach {
-        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0, apply: apply, context) {
-          _ = analyze(dependence: lifetimeDep, context)
-        }
-      }
-      apply.indirectResultOperands.forEach {
-        if let lifetimeDep = LifetimeDependence(unsafeApplyResult: $0.value, apply: apply, context) {
-          _ = analyze(dependence: lifetimeDep, context)
-        }
-      }
       continue
     }
   }

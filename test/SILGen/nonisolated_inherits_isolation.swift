@@ -18,8 +18,8 @@ func unspecifiedAsyncUse(_ t: NonSendableKlass) async {}
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: // nonisolatedAsync()
-// CHECK-NEXT: Isolation: caller_isolation_inheriting
-// CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation0A5AsyncyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-NEXT: Isolation: nonisolated(nonsending)
+// CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation0A5AsyncyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK: } // end sil function '$s30nonisolated_inherits_isolation0A5AsyncyyYaF'
@@ -28,11 +28,11 @@ nonisolated func nonisolatedAsync() async {}
 func unspecifiedAsyncCallee() async {}
 
 // CHECK-LABEL: // unspecifiedAsync()
-// CHECK-NEXT: Isolation: caller_isolation_inheriting
-// CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation16unspecifiedAsyncyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-NEXT: Isolation: nonisolated(nonsending)
+// CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation16unspecifiedAsyncyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Builtin.ImplicitActor):
 // CHECK:   hop_to_executor [[ACTOR]]
-// CHECK:   [[FUNC_REF:%.*]] = function_ref @$s30nonisolated_inherits_isolation22unspecifiedAsyncCalleeyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
+// CHECK:   [[FUNC_REF:%.*]] = function_ref @$s30nonisolated_inherits_isolation22unspecifiedAsyncCalleeyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> ()
 // CHECK:   apply [[FUNC_REF]]([[ACTOR]])
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK: } // end sil function '$s30nonisolated_inherits_isolation16unspecifiedAsyncyyYaF'
@@ -52,8 +52,8 @@ struct NonisolatedStruct {
   // Do apply it to sync initializers.
   //
   // CHECK-LABEL: // NonisolatedStruct.init(asynchronous:)
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
-  // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation17NonisolatedStructV12asynchronousACyt_tYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin NonisolatedStruct.Type) -> NonisolatedStruct {
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
+  // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation17NonisolatedStructV12asynchronousACyt_tYacfC : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin NonisolatedStruct.Type) -> NonisolatedStruct {
   // CHECK: } // end sil function '$s30nonisolated_inherits_isolation17NonisolatedStructV12asynchronousACyt_tYacfC'
   init(asynchronous: ()) async {}
 
@@ -62,20 +62,20 @@ struct NonisolatedStruct {
 
   // But do apply it to async methods.
   // CHECK-LABEL: // NonisolatedStruct.asyncMethod()
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
-  // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation17NonisolatedStructV11asyncMethodyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, NonisolatedStruct) -> () {
+  // CHECK-NEXT: // Isolation: nonisolated(nonsending)
+  // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation17NonisolatedStructV11asyncMethodyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, NonisolatedStruct) -> () {
   // CHECK: } // end sil function '$s30nonisolated_inherits_isolation17NonisolatedStructV11asyncMethodyyYaF'
   func asyncMethod() async {}
 }
 
 // CHECK-LABEL: // useNonisolatedStruct()
-// CHECK-NEXT: // Isolation: caller_isolation_inheriting
-// CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation20useNonisolatedStructyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-NEXT: // Isolation: nonisolated(nonsending)
+// CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation20useNonisolatedStructyyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK: bb0([[ACTOR:%.*]] :
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK:   [[VALUE:%.*]] = apply {{%.*}}({{%.*}}) : $@convention(method) (@thin NonisolatedStruct.Type) -> NonisolatedStruct
 // CHECK:   [[VAR_DECL:%.*]] = move_value [var_decl] [[VALUE]]
-// CHECK:   [[ASYNC_CALL:%.*]] = function_ref @$s30nonisolated_inherits_isolation17NonisolatedStructV11asyncMethodyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, NonisolatedStruct) -> ()
+// CHECK:   [[ASYNC_CALL:%.*]] = function_ref @$s30nonisolated_inherits_isolation17NonisolatedStructV11asyncMethodyyYaF : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, NonisolatedStruct) -> ()
 // CHECK:   apply [[ASYNC_CALL]]([[ACTOR]], [[VAR_DECL]])
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK:   extend_lifetime [[VAR_DECL]]
@@ -89,14 +89,14 @@ func useNonisolatedStruct() async {
 }
 
 // CHECK-LABEL: // useNonisolatedStruct2()
-// CHECK-NEXT: // Isolation: caller_isolation_inheriting
-// CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation21useNonisolatedStruct2yyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
+// CHECK-NEXT: // Isolation: nonisolated(nonsending)
+// CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation21useNonisolatedStruct2yyYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor) -> () {
 // CHECK: bb0([[ACTOR:%.*]] :
 // CHECK:   hop_to_executor [[ACTOR]]
-// CHECK:   [[VALUE:%.*]] = apply {{%.*}}([[ACTOR]], {{%.*}}) : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin NonisolatedStruct.Type) -> NonisolatedStruct
+// CHECK:   [[VALUE:%.*]] = apply {{%.*}}([[ACTOR]], {{%.*}}) : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @thin NonisolatedStruct.Type) -> NonisolatedStruct
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK:   [[VAR_DECL:%.*]] = move_value [var_decl] [[VALUE]]
-// CHECK:   apply {{%.*}}([[ACTOR]], [[VAR_DECL]]) : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, NonisolatedStruct) -> ()
+// CHECK:   apply {{%.*}}([[ACTOR]], [[VAR_DECL]]) : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, NonisolatedStruct) -> ()
 // CHECK:   hop_to_executor [[ACTOR]]
 // CHECK:   extend_lifetime [[VAR_DECL]]
 // CHECK: } // end sil function '$s30nonisolated_inherits_isolation21useNonisolatedStruct2yyYaF'
@@ -144,7 +144,7 @@ class MainActorKlass {
   // CHECK:   [[B_ACTOR_COPY_EX_OPT:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[B_ACTOR_COPY_EX]]
   // CHECK:   [[B_ACTOR_COPY_EX_OPT_B:%.*]] = begin_borrow [[B_ACTOR_COPY_EX_OPT]]
   // CHECK:   [[B_ACTOR_COPY_EX_OPT_B_CAST:%.*]] = unchecked_value_cast [[B_ACTOR_COPY_EX_OPT_B]] to $Builtin.ImplicitActor
-  // CHECK:   apply {{%.*}}([[B_ACTOR_COPY_EX_OPT_B_CAST]], [[B_VAR_DECL_2]]) : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> ()
+  // CHECK:   apply {{%.*}}([[B_ACTOR_COPY_EX_OPT_B_CAST]], [[B_VAR_DECL_2]]) : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, @guaranteed NonSendableKlass) -> ()
   // CHECK:   hop_to_executor [[B_ACTOR]]
   // CHECK: } // end sil function '$s30nonisolated_inherits_isolation14MainActorKlassC24callNonIsolatedWithParamyyYaF'
   func callNonIsolatedWithParam() async {
@@ -156,16 +156,16 @@ class MainActorKlass {
 
 struct TestVarUse {
   var test: Int {
-    // CHECK-LABEL: sil hidden [ossa] @$s30nonisolated_inherits_isolation10TestVarUseV4testSivg : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, TestVarUse) -> Int
+    // CHECK-LABEL: sil hidden [ossa] @$s30nonisolated_inherits_isolation10TestVarUseV4testSivg : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, TestVarUse) -> Int
     get async {
       42
     }
   }
 }
 
-// CHECK-LABEL: sil hidden [ossa] @$s30nonisolated_inherits_isolation12testUseOfVar1tyAA04TestgE0V_tYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, TestVarUse) -> ()
+// CHECK-LABEL: sil hidden [ossa] @$s30nonisolated_inherits_isolation12testUseOfVar1tyAA04TestgE0V_tYaF : $@convention(thin) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, TestVarUse) -> ()
 // CHECK: bb0([[ISOLATION:%.*]] : @guaranteed $Builtin.ImplicitActor, [[BASE:%.*]] : $TestVarUse)
-// CHECK:   [[GETTER:%.*]] = function_ref @$s30nonisolated_inherits_isolation10TestVarUseV4testSivg : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, TestVarUse) -> Int
+// CHECK:   [[GETTER:%.*]] = function_ref @$s30nonisolated_inherits_isolation10TestVarUseV4testSivg : $@convention(method) @caller_isolated @async (@sil_isolated @sil_implicit_leading_param @guaranteed Builtin.ImplicitActor, TestVarUse) -> Int
 // CHECK:   {{.*}} = apply [[GETTER]]([[ISOLATION]], [[BASE]])
 // CHECK: } // end sil function '$s30nonisolated_inherits_isolation12testUseOfVar1tyAA04TestgE0V_tYaF'
 func testUseOfVar(t: TestVarUse) async {

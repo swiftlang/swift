@@ -182,6 +182,15 @@ void SILInstruction::dropNonOperandReferences() {
     KPI->dropReferencedPattern();
     return;
   }
+
+  // If we have a DebugValueInst with a debug reconstruction block, drop it.
+  if (auto *DVI = dyn_cast<DebugValueInst>(this)) {
+    if (auto *DebugBB = DVI->getDebugReconstructionBlock()) {
+      DebugBB->dropAllReferences();
+      DebugBB->eraseAllInstructions(getModule());
+      DVI->setDebugReconstructionBlock(nullptr);
+    }
+  }
 }
 
 namespace {
@@ -1104,10 +1113,6 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     return MemoryBehavior::None;
   }
   
-  // TODO: An UncheckedTakeEnumDataAddr instruction has no memory behavior if
-  // it is nondestructive. Setting this currently causes LICM to miscompile
-  // because access paths do not account for enum projections.
-
   switch (getKind()) {
 #define FULL_INST(CLASS, TEXTUALNAME, PARENT, MEMBEHAVIOR, RELEASINGBEHAVIOR)  \
   case SILInstructionKind::CLASS:                                              \
@@ -1346,6 +1351,10 @@ SILInstruction::getStackAllocation() const {
       BUILTIN_CASE(StackAlloc, StackAlloc)
       BUILTIN_CASE(UnprotectedStackAlloc, UnprotectedStackAlloc)
       BUILTIN_CASE(StartAsyncLetWithLocalBuffer, StartAsyncLet)
+      BUILTIN_CASE(AddTaskLocalValue, AddTaskLocalValue)
+      BUILTIN_CASE(TaskAddPriorityEscalationHandler,
+                   TaskAddPriorityEscalationHandler)
+      BUILTIN_CASE(TaskAddCancellationHandler, TaskAddCancellationHandler)
 #undef BUILTIN_CASE
 
       default:
@@ -1363,6 +1372,10 @@ StackAllocationIsNested_t SILInstruction::isStackAllocationNested() const {
     return ASI->isStackAllocationNested();
   } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
     return PAI->isStackAllocationNested();
+  } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
+    return ARI->isStackAllocationNested();
+  } else if (auto API = dyn_cast<AllocPackMetadataInst>(this)) {
+    return API->isStackAllocationNested();
   } else {
     // TODO: implement for all remaining allocations
     return StackAllocationIsNested;
@@ -1375,8 +1388,13 @@ void SILInstruction::setStackAllocationIsNested(
     ASI->setStackAllocationIsNested(nested);
   } else if (auto PAI = dyn_cast<PartialApplyInst>(this)) {
     PAI->setStackAllocationIsNested(nested);
+  } else if (auto ARI = dyn_cast<AllocRefInstBase>(this)) {
+    ARI->setStackAllocationIsNested(nested);
+  } else if (auto API = dyn_cast<AllocPackMetadataInst>(this)) {
+    API->setStackAllocationIsNested(nested);
   } else if (!nested) {
-    llvm_unreachable("unimplemented");
+    verificationFailure("setStackAllocationIsNested unimplemented for instruction",
+                        this, [](SILPrintContext &ctx) {});
   }
 }
 
@@ -1437,11 +1455,19 @@ SILInstruction::getStackDeallocation() const {
                    : StackAllocationKind::BuiltinUnprotectedStackAlloc);
       }
 
-      case BuiltinValueKind::FinishAsyncLet: {
-        auto alloc = StackDeallocation::getAllocationOperand(BI);
-        return StackDeallocation::getUnchecked(alloc, BI,
-                             StackAllocationKind::BuiltinStartAsyncLet);
+#define BUILTIN_CASE(FINISH_BUILTIN_ID, ID)                              \
+      case BuiltinValueKind::FINISH_BUILTIN_ID: {                        \
+        auto alloc = StackDeallocation::getAllocationOperand(BI);        \
+        return StackDeallocation::getUnchecked(alloc, BI,                \
+                                               StackAllocationKind::ID); \
       }
+      BUILTIN_CASE(FinishAsyncLet, BuiltinStartAsyncLet)
+      BUILTIN_CASE(RemoveTaskLocalValue, BuiltinAddTaskLocalValue)
+      BUILTIN_CASE(TaskRemovePriorityEscalationHandler,
+                   BuiltinTaskAddPriorityEscalationHandler)
+      BUILTIN_CASE(TaskRemoveCancellationHandler,
+                   BuiltinTaskAddCancellationHandler)
+#undef BUILTIN_CASE
 
       default:
         return std::nullopt;
@@ -2005,15 +2031,14 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   SSAPrunedLiveness liveness(function, &discoveredBlocks);
   liveness.initializeDef(this);
 
-  StackList<SILValue> values(function);
-  values.push_back(this);
+  ValueWorklist values(function);
+  values.push(this);
 
-  while (!values.empty()) {
-    auto value = values.pop_back_val();
+  while (auto value = values.pop()) {
     for (auto *use : value->getUses()) {
       if (!use->isConsuming()) {
         if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
-          values.push_back(cvi);
+          values.pushIfNotVisited(cvi);
         }
         continue;
       }
@@ -2051,7 +2076,7 @@ PartialApplyInst::visitOnStackLifetimeEnds(
                                  "forwarded to a destroy_value");
       }
       forward.visitForwardedValues([&values](auto value) {
-        values.push_back(value);
+        values.pushIfNotVisited(value);
         return true;
       });
     }
@@ -2201,13 +2226,25 @@ DestroyValueInst::getNonescapingClosureAllocation() const {
 }
 
 bool
-UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
-  // We only potentially use spare bit optimization when an enum is always
-  // loadable.
+UncheckedEnumDataAddrInstBase::isDestructive(EnumDecl *forEnum, SILFunction *F){
+  auto &M = F->getModule();
   auto sig = forEnum->getGenericSignature().getCanonicalSignature();
-  if (SILType::isAddressOnly(forEnum->getDeclaredInterfaceType()->getReducedType(sig),
-                             M.Types, sig,
-                             TypeExpansionContext::minimal())) {
+
+  // If the enum appears resilient in this context, then we don't control its
+  // layout, and have to assume it may use spare bit packing now or in the future.
+  if (forEnum->isResilient(M.getSwiftModule(),
+                           F->getTypeExpansionContext().getResilienceExpansion())) {
+    return true;
+  }
+  
+  // We only potentially use spare bit optimization when an enum is always
+  // loadable in its original defined context. (We may still use spare bits
+  // for a resilient type's layout, even though it will be treated as address-
+  // only outside of the defining module.)
+  if (SILType::isAddressOnly(
+                      forEnum->getDeclaredInterfaceType()->getReducedType(sig),
+                      M.Types, sig,
+                      TypeExpansionContext::maximalResilienceExpansionOnly())) {
     return false;
   }
   
@@ -2227,6 +2264,20 @@ UncheckedTakeEnumDataAddrInst::isDestructive(EnumDecl *forEnum, SILModule &M) {
   }
   
   return false;
+}
+
+SILValue UncheckedEnumDataAddrInstBase::getEnum() const {
+  switch (getKind()) {
+#define ENUM_DATA_ADDR_SUBCLASS(c) \
+  case SILInstructionKind::c: \
+    return cast<c>(this)->getEnum();
+  ENUM_DATA_ADDR_SUBCLASS(UncheckedTakeEnumDataAddrInst)
+  ENUM_DATA_ADDR_SUBCLASS(UncheckedBorrowEnumDataAddrInst)
+  ENUM_DATA_ADDR_SUBCLASS(UncheckedInPlaceEnumDataAddrInst)
+
+  default:
+    llvm_unreachable("not an UncheckedEnumDataAddrInstBase");
+  }
 }
 
 SILInstructionContext SILInstructionContext::forFunctionInModule(SILFunction *F,

@@ -30,6 +30,7 @@
 #include "swift/SIL/TypeLowering.h"
 
 #include "Callee.h"
+#include "ComputedWitnessIndex.h"
 #include "Explosion.h"
 #include "FixedTypeInfo.h"
 #include "GenPointerAuth.h"
@@ -310,27 +311,36 @@ llvm::StructType *IRGenModule::getEnumValueWitnessTableTy() {
 
 Address irgen::slotForLoadOfOpaqueWitness(IRGenFunction &IGF,
                                           llvm::Value *table,
-                                          WitnessIndex index,
+                                          ComputedWitnessIndex index,
                                           bool areEntriesRelative) {
   assert(table->getType() == IGF.IGM.WitnessTablePtrTy);
 
-  // Are we loading from a relative protocol witness table.
+  llvm::Value *slot = table;
+  llvm::Type *elementTy = table->getType();
+  Alignment align = IGF.IGM.getPointerAlignment();
+
+  // Are we loading from a relative protocol witness table?
   if (areEntriesRelative) {
-    llvm::Value *slot =
-      IGF.Builder.CreateBitOrPointerCast(table, IGF.IGM.RelativeAddressPtrTy);
-    if (index.getValue() != 0)
-      slot = IGF.Builder.CreateConstInBoundsGEP1_32(IGF.IGM.RelativeAddressTy,
-                                                    slot, index.getValue());
-    return Address(slot, IGF.IGM.RelativeAddressTy, Alignment(4));
+    slot =
+        IGF.Builder.CreateBitOrPointerCast(table, IGF.IGM.RelativeAddressPtrTy);
+    elementTy = IGF.IGM.RelativeAddressTy;
+    align = Alignment(4);
   }
 
-  // GEP to the appropriate index, avoiding spurious IR in the trivial case.
-  llvm::Value *slot = table;
-  if (index.getValue() != 0)
-    slot = IGF.Builder.CreateConstInBoundsGEP1_32(IGF.IGM.WitnessTableTy, table,
-                                                  index.getValue());
+  // Is the index statically known?
+  if (auto staticIdx = index.getStaticIndex()) {
+    // GEP to the appropriate index, avoiding spurious IR in the trivial case.
+    if (staticIdx->getValue() != 0)
+      slot = IGF.Builder.CreateConstInBoundsGEP1_32(elementTy, slot,
+                                                    staticIdx->getValue());
 
-  return Address(slot, IGF.IGM.WitnessTableTy, IGF.IGM.getPointerAlignment());
+    return Address(slot, elementTy, align);
+  }
+
+  // For a non-static index, we can't avoid a GEP.
+  slot =
+      IGF.Builder.CreateInBoundsGEP(elementTy, slot, index.getDynamicIndex());
+  return Address(slot, elementTy, align);
 }
 
 /// Load a specific witness from a known table.  The result is
@@ -338,7 +348,7 @@ Address irgen::slotForLoadOfOpaqueWitness(IRGenFunction &IGF,
 llvm::Value *irgen::emitInvariantLoadOfOpaqueWitness(IRGenFunction &IGF,
                                                      bool isProtocolWitness,
                                                      llvm::Value *table,
-                                                     WitnessIndex index,
+                                                     ComputedWitnessIndex index,
                                                      llvm::Value **slotPtr) {
   // Is this is a load of a relative protocol witness table entry.
   auto isRelativeTable = IGF.IGM.IRGen.Opts.UseRelativeProtocolWitnessTables &&
@@ -553,16 +563,86 @@ irgen::emitInitializeBufferWithCopyOfBufferCall(IRGenFunction &IGF,
   return call;
 }
 
+static llvm::Value *emitArraySizeInBytes(IRGenFunction &IGF,
+                                         Size eltSize,
+                                         llvm::Value *arrayLength) {
+  if (eltSize == Size(1)) {
+    return arrayLength;
+  } else {
+    return IGF.Builder.CreateMul(arrayLength, IGF.IGM.getSize(eltSize));
+  }
+}
+
+static llvm::Value *emitArraySizeInBytes(IRGenFunction &IGF,
+                                         llvm::Type *eltTy,
+                                         llvm::Value *arrayLength) {
+  auto eltSize = Size(IGF.IGM.DataLayout.getTypeAllocSize(eltTy));
+  return emitArraySizeInBytes(IGF, eltSize, arrayLength);
+}
+
+static Size getMaxVoluntaryStackAlloc(IRGenModule &IGM) {
+  return 16 * IGM.getPointerSize();
+}
+
+static bool isInEntryBlock(IRGenFunction &IGF) {
+  return IGF.Builder.GetInsertBlock() == &*IGF.CurFn->begin();
+}
+
+static bool isAcceptableStackAllocSize(IRGenFunction &IGF,
+                                       const llvm::APInt &size) {
+  return (isInEntryBlock(IGF) ||
+          size.ule(getMaxVoluntaryStackAlloc(IGF.IGM).getValue()));
+}
+
+static bool isAcceptableArrayStackAllocSize(IRGenFunction &IGF,
+                                            Size eltSize,
+                                            const llvm::APInt &arraySize) {
+  if (isInEntryBlock(IGF)) return true;
+
+  return (arraySize * eltSize.getValue()).ule(
+            getMaxVoluntaryStackAlloc(IGF.IGM).getValue());
+}
+
+StackAddress
+IRGenFunction::emitArrayStackAllocation(llvm::Type *eltTy,
+                                        llvm::Value *arrayLength,
+                                        Alignment align,
+                                        StackAllocationIsNested_t isNested,
+                                        const llvm::Twine &name) {
+  Size eltSize = Size(IGM.DataLayout.getTypeAllocSize(eltTy));
+
+  // Allocate constant-sized allocations directly in the LLVM frame.
+  // We limit this unless we're emitting in the entry block.
+  if (auto constantLength = dyn_cast<llvm::ConstantInt>(arrayLength)) {
+    if (isAcceptableArrayStackAllocSize(*this, eltSize,
+                                        constantLength->getValue())) {
+      return emitStaticArrayAlloca(eltTy, eltSize, constantLength, align, name);
+    }
+  }
+
+  // If this code is properly-nested, use a dynamic allocation path.
+  if (isNested) {
+    return emitDynamicAlloca(eltTy, arrayLength, align, AllowsTaskAlloc,
+                             /*mallocTypeId=*/nullptr, name);
+  }
+
+  // Otherwise, use the non-nested dynamic allocation method (generally
+  // malloc).
+  auto byteCount = emitArraySizeInBytes(*this, eltSize, arrayLength);
+  auto allocation = emitNonNestedStackAllocation(byteCount, align, name);
+  auto castedAddress =
+    Builder.CreateElementBitCast(allocation.getAddress(), eltTy);
+  return allocation.withAddress(castedAddress);
+}
+
 StackAddress
 IRGenFunction::emitStackAllocation(llvm::Value *size, Alignment align,
                                    StackAllocationIsNested_t isNested,
                                    const llvm::Twine &name) {
   // Allocate constant-sized allocations directly in the LLVM frame.
-  // We limit this to 16 words unless we're emitting in the entry block.
+  // We limit this unless we're emitting in the entry block.
   if (auto constantSize = dyn_cast<llvm::ConstantInt>(size)) {
-    bool isInEntryBlock = (Builder.GetInsertBlock() == &*CurFn->begin());
-    if (isInEntryBlock ||
-        constantSize->getValue().ule(16 * IGM.getPointerSize().getValue())) {
+    if (isAcceptableStackAllocSize(*this, constantSize->getValue())) {
       return emitStaticByteArrayAlloca(constantSize, align, name);
     }
   }
@@ -613,12 +693,21 @@ StackAddress
 IRGenFunction::emitStaticByteArrayAlloca(llvm::ConstantInt *size,
                                          Alignment align,
                                          const llvm::Twine &name) {
-  auto addr = createAlloca(IGM.Int8Ty, size, align, name);
+  return emitStaticArrayAlloca(IGM.Int8Ty, Size(1), size, align, name);
+}
+
+StackAddress
+IRGenFunction::emitStaticArrayAlloca(llvm::Type *eltTy, Size eltSize,
+                                     llvm::ConstantInt *arrayLength,
+                                     Alignment align,
+                                     const llvm::Twine &name) {
+  auto addr = createAlloca(eltTy, arrayLength, align, name);
 
   // The lifetime intrinsics require an i64 on all targets.
-  auto sizeForLifetime = size;
-  if (size->getType() != IGM.Int64Ty) {
-    sizeForLifetime = llvm::ConstantInt::get(IGM.Int64Ty, size->getZExtValue());
+  auto sizeForLifetime = arrayLength;
+  if (eltSize != Size(1) || arrayLength->getType() != IGM.Int64Ty) {
+    sizeForLifetime = llvm::ConstantInt::get(IGM.Int64Ty,
+                        eltSize.getValue() * arrayLength->getZExtValue());
   }
 
   Builder.CreateLifetimeStart(addr, sizeForLifetime);
@@ -699,13 +788,7 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
                                               const llvm::Twine &name) {
   // Async functions call task alloc.
   if (allowTaskAlloc && isAsync()) {
-    llvm::Value *byteCount;
-    auto eltSize = IGM.DataLayout.getTypeAllocSize(eltTy);
-    if (eltSize == 1) {
-      byteCount = arraySize;
-    } else {
-      byteCount = Builder.CreateMul(arraySize, IGM.getSize(Size(eltSize)));
-    }
+    llvm::Value *byteCount = emitArraySizeInBytes(*this, eltTy, arraySize);
     // The task allocator wants size increments in the multiple of
     // MaximumAlignment.
     byteCount = alignUpToMaximumAlignment(IGM.SizeTy, byteCount);
@@ -719,13 +802,7 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
     // NOTE: llvm does not support dynamic allocas in coroutines.
 
     // Compute the number of bytes to allocate.
-    llvm::Value *byteCount;
-    auto eltSize = IGM.DataLayout.getTypeAllocSize(eltTy);
-    if (eltSize == 1) {
-      byteCount = arraySize;
-    } else {
-      byteCount = Builder.CreateMul(arraySize, IGM.getSize(Size(eltSize)));
-    }
+    llvm::Value *byteCount = emitArraySizeInBytes(*this, eltTy, arraySize);
 
     auto alignment = llvm::ConstantInt::get(IGM.Int32Ty, align.getValue());
 
@@ -753,7 +830,7 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
 
   // Save the stack pointer if we are not in the entry block (we could be
   // executed more than once).
-  bool isInEntryBlock = (Builder.GetInsertBlock() == &*CurFn->begin());
+  bool isInEntryBlock = ::isInEntryBlock(*this);
   if (!isInEntryBlock) {
     stackRestorePoint = Builder.CreateIntrinsicCall(
         llvm::Intrinsic::stacksave,

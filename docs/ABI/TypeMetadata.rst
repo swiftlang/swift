@@ -279,6 +279,16 @@ classes.
   Note that none of these fields are present for Objective-C base classes in
   the inheritance hierarchy.
 
+- Optionally, witness table pointers for fast existential casts are stored at
+  negative offsets, starting at **offset -4**. If a class conforms to a
+  protocol at the given index, the entry points to the corresponding witness
+  table. If the class does _not_ conform to the protocol, the entry is null.
+  The list of protocols for fast existential checks is managed by the SIL
+  optimizer and the information about it is kept in the SILVTable.
+  This is currently only used for metadata which is built at compile time,
+  but not for metadata which is built at runtime, e.g. for generic classes.
+
+
 Objective C class wrapper metadata
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

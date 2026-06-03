@@ -295,7 +295,19 @@ public:
   SolverTrail(const SolverTrail &) = delete;
   SolverTrail &operator=(const SolverTrail &) = delete;
 
-  bool isUndoActive() const { return UndoActive; }
+  bool isClosed() const {
+    return Closed;
+  }
+
+  void close() {
+    ASSERT(!Closed);
+    Closed = true;
+  }
+
+  void open() {
+    ASSERT(Closed);
+    Closed = false;
+  }
 
   void recordChange(Change change);
 
@@ -321,7 +333,11 @@ private:
 
   uint64_t Profile[unsigned(ChangeKind::Last) + 1];
 
-  bool UndoActive = false;
+  /// If true, new changes cannot be recorded, either because we're inside undo(),
+  /// or we've finished solving, but we're still inspecting the solver state for
+  /// diagnostics in salvage().
+  bool Closed = false;
+
   unsigned Total = 0;
   unsigned Max = 0;
 };

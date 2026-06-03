@@ -422,9 +422,18 @@ void swift::silverifier::verifyFlowSensitiveRules(SILFunction *F) {
         continue;
 
       if (term->isFunctionExiting()) {
-        require(state.Stack.empty(),
-                "return with stack allocs that haven't been deallocated");
-        require(state.ActiveOps.empty(), "return with operations still active");
+        if (!state.Stack.empty()) {
+          verificationFailure("return with stack allocs that haven't been deallocated",
+                              term, [&](SILPrintContext &ctx) {
+            state.printStack(ctx, "current stack");
+          });
+        }
+        if (!state.ActiveOps.empty()) {
+          verificationFailure("return with operations still active",
+                              term, [&](SILPrintContext &ctx) {
+            state.printActiveOps(ctx, "current active operation set");
+          });
+        }
         require(!state.GotAsyncContinuation,
                 "return with unawaited async continuation");
 

@@ -190,6 +190,13 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
       ParsedArgs.hasFlag(OPT_emit_extension_block_symbols,
                          OPT_omit_extension_block_symbols, /*default=*/false);
   Options.AllowedReexportedModules = AllowedRexports;
+  if (ParsedArgs.hasArg(OPT_active_platform_availability_only)) {
+    // The output should only include platform availability that applies to the
+    // platform inferred from the -target. Include app extension availability,
+    // too.
+    Options.ActivePlatform =
+        platformForTriple(Target, /*enableAppExtensionRestrictions=*/true);
+  }
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {
     Options.MinimumAccessLevel =

@@ -16,7 +16,10 @@ sil @use_guaranteed : $@convention(thin) (@guaranteed Klass) -> ()
 sil @get_owned : $@convention(thin) () -> @owned Klass
 
 // CHECK: Begin Error in function test_missing_end_borrow_single
-// CHECK: SIL verification failed: return with operations still active: state.ActiveOps.empty()
+// CHECK: SIL verification failed: return with operations still active
+// CHECK: current active operation set: [
+// CHECK:      %2 = store_borrow %0 to %1
+// CHECK: ]
 // CHECK: Verifying instruction:
 // CHECK:      %4 = tuple ()                                // user: %5
 // CHECK: ->   return %4 : $()                              // id: %5
@@ -31,7 +34,10 @@ bb0(%0 : @guaranteed $Klass):
 }
 
 // CHECK: Begin Error in function test_missing_end_borrow
-// CHECK: SIL verification failed: return with operations still active: state.ActiveOps.empty()
+// CHECK: SIL verification failed: return with operations still active
+// CHECK: current active operation set: [
+// CHECK:      %2 = store_borrow %0 to %1
+// CHECK: ]
 // CHECK: Verifying instruction:
 // CHECK:      %8 = tuple ()                                // user: %9
 // CHECK: ->   return %8 : $()                              // id: %9

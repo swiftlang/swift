@@ -493,11 +493,11 @@ ValueDecl *importDeclAlias(ClangImporter::Implementation &clang,
                AbstractFunctionDecl::BodyKind::TypeChecked);
   }
 
-  clang.makeComputed(V, G, S);
+  ClangImporter::Implementation::makeComputed(V, G, S);
 
   return V;
 }
-}
+} // namespace
 
 static ValueDecl *importMacro(ClangImporter::Implementation &impl,
                               llvm::SmallSet<StringRef, 4> &visitedMacros,

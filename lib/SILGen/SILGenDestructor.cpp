@@ -326,13 +326,13 @@ void SILGenFunction::emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd) {
     if (auto *mu =
             dyn_cast<MarkUnresolvedNonCopyableValueInst>(ddi->getOperand())) {
       if (auto *asi = dyn_cast<AllocStackInst>(mu->getOperand())) {
-        B.createDeallocStack(loc, asi);
+        B.createDeallocStack(cleanupLoc, asi);
       }
     }
   }
 
   // Return.
-  B.createReturn(loc, emitEmptyTuple(loc));
+  B.createReturn(returnLoc, emitEmptyTuple(cleanupLoc));
 }
 
 /// Determine whether the availability for the body the given destructor predates the introduction of
@@ -710,7 +710,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
       SILBuilder builder(enumBlock, enumBlock->begin());
 
       if (enumElt->hasAssociatedValues()) {
-        auto *take = builder.createUncheckedTakeEnumDataAddr(
+        auto *take = builder.createUncheckedEnumDataAddrForTake(
             cleanupLoc, selfValue, enumElt);
         builder.createDestroyAddr(cleanupLoc, take);
       }

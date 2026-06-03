@@ -18,8 +18,9 @@ struct TestError: Error {}
     var tests = TestSuite("CheckedContinuation")
 
     if #available(SwiftStdlib 5.1, *) {
-      #if !os(WASI)
-      tests.test("trap on double resume non-throwing continuation") {
+      tests.test("trap on double resume non-throwing continuation")
+      .require(.crashTesting)
+      .code {
         expectCrashLater()
 
         let task = detach {
@@ -31,7 +32,9 @@ struct TestError: Error {}
         await task.get()
       }
 
-      tests.test("trap on double resume throwing continuation") {
+      tests.test("trap on double resume throwing continuation")
+      .require(.crashTesting)
+      .code {
         expectCrashLater()
 
         let task = detach {
@@ -45,7 +48,6 @@ struct TestError: Error {}
         }
         await task.get()
       }
-      #endif
 
       tests.test("test withCheckedThrowingContinuation") {
         let task2 = detach {

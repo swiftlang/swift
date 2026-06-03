@@ -115,9 +115,9 @@ public:
 /// the task group.  It may also hold references to completed children
 /// which have not yet been found by `next()`.
 ///
-/// The child tasks are stored as an invasive single-linked list, starting
-/// from `FirstChild` and continuing through the `NextChild` pointers of all
-/// the linked children.
+/// The child tasks are stored as an invasive doubly-linked list, starting
+/// from `FirstChild` and continuing through the `NextChild` and `PrevChild`
+/// pointers of all the linked children.
 ///
 /// This list structure should only ever be modified:
 /// - while holding the status record lock of the owning task, so that
@@ -170,6 +170,9 @@ public:
     auto oldLastChild = LastChild;
     LastChild = child;
 
+    // Set the prev pointer of the new child to the old last child.
+    child->childFragment()->setPrevChild(oldLastChild);
+
     if (!getFirstChild()) {
       // This is the first child we ever attach, so store it as FirstChild.
       FirstChild.store(child, std::memory_order_relaxed);
@@ -182,37 +185,26 @@ public:
   void detachChild(AsyncTask *child) {
     assert(child && "cannot remove a null child from group");
 
-    AsyncTask *prev = getFirstChild();
+    auto *childFragment = child->childFragment();
+    auto *prev = childFragment->getPrevChild();
+    auto *next = childFragment->getNextChild();
 
-    if (prev == child) {
-      AsyncTask *next = getNextChildTask(child);
+    if (prev) {
+      prev->childFragment()->setNextChild(next);
+    } else {
+      // child is the first in the list.
       FirstChild.store(next, std::memory_order_relaxed);
-      if (next == nullptr) {
-        LastChild = nullptr;
-      }
-      return;
     }
 
-    // Remove the child from the linked list, i.e.:
-    //     prev -> afterPrev -> afterChild
-    //                 ==
-    //               child   -> afterChild
-    // Becomes:
-    //     prev --------------> afterChild
-    while (prev) {
-      auto afterPrev = getNextChildTask(prev);
-
-      if (afterPrev == child) {
-        auto afterChild = getNextChildTask(child);
-        prev->childFragment()->setNextChild(afterChild);
-        if (child == LastChild) {
-          LastChild = prev;
-        }
-        return;
-      }
-
-      prev = afterPrev;
+    if (next) {
+      next->childFragment()->setPrevChild(prev);
+    } else {
+      // child is the last in the list.
+      LastChild = prev;
     }
+
+    childFragment->setPrevChild(nullptr);
+    childFragment->setNextChild(nullptr);
   }
 
   static AsyncTask *getNextChildTask(AsyncTask *task) {

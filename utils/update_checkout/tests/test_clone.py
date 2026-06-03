@@ -5,8 +5,8 @@
 # Copyright (c) 2014 - 2018 Apple Inc. and the Swift project authors
 # Licensed under Apache License v2.0 with Runtime Library Exception
 #
-# See https:#swift.org/LICENSE.txt for license information
-# See https:#swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+# See https://swift.org/LICENSE.txt for license information
+# See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 # ===----------------------------------------------------------------------===#
 
@@ -186,6 +186,38 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
         ]
         with contextlib.redirect_stdout(StringIO()):
             main()
+
+    @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
+    @patch("sys.exit", return_value=None)
+    def test_clone_retry_on_exception(self, mock_exit, mock_obtain):
+        """Test that an exception (e.g. concurrent.futures.TimeoutError) is
+        retried rather than propagating and crashing the process."""
+        import concurrent.futures
+
+        call_count = [0]
+
+        def side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 1:
+                raise concurrent.futures.TimeoutError()
+            return obtain_all_additional_swift_sources(*args, **kwargs)
+
+        mock_obtain.side_effect = side_effect
+
+        sys.argv = [
+            "update-checkout",
+            "--config",
+            self.config_path,
+            "--source-root",
+            self.source_root,
+            "--clone",
+            "--max-retries",
+            "1",
+        ]
+        with contextlib.redirect_stdout(StringIO()):
+            main()
+
+        self.assertEqual(call_count[0], 2)
 
     @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
     @patch("sys.exit", return_value=None)

@@ -46,6 +46,7 @@ add_library(swift_Concurrency
   AsyncThrowingPrefixWhileSequence.swift
   AsyncThrowingStream.swift
   CheckedContinuation.swift
+  Continuation.swift
   Clock.swift
   ContinuousClock.swift
   CooperativeExecutor.swift
@@ -83,6 +84,7 @@ add_library(swift_Concurrency
   PlatformExecutorOpenBSD.swift
   PlatformExecutorWindows.swift
   PriorityQueue.swift
+  Result+AsyncInit.swift
   SourceCompatibilityShims.swift
   SuspendingClock.swift
   Task.swift

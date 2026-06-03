@@ -379,7 +379,7 @@ readOutputEntriesFromFile(StringRef Path) {
 }
 
 int SwiftCacheToolInvocation::validateOutputs() {
-  auto DB = CASOpts.getOrCreateDatabases();
+  auto DB = CASOpts.CASConfiguration::createDatabases();
   if (!DB)
     report_fatal_error(DB.takeError());
 
@@ -507,7 +507,7 @@ int SwiftCacheToolInvocation::printIncludeTreeList() {
     llvm::errs() << llvm::toString(std::move(err)) << "\n";
     return 1;
   };
-  auto DB = CASOpts.getOrCreateDatabases();
+  auto DB = CASOpts.CASConfiguration::createDatabases();
   if (!DB) {
     return error(DB.takeError());
   }
@@ -544,7 +544,7 @@ int SwiftCacheToolInvocation::printCompileCacheKey() {
     llvm::errs() << "expect 1 CASID as input\n";
     return 1;
   }
-  auto DB = CASOpts.getOrCreateDatabases();
+  auto DB = CASOpts.CASConfiguration::createDatabases();
   if (!DB) {
     return error(DB.takeError());
   }

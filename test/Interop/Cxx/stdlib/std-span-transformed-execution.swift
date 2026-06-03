@@ -9,9 +9,7 @@
 // REQUIRES: executable_test
 // REQUIRES: std_span
 
-#if !BRIDGING_HEADER
 import StdSpan
-#endif
 import CxxStdlib
 
 func canCallSafeSpanAPIs(_ x: Span<CInt>) {

@@ -12,6 +12,7 @@
 
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "../../IRGen/IRGenModule.h"
+#include "../../IRGen/GenClass.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -19,7 +20,6 @@
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
-#include "swift/SILOptimizer/IPO/ClosureSpecializer.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/ConstantFolding.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
@@ -74,7 +74,7 @@ void SILPassManager::runSwiftModuleVerification() {
 
 
 //===----------------------------------------------------------------------===//
-//                           OptimizerBridging
+//                           BridgedPassContext
 //===----------------------------------------------------------------------===//
 
 bool BridgedPassContext::tryOptimizeApplyOfPartialApply(BridgedInstruction closure) const {
@@ -173,6 +173,14 @@ bool BridgedPassContext::canMakeStaticObjectReadOnly(BridgedType type) const {
   return false;
 }
 
+bool BridgedPassContext::hasClassFixedMetadataLayout(BridgedDeclObj classDecl) const {
+  SILPassManager *pm = invocation->getPassManager();
+  auto *igm = pm->getIRGenModule();
+  if (!igm)
+    return false;
+  return igm->getClassMetadataStrategy(classDecl.getAs<swift::ClassDecl>()) == swift::irgen::ClassMetadataStrategy::Fixed;
+}
+
 OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction function,
                                                                BridgedSubstitutionMap substitutions,
                                                                bool convertIndirectToDirect,
@@ -183,7 +191,8 @@ OptionalBridgedFunction BridgedPassContext::specializeFunction(BridgedFunction f
   ReabstractionInfo ReInfo(mod->getSwiftModule(), mod->isWholeModule(),
                            ApplySite(), origFunc, subs, origFunc->getSerializedKind(),
                            convertIndirectToDirect,
-                           /*dropUnusedArguments=*/false);
+                           /*dropUnusedArguments=*/false,
+                           isMandatory);
 
   if (!ReInfo.canBeSpecialized()) {
     return {nullptr};
@@ -453,7 +462,7 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
       // classes (the classSubclassScope), because that may incorrectly
       // influence the linkage.
       getSpecializedLinkage(original, original->getLinkage()), specializedName.unbridged(),
-      ClonedTy,
+      ClonedTy, original->getActorIsolation(),
       preserveGenericSignature ? original->getGenericEnvironment() : nullptr,
       original->getLocation(), makeBare ? IsBare : original->isBare(), original->isTransparent(),
       original->getSerializedKind(), IsNotDynamic, IsNotDistributed,
@@ -555,11 +564,6 @@ bool BridgedFunction::isAddressor() const {
   return false;
 }
 
-bool BridgedFunction::isAutodiffVJP() const {
-  return swift::isDifferentiableFuncComponent(
-      getFunction(), swift::AutoDiffFunctionComponent::VJP);
-}
-
 bool BridgedFunction::isAutodiffSubsetParametersThunk() const {
   Demangle::Context Ctx;
   if (auto *root = Ctx.demangleSymbolAsNode(getFunction()->getName())) {
@@ -625,8 +629,4 @@ bool BridgedType::isAutodiffBranchTracingEnumInVJP(BridgedFunction vjp) const {
         return true;
 
   return false;
-}
-
-SwiftInt BridgedFunction::specializationLevel() const {
-  return swift::getSpecializationLevel(getFunction());
 }

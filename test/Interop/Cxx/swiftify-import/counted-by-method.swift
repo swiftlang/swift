@@ -2,7 +2,7 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 // RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=upcoming-swift -print-module -module-to-print=Method -source-filename=x | %FileCheck %s
-// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default %t/method.swift -dump-macro-expansions -typecheck -verify
+// RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default %t/method.swift -dump-macro-expansions -typecheck -verify -eager-macro-checking
 
 // CHECK: @_alwaysEmitIntoClient 
 // CHECK-SAME: public mutating func bar(_ p: UnsafeMutableBufferPointer<Float>)

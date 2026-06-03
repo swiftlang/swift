@@ -9,16 +9,21 @@
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_feature_Embedded
 
+// Use an @inline(never) wrapper so each event produces a single stable call
+// instruction in the IR regardless of how print() is lowered on a given platform.
+@inline(never)
+func output(_ s: StaticString) { print(s) }
+
 public class MyClass {
-  public init() { print("MyClass.init") }
-  deinit { print("MyClass.deinit") }
-  public func foo() { print("MyClass.foo") }
+  public init() { output("MyClass.init") }
+  deinit { output("MyClass.deinit") }
+  public func foo() { output("MyClass.foo") }
 }
 
 public class MySubClass: MyClass {
-  public override init() { print("MySubClass.init") }
-  deinit { print("MySubClass.deinit") }
-  public override func foo() { print("MySubClass.foo") }
+  public override init() { output("MySubClass.init") }
+  deinit { output("MySubClass.deinit") }
+  public override func foo() { output("MySubClass.foo") }
 }
 
 @inline(never)
@@ -27,9 +32,9 @@ public func bar(o: MyClass) {
 }
 
 final public class MyFinalClass {
-  public init() { print("MyFinalClass.init") }
-  deinit { print("MyFinalClass.deinit") }
-  public func foo() { print("MyFinalClass.foo") }
+  public init() { output("MyFinalClass.init") }
+  deinit { output("MyFinalClass.deinit") }
+  public func foo() { output("MyFinalClass.foo") }
 }
 
 public struct MyStruct {
@@ -63,7 +68,6 @@ struct Main {
 
   static func main() {
     test1()
-    print("")
     test2()
   }
 }
@@ -72,28 +76,27 @@ struct Main {
 
 // CHECK-IR:      define {{.*}}@"$e4main8MyStructVyAcA0B10FinalClassCcfC"
 // CHECK-IR-NEXT: entry:
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
 // CHECK-IR-NEXT:   call {{.*}}@swift_release
 // CHECK-IR-NEXT:   ret void
 // CHECK-IR-NEXT: }
 
-// CHECK-IR:      define {{.*}}@{{_*}}main
+// CHECK-IR:      define {{.*}}i32 @{{(main|__main_argc_argv)}}(
 // CHECK-IR-NEXT: entry:
 // CHECK-IR-NEXT:   alloca %T4main10MySubClassC
 // CHECK-IR-NEXT:   alloca %T4main12MyFinalClassC
 // CHECK-IR-NEXT:   call {{.*}}@swift_initStackObject
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
+// CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
+// CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
 // CHECK-IR-NEXT:   call {{.*}}@"$e4main3bar1oyAA7MyClassC_tF"
 // CHECK-IR-NEXT:   call {{.*}}@swift_setDeallocating
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
+// CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
 // CHECK-IR-NEXT:   call {{.*}}@llvm.lifetime.end.p0
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
 // CHECK-IR-NEXT:   call {{.*}}@swift_initStackObject
-// CHECK-IR-NEXT:   call {{.*}}@"$es5print_10terminatorys12StaticStringV_ADtF"
+// CHECK-IR-NEXT:   call {{.*}}@"$e4main6output
 // CHECK-IR-NEXT:   call {{.*}}@"$e4main8MyStructVyAcA0B10FinalClassCcfC"
 // CHECK-IR-NEXT:   call {{.*}}@llvm.lifetime.end.p0
-// CHECK-IR-NEXT:   ret {{.*}}0
+// CHECK-IR-NEXT:   ret
 // CHECK-IR-NEXT: }

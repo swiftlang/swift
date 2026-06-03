@@ -20,6 +20,7 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -633,9 +634,7 @@ static bool isLazyEmissionOfPublicSymbolInMultipleModulesPossible(CanType ty) {
   // In embedded existenitals mode we generate lazy public metadata on demand
   // which makes it non unique.
   auto &langOpts = ty->getASTContext().LangOpts;
-  auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
-    langOpts.hasFeature(Feature::EmbeddedExistentials);
-  if (isEmbeddedWithExistentials) {
+  if (langOpts.hasFeature(Feature::Embedded)) {
     if (auto nominal = ty->getAnyNominal()) {
       if (SILDeclRef::declHasNonUniqueDefinition(nominal)) {
         return true;
@@ -719,26 +718,40 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     if (isForcedShared())
       return SILLinkage::Shared;
 
-    // In embedded existenitals mode we generate lazy public metadata on demand
-    // which makes it non unique.
-    if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(getType()))
-      return SILLinkage::Shared;
-
     auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
-    case TypeMetadataAddress::FullMetadata:
+    case TypeMetadataAddress::FullMetadata: {
+      // In embedded existentials mode we generate lazy public metadata on
+      // demand which makes the full metadata non-unique. (The address-point
+      // alias still uses the formal declaration linkage so that it survives
+      // GlobalDCE under -internalize-at-link.)
+      if (isLazyEmissionOfPublicSymbolInMultipleModulesPossible(getType()))
+        return SILLinkage::Shared;
+
       // For imported types, the full metadata object is a candidate
       // for uniquing.
       if (getDeclLinkage(nominal) == FormalLinkage::PublicNonUnique)
         return SILLinkage::Shared;
 
-      // Prespecialization of the same generic metadata may be requested 
+      // Prespecialization of the same generic metadata may be requested
       // multiple times within the same module, so it needs to be uniqued.
       if (nominal->isGenericContext())
         return SILLinkage::Shared;
 
+      // @export(interface) types have a unique definition in their defining
+      // module, so the FullMetadata must be externally linkable.
+      bool isEmbedded =
+        nominal->getASTContext().LangOpts.hasFeature(Feature::Embedded);
+      if (isEmbedded) {
+        if (nominal->getEffectiveCodeGenerationModel()
+                == CodeGenerationModel::Interface) {
+          return getSILLinkage(FormalLinkage::PublicUnique, forDefinition);
+        }
+      }
+
       // The full metadata object is private to the containing module.
       return SILLinkage::Private;
+    }
     case TypeMetadataAddress::AddressPoint: {
       return getSILLinkage(nominal
                            ? getDeclLinkage(nominal)
@@ -1149,9 +1162,7 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata: {
       auto &langOpts = IGM.Context.LangOpts;
-      auto isEmbeddedWithExistentials = langOpts.hasFeature(Feature::Embedded) &&
-        langOpts.hasFeature(Feature::EmbeddedExistentials);
-      if (isEmbeddedWithExistentials) {
+      if (langOpts.hasFeature(Feature::Embedded)) {
         return IGM.EmbeddedExistentialsMetadataStructTy;
       }
       if (getType().getClassOrBoundGenericClass())
@@ -1806,6 +1817,13 @@ bool LinkEntity::hasNonUniqueDefinition() const {
 
   if (getKind() == Kind::TypeMetadata ||
       getKind() == Kind::ValueWitnessTable) {
+    // The address-point alias of type metadata is uniquely defined per
+    // binary even when the full metadata it references is shared, so it
+    // gets the formal declaration linkage rather than linkonce_odr.
+    if (getKind() == Kind::TypeMetadata &&
+        getMetadataAddress() == TypeMetadataAddress::AddressPoint)
+      return false;
+
     // For a nominal type, check its declaration.
     CanType type = getType();
     if (auto nominal = type->getAnyNominal()) {
@@ -1816,11 +1834,28 @@ bool LinkEntity::hasNonUniqueDefinition() const {
     return true;
   }
 
-  // Always treat witness tables as having non-unique definitions.
+  // In embedded Swift, witness tables are treated as having non-unique
+  // definitions (so they get linkonce_odr linkage) unless the underlying
+  // conformance was explicitly marked @export(interface).
   if (getKind() == Kind::ProtocolWitnessTable) {
-    if (auto context = getDeclContextForEmission())
-      if (context->getParentModule()->getASTContext().LangOpts.hasFeature(Feature::Embedded))
+    if (auto context = getDeclContextForEmission()) {
+      if (context->getParentModule()->getASTContext().LangOpts.hasFeature(
+              Feature::Embedded)) {
+        if (auto *normal = dyn_cast<NormalProtocolConformance>(
+                getProtocolConformance()->getRootConformance())) {
+          switch (normal->getEffectiveCodeGenerationModel()) {
+            case CodeGenerationModel::Interface:
+              return false;
+
+            case CodeGenerationModel::Implementation:
+            case CodeGenerationModel::Inlinable:
+              return true;
+          }
+        }
+
         return true;
+      }
+    }
   }
 
   return false;

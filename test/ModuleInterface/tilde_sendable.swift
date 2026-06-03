@@ -1,9 +1,7 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library -enable-experimental-feature TildeSendable
+// RUN: %target-swift-emit-module-interface(%t/Library.swiftinterface) %s -module-name Library
 // RUN: %target-swift-typecheck-module-from-interface(%t/Library.swiftinterface) -module-name Library
 // RUN: %FileCheck %s < %t/Library.swiftinterface
-
-// REQUIRES: swift_feature_TildeSendable
 
 // CHECK: #if compiler(>=5.3) && $TildeSendable
 // CHECK: public class A : ~Swift::Sendable {

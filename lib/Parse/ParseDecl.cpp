@@ -1286,9 +1286,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   } else {
     diagnoseExpectLanguage();
     DiscardAttribute = true;
-    while (Tok.isNot(tok::r_paren)) {
-      consumeToken();
-    }
+    skipUntilDeclRBrace(tok::r_paren, tok::NUM_TOKENS);
   }
 
   rParenLoc = Tok.getLoc();
@@ -1301,7 +1299,7 @@ bool Parser::parseExternAttribute(DeclAttributes &Attributes,
   auto AttrRange = SourceRange(Loc, rParenLoc);
 
   // Reject duplicate attributes with the same kind.
-  if (ExternAttr::find(Attributes, kind)) {
+  if (!DiscardAttribute && ExternAttr::find(Attributes, kind)) {
     diagnose(Loc, diag::duplicate_attribute, false);
     DiscardAttribute = true;
   }
@@ -2745,6 +2743,48 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::SetterAccess:
     llvm_unreachable("handled by DeclAttrKind::AccessControl");
 
+  case DeclAttrKind::PreInverseGenerics: {
+    TypeRepr *exceptType = nullptr;
+    Type resolvedExceptType;
+    SourceLoc rParenLoc = Loc;
+
+    // The @_preInverseGenericsExceptCopyable spelling is a shorthand for
+    // @_preInverseGenerics(except: ~Copyable) to avoid condfails during the
+    // Span<~E> adoption.
+    //
+    // We inject the resolved 'except:' type directly into the attribute.
+    if (AttrName == "_preInverseGenericsExceptCopyable") {
+      resolvedExceptType = ProtocolCompositionType::getInverseOf(
+          Context, InvertibleProtocolKind::Copyable);
+    } else if (consumeIfAttributeLParen()) {
+      if (Tok.getText() != "except" || peekToken().isNot(tok::colon)) {
+        diagnose(Tok, diag::attr_pre_inverse_generics_expected_except);
+        skipUntil(tok::r_paren);
+        consumeIf(tok::r_paren);
+        return makeParserSuccess();
+      }
+      consumeToken(tok::identifier);
+      consumeToken(tok::colon);
+
+      auto type = parseType(diag::expected_type);
+      if (type.isNull())
+        return makeParserSuccess();
+      exceptType = type.get();
+
+      if (!consumeIf(tok::r_paren, rParenLoc)) {
+        diagnose(Tok.getLoc(), diag::attr_expected_rparen,
+                 AttrName, /*isModifier=*/false);
+        return makeParserSuccess();
+      }
+    }
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) PreInverseGenericsAttr(
+          AtLoc, SourceRange(AtLoc.isValid() ? AtLoc : Loc, rParenLoc),
+          exceptType, resolvedExceptType));
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(_, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     if (!DiscardAttribute)
@@ -3254,7 +3294,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     break;
   }
 
-  case DeclAttrKind::Warn: {
+  case DeclAttrKind::Diagnose: {
     if (!consumeIfAttributeLParen()) {
       diagnose(Loc, diag::attr_expected_lparen, AttrName,
                DeclAttribute::isDeclModifier(DK));
@@ -3269,13 +3309,13 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
     auto DiagGroupID = getDiagGroupIDByName(ParsedCategoryIdentifier);
     if (!DiagGroupID) {
-      diagnose(Loc, diag::attr_warn_unknown_diagnostic_group_identifier,
+      diagnose(Loc, diag::attr_diagnose_unknown_diagnostic_group_identifier,
                ParsedCategoryIdentifier);
       DiscardAttribute = true;
     }
 
     if (!consumeIf(tok::comma)) {
-      diagnose(Tok, diag::attr_expected_comma, "@warn", false);
+      diagnose(Tok, diag::attr_expected_comma, AttrName, false);
       return makeParserSuccess();
     }
 
@@ -3290,7 +3330,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       diagnose(Loc, diag::attr_expected_colon_after_label, AsLabel.str());
       return makeParserSuccess();
     }
-    // Map the behavior identifier to WarnAttr::Behavior
+    // Map the behavior identifier to DiagnoseAttr::Behavior
     StringRef ParsedBehaviorIdentifier = Tok.getText();
     if (!consumeIf(tok::identifier)) {
       diagnose(Loc, diag::attr_expected_option_identifier, AttrName);
@@ -3304,7 +3344,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
             .Case("ignored", WarningGroupBehavior::Ignored)
             .Default(std::nullopt);
     if (!BehaviorSpecifier) {
-      diagnose(Loc, diag::attr_warn_expected_known_behavior,
+      diagnose(Loc, diag::attr_diagnose_expected_known_behavior,
                ParsedBehaviorIdentifier);
       DiscardAttribute = true;
     }
@@ -3341,7 +3381,7 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     }
 
     if (!DiscardAttribute)
-      Attributes.add(new (Context) WarnAttr(*DiagGroupID, *BehaviorSpecifier,
+      Attributes.add(new (Context) DiagnoseAttr(*DiagGroupID, *BehaviorSpecifier,
                                             ReasonString, AtLoc, AttrRange,
                                             /*Implicit=*/false));
     break;
@@ -4478,6 +4518,10 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
   checkInvalidAttrName("_used", "used", DeclAttrKind::Used,
                        diag::attr_renamed_warning);
 
+  // Historical name for @diagnose.
+  checkInvalidAttrName("warn", "diagnose", DeclAttrKind::Diagnose,
+                       diag::attr_renamed_warning);
+
   // Historical name for 'nonisolated'.
   if (!DK && Tok.getText() == "actorIndependent") {
     diagnose(
@@ -5533,7 +5577,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
 
       auto kwLoc = P.consumeToken();
 
-      if (CallerIsolatedLoc.isValid()) {
+      if (NonisolatedNonsendingLoc.isValid()) {
         P.diagnose(kwLoc, diag::nonisolated_nonsending_repeated)
             .fixItRemove(SpecifierLoc);
       }
@@ -5560,7 +5604,7 @@ ParserStatus Parser::ParsedTypeAttributeList::slowParse(Parser &P) {
         continue;
       }
 
-      CallerIsolatedLoc = kwLoc;
+      NonisolatedNonsendingLoc = kwLoc;
       continue;
     }
 
@@ -8279,13 +8323,6 @@ bool Parser::parseAccessorAfterIntroducer(
                                           /*underscored*/ false));
   }
 
-  if (requiresFeatureBorrowAndMutateAccessors(Kind) &&
-      !Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
-    diagnose(Tok, diag::accessor_requires_borrow_and_mutate_accessors,
-             getAccessorNameForDiagnostic(Kind, /*article*/ false,
-                                          /*underscored*/ false));
-  }
-
   if (Kind == AccessorKind::Borrow || Kind == AccessorKind::Mutate) {
     if (!Flags.contains(PD_InStruct) && !Flags.contains(PD_InEnum) &&
         !Flags.contains(PD_InClass) && !Flags.contains(PD_InExtension) &&
@@ -8414,7 +8451,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
 
       // parsingLimitedSyntax mode cannot have a body.
       if (parsingLimitedSyntax) {
-        diagnose(Tok, diag::expected_getreadset_in_protocol);
+        diagnose(Tok, diag::expected_getreadborrowsetmutate_in_protocol);
         Status |= makeParserError();
         break;
       }
@@ -8448,10 +8485,7 @@ ParserStatus Parser::parseGetSet(ParseDeclOptions Flags, ParameterList *Indices,
     // avoid having to deal with them everywhere.
     if (parsingLimitedSyntax && !isAllowedWhenParsingLimitedSyntax(
                                     Kind, SF.Kind == SourceFileKind::SIL)) {
-      auto diag = diag::expected_getreadset_in_protocol;
-      if (Context.LangOpts.hasFeature(Feature::BorrowAndMutateAccessors)) {
-        diag = diag::expected_getreadborrowsetmutate_in_protocol;
-      }
+      auto diag = diag::expected_getreadborrowsetmutate_in_protocol;
       diagnose(Loc, diag);
       continue;
     }

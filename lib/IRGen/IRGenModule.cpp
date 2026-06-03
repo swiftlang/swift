@@ -22,7 +22,9 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/CodeGenerationModel.h"
 #include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Demangling/ManglingMacros.h"
@@ -1017,6 +1019,16 @@ namespace RuntimeConstants {
     return RuntimeAvailability::AlwaysAvailable;
   }
 
+  RuntimeAvailability
+  TaskPriorityEscalationHandlersAvailability(ASTContext &Context) {
+    auto featureAvailability =
+        Context.getTaskPriorityEscalationHandlersAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
   RuntimeAvailability CoroutineAccessorsAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getCoroutineAccessorsAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
@@ -1427,9 +1439,22 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
   if (Opts.UseJIT)
     return false;
 
-  // witness tables are always emitted lazily in embedded swift.
-  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded))
+  // witness tables are always emitted lazily in embedded swift, except for
+  // @export(interface) conformances, which have a unique strong definition
+  // in the owning module.
+  if (SIL.getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
+    if (auto *normal = dyn_cast<NormalProtocolConformance>(wt->getConformance())) {
+      switch (normal->getEffectiveCodeGenerationModel()) {
+        case CodeGenerationModel::Interface:
+          return false;
+        case CodeGenerationModel::Implementation:
+        case CodeGenerationModel::Inlinable:
+          return true;
+      }
+    }
+
     return true;
+  }
 
   // Regardless of the access level, if the witness table is shared it means
   // we can safely not emit it. Every other module which needs it will generate
@@ -1457,13 +1482,6 @@ bool IRGenerator::canEmitWitnessTableLazily(SILWitnessTable *wt) {
 }
 
 void IRGenerator::addLazyWitnessTable(const ProtocolConformance *Conf) {
-  // In Embedded Swift, only class-bound wtables are allowed.
-  auto &langOpts = SIL.getASTContext().LangOpts;
-  if (langOpts.hasFeature(Feature::Embedded) &&
-      !langOpts.hasFeature(Feature::EmbeddedExistentials)) {
-    assert(Conf->getProtocol()->requiresClass());
-  }
-
   if (auto *wt = SIL.lookUpWitnessTable(Conf)) {
     // Add it to the queue if it hasn't already been put there.
     if (canEmitWitnessTableLazily(wt) &&
@@ -2273,8 +2291,17 @@ IRGenModule *IRGenerator::getGenModule(SourceFile *SF) {
   if (GenModules.size() == 1)
     return getPrimaryIGM();
 
- IRGenModule *IGM = GenModules[SF];
- assert(IGM);
+ IRGenModule *IGM = GenModules.lookup(SF);
+
+ if (!IGM) {
+   // SF is a macro expansion buffer from a _SwiftifyImport macro attached
+   // to a function imported from clang module, so it doesn't have a mapping
+   // in GenModule. The contents are @_alwaysEmitIntoClient, so for all intents
+   // and purposes they belong to the primary module.
+   ASSERT(SF->getParentModule()->findUnderlyingClangModule());
+   return getPrimaryIGM();
+ }
+
  return IGM;
 }
 
@@ -2287,9 +2314,7 @@ IRGenModule *IRGenerator::getGenModule(DeclContext *ctxt) {
     return getPrimaryIGM();
   }
 
-  IRGenModule *IGM = GenModules[SF];
-  assert(IGM);
-  return IGM;
+  return getGenModule(SF);
 }
 
 IRGenModule *IRGenerator::getGenModule(SILFunction *f) {
@@ -2395,6 +2420,12 @@ bool IRGenModule::isConcurrencyAvailable() {
   return deploymentAvailability.isContainedIn(ctx.getConcurrencyAvailability());
 }
 
+bool IRGenModule::isTypedAllocationAvailable() {
+  auto &langOpts = Context.LangOpts;
+  return langOpts.hasFeature(Feature::Embedded) &&
+         langOpts.hasFeature(Feature::TypedAllocation);
+}
+
 /// Pretend the other files that drivers/build systems expect exist by
 /// creating empty files. Used by UseSingleModuleLLVMEmission when
 /// num-threads > 0.
@@ -2432,7 +2463,5 @@ bool swift::writeEmptyOutputFilesFor(
 }
 
 bool IRGenModule::isEmbeddedWithExistentials() const {
-  auto &langOpts = Context.LangOpts;
-  return langOpts.hasFeature(Feature::Embedded) &&
-    langOpts.hasFeature(Feature::EmbeddedExistentials);
+  return Context.LangOpts.hasFeature(Feature::Embedded);
 }

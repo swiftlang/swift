@@ -64,9 +64,10 @@ SILFunction *SILGenModule::getDynamicThunk(SILDeclRef constant,
 
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateFunction(
-      constant.getDecl(), name, SILLinkage::Shared, constantTy, IsBare,
-      IsTransparent, IsSerialized, IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible, ProfileCounter(), IsThunk);
+      constant.getDecl(), name, SILLinkage::Shared, constantTy,
+      constant.getActorIsolation(), IsBare, IsTransparent, IsSerialized,
+      IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(),
+      IsThunk);
 
   if (F->empty()) {
     // Emit the thunk if we haven't yet.
@@ -355,6 +356,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
 
   SILGenFunctionBuilder builder(*this);
   auto F = builder.getOrCreateSharedFunction(loc, name, implTy,
+                                           ActorIsolation::forNonisolated(/*unsafe=*/false),
                                            IsBare, IsTransparent, IsSerialized,
                                            ProfileCounter(),
                                            IsThunk,
@@ -645,9 +647,16 @@ getOrCreateReabstractionThunk(CanSILFunctionType thunkType,
       ? IsSerialized : IsNotSerialized;
   }
 
+  auto isolation = ActorIsolation::forUnspecified();
+
+  // The isolation of the thunk should match that of its type
+  // otherwise it could lead to incorrect decision optimizations.
+  if (thunkType->hasNonisolatedNonsendingIsolation())
+    isolation = ActorIsolation::forNonisolatedNonsending();
+
   SILGenFunctionBuilder builder(*this);
   return builder.getOrCreateSharedFunction(
-      loc, name, thunkDeclType, IsBare, IsTransparent, serializable,
+      loc, name, thunkDeclType, isolation, IsBare, IsTransparent, serializable,
       ProfileCounter(), IsReabstractionThunk, IsNotDynamic, IsNotDistributed,
       IsNotRuntimeAccessible);
 }
@@ -672,9 +681,10 @@ SILFunction *SILGenModule::getOrCreateDerivativeVTableThunk(
                      derivativeId->getDerivativeGenericSignature()),
       /*isVTableThunk*/ true);
   auto *thunk = builder.getOrCreateFunction(
-      derivativeFnDecl, name, SILLinkage::Private, constantTy, IsBare,
-      IsTransparent, derivativeFnDeclRef.getSerializedKind(), IsNotDynamic,
-      IsNotDistributed, IsNotRuntimeAccessible, ProfileCounter(), IsThunk);
+      derivativeFnDecl, name, SILLinkage::Private, constantTy,
+      ActorIsolation::forUnspecified(), IsBare, IsTransparent,
+      derivativeFnDeclRef.getSerializedKind(), IsNotDynamic, IsNotDistributed,
+      IsNotRuntimeAccessible, ProfileCounter(), IsThunk);
   if (!thunk->empty())
     return thunk;
 

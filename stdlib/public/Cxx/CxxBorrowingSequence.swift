@@ -24,7 +24,9 @@ public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~E
   override associatedtype Element: ~Copyable
   override associatedtype BorrowingIterator: BorrowingIteratorProtocol<Element> & ~Copyable & ~Escapable = CxxBorrowingIterator<Self>
   associatedtype RawIterator: UnsafeCxxInputIterator
-    where RawIterator.Pointee == Element, RawIterator.DereferenceResult == UnsafePointer<Element>
+    where RawIterator.Pointee == Element,
+          RawIterator.DereferenceResult: _Pointer,
+          RawIterator.DereferenceResult.Pointee == Element
 
   /// Do not implement this function manually in Swift.
   func __beginUnsafe() -> RawIterator
@@ -35,8 +37,7 @@ public protocol CxxBorrowingSequence<Element> : BorrowingSequence, ~Copyable, ~E
 
 @frozen
 @available(SwiftStdlib 6.4, *)
-public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, T.Element: ~Copyable {
-  public typealias Element = T.RawIterator.Pointee
+public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol<T.Element>, ~Escapable, ~Copyable where T: CxxBorrowingSequence & ~Copyable & ~Escapable, T.Element: ~Copyable {
 
   @usableFromInline
   internal var current: T.RawIterator
@@ -49,30 +50,11 @@ public struct CxxBorrowingIterator<T>: BorrowingIteratorProtocol, ~Escapable, ~C
     self.current = begin
     self.end = end
   }
-
-  @inlinable
-  public mutating func skip(by offset: Int) -> Int {
-    var remainder = offset
-    while remainder > 0 {
-      let span = nextSpan(maximumCount: remainder)
-      if span.isEmpty { break }
-      remainder &-= span.count
-    }
-    return offset &- remainder
-  }
 }
 
 // For non-contiguous iterators, we create a span of size one for each element
 @available(SwiftStdlib 6.4, *)
 extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.Element: ~Copyable {
-  // FIXME methods `skip(by:)` and `nextSpan()` should be inherited from BorrowingSequence,
-  // but currently are not because of a bug. These will be removed once it gets fixed. 
-  @inlinable
-  @_lifetime(&self)
-  public mutating func nextSpan() -> Span<Element> {
-    nextSpan(maximumCount: Int.max)
-  }
-
   @inlinable
   @_lifetime(&self)
   public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
@@ -80,10 +62,10 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.Element: ~Copy
       return Span()
     }
 
-    let ptr = unsafe self.current.__operatorStar()
+    let rawPtr = self.current.__operatorStar()._rawValue
     self.current = self.current.successor()
     return unsafe _cxxOverrideLifetime(
-        Span(_unsafeStart: ptr, count: 1),
+        Span(_unsafeStart: UnsafePointer(rawPtr), count: 1),
         borrowing: self)
   }
 }
@@ -104,15 +86,15 @@ extension CxxBorrowingIterator where T: ~Copyable & ~Escapable, T.RawIterator: U
   @inlinable
   @_lifetime(&self)
   public mutating func nextSpan(maximumCount: Int) -> Span<Element> {
-    if self.current == self.end {
+    if maximumCount < 1 || self.current == self.end {
       return Span()
     }
 
-    let ptr = unsafe self.current.__operatorStar()
+    let rawPtr = self.current.__operatorStar()._rawValue
     let distance = min(count, maximumCount)
     self.current += T.RawIterator.Distance(distance)
     return unsafe _cxxOverrideLifetime(
-        Span(_unsafeStart: ptr, count: distance),
+        Span(_unsafeStart: UnsafePointer(rawPtr), count: distance),
         borrowing: self)
   }
 }
@@ -123,6 +105,6 @@ extension CxxBorrowingSequence where Element: ~Copyable, Self: ~Copyable {
   @_lifetime(borrow self)
   public borrowing func makeBorrowingIterator() -> CxxBorrowingIterator<Self> {
     let iterator = CxxBorrowingIterator<Self>(begin: __beginUnsafe(), end: __endUnsafe(), sequence: self)
-    return unsafe _cxxOverrideLifetime(iterator, borrowing: self)
+    return iterator
   }
 }

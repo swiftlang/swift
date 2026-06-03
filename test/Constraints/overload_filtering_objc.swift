@@ -19,7 +19,7 @@ import Foundation
 }
 
 func testOptional(obj: P) {
-  // CHECK: [disabled] $T2 bound to decl overload_filtering_objc.(file).P.opt(double:)
+  // CHECK: [disabled] $T2 bound to overload_filtering_objc.(file).P.opt(double:)
   _ = obj.opt?(1)
 }
 

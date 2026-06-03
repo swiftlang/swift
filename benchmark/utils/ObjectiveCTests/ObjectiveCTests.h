@@ -20,6 +20,7 @@ NS_ASSUME_NONNULL_BEGIN
   NSDate *myBeginDate;
   NSDate *myEndDate;
   NSArray<NSString *> *cornucopiaOfStrings;
+  NSArray<NSString *> *cornucopiaOfStringsNoCustom;
   NSArray<NSString *> *bridgedStrings;
 }
 
@@ -36,6 +37,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)testIsEqualToString;
 - (void)testIsEqualToString2;
+- (void)testIsEqualToString2NoCustom;
 - (void)testIsEqualToStringAllSwift;
 - (void)testUTF8String;
 - (void)testCStringUsingEncoding;

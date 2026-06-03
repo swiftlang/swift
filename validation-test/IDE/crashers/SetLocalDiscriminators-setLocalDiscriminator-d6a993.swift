@@ -1,0 +1,3 @@
+// {"kind":"complete","original":"4adf279a","signature":"(anonymous namespace)::SetLocalDiscriminators::setLocalDiscriminator(swift::ValueDecl*)","signatureAssert":"Assertion failed: (LocalDiscriminator == InvalidDiscriminator && \"LocalDiscriminator is set multiple times\"), function setLocalDiscriminator","signatureNext":"LocalDiscriminatorsRequest::evaluate","useSourceOrderCompletion":true}
+// RUN: not --crash %target-swift-ide-test -code-completion -batch-code-completion -skip-filecheck -code-completion-diagnostics -source-order-completion -source-filename %s
+@propertyWrapper struct a { wrappedValue: b func c( @a d: ) { struct e { f: e = #^^# #^g^#

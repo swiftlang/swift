@@ -8,10 +8,15 @@
     public var values: [Int] = .init() {
         willSet {}
     }
+
+    public internal(set) var dict: [String: Int] = [:]
 }
 // INTERFACE: @frozen public struct Struct {
 // INTERFACE-LABEL: @_hasStorage public var values: [Swift::Int] = .init() { @_accessorBlock
 // INTERFACE-NEXT:     @_transparent get
 // INTERFACE-NEXT:     set
-// INTERFACE-NEXT:   }
+// INTERFACE-NEXT: }
+// INTERFACE-LABEL: @_hasStorage public var dict: [Swift::String : Swift::Int] = [:] { @_accessorBlock
+// INTERFACE-NEXT:     get
+// INTERFACE-NEXT: }
 // INTERFACE: }

@@ -373,6 +373,8 @@ public:
     case ValueKind::ProjectBoxInst:
     case ValueKind::TupleElementAddrInst:
     case ValueKind::UncheckedTakeEnumDataAddrInst:
+    case ValueKind::UncheckedBorrowEnumDataAddrInst:
+    case ValueKind::UncheckedInPlaceEnumDataAddrInst:
       return cast<SingleValueInstruction>(v);
     }
   }

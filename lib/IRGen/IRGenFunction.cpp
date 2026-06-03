@@ -162,13 +162,26 @@ llvm::Value *IRGenFunction::emitAllocRawCall(llvm::Value *size,
 }
 
 /// Emit a heap allocation.
-llvm::Value *IRGenFunction::emitAllocObjectCall(llvm::Value *metadata,
-                                                llvm::Value *size,
-                                                llvm::Value *alignMask,
-                                                const llvm::Twine &name) {
+llvm::Value *IRGenFunction::emitAllocObjectCall(
+    llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
+    std::optional<uint64_t> mallocTypeId, const llvm::Twine &name) {
+  if (mallocTypeId) {
+    auto descriptorConst = llvm::ConstantInt::get(IGM.Int64Ty, *mallocTypeId);
+    return emitAllocObjectTypedCall(metadata, size, alignMask, descriptorConst,
+                                    name);
+  }
   // For now, all we have is swift_allocObject.
   return emitAllocatingCall(*this, IGM.getAllocObjectFunctionPointer(),
                             {metadata, size, alignMask}, name);
+}
+
+/// Emit a typed heap allocation.
+llvm::Value *IRGenFunction::emitAllocObjectTypedCall(
+    llvm::Value *metadata, llvm::Value *size, llvm::Value *alignMask,
+    llvm::Value *typeDescriptor, const llvm::Twine &name) {
+  // For now, all we have is swift_allocObjectTyped.
+  return emitAllocatingCall(*this, IGM.getAllocObjectTypedFunctionPointer(),
+                            {metadata, size, alignMask, typeDescriptor}, name);
 }
 
 llvm::Value *IRGenFunction::emitInitStackObjectCall(llvm::Value *metadata,
@@ -514,22 +527,6 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
     }
   }
 
-  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
-    // Emit unique side-effecting inline asm calls in order to eliminate
-    // the possibility that an LLVM optimization or code generation pass
-    // will merge these blocks back together again. We emit an empty asm
-    // string with the side-effect flag set, and with a unique integer
-    // argument for each cond_fail we see in the function.
-    llvm::IntegerType *asmArgTy = IGM.Int32Ty;
-    llvm::Type *argTys = {asmArgTy};
-    llvm::FunctionType *asmFnTy =
-        llvm::FunctionType::get(IGM.VoidTy, argTys, false /* = isVarArg */);
-    llvm::InlineAsm *inlineAsm =
-        llvm::InlineAsm::get(asmFnTy, "", "n", true /* = SideEffects */);
-    CreateAsmCall(inlineAsm,
-                  llvm::ConstantInt::get(asmArgTy, NumTrapBarriers++));
-  }
-
   // Emit the trap instruction.
   llvm::Function *trapIntrinsic = llvm::Intrinsic::getOrInsertDeclaration(
       &IGM.Module, llvm::Intrinsic::trap);
@@ -538,6 +535,10 @@ llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
   }
   auto Call = IRBuilderBase::CreateCall(trapIntrinsic, {});
   setCallingConvUsingCallee(Call);
+
+  if (IGM.IRGen.Opts.shouldOptimize() && !IGM.IRGen.Opts.MergeableTraps) {
+    Call->addFnAttr(llvm::Attribute::NoMerge);
+  }
 
   if (!IGM.IRGen.Opts.TrapFuncName.empty()) {
     auto A = llvm::Attribute::get(getContext(), "trap-func-name",

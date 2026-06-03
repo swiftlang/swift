@@ -78,7 +78,7 @@ func _findStringSwitchCaseWithCache(
   let cacheRawPtr = unsafe oncePtr + MemoryLayout<Builtin.Word>.stride
   let cachePtr = unsafe cacheRawPtr.bindMemory(to: _StringSwitchCache.self, capacity: 1)
   var context = unsafe _StringSwitchContext(cases: cases, cachePtr: cachePtr)
-  unsafe withUnsafeMutablePointer(to: &context) { (context) -> () in
+  withUnsafeMutablePointer(to: &context) { (context) -> () in
     Builtin.onceWithContext(oncePtr._rawValue, _createStringTableCache,
                             context._rawValue)
   }

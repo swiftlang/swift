@@ -41,6 +41,10 @@ class PrimitiveTypeMapping;
 class SwiftToClangInteropContext;
 class DeclAndTypePrinter;
 
+/// Returns the C++ method name for a property accessor (e.g. "getList" for
+/// a getter of `var list`, or "isEmpty" for a Bool property named `isEmpty`).
+std::string remapPropertyName(const AccessorDecl *accessor, Type resultTy);
+
 struct ClangRepresentation {
   enum Kind { representable, objcxxonly, unsupported };
 
@@ -175,6 +179,10 @@ public:
                         SwiftToClangInteropContext &interopContext,
                         DeclAndTypePrinter &declPrinter,
                         const ModuleDecl *emittedModule, Type ty);
+
+  /// Emits a RETURNS_RETAINED trailing attribute if the given result type
+  /// represents a +1 reference type in a C++ thunk.
+  static void printCxxReturnsRetainedAttribute(raw_ostream &os, Type resultTy);
 
   /// Prints the name of the type including generic arguments.
   void printTypeName(Type ty, const ModuleDecl *moduleContext);

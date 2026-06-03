@@ -3,7 +3,7 @@
 
 import _Differentiation
 
-// CHECK: sil non_abi @test_nil_coalescing
+// CHECK: sil non_abi [export_implementation] @test_nil_coalescing
 // CHECK: bb0(%{{.*}} : $*T, %[[ARG_OPT:.*]] : $*Optional<T>, %[[ARG_PB:.*]] :
 // CHECK:    $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>):
 // CHECK: %[[ALLOC_OPT:.*]] = alloc_stack [lexical] $Optional<T>

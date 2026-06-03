@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"expandMacroDefinition(swift::ExpandedMacroDefinition, swift::MacroDecl*, swift::SubstitutionMap, swift::ArgumentList*)"}
+// {"kind":"typecheck","signature":"expandMacroDefinition(swift::ExpandedMacroDefinition, swift::MacroDecl*, swift::SubstitutionMap, swift::ArgumentList*)","signatureNext":"evaluateFreestandingMacro"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 @expression macro a()
 @expression macro b<c, d>() =

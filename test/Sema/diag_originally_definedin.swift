@@ -60,3 +60,7 @@ public func incorrectPlatformNotSimilar() {}
 @available(macOS 10.9, *)
 @_originallyDefinedIn(module: "original", swift 5.1) // expected-warning {{unknown platform 'swift' for attribute '@_originallyDefinedIn'}}
 public func swiftVersionMacro() {}
+
+@available(macOS, unavailable)
+@_originallyDefinedIn(module: "original", macOS 10.15) // expected-error {{'@_originallyDefinedIn' requires that 'unavailableWithODI()' have explicit availability for macOS}}
+public func unavailableWithODI() {}

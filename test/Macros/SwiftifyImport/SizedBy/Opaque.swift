@@ -66,7 +66,7 @@ public func impNullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func nonnullSpan(_ ptr: RawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
-    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+    let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
     }
     defer {
@@ -81,7 +81,7 @@ public func nonnullSpan(_ ptr: RawSpan) {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func nullableSpan(_ ptr: RawSpan?) {
     let size = CInt(exactly: ptr?.byteCount ?? 0)!
-    let _ptrPtr = unsafe ptr?.withUnsafeBytes {
+    let _ptrPtr = ptr?.withUnsafeBytes {
         unsafe $0
     }
     defer {
@@ -96,7 +96,7 @@ public func nullableSpan(_ ptr: RawSpan?) {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func impNullableSpan(_ ptr: RawSpan) {
     let size = CInt(exactly: ptr.byteCount)!
-    let _ptrPtr = unsafe ptr.withUnsafeBytes {
+    let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
     }
     defer {

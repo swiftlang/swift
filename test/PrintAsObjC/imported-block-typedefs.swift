@@ -15,23 +15,14 @@ import ObjectiveC
 // CHECK-LABEL: @interface Typedefs
 @objc class Typedefs {
   
-  // FIXME: The imported typedefs should be printed directly as the param types,
-  // but one level of sugar is currently lost when applying @noescape. The importer
-  // also loses __attribute__((noescape)) for params of imported function types.
-  // https://github.com/apple/swift/issues/45125
+  // FIXME: The importer loses __attribute__((noescape)) for params of imported function types.
   // https://github.com/apple/swift/issues/45134
   
-  // CHECK-NEXT: - (void)noescapeParam1:(SWIFT_NOESCAPE void (^ _Nonnull)(void))input;
-  // CHECK-NEXT: - (void)noescapeParam2:(SWIFT_NOESCAPE void (^ _Nonnull)(PlainBlock _Nullable))input;
-  // CHECK-NEXT: - (void)noescapeParam3:(SWIFT_NOESCAPE void (^ _Nonnull)(PlainBlock _Nullable))input;
-  // CHECK-NEXT: - (void)noescapeParam4:(SWIFT_NOESCAPE BlockWithEscapingParam _Nullable (^ _Nonnull)(void))input;
-  // CHECK-NEXT: - (void)noescapeParam5:(SWIFT_NOESCAPE BlockWithNoescapeParam _Nullable (^ _Nonnull)(void))input;
-  // Ideally should be:
-  // - (void)noescapeParam1:(SWIFT_NOESCAPE PlainBlock _Nonnull)input;
-  // - (void)noescapeParam2:(SWIFT_NOESCAPE BlockWithEscapingParam _Nonnull)input;
-  // - (void)noescapeParam3:(SWIFT_NOESCAPE BlockWithNoescapeParam _Nonnull)input;
-  // - (void)noescapeParam4:(SWIFT_NOESCAPE BlockReturningBlockWithEscapingParam _Nonnull)input;
-  // - (void)noescapeParam5:(SWIFT_NOESCAPE BlockReturningBlockWithNoescapeParam _Nonnull)input;
+  // CHECK-NEXT: - (void)noescapeParam1:(SWIFT_NOESCAPE PlainBlock _Nonnull)input;
+  // CHECK-NEXT: - (void)noescapeParam2:(SWIFT_NOESCAPE BlockWithEscapingParam _Nonnull)input;
+  // CHECK-NEXT: - (void)noescapeParam3:(SWIFT_NOESCAPE BlockWithNoescapeParam _Nonnull)input;
+  // CHECK-NEXT: - (void)noescapeParam4:(SWIFT_NOESCAPE BlockReturningBlockWithEscapingParam _Nonnull)input;
+  // CHECK-NEXT: - (void)noescapeParam5:(SWIFT_NOESCAPE BlockReturningBlockWithNoescapeParam _Nonnull)input;
   @objc func noescapeParam1(_ input: PlainBlock) {}
   @objc func noescapeParam2(_ input: BlockWithEscapingParam) {}
   @objc func noescapeParam3(_ input: BlockWithNoescapeParam) {}
@@ -49,17 +40,11 @@ import ObjectiveC
   @objc func escapingParam4(_ input: @escaping BlockReturningBlockWithEscapingParam) {}
   @objc func escapingParam5(_ input: @escaping BlockReturningBlockWithNoescapeParam) {}
   
-  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE void (^ _Nonnull)(void)))resultHasNoescapeParam1 SWIFT_WARN_UNUSED_RESULT;
-  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE void (^ _Nonnull)(PlainBlock _Nullable)))resultHasNoescapeParam2 SWIFT_WARN_UNUSED_RESULT;
-  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE void (^ _Nonnull)(PlainBlock _Nullable)))resultHasNoescapeParam3 SWIFT_WARN_UNUSED_RESULT;
-  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockWithEscapingParam _Nullable (^ _Nonnull)(void)))resultHasNoescapeParam4 SWIFT_WARN_UNUSED_RESULT;
-  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockWithNoescapeParam _Nullable (^ _Nonnull)(void)))resultHasNoescapeParam5 SWIFT_WARN_UNUSED_RESULT;
-  // Ideally should be:
-  //  - (void (^ _Nonnull)(SWIFT_NOESCAPE PlainBlock _Nonnull))resultHasNoescapeParam1 SWIFT_WARN_UNUSED_RESULT;
-  //  - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockWithEscapingParam _Nonnull))resultHasNoescapeParam2 SWIFT_WARN_UNUSED_RESULT;
-  //  - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockWithNoescapeParam _Nonnull))resultHasNoescapeParam3 SWIFT_WARN_UNUSED_RESULT;
-  //  - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockReturningBlockWithEscapingParam _Nonnull))resultHasNoescapeParam4 SWIFT_WARN_UNUSED_RESULT;
-  //  - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockReturningBlockWithNoescapeParam _Nonnull))resultHasNoescapeParam5 SWIFT_WARN_UNUSED_RESULT;
+  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE PlainBlock _Nonnull))resultHasNoescapeParam1 SWIFT_WARN_UNUSED_RESULT;
+  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockWithEscapingParam _Nonnull))resultHasNoescapeParam2 SWIFT_WARN_UNUSED_RESULT;
+  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockWithNoescapeParam _Nonnull))resultHasNoescapeParam3 SWIFT_WARN_UNUSED_RESULT;
+  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockReturningBlockWithEscapingParam _Nonnull))resultHasNoescapeParam4 SWIFT_WARN_UNUSED_RESULT;
+  // CHECK-NEXT: - (void (^ _Nonnull)(SWIFT_NOESCAPE BlockReturningBlockWithNoescapeParam _Nonnull))resultHasNoescapeParam5 SWIFT_WARN_UNUSED_RESULT;
   @objc func resultHasNoescapeParam1() -> (PlainBlock) -> () { fatalError() }
   @objc func resultHasNoescapeParam2() -> (BlockWithEscapingParam) -> () { fatalError() }
   @objc func resultHasNoescapeParam3() -> (BlockWithNoescapeParam) -> () { fatalError() }

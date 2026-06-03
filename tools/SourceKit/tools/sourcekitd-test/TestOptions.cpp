@@ -155,6 +155,7 @@ bool TestOptions::parseArgs(llvm::ArrayRef<const char *> Args) {
         .Case("compile.close", SourceKitRequest::CompileClose)
         .Case("syntactic-expandmacro", SourceKitRequest::SyntacticMacroExpansion)
         .Case("index-to-store", SourceKitRequest::IndexToStore)
+        .Case("polyglot-ast", SourceKitRequest::PolyglotAST)
 #define SEMANTIC_REFACTORING(KIND, NAME, ID) .Case("refactoring." #ID, SourceKitRequest::KIND)
 #include "swift/Refactoring/RefactoringKinds.def"
         .Default(SourceKitRequest::None);

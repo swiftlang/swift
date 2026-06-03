@@ -60,6 +60,11 @@ let objectOutliner = FunctionPass(name: "object-outliner") {
     return
   }
 
+  if function.linkage.isExternal {
+    // Don't outline objects in external functions because this would "duplicate" singletons.
+    return
+  }
+
   var allocRefs = Stack<AllocRefInstBase>(context)
   defer { allocRefs.deinitialize() }
 

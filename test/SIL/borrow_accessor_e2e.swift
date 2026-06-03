@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t) 
-// RUN: %target-build-swift %s -emit-executable -enable-experimental-feature BorrowAndMutateAccessors -o %t/a.out
+// RUN: %target-build-swift %s -emit-executable -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 // REQUIRES: executable_test
 
 public struct Container<Element: ~Copyable >: ~Copyable {

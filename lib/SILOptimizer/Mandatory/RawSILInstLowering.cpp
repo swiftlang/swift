@@ -193,12 +193,6 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
   SILBuilderWithScope forCleanup(std::next(inst->getIterator()));
 
   switch (inst->getMode()) {
-    case AssignOrInitInst::Unknown:
-      assert(b.getModule().getASTContext().hadError() &&
-             "assign_or_init must have a valid mode");
-      // In case DefiniteInitialization already gave up with an error, just
-      // treat the assign_or_init with an "init" mode.
-      LLVM_FALLTHROUGH;
     case AssignOrInitInst::Init: {
       SILValue initFn = inst->getInitializer();
       CanSILFunctionType fTy = initFn->getType().castTo<SILFunctionType>();
@@ -350,6 +344,10 @@ lowerAssignOrInitInstruction(SILBuilderWithScope &b,
       }
       break;
     }
+    case AssignOrInitInst::Unknown:
+      // "Unknown" can be the case in a delegating initializer, where self was
+      // already assigned. Therefore it can only be a "set".
+      LLVM_FALLTHROUGH;
     case AssignOrInitInst::Set: {
       SILValue setterFn = inst->getSetter();
 

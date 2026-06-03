@@ -377,7 +377,8 @@ function (swift_benchmark_compile_archopts)
 
     # If we are not compiling at -Onone and are performing WMO, always emit
     # optimization-records.
-    if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*")
+    if(NOT ${optflag} STREQUAL "Onone" AND "${bench_flags}" MATCHES "-whole-module.*" AND
+       NOT SWIFT_CACHING_BUILD)
       list(APPEND common_options "-save-optimization-record=bitstream")
     endif()
   endif()

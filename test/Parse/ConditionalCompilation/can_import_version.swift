@@ -63,8 +63,12 @@ func canImportVersioned() {
   let buildLarger = 1
 #endif
   
-#if canImport(Foo, _version: 113.330.1.2.0) // expected-warning {{trailing components of version '113.330.1.2' are ignored}}
+#if canImport(Foo, _version: 113.330.1.2.0)
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: 113.330.1.2.0.0) // expected-warning {{trailing components of version '113.330.1.2.0' are ignored}}
+  let extraExtraComponent = 1 // expected-warning {{initialization of immutable value 'extraExtraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
 #if canImport(Foo, _underlyingVersion: 113.33) // expected-warning {{cannot find user version number for Clang module 'Foo'; version number ignored}}
@@ -132,8 +136,12 @@ func canImportVersionedString() {
   let buildLarger = 1
 #endif
 
-#if canImport(Foo, _version: "113.330.1.2.0") // expected-warning {{trailing components of version '113.330.1.2' are ignored}}
+#if canImport(Foo, _version: "113.330.1.2.0")
   let extraComponent = 1 // expected-warning {{initialization of immutable value 'extraComponent' was never used; consider replacing with assignment to '_' or removing it}}
+#endif
+
+#if canImport(Foo, _version: "113.330.1.2.0.0") // expected-warning {{trailing components of version '113.330.1.2.0' are ignored}}
+  let extraExtraComponent = 1 // expected-warning {{initialization of immutable value 'extraExtraComponent' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
 
 #if canImport(Foo, _underlyingVersion: "113.33") // expected-warning {{cannot find user version number for Clang module 'Foo'; version number ignored}}

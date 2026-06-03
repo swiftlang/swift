@@ -288,12 +288,8 @@ static bool isSwiftReservedName(StringRef name) {
 /// name.
 static bool shouldLowercaseValueName(StringRef name) {
   // If we see any lowercase characters, we can lowercase.
-  for (auto c : name) {
-    if (clang::isLowercase(c)) return true;
-  }
-
   // Otherwise, lowercasing will either be a no-op or we have ALL_CAPS.
-  return false;
+  return llvm::any_of(name, clang::isLowercase);
 }
 
 /// Will recursively print out the fully qualified context for the given name.
@@ -849,11 +845,7 @@ static bool shouldImportAsInitializer(const clang::ObjCMethodDecl *method,
     return false;
   }
 
-  if (determineFactoryInitializerKind(method))
-    return true;
-
-  // Not imported as an initializer.
-  return false;
+  return static_cast<bool>(determineFactoryInitializerKind(method));
 }
 
 /// Attempt to omit needless words from the given function name.
@@ -1719,6 +1711,21 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           swiftCtx, /*isSubscript=*/false,
           isa<clang::ClassTemplateSpecializationDecl>(D));
 
+      if (result.declName && result.declName.isSimpleName()) {
+        const clang::FunctionDecl *fnDecl = dyn_cast<clang::FunctionDecl>(D);
+        if (!fnDecl) {
+          if (auto *fnTemplate = dyn_cast<clang::FunctionTemplateDecl>(D))
+            fnDecl = fnTemplate->getAsFunction();
+        }
+        if (fnDecl) {
+          // Function-typed clang decls require a compound (non-simple) name.
+          SmallVector<Identifier, 4> emptyArgs(fnDecl->getNumParams(),
+                                               Identifier());
+          result.declName = DeclName(
+              swiftCtx, result.declName.getBaseName(), emptyArgs);
+        }
+      }
+
       // Handle globals treated as members.
       if (parsedName.isMember()) {
         // FIXME: Make sure this thing is global.
@@ -1918,25 +1925,13 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     break;
   }
 
-  case clang::DeclarationName::CXXConversionFunctionName: {
-    auto conversionDecl = dyn_cast<clang::CXXConversionDecl>(D);
-    if (!conversionDecl)
-      return ImportedName();
-    auto toType = conversionDecl->getConversionType();
-    // Only import `operator bool()` for now.
-    if (toType->isBooleanType()) {
-      isFunction = true;
-      baseName = "__convertToBool";
-      addDefaultArgNamesForClangFunction(conversionDecl, argumentNames);
-      break;
-    }
-    return ImportedName();
-  }
+  case clang::DeclarationName::CXXConversionFunctionName:
   case clang::DeclarationName::CXXDestructorName:
   case clang::DeclarationName::CXXLiteralOperatorName:
   case clang::DeclarationName::CXXUsingDirective:
   case clang::DeclarationName::CXXDeductionGuideName:
     // TODO: Handling these is part of C++ interoperability.
+    // Note that operator bool() is handled in lookupAndImportOperatorBool()
     return ImportedName();
 
   case clang::DeclarationName::CXXOperatorName: {

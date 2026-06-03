@@ -36,7 +36,7 @@ extension UTF8Span {
   /// Updates the `isKnownASCII` bit if contents are all-ASCII.
   ///
   /// - Complexity: O(n)
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func checkForASCII() -> Bool {
     if isKnownASCII { return true }
 
@@ -60,14 +60,14 @@ extension UTF8Span {
 
   // Set the isKnownASCII bit to true (also isNFC)
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   internal mutating func _setIsASCII() {
     self._countAndFlags |= Self._asciiBit | Self._nfcBit
   }
 
   // Set the isKnownNFC bit to true (also isNFC)
   @_alwaysEmitIntoClient
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   internal mutating func _setIsNFC() {
     self._countAndFlags |= Self._nfcBit
   }
@@ -84,7 +84,7 @@ extension UTF8Span {
   ///
   /// - Complexity: O(n)
   @_unavailableInEmbedded
-  @lifetime(self: copy self)
+  @_lifetime(self: copy self)
   public mutating func checkForNFC(
     quickCheck: Bool
   ) -> Bool {

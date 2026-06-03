@@ -663,7 +663,7 @@ case let (jeb):
   // expected-error@+2{{expected an identifier to name generic parameter}}
   // expected-error@+1{{expected '{' in class}}
   class Ceac<}> {}
-// expected-error@+1{{extraneous '}' at top level}} {{1-2=}}
+// expected-error@+1{{extraneous '}' at top level}} {{1-+1:1=}}
 }
 
 
@@ -775,7 +775,7 @@ class r22240342 {
   lazy var xx: Int = {
     foo {  // expected-error {{cannot find 'foo' in scope}}
       let issueView = 42
-      issueView.delegate = 12 // expected-error {{value of type 'Int' has no member 'delegate'}}
+      issueView.delegate = 12
       
     }
     return 42

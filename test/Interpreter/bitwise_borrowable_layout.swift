@@ -16,6 +16,10 @@
 // REQUIRES: swift_feature_RawLayout
 // REQUIRES: swift_feature_AddressableTypes
 // UNSUPPORTED: use_os_stdlib
+// UNSUPPORTED: back_deployment_runtime
+
+// rdar://169663198: test crashes when running on device
+// UNSUPPORTED: remote_run || device_run
 
 import BitwiseBorrowableLayoutResilientTypes
 

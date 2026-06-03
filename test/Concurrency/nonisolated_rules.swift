@@ -1,4 +1,6 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -swift-version 6 -parse-as-library %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-experimental-feature FlowIsolationGlobalActor
+
+// REQUIRES: swift_feature_FlowIsolationGlobalActor
 
 // REQUIRES: concurrency
 
@@ -85,10 +87,8 @@ nonisolated struct StructRemovesGlobalActor: GloballyIsolated {
   }
 
   struct Nested: GloballyIsolated {
-    // expected-note@+1 {{mutation of this property is only permitted within the actor}}
     var z: NonSendable
     nonisolated init(z: NonSendable) {
-      // expected-error@+1 {{main actor-isolated property 'z' can not be mutated from a nonisolated context}}
       self.z = z
     }
   }

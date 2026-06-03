@@ -22,11 +22,12 @@
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/AST/Type.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/OptionSet.h"
+#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
-#include "swift/Sema/CSDisjunction.h"
 #include "swift/Sema/TypeVariableType.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
@@ -582,10 +583,7 @@ void forEachDisjunctionChoice(
     if (!decl)
       continue;
 
-    Type overloadType = cs.getEffectiveOverloadType(
-        disjunction->getLocator(), constraint->getOverloadChoice(),
-        /*allowMembers=*/true, constraint->getDeclContext());
-
+    Type overloadType = constraint->getEffectiveOverloadType();
     if (!overloadType || !overloadType->is<FunctionType>())
       continue;
 
@@ -765,7 +763,7 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
 
   ASSERT(argumentType);
 
-  if (argumentType->hasTypeVariable() || argumentType->hasDependentMember())
+  if (argumentType->hasTypeVariable())
     return DisjunctionInfo::none();
 
   SmallVector<Constraint *, 2> favoredChoices;
@@ -883,10 +881,10 @@ using MatchOptions = OptionSet<MatchFlag>;
 // types are matched) this function is going to produce \c std::nullopt
 // instead of `0` that indicates "not a match".
 static std::optional<unsigned>
-scoreCandidateMatch(ConstraintSystem &cs,
-                    GenericSignature genericSig, ValueDecl *choice,
-                    std::optional<unsigned> paramIdx, Type candidateType,
-                    Type paramType, MatchOptions options) {
+scoreCandidateMatch(ConstraintSystem &cs, GenericSignature genericSig,
+                    ValueDecl *choice, std::optional<unsigned> paramIdx,
+                    Type candidateType, Type paramType, MatchOptions options,
+                    ConstraintLocator *locator) {
   auto isCGFloatDoubleConversionSupported = [&options]() {
     // CGFloat <-> Double conversion is supposed only while
     // match argument candidates to parameters.
@@ -935,7 +933,7 @@ scoreCandidateMatch(ConstraintSystem &cs,
       // overloads that are a possible match.
       auto score =
           scoreCandidateMatch(cs, genericSig, choice, paramIdx, candidateType,
-                              paramType, options - MatchFlag::Literal);
+                              paramType, options - MatchFlag::Literal, locator);
       if (score == 0)
         return 0;
 
@@ -1014,8 +1012,9 @@ scoreCandidateMatch(ConstraintSystem &cs,
       if ((paramOptionals.empty() &&
            paramType->is<GenericTypeParamType>()) ||
           paramOptionals.size() >= candidateOptionals.size()) {
-        auto score = scoreCandidateMatch(cs, genericSig, choice, paramIdx,
-                                         candidateType, paramType, options);
+        auto score =
+            scoreCandidateMatch(cs, genericSig, choice, paramIdx, candidateType,
+                                paramType, options, locator);
 
         if (score > 0) {
           // Injection lowers the score slightly to comply with
@@ -1035,8 +1034,11 @@ scoreCandidateMatch(ConstraintSystem &cs,
 
   // Conversion from a concrete type to its existential value.
   if (paramType->isExistentialType()) {
-    if (isSubtypeOfExistentialType(candidateType, paramType))
-      return 100;
+    if (isSubtypeOfExistentialType(candidateType, paramType)) {
+      // Operators always prefer exact and subtype matches. Erasure should
+      // shouldn't be scored higher than a match on a generic parameter.
+      return choice->isOperator() ? 90 : 100;
+    }
   }
 
   // Candidate could be converted to a superclass.
@@ -1069,8 +1071,11 @@ scoreCandidateMatch(ConstraintSystem &cs,
       // metatypes.
       if (candidateType->is<ExistentialMetatypeType>() ||
           !instanceType->isExistentialType()) {
-        if (isSubtypeOfExistentialType(instanceType, EMT->getInstanceType()))
-          return 100;
+        if (isSubtypeOfExistentialType(instanceType, EMT->getInstanceType())) {
+          // See other use of \c isSubtypeOfExistentialType as to why the score
+          // is lower.
+          return choice->isOperator() ? 90 : 100;
+        }
       }
     }
   }
@@ -1099,7 +1104,9 @@ scoreCandidateMatch(ConstraintSystem &cs,
       auto protocolRequirements =
           genericSig->getRequiredProtocols(paramType);
       if (llvm::all_of(protocolRequirements, [&](ProtocolDecl *protocol) {
-            return bool(cs.lookupConformance(candidateType, protocol));
+            auto conformance = cs.lookupConformance(candidateType, protocol);
+            return conformance &&
+                   !cs.isConformanceUnavailable(conformance, locator);
           })) {
         if (auto *GP = paramType->getAs<GenericTypeParamType>()) {
           auto *paramDecl = GP->getDecl();
@@ -1183,12 +1190,27 @@ scoreCandidateMatch(ConstraintSystem &cs,
         },
         SubstOptions(std::nullopt));
 
-    // Concrete operator overloads are always more preferable to
-    // generic ones if there are exact or subtype matches, for
-    // everything else the solver should try both concrete and
-    // generic and disambiguate during ranking.
-    if (result == CheckRequirementsResult::Success)
+    if (result == CheckRequirementsResult::Success) {
+      // Check whether there are any unavailable conformances involved. Just
+      // like unavailable declarations, they shouldn't be considered during
+      // normal/non-diagnostic mode.
+      if (llvm::any_of(requirements, [&](const auto &req) {
+            if (req.getFirstType()->isEqual(paramType) &&
+                req.getKind() == RequirementKind::Conformance) {
+              auto conformance =
+                  cs.lookupConformance(candidateType, req.getProtocolDecl());
+              return cs.isConformanceUnavailable(conformance, locator);
+            }
+            return false;
+          }))
+        return 0;
+
+      // Concrete operator overloads are always more preferable to
+      // generic ones if there are exact or subtype matches, for
+      // everything else the solver should try both concrete and
+      // generic and disambiguate during ranking.
       return choice->isOperator() ? 90 : 100;
+    }
 
     return 0;
   }
@@ -1452,18 +1474,21 @@ static DisjunctionInfo computeDisjunctionInfo(
           types.push_back({type, /*fromLiteral=*/true});
         }
 
-        auto binding =
-            inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
 
-        if (auto instanceTy = binding.getPointer()) {
-          types.push_back({instanceTy,
-                           /*fromLiteral=*/false,
-                           /*fromInitializerCall=*/true});
+        if (cs.getASTContext().TypeCheckerOpts.SolverEnablePerformanceHacks) {
+          auto binding =
+              inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
 
-          if (binding.getInt())
-            types.push_back({instanceTy->wrapInOptionalType(),
+          if (auto instanceTy = binding.getPointer()) {
+            types.push_back({instanceTy,
                              /*fromLiteral=*/false,
                              /*fromInitializerCall=*/true});
+
+            if (binding.getInt())
+              types.push_back({instanceTy->wrapInOptionalType(),
+                               /*fromLiteral=*/false,
+                               /*fromInitializerCall=*/true});
+          }
         }
       }
     } else {
@@ -1565,12 +1590,10 @@ static DisjunctionInfo computeDisjunctionInfo(
       cs, disjunction,
       [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
         GenericSignature genericSig;
-        {
-          if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
-            genericSig = GF->getGenericSignature();
-          } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
-            genericSig = SD->getGenericSignature();
-          }
+        if (auto *GF = dyn_cast<AbstractFunctionDecl>(decl)) {
+          genericSig = GF->getGenericSignature();
+        } else if (auto *SD = dyn_cast<SubscriptDecl>(decl)) {
+          genericSig = SD->getGenericSignature();
         }
 
         auto matchings =
@@ -1585,13 +1608,6 @@ static DisjunctionInfo computeDisjunctionInfo(
             onlySpeculativeArgumentCandidates &&
             (!canUseContextualResultTypes || resultTypes.empty());
 
-        // This is important for SIMD operators in particular because
-        // a lot of their overloads have same-type requires to a concrete
-        // type:  `<Scalar == (U)Int*>(_: SIMD*<Scalar>, ...) -> ...`.
-        if (genericSig) {
-          overloadType = overloadType->getReducedType(genericSig)
-                             ->castTo<FunctionType>();
-        }
 
         unsigned score = 0;
         unsigned numDefaulted = 0;
@@ -1693,10 +1709,10 @@ static DisjunctionInfo computeDisjunctionInfo(
               options |= MatchFlag::StringInterpolation;
 
             // The specifier for a candidate only matters for `inout` check.
-            auto candidateScore =
-                scoreCandidateMatch(cs, genericSig, decl, paramIdx,
-                                    candidate.type->getWithoutSpecifierType(),
-                                    paramType, options);
+            auto candidateScore = scoreCandidateMatch(
+                cs, genericSig, decl, paramIdx,
+                candidate.type->getWithoutSpecifierType(), paramType, options,
+                disjunction->getLocator());
 
             if (!candidateScore) {
               ASSERT(false);
@@ -1740,11 +1756,11 @@ static DisjunctionInfo computeDisjunctionInfo(
         if (canUseContextualResultTypes &&
             (score > 0 || !hasArgumentCandidates)) {
           if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
-                return scoreCandidateMatch(cs, genericSig, decl,
-                                           /*paramIdx=*/std::nullopt,
-                                           overloadType->getResult(),
-                                           candidateResultTy,
-                                           /*options=*/{}) > 0;
+                return scoreCandidateMatch(
+                           cs, genericSig, decl,
+                           /*paramIdx=*/std::nullopt, overloadType->getResult(),
+                           candidateResultTy,
+                           /*options=*/{}, disjunction->getLocator()) > 0;
               })) {
             score += 100;
           }

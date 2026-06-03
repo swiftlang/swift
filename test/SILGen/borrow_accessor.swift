@@ -1,7 +1,6 @@
-// RUN:%target-swift-frontend -emit-silgen %s -enable-experimental-feature BorrowAndMutateAccessors | %FileCheck %s
-// RUN:%target-swift-frontend -c %s -enable-experimental-feature BorrowAndMutateAccessors -Xllvm -sil-print-after=SILGenCleanup 2>&1 | %FileCheck %s --check-prefixes=CHECK-SIL
+// RUN:%target-swift-frontend -emit-silgen %s | %FileCheck %s
+// RUN:%target-swift-frontend -c %s -Xllvm -sil-print-after=SILGenCleanup 2>&1 | %FileCheck %s --check-prefixes=CHECK-SIL
 
-// REQUIRES: swift_feature_BorrowAndMutateAccessors
 
 public final class Klass {
   let id: Int = 0

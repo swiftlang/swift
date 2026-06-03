@@ -23,6 +23,7 @@
 #include "swift/Driver/Compilation.h"
 #include "swift/Driver/Driver.h"
 #include "swift/Driver/Job.h"
+#include "swift/Driver/PluginPaths.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Option/Options.h"
 #include "clang/Basic/Version.h"
@@ -801,6 +802,8 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-scan-dependencies";
   case file_types::TY_JSONArguments:
     return "-emit-supported-arguments";
+  case file_types::TY_JSONPolyglotAST:
+    return "-emit-polyglot-ast";
   case file_types::TY_IndexData:
     return "-typecheck";
   case file_types::TY_Remapping:
@@ -1093,6 +1096,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_IndexData:
     case file_types::TY_JSONDependencies:
     case file_types::TY_JSONArguments:
+    case file_types::TY_JSONPolyglotAST:
       llvm_unreachable("Cannot be output from backend job");
     case file_types::TY_Swift:
     case file_types::TY_dSYM:
@@ -1559,8 +1563,9 @@ void ToolChain::addLinkRuntimeLib(const ArgList &Args, ArgStringList &Arguments,
   Arguments.push_back(Args.MakeArgString(P));
 }
 
-static void appendInProcPluginServerPath(StringRef PluginPathRoot,
-                                         llvm::SmallVectorImpl<char> &InProcPluginServerPath) {
+void swift::driver::appendInProcPluginServerPath(
+    StringRef PluginPathRoot,
+    llvm::SmallVectorImpl<char> &InProcPluginServerPath) {
   InProcPluginServerPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
 #if defined(_WIN32)
   llvm::sys::path::append(InProcPluginServerPath, "bin", "SwiftInProcPluginServer.dll");
@@ -1573,8 +1578,8 @@ static void appendInProcPluginServerPath(StringRef PluginPathRoot,
 #endif
 }
 
-static void appendPluginsPath(StringRef PluginPathRoot,
-                              llvm::SmallVectorImpl<char> &PluginsPath) {
+void swift::driver::appendPluginsPath(
+    StringRef PluginPathRoot, llvm::SmallVectorImpl<char> &PluginsPath) {
   PluginsPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
 #if defined(_WIN32)
   llvm::sys::path::append(PluginsPath, "bin");
@@ -1586,11 +1591,11 @@ static void appendPluginsPath(StringRef PluginPathRoot,
 }
 
 #if defined(__APPLE__) || defined(__unix__)
-static void appendLocalPluginsPath(StringRef PluginPathRoot,
-                                   llvm::SmallVectorImpl<char> &LocalPluginsPath) {
+void swift::driver::appendLocalPluginsPath(
+    StringRef PluginPathRoot, llvm::SmallVectorImpl<char> &LocalPluginsPath) {
   SmallString<261> localPluginPathRoot = PluginPathRoot;
   llvm::sys::path::append(localPluginPathRoot, "local");
-  appendPluginsPath(localPluginPathRoot, LocalPluginsPath);
+  swift::driver::appendPluginsPath(localPluginPathRoot, LocalPluginsPath);
 }
 #endif
 

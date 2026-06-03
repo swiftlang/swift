@@ -259,7 +259,8 @@ private struct CallSiteSpecializer {
     // Emit a call to the specialized function
     let specializedFunctionRef = builder.createFunctionRef(self.callee.specialized)
     let specializedApply = builder.createApply(
-      function: specializedFunctionRef, self.apply.substitutionMap, arguments: arguments)
+      function: specializedFunctionRef, self.apply.substitutionMap, arguments: arguments,
+      isNonThrowing: self.apply.isNonThrowing, isNonAsync: self.apply.isNonAsync)
     return specializedApply
   }
 
@@ -355,7 +356,7 @@ private struct CallSiteSpecializer {
     var mappedResultPacks = self.callee.resultMap.makeIterator()
     var indirectResultIterator = self.apply.indirectResultOperands.makeIterator()
 
-    for resultInfo in self.apply.functionConvention.results {
+    for resultInfo in self.apply.functionConvention.formalResults {
       // We only need to handle direct and pack results, since indirect results are handled above
       if !resultInfo.isSILIndirect {
         // Direct results of the original function are mapped to direct results of the specialized function.
@@ -651,7 +652,7 @@ private struct PackExplodedFunction {
     var indirectResultIterator = function.arguments[0..<function.convention.indirectSILResultCount]
       .lazy.enumerated().makeIterator()
 
-    for (resultIndex, resultInfo) in function.convention.results.enumerated() {
+    for (resultIndex, resultInfo) in function.convention.formalResults.enumerated() {
       assert(
         !resultInfo.isSILIndirect || !indirectResultIterator.isEmpty,
         "There must be exactly as many indirect results in the function convention and argument list."
@@ -770,7 +771,7 @@ private struct PackExplodedFunction {
 
         // Collect any direct results before the next mappedResult.
         while resultIndex < mappedResult.resultIndex {
-          if !self.original.convention.results[resultIndex].isSILIndirect {
+          if !self.original.convention.formalResults[resultIndex].isSILIndirect {
             returnValues.append(originalDirectResultIterator.next()!)
           }
           resultIndex += 1

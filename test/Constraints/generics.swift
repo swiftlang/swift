@@ -571,22 +571,6 @@ func rdar35541153() {
   bar(y, "ultimate question", 42) // Ok
 }
 
-// rdar://problem/38159133
-// https://github.com/apple/swift/issues/49673
-// Swift 4.1 Xcode 9.3b4 regression
-
-protocol P_38159133 {}
-
-do {
-  class Super {}
-  class A: Super, P_38159133 {}
-  class B: Super, P_38159133 {}
-
-  func rdar38159133(_ a: A?, _ b: B?) {
-    let _: [P_38159133] = [a, b].compactMap { $0 } // Ok
-  }
-}
-
 func rdar35890334(_ arr: inout [Int]) {
   _ = arr.popFirst() // expected-error {{referencing instance method 'popFirst()' on 'Collection' requires the types '[Int]' and 'ArraySlice<Int>' be equivalent}}
 }
@@ -937,10 +921,7 @@ func rdar79757320() {
     var value: String
   }
 
-  // FIXME: There has to be a way to propagate holes that makes it easy to suppress failures caused by missing members.
   _ = Container(value: Value(42).formatted(.S(a: .a, b: .b(0)))) // expected-error {{type 'R_79757320' has no member 'S'}}
-  // expected-error@-1 {{cannot infer contextual base in reference to member 'a'}}
-  // expected-error@-2 {{cannot infer contextual base in reference to member 'b'}}
 }
 
 protocol P_eaf0300ff7a {}

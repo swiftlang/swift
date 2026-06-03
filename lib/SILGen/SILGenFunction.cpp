@@ -125,6 +125,14 @@ SILGenFunction::~SILGenFunction() {
 // Function emission
 //===----------------------------------------------------------------------===//
 
+void SILGenFunction::finalizeEmission() {
+  mergeCleanupBlocks();
+
+  for (auto &finalizer : EmissionFinalizers) {
+    finalizer(*this);
+  }
+}
+
 // Get the #function name for a declaration.
 DeclName SILGenModule::getMagicFunctionName(DeclContext *dc) {
   // For closures, use the parent name.
@@ -424,10 +432,10 @@ const SILDebugScope *SILGenFunction::getMacroScope(SourceLoc SLoc) {
     // Use the ExpansionLoc as the location so IRGenDebugInfo can extract the
     // human-readable macro name from the MacroExpansionDecl.
     SILFunction *MacroFn = B.getOrCreateFunction(
-        Macro.ExpansionLoc, MacroName,
-        SILLinkage::DefaultForDeclaration, FunctionType, IsNotBare,
-        IsNotTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
-        IsNotRuntimeAccessible);
+        Macro.ExpansionLoc, MacroName, SILLinkage::DefaultForDeclaration,
+        FunctionType, ActorIsolation::forNonisolated(/*unsafe=*/false),
+        IsNotBare, IsNotTransparent, IsNotSerialized, IsNotDynamic,
+        IsNotDistributed, IsNotRuntimeAccessible);
     // At the end of the chain ExpansionLoc should be a macro expansion node.
     const SILDebugScope *InlinedAt = nullptr;
     const SILDebugScope *ExpansionScope = getOrCreateScope(Macro.ExpansionSLoc);
@@ -1149,7 +1157,7 @@ void SILGenFunction::emitFunction(FuncDecl *fd) {
     emitEpilog(fd);
   }
 
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 void SILGenFunction::emitClosure(AbstractClosureExpr *ace) {
@@ -1295,9 +1303,11 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
 
     auto NSStringFromClassFn = builder.getOrCreateFunction(
         mainClass, "NSStringFromClass", SILLinkage::PublicExternal,
-        NSStringFromClassType, IsBare, IsTransparent, IsNotSerialized,
-        IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
-    auto NSStringFromClass = B.createFunctionRef(mainClass, NSStringFromClassFn);
+        NSStringFromClassType, ActorIsolation::forUnspecified(), IsBare,
+        IsTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible);
+    auto NSStringFromClass =
+        B.createFunctionRef(mainClass, NSStringFromClassFn);
     SILValue metaTy = B.createMetatype(mainClass,
                              SILType::getPrimitiveObjectType(mainClassMetaty));
     metaTy = B.createInitExistentialMetatype(mainClass, metaTy,
@@ -1385,8 +1395,9 @@ void SILGenFunction::emitArtificialTopLevel(Decl *mainDecl) {
     SILGenFunctionBuilder builder(SGM);
     auto NSApplicationMainFn = builder.getOrCreateFunction(
         mainClass, "NSApplicationMain", SILLinkage::PublicExternal,
-        NSApplicationMainType, IsBare, IsTransparent, IsNotSerialized,
-        IsNotDynamic, IsNotDistributed, IsNotRuntimeAccessible);
+        NSApplicationMainType, ActorIsolation::forUnspecified(), IsBare,
+        IsTransparent, IsNotSerialized, IsNotDynamic, IsNotDistributed,
+        IsNotRuntimeAccessible);
 
     auto NSApplicationMain = B.createFunctionRef(mainClass, NSApplicationMainFn);
     SILValue args[] = { argc, argv };
@@ -1673,7 +1684,7 @@ void SILGenFunction::emitGeneratorFunction(SILDeclRef function, Expr *value,
   }
 
   emitEpilog(Loc);
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 void SILGenFunction::emitGeneratorFunction(SILDeclRef function, VarDecl *var) {
@@ -1766,7 +1777,7 @@ void SILGenFunction::emitGeneratorFunction(
   emitStmt(body);
 
   emitEpilog(loc);
-  mergeCleanupBlocks();
+  finalizeEmission();
 }
 
 InitializationPtr SILGenFunction::getSingleValueStmtInit(Expr *E) {
@@ -1977,13 +1988,6 @@ void SILGenFunction::emitAssignOrInit(SILLocation loc, ManagedValue selfValue,
   if (!expectedSelfTy->isEqual(selfTy)) {
     selfMetatype = B.createUpcast(loc, selfMetatype,
                              getLoweredType(MetatypeType::get(expectedSelfTy)));
-  }
-
-  if (auto invocationSig = initTy->getInvocationGenericSignature()) {
-    if (invocationSig->areAllParamsConcrete())
-      substitutions = SubstitutionMap();
-  } else {
-    substitutions = SubstitutionMap();
   }
 
   PartialApplyInst *initPAI =

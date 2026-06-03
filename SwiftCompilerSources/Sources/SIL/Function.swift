@@ -156,6 +156,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// It's called from a `[global_init]` function via a `builtin "once"`.
   public var isGlobalInitOnceFunction: Bool { bridged.isGlobalInitOnceFunction() }
 
+  public var isLazyPropertyGetter: Bool { bridged.isLazyPropertyGetter() }
+
   public var isDestructor: Bool { bridged.isDestructor() }
 
   public var isGeneric: Bool { bridged.isGeneric() }
@@ -181,6 +183,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       bridged.hasSemanticsAttr(BridgedStringRef(data: buffer.baseAddress!, count: buffer.count))
     }
   }
+
   public var isSerialized: Bool {
     switch serializedKind {
     case .notSerialized, .serializedForPackage:

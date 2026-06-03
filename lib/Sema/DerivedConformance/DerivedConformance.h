@@ -465,6 +465,10 @@ public:
 /// because they involve mutable state.
 bool memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal);
 
+/// Get a string describing the nominal type we are deriving a conformance
+/// for by producing valid swift syntax.
+std::string getNominalTypeInfoString(DerivedConformance &derived);
+
 } // namespace swift
 
 #endif

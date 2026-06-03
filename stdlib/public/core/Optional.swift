@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2026 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -156,33 +156,18 @@ where Wrapped: ~Copyable & ~Escapable {
   /// initializer behind the scenes.
   @_transparent
   @_preInverseGenerics
-  @lifetime(immortal)
+  @_lifetime(immortal)
   public init(nilLiteral: ()) {
     self = .none
-  }
-}
-
-extension Optional where Wrapped: ~Copyable {
-  /// Creates an instance that stores the given value.
-  @_transparent
-  @_preInverseGenerics
-  public init(_ value: consuming Wrapped) {
-    // FIXME: Merge this with the generalization below.
-    // This is the original initializer, preserved to avoid breaking source
-    // compatibility with clients that use the `Optional.init` syntax to create
-    // a function reference. The ~Escapable generalization is currently breaking
-    // that. (rdar://147533059)
-    self = .some(value)
   }
 }
 
 extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// Creates an instance that stores the given value.
   @_transparent
-  @_alwaysEmitIntoClient
-  @lifetime(copy value)
+  @_preInverseGenerics
+  @_lifetime(copy value)
   public init(_ value: consuming Wrapped) {
-    // FIXME: Merge this into the original entry above.
     self = .some(value)
   }
 }
@@ -369,7 +354,7 @@ extension Optional where Wrapped: ~Escapable {
     // implementation is copying the value, so that generalization will need to
     // be emitted into clients -- `@_preInverseGenerics` will not cut it.
     @inline(__always)
-    @lifetime(copy self)
+    @_lifetime(copy self)
     get {
       if let x = self {
         return x
@@ -382,7 +367,7 @@ extension Optional where Wrapped: ~Escapable {
 extension Optional where Wrapped: ~Copyable & ~Escapable {
   // FIXME(NCG): Do we want this? It seems like we do. Make this public.
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public consuming func _consumingUnsafelyUnwrap() -> Wrapped {
     switch consume self {
     case .some(let x):
@@ -402,7 +387,7 @@ extension Optional where Wrapped: ~Escapable {
   @_preInverseGenerics
   internal var _unsafelyUnwrappedUnchecked: Wrapped {
     @inline(__always)
-    @lifetime(copy self)
+    @_lifetime(copy self)
     get {
       if let x = self {
         return x
@@ -418,12 +403,28 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// This version is for internal stdlib use; it avoids any checking
   /// overhead for users, even in Debug builds.
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   internal consuming func _consumingUncheckedUnwrapped() -> Wrapped {
     if let x = self {
       return x
     }
     _internalInvariantFailure("_uncheckedUnwrapped of nil optional")
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Optional where Wrapped: ~Copyable & Escapable {
+  @_alwaysEmitIntoClient
+  @_addressableSelf
+  @_lifetime(borrow self)
+  public func _span() -> Span<Wrapped> {
+    if self == nil {
+      return Span()
+    }
+    let a = Builtin.unprotectedAddressOfBorrow(self)
+    let s = unsafe Span<Wrapped>(_unsafeStart: .init(a), count: 1)
+    return unsafe _overrideLifetime(s, borrowing: self)
   }
 }
 
@@ -445,7 +446,7 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
   @_alwaysEmitIntoClient
-  @lifetime(copy self)
+  @_lifetime(copy self)
   public mutating func take() -> Self {
     let result = consume self
     self = nil
@@ -839,7 +840,7 @@ public func ?? <T: ~Copyable>(
   // To implement that, we need to be able to express that the result's lifetime
   // is limited to the intersection of `optional` and the result of
   // `defaultValue`:
-  //    @lifetime(optional, defaultValue.result)
+  //    @_lifetime(optional, defaultValue.result)
   switch consume optional {
   case .some(let value):
     return value
@@ -915,7 +916,7 @@ public func ?? <T: ~Copyable>(
   // To implement that, we need to be able to express that the result's lifetime
   // is limited to the intersection of `optional` and the result of
   // `defaultValue`:
-  //    @lifetime(optional, defaultValue.result)
+  //    @_lifetime(optional, defaultValue.result)
   switch consume optional {
   case .some(let value):
     return value
@@ -1016,22 +1017,3 @@ extension Optional: _ObjectiveCBridgeable {
   }
 }
 #endif
-
-extension Optional where Wrapped: ~Copyable {
-  @available(SwiftStdlib 6.3, *)
-  @_transparent
-  public var _span: Span<Wrapped> {
-    @_addressableSelf
-    @lifetime(borrow self)
-    get {
-      guard self != nil else {
-        return Span()
-      }
-
-      let ptr = Builtin.unprotectedAddressOfBorrow(self)
-      return unsafe _overrideLifetime(
-        Span(_unsafeStart: UnsafePointer(ptr), count: 1),
-        borrowing: self)
-    }
-  }
-}

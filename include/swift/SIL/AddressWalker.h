@@ -291,6 +291,7 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
         case BuiltinValueKind::FlowSensitiveSelfIsolation:
         case BuiltinValueKind::FlowSensitiveDistributedSelfIsolation:
         case BuiltinValueKind::TaskLocalValuePush:
+        case BuiltinValueKind::AddTaskLocalValue:
         case BuiltinValueKind::TaskCancellationShieldPush:
         case BuiltinValueKind::TaskCancellationShieldPop:
           callVisitUse(op);
@@ -302,6 +303,11 @@ TransitiveAddressWalker<Impl>::walk(SILValue projectedAddress) {
     }
 
     if (auto fas = FullApplySite::isa(user)) {
+      // Visit transitive uses for borrow and mutate accessors
+      if (fas.hasAddressResult()) {
+        transitiveResultUses(op);
+        continue;
+      }
       callVisitUse(op);
       continue;
     }

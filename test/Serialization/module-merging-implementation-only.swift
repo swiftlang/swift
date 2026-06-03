@@ -7,11 +7,11 @@
 // RUN: %target-swift-frontend -emit-module -o %t %S/Inputs/def_struct.swift
 
 // RUN: %target-swift-frontend -emit-module -I %t -o %t/main~partial.swiftmodule -module-name main %s
-// RUN: llvm-bcanalyzer -dump %t/main~partial.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer -dump %t/main~partial.swiftmodule | %FileCheck %s
 // RUN: grep -q TwoInts %t/main~partial.swiftmodule
 
 // RUN: %target-swift-frontend -merge-modules -emit-module -I %t -o %t/main.swiftmodule %t/main~partial.swiftmodule
-// RUN: llvm-bcanalyzer -dump %t/main.swiftmodule | %FileCheck %s
+// RUN: %llvm-bcanalyzer -dump %t/main.swiftmodule | %FileCheck %s
 // RUN: grep -q TwoInts %t/main.swiftmodule
 
 @_implementationOnly import def_struct

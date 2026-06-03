@@ -3121,6 +3121,22 @@ struct swift_ptrauth_struct_context_descriptor(ContextDescriptor)
   const InvertibleProtocolSet *
   getInvertedProtocols() const;
 
+  /// Whether this type's primary definition is `~Protocol` and has no
+  /// conditional conformance to the protocol.
+  bool isUnconditionallySuppressing(InvertibleProtocolKind kind) const {
+    auto *inverted = getInvertedProtocols();
+    if (!inverted || !inverted->contains(kind))
+      return false;
+
+    if (auto *genericContext = getGenericContext()) {
+      if (genericContext->hasConditionalInvertedProtocols() &&
+          genericContext->getConditionalInvertedProtocols().contains(kind))
+        return false;
+    }
+
+    return true;
+  }
+
   /// Is this context part of a C-imported module?
   bool isCImportedContext() const;
 
@@ -4004,7 +4020,10 @@ struct TargetCanonicalSpecializedMetadatasListEntry {
 
 template <typename Runtime>
 struct TargetCanonicalSpecializedMetadataAccessorsListEntry {
-  TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false> accessor;
+  TargetCompactFunctionPointer<
+      Runtime, SWIFT_CC(swift) MetadataResponse(MetadataRequest),
+      /*Nullable*/ false>
+      accessor;
 };
 
 template <typename Runtime>
@@ -4318,8 +4337,9 @@ public:
     TargetCanonicalSpecializedMetadatasListCount<Runtime>;
   using MetadataListEntry = 
     TargetCanonicalSpecializedMetadatasListEntry<Runtime>;
-  using MetadataAccessor = 
-    TargetCompactFunctionPointer<Runtime, MetadataResponse(MetadataRequest), /*Nullable*/ false>;
+  using MetadataAccessor = TargetCompactFunctionPointer<
+      Runtime, SWIFT_CC(swift) MetadataResponse(MetadataRequest),
+      /*Nullable*/ false>;
   using MetadataAccessorListEntry =
       TargetCanonicalSpecializedMetadataAccessorsListEntry<Runtime>;
   using MetadataCachingOnceToken =

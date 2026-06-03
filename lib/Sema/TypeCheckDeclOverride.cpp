@@ -32,6 +32,8 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/LanguageMode.h"
+#include "llvm/ADT/SmallVector.h"
 using namespace swift;
 
 static void adjustFunctionTypeForOverride(Type &type) {
@@ -1611,6 +1613,7 @@ namespace  {
     UNINTERESTING_ATTR(ForbidSerializingReference)
     UNINTERESTING_ATTR(GKInspectable)
     UNINTERESTING_ATTR(HasMissingDesignatedInitializers)
+    UNINTERESTING_ATTR(HasHiddenStoredProperties)
     UNINTERESTING_ATTR(IBAction)
     UNINTERESTING_ATTR(IBDesignable)
     UNINTERESTING_ATTR(IBInspectable)
@@ -1764,7 +1767,7 @@ namespace  {
     UNINTERESTING_ATTR(Safe)
     UNINTERESTING_ATTR(AddressableForDependencies)
     UNINTERESTING_ATTR(UnsafeSelfDependentResult)
-    UNINTERESTING_ATTR(Warn)
+    UNINTERESTING_ATTR(Diagnose)
 #undef UNINTERESTING_ATTR
 
     void visitABIAttr(ABIAttr *attr) {
@@ -2001,6 +2004,28 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
       diags.diagnose(overrideASD, diag::override_with_more_effects, overrideASD,
                      "throwing");
       return true;
+    }
+
+    // Make sure that if we're overriding a `@dynamicMemberLookup` subscript, it
+    // remains as valid as its parent. `@dynamicMemberLookup`-annotated types
+    // normally go through `AttributeChecker` for validation, but if
+    // `@dynamicMemberLookup` is inherited, there isn't an explicit attr to
+    // validate. Most potential mismatches have been caught at this point, but
+    // we do still need to check that, e.g., the overridden decl hasn't dropped
+    // a default value for one of its parameters.
+    if (auto parentSubscript = dyn_cast<SubscriptDecl>(baseASD)) {
+      auto owningTy = override->getDeclContext()->getDeclaredInterfaceType();
+      if (owningTy->hasDynamicMemberLookupAttribute() &&
+          (bool) parentSubscript->getDynamicMemberLookupKind()) {
+        auto overrideSubscript = cast<SubscriptDecl>(overrideASD);
+
+        auto eligibility = evaluateOrFatal(
+            overrideSubscript->getASTContext().evaluator,
+            DynamicMemberLookupSubscriptRequest{overrideSubscript});
+        if (eligibility.diagnose(overrideSubscript)) {
+          return true;
+        }
+      }
     }
   }
 
@@ -2480,24 +2505,31 @@ computeOverriddenDecls(ValueDecl *decl, bool ignoreMissingImports) {
     return noResults;
   }
 
-  auto matches = matcher.match(OverrideCheckingAttempt::PerfectMatch);
-  if (matches.empty()) {
-    return noResults;
+  // Mismatches on @Sendable and global-actor attributes are treated as
+  // warnings depending on the language mode and declaration attributes.
+  // `checkOverrides` would produce mismatching override results and so
+  // should this method.
+  for (auto attempt : {OverrideCheckingAttempt::PerfectMatch,
+                       OverrideCheckingAttempt::MismatchedConcurrency}) {
+    auto matches = matcher.match(attempt);
+    if (matches.empty())
+      continue;
+
+    // If we have more than one potential match from a class, diagnose the
+    // ambiguity and fail.
+    if (matches.size() > 1 && decl->getDeclContext()->getSelfClassDecl()) {
+      diagnoseGeneralOverrideFailure(decl, matches, attempt);
+      invalidateOverrideAttribute(decl);
+      return noResults;
+    }
+
+    // Check the matches. If any are ill-formed, invalidate the override
+    // attribute
+    // so we don't try again.
+    return matcher.checkPotentialOverrides(matches, attempt);
   }
 
-  // If we have more than one potential match from a class, diagnose the
-  // ambiguity and fail.
-  if (matches.size() > 1 && decl->getDeclContext()->getSelfClassDecl()) {
-    diagnoseGeneralOverrideFailure(decl, matches,
-                                   OverrideCheckingAttempt::PerfectMatch);
-    invalidateOverrideAttribute(decl);
-    return noResults;
-  }
-
-  // Check the matches. If any are ill-formed, invalidate the override attribute
-  // so we don't try again.
-  return matcher.checkPotentialOverrides(matches,
-                                         OverrideCheckingAttempt::PerfectMatch);
+  return noResults;
 }
 
 llvm::TinyPtrVector<ValueDecl *>

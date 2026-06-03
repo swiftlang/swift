@@ -26,19 +26,15 @@ import Swift
 % IS_THROWING = THROWING_VARIANT == 'THROWING'
 % IS_DETACHED = 'Detached' in METHOD_NAME
 % if IS_THROWING:
-%   FAILURE_TYPE = 'Failure'
-%   THROWS = 'throws(Failure) '
+%   FAILURE_TYPE = 'Error'
+%   THROWS = 'throws '
 % else:
 %   FAILURE_TYPE = 'Never'
 %   THROWS = ''
 % end
 
 @available(SwiftStdlib 6.2, *)
-% if IS_THROWING:
-extension Task { // throwing Failure error type
-% else:
 extension Task where Failure == ${FAILURE_TYPE} {
-% end
 
   % if IS_DETACHED:
   /// Create and immediately start running a new detached task in the context of the calling thread/task.
@@ -113,7 +109,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
     if let name {
       #if $BuiltinCreateAsyncTaskOwnedTaskExecutor
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
@@ -123,7 +119,7 @@ extension Task where Failure == ${FAILURE_TYPE} {
         }
       #else // no $BuiltinCreateAsyncTaskOwnedTaskExecutor
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           Builtin.createTask(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,
@@ -302,7 +298,7 @@ extension ${GROUP_TYPE} {
     #if $BuiltinCreateAsyncTaskName
     if let name {
       task =
-        unsafe name.utf8CString.withUnsafeBufferPointer { nameBytes in
+        name.utf8CString.withUnsafeBufferPointer { nameBytes in
           ${TASK_CREATE_FN}(
             flags: flags,
             initialSerialExecutor: builtinSerialExecutor,

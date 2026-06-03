@@ -330,6 +330,31 @@ static bool isPartialApplyNonisolatedUnsafe(PartialApplyInst *pai) {
   return foundOneNonIsolatedUnsafe;
 }
 
+static const SILFunctionArgument *
+getSelfFunctionArgumentForRefElementAddr(SILValue value) {
+  auto *reai = dyn_cast<RefElementAddrInst>(value);
+  if (!reai)
+    return {};
+
+  auto self = llvm::cast_or_null<SILFunctionArgument>(
+      reai->getFunction()->maybeGetSelfArgument());
+  if (!self || !self->getType().isAnyActor())
+    return {};
+
+  auto declRef = reai->getFunction()->getDeclRef();
+  if (!declRef || declRef.kind != SILDeclRef::Kind::Initializer)
+    return {};
+
+  auto *lbi = dyn_cast<LoadBorrowInst>(reai->getOperand());
+  if (!lbi)
+    return {};
+
+  auto *asi = dyn_cast<AllocStackInst>(lbi->getOperand());
+  if (!asi || !asi->getDecl()->isActorSelf())
+    return {};
+  return self;
+}
+
 /// Return the SILIsolationInfo for a class field for a ref_element_addr or
 /// class_method. Methods that are direct should get their isolation information
 /// from the static function rather than from this function.
@@ -352,9 +377,12 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
   // override what is on the class.
   auto varIsolation = swift::getActorIsolation(field);
 
-  // If we have an explicitly global actor isolated field, then we must prefer
-  // that isolation since it takes precedence over any isolation directly on the
-  // underlying class type.
+  // If we have a global actor isolated field, then prefer that.
+  //
+  // NOTE: This handles both cases where the field has an explicit isolation and
+  // a field where the field does not have an explicit isolation but inherits
+  // its isolation from its parent type since swift::getActorIsolation handles
+  // this for us.
   if (varIsolation.isGlobalActor()) {
     assert(!varIsolation.isNonisolatedUnsafe() &&
            "Cannot apply both nonisolated(unsafe) and a global actor attribute "
@@ -363,44 +391,37 @@ static SILIsolationInfo computeIsolationForClassField(SILValue queriedValue,
         queriedValue, varIsolation.getGlobalActor());
   }
 
-  // Then check if our field is explicitly nonisolated (not
-  // nonisolated(unsafe)). In such a case, we want to return disconnected since
-  // we are overriding the isolation of the actual nominal type. If we have
-  // nonisolated(unsafe), we want to respect the isolation of the nominal type
-  // since we just want to squelch the error but still have it be isolated in
-  // its normal way. This provides more information since we know what the
-  // underlying isolation /would/ have been.
-  if (varIsolation.isNonisolated() && !varIsolation.isNonisolatedUnsafe())
-    return SILIsolationInfo::getDisconnected(false /*nonisolated unsafe*/);
+  // Then check if our field is explicitly nonisolated or
+  // nonisolated(unsafe). If so, return early here.
+  if (varIsolation.isNonisolatedOrConcurrent())
+    return SILIsolationInfo::getDisconnected(
+        varIsolation.isNonisolatedUnsafe());
 
-  // Ok, we know that we do not have any overriding isolation from the var
-  // itself... so now we should use isolation from the underlying nominal type.
+  // See if we have a load from a box in an objc actor initializer where we need
+  // to identify our actor instance (which would be a box otherwise) with self.
+  if (auto newValue = getSelfFunctionArgumentForRefElementAddr(queriedValue)) {
+    if (auto info =
+            SILIsolationInfo::getActorInstanceIsolated(queriedValue, newValue))
+      return info;
+  }
 
-  // First see if we have an actor instance value from an isolated
-  // SILFunctionArgument.
+  // Check if we actually have an actor as our class value. First see if we have
+  // an actor instance value from an isolated SILFunctionArgument.
   if (auto instance = ActorInstance::getForValue(classValue)) {
     if (auto *fArg = llvm::dyn_cast_or_null<SILFunctionArgument>(
             instance.maybeGetValue())) {
       if (auto info =
               SILIsolationInfo::getActorInstanceIsolated(queriedValue, fArg)) {
-        return info.withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+        return info;
       }
     }
   }
 
-  // First find out if our classValue is a nominal type and exit early...
-  if (auto *nomDecl = classValue->getType().getNominalOrBoundGenericNominal()) {
-    if (auto isolation = swift::getActorIsolation(nomDecl);
-        isolation && isolation.isGlobalActor()) {
-      return SILIsolationInfo::getGlobalActorIsolated(
-                 queriedValue, isolation.getGlobalActor())
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
-    }
-
-    if (nomDecl->isAnyActor())
-      return SILIsolationInfo::getActorInstanceIsolated(queriedValue,
-                                                        classValue, nomDecl)
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+  // Then check if our classValue is an any Actor.
+  if (auto *nomDecl = classValue->getType().getNominalOrBoundGenericNominal();
+      nomDecl && nomDecl->isAnyActor()) {
+    return SILIsolationInfo::getActorInstanceIsolated(queriedValue, classValue,
+                                                      nomDecl);
   }
 
   // If we have a metatype...
@@ -479,7 +500,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       auto actualIsolatedValue =
           ActorInstance::lookThroughInsts(isolatedOp->get());
 
-      // First see if we have a .none enum inst. In such a case, we are actually
+      // See if we have a .none enum inst. In such a case, we are actually
       // on the nonisolated global queue.
       if (auto *ei = dyn_cast<EnumInst>(actualIsolatedValue)) {
         if (ei->getElement()->getParentEnum()->isOptionalDecl() &&
@@ -490,6 +511,20 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
           // nonisolated.
           return SILIsolationInfo::getDisconnected(false);
         }
+      }
+
+      // Then check if we are passing the implicit builtin actor to this. In
+      // such a case, this is nonisolated(nonsending).
+      if (auto *fArg = dyn_cast<SILFunctionArgument>(actualIsolatedValue);
+          fArg && fArg->isImplicitBuiltinActor()) {
+        // TODO: We probably should split this API so that the user in the case
+        // where we are asking for a specific value, we use that value and if we
+        // are asking for the instruction generally (for instance if we are
+        // generating an actor introducing value), we set a bit on the
+        // SILIsolationInfo saying that the isolation was introduced by the
+        // instruction. This is important for isolation history eventually.
+        return SILIsolationInfo::getTaskIsolated(SILValue())
+            .withNonisolatedNonsendingTaskIsolated(true);
       }
 
       // Then using that value, grab the AST type from the actual isolated
@@ -630,62 +665,59 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
 
   // Treat function ref as either actor isolated or sendable.
   if (auto *fri = dyn_cast<FunctionRefInst>(inst)) {
-    if (auto optIsolation = fri->getReferencedFunction()->getActorIsolation()) {
-      auto isolation = *optIsolation;
+    auto isolation = fri->getReferencedFunction()->getActorIsolation();
 
-      // First check if we are actor isolated at the AST level... if we are,
-      // then create the relevant actor isolated.
-      if (isolation.isActorIsolated()) {
-        if (isolation.isGlobalActor()) {
-          return SILIsolationInfo::getGlobalActorIsolated(
-              fri, isolation.getGlobalActor());
-        }
-
-        // TODO: We need to be able to support flow sensitive actor instances
-        // like we do for partial apply. Until we do so, just store SILValue()
-        // for this. This could cause a problem if we can construct a function
-        // ref and invoke it with two different actor instances of the same type
-        // and pass in the same parameters to both. We should error and we would
-        // not with this impl since we could not distinguish the two.
-        if (isolation.getKind() == ActorIsolation::ActorInstance) {
-          return SILIsolationInfo::getFlowSensitiveActorIsolated(fri,
-                                                                 isolation);
-        }
-
-        assert(isolation.getKind() != ActorIsolation::Erased &&
-               "Implement this!");
+    // First check if we are actor isolated at the AST level... if we are,
+    // then create the relevant actor isolated.
+    if (isolation.isActorIsolated()) {
+      if (isolation.isGlobalActor()) {
+        return SILIsolationInfo::getGlobalActorIsolated(
+            fri, isolation.getGlobalActor());
       }
 
-      // Then check if we have something that is nonisolated unsafe.
-      if (isolation.isNonisolatedUnsafe()) {
-        // First check if our function_ref is a method of a global actor
-        // isolated type. In such a case, we create a global actor isolated
-        // nonisolated(unsafe) so that if we assign the value to another
-        // variable, the variable still says that it is the appropriate global
-        // actor isolated thing.
-        //
-        // E.x.:
-        //
-        // @MainActor
-        // struct X { nonisolated(unsafe) var x: NonSendableThing { ... } }
-        //
-        // We want X.x to be safe to use... but to have that 'z' in the
-        // following is considered MainActor isolated.
-        //
-        // let z = X.x
-        //
-        auto *func = fri->getReferencedFunction();
-        auto funcType = func->getLoweredFunctionType();
-        if (funcType->hasSelfParam()) {
-          auto selfParam = funcType->getSelfInstanceType(
-              fri->getModule(), func->getTypeExpansionContext());
-          if (auto *nomDecl = selfParam->getNominalOrBoundGenericNominal()) {
-            auto nomDeclIsolation = swift::getActorIsolation(nomDecl);
-            if (nomDeclIsolation.isGlobalActor()) {
-              return SILIsolationInfo::getGlobalActorIsolated(
-                         fri, nomDeclIsolation.getGlobalActor())
-                  .withUnsafeNonIsolated(true);
-            }
+      // TODO: We need to be able to support flow sensitive actor instances
+      // like we do for partial apply. Until we do so, just store SILValue()
+      // for this. This could cause a problem if we can construct a function
+      // ref and invoke it with two different actor instances of the same type
+      // and pass in the same parameters to both. We should error and we would
+      // not with this impl since we could not distinguish the two.
+      if (isolation.getKind() == ActorIsolation::ActorInstance) {
+        return SILIsolationInfo::getFlowSensitiveActorIsolated(fri, isolation);
+      }
+
+      assert(isolation.getKind() != ActorIsolation::Erased &&
+             "Implement this!");
+    }
+
+    // Then check if we have something that is nonisolated unsafe.
+    if (isolation.isNonisolatedUnsafe()) {
+      // First check if our function_ref is a method of a global actor
+      // isolated type. In such a case, we create a global actor isolated
+      // nonisolated(unsafe) so that if we assign the value to another
+      // variable, the variable still says that it is the appropriate global
+      // actor isolated thing.
+      //
+      // E.x.:
+      //
+      // @MainActor
+      // struct X { nonisolated(unsafe) var x: NonSendableThing { ... } }
+      //
+      // We want X.x to be safe to use... but to have that 'z' in the
+      // following is considered MainActor isolated.
+      //
+      // let z = X.x
+      //
+      auto *func = fri->getReferencedFunction();
+      auto funcType = func->getLoweredFunctionType();
+      if (funcType->hasSelfParam()) {
+        auto selfParam = funcType->getSelfInstanceType(
+            fri->getModule(), func->getTypeExpansionContext());
+        if (auto *nomDecl = selfParam->getNominalOrBoundGenericNominal()) {
+          auto nomDeclIsolation = swift::getActorIsolation(nomDecl);
+          if (nomDeclIsolation.isGlobalActor()) {
+            return SILIsolationInfo::getGlobalActorIsolated(
+                       fri, nomDeclIsolation.getGlobalActor())
+                .withUnsafeNonIsolated(true);
           }
         }
       }
@@ -738,14 +770,9 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     // itself. We should use that instead.
     if (varIsolation.isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
-                 sei, varIsolation.getGlobalActor())
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+          sei, varIsolation.getGlobalActor());
     }
 
-    if (auto isolation =
-            SILIsolationInfo::getGlobalActorIsolated(sei, sei->getStructDecl()))
-      return isolation.withUnsafeNonIsolated(
-          varIsolation.isNonisolatedUnsafe());
     return SILIsolationInfo::getDisconnected(
         varIsolation.isNonisolatedUnsafe());
   }
@@ -753,19 +780,13 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto *seai = dyn_cast<StructElementAddrInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(seai->getField());
 
-    // If our var is global actor isolated, then we override the isolation of
-    // whatever our struct was with a specific isolation on the struct
-    // itself. We should use that instead.
+    // If our var is explicitly global actor isolated, return it.
     if (varIsolation.isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
-                 seai, varIsolation.getGlobalActor())
-          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
+          seai, varIsolation.getGlobalActor());
     }
 
-    if (auto isolation = SILIsolationInfo::getGlobalActorIsolated(
-            seai, seai->getStructDecl()))
-      return isolation.withUnsafeNonIsolated(
-          varIsolation.isNonisolatedUnsafe());
+    // Otherwise, just return disconnected.
     return SILIsolationInfo::getDisconnected(
         varIsolation.isNonisolatedUnsafe());
   }
@@ -774,9 +795,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto *uedi = dyn_cast<UncheckedEnumDataInst>(inst)) {
     return SILIsolationInfo::getGlobalActorIsolated(uedi, uedi->getEnumDecl());
   }
-
-  // See if we have an unchecked_enum_data from a global-actor-isolated type.
-  if (auto *utedi = dyn_cast<UncheckedTakeEnumDataAddrInst>(inst)) {
+  if (auto *utedi = dyn_cast<UncheckedEnumDataAddrInstBase>(inst)) {
     return SILIsolationInfo::getGlobalActorIsolated(utedi,
                                                     utedi->getEnumDecl());
   }
@@ -888,13 +907,25 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
-  /// Consider non-Sendable metatypes to be task-isolated, so they cannot cross
-  /// into another isolation domain.
+  /// Consider non-Sendable metatypes to be isolated to the context in which it
+  /// is initialized so they cannot into another isolation domain.
   if (auto *mi = dyn_cast<MetatypeInst>(inst)) {
-    if (auto funcIsolation = mi->getFunction()->getActorIsolation();
-        funcIsolation && funcIsolation->isCallerIsolationInheriting()) {
+    auto funcIsolation = mi->getFunction()->getActorIsolation();
+    if (funcIsolation.isNonisolatedNonsending()) {
       return SILIsolationInfo::getTaskIsolated(mi)
           .withNonisolatedNonsendingTaskIsolated(true);
+    }
+
+    if (funcIsolation.isGlobalActor()) {
+      return SILIsolationInfo::getGlobalActorIsolated(
+          mi, funcIsolation.getGlobalActor());
+    }
+
+    if (funcIsolation.isActorInstanceIsolated()) {
+      if (auto *iso = llvm::cast_or_null<SILFunctionArgument>(
+              mi->getFunction()->maybeGetIsolatedArgument())) {
+        return SILIsolationInfo::getActorInstanceIsolated(mi, iso);
+      }
     }
 
     return SILIsolationInfo::getTaskIsolated(mi);
@@ -911,7 +942,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // caused by the actor instances not matching.
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
     if (auto crossing = apply->getIsolationCrossing()) {
-      if (crossing->getCalleeIsolation().isNonisolated()) {
+      if (crossing->getCalleeIsolation().isNonisolatedOrConcurrent()) {
         return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
     }
@@ -925,16 +956,27 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   if (!SILIsolationInfo::isNonSendable(arg))
     return {};
 
-  // Handle a switch_enum from a global-actor-isolated type.
   if (auto *phiArg = dyn_cast<SILPhiArgument>(arg)) {
     if (auto *singleTerm = phiArg->getSingleTerminator()) {
+      // Handle a switch_enum from a global-actor-isolated type.
       if (auto *swi = dyn_cast<SwitchEnumInst>(singleTerm)) {
         auto enumDecl =
             swi->getOperand()->getType().getEnumOrBoundGenericEnum();
         return SILIsolationInfo::getGlobalActorIsolated(arg, enumDecl);
       }
+
+      // Handle a checked_cast_br argument that involves an isolated
+      // conformance. The conformance only changes for the first element.
+      if (auto *ccbi = dyn_cast<CheckedCastBranchInst>(singleTerm);
+          ccbi && ccbi->getSuccessBB() == phiArg->getParent()) {
+        if (auto isolation = SILIsolationInfo::getConformanceIsolation(ccbi)) {
+          return isolation;
+        }
+      }
     }
-    return SILIsolationInfo();
+
+    // Otherwise assume that we are disconnected. We will rely on merging.
+    return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
   }
 
   auto *fArg = cast<SILFunctionArgument>(arg);
@@ -958,6 +1000,8 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
     return attr->isUnsafe();
   }();
 
+  auto *func = fArg->getFunction();
+
   // If we have a closure capture that is not an indirect result or indirect
   // result error, we want to treat it as sending so that we properly handle
   // async lets.
@@ -967,7 +1011,7 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // sync with that code.
   if (!fArg->isIndirectResult() && !fArg->isIndirectErrorResult() &&
       fArg->isClosureCapture()) {
-    if (auto declRef = arg->getFunction()->getDeclRef();
+    if (auto declRef = func->getDeclRef();
         declRef && declRef.isAsyncLetClosure) {
       return SILIsolationInfo::getDisconnected(
           isClosureCapturedNonisolatedUnsafe);
@@ -977,11 +1021,10 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // Before we do anything further, see if we have an isolated parameter. This
   // handles isolated self and specifically marked isolated.
   if (auto *isolatedArg = llvm::cast_or_null<SILFunctionArgument>(
-          fArg->getFunction()->maybeGetIsolatedArgument())) {
+          func->maybeGetIsolatedArgument())) {
     // See if the function is nonisolated(nonsending). In such a case, return
     // task isolated.
-    if (auto funcIsolation = fArg->getFunction()->getActorIsolation();
-        funcIsolation && funcIsolation->isCallerIsolationInheriting()) {
+    if (func->getActorIsolation().isNonisolatedNonsending()) {
       return SILIsolationInfo::getTaskIsolated(fArg)
           .withNonisolatedNonsendingTaskIsolated(true)
           .withUnsafeNonIsolated(isClosureCapturedNonisolatedUnsafe);
@@ -1002,37 +1045,48 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
 
   // Otherwise, see if we need to handle this isolation computation specially
   // due to information from the decl ref if we have one.
-  if (auto declRef = fArg->getFunction()->getDeclRef()) {
+  if (auto declRef = func->getDeclRef()) {
+    auto funcIsolation = func->getActorIsolation();
     // First check if we have an allocator decl ref. If we do and we have an
-    // actor instance isolation, then we know that we are actively just calling
-    // the initializer. To just make region isolation work, treat this as
-    // disconnected so we can construct the actor value. Users cannot write
+    // actor instance isolation, then we know that we are actively just
+    // calling the initializer. To just make region isolation work, treat this
+    // as disconnected so we can construct the actor value. Users cannot write
     // allocator functions so we just need to worry about compiler generated
     // code. In the case of a non-actor, we can only have an allocator that is
     // global-actor isolated, so we will never hit this code path.
-    if (declRef.kind == SILDeclRef::Kind::Allocator) {
-      if (auto isolation = fArg->getFunction()->getActorIsolation()) {
-        if (isolation->isActorInstanceIsolated()) {
-          return SILIsolationInfo::getDisconnected(
-              false /*nonisolated(unsafe)*/);
+    if (declRef.kind == SILDeclRef::Kind::Allocator &&
+        funcIsolation.isActorInstanceIsolated()) {
+      return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
+    }
+
+    // Then see if we have an init accessor that is isolated to an actor
+    // instance, but for which we have not actually passed self. In such a
+    // case, we need to pass in a "fake" ActorInstance that users know is a
+    // sentinel for the self value.
+    if (funcIsolation.isActorInstanceIsolated() && declRef.getDecl()) {
+      if (auto *accessor =
+              dyn_cast_or_null<AccessorDecl>(declRef.getFuncDecl())) {
+        if (accessor->isInitAccessor()) {
+          return SILIsolationInfo::getActorInstanceIsolated(
+              fArg, ActorInstance::getForActorAccessorInit(),
+              funcIsolation.getActor());
         }
       }
     }
 
-    // Then see if we have an init accessor that is isolated to an actor
-    // instance, but for which we have not actually passed self. In such a case,
-    // we need to pass in a "fake" ActorInstance that users know is a sentinel
-    // for the self value.
-    if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
-      if (functionIsolation->isActorInstanceIsolated() && declRef.getDecl()) {
-        if (auto *accessor =
-                dyn_cast_or_null<AccessorDecl>(declRef.getFuncDecl())) {
-          if (accessor->isInitAccessor()) {
-            return SILIsolationInfo::getActorInstanceIsolated(
-                fArg, ActorInstance::getForActorAccessorInit(),
-                functionIsolation->getActor());
-          }
-        }
+    // Check if we have a nonisolated synchronous initializer for an actor. In
+    // such a case, we want to treat the non-Sendable parameters as being in
+    // the actor's isolation domain. This is a special case from the region
+    // isolation proposal and ensures that nonisolated async and sync
+    // initializers act the same way.
+    if (funcIsolation.isNonisolated() &&
+        declRef.kind == SILDeclRef::Kind::Initializer &&
+        !func->getLoweredFunctionType()->isAsync()) {
+      // Just performing some defensive checks here.
+      if (auto *self =
+              cast_or_null<SILFunctionArgument>(func->getSelfArgument());
+          self && self->getType().isAnyActor()) {
+        return SILIsolationInfo::getActorInstanceIsolated(fArg, self);
       }
     }
   }
@@ -1040,18 +1094,17 @@ SILIsolationInfo SILIsolationInfo::get(SILArgument *arg) {
   // Otherwise, if we do not have an isolated argument and are not in an
   // allocator, then we might be isolated via global isolation or in a global
   // actor isolated initializer.
-  if (auto functionIsolation = fArg->getFunction()->getActorIsolation()) {
-    if (functionIsolation->isActorIsolated()) {
-      if (functionIsolation->isGlobalActor()) {
-        return SILIsolationInfo::getGlobalActorIsolated(
-                   fArg, functionIsolation->getGlobalActor())
-            .withUnsafeNonIsolated(isClosureCapturedNonisolatedUnsafe);
-      }
-
-      return SILIsolationInfo::getActorInstanceIsolated(
-          fArg, ActorInstance::getForActorAccessorInit(),
-          functionIsolation->getActor());
+  auto functionIsolation = fArg->getFunction()->getActorIsolation();
+  if (functionIsolation.isActorIsolated()) {
+    if (functionIsolation.isGlobalActor()) {
+      return SILIsolationInfo::getGlobalActorIsolated(
+                 fArg, functionIsolation.getGlobalActor())
+          .withUnsafeNonIsolated(isClosureCapturedNonisolatedUnsafe);
     }
+
+    return SILIsolationInfo::getActorInstanceIsolated(
+        fArg, ActorInstance::getForActorAccessorInit(),
+        functionIsolation.getActor());
   }
 
   return SILIsolationInfo::getTaskIsolated(fArg).withUnsafeNonIsolated(
@@ -1098,6 +1151,22 @@ SILIsolationInfo SILIsolationInfo::getFromConformances(
       if (sendableMetatype &&
           lookupConformance(conformance.getType(), sendableMetatype,
                             /*allowMissing=*/false).isInvalid()) {
+        auto functionIsolation = value->getFunction()->getActorIsolation();
+        if (functionIsolation.isGlobalActor()) {
+          return SILIsolationInfo::getGlobalActorIsolated(
+              value, functionIsolation.getGlobalActor(),
+              conformance.getProtocol());
+        }
+        if (functionIsolation.isActorInstanceIsolated()) {
+          if (auto isolatedParam = cast_or_null<SILFunctionArgument>(
+                  value->getFunction()->maybeGetIsolatedArgument())) {
+            if (auto result = SILIsolationInfo::getActorInstanceIsolated(
+                    value, isolatedParam, conformance.getProtocol())) {
+              return result;
+            }
+          }
+        }
+
         return SILIsolationInfo::getTaskIsolated(value,
                                                  conformance.getProtocol());
       }
@@ -1113,7 +1182,7 @@ SILIsolationInfo SILIsolationInfo::getForCastConformances(
   // any isolated conformances because it's not on any actor.
   auto function = value->getFunction();
   auto functionIsolation = function->getActorIsolation();
-  if (functionIsolation && functionIsolation->isNonisolated())
+  if (functionIsolation.isNonisolatedOrConcurrent())
     return {};
 
   auto sendableMetatype =
@@ -1141,11 +1210,28 @@ SILIsolationInfo SILIsolationInfo::getForCastConformances(
 
     // The cast can produce a conformance with the same isolation as this
     // function is dynamically executing. If that's known (i.e., because we're
-    // on a global actor), the value is isolated to that global actor.
-    // Otherwise, it's task-isolated.
-    if (functionIsolation && functionIsolation->isGlobalActor()) {
+    // on a global actor or in a an actor instance method), the value could be
+    // isolated to that actor. Otherwise, if we are nonisolated, it's
+    // task-isolated.
+    //
+    // DISCUSSION: We assume that if it were not possible to get a conformance
+    // that is isolated to the current context, then we would emit an error in
+    // the type checker. The fact that we were let through means that the
+    // runtime will return nil or produce a value that is isolated to the
+    // current isolation domain.
+    if (functionIsolation.isGlobalActor()) {
       return SILIsolationInfo::getGlobalActorIsolated(
-          value, functionIsolation->getGlobalActor(), proto);
+          value, functionIsolation.getGlobalActor(), proto);
+    }
+
+    if (functionIsolation.isActorInstanceIsolated()) {
+      if (auto isolatedParam = cast_or_null<SILFunctionArgument>(
+              value->getFunction()->maybeGetIsolatedArgument())) {
+        if (auto result = SILIsolationInfo::getActorInstanceIsolated(
+                value, isolatedParam, proto)) {
+          return result;
+        }
+      }
     }
 
     // Consider the cast to be task-isolated, because the runtime could find
@@ -1199,7 +1285,7 @@ SILIsolationInfo SILIsolationInfo::getConformanceIsolation(SILInstruction *inst)
 
 void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
   if (isolatedConformance) {
-    os << "isolated-conformance-to(" << isolatedConformance->getName() << ")";
+    os << " isolated-conformance-to(" << isolatedConformance->getName() << ")";
   }
 
   auto opts = getOptions();
@@ -1231,7 +1317,7 @@ void SILIsolationInfo::printOptions(llvm::raw_ostream &os) const {
          "Please update MaxNumBits so that we can avoid heap allocations in "
          "this SmallVector");
 
-  llvm::interleave(data, os, ", ");
+  llvm::interleaveComma(data, os);
 }
 
 StringRef SILIsolationInfo::printActorIsolationForDiagnostics(
@@ -1250,19 +1336,14 @@ StringRef SILIsolationInfo::printActorIsolationForDiagnostics(
 void SILIsolationInfo::printActorIsolationForDiagnostics(
     SILFunction *fn, ActorIsolation iso, llvm::raw_ostream &os,
     StringRef openingQuotationMark, bool asNoun) {
-  // If we have NonisolatedNonsendingByDefault enabled, we need to return
-  // @concurrent for nonisolated and nonisolated for caller isolation inherited.
-  if (fn->isAsync() && fn->getASTContext().LangOpts.hasFeature(
-                           Feature::NonisolatedNonsendingByDefault)) {
-    if (iso.isCallerIsolationInheriting()) {
-      os << "nonisolated";
-      return;
-    }
-
-    if (iso.isNonisolated()) {
-      os << "@concurrent";
-      return;
-    }
+  // Under NonisolatedNonsendingByDefault, render NonisolatedNonsending as
+  // "nonisolated" instead of the default "caller isolation inheriting-isolated".
+  if (fn->isAsync() &&
+      fn->getASTContext().LangOpts.hasFeature(
+          Feature::NonisolatedNonsendingByDefault) &&
+      iso.isNonisolatedNonsending()) {
+    os << "nonisolated";
+    return;
   }
 
   return iso.printForDiagnostics(os, openingQuotationMark, asNoun);
@@ -1270,8 +1351,8 @@ void SILIsolationInfo::printActorIsolationForDiagnostics(
 
 void SILIsolationInfo::print(SILFunction *fn, llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
-  case Unknown:
-    os << "unknown";
+  case Invalid:
+    os << "invalid";
     return;
   case Disconnected:
     os << "disconnected";
@@ -1344,7 +1425,7 @@ bool SILIsolationInfo::hasSameIsolation(const SILIsolationInfo &other) const {
     return false;
 
   switch (getKind()) {
-  case Unknown:
+  case Invalid:
   case Disconnected:
     return true;
   case Task:
@@ -1394,7 +1475,7 @@ void SILIsolationInfo::Profile(llvm::FoldingSetNodeID &id) const {
   id.AddInteger(getKind());
   id.AddInteger(getOptions().toRaw());
   switch (getKind()) {
-  case Unknown:
+  case Invalid:
   case Disconnected:
     return;
   case Task:
@@ -1422,8 +1503,8 @@ StringRef SILIsolationInfo::printForDiagnostics(SILFunction *fn) const {
 void SILIsolationInfo::printForDiagnostics(SILFunction *fn,
                                            llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
-  case Unknown:
-    llvm::report_fatal_error("Printing unknown for diagnostics?!");
+  case Invalid:
+    llvm::report_fatal_error("Printing invalid for diagnostics?!");
     return;
   case Disconnected:
     os << "disconnected";
@@ -1490,8 +1571,8 @@ StringRef SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn) const {
 void SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn,
                                               llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
-  case Unknown:
-    llvm::report_fatal_error("Printing unknown for code diagnostic?!");
+  case Invalid:
+    llvm::report_fatal_error("Printing invalid for code diagnostic?!");
     return;
   case Disconnected:
     llvm::report_fatal_error("Printing disconnected for code diagnostic?!");
@@ -1534,8 +1615,8 @@ void SILIsolationInfo::printForCodeDiagnostic(SILFunction *fn,
 void SILIsolationInfo::printForOneLineLogging(SILFunction *fn,
                                               llvm::raw_ostream &os) const {
   switch (Kind(*this)) {
-  case Unknown:
-    os << "unknown";
+  case Invalid:
+    os << "invalid";
     return;
   case Disconnected:
     os << "disconnected";
@@ -1689,12 +1770,12 @@ SILIsolationInfo SILIsolationInfo::getFunctionIsolation(SILFunction *fn) {
   if (!isolation)
     return {};
 
-  if (isolation->isGlobalActor()) {
+  if (isolation.isGlobalActor()) {
     return SILIsolationInfo::getGlobalActorIsolated(
-        SILValue(), isolation->getGlobalActor());
+        SILValue(), isolation.getGlobalActor());
   }
 
-  if (isolation->isActorInstanceIsolated()) {
+  if (isolation.isActorInstanceIsolated()) {
     return SILIsolationInfo::getActorInstanceIsolated(
         SILValue(), cast<SILFunctionArgument>(fn->maybeGetIsolatedArgument()));
   }
@@ -1717,7 +1798,8 @@ SILValue ActorInstance::lookThroughInsts(SILValue value) {
         isa<CopyableToMoveOnlyWrapperValueInst>(svi) ||
         isa<MoveOnlyWrapperToCopyableValueInst>(svi) ||
         isa<InitExistentialRefInst>(svi) || isa<UncheckedRefCastInst>(svi) ||
-        isa<UnconditionalCheckedCastInst>(svi)) {
+        isa<UnconditionalCheckedCastInst>(svi) ||
+        isa<ImplicitActorToOpaqueIsolationCastInst>(svi)) {
       value = lookThroughInsts(svi->getOperand(0));
       continue;
     }
@@ -1776,69 +1858,108 @@ SILValue ActorInstance::lookThroughInsts(SILValue value) {
 //                    MARK: SILDynamicMergedIsolationInfo
 //===----------------------------------------------------------------------===//
 
-std::optional<SILDynamicMergedIsolationInfo>
+SILDynamicMergedIsolationInfo
 SILDynamicMergedIsolationInfo::merge(SILIsolationInfo other) const {
-  // If we are greater than the other kind, then we are further along the
-  // lattice. We ignore the change.
-  //
-  // NOTE: If we are further along, then we both cannot be task isolated. In
-  // such a case, we are the only potential thing that can be
-  // nonisolated(unsafe)... so we do not need to try to propagate.
-  if (unsigned(innerInfo.getKind() > unsigned(other.getKind()))) {
-    return {*this};
-  }
+  auto lhs = innerInfo;
+  auto rhs = other;
 
-  // If we are both actor isolated...
-  if (innerInfo.isActorIsolated() && other.isActorIsolated()) {
-    // If both innerInfo and other have the same isolation, we are obviously
-    // done. Just return innerInfo since we could return either.
-    if (innerInfo.hasSameIsolation(other))
-      return {innerInfo.withMergedIsolatedConformance(other.getIsolatedConformance())};
+  if (lhs.getKind() > rhs.getKind())
+    std::swap(lhs, rhs);
 
-    // Ok, there is some difference in between innerInfo and other. Lets see if
+#ifdef KIND_COMBINE
+#error "KIND_COMBINE already defined?!"
+#endif
+
+#ifdef KIND_COMBINE_DECL
+#error "KIND_COMBINE_DECL already defined?!"
+#endif
+
+#define KIND_COMBINE(X, Y) (uint8_t(X) | (uint8_t(Y) << 2))
+  enum class CombinedKind : uint8_t {
+#define KIND_COMBINE_DECL(X, Y)                                                \
+  X##Y = KIND_COMBINE(SILIsolationInfo::Kind::X, SILIsolationInfo::Kind::Y)
+    KIND_COMBINE_DECL(Disconnected, Disconnected),
+    KIND_COMBINE_DECL(Disconnected, Task),
+    KIND_COMBINE_DECL(Disconnected, Actor),
+    KIND_COMBINE_DECL(Disconnected, Invalid),
+    KIND_COMBINE_DECL(Task, Task),
+    KIND_COMBINE_DECL(Task, Actor),
+    KIND_COMBINE_DECL(Task, Invalid),
+    KIND_COMBINE_DECL(Actor, Actor),
+    KIND_COMBINE_DECL(Actor, Invalid),
+    KIND_COMBINE_DECL(Invalid, Invalid)
+  };
+
+  switch (CombinedKind(KIND_COMBINE(lhs.getKind(), rhs.getKind()))) {
+  case CombinedKind::DisconnectedDisconnected:
+    // If we are both disconnected and rhs has the unsafeNonIsolated bit set,
+    // drop that bit and return that.
+    //
+    // DISCUSSION: We do not want to preserve the unsafe non isolated bit after
+    // merging. These bits should not propagate through merging and should
+    // instead always be associated with non-merged infos.
+    if (rhs.isDisconnected() && rhs.isUnsafeNonIsolated()) {
+      return {rhs.withUnsafeNonIsolated(false)};
+    }
+    return {lhs};
+
+  case CombinedKind::DisconnectedTask:
+  case CombinedKind::DisconnectedActor:
+  case CombinedKind::DisconnectedInvalid:
+    return {rhs};
+  case CombinedKind::TaskTask:
+    if (lhs.isNonisolatedNonsendingTaskIsolated() ||
+        rhs.isNonisolatedNonsendingTaskIsolated())
+      return lhs.withNonisolatedNonsendingTaskIsolated(true)
+          .withMergedIsolatedConformance(rhs.getIsolatedConformance());
+    return {rhs};
+  case CombinedKind::TaskActor:
+    // If we have a nonisolated(nonsending) task isolated value and an unapplied
+    // isolated any parameter, allow for it to merge by just taking the isolated
+    // any parameter.
+    //
+    // TODO: Should we model unapplied isolated any parameter as a separate
+    // lattice element?
+    //
+    // TODO: Should we model NonisolatedNonsendingTaskIsolated as a separate
+    // kind. It is sort of an Actor, but we do not want to treat it like an
+    // actor when emitting diagnostics and the like.
+    if (lhs.isNonisolatedNonsendingTaskIsolated() &&
+        rhs.isUnappliedIsolatedAnyParameter()) {
+      return {lhs};
+    }
+
+    // Otherwise, fail.
+    return {SILIsolationInfo()};
+  case CombinedKind::TaskInvalid:
+    return {rhs};
+  case CombinedKind::ActorActor: {
+    // If both lhs and rhs have the same isolation, we are obviously
+    // done. Just return lhs since we could return either.
+    if (lhs.hasSameIsolation(rhs))
+      return {lhs.withMergedIsolatedConformance(rhs.getIsolatedConformance())};
+
+    // Ok, there is some difference in between lhs and rhs. Lets see if
     // they are both actor instance isolated and if either are unapplied
     // isolated any parameter. In such a case, take the one that is further
     // along.
-    if (innerInfo.getActorIsolation().isActorInstanceIsolated() &&
-        other.getActorIsolation().isActorInstanceIsolated()) {
-      if (innerInfo.isUnappliedIsolatedAnyParameter())
-        return other.withMergedIsolatedConformance(innerInfo.getIsolatedConformance());
-      if (other.isUnappliedIsolatedAnyParameter())
-        return innerInfo.withMergedIsolatedConformance(other.getIsolatedConformance());
+    if (lhs.getActorIsolation().isActorInstanceIsolated() &&
+        rhs.getActorIsolation().isActorInstanceIsolated()) {
+      if (lhs.isUnappliedIsolatedAnyParameter())
+        return rhs.withMergedIsolatedConformance(lhs.getIsolatedConformance());
+      if (rhs.isUnappliedIsolatedAnyParameter())
+        return lhs.withMergedIsolatedConformance(rhs.getIsolatedConformance());
     }
 
-    // Otherwise, they do not match... so return None to signal merge failure.
-    return {};
+    return {SILIsolationInfo()};
   }
-
-  // If we are both disconnected and other has the unsafeNonIsolated bit set,
-  // drop that bit and return that.
-  //
-  // DISCUSSION: We do not want to preserve the unsafe non isolated bit after
-  // merging. These bits should not propagate through merging and should instead
-  // always be associated with non-merged infos.
-  if (other.isDisconnected() && other.isUnsafeNonIsolated()) {
-    return {other.withUnsafeNonIsolated(false)};
+  case CombinedKind::ActorInvalid:
+  case CombinedKind::InvalidInvalid:
+    return {rhs};
   }
-
-  // We know that we are either the same as other or other is further along. If
-  // other is further along, it is the only thing that can propagate the task
-  // isolated bit. So we do not need to do anything. If we are equal though, we
-  // may need to propagate the bit. This ensures that when we emit a diagnostic
-  // we appropriately say potentially actor isolated code instead of code in the
-  // current task.
-  //
-  // TODO: We should really represent this as a separate isolation info
-  // kind... but that would be a larger change than we want for 6.2.
-  if (innerInfo.isTaskIsolated() && other.isTaskIsolated()) {
-    if (innerInfo.isNonisolatedNonsendingTaskIsolated() ||
-        other.isNonisolatedNonsendingTaskIsolated())
-      return other.withNonisolatedNonsendingTaskIsolated(true)
-        .withMergedIsolatedConformance(innerInfo.getIsolatedConformance());
-  }
-
-  // Otherwise, just return other.
-  return {other};
+  llvm_unreachable("Unhandled case?!");
+#undef KIND_COMBINE_DECL
+#undef KIND_COMBINE
 }
 
 void ActorInstance::print(llvm::raw_ostream &os) const {
@@ -1932,8 +2053,8 @@ static FunctionTest IsolationMergeTest(
       auto secondValue = arguments.takeValue();
       SILIsolationInfo firstValueInfo = SILIsolationInfo::get(firstValue);
       SILIsolationInfo secondValueInfo = SILIsolationInfo::get(secondValue);
-      std::optional<SILDynamicMergedIsolationInfo> mergedInfo(firstValueInfo);
-      mergedInfo = mergedInfo->merge(secondValueInfo);
+      SILDynamicMergedIsolationInfo mergedInfo(firstValueInfo);
+      mergedInfo = mergedInfo.merge(secondValueInfo);
       llvm::outs() << "First Value: " << *firstValue;
       llvm::outs() << "First Isolation: ";
       firstValueInfo.printForOneLineLogging(&function, llvm::outs());
@@ -1948,5 +2069,24 @@ static FunctionTest IsolationMergeTest(
       }
       llvm::outs() << "\n";
     });
+
+// Arguments:
+// - SILValue: value to look up isolation for.
+// Dumps:
+// - The inferred isolation.
+static FunctionTest
+    GetConformanceIsolationInferrence("sil_isolation_info_get_conformance_isolation_inferrence",
+                            [](auto &function, auto &arguments, auto &test) {
+                              auto value = arguments.takeValue();
+
+                              SILIsolationInfo info =
+                                SILIsolationInfo::getConformanceIsolation(cast<SingleValueInstruction>(value));
+                              llvm::outs() << "Input Value: " << *value;
+                              llvm::outs() << "Isolation: ";
+                              info.printForOneLineLogging(&function,
+                                                          llvm::outs());
+                              llvm::outs() << "\n";
+                            });
+
 
 } // namespace swift::test

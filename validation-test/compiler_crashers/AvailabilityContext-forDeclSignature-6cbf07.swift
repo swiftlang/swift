@@ -1,4 +1,4 @@
-// {"kind":"typecheck","signature":"swift::AvailabilityContext::forDeclSignature(swift::Decl const*)"}
+// {"kind":"typecheck","signature":"swift::AvailabilityContext::forDeclSignature(swift::Decl const*)","signatureNext":"ConstraintSystem::buildTypeErasedExpr"}
 // RUN: not --crash %target-swift-frontend -typecheck %s
 @_typeEraser(a) protocol b dynamic func c->some b {
   d

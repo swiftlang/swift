@@ -6,6 +6,9 @@
 // XFAIL: OS=windows-msvc
 // RUN: %empty-directory(%t)
 
+// rdar://173266760
+// XFAIL: OS=freebsd
+
 // rdar://100558042
 // UNSUPPORTED: CPU=arm64e
 
@@ -1274,12 +1277,18 @@ $1_SiBV
 // CHECK-64:      (builtin_fixed_array
 // CHECK-64-NEXT:   (integer value=2)
 // CHECK-64-NEXT:   (struct Swift.Int))
-// CHECK-64-NEXT: (array size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1)
+// CHECK-64-NEXT: (array size=16 alignment=8 stride=16 num_extra_inhabitants=0 bitwise_takable=1 count=2
+// CHECK-64-NEXT:   (struct size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-64-NEXT:     (field name=_value offset=0
+// CHECK-64-NEXT:       (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=0 bitwise_takable=1))))
 
 // CHECK-32:      (builtin_fixed_array
 // CHECK-32-NEXT:   (integer value=2)
 // CHECK-32-NEXT:   (struct Swift.Int))
-// CHECK-32-NEXT: (array size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1)
+// CHECK-32-NEXT: (array size=8 alignment=4 stride=8 num_extra_inhabitants=0 bitwise_takable=1 count=2
+// CHECK-32-NEXT:   (struct size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1
+// CHECK-32-NEXT:     (field name=_value offset=0
+// CHECK-32-NEXT:       (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=0 bitwise_takable=1))))
 
 SiBW
 // CHECK-64:      (builtin_borrow
@@ -1416,4 +1425,31 @@ $1_12TypeLowering10SimpleEnumOBVBW
 // CHECK-32-NEXT:      (struct TypeLowering.Big))
 // CHECK-32-NEXT:    (borrow size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)
 
+// `unmanaged_storage` applied to a single-field pointer-sized struct.
+SpySiGXu
+// CHECK:      (unmanaged_storage
+// CHECK-NEXT:   (bound_generic_struct Swift.UnsafeMutablePointer
+// CHECK-NEXT:     (struct Swift.Int)))
+// CHECK-64-NEXT: (struct size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1
+// CHECK-64-NEXT:   (field name=_rawValue offset=0
+// CHECK-64-NEXT:     (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))
+// CHECK-32-NEXT: (struct size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1
+// CHECK-32-NEXT:   (field name=_rawValue offset=0
+// CHECK-32-NEXT:     (builtin size=4 alignment=4 stride=4 num_extra_inhabitants={{[0-9]+}} bitwise_takable=1)))
 
+// Existential metatype of a constrained existential
+12TypeLowering2PP_pSi1TAaCPRts_XPXp
+// CHECK: (existential_metatype
+// CHECK-NEXT: (constrained_existential_type
+// CHECK-NEXT: (protocol_composition
+// CHECK-NEXT: (protocol TypeLowering.PP))
+// CHECK-64: (existential_metatype size=16 alignment=8 stride=16 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1
+// CHECK-64-NEXT: (field name=metadata offset=0
+// CHECK-64-NEXT: (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=[[PTR_XI]] bitwise_takable=1))
+// CHECK-64-NEXT: (field name=wtable offset=8
+// CHECK-64-NEXT: (builtin size=8 alignment=8 stride=8 num_extra_inhabitants=1 bitwise_takable=1)))
+// CHECK-32: (existential_metatype size=8 alignment=4 stride=8 num_extra_inhabitants=4096 bitwise_takable=1
+// CHECK-32-NEXT: (field name=metadata offset=0
+// CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=4096 bitwise_takable=1))
+// CHECK-32-NEXT: (field name=wtable offset=4
+// CHECK-32-NEXT: (builtin size=4 alignment=4 stride=4 num_extra_inhabitants=1 bitwise_takable=1)))

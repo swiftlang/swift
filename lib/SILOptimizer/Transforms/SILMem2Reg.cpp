@@ -1981,9 +1981,11 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
             LiveValues::toReplace(asi,
                                   /*replacement=*/initialValue),
             /*isStorageValid=*/!doesLoadInvalidateStorage(inst)};
-        if (auto varInfo = asi->getVarInfo()) {
-          SILBuilderWithScope(inst, ctx).createDebugValue(
-              inst->getLoc(), initialValue, *varInfo);
+        if (auto var = asi->getVarInfo()) {
+          // Remove the implicit op_deref, as it is no longer on the stack.
+          var->DIExpr = {};
+          SILBuilder Builder(inst, ctx, asi->getDebugScope());
+          Builder.createDebugValue(inst->getLoc(), initialValue, *var);
         }
       }
       auto *loadInst = dyn_cast<LoadInst>(inst);

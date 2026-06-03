@@ -15,7 +15,7 @@
 /// A 128-bit signed integer value type.
 @available(SwiftStdlib 6.0, *)
 @frozen
-public struct Int128: Sendable {
+public struct Int128: Sendable, BitwiseCopyable {
 #if _pointerBitWidth(_64) || arch(arm64_32)
   //  On 64-bit platforms (including arm64_32 and any similar targets with
   //  32b pointers but HW-backed 64b integers), the layout is simply that
@@ -552,3 +552,6 @@ extension Int128 {
     return rhs < lhs
   }
 }
+
+@available(SwiftStdlib 6.0, *)
+extension Int128: ConvertibleToBytes, ConvertibleFromBytes {}

@@ -604,13 +604,12 @@ There are very few safe changes to make to protocols and their members:
   uses ``Self`` and the protocol has no other requirements using ``Self`` and
   no associated types, this is a `binary-compatible source-breaking change` due
   to restrictions on protocol value types.
-- A `@reparented` protocol refinement relationship may be added. All
-  requirements of this new parent must have default witnesses in the refining
-  protocol. A protocol can only be reparented by a `@reparentable` protocol.
+- A `reparented <Reparenting_>`_ protocol refinement relationship may be added.
 
 All other changes to the protocol itself are forbidden, including:
 
-- Adding or removing refined protocols (see exception for `@reparented`).
+- Removing refined protocols
+- Adding refined protocols (unless via `reparenting <Reparenting_>`_).
 - Removing any existing requirements (type or non-type).
 - Removing the default type of an associated type.
 - Making an existing requirement optional.
@@ -619,11 +618,13 @@ All other changes to the protocol itself are forbidden, including:
   clause of an associated type.
 - Adding or removing constraints from the ``where`` clause of
   the protocol or an associated type.
-- Adding `@reparentable` to a protocol.
+- Adding or removing ``@reparentable`` from a protocol.
 
 Protocol extensions may be more freely modified; `see below`__.
 
 __ #protocol-extensions
+
+.. _Reparenting: https://github.com/swiftlang/swift/blob/main/docs/Reparenting.md
 
 Classes
 ~~~~~~~

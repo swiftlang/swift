@@ -1,0 +1,4 @@
+// {"extraArgs":["-experimental-allow-module-with-compiler-errors","-cxx-interoperability-mode=default","-emit-clang-header-min-access","internal","-emit-clang-header-path","/dev/null"],"kind":"typecheck","original":"9726f892","signature":"swift::DeclAndTypePrinter::Implementation::printAvailability(llvm::raw_ostream&, swift::Decl const*, swift::DeclAndTypePrinter::Implementation::PrintLeadingSpace)","signatureAssert":"Assertion failed: (shouldInclude(renamedDecl) && \"ObjC printer logic mismatch with renamed decl\"), function printRenameForDecl","signatureNext":"DeclAndTypePrinter::Implementation::printCFunctionWithLoweredSignature"}
+// RUN: not %target-swift-frontend -typecheck -experimental-allow-module-with-compiler-errors -cxx-interoperability-mode=default -emit-clang-header-min-access internal -emit-clang-header-path /dev/null %s
+@available(*, deprecated, renamed: "b") func == ()
+func b() -> a

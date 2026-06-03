@@ -29,3 +29,8 @@ module InRegSRet {
   header "inreg-sret.h"
   requires cplusplus
 }
+
+module SwiftNameDifferentType {
+  header "swift-name-different-type.h"
+  requires cplusplus
+}

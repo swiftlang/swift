@@ -194,6 +194,7 @@ import SortIntPyramids
 import SortLargeExistentials
 import SortLettersInPlace
 import SortStrings
+import SpanTests
 import StaticArray
 import StrComplexWalk
 import StrToInt
@@ -214,11 +215,15 @@ import StringWalk
 import SubstringTest
 import Suffix
 import SuperChars
+import TaskGroups
+import TaskLocalGet
+import ToddCoxeter
 import TwoSum
 import TypeFlood
 import UTF8Decode
 import UTF16Decode
 import Walsh
+import WithUnsafeCurrentTask
 import WordCount
 import XorLoop
 
@@ -403,6 +408,7 @@ register(SortIntPyramids.benchmarks)
 register(SortLargeExistentials.benchmarks)
 register(SortLettersInPlace.benchmarks)
 register(SortStrings.benchmarks)
+register(SpanTests.benchmarks)
 register(StaticArray.benchmarks)
 register(StrComplexWalk.benchmarks)
 register(StrToInt.benchmarks)
@@ -427,11 +433,15 @@ register(StringWalk.benchmarks)
 register(SubstringTest.benchmarks)
 register(Suffix.benchmarks)
 register(SuperChars.benchmarks)
+register(TaskGroups.benchmarks)
+register(TaskLocalGet.benchmarks)
+register(ToddCoxeter.benchmarks)
 register(TwoSum.benchmarks)
 register(TypeFlood.benchmarks)
 register(UTF8Decode.benchmarks)
 register(UTF16Decode.benchmarks)
 register(Walsh.benchmarks)
+register(WithUnsafeCurrentTask.benchmarks)
 register(WordCount.benchmarks)
 register(XorLoop.benchmarks)
 

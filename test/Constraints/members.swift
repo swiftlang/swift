@@ -325,9 +325,6 @@ enum r23942743 {
   case Tomato(cloud: String)
 }
 let _ = .Tomato(cloud: .none)  // expected-error {{reference to member 'Tomato' cannot be resolved without a contextual type}}
-// expected-error@-1 {{cannot infer contextual base in reference to member 'none'}}
-
-
 
 // https://github.com/apple/swift/issues/43267
 // REGRESSION: Assertion failed: (baseTy && "Couldn't find appropriate context"), function getMemberSubstitutions
@@ -633,7 +630,7 @@ func rdar_50467583_and_50909555() {
     // expected-error@-1 {{no exact matches in call to subscript}}
     // expected-note@-2 {{found candidate with type '(Int) -> Int'}}
     // expected-note@-3 {{found candidate with type '(Range<Int>) -> ArraySlice<Int>'}}
-    // expected-note@-4 {{found candidate with type '((UnboundedRange_) -> ()) -> ArraySlice<Int>'}}
+    // expected-note@-4 {{found candidate with type '(UnboundedRange) -> ArraySlice<Int>' (aka '((UnboundedRange_) -> ()) -> ArraySlice<Int>')}}
     // expected-note@-5 * {{found candidate with type '(RangeSet<Array<Int>.Index>) -> DiscontiguousSlice<[Int]>' (aka '(RangeSet<Int>) -> DiscontiguousSlice<Array<Int>>')}}
   }
   

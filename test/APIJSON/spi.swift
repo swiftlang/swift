@@ -96,7 +96,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTj",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "10.10",
@@ -104,7 +104,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule0A6Class2C18spiAvailableMethodyyFTq",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "10.10",
@@ -178,7 +178,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule16spiAvailableFuncyyF",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "10.10",
@@ -186,7 +186,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassC18noAvailabilityAttryyFTj",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -194,7 +194,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassC18noAvailabilityAttryyFTq",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -202,7 +202,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMa",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -210,7 +210,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMm",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -218,7 +218,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMn",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -226,7 +226,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMo",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -234,7 +234,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCMu",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -242,7 +242,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCN",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -250,7 +250,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCfD",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -258,7 +258,7 @@ public class SPIClass {
 // CHECK-NEXT:     },
 // CHECK-NEXT:     {
 // CHECK-NEXT:       "name": "_$s8MyModule8SPIClassCfd",
-// CHECK-NEXT:       "access": "private",
+// CHECK-NEXT:       "access": "public",
 // CHECK-NEXT:       "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:       "linkage": "exported",
 // CHECK-NEXT:       "introduced": "11",
@@ -300,7 +300,7 @@ public class SPIClass {
 // CHECK-NEXT:         },
 // CHECK-NEXT:         {
 // CHECK-NEXT:           "name": "spiAvailableMethod",
-// CHECK-NEXT:           "access": "private",
+// CHECK-NEXT:           "access": "public",
 // CHECK-NEXT:           "file": "SOURCE_DIR/test/APIJSON/spi.swift",
 // CHECK-NEXT:           "introduced": "10.10",
 // CHECK-NEXT:           "SPIAvailable": true

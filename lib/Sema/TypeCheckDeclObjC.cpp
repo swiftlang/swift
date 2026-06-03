@@ -539,7 +539,8 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     llvm_unreachable("decl cannot have dynamic isolation");
 
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
+  case ActorIsolation::NonisolatedConcurrent:
+  case ActorIsolation::NonisolatedNonsending:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     return false;
@@ -3905,7 +3906,10 @@ private:
         return MatchOutcome::WrongForeignErrorConvention;
       for (auto [reqParam, candParam] :
            llvm::zip(*reqAFD->getParameters(), *candAFD->getParameters())) {
-        if (reqParam->getValueOwnership() != candParam->getValueOwnership())
+        // In case the ObjC owership is unowned and the swift is owned, the ObjC
+        // thunk will make the necessary adjustment.
+        if (reqParam->getValueOwnership() != candParam->getValueOwnership() &&
+            reqParam->getValueOwnership() != ValueOwnership::Default)
           return MatchOutcome::WrongParameterOwnership;
       }
     }

@@ -271,21 +271,34 @@ internal func _swift_exclusivityAccessGetParent(
 
 @inline(never)
 fileprivate func invalidFlags(_ flags: UInt) -> Never {
+  #if !$Embedded
   reportExclusivityError("Internal exclusivity error",
-                         "unable to construct action from flags \(flags)")
+    "unable to construct action from flags \(flags)")
+  #else
+  fatalError("Internal exclusivity error: unable to construct action from flags")
+  #endif
 }
 
 @inline(never)
 fileprivate func accessNotFound(_ access: AccessPointer) -> Never {
+  #if !$Embedded
   unsafe reportExclusivityError("Internal exclusivity error",
                                 "didn't find exclusive access buffer \(access)")
+  #else
+  fatalError("Internal exclusivity error: didn't find exclusive access buffer")
+  #endif
 }
 
 @inline(never)
 fileprivate func nullAccessBuffer() -> Never {
+  #if !$Embedded
   reportExclusivityError("Internal exclusivity error", "NULL access buffer")
+  #else
+  fatalError("Internal exclusivity error: NULL access buffer")
+  #endif
 }
 
+@_unavailableInEmbedded
 fileprivate func reportExclusivityError(
   _ prefix: StaticString, _ message: String
 ) -> Never {
