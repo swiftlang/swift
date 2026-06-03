@@ -1442,7 +1442,7 @@ final public class ExplicitCopyValueInst : SingleValueInstruction, CopyingInstru
 final public class UnownedCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 final public class WeakCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 
-final public class UncheckedOwnershipConversionInst : SingleValueInstruction {}
+final public class UncheckedOwnershipConversionInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
@@ -2205,9 +2205,9 @@ final public class CondBranchInst : TermInst {
 final public class SwitchValueInst : TermInst {
 }
 
-final public class SwitchEnumInst : TermInst {
+final public class SwitchEnumInst : TermInst, UnaryInstruction {
 
-  public var enumOp: Value { operands[0].value }
+  public var enumOp: Value { operand.value }
 
   public struct CaseIndexArray : RandomAccessCollection {
     fileprivate let switchEnum: SwitchEnumInst

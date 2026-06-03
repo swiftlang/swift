@@ -159,6 +159,7 @@ private func registerSwiftPasses() {
   registerForSILCombine(DereferenceBorrowInst.self, { run(DereferenceBorrowInst.self, $0) })
   registerForSILCombine(DereferenceAddrBorrowInst.self, { run(DereferenceAddrBorrowInst.self, $0) })
   registerForSILCombine(DifferentiableFunctionInst.self, { run(DifferentiableFunctionInst.self, $0) })
+  registerForSILCombine(UncheckedOwnershipConversionInst.self, { run(UncheckedOwnershipConversionInst.self, $0) })
 }
 
 private func registerSwiftAnalyses() {
