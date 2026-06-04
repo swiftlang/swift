@@ -447,7 +447,7 @@ extension SerialExecutor {
 /// the provided task executor, instead of the default global one.
 ///
 /// If an actor has a specific executor requirement, the task executor preference will not take effect.
-
+///
 /// The task executor preference is effective through child tasks as well, so even if
 /// a child task of a task with a preference did not re-state the preference, the preference is still active:
 ///
@@ -461,8 +461,106 @@ extension SerialExecutor {
 ///         }
 ///       }
 ///     }
-///
 /// Unstructured tasks do not inherit the task executor preference.
+///
+/// ### Task executor preference semantics
+/// Task executors influence _where_ nonisolated asynchronous functions, and default actor methods execute.
+/// The preferred executor will be used whenever possible, rather than hopping to the global concurrent pool.
+///
+/// For an in depth discussion of this topic, see ``TaskExecutor``.
+///
+/// ### Asynchronous function execution semantics in presence of task executor preferences
+/// The following diagram illustrates on which executor an `async` function will
+/// execute, in presence (or lack thereof) a task executor preference.
+///
+/// ```
+/// [ func / closure ] - /* where should it execute? */
+///                               |
+///                     +--------------+          +===========================+
+///           +-------- | is isolated? | - yes -> | actor has unownedExecutor |
+///           |         +--------------+          +===========================+
+///           |                                       |                |
+///           |                                      yes               no
+///           |                                       |                |
+///           |                                       v                v
+///           |                  +=======================+    /* task executor preference? */
+///           |                  | on specified executor |        |                   |
+///           |                  +=======================+       yes                  no
+///           |                                                   |                   |
+///           |                                                   |                   v
+///           |                                                   |    +==========================+
+///           |                                                   |    | default (actor) executor |
+///           |                                                   v    +==========================+
+///           v                                     +==============================+
+///  /* task executor preference? */ ---- yes ----> | on Task's preferred executor |
+///           |                                     +==============================+
+///           no
+///           |
+///           v
+///  +===============================+
+///  | on global concurrent executor |
+///  +===============================+
+/// ```
+///
+/// In short, without a task executor preference, `nonisolated async` functions
+/// will execute on the global concurrent executor. If a task executor preference
+/// is present, such `nonisolated async` functions will execute on the preferred
+/// task executor.
+///
+/// Isolated functions semantically execute on the actor they are isolated to,
+/// however if such actor does not declare a custom executor (it is a "default
+/// actor"), in presence of a task executor preference, tasks executing on this
+/// actor will use the preferred executor as source of threads to run the task,
+/// while isolated on the actor.
+///
+/// ### Disabling task executor preference
+/// Pass ``globalConcurrentExecutor`` to override any existing preference with the global concurrent executor,
+/// which is equivalent to having no preference set.
+///
+/// ### Example
+///
+///     Task {
+///       // case 0) "no task executor preference"
+///
+///       // default task executor
+///       // ...
+///       await SomeDefaultActor().hello() // default executor
+///       await ActorWithCustomExecutor().hello() // 'hello' executes on actor's custom executor
+///
+///       // child tasks execute on default executor:
+///       async let x = ...
+///       await withTaskGroup(of: Int.self) { group in g.addTask { 7 } }
+///
+///       await withTaskExecutorPreference(specific) {
+///         // case 1) 'specific' task executor preference
+///
+///         // 'specific' task executor
+///         // ...
+///         await SomeDefaultActor().hello() // 'hello' executes on 'specific' executor
+///         await ActorWithCustomExecutor().hello() // 'hello' executes on actor's custom executor (same as case 0)
+///
+///         // child tasks execute on 'specific' task executor:
+///         async let x = ...
+///         await withTaskGroup(of: Int.self) { group in
+///           group.addTask { 7 } // child task executes on 'specific' executor
+///           group.addTask(executorPreference: globalConcurrentExecutor) { 13 } // child task executes on global concurrent executor
+///         }
+///
+///         // disable the task executor preference:
+///         await withTaskExecutorPreference(globalConcurrentExecutor) {
+///           // equivalent to case 0) preference is globalConcurrentExecutor
+///
+///           // default task executor
+///           // ...
+///           await SomeDefaultActor().hello() // default executor (same as case 0)
+///           await ActorWithCustomExecutor().hello() // 'hello' executes on actor's custom executor (same as case 0)
+///
+///           // child tasks execute on default executor (same as case 0):
+///           async let x = ...
+///           await withTaskGroup(of: Int.self) { group in group.addTask { 7 } }
+///         }
+///       }
+///     }
 ///
 /// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
 @available(StdlibDeploymentTarget 6.0, *)
