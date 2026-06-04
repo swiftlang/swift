@@ -2296,6 +2296,16 @@ static bool diagnoseConflictingGenericArguments(ConstraintSystem &cs,
       llvm::all_of(solutions, [](const Solution &solution) -> bool {
         return llvm::all_of(
             solution.Fixes, [](const ConstraintFix *fix) -> bool {
+              if (fix->getKind() == FixKind::IgnoreContextualType) {
+                // Only consider an `IgnoreContextualType` fix at the
+                // unresolved-member chain result when looking for conflicting
+                // generic arguments. This is produced in a ternary expression
+                // with branches that resolve to conflicting specializations of
+                // the same generic type.
+                return fix->getLocator()
+                    ->isLastElement<
+                        LocatorPathElt::UnresolvedMemberChainResult>();
+              }
               return fix->getKind() == FixKind::AllowArgumentTypeMismatch ||
                      fix->getKind() == FixKind::AllowFunctionTypeMismatch ||
                      fix->getKind() == FixKind::AllowTupleTypeMismatch ||
