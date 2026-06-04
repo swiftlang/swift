@@ -110,7 +110,8 @@ struct SwiftCountExprEmitter
 
   bool VisitIntegerLiteral(const clang::IntegerLiteral *IL) {
     const auto *bt = IL->getType()->getAs<clang::BuiltinType>();
-    if (!bt) return false;
+    if (!bt)
+      return false;
     bool isSigned = IL->getType()->isSignedIntegerType();
     llvm::SmallString<20> valueStr;
     IL->getValue().toString(valueStr, /*Radix=*/10, isSigned);
@@ -195,7 +196,8 @@ struct SwiftCountExprEmitter
 
   bool VisitParenExpr(const clang::ParenExpr *p) {
     out << '(';
-    if (!Visit(p->getSubExpr())) return false;
+    if (!Visit(p->getSubExpr()))
+      return false;
     out << ')';
     return true;
   }
@@ -203,9 +205,14 @@ struct SwiftCountExprEmitter
   bool VisitUnaryOperator(const clang::UnaryOperator *unop) {
     llvm::StringRef op;
     switch (unop->getOpcode()) {
-    case clang::UO_Plus:  op = "+"; break;
-    case clang::UO_Minus: op = "-"; break;
-    case clang::UO_Not:   op = "~"; break;
+#define UNOP(variant, string)                                                  \
+  case clang::variant:                                                         \
+    op = string;                                                               \
+    break
+      UNOP(UO_Plus, "+");
+      UNOP(UO_Minus, "-");
+      UNOP(UO_Not, "~");
+#undef CASE_UNOP
     default:
       DLOG("Unsupported unary operator\n");
       return false;
@@ -217,17 +224,20 @@ struct SwiftCountExprEmitter
   bool VisitBinaryOperator(const clang::BinaryOperator *binop) {
     llvm::StringRef op;
     switch (binop->getOpcode()) {
-#define BINOP(variant, string) case clang::variant: op = " " string " "; break
-    BINOP(BO_Add, "+");
-    BINOP(BO_Sub, "-");
-    BINOP(BO_Mul, "*");
-    BINOP(BO_Div, "/");
-    BINOP(BO_Rem, "%");
-    BINOP(BO_Shl, "<<");
-    BINOP(BO_Shr, ">>");
-    BINOP(BO_And, "&");
-    BINOP(BO_Or,  "|");
-    BINOP(BO_Xor, "^");
+#define BINOP(variant, string)                                                 \
+  case clang::variant:                                                         \
+    op = " " string " ";                                                       \
+    break
+      BINOP(BO_Add, "+");
+      BINOP(BO_Sub, "-");
+      BINOP(BO_Mul, "*");
+      BINOP(BO_Div, "/");
+      BINOP(BO_Rem, "%");
+      BINOP(BO_Shl, "<<");
+      BINOP(BO_Shr, ">>");
+      BINOP(BO_And, "&");
+      BINOP(BO_Or, "|");
+      BINOP(BO_Xor, "^");
 #undef CASE_BINOP
     default:
       DLOG("Unsupported binary operator\n");
@@ -237,9 +247,11 @@ struct SwiftCountExprEmitter
     // relative precedence of `<<`/`>>` vs `+`/`-` and `&` vs `+`/`-`, so
     // unparenthesized output could change meaning across languages.
     out << '(';
-    if (!Visit(binop->getLHS())) return false;
+    if (!Visit(binop->getLHS()))
+      return false;
     out << op;
-    if (!Visit(binop->getRHS())) return false;
+    if (!Visit(binop->getRHS()))
+      return false;
     out << ')';
     return true;
   }
@@ -251,10 +263,12 @@ struct SwiftCountExprEmitter
 
 private:
   bool isNarrowingIntCast(const clang::CastExpr *c) {
-    if (c->getCastKind() != clang::CK_IntegralCast) return false;
+    if (c->getCastKind() != clang::CK_IntegralCast)
+      return false;
     auto destTy = c->getType();
     auto srcTy = c->getSubExpr()->getType();
-    if (!destTy->isIntegerType() || !srcTy->isIntegerType()) return false;
+    if (!destTy->isIntegerType() || !srcTy->isIntegerType())
+      return false;
     uint64_t srcBits = ctx.getTypeSize(srcTy);
     uint64_t destBits = ctx.getTypeSize(destTy);
     bool srcSigned = srcTy->isSignedIntegerType();
@@ -267,19 +281,21 @@ private:
 
   std::optional<llvm::StringRef> swiftBuiltinTypeName(clang::QualType ty) {
     const auto *bt = ty->getAs<clang::BuiltinType>();
-    if (!bt) return std::nullopt;
+    if (!bt)
+      return std::nullopt;
     return swiftBuiltinTypeName(bt);
   }
 
   std::optional<llvm::StringRef>
   swiftBuiltinTypeName(const clang::BuiltinType *bt) {
     switch (bt->getKind()) {
-#define MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME) \
-    case clang::BuiltinType::CLANG_KIND: return llvm::StringRef(#SWIFT_NAME);
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_KIND, SWIFT_NAME) \
-    MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)
-#define MAP_BUILTIN_INTEGER_TYPE(CLANG_KIND, SWIFT_NAME) \
-    MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)
+#define MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)                               \
+  case clang::BuiltinType::CLANG_KIND:                                         \
+    return llvm::StringRef(#SWIFT_NAME);
+#define MAP_BUILTIN_CCHAR_TYPE(CLANG_KIND, SWIFT_NAME)                         \
+  MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)
+#define MAP_BUILTIN_INTEGER_TYPE(CLANG_KIND, SWIFT_NAME)                       \
+  MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
     default:
       return std::nullopt;
@@ -291,16 +307,17 @@ static Type ConcretePointeeType(Type swiftType) {
   Type nonnullType = swiftType->lookThroughSingleOptionalType();
   PointerTypeKind PTK;
   Type PointeeTy = nonnullType->getAnyPointerElementType(PTK);
-  if (PointeeTy && (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer))
+  if (PointeeTy &&
+      (PTK == PTK_UnsafePointer || PTK == PTK_UnsafeMutablePointer))
     return PointeeTy;
   return Type();
 }
 
 // Don't try to transform any Swift types that _SwiftifyImport doesn't know how
 // to handle.
-static bool SwiftifiableSizedByPointerType(const clang::ASTContext &ctx,
-                                           Type swiftType,
-                                           const clang::CountAttributedType *CAT) {
+static bool
+SwiftifiableSizedByPointerType(const clang::ASTContext &ctx, Type swiftType,
+                               const clang::CountAttributedType *CAT) {
   Type nonnullType = swiftType->lookThroughSingleOptionalType();
   if (nonnullType->isOpaquePointer())
     return true;
@@ -404,14 +421,12 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
                       llvm::StringMap<std::string> &typeMapping)
       : SwiftifyInfoPrinter(ctx, SwiftContext, out, SwiftifyImportDecl, typeMapping) {}
 
-  bool printCountedBy(const clang::CountAttributedType *CAT,
-                      Type swiftType,
+  bool printCountedBy(const clang::CountAttributedType *CAT, Type swiftType,
                       ssize_t pointerIndex) {
     // Step 1: check if we support this attribute
     bool isSizedBy = CAT->isCountInBytes();
-    if (isSizedBy
-            ? !SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
-            : ConcretePointeeType(swiftType).isNull())
+    if (isSizedBy ? !SwiftifiableSizedByPointerType(ctx, swiftType, CAT)
+                  : ConcretePointeeType(swiftType).isNull())
       return false;
     SwiftCountExprEmitter emitter(ctx);
     if (!emitter.Visit(CAT->getCountExpr()))
@@ -489,7 +504,6 @@ private:
     return false;
   }
 };
-
 
 // Searches for template instantiations that are not behind type aliases.
 // FIXME: make sure the generated code compiles for template
@@ -804,7 +818,8 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
                "free function mapped to instance method without swift_name??");
         Self.diagnose(HeaderLoc(swiftName->getLocation()),
                  diag::note_swift_name_instance_method);
-      } else if (CAT && printer.printCountedBy(CAT, swiftParamTy, mappedIndex)) {
+      } else if (CAT &&
+                 printer.printCountedBy(CAT, swiftParamTy, mappedIndex)) {
         DLOG("Found bounds info '" << clangParamTy << "'\n");
         attachMacro = paramHasBoundsInfo = true;
       }
@@ -885,8 +900,9 @@ static bool swiftifyImpl(ClangImporter::Implementation &Self,
       return false;
     (void)printer.registerStdSpanTypeMapping(
         swiftReturnTy, clangReturnTy);
-    if (CAT && printer.printCountedBy(CAT, swiftReturnTy,
-                                       SwiftifyInfoPrinter::RETURN_VALUE_INDEX)) {
+    if (CAT &&
+        printer.printCountedBy(CAT, swiftReturnTy,
+                               SwiftifyInfoPrinter::RETURN_VALUE_INDEX)) {
       DLOG("Found bounds info '" << clang::QualType(CAT, 0) << "' on return value\n");
       attachMacro = true;
     }
