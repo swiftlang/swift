@@ -78,7 +78,7 @@ public struct JobCancellationToken: ~Copyable {
   /// Cancel a scheduled job.
   ///
   /// Requests that the executor cancel the job identified by the
-  /// `cancellationToken` argument.  Note: executors may not be able
+  /// ``cancellationToken`` argument.  Note: executors may not be able
   /// to cancel any given job, for various reasons including:
   ///
   /// - Where the job has already started executing.
@@ -94,19 +94,36 @@ public struct JobCancellationToken: ~Copyable {
   #endif
 }
 
+/// Specifies whether a job is to be dropped on cancellation, or
+/// whether it should execute immediately.
+///
+/// For ``AsyncTask``s, dropping the job is generally the wrong choice;
+/// instead the job should execute immediately and test for cancellation.
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 9999, *)
 public enum CancellationBehavior {
+  /// On cancellation, drop the job.
   case drop
+
+  /// On cancellation, execute the job immediately.
   case executeImmediately
 }
 
+/// Represents the time at which a job should be scheduled.
+///
+/// A ``FireTime`` is either relative or absolute, and provides
+/// methods to convert to relative or absolute as required by its
+/// user.
 @_spi(ExperimentalScheduling)
 @available(StdlibDeploymentTarget 9999, *)
 public enum FireTime<C: Clock> {
+  /// A relative time
   case after(C.Duration)
+
+  /// An absolute time
   case at(C.Instant)
 
+  /// Return the duration from now until the ``FireTime``.
   public func asDuration(clock: C) -> C.Duration {
     switch self {
       case let .after(someDuration):
@@ -117,6 +134,7 @@ public enum FireTime<C: Clock> {
     }
   }
 
+  /// Return the absolute time represented by the ``FireTime``.
   public func asInstant(clock: C) -> C.Instant {
     switch self {
       case let .after(someDuration):
