@@ -7399,18 +7399,18 @@ ClangImporter::instantiateCXXClassTemplate(
 // "long long" and then back into Swift as "Int64" not "Int."
 static ValueDecl *rewriteIntegerTypes(SubstitutionMap subst, ValueDecl *oldDecl,
                                       AbstractFunctionDecl *newDecl) {
-  auto originalFnSubst = oldDecl->getInterfaceType()
-                             ->getAs<GenericFunctionType>()
-                             ->substGenericArgs(subst);
+  auto *originalFnSubst = oldDecl->getInterfaceType()
+                              ->castTo<GenericFunctionType>()
+                              ->substGenericArgs(subst);
   // AbstractFunctionDecl interface types with an implicit self are curried as:
   //   (Self[.Type]) -> (Generic) -> Result
   // Strip the outer self arrow to get the (Generic) -> Result layer, which is
   // what the rest of this function compares against newDecl's parameters.
-  // SubscriptDecl interface types are not curried this way (they are already
-  // (Generic) -> Element; see InterfaceTypeRequest::evaluate).
+  // This mirrors what AbstractFunctionDecl::getMethodInterfaceType() does, but
+  // on the result of substituting into the generic interface type.
   if (auto *afd = dyn_cast<AbstractFunctionDecl>(oldDecl);
-      afd && afd->hasImplicitSelfDecl())
-    originalFnSubst = cast<FunctionType>(originalFnSubst->getResult().getPointer());
+      afd && afd->getDeclContext()->isTypeContext())
+    originalFnSubst = originalFnSubst->getResult()->castTo<FunctionType>();
 
   SmallVector<ParamDecl *, 4> fixedParameters;
   unsigned parameterIndex = 0;
