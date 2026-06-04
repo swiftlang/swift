@@ -130,6 +130,18 @@ func multiLineFixitErrors() {
   let b = 3 // expected-warning{{initialization of immutable value 'b' was never used}} {{1-2=B}}
 }
 
+func groupNamePreserved(_ x: Int) {
+  // {{group-name=...}} is parsed by the verifier as a separate field, not a
+  // fix-it. consume_trailing_fixits must skip it (and any
+  // {{documentation-file=...}}) when consuming fix-it markers, and
+  // _render_fixits must re-emit those preserved markers in source order
+  // when the run is rewritten.
+  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{1-2=wrong}}
+  if case _ = x {
+    _ = 0
+  }
+}
+
 func wrongCategoryWithFixit() {
   // The expected category mismatches the actual. The verifier reports both
   // a wrong-category error and a fix-it mismatch on the same diagnostic.
@@ -262,6 +274,18 @@ func multiLineFixitErrors() {
   // lines.
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
   let b = 3 // expected-warning{{initialization of immutable value 'b' was never used}} {{3-8=_}}
+}
+
+func groupNamePreserved(_ x: Int) {
+  // {{group-name=...}} is parsed by the verifier as a separate field, not a
+  // fix-it. consume_trailing_fixits must skip it (and any
+  // {{documentation-file=...}}) when consuming fix-it markers, and
+  // _render_fixits must re-emit those preserved markers in source order
+  // when the run is rewritten.
+  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{3-134:4=_ = 0}}
+  if case _ = x {
+    _ = 0
+  }
 }
 
 func wrongCategoryWithFixit() {

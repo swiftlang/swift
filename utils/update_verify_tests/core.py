@@ -83,6 +83,7 @@ class Diag:
         original_count_str=None,
         fixits_raw_str="",
         had_none_fixit_marker=False,
+        preserved_markers=None,
     ):
         self.prefix = prefix
         self.diag_content = diag_content
@@ -109,6 +110,13 @@ class Diag:
         self.closer = None
         self.fixits_raw_str = fixits_raw_str
         self.had_none_fixit_marker = had_none_fixit_marker
+        # Non-fix-it markers (group-name=, documentation-file=) seen inside
+        # the trailing fix-it run on the source line, in source order. They
+        # need to be re-emitted verbatim if actual_fixits replaces the
+        # source's fix-its.
+        self.preserved_markers = (
+            list(preserved_markers) if preserved_markers else []
+        )
         # None means: no fix-it error reported for this diag, render
         # fixits_raw_str as is. A list (possibly empty) means: replace the
         # source fix-its with these exact marker strings.
@@ -167,19 +175,32 @@ class Diag:
         self.fixits_raw_str = other_diag.fixits_raw_str
         self.had_none_fixit_marker = other_diag.had_none_fixit_marker
         self.actual_fixits = other_diag.actual_fixits
+        self.preserved_markers = other_diag.preserved_markers
         other_diag.count = 0
 
     def _render_fixits(self):
         if self.actual_fixits is None:
             return self.fixits_raw_str
-        parts = list(self.actual_fixits)
+        # Re-emit any non-fix-it markers seen inside the source fix-it run
+        # (e.g. {{group-name=...}}) in their original order, then the actual
+        # fix-its from the verifier, then preserve {{none}} if present.
+        parts = list(self.preserved_markers)
+        parts.extend(self.actual_fixits)
         if self.had_none_fixit_marker:
             parts.append(
                 "{{none}}"
             )  # keep {{none}}, it still means "no documentation-file" etc.
         if not parts:
             return ""
-        return " " + " ".join(parts)
+        # Match the source's separator pattern: if the original fix-it run
+        # was packed directly against `}}` of the message (no whitespace),
+        # stay packed; otherwise emit a leading space.
+        leading = (
+            ""
+            if self.fixits_raw_str and self.fixits_raw_str[0] not in " \t"
+            else " "
+        )
+        return leading + " ".join(parts)
 
     def render(self):
         assert self.count >= 0
@@ -259,18 +280,31 @@ fixit_marker_re = re.compile(r"\{\{(?P<content>(?:[^}]|\}(?!\}))*)\}\}+")
 
 
 def consume_trailing_fixits(s):
-    """Pull `{{...}}` fix-it markers (and `{{none}}`) off the head of *s*.
+    """Pull fix-it and related ``{{...}}`` markers off the head of *s*.
 
-    Returns a tuple ``(raw_text, has_none_marker)``
+    Returns ``(raw_text, has_none_marker, preserved_markers)`` where:
 
-    Stops at the first non-fix-it marker (``{{documentation-file=...}}`` or
-    ``{{children:...}}``), leaving it in *s* — those carry their own state
-    and we don't want to clobber them when replacing fix-its.
+    * ``raw_text`` is the substring of *s* covering everything consumed.
+      Non-fix-it markers (``{{documentation-file=...}}``,
+      ``{{group-name=...}}``) are only included when they appear *between*
+      fix-its in the run; trailing ones stay in *s* so the line content
+      around the fix-it expectation continues to round-trip verbatim.
+    * ``has_none_marker`` is True if a ``{{none}}`` marker was seen.
+    * ``preserved_markers`` is the list of non-fix-it markers consumed
+      inside the run, in source order; these must be re-emitted verbatim
+      when the fix-it run is rewritten.
+
+    Stops at ``{{children:...}}`` (which is parsed elsewhere).
     """
     pos = 0
     last_consumed_end = 0
     has_none = False
     saw_any = False
+    preserved = []
+    # Non-fix-it markers seen since the last fix-it (or start). These
+    # become "preserved" only if a subsequent fix-it/{{none}} extends the
+    # consumed run past them; otherwise they are left for line.content.
+    pending_preserved = []
     while True:
         ws_match = re.match(r"[ \t]*", s[pos:])
         next_pos = pos + ws_match.end()
@@ -283,16 +317,24 @@ def consume_trailing_fixits(s):
         if not m:
             break
         content = m.group("content")
-        if content.startswith("documentation-file=") or content.startswith(
-            "children:"
-        ):
+        if content.startswith("children:"):
             break
+        if content.startswith("documentation-file=") or content.startswith(
+            "group-name="
+        ):
+            pending_preserved.append(m.group(0))
+            pos = m.end()
+            continue
+        # Real fix-it (or {{none}}). Commit any pending preserved markers
+        # and extend the consumed range to cover this fix-it.
+        preserved.extend(pending_preserved)
+        pending_preserved = []
         if content == "none":
             has_none = True
         pos = m.end()
         last_consumed_end = m.end()
         saw_any = True
-    return (s[:last_consumed_end], has_none)
+    return (s[:last_consumed_end], has_none, preserved)
 
 
 def split_fixit_markers(s):
@@ -363,9 +405,11 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
     col = int(target_col_s[1:]) if target_col_s else None
     count = int(count_s) if count_s else 1
     if matched_re is expected_diag_re:
-        fixits_raw_str, has_none_marker = consume_trailing_fixits(s[m.end() :])
+        fixits_raw_str, has_none_marker, preserved_markers = (
+            consume_trailing_fixits(s[m.end() :])
+        )
     else:
-        fixits_raw_str, has_none_marker = "", False
+        fixits_raw_str, has_none_marker, preserved_markers = "", False, []
     line.content = (
         s[: m.start()] + "{{DIAG}}" + s[m.end() + len(fixits_raw_str) :]
     )
@@ -390,6 +434,7 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         original_count_str=count_s if count_s else None,
         fixits_raw_str=fixits_raw_str,
         had_none_fixit_marker=has_none_marker,
+        preserved_markers=preserved_markers,
     )
 
 
@@ -578,6 +623,7 @@ def remove_dead_diags(lines, prefix):
                 other_diag.had_none_fixit_marker = (
                     line.diag.had_none_fixit_marker
                 )
+                other_diag.preserved_markers = line.diag.preserved_markers
                 break
         if line.render() == "":
             remove_line(line, lines)
