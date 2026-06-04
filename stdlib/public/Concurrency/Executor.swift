@@ -54,13 +54,13 @@ public struct JobCancellationToken: ~Copyable {
   public let cancellationBehavior: CancellationBehavior
 
   /// Optional clean-up function
-  public let cleanUp: ((borrowing JobCancellationToken) -> ())?
+  public let cleanUp: (@convention(thin) (borrowing JobCancellationToken) -> ())?
 
   public init(executor: any SchedulingExecutor,
               jobID: UInt64,
               opaqueData: InlineArray<2, Int>,
               onCancellation behavior: CancellationBehavior,
-              cleanUp: ((borrowing JobCancellationToken) -> ())? = nil) {
+              cleanUp: (@convention(thin) (borrowing JobCancellationToken) -> ())? = nil) {
     self.executor = executor
     self.jobID = jobID
     self.opaqueData = opaqueData
