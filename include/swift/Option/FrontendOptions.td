@@ -590,14 +590,14 @@ def debug_assert_immediately : Flag<["-"], "debug-assert-immediately">,
 def debug_assert_after_type_checking : Flag<["-"], "debug-assert-after-type-checking">,
   DebugCrashOpt, HelpText<"Force an assertion failure after type checking">;
 def debug_assert_after_parse : Flag<["-"], "debug-assert-after-parse">,
-  DebugCrashOpt,
+  DebugCrashOpt, Flags<[HelpHidden]>,
   HelpText<"Deprecated alias for -debug-assert-after-type-checking">;
 def debug_crash_immediately : Flag<["-"], "debug-crash-immediately">,
   DebugCrashOpt, HelpText<"Force a crash immediately">;
 def debug_crash_after_type_checking : Flag<["-"], "debug-crash-after-type-checking">,
   DebugCrashOpt, HelpText<"Force a crash after type checking">;
 def debug_crash_after_parse : Flag<["-"], "debug-crash-after-parse">,
-  DebugCrashOpt,
+  DebugCrashOpt, Flags<[HelpHidden]>,
   HelpText<"Deprecated alias for -debug-crash-after-type-checking">;
 
 def debug_test_dependency_scan_cache_serialization: Flag<["-"], "test-dependency-scan-cache-serialization">,
