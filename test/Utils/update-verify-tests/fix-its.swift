@@ -35,6 +35,16 @@ func unexpectedFixitWithNone() {
   foo(b: 1)
 }
 
+func multipleActualFixitsPlural() {
+  // The compiler emits two fix-its on the note. Source has a single wrong
+  // fix-it, so verifier reports the plural form
+  // "actual fix-its seen: {{...}} {{...}}". Both markers should land in the
+  // updated source.
+  // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 {{use 'bar(example:)' instead}} {{1-2=wrong}}
+  foo(b: 1)
+}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -62,6 +72,16 @@ func unexpectedFixitWithNone() {
   // {{none}}.
   // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
   // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} {{7-8=example}} {{none}}
+  foo(b: 1)
+}
+
+func multipleActualFixitsPlural() {
+  // The compiler emits two fix-its on the note. Source has a single wrong
+  // fix-it, so verifier reports the plural form
+  // "actual fix-its seen: {{...}} {{...}}". Both markers should land in the
+  // updated source.
+  // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} {{7-8=example}}
   foo(b: 1)
 }
 
