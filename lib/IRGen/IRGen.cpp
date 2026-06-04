@@ -389,7 +389,7 @@ void swift::performLLVMOptimizations(
     PTO.MergeFunctions = !Opts.DisableLLVMMergeFunctions;
     // Splitting trades code size to enhance memory locality, avoid in -Osize.
     DoHotColdSplit = Opts.EnableHotColdSplit && !Opts.optimizeForSize();
-    level = llvm::OptimizationLevel::O2;
+    level = llvm::OptimizationLevel::Os;
   } else {
     level = llvm::OptimizationLevel::O0;
   }
