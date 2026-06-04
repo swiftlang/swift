@@ -73,6 +73,18 @@ func alternationReplaced() {
   foo(b: 1)
 }
 
+func fixitBeforeDocFile() {
+  // The fix-it appears before the {{documentation-file=...}} marker on the
+  // warning line. consume_trailing_fixits should capture the fix-it and stop
+  // at the documentation-file marker, leaving it intact across the update.
+  // The compiler does not actually emit a fix-it on this warning, so the
+  // verifier reports "expected fix-it not seen" with no actual fix-it; the
+  // wrong fix-it should be dropped while the documentation-file is preserved.
+  // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}} {{1-2=wrong}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} {{7-8=example}}
+  foo(b: 1)
+}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -136,6 +148,18 @@ func alternationReplaced() {
   // Neither alternative matches an actual fix-it. The replacement range
   // covers the entire run including '||', so the alternation collapses
   // into the actual marker(s).
+  // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} {{7-8=example}}
+  foo(b: 1)
+}
+
+func fixitBeforeDocFile() {
+  // The fix-it appears before the {{documentation-file=...}} marker on the
+  // warning line. consume_trailing_fixits should capture the fix-it and stop
+  // at the documentation-file marker, leaving it intact across the update.
+  // The compiler does not actually emit a fix-it on this warning, so the
+  // verifier reports "expected fix-it not seen" with no actual fix-it; the
+  // wrong fix-it should be dropped while the documentation-file is preserved.
   // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
   // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} {{7-8=example}}
   foo(b: 1)
