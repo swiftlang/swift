@@ -113,6 +113,15 @@ func countWithFixit() {
   _ = deprecatedNoRename(1) + deprecatedNoRename(2)
 }
 
+// The fix-it lands on a line different from the diagnostic, so the marker
+// uses 'line:col' syntax in the start position (with a relative line offset
+// here on the source side). The verifier accepts this expectation exactly,
+// so consume_trailing_fixits must capture the entire marker including the
+// colon and round-trip it unchanged.
+extension OperatorTestType {
+    static func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{-1:1-1=infix operator <=> : <# Precedence Group #>\n}}
+}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -219,5 +228,14 @@ func countWithFixit() {
   // should drop the wrong fix-it idempotently.
   // expected-warning@+1 2 {{'deprecatedNoRename' is deprecated: old}}{{documentation-file=deprecated-declaration}}
   _ = deprecatedNoRename(1) + deprecatedNoRename(2)
+}
+
+// The fix-it lands on a line different from the diagnostic, so the marker
+// uses 'line:col' syntax in the start position (with a relative line offset
+// here on the source side). The verifier accepts this expectation exactly,
+// so consume_trailing_fixits must capture the entire marker including the
+// colon and round-trip it unchanged.
+extension OperatorTestType {
+    static func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{-1:1-1=infix operator <=> : <# Precedence Group #>\n}}
 }
 
