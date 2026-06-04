@@ -95,25 +95,23 @@ int * __counted_by(len) _Null_unspecified nullUnspecified(int len, int len2, int
 // }}
 int * __counted_by(len) _Nonnull nonnull(int len, int len2, int * _Nonnull p __counted_by(len2) __lifetimebound);
 
-// expected-experimental-expansion@+20:80{{
+// expected-experimental-expansion@+18:80{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nullable(_ len: Int32, _ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {|}}
-//   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p?.count ?? 0)!|}}
-//   expected-experimental-remark@4{{macro content: |    let _pPtr = p?.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func nullable(_ len: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {|}}
+//   expected-experimental-remark@3{{macro content: |    let len2 = Int32(exactly: p.count)!|}}
+//   expected-experimental-remark@4{{macro content: |    let _pPtr = p.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@5{{macro content: |        unsafe $0|}}
 //   expected-experimental-remark@6{{macro content: |    }|}}
 //   expected-experimental-remark@7{{macro content: |    defer {|}}
 //   expected-experimental-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    return unsafe _swiftifyOverrideLifetime({ () in|}}
-//   expected-experimental-remark@11{{macro content: |      let _resultValue = unsafe nullable(len, len2, _pPtr?.baseAddress)|}}
-//   expected-experimental-remark@12{{macro content: |      if unsafe _resultValue == nil {|}}
-//   expected-experimental-remark@13{{macro content: |        return nil|}}
-//   expected-experimental-remark@14{{macro content: |      } else {|}}
-//   expected-experimental-remark@15{{macro content: |        return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())|}}
-//   expected-experimental-remark@16{{macro content: |      }|}}
-//   expected-experimental-remark@17{{macro content: |        }(), copying: ())|}}
-//   expected-experimental-remark@18{{macro content: |}|}}
+//   expected-experimental-remark@10{{macro content: |    let _resultValue = unsafe nullable(len, len2, _pPtr.baseAddress)|}}
+//   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@12{{macro content: |      precondition(len == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")|}}
+//   expected-experimental-remark@13{{macro content: |      return MutableSpan<Int32>()|}}
+//   expected-experimental-remark@14{{macro content: |    }|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())|}}
+//   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 int * __counted_by(len) _Nullable nullable(int len, int len2, int * _Nullable p __counted_by(len2) __lifetimebound);
 
@@ -128,28 +126,25 @@ opaque_t * __counted_by(len) opaque(int len, int len2, opaque_t * p __counted_by
 // }}
 int * __counted_by(len) noncountedLifetime(int len, int * p __lifetimebound);
 
-// expected-experimental-expansion@+23:60{{
+// expected-experimental-expansion@+20:60{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func constant(_ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {|}}
-//   expected-experimental-remark@3{{macro content: |    let _pCount = p?.count ?? 0|}}
-//   expected-experimental-remark@4{{macro content: |    if _pCount != 13 {|}}
-//   expected-experimental-remark@5{{macro content: |      fatalError("bounds check failure in constant: expected \\(13) but got \\(_pCount)")|}}
-//   expected-experimental-remark@6{{macro content: |    }|}}
-//   expected-experimental-remark@7{{macro content: |    let _pPtr = p?.withUnsafeMutableBufferPointer {|}}
-//   expected-experimental-remark@8{{macro content: |        unsafe $0|}}
-//   expected-experimental-remark@9{{macro content: |    }|}}
-//   expected-experimental-remark@10{{macro content: |    defer {|}}
-//   expected-experimental-remark@11{{macro content: |        _fixLifetime(p)|}}
-//   expected-experimental-remark@12{{macro content: |    }|}}
-//   expected-experimental-remark@13{{macro content: |    return unsafe _swiftifyOverrideLifetime({ () in|}}
-//   expected-experimental-remark@14{{macro content: |      let _resultValue = unsafe constant(_pPtr?.baseAddress)|}}
-//   expected-experimental-remark@15{{macro content: |      if unsafe _resultValue == nil {|}}
-//   expected-experimental-remark@16{{macro content: |        return nil|}}
-//   expected-experimental-remark@17{{macro content: |      } else {|}}
-//   expected-experimental-remark@18{{macro content: |        return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(13)), copying: ())|}}
-//   expected-experimental-remark@19{{macro content: |      }|}}
-//   expected-experimental-remark@20{{macro content: |        }(), copying: ())|}}
-//   expected-experimental-remark@21{{macro content: |}|}}
+//   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func constant(_ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32> {|}}
+//   expected-experimental-remark@3{{macro content: |    if let _pCount = p?.count, _pCount != 13 {|}}
+//   expected-experimental-remark@4{{macro content: |      fatalError("bounds check failure in constant: expected \\(13) but got \\(_pCount)")|}}
+//   expected-experimental-remark@5{{macro content: |    }|}}
+//   expected-experimental-remark@6{{macro content: |    let _pPtr = p?.withUnsafeMutableBufferPointer {|}}
+//   expected-experimental-remark@7{{macro content: |        unsafe $0|}}
+//   expected-experimental-remark@8{{macro content: |    }|}}
+//   expected-experimental-remark@9{{macro content: |    defer {|}}
+//   expected-experimental-remark@10{{macro content: |        _fixLifetime(p)|}}
+//   expected-experimental-remark@11{{macro content: |    }|}}
+//   expected-experimental-remark@12{{macro content: |    let _resultValue = unsafe constant(_pPtr?.baseAddress)|}}
+//   expected-experimental-remark@13{{macro content: |    if unsafe _resultValue == nil {|}}
+//   expected-experimental-remark@14{{macro content: |      precondition(13 == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")|}}
+//   expected-experimental-remark@15{{macro content: |      return MutableSpan<Int32>()|}}
+//   expected-experimental-remark@16{{macro content: |    }|}}
+//   expected-experimental-remark@17{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(13)), copying: ())|}}
+//   expected-experimental-remark@18{{macro content: |}|}}
 // }}
 int * __counted_by(13) _Nullable constant(int * _Nullable p __counted_by_or_null(13) __lifetimebound);
 
@@ -218,7 +213,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -enable-experimental-feature SafeInteropWrappers -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 4add983f4582598af9fb1ebe8326aa2d92603cb7366ecb416251b44680eb1fbb
+// GENERATED-HASH: a717bad6588597058f5a485905c9400d852f482e25d7b378fab6861cf2e92221
 import Test
 
 func call_simple(_ len: Int32, _ len2: Int32, _ p: UnsafeMutablePointer<Int32>!) -> UnsafeMutablePointer<Int32>! {
@@ -287,9 +282,9 @@ func call_oneLifetimeboundOneEscapable(_ len: Int32, _ len2: Int32, _ p: UnsafeM
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @_lifetime(copy p)
 @_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_constant(_ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_constant(_ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32> {
   // expected-stable-error@+2{{cannot convert value of type 'UnsafeMutablePointer<MutableSpan<Int32>?>' to expected argument type 'UnsafeMutablePointer<Int32>'}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<Int32>?' to return type 'MutableSpan<Int32>?'}}
+  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<Int32>?' to return type 'MutableSpan<Int32>'}}
   return constant(&p)
 }
 
@@ -349,10 +344,10 @@ func call_oneLifetimeboundOneEscapable(_ len: Int32, _ len2: Int32, _ p: UnsafeM
 @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *)
 @_lifetime(copy p)
 @_lifetime(p: copy p)
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ len: Int32, _ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ len: Int32, _ p: inout MutableSpan<Int32>) -> MutableSpan<Int32> {
   // expected-stable-error@+3{{missing argument for parameter #3 in call}}
-  // expected-stable-error@+2{{cannot convert value of type 'MutableSpan<Int32>?' to expected argument type 'Int32'}}
-  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<Int32>?' to return type 'MutableSpan<Int32>?'}}
+  // expected-stable-error@+2{{cannot convert value of type 'MutableSpan<Int32>' to expected argument type 'Int32'}}
+  // expected-stable-error@+1{{cannot convert return expression of type 'UnsafeMutablePointer<Int32>?' to return type 'MutableSpan<Int32>'}}
   return nullable(len, &p)
 }
 
