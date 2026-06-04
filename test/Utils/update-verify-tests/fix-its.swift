@@ -25,6 +25,12 @@ func noneToFixit() {
 @available(*, deprecated, renamed: "bar(example:)")
 func foo(b: Int) {}
 
+// Returning Int so it can be used in expressions like
+// `fooReturn(b: 1) + fooReturn(b: 2)` without a separate "result unused"
+// warning getting in the way of the count test.
+@available(*, deprecated, renamed: "bar(example:)")
+func fooReturn(b: Int) -> Int { 0 }
+
 func unexpectedFixitWithNone() {
   // The expected fix-it list matches one of the actual fix-its, and {{none}}
   // forbids any extras; the compiler emits an additional fix-it. Verifier
@@ -142,6 +148,18 @@ func groupNamePreserved(_ x: Int) {
   }
 }
 
+func countWithDifferentFixits() {
+  // The note directive below carries both `count = 2` and a fix-it on the
+  // same line. The two fooReturn calls land on different columns, so each
+  // emits its own rename fix-its and the verifier reports two distinct
+  // FixitErrors against this directive. update_lines must split the count
+  // into one count-1 directive per occurrence so each actual fix-it set
+  // lands on its own note.
+  // expected-warning@+2 2 {{'fooReturn(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 2 {{use 'bar(example:)' instead}} {{1-2=wrong}}
+  _ = fooReturn(b: 1) + fooReturn(b: 2)
+}
+
 func wrongCategoryWithFixit() {
   // The expected category mismatches the actual. The verifier reports both
   // a wrong-category error and a fix-it mismatch on the same diagnostic.
@@ -170,6 +188,12 @@ func noneToFixit() {
 
 @available(*, deprecated, renamed: "bar(example:)")
 func foo(b: Int) {}
+
+// Returning Int so it can be used in expressions like
+// `fooReturn(b: 1) + fooReturn(b: 2)` without a separate "result unused"
+// warning getting in the way of the count test.
+@available(*, deprecated, renamed: "bar(example:)")
+func fooReturn(b: Int) -> Int { 0 }
 
 func unexpectedFixitWithNone() {
   // The expected fix-it list matches one of the actual fix-its, and {{none}}
@@ -282,10 +306,23 @@ func groupNamePreserved(_ x: Int) {
   // {{documentation-file=...}}) when consuming fix-it markers, and
   // _render_fixits must re-emit those preserved markers in source order
   // when the run is rewritten.
-  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{3-134:4=_ = 0}}
+  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{3-140:4=_ = 0}}
   if case _ = x {
     _ = 0
   }
+}
+
+func countWithDifferentFixits() {
+  // The note directive below carries both `count = 2` and a fix-it on the
+  // same line. The two fooReturn calls land on different columns, so each
+  // emits its own rename fix-its and the verifier reports two distinct
+  // FixitErrors against this directive. update_lines must split the count
+  // into one count-1 directive per occurrence so each actual fix-it set
+  // lands on its own note.
+  // expected-note@+3  {{use 'bar(example:)' instead}} {{7-16=bar}} {{17-18=example}}
+  // expected-warning@+2 2 {{'fooReturn(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1  {{use 'bar(example:)' instead}} {{25-34=bar}} {{35-36=example}}
+  _ = fooReturn(b: 1) + fooReturn(b: 2)
 }
 
 func wrongCategoryWithFixit() {

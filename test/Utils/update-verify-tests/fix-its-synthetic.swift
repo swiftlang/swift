@@ -27,22 +27,6 @@
 // RUN:   | %update-verify-tests
 // RUN: %diff %t/brace.swift %t/brace.swift.expected
 
-// 'expected-X N {{msg}} {{fix-it}}' with distinct actual fix-its per
-// occurrence. Putting the count and the fix-it on the same warning
-// directive (no separate note involved) directly exercises the split
-// logic on a single Diag with count > 1.
-// RUN: printf '%%s\n' \
-// RUN:   '%t/count.swift:1:30: error: expected fix-it not seen; actual fix-it seen: {{1-1=A}}' \
-// RUN:   "// expected-warning@+1 2 {{msg}} {{1-1=wrong}}" \
-// RUN:   "                             ^~~~~~~~~~~~" \
-// RUN:   "                             {{1-1=A}}" \
-// RUN:   '%t/count.swift:1:30: error: expected fix-it not seen; actual fix-it seen: {{1-1=B}}' \
-// RUN:   "// expected-warning@+1 2 {{msg}} {{1-1=wrong}}" \
-// RUN:   "                             ^~~~~~~~~~~~" \
-// RUN:   "                             {{1-1=B}}" \
-// RUN:   | %update-verify-tests
-// RUN: %diff %t/count.swift %t/count.swift.expected
-
 //--- backslash.swift
 let a = 0 // expected-warning{{msg}} {{1-1=wrong}}
 
@@ -54,13 +38,4 @@ let a = 0 // expected-warning{{msg}} {{1-1=wrong}}
 
 //--- brace.swift.expected
 let a = 0 // expected-warning{{msg}} {{1-1=a\}b}}
-
-//--- count.swift
-// expected-warning@+1 2 {{msg}} {{1-1=wrong}}
-let x = 1
-
-//--- count.swift.expected
-// expected-warning@+2  {{msg}} {{1-1=A}}
-// expected-warning@+1  {{msg}} {{1-1=B}}
-let x = 1
 
