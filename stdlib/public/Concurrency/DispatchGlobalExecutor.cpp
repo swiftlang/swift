@@ -453,8 +453,8 @@ extern "C" SWIFT_CC(swift) uintptr_t
     //
     // Right now, we have no way to get Dispatch's idea of the priority,
     // so default to 6.7%.
-    int64_t seconds;
-    int64_t nanos;
+    long long seconds;
+    long long nanos;
     swift_get_time(&seconds, &nanos, (swift_clock_id)clock);
 
     uint64_t now = deadline_from_sec_nsec(seconds, nanos);

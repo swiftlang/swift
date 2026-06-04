@@ -134,9 +134,11 @@ internal func _dispatchEnqueueWithDeadline(_ global: CBool,
                                            _ clock: CInt,
                                            _ job: UnownedJob) -> Int
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(StdlibDeploymentTarget 9999, *)
 @_silgen_name("swift_dispatchCancel")
 internal func _dispatchCancel(_ source: Int) -> ExecutorJob?
+#endif
 
 @available(StdlibDeploymentTarget 9999, *)
 @_silgen_name("swift_dispatchReleaseSource")
