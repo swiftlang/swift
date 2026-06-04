@@ -7,6 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// Resolve this path against the filesystem, producing an absolute
   /// path with all symbolic links and `.`/`..` components resolved.

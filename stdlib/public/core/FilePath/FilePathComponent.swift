@@ -7,6 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// Represents an individual component of a file path.
   @available(SwiftStdlib 9999, *)
@@ -50,6 +51,7 @@ extension FilePath {
 
 // MARK: - Component Hashable, Comparable, descriptions
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Component: Hashable {
   @available(SwiftStdlib 9999, *)
   public static func == (lhs: FilePath.Component, rhs: FilePath.Component) -> Bool {
@@ -63,6 +65,7 @@ extension FilePath.Component: Hashable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Component: Comparable {
   @available(SwiftStdlib 9999, *)
   public static func < (lhs: FilePath.Component, rhs: FilePath.Component) -> Bool {
@@ -70,6 +73,7 @@ extension FilePath.Component: Comparable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Component: CustomStringConvertible, CustomDebugStringConvertible {
   @available(SwiftStdlib 9999, *)
   public var description: String {
@@ -85,6 +89,7 @@ extension FilePath.Component: CustomStringConvertible, CustomDebugStringConverti
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Component: ExpressibleByStringLiteral {
   /// Creates a file path component from a string literal.
   ///
@@ -117,5 +122,8 @@ extension FilePath.Component: ExpressibleByStringLiteral {
     let comps = path.components
     guard comps.count == 1 else { return nil }
     self = comps.first!
+
+    // TODO: lots of duplication and bug potential from that with the span based init.
+    // We should probably defer to the span init.
   }
 }

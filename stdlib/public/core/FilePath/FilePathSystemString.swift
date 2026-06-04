@@ -15,6 +15,7 @@
 // the underlying `CChar` / `UInt16` type with names a reader can
 // recognise as path-byte constants.
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.CodeUnit {
   internal static var _null: Self { 0 }
   internal static var _slash: Self { Self(_ascii: "/") }
@@ -40,11 +41,13 @@ extension FilePath.CodeUnit {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 internal struct _SystemString: Sendable {
   internal typealias _Storage = [FilePath.CodeUnit]
   internal var nullTerminatedStorage: _Storage
 }
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   internal init() {
     self.nullTerminatedStorage = [._null]
@@ -71,6 +74,7 @@ extension _SystemString {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   fileprivate func _invariantsSatisfied() -> Bool {
     guard !nullTerminatedStorage.isEmpty else { return false }
@@ -88,6 +92,7 @@ extension _SystemString {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString: RandomAccessCollection, MutableCollection {
   internal typealias Element = FilePath.CodeUnit
   internal typealias Index = _Storage.Index
@@ -113,6 +118,7 @@ extension _SystemString: RandomAccessCollection, MutableCollection {
     }
   }
 }
+@available(SwiftStdlib 9999, *)
 extension _SystemString: RangeReplaceableCollection {
   internal mutating func replaceSubrange<C: Collection>(
     _ subrange: Range<Index>, with newElements: C
@@ -147,8 +153,10 @@ extension _SystemString: RangeReplaceableCollection {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString: Hashable {}
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   // _Storage backing — includes the trailing null byte.
   internal func withNullTerminatedCodeUnits<T>(
@@ -170,6 +178,7 @@ extension _SystemString {
 
 // MARK: - Span access
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   // A borrowed span over the whole backing array, INCLUDING the trailing
   // null terminator as its final element. Backs FilePath's
@@ -188,6 +197,7 @@ extension _SystemString {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension Slice<_SystemString> {
   internal func withCodeUnits<T>(
     _ f: (UnsafeBufferPointer<FilePath.CodeUnit>) throws -> T
@@ -201,6 +211,7 @@ extension Slice<_SystemString> {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension String {
   internal init?(validating str: _SystemString) {
     let decoded = str.string
@@ -209,6 +220,7 @@ extension String {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString: ExpressibleByStringLiteral {
   internal init(stringLiteral: String) {
     self.init(stringLiteral)
@@ -225,6 +237,7 @@ extension _SystemString: ExpressibleByStringLiteral {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString: CustomStringConvertible, CustomDebugStringConvertible {
   internal var string: String {
     unsafe self.withCodeUnits { codeUnits in

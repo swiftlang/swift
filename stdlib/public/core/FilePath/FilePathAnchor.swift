@@ -7,6 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// The anchor of a file path identifies a reference point
   /// and precedes any components.
@@ -28,6 +29,7 @@ extension FilePath {
     /// Whether this anchor is rooted.
     @available(SwiftStdlib 9999, *)
     public var isRooted: Bool {
+      // TODO: all through this file, we have this pattern. Change to guard when it improves clarity
       if !_isWindows { return true }
 
       // On Windows, the only non-rooted anchor is drive-relative `C:`
@@ -35,6 +37,8 @@ extension FilePath {
       // `C:\`, `\\server\share`, `\\?\...` — is rooted.
       return !_isDriveRelativeAnchor(_slice)
     }
+
+    // TODO: Gate the below and others by platform as the proposal now does
 
     /// The drive letter of this anchor, if any.
     ///
@@ -63,6 +67,7 @@ extension FilePath {
     /// Whether this anchor uses the Windows verbatim-component form.
     @available(SwiftStdlib 9999, *)
     public var isVerbatimComponent: Bool {
+      // TODO: this can be a guard along with a guard let, probably in one guard statement
       if !_isWindows { return false }
       if let parsed = _parseWindowsAnchor() {
         return parsed.isVerbatimComponent
@@ -78,6 +83,7 @@ extension FilePath {
 
 // MARK: - Anchor Hashable, Comparable, descriptions
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Anchor: Hashable {
   @available(SwiftStdlib 9999, *)
   public static func == (lhs: FilePath.Anchor, rhs: FilePath.Anchor) -> Bool {
@@ -91,6 +97,7 @@ extension FilePath.Anchor: Hashable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Anchor: Comparable {
   @available(SwiftStdlib 9999, *)
   public static func < (lhs: FilePath.Anchor, rhs: FilePath.Anchor) -> Bool {
@@ -98,6 +105,7 @@ extension FilePath.Anchor: Comparable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Anchor: CustomStringConvertible, CustomDebugStringConvertible {
   @available(SwiftStdlib 9999, *)
   public var description: String {
@@ -113,6 +121,7 @@ extension FilePath.Anchor: CustomStringConvertible, CustomDebugStringConvertible
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Anchor: ExpressibleByStringLiteral {
   /// Creates an anchor from a string literal.
   ///
@@ -154,6 +163,8 @@ extension FilePath.Anchor: ExpressibleByStringLiteral {
   }
 }
 
+// TODO: consider de-genericizing the below, basing it on slice. that would help debug builds.
+
 /// Returns `true` when `anchorBytes` is a Windows UNC/device/verbatim
 /// anchor form that is missing its name: incomplete UNC (`\\`, `\\server`),
 /// empty device (`\\.\`), or empty verbatim (`\\?\`).
@@ -167,6 +178,7 @@ extension FilePath.Anchor: ExpressibleByStringLiteral {
 /// non-empty share; device (`\\.\`) needs a non-empty device name; verbatim
 /// (`\\?\`) needs a non-empty component after the prefix. Traditional roots
 /// (`\`, `C:`, `C:\`) carry no separate name and are never rejected here.
+@available(SwiftStdlib 9999, *)
 private func _isIncompleteWindowsNamedAnchor(
   _ anchorBytes: some Collection<FilePath.CodeUnit>
 ) -> Bool {

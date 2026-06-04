@@ -9,6 +9,7 @@
 
 // MARK: - Anchor property
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// The anchor of this path, if any.
   @available(SwiftStdlib 9999, *)
@@ -47,6 +48,7 @@ extension FilePath {
 
 // MARK: - Components property
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// View the relative path components that make up this path.
   ///
@@ -88,6 +90,7 @@ extension FilePath {
 
 // MARK: - Absolute / relative
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// Returns true if this path uniquely identifies the location of
   /// a file without reference to an additional starting location.
@@ -109,6 +112,7 @@ extension FilePath {
 
 // MARK: - Trailing separator
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// Whether this path ends with a directory separator that is
   /// not structurally required by the path's anchor.
@@ -179,6 +183,7 @@ extension FilePath {
 
 // MARK: - Resource fork (Darwin-only, simulated for all platforms in review)
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// Whether this path ends with a resource fork reference.
   @available(SwiftStdlib 9999, *)
@@ -226,6 +231,7 @@ extension FilePath {
 
 // MARK: - Reconstruction initializers
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// Creates a file path from a decomposed form.
   @available(SwiftStdlib 9999, *)

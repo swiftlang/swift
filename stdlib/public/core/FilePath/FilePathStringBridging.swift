@@ -9,6 +9,7 @@
 
 // MARK: - FilePath String bridging
 
+@available(SwiftStdlib 9999, *)
 extension FilePath: Hashable {
   @available(SwiftStdlib 9999, *)
   public static func == (lhs: FilePath, rhs: FilePath) -> Bool {
@@ -21,6 +22,7 @@ extension FilePath: Hashable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath: Comparable {
   @available(SwiftStdlib 9999, *)
   public static func < (lhs: FilePath, rhs: FilePath) -> Bool {
@@ -28,6 +30,7 @@ extension FilePath: Comparable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath: CustomStringConvertible, CustomDebugStringConvertible {
   /// A textual representation of the file path.
   @available(SwiftStdlib 9999, *)
@@ -45,6 +48,7 @@ extension FilePath: CustomStringConvertible, CustomDebugStringConvertible {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath: ExpressibleByStringLiteral {
   /// Creates a file path from a string literal.
   ///

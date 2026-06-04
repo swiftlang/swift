@@ -29,14 +29,20 @@ internal var _isDarwin: Bool {
   false
   #endif
 }
+// TODO: add _isLinux so that we can _internalInvariant on it (and add those assertions)
+// in the if-else code paths over platforms.
 
 // The separator we use for slash-based platforms
+@available(SwiftStdlib 9999, *)
 private var genericSeparator: FilePath.CodeUnit { ._slash }
 
+// TODO: all internal interfaces need a leading underscore somewhere in their name or chain of names.
+@available(SwiftStdlib 9999, *)
 internal var platformSeparator: FilePath.CodeUnit {
   _isWindows ? ._backslash : genericSeparator
 }
 
+@available(SwiftStdlib 9999, *)
 internal func isSeparator(_ c: FilePath.CodeUnit) -> Bool {
   c == platformSeparator
 }
@@ -59,6 +65,7 @@ internal func isSeparator(_ c: FilePath.CodeUnit) -> Bool {
 /// in `:` — UNC with a colon-ending share name (`\\server\C:`),
 /// Darwin volfs with a colon-ending FILEID — are NOT 2 bytes and
 /// don't match.
+@available(SwiftStdlib 9999, *)
 internal func _isDriveRelativeAnchor(
   _ anchorBytes: some BidirectionalCollection<FilePath.CodeUnit>
 ) -> Bool {
@@ -85,6 +92,7 @@ internal func _isDriveRelativeAnchor(
 /// those name bytes happens to be `:` (e.g. UNC share `\\server\C:`
 /// or volfs FILEID ending in `:`). Those are NOT 2 bytes, so they
 /// don't match the drive-relative shape.
+@available(SwiftStdlib 9999, *)
 internal func _anchorNeedsGapSeparator(
   _ anchorBytes: some BidirectionalCollection<FilePath.CodeUnit>
 ) -> Bool {
@@ -96,6 +104,7 @@ internal func _anchorNeedsGapSeparator(
 
 // MARK: - Root parsing
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   internal func _parseRoot() -> (
     rootEnd: Index, relativeBegin: Index
@@ -126,6 +135,7 @@ extension _SystemString {
 
 // MARK: - Separator normalization
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   // Normalize separators: coalesce repeated seps.
   // On Windows, convert / to \ and prenormalize roots.
@@ -175,6 +185,7 @@ extension _SystemString {
 
 // MARK: - Dot normalization (new rules for SE-0529)
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   // Drop interior `.` components per the proposal rules:
   // - `.` is dropped unless it is the first component of a non-rooted path
@@ -259,5 +270,8 @@ extension _SystemString {
     }
 
     self = _SystemString(result)
+
+    // TODO: remove all those array allocations whenever possible, and probably refactor
+    // or rework this code a little bit.
   }
 }

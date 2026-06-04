@@ -71,6 +71,11 @@ public struct FilePath: Sendable {
   }
 
   private static func _normalizeDarwin(_ str: _SystemString) -> FilePath {
+    // TODO: the below comment isn't quite right. We are canonicalizing separators
+    // first, then we are parsing and canonicalizing the way XNU does second. XNU
+    // doesn't canonicalize separators, but we're doing a modulo-separator-canonicalization
+    // semantics here.
+
     // Darwin follows the coalescing POSIX kernel parse: coalesce the
     // whole string first, then canonicalize the anchor, then parse the
     // anchor and resource-fork suffix boundaries on those same
@@ -93,6 +98,8 @@ public struct FilePath: Sendable {
     if suffixStart < relBegin {
       suffixStart = s.endIndex
     }
+
+    // TODO: Do the below without making a bunch of arrays and allocations
 
     // Slice into anchor + gap separator + relative + suffix.
     let anchorSlice = Array(s[s.startIndex..<rootEnd])
@@ -144,6 +151,7 @@ public struct FilePath: Sendable {
 }
 
 // Check if a path is a verbatim-component Windows path
+@available(SwiftStdlib 9999, *)
 internal func _isVerbatimComponentPath(_ storage: _SystemString) -> Bool {
   guard _isWindows else { return false }
   guard let parsed = storage._parseWindowsRootInternal() else { return false }

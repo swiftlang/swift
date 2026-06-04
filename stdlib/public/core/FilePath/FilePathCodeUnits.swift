@@ -9,6 +9,7 @@
 
 // MARK: - CodeUnit typealias
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// The type used to represent a "character" in the platform's
   /// native path encoding.
@@ -30,6 +31,7 @@ extension FilePath {
 
 // MARK: - withCodeUnits (C interop)
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// Calls the given closure with a pointer to the path's null-terminated
   /// contents and the number of code units preceding the null terminator.
@@ -74,6 +76,7 @@ extension FilePath {
 // `.enableExperimentalFeature("Lifetimes")` in Package.swift. Span access is
 // safe, so the bodies carry no `unsafe` expressions under StrictMemorySafety.
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// A span of the platform code units comprising this path, not
   /// including the null terminator.
@@ -120,6 +123,7 @@ extension FilePath {
   // compiler flags.  Stubbed until OutputSpan is generally available.
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Component {
   /// A span of the platform code units comprising this component.
   @available(SwiftStdlib 9999, *)
@@ -147,9 +151,12 @@ extension FilePath.Component {
     let comps = path.components
     guard comps.count == 1 else { return nil }
     self = comps.first!
+
+    // TODO: what about checking for trailing slash? do we have tests for that?
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.Anchor {
   /// A span of the platform code units comprising this anchor.
   @available(SwiftStdlib 9999, *)
@@ -159,6 +166,7 @@ extension FilePath.Anchor {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.ComponentView {
   /// A span of the platform code units comprising the relative
   /// components portion of the path.

@@ -7,6 +7,7 @@
  See https://swift.org/LICENSE.txt for license information
 */
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   /// A bidirectional, range-replaceable collection of the
   /// components that make up a file path.
@@ -52,6 +53,7 @@ extension FilePath {
 
 // MARK: - Index
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.ComponentView {
   @available(SwiftStdlib 9999, *)
   public struct Index: Sendable, Comparable, Hashable {
@@ -70,6 +72,7 @@ extension FilePath.ComponentView {
 
 // MARK: - Internal helpers
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.ComponentView {
   internal func _componentEnd(at pos: _SystemString.Index) -> _SystemString.Index {
     var i = pos
@@ -90,6 +93,7 @@ extension FilePath.ComponentView {
 
 // MARK: - BidirectionalCollection
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.ComponentView: BidirectionalCollection {
   @available(SwiftStdlib 9999, *)
   public typealias Element = FilePath.Component
@@ -154,6 +158,7 @@ extension FilePath.ComponentView: BidirectionalCollection {
 // resource fork status, and trailing-separator status are whatever the
 // resulting bytes parse as.
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.ComponentView: RangeReplaceableCollection {
   @available(SwiftStdlib 9999, *)
   public init() {
@@ -265,6 +270,7 @@ extension FilePath.ComponentView: RangeReplaceableCollection {
 
 // MARK: - Hashable, Comparable
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.ComponentView: Hashable {
   @available(SwiftStdlib 9999, *)
   public static func == (lhs: FilePath.ComponentView, rhs: FilePath.ComponentView) -> Bool {
@@ -278,6 +284,7 @@ extension FilePath.ComponentView: Hashable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath.ComponentView: Comparable {
   @available(SwiftStdlib 9999, *)
   public static func < (lhs: FilePath.ComponentView, rhs: FilePath.ComponentView) -> Bool {

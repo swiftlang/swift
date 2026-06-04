@@ -13,11 +13,13 @@
 // - Resolve flags: /.nofollow/, /.resolve/N/
 // - Volume references: /.vol/FSID/FILEID
 
+@available(SwiftStdlib 9999, *)
 internal struct _ParsedDarwinAnchor {
   var anchorEnd: _SystemString.Index
   var relativeBegin: _SystemString.Index
 }
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   // Try to parse a Darwin-specific anchor.
   // Returns nil if this is just a plain `/` root.
@@ -51,6 +53,11 @@ extension _SystemString {
   }
 
   // MARK: - /.nofollow/
+
+  // TODO: Remove all the eager maps below, all the `.count` over grapheme clusters, etc.
+  // Is there a better way to design or architect this? At very least we can work with UTF8View
+  // and stop making extra memory allocations and such, but I'm also wondering if there isn't
+  // just a better coding pattern we could adopt
 
   private func _matchesNofollow(from dotIdx: Index) -> Bool {
     let nofollow: [FilePath.CodeUnit] = ".nofollow".unicodeScalars.map {
@@ -152,6 +159,7 @@ extension _SystemString {
 
 // MARK: - Darwin anchor canonicalization
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   // /.resolve/1/ -> /.nofollow/
   // /.vol/NNNN/2/ -> /.vol/NNNN/@/
@@ -202,6 +210,7 @@ extension _SystemString {
 
 // MARK: - Resource fork detection
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   // The resource fork suffix is exactly "/..namedfork/rsrc" (17 bytes)
   internal static let _resourceForkSuffix: [FilePath.CodeUnit] =

@@ -9,6 +9,7 @@
 
 // MARK: - Parsed Windows root
 
+@available(SwiftStdlib 9999, *)
 internal struct _ParsedWindowsRoot {
   var rootEnd: _SystemString.Index
   var relativeBegin: _SystemString.Index
@@ -16,6 +17,7 @@ internal struct _ParsedWindowsRoot {
   var deviceSigil: FilePath.CodeUnit?
 }
 
+@available(SwiftStdlib 9999, *)
 extension _ParsedWindowsRoot {
   static func traditional(
     drive: FilePath.CodeUnit?,
@@ -60,6 +62,7 @@ extension _ParsedWindowsRoot {
 
 // MARK: - Lexer
 
+@available(SwiftStdlib 9999, *)
 struct _Lexer {
   var slice: Slice<_SystemString>
 
@@ -138,6 +141,7 @@ struct _Lexer {
 
 // MARK: - Verbatim prefix detection (pre-normalization)
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   // Check if this string starts with the exact verbatim prefix \\?\
   // (four backslashes — no forward slashes). Returns the index past
@@ -179,6 +183,8 @@ extension _SystemString {
       return idx
     }
 
+    // TODO: a better way to do this than making an eager array
+
     // \\?\UNC\server\share[\]
     let uncChars: [FilePath.CodeUnit] = [
       FilePath.CodeUnit(_ascii: "U"),
@@ -219,6 +225,7 @@ extension _SystemString {
 
 // MARK: - Windows root parsing
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   internal func _parseWindowsRootInternal() -> _ParsedWindowsRoot? {
     _internalInvariant(_isWindows)
@@ -336,6 +343,7 @@ extension _SystemString {
 
 // MARK: - Windows root prenormalization
 
+@available(SwiftStdlib 9999, *)
 extension _SystemString {
   internal mutating func _prenormalizeWindowsRoots() -> Index {
     _internalInvariant(_isWindows)
