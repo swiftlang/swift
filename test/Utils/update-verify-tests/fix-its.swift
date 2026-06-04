@@ -100,6 +100,19 @@ struct OperatorTestType {}
 // marker as opaque text, so the escape round-trips byte-for-byte.
 func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType {} // expected-error {{operator implementation without matching operator declaration}} {{1-2=wrong}}
 
+@available(*, deprecated, message: "old")
+func deprecatedNoRename(_ x: Int) -> Int { 0 }
+
+func countWithFixit() {
+  // The 'N' between the kind and the message duplicates the expectation N
+  // times; each copy carries the same fix-it list. The compiler emits two
+  // warnings on the line below with no fix-its on either, so the verifier
+  // emits two fix-it mismatches at the same location. update-verify-tests
+  // should drop the wrong fix-it idempotently.
+  // expected-warning@+1 2 {{'deprecatedNoRename' is deprecated: old}} {{1-2=wrong}}{{documentation-file=deprecated-declaration}}
+  _ = deprecatedNoRename(1) + deprecatedNoRename(2)
+}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -194,4 +207,17 @@ struct OperatorTestType {}
 // '\n' escape in the replacement text. update-verify-tests preserves the
 // marker as opaque text, so the escape round-trips byte-for-byte.
 func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType {} // expected-error {{operator implementation without matching operator declaration}} {{1-1=infix operator <=> : <# Precedence Group #>\n}}
+
+@available(*, deprecated, message: "old")
+func deprecatedNoRename(_ x: Int) -> Int { 0 }
+
+func countWithFixit() {
+  // The 'N' between the kind and the message duplicates the expectation N
+  // times; each copy carries the same fix-it list. The compiler emits two
+  // warnings on the line below with no fix-its on either, so the verifier
+  // emits two fix-it mismatches at the same location. update-verify-tests
+  // should drop the wrong fix-it idempotently.
+  // expected-warning@+1 2 {{'deprecatedNoRename' is deprecated: old}}{{documentation-file=deprecated-declaration}}
+  _ = deprecatedNoRename(1) + deprecatedNoRename(2)
+}
 
