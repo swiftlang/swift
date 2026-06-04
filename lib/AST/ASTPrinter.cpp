@@ -118,10 +118,6 @@ void PrintOptions::initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
                                       TypeTransformContext(D));
 }
 
-void PrintOptions::clearSynthesizedExtension() {
-  TransformContext.reset();
-}
-
 static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
   AccessScope scope =
       VD->getFormalAccessScope(/*useDC*/nullptr,
