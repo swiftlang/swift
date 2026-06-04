@@ -96,6 +96,11 @@ Solution ConstraintSystem::finalize() {
     solution.typeBindings[tv] = simplifyType(tv)->reconstituteSugar(false);
   }
 
+  // If constraint system held onto any unified types, finalize them into solution
+  for (auto uBinding : crossSolutionUnionTypes) {
+    solution.UnionedTypes[uBinding.first] = uBinding.second;
+  }
+
   // Copy over the resolved overloads.
   solution.overloadChoices.reserve(ResolvedOverloads.size());
   solution.overloadChoices.insert(ResolvedOverloads.begin(),
@@ -285,6 +290,11 @@ void ConstraintSystem::replaySolution(const Solution &solution,
       continue;
 
     assignFixedType(binding.first, binding.second, /*updateState=*/false);
+  }
+
+  // Register any unified bindings found in analysis of this solution
+  for (auto uBinding : solution.UnionedTypes) {
+    crossSolutionUnionTypes[uBinding.first] = uBinding.second;
   }
 
   // Register overload choices.
