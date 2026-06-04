@@ -37,24 +37,23 @@ void swiftAttr(int len, void *p) __attribute__((swift_attr(
 // expected-expansion@+10:74{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func shared(_ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: p1.count)!|}}
-//   expected-remark@4{{macro content: |    if p2.count != len {|}}
-//   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p2.count)")|}}
+//   expected-remark@3{{macro content: |    let len = Int32(exactly: p2.count)!|}}
+//   expected-remark@4{{macro content: |    if p1.count != len {|}}
+//   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p1.count)")|}}
 //   expected-remark@6{{macro content: |    }|}}
 //   expected-remark@7{{macro content: |    return unsafe shared(len, p1.baseAddress!, p2.baseAddress!)|}}
 //   expected-remark@8{{macro content: |}|}}
 // }}
 void shared(int len, void * __sized_by(len) p1, void * __sized_by(len) p2);
 
-// expected-expansion@+10:72{{
+// expected-expansion@+9:72{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: UnsafeMutableRawBufferPointer) {|}}
-//   expected-remark@3{{macro content: |    let _pCount = p.count|}}
-//   expected-remark@4{{macro content: |    if _pCount != len - offset {|}}
-//   expected-remark@5{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(_pCount)")|}}
-//   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    return unsafe complexExpr(len, offset, p.baseAddress!)|}}
-//   expected-remark@8{{macro content: |}|}}
+//   expected-remark@3{{macro content: |    if p.count != len - offset {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(p.count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    return unsafe complexExpr(len, offset, p.baseAddress!)|}}
+//   expected-remark@7{{macro content: |}|}}
 // }}
 void complexExpr(int len, int offset, void * __sized_by(len - offset) p);
 
@@ -78,9 +77,9 @@ void nonnull(int len, void * __sized_by(len) _Nonnull p);
 
 // expected-expansion@+7:58{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
-//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableRawBufferPointer?) {|}}
-//   expected-remark@3{{macro content: |    let len = Int32(exactly: unsafe p?.count ?? 0)!|}}
-//   expected-remark@4{{macro content: |    return unsafe nullable(len, p?.baseAddress)|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullable(_ p: UnsafeMutableRawBufferPointer) {|}}
+//   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
+//   expected-remark@4{{macro content: |    return unsafe nullable(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void nullable(int len, void * __sized_by(len) _Nullable p);
@@ -149,7 +148,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: aa5390a44af0df94f37482b65880a491defd2b196a9ff00e67dfcc834e86c6cc
+// GENERATED-HASH: aa0ef698c5b89ce6cae09977d23227d1ff414b5f3d685beb8e3fae593ab566a0
 import Test
 
 
@@ -234,7 +233,7 @@ func call_aliasedBytesized(_ p: UnsafeMutablePointer<UInt8>!, _ size: Int32) {
   return unsafe nullUnspecified(p)
 }
 
-@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableRawBufferPointer?) {
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_nullable(_ p: UnsafeMutableRawBufferPointer) {
   return unsafe nullable(p)
 }
 

@@ -38,6 +38,7 @@
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Module.h"
+#include <optional>
 
 using namespace swift;
 using namespace importer;
@@ -176,6 +177,8 @@ struct SwiftifyInfoFunctionPrinter : public SwiftifyInfoPrinter {
       out << "sizedBy";
     else
       out << "countedBy";
+    if (CAT->isOrNull() && hasOrNullSupport())
+      out << "OrNull";
     out << "(pointer: ";
     printParamOrReturn(pointerIndex);
     out << ", ";
@@ -222,6 +225,26 @@ private:
       out << ".return";
     else
       out << ".param(" << pointerIndex + 1 << ")";
+  }
+
+  std::optional<bool> hasOrNullSupportCached = std::nullopt;
+  bool hasOrNullSupport() {
+    if (hasOrNullSupportCached.has_value())
+      return hasOrNullSupportCached.value();
+
+    auto *D = getKnownSingleDecl(SwiftContext, "_SwiftifyInfo");
+    auto *Enum = dyn_cast_or_null<EnumDecl>(D);
+    if (!Enum)
+      return false;
+    for (auto *Element :
+         Enum->lookupDirect(SwiftContext.getIdentifier("countedByOrNull"))) {
+      if (isa<EnumElementDecl>(Element)) {
+        hasOrNullSupportCached = true;
+        return true;
+      }
+    }
+    hasOrNullSupportCached = false;
+    return false;
   }
 };
 
