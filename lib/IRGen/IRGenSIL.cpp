@@ -829,13 +829,13 @@ public:
           // The current basic block must be a successor of the dbg.value().
           continue;
 
-        llvm::SmallVector<llvm::DbgValueInst *, 4> DbgValues;
-        llvm::findDbgValues(DbgValues, Var);
-        for (auto *DVI : DbgValues)
-          if (DVI->getParent() == BB)
+        llvm::SmallVector<llvm::DbgVariableRecord *, 4> DbgValues;
+        llvm::findDbgValues(Var, DbgValues);
+        for (auto *DVR : DbgValues)
+          if (DVR->getParent() == BB)
             IGM.DebugInfo->getBuilder().insertDbgValueIntrinsic(
-                DVI->getValue(), DVI->getVariable(), DVI->getExpression(),
-                DVI->getDebugLoc(), CurBB->getFirstInsertionPt());
+                DVR->getValue(), DVR->getVariable(), DVR->getExpression(),
+                DVR->getDebugLoc(), CurBB->getFirstInsertionPt());
       }
     }
   }
@@ -6178,9 +6178,8 @@ static bool InCoroContext(SILFunction &f, SILInstruction &i) {
 /// loads, need a special case.
 static void salvageDebugReconstructionInst(llvm::Instruction *I) {
   if (auto *LI = dyn_cast<llvm::LoadInst>(I)) {
-    llvm::SmallVector<llvm::DbgVariableIntrinsic *, 1> DbgInsts;
     llvm::SmallVector<llvm::DbgVariableRecord *, 2> DbgRecords;
-    llvm::findDbgUsers(DbgInsts, LI, &DbgRecords);
+    llvm::findDbgUsers(LI, DbgRecords);
     llvm::Value *Addr = LI->getPointerOperand();
     for (llvm::DbgVariableRecord *DVR : DbgRecords) {
       // Insert DW_OP_deref after each arg that references the load.
