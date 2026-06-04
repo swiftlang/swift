@@ -25,6 +25,8 @@
 #include "swift/AST/DeclExportabilityVisitor.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Expr.h"
+#include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Parse/Lexer.h"
@@ -225,6 +227,8 @@ private:
         case AvailabilityScope::Reason::GuardStmtFallthrough:
         case AvailabilityScope::Reason::GuardStmtElseBranch:
         case AvailabilityScope::Reason::WhileStmtBody:
+        case AvailabilityScope::Reason::SwitchStmt:
+        case AvailabilityScope::Reason::SwitchStmtCaseBody:
           // Nothing to check here.
           break;
         }
@@ -670,6 +674,11 @@ private:
       return Action::SkipNode(stmt);
     }
 
+    if (auto *switchStmt = dyn_cast<SwitchStmt>(stmt)) {
+      if (buildSwitchStmtRefinementContext(switchStmt))
+        return Action::SkipNode(stmt);
+    }
+
     return Action::Continue(stmt);
   }
 
@@ -770,6 +779,136 @@ private:
     } else {
       build(whileStmt->getBody());
     }
+  }
+
+  /// Returns the enum element matched by \p pattern, or null if the pattern
+  /// does not bind to a single enum element. The pattern is expected to have
+  /// already been resolved to an `EnumElementPattern` with a resolved decl
+  /// (which is the state after switch type-checking has run).
+  static const EnumElementDecl *getMatchedEnumElement(const Pattern *pattern) {
+    auto *p = pattern->getSemanticsProvidingPattern();
+    if (auto *eep = dyn_cast<EnumElementPattern>(p))
+      return eep->getElementDecl();
+    return nullptr;
+  }
+
+  /// Builds the children of a switch statement's placeholder availability
+  /// scope. Called during lazy expansion via
+  /// `ExpandChildAvailabilityScopesRequest`. By this point the case label
+  /// items have been type-checked, so we can extract the matched enum
+  /// elements and decide which case bodies need refinement scopes.
+  void expandSwitchStmtRefinementContext(SwitchStmt *switchStmt) {
+    // Note: the subject expression has already been walked in the outer
+    // scope when the placeholder was created, so it isn't walked again here.
+
+    // In a single pass over the cases, compute the set of cases that can be
+    // entered via fallthrough from another case.
+    llvm::DenseSet<CaseStmt *> casesWithFallthroughPredecessor;
+    for (auto *caseStmt : switchStmt->getCases()) {
+      if (!caseStmt->hasFallthroughDest())
+        continue;
+      if (auto *dest = caseStmt->getFallthroughDest().getPtrOrNull())
+        casesWithFallthroughPredecessor.insert(dest);
+    }
+
+    auto enclosingAvailability = getCurrentScope()->getAvailabilityContext();
+    for (auto *caseStmt : switchStmt->getCases()) {
+      // If a fallthrough statement could enter this case body from another
+      // case, matching this case's patterns isn't a precondition for
+      // executing the body. Avoid introducing a refined availability scope
+      // and walk the body directly in the placeholder scope.
+      if (casesWithFallthroughPredecessor.count(caseStmt)) {
+        walkCaseStmtChildren(caseStmt);
+        continue;
+      }
+
+      // Otherwise, compute the case body's effective availability as what's
+      // *common* to the matched enum elements: matching any one of the case
+      // label items is sufficient to enter the body, so we only refine when
+      // every item produces the same availability context.
+      std::optional<AvailabilityContext> bodyAvailability;
+      for (auto &item : caseStmt->getCaseLabelItems()) {
+        auto *element = getMatchedEnumElement(item.getPattern());
+        if (!element) {
+          bodyAvailability = std::nullopt;
+          break;
+        }
+        auto itemAvailability = enclosingAvailability;
+        itemAvailability.constrainWithDecl(element);
+
+        if (!bodyAvailability) {
+          bodyAvailability = itemAvailability;
+        } else if (*bodyAvailability != itemAvailability) {
+          bodyAvailability = std::nullopt;
+          break;
+        }
+      }
+
+      // Only introduce a new scope when the matched-element availability
+      // actually refines what's already in scope.
+      if (bodyAvailability && *bodyAvailability != enclosingAvailability) {
+        auto *caseBodyScope = AvailabilityScope::createForSwitchStmtCaseBody(
+            Context, caseStmt, getCurrentDeclContext(), getCurrentScope(),
+            *bodyAvailability);
+        // Walk the case label items in the outer scope: the patterns and
+        // `where` guards execute before entering the case body.
+        for (auto &item : caseStmt->getMutableCaseLabelItems()) {
+          if (auto *p = item.getPattern())
+            p->walk(*this);
+          if (auto *g = item.getGuardExpr())
+            g->walk(*this);
+        }
+        AvailabilityScopeBuilder(caseBodyScope, Context)
+            .build(caseStmt->getBody());
+        continue;
+      }
+
+      walkCaseStmtChildren(caseStmt);
+    }
+  }
+
+  /// Walks the patterns, where guards, and body of \p caseStmt in the current
+  /// scope.
+  void walkCaseStmtChildren(CaseStmt *caseStmt) {
+    for (auto &item : caseStmt->getMutableCaseLabelItems()) {
+      if (auto *p = item.getPattern())
+        p->walk(*this);
+      if (auto *g = item.getGuardExpr())
+        g->walk(*this);
+    }
+    if (auto *body = caseStmt->getBody())
+      body->walk(*this);
+  }
+
+  /// During the initial scope build, defers all switch-statement scope
+  /// construction by creating a placeholder availability scope that is
+  /// expanded lazily. This is necessary because the case label items haven't
+  /// been type-checked yet when the function body's availability scope is
+  /// built, so we can't yet tell which case bodies need refinement.
+  ///
+  /// Returns true if a placeholder has been created and the caller should
+  /// skip walking the switch's children.
+  bool buildSwitchStmtRefinementContext(SwitchStmt *switchStmt) {
+    // If parse recovery left us without a valid brace range, skip this
+    // statement and let the walker handle its (incomplete) children.
+    if (switchStmt->getLBraceLoc().isInvalid() ||
+        switchStmt->getRBraceLoc().isInvalid())
+      return false;
+
+    // Walk the subject expression in the *outer* scope. The placeholder's
+    // source range only covers the case bodies (between the braces), so the
+    // subject is excluded — that excludes any nested availability scopes
+    // induced by the subject from being added as out-of-range children of
+    // the placeholder.
+    if (auto *subject = switchStmt->getSubjectExpr())
+      subject->walk(*this);
+
+    auto *currentScope = getCurrentScope();
+    auto *placeholderScope = AvailabilityScope::createForSwitchStmt(
+        Context, switchStmt, getCurrentDeclContext(), currentScope,
+        currentScope->getAvailabilityContext());
+    placeholderScope->setNeedsExpansion(true);
+    return true;
   }
 
   /// Builds the availability scopes for the GuardStmt and pushes
@@ -1332,6 +1471,13 @@ evaluator::SideEffect ExpandChildAvailabilityScopesRequest::evaluate(
     AvailabilityScopeBuilder builder(parentScope, ctx);
     builder.prepareDeclForLazyExpansion(decl);
     builder.build(decl);
+  } else if (parentScope->getReason() ==
+             AvailabilityScope::Reason::SwitchStmt) {
+    auto *switchStmt = parentScope->getIntroductionNode().getAsSwitchStmt();
+    auto *dc = parentScope->getIntroductionNode().getDeclContext();
+    ASTContext &ctx = dc->getASTContext();
+    AvailabilityScopeBuilder builder(parentScope, ctx);
+    builder.expandSwitchStmtRefinementContext(switchStmt);
   }
   return evaluator::SideEffect();
 }
