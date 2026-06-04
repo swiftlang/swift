@@ -229,7 +229,7 @@ private:
       out << *swiftName << '(';
       // Implicit casts get plain T(x) casts: trap instead of truncate
       // Explicit casts mirror C's truncation on narrowing integer conversions
-      if (isExplicitCast && isNarrowingIntCast(c))
+      if (isExplicitCast && c->getCastKind() == CK::CK_IntegralCast)
         out << "truncatingIfNeeded: ";
       if (!Visit(c->getSubExpr()))
         return false;
@@ -240,23 +240,6 @@ private:
       DLOG("Unsupported cast kind\n");
       return false;
     }
-  }
-
-  bool isNarrowingIntCast(const clang::CastExpr *c) {
-    if (c->getCastKind() != clang::CK_IntegralCast)
-      return false;
-    auto destTy = c->getType();
-    auto srcTy = c->getSubExpr()->getType();
-    if (!destTy->isIntegerType() || !srcTy->isIntegerType())
-      return false;
-    uint64_t srcBits = ctx.getTypeSize(srcTy);
-    uint64_t destBits = ctx.getTypeSize(destTy);
-    bool srcSigned = srcTy->isSignedIntegerType();
-    bool destSigned = destTy->isSignedIntegerType();
-    // Narrowing or same-width signedness change: plain T(x) traps in Swift on
-    // values that C would silently truncate, so use truncatingIfNeeded:.
-    return destBits < srcBits ||
-           (destBits == srcBits && srcSigned != destSigned);
   }
 
   std::optional<llvm::StringRef> swiftBuiltinTypeName(clang::QualType ty) {

@@ -311,13 +311,24 @@ void castTwiceLiteral(int * __counted_by((unsigned int)(signed short)-1) p);
 // expected-expansion@+9:73{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func castParam(_ p: UnsafeMutableBufferPointer<Int32>, _ len: Int16) {|}}
-//   expected-remark@3{{macro content: |    if p.count != CUnsignedInt(len) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in castParam: expected \\(CUnsignedInt(len)) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedInt(truncatingIfNeeded: len) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in castParam: expected \\(CUnsignedInt(truncatingIfNeeded: len)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe castParam(p.baseAddress!, len)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void castParam(int * __counted_by((unsigned int)len) p, signed short len);
+
+// expected-expansion@+9:72{{
+//   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
+//   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func castParam2(_ p: UnsafeMutableBufferPointer<Int32>, _ len: UInt32) {|}}
+//   expected-remark@3{{macro content: |    if p.count != CInt(truncatingIfNeeded: len) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in castParam2: expected \\(CInt(truncatingIfNeeded: len)) but got \\(p.count)")|}}
+//   expected-remark@5{{macro content: |    }|}}
+//   expected-remark@6{{macro content: |    return unsafe castParam2(p.baseAddress!, len)|}}
+//   expected-remark@7{{macro content: |}|}}
+// }}
+void castParam2(int * __counted_by((signed int)len) p, unsigned int len);
 
 void variadic(int len, int * __counted_by(len) p, ...);
 
@@ -328,7 +339,7 @@ module Test {
 
 //--- test.swift
 // GENERATED-BY: %target-swift-ide-test -print-module -module-to-print=Test -plugin-path %swift-plugin-dir -I %t -source-filename=x -Xcc -Wno-nullability-completeness -Xcc -Wno-div-by-zero -Xcc -Wno-pointer-to-int-cast > %t/Test-interface.swift && %swift-function-caller-generator Test %t/Test-interface.swift
-// GENERATED-HASH: 9a9868adf1d87e2316e50537687ace17870d6ae82ec1dcf06a9580facb95143d
+// GENERATED-HASH: 71efeba6e5ec0b384ab8b97441fc84136f94762bc691f5374d67cc0adc3bcdc8
 import Test
 
 func call_simple(_ len: Int32, _ p: UnsafeMutablePointer<Int32>!) {
@@ -463,6 +474,10 @@ func call_castParam(_ p: UnsafeMutablePointer<Int32>!, _ len: Int16) {
   return unsafe castParam(p, len)
 }
 
+func call_castParam2(_ p: UnsafeMutablePointer<Int32>!, _ len: UInt32) {
+  return unsafe castParam2(p, len)
+}
+
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_binaryLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {
   return unsafe binaryLiteral(p)
 }
@@ -477,6 +492,10 @@ func call_castParam(_ p: UnsafeMutablePointer<Int32>!, _ len: Int16) {
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_castParam(_ p: UnsafeMutableBufferPointer<Int32>, _ len: Int16) {
   return unsafe castParam(p, len)
+}
+
+@_alwaysEmitIntoClient @_disfavoredOverload public func call_castParam2(_ p: UnsafeMutableBufferPointer<Int32>, _ len: UInt32) {
+  return unsafe castParam2(p, len)
 }
 
 @_alwaysEmitIntoClient @_disfavoredOverload public func call_castTwiceLiteral(_ p: UnsafeMutableBufferPointer<Int32>) {
