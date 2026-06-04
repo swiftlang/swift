@@ -1331,6 +1331,10 @@ GROUPED_WARNING(cannot_find_module_version,ModuleVersionMissing,none,
         "cannot find user version number for%select{| Clang}1 module '%0';"
         " version number ignored", (StringRef, bool))
 
+GROUPED_WARNING(canimport_missing_module,CanImportMissingModule,none,
+        "cannot find module '%0' for canImport check; the directive will"
+        " evaluate to false", (StringRef))
+
 // Operator decls
 ERROR(ambiguous_operator_decls,none,
       "ambiguous operator declarations found for operator", ())
