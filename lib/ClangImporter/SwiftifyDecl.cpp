@@ -34,6 +34,7 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/Expr.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
@@ -129,69 +130,11 @@ struct SwiftCountExprEmitter
   }
 
   bool VisitImplicitCastExpr(const clang::ImplicitCastExpr *c) {
-    using CK = clang::CastKind;
-    switch (c->getCastKind()) {
-    case CK::CK_LValueToRValue:
-    case CK::CK_NoOp:
-    case CK::CK_ArrayToPointerDecay:
-    case CK::CK_FunctionToPointerDecay:
-      return Visit(c->getSubExpr());
-    case CK::CK_IntegralCast:
-    case CK::CK_BooleanToSignedIntegral:
-    case CK::CK_IntegralToBoolean:
-    case CK::CK_IntegralToFloating:
-    case CK::CK_FloatingToIntegral:
-    case CK::CK_FloatingCast: {
-      // Implicit casts get plain T(x) casts: trap instead of truncate
-      auto swiftName = swiftBuiltinTypeName(c->getType());
-      if (!swiftName) {
-        DLOG("Unsupported cast destination type\n");
-        return false;
-      }
-      out << *swiftName << '(';
-      if (!Visit(c->getSubExpr()))
-        return false;
-      out << ')';
-      return true;
-    }
-    default:
-      DLOG("Unsupported implicit cast kind\n");
-      return false;
-    }
+    return visitCastImpl(c);
   }
 
   bool VisitCStyleCastExpr(const clang::CStyleCastExpr *c) {
-    using CK = clang::CastKind;
-    auto kind = c->getCastKind();
-    switch (kind) {
-    case CK::CK_NoOp:
-    case CK::CK_LValueToRValue:
-      return Visit(c->getSubExpr());
-    case CK::CK_IntegralCast:
-    case CK::CK_BooleanToSignedIntegral:
-    case CK::CK_IntegralToBoolean:
-    case CK::CK_IntegralToFloating:
-    case CK::CK_FloatingToIntegral:
-    case CK::CK_FloatingCast: {
-      auto swiftName = swiftBuiltinTypeName(c->getType());
-      if (!swiftName) {
-        DLOG("Unsupported cast destination type\n");
-        return false;
-      }
-      out << *swiftName << '(';
-      // Mirror C's silent truncation on narrowing integer conversions for
-      // explicit casts.
-      if (isNarrowingIntCast(c))
-        out << "truncatingIfNeeded: ";
-      if (!Visit(c->getSubExpr()))
-        return false;
-      out << ')';
-      return true;
-    }
-    default:
-      DLOG("Unsupported C-style cast kind\n");
-      return false;
-    }
+    return visitCastImpl(c);
   }
 
   bool VisitParenExpr(const clang::ParenExpr *p) {
@@ -212,7 +155,7 @@ struct SwiftCountExprEmitter
       UNOP(UO_Plus, "+");
       UNOP(UO_Minus, "-");
       UNOP(UO_Not, "~");
-#undef CASE_UNOP
+#undef UNOP
     default:
       DLOG("Unsupported unary operator\n");
       return false;
@@ -238,7 +181,7 @@ struct SwiftCountExprEmitter
       BINOP(BO_And, "&");
       BINOP(BO_Or, "|");
       BINOP(BO_Xor, "^");
-#undef CASE_BINOP
+#undef BINOP
     default:
       DLOG("Unsupported binary operator\n");
       return false;
@@ -262,6 +205,43 @@ struct SwiftCountExprEmitter
   }
 
 private:
+  bool visitCastImpl(const clang::CastExpr *c) {
+    ASSERT(isa<clang::CStyleCastExpr>(c) || isa<clang::ImplicitCastExpr>(c));
+    using CK = clang::CastKind;
+    switch (c->getCastKind()) {
+    case CK::CK_LValueToRValue:
+    case CK::CK_NoOp:
+    case CK::CK_ArrayToPointerDecay:
+    case CK::CK_FunctionToPointerDecay:
+      return Visit(c->getSubExpr());
+    case CK::CK_IntegralCast:
+    case CK::CK_BooleanToSignedIntegral:
+    case CK::CK_IntegralToBoolean:
+    case CK::CK_IntegralToFloating:
+    case CK::CK_FloatingToIntegral:
+    case CK::CK_FloatingCast: {
+      auto swiftName = swiftBuiltinTypeName(c->getType());
+      if (!swiftName) {
+        DLOG("Unsupported cast destination type\n");
+        return false;
+      }
+      bool isExplicitCast = isa<clang::CStyleCastExpr>(c);
+      out << *swiftName << '(';
+      // Implicit casts get plain T(x) casts: trap instead of truncate
+      // Explicit casts mirror C's truncation on narrowing integer conversions
+      if (isExplicitCast && isNarrowingIntCast(c))
+        out << "truncatingIfNeeded: ";
+      if (!Visit(c->getSubExpr()))
+        return false;
+      out << ')';
+      return true;
+    }
+    default:
+      DLOG("Unsupported cast kind\n");
+      return false;
+    }
+  }
+
   bool isNarrowingIntCast(const clang::CastExpr *c) {
     if (c->getCastKind() != clang::CK_IntegralCast)
       return false;
