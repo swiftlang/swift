@@ -693,7 +693,7 @@ void AsyncTask::initializeTaskName(const char *_taskName) {
   taskNameCopy[taskNameLen] = '\0'; // make sure we null-terminate
 #endif
 
-  nameFragment()->setName(taskNameCopy);
+  nameFragment()->setName(taskNameCopy, taskNameLen);
   SWIFT_TASK_DEBUG_LOG("[TaskName] Initialize name slot for task:%p, name:%s",
                        this, taskNameCopy);
 }

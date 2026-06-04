@@ -337,7 +337,7 @@ AsyncTask::~AsyncTask() {
   if (hasTaskName()) {
     if (const char *name = nameFragment()->getName()) {
       _swift_task_dealloc_specific(this, const_cast<char*>(name));
-      nameFragment()->setName(nullptr);
+      nameFragment()->setName(nullptr, 0);
     }
 
     #ifndef NDEBUG
@@ -1134,7 +1134,7 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   // First, initialize the NameFragment, if any.
   if (jobFlags.task_hasInitialTaskName()) {
-    ::new (task->nameFragment()) AsyncTask::NameFragment(nullptr);
+    ::new (task->nameFragment()) AsyncTask::NameFragment();
     task->initializeTaskName(taskName);
   }
 

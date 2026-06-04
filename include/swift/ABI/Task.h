@@ -557,12 +557,19 @@ public:
     /// The string is allocated no the task-local allocator as the first thing
     /// allocated on it, and must be the last thing we free on it.
     const char *Name;
+    /// The length of the string stored in Name (not counting the trailing \0).
+    /// Used by tools so they can preallocate a buffer of the right size.
+    size_t NameLength;
 
   public:
-    explicit NameFragment(const char *name) : Name(name) {}
+    NameFragment() : Name(nullptr), NameLength(0) {}
 
     const char *getName() const { return Name; }
-    void setName(const char *name) { Name = name; }
+    size_t getNameLength() const { return NameLength; }
+    void setName(const char *name, size_t length) {
+      Name = name;
+      NameLength = length;
+    }
   };
 
   /// Returns the `NameFragment` of this task.
