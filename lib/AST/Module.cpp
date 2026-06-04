@@ -3986,6 +3986,12 @@ ArrayRef<TypeDecl *> LocalTypeDeclsRequest::evaluate(Evaluator &evaluator,
   SmallVector<TypeDecl *> results;
   LocalTypeDeclCollector collector(results);
   sf->walk(collector);
+
+  // Also walk the synthesized file to collect local types from
+  // extension macro expansions.
+  if (auto *synthesizedFile = sf->getSynthesizedFile())
+    synthesizedFile->walk(collector);
+
   return sf->getASTContext().AllocateCopy(results);
 }
 
