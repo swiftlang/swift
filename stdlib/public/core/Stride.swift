@@ -288,6 +288,33 @@ extension Strideable where Self: FloatingPoint, Self == Stride {
   }
 }
 
+extension Strideable {
+  @_alwaysEmitIntoClient
+  internal mutating func _advance(
+    by distance: inout Stride, limitedBy limit: Self
+  ) {
+    if distance >= 0 {
+      guard limit >= self else {
+        self = self.advanced(by: distance)
+        distance = 0
+        return
+      }
+      let d = Swift.min(distance, self.distance(to: limit))
+      self = self.advanced(by: d)
+      distance -= d
+    } else {
+      guard limit <= self else {
+        self = self.advanced(by: distance)
+        distance = 0
+        return
+      }
+      let d = Swift.max(distance, self.distance(to: limit))
+      self = self.advanced(by: d)
+      distance -= d
+    }
+  }
+}
+
 /// An iterator for a `StrideTo` instance.
 @frozen
 public struct StrideToIterator<Element: Strideable> {

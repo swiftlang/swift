@@ -1006,3 +1006,38 @@ extension Span: BorrowingSequence where Element: ~Copyable {
   }
 }
 #endif
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Span where Element: Equatable & ~Copyable {
+  @_alwaysEmitIntoClient
+  internal func _elementsEqual(to other: borrowing Self) -> Bool {
+    return self.withUnsafeBufferPointer { a in
+      other.withUnsafeBufferPointer { b in
+        guard a.count == b.count else { return false }
+        guard unsafe a.baseAddress != b.baseAddress else { return true }
+        var i = 0
+        while i < self.count {
+          guard unsafe a[i] == b[i] else { return false }
+          i &+= 1
+        }
+        return true
+      }
+    }
+  }
+}
+
+@available(SwiftCompatibilitySpan 5.0, *)
+@_originallyDefinedIn(module: "Swift;CompatibilitySpan", SwiftCompatibilitySpan 6.2)
+extension Span where Element: Hashable & ~Copyable {
+  @_alwaysEmitIntoClient
+  internal func _hashContents(into hasher: inout Hasher) {
+    // Note: no discriminating combine call -- caller is expected to do that
+    // separately when needed.
+    var i = 0
+    while i < self.count {
+      hasher.combine(unsafe self[unchecked: i])
+      i &+= 1
+    }
+  }
+}
