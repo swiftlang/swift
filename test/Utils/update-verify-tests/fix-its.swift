@@ -128,6 +128,15 @@ extension OperatorTestType {
     static func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{-1:1-1=infix operator <=> : <# Precedence Group #>\n}}
 }
 
+// Same diagnostic shape, but the source has {{none}} instead of the correct
+// fix-it. The verifier reports "expected no fix-its; actual fix-it seen:
+// {{N:1-1=...}}" with an absolute line number; update-verify-tests should
+// insert the actual marker (colon, line:col offset and all) while
+// preserving the {{none}} marker after it.
+extension OperatorTestType {
+    static func <=<(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{none}}
+}
+
 func multiLineFixitErrors() {
   // Two unrelated diagnostics on adjacent lines, each with its own wrong
   // fix-it. The per-Diag actual_fixits state must be independent across
@@ -292,6 +301,15 @@ extension OperatorTestType {
     static func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{-1:1-1=infix operator <=> : <# Precedence Group #>\n}}
 }
 
+// Same diagnostic shape, but the source has {{none}} instead of the correct
+// fix-it. The verifier reports "expected no fix-its; actual fix-it seen:
+// {{N:1-1=...}}" with an absolute line number; update-verify-tests should
+// insert the actual marker (colon, line:col offset and all) while
+// preserving the {{none}} marker after it.
+extension OperatorTestType {
+    static func <=<(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{128:1-1=infix operator <=< : <# Precedence Group #>\n}} {{none}}
+}
+
 func multiLineFixitErrors() {
   // Two unrelated diagnostics on adjacent lines, each with its own wrong
   // fix-it. The per-Diag actual_fixits state must be independent across
@@ -306,7 +324,7 @@ func groupNamePreserved(_ x: Int) {
   // {{documentation-file=...}}) when consuming fix-it markers, and
   // _render_fixits must re-emit those preserved markers in source order
   // when the run is rewritten.
-  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{3-140:4=_ = 0}}
+  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{3-149:4=_ = 0}}
   if case _ = x {
     _ = 0
   }
