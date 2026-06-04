@@ -709,6 +709,13 @@ def update_lines(
             )
         line.diag.decrement_count()
 
+    # Group FixitErrors by their target diag. When count > 1 and the verifier
+    # produces distinct actual fix-it sets per occurrence (e.g.
+    # `expected-warning 2 {{msg}} {{wrong}}` against two diagnostics that
+    # emit different fix-its), split the source's count expectation into
+    # one per occurrence so each set of actual fix-its lands on its own
+    # directive.
+    fixit_errors_by_diag = {}
     for diag_error in diag_errors:
         if not isinstance(diag_error, FixitError):
             continue
@@ -718,7 +725,41 @@ def update_lines(
             raise KnownException(
                 f"{filename}:{line_n} - fix-it mismatch reported, but no expected-* directive parsed on that line"
             )
-        line.diag.actual_fixits = diag_error.actual_fixits
+        bucket = fixit_errors_by_diag.setdefault(id(line.diag), (line.diag, []))
+        bucket[1].append(diag_error.actual_fixits)
+
+    for diag, actuals_list in fixit_errors_by_diag.values():
+        unique = []
+        for actual in actuals_list:
+            if actual not in unique:
+                unique.append(actual)
+        if len(unique) <= 1 or diag.count <= 1 or nested_context is not None:
+            diag.actual_fixits = unique[0]
+            continue
+        # Split: peel off siblings for each earlier distinct actual_fixits
+        # set. The original diag keeps the last set so the synthesized
+        # siblings (inserted ahead of it via add_diag) line up with the
+        # earlier actual diagnostics in source order.
+        diag.actual_fixits = unique[-1]
+        diag.count -= len(unique) - 1
+        if diag.count < 1:
+            # Shouldn't happen if the verifier reports at most `count` fix-it
+            # errors per directive, but guard against pathological inputs.
+            diag.count = 1
+        for extra_actual in unique[:-1]:
+            new_diag = add_diag(
+                diag.absolute_target(),
+                diag.col(),
+                diag.diag_content,
+                diag.category,
+                lines,
+                orig_lines,
+                diag.prefix,
+                nested_context,
+            )
+            new_diag.actual_fixits = extra_actual
+            new_diag.had_none_fixit_marker = diag.had_none_fixit_marker
+            new_diag.preserved_markers = list(diag.preserved_markers)
 
     diag_errors.sort(reverse=True, key=lambda diag_error: diag_error.line)
     for diag_error in diag_errors:

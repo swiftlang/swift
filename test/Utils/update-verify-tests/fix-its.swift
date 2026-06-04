@@ -25,6 +25,11 @@ func noneToFixit() {
 @available(*, deprecated, renamed: "bar(example:)")
 func foo(b: Int) {}
 
+// Returning Int so it can be used in expressions like `foo(b: 1) + foo(b: 2)`
+// without a separate "result unused" warning.
+@available(*, deprecated, renamed: "bar(example:)")
+func fooReturn(b: Int) -> Int { 0 }
+
 func unexpectedFixitWithNone() {
   // The expected fix-it list matches one of the actual fix-its, and {{none}}
   // forbids any extras; the compiler emits an additional fix-it. Verifier
@@ -151,6 +156,18 @@ func wrongCategoryWithFixit() {
   let a = 2 // expected-error{{initialization of immutable value 'a' was never used}} {{1-2=wrong}}
 }
 
+func countWithDifferentFixits() {
+  // 'expected-X N {{msg}} {{...}}' duplicates the fix-it expectation N
+  // times, but each occurrence may have its own actual fix-its (here the
+  // two fooReturn calls land on different columns). The verifier emits N
+  // fix-it errors with distinct actual sets; update_lines must split the
+  // count expectation into one directive per occurrence so each set lands
+  // on its own line.
+  // expected-warning@+2 2 {{'fooReturn(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 2 {{use 'bar(example:)' instead}} {{1-2=wrong}}
+  _ = fooReturn(b: 1) + fooReturn(b: 2)
+}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -170,6 +187,11 @@ func noneToFixit() {
 
 @available(*, deprecated, renamed: "bar(example:)")
 func foo(b: Int) {}
+
+// Returning Int so it can be used in expressions like `foo(b: 1) + foo(b: 2)`
+// without a separate "result unused" warning.
+@available(*, deprecated, renamed: "bar(example:)")
+func fooReturn(b: Int) -> Int { 0 }
 
 func unexpectedFixitWithNone() {
   // The expected fix-it list matches one of the actual fix-its, and {{none}}
@@ -282,7 +304,7 @@ func groupNamePreserved(_ x: Int) {
   // {{documentation-file=...}}) when consuming fix-it markers, and
   // _render_fixits must re-emit those preserved markers in source order
   // when the run is rewritten.
-  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{3-134:4=_ = 0}}
+  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{3-139:4=_ = 0}}
   if case _ = x {
     _ = 0
   }
@@ -296,5 +318,18 @@ func wrongCategoryWithFixit() {
   // not silently dropped.
   // expected-warning@+1{{initialization of immutable value 'a' was never used}} {{3-8=_}}
   let a = 2
+}
+
+func countWithDifferentFixits() {
+  // 'expected-X N {{msg}} {{...}}' duplicates the fix-it expectation N
+  // times, but each occurrence may have its own actual fix-its (here the
+  // two fooReturn calls land on different columns). The verifier emits N
+  // fix-it errors with distinct actual sets; update_lines must split the
+  // count expectation into one directive per occurrence so each set lands
+  // on its own line.
+  // expected-note@+3  {{use 'bar(example:)' instead}} {{7-16=bar}} {{17-18=example}}
+  // expected-warning@+2 2 {{'fooReturn(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1  {{use 'bar(example:)' instead}} {{25-34=bar}} {{35-36=example}}
+  _ = fooReturn(b: 1) + fooReturn(b: 2)
 }
 
