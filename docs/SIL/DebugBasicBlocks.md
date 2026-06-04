@@ -2,7 +2,7 @@
 
 ## Overview
 
-A **debug basic block** is a standalone `SILBasicBlock` attached to a `debug_value` instruction via the `transform` keyword. It contains SIL instructions that describe how to reconstruct a source variable's value from the SSA values that are still alive at that program point. These instructions are not part of the normal program, and are invisible to the optimizer, they are only used to produce DWARF debug info.
+A **debug reconstruction block** (or Debug BB) is a standalone `SILBasicBlock` attached to a `debug_value` instruction via the `transform` keyword. It contains SIL instructions that describe how to reconstruct a source variable's value from the SSA values that are still alive at that program point. These instructions are not part of the normal program, and are invisible to the optimizer, they are only used to produce DWARF debug info.
 
 ## Structure
 
@@ -52,7 +52,9 @@ The terminator is always a regular `return`.
 
 ### Combining with DIExpr
 
-Debug basic blocks coexist with `SILDebugInfoExpression`. When both are present, the `transform` block is evaluated first, then the DIExpr evaluates `op_deref` and fragments.
+Debug basic blocks coexist with `SILDebugInfoExpression`. When both are present, the `transform` block is evaluated first, then the DIExpr evaluates fragments.
+
+### Combining with fragments
 
 For example, when each field of the struct is tracked separately using fragments:
 
@@ -71,6 +73,14 @@ bb0(%0 : $Int):
   return %3
 }
 ```
+
+#### Combining with `op_deref`
+
+Normally (for loadable types), `op_deref` and debug reconstruction blocks are **incompatible**. When a debug BB is created from a `debug_value` that has an `op_deref`, the deref is converted into a `load` instruction in the block
+
+For **address-only types** (types that are not loadable), `op_deref` is kept alongside the debug basic block, as `load` instructions for them cannot be generated.
+
+Because address-only types cannot be loaded or manipulated as values, debug BBs for address-only types are limited. Any salvage operation that would require manipulating the value or rewriting a load, cannot be done on an address-only type, so the operand is killed instead.
 
 ## Optimizer Interaction
 
