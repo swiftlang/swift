@@ -2033,9 +2033,13 @@ static void salvagePackElementSetDebugInfo(PackElementSetInst *PESI) {
 
   for (Operand *U : getDebugUses(API)) {
     auto *DbgInst = cast<DebugValueInst>(U->getUser());
+    // TODO: Support salvaging reconstruction blocks for packs, and use a
+    // reconstruction block instead of tuple fragments to salvage their debug
+    // info.
+    ASSERT(DbgInst->getDebugReconstructionBlock() == nullptr &&
+           "We do not yet support reconstruction blocks for packs.");
     auto VarInfo = DbgInst->getCompleteVarInfo();
     VarInfo.Type = silType;
-    VarInfo.Scope = API->getDebugScope();
     if (tupleType) {
       auto FragDIExpr = SILDebugInfoExpression::createTupleFragment(
           tupleType, SPII->getComponentIndex());
