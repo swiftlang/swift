@@ -1953,7 +1953,7 @@ static ManagedValue emitBuiltinSuspend(SILGenFunction &SGF, SILLocation loc,
   SmallVector<ManagedValue, 6> helperArgs{
       contMV,
       args[0],                 // executor: E
-      args[1],                 // FireTime<C>
+      ensureIndirect(args[1]), // FireTime<C>
       ensureIndirect(args[2]), // C.Duration?
       args[3],                 // clock: C
       args[4]                  // closure
