@@ -130,6 +130,15 @@ func multiLineFixitErrors() {
   let b = 3 // expected-warning{{initialization of immutable value 'b' was never used}} {{1-2=B}}
 }
 
+func wrongCategoryWithFixit() {
+  // The expected category mismatches the actual. The verifier reports both
+  // a wrong-category error and a fix-it mismatch on the same diagnostic.
+  // The fix-it from the FixitError must be transferred from the dead
+  // (wrong-category) diag onto the synthesized replacement diag, so it is
+  // not silently dropped.
+  let a = 2 // expected-error{{initialization of immutable value 'a' was never used}} {{1-2=wrong}}
+}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -253,5 +262,15 @@ func multiLineFixitErrors() {
   // lines.
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
   let b = 3 // expected-warning{{initialization of immutable value 'b' was never used}} {{3-8=_}}
+}
+
+func wrongCategoryWithFixit() {
+  // The expected category mismatches the actual. The verifier reports both
+  // a wrong-category error and a fix-it mismatch on the same diagnostic.
+  // The fix-it from the FixitError must be transferred from the dead
+  // (wrong-category) diag onto the synthesized replacement diag, so it is
+  // not silently dropped.
+  // expected-warning@+1{{initialization of immutable value 'a' was never used}} {{3-8=_}}
+  let a = 2
 }
 

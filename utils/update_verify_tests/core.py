@@ -556,6 +556,29 @@ def remove_dead_diags(lines, prefix):
                 break
         if took:
             continue
+        # Even if take() didn't merge (e.g. because the synthesized sibling
+        # has a different category, as in the wrong-category-with-fix-it
+        # case), transfer the dead diag's fix-it state to a live sibling on
+        # the same target. The fix-it was reported by the verifier against
+        # this source location, so it logically belongs to whichever diag
+        # ends up rendering at this location.
+        if (
+            line.diag.actual_fixits is not None
+            and line.diag.target is not None
+        ):
+            for other_diag in line.diag.target.targeting_diags:
+                if (
+                    other_diag is line.diag
+                    or other_diag.is_from_source_file
+                    or other_diag.count == 0
+                    or other_diag.actual_fixits is not None
+                ):
+                    continue
+                other_diag.actual_fixits = line.diag.actual_fixits
+                other_diag.had_none_fixit_marker = (
+                    line.diag.had_none_fixit_marker
+                )
+                break
         if line.render() == "":
             remove_line(line, lines)
 
