@@ -1557,15 +1557,16 @@ public:
   ///   - address: The address of the value.
   ///   - ptr: The bytes that have been read so far. On return, the full object.
   ///   - existingByteCount: The number of bytes in ptr.
+  /// Returns the full size, or 0 if an error occurred.
   template <typename BaseTy>
-  bool readFullTrailingObjects(RemoteAddress address,
-                               MemoryReader::ReadBytesResult &ptr,
-                               size_t existingByteCount) {
+  size_t readFullTrailingObjects(RemoteAddress address,
+                                 MemoryReader::ReadBytesResult &ptr,
+                                 size_t existingByteCount) {
     // Read the full base descriptor if it's bigger than what we have so far.
     if (sizeof(BaseTy) > existingByteCount) {
       ptr = Reader->template readObj<BaseTy>(address);
       if (!ptr)
-        return false;
+        return -1;
     }
 
     // We don't know how much memory we need to read to get all the trailing
@@ -1588,15 +1589,15 @@ public:
       if (thisSize > sizeSoFar) {
         // Make sure we haven't ended up with a ridiculous size.
         if (thisSize > MaxMetadataSize)
-          return false;
+          return -1;
 
         ptr = Reader->readBytes(address, thisSize);
         if (!ptr)
-          return false;
+          return -1;
         sizeSoFar = thisSize;
       }
     }
-    return true;
+    return sizeSoFar;
   }
 
   /// Demangle the entity represented by a symbolic reference to a given symbol name.
@@ -2162,9 +2163,13 @@ protected:
                          reinterpret_cast<const TargetMetadata<Runtime> *>(
                              cached->second.get()));
 
+    return readMetadataAndSize(address).first;
+  }
+
+  std::pair<MetadataRef, size_t> readMetadataAndSize(RemoteAddress address) {
     StoredPointer KindValue = 0;
     if (!Reader->readInteger(address, &KindValue))
-      return nullptr;
+      return {nullptr, 0};
 
     switch (getEnumeratedMetadataKind(KindValue)) {
       case MetadataKind::Class:
@@ -2188,12 +2193,12 @@ protected:
         RemoteAddress signedShapePtr;
         if (!Reader->template readRemoteAddress<StoredPointer>(shapeAddress,
                                                                signedShapePtr))
-          return nullptr;
+          return {nullptr, 0};
         auto shapePtr = stripSignedPointer(signedShapePtr);
 
         auto shape = readShape(shapePtr);
         if (!shape)
-          return nullptr;
+          return {nullptr, 0};
 
         auto totalSize =
             sizeof(TargetExtendedExistentialTypeMetadata<Runtime>)
@@ -2225,13 +2230,13 @@ protected:
           TargetTupleTypeMetadata<Runtime>::getOffsetToNumElements();
         StoredSize numElements;
         if (!Reader->readInteger(numElementsAddress, &numElements))
-          return nullptr;
+          return {nullptr, 0};
         auto totalSize = sizeof(TargetTupleTypeMetadata<Runtime>) +
                          numElements * sizeof(TupleTypeMetadata::Element);
 
         // Make sure the number of elements is reasonable
         if (numElements >= 256)
-          return nullptr;
+          return {nullptr, 0};
 
         return _readMetadata(address, totalSize);
       }
@@ -2242,7 +2247,7 @@ protected:
 
     // We can fall out here if the value wasn't actually a valid
     // MetadataKind.
-    return nullptr;
+    return {nullptr, 0};
   }
 
   RemoteAddress
@@ -2315,7 +2320,7 @@ protected:
 
 private:
   template <template <class R> class M>
-  MetadataRef _readMetadataFixedSize(RemoteAddress address) {
+  std::pair<MetadataRef, size_t> _readMetadataFixedSize(RemoteAddress address) {
     static_assert(!ABI::typeHasTrailingObjects<M<Runtime>>(),
                   "Type must not have trailing objects. Use "
                   "_readMetadataVariableSize for types that have them.");
@@ -2324,23 +2329,23 @@ private:
   }
 
   template <template <class R> class M>
-  MetadataRef _readMetadataVariableSize(RemoteAddress address) {
+  std::pair<MetadataRef, size_t> _readMetadataVariableSize(RemoteAddress address) {
     static_assert(ABI::typeHasTrailingObjects<M<Runtime>>(),
                   "Type must have trailing objects. Use _readMetadataFixedSize "
                   "for types that don't.");
 
     MemoryReader::ReadBytesResult bytes;
     auto readResult = readFullTrailingObjects<M<Runtime>>(address, bytes, 0);
-    if (!readResult)
-      return nullptr;
-    return _cacheMetadata(address, bytes);
+    if (readResult == 0)
+      return {nullptr, 0};
+    return {_cacheMetadata(address, bytes), readResult};
   }
 
-  MetadataRef _readMetadata(RemoteAddress address, size_t sizeAfter) {
+  std::pair<MetadataRef, size_t> _readMetadata(RemoteAddress address, size_t sizeAfter) {
     if (sizeAfter > MaxMetadataSize)
-      return nullptr;
+      return {nullptr, 0};
     auto readResult = Reader->readBytes(address, sizeAfter);
-    return _cacheMetadata(address, readResult);
+    return {_cacheMetadata(address, readResult), sizeAfter};
   }
 
   MetadataRef _cacheMetadata(RemoteAddress address,
