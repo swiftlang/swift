@@ -6178,9 +6178,8 @@ static bool InCoroContext(SILFunction &f, SILInstruction &i) {
 /// loads, need a special case.
 static void salvageDebugReconstructionInst(llvm::Instruction *I) {
   if (auto *LI = dyn_cast<llvm::LoadInst>(I)) {
-    llvm::SmallVector<llvm::DbgVariableIntrinsic *, 1> DbgInsts;
     llvm::SmallVector<llvm::DbgVariableRecord *, 2> DbgRecords;
-    llvm::findDbgUsers(DbgInsts, LI, &DbgRecords);
+    llvm::findDbgUsers(LI, DbgRecords);
     llvm::Value *Addr = LI->getPointerOperand();
     for (llvm::DbgVariableRecord *DVR : DbgRecords) {
       // Insert DW_OP_deref after each arg that references the load.
