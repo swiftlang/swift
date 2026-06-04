@@ -661,7 +661,9 @@ final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariable
 
   public func stripDeref() { bridged.DebugValue_stripDeref() }
   public func prependDeref() { bridged.DebugValue_prependDeref() }
-  public func killOperand() { bridged.DebugValue_killOperand() }
+  public func killOperand(withType type: Type? = nil) {
+    bridged.DebugValue_killOperand(type?.bridged ?? BridgedType())
+  }
 }
 
 final public class DebugStepInst : Instruction {}

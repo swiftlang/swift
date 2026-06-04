@@ -5813,7 +5813,9 @@ public:
   /// value is no longer valid and cannot be salvaged.
   /// This will replace the operand with an undef, and clear any DIExpr or debug
   /// reconstruction block.
-  void killOperand();
+  /// If \p varType is specified, the undef will use that type (in the
+  /// appropriate address/object form) instead of the current operand's type.
+  void killOperand(SILType operandType = SILType());
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds

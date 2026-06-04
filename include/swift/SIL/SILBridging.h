@@ -1003,7 +1003,7 @@ struct BridgedInstruction {
   DebugValue_getOrCreateDebugReconstructionBlock() const;
   BRIDGED_INLINE void DebugValue_stripDeref() const;
   BRIDGED_INLINE void DebugValue_prependDeref() const;
-  BRIDGED_INLINE void DebugValue_killOperand() const;
+  BRIDGED_INLINE void DebugValue_killOperand(BridgedType operandType) const;
 
   BRIDGED_INLINE bool AllocStack_hasVarInfo() const;
   BRIDGED_INLINE BridgedSILDebugVariable AllocStack_getVarInfo() const;

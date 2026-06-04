@@ -2031,8 +2031,8 @@ void BridgedInstruction::DebugValue_stripDeref() const {
 void BridgedInstruction::DebugValue_prependDeref() const {
   getAs<swift::DebugValueInst>()->prependDeref();
 }
-void BridgedInstruction::DebugValue_killOperand() const {
-  getAs<swift::DebugValueInst>()->killOperand();
+void BridgedInstruction::DebugValue_killOperand(BridgedType operandType) const {
+  getAs<swift::DebugValueInst>()->killOperand(operandType.unbridged());
 }
 
 bool BridgedInstruction::AllocStack_hasVarInfo() const {

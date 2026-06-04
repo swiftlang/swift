@@ -597,19 +597,20 @@ void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
   DebugBasicBlockCloner(*getFunction()).clone(srcBB, newBB);
 }
 
-void DebugValueInst::killOperand() {
+void DebugValueInst::killOperand(SILType operandType) {
   if (isa<SILUndef>(getOperand())) {
     // Already undef: no operand to kill.
     return;
   }
 
-  SILType origType = getOperand()->getType();
+  SILType origType = operandType ? operandType : getOperand()->getType();
   bool addressOnly = !origType.isLoadableOrOpaque(*getFunction());
 
   // For address-only types, keep the address type and prependDeref flag.
   // For loadable types, use the object type and strip prependDeref.
-  SILValue undef = SILUndef::get(getFunction(),
-      addressOnly ? origType : origType.getObjectType());
+  SILValue undef =
+      SILUndef::get(getFunction(), addressOnly ? origType.getAddressType()
+                                               : origType.getObjectType());
   setOperand(undef);
 
   // Strip prependDeref (unless address-only).

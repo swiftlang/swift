@@ -84,8 +84,7 @@ private extension AllocStackInst {
           dv.salvageEnumPayload(caseIndex: caseIndex, enumType: oldAllocType.objectType, context)
         } else {
           // Kill the operand, and fix the type to be the enum type rather than the payload type.
-          dv.killOperand()
-          dv.operand.set(to: Undef.get(type: oldAllocType.objectType, context), context)
+          dv.killOperand(withType: oldAllocType)
         }
       case is DestroyAddrInst, is DeallocStackInst, is StoreInst:
         break
@@ -563,10 +562,10 @@ private extension DebugValueInst {
     let operandType = self.operand.value.type
 
     // Address-only types can't be represented in DWARF expressions.
-    guard operandType.objectType.isLoadable(in: self.parentFunction) else {
+    guard operandType.objectType.isLoadable(in: self.parentFunction),
+          enumType.isLoadable(in: self.parentFunction) else {
       // Kill the operand, and fix the type to be the enum type rather than the payload type.
-      self.killOperand()
-      self.operand.set(to: Undef.get(type: enumType.addressType, context), context)
+      self.killOperand(withType: enumType)
       return
     }
 
