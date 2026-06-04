@@ -2,6 +2,10 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -primary-file %s -O -sil-verify-all -emit-sil >%t/output.sil
 // RUN: %FileCheck %s < %t/output.sil
 
+// RUN: %empty-directory(%t)
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -primary-file %s -O -sil-verify-all -emit-sil -enable-sil-opaque-values >%t/output.sil
+// RUN: %FileCheck %s < %t/output.sil
+
 // REQUIRES: objc_interop
 // REQUIRES: swift_in_compiler
 

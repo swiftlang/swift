@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -enable-sil-opaque-values %s | %FileCheck %s
 
 // REQUIRES: objc_interop
 

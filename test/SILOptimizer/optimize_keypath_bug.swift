@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend -emit-sil -O -sil-verify-all %s
+// RUN: %target-swift-frontend -emit-sil -O -sil-verify-all -enable-sil-opaque-values %s
 // REQUIRES: OS=macosx
 
 import Foundation

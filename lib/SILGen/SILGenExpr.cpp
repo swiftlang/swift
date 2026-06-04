@@ -3658,14 +3658,23 @@ static PreparedArguments loadIndexValuesForKeyPathComponent(
   }
 
   for (unsigned i : indices(indexes)) {
-    SILValue eltAddr = pointer;
-    if (indexes.size() > 1) {
-      eltAddr = SGF.B.createTupleElementAddr(loc, eltAddr, i);
-    }
+    SILValue elt = pointer;
     auto ty = SGF.F.mapTypeIntoEnvironment(indexes[i].second);
-    auto value = SGF.emitLoad(loc, eltAddr,
-                              SGF.getTypeLowering(ty),
-                              SGFContext(), IsNotTake);
+    ManagedValue value;
+    if (pointer->getType().isAddress()) {
+      if (indexes.size() > 1)
+        elt = SGF.B.createTupleElementAddr(loc, elt, i);
+      value = SGF.emitLoad(loc, elt, SGF.getTypeLowering(ty), SGFContext(),
+                           IsNotTake);
+    } else {
+      // The index argument arrives as an `Indirect_In_Guaranteed` parameter,
+      // so a non-address shape is only possible when SIL operates on opaque
+      // values rather than addresses.
+      assert(!SGF.SGM.M.useLoweredAddresses());
+      if (indexes.size() > 1)
+        elt = SGF.B.createTupleExtract(loc, elt, i);
+      value = ManagedValue::forBorrowedRValue(elt).copy(SGF, loc);
+    }
     auto substType =
       SGF.F.mapTypeIntoEnvironment(indexes[i].first)->getCanonicalType();
     indexValues.add(loc, RValue(SGF, loc, substType, value));
@@ -4397,27 +4406,43 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
 
       Scope branchScope(subSGF, loc);
 
-      SILValue lhsEltAddr = lhsAddr;
-      SILValue rhsEltAddr = rhsAddr;
-      if (indexes.size() > 1) {
-        lhsEltAddr = subSGF.B.createTupleElementAddr(loc, lhsAddr, i);
-        rhsEltAddr = subSGF.B.createTupleElementAddr(loc, rhsAddr, i);
-      }
-      auto lhsArg = subSGF.emitLoad(loc, lhsEltAddr,
-             subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
-             SGFContext(), IsNotTake);
-      auto rhsArg = subSGF.emitLoad(loc, rhsEltAddr,
-             subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
-             SGFContext(), IsNotTake);
-      
-      if (!lhsArg.getType().isAddress()) {
-        auto lhsBuf = subSGF.emitTemporaryAllocation(loc, lhsArg.getType());
-        lhsArg.forwardInto(subSGF, loc, lhsBuf);
-        lhsArg = subSGF.emitManagedBufferWithCleanup(lhsBuf);
+      ManagedValue lhsArg, rhsArg;
+      if (lhsAddr->getType().isAddress()) {
+        SILValue lhsEltAddr = lhsAddr;
+        SILValue rhsEltAddr = rhsAddr;
+        if (indexes.size() > 1) {
+          lhsEltAddr = subSGF.B.createTupleElementAddr(loc, lhsAddr, i);
+          rhsEltAddr = subSGF.B.createTupleElementAddr(loc, rhsAddr, i);
+        }
+        lhsArg = subSGF.emitLoad(loc, lhsEltAddr,
+               subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
+               SGFContext(), IsNotTake);
+        rhsArg = subSGF.emitLoad(loc, rhsEltAddr,
+               subSGF.getTypeLowering(AbstractionPattern::getOpaque(), formalTy),
+               SGFContext(), IsNotTake);
 
-        auto rhsBuf = subSGF.emitTemporaryAllocation(loc, rhsArg.getType());
-        rhsArg.forwardInto(subSGF, loc, rhsBuf);
-        rhsArg = subSGF.emitManagedBufferWithCleanup(rhsBuf);
+        if (!lhsArg.getType().isAddress()) {
+          auto lhsBuf = subSGF.emitTemporaryAllocation(loc, lhsArg.getType());
+          lhsArg.forwardInto(subSGF, loc, lhsBuf);
+          lhsArg = subSGF.emitManagedBufferWithCleanup(lhsBuf);
+
+          auto rhsBuf = subSGF.emitTemporaryAllocation(loc, rhsArg.getType());
+          rhsArg.forwardInto(subSGF, loc, rhsBuf);
+          rhsArg = subSGF.emitManagedBufferWithCleanup(rhsBuf);
+        }
+      } else {
+        // Opaque-values mode: the function arguments are guaranteed object
+        // values rather than addresses. Extract the i-th element (if needed)
+        // and copy it; the apply will borrow the owned value for the
+        // @in_guaranteed Self parameter.
+        SILValue lhsElt = lhsAddr;
+        SILValue rhsElt = rhsAddr;
+        if (indexes.size() > 1) {
+          lhsElt = subSGF.B.createTupleExtract(loc, lhsAddr, i);
+          rhsElt = subSGF.B.createTupleExtract(loc, rhsAddr, i);
+        }
+        lhsArg = ManagedValue::forBorrowedRValue(lhsElt).copy(subSGF, loc);
+        rhsArg = ManagedValue::forBorrowedRValue(rhsElt).copy(subSGF, loc);
       }
 
       auto metaty = CanMetatypeType::get(formalCanTy,
@@ -4531,7 +4556,11 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       // Extract the index value.
       SILValue indexAddr = indexPtr;
       if (indexes.size() > 1) {
-        indexAddr = subSGF.B.createTupleElementAddr(loc, indexPtr, 0);
+        if (indexPtr->getType().isAddress()) {
+          indexAddr = subSGF.B.createTupleElementAddr(loc, indexPtr, 0);
+        } else {
+          indexAddr = subSGF.B.createTupleExtract(loc, indexPtr, 0);
+        }
       }
 
       VarDecl *hashValueVar =
@@ -4553,7 +4582,9 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
           hashGenericSig, formalTy, hashable);
 
       // Read the storage.
-      ManagedValue base = ManagedValue::forBorrowedAddressRValue(indexAddr);
+      ManagedValue base = indexAddr->getType().isAddress()
+                              ? ManagedValue::forBorrowedAddressRValue(indexAddr)
+                              : ManagedValue::forBorrowedObjectRValue(indexAddr);
       hashCode =
         subSGF.emitRValueForStorageLoad(loc, base, formalTy, /*super*/ false,
                                         hashValueVar, PreparedArguments(),
@@ -4649,7 +4680,32 @@ static void lowerKeyPathMemberIndexTypes(
           AbstractionPattern::getOpaque(), paramTy,
           TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
               ResilienceExpansion::Minimal));
+
+      // In opaque-values mode, TypeLowering::handleAddressOnly lowers
+      // address-only AST types objects until AddressLowering runs, so the
+      // `getLoweredType` above returns the object form. The keypath runtime
+      // ABI requires the address form, and KeyPathPatternComponent caches
+      // its lowered index type — AddressLowering does not reconstruct the
+      // pattern with refreshed lowerings, so we have to embed the
+      // post-AddressLowering shape here. Bypass TypeLowering with
+      // SILType::isAddressOnly and switch address-only indices to address form.
+      // The keypath instruction's operand may still be at object type in
+      // opaque-values mode; the SIL verifier accepts that intermediate shape 
+      // and AddressLowering rewrites the operand later.
+      //
+      // TODO: Drop the cached lowering from KeyPathPatternComponent::Index,
+      // or have AddressLowering rebuild the keypath pattern with refreshed
+      // type lowerings.
+      bool addressOnly =
+          paramLoweredTy.isObject() &&
+          SILType::isAddressOnly(
+              paramTy->getCanonicalType(), SGM.Types,
+              sig ? sig->getCanonicalSignature() : CanGenericSignature(),
+              TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                  ResilienceExpansion::Minimal));
       paramLoweredTy = paramLoweredTy.mapTypeOutOfEnvironment();
+      if (addressOnly)
+        paramLoweredTy = paramLoweredTy.getAddressType();
 
       indexPatterns.push_back(
           {paramTy->mapTypeOutOfEnvironment()->getCanonicalType(), paramLoweredTy});

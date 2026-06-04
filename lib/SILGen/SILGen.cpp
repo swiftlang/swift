@@ -2171,10 +2171,6 @@ static bool canStorageUseTrivialDescriptor(SILGenModule &SGM,
 }
 
 void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
-  // TODO: Key path code emission doesn't handle opaque values properly yet.
-  if (!SILModuleConventions(M).useLoweredAddresses())
-    return;
-  
   auto descriptorContext = decl->getPropertyDescriptorGenericSignature();
   if (!descriptorContext)
     return;
