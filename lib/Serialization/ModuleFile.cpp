@@ -1260,9 +1260,11 @@ ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
       4 +        // Source filename offset
       4 +        // Doc ranges offset
       4 * 3 * 7; // Loc/StartLoc/EndLoc each have 7 4-byte fields
-  uint32_t RecordOffset = RecordSize * UsrId;
-  assert(RecordOffset < Core->BasicDeclLocsData.size());
-  assert(Core->BasicDeclLocsData.size() % RecordSize == 0);
+  // Bounds check. Compute the offset with 64-bit arithmetic to avoid overflows.
+  uint64_t RecordOffset = uint64_t(RecordSize) * UsrId;
+  if (RecordOffset + RecordSize > Core->BasicDeclLocsData.size() ||
+      Core->BasicDeclLocsData.size() % RecordSize != 0)
+    return std::nullopt;
   auto *Record = Core->BasicDeclLocsData.data() + RecordOffset;
 
   ExternalSourceLocs::RawLocs Result;
@@ -1270,10 +1272,21 @@ ModuleFile::getExternalRawLocsForDecl(const Decl *D) const {
 
   const auto DocRangesOffset = readNext<uint32_t>(Record);
   if (DocRangesOffset) {
-    assert(!Core->DocRangesData.empty());
+    if (Core->DocRangesData.empty() ||
+        DocRangesOffset + sizeof(uint32_t) > Core->DocRangesData.size())
+      return std::nullopt;
     const auto *Data = Core->DocRangesData.data() + DocRangesOffset;
     const auto NumLocs = readNext<uint32_t>(Data);
-    assert(NumLocs);
+    if (!NumLocs)
+      return std::nullopt;
+    // Each iteration consumes one RawLoc (7 x uint32_t) plus a trailing
+    // uint32_t length, i.e. 32 bytes. Cap NumLocs against the remaining
+    // bytes in DocRangesData so the loop can't read past the buffer.
+    constexpr uint64_t BytesPerLoc = 8 * sizeof(uint32_t);
+    const uint64_t BytesAvailable =
+        Core->DocRangesData.data() + Core->DocRangesData.size() - Data;
+    if (uint64_t(NumLocs) * BytesPerLoc > BytesAvailable)
+      return std::nullopt;
 
     for (uint32_t I = 0; I < NumLocs; ++I) {
       auto &Range =
