@@ -2156,8 +2156,13 @@ public final class TestSuite {
       return self
     }
 
-    public func crashOutputMatches(_ string: String) -> _TestBuilder {
-      _data._crashOutputMatches.append(string)
+    public func crashOutputMatches(
+      _ string: String,
+      when predicate: Bool = true
+    ) -> _TestBuilder {
+      if predicate {
+        _data._crashOutputMatches.append(string)
+      }
       return self
     }
 
