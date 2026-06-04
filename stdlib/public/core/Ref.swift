@@ -13,7 +13,7 @@
 /// A safe reference allowing in-place reads to a shared value.
 @available(SwiftStdlib 6.4, *)
 @frozen
-public struct Ref<Value: ~Copyable & ~Escapable>: Copyable, ~Escapable {
+public struct Ref<Value: ~Copyable>: Copyable, ~Escapable {
   @usableFromInline
   let builtin: Builtin.Borrow<Value>
 
@@ -50,21 +50,19 @@ public struct Ref<Value: ~Copyable & ~Escapable>: Copyable, ~Escapable {
 }
 
 @available(SwiftStdlib 6.4, *)
-extension Ref: @unchecked Sendable
-  where Value: Sendable & ~Copyable & ~Escapable {}
+extension Ref: @unchecked Sendable where Value: Sendable & ~Copyable {}
 
 @available(SwiftStdlib 6.4, *)
 extension Ref: BitwiseCopyable {}
 
 @available(SwiftStdlib 6.4, *)
-extension Ref where Value: ~Copyable & ~Escapable {
+extension Ref where Value: ~Copyable {
   /// Dereferences the constant reference allowing for in-place reads to the
   /// underlying value.
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
   @_transparent
   public var value: Value {
-    @_lifetime(copy self)
     borrow {
       Builtin.dereferenceBorrow(builtin)
     }
