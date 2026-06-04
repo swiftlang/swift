@@ -4772,6 +4772,11 @@ protected:
   }
 
   void visitDebugValueInst(DebugValueInst *dbg) {
+    // Undef debug values have a special meaning. Don't allocate stack space
+    // for those.
+    // Rewriting them would also break nullary debug reconstruction blocks.
+    if (isa<SILUndef>(dbg->getOperand()))
+      return;
     if (!dbg->hasAddrVal() &&
         (assignment.isPotentiallyCArray(dbg->getOperand()->getType()) ||
          overlapsWithOnStackDebugLoc(dbg->getOperand()))) {
