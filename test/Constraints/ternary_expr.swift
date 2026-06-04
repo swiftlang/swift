@@ -108,3 +108,21 @@ do {
     _ = Data(value: n) // Ok
   }
 }
+
+// Test scenario from https://github.com/swiftlang/swift/issues/89507 - 
+// a ternary expression with branches that resolve to conflicting 
+// specializations of the same generic type should produce a diagnostic
+// about the conflict.
+// Both `f`'s `E` and `G`'s `E` end up in conflict, so two reports are emitted.
+do {
+  struct G<E> {
+    static var a: G<Int> { fatalError() }
+    static var b: G<String> { fatalError() }
+  }
+
+  func f<E>(_: G<E>) {}
+
+  func test(c: Bool) {
+    f(c ? .a : .b) // expected-error 2 {{conflicting arguments to generic parameter 'E' ('Int' vs. 'String')}}
+  }
+}
