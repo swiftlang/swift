@@ -25,8 +25,8 @@ import Swift
 /// For an in depth discussion of this topic, see ``TaskExecutor``.
 ///
 /// ### Disabling task executor preference
-/// Passing `nil` as executor means disabling any preference (if it was set) and the task hierarchy
-/// will execute without any executor preference until a different preference is set.
+/// Pass `globalConcurrentExecutor` to override any existing preference with the default global executor,
+/// which is equivalent to having no preference set.
 ///
 /// ### Asynchronous function execution semantics in presence of task executor preferences
 /// The following diagram illustrates on which executor an `async` function will
@@ -118,10 +118,12 @@ import Swift
 ///     }
 ///
 /// - Parameters:
-///   - taskExecutor: the executor to use as preferred task executor for this
-///     operation, and any child tasks created inside the `operation` closure.
+///   - taskExecutor: The preferred task executor for this operation, and any
+///     child tasks created inside the `operation` closure.
 ///     If `nil` it is interpreted as "no preference" and calling this method
-///     will have no impact on execution semantics of the `operation`
+///     will have no impact on execution semantics of the `operation`.
+///     Pass ``globalConcurrentExecutor`` to explicitly prefer the global
+///     concurrent executor (e.g. to override an outer task's preference).
 ///   - operation: the operation to execute on the passed executor
 /// - Returns: the value returned from the `operation` closure
 /// - Throws: if the operation closure throws

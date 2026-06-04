@@ -232,11 +232,10 @@ extension ${TYPE} {
   ///   - name: Human readable name of this task.
   % end
   % if HAS_TASK_EXECUTOR:
-  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///      Explicitly passing `nil` as the executor preference is equivalent to
-  ///      calling the `${METHOD_NAME}` method without a preference, and effectively
-  ///      means to inherit the outer context's executor preference.
-  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
+  ///   - taskExecutor: The preferred task executor for this task and any child
+  ///      tasks it creates.
+  ///      Pass ``globalConcurrentExecutor`` to explicitly prefer the global
+  ///      concurrent executor (e.g. to override an outer task's preference).
   % end
   % if HAS_TASK_PRIORITY:
   ///   - priority: The priority of the operation task.

@@ -64,10 +64,8 @@ extension Task where Failure == ${FAILURE_TYPE} {
   ///   - name: The high-level human-readable name given for this task
   ///   - priority: The priority of the task.
   ///     Pass `nil` to use the ``Task/basePriority`` of the current task (if there is one).
-  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///      Explicitly passing `nil` as the executor preference is equivalent to no preference,
-  ///      and effectively means to inherit the outer context's executor preference.
-  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
+  ///   - taskExecutor: The preferred task executor for this task and any child
+  ///      tasks it creates. Explicitly passing `nil` means no preference.
   ///   - operation: the operation to be run immediately upon entering the task.
   /// - Returns: A reference to the unstructured task which may be awaited on.
   @available(SwiftStdlib 6.2, *)
@@ -245,11 +243,9 @@ extension ${GROUP_TYPE} {
   ///   - name: Human readable name of this task.
   ///   - priority: The priority of the operation task.
   ///      Omit this parameter or pass `nil` to inherit the task group's base priority.
-  ///   - taskExecutor: The task executor that the child task should be started on and keep using.
-  ///      Explicitly passing `nil` as the executor preference is equivalent to
-  ///      calling the `${METHOD_NAME}` method without a preference, and effectively
-  ///      means to inherit the outer context's executor preference.
-  ///      You can also pass the ``globalConcurrentExecutor`` global executor explicitly.
+  ///   - taskExecutor: The preferred task executor for this task and any child
+  ///      tasks it creates. Pass ``globalConcurrentExecutor`` to explicitly prefer
+  ///      the global concurrent executor (e.g. to override an outer task's preference).
   ///   - operation: The operation to execute as part of the task group.
   % if IS_ADD_UNLESS_CANCELLED:
   /// - Returns: `true` if the child task was added to the group;

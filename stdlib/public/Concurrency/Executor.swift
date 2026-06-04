@@ -433,7 +433,7 @@ extension SerialExecutor {
 /// An executor that may be used as preferred executor by a task.
 ///
 /// ### Impact of setting a task executor preference
-/// By default, without setting a task executor preference, nonisolated
+/// By default, without setting a task executor preference, @concurrent
 /// asynchronous functions, as well as methods declared on default actors --
 /// that is actors which do not require a specific executor -- execute on
 /// Swift's default global concurrent executor. This is an executor shared by
@@ -443,10 +443,28 @@ extension SerialExecutor {
 /// By setting a task executor preference, either with a
 /// ``withTaskExecutorPreference(_:operation:)``, creating a task with a preference
 /// (`Task(executorPreference:)`, or `group.addTask(executorPreference:)`), the task and all of its child
-/// tasks (unless a new preference is set) will be preferring to execute on
-/// the provided task executor.
+/// tasks (unless a new preference is set) will prefer to execute on
+/// the provided task executor, instead of the default global one.
 ///
-/// Unstructured tasks do not inherit the task executor.
+/// If an actor has a specific executor requirement, the task executor preference will not take effect.
+
+/// The task executor preference is effective through child tasks as well, so even if
+/// a child task of a task with a preference did not re-state the preference, the preference is still active:
+///
+///     await withTaskExecutorPreference(myExecutor) {
+///       // 'myExecutor' is the preferred task executor here.
+///       await withDiscardingTaskGroup { group in
+///         group.addTask {
+///           // No 'executorPreference:' was passed when adding this child task,
+///           // but it still inherits 'myExecutor' from the enclosing task.
+///           await runWork()
+///         }
+///       }
+///     }
+///
+/// Unstructured tasks do not inherit the task executor preference.
+///
+/// - SeeAlso: ``withTaskExecutorPreference(_:operation:)``
 @available(StdlibDeploymentTarget 6.0, *)
 public protocol TaskExecutor: Executor {
   // This requirement is repeated here as a non-override so that we
