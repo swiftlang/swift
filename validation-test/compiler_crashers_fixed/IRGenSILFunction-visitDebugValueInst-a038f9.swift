@@ -1,5 +1,5 @@
 // {"kind":"emit-ir","original":"eeed16fc","signature":"(anonymous namespace)::IRGenSILFunction::visitDebugValueInst(swift::DebugValueInst*)","signatureAssert":"Assertion failed: (hasErrorResult()), function getMutableErrorResult","signatureNext":"IRGenSILFunction::emitSILFunction"}
-// RUN: not --crash %target-swift-frontend -emit-ir %s
+// RUN: %target-swift-frontend -emit-ir %s
 protocol a {
   associatedtype b: c where b.d == Self
   associatedtype e: Collection where e.Element == Self

@@ -837,9 +837,6 @@ def main_normal():
         if args.caching_prefix_map:
             os.environ['LLVM_CACHE_PREFIX_MAPS'] = \
                 SWIFT_SOURCE_ROOT + '=/^src'
-        if args.caching_remote_service_path:
-            os.environ['LLVM_CACHE_REMOTE_SERVICE_SOCKET_PATH'] = \
-                args.caching_remote_service_path
 
         # Enable MCCAS backend unless using remote service or explicitly
         # disabled via environment.
