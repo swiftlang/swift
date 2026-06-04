@@ -60,6 +60,9 @@ class TaskOptionRecord;
 class TaskGroup;
 class ContinuationAsyncContext;
 
+// Forward-declared from `stdlib/public/Concurrency/Debug.h` so we can assert against it.
+extern "C" const size_t _swift_concurrency_debug_asyncTaskNameOffset;
+
 // lldb knows about some of these internals. If you change things that lldb
 // knows about (or might know about in the future, as a future lldb might be
 // inspecting a process running an older Swift runtime), increment
@@ -566,6 +569,10 @@ public:
     assert(hasTaskName());
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
+    assert(static_cast<size_t>(offset - reinterpret_cast<char*>(this)) ==
+           _swift_concurrency_debug_asyncTaskNameOffset &&
+       "AsyncTask::nameFragment offset must match "
+       "_swift_concurrency_debug_asyncTaskNameOffset");
     return reinterpret_cast<NameFragment*>(offset);
   }
 
