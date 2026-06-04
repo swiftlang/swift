@@ -93,6 +93,13 @@ func greedyTrailingBraces() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{1-1=}}}}
 }
 
+struct OperatorTestType {}
+
+// Fix-its that insert a newline are emitted by the verifier with a literal
+// '\n' escape in the replacement text. update-verify-tests preserves the
+// marker as opaque text, so the escape round-trips byte-for-byte.
+func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType {} // expected-error {{operator implementation without matching operator declaration}} {{1-2=wrong}}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -180,4 +187,11 @@ func greedyTrailingBraces() {
   // run, otherwise the source line shape would drift after the update.
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
 }
+
+struct OperatorTestType {}
+
+// Fix-its that insert a newline are emitted by the verifier with a literal
+// '\n' escape in the replacement text. update-verify-tests preserves the
+// marker as opaque text, so the escape round-trips byte-for-byte.
+func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType {} // expected-error {{operator implementation without matching operator declaration}} {{1-1=infix operator <=> : <# Precedence Group #>\n}}
 
