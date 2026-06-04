@@ -307,7 +307,7 @@ extension OperatorTestType {
 // insert the actual marker (colon, line:col offset and all) while
 // preserving the {{none}} marker after it.
 extension OperatorTestType {
-    static func <=<(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{128:1-1=infix operator <=< : <# Precedence Group #>\n}} {{none}}
+    static func <=<(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{-1:1-1=infix operator <=< : <# Precedence Group #>\n}} {{none}}
 }
 
 func multiLineFixitErrors() {
@@ -324,7 +324,7 @@ func groupNamePreserved(_ x: Int) {
   // {{documentation-file=...}}) when consuming fix-it markers, and
   // _render_fixits must re-emit those preserved markers in source order
   // when the run is rewritten.
-  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{3-149:4=_ = 0}}
+  // expected-warning@+1 {{'if' condition is always true}}{{group-name=UselessConditionalStatement}} {{3-+2:4=_ = 0}}
   if case _ = x {
     _ = 0
   }

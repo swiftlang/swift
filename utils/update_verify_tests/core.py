@@ -84,6 +84,7 @@ class Diag:
         fixits_raw_str="",
         had_none_fixit_marker=False,
         preserved_markers=None,
+        had_absolute_line_in_source=False,
     ):
         self.prefix = prefix
         self.diag_content = diag_content
@@ -117,6 +118,11 @@ class Diag:
         self.preserved_markers = (
             list(preserved_markers) if preserved_markers else []
         )
+        # Whether any fix-it marker on the source side carried an absolute
+        # `<line>:<col>` position. When False, actual fix-its with absolute
+        # lines coming from the verifier are rewritten as relative offsets
+        # at render time so the test stays stable across line shifts.
+        self.had_absolute_line_in_source = had_absolute_line_in_source
         # None means: no fix-it error reported for this diag, render
         # fixits_raw_str as is. A list (possibly empty) means: replace the
         # source fix-its with these exact marker strings.
@@ -176,6 +182,9 @@ class Diag:
         self.had_none_fixit_marker = other_diag.had_none_fixit_marker
         self.actual_fixits = other_diag.actual_fixits
         self.preserved_markers = other_diag.preserved_markers
+        self.had_absolute_line_in_source = (
+            other_diag.had_absolute_line_in_source
+        )
         other_diag.count = 0
 
     def _render_fixits(self):
@@ -185,7 +194,19 @@ class Diag:
         # (e.g. {{group-name=...}}) in their original order, then the actual
         # fix-its from the verifier, then preserve {{none}} if present.
         parts = list(self.preserved_markers)
-        parts.extend(self.actual_fixits)
+        actuals = self.actual_fixits
+        if not self.had_absolute_line_in_source:
+            # The verifier always emits absolute `<line>:<col>` positions in
+            # actual fix-its; convert them to relative offsets so the test
+            # source is stable across line shifts. Source already using
+            # absolute lines is left alone. Relative offsets in fix-it
+            # bodies are interpreted by the verifier as offsets from the
+            # diagnostic line, not the comment line.
+            diag_line_n = self.absolute_target()
+            actuals = [
+                relativize_fixit_marker(a, diag_line_n) for a in actuals
+            ]
+        parts.extend(actuals)
         if self.had_none_fixit_marker:
             parts.append(
                 "{{none}}"
@@ -277,6 +298,72 @@ expected_expansion_diag_re = re.compile(
 expected_expansion_close_re = re.compile(r"//(\s*)\}\}")
 
 fixit_marker_re = re.compile(r"\{\{(?P<content>(?:[^}]|\}(?!\}))*)\}\}+")
+
+# Matches the `<line>:<col>` form of a fix-it position, optionally with a
+# leading `+`/`-` sign that makes the line offset relative to the comment
+# line. Without a sign, the line is absolute.
+_fixit_pos_with_line_re = re.compile(r"^(?P<sign>[+-])?(?P<line>\d+):(?P<col>\d+)$")
+# Matches a full fix-it range `<start>-<end>` where each side is either a
+# line:col pair (with optional sign) or a bare column.
+_fixit_range_re = re.compile(
+    r"^(?P<start>[+-]?\d+(?::\d+)?)-(?P<end>[+-]?\d+(?::\d+)?)(?P<rest>=.*)\Z",
+    re.DOTALL,
+)
+
+
+def _fixit_content_has_absolute_line(content):
+    """Whether a fix-it marker's *content* (no `{{`/`}}`) carries an absolute
+    line number on either the start or the end of its range.
+    """
+    rm = _fixit_range_re.match(content)
+    if not rm:
+        return False
+    for pos in (rm.group("start"), rm.group("end")):
+        if (
+            ":" in pos
+            and not pos.startswith("+")
+            and not pos.startswith("-")
+        ):
+            return True
+    return False
+
+
+def _relativize_fixit_pos(pos_str, comment_line_n):
+    """If *pos_str* is an absolute `<line>:<col>` position, rewrite it as a
+    sign-prefixed offset relative to *comment_line_n*. Already-relative or
+    column-only positions are returned unchanged.
+    """
+    m = _fixit_pos_with_line_re.match(pos_str)
+    if not m or m.group("sign"):
+        return pos_str
+    line_n = int(m.group("line"))
+    col = m.group("col")
+    offset = line_n - comment_line_n
+    if offset == 0:
+        # Same line as the comment: drop the line prefix entirely.
+        return col
+    sign = "+" if offset > 0 else "-"
+    return f"{sign}{abs(offset)}:{col}"
+
+
+def relativize_fixit_marker(marker_text, comment_line_n):
+    """Rewrite any absolute line numbers inside a `{{...}}` fix-it marker as
+    relative offsets from *comment_line_n*. Markers that already use
+    relative offsets, or that do not carry line information, are returned
+    unchanged.
+    """
+    m = fixit_marker_re.match(marker_text)
+    if not m:
+        return marker_text
+    content = m.group("content")
+    rm = _fixit_range_re.match(content)
+    if not rm:
+        return marker_text
+    new_start = _relativize_fixit_pos(rm.group("start"), comment_line_n)
+    new_end = _relativize_fixit_pos(rm.group("end"), comment_line_n)
+    if new_start == rm.group("start") and new_end == rm.group("end"):
+        return marker_text
+    return "{{" + new_start + "-" + new_end + rm.group("rest") + "}}"
 
 
 def consume_trailing_fixits(s):
@@ -408,8 +495,27 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         fixits_raw_str, has_none_marker, preserved_markers = (
             consume_trailing_fixits(s[m.end() :])
         )
+        # Detect whether any source-side fix-it marker carries an absolute
+        # `<line>:<col>` position; if so, future updates preserve absolute
+        # form, otherwise actual fix-its are rewritten as relative offsets.
+        had_absolute_line = False
+        for marker in split_fixit_markers(fixits_raw_str):
+            fm = fixit_marker_re.match(marker)
+            if not fm:
+                continue
+            content = fm.group("content")
+            if (
+                content == "none"
+                or content.startswith("documentation-file=")
+                or content.startswith("group-name=")
+            ):
+                continue
+            if _fixit_content_has_absolute_line(content):
+                had_absolute_line = True
+                break
     else:
         fixits_raw_str, has_none_marker, preserved_markers = "", False, []
+        had_absolute_line = False
     line.content = (
         s[: m.start()] + "{{DIAG}}" + s[m.end() + len(fixits_raw_str) :]
     )
@@ -435,6 +541,7 @@ def parse_diag(line, filename, prefix, all_prefixes=False):
         fixits_raw_str=fixits_raw_str,
         had_none_fixit_marker=has_none_marker,
         preserved_markers=preserved_markers,
+        had_absolute_line_in_source=had_absolute_line,
     )
 
 
@@ -624,6 +731,9 @@ def remove_dead_diags(lines, prefix):
                     line.diag.had_none_fixit_marker
                 )
                 other_diag.preserved_markers = line.diag.preserved_markers
+                other_diag.had_absolute_line_in_source = (
+                    line.diag.had_absolute_line_in_source
+                )
                 break
         if line.render() == "":
             remove_line(line, lines)
@@ -760,6 +870,9 @@ def update_lines(
             new_diag.actual_fixits = extra_actual
             new_diag.had_none_fixit_marker = diag.had_none_fixit_marker
             new_diag.preserved_markers = list(diag.preserved_markers)
+            new_diag.had_absolute_line_in_source = (
+                diag.had_absolute_line_in_source
+            )
 
     diag_errors.sort(reverse=True, key=lambda diag_error: diag_error.line)
     for diag_error in diag_errors:
