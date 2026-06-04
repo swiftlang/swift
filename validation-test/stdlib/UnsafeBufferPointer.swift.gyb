@@ -380,6 +380,216 @@ ${SelfName}TestSuite.test("badNilCount")
   let buffer = ${SelfType}(start: nil, count: 1)
   _ = buffer
 }
+
+${SelfName}TestSuite.test("extracting() functions")
+.require(.stdlib_6_5)
+.code {
+  let capacity = 4
+%   if IsRaw:
+  let memory = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 1)
+  defer { memory.deallocate() }
+  initUnsafeRawBufferPointer(
+    UnsafeMutableRawBufferPointer(start: memory, count: capacity)
+  )
+%   else:
+  let memory = UnsafeMutablePointer<Float>.allocate(capacity: capacity)
+  defer { memory.deallocate() }
+  initUnsafeBufferPointer(
+    UnsafeMutableBufferPointer(start: memory, count: capacity)
+  )
+%   end
+  let buffer = ${SelfType}(start: ${PointerType}(memory), count: capacity)
+
+  let sub1 = buffer.extracting(0..<2)
+  let sub2 = buffer.extracting(..<2)
+  let sub3 = buffer.extracting(...)
+  let sub4 = buffer.extracting(2...)
+  let sub5 = buffer.extracting(1...3)
+
+  expectEqual(sub1.count, 2)
+  expectEqual(sub1.baseAddress, buffer.baseAddress)
+  expectEqual(sub2.count, 2)
+  expectEqual(sub2.baseAddress, buffer.baseAddress)
+  expectEqual(sub3.count, buffer.count)
+  expectEqual(sub3.baseAddress, buffer.baseAddress)
+  expectEqual(sub4.count, capacity - 2)
+  expectEqual(sub5.count, capacity - 1)
+
+  expectEqual(sub1[0], ${Element}(0))
+  expectEqual(sub1[1], ${Element}(1))
+  expectEqual(sub2[0], ${Element}(0))
+  expectEqual(sub3[capacity - 1], ${Element}(capacity - 1))
+  expectEqual(sub4[0], ${Element}(2))
+  expectEqual(sub5[0], ${Element}(1))
+}
+
+${SelfName}TestSuite.test("extracting() bounds checking")
+.require(.stdlib_6_5)
+.require(.crashTesting)
+.crashOutputMatches("${'Byte offset' if IsRaw else 'Index'} out of range")
+.code {
+  let fakeStart = ${PointerType}(bitPattern: 0xba0bab5)
+  let buffer = ${SelfType}(start: fakeStart, count: 4)
+
+  expectCrashLater()
+  _ = buffer.extracting(2 ..< .max)
+}
+
+${SelfName}TestSuite.test("extracting(unchecked:) functions")
+.require(.stdlib_6_5)
+.code {
+  let capacity = 32
+%   if IsRaw:
+  let memory = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 1)
+  defer { memory.deallocate() }
+  initUnsafeRawBufferPointer(
+    UnsafeMutableRawBufferPointer(start: memory, count: capacity)
+  )
+%   else:
+  let memory = UnsafeMutablePointer<Float>.allocate(capacity: capacity)
+  defer { memory.deallocate() }
+  initUnsafeBufferPointer(
+    UnsafeMutableBufferPointer(start: memory, count: capacity)
+  )
+%   end
+  let buffer = ${SelfType}(start: ${PointerType}(memory), count: capacity)
+
+  // The unchecked variant accepts bounds outside the original buffer's range,
+  // so long as the resulting region is within the underlying allocation.
+  let prefix = buffer.extracting(0..<8)
+  let beyondHalfOpen = prefix.extracting(unchecked: 16..<24)
+  expectEqual(beyondHalfOpen.count, 8)
+  expectEqual(beyondHalfOpen[0], ${Element}(16))
+  let beyondClosed = prefix.extracting(unchecked: 16...23)
+  expectEqual(beyondClosed.count, 8)
+  expectEqual(beyondClosed[0], ${Element}(16))
+
+  let empty1 = buffer.extracting(unchecked: 0..<0)
+  expectEqual(empty1.count, 0)
+  let empty2 = buffer.extracting(unchecked: capacity..<capacity)
+  expectEqual(empty2.count, 0)
+}
+
+${SelfName}TestSuite.test("prefix extracting() functions")
+.require(.stdlib_6_5)
+.code {
+  let capacity = 4
+%   if IsRaw:
+  let memory = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 1)
+  defer { memory.deallocate() }
+  initUnsafeRawBufferPointer(
+    UnsafeMutableRawBufferPointer(start: memory, count: capacity))
+%   else:
+  let memory = UnsafeMutablePointer<Float>.allocate(capacity: capacity)
+  defer { memory.deallocate() }
+  initUnsafeBufferPointer(
+    UnsafeMutableBufferPointer(start: memory, count: capacity))
+%   end
+  let buffer = ${SelfType}(start: ${PointerType}(memory), count: capacity)
+
+  expectEqual(buffer.count, capacity)
+  expectEqual(buffer.extracting(first: 0).count, 0)
+  expectEqual(buffer.extracting(first: 1)[0], ${Element}(0))
+  expectEqual(
+    buffer.extracting(first: capacity)[capacity - 1], ${Element}(capacity - 1))
+  // Over-large maxLength clamps to count.
+  expectEqual(buffer.extracting(first: capacity + 5).count, capacity)
+
+  expectEqual(buffer.extracting(droppingLast: capacity).count, 0)
+  expectEqual(
+    buffer.extracting(droppingLast: 1)[capacity - 2],
+    ${Element}(capacity - 2))
+  // Over-large k clamps to count.
+  expectEqual(buffer.extracting(droppingLast: capacity + 5).count, 0)
+
+  // Empty source.
+  let empty = ${SelfType}(start: nil, count: 0)
+  expectEqual(empty.extracting(first: 1).count, 0)
+  expectEqual(empty.extracting(droppingLast: 1).count, 0)
+}
+
+${SelfName}TestSuite.test("extracting(first:) bound checking")
+.require(.stdlib_6_5)
+.require(.crashTesting)
+.crashOutputMatches("Can't have a prefix of negative length")
+.code {
+  let fakeStart = ${PointerType}(bitPattern: 0xba0bab5)
+  let buffer = ${SelfType}(start: fakeStart, count: 4)
+
+  expectCrashLater()
+  _ = buffer.extracting(first: -1)
+}
+
+${SelfName}TestSuite.test("extracting(droppingLast:) bound checking")
+.require(.stdlib_6_5)
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of ${'bytes' if IsRaw else 'elements'}")
+.code {
+  let fakeStart = ${PointerType}(bitPattern: 0xba0bab5)
+  let buffer = ${SelfType}(start: fakeStart, count: 4)
+
+  expectCrashLater()
+  _ = buffer.extracting(droppingLast: -1)
+}
+
+${SelfName}TestSuite.test("suffix extracting() functions")
+.require(.stdlib_6_5)
+.code {
+  let capacity = 4
+%   if IsRaw:
+  let memory = UnsafeMutableRawPointer.allocate(byteCount: capacity, alignment: 1)
+  defer { memory.deallocate() }
+  initUnsafeRawBufferPointer(
+    UnsafeMutableRawBufferPointer(start: memory, count: capacity))
+%   else:
+  let memory = UnsafeMutablePointer<Float>.allocate(capacity: capacity)
+  defer { memory.deallocate() }
+  initUnsafeBufferPointer(
+    UnsafeMutableBufferPointer(start: memory, count: capacity))
+%   end
+  let buffer = ${SelfType}(start: ${PointerType}(memory), count: capacity)
+
+  expectEqual(buffer.count, capacity)
+  expectEqual(buffer.extracting(last: capacity)[0], ${Element}(0))
+  expectEqual(buffer.extracting(last: capacity - 1)[0], ${Element}(1))
+  expectEqual(buffer.extracting(last: 1)[0], ${Element}(capacity - 1))
+  // Over-large maxLength clamps to count.
+  expectEqual(buffer.extracting(last: capacity + 5).count, capacity)
+
+  expectEqual(buffer.extracting(droppingFirst: capacity).count, 0)
+  expectEqual(buffer.extracting(droppingFirst: 1)[0], ${Element}(1))
+  // Over-large k clamps to count.
+  expectEqual(buffer.extracting(droppingFirst: capacity + 5).count, 0)
+
+  // Empty source.
+  let empty = ${SelfType}(start: nil, count: 0)
+  expectEqual(empty.extracting(last: 1).count, 0)
+  expectEqual(empty.extracting(droppingFirst: 1).count, 0)
+}
+
+${SelfName}TestSuite.test("extracting(last:) bound checking")
+.require(.stdlib_6_5)
+.require(.crashTesting)
+.crashOutputMatches("Can't have a suffix of negative length")
+.code {
+  let fakeStart = ${PointerType}(bitPattern: 0xba0bab5)
+  let buffer = ${SelfType}(start: fakeStart, count: 4)
+
+  expectCrashLater()
+  _ = buffer.extracting(last: -1)
+}
+
+${SelfName}TestSuite.test("extracting(droppingFirst:) bound checking")
+.require(.stdlib_6_5)
+.require(.crashTesting)
+.crashOutputMatches("Can't drop a negative number of ${'bytes' if IsRaw else 'elements'}")
+.code {
+  let fakeStart = ${PointerType}(bitPattern: 0xba0bab5)
+  let buffer = ${SelfType}(start: fakeStart, count: 4)
+
+  expectCrashLater()
+  _ = buffer.extracting(droppingFirst: -1)
+}
 % end # for SelfName, IsRaw, SelfType
 
 UnsafeMutableRawBufferPointerTestSuite.test("changeElementViaBuffer") {
