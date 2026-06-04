@@ -85,6 +85,14 @@ func fixitBeforeDocFile() {
   foo(b: 1)
 }
 
+func greedyTrailingBraces() {
+  // The verifier's fix-it parser is greedy: trailing '}' characters are
+  // absorbed into the marker so {{1-1=}}}} represents one fix-it whose
+  // replacement is the literal '}}'. The Python regex must match the same
+  // run, otherwise the source line shape would drift after the update.
+  let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{1-1=}}}}
+}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -163,5 +171,13 @@ func fixitBeforeDocFile() {
   // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
   // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} {{7-8=example}}
   foo(b: 1)
+}
+
+func greedyTrailingBraces() {
+  // The verifier's fix-it parser is greedy: trailing '}' characters are
+  // absorbed into the marker so {{1-1=}}}} represents one fix-it whose
+  // replacement is the literal '}}'. The Python regex must match the same
+  // run, otherwise the source line shape would drift after the update.
+  let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
 }
 
