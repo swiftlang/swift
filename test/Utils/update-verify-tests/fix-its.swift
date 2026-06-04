@@ -54,6 +54,25 @@ func twoSourceFixitsReplaced() {
   foo(b: 1)
 }
 
+func alternationRoundTrip() {
+  // '||' is a verifier-side alternation operator: any one of the markers
+  // separated by '||' may match. Here the first alternative matches the
+  // first actual fix-it, so the verifier reports nothing on this line and
+  // update-verify-tests must preserve the '||' run verbatim.
+  // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} || {{3-6=other}} {{7-8=example}}
+  foo(b: 1)
+}
+
+func alternationReplaced() {
+  // Neither alternative matches an actual fix-it. The replacement range
+  // covers the entire run including '||', so the alternation collapses
+  // into the actual marker(s).
+  // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 {{use 'bar(example:)' instead}} {{1-2=a}} || {{2-3=b}}
+  foo(b: 1)
+}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -98,6 +117,25 @@ func twoSourceFixitsReplaced() {
   // Source has two fix-its in a single run; neither matches an actual
   // fix-it. The verifier's replacement range covers from the first '{{' to
   // the last '}}' so the entire source run is rewritten.
+  // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} {{7-8=example}}
+  foo(b: 1)
+}
+
+func alternationRoundTrip() {
+  // '||' is a verifier-side alternation operator: any one of the markers
+  // separated by '||' may match. Here the first alternative matches the
+  // first actual fix-it, so the verifier reports nothing on this line and
+  // update-verify-tests must preserve the '||' run verbatim.
+  // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
+  // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} || {{3-6=other}} {{7-8=example}}
+  foo(b: 1)
+}
+
+func alternationReplaced() {
+  // Neither alternative matches an actual fix-it. The replacement range
+  // covers the entire run including '||', so the alternation collapses
+  // into the actual marker(s).
   // expected-warning@+2 {{'foo(b:)' is deprecated: renamed to 'bar(example:)'}}{{documentation-file=deprecated-declaration}}
   // expected-note@+1 {{use 'bar(example:)' instead}} {{3-6=bar}} {{7-8=example}}
   foo(b: 1)
