@@ -1744,7 +1744,7 @@ uint16_t SILGenFunction::emitBasicProlog(
       .emitParams(origClosureType, paramList, selfParam);
 
   // Record the ArgNo of the artificial $error inout argument. 
-  if (errorType && IndirectErrorResult == nullptr) {
+  if (errorType && !(*errorType)->isNever() && IndirectErrorResult == nullptr) {
     CanType errorTypeInContext =
       DC->mapTypeIntoEnvironment(*errorType)->getCanonicalType();
     auto loweredErrorTy = getLoweredType(*origErrorType, errorTypeInContext);
