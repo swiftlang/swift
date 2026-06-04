@@ -163,11 +163,7 @@ public protocol SchedulingExecutor: Executor {
   ///              job is executed.  `nil` means no limit.
   /// - clock:     The clock used for the delay.
   /// - onCancellation:
-  ///              Specify what to do when the job is cancelled.  The
-  ///              default, ``.drop``, means to simply drop the job if
-  ///              it has not already started.  The other option,
-  ///              ``.executeImmediately``, causes the job to run
-  ///              immediately on cancellation.
+  ///              Specify what to do when the job is cancelled.
   ///
   /// Returns a ``JobCancellationToken`` that can be used to
   /// cancel the job before it runs.
