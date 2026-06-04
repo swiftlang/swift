@@ -217,16 +217,18 @@ struct SwiftCountExprEmitter
   bool VisitBinaryOperator(const clang::BinaryOperator *binop) {
     llvm::StringRef op;
     switch (binop->getOpcode()) {
-    case clang::BO_Add: op = " + "; break;
-    case clang::BO_Sub: op = " - "; break;
-    case clang::BO_Mul: op = " * "; break;
-    case clang::BO_Div: op = " / "; break;
-    case clang::BO_Rem: op = " % "; break;
-    case clang::BO_Shl: op = " << "; break;
-    case clang::BO_Shr: op = " >> "; break;
-    case clang::BO_And: op = " & "; break;
-    case clang::BO_Or:  op = " | "; break;
-    case clang::BO_Xor: op = " ^ "; break;
+#define BINOP(variant, string) case clang::variant: op = " " string " "; break
+    BINOP(BO_Add, "+");
+    BINOP(BO_Sub, "-");
+    BINOP(BO_Mul, "*");
+    BINOP(BO_Div, "/");
+    BINOP(BO_Rem, "%");
+    BINOP(BO_Shl, "<<");
+    BINOP(BO_Shr, ">>");
+    BINOP(BO_And, "&");
+    BINOP(BO_Or,  "|");
+    BINOP(BO_Xor, "^");
+#undef CASE_BINOP
     default:
       DLOG("Unsupported binary operator\n");
       return false;
