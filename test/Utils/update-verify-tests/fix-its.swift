@@ -122,6 +122,14 @@ extension OperatorTestType {
     static func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{-1:1-1=infix operator <=> : <# Precedence Group #>\n}}
 }
 
+func multiLineFixitErrors() {
+  // Two unrelated diagnostics on adjacent lines, each with its own wrong
+  // fix-it. The per-Diag actual_fixits state must be independent across
+  // lines.
+  let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{1-2=A}}
+  let b = 3 // expected-warning{{initialization of immutable value 'b' was never used}} {{1-2=B}}
+}
+
 //--- test.swift.expected
 func wrongFixit() {
   let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
@@ -237,5 +245,13 @@ func countWithFixit() {
 // colon and round-trip it unchanged.
 extension OperatorTestType {
     static func <=>(lhs: OperatorTestType, rhs: OperatorTestType) -> OperatorTestType { lhs } // expected-error {{operator implementation without matching operator declaration}} {{-1:1-1=infix operator <=> : <# Precedence Group #>\n}}
+}
+
+func multiLineFixitErrors() {
+  // Two unrelated diagnostics on adjacent lines, each with its own wrong
+  // fix-it. The per-Diag actual_fixits state must be independent across
+  // lines.
+  let a = 2 // expected-warning{{initialization of immutable value 'a' was never used}} {{3-8=_}}
+  let b = 3 // expected-warning{{initialization of immutable value 'b' was never used}} {{3-8=_}}
 }
 
