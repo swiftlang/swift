@@ -4,26 +4,31 @@
 
 /// Using the flag directly raises warnings and fixits.
 // RUN: %target-swift-frontend -typecheck -parse-as-library -verify %s \
+// RUN:   -disable-objc-attr-requires-foundation-module \
 // RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo \
 // RUN:   -require-explicit-availability -require-explicit-availability-target "macOS 10.10"
 // RUN: %target-swift-frontend -typecheck -parse-as-library -verify %s \
+// RUN:   -disable-objc-attr-requires-foundation-module \
 // RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo \
 // RUN:   -require-explicit-availability=warn -require-explicit-availability-target "macOS 10.10"
 
 /// Using -library-level api defaults to enabling warnings, without fixits.
 // RUN: sed -e "s/}} {{.*/}}/" < %s > %t/NoFixits.swift
 // RUN: %target-swift-frontend -typecheck -parse-as-library -verify %t/NoFixits.swift \
+// RUN:   -disable-objc-attr-requires-foundation-module \
 // RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo -library-level api
 
 /// Explicitly disable the diagnostic.
 // RUN: sed -e 's/xpected-warning/not-something-expected/' < %s > %t/None.swift
 // RUN: %target-swift-frontend -typecheck -parse-as-library -verify %t/None.swift \
+// RUN:   -disable-objc-attr-requires-foundation-module \
 // RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo -library-level api \
 // RUN:   -require-explicit-availability=ignore -require-explicit-availability-target "macOS 10.10"
 
 /// Upgrade the diagnostic to an error.
 // RUN: sed -e "s/xpected-warning/xpected-error/" < %s > %t/Errors.swift
 // RUN: %target-swift-frontend -typecheck -parse-as-library -verify %t/Errors.swift \
+// RUN:   -disable-objc-attr-requires-foundation-module \
 // RUN:   -target %target-cpu-apple-macosx10.10 -package-name Foo \
 // RUN:   -require-explicit-availability=error -require-explicit-availability-target "macOS 10.10"
 
@@ -274,4 +279,18 @@ extension Error {
 
 extension Error { // expected-warning {{public declarations should have an availability attribute with an introduction version}}
   public var publicVar: Bool { return true } // expected-warning {{public declarations should have an availability attribute with an introduction version}}
+}
+
+@available(macOS 10.10, *)
+public class BaseClass {
+  @objc public dynamic func overridden() {}
+  @objc public dynamic func overriddenImplementationOnly() {}
+}
+
+public class DerivedClass: BaseClass { // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{1-1=@available(macOS 10.10, *)\n}}
+}
+
+extension DerivedClass { // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{1-1=@available(macOS 10.10, *)\n}}
+  public override func overridden() {} // expected-warning {{public declarations should have an availability attribute with an introduction version}} {{3-3=@available(macOS 10.10, *)\n  }}
+  @_implementationOnly public override func overriddenImplementationOnly() {}
 }

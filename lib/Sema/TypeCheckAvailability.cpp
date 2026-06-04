@@ -3792,6 +3792,11 @@ static bool declNeedsExplicitAvailability(const Decl *decl) {
   if (decl->isUnavailable())
     return false;
 
+  // Skip @_implementationOnly decls since they are hidden from the module's
+  // interface.
+  if (decl->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+    return false;
+
   // Warn on decls without a platform introduction version.
   return !decl->getAvailableAttrForPlatformIntroduction();
 }
