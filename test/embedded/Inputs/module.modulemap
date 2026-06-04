@@ -1,8 +1,3 @@
 module StructAsOptionSet {
   header "struct-as-option-set.h"
 }
-
-module CxxStdVector {
-  header "cxx-std-vector.h"
-  requires cplusplus
-}
