@@ -282,6 +282,11 @@ TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_cancelAll) {
   swift_taskGroup_cancelAll(nullptr);
 }
 
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_cancelAllWithReason) {
+  swift_taskGroup_cancelAllWithReason(
+      nullptr, swift_task_cancellation_reason_TaskCancelled);
+}
+
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_taskGroup_waitAll) {
   swift_taskGroup_waitAll(nullptr, nullptr, nullptr, nullptr, nullptr, nullptr);
 }
@@ -324,6 +329,15 @@ TEST_F(CompatibilityOverrideConcurrencyTest, task_popTaskExecutorPreference) {
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_cancel) {
   swift_task_cancel(nullptr);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_cancelWithReason) {
+  swift_task_cancelWithReason(nullptr,
+                              swift_task_cancellation_reason_TaskCancelled);
+}
+
+TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_getCancellationReason) {
+  swift_task_getCancellationReason(nullptr);
 }
 
 TEST_F(CompatibilityOverrideConcurrencyTest, test_swift_task_cancel_group_child_tasks) {

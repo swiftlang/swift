@@ -90,6 +90,47 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
   return try await operation()
 }
 
+/// Execute an operation with a cancellation handler that receives the
+/// reason for cancellation. Behaves identically to the existing
+/// `withTaskCancellationHandler` except that the handler is passed a
+/// `CancellationError.Reason` describing why the surrounding task was
+/// cancelled. This makes it possible to distinguish, for example, an
+/// explicit `Task.cancel()` from a deadline-driven cancellation produced
+/// by `withDeadline`.
+///
+/// - Parameters:
+///   - operation: The operation to perform.
+///   - handler: A closure to execute on cancellation. The closure receives
+///     the cancellation reason recorded on the surrounding task.
+@available(SwiftStdlib 6.5, *)
+@_alwaysEmitIntoClient
+public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>(
+  operation: nonisolated(nonsending) () async throws(Failure) -> Return,
+  onCancel handler: sending (CancellationError.Reason) -> Void
+) async throws(Failure) -> Return {
+  // Wrap the reason-taking handler in a no-arg handler that queries the
+  // cancellation reason from the current task and forwards it. The wrapped
+  // closure is only ever called once (via the cancellation status record),
+  // matching the semantics of the underlying handler API.
+  let wrapped: () -> Void = {
+    let raw: UInt8
+    if let task = unsafe _getCurrentAsyncTask() {
+      raw = unsafe _taskGetCancellationReason(task)
+    } else {
+      raw = 1 // .taskCancelled fallback
+    }
+    handler(CancellationError.Reason(_rawValue: raw))
+  }
+#if $BuiltinConcurrencyStackNesting
+  let record = unsafe Builtin.taskAddCancellationHandler(handler: wrapped)
+  defer { unsafe Builtin.taskRemoveCancellationHandler(record: record) }
+#else
+  let record = unsafe _taskAddCancellationHandler(handler: wrapped)
+  defer { unsafe _taskRemoveCancellationHandler(record: record) }
+#endif
+  return try await operation()
+}
+
 #if !$Embedded
 /// Execute an operation with a cancellation handler that's immediately
 /// invoked if the current task is canceled.
@@ -279,8 +320,63 @@ extension Task where Success == Never, Failure == Never {
 /// if the current task has been canceled.
 @available(SwiftStdlib 5.1, *)
 public struct CancellationError: Error {
+  /// The reason that a task was cancelled. Different cancellation entry points
+  /// supply different reasons; for example, an explicit `Task.cancel()` call
+  /// records `.taskCancelled`, while a deadline expiration records
+  /// `.deadlineExpired`.
+  ///
+  /// Switching exhaustively over this type requires an `@unknown default` case
+  /// because additional reasons may be added in the future.
+  @available(SwiftStdlib 6.5, *)
+  @nonexhaustive
+  public enum Reason: Sendable {
+      /// The task was ca'ncelled through an explicit cancellation request such
+    /// as `Task.cancel()` or `TaskGroup.cancelAll()`.
+    case taskCancelled
+    /// The task was cancelled because a deadline applied via `withDeadline`
+    /// expired before the operation completed.
+    case deadlineExpired
+
+    @usableFromInline
+    internal var _rawValue: UInt8 {
+      switch self {
+      case .taskCancelled: return 1
+      case .deadlineExpired: return 2
+      }
+    }
+
+    @usableFromInline
+    internal init(_rawValue raw: UInt8) {
+      switch raw {
+      case 2: self = .deadlineExpired
+      default: self = .taskCancelled
+      }
+    }
+  }
+
+  @usableFromInline
+  internal var _reason: UInt8
+
+  /// The reason that this cancellation error was produced. The default value
+  /// is `.taskCancelled` for instances created by code written before this
+  /// API existed.
+  @available(SwiftStdlib 6.5, *)
+  public var reason: Reason {
+    Reason(_rawValue: _reason)
+  }
+
   // no extra information, cancellation is intended to be light-weight
-  public init() {}
+  public init() {
+    self._reason = 1 // .taskCancelled
+  }
+
+  /// Construct a `CancellationError` with a specific reason. Use this to
+  /// convey to callers why a task was cancelled (for example, to distinguish
+  /// a deadline expiration from an explicit cancellation request).
+  @available(SwiftStdlib 6.5, *)
+  public init(reason: Reason) {
+    self._reason = reason._rawValue
+  }
 }
 
 @usableFromInline
@@ -293,6 +389,23 @@ func _taskAddCancellationHandler(handler: () -> Void) -> UnsafeRawPointer /*Canc
 @_silgen_name("swift_task_removeCancellationHandler")
 func _taskRemoveCancellationHandler(
   record: UnsafeRawPointer /*CancellationNotificationStatusRecord*/
+)
+
+@available(SwiftStdlib 6.5, *)
+@usableFromInline
+@_silgen_name("swift_task_cancelWithReason")
+internal func _taskCancelWithReason(_ task: Builtin.NativeObject, reason: UInt8)
+
+@available(SwiftStdlib 6.5, *)
+@usableFromInline
+@_silgen_name("swift_task_getCancellationReason")
+internal func _taskGetCancellationReason(_ task: Builtin.NativeObject) -> UInt8
+
+@available(SwiftStdlib 6.5, *)
+@usableFromInline
+@_silgen_name("swift_taskGroup_cancelAllWithReason")
+internal func _taskGroupCancelAllWithReason(
+  group: Builtin.RawPointer, reason: UInt8
 )
 
 

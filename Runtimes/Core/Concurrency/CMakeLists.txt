@@ -96,6 +96,7 @@ add_library(swift_Concurrency
   TaskSleep.swift
   TaskSleepDuration.swift
   UnimplementedExecutor.swift
+  Deadline.swift
   "${CMAKE_CURRENT_BINARY_DIR}/Task+init.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/TaskGroup+addTask.swift"
   "${CMAKE_CURRENT_BINARY_DIR}/Task+immediate.swift")

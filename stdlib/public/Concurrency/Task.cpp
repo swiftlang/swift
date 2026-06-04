@@ -1131,8 +1131,15 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     // In a task group we would not have allowed the `add` to create a child anymore,
     // however better safe than sorry and `async let` are not expressed as task groups,
     // so they may have been spawned in any case still.
-    if ((group && group->isCancelled()) || swift_task_isCancelled(parent))
-      swift_task_cancel(task);
+    if ((group && group->isCancelled()) || swift_task_isCancelled(parent)) {
+      auto parentReason = static_cast<swift_task_cancellation_reason>(
+          swift_task_getCancellationReason(parent));
+      if (parentReason ==
+          static_cast<swift_task_cancellation_reason>(0)) {
+        parentReason = swift_task_cancellation_reason_TaskCancelled;
+      }
+      swift_task_cancelWithReason(task, parentReason);
+    }
 
     // Inside a task group, we may have to perform some defensive copying,
     // check if doing so is necessary, and initialize storage using partial

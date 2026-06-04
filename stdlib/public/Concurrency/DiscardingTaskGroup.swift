@@ -218,6 +218,14 @@ public struct DiscardingTaskGroup {
     _taskGroupCancelAll(group: _group)
   }
 
+  /// Cancel all of the remaining tasks in the group, recording the reason
+  /// on each affected child task. See `TaskGroup.cancelAll(reason:)` for the
+  /// semantics shared between all task group variants.
+  @available(SwiftStdlib 6.5, *)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithReason(group: _group, reason: reason._rawValue)
+  }
+
   /// A Boolean value that indicates whether the group was canceled.
   ///
   /// To cancel a group, call the `DiscardingTaskGroup.cancelAll()` method.
@@ -514,6 +522,14 @@ public struct ThrowingDiscardingTaskGroup<Failure: Error> {
   /// - SeeAlso: `ThrowingDiscardingTaskGroup.isCancelled`
   public func cancelAll() {
     _taskGroupCancelAll(group: _group)
+  }
+
+  /// Cancel all of the remaining tasks in the group, recording the reason
+  /// on each affected child task. See `TaskGroup.cancelAll(reason:)` for the
+  /// semantics shared between all task group variants.
+  @available(SwiftStdlib 6.5, *)
+  public func cancelAll(reason: CancellationError.Reason) {
+    _taskGroupCancelAllWithReason(group: _group, reason: reason._rawValue)
   }
 
   /// A Boolean value that indicates whether the group was canceled.
