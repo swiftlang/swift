@@ -466,7 +466,8 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
     Var.Loc = {};
   if (Var.Scope == DebugLoc.getScope())
     Var.Scope = nullptr;
-  if (Var.Type == Operand->getType().getObjectType())
+  if (Var.Type == Operand->getType().getObjectType() &&
+      !Var.DIExpr.getFragmentPart())
     Var.Type = {};
   // Use the prependDeref bit rather than storing it in the DIExpr.
   bool prependDeref = Var.DIExpr.startsWithDeref();
