@@ -3,8 +3,11 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main
 
-// Temporarily disabled until issues in the optimized builds are addressed.
-// REQUIRES: rdar178397835
+// RUN: rm %t/main
+
+// RUN: %target-build-swift -language-mode 5 -strict-concurrency=complete -target %target-swift-5.1-abi-triple %s -parse-as-library -module-name main -O -o %t/main
+// RUN: %target-codesign %t/main
+// RUN: %target-run %t/main
 
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime

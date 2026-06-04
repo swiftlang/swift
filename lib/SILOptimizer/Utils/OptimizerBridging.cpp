@@ -469,6 +469,14 @@ createSpecializedFunctionDeclaration(BridgedStringRef specializedName,
   for (auto &Attr : original->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
 
+  // A narrow fix for issues with reabstraction thunk specialization.
+  // If the isolation is not set when re-abstracting into
+  // `nonisolated(nonsending)` it could lead to `OptimizeHopToExecutor`
+  // pass removing valid backward hops.
+  if (original->isNonisolatedNonsending())
+    specializedApplySiteCallee->setActorIsolation(
+        *original->getActorIsolation());
+
   return {specializedApplySiteCallee};
 }
 

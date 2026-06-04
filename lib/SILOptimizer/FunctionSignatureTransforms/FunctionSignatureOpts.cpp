@@ -563,6 +563,12 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     NewF->setSpecializationInfo(F->getSpecializationInfo());
   }
 
+  // Optimizing `nonisolated(nonsending)` functions should preserve isolation
+  // otherwise it could lead to `OptimizeHopToExecutor` pass removing valid
+  // backward hops.
+  if (F->isNonisolatedNonsending())
+    NewF->setActorIsolation(*F->getActorIsolation());
+
   // Then we transfer the body of F to NewF.
   NewF->moveAllBlocksFromOtherFunction(F);
 
