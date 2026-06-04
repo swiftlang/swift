@@ -2130,9 +2130,9 @@ ERROR(extra_tokens_after_expression,PointsToFirstBadToken,
       "extra tokens after expression in macro expansion", ())
 
 ERROR(parser_round_trip_error,none,
-      "source file did not round-trip through the new Swift parser", ())
+      "source file did not round-trip through SwiftSyntax", ())
 ERROR(parser_new_parser_errors,none,
-      "new Swift parser generated errors for code that C++ parser accepted",
+      "SwiftSyntax generated errors for code that C++ parser accepted",
        ())
 
 // MARK: Reference Binding Diagnostics
