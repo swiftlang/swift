@@ -328,21 +328,14 @@ public:
   }
 };
 
-class TaskNameStatusRecord : public TaskStatusRecord {
-private:
-  const char *Name;
-
-public:
-  TaskNameStatusRecord(const char *name)
-      : TaskStatusRecord(TaskStatusRecordKind::TaskName),
-        Name(name) {}
-
-  const char *getName() { return Name; }
-
-  static bool classof(const TaskStatusRecord *record) {
-    return record->getKind() == TaskStatusRecordKind::TaskName;
-  }
-};
+// Deprecated: TaskNameStatusRecord was used Swift 6.4 (including)
+// to store the initial task name of a task; However we later optimized
+// this to avoid the ready-for-mutable-operations record infrastructure
+// in order to facilitate quicker task name lookups by tools like lldb, spindump etc.
+//
+//    class TaskNameStatusRecord : public TaskStatusRecord {
+//      const char *Name;
+//    };
 
 // This record is allocated for a task to record what it is dependent on before
 // the task can make progress again.

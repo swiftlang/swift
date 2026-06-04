@@ -2897,7 +2897,13 @@ enum class TaskStatusRecordKind : uint8_t {
   TaskExecutorPreference = 5,
 
   /// A human-readable task name.
-  TaskName = 6,
+  ///
+  /// Deprecated:
+  /// Previously (including Swift 6.4) initial task name was stored as a record.
+  /// However, we want to facilitate more efficient name lookups and avoid the record
+  /// infrastructure which is prepared for mutable state - therefore the task name
+  /// has become a *fragment*, so there's no need for the record kind anymore.
+  // DEPRECATED: TaskName = 6,
 
   // Kinds >= 192 are private to the implementation.
   First_Reserved = 192,

@@ -65,6 +65,8 @@ class ContinuationAsyncContext;
 // inspecting a process running an older Swift runtime), increment
 // _swift_concurrency_debug_internal_layout_version and add a comment describing
 // the new version.
+//
+// See `Concurrency/Debug.h` for details about each version.
 
 extern const HeapMetadata *jobHeapMetadataPtr;
 extern const HeapMetadata *taskHeapMetadataPtr;
@@ -283,6 +285,7 @@ struct ResultTypeInfo {
 /// An AsyncTask may have the following fragments:
 ///
 ///    +--------------------------+
+///    | nameFragment?            |
 ///    | childFragment?           |
 ///    | groupChildFragment?      |
 ///    | futureFragment?          |*
@@ -473,25 +476,18 @@ public:
   ///        Cancellation shields prevent the observation of the isCancelled flag while active.
   bool isCancelled(bool ignoreShield) const;
 
-  // ==== INITIAL TASK RECORDS =================================================
-  // A task may have a number of "initial" records set, they MUST be set in the
-  // following order to make the task-local allocation/deallocation's stack
-  // discipline easy to work out at the tasks destruction:
-  //
-  // - Initial TaskName
-  // - Initial ExecutorPreference
-
   // ==== Task Naming ----------------------------------------------------------
 
-  /// At task creation a task may be assigned a name.
-  void pushInitialTaskName(const char* taskName);
-  void dropInitialTaskNameRecord();
-
   /// Get the initial task name that was given to this task during creation,
-  /// or nullptr if the task has no name
+  /// or nullptr if the task has no name.
   const char* getTaskName();
 
-  bool hasInitialTaskNameRecord() const {
+  /// Copy `taskName` into the the task local allocated memory, and store a pointer
+  /// to it in `NameFragment`.
+  void initializeTaskName(const char *taskName);
+
+  /// True only if this task has a `NameFragment`.
+  bool hasTaskName() const {
     return Flags.task_hasInitialTaskName();
   }
 
@@ -542,6 +538,36 @@ public:
   bool cancellationShieldPush();
 
   void cancellationShieldPop();
+
+  // ==== Name Fragment --------------------------------------------------------
+
+  /// A fragment of an async task that holds the task's name.
+  ///
+  /// This fragment MUST be allocated immediately after the AsyncTask itself,
+  /// as external tools rely on the location of this record to read the task name,
+  /// see `Concurrency/Debug.h`.
+  class NameFragment {
+    /// Pointer to a null-terminated UTF-8 string.
+    /// The string is allocated no the task-local allocator as the first thing
+    /// allocated on it, and must be the last thing we free on it.
+    const char *Name;
+
+  public:
+    explicit NameFragment(const char *name) : Name(name) {}
+
+    const char *getName() const { return Name; }
+    void setName(const char *name) { Name = name; }
+  };
+
+  /// Returns the `NameFragment` of this task.
+  ///
+  /// WARNING: Only valid when `hasTaskName()` is true.
+  NameFragment *nameFragment() {
+    assert(hasTaskName());
+    auto offset = reinterpret_cast<char*>(this);
+    offset += sizeof(AsyncTask);
+    return reinterpret_cast<NameFragment*>(offset);
+  }
 
   // ==== Child Fragment -------------------------------------------------------
 
@@ -603,6 +629,8 @@ public:
 
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
+    if (hasTaskName())
+      offset += sizeof(NameFragment);
 
     return reinterpret_cast<ChildFragment*>(offset);
   }
@@ -642,6 +670,8 @@ public:
 
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
+    if (hasTaskName())
+      offset += sizeof(NameFragment);
     if (hasChildFragment())
       offset += sizeof(ChildFragment);
 
@@ -785,6 +815,8 @@ public:
     assert(isFuture());
     auto offset = reinterpret_cast<char*>(this);
     offset += sizeof(AsyncTask);
+    if (hasTaskName())
+      offset += sizeof(NameFragment);
     if (hasChildFragment())
       offset += sizeof(ChildFragment);
     if (hasGroupChildFragment())
