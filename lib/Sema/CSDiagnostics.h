@@ -1812,6 +1812,20 @@ public:
   bool diagnoseAsError() override;
 };
 
+class InvalidProtocolMetatypeStaticMemberRefInKeyPath final
+    : public InvalidMemberRefInKeyPath {
+  Type BaseType;
+
+public:
+  InvalidProtocolMetatypeStaticMemberRefInKeyPath(
+      const Solution &solution, Type baseType, ValueDecl *member,
+      ConstraintLocator *locator)
+      : InvalidMemberRefInKeyPath(solution, member, locator),
+        BaseType(resolveType(baseType)->getRValueType()) {}
+
+  bool diagnoseAsError() override;
+};
+
 /// Diagnose an attempt to reference a static member from an unsupported module.
 ///
 /// Only modules built either from source with 6.1+ compiler or

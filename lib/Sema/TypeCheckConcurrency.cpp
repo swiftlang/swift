@@ -5168,8 +5168,7 @@ ActorIsolation swift::determineClosureActorIsolation(
 /// inference rules). Returns \c None if there were no attributes on this
 /// declaration.
 static std::optional<ActorIsolation>
-getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
-                           bool onlyExplicit = false) {
+getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true) {
   // Look up attributes on the declaration that can affect its actor isolation.
   // If any of them are present, use that attribute.
 
@@ -5183,22 +5182,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   auto globalActorAttr = decl->getGlobalActorAttr();
   auto concurrentAttr = decl->getAttrs().getAttribute<ConcurrentAttr>();
 
-  // Remove implicit attributes if we only care about explicit ones.
-  if (onlyExplicit) {
-    if (nonisolatedAttr && nonisolatedAttr->isImplicit())
-      nonisolatedAttr = nullptr;
-    if (isolatedAttr && isolatedAttr->isImplicit())
-      isolatedAttr = nullptr;
-    if (globalActorAttr && globalActorAttr->first->isImplicit())
-      globalActorAttr = std::nullopt;
-    if (concurrentAttr && concurrentAttr->isImplicit())
-      concurrentAttr = nullptr;
-  }
-
-  unsigned numIsolationAttrs =
-      (isolatedAttr ? 1 : 0) + (nonisolatedAttr ? 1 : 0) +
-      (globalActorAttr ? 1 : 0) + (concurrentAttr ? 1 : 0);
-  if (numIsolationAttrs == 0) {
+  if (!(isolatedAttr || nonisolatedAttr || globalActorAttr || concurrentAttr)) {
     if (isa<DestructorDecl>(decl) && !decl->isImplicit()) {
       return cast<DestructorDecl>(decl)->isAsync()
                  ? ActorIsolation::forNonisolatedConcurrent()
@@ -5961,7 +5945,7 @@ static OverrideIsolationResult validOverrideIsolation(
   auto &ctx = declContext->getASTContext();
 
   // Normally we are checking if overriding declaration can be called by calling
-  // overriden declaration. But in case of destructors, overriden declaration is
+  // overridden declaration. But in case of destructors, overridden declaration is
   // always callable by definition and we are checking that subclass deinit can
   // call super deinit.
   bool isDtor = isa<DestructorDecl>(value);

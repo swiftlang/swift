@@ -959,7 +959,7 @@ static ModuleDecl *getModuleContextForNameLookupForCxxDecl(const Decl *decl) {
     return nullptr;
   }
 
-  auto clangModule = clangImporter->getClangOwningModule(decl->getClangDecl());
+  auto clangModule = clangImporter->getClangOwningModule(decl->getClangNode());
   if (!clangModule)
     return nullptr;
 
@@ -5494,6 +5494,32 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
                                                treatUsableFromInlineAsPublic);
   const DeclContext *resultDC = VD->getDeclContext();
 
+  // For a DeclContext that introduces a type or extends one,
+  // restrict `access` by that type's adjusted formal access and return
+  // the type's own enclosing DeclContext to continue walking. Returns
+  // nullptr for any other kind of context.
+  auto adjustForEnclosingType =
+      [&](const DeclContext *dc) -> const DeclContext * {
+    if (auto enclosing = dyn_cast<GenericTypeDecl>(dc)) {
+      access = std::min(access,
+                        getAdjustedFormalAccess(enclosing, useDC,
+                                                treatUsableFromInlineAsPublic));
+      return enclosing->getDeclContext();
+    }
+    if (auto ext = dyn_cast<ExtensionDecl>(dc)) {
+      // Just check the base type. If it's a constrained extension, Sema
+      // should have already enforced access more strictly.
+      auto *nominal = ext->getExtendedNominal();
+      if (!nominal || nominal->getParentModule() != ext->getParentModule())
+        return nullptr;
+      access =
+          std::min(access, getAdjustedFormalAccess(
+                               nominal, useDC, treatUsableFromInlineAsPublic));
+      return nominal->getDeclContext();
+    }
+    return nullptr;
+  };
+
   while (!resultDC->isModuleScopeContext()) {
     if (isa<TopLevelCodeDecl>(resultDC)) {
       return AccessScope(resultDC->getModuleScopeContext(),
@@ -5503,24 +5529,20 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
     if (resultDC->isLocalContext() || access == AccessLevel::Private)
       return AccessScope(resultDC, /*private*/ true);
 
-    if (auto enclosingNominal = dyn_cast<GenericTypeDecl>(resultDC)) {
-      auto enclosingAccess =
-          getAdjustedFormalAccess(enclosingNominal, useDC,
-                                  treatUsableFromInlineAsPublic);
-      access = std::min(access, enclosingAccess);
-
-    } else if (auto enclosingExt = dyn_cast<ExtensionDecl>(resultDC)) {
-      // Just check the base type. If it's a constrained extension, Sema should
-      // have already enforced access more strictly.
-      if (auto nominal = enclosingExt->getExtendedNominal()) {
-        if (nominal->getParentModule() == enclosingExt->getParentModule()) {
-          auto nominalAccess =
-              getAdjustedFormalAccess(nominal, useDC,
-                                      treatUsableFromInlineAsPublic);
-          access = std::min(access, nominalAccess);
-        }
+    if (isa<GenericTypeDecl>(resultDC)) {
+      // Restrict by this nominal's access. The outer parent walk below
+      // will pick up any types that enclose it.
+      adjustForEnclosingType(resultDC);
+    } else if (isa<ExtensionDecl>(resultDC)) {
+      // Restrict by the extended nominal and any types that enclose it.
+      // Extensions are always at file scope, so the parent walk below would
+      // otherwise skip those types entirely. We don't redirect `resultDC` here,
+      // because `fileprivate` and `private` scopes must continue to resolve to
+      // the file containing the declaration, which may differ from the file
+      // containing the extended type.
+      for (const DeclContext *dc = adjustForEnclosingType(resultDC);
+           dc != nullptr; dc = adjustForEnclosingType(dc)) {
       }
-
     } else {
       llvm_unreachable("unknown DeclContext kind");
     }
@@ -12610,6 +12632,18 @@ ActorIsolation swift::getActorIsolationOfContext(
   }
 
   if (auto *init = dyn_cast<Initializer>(dcToUse)) {
+    // The initializer of a 'lazy' stored property is emitted into the property's
+    // synthesized getter, which is isolated to the property. So unlike an
+    // ordinary stored-property default value -- whose required isolation is
+    // computed and validated separately, and which is reported as unspecified
+    // here -- the lazy initializer, and any closures within it, run with the
+    // lazy variable's actor isolation and should inherit it.
+    if (auto *pbi = dyn_cast<PatternBindingInitializer>(init)) {
+      if (auto *lazyVar = pbi->getInitializedLazyVar()) {
+        return getActorIsolation(lazyVar);
+      }
+    }
+
     // FIXME: force default argument initializers to report a meaningless
     // isolation in order to break a bunch of cycles with the way that
     // isolation is computed for them.

@@ -14,7 +14,7 @@ import SIL
 
 extension LoadBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
-    if uses.ignoreDebugUses.ignore(usersOfType: EndBorrowInst.self).isEmpty {
+    if uses.ignoreDebugUses.hasOnlyUsers(ofType: EndBorrowInst.self) {
       context.erase(instructionIncludingAllUsers: self)
       return
     }
@@ -109,7 +109,7 @@ extension LoadBorrowInst : OnoneSimplifiable, SILCombineSimplifiable {
     let accessPath = address.accessPath
     guard case .storeBorrow(let storeBorrow) = accessPath.base,
           accessPath.projectionPath.isMaterializable,
-          uses.endingLifetime.ignore(usersOfType: EndBorrowInst.self).isEmpty
+          uses.endingLifetime.hasOnlyUsers(ofType: EndBorrowInst.self)
     else {
       return
     }

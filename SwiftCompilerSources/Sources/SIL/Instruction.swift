@@ -1442,7 +1442,7 @@ final public class ExplicitCopyValueInst : SingleValueInstruction, CopyingInstru
 final public class UnownedCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 final public class WeakCopyValueInst : SingleValueInstruction, CopyingInstruction {}
 
-final public class UncheckedOwnershipConversionInst : SingleValueInstruction {}
+final public class UncheckedOwnershipConversionInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class MoveValueInst : SingleValueInstruction, UnaryInstruction {
   public var fromValue: Value { operand.value }
@@ -2005,7 +2005,11 @@ final public class DestructureTupleInst : MultipleValueInstruction, UnaryInstruc
 //                           parameter pack instructions
 //===----------------------------------------------------------------------===//
 
-final public class AllocPackInst : SingleValueInstruction, Allocation {}
+final public class AllocPackInst : SingleValueInstruction, Allocation {
+  public var packType: CanonicalType {
+    CanonicalType(bridged: bridged.AllocPackInst_getPackType())
+  }
+}
 final public class AllocPackMetadataInst : SingleValueInstruction, Allocation {}
 
 final public class DeallocPackInst : Instruction, UnaryInstruction, Deallocation {}
@@ -2047,9 +2051,16 @@ final public class TuplePackElementAddrInst: SingleValueInstruction {
   public var tupleOperand: Operand { operands[1] }
 }
 
-final public class PackElementGetInst: SingleValueInstruction {}
+final public class PackElementGetInst: SingleValueInstruction {
+  public var indexOperand: Operand { operands[0] }
+  public var packOperand: Operand { operands[1] }
+}
 
-final public class PackElementSetInst: Instruction {}
+final public class PackElementSetInst: Instruction {
+  public var valueOperand: Operand { operands[0] }
+  public var indexOperand: Operand { operands[1] }
+  public var packOperand: Operand { operands[2] }
+}
 
 //===----------------------------------------------------------------------===//
 //                            terminator instructions
@@ -2194,9 +2205,9 @@ final public class CondBranchInst : TermInst {
 final public class SwitchValueInst : TermInst {
 }
 
-final public class SwitchEnumInst : TermInst {
+final public class SwitchEnumInst : TermInst, UnaryInstruction {
 
-  public var enumOp: Value { operands[0].value }
+  public var enumOp: Value { operand.value }
 
   public struct CaseIndexArray : RandomAccessCollection {
     fileprivate let switchEnum: SwitchEnumInst

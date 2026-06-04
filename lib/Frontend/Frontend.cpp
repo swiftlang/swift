@@ -33,6 +33,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/Basic/Version.h"
 #include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
@@ -87,7 +88,20 @@ std::string CompilerInvocation::getPCHHash() const {
 std::string CompilerInvocation::getModuleScanningHash() const {
   using llvm::hash_combine;
 
-  auto Code = hash_combine(LangOpts.getModuleScanningHashComponents(),
+  // The compiler version is folded into the hash so that swapping the
+  // swift-frontend binary forces the serialized scanner cache to be
+  // discarded. Without this, a Clang module's contextHash can shift
+  // (for example because ClangImporter injects -D__SWIFT_COMPILER_VERSION
+  // into every Clang invocation), causing the live scan to produce a new
+  // variant of a module already in the loaded cache.
+  static const char *forcedDependencyScanVersion =
+      ::getenv("SWIFT_DEBUG_FORCE_DEPENDENCY_SCAN_VERSION");
+  std::string compilerVersion = forcedDependencyScanVersion
+                                    ? std::string(forcedDependencyScanVersion)
+                                    : version::getSwiftFullVersion();
+
+  auto Code = hash_combine(compilerVersion,
+                           LangOpts.getModuleScanningHashComponents(),
                            FrontendOpts.getModuleScanningHashComponents(),
                            ClangImporterOpts.getModuleScanningHashComponents(),
                            SearchPathOpts.getModuleScanningHashComponents(),

@@ -121,8 +121,8 @@ public func applyPointer<each T>(input: repeat UnsafePointer<each T>, op: (repea
   op(repeat (each input).pointee)
 }
 
-// CHECK: define {{.*}} i32 @"$s19pack_specialization4tests5Int32VyF"() {{.*}} {
-// CHECK-NEXT: "$s19pack_specialization4tests5Int32VyFADSPyADGXEfU_.exit":
+// CHECK:      define {{.*}} i32 @"$s19pack_specialization4tests5Int32VyF"() {{.*}} {
+// CHECK-NEXT: entry:
 // CHECK-NEXT:   ret i32 54
 // CHECK-NEXT: }
 public func test() -> Int32 {
@@ -135,10 +135,32 @@ public func applyDirect<each T>(input: repeat each T, op: (repeat each T) -> Int
   op(repeat (each input))
 }
 
-// CHECK: define {{.*}} i32 @"$s19pack_specialization10testDirects5Int32VyF"() {{.*}} {
+// CHECK:      define {{.*}} i32 @"$s19pack_specialization10testDirects5Int32VyF"() {{.*}} {
 // CHECK-NEXT: entry:
 // CHECK-NEXT:   ret i32 54
 // CHECK-NEXT: }
 public func testDirect() -> Int32 {
     applyDirect(input: 27, 27) { ($0 + $1) }
 }
+
+// rdar://178048566: Two variables with different type but same scope
+
+public protocol P { var n: Int { get } }
+public struct A: P {
+  public var n: Int
+  public init(_ n: Int) { self.n = n }
+}
+public struct B: P {
+  public var n: Int
+  public init(_ n: Int) { self.n = n }
+}
+
+@inline(never)
+public func sum<each T: P>(_ xs: repeat each T) -> Int {
+  var total = 0
+  for x in repeat each xs { total += x.n }
+  return total
+}
+
+@inline(never)
+public func driver(_ a: A, _ b: B) -> Int { sum(a, b) }

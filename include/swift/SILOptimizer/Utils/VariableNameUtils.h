@@ -258,6 +258,13 @@ public:
   static StringRef getNameFromDecl(Decl *d);
 
 private:
+  /// Helper that names the result of a call (apply / try_apply / begin_apply),
+  /// looking through partial_apply / conversions to the underlying callee and
+  /// walking into self to produce 'self.member'. Defined out-of-line in
+  /// VariableNameUtils.cpp. Holds a back-reference to its owning inferrer so it
+  /// can push path components and stash state across queries.
+  struct CallResultNamer;
+
   void drainVariableNamePath();
 
   /// Push \p name onto the variable name path, recording \p providingLoc

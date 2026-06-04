@@ -2469,6 +2469,10 @@ private:
       // substitutions.
       bool Progress = false;
       for (auto Source : Info.MetadataSources) {
+        // If either component of the source is NULL, something went wrong.
+        if (!Source.first || !Source.second)
+          return nullptr;
+
         // Don't read a source more than once.
         if (Done.count(Source))
           continue;
@@ -2547,6 +2551,9 @@ private:
   std::optional<RemoteAddress>
   readMetadataSource(RemoteAddress Context, const MetadataSource *MS,
                      const RecordTypeInfoBuilder &Builder) {
+    if (!MS)
+      return std::nullopt;
+
     switch (MS->getKind()) {
     case MetadataSourceKind::ClosureBinding: {
       unsigned Index = cast<ClosureBindingMetadataSource>(MS)->getIndex();

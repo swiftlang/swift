@@ -817,13 +817,13 @@ private:
     }
   }
 
-  llvm::DITypeRefArray createParameterTypes(SILType SILTy) {
+  llvm::DITypeArray createParameterTypes(SILType SILTy) {
     if (!SILTy)
       return nullptr;
     return createParameterTypes(SILTy.castTo<SILFunctionType>());
   }
 
-  llvm::DITypeRefArray createParameterTypes(CanSILFunctionType FnTy) {
+  llvm::DITypeArray createParameterTypes(CanSILFunctionType FnTy) {
     SmallVector<llvm::Metadata *, 16> Parameters;
 
     GenericContextScope scope(IGM, FnTy->getInvocationGenericSignature());

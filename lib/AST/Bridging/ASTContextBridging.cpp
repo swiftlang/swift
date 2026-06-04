@@ -71,9 +71,14 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
     version = llvm::VersionTuple(versionComponents[0], versionComponents[1],
                                  versionComponents[2]);
     break;
-  default:
+  case 4:
     version = llvm::VersionTuple(versionComponents[0], versionComponents[1],
                                  versionComponents[2], versionComponents[3]);
+    break;
+  default:
+    version = llvm::VersionTuple(versionComponents[0], versionComponents[1],
+                                 versionComponents[2], versionComponents[3],
+                                 versionComponents[4]);
     break;
   }
 

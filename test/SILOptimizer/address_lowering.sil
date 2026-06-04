@@ -2724,6 +2724,36 @@ bb0:
   return %5
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_mark_dependence_addr_dep_opaque_base :
+// CHECK:       bb0(%0 : $*U):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         mark_dependence [unresolved] [[STK]] : $*T on %0 : $*U
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_addr_dep_opaque_base'
+sil hidden [ossa] @test_mark_dependence_addr_dep_opaque_base : $@convention(thin) <T, U> (@in_guaranteed U) -> () {
+bb0(%0 : @guaranteed $U):
+  %1 = alloc_stack $T
+  %2 = mark_dependence [unresolved] %1 : $*T on %0 : $U
+  dealloc_stack %1 : $*T
+  %3 = tuple ()
+  return %3 : $()
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_mark_dependence_opaque_dep_opaque_base :
+// CHECK:       bb0(%0 : $*T, %1 : $*T, %2 : $*U):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr %1 to [init] [[STK]] : $*T
+// CHECK:         mark_dependence_addr [unresolved] [[STK]] : $*T on %2 : $*U
+// CHECK:         copy_addr [take] [[STK]] to [init] %0 : $*T
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_mark_dependence_opaque_dep_opaque_base'
+sil hidden [ossa] @test_mark_dependence_opaque_dep_opaque_base : $@convention(thin) <T, U> (@in_guaranteed T, @in_guaranteed U) -> @out T {
+bb0(%0 : @guaranteed $T, %1 : @guaranteed $U):
+  %2 = copy_value %0 : $T
+  %3 = mark_dependence [unresolved] %2 : $T on %1 : $U
+  return %3 : $T
+}
+
 // CHECK-LABEL: sil [ossa] @test_mark_unresolved_non_copyable_value_1_consumable_and_assignable : {{.*}} {
 // CHECK:       bb0([[T:%[^,]+]] :
 // CHECK:         [[TP:%[^,]+]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[T]]
@@ -3043,6 +3073,21 @@ bb0(%0 : @guaranteed $T, %1 : $@thick U.Type):
   return %6 : $U
 }
 
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast_from_loadable_trivial :
+// CHECK:       bb0(%0 : $*T, %1 : $Builtin.Int64):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         [[CAST:%[^,]+]] = unchecked_addr_cast [[STK]] : $*T to $*Builtin.Int64
+// CHECK:         store %1 to [trivial] [[CAST]] : $*Builtin.Int64
+// CHECK:         copy_addr [[STK]] to [init] %0 : $*T
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_unchecked_bitwise_cast_from_loadable_trivial'
+sil hidden [ossa] @test_unchecked_bitwise_cast_from_loadable_trivial : $@convention(thin) <T> (Builtin.Int64) -> @out T {
+bb0(%0 : $Builtin.Int64):
+  %1 = unchecked_bitwise_cast %0 : $Builtin.Int64 to $T
+  %2 = copy_value %1 : $T
+  return %2 : $T
+}
+
 // There's only one use and it's a copy, just rewrite it as a load [copy].
 // CHECK-LABEL: sil hidden [ossa] @test_unchecked_bitwise_cast_to_loadable :
 // CHECK:       {{bb[0-9]+}}([[ADDR_IN:%[^,]+]] : $*T):
@@ -3088,6 +3133,32 @@ bb0(%instance : @guaranteed $T):
   destroy_value %klass2 : $Klass
   destroy_value %copy : $T
   return %klass : $Klass
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_value_cast_from_loadable :
+// CHECK:       bb0(%0 : $*T, %1 : @owned $Klass):
+// CHECK:         [[CAST:%[^,]+]] = unchecked_addr_cast %0 : $*T to $*Klass
+// CHECK:         store %1 to [init] [[CAST]] : $*Klass
+// CHECK-LABEL: } // end sil function 'test_unchecked_value_cast_from_loadable'
+sil hidden [ossa] @test_unchecked_value_cast_from_loadable : $@convention(thin) <T> (@owned Klass) -> @out T {
+bb0(%0 : @owned $Klass):
+  %1 = unchecked_value_cast %0 : $Klass to $T
+  return %1 : $T
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_unchecked_value_cast_opaque :
+// CHECK:       bb0(%0 : $*U, %1 : $*T):
+// CHECK:         [[STK:%[^,]+]] = alloc_stack $T
+// CHECK:         copy_addr %1 to [init] [[STK]] : $*T
+// CHECK:         [[CAST:%[^,]+]] = unchecked_addr_cast [[STK]] : $*T to $*U
+// CHECK:         copy_addr [take] [[CAST]] to [init] %0 : $*U
+// CHECK:         dealloc_stack [[STK]]
+// CHECK-LABEL: } // end sil function 'test_unchecked_value_cast_opaque'
+sil hidden [ossa] @test_unchecked_value_cast_opaque : $@convention(thin) <T, U> (@in_guaranteed T) -> @out U {
+bb0(%0 : @guaranteed $T):
+  %1 = copy_value %0 : $T
+  %2 = unchecked_value_cast %1 : $T to $U
+  return %2 : $U
 }
 
 // CHECK-LABEL: sil hidden [ossa] @test_unconditional_checked_cast1 : $@convention(thin) <T> (Builtin.Int64) -> @out T {
@@ -3513,5 +3584,16 @@ bb1:
 bb2:
   abort_apply %4
   unwind
+}
+
+// CHECK-LABEL: sil hidden [ossa] @test_zero_initializer_opaque :
+// CHECK:       bb0(%0 : $*T):
+// CHECK:         builtin "zeroInitializer"(%0 : $*T) : $()
+// CHECK:         return
+// CHECK-LABEL: } // end sil function 'test_zero_initializer_opaque'
+sil hidden [ossa] @test_zero_initializer_opaque : $@convention(thin) <T> () -> @out T {
+bb0:
+  %0 = builtin "zeroInitializer"() : $T
+  return %0 : $T
 }
 

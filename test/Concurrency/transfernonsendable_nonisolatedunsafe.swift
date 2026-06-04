@@ -55,36 +55,36 @@ func transferLetNonTransferrableSquelched(_ ns: NonSendableKlass) async {
 
   await transferToMainDirect(ns)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainDirect(ns2)
 
   await transferToMainDirect(ns3)
   // expected-warning @-1 {{sending 'ns3' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns3' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns3' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainDirect(ns4)
   // expected-warning @-1 {{sending 'ns4' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns4' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns4' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns2)
 
   await transferToMainIndirect(ns3)
   // expected-warning @-1 {{sending 'ns3' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns4)
   // expected-warning @-1 {{sending 'ns4' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 }
 
@@ -150,11 +150,11 @@ func transferNonTransferrableClassField(_ ns: NonSendableKlass) async {
 
   await transferToMainDirect(ns2.field!)
   // expected-warning @-1 {{sending 'ns2.field' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns2.field' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns2.field' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   await transferToMainIndirect(ns2.field!)
   // expected-warning @-1 {{sending 'ns2.field' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns2.field' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns2.field' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 }
 
@@ -167,17 +167,17 @@ func transferNonTransferrableStructField(_ ns: NonSendableStruct) async {
 
   await transferToMainDirect(ns2.field!)
   // expected-warning @-1 {{sending 'ns2.field' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns2.field' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns2.field' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns2.field!)
   // expected-warning @-1 {{sending 'ns2.field' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns2.field' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns2.field' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns2.field)
   // expected-warning @-1 {{sending 'ns2.field' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns2.field' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns2.field' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass?' into main actor-isolated context may introduce data races}}
 }
 
@@ -187,12 +187,12 @@ func testConsumingTransfer(_ ns: NonSendableKlass) async {
 
   await transferToMainDirectConsuming(ns)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainDirectConsuming' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainDirectConsuming' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirectConsuming(ns)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainIndirectConsuming' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainIndirectConsuming' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainDirectConsuming(ns2)
@@ -210,36 +210,36 @@ func transferVarNonTransferrableSquelched(_ ns: NonSendableKlass) async {
 
   await transferToMainDirect(ns)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainDirect(ns2)
 
   await transferToMainDirect(ns3)
   // expected-warning @-1 {{sending 'ns3' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns3' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns3' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainDirect(ns4)
   // expected-warning @-1 {{sending 'ns4' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns4' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns4' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns2)
 
   await transferToMainIndirect(ns3)
   // expected-warning @-1 {{sending 'ns3' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns4)
   // expected-warning @-1 {{sending 'ns4' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
 }
 
@@ -285,19 +285,19 @@ func transferLetNonTransferrableSquelchedAddressOnly<T>(_ ns: T) async { // expe
 
   await transferToMainIndirect(ns)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'T' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns2)
 
   await transferToMainIndirect(ns3)
   // expected-warning @-1 {{sending 'ns3' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'T' into main actor-isolated context may introduce data races}}
 
   await transferToMainIndirect(ns4)
   // expected-warning @-1 {{sending 'ns4' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'T' into main actor-isolated context may introduce data races}}
 }
 
@@ -309,7 +309,7 @@ func useAfterTransferLetSquelchedIndirectAddressOnly<T : ProvidesStaticValue>(_ 
 
   await transferToMainIndirect(ns)
   // expected-warning @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'T' into main actor-isolated context may introduce data races}}
   print(ns)
 
@@ -318,13 +318,13 @@ func useAfterTransferLetSquelchedIndirectAddressOnly<T : ProvidesStaticValue>(_ 
 
   await transferToMainIndirect(ns3)
   // expected-warning @-1 {{sending 'ns3' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns3' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'T' into main actor-isolated context may introduce data races}}
   print(ns3)
 
   await transferToMainIndirect(ns4)
   // expected-warning @-1 {{sending 'ns4' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns4' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
   // expected-complete-warning @-3 {{passing argument of non-Sendable type 'T' into main actor-isolated context may introduce data races}}
   print(ns4)
 }
@@ -749,11 +749,11 @@ struct NonIsolatedUnsafeFieldNonSendableStruct {
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainDirect(letObject)
     // expected-warning @-1 {{sending 'self.letObject' risks causing data races}}
-    // expected-note @-2 {{sending task-isolated 'self.letObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-note @-2 {{sending 'self.letObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
     // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainDirect(varObject)
     // expected-warning @-1 {{sending 'self.varObject' risks causing data races}}
-    // expected-note @-2 {{sending task-isolated 'self.varObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-note @-2 {{sending 'self.varObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
     // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
@@ -782,11 +782,11 @@ final class FinalNonIsolatedUnsafeFieldKlass {
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainDirect(letObject)
     // expected-warning @-1 {{sending 'self.letObject' risks causing data races}}
-    // expected-note @-2 {{sending task-isolated 'self.letObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-note @-2 {{sending 'self.letObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
     // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainDirect(varObject)
     // expected-warning @-1 {{sending 'self.varObject' risks causing data races}}
-    // expected-note @-2 {{sending task-isolated 'self.varObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-note @-2 {{sending 'self.varObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
     // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
@@ -815,11 +815,11 @@ class NonIsolatedUnsafeFieldKlass {
     // expected-complete-warning @-1 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainDirect(letObject)
     // expected-warning @-1 {{sending 'self.letObject' risks causing data races}}
-    // expected-note @-2 {{sending task-isolated 'self.letObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-note @-2 {{sending 'self.letObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
     // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
     await transferToMainDirect(varObject)
     // expected-warning @-1 {{sending 'self.varObject' risks causing data races}}
-    // expected-note @-2 {{sending task-isolated 'self.varObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-note @-2 {{sending 'self.varObject' to main actor-isolated global function 'transferToMainDirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
     // expected-complete-warning @-3 {{passing argument of non-Sendable type 'NonSendableKlass' into main actor-isolated context may introduce data races}}
   }
 
@@ -850,14 +850,14 @@ class NonIsolatedUnsafeFieldGenericKlass<T> { // expected-complete-note 4{{}}
 
     await transferToMainIndirect(letAddressOnly)
     // expected-warning @-1 {{sending 'self.letAddressOnly' risks causing data races}}
-    // expected-note @-2 {{sending task-isolated 'self.letAddressOnly' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated and task-isolated uses}}
+    // expected-note @-2 {{sending 'self.letAddressOnly' to main actor-isolated global function 'transferToMainIndirect' risks causing data races between main actor-isolated code and code in the current isolation context}}
     // expected-complete-warning @-3 {{passing argument of non-Sendable type 'T?' into main actor-isolated context may introduce data races}}
 
     // TODO: This diagnostic is unfortunate since we are erroring on the
     // temporary created by the class_method call.
     await transferToMainIndirect(varAddressOnly)
     // expected-warning @-1 {{sending value of non-Sendable type 'T?' risks causing data races}}
-    // expected-note @-2 {{sending task-isolated value of non-Sendable type 'T?' to main actor-isolated global function 'transferToMainIndirect' risks causing races in between task-isolated and main actor-isolated uses}}
+    // expected-note @-2 {{sending value of non-Sendable type 'T?' to main actor-isolated global function 'transferToMainIndirect' risks causing races in between code in the current isolation context and main actor-isolated uses}}
   }
 
   // This is safe since self will become MainActor isolated as a result of
@@ -895,7 +895,7 @@ func closureTests() async {
 
   func testLetOneNSVariableError() async {
     let x = NonSendableKlass()
-    sendingClosure { _ = x } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+    sendingClosure { _ = x } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current isolation context}}
     sendingClosure { _ = x } // expected-note {{access can happen concurrently}}
   }
 
@@ -909,7 +909,7 @@ func closureTests() async {
     let x = NonSendableKlass()
     let y = CustomActorInstance()
     sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current isolation context}}
       _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
@@ -935,8 +935,8 @@ func closureTests() async {
     let x = NonSendableKlass()
     let y = NonSendableKlass()
     sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
-      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current isolation context}}
+      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current isolation context}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -949,7 +949,7 @@ func closureTests() async {
     let y = NonSendableKlass()
     sendingClosure {
       _ = x
-      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
+      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current isolation context}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -974,7 +974,7 @@ func closureTests() async {
     var x = NonSendableKlass()
     x = NonSendableKlass()
 
-    sendingClosure { _ = x } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+    sendingClosure { _ = x } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current isolation context}}
     sendingClosure { _ = x } // expected-note {{access can happen concurrently}}
   }
 
@@ -992,7 +992,7 @@ func closureTests() async {
     var y = CustomActorInstance()
     y = CustomActorInstance()
     sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current isolation context}}
       _ = y
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
@@ -1022,8 +1022,8 @@ func closureTests() async {
     var y = NonSendableKlass()
     y = NonSendableKlass()
     sendingClosure {
-      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current task}}
-      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
+      _ = x // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x' which is accessed later by code in the current isolation context}}
+      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current isolation context}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -1038,7 +1038,7 @@ func closureTests() async {
     y = NonSendableKlass()
     sendingClosure {
       _ = x
-      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current task}}
+      _ = y // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'y' which is accessed later by code in the current isolation context}}
     }
     sendingClosure { // expected-note {{access can happen concurrently}}
       _ = x
@@ -1063,7 +1063,7 @@ func closureTests() async {
 
   func testWithTaskDetached() async {
     let x1 = NonSendableKlass()
-    Task.detached { _ = x1 } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x1' which is accessed later by code in the current task}}
+    Task.detached { _ = x1 } // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x1' which is accessed later by code in the current isolation context}}
     Task.detached { _ = x1 } // expected-note {{access can happen concurrently}}
 
     nonisolated(unsafe) let x2 = NonSendableKlass()
@@ -1079,7 +1079,7 @@ func closureTests() async {
     let x4b = NonSendableKlass()
     Task.detached {
       _ = x4a;
-      _ = x4b // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x4b' which is accessed later by code in the current task}}
+      _ = x4b // expected-warning {{closure passed as an argument to a 'sending' parameter captures 'x4b' which is accessed later by code in the current isolation context}}
     }
 
     Task.detached { // expected-note {{access can happen concurrently}}
@@ -1127,18 +1127,18 @@ func closureTests() async {
     sendingClosure(y)
   }
 
-  // Task-isolated parameter + nonisolated(unsafe) capture. Each send of the
-  // closure triggers a SentNeverSendable error for ns (task-isolated), while
+  // Parameter accessible to code in the current isolation context + nonisolated(unsafe) capture. Each send of the
+  // closure triggers a SentNeverSendable error for ns (accessible to code in the current isolation context), while
   // x (nonisolated(unsafe)) is not diagnosed.
   func testSendingClosureTaskIsolatedAndNonisolatedUnsafe(_ ns: NonSendableKlass) async {
     nonisolated(unsafe) let x = NonSendableKlass()
-    sendingClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    sendingClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
       _ = x
-      _ = ns // expected-note {{closure captures 'ns' which is accessible to code in the current task}}
+      _ = ns // expected-note {{closure captures 'ns' which is accessible to code in the current isolation context}}
     }
-    sendingClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    sendingClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current isolation context and concurrent execution of the closure}}
       _ = x
-      _ = ns // expected-note {{closure captures 'ns' which is accessible to code in the current task}}
+      _ = ns // expected-note {{closure captures 'ns' which is accessible to code in the current isolation context}}
     }
   }
 

@@ -7,6 +7,7 @@
 # See http://swift.org/CONTRIBUTORS.txt for Swift project authors
 
 swift_compiler_sources(Optimizer
+  SimplifyAllocPack.swift
   SimplifyAllocRefDynamic.swift
   SimplifyAllocStack.swift
   SimplifyApply.swift
@@ -50,5 +51,6 @@ swift_compiler_sources(Optimizer
   SimplifyTypeValue.swift
   SimplifyUncheckedAddrCast.swift
   SimplifyUncheckedEnumData.swift
+  SimplifyUncheckedOwnershipConversion.swift
   SimplifyValueToBridgeObject.swift
   SimplifyWitnessMethod.swift)

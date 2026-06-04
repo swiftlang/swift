@@ -142,12 +142,12 @@ func testTaskLocal(_ y: NSObject) async {
   let x = ObjCObject()
   await x.useValue(y)
   await useValueConcurrently(x) // expected-ni-ns-error {{sending 'x' risks causing data races}}
-  // expected-ni-ns-note @-1 {{sending task-isolated 'x' to @concurrent global function 'useValueConcurrently' risks causing data races between @concurrent and task-isolated uses}}
+  // expected-ni-ns-note @-1 {{sending 'x' to @concurrent global function 'useValueConcurrently' risks causing data races between @concurrent code and code in the current isolation context}}
 
   // This is not safe since we merge x into y's region making x task
   // isolated. We then try to send it to a main actor function.
   await useValueMainActor(x) // expected-error {{sending 'x' risks causing data races}}
-  // expected-note @-1 {{sending task-isolated 'x' to main actor-isolated global function 'useValueMainActor' risks causing data races between main actor-isolated and task-isolated uses}}
+  // expected-note @-1 {{sending 'x' to main actor-isolated global function 'useValueMainActor' risks causing data races between main actor-isolated code and code in the current isolation context}}
 }
 
 actor MyActor {

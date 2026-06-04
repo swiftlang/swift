@@ -1973,8 +1973,9 @@ ERROR(unsupported_conditional_compilation_integer,none,
       (StringRef, StringRef))
 ERROR(version_component_not_number,none,
       "version component contains non-numeric characters", ())
-ERROR(compiler_version_too_many_components,none,
-      "compiler version must not have more than five components", ())
+WARNING(compiler_version_too_many_components,none,
+      "trailing components of version '%0' are ignored",
+      (StringRef))
 GROUPED_WARNING(unused_compiler_version_component,NoUsage,NoUsage,
       "the second version component is not used for comparison in legacy "
       "compiler versions%select{|; are you trying to encode a new Swift "
@@ -2129,9 +2130,9 @@ ERROR(extra_tokens_after_expression,PointsToFirstBadToken,
       "extra tokens after expression in macro expansion", ())
 
 ERROR(parser_round_trip_error,none,
-      "source file did not round-trip through the new Swift parser", ())
+      "source file did not round-trip through SwiftSyntax", ())
 ERROR(parser_new_parser_errors,none,
-      "new Swift parser generated errors for code that C++ parser accepted",
+      "SwiftSyntax generated errors for code that C++ parser accepted",
        ())
 
 // MARK: Reference Binding Diagnostics

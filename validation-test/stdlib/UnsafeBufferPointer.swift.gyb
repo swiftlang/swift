@@ -119,6 +119,81 @@ ${SelfName}TestSuite.test("rebasing") {
 %   end # Mutable
 }
 
+${SelfName}TestSuite.test("_checkBounds(_: Range) helper")
+.require(.minimumStdlib(.stdlib_6_4))
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+%   if IsRaw:
+  let allocated = UnsafeMutableRawBufferPointer.allocate(byteCount: 20, alignment: 8)
+  let buffer = ${SelfType}(allocated)
+%   else:
+  let allocated = UnsafeMutableBufferPointer<Float>.allocate(capacity: 20)
+%     if IsMutable:
+  let buffer = allocated
+%     else:
+  let buffer = ${SelfType}(allocated)
+%     end
+%   end
+  defer { allocated.deallocate() }
+
+  expectFalse(buffer._checkBounds(-15 ..< -5))
+  expectFalse(buffer._checkBounds( -5 ..< 5))
+  expectTrue( buffer._checkBounds(  5 ..< 15))
+  expectFalse(buffer._checkBounds( 15 ..< 25))
+  expectFalse(buffer._checkBounds( 25 ..< 35))
+}
+
+% if not IsMutable:
+${SelfName}TestSuite.test("rebasingInvalidNonMutableSlice")
+.require(.crashTesting)
+.code {
+  let rawBuffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 32, alignment: 8
+  )
+  defer { rawBuffer.deallocate() }
+
+  rawBuffer.copyBytes(from: UInt8.zero ..< 32)
+
+%   if IsRaw:
+  let baseBuffer = ${SelfType}(rawBuffer)
+%   else:
+  let rebound = rawBuffer.bindMemory(to: Float.self)
+  let baseBuffer = ${SelfType}(rebound)
+%   end
+
+  let invalidSlice = Slice(base: baseBuffer, bounds: -5 ..< 5)
+
+  expectCrashLater()
+  _ = ${SelfType}(rebasing: invalidSlice)
+}
+
+% end
+${SelfName}TestSuite.test("rebasingInvalidMutableSlice")
+.require(.minimumStdlib(.stdlib_6_4))
+.require(.crashTesting)
+.code {
+  guard #available(SwiftStdlib 6.4, *) else { return }
+
+  let rawBuffer = UnsafeMutableRawBufferPointer.allocate(
+    byteCount: 32, alignment: 8
+  )
+  defer { rawBuffer.deallocate() }
+
+  rawBuffer.copyBytes(from: UInt8.zero ..< 32)
+
+%   if IsRaw:
+  let baseBuffer = rawBuffer
+%   else:
+  let baseBuffer = rawBuffer.bindMemory(to: Float.self)
+%   end
+
+  let invalidSlice = Slice(base: baseBuffer, bounds: -5 ..< 5)
+
+  expectCrashLater()
+  _ = ${SelfType}(rebasing: invalidSlice)
+}
+
 // Allocate two buffers. Initialize one and copy it into the other. Pass those
 // to the specified generic collection test function `checkBuffers`.
 func checkWithExpectedBuffer(checkBuffers: (${SelfType}, ${SelfType}) -> Void) {
@@ -1230,7 +1305,7 @@ UnsafeMutableBufferPointerTestSuite.test("UMBP.moveInitialize.overflow")
 .code {
   let s = UnsafeMutableBufferPointer<Int>.allocate(capacity: 8)
   defer { s.deallocate() }
-  s.initialize(fromContentsOf: 0..<s.count)
+  _ = s.initialize(fromContentsOf: 0..<s.count)
 
   let b = UnsafeMutableBufferPointer<Int>.allocate(capacity: s.count-1)
   defer { b.deallocate() }
@@ -1246,7 +1321,7 @@ UnsafeMutableBufferPointerTestSuite.test("UMBP.moveUpdate.overflow")
 .code {
   let s = UnsafeMutableBufferPointer<Int>.allocate(capacity: 8)
   defer { s.deallocate() }
-  s.initialize(fromContentsOf: 0..<s.count)
+  _ = s.initialize(fromContentsOf: 0..<s.count)
 
   var b = Array(repeating: 0, count: s.count-1)
   b.withUnsafeMutableBufferPointer { b in
@@ -1283,7 +1358,7 @@ UnsafeMutableRawBufferPointerTestSuite.test("UMRBP.moveInitializeMemory.overflow
 .code {
   let s = UnsafeMutableBufferPointer<Int>.allocate(capacity: 8)
   defer { s.deallocate() }
-  s.initialize(fromContentsOf: 0..<s.count)
+  _ = s.initialize(fromContentsOf: 0..<s.count)
 
   let b = UnsafeMutableRawBufferPointer.allocate(
     byteCount: MemoryLayout<Int>.stride * (s.count-1),

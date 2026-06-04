@@ -1929,6 +1929,10 @@ BridgedCanType BridgedInstruction::TypeValueInst_getParamType() const {
   return getAs<swift::TypeValueInst>()->getParamType();
 }
 
+BridgedCanType BridgedInstruction::AllocPackInst_getPackType() const {
+  return getAs<swift::AllocPackInst>()->getPackType();
+}
+
 BridgedCanType BridgedInstruction::PackLengthInst_getPackType() const {
   return getAs<swift::PackLengthInst>()->getPackType();
 }
@@ -3080,6 +3084,10 @@ BridgedInstruction BridgedBuilder::createMakeAddrBorrow(BridgedValue referent) c
 
 BridgedInstruction BridgedBuilder::createFixLifetime(BridgedValue operand) const {
   return {unbridged().createFixLifetime(regularLoc(), operand.getSILValue())};
+}
+
+BridgedInstruction BridgedBuilder::createDropDeinit(BridgedValue operand) const {
+  return {unbridged().createDropDeinit(regularLoc(), operand.getSILValue())};
 }
 
 //===----------------------------------------------------------------------===//

@@ -417,8 +417,8 @@ Added: _swift_task_isCancelledWithFlags
 Added: _$sSct5_taskBovg
 Added: _$sSct5_taskBovpMV
 
-// Swift.UnsafeCurrentTask.init(Builtin.NativeObject) -> Swift.UnsafeCurrentTask
-Added: _$sSctySctBocfC
+// Swift.UnsafeCurrentTask.init(_AsyncTask) -> Swift.UnsafeCurrentTask
+Added: _$sSctyScts10_AsyncTaskVcfC
 // Swift.withUnsafeCurrentTaskNonsending<A>(body: nonisolated(nonsending) (Swift.UnsafeCurrentTask?) async throws -> A) async throws -> A
 Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlF
 Added: _$ss31withUnsafeCurrentTaskNonsending4bodyxxSctSgYaKYCXE_tYaKlFTu
@@ -443,3 +443,19 @@ Added: _$ss12ContinuationVMn
 Added: _$ss12ContinuationVsRi_zrlE7contextBcvg
 Added: _$ss12ContinuationVsRi_zrlEfD
 Added: _$ss12ContinuationVsRi_zrlEyAByxq_GBccfC
+
+// _AsyncTask: opaque pointer wrapper for AsyncTask*. Single decl for each
+// runtime fn parameter (replaces the previous Builtin.NativeObject /
+// UnsafeRawPointer? Raw-overload pairs which collided at the SIL level).
+Added: _$ss10_AsyncTaskV9_rawValueBpvg
+Added: _$ss10_AsyncTaskV9_rawValueBpvpMV
+Added: _$ss10_AsyncTaskVMa
+Added: _$ss10_AsyncTaskVMn
+Added: _$ss10_AsyncTaskVN
+Added: _$ss10_AsyncTaskVyABBocfC
+Added: _$ss10_AsyncTaskVyABBpcfC
+
+// UnsafeCurrentTask now stores the task as a non-owning `_AsyncTask`
+// (raw pointer wrapper) under the new `_rawTask` field.
+Added: _$sSct8_rawTasks06_AsyncB0Vvg
+Added: _$sSct8_rawTasks06_AsyncB0VvpMV

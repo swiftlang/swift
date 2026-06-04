@@ -375,7 +375,7 @@ private extension AllocStackInst {
           iea.replace(with: newAlloc, context)
         }
       case let oea as OpenExistentialAddrInst:
-        assert(oea.uses.ignore(usersOfType: DestroyAddrInst.self).isEmpty)
+        assert(oea.uses.hasOnlyUsers(ofType: DestroyAddrInst.self))
         oea.replace(with: newAlloc, context)
       case let cab as CheckedCastAddrBranchInst:
         let builder = Builder(before: cab, context)
@@ -426,7 +426,7 @@ private extension AllocStackInst {
            is DebugValueInst:
         break
       case let oea as OpenExistentialAddrInst:
-        if !oea.uses.ignore(usersOfType: DestroyAddrInst.self).isEmpty {
+        guard oea.uses.hasOnlyUsers(ofType: DestroyAddrInst.self) else {
           return nil
         }
       case let iea as InitExistentialAddrInst:

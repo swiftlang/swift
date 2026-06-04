@@ -225,9 +225,9 @@ extension Task {
     // This is @available(SwiftStdlib 6.4, *) but can't use SwiftStdlib in transparent function
     if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
       let ignoreTaskCancellationShield: UInt64 = 0x1
-      return _taskIsCancelledWithFlags(_task, flags: ignoreTaskCancellationShield)
+      return unsafe _taskIsCancelledWithFlags(_AsyncTask(_task), flags: ignoreTaskCancellationShield)
     } else {
-      return _taskIsCancelled(_task)
+      return unsafe _taskIsCancelled(_AsyncTask(_task))
     }
   }
 }
