@@ -2809,7 +2809,7 @@ namespace {
 
       auto infersIsolationFromContext =
           [](const DeclContext *dc) -> bool {
-            // Isolation for declarations is based solely on explicit
+            // Isolation for declarations is based solely on explicit 
             // annotations; only infer isolation for initializer expressions
             // and closures.
             if (dc->getAsDecl())
@@ -5076,7 +5076,7 @@ bool ActorIsolationChecker::mayExecuteConcurrentlyWith(
 
     bool regionIsolationEnabled =
         ctx.LangOpts.hasFeature(Feature::RegionBasedIsolation);
-
+    
     // Globally-isolated closures may never be executed concurrently.
     if (ctx.LangOpts.hasFeature(Feature::GlobalActorIsolatedTypesUsability) &&
         regionIsolationEnabled && useIsolation.isGlobalActor())
@@ -7125,7 +7125,7 @@ void swift::checkOverrideActorIsolation(ValueDecl *value) {
 
   // Determine the actor isolation of the overriding function.
   auto isolation = getActorIsolation(value);
-
+  
   // Determine the actor isolation of the overridden function.
   auto overriddenIsolation = getOverriddenIsolationFor(value);
   switch (validOverrideIsolation(
