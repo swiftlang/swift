@@ -1122,7 +1122,7 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
   ASSERT(expansion);
 
   // Find the expanded `ValueDecl *` and return it. There should only ever be a
-  // single oneks
+  // single one.
   ValueDecl *witness = nullptr;
   expansion->forEachExpandedNode([&](ASTNode node) {
     auto *vDecl = handleASTNodeForDerivation(C, derived, node);
