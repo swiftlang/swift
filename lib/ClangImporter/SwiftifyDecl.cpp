@@ -34,11 +34,13 @@
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclObjC.h"
 #include "clang/AST/DeclTemplate.h"
+#include "clang/AST/DeclarationName.h"
 #include "clang/AST/Expr.h"
 #include "clang/AST/RecursiveASTVisitor.h"
 #include "clang/AST/StmtVisitor.h"
 #include "clang/AST/Type.h"
 #include "clang/Basic/Module.h"
+#include "clang/Sema/Overload.h"
 #include <optional>
 
 using namespace swift;
@@ -105,6 +107,12 @@ struct SwiftCountExprEmitter
   llvm::StringRef str() const { return result; }
 
   bool VisitDeclRefExpr(const clang::DeclRefExpr *e) {
+    const clang::DeclarationName name = e->getDecl()->getDeclName();
+    if (name.getNameKind() != clang::DeclarationName::Identifier ||
+        name.isEmpty()) {
+      DLOG("Unsupported decl name in count expr\n");
+      return false;
+    }
     out << e->getDecl()->getName();
     return true;
   }
