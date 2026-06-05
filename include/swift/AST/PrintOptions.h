@@ -826,8 +826,6 @@ public:
   void initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
                                           OverrideScope &scope) const;
 
-  void clearSynthesizedExtension();
-
   bool shouldPrint(const Decl* D) const {
     return CurrentPrintabilityChecker->shouldPrint(D, *this);
   }
