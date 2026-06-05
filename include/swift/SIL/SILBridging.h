@@ -997,6 +997,14 @@ struct BridgedInstruction {
   BRIDGED_INLINE bool DebugValue_hasVarInfo() const;
   BRIDGED_INLINE BridgedSILDebugVariable DebugValue_getVarInfo() const;
 
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedBasicBlock
+  DebugValue_getDebugReconstructionBlock() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock
+  DebugValue_getOrCreateDebugReconstructionBlock() const;
+  BRIDGED_INLINE void DebugValue_stripDeref() const;
+  BRIDGED_INLINE void DebugValue_prependDeref() const;
+  BRIDGED_INLINE void DebugValue_killOperand(BridgedType operandType) const;
+
   BRIDGED_INLINE bool AllocStack_hasVarInfo() const;
   BRIDGED_INLINE BridgedSILDebugVariable AllocStack_getVarInfo() const;
 
@@ -1067,6 +1075,7 @@ struct BridgedBasicBlock {
   BRIDGED_INLINE void moveAllInstructionsToBegin(BridgedBasicBlock dest) const;
   BRIDGED_INLINE void moveAllInstructionsToEnd(BridgedBasicBlock dest) const;
   BRIDGED_INLINE void moveArgumentsTo(BridgedBasicBlock dest) const;
+  BRIDGED_INLINE bool isDebugReconstructionBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedSuccessor getFirstPred() const;
 };
 

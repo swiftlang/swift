@@ -479,8 +479,8 @@ DebugValueInst *DebugValueInst::create(SILDebugLocation DebugLoc,
 }
 
 void DebugValueInst::prependDeref() {
-  ASSERT(!hasDeref() && "Debug value cannot have two derefs!");
   if (!ReconstructionBlock) {
+    ASSERT(!hasDeref() && "Debug value cannot have two derefs!");
     sharedUInt8().DebugValueInst.prependDeref = true;
     return;
   }
@@ -489,9 +489,14 @@ void DebugValueInst::prependDeref() {
   if (isa<SILUndef>(getOperand()))
     return;
 
+  // If the type is address-only (not loadable or opaque), we cannot insert
+  // a load into the reconstruction block. Kill the operand instead.
+  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
+  if (!oldArg->getType().isLoadableOrOpaque(*getFunction()))
+    return killOperand();
+
   // If we have a reconstruction block, add a load at the beginning.
   SILBuilder builder(ReconstructionBlock->begin());
-  SILArgument *oldArg = ReconstructionBlock->getArgument(0);
   SILType addrType = oldArg->getType().getAddressType();
   SILValue undefAddress = SILUndef::get(getFunction(), addrType);
   LoadInst *load = builder.createLoad(getLoc(), undefAddress,
@@ -506,6 +511,8 @@ void DebugValueInst::stripDeref() {
   // If we have an undef, nothing to do.
   if (isa<SILUndef>(getOperand()))
     return;
+  ASSERT(getOperand()->getType().isLoadableOrOpaque(*getFunction()) &&
+         "cannot strip deref for address-only types");
   if (!ReconstructionBlock) {
     ASSERT(hasDeref() && "Cannot strip deref without one!");
     sharedUInt8().DebugValueInst.prependDeref = false;
@@ -551,22 +558,30 @@ SILBasicBlock *DebugValueInst::getOrCreateDebugReconstructionBlock() {
   SILBuilder builder(block);
 
   SILValue operand = getOperand();
+  bool addressOnly = !operand->getType().isLoadableOrOpaque(*getFunction());
   SILValue retVal;
   if (isa<SILUndef>(operand)) {
     // No arguments, return the same undef directly.
     retVal = operand;
+    // Clear the op_deref, unless we have an address-only type.
+    if (!addressOnly)
+      sharedUInt8().DebugValueInst.prependDeref = false;
   } else if (hasDeref()) {
-    // Convert the deref to a load.
     SILArgument *arg = block->createPhiArgument(
         operand->getType().getAddressType(), OwnershipKind::None);
-    retVal = builder.createLoad(getLoc(), arg,
-                                LoadOwnershipQualifier::Unqualified);
+    if (addressOnly) {
+      // Address-only: keep op_deref, cannot load.
+      retVal = arg;
+    } else {
+      // Convert the deref to a load.
+      retVal = builder.createLoad(getLoc(), arg,
+                                  LoadOwnershipQualifier::Unqualified);
+      sharedUInt8().DebugValueInst.prependDeref = false;
+    }
   } else {
     // Add a block argument matching the operand type.
     retVal = block->createPhiArgument(operand->getType(), OwnershipKind::None);
   }
-  // If the prependDeref flag was set, reset it, including in the undef case.
-  sharedUInt8().DebugValueInst.prependDeref = false;
 
   builder.createReturn(getLoc(), retVal);
   ReconstructionBlock = block;
@@ -582,20 +597,26 @@ void DebugValueInst::cloneReconstructionBlockFrom(DebugValueInst *src) {
   DebugBasicBlockCloner(*getFunction()).clone(srcBB, newBB);
 }
 
-void DebugValueInst::killOperand() {
+void DebugValueInst::killOperand(SILType operandType) {
   if (isa<SILUndef>(getOperand())) {
     // Already undef: no operand to kill.
     return;
   }
 
-  // Use the object type because we may be stripping the deref.
+  SILType origType = operandType ? operandType : getOperand()->getType();
+  bool addressOnly = !origType.isLoadableOrOpaque(*getFunction());
+
+  // For address-only types, keep the address type and prependDeref flag.
+  // For loadable types, use the object type and strip prependDeref.
   SILValue undef =
-      SILUndef::get(getFunction(), getOperand()->getType().getObjectType());
+      SILUndef::get(getFunction(), addressOnly ? origType.getAddressType()
+                                               : origType.getObjectType());
   setOperand(undef);
 
-  // Strip prependDeref.
+  // Strip prependDeref (unless address-only).
   // The stored DIExpr only contains fragments, which we want to keep.
-  sharedUInt8().DebugValueInst.prependDeref = false;
+  if (!addressOnly)
+    sharedUInt8().DebugValueInst.prependDeref = false;
 
   // Rather than completely removing the debug reconstruction block, remove its
   // argument, as a part of the variable might be constant and recoverable.
@@ -645,11 +666,12 @@ bool DebugValueInst::isExprTypeValid() const {
       if (debugBB->getArgument(0)->getType() != valueType)
         return false;
     }
-    // Cannot have both an op_deref and a debug reconstruction block.
-    if (hasDeref())
-      return false;
     auto *terminator = cast<ReturnInst>(debugBB->getTerminator());
     valueType = terminator->getOperand()->getType();
+    // Cannot have both an op_deref and a debug reconstruction block, unless
+    // the type is genuinely address-only (not loadable or opaque).
+    if (hasDeref() && valueType.isLoadableOrOpaque(*getFunction()))
+      return false;
   }
 
   // Fragments are in the opposite direction, process from right to left.
