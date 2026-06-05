@@ -2559,18 +2559,21 @@ namespace {
 
           // If this is an inherited foreign reference type, check if it has a
           // suitable superclass.
-          auto frtInfo = evaluateOrDefault(
-              Impl.SwiftContext.evaluator,
-              ForeignReferenceTypeInfoRequest({cxxRecordDecl}), {});
-          if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
-            if (auto baseDecl = cast_or_null<ClassDecl>(
-                    Impl.importDecl(primaryBase, getVersion()))) {
-              auto classResult = cast<ClassDecl>(result);
-              Type superclassType = baseDecl->getDeclaredInterfaceType();
-              classResult->setSuperclass(superclassType);
-              classResult->setInherited(
-                  Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
-                      TypeLoc::withoutLoc(superclassType)}));
+          if (Impl.SwiftContext.LangOpts.hasFeature(
+                  Feature::ForeignReferenceTypeInheritance)) {
+            auto frtInfo = evaluateOrDefault(
+                Impl.SwiftContext.evaluator,
+                ForeignReferenceTypeInfoRequest({cxxRecordDecl}), {});
+            if (auto primaryBase = frtInfo.getPrimarySuperclass()) {
+              if (auto baseDecl = cast_or_null<ClassDecl>(
+                      Impl.importDecl(primaryBase, getVersion()))) {
+                auto classResult = cast<ClassDecl>(result);
+                Type superclassType = baseDecl->getDeclaredInterfaceType();
+                classResult->setSuperclass(superclassType);
+                classResult->setInherited(
+                    Impl.SwiftContext.AllocateCopy(ArrayRef<InheritedEntry>{
+                        TypeLoc::withoutLoc(superclassType)}));
+              }
             }
           }
         }
@@ -10927,10 +10930,14 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
   const clang::CXXRecordDecl *cxxRecord;
   if ((cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) &&
       cxxRecord->isCompleteDefinition()) {
-    auto derivedInfo =
-        evaluateOrDefault(Impl.SwiftContext.evaluator,
-                          ForeignReferenceTypeInfoRequest({cxxRecord}), {});
-    auto superclassClangDecl = derivedInfo.getPrimarySuperclass();
+    const clang::RecordDecl *superclassClangDecl = nullptr;
+    if (Impl.SwiftContext.LangOpts.hasFeature(
+            Feature::ForeignReferenceTypeInheritance)) {
+      auto derivedInfo =
+          evaluateOrDefault(Impl.SwiftContext.evaluator,
+                            ForeignReferenceTypeInfoRequest({cxxRecord}), {});
+      superclassClangDecl = derivedInfo.getPrimarySuperclass();
+    }
 
     for (auto base : cxxRecord->bases()) {
       if (skipIfNonPublic && base.getAccessSpecifier() != clang::AS_public)
