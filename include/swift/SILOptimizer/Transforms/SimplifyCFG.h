@@ -111,7 +111,6 @@ public:
   bool simplifySwitchValueBlock(SwitchValueInst *SVI);
   bool simplifyTermWithIdenticalDestBlocks(SILBasicBlock *BB);
   bool simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI);
-  bool simplifySwitchEnumBlock(SwitchEnumInst *SEI);
   bool simplifyUnreachableBlock(UnreachableInst *UI);
   bool simplifyProgramTerminationBlock(SILBasicBlock *BB);
   bool simplifyArgument(SILBasicBlock *BB, unsigned i);

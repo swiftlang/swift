@@ -2146,86 +2146,6 @@ static FunctionTest SimplifyCFGSwitchEnumOnObjcClassOptional(
     });
 } // end namespace swift::test
 
-/// simplifySwitchEnumBlock - Simplify a basic block that ends with a
-/// switch_enum instruction that gets its operand from an enum
-/// instruction.
-bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
-  auto EnumCase = getEnumCase(SEI->getOperand(), SEI->getParent());
-  if (!EnumCase)
-    return false;
-
-  auto *LiveBlock = SEI->getCaseDestination(EnumCase.get());
-  auto *ThisBB = SEI->getParent();
-
-  bool DroppedLiveBlock = false;
-  // Copy the successors into a vector, dropping one entry for the liveblock.
-  SmallVector<SILBasicBlock*, 4> Dests;
-  for (auto &S : SEI->getSuccessors()) {
-    if (S == LiveBlock && !DroppedLiveBlock) {
-      DroppedLiveBlock = true;
-      continue;
-    }
-    Dests.push_back(S);
-  }
-
-  LLVM_DEBUG(llvm::dbgs() << "fold switch " << *SEI);
-
-  auto *EI = dyn_cast<EnumInst>(SEI->getOperand());
-  auto loc = SEI->getLoc();
-  SILBuilderWithScope Builder(SEI);
-  if (!LiveBlock->args_empty()) {
-    SILValue PayLoad;
-    if (SEI->hasDefault() && LiveBlock == SEI->getDefaultBB()) {
-      assert(Fn.hasOwnership() && "Only OSSA default case has an argument");
-      PayLoad = SEI->getOperand();
-    } else {
-      PayLoad = Builder.createUncheckedEnumData(loc, SEI->getOperand(),
-                                                EnumCase.get());
-    }
-    Builder.createBranch(loc, LiveBlock, PayLoad);
-    SEI->eraseFromParent();
-    updateGuaranteedPhis(PM, { cast<SILPhiArgument>(LiveBlock->getArgument(0)) });
-  } else {
-    if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
-      Builder.createDestroyValue(loc, SEI->getOperand());
-    }
-    Builder.createBranch(loc, LiveBlock);
-    SEI->eraseFromParent();
-  }
-
-  if (EI && isInstructionTriviallyDead(EI)) {
-    EI->replaceAllUsesOfAllResultsWithUndef();
-    EI->eraseFromParent();
-  }
-
-  addToWorklist(ThisBB);
-
-  for (auto B : Dests)
-    simplifyAfterDroppingPredecessor(B);
-  addToWorklist(LiveBlock);
-  ++NumConstantFolded;
-  return true;
-}
-
-namespace swift::test {
-/// Arguments:
-/// - SwitchEnumInst - the instruction to to simplify
-/// Dumps:
-/// - nothing
-static FunctionTest SimplifyCFGSimplifySwitchEnumBlock(
-    "simplify_cfg_simplify_switch_enum_block",
-    [](auto &function, auto &arguments, auto &test) {
-      auto *passToRun = cast<SILFunctionTransform>(createSimplifyCFG());
-      passToRun->injectPassManager(test.getPassManager());
-      passToRun->injectFunction(&function);
-      SimplifyCFG(function, *passToRun, /*VerifyAll=*/false,
-                  /*EnableJumpThread=*/false)
-          .simplifySwitchEnumBlock(
-              cast<SwitchEnumInst>(arguments.takeInstruction()));
-      removeUnreachableBlocks(function);
-    });
-} // end namespace swift::test
-
 /// simplifySwitchValueBlock - Simplify a basic block that ends with a
 /// switch_value instruction that gets its operand from an integer
 /// literal instruction.
@@ -2807,9 +2727,7 @@ bool SimplifyCFG::simplifyBlocks() {
       break;
     case TermKind::SwitchEnumInst: {
       auto *SEI = cast<SwitchEnumInst>(TI);
-      if (simplifySwitchEnumBlock(SEI)) {
-        Changed = true;
-      } else if (simplifySwitchEnumOnObjcClassOptional(SEI)) {
+      if (simplifySwitchEnumOnObjcClassOptional(SEI)) {
         Changed = true;
       } else {
         Changed |= simplifySwitchEnumUnreachableBlocks(SEI);
