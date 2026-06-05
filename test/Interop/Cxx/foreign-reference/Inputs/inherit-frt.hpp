@@ -39,14 +39,15 @@ _Pragma("clang diagnostic ignored \"-Wnullability-extension\"");
   }                                                                            \
   struct Name
 
-#define _SHARED(Name, RetainRelease)                                           \
+#define _SHARED(Name, Retain, Release, MoreStructMembers)                      \
   {                                                                            \
     int refcount = 1;                                                          \
     _STRUCT_PAYLOAD;                                                           \
+    MoreStructMembers                                                          \
   }                                                                            \
   __attribute__((swift_attr("import_reference")))                              \
-  __attribute__((swift_attr("retain:retain" #RetainRelease)))                  \
-  __attribute__((swift_attr("release:release" #RetainRelease)));               \
+  __attribute__((swift_attr("retain:" #Retain)))                               \
+  __attribute__((swift_attr("release:" #Release)));                            \
   __attribute__((swift_attr("returns_retained"))) inline Name *make##Name() {  \
     return new Name{};                                                         \
   }                                                                            \
@@ -59,7 +60,7 @@ _Pragma("clang diagnostic ignored \"-Wnullability-extension\"");
 /// class release function, typically done using CRTP or by embedding memory
 /// layout info into the base class.
 #define SHARED(Name)                                                           \
-  _SHARED(Name, Name);                                                         \
+  _SHARED(Name, retain##Name, release##Name, );                                \
   inline void retain##Name(Name *t) { ++t->refcount; }                         \
   inline void release##Name(Name *t) {                                         \
     if (--t->refcount <= 0)                                                    \
@@ -69,7 +70,8 @@ _Pragma("clang diagnostic ignored \"-Wnullability-extension\"");
 
 /// Struct with shared reference annotations, reusing a base's retain/release
 /// functions
-#define SHARED_USING_BASE(Name, Base) _SHARED(Name, Base)
+#define SHARED_USING_BASE(Name, Base)                                          \
+  _SHARED(Name, retain##Base, release##Base, )
 
 // MARK: Simple: simple record types without inheritance
 
