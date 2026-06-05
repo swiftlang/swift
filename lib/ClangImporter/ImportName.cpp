@@ -959,9 +959,11 @@ NameImporter::determineEffectiveContext(const clang::NamedDecl *decl,
       LLVM_FALLTHROUGH;
     case EnumKind::Constants:
     case EnumKind::Unknown:
-      // The enum constant goes into the redeclaration context of the
-      // enum.
-      res = enumDecl->getRedeclContext();
+      // The enum constant goes into the parent context of the enum,
+      // skipping past the (transparent) unscoped enum itself but stopping at
+      // any enclosing record. This makes record-nested enumerators behave as
+      // members in both C and C++ rather than getting promoted to file scope.
+      res = enumDecl->getNonTransparentDeclContext();
       break;
     }
     // Import onto a swift_newtype if present

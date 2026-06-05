@@ -833,6 +833,24 @@ bool declIsCxxOnly(const Decl *decl);
 /// Is this DeclContext an `enum` that represents a C++ namespace?
 bool isClangNamespace(const DeclContext *dc);
 
+/// Enumerate and import all members of the C++ namespace represented by
+/// \p namespaceEnum, invoking \p emit once for each newly imported member.
+///
+/// This is an expensive operation.
+///
+/// \param namespaceEnum  An imported \c EnumDecl whose Clang decl is
+///                       a \c clang::NamespaceDecl.
+/// \param emit           Callback invoked once per unique imported member.
+/// \param includeSpecializations   If true, also emit imported class template
+///                                 specializations declared in the namespace.
+/// \param includeOtherModules      If true, include namespace redeclarations
+///                                 from Clang modules other than where the
+///                                 underlying namespace is from.
+void forEachCXXNamespaceMember(EnumDecl *namespaceEnum,
+                               llvm::function_ref<void(ValueDecl *)> emit,
+                               bool includeSpecializations,
+                               bool includeOtherModules);
+
 /// For some \a templatedClass that inherits from \a base, whether they are
 /// derived from the same class template.
 ///

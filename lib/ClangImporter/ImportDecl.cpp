@@ -3612,6 +3612,53 @@ namespace {
         if (correctSwiftName)
           markAsVariant(result, *correctSwiftName);
 
+        // In C, enumerators of an unscoped enum nested in a record were
+        // historically promoted to file scope (to mirror C's lookup rules).
+        // We now place the primary import as a record member (matching C++),
+        // but to keep existing C interop sources building we also synthesize a
+        // (deprecated) top-level alias forwarding to the qualified form.
+        if (!Impl.SwiftContext.LangOpts.EnableCXXInterop &&
+            isa<clang::RecordDecl>(clangEnum->getDeclContext()) &&
+            !clangEnum->isScoped() && dc->isTypeContext()) {
+          auto *TU = Impl.importDeclContextOf(
+              decl,
+              EffectiveClangContext(clangContext.getTranslationUnitDecl()));
+          if (TU && TU != dc) {
+            auto alias = synthesizer.createConstant(
+                name, TU, type, clang::APValue(decl->getInitVal()),
+                enumKind == EnumKind::Unknown
+                    ? ConstantConvertKind::Construction
+                    : ConstantConvertKind::None,
+                /*isStatic=*/false, decl, AccessLevel::Public);
+            if (alias) {
+              if (auto *parentNominal = dc->getSelfNominalTypeDecl();
+                  parentNominal && parentNominal->hasName() &&
+                  !parentNominal->getName().str().starts_with("__Unnamed_")) {
+                // Only add deprecation notice on named parents (but not those
+                // with empty names that we've given a fake __Unnamed name)
+                StringRef msg =
+                    cast<clang::RecordDecl>(clangEnum->getDeclContext())
+                            ->isUnion()
+                        ? "nested C-style enums are imported as members of the "
+                          "enclosing union"
+                        : "nested C-style enums are imported as members of the "
+                          "enclosing struct";
+
+                llvm::SmallString<64> buf;
+                auto qualified = Impl.SwiftContext.AllocateCopy(
+                    (parentNominal->getName().str() + "." + name.str())
+                        .toStringRef(buf));
+
+                auto *attr = AvailableAttr::createUniversallyDeprecated(
+                    Impl.SwiftContext, msg, /*rename=*/qualified);
+                alias->getAttrs().add(attr);
+              }
+
+              Impl.addAlternateDecl(result, alias);
+            }
+          }
+        }
+
         return result;
       }
 
@@ -4653,7 +4700,7 @@ namespace {
       // and may affect the imported name (e.g., adding a "__*Unsafe" prefix).
       // We defer this instantiation to after importing the method so that we
       // don't eagerly instantiate templates for methods we may not even end up
-      // importing. The "__*Unsafe" lookup fallback in ClangDirectLookupRequest
+      // importing. The "__*Unsafe" lookup fallback in ClangRecordMemberLookup
       // will also find methods whose imported name changes due to safety after
       // instantiation.
       //
@@ -10806,10 +10853,24 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
     const bool isCanonicalInContext =
         (isa<clang::FieldDecl>(nd) || nd == nd->getCanonicalDecl());
     if (isCanonicalInContext && nd->getDeclContext() == clangRecord &&
-        Impl.isVisibleClangEntry(nd))
-      // We don't pass `swiftDecl` as `expectedDC` because we might be in a
-      // recursive call that adds base class members to a derived class.
-      Impl.insertMembersAndAlternates(nd, members);
+        Impl.isVisibleClangEntry(nd)) {
+      // Filter for direct members of swiftDecl, so that decls imported as
+      // members of an *extension* of swiftDecl are not force-added to swiftDecl
+      // itself. No filtering is needed for inherited members since those are
+      // cloned as direct members of swiftDecl.
+      auto *expectedDC =
+          inheritance ? nullptr : static_cast<DeclContext *>(swiftDecl);
+      Impl.insertMembersAndAlternates(nd, members, expectedDC);
+
+      // Unscoped enums have their enumerators present in the parent namespace,
+      // so load those too.
+      if (auto *ED = dyn_cast<clang::EnumDecl>(nd);
+          ED && !ED->isScoped()) {
+        for (auto *ECD : ED->enumerators()) {
+          Impl.insertMembersAndAlternates(ECD, members, expectedDC);
+        }
+      }
+    }
   }
 
   // Add the members here.
@@ -10856,10 +10917,10 @@ void ClangRecordMemberLoader::load(const clang::RecordDecl *clangRecord,
 
     // FIXME: constructors are added eagerly, but shouldn't be
     // FIXME: subscripts are added eagerly, but shouldn't be
-    if (!isa<AccessorDecl>(member) && !isa<SubscriptDecl>(member) &&
-        !isa<ConstructorDecl>(member)) {
-      swiftDecl->addMember(member);
-    }
+    if (isa<AccessorDecl, SubscriptDecl, ConstructorDecl>(member))
+      continue;
+
+    swiftDecl->addMember(member);
   }
 
   // If this is a C++ record, look through the base classes too.
