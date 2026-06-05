@@ -230,7 +230,8 @@ class SchemeMockTestCase(unittest.TestCase):
             kwargs["cwd"] = self.source_root
         return call_quietly(*args, **kwargs)
 
-    def get_all_repos(self):
+    @property
+    def repo_names(self):
         return list(self.config["repos"].keys())
 
     def add_branch_scheme(self, name, scheme):

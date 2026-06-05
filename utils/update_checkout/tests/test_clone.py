@@ -39,7 +39,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             self.assertTrue(os.path.isdir(repo_path))
 
@@ -79,7 +79,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             output,
         )
 
-        repo = self.get_all_repos()[0]
+        repo = self.repo_names[0]
         repo_path = os.path.join(self.source_root, repo)
         shutil.rmtree(repo_path)
         output = self.call(
@@ -113,7 +113,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
             ]
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             output = subprocess.check_output(
                 ["git", "-C", repo_path, "config", "--get", "core.symlinks"], text=True
@@ -127,7 +127,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
     @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
     @patch("sys.exit", return_value=None)
     def test_clone_with_incorrect_git_config(self, mock_exit, mock_obtain):
-        repo = self.get_all_repos()[0]
+        repo = self.repo_names[0]
 
         def side_effect(*args, **kwargs):
             result = obtain_all_additional_swift_sources(*args, **kwargs)
@@ -161,7 +161,7 @@ class CloneTestCase(scheme_mock.SchemeMockTestCase):
     @patch("update_checkout.update_checkout.obtain_all_additional_swift_sources")
     @patch("sys.exit", return_value=None)
     def test_clone_with_missing_git_config_entry(self, mock_exit, mock_obtain):
-        repo = self.get_all_repos()[0]
+        repo = self.repo_names[0]
 
         def side_effect(*args, **kwargs):
             result = obtain_all_additional_swift_sources(*args, **kwargs)
@@ -305,7 +305,7 @@ class SchemeWithHashTestCase(scheme_mock.SchemeMockTestCase):
             ] + additional_flags
         )
 
-        for repo in self.get_all_repos():
+        for repo in self.repo_names:
             repo_path = os.path.join(self.source_root, repo)
             self.assertTrue(os.path.isdir(repo_path))
 
@@ -327,7 +327,7 @@ class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
             self.source_root,
         ]
 
-        repos = self.get_all_repos()
+        repos = self.repo_names
         repos.pop()
 
         self.scheme_name = "missing-repo"
@@ -342,7 +342,7 @@ class SchemeWithMissingRepoTestCase(scheme_mock.SchemeMockTestCase):
     def test_clone(self):
         self.call(self.base_args + ["--scheme", self.scheme_name, "--clone"])
 
-        missing_repo_path = os.path.join(self.source_root, self.get_all_repos().pop())
+        missing_repo_path = os.path.join(self.source_root, self.repo_names.pop())
         self.assertFalse(os.path.isdir(missing_repo_path))
 
     # Test that we do not update a repository that is not listed in the given
