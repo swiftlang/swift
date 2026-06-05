@@ -69,12 +69,13 @@ class ForeignReferenceTypeChecker {
       ASSERT(!base->isDependentContext() && "base should not be dependent");
 
       if (!declBase.isVirtual() || virtualBases.insert(base).second) {
-        bool baseIsFRT = false;
+        bool baseIsFRT;
         if (importer::hasImportReferenceAttr(base)) {
           FRTBases.push_back(base);
           baseIsFRT = true;
+        } else {
+          baseIsFRT = static_cast<bool>(visitBases(base));
         }
-        baseIsFRT |= static_cast<bool>(visitBases(base));
 
         if (baseIsFRT && !declBase.isVirtual() &&
             declBase.getAccessSpecifier() ==

@@ -114,10 +114,8 @@ struct SingleShared_NoAttr_Final final
 
 struct SingleShared_Shared_Shared
     : SingleShared_Shared SHARED(SingleShared_Shared_Shared);
-// BUG: should be allowed, we're just singly inheriting from a shared ref
-// expected-warning@+1 {{unable to infer SWIFT_SHARED_REFERENCE}}
 struct SingleShared_Shared_NoAttr
-    : SingleShared_Shared NO_ATTR(SingleShared_Shared_NoAttr);
+    : SingleShared_Shared NO_ATTR_SHARED(SingleShared_Shared_NoAttr);
 struct SingleShared_NoAttr_Shared
     : SingleShared_NoAttr SHARED(SingleShared_NoAttr_Shared);
 struct SingleShared_NoAttr_NoAttr
