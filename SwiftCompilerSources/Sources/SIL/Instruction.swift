@@ -650,6 +650,20 @@ final public class DebugValueInst : Instruction, UnaryInstruction, DebugVariable
   public var debugVariable: DebugVariable? {
     return bridged.DebugValue_hasVarInfo() ? bridged.DebugValue_getVarInfo() : nil
   }
+
+  public var debugReconstructionBlock: BasicBlock? {
+    bridged.DebugValue_getDebugReconstructionBlock().block
+  }
+
+  public func getOrCreateDebugReconstructionBlock() -> BasicBlock {
+    bridged.DebugValue_getOrCreateDebugReconstructionBlock().block
+  }
+
+  public func stripDeref() { bridged.DebugValue_stripDeref() }
+  public func prependDeref() { bridged.DebugValue_prependDeref() }
+  public func killOperand(withType type: Type? = nil) {
+    bridged.DebugValue_killOperand(type?.bridged ?? BridgedType())
+  }
 }
 
 final public class DebugStepInst : Instruction {}

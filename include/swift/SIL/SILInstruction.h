@@ -5749,8 +5749,10 @@ public:
     return DVI && DVI->hasAddrVal()? DVI : nullptr;
   }
 
-  /// Whether this debug value has a DIExpr with a deref. If this instruction
-  /// has a debug reconstruction block, this returns false.
+  /// Whether this debug value has a DIExpr with a deref.
+  /// For address-only types with a debug reconstruction block, the deref
+  /// applies after the BB's result. Otherwise, this is incompatible with
+  /// debug reconstruction blocks.
   bool hasDeref() const {
     return sharedUInt8().DebugValueInst.prependDeref;
   }
@@ -5765,6 +5767,7 @@ public:
   /// Removes a deref operator to this debug_value in place.
   /// This must be called when the operand is changed from an address type to
   /// an object type (when moved from the stack to a register, for example).
+  /// Asserts that the type is loadable (cannot strip deref for address-only).
   /// If a reconstruction block exists, a load is removed at the beginning. If
   /// there is no load at the beginning, the operand is killed, marking the
   /// variable as optimized away.
@@ -5810,7 +5813,9 @@ public:
   /// value is no longer valid and cannot be salvaged.
   /// This will replace the operand with an undef, and clear any DIExpr or debug
   /// reconstruction block.
-  void killOperand();
+  /// If \p varType is specified, the undef will use that type (in the
+  /// appropriate address/object form) instead of the current operand's type.
+  void killOperand(SILType operandType = SILType());
 
   /// True if all references within this debug value will be overwritten with a
   /// poison sentinel at this point in the program. This is used in debug builds
