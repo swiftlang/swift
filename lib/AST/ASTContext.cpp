@@ -2809,17 +2809,20 @@ bool ASTContext::canImportModuleImpl(
   if (FailedModuleImportNames.count(ModuleNameStr))
     return false;
 
-  auto missingVersion = [this, &loc, &ModuleName,
-                         &isUnderlyingVersion]() -> bool {
+  auto missingVersion = [this, &loc, &ModuleName, &isUnderlyingVersion,
+                         isSourceCanImport]() -> bool {
     // The module version could not be parsed from the preferred source for
-    // this query. Diagnose and return `true` to indicate that the unversioned
-    // module will satisfy the query.
-    auto mID = ModuleName[0];
-    auto diagLoc = mID.Loc;
-    if (mID.Loc.isInvalid())
-      diagLoc = loc;
-    Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
-                   isUnderlyingVersion);
+    // this query. Diagnose (only for source-level `#if canImport` queries) and
+    // return `true` to indicate that the unversioned module will satisfy the
+    // query.
+    if (isSourceCanImport) {
+      auto mID = ModuleName[0];
+      auto diagLoc = mID.Loc;
+      if (mID.Loc.isInvalid())
+        diagLoc = loc;
+      Diags.diagnose(diagLoc, diag::cannot_find_module_version, mID.Item.str(),
+                     isUnderlyingVersion);
+    }
     return true;
   };
 
