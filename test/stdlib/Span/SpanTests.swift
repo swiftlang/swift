@@ -363,7 +363,7 @@ suite.test("extracting() functions")
 suite.test("extracting() bounds checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Index range out of bounds")
+.crashOutputMatches("Index range out of bounds", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<Int> = [1, 2, 3, 4]
   let span = b.span
@@ -413,7 +413,7 @@ suite.test("prefix extracting() functions")
 suite.test("extracting(first:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't have a prefix of negative length")
+.crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<Int> = [1, 2, 3, 4]
   let span = b.span
@@ -424,7 +424,7 @@ suite.test("extracting(first:) bound checking")
 suite.test("extracting(droppingLast:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't drop a negative number of elements")
+.crashOutputMatches("Can't drop a negative number of elements", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<Int> = [1, 2, 3, 4]
   let span = b.span
@@ -461,7 +461,7 @@ suite.test("suffix extracting() functions")
 suite.test("extracting(last:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't have a suffix of negative length")
+.crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<Int> = [1, 2, 3, 4]
   let span = b.span
@@ -472,7 +472,7 @@ suite.test("extracting(last:) bound checking")
 suite.test("extracting(droppingFirst:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't drop a negative number of elements")
+.crashOutputMatches("Can't drop a negative number of elements", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<Int> = [1, 2, 3, 4]
   let span = b.span

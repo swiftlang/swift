@@ -399,7 +399,7 @@ suite.test("_mutatingExtracting()")
 suite.test("_mutatingExtracting() bounds checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Byte offset range out of bounds")
+.crashOutputMatches("Byte offset range out of bounds", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)
@@ -443,7 +443,7 @@ suite.test("_consumingExtracting()")
 suite.test("_consumingExtracting() bounds checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Byte offset range out of bounds")
+.crashOutputMatches("Byte offset range out of bounds", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)
@@ -526,7 +526,7 @@ suite.test("_mutatingExtracting prefixes")
 suite.test("_mutatingExtracting(first:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't have a prefix of negative length")
+.crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)
@@ -537,7 +537,7 @@ suite.test("_mutatingExtracting(first:) bound checking")
 suite.test("_mutatingExtracting(droppingLast:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't drop a negative number of bytes")
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)
@@ -593,7 +593,7 @@ suite.test("_consumingExtracting prefixes")
 suite.test("_consumingExtracting(first:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't have a prefix of negative length")
+.crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)
@@ -604,7 +604,7 @@ suite.test("_consumingExtracting(first:) bound checking")
 suite.test("_consumingExtracting(droppingLast:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't drop a negative number of bytes")
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)
@@ -656,7 +656,7 @@ suite.test("_mutatingExtracting suffixes")
 suite.test("_mutatingExtracting(last:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't have a suffix of negative length")
+.crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)
@@ -667,7 +667,7 @@ suite.test("_mutatingExtracting(last:) bound checking")
 suite.test("_mutatingExtracting(droppingFirst:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't drop a negative number of bytes")
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)
@@ -720,7 +720,7 @@ suite.test("_consumingExtracting suffixes")
 suite.test("_consumingExtracting(last:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't have a suffix of negative length")
+.crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)
@@ -731,7 +731,7 @@ suite.test("_consumingExtracting(last:) bound checking")
 suite.test("_consumingExtracting(droppingFirst:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't drop a negative number of bytes")
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   var b: ContiguousArray<Int> = [1, 2, 3, 4]
   var span = MutableRawSpan(elements: b.mutableSpan)

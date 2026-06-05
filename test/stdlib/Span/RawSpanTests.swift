@@ -182,7 +182,7 @@ suite.test("extracting() functions")
 suite.test("extracting() bounds checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Byte offset range out of bounds")
+.crashOutputMatches("Byte offset range out of bounds", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
   let bytes = b.span.bytes
@@ -245,7 +245,7 @@ suite.test("prefix extracting() functions")
 suite.test("extracting(first:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't have a prefix of negative length")
+.crashOutputMatches("Can't have a prefix of negative length", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
   let bytes = b.span.bytes
@@ -256,7 +256,7 @@ suite.test("extracting(first:) bound checking")
 suite.test("extracting(droppingLast:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't drop a negative number of bytes")
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
   let bytes = b.span.bytes
@@ -293,7 +293,7 @@ suite.test("suffix extracting() functions")
 suite.test("extracting(last:) bound checking")
 .require(.minimumStdlib(.stdlib_6_2))
 .require(.crashTesting)
-.crashOutputMatches("Can't have a suffix of negative length")
+.crashOutputMatches("Can't have a suffix of negative length", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
   let bytes = b.span.bytes
@@ -304,7 +304,7 @@ suite.test("extracting(last:) bound checking")
 suite.test("extracting(droppingFirst:) bound checking")
 .require(.stdlib_6_2)
 .require(.crashTesting)
-.crashOutputMatches("Can't drop a negative number of bytes")
+.crashOutputMatches("Can't drop a negative number of bytes", when: _isDebugAssertConfiguration())
 .code {
   let b: ContiguousArray<UInt8> = [0, 1, 2, 3]
   let bytes = b.span.bytes
