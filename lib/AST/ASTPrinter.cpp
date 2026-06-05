@@ -1603,7 +1603,19 @@ void PrintAST::printAttributes(const Decl *D) {
         Printer.printAttrName("@_inheritsConvenienceInitializers");
         Printer << " ";
       }
-      if (CD->hasMissingDesignatedInitializers()) {
+      bool hasMissing = CD->hasMissingDesignatedInitializers();
+      // When emitting a public-only interface, SPI designated initializers
+      // are filtered out, so the class effectively has missing designated
+      // initializers from the perspective of public clients.
+      if (!hasMissing && Options.printPublicInterface()) {
+        auto ctors = const_cast<ClassDecl *>(CD)->lookupDirect(
+            DeclBaseName::createConstructor());
+        hasMissing = llvm::any_of(ctors, [](ValueDecl *member) {
+          auto init = cast<ConstructorDecl>(member);
+          return init->isDesignatedInit() && init->isSPI();
+        });
+      }
+      if (hasMissing) {
         Printer.printAttrName("@_hasMissingDesignatedInitializers");
         Printer << " ";
       }
