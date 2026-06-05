@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -strict-memory-safety \
+// RUN: env SWIFT_BACKTRACE="" %target-swift-frontend -emit-module -plugin-path %swift-plugin-dir -strict-memory-safety \
 // RUN:   -Xcc -Werror %t/test.swift -import-bridging-header %t/test.h -dump-macro-expansions -eager-macro-checking -Xcc -fbounds-safety -disable-objc-interop 2> %t/expansion.out
 // RUN: %diff %t/expansion.out %t/expansion.expected
 
