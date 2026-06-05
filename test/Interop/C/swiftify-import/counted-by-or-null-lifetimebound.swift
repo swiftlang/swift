@@ -153,8 +153,8 @@ int * __counted_by_or_null(len) noncountedLifetime(int len, int * p __lifetimebo
 // expected-experimental-expansion@+19:68{{
 //   expected-experimental-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-experimental-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(copy p) @_lifetime(p: copy p) @_disfavoredOverload public func constant(_ p: inout MutableSpan<Int32>?) -> MutableSpan<Int32>? {|}}
-//   expected-experimental-remark@3{{macro content: |    if let _pCount = p?.count, _pCount != 13 {|}}
-//   expected-experimental-remark@4{{macro content: |      fatalError("bounds check failure in constant: expected \\(13) but got \\(_pCount)")|}}
+//   expected-experimental-remark@3{{macro content: |    if let _pCount = p?.count, _pCount != CInt(13) {|}}
+//   expected-experimental-remark@4{{macro content: |      fatalError("bounds check failure in constant: expected \\(CInt(13)) but got \\(_pCount)")|}}
 //   expected-experimental-remark@5{{macro content: |    }|}}
 //   expected-experimental-remark@6{{macro content: |    let _pPtr = p?.withUnsafeMutableBufferPointer {|}}
 //   expected-experimental-remark@7{{macro content: |        unsafe $0|}}
@@ -166,7 +166,7 @@ int * __counted_by_or_null(len) noncountedLifetime(int len, int * p __lifetimebo
 //   expected-experimental-remark@13{{macro content: |    if unsafe _resultValue == nil {|}}
 //   expected-experimental-remark@14{{macro content: |      return nil|}}
 //   expected-experimental-remark@15{{macro content: |    }|}}
-//   expected-experimental-remark@16{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(13)), copying: ())|}}
+//   expected-experimental-remark@16{{macro content: |    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(CInt(13))), copying: ())|}}
 //   expected-experimental-remark@17{{macro content: |}|}}
 // }}
 int * __counted_by_or_null(13) _Nullable constant(int * _Nullable p __counted_by_or_null(13) __lifetimebound);

@@ -104,7 +104,7 @@ struct SwiftCountExprEmitter
   explicit SwiftCountExprEmitter(const clang::ASTContext &ctx)
       : ctx(ctx), out(result) {}
 
-  llvm::StringRef str() const { return result; }
+  StringRef str() const { return result; }
 
   bool VisitDeclRefExpr(const clang::DeclRefExpr *e) {
     const clang::DeclarationName name = e->getDecl()->getDeclName();
@@ -124,11 +124,7 @@ struct SwiftCountExprEmitter
     bool isSigned = IL->getType()->isSignedIntegerType();
     llvm::SmallString<20> valueStr;
     IL->getValue().toString(valueStr, /*Radix=*/10, isSigned);
-    if (bt->getKind() == clang::BuiltinType::Int) {
-      out << valueStr;
-      return true;
-    }
-    auto swiftName = swiftBuiltinTypeName(bt);
+    std::optional<StringRef> swiftName = swiftBuiltinTypeName(bt);
     if (!swiftName) {
       DLOG("Unsupported integer literal type\n");
       return false;
@@ -173,7 +169,7 @@ struct SwiftCountExprEmitter
   }
 
   bool VisitBinaryOperator(const clang::BinaryOperator *binop) {
-    llvm::StringRef op;
+    StringRef op;
     switch (binop->getOpcode()) {
 #define BINOP(variant, string)                                                 \
   case clang::variant:                                                         \
@@ -228,7 +224,7 @@ private:
     case CK::CK_IntegralToFloating:
     case CK::CK_FloatingToIntegral:
     case CK::CK_FloatingCast: {
-      auto swiftName = swiftBuiltinTypeName(c->getType());
+      std::optional<StringRef> swiftName = swiftBuiltinTypeName(c->getType());
       if (!swiftName) {
         DLOG("Unsupported cast destination type\n");
         return false;
@@ -250,19 +246,19 @@ private:
     }
   }
 
-  std::optional<llvm::StringRef> swiftBuiltinTypeName(clang::QualType ty) {
+  std::optional<StringRef> swiftBuiltinTypeName(clang::QualType ty) {
     const auto *bt = ty->getAs<clang::BuiltinType>();
     if (!bt)
       return std::nullopt;
     return swiftBuiltinTypeName(bt);
   }
 
-  std::optional<llvm::StringRef>
+  std::optional<StringRef>
   swiftBuiltinTypeName(const clang::BuiltinType *bt) {
     switch (bt->getKind()) {
 #define MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)                               \
   case clang::BuiltinType::CLANG_KIND:                                         \
-    return llvm::StringRef(#SWIFT_NAME);
+    return StringRef(#SWIFT_NAME);
 #define MAP_BUILTIN_CCHAR_TYPE(CLANG_KIND, SWIFT_NAME)                         \
   MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)
 #define MAP_BUILTIN_INTEGER_TYPE(CLANG_KIND, SWIFT_NAME)                       \
