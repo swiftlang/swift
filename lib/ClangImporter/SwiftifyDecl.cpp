@@ -154,15 +154,15 @@ struct SwiftCountExprEmitter
   }
 
   bool VisitUnaryOperator(const clang::UnaryOperator *unop) {
-    llvm::StringRef op;
+    char op;
     switch (unop->getOpcode()) {
-#define UNOP(variant, string)                                                  \
+#define UNOP(variant, c)                                                  \
   case clang::variant:                                                         \
-    op = string;                                                               \
+    op = c;                                                               \
     break
-      UNOP(UO_Plus, "+");
-      UNOP(UO_Minus, "-");
-      UNOP(UO_Not, "~");
+      UNOP(UO_Plus, '+');
+      UNOP(UO_Minus, '-');
+      UNOP(UO_Not, '~');
 #undef UNOP
     default:
       DLOG("Unsupported unary operator\n");
