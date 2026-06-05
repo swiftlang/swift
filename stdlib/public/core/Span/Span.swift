@@ -474,7 +474,8 @@ extension Span where Element: ~Copyable {
   public subscript(unchecked position: Index) -> Element {
     @_unsafeSelfDependentResult
     borrow {
-      Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: position))
+      unsafe UnsafePointer<Element>(
+        _unsafeAddressOfElement(unchecked: position)).pointee
     }
   }
 
