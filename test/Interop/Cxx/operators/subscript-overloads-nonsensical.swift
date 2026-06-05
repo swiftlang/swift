@@ -72,5 +72,5 @@ let _: Bar = fbv[Ref()]
 fbv[Ref()] = Bar()
 
 let _: Bar = fbu[Ref()] // expected-error {{cannot use mutating getter on immutable value: 'fbu' is a 'let'}}
-fbu[Ref()] = Bar()      // expected-error {{failed to produce diagnostic for expression}}
+fbu[Ref()] = Bar()      // expected-error {{ambiguous use of 'subscript(_:)'}}
                         // FIXME: ^this should complain about get-only setter

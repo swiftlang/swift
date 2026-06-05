@@ -50,7 +50,7 @@ v[unit] = unit
 let _: Overloaded.Unit = u[unit] // expected-error {{cannot use mutating getter on immutable value: 'u' is a 'let' constant}}
 u[unit] = val // expected-error {{cannot convert value of type 'Overloaded.Unit' to expected argument type}}
 
-u[unit] = unit // expected-error {{failed to produce diagnostic}}
+u[unit] = unit // expected-error {{ambiguous use of 'subscript(_:)'}}
                // FIXME: ^this should complain about 'u' being a 'let' constant
 
 let _: Bool = v[Overloaded.Bogus()]
@@ -102,7 +102,7 @@ let vGetRef: UnsafeMutablePointer<UInt32>? = v[getRef]
 v[getRef] = vGetRef
 let uGetRef: UnsafeMutablePointer<UInt32>? = u[getRef] // expected-error {{cannot use mutating getter on immutable value: 'u' is a 'let' constant}}
                                                        // FIXME: ^this should complain about 'u' being a 'let' constant
-u[getRef] = uGetRef // expected-error {{failed to produce diagnostic for expression}}
+u[getRef] = uGetRef // expected-error {{ambiguous use of 'subscript(_:)'}}
                     // FIXME: ^this should complain about 'u' being a 'let' constant
 
 let vGetPtrRef: CUnsignedInt = v[getPtrRef]

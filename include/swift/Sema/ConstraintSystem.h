@@ -2138,7 +2138,7 @@ public:
   /// emits an error message.
   void diagnoseFailureFor(SyntacticElementTarget target);
 
-  bool diagnoseAmbiguity(ArrayRef<Solution> solutions);
+  bool diagnoseAmbiguityInSolutions(ArrayRef<Solution> solutions);
   bool diagnoseAmbiguityWithFixes(SmallVectorImpl<Solution> &solutions);
 
   /// Add a constraint to the constraint system.
