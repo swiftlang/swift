@@ -164,13 +164,12 @@ void printHelp(const char *extra) {
 
 } // end anonymous namespace
 
-swift::runtime::environment::EnvironmentVariableState
-    swift::runtime::environment::environmentVariableState = {
+// Define backing variables.
 #define VARIABLE(name, type, defaultValue, help)                               \
-  /* name##_variable        = */ defaultValue,                                 \
-  /* name##_isSet_variable  = */ false,
+  swift::runtime::environment::types::type                                     \
+      swift::runtime::environment::name##_variable = defaultValue;             \
+  bool swift::runtime::environment::name##_isSet_variable = false;
 #include "EnvironmentVariables.def"
-};
 
 // Initialization code.
 swift::once_t swift::runtime::environment::initializeToken;
@@ -204,8 +203,8 @@ static void platformInitialize(void *context) {
 #define SYSPROP_PREFIX "debug.org.swift.runtime."
 #define VARIABLE(name, type, defaultValue, help)                \
   if (__system_property_get(SYSPROP_PREFIX #name, buffer)) {    \
-    environmentVariableState.name##_isSet_variable = true;      \
-    environmentVariableState.name##_variable =                  \
+    swift::runtime::environment::name##_isSet_variable = true;  \
+    swift::runtime::environment::name##_variable =              \
         parse_##type(#name, buffer, defaultValue);              \
   }
 #include "EnvironmentVariables.def"
@@ -230,29 +229,30 @@ void swift::runtime::environment::initialize(void *context) {
 
   bool SWIFT_DEBUG_HELP_variable = false;
 
+  // Placeholder variable, we never use the result but the macros want to write
+  // to it.
+  bool SWIFT_DEBUG_HELP_isSet_variable = false;
+  (void)SWIFT_DEBUG_HELP_isSet_variable; // Silence warnings about unused vars.
   for (char **var = ENVIRON; *var; var++) {
     // Immediately skip anything without a SWIFT_ prefix.
     if (strncmp(*var, "SWIFT_", 6) != 0)
       continue;
 
     bool foundVariable = false;
-    // Handle SWIFT_DEBUG_HELP separately since it's not in the .def file.
-    if (strncmp(*var, "SWIFT_DEBUG_HELP=",
-                strlen("SWIFT_DEBUG_HELP=")) == 0) {
-      SWIFT_DEBUG_HELP_variable = parse_boolean(
-          "SWIFT_DEBUG_HELP", *var + strlen("SWIFT_DEBUG_HELP="), false);
-      foundVariable = true;
-    }
-    // Check each defined variable in turn. Variables are parsed by functions
-    // named parse_<type> above. An unknown type will produce an error that
-    // parse_<unknown-type> doesn't exist. Add new parsers above.
+    // Check each defined variable in turn, plus SWIFT_DEBUG_HELP. Variables are
+    // parsed by functions named parse_<type> above. An unknown type will
+    // produce an error that parse_<unknown-type> doesn't exist. Add new parsers
+    // above.
 #define VARIABLE(name, type, defaultValue, help)                               \
   if (strncmp(*var, #name "=", strlen(#name "=")) == 0) {                      \
-    environmentVariableState.name##_variable =                                 \
+    name##_variable =                                                          \
         parse_##type(#name, *var + strlen(#name "="), defaultValue);           \
-    environmentVariableState.name##_isSet_variable = true;                     \
+    name##_isSet_variable = true;                                              \
     foundVariable = true;                                                      \
   }
+    // SWIFT_DEBUG_HELP is not in the variables list. Parse it like the other
+    // variables.
+    VARIABLE(SWIFT_DEBUG_HELP, boolean, false, )
 #include "EnvironmentVariables.def"
 
     // Flag unknown SWIFT_DEBUG_ variables to catch misspellings. We don't flag
@@ -284,9 +284,8 @@ void swift::runtime::environment::initialize(void *context) {
   do {                                                                         \
     const char *name##_string = getenv(#name);                                 \
     if (name##_string)                                                         \
-      environmentVariableState.name##_isSet_variable = true;                   \
-    environmentVariableState.name##_variable =                                 \
-        parse_##type(#name, name##_string, defaultValue);                      \
+      name##_isSet_variable = true;                                            \
+    name##_variable = parse_##type(#name, name##_string, defaultValue);        \
   } while (0);
 #include "EnvironmentVariables.def"
 
