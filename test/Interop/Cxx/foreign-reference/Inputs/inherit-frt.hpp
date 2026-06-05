@@ -73,11 +73,31 @@ _Pragma("clang diagnostic ignored \"-Wnullability-extension\"");
 #define SHARED_USING_BASE(Name, Base)                                          \
   _SHARED(Name, retain##Base, release##Base, )
 
+/// Struct with shared reference annotations that defines its own retain/release
+/// operations as methods
+#define SHARED_DEF_METHOD(Name, Suffix)                                        \
+  _SHARED(                                                                     \
+      Name, .doRetain##Suffix, .doRelease##Suffix,                             \
+      void doRetain##Suffix() { ++refcount; };                                 \
+      void doRelease##Suffix() {                                               \
+        if (--refcount <= 0)                                                   \
+          (void)"DELETION PLACEHOLDER";                                        \
+      })
+
+/// Struct with shared reference annotations that uses retain/release methods,
+/// presumably inherited from elsewhere
+#define SHARED_USE_METHOD(Name, Suffix)                                        \
+  _SHARED(Name, .doRetain##Suffix, .doRelease##Suffix, )
+
 // MARK: Simple: simple record types without inheritance
 
 struct SimpleValue NO_ATTR(SimpleValue);
 struct SimpleShared SHARED(SimpleShared);
 struct SimpleImmortal IMMORTAL(SimpleImmortal);
+struct SimpleSharedMethod SHARED_DEF_METHOD(SimpleSharedMethod, );
+struct SimpleSharedMissingMethod SHARED_USE_METHOD(SimpleSharedMissingMethod, );
+// expected-error@-1 {{cannot find retain function}}
+// expected-error@-2 {{cannot find release function}}
 
 // MARK: SingleShared: single inheritance with a shared refence base
 
@@ -102,6 +122,13 @@ struct SingleShared_NoAttr_Shared
     : SingleShared_NoAttr SHARED(SingleShared_NoAttr_Shared);
 struct SingleShared_NoAttr_NoAttr
     : SingleShared_NoAttr NO_ATTR_SHARED(SingleShared_NoAttr_NoAttr);
+
+struct SingleSharedM_BaseM SHARED_DEF_METHOD(SingleSharedM_BaseM, );
+
+struct SingleSharedM_SharedM
+    : SingleSharedM_BaseM SHARED_DEF_METHOD(SingleSharedM_SharedM, );
+struct SingleSharedM_SharedU
+    : SingleSharedM_BaseM SHARED_USE_METHOD(SingleSharedM_SharedU, );
 
 // MARK: SingleImmortal: single inheritance with an immortal refence base
 
@@ -163,6 +190,31 @@ struct OneShared_DRU_NoAttr : OneShared_DR,
                               OneShared_U NO_ATTR_SHARED(OneShared_DRU_NoAttr);
 struct OneShared_UDR_NoAttr : OneShared_U,
                               OneShared_DR NO_ATTR_SHARED(OneShared_UDR_NoAttr);
+
+struct OneSharedM_R
+    SHARED_DEF_METHOD(OneSharedM_R, );     // the shared reference base
+struct OneSharedM_U NO_ATTR(OneSharedM_U); // an unannotated value base
+struct OneSharedM_DR : OneSharedM_R        // derives the shared ref base
+                           NO_ATTR_SHARED(OneSharedM_DR);
+
+struct OneSharedM_RU_Shared : OneSharedM_R,
+                              OneSharedM_U SHARED(OneSharedM_RU_Shared);
+struct OneSharedM_UR_Shared : OneSharedM_U,
+                              OneSharedM_R SHARED(OneSharedM_UR_Shared);
+struct OneSharedM_RU_NoAttr : OneSharedM_R,
+                              OneSharedM_U NO_ATTR_SHARED(OneSharedM_RU_NoAttr);
+struct OneSharedM_UR_NoAttr : OneSharedM_U,
+                              OneSharedM_R NO_ATTR_SHARED(OneSharedM_UR_NoAttr);
+struct OneSharedM_DRU_Shared : OneSharedM_DR,
+                               OneSharedM_U SHARED(OneSharedM_DRU_Shared);
+struct OneSharedM_UDR_Shared : OneSharedM_U,
+                               OneSharedM_DR SHARED(OneSharedM_UDR_Shared);
+struct OneSharedM_DRU_NoAttr
+    : OneSharedM_DR,
+      OneSharedM_U NO_ATTR_SHARED(OneSharedM_DRU_NoAttr);
+struct OneSharedM_UDR_NoAttr
+    : OneSharedM_U,
+      OneSharedM_DR NO_ATTR_SHARED(OneSharedM_UDR_NoAttr);
 
 // MARK: TwoShared: inheriting two shared reference bases
 

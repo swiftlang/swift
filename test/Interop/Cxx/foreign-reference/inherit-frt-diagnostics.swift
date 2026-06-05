@@ -7,6 +7,8 @@ import InheritFRT
 let _ = makeSimpleValue()
 let _ = makeSimpleShared()
 let _ = makeSimpleImmortal()
+let _ = makeSimpleSharedMethod()
+let _ = makeSimpleSharedMissingMethod()
 
 let _ = makeSingleShared_Shared()
 let _ = makeSingleShared_NoAttr()
@@ -17,6 +19,9 @@ let _ = makeSingleShared_Shared_Shared()
 let _ = makeSingleShared_Shared_NoAttr()
 let _ = makeSingleShared_NoAttr_Shared()
 let _ = makeSingleShared_NoAttr_NoAttr()
+
+let _ = makeSingleSharedM_SharedM()
+let _ = makeSingleSharedM_SharedU()
 
 let _ = makeSingleImmortal_Immort()
 let _ = makeSingleImmortal_NoAttr()
@@ -40,6 +45,15 @@ let _ = makeOneShared_DRU_Shared()
 let _ = makeOneShared_UDR_Shared()
 let _ = makeOneShared_DRU_NoAttr()
 let _ = makeOneShared_UDR_NoAttr()
+
+let _ = makeOneSharedM_RU_Shared()
+let _ = makeOneSharedM_UR_Shared()
+let _ = makeOneSharedM_RU_NoAttr()
+let _ = makeOneSharedM_UR_NoAttr()
+let _ = makeOneSharedM_DRU_Shared()
+let _ = makeOneSharedM_UDR_Shared()
+let _ = makeOneSharedM_DRU_NoAttr()
+let _ = makeOneSharedM_UDR_NoAttr()
 
 let _ = makeTwoShared_NoAttr() // NOTE: this is not a valid FRT
 let _ = makeTwoShared_Shared()
