@@ -9365,6 +9365,20 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
   if (wrappedVar) {
     if (!finalPatternType->hasError() && !finalPatternType->is<TypeVariableType>())
       finalPatternType = computeWrappedValueType(wrappedVar, finalPatternType);
+  } else if (auto *typedPattern =
+                 dyn_cast<TypedPattern>(target.getInitializationPattern())) {
+    // When the pattern carries an explicit type annotation, prefer the type
+    // the solver assigned to the pattern over the type of the coerced
+    // initializer expression. The two share a canonical type, but if their
+    // sugar differs the initializer's sugar wins through coercion, which can
+    // have surprising results like printing an internal typealias into a
+    // .swiftinterface for a public stored property.
+
+    // FIXME: https://github.com/swiftlang/swift/issues/89690
+    // The final type could be set to the init type unconditionally without any
+    // regressions if constructor types were resugared consistently.
+    if (typedPattern->getTypeRepr())
+      finalPatternType = initType;
   }
 
   finalPatternType = finalPatternType->reconstituteSugar(/*recursive =*/false);
