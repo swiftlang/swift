@@ -945,6 +945,7 @@ public:
   std::string getMagicFileIDString(SourceLoc loc);
   StringRef getMagicFilePathString(SourceLoc loc);
   StringRef getMagicFunctionString();
+  SourceLoc getLocInOutermostSourceFile(SourceLoc loc);
 
   SILDebugLocation
   getSILDebugLocation(SILBuilder &B, SILLocation Loc,
