@@ -28,20 +28,20 @@ struct HasWrappedStoredProperty: ~Copyable { @Wrapper var x: Int }
 @_rawLayout(like: T) // expected-error{{cannot find type 'T' in scope}}
 struct TypeDoesntExist<A>: ~Copyable {}
 
-@_rawLayout(size: 4, alignment: 4) // expected-error{{@_rawLayout may only be used on 'struct'}}
+@_rawLayout(size: 4, alignment: 4) // expected-error{{'@_rawLayout' may only be used on 'struct'}}
 enum EnumWithRawLayout: ~Copyable {}
 
-@_rawLayout(size: 4, alignment: 4) // expected-error{{@_rawLayout may only be used on 'struct'}}
+@_rawLayout(size: 4, alignment: 4) // expected-error{{'@_rawLayout' may only be used on 'struct'}}
 class ClassWithRawLayout {}
 
 @_rawLayout(size: 4, alignment: 4)
 struct Lock: ~Copyable {}
 
-@_rawLayout(size: 4, alignment: 4) // expected-error{{@_rawLayout may only be used on 'struct'}}
+@_rawLayout(size: 4, alignment: 4) // expected-error{{'@_rawLayout' may only be used on 'struct'}}
 typealias TypealiasWithRawLayout = Lock
 
 struct Butt {
-    @_rawLayout(size: 4, alignment: 4) // expected-error{{@_rawLayout may only be used on 'struct'}}
+    @_rawLayout(size: 4, alignment: 4) // expected-error{{'@_rawLayout' may only be used on 'struct'}}
     var propertyWithStoredLayout: ()
 }
 

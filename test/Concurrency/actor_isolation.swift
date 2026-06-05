@@ -1801,7 +1801,7 @@ actor UserDefinedActorSelfDotMethod {
 }
 
 func requireSendableInheritContext(@_inheritActorContext _: @Sendable () -> ()) {}
-// expected-warning@-1 {{@_inheritActorContext only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+// expected-warning@-1 {{'@_inheritActorContext' only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
 
 actor InvalidInheritedActorIsolation {
   func actorFunction() {} // expected-note {{calls to instance method 'actorFunction()' from outside of its actor context are implicitly asynchronous}}

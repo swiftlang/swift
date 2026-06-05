@@ -153,7 +153,7 @@ struct ImplementsStruct: ImplementsProto {
 
 @_optimize(speed) func OspeedFunc() {}
 
-@_private(sourceFile: "none") func foo() {} // expected-error {{@_private may only be used on 'import' declarations}} {{1-31=}}
+@_private(sourceFile: "none") func foo() {} // expected-error {{'@_private' may only be used on 'import' declarations}} {{1-31=}}
 
 struct ProjectedValueStruct {
   @_projectedValueProperty($dummy)

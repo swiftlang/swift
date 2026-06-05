@@ -370,7 +370,7 @@ func testSendableMetatypeDowngrades() {
 
 do {
   func test(@_inheritActorContext _: @Sendable () -> Void) async {
-    // expected-warning@-1 {{@_inheritActorContext only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
+    // expected-warning@-1 {{'@_inheritActorContext' only applies to '@isolated(any)' parameters or parameters with asynchronous function types; this will be an error in a future Swift language mode}}
   }
 
   @MainActor

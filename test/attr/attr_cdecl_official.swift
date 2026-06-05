@@ -87,10 +87,10 @@ enum CDeclAndObjC: CInt { case A, B }
 func TwoCDecls() {}
 
 class Foo {
-  @c(Foo_foo) // expected-error{{@c can only be applied to global functions}}
+  @c(Foo_foo) // expected-error{{'@c' can only be applied to global functions}}
   func foo(x: Int) -> Int { return x }
 
-  @c(Foo_foo_2) // expected-error{{@c can only be applied to global functions}}
+  @c(Foo_foo_2) // expected-error{{'@c' can only be applied to global functions}}
   static func foo(x: Int) -> Int { return x }
 
   @c(Foo_init) // expected-error{{'@c' attribute cannot be applied to this declaration}}
@@ -100,7 +100,7 @@ class Foo {
   deinit {}
 }
 
-@c(throwing) // expected-error{{raising errors from @c functions is not supported}}
+@c(throwing) // expected-error{{raising errors from '@c' functions is not supported}}
 func throwing() throws { }
 
 @c(acceptedPointers)
