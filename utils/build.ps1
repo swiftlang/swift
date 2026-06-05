@@ -363,10 +363,27 @@ $KnownPlatforms = @{
 }
 
 $WiX = @{
-  Version = "4.0.6";
-  URL = "https://www.nuget.org/api/v2/package/wix/4.0.6";
-  SHA256 = "A94DD42AE1FB56B32DA180E2173CEDA4F0D10B4C8871C5EE59ECB502131A1EB6";
-  Path = [IO.Path]::Combine("$BinaryCache\WiX-4.0.6", "tools", "net6.0", "any");
+  Version = "7.0.0";
+  EulaIdentifier = "wix7";
+  URL = "https://www.nuget.org/api/v2/package/wix/7.0.0";
+  SHA256 = "7f992e57c356dcbda2ea961bf3b348e1bd7d31d96795be4ac391e04cf140536d";
+  Path = [IO.Path]::Combine("$BinaryCache\WiX-7.0.0", "tools", "net8.0", "any");
+}
+
+$DotNetRuntime = @{
+  Version = "8.0.27";
+  Runtimes = @{
+    AMD64 = @{
+      RuntimeIdentifier = "win-x64";
+      URL = "https://builds.dotnet.microsoft.com/dotnet/Runtime/8.0.27/dotnet-runtime-8.0.27-win-x64.zip";
+      SHA256 = "0708AEAB018AB9C2BFAAC248AD2F3A2A1046913D96CB9A0A904A107C4CE4A813";
+    };
+    ARM64 = @{
+      RuntimeIdentifier = "win-arm64";
+      URL = "https://builds.dotnet.microsoft.com/dotnet/Runtime/8.0.27/dotnet-runtime-8.0.27-win-arm64.zip";
+      SHA256 = "6FFBD29E58B71AB1EE7DD02741C420AF172D27A3963098D57F6FE8887FC7BEBF";
+    };
+  };
 }
 
 $KnownPythons = @{
@@ -1361,6 +1378,34 @@ function Invoke-Program() {
   }
 }
 
+function Get-DotNetRuntime() {
+  if (-not $DotNetRuntime.Runtimes.ContainsKey($HostArchName)) {
+    throw "Unsupported .NET runtime host architecture '$HostArchName'"
+  }
+
+  return $DotNetRuntime.Runtimes[$HostArchName]
+}
+
+function Get-DotNetRuntimeRoot() {
+  $Runtime = Get-DotNetRuntime
+  return [IO.Path]::Combine("$BinaryCache", "dotnet-runtime-$($DotNetRuntime.Version)-$($Runtime.RuntimeIdentifier)")
+}
+
+function Get-DotNet() {
+  return [IO.Path]::Combine((Get-DotNetRuntimeRoot), "dotnet.exe")
+}
+
+function Invoke-WithDotNetRuntime([scriptblock] $Body) {
+  Invoke-IsolatingEnvVars {
+    $DotNetRuntimeRoot = Get-DotNetRuntimeRoot
+    $env:DOTNET_ROOT = $DotNetRuntimeRoot
+    $env:DOTNET_HOST_PATH = Get-DotNet
+    $env:DOTNET_MULTILEVEL_LOOKUP = "0"
+
+    & $Body
+  }
+}
+
 function Invoke-IsolatingEnvVars([scriptblock]$Block) {
   $OldVars = @{}
   foreach ($Var in (Get-ChildItem env:*).GetEnumerator()) {
@@ -1498,7 +1543,9 @@ function Get-Dependencies {
 
       # The new runtime MSI is built to expand files into the immediate directory. So, setup the installation location.
       New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin | Out-Null
-      Invoke-Program "$($WiX.Path)\wix.exe" -- burn extract $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
+      Invoke-WithDotNetRuntime {
+        Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn extract -acceptEula $WiX.EulaIdentifier $BinaryCache\$InstallerExeName -out $BinaryCache\toolchains\ -outba $BinaryCache\toolchains\
+      }
       Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
         $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
         $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$PinnedVersion\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
@@ -1589,6 +1636,12 @@ function Get-Dependencies {
     # WiX is needed both for packaging and for extracting the pinned toolchain
     # installer that bootstraps toolchain builds.
     if ($Toolchain -or $Package) {
+      $DotNetRuntimeInfo = Get-DotNetRuntime
+      $DotNetArchive = "dotnet-runtime-$($DotNetRuntime.Version)-$($DotNetRuntimeInfo.RuntimeIdentifier).zip"
+      DownloadAndVerify $DotNetRuntimeInfo.URL "$BinaryCache\$DotNetArchive" $DotNetRuntimeInfo.SHA256
+      Expand-ZipFile $DotNetArchive -ExtractPath "dotnet-runtime-$($DotNetRuntime.Version)-$($DotNetRuntimeInfo.RuntimeIdentifier)"
+      Write-Success ".NET Runtime $($DotNetRuntime.Version) ($($DotNetRuntimeInfo.RuntimeIdentifier))"
+
       DownloadAndVerify $WiX.URL "$BinaryCache\WiX-$($WiX.Version).zip" $WiX.SHA256
       Expand-ZipFile WiX-$($WiX.Version).zip -ExtractPath WiX-$($WiX.Version)
       Write-Success "WiX $($WiX.Version)"
@@ -2586,8 +2639,8 @@ function Build-WiXProject() {
 
   $ProductVersionArg = $ProductVersion
   if (-not $Bundle) {
-    # WiX v4 will accept a semantic version string for Bundles,
-    # but Packages still require a purely numerical version number,
+    # WiX accepts a semantic version string for Bundles, but Packages still
+    # require a purely numerical version number,
     # so trim any semantic versioning suffixes
     $ProductVersionArg = [regex]::Replace($ProductVersion, "[-+].*", "")
   }
@@ -2597,6 +2650,7 @@ function Build-WiXProject() {
   Add-KeyValueIfNew $Properties BaseOutputPath "$BinaryCache\$($Platform.Triple)\installer\"
   Add-KeyValueIfNew $Properties ProductArchitecture $Platform.Architecture.VSName
   Add-KeyValueIfNew $Properties ProductVersion $ProductVersionArg
+  Add-KeyValueIfNew $Properties AcceptEula $WiX.EulaIdentifier
 
   $MSBuildArgs = @( "-noLogo", "-maxCpuCount", "-restore", "$SourceCache\swift-installer-scripts\platforms\Windows\$FileName" )
   foreach ($Property in $Properties.GetEnumerator()) {
@@ -2609,8 +2663,10 @@ function Build-WiXProject() {
   $MSBuildArgs += "-binaryLogger:$BinaryCache\$($Platform.Triple)\msi\$($Platform.Architecture.VSName)-$([System.IO.Path]::GetFileNameWithoutExtension($FileName)).binlog"
   $MSBuildArgs += "-detailedSummary:False"
 
-  Write-Host "$msbuild $MSBuildArgs"
-  Invoke-Program $msbuild @MSBuildArgs
+  Invoke-WithDotNetRuntime {
+    Write-Host "$msbuild $MSBuildArgs"
+    Invoke-Program $msbuild @MSBuildArgs
+  }
 }
 
 # TODO(compnerd): replace this with Get-{Build,Host,Target}ProjectBinaryCache
@@ -5572,7 +5628,9 @@ function Copy-BuildArtifactsToStage([Hashtable] $Platform) {
   Copy-File "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" $Stage
   # Extract installer engine to ease code-signing on swift.org CI
   New-Item -Type Directory -Path "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)" -ErrorAction Ignore | Out-Null
-  Invoke-Program "$($WiX.Path)\wix.exe" -- burn detach "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)\"
+  Invoke-WithDotNetRuntime {
+    Invoke-Program (Get-DotNet) "$($WiX.Path)\wix.dll" -- burn detach -acceptEula $WiX.EulaIdentifier "$BinaryCache\$($Platform.Triple)\installer\Release\$($Platform.Architecture.VSName)\installer.exe" -engine "$Stage\installer-engine.exe" -intermediateFolder "$BinaryCache\$($Platform.Triple)\installer\$($Platform.Architecture.VSName)\"
+  }
 }
 
 #-------------------------------------------------------------------
