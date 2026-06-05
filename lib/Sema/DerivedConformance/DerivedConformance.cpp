@@ -1003,7 +1003,7 @@ bool swift::memberwiseAccessorsRequireActorIsolation(NominalTypeDecl *nominal) {
   return false;
 }
 
-/// Provides the location to use when plumbing the synthesized  macro expansion
+/// Provides the location to use when plumbing the synthesized macro expansion
 /// with its parent context for name lookup.
 static SourceLoc getValidParentLocForDerivation(DerivedConformance &derived, ValueDecl *requirement) {
   auto atLoc = derived.Conformance->getLoc();
