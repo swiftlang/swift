@@ -39,7 +39,7 @@ struct container_t {
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func fooWrapped(_ x: UnsafeMutablePointer<container_t>!, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe fooWrapped(x, p.baseAddress!, len)|}}
+//   expected-remark@4{{macro content: |    return unsafe fooWrapped(x, p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void fooWrapped(struct container_t * x, int * __counted_by(len) p, int len);
@@ -55,7 +55,7 @@ void foobar_release(foobar_ref x);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func foobar(_ _foobar_param0: UnsafeMutableBufferPointer<Int32>, _ _foobar_param2: foobar_ref!) {|}}
 //   expected-remark@3{{macro content: |    let _foobar_param1 = Int32(exactly: _foobar_param0.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe foobar(_foobar_param0.baseAddress!, _foobar_param1, _foobar_param2)|}}
+//   expected-remark@4{{macro content: |    return unsafe foobar(_foobar_param0.baseAddress, _foobar_param1, _foobar_param2)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 // expected-expansion@+3:6{{
@@ -73,7 +73,7 @@ void foobar(int * __counted_by(len), int len, foobar_ref);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bar(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe bar(x, p.baseAddress!, len)|}}
+//   expected-remark@4{{macro content: |    return unsafe bar(x, p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 // expected-expansion@+3:6{{
@@ -84,7 +84,7 @@ void bar(struct qux *x, int * __counted_by(len) p, int len);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func barReturn(_ p: UnsafeMutableBufferPointer<Int32>) -> UnsafeMutablePointer<qux>! {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe barReturn(p.baseAddress!, len)|}}
+//   expected-remark@4{{macro content: |    return unsafe barReturn(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 // expected-expansion@+3:14{{
@@ -103,7 +103,7 @@ struct qux;
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func baz(_ x: UnsafeMutablePointer<qux>!, _ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe baz(x, p.baseAddress!, len)|}}
+//   expected-remark@4{{macro content: |    return unsafe baz(x, p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 // expected-expansion@+3:6{{
@@ -114,7 +114,7 @@ void baz(struct qux *x, int * __counted_by(len) p, int len);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func bazReturn(_ p: UnsafeMutableBufferPointer<Int32>) -> UnsafeMutablePointer<qux>! {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe bazReturn(p.baseAddress!, len)|}}
+//   expected-remark@4{{macro content: |    return unsafe bazReturn(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 // expected-expansion@+3:14{{
