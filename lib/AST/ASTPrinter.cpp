@@ -118,10 +118,6 @@ void PrintOptions::initForSynthesizedExtensionInScope(TypeOrExtensionDecl D,
                                       TypeTransformContext(D));
 }
 
-void PrintOptions::clearSynthesizedExtension() {
-  TransformContext.reset();
-}
-
 static bool isPublicOrUsableFromInline(const ValueDecl *VD) {
   AccessScope scope =
       VD->getFormalAccessScope(/*useDC*/nullptr,
@@ -8034,9 +8030,11 @@ public:
         Printer.printName(Assoc->getProtocol()->getName());
         Printer << "]";
       }
-      Printer.printTypeRef(T, Assoc, T->getName());
+      Printer.printTypeRef(T, Assoc, T->getName(),
+                           PrintNameContext::TypeMember);
     } else {
-      Printer.printName(T->getName());
+      Printer.printName(T->getName(),
+                        PrintNameContext::TypeMember);
     }
   }
 
