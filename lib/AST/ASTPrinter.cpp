@@ -8031,9 +8031,11 @@ public:
         Printer.printName(Assoc->getProtocol()->getName());
         Printer << "]";
       }
-      Printer.printTypeRef(T, Assoc, T->getName());
+      Printer.printTypeRef(T, Assoc, T->getName(),
+                           PrintNameContext::TypeMember);
     } else {
-      Printer.printName(T->getName());
+      Printer.printName(T->getName(),
+                        PrintNameContext::TypeMember);
     }
   }
 
