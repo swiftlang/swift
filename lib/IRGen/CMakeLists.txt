@@ -72,6 +72,7 @@ add_swift_host_library(swiftIRGen STATIC
   TypeLayoutVerifier.cpp
 
   LLVM_LINK_COMPONENTS
+    Plugins
     target
     targetparser
     transformutils
