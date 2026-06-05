@@ -57,6 +57,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:unavailable-sendable-conformance>
 - <doc:unknown-warning-group>
 - <doc:unnecessary-effect-marker>
+- <doc:unnecessary-unsafe>
 - <doc:unsupported-scoped-import>
 - <doc:untyped-throws>
 - <doc:unused-import-access>
@@ -119,6 +120,7 @@ Or upgrade all warnings except deprecated declaration to errors:
 - <doc:opaque-type-inference>
 - <doc:unknown-warning-group>
 - <doc:unnecessary-effect-marker>
+- <doc:unnecessary-unsafe>
 - <doc:availability-unrecognized-name>
 - <doc:mutable-global-variable>
 - <doc:unsupported-scoped-import>
