@@ -2,20 +2,20 @@
 
 // REQUIRES: objc_interop
 
-@IBSegueAction // expected-error {{@IBSegueAction may only be used on 'func' declarations}} {{1-16=}}
+@IBSegueAction // expected-error {{'@IBSegueAction' may only be used on 'func' declarations}} {{1-16=}}
 var iboutlet_global: Int
 
 var iboutlet_accessor: Int {
-  @IBSegueAction // expected-error {{@IBSegueAction may only be used on 'func' declarations}} {{3-18=}}
+  @IBSegueAction // expected-error {{'@IBSegueAction' may only be used on 'func' declarations}} {{3-18=}}
   get { return 42 }
 }
 
-@IBSegueAction // expected-error {{@IBSegueAction may only be used on 'func' declarations}} {{1-16=}}
+@IBSegueAction // expected-error {{'@IBSegueAction' may only be used on 'func' declarations}} {{1-16=}}
 class IBOutletClassTy {}
-@IBSegueAction // expected-error {{@IBSegueAction may only be used on 'func' declarations}} {{1-16=}}
+@IBSegueAction // expected-error {{'@IBSegueAction' may only be used on 'func' declarations}} {{1-16=}}
 struct IBStructTy {}
 
-@IBSegueAction // expected-error {{only instance methods can be declared @IBSegueAction}} {{1-16=}}
+@IBSegueAction // expected-error {{only instance methods can be declared '@IBSegueAction'}} {{1-16=}}
 func IBFunction(_: AnyObject, _: AnyObject, _: AnyObject) -> AnyObject {}
 
 class IBActionWrapperTy {
@@ -23,15 +23,15 @@ class IBActionWrapperTy {
   func click(_: AnyObject, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()} // no-warning
 
   func outer(_: AnyObject, _: AnyObject, _: AnyObject) -> AnyObject {
-    @IBSegueAction  // expected-error {{only instance methods can be declared @IBSegueAction}} {{5-20=}}
+    @IBSegueAction  // expected-error {{only instance methods can be declared '@IBSegueAction'}} {{5-20=}}
     func inner(_: AnyObject, _: AnyObject, _: AnyObject) -> AnyObject {fatalError()}
     fatalError()
   }
-  @IBSegueAction // expected-error {{@IBSegueAction may only be used on 'func' declarations}} {{3-18=}}
+  @IBSegueAction // expected-error {{'@IBSegueAction' may only be used on 'func' declarations}} {{3-18=}}
   var value : AnyObject? = nil
 
   @IBSegueAction
-  func process(x: AnyObject, _: AnyObject, _: AnyObject) {}  // expected-error {{methods declared @IBSegueAction must return a value}}
+  func process(x: AnyObject, _: AnyObject, _: AnyObject) {}  // expected-error {{methods declared '@IBSegueAction' must return a value}}
 
   @IBSegueAction
   func process(_: AnyObject, _: AnyObject, _: AnyObject) -> Int? {fatalError()}  // expected-error {{method cannot be marked '@IBSegueAction' because its result type cannot be represented in Objective-C}}
@@ -48,7 +48,7 @@ class IBActionWrapperTy {
 
   @available(SwiftStdlib 5.5, *) @IBSegueAction
   func process(_: AnyObject, _: AnyObject, _: AnyObject) async -> AnyObject { }
-  // expected-error@-1 {{@IBSegueAction instance method cannot be asynchronous}}
+  // expected-error@-1 {{'@IBSegueAction' instance method cannot be asynchronous}}
   // expected-note@-2 {{remove 'async' and wrap in 'Task' to use concurrency in 'process'}}{{49:3-50:80=@available(SwiftStdlib 5.5, *) @IBSegueAction\n  func process(_: AnyObject, _: AnyObject, _: AnyObject) -> AnyObject {\nTask { @MainActor in \}\n\}}}
 }
 
@@ -68,27 +68,27 @@ protocol CP2 : class { }
 // semantics.
 @objc class Leaky {
   @IBSegueAction func newScreen(_: AnyObject) -> AnyObject {fatalError()}
-  // expected-error@-1{{@IBSegueAction method cannot have selector 'newScreen:' because it has special memory management behavior}}
+  // expected-error@-1{{'@IBSegueAction' method cannot have selector 'newScreen:' because it has special memory management behavior}}
   // expected-note@-2{{change Swift name to 'makeScreen'}} {{23-32=makeScreen}}
   // expected-note@-3{{change Objective-C selector to 'makeScreen:'}} {{3-3=@objc(makeScreen:) }}
   @IBSegueAction func allocScreen(_: AnyObject) -> AnyObject {fatalError()}
-  // expected-error@-1{{@IBSegueAction method cannot have selector 'allocScreen:' because it has special memory management behavior}}
+  // expected-error@-1{{'@IBSegueAction' method cannot have selector 'allocScreen:' because it has special memory management behavior}}
   // expected-note@-2{{change Swift name to 'makeScreen'}} {{23-34=makeScreen}}
   // expected-note@-3{{change Objective-C selector to 'makeScreen:'}} {{3-3=@objc(makeScreen:) }}
   @IBSegueAction func initScreen(_: AnyObject) -> AnyObject {fatalError()}
-  // expected-error@-1{{@IBSegueAction method cannot have selector 'initScreen:' because it has special memory management behavior}}
+  // expected-error@-1{{'@IBSegueAction' method cannot have selector 'initScreen:' because it has special memory management behavior}}
   // expected-note@-2{{change Swift name to 'makeScreen'}} {{23-33=makeScreen}}
   // expected-note@-3{{change Objective-C selector to 'makeScreen:'}} {{3-3=@objc(makeScreen:) }}
   @IBSegueAction func copyScreen(_: AnyObject) -> AnyObject {fatalError()}
-  // expected-error@-1{{@IBSegueAction method cannot have selector 'copyScreen:' because it has special memory management behavior}}
+  // expected-error@-1{{'@IBSegueAction' method cannot have selector 'copyScreen:' because it has special memory management behavior}}
   // expected-note@-2{{change Swift name to 'makeCopyScreen'}} {{23-33=makeCopyScreen}}
   // expected-note@-3{{change Objective-C selector to 'makeCopyScreen:'}} {{3-3=@objc(makeCopyScreen:) }}
   @IBSegueAction func mutableCopyScreen(_: AnyObject) -> AnyObject {fatalError()}
-  // expected-error@-1{{@IBSegueAction method cannot have selector 'mutableCopyScreen:' because it has special memory management behavior}}
+  // expected-error@-1{{'@IBSegueAction' method cannot have selector 'mutableCopyScreen:' because it has special memory management behavior}}
   // expected-note@-2{{change Swift name to 'makeMutableCopyScreen'}} {{23-40=makeMutableCopyScreen}}
   // expected-note@-3{{change Objective-C selector to 'makeMutableCopyScreen:'}} {{3-3=@objc(makeMutableCopyScreen:) }}
   @IBSegueAction func newScreen(_: AnyObject, secondArg: AnyObject) -> AnyObject {fatalError()}
-  // expected-error@-1{{@IBSegueAction method cannot have selector 'newScreen:secondArg:' because it has special memory management behavior}}
+  // expected-error@-1{{'@IBSegueAction' method cannot have selector 'newScreen:secondArg:' because it has special memory management behavior}}
   // expected-note@-2{{change Swift name to 'makeScreen(_:secondArg:)'}} {{23-32=makeScreen}}
   // expected-note@-3{{change Objective-C selector to 'makeScreen:secondArg:'}} {{3-3=@objc(makeScreen:secondArg:) }}
 
@@ -102,12 +102,12 @@ protocol CP2 : class { }
 
   @objc(newProblematicScreen:)
   @IBSegueAction func problematicScreen(_: AnyObject) -> AnyObject {fatalError()}
-  // expected-error@-1{{@IBSegueAction method cannot have selector 'newProblematicScreen:' because it has special memory management behavior}}
+  // expected-error@-1{{'@IBSegueAction' method cannot have selector 'newProblematicScreen:' because it has special memory management behavior}}
   // expected-note@-2{{change Objective-C selector to 'makeProblematicScreen:'}} {{-1:9-30=makeProblematicScreen:}}
 
   @objc(newProblematicScreen:secondArg:)
   @IBSegueAction func problematicScreen(_: AnyObject, secondArg: AnyObject) -> AnyObject {fatalError()}
-  // expected-error@-1{{@IBSegueAction method cannot have selector 'newProblematicScreen:secondArg:' because it has special memory management behavior}}
+  // expected-error@-1{{'@IBSegueAction' method cannot have selector 'newProblematicScreen:secondArg:' because it has special memory management behavior}}
   // expected-note@-2{{change Objective-C selector to 'makeProblematicScreen:secondArg:'}} {{-1:9-40=makeProblematicScreen:secondArg:}}
 }
 
@@ -230,11 +230,11 @@ protocol CP2 : class { }
   @IBSegueAction func action31d(_: AnyObject, _: AnyObject, _: E) -> AnyObject {fatalError()} // expected-error{{method cannot be marked '@IBSegueAction' because the type of the parameter 3 cannot be represented in Objective-C}} expected-note{{Swift enums not marked '@c' or '@objc' cannot be represented in Objective-C}}
 
   // Supported arities
-  @IBSegueAction func actionWith0() -> X {fatalError()} // expected-error{{@IBSegueAction methods must have 1 to 3 arguments}}
+  @IBSegueAction func actionWith0() -> X {fatalError()} // expected-error{{'@IBSegueAction' methods must have 1 to 3 arguments}}
   @IBSegueAction func actionWith1(_: X) -> X {fatalError()}
   @IBSegueAction func actionWith2(_: X, _: X) -> X {fatalError()}
   @IBSegueAction func actionWith3(_: X, _: X, _: X) -> X {fatalError()}
-  @IBSegueAction func actionWith4(_: X, _: X, _: X, _: X) -> X {fatalError()} // expected-error{{@IBSegueAction methods must have 1 to 3 arguments}}
+  @IBSegueAction func actionWith4(_: X, _: X, _: X, _: X) -> X {fatalError()} // expected-error{{'@IBSegueAction' methods must have 1 to 3 arguments}}
 
   init() { }
 }

@@ -77,7 +77,7 @@ func testMissingParentheses(_: @callable Int) {}
 // expected-error@-1 {{expected '(' in 'callable' attribute}}
 
 func testBothAttributes(_: @once @callable(once) () -> Void) {}
-// expected-error@-1 {{'@callable' contradicts previous '@once'}}
+// expected-error@-1 {{attribute 'callable' contradicts previous attribute 'once'}}
 // expected-forbidden-error@-2 {{'@once' attribute is only valid when experimental feature OnceFunctions is enabled}}
 
 func testOldSpelling(_: @called(atMostOnce) () -> Void) {}
@@ -105,7 +105,7 @@ func testClosure() {
   // expected-error@-1 {{expected '(' in 'callable' attribute}}
 
   _ = { @once @callable(once) in }
-  // expected-supported-error@-1 {{'@callable(once)' contradicts previous attribute '@once'}}
+  // expected-supported-error@-1 {{attribute 'callable(once)' contradicts previous attribute 'once'}}
   // expected-forbidden-error@-2 {{'@once' attribute is only valid when experimental feature OnceFunctions is enabled}}
   // expected-forbidden-error@-3 {{'@callable(once)' attribute is only valid when experimental feature OnceFunctions is enabled}}
 

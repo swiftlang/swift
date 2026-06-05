@@ -38,6 +38,6 @@ class TestClass5 {
 
 #if true
 class TestClass6 {
-  @objc func testMethod() {} // expected-error {{@objc attribute used without importing module 'Foundation'}}
+  @objc func testMethod() {} // expected-error {{'@objc' attribute used without importing module 'Foundation'}}
 }
 #endif

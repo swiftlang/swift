@@ -115,14 +115,14 @@ func dfoo(x: Float) -> (value: Float, differential: (Float) -> (Float)) {
 }
 
 func testLocalDerivativeRegistration() {
-  // expected-error @+1 {{attribute '@derivative' can only be used in a non-local scope}}
+  // expected-error @+1 {{'@derivative' can only be used in a non-local scope}}
   @derivative(of: sin)
   func dsin()
 }
 
 
 func testLocalDerivativeRegistration() {
-  // expected-error @+1 {{attribute '@derivative' can only be used in a non-local scope}}
+  // expected-error @+1 {{'@derivative' can only be used in a non-local scope}}
   @derivative(of: sin)
   func dsin()
 }

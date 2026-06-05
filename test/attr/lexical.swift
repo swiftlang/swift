@@ -15,10 +15,10 @@ func bar(@_noEagerMove _ s: S) {} // okay
 
 func baz(@_eagerMove _ c: C) {} // okay
 
-@_eagerMove // expected-error {{@_eagerMove is only valid on methods}}
+@_eagerMove // expected-error {{'@_eagerMove' is only valid on methods}}
 func bazzoo(_ c: C) {}
 
-@_noEagerMove // expected-error {{@_noEagerMove is only valid on methods}}
+@_noEagerMove // expected-error {{'@_noEagerMove' is only valid on methods}}
 func bazzoozoo(_ c: C) {}
 
 extension C {

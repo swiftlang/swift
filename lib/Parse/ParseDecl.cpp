@@ -3317,7 +3317,8 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
     if (CurDeclContext->isLocalContext()) {
       // Emit an error, but do not discard the attribute.  This enables
       // better recovery in the parser.
-      diagnose(Loc, diag::attr_name_only_at_non_local_scope, AttrName);
+      diagnose(Loc, diag::attr_name_only_at_non_local_scope,
+               '@' + AttrName.str());
     }
 
     if (!DiscardAttribute) {
@@ -6076,7 +6077,7 @@ static void diagnoseOperatorFixityAttributes(Parser &P,
     if (it != fixityAttrs.begin()) {
       auto *attr = *it;
       P.diagnose(attr->getLocation(), diag::mutually_exclusive_decl_attrs, attr,
-                 fixityAttrs.front(), attr->isDeclModifier())
+                 fixityAttrs.front())
           .fixItRemove(attr->getRange());
       attr->setInvalid();
     }
