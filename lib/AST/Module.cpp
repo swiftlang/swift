@@ -1190,7 +1190,8 @@ std::optional<MacroRole> SourceFile::getFulfilledMacroRole() const {
 
 SourceFile *SourceFile::getEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
-      Kind != SourceFileKind::DefaultArgument)
+      Kind != SourceFileKind::DefaultArgument &&
+      Kind != SourceFileKind::SyntheticMacro)
     return nullptr;
 
   auto sourceLoc = getGeneratedSourceFileInfo()->originalSourceRange.getStart();
@@ -1199,7 +1200,8 @@ SourceFile *SourceFile::getEnclosingSourceFile() const {
 
 ASTNode SourceFile::getNodeInEnclosingSourceFile() const {
   if (Kind != SourceFileKind::MacroExpansion &&
-      Kind != SourceFileKind::DefaultArgument)
+      Kind != SourceFileKind::DefaultArgument &&
+      Kind != SourceFileKind::SyntheticMacro)
     return nullptr;
 
   return ASTNode::getFromOpaqueValue(getGeneratedSourceFileInfo()->astNode);

@@ -74,14 +74,8 @@ AvailabilityScope::createForSourceFile(SourceFile *SF,
       range = SourceRange(charRange.getStart(), charRange.getEnd());
       auto originalNode = SF->getNodeInEnclosingSourceFile();
       auto loc = SourceLoc();
-      auto infos = Ctx.SourceMgr.getGeneratedSourceInfo(SF->getBufferID());
-      if (infos->kind == GeneratedSourceInfo::SyntheticMacro) {
-        loc = infos->generatedSourceRange.getStart();
-      } else {
-        loc = originalNode.getStartLoc();
-      }
-
-      parentContext = parentScope->findMostRefinedSubContext(loc, Ctx);
+      parentContext = parentScope->findMostRefinedSubContext(
+          originalNode.getStartLoc(), Ctx);
     }
     break;
   }
