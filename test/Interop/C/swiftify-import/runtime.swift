@@ -38,6 +38,16 @@ static inline void interop_counted_nullable(const int* __counted_by(count) _Null
     out[i] = in[i];
 }
 
+static inline void interop_counted_noescape_null_unspecified(const int* __counted_by(count) _Null_unspecified in __noescape, int * __counted_by(count) _Null_unspecified out __noescape, int count) {
+  for(int i = 0; i < count; i++)
+    out[i] = in[i];
+}
+
+static inline void interop_counted_null_unspecified(const int* __counted_by(count) _Null_unspecified in, int * __counted_by(count) _Null_unspecified out, int count) {
+  for(int i = 0; i < count; i++)
+    out[i] = in[i];
+}
+
 static inline const int* __counted_by(count) _Nonnull interop_counted_return_lifetimebound(const int* __counted_by(count) _Nonnull in __lifetimebound, int count) {
   int *out = malloc(count * sizeof(int));
   for(int i = 0; i < count; i++)
@@ -60,6 +70,20 @@ static inline const int* __counted_by(count) _Nullable interop_counted_return_li
 }
 
 static inline const int* __counted_by(count) _Nullable interop_counted_return_nullable(const int* __counted_by(count) _Nullable in, int count) {
+  int *out = malloc(count * sizeof(int));
+  for(int i = 0; i < count; i++)
+    out[i] = in[i];
+  return out;
+}
+
+static inline const int* __counted_by(count) _Null_unspecified interop_counted_return_lifetimebound_null_unspecified(const int* __counted_by(count) _Null_unspecified in __lifetimebound, int count) {
+  int *out = malloc(count * sizeof(int));
+  for(int i = 0; i < count; i++)
+    out[i] = in[i];
+  return out;
+}
+
+static inline const int* __counted_by(count) _Null_unspecified interop_counted_return_null_unspecified(const int* __counted_by(count) _Null_unspecified in, int count) {
   int *out = malloc(count * sizeof(int));
   for(int i = 0; i < count; i++)
     out[i] = in[i];
@@ -313,6 +337,84 @@ Suite.test("Non-empty inline array with counted_by_nullable") {
     expectEqual(arr, arrOut)
 }
 
+Suite.test("Empty array with counted_by_null_unspecified and noescape") {
+    let emptyArr: [Int32] = []
+    var emptyArrOut: [Int32] = []
+    var spanOut = emptyArrOut.mutableSpan
+    interop_counted_noescape_null_unspecified(emptyArr.span, &spanOut)
+    expectEqual(emptyArr, emptyArrOut)
+}
+
+Suite.test("Empty array with counted_by_null_unspecified") {
+    let emptyArr: [Int32] = []
+    var emptyArrOut: [Int32] = []
+    emptyArr.withUnsafeBufferPointer { buf in
+      emptyArrOut.withUnsafeMutableBufferPointer { bufOut in
+        unsafe interop_counted_null_unspecified(buf, bufOut)
+      }
+    }
+    expectEqual(emptyArr, emptyArrOut)
+}
+
+Suite.test("Non-empty array with counted_by_null_unspecified and noescape") {
+    let arr: [Int32] = [1, 2, 3]
+    var arrOut: [Int32] = [3, 2, 1]
+    var spanOut = arrOut.mutableSpan
+    interop_counted_noescape_null_unspecified(arr.span, &spanOut)
+    expectEqual(arr, arrOut)
+}
+
+Suite.test("Non-empty array with counted_by_null_unspecified") {
+    let arr: [Int32] = [1, 2, 3]
+    var arrOut: [Int32] = [3, 2, 1]
+    arr.withUnsafeBufferPointer { buf in
+      arrOut.withUnsafeMutableBufferPointer { bufOut in
+        unsafe interop_counted_null_unspecified(buf, bufOut)
+      }
+    }
+    expectEqual(arr, arrOut)
+}
+
+Suite.test("Empty inline array with counted_by_null_unspecified and noescape") {
+    let emptyArr: [0 of Int32] = []
+    var emptyArrOut: [0 of Int32] = []
+    var spanOut = emptyArrOut.mutableSpan
+    interop_counted_noescape_null_unspecified(emptyArr.span, &spanOut)
+    expectEqual(emptyArr, emptyArrOut)
+}
+
+Suite.test("Empty inline array with counted_by_null_unspecified") {
+    let emptyArr: [0 of Int32] = []
+    var emptyArrOut: [0 of Int32] = []
+    var spanOut = emptyArrOut.mutableSpan
+    emptyArr.span.withUnsafeBufferPointer { buf in
+      spanOut.withUnsafeMutableBufferPointer { bufOut in
+        unsafe interop_counted_null_unspecified(buf, bufOut)
+      }
+    }
+    expectEqual(emptyArr, emptyArrOut)
+}
+
+Suite.test("Non-empty inline array with counted_by_null_unspecified and noescape") {
+    let arr: [3 of Int32] = [1, 2, 3]
+    var arrOut: [3 of Int32] = [3, 2, 1]
+    var spanOut = arrOut.mutableSpan
+    interop_counted_noescape_null_unspecified(arr.span, &spanOut)
+    expectEqual(arr, arrOut)
+}
+
+Suite.test("Non-empty inline array with counted_by_null_unspecified") {
+    let arr: [3 of Int32] = [1, 2, 3]
+    var arrOut: [3 of Int32] = [3, 2, 1]
+    var spanOut = arrOut.mutableSpan
+    arr.span.withUnsafeBufferPointer { buf in
+      spanOut.withUnsafeMutableBufferPointer { bufOut in
+        unsafe interop_counted_null_unspecified(buf, bufOut)
+      }
+    }
+    expectEqual(arr, arrOut)
+}
+
 Suite.test("Empty array with return_lifetimebound") {
     let emptyArr: [Int32] = []
     let result = interop_counted_return_lifetimebound(emptyArr.span)
@@ -447,6 +549,74 @@ Suite.test("Default buffer with return_nullable") {
     unsafe expectEqual(buf, result)
 }
 
+Suite.test("Empty array with return_lifetimebound_null_unspecified") {
+    let emptyArr: [Int32] = []
+    let result = interop_counted_return_lifetimebound_null_unspecified(emptyArr.span)
+    expectEqual(emptyArr.span, result)
+}
+
+Suite.test("Non-empty array with return_lifetimebound_null_unspecified") {
+    let arr: [Int32] = [1, 2, 3]
+    let result = interop_counted_return_lifetimebound_null_unspecified(arr.span)
+    expectEqual(arr.span, result)
+}
+
+Suite.test("Empty array with return_null_unspecified") {
+    let emptyArr: [Int32] = []
+    emptyArr.withUnsafeBufferPointer { buf in
+        let result = unsafe interop_counted_return_null_unspecified(buf)
+        unsafe expectEqual(buf, result)
+    }
+}
+
+Suite.test("Non-empty array with return_null_unspecified") {
+    let arr: [Int32] = [1, 2, 3]
+    arr.withUnsafeBufferPointer { buf in
+        let result = unsafe interop_counted_return_null_unspecified(buf)
+        unsafe expectEqual(buf, result)
+    }
+}
+
+Suite.test("Empty inline array with return_lifetimebound_null_unspecified") {
+    let emptyArr: [0 of Int32] = []
+    let result = interop_counted_return_lifetimebound_null_unspecified(emptyArr.span)
+    expectEqual(emptyArr.span, result)
+}
+
+Suite.test("Non-empty inline array with return_lifetimebound_null_unspecified") {
+    let arr: [3 of Int32] = [1, 2, 3]
+    let result = interop_counted_return_lifetimebound_null_unspecified(arr.span)
+    expectEqual(arr.span, result)
+}
+
+Suite.test("Default span with return_lifetimebound_null_unspecified") {
+    let span = Span<Int32>()
+    let result = interop_counted_return_lifetimebound_null_unspecified(span)
+    expectEqual(span, result)
+}
+
+Suite.test("Empty inline array with return_null_unspecified") {
+    let emptyArr: [0 of Int32] = []
+    emptyArr.span.withUnsafeBufferPointer { buf in
+      let result = unsafe interop_counted_return_null_unspecified(buf)
+      unsafe expectEqual(buf, result)
+    }
+}
+
+Suite.test("Non-empty inline array with return_null_unspecified") {
+    let arr: [3 of Int32] = [1, 2, 3]
+    arr.span.withUnsafeBufferPointer { buf in
+      let result = unsafe interop_counted_return_null_unspecified(buf)
+      unsafe expectEqual(buf, result)
+    }
+}
+
+Suite.test("Default buffer with return_null_unspecified") {
+    let buf = UnsafeBufferPointer<Int32>(_empty:())
+    let result = unsafe interop_counted_return_null_unspecified(buf)
+    unsafe expectEqual(buf, result)
+}
+
 Suite.test("Mismatching lengths span") {
     let emptyArr: [Int32] = [1]
     var emptyArrOut: [Int32] = []
@@ -459,6 +629,13 @@ Suite.test("Mismatching lengths span nullable") {
     var emptyArrOut: [Int32] = []
     var spanOut = emptyArrOut.mutableSpan
     expectCrash { interop_counted_noescape_nullable(emptyArr.span, &spanOut) }
+}
+
+Suite.test("Mismatching lengths span null_unspecified") {
+    let emptyArr: [Int32] = [1]
+    var emptyArrOut: [Int32] = []
+    var spanOut = emptyArrOut.mutableSpan
+    expectCrash { interop_counted_noescape_null_unspecified(emptyArr.span, &spanOut) }
 }
 
 // --- Mixed nullability shared-count tests ---

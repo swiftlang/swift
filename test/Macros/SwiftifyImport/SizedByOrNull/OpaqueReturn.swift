@@ -101,7 +101,12 @@ public func impNullableSpan(p: RawSpan) -> RawSpan {
     defer {
         _fixLifetime(p)
     }
-    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(unsafe impNullableSpan(p: OpaquePointer(_pPtr.baseAddress!), size)), byteCount: Int(size)), copying: ())
+    let _resultValue: OpaquePointer? = unsafe impNullableSpan(p: OpaquePointer(_pPtr.baseAddress), size)
+    if unsafe _resultValue == nil {
+      precondition(size == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")
+      return RawSpan()
+    }
+    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: unsafe UnsafeRawPointer(_resultValue!), byteCount: Int(size)), copying: ())
 }
 ------------------------------
 

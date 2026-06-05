@@ -19,7 +19,7 @@
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func simple(_ p: UnsafeMutableRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe simple(len, p.baseAddress!)|}}
+//   expected-remark@4{{macro content: |    return unsafe simple(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void simple(int len, void * __sized_by_or_null(len) p);
@@ -28,7 +28,7 @@ void simple(int len, void * __sized_by_or_null(len) p);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_ p: UnsafeMutableRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe swiftAttr(len, p.baseAddress!)|}}
+//   expected-remark@4{{macro content: |    return unsafe swiftAttr(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void swiftAttr(int len, void *p) __attribute__((swift_attr(
@@ -41,7 +41,7 @@ void swiftAttr(int len, void *p) __attribute__((swift_attr(
 //   expected-remark@4{{macro content: |    if p1.count != len {|}}
 //   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p1.count)")|}}
 //   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    return unsafe shared(len, p1.baseAddress!, p2.baseAddress!)|}}
+//   expected-remark@7{{macro content: |    return unsafe shared(len, p1.baseAddress, p2.baseAddress)|}}
 //   expected-remark@8{{macro content: |}|}}
 // }}
 void shared(int len, void * __sized_by_or_null(len) p1, void * __sized_by_or_null(len) p2);
@@ -52,7 +52,7 @@ void shared(int len, void * __sized_by_or_null(len) p1, void * __sized_by_or_nul
 //   expected-remark@3{{macro content: |    if p.count != len - offset {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe complexExpr(len, offset, p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe complexExpr(len, offset, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void complexExpr(int len, int offset, void * __sized_by_or_null(len - offset) p);
@@ -61,7 +61,7 @@ void complexExpr(int len, int offset, void * __sized_by_or_null(len - offset) p)
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_ p: UnsafeMutableRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe nullUnspecified(len, p.baseAddress!)|}}
+//   expected-remark@4{{macro content: |    return unsafe nullUnspecified(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void nullUnspecified(int len, void * __sized_by_or_null(len) _Null_unspecified p);
@@ -98,7 +98,7 @@ typedef struct foo opaque_t;
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func opaque(_ p: UnsafeRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe opaque(len, OpaquePointer(p.baseAddress!))|}}
+//   expected-remark@4{{macro content: |    return unsafe opaque(len, OpaquePointer(p.baseAddress))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void opaque(int len, opaque_t * __sized_by_or_null(len) p);
@@ -108,16 +108,17 @@ typedef opaque_t *opaqueptr_t;
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func opaqueptr(_ p: UnsafeRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe opaqueptr(len, OpaquePointer(p.baseAddress!))|}}
+//   expected-remark@4{{macro content: |    return unsafe opaqueptr(len, OpaquePointer(p.baseAddress))|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void opaqueptr(int len, opaqueptr_t __sized_by_or_null(len) p);
 
-// expected-expansion@+7:56{{
+// expected-expansion@+8:56{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func charsized(_ _charsized_param0: UnsafeMutableRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    let _charsized_param1 = Int32(exactly: _charsized_param0.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe charsized(_charsized_param0.baseAddress!.assumingMemoryBound(to: CChar.self), _charsized_param1)|}}
+//   expected-error@4{{value of optional type 'UnsafeMutableRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeMutableRawPointer'}}
+//   expected-remark@4{{macro content: |    return unsafe charsized(_charsized_param0.baseAddress.assumingMemoryBound(to: CChar.self), _charsized_param1)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void charsized(char *__sized_by_or_null(size), int size);
@@ -133,11 +134,12 @@ uint8_t *__sized_by_or_null(size) bytesized(int size);
 void doublebytesized(uint16_t *__sized_by_or_null(size), int size);
 
 typedef uint8_t * bytesizedptr_t;
-// expected-expansion@+7:74{{
+// expected-expansion@+8:74{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func aliasedBytesized(_ p: UnsafeMutableRawBufferPointer) {|}}
 //   expected-remark@3{{macro content: |    let size = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe aliasedBytesized(p.baseAddress!.assumingMemoryBound(to: UInt8.self), size)|}}
+//   expected-error@4{{value of optional type 'UnsafeMutableRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeMutableRawPointer'}}
+//   expected-remark@4{{macro content: |    return unsafe aliasedBytesized(p.baseAddress.assumingMemoryBound(to: UInt8.self), size)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void aliasedBytesized(bytesizedptr_t __sized_by_or_null(size) p, int size);

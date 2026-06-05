@@ -24,7 +24,7 @@
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe simple(len, _pPtr.baseAddress!)|}}
+//   expected-remark@10{{macro content: |    return unsafe simple(len, _pPtr.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void simple(int len, int * __counted_by_or_null(len) __noescape p);
@@ -39,7 +39,7 @@ void simple(int len, int * __counted_by_or_null(len) __noescape p);
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe swiftAttr(len, _pPtr.baseAddress!)|}}
+//   expected-remark@10{{macro content: |    return unsafe swiftAttr(len, _pPtr.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void swiftAttr(int len, int *p) __attribute__((
@@ -64,7 +64,7 @@ void swiftAttr(int len, int *p) __attribute__((
 //   expected-remark@16{{macro content: |    defer {|}}
 //   expected-remark@17{{macro content: |        _fixLifetime(p2)|}}
 //   expected-remark@18{{macro content: |    }|}}
-//   expected-remark@19{{macro content: |    return unsafe shared(len, _p1Ptr.baseAddress!, _p2Ptr.baseAddress!)|}}
+//   expected-remark@19{{macro content: |    return unsafe shared(len, _p1Ptr.baseAddress, _p2Ptr.baseAddress)|}}
 //   expected-remark@20{{macro content: |}|}}
 // }}
 void shared(int len, int * __counted_by_or_null(len) __noescape p1, int * __counted_by_or_null(len) __noescape p2);
@@ -81,7 +81,7 @@ void shared(int len, int * __counted_by_or_null(len) __noescape p1, int * __coun
 //   expected-remark@9{{macro content: |    defer {|}}
 //   expected-remark@10{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@11{{macro content: |    }|}}
-//   expected-remark@12{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress!)|}}
+//   expected-remark@12{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress)|}}
 //   expected-remark@13{{macro content: |}|}}
 // }}
 void complexExpr(int len, int offset, int * __counted_by_or_null(len - offset) __noescape p);
@@ -96,7 +96,7 @@ void complexExpr(int len, int offset, int * __counted_by_or_null(len - offset) _
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe nullUnspecified(len, _pPtr.baseAddress!)|}}
+//   expected-remark@10{{macro content: |    return unsafe nullUnspecified(len, _pPtr.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void nullUnspecified(int len, int * __counted_by_or_null(len) _Null_unspecified __noescape p);
@@ -352,7 +352,7 @@ typedef struct actor_ *actor;
 //   expected-warning@8{{expression uses unsafe constructs but is not marked with 'unsafe'}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe keywordType(len, _pPtr.baseAddress!, p2)|}}
+//   expected-remark@10{{macro content: |    return unsafe keywordType(len, _pPtr.baseAddress, p2)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 actor _Nonnull keywordType(int len, actor * __counted_by_or_null(len) __noescape p, actor _Nonnull p2);
