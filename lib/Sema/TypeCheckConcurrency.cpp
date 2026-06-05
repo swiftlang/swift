@@ -357,6 +357,8 @@ swift::checkGlobalActorAttributes(SourceLoc loc, ArrayRef<CustomAttr *> attrs) {
       ctx.Diags.diagnose(attr->getLocation(), diag::multiple_global_actors_note,
                          nominal);
 
+      const_cast<CustomAttr *>(attr)->setInvalid();
+
       continue;
     }
 
@@ -436,8 +438,9 @@ GlobalActorAttributeRequest::evaluate(
     if (auto classDecl = dyn_cast<ClassDecl>(nominal)){
       if (classDecl->isActor()) {
         // ... except for actors.
-        nominal->diagnose(diag::global_actor_on_actor_class, nominal->getName())
-            .highlight(globalActorAttr->getRangeWithAt());
+        diagnoseAndRemoveAttr(nominal, globalActorAttr,
+                              diag::global_actor_on_actor_class,
+                              nominal->getName());
         return std::nullopt;
       }
     }
@@ -450,15 +453,16 @@ GlobalActorAttributeRequest::evaluate(
           (var->getDeclContext()->isAsyncContext() ||
            var->getASTContext().LangOpts.StrictConcurrencyLevel >=
              StrictConcurrency::Complete)) {
-        var->diagnose(diag::global_actor_top_level_var)
-            .highlight(globalActorAttr->getRangeWithAt());
+        diagnoseAndRemoveAttr(var, globalActorAttr,
+                              diag::global_actor_top_level_var);
         return std::nullopt;
       }
 
       // ... and not if it's local property
       if (var->getDeclContext()->isLocalContext()) {
-        var->diagnose(diag::global_actor_on_local_variable, var->getName())
-            .highlight(globalActorAttr->getRangeWithAt());
+        diagnoseAndRemoveAttr(var, globalActorAttr,
+                              diag::global_actor_on_local_variable,
+                              var->getName());
         return std::nullopt;
       }
     }
@@ -504,14 +508,17 @@ GlobalActorAttributeRequest::evaluate(
         }
 
         // In Swift 6, once the diag above is an error, it is disallowed.
-        if (ctx.isLanguageModeAtLeast(LanguageMode::v6))
+        if (ctx.isLanguageModeAtLeast(LanguageMode::v6)) {
+          globalActorAttr->setInvalid();
           return std::nullopt;
+        }
       }
     }
     // Functions are okay.
   } else {
     // Everything else is disallowed.
-    decl->diagnose(diag::global_actor_disallowed, decl);
+    diagnoseAndRemoveAttr(decl, globalActorAttr, diag::global_actor_disallowed,
+                          decl);
     return std::nullopt;
   }
 
