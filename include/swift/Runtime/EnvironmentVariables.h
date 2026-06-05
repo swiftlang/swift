@@ -38,14 +38,11 @@ using uint32 = uint32_t;
 using optional_uint8 = std::optional<uint8_t>;
 } // namespace types
 
-struct EnvironmentVariableState {
+// Declare backing variables.
 #define VARIABLE(name, type, defaultValue, help)                               \
-  types::type name##_variable;                                                 \
-  bool name##_isSet_variable;
+  extern swift::runtime::environment::types::type name##_variable;             \
+  extern bool name##_isSet_variable;
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
-};
-
-extern EnvironmentVariableState environmentVariableState;
 
 // Define getter functions. This creates one function with the same name as the
 // variable which returns the value set for that variable, and second function
@@ -55,11 +52,11 @@ extern EnvironmentVariableState environmentVariableState;
 #define VARIABLE(name, type, defaultValue, help)                               \
   inline swift::runtime::environment::types::type name() {                     \
     swift::once(initializeToken, initialize, nullptr);                         \
-    return environmentVariableState.name##_variable;                           \
+    return name##_variable;                                                    \
   }                                                                            \
   inline bool name##_isSet() {                                                 \
     swift::once(initializeToken, initialize, nullptr);                         \
-    return environmentVariableState.name##_isSet_variable;                     \
+    return name##_isSet_variable;                                              \
   }
 #include "../../../stdlib/public/runtime/EnvironmentVariables.def"
 
