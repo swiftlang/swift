@@ -14,7 +14,7 @@
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func simple(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe simple(len, p.baseAddress!)|}}
+//   expected-remark@4{{macro content: |    return unsafe simple(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void simple(int len, int * __counted_by_or_null(len) p);
@@ -23,7 +23,7 @@ void simple(int len, int * __counted_by_or_null(len) p);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func simpleFlipped(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe simpleFlipped(p.baseAddress!, len)|}}
+//   expected-remark@4{{macro content: |    return unsafe simpleFlipped(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void simpleFlipped(int * __counted_by_or_null(len) p, int len);
@@ -32,7 +32,7 @@ void simpleFlipped(int * __counted_by_or_null(len) p, int len);
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func swiftAttr(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe swiftAttr(len, p.baseAddress!)|}}
+//   expected-remark@4{{macro content: |    return unsafe swiftAttr(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void swiftAttr(int len, int *p) __attribute__((
@@ -45,7 +45,7 @@ void swiftAttr(int len, int *p) __attribute__((
 //   expected-remark@4{{macro content: |    if p1.count != len {|}}
 //   expected-remark@5{{macro content: |      fatalError("bounds check failure in shared: expected \\(len) but got \\(p1.count)")|}}
 //   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    return unsafe shared(len, p1.baseAddress!, p2.baseAddress!)|}}
+//   expected-remark@7{{macro content: |    return unsafe shared(len, p1.baseAddress, p2.baseAddress)|}}
 //   expected-remark@8{{macro content: |}|}}
 // }}
 void shared(int len, int * __counted_by_or_null(len) p1, int * __counted_by_or_null(len) p2);
@@ -56,7 +56,7 @@ void shared(int len, int * __counted_by_or_null(len) p1, int * __counted_by_or_n
 //   expected-remark@3{{macro content: |    if p.count != len - offset {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe complexExpr(len, offset, p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe complexExpr(len, offset, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void complexExpr(int len, int offset, int * __counted_by_or_null(len - offset) p);
@@ -65,7 +65,7 @@ void complexExpr(int len, int offset, int * __counted_by_or_null(len - offset) p
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func nullUnspecified(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe nullUnspecified(len, p.baseAddress!)|}}
+//   expected-remark@4{{macro content: |    return unsafe nullUnspecified(len, p.baseAddress)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void nullUnspecified(int len, int * __counted_by_or_null(len) _Null_unspecified p);
@@ -103,7 +103,7 @@ int * __counted_by_or_null(len) returnPointer(int len);
 //   expected-remark@3{{macro content: |    if p.count != len + 1 {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in offByOne: expected \\(len + 1) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe offByOne(len, p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe offByOne(len, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void offByOne(int len, int * __counted_by_or_null(len + 1) p);
@@ -114,7 +114,7 @@ void offByOne(int len, int * __counted_by_or_null(len + 1) p);
 //   expected-remark@3{{macro content: |    if p.count != len + (1 + offset) {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in offBySome: expected \\(len + (1 + offset)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe offBySome(len, offset, p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe offBySome(len, offset, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void offBySome(int len, int offset, int * __counted_by_or_null(len + (1 + offset)) p);
@@ -125,7 +125,7 @@ void offBySome(int len, int offset, int * __counted_by_or_null(len + (1 + offset
 //   expected-remark@3{{macro content: |    if p.count != m * n {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in scalar: expected \\(m * n) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe scalar(m, n, p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe scalar(m, n, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void scalar(int m, int n, int * __counted_by_or_null(m * n) p);
@@ -136,7 +136,7 @@ void scalar(int m, int n, int * __counted_by_or_null(m * n) p);
 //   expected-remark@3{{macro content: |    if p.count != m & n | ~o {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in bitwise: expected \\(m & n | ~o) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe bitwise(m, n, o, p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe bitwise(m, n, o, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void bitwise(int m, int n, int o, int * __counted_by_or_null(m & n | ~o) p);
@@ -147,7 +147,7 @@ void bitwise(int m, int n, int o, int * __counted_by_or_null(m & n | ~o) p);
 //   expected-remark@3{{macro content: |    if p.count != m << (n >> o) {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in bitshift: expected \\(m << (n >> o)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe bitshift(m, n, o, p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe bitshift(m, n, o, p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void bitshift(int m, int n, int o, int * __counted_by_or_null(m << (n >> o)) p);
@@ -158,7 +158,7 @@ void bitshift(int m, int n, int o, int * __counted_by_or_null(m << (n >> o)) p);
 //   expected-remark@3{{macro content: |    if p.count != 420 {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in constInt: expected \\(420) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe constInt(p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe constInt(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void constInt(int * __counted_by_or_null(42 * 10) p);
@@ -169,7 +169,7 @@ void constInt(int * __counted_by_or_null(42 * 10) p);
 //   expected-remark@3{{macro content: |    if p.count != 0 {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in constFloatCastedToInt: expected \\(0) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe constFloatCastedToInt(p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe constFloatCastedToInt(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void constFloatCastedToInt(int * __counted_by_or_null((int) (4.2 / 12)) p);
@@ -202,7 +202,7 @@ void longLiteral(int * __counted_by_or_null(2l) p);
 //   expected-remark@3{{macro content: |    if p.count != 250 {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in hexLiteral: expected \\(250) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe hexLiteral(p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe hexLiteral(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void hexLiteral(int * __counted_by_or_null(0xfa) p);
@@ -213,7 +213,7 @@ void hexLiteral(int * __counted_by_or_null(0xfa) p);
 //   expected-remark@3{{macro content: |    if p.count != 2 {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in binaryLiteral: expected \\(2) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe binaryLiteral(p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe binaryLiteral(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void binaryLiteral(int * __counted_by_or_null(0b10) p);
@@ -224,7 +224,7 @@ void binaryLiteral(int * __counted_by_or_null(0b10) p);
 //   expected-remark@3{{macro content: |    if p.count != 511 {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in octalLiteral: expected \\(511) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe octalLiteral(p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe octalLiteral(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void octalLiteral(int * __counted_by_or_null(0777) p);
@@ -244,7 +244,7 @@ void variadic(int len, int * __counted_by_or_null(len) p, ...);
 //   expected-remark@4{{macro content: |    if let _p1Count = unsafe p1?.count, _p1Count != len {|}}
 //   expected-remark@5{{macro content: |      fatalError("bounds check failure in mixedShared: expected \\(len) but got \\(_p1Count)")|}}
 //   expected-remark@6{{macro content: |    }|}}
-//   expected-remark@7{{macro content: |    return unsafe mixedShared(len, p1?.baseAddress, p2.baseAddress!)|}}
+//   expected-remark@7{{macro content: |    return unsafe mixedShared(len, p1?.baseAddress, p2.baseAddress)|}}
 //   expected-remark@8{{macro content: |}|}}
 // }}
 void mixedShared(int len, int * __counted_by_or_null(len) _Nullable p1, int * __counted_by(len) p2);
@@ -261,7 +261,7 @@ void mixedShared(int len, int * __counted_by_or_null(len) _Nullable p1, int * __
 //   expected-remark@7{{macro content: |    if let _p3Count = unsafe p3?.count, _p3Count != len {|}}
 //   expected-remark@8{{macro content: |      fatalError("bounds check failure in mixedThree: expected \\(len) but got \\(_p3Count)")|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe mixedThree(len, p1?.baseAddress, p2.baseAddress!, p3?.baseAddress)|}}
+//   expected-remark@10{{macro content: |    return unsafe mixedThree(len, p1?.baseAddress, p2.baseAddress, p3?.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void mixedThree(int len, int * __counted_by_or_null(len) _Nullable p1, int * __counted_by(len) p2, int * __counted_by_or_null(len) _Nullable p3);

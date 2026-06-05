@@ -117,7 +117,7 @@ public mutating func basic(_ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe basic(_pPtr.baseAddress!, len)
+    return unsafe basic(_pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So5basic15_SwiftifyImportfMp_.swift
@@ -132,7 +132,7 @@ public func basic(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<Int32>) 
     defer {
         _fixLifetime(p)
     }
-    return unsafe basic(a, _pPtr.baseAddress!, len)
+    return unsafe basic(a, _pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So1AV3bar15_SwiftifyImportfMp_.swift
@@ -147,7 +147,7 @@ public mutating func bar(_ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe bar(_pPtr.baseAddress!, len)
+    return unsafe bar(_pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So7renamed15_SwiftifyImportfMp_.swift
@@ -162,7 +162,7 @@ public func renamed(_ a: UnsafeMutablePointer<A>!, _ p: inout MutableSpan<Int32>
     defer {
         _fixLifetime(p)
     }
-    return unsafe renamed(a, _pPtr.baseAddress!, len)
+    return unsafe renamed(a, _pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So1AV9constSelf15_SwiftifyImportfMp_.swift
@@ -177,7 +177,7 @@ public func constSelf(_ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe constSelf(_pPtr.baseAddress!, len)
+    return unsafe constSelf(_pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So9constSelf15_SwiftifyImportfMp_.swift
@@ -192,7 +192,7 @@ public func constSelf(_ a: UnsafePointer<A>!, _ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe constSelf(a, _pPtr.baseAddress!, len)
+    return unsafe constSelf(a, _pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So1AV7valSelf15_SwiftifyImportfMp_.swift
@@ -207,7 +207,7 @@ public func valSelf(_ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe valSelf(_pPtr.baseAddress!, len)
+    return unsafe valSelf(_pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So7valSelf15_SwiftifyImportfMp_.swift
@@ -222,7 +222,7 @@ public func valSelf(_ a: A, _ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe valSelf(a, _pPtr.baseAddress!, len)
+    return unsafe valSelf(a, _pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So1AV17lifetimeBoundSelf15_SwiftifyImportfMp_.swift
@@ -230,7 +230,12 @@ public func valSelf(_ a: A, _ p: inout MutableSpan<Int32>) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow self) @_disfavoredOverload
 public func lifetimeBoundSelf(_ len: Int32) -> MutableSpan<Int32> {
-    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: unsafe lifetimeBoundSelf(len), count: Int(len)), copying: ())
+    let _resultValue: UnsafeMutablePointer<Int32>? = unsafe lifetimeBoundSelf(len)
+    if unsafe _resultValue == nil {
+      precondition(len == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")
+      return MutableSpan<Int32>()
+    }
+    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())
 }
 ------------------------------
 @__swiftmacro_So17lifetimeBoundSelf15_SwiftifyImportfMp_.swift
@@ -238,7 +243,12 @@ public func lifetimeBoundSelf(_ len: Int32) -> MutableSpan<Int32> {
 /// This is an auto-generated wrapper for safer interop
 @available(swift, obsoleted: 3, renamed: "A.lifetimeBoundSelf(self:_:)") @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(borrow a) @_disfavoredOverload
 public func lifetimeBoundSelf(_ a: A, _ len: Int32) -> MutableSpan<Int32> {
-    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: unsafe lifetimeBoundSelf(a, len), count: Int(len)), copying: ())
+    let _resultValue: UnsafeMutablePointer<Int32>? = unsafe lifetimeBoundSelf(a, len)
+    if unsafe _resultValue == nil {
+      precondition(len == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")
+      return MutableSpan<Int32>()
+    }
+    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())
 }
 ------------------------------
 @__swiftmacro_So1CV7refSelf15_SwiftifyImportfMp_.swift
@@ -253,7 +263,7 @@ public final func refSelf(_ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe refSelf(_pPtr.baseAddress!, len)
+    return unsafe refSelf(_pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So7refSelf15_SwiftifyImportfMp_.swift
@@ -268,7 +278,7 @@ public func refSelf(_ c: C!, _ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe refSelf(c, _pPtr.baseAddress!, len)
+    return unsafe refSelf(c, _pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So4DRefa7refSelf15_SwiftifyImportfMp_.swift
@@ -283,7 +293,7 @@ public final func refSelf(_ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe refSelf(_pPtr.baseAddress!, len)
+    return unsafe refSelf(_pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So9refSelfCF15_SwiftifyImportfMp_.swift
@@ -298,7 +308,7 @@ public func refSelfCF(_ d: D!, _ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe refSelfCF(d, _pPtr.baseAddress!, len)
+    return unsafe refSelfCF(d, _pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So1BV11nonescaping15_SwiftifyImportfMp_.swift
@@ -313,7 +323,7 @@ public func nonescaping(_ p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    return unsafe nonescaping(_pPtr.baseAddress!, len)
+    return unsafe nonescaping(_pPtr.baseAddress, len)
 }
 ------------------------------
 @__swiftmacro_So1BV24nonescapingLifetimebound15_SwiftifyImportfMp_.swift
@@ -321,7 +331,12 @@ public func nonescaping(_ p: inout MutableSpan<Int32>) {
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(&self) @_disfavoredOverload
 public mutating func nonescapingLifetimebound(_ len: Int32) -> MutableSpan<Int32> {
-    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: unsafe nonescapingLifetimebound(len), count: Int(len)), copying: ())
+    let _resultValue: UnsafeMutablePointer<Int32>? = unsafe nonescapingLifetimebound(len)
+    if unsafe _resultValue == nil {
+      precondition(len == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")
+      return MutableSpan<Int32>()
+    }
+    return unsafe _swiftifyOverrideLifetime(MutableSpan<Int32>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())
 }
 ------------------------------
 @__swiftmacro_So1AV4init15_SwiftifyImportfMp_.swift
@@ -330,7 +345,7 @@ public mutating func nonescapingLifetimebound(_ len: Int32) -> MutableSpan<Int32
 @_alwaysEmitIntoClient @_disfavoredOverload
 public /*not inherited*/ init!(pointerA p: UnsafeMutableBufferPointer<Int32>) {
     let len = Int32(exactly: p.count)!
-    unsafe self.init(countA: len, pointerA: p.baseAddress!)
+    unsafe self.init(countA: len, pointerA: p.baseAddress)
 }
 ------------------------------
 @__swiftmacro_So7createA15_SwiftifyImportfMp_.swift
@@ -339,7 +354,7 @@ public /*not inherited*/ init!(pointerA p: UnsafeMutableBufferPointer<Int32>) {
 @available(swift, obsoleted: 3, renamed: "A.init(countA:pointerA:)") @_alwaysEmitIntoClient @_disfavoredOverload
 public func createA(_ p: UnsafeMutableBufferPointer<Int32>) -> UnsafeMutablePointer<A>! {
     let len = Int32(exactly: p.count)!
-    return unsafe createA(len, p.baseAddress!)
+    return unsafe createA(len, p.baseAddress)
 }
 ------------------------------
 @__swiftmacro_So1AV4init15_SwiftifyImportfMp_.swift
@@ -354,7 +369,7 @@ public /*not inherited*/ init!(pointerA2 p: inout MutableSpan<Int32>) {
     defer {
         _fixLifetime(p)
     }
-    unsafe self.init(countA2: len, pointerA2: _pPtr.baseAddress!)
+    unsafe self.init(countA2: len, pointerA2: _pPtr.baseAddress)
 }
 ------------------------------
 @__swiftmacro_So8createA215_SwiftifyImportfMp_.swift
@@ -369,7 +384,7 @@ public func createA2(_ p: inout MutableSpan<Int32>) -> UnsafeMutablePointer<A>! 
     defer {
         _fixLifetime(p)
     }
-    return unsafe createA2(len, _pPtr.baseAddress!)
+    return unsafe createA2(len, _pPtr.baseAddress)
 }
 ------------------------------
 @__swiftmacro_So1CV4init15_SwiftifyImportfMp_.swift
@@ -378,7 +393,7 @@ public func createA2(_ p: inout MutableSpan<Int32>) -> UnsafeMutablePointer<A>! 
 @_alwaysEmitIntoClient @_disfavoredOverload
 public /*not inherited*/ final convenience init!(pointerC p: UnsafeMutableBufferPointer<Int32>) {
     let len = Int32(exactly: p.count)!
-    unsafe self.init(countC: len, pointerC: p.baseAddress!)
+    unsafe self.init(countC: len, pointerC: p.baseAddress)
 }
 ------------------------------
 @__swiftmacro_So7createC15_SwiftifyImportfMp_.swift
@@ -387,7 +402,7 @@ public /*not inherited*/ final convenience init!(pointerC p: UnsafeMutableBuffer
 @available(swift, obsoleted: 3, renamed: "C.init(countC:pointerC:)") @_alwaysEmitIntoClient @_disfavoredOverload
 public func createC(_ p: UnsafeMutableBufferPointer<Int32>) -> C! {
     let len = Int32(exactly: p.count)!
-    return unsafe createC(len, p.baseAddress!)
+    return unsafe createC(len, p.baseAddress)
 }
 ------------------------------
 @__swiftmacro_So7createD15_SwiftifyImportfMp_.swift
@@ -396,6 +411,6 @@ public func createC(_ p: UnsafeMutableBufferPointer<Int32>) -> C! {
 @available(swift, obsoleted: 3, renamed: "D.init(countD:pointerD:)") @_alwaysEmitIntoClient @_disfavoredOverload
 public func createD(_ p: UnsafeMutableBufferPointer<Int32>) -> Unmanaged<D>! {
     let len = Int32(exactly: p.count)!
-    return unsafe createD(len, p.baseAddress!)
+    return unsafe createD(len, p.baseAddress)
 }
 ------------------------------
