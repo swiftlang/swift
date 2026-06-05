@@ -23,7 +23,7 @@
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe simple(len, _pPtr.baseAddress!)|}}
+//   expected-remark@10{{macro content: |    return unsafe simple(len, _pPtr.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void simple(int len, int * __counted_by(len) __noescape p);
