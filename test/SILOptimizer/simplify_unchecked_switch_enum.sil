@@ -6,6 +6,14 @@
 import Swift
 import Builtin
 
+class Klass {
+}
+
+enum FakeOptional<T> {
+  case some(T)
+  case none
+}
+
 enum E {
   case A
   case B(String)
@@ -157,3 +165,111 @@ bb2(%4 : @owned $E):
   unreachable
 }
 
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum1 :
+// CHECK-O-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum1'
+sil [ossa] @test_simplify_switch_enum1 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @owned $Klass):
+  destroy_value %3 : $Klass
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum2 :
+// CHECK-O-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum2'
+sil [ossa] @test_simplify_switch_enum2 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum3 :
+// CHECK-O-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum3'
+sil [ossa] @test_simplify_switch_enum3 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %b = begin_borrow %0 : $Klass
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  end_borrow %b : $Klass
+  destroy_value %0 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @use_optional : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum4 :
+// CHECK-O-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum4'
+sil [ossa] @test_simplify_switch_enum4 : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %0 : $Klass
+  %f = function_ref @use_optional : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  %c = apply %f(%1) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @test_simplify_switch_enum5 :
+// CHECK-O-NOT: switch_enum
+// CHECK-LABEL: } // end sil function 'test_simplify_switch_enum5'
+sil [ossa] @test_simplify_switch_enum5 : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %b = begin_borrow %0 : $Klass
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %b : $Klass
+  %f = function_ref @use_optional : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  %c = apply %f(%1) : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> ()
+  switch_enum %1 : $FakeOptional<Klass>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb2:
+  br bb3
+
+bb1(%3 : @guaranteed $Klass):
+  br bb3
+
+bb3:
+  end_borrow %b : $Klass
+  destroy_value %0 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
