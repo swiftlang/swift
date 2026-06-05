@@ -1114,24 +1114,24 @@ ValueDecl *swift::deriveRequirementViaMacro(DerivedConformance &derived,
     auto mDecl = dyn_cast<MacroExpansionDecl>(decl);
     if (!mDecl)
       continue;
-    if (expansion) {
-      ABORT("Expected a single macro expansion decl in the code buffer.");
-    }
+   
+    ASSERT(!expansion && "Expected a single macro expansion decl in the code buffer.");
+    
     expansion = mDecl;
   }
   ASSERT(expansion);
 
   // Find the expanded `ValueDecl *` and return it. There should only ever be a
-  // single one
+  // single oneks
   ValueDecl *witness = nullptr;
   expansion->forEachExpandedNode([&](ASTNode node) {
     auto *vDecl = handleASTNodeForDerivation(C, derived, node);
     if (!vDecl)
       return;
-    if (witness) {
-      ABORT("Expected a single ValueDecl * from the expansion of "
+    
+    ASSERT(!witness && "Expected a single ValueDecl * from the expansion of "
             "the synthesized macro decl.");
-    }
+    
     witness = vDecl;
   });
   ASSERT(witness && "Expected a witness but got NULL");
