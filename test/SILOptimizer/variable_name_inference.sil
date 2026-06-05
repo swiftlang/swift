@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -module-name infer -test-runner %s 2>&1 | %FileCheck %s
 
 import Builtin
+import Swift
 
 //===----------------------------------------------------------------------===//
 //                             MARK: Declarations
@@ -783,6 +784,48 @@ bb0(%0 : $*Klass):
   return %9999 : $()
 }
 
+// Trace starts at the init_existential_addr result ($*Klass) rather than the
+// alloc_stack; the inferrer looks backward through init_existential_addr to
+// the named alloc_stack.
+//
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_addr_trace_at_result: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %2 = init_existential_addr %1 : $*Any, $Klass
+// CHECK: Name: 'myStorage'
+// CHECK: Root:   %1 = alloc_stack $Any, var, name "myStorage"
+// CHECK: end running test 1 of 1 on init_existential_addr_trace_at_result: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_addr_trace_at_result : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  specify_test "variable_name_inference @trace[0]"
+  %2 = alloc_stack $Any, var, name "myStorage"
+  %3 = init_existential_addr %2 : $*Any, $Klass
+  debug_value [trace] %3 : $*Klass
+  store %0 to [init] %3 : $*Klass
+  destroy_addr %2 : $*Any
+  dealloc_stack %2 : $*Any
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Same but via copy_addr into the init_existential_addr slot.
+//
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_addr_trace_at_result_copy_addr: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %2 = init_existential_addr %1 : $*Any, $Klass
+// CHECK: Name: 'myStorage'
+// CHECK: Root:   %1 = alloc_stack $Any, var, name "myStorage"
+// CHECK: end running test 1 of 1 on init_existential_addr_trace_at_result_copy_addr: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_addr_trace_at_result_copy_addr : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  specify_test "variable_name_inference @trace[0]"
+  %2 = alloc_stack $Any, var, name "myStorage"
+  %3 = init_existential_addr %2 : $*Any, $Klass
+  debug_value [trace] %3 : $*Klass
+  copy_addr [take] %0 to [init] %3 : $*Klass
+  destroy_addr %2 : $*Any
+  dealloc_stack %2 : $*Any
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: begin running test 1 of 1 on move_value_var_decl: variable_name_inference with: @trace[0]
 // CHECK: Input Value:   %2 = move_value [var_decl] %1 : $Klass
 // CHECK: Name: 'MyName'
@@ -1085,6 +1128,77 @@ bb0(%0 : @guaranteed $C):
   debug_value [trace] %r : $Klass
   destroy_value %r : $Klass
   destroy_value %pa : $@callee_guaranteed () -> @owned Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: init_existential_ref look-through
+//
+// When a named class value is wrapped in `any Protocol` via init_existential_ref
+// the name inferrer must look through it to reach the concrete value, otherwise
+// region-isolation diagnostics fall back to the catch-all unknown-pattern error.
+//===----------------------------------------------------------------------===//
+
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_ref_named_variable: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %3 = init_existential_ref %2 : $Klass : $Klass, $AnyObject
+// CHECK: Name: 'myKlass'
+// CHECK: Root: %0 = argument of bb0 : $Klass
+// CHECK: end running test 1 of 1 on init_existential_ref_named_variable: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_ref_named_variable : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  specify_test "variable_name_inference @trace[0]"
+  debug_value %0 : $Klass, var, name "myKlass"
+  %2 = copy_value %0 : $Klass
+  %3 = init_existential_ref %2 : $Klass : $Klass, $AnyObject
+  debug_value [trace] %3 : $AnyObject
+  destroy_value %3 : $AnyObject
+  destroy_value %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Swift.Optional wrapping: init_existential_ref followed by Optional.some.
+// The `.some` path component is suppressed for Swift.Optional so the name
+// comes out clean as 'myKlass', not 'myKlass.some'.
+//
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_ref_optional_some_suppressed: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %4 = enum $Optional<AnyObject>, #Optional.some!enumelt, %3 : $AnyObject
+// CHECK: Name: 'myKlass'
+// CHECK: Root: %0 = argument of bb0 : $Klass
+// CHECK: end running test 1 of 1 on init_existential_ref_optional_some_suppressed: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_ref_optional_some_suppressed : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  specify_test "variable_name_inference @trace[0]"
+  debug_value %0 : $Klass, var, name "myKlass"
+  %2 = copy_value %0 : $Klass
+  %3 = init_existential_ref %2 : $Klass : $Klass, $AnyObject
+  %4 = enum $Optional<AnyObject>, #Optional.some!enumelt, %3 : $AnyObject
+  debug_value [trace] %4 : $Optional<AnyObject>
+  destroy_value %4 : $Optional<AnyObject>
+  destroy_value %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// FakeOptional wrapping: the `.some` path component IS included because
+// FakeOptional is not Swift.Optional (getOptionalObjectType() returns null).
+//
+// CHECK-LABEL: begin running test 1 of 1 on init_existential_ref_fakeoptional_some_kept: variable_name_inference with: @trace[0]
+// CHECK: Input Value:   %4 = enum $FakeOptional<AnyObject>, #FakeOptional.some!enumelt, %3 : $AnyObject
+// CHECK: Name: 'myKlass.some'
+// CHECK: Root: %0 = argument of bb0 : $Klass
+// CHECK: end running test 1 of 1 on init_existential_ref_fakeoptional_some_kept: variable_name_inference with: @trace[0]
+sil [ossa] @init_existential_ref_fakeoptional_some_kept : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  specify_test "variable_name_inference @trace[0]"
+  debug_value %0 : $Klass, var, name "myKlass"
+  %2 = copy_value %0 : $Klass
+  %3 = init_existential_ref %2 : $Klass : $Klass, $AnyObject
+  %4 = enum $FakeOptional<AnyObject>, #FakeOptional.some!enumelt, %3 : $AnyObject
+  debug_value [trace] %4 : $FakeOptional<AnyObject>
+  destroy_value %4 : $FakeOptional<AnyObject>
+  destroy_value %0 : $Klass
   %9999 = tuple ()
   return %9999 : $()
 }
