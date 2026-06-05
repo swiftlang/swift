@@ -114,8 +114,10 @@ public nonisolated(nonsending) func withTaskCancellationHandler<Return, Failure>
   // matching the semantics of the underlying handler API.
   let wrapped: () -> Void = {
     let raw: UInt8
-    if let task = unsafe _getCurrentAsyncTask() {
-      raw = unsafe _taskGetCancellationReason(task)
+    if let rawTask = unsafe _getCurrentAsyncTask() {
+      let ref: Builtin.NativeObject =
+        unsafe Builtin.bridgeFromRawPointer(rawTask._rawValue)
+      raw = unsafe _taskGetCancellationReason(ref)
     } else {
       raw = 1 // .taskCancelled fallback
     }
