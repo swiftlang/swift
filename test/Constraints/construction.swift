@@ -298,3 +298,33 @@ public func rdar85263844_2(_ x: [Int]) -> S4<(outer: Int, y: Int)> {
   S4(x.map { (inner: $0, y: $0) })
   // expected-warning@-1 {{tuple conversion from '(inner: Int, y: Int)' to '(outer: Int, y: Int)' mismatches labels}}
 }
+
+struct AliasedStruct {
+  init() {}
+  init?(failable: Void) {}
+}
+class AliasedClass {}
+struct AliasedGeneric<T> {
+  init() {}
+  init?(failable: Void) {}
+}
+
+typealias StructAlias = AliasedStruct
+typealias ClassAlias = AliasedClass
+typealias BoundGenericAlias = AliasedGeneric<Int>
+typealias ParameterizedGenericAlias<T> = AliasedGeneric<T>
+
+func testAliasedTypeConstruction() {
+  let _: Int = StructAlias()
+  // expected-error@-1 {{cannot convert value of type 'StructAlias' (aka 'AliasedStruct') to specified type 'Int'}}
+  let _: Int = StructAlias(failable: ())
+  // expected-error@-1 {{cannot convert value of type 'StructAlias?' (aka 'Optional<AliasedStruct>') to specified type 'Int'}}
+  let _: Int = ClassAlias()
+  // expected-error@-1 {{cannot convert value of type 'ClassAlias' (aka 'AliasedClass') to specified type 'Int'}}
+  let _: Int = BoundGenericAlias()
+  // expected-error@-1 {{cannot convert value of type 'BoundGenericAlias' (aka 'AliasedGeneric<Int>') to specified type 'Int'}}
+  let _: Int = BoundGenericAlias(failable: ())
+  // expected-error@-1 {{cannot convert value of type 'BoundGenericAlias?' (aka 'Optional<AliasedGeneric<Int>>') to specified type 'Int'}}
+  let _: Int = ParameterizedGenericAlias<String>()
+  // expected-error@-1 {{cannot convert value of type 'ParameterizedGenericAlias<String>' (aka 'AliasedGeneric<String>') to specified type 'Int'}}
+}
