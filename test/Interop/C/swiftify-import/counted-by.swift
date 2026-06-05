@@ -306,7 +306,7 @@ void implicitIntCast(long long offset, int len, int * __counted_by(offset + len)
 //   expected-remark@3{{macro content: |    if p.count != CUnsignedInt(4294967295) {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in castTwiceLiteral: expected \\(CUnsignedInt(4294967295)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe castTwiceLiteral(p.baseAddress!)|}}
+//   expected-remark@6{{macro content: |    return unsafe castTwiceLiteral(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void castTwiceLiteral(int * __counted_by((unsigned int)(signed short)-1) p);
@@ -317,7 +317,7 @@ void castTwiceLiteral(int * __counted_by((unsigned int)(signed short)-1) p);
 //   expected-remark@3{{macro content: |    if p.count != CUnsignedInt(truncatingIfNeeded: len) {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in castParam: expected \\(CUnsignedInt(truncatingIfNeeded: len)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe castParam(p.baseAddress!, len)|}}
+//   expected-remark@6{{macro content: |    return unsafe castParam(p.baseAddress, len)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void castParam(int * __counted_by((unsigned int)len) p, signed short len);
@@ -328,7 +328,7 @@ void castParam(int * __counted_by((unsigned int)len) p, signed short len);
 //   expected-remark@3{{macro content: |    if p.count != CInt(truncatingIfNeeded: len) {|}}
 //   expected-remark@4{{macro content: |      fatalError("bounds check failure in castParam2: expected \\(CInt(truncatingIfNeeded: len)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
-//   expected-remark@6{{macro content: |    return unsafe castParam2(p.baseAddress!, len)|}}
+//   expected-remark@6{{macro content: |    return unsafe castParam2(p.baseAddress, len)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
 void castParam2(int * __counted_by((signed int)len) p, unsigned int len);

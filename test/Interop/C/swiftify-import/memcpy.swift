@@ -40,6 +40,6 @@ void * __sized_by(n) foo(void *__sized_by(n) dst, const void *__sized_by(n) src,
     if dst.count != n {
       fatalError("bounds check failure in foo: expected \(n) but got \(dst.count)")
     }
-    return unsafe UnsafeMutableRawBufferPointer(start: unsafe foo(dst.baseAddress!, src.baseAddress!, n), count: Int(n))
+    return unsafe UnsafeMutableRawBufferPointer(start: unsafe foo(dst.baseAddress, src.baseAddress, n), count: Int(n))
 }
 ------------------------------
