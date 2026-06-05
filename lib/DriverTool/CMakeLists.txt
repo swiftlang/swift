@@ -15,7 +15,8 @@ set(driver_sources_and_options
                 swift_synthesize_interface_main.cpp
                 swift_parse_test_main.cpp
   LLVM_LINK_COMPONENTS
-                BitstreamReader)
+                BitstreamReader
+                Plugins)
 
 set(driver_common_libs
                 swiftAPIDigester
