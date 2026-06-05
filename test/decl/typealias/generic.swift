@@ -178,6 +178,8 @@ class GenericClass<T> {
   }
 
   func testCaptureInvalid1<S>(s: S, t: T) -> TA<Int> {
+    // FIXME: https://github.com/swiftlang/swift/issues/89690
+    // Should print "type 'TA<S>'"
     return TA<S>(a: t, b: s) // expected-error {{cannot convert return expression of type 'MyType<T, S>' to return type 'GenericClass<T>.TA<Int>' (aka 'MyType<T, Int>')}}
   }
 
