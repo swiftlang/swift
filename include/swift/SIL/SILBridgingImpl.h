@@ -2018,6 +2018,23 @@ BridgedSILDebugVariable BridgedInstruction::DebugValue_getVarInfo() const {
   return BridgedSILDebugVariable(getAs<swift::DebugValueInst>()->getVarInfo().value());
 }
 
+OptionalBridgedBasicBlock BridgedInstruction::DebugValue_getDebugReconstructionBlock() const {
+  return {getAs<swift::DebugValueInst>()->getDebugReconstructionBlock()};
+}
+BridgedBasicBlock BridgedInstruction::DebugValue_getOrCreateDebugReconstructionBlock() const {
+  return {getAs<swift::DebugValueInst>()->getOrCreateDebugReconstructionBlock()};
+}
+
+void BridgedInstruction::DebugValue_stripDeref() const {
+  getAs<swift::DebugValueInst>()->stripDeref();
+}
+void BridgedInstruction::DebugValue_prependDeref() const {
+  getAs<swift::DebugValueInst>()->prependDeref();
+}
+void BridgedInstruction::DebugValue_killOperand(BridgedType operandType) const {
+  getAs<swift::DebugValueInst>()->killOperand(operandType.unbridged());
+}
+
 bool BridgedInstruction::AllocStack_hasVarInfo() const {
   return getAs<swift::AllocStackInst>()->getVarInfo().has_value();
 }
@@ -2129,6 +2146,10 @@ void BridgedBasicBlock::moveAllInstructionsToEnd(BridgedBasicBlock dest) const {
 
 void BridgedBasicBlock::moveArgumentsTo(BridgedBasicBlock dest) const {
   dest.unbridged()->moveArgumentList(unbridged());
+}
+
+bool BridgedBasicBlock::isDebugReconstructionBlock() const {
+  return unbridged()->isDebugReconstructionBlock();
 }
 
 OptionalBridgedSuccessor BridgedBasicBlock::getFirstPred() const {

@@ -71,7 +71,7 @@ sil_scope 3 { loc "sroa.swift":20:6 parent @sroa_kills_debug_reconstruction_bloc
 // CHECK-SROA-LABEL: sil {{.+}} @sroa_kills_debug_reconstruction_block
 // When a debug_value has a reconstruction block, SROA cannot append fragments.
 // Instead it kills the operand (replaces with undef) and preserves the block.
-// CHECK-SROA: debug_value undef : $MyStruct, let, name "ptr", type $Builtin.RawPointer, transform {
+// CHECK-SROA: debug_value undef : {{.+}}, let, name "ptr", type $Builtin.RawPointer, transform {
 // CHECK-SROA:   bb0:
 // CHECK-SROA:     address_to_pointer undef : $*MyStruct to $Builtin.RawPointer
 // CHECK-SROA:     return

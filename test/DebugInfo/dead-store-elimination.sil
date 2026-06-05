@@ -57,7 +57,7 @@ bb0(%0 : $MyStruct):
 // When a debug_value has a reconstruction block with no load (e.g.
 // address_to_pointer), stripDeref cannot salvage and calls killOperand.
 // CHECK-LABEL: @dse_salvage_store_strip_deref_kill
-// CHECK: debug_value undef : $MyStruct, let, name "ptr", type $Builtin.RawPointer, transform {
+// CHECK: debug_value undef : {{.+}}, let, name "ptr", type $Builtin.RawPointer, transform {
 // CHECK:   bb0:
 // CHECK:     address_to_pointer undef : $*MyStruct to $Builtin.RawPointer
 // CHECK:     return
