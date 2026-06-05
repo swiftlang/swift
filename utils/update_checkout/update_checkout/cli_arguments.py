@@ -15,6 +15,7 @@ class CliArguments(argparse.Namespace):
     all_repositories: bool
     scheme: Optional[str]
     reset_to_remote: bool
+    update_remote: bool
     clean: bool
     stash: bool
     configs: List[str]
@@ -87,6 +88,13 @@ repositories.
         parser.add_argument(
             "--reset-to-remote",
             help="Reset each branch to the remote state.",
+            action="store_true",
+        )
+        parser.add_argument(
+            "--update-remote",
+            help="""If a repository's 'origin' remote URL does not match the one
+            specified in the configuration, point 'origin' at the configured URL
+            before updating the repository.""",
             action="store_true",
         )
         parser.add_argument(

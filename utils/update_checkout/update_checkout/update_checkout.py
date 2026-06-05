@@ -147,6 +147,29 @@ def get_branch_for_repo(
     return repo_branch, cross_repo
 
 
+def get_remote_url(
+    config: Dict[str, Any], repo_name: str, clone_with_ssh: bool
+) -> str:
+    """Returns the remote URL the configuration specifies for a repository.
+
+    Args:
+        config (Dict[str, Any]): deserialized `update-checkout-config.json`
+        repo_name (str): name of the repository to look up
+        clone_with_ssh (bool): whether to prefer the SSH clone pattern
+
+    Returns:
+        str: the remote URL for the repository.
+    """
+    # If we have a url override, use that url instead of interpolating.
+    remote_repo_info = config["repos"][repo_name]["remote"]
+    if "url" in remote_repo_info:
+        return remote_repo_info["url"]
+    remote_repo_id = remote_repo_info["id"]
+    if clone_with_ssh is True or "https-clone-pattern" not in config:
+        return config["ssh-clone-pattern"] % remote_repo_id
+    return config["https-clone-pattern"] % remote_repo_id
+
+
 def update_single_repository(pool_args: UpdateArguments):
     verbose = pool_args.verbose
     repo_name = pool_args.repo_name
@@ -159,6 +182,16 @@ def update_single_repository(pool_args: UpdateArguments):
         prefix = f"[{repo_path.name}] ".ljust(40)
         if verbose:
             print(f"{prefix}Updating '{repo_path}'")
+
+        if pool_args.update_remote_url:
+            current_remote, _, _ = Git.run(repo_path, ["remote", "get-url", "origin"])
+            if current_remote != pool_args.update_remote_url:
+                Git.run(
+                    repo_path,
+                    ["remote", "set-url", "origin", pool_args.update_remote_url],
+                    echo=verbose,
+                    prefix=prefix,
+                )
 
         fetch_extra_args = []
         if pool_args.skip_history:
@@ -547,6 +580,12 @@ def update_all_repositories(
                 )
             continue
 
+        update_remote_url = None
+        if args.update_remote:
+            update_remote_url = get_remote_url(
+                config, repo_name, args.clone_with_ssh
+            )
+
         my_args = UpdateArguments(
             source_root=args.source_root,
             config=config,
@@ -561,6 +600,7 @@ def update_all_repositories(
             cross_repos_pr=cross_repos_pr,
             skip_history=args.skip_history,
             partial_clone=args.partial_clone,
+            update_remote_url=update_remote_url,
             output_prefix="Updating",
             verbose=args.verbose,
         )
@@ -725,17 +765,7 @@ def obtain_all_additional_swift_sources(
             )
             continue
 
-        # If we have a url override, use that url instead of
-        # interpolating.
-        remote_repo_info = repo_info["remote"]
-        if "url" in remote_repo_info:
-            remote = remote_repo_info["url"]
-        else:
-            remote_repo_id = remote_repo_info["id"]
-            if args.clone_with_ssh is True or "https-clone-pattern" not in config:
-                remote = config["ssh-clone-pattern"] % remote_repo_id
-            else:
-                remote = config["https-clone-pattern"] % remote_repo_id
+        remote = get_remote_url(config, repo_name, args.clone_with_ssh)
 
         repo_branch: Optional[str] = None
         repo_not_in_scheme = False
