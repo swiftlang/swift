@@ -1613,6 +1613,9 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
   assert(!field->isStatic());
 
   for (auto i : range(field->getNumPatternEntries())) {
+    if (auto *var = field->getAnchoringVarDecl(i))
+      (void)var->getImplInfo(); // trigger expansion of attached accessor macros
+
     auto init = field->getExecutableInit(i);
     if (!init)
       continue;
