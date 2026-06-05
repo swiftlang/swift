@@ -1948,6 +1948,26 @@ class StoredPropertiesWithAvailabilityInClosures {
   }()
 }
 
+// https://github.com/swiftlang/swift/issues/80338
+func testAvailabilityInIfExprInClosure() { // expected-note {{add '@available' attribute to enclosing global function}}
+  _ = {
+    if #available(macOS 51, *) {
+      globalFuncAvailableOn51()
+    } else {
+      nil
+    }
+  }() ?? 0
+
+  _ = {
+    if #available(macOS 51, *) {
+      nil
+    } else {
+      globalFuncAvailableOn51() // expected-error {{'globalFuncAvailableOn51()' is only available in macOS 51 or newer}}
+      // expected-note@-1 {{add 'if #available' version check}}
+    }
+  }() ?? 0
+}
+
 struct PropertyObservers {
   var hasPotentiallyUnavailableObservers: Int {
     @available(macOS 51, *) // expected-error {{willSet observer cannot be marked potentially unavailable with '@available'}}
