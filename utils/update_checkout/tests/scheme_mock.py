@@ -82,18 +82,40 @@ MOCK_ADDITIONAL_SCHEME = {
 }
 
 
-class CallQuietlyException(Exception):
-    def __init__(self, command, returncode, output):
-        self.command = command
-        self.returncode = returncode
-        self.output = output
+class PrintableSubprocessError(Exception):
+    def __init__(self, *, underlying_error: subprocess.SubprocessError):
+        self.underlying_error = underlying_error
+
+    @property
+    def stdout(self):
+        return self.underlying_error.stdout
+
+    @property
+    def stderr(self):
+        return self.underlying_error.stderr
+
+    @property
+    def output(self):
+        return self.underlying_error.output
+
+    @property
+    def cmd(self):
+        return self.underlying_error.cmd
+
+    @property
+    def returncode(self):
+        return self.underlying_error.returncode
 
     def __str__(self):
-        return (
-            f"Command returned a non-zero exit status {self.returncode}:\n"
-            f"Command: {' '.join(self.command)}\n"
-            f"Output: {self.output.decode('utf-8')}"
-        )
+        decoded_output = self.underlying_error.output
+        if isinstance(decoded_output, bytes):
+            decoded_output = decoded_output.decode()
+
+        return f"""Command returned a non-zero exit status {self.underlying_error.returncode}:
+Command: {' '.join(self.underlying_error.cmd)}
+Output:
+
+{decoded_output}"""
 
 
 def call_quietly(*args, **kwargs):
@@ -101,10 +123,8 @@ def call_quietly(*args, **kwargs):
     kwargs["encoding"] = "utf-8"
     try:
         return subprocess.check_output(*args, **kwargs)
-    except subprocess.CalledProcessError as e:
-        raise CallQuietlyException(
-            command=e.cmd, returncode=e.returncode, output=e.stdout
-        ) from e
+    except subprocess.SubprocessError as e:
+        raise PrintableSubprocessError(underlying_error=e) from e
 
 
 def create_dir(d):

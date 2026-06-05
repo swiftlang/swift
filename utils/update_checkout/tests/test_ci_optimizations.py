@@ -168,7 +168,7 @@ class PartialCloneTestCase(scheme_mock.SchemeMockTestCase):
                 ["git", "config", "remote.origin.partialclonefilter"],
                 cwd=repo_path,
             ).strip()
-        except scheme_mock.CallQuietlyException:
+        except scheme_mock.PrintableSubprocessError:
             return None
 
     def test_partial_clone_sets_filter(self):
