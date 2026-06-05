@@ -1231,6 +1231,10 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
 
   SILBuilder Builder(*fn);
 
+  // Clear the debug BB worklist for this function.
+  DebugBBWorklist.clear();
+  DebugBBWorklistIdx = 0;
+
   // Another SIL_FUNCTION record means the end of this SILFunction.
   // SIL_VTABLE or SIL_GLOBALVAR or SIL_WITNESS_TABLE record also means the end
   // of this SILFunction.
@@ -1260,6 +1264,8 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
       if (!Loc)
         return Loc.takeError();
       Builder.applyDebugLocOverride(Loc.get());
+    } else if (kind == SIL_DEBUG_RECONSTRUCTION_BLOCK) {
+      CurrentBB = readSILDebugReconstructionBlock(fn, scratch);
     } else {
       // If CurrentBB is empty, just return fn. The code in readSILInstruction
       // assumes that such a situation means that fn is a declaration. Thus it
@@ -1341,12 +1347,19 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
   //    ValueOwnershipKind. We enforce size constraints of these types above.
   // 3. A ValueID.
   SILBasicBlock *CurrentBB = getBBForDefinition(Fn, Prev, BasicBlockID++);
+  if (readBlockArgs(CurrentBB, Fn, Args))
+    return nullptr;
+  return CurrentBB;
+}
+
+bool SILDeserializer::readBlockArgs(SILBasicBlock *CurrentBB, SILFunction *Fn,
+                                    ArrayRef<uint64_t> Args) {
   bool IsEntry = CurrentBB->isEntry();
   for (unsigned I = 0, E = Args.size(); I < E; I += 3) {
     TypeID TyID = Args[I];
-    if (!TyID) return nullptr;
+    if (!TyID) return true;
     ValueID ValId = Args[I+2];
-    if (!ValId) return nullptr;
+    if (!ValId) return true;
 
     auto ArgTy = MF->getType(TyID);
     SILArgument *Arg;
@@ -1376,7 +1389,29 @@ SILBasicBlock *SILDeserializer::readSILBasicBlock(SILFunction *Fn,
     LastValueID = LastValueID + 1;
     setLocalValue(Arg, LastValueID);
   }
-  return CurrentBB;
+  return false;
+}
+
+SILBasicBlock *SILDeserializer::readSILDebugReconstructionBlock(
+    SILFunction *Fn, SmallVectorImpl<uint64_t> &scratch) {
+  // Clear local values and set up fresh IDs for this debug BB.
+  LocalValues.clear();
+  LastValueID = 1;
+
+  ArrayRef<uint64_t> Args;
+  SILDebugReconstructionBlockLayout::readRecord(scratch, Args);
+
+  auto *DebugBB = Fn->createEmptyDebugReconstructionBlock();
+  if (readBlockArgs(DebugBB, Fn, Args))
+    return nullptr;
+
+  // Pop the next DVI from the worklist and attach the debug BB.
+  if (DebugBBWorklistIdx >= DebugBBWorklist.size())
+    return nullptr;
+  auto *DVI = DebugBBWorklist[DebugBBWorklistIdx++];
+  DVI->setDebugReconstructionBlock(DebugBB);
+
+  return DebugBB;
 }
 
 static CastConsumptionKind getCastConsumptionKind(unsigned attr) {
@@ -1833,6 +1868,13 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     ResultInst =
         Builder.createDebugValue(Loc, Value, DebugVar, PoisonRefs,
                                  UsesMoveableValDebugInfo, HasTrace, !HasLoc);
+
+    // If the serialized debug_value has a reconstruction block, add it to
+    // the worklist. The matching SIL_DEBUG_RECONSTRUCTION_BLOCK records
+    // appear after all regular blocks.
+    bool hasReconstructionBlock = (Attr >> 11) & 0x1;
+    if (hasReconstructionBlock)
+      DebugBBWorklist.push_back(cast<DebugValueInst>(ResultInst));
 
     break;
   }
