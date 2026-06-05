@@ -220,6 +220,11 @@ nonisolated func blah() {
   // expected-warning@-1 {{call to main actor-isolated static method 'predatesConcurrency()' in a synchronous nonisolated context}}
 }
 
+@concurrent func bleh() async {
+  InferMainActorPreconcurrency.predatesConcurrency()
+  // expected-warning@-1 {{main actor-isolated static method 'predatesConcurrency()' cannot be called from outside of the actor; this is an error in the Swift 6 language mode}}
+}
+
 protocol NotIsolated {
   func requirement()
 }
