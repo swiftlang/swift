@@ -545,7 +545,7 @@ public:
 
   void cancellationShieldPop();
 
-  // ==== Name Fragment --------------------------------------------------------
+  // ==== Task Name Fragment --------------------------------------------------------
 
   /// A fragment of an async task that holds the task's name.
   ///

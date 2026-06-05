@@ -2101,6 +2101,59 @@ private:
     return {false, 0};
   }
 
+  // ==== Task fragment offsets ===============================================
+  //
+  // An `AsyncTask` has a fixed-size header followed by optional tail-allocated
+  // fragments, in the following order:
+  //
+  //   1. `NameFragment`        — present iff `JobFlags::task_hasInitialTaskName`
+  //   2. `ChildFragment`       — present iff `JobFlags::task_isChildTask`
+  //   3. `GroupChildFragment`  — present iff `JobFlags::task_isGroupChildTask`
+  //   4. `FutureFragment`      — present iff `JobFlags::task_isFuture`
+
+  /// Address of `NameFragment` for `task`.
+  RemoteAddress nameFragmentAddr(RemoteAddress task,
+                                 swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_hasInitialTaskName());
+    return task + asyncTaskSize;
+  }
+
+  /// Address of `ChildFragment` for `task`.
+  RemoteAddress childFragmentAddr(RemoteAddress task,
+                                  swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_isChildTask());
+    RemoteAddress addr = task + asyncTaskSize;
+    if (flags.task_hasInitialTaskName())
+      addr = addr + sizeof(NameFragment<Runtime>);
+    return addr;
+  }
+
+  /// Address of `GroupChildFragment` for `task`.
+  RemoteAddress groupChildFragmentAddr(RemoteAddress task,
+                                       swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_isGroupChildTask());
+    RemoteAddress addr = task + asyncTaskSize;
+    if (flags.task_hasInitialTaskName())
+      addr = addr + sizeof(NameFragment<Runtime>);
+    if (flags.task_isChildTask())
+      addr = addr + sizeof(ChildFragment<Runtime>);
+    return addr;
+  }
+
+  /// Address of `FutureFragment` for `task`.
+  RemoteAddress futureFragmentAddr(RemoteAddress task,
+                                   swift::JobFlags flags) const {
+    assert(asyncTaskSize != 0 && flags.task_isFuture());
+    RemoteAddress addr = task + asyncTaskSize;
+    if (flags.task_hasInitialTaskName())
+      addr = addr + sizeof(NameFragment<Runtime>);
+    if (flags.task_isChildTask())
+      addr = addr + sizeof(ChildFragment<Runtime>);
+    if (flags.task_isGroupChildTask())
+      addr = addr + sizeof(GroupChildFragment<Runtime>);
+    return addr;
+  }
+
   template <typename AsyncTaskType>
   std::pair<std::optional<std::string>, AsyncTaskInfo>
   asyncTaskInfo(RemoteAddress AsyncTaskPtr, unsigned ChildTaskLimit,
@@ -2140,8 +2193,7 @@ private:
 
     Info.ParentTask = 0;
     if (Info.IsChildTask && asyncTaskSize != 0) {
-      // Parent information ("child fragment") is right after the task itself.
-      RemoteAddress ChildFragmentAddr = AsyncTaskPtr + asyncTaskSize;
+      RemoteAddress ChildFragmentAddr = childFragmentAddr(AsyncTaskPtr, JobFlags);
       auto ChildFragmentObj =
           readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
       if (ChildFragmentObj)
@@ -2191,7 +2243,7 @@ private:
                                 "iterate child tasks"),
                     Info};
 
-          RemoteAddress ChildFragmentAddr = ChildTaskAddress + asyncTaskSize;
+          RemoteAddress ChildFragmentAddr = childFragmentAddr(ChildTaskAddress, ChildJobFlags);
           auto ChildFragmentObj =
               readObj<ChildFragment<Runtime>>(ChildFragmentAddr);
           if (ChildFragmentObj)
@@ -2210,17 +2262,7 @@ private:
 
     // Read the wait queue from the FutureFragment, if this is a future task.
     if (Info.IsFuture && asyncTaskSize != 0) {
-      // The FutureFragment is located after AsyncTask, ChildFragment (if
-      // child), and GroupChildFragment (if group child).
-      // See AsyncTask::futureFragment() in include/swift/ABI/Task.h.
-      auto FutureFragmentAddr = AsyncTaskPtr + asyncTaskSize;
-      if (Info.IsChildTask)
-        FutureFragmentAddr =
-            FutureFragmentAddr + sizeof(ChildFragment<Runtime>);
-      if (Info.IsGroupChildTask)
-        FutureFragmentAddr =
-            FutureFragmentAddr + sizeof(GroupChildFragment<Runtime>);
-
+      RemoteAddress FutureFragmentAddr = futureFragmentAddr(AsyncTaskPtr, JobFlags);
       auto FutureFragmentObj =
           readObj<FutureFragment<Runtime>>(FutureFragmentAddr);
       if (FutureFragmentObj) {
