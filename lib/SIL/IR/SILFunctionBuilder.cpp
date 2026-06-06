@@ -252,8 +252,8 @@ void SILFunctionBuilder::addFunctionAttributes(
     return;
   auto *decl = constant.getDecl();
 
-  // Don't add section for addressor functions (where decl is a global)
-  if (isa<FuncDecl>(decl)) {
+  // Add section for anything that was originally a function.
+  if (isa<AbstractFunctionDecl>(decl)) {
     if (auto *SA = Attrs.getAttribute<SectionAttr>())
       F->setSection(SA->Name);
   }
