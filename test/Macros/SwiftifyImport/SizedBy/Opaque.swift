@@ -46,9 +46,9 @@ public func nonnullUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func nullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer?) {
-    let size = CInt(exactly: unsafe ptr?.count ?? 0)!
-    return unsafe nullableUnsafeRawBufferPointer(OpaquePointer(ptr?.baseAddress), size)
+public func nullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
+    let size = CInt(exactly: ptr.count)!
+    return unsafe nullableUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress), size)
 }
 ------------------------------
 @__swiftmacro_4test33impNullableUnsafeRawBufferPointer15_SwiftifyImportfMp_.swift
@@ -79,15 +79,15 @@ public func nonnullSpan(_ ptr: RawSpan) {
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_disfavoredOverload
-public func nullableSpan(_ ptr: RawSpan?) {
-    let size = CInt(exactly: ptr?.byteCount ?? 0)!
-    let _ptrPtr = ptr?.withUnsafeBytes {
+public func nullableSpan(_ ptr: RawSpan) {
+    let size = CInt(exactly: ptr.byteCount)!
+    let _ptrPtr = ptr.withUnsafeBytes {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr)
     }
-    return unsafe nullableSpan(OpaquePointer(_ptrPtr?.baseAddress), size)
+    return unsafe nullableSpan(OpaquePointer(_ptrPtr.baseAddress), size)
 }
 ------------------------------
 @__swiftmacro_4test15impNullableSpan15_SwiftifyImportfMp_.swift

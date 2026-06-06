@@ -18,28 +18,26 @@ public func myFunc(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: Unsa
 ------------------------------
 /// This is an auto-generated wrapper for safer interop
 @_alwaysEmitIntoClient @_lifetime(copy ptr) @_lifetime(ptr: copy ptr) @_lifetime(ptr2: copy ptr2) @_disfavoredOverload
-public func myFunc(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) -> MutableSpan<CInt>? {
-    let len = CInt(exactly: ptr?.count ?? 0)!
-    let len2 = CInt(exactly: ptr2?.count ?? 0)!
-    let _ptrPtr = ptr?.withUnsafeMutableBufferPointer {
+public func myFunc(_ ptr: inout MutableSpan<CInt>, _ ptr2: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
+    let len = CInt(exactly: ptr.count)!
+    let len2 = CInt(exactly: ptr2.count)!
+    let _ptrPtr = ptr.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr)
     }
-    let _ptr2Ptr = ptr2?.withUnsafeMutableBufferPointer {
+    let _ptr2Ptr = ptr2.withUnsafeMutableBufferPointer {
         unsafe $0
     }
     defer {
         _fixLifetime(ptr2)
     }
-    return unsafe _swiftifyOverrideLifetime({ () in
-      let _resultValue = unsafe myFunc(_ptrPtr?.baseAddress, len, _ptr2Ptr?.baseAddress, len2)
-      if unsafe _resultValue == nil {
-        return nil
-      } else {
-        return unsafe _swiftifyOverrideLifetime(MutableSpan<CInt>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())
-      }
-        }(), copying: ())
+    let _resultValue = unsafe myFunc(_ptrPtr.baseAddress, len, _ptr2Ptr.baseAddress, len2)
+    if unsafe _resultValue == nil {
+      precondition(len == 0, "counted_by may only be null if count is 0 (unlike counted_by_or_null)")
+      return MutableSpan<CInt>()
+    }
+    return unsafe _swiftifyOverrideLifetime(MutableSpan<CInt>(_unsafeStart: _resultValue!, count: Int(len)), copying: ())
 }
 ------------------------------
