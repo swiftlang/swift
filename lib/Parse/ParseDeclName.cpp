@@ -34,12 +34,18 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
       return true;
     }
 
-    auto isValidIdentifier = [](StringRef text) -> bool {
-      return Lexer::isIdentifier(text) && text != "_";
+    auto isValidBaseName = [](StringRef text) -> bool {
+      auto isValidIdentifier = [](StringRef text) -> bool {
+        return Lexer::isIdentifier(text) && text != "_";
+      };
+
+      auto pair = text.split("::");
+      return isValidIdentifier(pair.first) &&
+                (pair.second.empty() || isValidIdentifier(pair.second));
     };
 
     // Make sure we have an identifier for the base name.
-    if (!isValidIdentifier(baseName))
+    if (!isValidBaseName(baseName))
       return true;
 
     // If we have a context, make sure it is an identifier, or a series of
@@ -50,7 +56,7 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
       StringRef rest = contextName;
       do {
         std::tie(first, rest) = rest.split('.');
-        if (!isValidIdentifier(first))
+        if (!isValidBaseName(first))
           return true;
       } while (!rest.empty());
     }
@@ -133,8 +139,9 @@ ParsedDeclName swift::parseDeclName(StringRef name) {
 
 DeclName ParsedDeclName::formDeclName(ASTContext &ctx, bool isSubscript,
                                       bool isCxxClassTemplateSpec) const {
-  return formDeclNameRef(ctx, isSubscript, isCxxClassTemplateSpec)
-      .getFullName();
+  return swift::formDeclName(ctx, BaseName, ArgumentLabels, IsFunctionName,
+                             /*IsInitializer=*/true, isSubscript,
+                             isCxxClassTemplateSpec);
 }
 
 DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx, bool isSubscript,
@@ -144,26 +151,63 @@ DeclNameRef ParsedDeclName::formDeclNameRef(ASTContext &ctx, bool isSubscript,
                                 isCxxClassTemplateSpec);
 }
 
+static DeclNameRef formDeclNameRefImpl(ASTContext &ctx,
+                                       bool allowModuleSelector,
+                                       StringRef moduleSelectorAndBaseName,
+                                       ArrayRef<StringRef> argumentLabels,
+                                       bool isFunctionName, bool isInitializer,
+                                       bool isSubscript,
+                                       bool isCxxClassTemplateSpec);
+
 DeclName swift::formDeclName(ASTContext &ctx, StringRef baseName,
                              ArrayRef<StringRef> argumentLabels,
                              bool isFunctionName, bool isInitializer,
                              bool isSubscript, bool isCxxClassTemplateSpec) {
-  return formDeclNameRef(ctx, baseName, argumentLabels, isFunctionName,
-                         isInitializer, isSubscript, isCxxClassTemplateSpec)
+  return formDeclNameRefImpl(ctx, /*allowModuleSelector=*/false, baseName,
+                             argumentLabels, isFunctionName, isInitializer,
+                             isSubscript, isCxxClassTemplateSpec)
       .getFullName();
 }
 
-DeclNameRef swift::formDeclNameRef(ASTContext &ctx, StringRef baseName,
+DeclNameRef swift::formDeclNameRef(ASTContext &ctx,
+                                   StringRef moduleSelectorAndBaseName,
                                    ArrayRef<StringRef> argumentLabels,
                                    bool isFunctionName, bool isInitializer,
                                    bool isSubscript,
                                    bool isCxxClassTemplateSpec) {
+  return formDeclNameRefImpl(ctx, /*allowModuleSelector=*/true,
+                             moduleSelectorAndBaseName, argumentLabels,
+                             isFunctionName, isInitializer, isSubscript,
+                             isCxxClassTemplateSpec);
+}
+
+static DeclNameRef formDeclNameRefImpl(ASTContext &ctx,
+                                       bool allowModuleSelector,
+                                       StringRef moduleSelectorAndBaseName,
+                                       ArrayRef<StringRef> argumentLabels,
+                                       bool isFunctionName, bool isInitializer,
+                                       bool isSubscript,
+                                       bool isCxxClassTemplateSpec) {
   // We cannot import when the base name is not an identifier.
-  if (baseName.empty())
+  if (moduleSelectorAndBaseName.empty())
     return DeclNameRef();
+
+  StringRef moduleSelector = "";
+  StringRef baseName = moduleSelectorAndBaseName;
+
+  auto baseNamePair = moduleSelectorAndBaseName.split("::");
+  if (allowModuleSelector && !baseNamePair.second.empty())
+    std::tie(moduleSelector, baseName) = baseNamePair;
 
   if (!Lexer::isIdentifier(baseName) && !Lexer::isOperator(baseName) &&
       !isCxxClassTemplateSpec)
+    return DeclNameRef();
+
+  // Get the identifier for the module selector (if present).
+  Identifier moduleSelectorId;
+  if (Lexer::isIdentifier(moduleSelector))
+    moduleSelectorId = ctx.getIdentifier(moduleSelector);
+  else if (!moduleSelector.empty())
     return DeclNameRef();
 
   // Get the identifier for the base name. Special-case `init`.
@@ -177,7 +221,7 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx, StringRef baseName,
 
   // For non-functions, just use the base name.
   if (!isFunctionName && !baseNameId.isSubscript())
-    return DeclNameRef(baseNameId);
+    return DeclNameRef(ctx, moduleSelectorId, baseNameId);
 
   // For functions, we need to form a complete name.
 
@@ -193,5 +237,25 @@ DeclNameRef swift::formDeclNameRef(ASTContext &ctx, StringRef baseName,
   }
 
   // Build the result.
-  return DeclNameRef({ctx, baseNameId, argumentLabelIds});
+  return DeclNameRef(ctx, moduleSelectorId, baseNameId, argumentLabelIds);
+}
+
+void ParsedDeclName::formContextNames(ASTContext &ctx,
+                                      llvm::SmallVectorImpl<DeclNameRef> &out) {
+  ASSERT(out.empty());
+
+  if (ContextName.empty())
+    return;
+
+  for (auto component : llvm::split(ContextName, '.')) {
+    auto pair = component.split("::");
+    DeclNameRef componentRef;
+    if (pair.second.empty())
+      // No module selector
+      componentRef = DeclNameRef(ctx.getIdentifier(component));
+    else
+      componentRef = DeclNameRef(ctx, ctx.getIdentifier(pair.first),
+                                 ctx.getIdentifier(pair.second));
+    out.push_back(componentRef);
+  }
 }

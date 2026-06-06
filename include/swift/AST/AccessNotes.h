@@ -41,11 +41,11 @@ class AccessNoteDeclName {
 public:
   /// The names of the parent/contextual declarations containing the declaration
   /// the access note should apply to.
-  std::vector<Identifier> parentNames;
+  std::vector<DeclNameRef> parentNames;
 
   /// The name of the declaration the access note should be applied to. (For
   /// accessors, this is actually the name of the storage it's attached to.)
-  DeclName name;
+  DeclNameRef name;
 
   /// For accessors, the kind of accessor; for non-accessors, \c None.
   std::optional<AccessorKind> accessorKind;
