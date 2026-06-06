@@ -1,4 +1,6 @@
-// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -disable-availability-checking -I %S/Inputs
+// RUN: %target-typecheck-verify-swift -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeInheritance -disable-availability-checking -I %S/Inputs
+
+// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
 import Upcast
 

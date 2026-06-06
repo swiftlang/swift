@@ -514,6 +514,10 @@ EXPERIMENTAL_FEATURE(ImportNonPublicCxxMembers, true)
 /// Do not import non-field C++ record members until requested from Swift.
 EXPERIMENTAL_FEATURE(ImportCxxMembersLazily, true)
 
+/// Import a C++ foreign reference type's primary FRT base as a Swift
+/// superclass.
+EXPERIMENTAL_FEATURE(ForeignReferenceTypeInheritance, true)
+
 /// `yielding borrow`/`yielding mutate` single-yield coroutine accessors
 // TODO: When this is turned on by default, take care of:
 // * "TODO" around line 8100 of lib/Parse/ParseDecl.cpp
