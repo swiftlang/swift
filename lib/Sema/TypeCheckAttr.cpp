@@ -9102,7 +9102,7 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 
   // Handle types separately
   if (isa<NominalTypeDecl>(attached)) {
-    if (!parsedName.ContextName.empty())
+    if (parsedName.isMember())
       return nullptr;
 
     SmallVector<ValueDecl *, 1> lookupResults;

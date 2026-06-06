@@ -21,6 +21,7 @@
 #include "TypeCheckInvertible.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTBridging.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -46,6 +47,7 @@
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/Parse/Lexer.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
 #include "clang/AST/DeclObjC.h"
@@ -2949,20 +2951,24 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
 
     if (!oldName.has_value() && newName.has_value()) {
       ++numMissing;
-      missingBuffer += newName->str();
+      missingBuffer += identifierEscapingIfNeeded(
+          newName->str(), PrintNameContext::FunctionParameterExternal);
       missingBuffer += ':';
     } else if (oldName.has_value() && !newName.has_value()) {
       ++numExtra;
-      extraBuffer += oldName->str();
+      extraBuffer += identifierEscapingIfNeeded(
+          oldName->str(), PrintNameContext::FunctionParameterExternal);
       extraBuffer += ':';
     } else if (oldName->empty()) {
       // In the cases from here onwards oldValue and newValue are not null
       ++numMissing;
-      missingBuffer += newName->str();
+      missingBuffer += identifierEscapingIfNeeded(
+          newName->str(), PrintNameContext::FunctionParameterExternal);
       missingBuffer += ":";
     } else if (newName->empty()) {
       ++numExtra;
-      extraBuffer += oldName->str();
+      extraBuffer += identifierEscapingIfNeeded(
+          oldName->str(), PrintNameContext::FunctionParameterExternal);
       extraBuffer += ':';
     } else {
       ++numWrong;
@@ -2986,7 +2992,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
         if (haveName.empty())
           haveBuffer += '_';
         else
-          haveBuffer += haveName.str();
+          haveBuffer += identifierEscapingIfNeeded(
+              haveName.str(), PrintNameContext::FunctionParameterExternal);
         haveBuffer += ':';
       }
 
@@ -2994,7 +3001,8 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
         if (expected.empty())
           expectedBuffer += '_';
         else
-          expectedBuffer += expected.str();
+          expectedBuffer += identifierEscapingIfNeeded(
+              expected.str(), PrintNameContext::FunctionParameterExternal);
         expectedBuffer += ':';
       }
 
@@ -3044,13 +3052,9 @@ bool swift::diagnoseArgumentLabelError(ASTContext &ctx,
       continue;
     }
 
-    bool newNameIsReserved = !canBeArgumentLabel(newName.str());
     llvm::SmallString<16> newStr;
-    if (newNameIsReserved)
-      newStr += "`";
-    newStr += newName.str();
-    if (newNameIsReserved)
-      newStr += "`";
+    newStr = identifierEscapingIfNeeded(
+        newName.str(), PrintNameContext::FunctionParameterExternal);
 
     // If the argument was previously unlabeled, insert the new label. Note that
     // we don't do this for labeled trailing closures as they write unlabeled
