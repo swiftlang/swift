@@ -174,27 +174,27 @@ void constInt(int * __counted_by_or_null(42 * 10) p);
 // }}
 void constFloatCastedToInt(int * __counted_by_or_null((int) (4.2 / 12)) p);
 
-// expected-expansion@+9:60{{
+// expected-expansion@+9:148{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofType(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != CUnsignedLong(8) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofType: expected \\(CUnsignedLong(8)) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(8) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofType: expected \\(CUnsignedLongLong(8)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe sizeofType(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
-void sizeofType(int * __counted_by_or_null(sizeof(int *)) p);
+void sizeofType(int * __counted_by_or_null((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(int *)) p);
 
-// expected-expansion@+9:57{{
+// expected-expansion@+9:145{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func sizeofParam(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
-//   expected-remark@3{{macro content: |    if p.count != CUnsignedLong(8) {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofParam: expected \\(CUnsignedLong(8)) but got \\(p.count)")|}}
+//   expected-remark@3{{macro content: |    if p.count != CUnsignedLongLong(8) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in sizeofParam: expected \\(CUnsignedLongLong(8)) but got \\(p.count)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    return unsafe sizeofParam(p.baseAddress)|}}
 //   expected-remark@7{{macro content: |}|}}
 // }}
-void sizeofParam(int * __counted_by_or_null(sizeof(p)) p);
+void sizeofParam(int * __counted_by_or_null((unsigned long long /*cast to long long to avoid size_t differences between platforms*/)sizeof(p)) p);
 
 void derefLen(int * len, int * __counted_by_or_null(*len) p);
 
