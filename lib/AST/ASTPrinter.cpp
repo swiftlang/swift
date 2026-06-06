@@ -3986,6 +3986,12 @@ void PrintAST::visitTypeAliasDecl(TypeAliasDecl *decl) {
   printAccess(decl);
   Printer.printIntroducerKeyword("typealias", Options, " ");
   printContextIfNeeded(decl);
+  // For an associated-type-disambiguating alias (`typealias P.Name = T`), print
+  // the qualifying protocol so the declaration round-trips.
+  if (auto *qualifier = decl->getDisambiguatedProtocolRepr()) {
+    printTypeLoc(TypeLoc(qualifier));
+    Printer << ".";
+  }
   recordDeclLoc(
       decl,
       [&] { Printer.printName(name, getTypeMemberPrintNameContext(decl)); },
