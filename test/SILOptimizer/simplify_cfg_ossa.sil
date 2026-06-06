@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-experimental-feature MoveOnlyEnumDeinits -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 // REQUIRES: swift_feature_MoveOnlyEnumDeinits
+// REQUIRES: objc_codegen
 
 // OSSA form of tests from simplify_cfg.sil and simplify_cfg_simple.sil.
 //

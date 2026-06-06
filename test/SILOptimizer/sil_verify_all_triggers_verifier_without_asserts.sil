@@ -5,6 +5,11 @@
 
 // UNSUPPORTED: asserts
 
+// The wasi lit.site.cfg has LLVM_ENABLE_ASSERTIONS=FALSE, so `asserts` is
+// not in available_features. But the macOS-arm64 asserts compiler is what
+// actually runs the wasi tests, so the SIL verifier triggers anyway.
+// UNSUPPORTED: OS=wasip1
+
 class Klass {}
 
 sil [ossa] @leaky_code : $@convention(thin) () -> () {

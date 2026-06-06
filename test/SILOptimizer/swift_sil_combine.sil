@@ -1,5 +1,6 @@
 // RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 // REQUIRES: swift_in_compiler
+// REQUIRES: objc_codegen
 
 sil_stage canonical
 
