@@ -4,6 +4,8 @@
 
 // We have a separate test for 64-bit architectures.
 // REQUIRES: PTRSIZE=32
+// wasm32: multi-byte inline-string fold not applied
+// UNSUPPORTED: OS=wasip1
 // XFAIL: OS=linux-androideabi
 
 // NOTE: 25185.byteSwapped = 0x62 'a', 0x61 'b'

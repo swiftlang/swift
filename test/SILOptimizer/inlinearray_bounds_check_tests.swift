@@ -7,6 +7,9 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
+// CHECK-IR shape differs on wasm32: optimized vector-reduce form not produced, trap retained
+// XFAIL: OS=wasip1
+
 // Bounds check should be eliminated
 // Induction variable optimization eliminates the bounds check in SIL
 // CHECK-SIL-LABEL: sil @$s30inlinearray_bounds_check_tests0A29_sum_iterate_to_count_wo_trapySis11InlineArrayVyxSiGSiRVzlF :
