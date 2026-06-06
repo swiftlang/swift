@@ -7,6 +7,8 @@
 // REQUIRES: executable_test,swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: synchronization
 // UNSUPPORTED: back_deployment_runtime
+// Mutex storage empty on single-threaded wasi; expected to flip to PASS on wasi-threads once WasmKit supports WASI threads
+// XFAIL: OS=wasip1 && threading_none
 
 import Synchronization
 

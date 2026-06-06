@@ -1,5 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-objc-interop -module-name mandatory_inlining -enable-sil-verify-all %s -mandatory-inlining | %FileCheck %s
 
+// REQUIRES: objc_codegen
+
 import Builtin
 import Swift
 
