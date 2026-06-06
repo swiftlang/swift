@@ -229,6 +229,34 @@ struct TwoShared_Shared_UsingB
     : TwoShared_A,
       TwoShared_B SHARED_USING_BASE(TwoShared_Shared_UsingB, TwoShared_B);
 
+// MARK: TwoSharedM: inheriting two shared reference bases with refcounting
+// methods
+//
+// Note that the key difference from TwoShared is that the bases may contribute
+// distinct refcounting methods of the same name.
+
+struct TwoSharedM_A SHARED_DEF_METHOD(TwoSharedM_A, );  // .doRetain
+struct TwoSharedM_B SHARED_DEF_METHOD(TwoSharedM_B, );  // .doRetain
+struct TwoSharedM_C SHARED_DEF_METHOD(TwoSharedM_C, C); // .doRetainC
+
+// expected-warning@+1 {{unable to infer SWIFT_SHARED_REFERENCE}}
+struct TwoSharedM_NoAttr : TwoSharedM_A,
+                           TwoSharedM_B NO_ATTR(TwoSharedM_NoAttr);
+// expected-error@+2 {{multiple functions '.doRetain' found}}
+// expected-error@+1 {{multiple functions '.doRelease' found}}
+struct TwoSharedM_SharedAmbiguous
+    : TwoSharedM_A,
+      TwoSharedM_B SHARED_USE_METHOD(TwoSharedM_SharedAmbiguous, );
+struct TwoSharedM_SharedDisambiguated1
+    : TwoSharedM_A,
+      TwoSharedM_C SHARED_USE_METHOD(TwoSharedM_SharedDisambiguated1, );
+struct TwoSharedM_SharedDisambiguated2
+    : TwoSharedM_A,
+      TwoSharedM_C SHARED_USE_METHOD(TwoSharedM_SharedDisambiguated2, C);
+struct TwoSharedM_SharedOverridden
+    : TwoSharedM_A,
+      TwoSharedM_B SHARED_DEF_METHOD(TwoSharedM_SharedOverridden, );
+
 // MARK: DiamondRef: inheriting same ref base twice due to diamond inheritance
 
 struct DiamondRef_Base SHARED(DiamondRef_Base);
@@ -272,6 +300,55 @@ struct DiamondNoRef_RAB : DiamondNoRef_RA,
 // expected-warning@+1 {{unable to infer SWIFT_SHARED_REFERENCE}}
 struct DiamondNoRef_RARB : DiamondNoRef_RA,
                            DiamondNoRef_RB NO_ATTR(DiamondNoRef_RARB);
+
+// MARK: Immortal: singly and multiply inheriting from immortal references
+
+struct Immortal_Base IMMORTAL(Immortal_Base);
+struct Immortal_Also IMMORTAL(Immortal_Also);
+
+struct Immortal_NoAttr : Immortal_Base NO_ATTR(Immortal_NoAttr);
+struct Immortal_Immortal : Immortal_Base IMMORTAL(Immortal_Immortal);
+struct Immortal_NoAttr_Final final
+    : Immortal_Base NO_ATTR(Immortal_NoAttr_Final);
+struct Immortal_Immortal_Final final
+    : Immortal_Base IMMORTAL(Immortal_Immortal_Final);
+
+struct Immortal_Immortal_Immortal
+    : Immortal_Immortal IMMORTAL(Immortal_Immortal_Immortal);
+struct Immortal_Immortal_NoAttr
+    : Immortal_Immortal NO_ATTR(Immortal_Immortal_NoAttr);
+struct Immortal_NoAttr_Immortal
+    : Immortal_NoAttr IMMORTAL(Immortal_NoAttr_Immortal);
+struct Immortal_NoAttr_NoAttr : Immortal_NoAttr NO_ATTR(Immortal_NoAttr_NoAttr);
+
+struct Immortal_NoAttrTwo : Immortal_Base,
+                            Immortal_Also NO_ATTR(Immortal_NoAttrTwo);
+struct Immortal_ImmortalSame : Immortal_Base,
+                               Immortal_Also IMMORTAL(Immortal_ImmortalSame);
+
+struct Immortal_D1 : Immortal_Base NO_ATTR(Immortal_D1);
+struct Immortal_D2 : Immortal_Base NO_ATTR(Immortal_D2);
+struct Immortal_Diamond : Immortal_D1, Immortal_D2 NO_ATTR(Immortal_Diamond);
+
+struct Immortal_V1 : virtual Immortal_Base NO_ATTR(Immortal_V1);
+struct Immortal_V2 : virtual Immortal_Base NO_ATTR(Immortal_V2);
+struct Immortal_VDiamond : Immortal_V1, Immortal_V2 NO_ATTR(Immortal_VDiamond);
+
+// MARK: Mixed: inheriting from a mix of immortal and shared references
+
+struct Mixed_SharedBase SHARED(Mixed_SharedBase);
+struct Mixed_ImmortalBase IMMORTAL(Mixed_ImmortalBase);
+
+// expected-warning@+1 {{unable to infer SWIFT_SHARED_REFERENCE}}
+struct Mixed_NoAttr
+    : Mixed_SharedBase,
+      Mixed_ImmortalBase NO_ATTR(Mixed_NoAttr);
+struct Mixed_Shared : Mixed_SharedBase, Mixed_ImmortalBase SHARED(Mixed_Shared);
+struct Mixed_UsingShared
+    : Mixed_SharedBase,
+      Mixed_ImmortalBase SHARED_USING_BASE(Mixed_UsingShared, Mixed_SharedBase);
+struct Mixed_Immortal : Mixed_SharedBase,
+                        Mixed_ImmortalBase IMMORTAL(Mixed_Immortal);
 
 #if __has_feature(nullability)
 _Pragma("clang diagnostic pop");

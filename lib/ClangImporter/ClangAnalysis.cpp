@@ -172,32 +172,25 @@ public:
       ASSERT(!FRTBases.empty() && "if checkedDecl wasn't explicitly annotated,"
                                   "at least one of its bases should be an FRT");
       FRTBase = nullptr;
-      std::optional<StringRef> FRTBaseRetain = std::nullopt,
-                               FRTBaseRelease = std::nullopt;
-      llvm::SmallPtrSet<const clang::CXXRecordDecl *, 1> seenBases;
-      bool recurringBase = false, ambiguousOps = false;
+      bool seenShared = false, seenMultipleShared = false, seenImmortal = false;
       for (auto *base : FRTBases) {
-        if (!seenBases.insert(base).second) {
-          recurringBase = true;
-          continue;
-        }
-
-        if (FRTBase == nullptr) {
+        if (importer::hasAnyImmortalAttr(base)) {
+          seenImmortal = true;
+        } else if (!FRTBase) {
           FRTBase = base;
-          std::tie(FRTBaseRetain, FRTBaseRelease) = getRetainReleaseOps(base);
-          continue;
+          seenShared = true;
+        } else {
+          seenMultipleShared = true;
         }
-
-        auto [baseRetain, baseRelease] = getRetainReleaseOps(base);
-        if (!opsMatch(FRTBaseRetain, baseRetain) ||
-            !opsMatch(FRTBaseRelease, baseRelease))
-          ambiguousOps = true;
       }
 
-      if (recurringBase || ambiguousOps) {
-        // checkedDecl is an invalid FRT, either because the same FRT base
-        // appears multiple times, or because different FRT bases provide
-        // conflicting retain/release operations.
+      // If there are no shared references, FRTBase is the first immortal base
+      FRTBase = FRTBase ? FRTBase : FRTBases.front();
+
+      if (seenMultipleShared || (seenShared && seenImmortal)) {
+        // checkedDecl is an invalid FRT, either because it has multiple shared
+        // FRT bases (ambiguous retain/release ops), or because it has mixed
+        // ancestry between shared and immortal bases.
         if (Impl)
           Impl->diagnose(HeaderLoc{checkedDecl->getLocation()},
                          diag::cant_infer_frt_in_cxx_inheritance, checkedDecl);
@@ -214,6 +207,7 @@ public:
       }
     }
 
+    ASSERT(FRTBase && "should have encountered FRTBase");
     return ForeignReferenceTypeInfo::Shared(FRTBase, primarySuperclass);
   }
 };

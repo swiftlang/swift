@@ -1,5 +1,6 @@
 // RUN: %target-swift-frontend -typecheck -verify -cxx-interoperability-mode=default \
 // RUN:   -I %S%{fs-sep}Inputs %s \
+// RUN:   -disable-availability-checking \
 // RUN:   -verify-additional-file %S%{fs-sep}Inputs%{fs-sep}inherit-frt.hpp
 
 import InheritFRT
@@ -60,6 +61,12 @@ let _ = makeTwoShared_Shared()
 let _ = makeTwoShared_Shared_UsingA()
 let _ = makeTwoShared_Shared_UsingB()
 
+let _ = makeTwoSharedM_NoAttr() // NOTE: this is not a valid FRT
+let _ = makeTwoSharedM_SharedAmbiguous() // NOTE: this is not a valid FRT
+let _ = makeTwoSharedM_SharedDisambiguated1()
+let _ = makeTwoSharedM_SharedDisambiguated2()
+let _ = makeTwoSharedM_SharedOverridden()
+
 let _ = makeDiamondRef_NoAttr() // NOTE: this is not a valid FRT
 let _ = makeDiamondRef_Shared()
 let _ = makeDiamondRef_VV_NoAttr()
@@ -72,3 +79,21 @@ let _ = makeDiamondRef_VX_Shared()
 let _ = makeDiamondNoRef_ARB()
 let _ = makeDiamondNoRef_RAB()
 let _ = makeDiamondNoRef_RARB() // NOTE: this is not a valid FRT
+
+let _ = makeImmortal_NoAttr()
+let _ = makeImmortal_Immortal()
+let _ = makeImmortal_NoAttr_Final()
+let _ = makeImmortal_Immortal_Final()
+let _ = makeImmortal_Immortal_Immortal()
+let _ = makeImmortal_Immortal_NoAttr()
+let _ = makeImmortal_NoAttr_Immortal()
+let _ = makeImmortal_NoAttr_NoAttr()
+let _ = makeImmortal_NoAttrTwo()
+let _ = makeImmortal_ImmortalSame()
+let _ = makeImmortal_Diamond()
+let _ = makeImmortal_VDiamond()
+
+let _ = makeMixed_NoAttr() // NOTE: this is not a valid FRT
+let _ = makeMixed_Shared()
+let _ = makeMixed_UsingShared()
+let _ = makeMixed_Immortal()
