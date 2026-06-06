@@ -534,60 +534,21 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
   endforeach()
 endif()
 
-# Embedded standard library - embedded libraries are built as .swiftmodule only,
-# i.e. there is no .o or .a file produced (no binary code is actually produced)
-# and only users of a library are going to actually compile any needed code.
+# Embedded standard library.
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   add_custom_target(embedded-stdlib)
   add_dependencies(embedded-libraries embedded-stdlib)
 
-  set(SWIFT_ENABLE_REFLECTION OFF)
-  set(SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT OFF)
-  set(SWIFT_STDLIB_STABLE_ABI OFF)
-  set(SWIFT_STDLIB_ENABLE_OBJC_INTEROP OFF)
-  set(SWIFT_STDLIB_ENABLE_VECTOR_TYPES OFF)
-
-  # Under Embedded Swift, all stdlib APIs should be available always. Replace
-  # all availability macros with an empty expansion (`*`).
-  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED)
-  foreach(def ${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS})
-    string(REGEX REPLACE ":.*" ":*" replaced "${def}")
-    list(APPEND SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED "${replaced}")
-  endforeach()
-  set(SWIFT_STDLIB_AVAILABILITY_DEFINITIONS "${SWIFT_STDLIB_AVAILABILITY_DEFINITIONS_EMBEDDED}")
-
-  foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
-    string(REGEX REPLACE "[ \t]+" ";" list "${entry}")
-    list(GET list 0 arch)
-    list(GET list 1 mod)
-    list(GET list 2 triple)
-    
-    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
-    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
-    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
-    if(SWIFT_EMBEDDED_STDLIB_SDKS_FOR_TARGET_TRIPLES)
-      set(SWIFT_SDK_embedded_ARCH_${arch}_PATH "${EMBEDDED_STDLIB_SDK_FOR_${triple}}")
-    endif()
-    set(swift_embedded_stdlib_extra_compile_flags)
-    if(SWIFT_USE_SWIFT_EMBEDDED_PLATFORM)
-      list(APPEND swift_embedded_stdlib_extra_compile_flags "-D" "SWIFT_USE_EMBEDDED_SWIFT_PLATFORM")
-    endif()
-    add_swift_target_library_single(
-      embedded-stdlib-${mod}
-      swiftCore
-      ONLY_SWIFTMODULE
-      IS_STDLIB IS_STDLIB_CORE IS_FRAGILE
-      ${SWIFTLIB_EMBEDDED_SOURCES}
-      GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
-      SWIFT_COMPILE_FLAGS
-        ${swift_stdlib_compile_flags} -Xcc -ffreestanding -enable-experimental-feature Embedded ${swift_embedded_stdlib_extra_compile_flags}
-      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
-      SDK "embedded"
-      ARCHITECTURE "${arch}"
-      FILE_DEPENDS ${swiftCore_common_dependencies}
-      DEPENDS ${tooling_stdlib_deps}
-      INSTALL_IN_COMPONENT stdlib
-      )
-    add_dependencies(embedded-stdlib embedded-stdlib-${mod})
-  endforeach()
+  add_embedded_swift_target_library(
+    embedded-stdlib
+    swiftCore
+    IS_STDLIB IS_STDLIB_CORE
+    ${SWIFTLIB_EMBEDDED_SOURCES}
+    GYB_SOURCES ${SWIFTLIB_EMBEDDED_GYB_SOURCES}
+    SWIFT_COMPILE_FLAGS
+      ${swift_stdlib_compile_flags}
+    FILE_DEPENDS ${swiftCore_common_dependencies}
+    DEPENDS ${tooling_stdlib_deps}
+    INSTALL_IN_COMPONENT stdlib
+  )
 endif()
