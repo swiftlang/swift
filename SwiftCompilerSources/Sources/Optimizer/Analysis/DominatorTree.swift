@@ -46,24 +46,15 @@ struct DominatorTree {
   }
 }
 
-struct DomChildren: BridgedRandomAccessCollection {
-  private let bridgedDomTree: BridgedDomTree
-  private let block: BasicBlock
-  
-  let count: Int
-  
-  var startIndex: Int { return 0 }
-  var endIndex: Int { return count }
-  
-  init(bridgedDomTree: BridgedDomTree, bb: BasicBlock) {
-    self.bridgedDomTree = bridgedDomTree
-    self.block = bb
-    self.count = bridgedDomTree.getNumberOfChildren(bb.bridged)
+struct DomChildren: Sequence, IteratorProtocol {
+  private var bridgedIterator: BridgedDomChildrenIterator
+
+  mutating func next() -> BasicBlock? {
+    bridgedIterator.next().block
   }
-  
-  subscript(_ index: Int) -> BasicBlock {
-    assert(index >= startIndex && index < endIndex)
-    return bridgedDomTree.getChildAt(block.bridged, index).block
+
+  init(bridgedDomTree: BridgedDomTree, bb: BasicBlock) {
+    self.bridgedIterator = .init(bridgedDomTree, bb.bridged)
   }
 }
 
