@@ -8221,6 +8221,7 @@ const void * const swift::_swift_debug_allocationPoolPointer = &AllocationPool;
 const size_t swift::_swift_debug_allocationPoolSize = InitialPoolSize;
 const size_t swift::_swift_debug_metadataAllocatorPageSize = PoolRange::PageSize;
 std::atomic<const void *> swift::_swift_debug_metadataAllocationBacktraceList;
+size_t swift::_swift_debug_allocationPoolBackPointerOffset = ~0;
 
 static void recordBacktrace(void *allocation) {
   withCurrentBacktrace([&](void **addrs, int count) {
@@ -8287,6 +8288,7 @@ static void checkAllocatorDebugEnvironmentVariables(void *context) {
                      "Warning: SWIFT_DEBUG_ENABLE_METADATA_BACKTRACE_LOGGING "
                      "without SWIFT_DEBUG_ENABLE_METADATA_ALLOCATION_ITERATION "
                      "has no effect.\n");
+    _swift_debug_allocationPoolBackPointerOffset = PoolRange::PageSize - sizeof(void **);
     return;
   }
 
@@ -8299,6 +8301,7 @@ static void checkAllocatorDebugEnvironmentVariables(void *context) {
   memcpy(InitialAllocationPool.Pool + newPoolSize, &trailer, sizeof(trailer));
   poolCopy.Remaining = newPoolSize;
   AllocationPool.store(poolCopy, std::memory_order_relaxed);
+  _swift_debug_allocationPoolBackPointerOffset = PoolRange::PageSize - sizeof(PoolTrailer);
 }
 
 void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
@@ -8333,19 +8336,24 @@ void *MetadataAllocator::Allocate(size_t size, size_t alignment) {
       newState = PoolRange{curState.Begin + sizeWithHeader,
                            curState.Remaining - sizeWithHeader};
     } else {
-      auto poolSize = PoolRange::PageSize;
-      if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled))
-        poolSize -= sizeof(PoolTrailer);
       allocatedNewPage = true;
       allocation = reinterpret_cast<char *>(swift_slowAlloc(PoolRange::PageSize,
                                                             alignof(char) - 1));
       memsetScribble(allocation, PoolRange::PageSize);
 
+      auto poolSize = PoolRange::PageSize;
       if (SWIFT_UNLIKELY(_swift_debug_metadataAllocationIterationEnabled)) {
+        poolSize -= sizeof(PoolTrailer);
         PoolTrailer *newTrailer = (PoolTrailer *)(allocation + poolSize);
         char *prevTrailer = curState.Begin + curState.Remaining;
         newTrailer->PrevTrailer = prevTrailer;
         newTrailer->PoolSize = poolSize;
+      } else {
+        // Write a single back pointer to the end of the pool for the benefit of
+        // memory analysis tools.
+        poolSize -= sizeof(void *);
+        void **ptr = (void **)(allocation + poolSize);
+        *ptr = curState.Begin + curState.Remaining;
       }
       newState = PoolRange{allocation + sizeWithHeader,
                            poolSize - sizeWithHeader};
