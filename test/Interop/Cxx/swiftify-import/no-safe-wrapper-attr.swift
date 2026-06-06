@@ -11,7 +11,7 @@
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload public func control_group_function(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
 //   expected-remark@3{{macro content: |    let len = Int32(exactly: p.count)!|}}
-//   expected-remark@4{{macro content: |    return unsafe control_group_function(p.baseAddress!, len)|}}
+//   expected-remark@4{{macro content: |    return unsafe control_group_function(p.baseAddress, len)|}}
 //   expected-remark@5{{macro content: |}|}}
 // }}
 void control_group_function(int * __counted_by(len) p, int len);
@@ -24,7 +24,7 @@ struct Bar {
   //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @_disfavoredOverload|}}
   //   expected-remark@3{{macro content: |public mutating func control_group_method(_ p: UnsafeMutableBufferPointer<Int32>) {|}}
   //   expected-remark@4{{macro content: |    let len = Int32(exactly: p.count)!|}}
-  //   expected-remark@5{{macro content: |    return unsafe control_group_method(p.baseAddress!, len)|}}
+  //   expected-remark@5{{macro content: |    return unsafe control_group_method(p.baseAddress, len)|}}
   //   expected-remark@6{{macro content: |}|}}
   // }}
   void control_group_method(int * __counted_by(len) p, int len);

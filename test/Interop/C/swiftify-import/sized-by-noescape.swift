@@ -28,7 +28,7 @@
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe simple(len, _pPtr.baseAddress!)|}}
+//   expected-remark@10{{macro content: |    return unsafe simple(len, _pPtr.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void simple(int len, const void * __sized_by(len) __noescape p);
@@ -43,7 +43,7 @@ void simple(int len, const void * __sized_by(len) __noescape p);
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe swiftAttr(len, _pPtr.baseAddress!)|}}
+//   expected-remark@10{{macro content: |    return unsafe swiftAttr(len, _pPtr.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void swiftAttr(int len, const void *p) __attribute__((swift_attr(
@@ -68,7 +68,7 @@ void swiftAttr(int len, const void *p) __attribute__((swift_attr(
 //   expected-remark@16{{macro content: |    defer {|}}
 //   expected-remark@17{{macro content: |        _fixLifetime(p2)|}}
 //   expected-remark@18{{macro content: |    }|}}
-//   expected-remark@19{{macro content: |    return unsafe shared(len, _p1Ptr.baseAddress!, _p2Ptr.baseAddress!)|}}
+//   expected-remark@19{{macro content: |    return unsafe shared(len, _p1Ptr.baseAddress, _p2Ptr.baseAddress)|}}
 //   expected-remark@20{{macro content: |}|}}
 // }}
 void shared(int len, const void * __sized_by(len) __noescape p1, const void * __sized_by(len) __noescape p2);
@@ -85,7 +85,7 @@ void shared(int len, const void * __sized_by(len) __noescape p1, const void * __
 //   expected-remark@9{{macro content: |    defer {|}}
 //   expected-remark@10{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@11{{macro content: |    }|}}
-//   expected-remark@12{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress!)|}}
+//   expected-remark@12{{macro content: |    return unsafe complexExpr(len, offset, _pPtr.baseAddress)|}}
 //   expected-remark@13{{macro content: |}|}}
 // }}
 void complexExpr(int len, int offset, const void * __sized_by(len - offset) __noescape p);
@@ -100,7 +100,7 @@ void complexExpr(int len, int offset, const void * __sized_by(len - offset) __no
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe nullUnspecified(len, _pPtr.baseAddress!)|}}
+//   expected-remark@10{{macro content: |    return unsafe nullUnspecified(len, _pPtr.baseAddress)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void nullUnspecified(int len, const void * __sized_by(len) __noescape _Null_unspecified p);
@@ -154,12 +154,12 @@ typedef struct foo opaque_t;
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(p)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe opaque(len, OpaquePointer(_pPtr.baseAddress!))|}}
+//   expected-remark@10{{macro content: |    return unsafe opaque(len, OpaquePointer(_pPtr.baseAddress))|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void opaque(int len, opaque_t * __sized_by(len) __noescape p);
 
-// expected-expansion@+13:41{{
+// expected-expansion@+14:41{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func bytesized(_ _bytesized_param1: RawSpan) {|}}
 //   expected-remark@3{{macro content: |    let _bytesized_param0 = Int32(exactly: _bytesized_param1.byteCount)!|}}
@@ -169,12 +169,13 @@ void opaque(int len, opaque_t * __sized_by(len) __noescape p);
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(_bytesized_param1)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe bytesized(_bytesized_param0, __bytesized_param1Ptr.baseAddress!.assumingMemoryBound(to: UInt8.self))|}}
+//   expected-error@10{{value of optional type 'UnsafeRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeRawPointer'}}
+//   expected-remark@10{{macro content: |    return unsafe bytesized(_bytesized_param0, __bytesized_param1Ptr.baseAddress.assumingMemoryBound(to: UInt8.self))|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void bytesized(int size, const uint8_t *__sized_by(size) __noescape);
 
-// expected-expansion@+13:59{{
+// expected-expansion@+14:59{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_lifetime(_charsized_param0: copy _charsized_param0) @_disfavoredOverload public func charsized(_ _charsized_param0: inout MutableRawSpan) {|}}
 //   expected-remark@3{{macro content: |    let _charsized_param1 = Int32(exactly: _charsized_param0.byteCount)!|}}
@@ -184,7 +185,8 @@ void bytesized(int size, const uint8_t *__sized_by(size) __noescape);
 //   expected-remark@7{{macro content: |    defer {|}}
 //   expected-remark@8{{macro content: |        _fixLifetime(_charsized_param0)|}}
 //   expected-remark@9{{macro content: |    }|}}
-//   expected-remark@10{{macro content: |    return unsafe charsized(__charsized_param0Ptr.baseAddress!.assumingMemoryBound(to: CChar.self), _charsized_param1)|}}
+//   expected-error@10{{value of optional type 'UnsafeMutableRawPointer?' must be unwrapped to refer to member 'assumingMemoryBound' of wrapped base type 'UnsafeMutableRawPointer'}}
+//   expected-remark@10{{macro content: |    return unsafe charsized(__charsized_param0Ptr.baseAddress.assumingMemoryBound(to: CChar.self), _charsized_param1)|}}
 //   expected-remark@11{{macro content: |}|}}
 // }}
 void charsized(char *__sized_by(size) __noescape, int size);

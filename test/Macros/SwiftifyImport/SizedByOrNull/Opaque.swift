@@ -57,7 +57,7 @@ public func nullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer?) {
 @_alwaysEmitIntoClient @_disfavoredOverload
 public func impNullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
     let size = CInt(exactly: ptr.count)!
-    return unsafe impNullableUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), size)
+    return unsafe impNullableUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress), size)
 }
 ------------------------------
 @__swiftmacro_4test11nonnullSpan15_SwiftifyImportfMp_.swift
@@ -102,6 +102,6 @@ public func impNullableSpan(_ ptr: RawSpan) {
     defer {
         _fixLifetime(ptr)
     }
-    return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), size)
+    return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress), size)
 }
 ------------------------------
