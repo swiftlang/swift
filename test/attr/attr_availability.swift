@@ -62,6 +62,21 @@ protocol MyOlderProtocol {} // expected-note {{'MyOlderProtocol' has been explic
 
 extension Int: MyOlderProtocol {} // expected-error {{'MyOlderProtocol' has been renamed to 'MyNewerProtocol'}} 
 
+@available(*, unavailable, renamed: "`class`")
+func keyword_renamed() {} // expected-note {{'keyword_renamed()' has been explicitly marked unavailable here}}
+
+@available(*, unavailable, renamed: "`foo bar`")
+func spaces_renamed() {} // expected-note {{'spaces_renamed()' has been explicitly marked unavailable here}}
+
+@available(*, unavailable, renamed: "foo(`3bar baz`:)")
+func keywords_in_arguments(x: Int) {} // expected-note {{'keywords_in_arguments(x:)' has been explicitly marked unavailable here}}
+
+func testEscapedRenamed() {
+  keyword_renamed() // expected-error {{'keyword_renamed()' has been renamed to '`class`'}}
+  spaces_renamed() // expected-error {{'spaces_renamed()' has been renamed to '`foo bar`'}}
+  keywords_in_arguments(x: 0) // expected-error {{'keywords_in_arguments(x:)' has been renamed to 'foo(`3bar baz`:)'}}
+}
+
 struct MyCollection<Element> {
   @available(*, unavailable, renamed: "Element")
   typealias T = Element // expected-note 2{{'T' has been explicitly marked unavailable here}}
@@ -656,7 +671,7 @@ class DeprecatedInitBase {
   convenience init(testSelf: Int) {
     // https://github.com/apple/swift/issues/57354
     // The fix-it should not remove `.init`
-    self.init(old: testSelf) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{15-18=new}}
+    self.init(old: testSelf) // expected-warning {{'init(old:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{15-18=new}}
   }
 
   init(testSuper: Int) {}
@@ -675,32 +690,32 @@ class DeprecatedInitSub1: DeprecatedInitBase {
   override init(testSuper: Int) {
     // https://github.com/apple/swift/issues/57354
     // The fix-it should not remove `.init`
-    super.init(old: testSuper) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{16-19=new}}
+    super.init(old: testSuper) // expected-warning {{'init(old:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{16-19=new}}
   }
 }
 
 class DeprecatedInitSub2: DeprecatedInitBase { }
 
-_ = DeprecatedInitBase(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-27=new}}
-_ = DeprecatedInitBase.init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-32=new}}
-let _: DeprecatedInitBase = .init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-38=new}}
-_ = DeprecatedInitSub2(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-27=new}}
-_ = DeprecatedInitSub2.init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-32=new}}
-let _: DeprecatedInitSub2 = .init(old: 0) // expected-warning {{'init(old:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-38=new}}
+_ = DeprecatedInitBase(old: 0) // expected-warning {{'init(old:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-27=new}}
+_ = DeprecatedInitBase.init(old: 0) // expected-warning {{'init(old:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-32=new}}
+let _: DeprecatedInitBase = .init(old: 0) // expected-warning {{'init(old:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-38=new}}
+_ = DeprecatedInitSub2(old: 0) // expected-warning {{'init(old:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-27=new}}
+_ = DeprecatedInitSub2.init(old: 0) // expected-warning {{'init(old:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-32=new}}
+let _: DeprecatedInitSub2 = .init(old: 0) // expected-warning {{'init(old:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-38=new}}
 
-_ = DeprecatedInitBase(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-59=new}}
-_ = DeprecatedInitBase.init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-64=new}}
-let _: DeprecatedInitBase = .init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-70=new}}
-_ = DeprecatedInitSub2(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-59=new}}
-_ = DeprecatedInitSub2.init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-64=new}}
-let _: DeprecatedInitSub2 = .init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-70=new}}
+_ = DeprecatedInitBase(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-59=new}}
+_ = DeprecatedInitBase.init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-64=new}}
+let _: DeprecatedInitBase = .init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-70=new}}
+_ = DeprecatedInitSub2(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-59=new}}
+_ = DeprecatedInitSub2.init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-64=new}}
+let _: DeprecatedInitSub2 = .init(multipleEqualAvailabilityAttributes: 0) // expected-warning {{'init(multipleEqualAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-70=new}}
 
-_ = DeprecatedInitBase(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-61=new}}
-_ = DeprecatedInitBase.init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-66=new}}
-let _: DeprecatedInitBase = .init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-72=new}}
-_ = DeprecatedInitSub2(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-61=new}}
-_ = DeprecatedInitSub2.init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-66=new}}
-let _: DeprecatedInitSub2 = .init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: replaced by 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-72=new}}
+_ = DeprecatedInitBase(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-61=new}}
+_ = DeprecatedInitBase.init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-66=new}}
+let _: DeprecatedInitBase = .init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-72=new}}
+_ = DeprecatedInitSub2(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{24-61=new}}
+_ = DeprecatedInitSub2.init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{29-66=new}}
+let _: DeprecatedInitSub2 = .init(multipleUnequalAvailabilityAttributes: 0) // expected-warning {{'init(multipleUnequalAvailabilityAttributes:)' is deprecated: renamed to 'init(new:)'}}{{documentation-file=deprecated-declaration}} expected-note {{use 'init(new:)' instead}} {{35-72=new}}
 
 
 class Base {
@@ -1223,7 +1238,7 @@ func log(message: String) { }
 func log(format: String, _ args: Any...) { fatalError() } // expected-note {{'log(format:_:)' has been explicitly marked unavailable here}}
 
 func testBadRename() {
-  _ = BadRename(from: 5, to: 17) // expected-warning{{'init(from:to:step:)' is deprecated: replaced by 'init(range:step:)'}}{{documentation-file=deprecated-declaration}}
+  _ = BadRename(from: 5, to: 17) // expected-warning{{'init(from:to:step:)' is deprecated: renamed to 'init(range:step:)'}}{{documentation-file=deprecated-declaration}}
   // expected-note@-1{{use 'init(range:step:)' instead}}
 
   // Regression test for https://github.com/apple/swift/issues/64694

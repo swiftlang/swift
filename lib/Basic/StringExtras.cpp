@@ -1467,3 +1467,37 @@ bool swift::pathStartsWith(StringRef prefix, StringRef path) {
   }
   return prefixIt == prefixEnd;
 }
+
+std::pair<StringRef, StringRef> swift::backtickAwareSplit(StringRef text,
+                                                          char separator) {
+  bool inBackticks = false;
+  for (size_t i = 0; i < text.size(); ++i) {
+    char c = text[i];
+    if (c == '`') {
+      inBackticks = !inBackticks;
+    } else if (c == separator && !inBackticks) {
+      return {text.substr(0, i), text.substr(i + 1)};
+    }
+  }
+  return {text, StringRef()};
+}
+
+std::pair<StringRef, StringRef> swift::backtickAwareRSplit(StringRef text,
+                                                           char separator) {
+  bool inBackticks = false;
+  for (size_t i = text.size(); i > 0; --i) {
+    char c = text[i - 1];
+    if (c == '`') {
+      inBackticks = !inBackticks;
+    } else if (c == separator && !inBackticks) {
+      return {text.substr(0, i - 1), text.substr(i)};
+    }
+  }
+  return {text, StringRef()};
+}
+
+StringRef swift::stripBackticks(StringRef name) {
+  if (name.size() > 2 && name.front() == '`' && name.back() == '`')
+    return name.drop_front().drop_back();
+  return name;
+}
