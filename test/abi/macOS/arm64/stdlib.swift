@@ -1310,3 +1310,6 @@ Added: _$ss9UniqueBoxVsRi_zrlE7pointerSpyxGvg
 
 // Cross-encoding strcmp for Foundation
 Added: __swift_unicodeBuffersEqual_nonNormalizing
+
+// Debug variable for metadata allocator back pointer
+Added: __swift_debug_allocationPoolBackPointerOffset
