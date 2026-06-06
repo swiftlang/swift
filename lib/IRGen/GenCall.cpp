@@ -6854,7 +6854,7 @@ void irgen::emitYieldOnceCoroutineResult(IRGenFunction &IGF, Explosion &result,
 
     // Find coro.end intrinsic
     llvm::CallInst *coroEndCall = nullptr;
-    for (llvm::Instruction &inst : coroEndBB->instructionsWithoutDebug()) {
+    for (llvm::Instruction &inst : *coroEndBB) {
       if (auto *CI = dyn_cast<llvm::CallInst>(&inst)) {
         if (CI->getIntrinsicID() == llvm::Intrinsic::coro_end) {
           coroEndCall = CI;
