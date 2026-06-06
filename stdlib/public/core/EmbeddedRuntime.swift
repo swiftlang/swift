@@ -904,6 +904,67 @@ func _embeddedReportExclusivityViolation(
   Builtin.int_trap()
 }
 
+// IntegerLiteral-to-FloatingPoint conversion
+
+/// Convert a `Builtin.IntegerLiteral` value to a binary floating-point type.
+///
+/// `data` is a pointer to little-endian word-sized chunks; `flags` packs the
+/// minimum bit width needed to store the value (in bits 8 and above) and the
+/// sign (in bit 0). The format mirrors `swift::IntegerLiteral` /
+/// `swift::IntegerLiteralFlags` in `include/swift/Runtime/Numeric.h` and
+/// `include/swift/ABI/MetadataValues.h`. The same algorithm is implemented
+/// in C++ in `stdlib/public/runtime/Numeric.cpp` for non-Embedded builds.
+@_silgen_name("swift_intToFloat32")
+public func _swift_intToFloat32(
+  _ data: UnsafePointer<UInt>, _ flags: Int
+) -> Float {
+  let bitsPerChunk = Int.bitWidth
+  let bitWidth = flags >> 8
+  let numChunks = (bitWidth + bitsPerChunk - 1) / bitsPerChunk
+
+  // Single chunk: the entire value is sign-extended into one chunk.
+  if numChunks == 1 {
+    return Float(Int(bitPattern: unsafe data[0]))
+  }
+
+  // Multi-chunk: lower chunks contribute as unsigned digits in base
+  // 2^bitsPerChunk; only the top chunk carries the sign.
+  let chunkFactor: Float = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
+
+  var result = Float(unsafe data[0])
+  var scale = chunkFactor
+  for i in 1 ..< numChunks - 1 {
+    result += Float(unsafe data[i]) * scale
+    scale *= chunkFactor
+  }
+  result += Float(Int(bitPattern: unsafe data[numChunks - 1])) * scale
+  return result
+}
+
+@_silgen_name("swift_intToFloat64")
+public func _swift_intToFloat64(
+  _ data: UnsafePointer<UInt>, _ flags: Int
+) -> Double {
+  let bitsPerChunk = Int.bitWidth
+  let bitWidth = flags >> 8
+  let numChunks = (bitWidth + bitsPerChunk - 1) / bitsPerChunk
+
+  if numChunks == 1 {
+    return Double(Int(bitPattern: unsafe data[0]))
+  }
+
+  let chunkFactor: Double = bitsPerChunk == 64 ? 0x1p64 : 0x1p32
+
+  var result = Double(unsafe data[0])
+  var scale = chunkFactor
+  for i in 1 ..< numChunks - 1 {
+    result += Double(unsafe data[i]) * scale
+    scale *= chunkFactor
+  }
+  result += Double(Int(bitPattern: unsafe data[numChunks - 1])) * scale
+  return result
+}
+
 // CXX Exception Personality
 
 public typealias _Unwind_Action = CInt
