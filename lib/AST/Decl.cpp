@@ -6790,10 +6790,11 @@ void NominalTypeDecl::synthesizeSemanticMembersIfNeeded(DeclName member) {
 
   if (member.isSimpleName() && !baseName.isSpecial()) {
     if (baseName.getIdentifier() == Context.Id_CodingKeys) {
-      // Only request CodingKeys synthesis if no explicit CodingKeys exists.
-      // lookupDirect does not trigger synthesis, so this is safe from cycles.
-      if (lookupDirect(DeclName(Context.Id_CodingKeys)).empty())
-        action.emplace(ImplicitMemberAction::ResolveCodingKeys);
+      // SynthesizeCodingKeysRequest is a no-op when an explicit CodingKeys
+      // exists, so this lookup site does not have to know about cycle
+      // conditions.
+      (void)evaluateOrDefault(Context.evaluator,
+                              SynthesizeCodingKeysRequest{this}, {});
     }
   } else {
     auto argumentNames = member.getArgumentNames();

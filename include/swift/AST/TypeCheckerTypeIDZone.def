@@ -404,6 +404,12 @@ SWIFT_REQUEST(TypeChecker, BraceHasExplicitReturnStmtRequest,
 SWIFT_REQUEST(TypeChecker, ResolveImplicitMemberRequest,
               evaluator::SideEffect(NominalTypeDecl *, ImplicitMemberAction),
               Uncached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, SynthesizeCodingKeysRequest,
+              evaluator::SideEffect(NominalTypeDecl *),
+              Uncached, NoLocationInfo)
+SWIFT_REQUEST(TypeChecker, CheckCodableStoredPropertiesRequest,
+              evaluator::SideEffect(NominalTypeDecl *),
+              Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, ResolveMacroRequest,
               ConcreteDeclRef(UnresolvedMacroReference),
               Cached, NoLocationInfo)

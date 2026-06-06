@@ -3036,7 +3036,6 @@ public:
 // Please do not add any more.
 enum class ImplicitMemberAction : uint8_t {
   ResolveImplicitInit,
-  ResolveCodingKeys,
   ResolveEncodable,
   ResolveDecodable,
 };
@@ -3056,6 +3055,59 @@ private:
   evaluator::SideEffect
   evaluate(Evaluator &evaluator, NominalTypeDecl *NTD,
            ImplicitMemberAction action) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+/// Synthesizes a CodingKeys enum for a Codable nominal type when one has not
+/// been provided explicitly. Synthesis is performed as a side effect of
+/// Codable conformance derivation in DerivedConformanceCodable. When the
+/// nominal type already has an explicit CodingKeys, this request is a no-op
+/// and does not trigger conformance derivation.
+///
+/// Because the request is a no-op for explicit CodingKeys, it can be
+/// invoked safely from member lookup paths that may execute while
+/// StoredPropertiesRequest is active (e.g. resolving CodingKeys.foo inside
+/// a property wrapper initializer).
+class SynthesizeCodingKeysRequest
+    : public SimpleRequest<SynthesizeCodingKeysRequest,
+                           evaluator::SideEffect(NominalTypeDecl *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, NominalTypeDecl *NTD) const;
+
+public:
+  // Separate caching.
+  bool isCached() const { return true; }
+};
+
+/// Diagnoses immutable stored properties that have an initial value and are
+/// present in a Decodable type's CodingKeys, since they cannot be decoded.
+///
+/// This is a purely static check over stored properties and the CodingKeys
+/// enum. It is split off from init(from:) body synthesis so the diagnostic
+/// no longer depends on body type-checking (and therefore on Codable
+/// conformance derivation) running for the type.
+class CheckCodableStoredPropertiesRequest
+    : public SimpleRequest<CheckCodableStoredPropertiesRequest,
+                           evaluator::SideEffect(NominalTypeDecl *),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  evaluator::SideEffect
+  evaluate(Evaluator &evaluator, NominalTypeDecl *NTD) const;
 
 public:
   // Separate caching.
