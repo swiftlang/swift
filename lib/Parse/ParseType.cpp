@@ -249,9 +249,52 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     else
       ty = parseAnyType();
     break;
-  case tok::l_paren:
-    ty = parseTypeTupleBody();
+  case tok::l_paren: {
+    // Associated-type disambiguation: a parenthesized `(Subject as Protocol)`
+    // used as the base of a member type reference, e.g. `(T as Sequence).Foo`.
+    // Look ahead for a top-level `as` before the closing paren to distinguish
+    // it from an ordinary tuple type.
+    bool isConformanceQualified = false;
+    if (Context.LangOpts.hasFeature(Feature::AssociatedTypeDisambiguation)) {
+      BacktrackingScope backtrack(*this);
+      consumeToken(tok::l_paren);
+      while (!Tok.isAny(tok::r_paren, tok::eof)) {
+        if (Tok.is(tok::kw_as)) {
+          isConformanceQualified = true;
+          break;
+        }
+        if (Tok.is(tok::comma))
+          break;
+        skipSingle();
+      }
+    }
+
+    if (isConformanceQualified) {
+      SourceLoc lParen = consumeToken(tok::l_paren);
+      auto subject = parseType();
+      SourceLoc asLoc;
+      consumeIf(tok::kw_as, asLoc);
+      auto proto = parseType();
+      SourceLoc rParen;
+      ParserStatus status;
+      status |= subject;
+      status |= proto;
+      if (parseMatchingToken(tok::r_paren, rParen,
+                             diag::expected_rparen_tuple_type_list, lParen))
+        status.setIsParseError();
+      if (!subject.getPtrOrNull() || !proto.getPtrOrNull()) {
+        ty = makeParserResult(
+            status, ErrorTypeRepr::create(Context, SourceRange(lParen, rParen)));
+      } else {
+        auto *repr = new (Context) ConformanceQualifiedTypeRepr(
+            subject.get(), asLoc, proto.get(), SourceRange(lParen, rParen));
+        ty = makeParserResult(status, repr);
+      }
+    } else {
+      ty = parseTypeTupleBody();
+    }
     break;
+  }
   case tok::code_complete:
     if (CodeCompletionCallbacks) {
       if (tildeLoc.isValid()) {

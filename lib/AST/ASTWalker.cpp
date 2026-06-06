@@ -2368,6 +2368,13 @@ bool Traversal::visitProtocolTypeRepr(ProtocolTypeRepr *T) {
   return doIt(T->getBase());
 }
 
+bool Traversal::visitConformanceQualifiedTypeRepr(
+    ConformanceQualifiedTypeRepr *T) {
+  if (doIt(T->getSubject()))
+    return true;
+  return doIt(T->getProtocol());
+}
+
 bool Traversal::visitOwnershipTypeRepr(OwnershipTypeRepr *T) {
   return doIt(T->getBase());
 }

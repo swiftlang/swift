@@ -3882,6 +3882,16 @@ class TypeAliasDecl : public GenericTypeDecl {
   /// The location of the right-hand side of the typealias binding
   TypeLoc UnderlyingTy;
 
+  /// For an associated-type-disambiguating type alias written as
+  /// `typealias P.Name = T`, this is the parsed representation of the
+  /// qualifying protocol `P`. Null for an ordinary type alias.
+  ///
+  /// Such an alias keeps its base name (`Name`) so that associated type
+  /// witness lookup can find it, but it is excluded from ordinary
+  /// unqualified name lookup and redeclaration checking; instead it only
+  /// witnesses the matching associated type of protocol `P`.
+  TypeRepr *DisambiguatedProtocolRepr = nullptr;
+
 public:
   TypeAliasDecl(SourceLoc TypeAliasLoc, SourceLoc EqualLoc, Identifier Name,
                 SourceLoc NameLoc, GenericParamList *GenericParams,
@@ -3955,6 +3965,23 @@ public:
   bool isDebuggerAlias() const { return Bits.TypeAliasDecl.IsDebuggerAlias; }
   void markAsDebuggerAlias(bool isDebuggerAlias) {
     Bits.TypeAliasDecl.IsDebuggerAlias = isDebuggerAlias;
+  }
+
+  /// Whether this type alias disambiguates an associated type witness by
+  /// naming the protocol it belongs to, i.e. `typealias P.Name = T`
+  /// (the experimental AssociatedTypeDisambiguation feature).
+  bool isProtocolQualifiedWitness() const {
+    return DisambiguatedProtocolRepr != nullptr;
+  }
+
+  /// Retrieve the TypeRepr for the qualifying protocol `P` of an
+  /// associated-type-disambiguating type alias (`typealias P.Name = T`),
+  /// or null for an ordinary type alias.
+  TypeRepr *getDisambiguatedProtocolRepr() const {
+    return DisambiguatedProtocolRepr;
+  }
+  void setDisambiguatedProtocolRepr(TypeRepr *repr) {
+    DisambiguatedProtocolRepr = repr;
   }
 
   static bool classof(const Decl *D) {

@@ -4868,6 +4868,14 @@ public:
     printFoot();
   }
 
+  void visitConformanceQualifiedTypeRepr(ConformanceQualifiedTypeRepr *T,
+                                         Label label) {
+    printCommon("type_conformance_qualified", label);
+    printRec(T->getSubject(), Label::optional("subject"));
+    printRec(T->getProtocol(), Label::optional("protocol"));
+    printFoot();
+  }
+
   void visitOwnershipTypeRepr(OwnershipTypeRepr *T, Label label) {
     printCommon("type_ownership", label);
     printFlag(getDumpString(T->getSpecifier()));

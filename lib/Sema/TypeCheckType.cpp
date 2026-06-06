@@ -642,6 +642,14 @@ private:
   NeverNullType resolveUnqualifiedIdentTypeRepr(UnqualifiedIdentTypeRepr *repr,
                                                 TypeResolutionOptions options);
 
+  /// Resolve a `(Subject as Protocol)` conformance-qualified type, used to
+  /// disambiguate same-named associated types (the experimental
+  /// AssociatedTypeDisambiguation feature). Returns the subject type; the
+  /// protocol is consulted when resolving the trailing member type.
+  NeverNullType
+  resolveConformanceQualifiedType(ConformanceQualifiedTypeRepr *repr,
+                                  TypeResolutionOptions options);
+
   NeverNullType resolveTypeDecl(TypeDecl *typeDecl, DeclContext *foundDC,
                                 UnqualifiedIdentTypeRepr *repr,
                                 TypeResolutionOptions options);
@@ -968,6 +976,20 @@ auto getWithoutClaiming<NonisolatedNonsendingTypeRepr>(TypeAttrSet *attrs) {
 }
 } // end anonymous namespace
 
+/// Extract the protocol named by the qualifier of a `(X as P)`
+/// conformance-qualified type. A bare protocol name resolves to an
+/// existential (`any P`) in type position, so look through that to recover the
+/// underlying protocol.
+static ProtocolDecl *protocolDeclForConformanceQualifier(Type protoTy) {
+  if (!protoTy || protoTy->hasError())
+    return nullptr;
+  if (auto *existential = protoTy->getAs<ExistentialType>())
+    protoTy = existential->getConstraintType();
+  if (auto *protoType = protoTy->getAs<ProtocolType>())
+    return protoType->getDecl();
+  return nullptr;
+}
+
 NeverNullType
 TypeResolver::resolveDependentMemberType(Type baseTy,
                                          SourceRange baseRange,
@@ -1001,6 +1023,97 @@ TypeResolver::resolveDependentMemberType(Type baseTy,
   auto genericSig = resolution.getGenericSignature();
   if (!genericSig)
     return ErrorType::get(baseTy);
+
+  // Associated-type disambiguation: if the base is written as `(X as P)`,
+  // resolve the member against protocol `P` specifically, bypassing the
+  // name-based anchor selection that would otherwise be ambiguous.
+  if (auto *cqBase = dyn_cast<ConformanceQualifiedTypeRepr>(repr->getBase())) {
+    auto protoOptions =
+        options.withContext(TypeResolverContext::GenericRequirement);
+    protoOptions |= TypeResolutionFlags::SilenceDiagnostics;
+    Type protoTy = resolveType(cqBase->getProtocol(), protoOptions);
+    auto *proto = protocolDeclForConformanceQualifier(protoTy);
+    if (!proto)
+      return ErrorType::get(ctx);
+
+    auto *assoc = proto->getAssociatedType(refIdentifier);
+    if (!assoc) {
+      if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+        diagnose(repr->getNameLoc(), diag::conformance_qualifier_no_member,
+                 proto, refIdentifier);
+      return ErrorType::get(ctx);
+    }
+
+    // The disambiguation only takes effect for a concrete base. For an abstract
+    // type parameter that conforms to more than one protocol declaring this
+    // name, the requirement machine merges the associated types into a single
+    // type parameter, so `(T as P).Name` and `(T as Q).Name` denote the same
+    // type. Warn and point at the split-parameter workaround.
+    if (!options.contains(TypeResolutionFlags::SilenceDiagnostics) &&
+        baseTy->isTypeParameter()) {
+      auto *assocAnchor = assoc->getAssociatedTypeAnchor();
+      for (auto *otherProto : genericSig->getRequiredProtocols(baseTy)) {
+        if (otherProto == proto)
+          continue;
+        auto *otherAssoc = otherProto->getAssociatedType(refIdentifier);
+        if (otherAssoc &&
+            otherAssoc->getAssociatedTypeAnchor() != assocAnchor) {
+          diagnose(repr->getNameLoc(),
+                   diag::associated_type_disambiguation_collapsed,
+                   refIdentifier, baseTy, proto, otherProto);
+          break;
+        }
+      }
+    }
+
+    repr->setValue(assoc, nullptr);
+    return DependentMemberType::get(baseTy, assoc);
+  }
+
+  // Associated-type disambiguation: when the base conforms to more than one
+  // protocol that supplies a same-named associated type, and those associated
+  // types are not constrained to be equal, a bare reference like `T.Iterator`
+  // is ambiguous. Name lookup would otherwise silently pick one; instead
+  // require the `(X as P).Name` spelling.
+  if (ctx.LangOpts.hasFeature(Feature::AssociatedTypeDisambiguation) &&
+      !options.contains(TypeResolutionFlags::SilenceDiagnostics) &&
+      baseTy->isTypeParameter()) {
+    SmallVector<std::pair<ProtocolDecl *, AssociatedTypeDecl *>, 2> candidates;
+    SmallVector<CanType, 2> distinctReduced;
+    for (auto *proto : genericSig->getRequiredProtocols(baseTy)) {
+      auto *assoc = proto->getAssociatedType(refIdentifier);
+      if (!assoc)
+        continue;
+
+      auto reduced =
+          genericSig.getReducedType(DependentMemberType::get(baseTy, assoc));
+      if (llvm::is_contained(distinctReduced, reduced))
+        continue;
+
+      distinctReduced.push_back(reduced);
+      candidates.push_back({proto, assoc});
+    }
+
+    if (candidates.size() > 1) {
+      diagnose(repr->getNameLoc(),
+               diag::ambiguous_associated_type_disambiguation, refIdentifier,
+               baseTy);
+      for (const auto &candidate : candidates) {
+        auto note = diagnose(
+            repr->getNameLoc(),
+            diag::ambiguous_associated_type_disambiguation_candidate,
+            candidate.second, candidate.first);
+        if (auto *qualRepr = dyn_cast<QualifiedIdentTypeRepr>(repr)) {
+          auto baseRange = qualRepr->getBase()->getSourceRange();
+          std::string suffix =
+              (Twine(" as ") + candidate.first->getName().str() + ")").str();
+          note.fixItInsert(baseRange.Start, "(")
+              .fixItInsertAfter(baseRange.End, suffix);
+        }
+      }
+      return ErrorType::get(ctx);
+    }
+  }
 
   // Look for a nested type with the given name.
   if (auto nestedType = genericSig->lookupNestedType(baseTy, refIdentifier)) {
@@ -2562,6 +2675,45 @@ TypeResolver::resolveQualifiedIdentTypeRepr(Type parentTy,
     return ErrorType::get(ctx);
   }
 
+  // Associated-type disambiguation for a concrete base: `(C as P).Member`
+  // resolves to C's type witness for protocol P's associated type Member.
+  // (The type-parameter case is handled in resolveDependentMemberType.)
+  if (auto *cqBase = dyn_cast<ConformanceQualifiedTypeRepr>(repr->getBase())) {
+    if (!parentTy->isTypeParameter()) {
+      auto refIdentifier = repr->getNameRef().getBaseIdentifier();
+      auto protoOptions =
+          options.withContext(TypeResolverContext::GenericRequirement);
+      protoOptions |= TypeResolutionFlags::SilenceDiagnostics;
+      Type protoTy = resolveType(cqBase->getProtocol(), protoOptions);
+      auto *proto = protocolDeclForConformanceQualifier(protoTy);
+      if (!proto)
+        return ErrorType::get(ctx);
+
+      auto *assoc = proto->getAssociatedType(refIdentifier);
+      if (!assoc) {
+        if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+          diagnose(repr->getNameLoc(), diag::conformance_qualifier_no_member,
+                   proto, refIdentifier);
+        return ErrorType::get(ctx);
+      }
+
+      auto conformance = lookupConformance(parentTy, proto);
+      if (conformance.isInvalid()) {
+        if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+          diagnose(repr->getNameLoc(), diag::type_does_not_conform, parentTy,
+                   proto->getDeclaredInterfaceType());
+        return ErrorType::get(ctx);
+      }
+
+      Type witness = conformance.getTypeWitness(assoc);
+      if (!witness || witness->hasError())
+        return ErrorType::get(ctx);
+
+      repr->setValue(assoc, nullptr);
+      return witness;
+    }
+  }
+
   // If the parent is a type parameter, the member is a dependent member,
   // and we skip much of the work below.
   if (parentTy->isTypeParameter()) {
@@ -3015,6 +3167,10 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
 
   case TypeReprKind::Protocol:
     return resolveProtocolType(cast<ProtocolTypeRepr>(repr), options);
+
+  case TypeReprKind::ConformanceQualified:
+    return resolveConformanceQualifiedType(
+        cast<ConformanceQualifiedTypeRepr>(repr), options);
 
   case TypeReprKind::OpaqueReturn: {
     // If the opaque type is in a valid position, e.g. part of a function return
@@ -6804,6 +6960,37 @@ NeverNullType TypeResolver::resolveProtocolType(ProtocolTypeRepr *repr,
   return buildProtocolType(repr, ty, storedRepr);
 }
 
+NeverNullType TypeResolver::resolveConformanceQualifiedType(
+    ConformanceQualifiedTypeRepr *repr, TypeResolutionOptions options) {
+  auto &ctx = getASTContext();
+
+  // The subject of `(Subject as Protocol)` becomes the base of the trailing
+  // member type reference.
+  Type subjectTy = resolveType(repr->getSubject(), options);
+  if (subjectTy->hasError())
+    return ErrorType::get(ctx);
+
+  // Resolve and validate the protocol. A bare protocol name resolves to an
+  // existential (`any P`) in type position, so look through that.
+  auto protoOptions =
+      options.withContext(TypeResolverContext::GenericRequirement);
+  protoOptions |= TypeResolutionFlags::SilenceDiagnostics;
+  Type protoTy = resolveType(repr->getProtocol(), protoOptions);
+  if (protoTy->hasError())
+    return ErrorType::get(ctx);
+
+  if (!protocolDeclForConformanceQualifier(protoTy)) {
+    if (!options.contains(TypeResolutionFlags::SilenceDiagnostics))
+      diagnose(repr->getProtocol()->getLoc(),
+               diag::conformance_qualifier_not_protocol, protoTy);
+    return ErrorType::get(ctx);
+  }
+
+  // The resolved type is the subject; the protocol is consulted when the
+  // trailing member type is resolved (see resolveDependentMemberType).
+  return subjectTy;
+}
+
 NeverNullType TypeResolver::buildProtocolType(
     ProtocolTypeRepr *repr, Type instanceType,
     std::optional<MetatypeRepresentation> storedRepr) {
@@ -7026,6 +7213,7 @@ private:
     case TypeReprKind::Tuple:
     case TypeReprKind::Fixed:
     case TypeReprKind::Self:
+    case TypeReprKind::ConformanceQualified:
     case TypeReprKind::Array:
     case TypeReprKind::InlineArray:
     case TypeReprKind::SILBox:

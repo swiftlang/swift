@@ -622,6 +622,12 @@ EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 /// SIL-level flow-isolation pass, allowing more programs to be accepted.
 EXPERIMENTAL_FEATURE(FlowIsolationGlobalActor, false)
 
+/// Allow a conforming type to provide distinct type witnesses for two
+/// associated types that share the same name across different protocols,
+/// using a protocol-qualified type alias (`typealias P.Name = T`), and to
+/// disambiguate references at use sites with `(X as P).Name`.
+EXPERIMENTAL_FEATURE(AssociatedTypeDisambiguation, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

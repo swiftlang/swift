@@ -855,6 +855,16 @@ void ProtocolTypeRepr::printImpl(ASTPrinter &Printer,
   Printer << ".Protocol";
 }
 
+void ConformanceQualifiedTypeRepr::printImpl(
+    ASTPrinter &Printer, const PrintOptions &Opts,
+    NonRecursivePrintOptions nrOpts) const {
+  Printer << "(";
+  printTypeRepr(Subject, Printer, Opts);
+  Printer << " as ";
+  printTypeRepr(Protocol, Printer, Opts);
+  Printer << ")";
+}
+
 void OpaqueReturnTypeRepr::printImpl(ASTPrinter &Printer,
                                      const PrintOptions &Opts,
                                      NonRecursivePrintOptions nrOpts) const {

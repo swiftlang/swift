@@ -526,6 +526,28 @@ static void resolveTypeWitnessViaParameterizedProtocol(
   }
 }
 
+/// Resolve the qualifying protocol of a protocol-qualified witness type alias
+/// (`typealias P.Name = T`), part of the experimental
+/// AssociatedTypeDisambiguation feature. Returns null if \p alias is an
+/// ordinary type alias or its qualifier does not name a protocol.
+static ProtocolDecl *resolveWitnessAliasProtocol(TypeAliasDecl *alias) {
+  auto *repr = alias->getDisambiguatedProtocolRepr();
+  if (!repr)
+    return nullptr;
+
+  auto resolution = TypeResolution::forInterface(
+      alias->getDeclContext(), TypeResolverContext::GenericRequirement,
+      /*unboundTyOpener=*/nullptr, /*placeholderHandler=*/nullptr,
+      /*packElementOpener=*/nullptr);
+  Type resolved = resolution.resolveType(repr);
+  if (!resolved || resolved->hasError())
+    return nullptr;
+
+  if (auto *protoTy = resolved->getAs<ProtocolType>())
+    return protoTy->getDecl();
+  return nullptr;
+}
+
 /// Attempt to resolve a type witness via member name lookup.
 static ResolveWitnessResult resolveTypeWitnessViaLookup(
                        NormalProtocolConformance *conformance,
@@ -570,6 +592,45 @@ static ResolveWitnessResult resolveTypeWitnessViaLookup(
   dc->lookupQualified(dc->getSelfNominalTypeDecl(), assocType->createNameRef(),
                       dc->getSelfNominalTypeDecl()->getLoc(), subOptions,
                       candidates);
+
+  // Associated-type disambiguation: a protocol-qualified witness alias
+  // (`typealias P.Name = T`) only witnesses the associated type of the protocol
+  // `P` it names. If any qualified alias names this requirement's protocol, then
+  // those qualified aliases are the sole witnesses; otherwise, any qualified
+  // aliases (which must name *other* protocols) are removed so they don't bind
+  // this requirement, and ordinary candidates are used as before.
+  if (ctx.LangOpts.hasFeature(Feature::AssociatedTypeDisambiguation)) {
+    auto *targetProto = assocType->getProtocol();
+    auto namesTargetProtocol = [&](TypeAliasDecl *alias) {
+      auto *qualProto = resolveWitnessAliasProtocol(alias);
+      return qualProto && (qualProto == targetProto ||
+                           qualProto == conformance->getProtocol());
+    };
+
+    SmallVector<ValueDecl *, 2> qualifiedMatches;
+    bool sawAnyQualified = false;
+    for (auto candidate : candidates) {
+      auto *alias = dyn_cast<TypeAliasDecl>(candidate);
+      if (!alias || !alias->isProtocolQualifiedWitness())
+        continue;
+      sawAnyQualified = true;
+      if (namesTargetProtocol(alias))
+        qualifiedMatches.push_back(candidate);
+    }
+
+    if (!qualifiedMatches.empty()) {
+      candidates.clear();
+      candidates.append(qualifiedMatches.begin(), qualifiedMatches.end());
+    } else if (sawAnyQualified) {
+      candidates.erase(
+          std::remove_if(candidates.begin(), candidates.end(),
+                         [](ValueDecl *c) {
+                           auto *a = dyn_cast<TypeAliasDecl>(c);
+                           return a && a->isProtocolQualifiedWitness();
+                         }),
+          candidates.end());
+    }
+  }
 
   // Determine which of the candidates is viable.
   SmallVector<LookupTypeResultEntry, 2> viable;

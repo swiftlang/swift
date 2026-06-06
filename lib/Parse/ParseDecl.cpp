@@ -29,6 +29,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
@@ -7742,13 +7743,53 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc IdLoc;
   ParserStatus Status;
 
+  const bool allowDisambiguation =
+      Context.LangOpts.hasFeature(Feature::AssociatedTypeDisambiguation);
+
   Status |= parseIdentifierDeclName(
-      *this, Id, IdLoc, "typealias",
-      [](const Token &next) { return next.isAny(tok::colon, tok::equal); });
+      *this, Id, IdLoc, "typealias", [&](const Token &next) {
+        return next.isAny(tok::colon, tok::equal) ||
+               (allowDisambiguation && next.is(tok::period));
+      });
   if (Status.isErrorOrHasCompletion()) {
     return Status;
   }
-    
+
+  // Associated-type disambiguation: `typealias P.Name = T`. The identifier we
+  // just parsed names the qualifying protocol; the alias name follows the dot.
+  // A dotted qualifier (e.g. `Mod.Proto.Name`) folds all leading components
+  // into the protocol type, leaving the final component as the alias name.
+  TypeRepr *disambiguatedProtocol = nullptr;
+  if (allowDisambiguation && Tok.is(tok::period)) {
+    disambiguatedProtocol = UnqualifiedIdentTypeRepr::create(
+        Context, DeclNameLoc(IdLoc), DeclNameRef(DeclName(Id)));
+
+    do {
+      consumeToken(tok::period);
+
+      Identifier componentId;
+      SourceLoc componentLoc;
+      auto componentStatus = parseIdentifierDeclName(
+          *this, componentId, componentLoc, "typealias",
+          [](const Token &next) {
+            return next.isAny(tok::colon, tok::equal, tok::period);
+          });
+      if (componentStatus.isErrorOrHasCompletion())
+        return componentStatus;
+
+      if (Tok.is(tok::period)) {
+        // Another component follows, so this one is part of the protocol type.
+        disambiguatedProtocol = QualifiedIdentTypeRepr::create(
+            Context, disambiguatedProtocol, DeclNameLoc(componentLoc),
+            DeclNameRef(DeclName(componentId)));
+      } else {
+        // The final component is the alias name.
+        Id = componentId;
+        IdLoc = componentLoc;
+      }
+    } while (Tok.is(tok::period));
+  }
+
   DebuggerContextChange DCC(*this, Id, DeclKind::TypeAlias);
 
   // Parse a generic parameter list if it is present.
@@ -7778,6 +7819,7 @@ parseDeclTypeAlias(Parser::ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   auto *TAD = new (Context) TypeAliasDecl(TypeAliasLoc, EqualLoc, Id, IdLoc,
                                           genericParams, CurDeclContext);
+  TAD->setDisambiguatedProtocolRepr(disambiguatedProtocol);
   ParserResult<TypeRepr> UnderlyingTy;
 
   if (Tok.is(tok::colon) || Tok.is(tok::equal)) {

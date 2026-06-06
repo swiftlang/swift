@@ -3408,6 +3408,7 @@ directReferencesForTypeRepr(Evaluator &evaluator, ASTContext &ctx,
   case TypeReprKind::LifetimeDependent:
   case TypeReprKind::Sending:
   case TypeReprKind::GenericArgumentExpr:
+  case TypeReprKind::ConformanceQualified:
     return result;
 
   case TypeReprKind::Fixed:

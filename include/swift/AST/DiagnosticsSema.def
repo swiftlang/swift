@@ -3324,6 +3324,25 @@ NOTE(ambiguous_witnesses_type,none,
 ERROR(ambiguous_associated_type_from_parameterized_protocols,none,
      "ambiguous associated type %0 in conformance to %1",
      (const AssociatedTypeDecl *, const ProtocolDecl *))
+ERROR(ambiguous_associated_type_disambiguation,none,
+     "reference to associated type %0 is ambiguous; it is provided by more than "
+     "one protocol that %1 conforms to",
+     (Identifier, Type))
+NOTE(ambiguous_associated_type_disambiguation_candidate,none,
+     "found %0 in protocol %1; qualify the reference with '(... as %1)' to use it",
+     (const AssociatedTypeDecl *, const ProtocolDecl *))
+ERROR(conformance_qualifier_not_protocol,none,
+     "type %0 to the right of 'as' in a disambiguating member type must be a "
+     "protocol",
+     (Type))
+ERROR(conformance_qualifier_no_member,none,
+     "protocol %0 has no associated type named %1",
+     (const ProtocolDecl *, Identifier))
+WARNING(associated_type_disambiguation_collapsed,none,
+     "disambiguation of associated type %0 has no effect: %1 conforms to both "
+     "%2 and %3, whose %0 are merged into a single type parameter; to keep them "
+     "distinct, constrain each protocol with its own generic parameter instead",
+     (Identifier, Type, const ProtocolDecl *, const ProtocolDecl *))
 NOTE(associated_type_candidate_from_parameterized_protocol,none,
      "candidate inferred from parameterized protocol here", ())
 NOTE(protocol_witness_exact_match,none,

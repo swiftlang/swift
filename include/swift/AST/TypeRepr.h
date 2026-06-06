@@ -1137,6 +1137,43 @@ private:
   friend class TypeRepr;
 };
 
+/// A parenthesized `(Subject as Protocol)` used as the base of a member type
+/// reference to disambiguate a same-named associated type provided by more than
+/// one protocol (the experimental AssociatedTypeDisambiguation feature). For
+/// example, in `(T as Sequence).Iterator` the `(T as Sequence)` portion is a
+/// \c ConformanceQualifiedTypeRepr, and the `.Iterator` member is resolved
+/// against the \c Sequence protocol specifically.
+class ConformanceQualifiedTypeRepr : public TypeRepr {
+  TypeRepr *Subject;
+  TypeRepr *Protocol;
+  SourceLoc AsLoc;
+  SourceRange Parens;
+
+public:
+  ConformanceQualifiedTypeRepr(TypeRepr *Subject, SourceLoc AsLoc,
+                               TypeRepr *Protocol, SourceRange Parens)
+      : TypeRepr(TypeReprKind::ConformanceQualified), Subject(Subject),
+        Protocol(Protocol), AsLoc(AsLoc), Parens(Parens) {}
+
+  TypeRepr *getSubject() const { return Subject; }
+  TypeRepr *getProtocol() const { return Protocol; }
+  SourceLoc getAsLoc() const { return AsLoc; }
+  SourceRange getParens() const { return Parens; }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::ConformanceQualified;
+  }
+  static bool classof(const ConformanceQualifiedTypeRepr *T) { return true; }
+
+private:
+  SourceLoc getStartLocImpl() const { return Parens.Start; }
+  SourceLoc getEndLocImpl() const { return Parens.End; }
+  SourceLoc getLocImpl() const { return AsLoc; }
+  void printImpl(ASTPrinter &Printer, const PrintOptions &opts,
+                 NonRecursivePrintOptions nrOpts) const;
+  friend class TypeRepr;
+};
+
 class SpecifierTypeRepr : public TypeRepr {
   TypeRepr *Base;
   SourceLoc SpecifierLoc;
@@ -1720,6 +1757,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Tuple:
   case TypeReprKind::Fixed:
   case TypeReprKind::Self:
+  case TypeReprKind::ConformanceQualified:
   case TypeReprKind::Array:
   case TypeReprKind::InlineArray:
   case TypeReprKind::SILBox:

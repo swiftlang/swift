@@ -749,6 +749,16 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
   if (current->isInvalid() || !current->hasName())
     return std::make_tuple<>();
 
+  // Protocol-qualified witness type aliases (`typealias P.Name = T`) keep their
+  // base name so that associated type witness lookup can find them, which means
+  // sibling aliases disambiguating different protocols deliberately share that
+  // name. They are not ordinary redeclarations; a duplicate witness for the
+  // same protocol is diagnosed during conformance checking instead.
+  if (auto *currentAlias = dyn_cast<TypeAliasDecl>(current)) {
+    if (currentAlias->isProtocolQualifiedWitness())
+      return std::make_tuple<>();
+  }
+
   // If this declaration isn't from a source file, don't check it.
   // FIXME: Should restrict this to the source file we care about.
   DeclContext *currentDC = current->getDeclContext();
@@ -836,6 +846,13 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
       continue;
 
     auto *otherDC = other->getDeclContext();
+
+    // A protocol-qualified witness alias (`typealias P.Name = T`) shares its
+    // base name by design; never treat it as conflicting with another decl.
+    if (auto *otherAlias = dyn_cast<TypeAliasDecl>(other)) {
+      if (otherAlias->isProtocolQualifiedWitness())
+        continue;
+    }
 
     // Skip declarations in other modules.
     if (currentModule != otherDC->getParentModule())

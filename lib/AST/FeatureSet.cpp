@@ -686,6 +686,7 @@ UNINTERESTING_FEATURE(StrictAccessControl)
 UNINTERESTING_FEATURE(BorrowingSequence)
 UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
 UNINTERESTING_FEATURE(FlowIsolationGlobalActor)
+UNINTERESTING_FEATURE(AssociatedTypeDisambiguation)
 
 static bool usesFeatureBorrowInout(Decl *decl) {
   auto &ctx = decl->getASTContext();
