@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-sil %s -sil-verify-all > /dev/null
 
 // https://github.com/swiftlang/swift/issues/77880
 // (and related: https://github.com/swiftlang/swift/issues/88027)
@@ -110,3 +111,34 @@ func compilesThrowsAnyAll() throws -> (Int, Int)? {
     return (3, 4)
   }
 }
+
+// Sibling: outer pattern is a tuple `(opaque T, String?)` whose first
+// element substitutes to `()`. The fix's interface-type gate prevents
+// the whole-tuple-into-opaque branch from mis-claiming the sibling
+// `String?` slot when recursively processing the empty-tuple element.
+
+protocol DonutFryer {}
+
+extension DonutFryer {
+  @discardableResult
+  func fry<T>(perform: () throws -> (donut: T, glaze: String?)) rethrows -> T {
+    let (d, _) = try perform()
+    return d
+  }
+}
+
+func drainOil() {}
+
+struct DonutShop {
+  let fryer: DonutFryer
+  func openForBusiness() {
+    self.fryer.fry {
+      (drainOil(), nil)
+    }
+  }
+}
+
+// CHECK-LABEL: sil shared {{.*}}[reabstraction_thunk] {{.*}}@$sSSSgIgo_ytAAs5Error_pIegrozo_TR
+// CHECK: bb0([[OUT:%.*]] : $*(), [[INNER:%.*]] : @guaranteed $@noescape @callee_guaranteed () -> @owned Optional<String>):
+// CHECK-NEXT: [[RES:%.*]] = apply [[INNER]]()
+// CHECK-NEXT: return [[RES]]
