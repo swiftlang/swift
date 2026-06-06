@@ -464,12 +464,14 @@ static InFlightDiagnostic diagnoseNote(const PartitionOp &op, Diag<T...> diag,
 //               MARK: Unknown Pattern Error Helper
 //===----------------------------------------------------------------------===//
 
-// Helper to emit unknown pattern errors with diagnostic context
+// Helper to emit unknown pattern errors with diagnostic context.
 static void
 emitUnknownPatternErrorHelper(const char *emitterName, SILInstruction *inst,
                               std::optional<DiagnosticBehavior> behaviorLimit,
-                              const char *file, int line) {
-  if (inst->getFunction()->getModule().getOptions()
+                              bool pushToFuture, const char *file, int line) {
+  if (inst->getFunction()
+          ->getModule()
+          .getOptions()
           .AbortOnUnknownRegionIsolationPatternError) {
     llvm::report_fatal_error(
         "RegionIsolation: Found unknown SIL pattern in diagnostic emitter. "
@@ -477,11 +479,31 @@ emitUnknownPatternErrorHelper(const char *emitterName, SILInstruction *inst,
   }
 
   REGIONBASEDISOLATION_LOG(llvm::dbgs()
-                           << "Emitting Error. DiagnosticEmission Error: "
-                              "Unknown Code Pattern.\n"
+                           << "Emitting "
+                           << (pushToFuture ? "Warning (pushed to future). "
+                                            : "Error. ")
+                           << "DiagnosticEmission "
+                           << (pushToFuture ? "Warning" : "Error")
+                           << ": Unknown Code Pattern.\n"
                            << "  Emitter: " << emitterName << "\n"
                            << "  Instruction: " << *inst
                            << "  Location: " << file << ":" << line << "\n");
+
+  if (pushToFuture) {
+    // Bypass the file-scope `siloptimizer::diagnoseError` (which wraps in
+    // `warnUntilLanguageMode(v6)`) and emit directly with
+    // `warnUntilLanguageMode(future)` so this becomes a real warning even
+    // under `-swift-version 6`. Matches the IncompatibleRegionMergeErrorEmitter
+    // convention.
+    inst->getFunction()
+        ->getASTContext()
+        .Diags
+        .diagnose(inst->getLoc().getSourceLoc(),
+                  diag::regionbasedisolation_unknown_pattern)
+        .warnUntilLanguageMode(LanguageMode::future)
+        .limitBehaviorIf(behaviorLimit);
+    return;
+  }
 
   diagnoseError(inst, diag::regionbasedisolation_unknown_pattern)
       .limitBehaviorIf(behaviorLimit);
@@ -491,9 +513,10 @@ emitUnknownPatternErrorHelper(const char *emitterName, SILInstruction *inst,
 #error "EMIT_UNKNOWN_PATTERN_ERROR macro is already defined"
 #endif
 
-#define EMIT_UNKNOWN_PATTERN_ERROR(emitterName, inst, behaviorLimit)           \
-  emitUnknownPatternErrorHelper(#emitterName, inst, behaviorLimit, __FILE__,   \
-                                __LINE__)
+#define EMIT_UNKNOWN_PATTERN_ERROR(emitterName, inst, behaviorLimit,           \
+                                   pushToFuture)                               \
+  emitUnknownPatternErrorHelper(#emitterName, inst, behaviorLimit,             \
+                                pushToFuture, __FILE__, __LINE__)
 
 //===----------------------------------------------------------------------===//
 //                           MARK: Require Liveness
@@ -1246,7 +1269,8 @@ public:
 
   void emitUnknownPatternError() {
     EMIT_UNKNOWN_PATTERN_ERROR(UseAfterSendDiagnosticEmitter,
-                               sendingOp->getUser(), getBehaviorLimit());
+                               sendingOp->getUser(), getBehaviorLimit(),
+                               /*pushToFuture=*/false);
   }
 
 private:
@@ -1701,7 +1725,8 @@ void SendNonSendableImpl::emitUseAfterSendDiagnostics() {
           sendingOp->get()->getType().getConcurrencyDiagnosticBehavior(
               function);
       EMIT_UNKNOWN_PATTERN_ERROR(emitUseAfterSendDiagnostics,
-                                 sendingOp->getUser(), behaviorLimit);
+                                 sendingOp->getUser(), behaviorLimit,
+                                 /*pushToFuture=*/false);
       continue;
     }
 
@@ -1813,7 +1838,8 @@ public:
   void emitUnknownPatternError() {
     emittedErrorDiagnostic = true;
     EMIT_UNKNOWN_PATTERN_ERROR(SendNeverSentDiagnosticEmitter,
-                               getOperand()->getUser(), getBehaviorLimit());
+                               getOperand()->getUser(), getBehaviorLimit(),
+                               /*pushToFuture=*/false);
   }
 
   void emitUnknownUse(SILLocation loc) {
@@ -2655,10 +2681,11 @@ public:
         getFunction());
   }
 
-  void emitUnknownPatternError() {
+  void emitUnknownPatternError(bool pushToFuture = false) {
     emittedErrorDiagnostic = true;
     EMIT_UNKNOWN_PATTERN_ERROR(InOutSendingReturnedDiagnosticEmitter,
-                               functionExitingInst, getBehaviorLimit());
+                               functionExitingInst, getBehaviorLimit(),
+                               pushToFuture);
   }
 
   void emit();
@@ -2704,7 +2731,8 @@ public:
 
     std::optional<Identifier> erroringEltName = inferNameHelper(value);
     if (!erroringEltName) {
-      return emitUnknownPatternError();
+      // We could not infer a name for the returned value.
+      return emitUnknownPatternError(/*pushToFuture=*/downgradeToWarning);
     }
 
     diagnoseError(
@@ -3297,7 +3325,8 @@ public:
 
   void emitUnknownPatternError() {
     EMIT_UNKNOWN_PATTERN_ERROR(InOutSendingNotDisconnectedDiagnosticEmitter,
-                               functionExitingInst, getBehaviorLimit());
+                               functionExitingInst, getBehaviorLimit(),
+                               /*pushToFuture=*/false);
   }
 
   void emit();
@@ -3437,7 +3466,8 @@ public:
   void emitUnknownPatternError() {
     EMIT_UNKNOWN_PATTERN_ERROR(AssignIsolatedIntoSendingResultDiagnosticEmitter,
                                srcOperand->getUser(),
-                               getConcurrencyDiagnosticBehavior());
+                               getConcurrencyDiagnosticBehavior(),
+                               /*pushToFuture=*/false);
   }
 
   void emit();
@@ -3717,7 +3747,8 @@ struct NonSendableIsolationCrossingResultDiagnosticEmitter {
     emittedErrorDiagnostic = true;
     EMIT_UNKNOWN_PATTERN_ERROR(
         NonSendableIsolationCrossingResultDiagnosticEmitter,
-        error.op->getSourceInst(), getBehaviorLimit());
+        error.op->getSourceInst(), getBehaviorLimit(),
+        /*pushToFuture=*/false);
   }
 
   Type getType() const {
@@ -3895,7 +3926,8 @@ public:
   void emitUnknownPatternError() {
     EMIT_UNKNOWN_PATTERN_ERROR(
         InOutSendingParametersInSameRegionDiagnosticEmitter,
-        functionExitingInst, getBehaviorLimit());
+        functionExitingInst, getBehaviorLimit(),
+        /*pushToFuture=*/false);
   }
 
   void emit();
@@ -4040,7 +4072,8 @@ struct IncompatibleRegionMergeDiagnosticEmitter {
 private:
   void emitUnknownPatternError() {
     EMIT_UNKNOWN_PATTERN_ERROR(IncompatibleRegionMergeErrorEmitter,
-                               op->getUser(), getBehaviorLimit());
+                               op->getUser(), getBehaviorLimit(),
+                               /*pushToFuture=*/true);
   }
 
   // Emit incompatible-region-merge diagnostics as warnings until the future
