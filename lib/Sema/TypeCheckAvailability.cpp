@@ -22,8 +22,9 @@
 #include "TypeCheckType.h"
 #include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
-#include "swift/AST/AbstractLayout.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AbstractLayout.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityScope.h"
@@ -1351,7 +1352,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
       selfReplace.push_back(')');
 
     selfReplace.push_back('.');
-    selfReplace += parsed.BaseName;
+    selfReplace += parsed.baseNameSpelling(PrintNameContext::TypeMember);
 
     diag.fixItReplace(CE->getFn()->getSourceRange(), selfReplace);
 
@@ -1360,14 +1361,16 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
 
     // Continue on to diagnose any argument label renames.
 
-  } else if (parsed.BaseName == "init" && isa_and_nonnull<CallExpr>(call)) {
+  } else if (parsed.BaseNameKind == DeclBaseName::Kind::Constructor &&
+             isa_and_nonnull<CallExpr>(call)) {
     auto *CE = cast<CallExpr>(call);
 
     // If it is a call to an initializer (rather than a first-class reference):
 
     if (parsed.isMember()) {
       // replace with a "call" to the type (instead of writing `.init`)
-      diag.fixItReplace(CE->getFn()->getSourceRange(), parsed.ContextName);
+      diag.fixItReplace(CE->getFn()->getSourceRange(),
+                        parsed.fullContextName());
     } else if (auto *dotCall = dyn_cast<DotSyntaxCallExpr>(CE->getFn())) {
       // if it's a dot call, and the left side is a type (and not `self` or 
       // `super`, for example), just remove the dot and the right side, again 
@@ -1404,11 +1407,11 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
     // Just replace the base name.
     SmallString<64> baseReplace;
 
-    if (!parsed.ContextName.empty()) {
-      baseReplace += parsed.ContextName;
+    if (parsed.isMember()) {
+      baseReplace += parsed.fullContextName();
       baseReplace += '.';
     }
-    baseReplace += parsed.BaseName;
+    baseReplace += parsed.baseNameSpelling(PrintNameContext::Normal);
 
     if (parsed.IsFunctionName && isa_and_nonnull<SubscriptExpr>(call)) {
       auto *SE = cast<SubscriptExpr>(call);
@@ -1426,7 +1429,7 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
         if (auto *DCE = dyn_cast<DotSyntaxCallExpr>(CE->getDirectCallee())) {
           if (auto *TE = dyn_cast<TypeExpr>(DCE->getBase())) {
             TE->getTypeRepr()->print(name);
-            if (!parsed.ContextName.empty()) {
+            if (parsed.isMember()) {
               // If there is a context in rename function e.g.
               // `Context.function()` and call context is a `DotSyntaxCallExpr`
               // adjust the range so it replaces the base as well.
@@ -1438,8 +1441,8 @@ static void fixItAvailableAttrRename(InFlightDiagnostic &diag,
         // Function names are the same (including context if applicable), so
         // renaming fix-it doesn't need do be produced.
         auto calledValue = CE->getCalledValue(/*skipFunctionConversions=*/true);
-        if ((parsed.ContextName.empty() ||
-             parsed.ContextName == callContextName) &&
+        if ((!parsed.isMember() ||
+             parsed.fullContextName() == callContextName.str()) &&
             calledValue && calledValue->getBaseName() == parsed.BaseName) {
           shouldEmitRenameFixit = false;
         }
@@ -1581,6 +1584,36 @@ namespace {
   };
 } // end anonymous namespace
 
+static std::string formatEscapedRename(ASTContext &ctx, StringRef renameStr,
+                                       const ValueDecl *D) {
+  ParsedDeclName parsed = swift::parseDeclName(renameStr);
+  if (!parsed)
+    return renameStr.str();
+
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  if (parsed.isMember()) {
+    os << parsed.fullContextName() << '.';
+  }
+  if (parsed.IsFunctionName) {
+    os << parsed.baseNameSpelling(PrintNameContext::Normal);
+    os << '(';
+    for (auto label : parsed.ArgumentLabels) {
+      if (label.empty()) {
+        os << "_:";
+      } else {
+        printIdentifierEscapingIfNeeded(
+            label, os, PrintNameContext::FunctionParameterExternal);
+        os << ":";
+      }
+    }
+    os << ')';
+  } else {
+    os << parsed.baseNameSpelling(PrintNameContext::Normal);
+  }
+  return result;
+}
+
 static std::optional<ReplacementDeclKind>
 describeRename(ASTContext &ctx, StringRef newName, const ValueDecl *D,
                SmallVectorImpl<char> &nameBuf) {
@@ -1597,21 +1630,13 @@ describeRename(ASTContext &ctx, StringRef newName, const ValueDecl *D,
   // and bindings to member types and class/static properties.
   if (!(parsed.isInstanceMember() || parsed.isPropertyAccessor() ||
         (parsed.isMember() && parsed.IsFunctionName) ||
-        (parsed.BaseName == "init" &&
+        (parsed.BaseNameKind == DeclBaseName::Kind::Constructor &&
          !dyn_cast_or_null<ConstructorDecl>(D)))) {
     return std::nullopt;
   }
 
-  llvm::raw_svector_ostream name(nameBuf);
-
-  if (!parsed.ContextName.empty())
-    name << parsed.ContextName << '.';
-
-  if (parsed.IsFunctionName) {
-    name << parsed.formDeclName(ctx, (D && isa<SubscriptDecl>(D)));
-  } else {
-    name << parsed.BaseName;
-  }
+  std::string formatted = formatEscapedRename(ctx, newName, D);
+  nameBuf.append(formatted.begin(), formatted.end());
 
   if (parsed.isMember() && parsed.isPropertyAccessor())
     return ReplacementDeclKind::Property;
@@ -1673,8 +1698,10 @@ static void diagnoseIfDeprecated(SourceRange ReferenceRange,
 
   SmallString<32> newNameBuf;
   std::optional<ReplacementDeclKind> replacementDeclKind =
-      describeRename(Context, NewName, /*decl*/ nullptr, newNameBuf);
-  StringRef newName = replacementDeclKind ? newNameBuf.str() : NewName;
+      describeRename(Context, NewName, DeprecatedDecl, newNameBuf);
+  std::string escapedFallback =
+      formatEscapedRename(Context, NewName, DeprecatedDecl);
+  StringRef newName = replacementDeclKind ? newNameBuf.str() : escapedFallback;
 
   if (!Message.empty()) {
     EncodedDiagnosticMessage EncodedMessage(Message);
@@ -1794,12 +1821,15 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
         }
 
         // Only initializers should be named 'init'.
-        if (isa<ConstructorDecl>(override) ^ (parsedName.BaseName == "init")) {
+        if (isa<ConstructorDecl>(override) ^
+            (parsedName.BaseNameKind == DeclBaseName::Kind::Constructor)) {
           return;
         }
 
         if (!parsedName.IsFunctionName) {
-          diag.fixItReplace(override->getNameLoc(), parsedName.BaseName);
+          diag.fixItReplace(
+              override->getNameLoc(),
+              parsedName.baseNameSpelling(PrintNameContext::Normal));
           return;
         }
 
@@ -2286,7 +2316,8 @@ bool diagnoseExplicitUnavailability(
         describeRename(ctx, Attr.getRename(), D, newNameBuf);
     unsigned rawReplaceKind = static_cast<unsigned>(
         replaceKind.value_or(ReplacementDeclKind::None));
-    StringRef newName = replaceKind ? newNameBuf.str() : rename;
+    std::string escapedFallback = formatEscapedRename(ctx, rename, D);
+    StringRef newName = replaceKind ? newNameBuf.str() : escapedFallback;
     EncodedDiagnosticMessage EncodedMessage(message);
     auto diag = diags.diagnose(Loc, diag::availability_decl_unavailable_rename,
                                D, replaceKind.has_value(), rawReplaceKind,

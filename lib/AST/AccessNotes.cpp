@@ -35,10 +35,8 @@ AccessNoteDeclName::AccessNoteDeclName()
 AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
   auto parsedName = parseDeclName(str);
 
-  StringRef first, rest = parsedName.ContextName;
-  while (!rest.empty()) {
-    std::tie(first, rest) = rest.split('.');
-    parentNames.push_back(ctx.getIdentifier(first));
+  for (auto component : parsedName.ContextNames) {
+    parentNames.push_back(ctx.getIdentifier(component));
   }
 
   if (parsedName.IsGetter)
@@ -48,7 +46,7 @@ AccessNoteDeclName::AccessNoteDeclName(ASTContext &ctx, StringRef str) {
   else
     accessorKind = std::nullopt;
 
-  name = parsedName.formDeclName(ctx, /*isSubscript=*/true);
+  name = parsedName.formDeclName(ctx);
 }
 
 bool AccessNoteDeclName::matches(ValueDecl *VD) const {

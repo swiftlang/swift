@@ -777,15 +777,16 @@ ASTPrinter &operator<<(ASTPrinter &printer, tok keyword) {
   return printer;
 }
 
+namespace swift {
+
 /// Determine whether to escape the given keyword in the given context.
-bool swift::escapeIdentifierInContext(Identifier name, PrintNameContext context,
+static bool escapeIdentifierInContext(StringRef name, PrintNameContext context,
                                       bool isSpecializedCxxTemplate) {
-  StringRef keyword = name.str();
-  bool isKeyword = llvm::StringSwitch<bool>(keyword)
+  bool isKeyword = llvm::StringSwitch<bool>(name)
 #define KEYWORD(KW) \
       .Case(#KW, true)
 #include "swift/AST/TokenKinds.def"
-      .Default(false);
+                       .Default(false);
 
   // NB: ClangImporter synthesizes C++ template specializations with Identifiers
   // that contain the full type signature; e.g., a type named literally
@@ -795,29 +796,61 @@ bool swift::escapeIdentifierInContext(Identifier name, PrintNameContext context,
   switch (context) {
   case PrintNameContext::Normal:
   case PrintNameContext::Attribute:
-    return isKeyword ||
-           (!isSpecializedCxxTemplate && name.mustAlwaysBeEscaped());
+    return isKeyword || (!isSpecializedCxxTemplate &&
+                         Lexer::identifierMustAlwaysBeEscaped(name));
   case PrintNameContext::Keyword:
   case PrintNameContext::IntroducerKeyword:
     return false;
 
   case PrintNameContext::ClassDynamicSelf:
   case PrintNameContext::GenericParameter:
-    return isKeyword && keyword != "Self";
+    return isKeyword && name != "Self";
 
   case PrintNameContext::TypeMember:
-    return isKeyword || !canBeMemberName(keyword) ||
-           (!isSpecializedCxxTemplate && name.mustAlwaysBeEscaped());
+    return isKeyword || !canBeMemberName(name) ||
+           (!isSpecializedCxxTemplate &&
+            Lexer::identifierMustAlwaysBeEscaped(name));
 
   case PrintNameContext::FunctionParameterExternal:
   case PrintNameContext::FunctionParameterLocal:
   case PrintNameContext::TupleElement:
-    return !canBeArgumentLabel(keyword) ||
-           (!isSpecializedCxxTemplate && name.mustAlwaysBeEscaped());
+    return !canBeArgumentLabel(name) ||
+           (!isSpecializedCxxTemplate &&
+            Lexer::identifierMustAlwaysBeEscaped(name));
   }
 
   llvm_unreachable("Unhandled PrintNameContext in switch.");
 }
+
+bool escapeIdentifierInContext(Identifier name, PrintNameContext context,
+                               bool isSpecializedCxxTemplate) {
+  return escapeIdentifierInContext(name.str(), context,
+                                   isSpecializedCxxTemplate);
+}
+
+void printIdentifierEscapingIfNeeded(StringRef identifier,
+                                     llvm::raw_ostream &os,
+                                     PrintNameContext context) {
+  bool mustEscape = escapeIdentifierInContext(
+      identifier, context, /*isSpecializedCxxTemplate=*/false);
+  if (mustEscape) {
+    os << '`';
+  }
+  os << identifier;
+  if (mustEscape) {
+    os << '`';
+  }
+}
+
+std::string identifierEscapingIfNeeded(StringRef identifier,
+                                       PrintNameContext context) {
+  std::string result;
+  llvm::raw_string_ostream os(result);
+  printIdentifierEscapingIfNeeded(identifier, os, context);
+  return result;
+}
+
+} // namespace swift
 
 void ASTPrinter::printName(Identifier Name, PrintNameContext Context,
                            bool IsSpecializedCxxTemplate) {
