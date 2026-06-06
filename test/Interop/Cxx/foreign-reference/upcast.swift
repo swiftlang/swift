@@ -1,6 +1,7 @@
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -Xfrontend -disable-availability-checking -Onone)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=default -enable-experimental-feature ForeignReferenceTypeInheritance -Xfrontend -disable-availability-checking -Onone)
 
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_ForeignReferenceTypeInheritance
 
 import StdlibUnittest
 import Upcast
