@@ -348,7 +348,9 @@ public struct ManagedBufferPointer<
     bufferClass: AnyClass,
     minimumCapacity: Int
   ) {
+    #if !$Embedded
     ManagedBufferPointer._checkValidBufferClass(bufferClass, creating: true)
+    #endif
     _precondition(
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
@@ -365,8 +367,10 @@ public struct ManagedBufferPointer<
     _uncheckedBufferClass: AnyClass,
     minimumCapacity: Int
   ) {
+    #if !$Embedded
     ManagedBufferPointer._internalInvariantValidBufferClass(
       _uncheckedBufferClass, creating: true)
+    #endif
     _internalInvariant(
       minimumCapacity >= 0,
       "ManagedBufferPointer must have non-negative capacity")
@@ -524,6 +528,7 @@ extension ManagedBufferPointer {
 extension ManagedBufferPointer where Element: ~Copyable {
   @_preInverseGenerics
   @inlinable
+  @_unavailableInEmbedded
   internal static func _checkValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
@@ -543,6 +548,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
 
   @_preInverseGenerics
   @inlinable
+  @_unavailableInEmbedded
   internal static func _internalInvariantValidBufferClass(
     _ bufferClass: AnyClass, creating: Bool = false
   ) {
