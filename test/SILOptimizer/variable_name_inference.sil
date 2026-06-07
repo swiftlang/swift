@@ -38,6 +38,7 @@ sil @getKlassThrows : $@convention(thin) () -> (@owned Klass, @error MyError)
 sil @getKlassCoro : $@yield_once @convention(thin) () -> @yields @owned Klass
 sil @C_throwingMethod : $@convention(method) (@guaranteed C) -> (@owned Klass, @error MyError)
 sil @C_method : $@convention(method) (@owned C) -> @owned Klass
+sil @globalVar_addressor : $@convention(thin) () -> Builtin.RawPointer
 sil @freeFunc : $@convention(thin) (@owned C) -> @owned Klass
 
 enum FakeOptional<T> {
@@ -1202,3 +1203,56 @@ bb0(%0 : @owned $Klass):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: Global addressor (lazy-init global variable via pointer_to_address)
+//===----------------------------------------------------------------------===//
+
+// Basic: load from a lazy global through its addressor.
+// The addressor is a free function (no self) that returns a RawPointer.
+//
+// CHECK-LABEL: begin running test 1 of 1 on global_addressor_basic: variable_name_inference with: @trace[0]
+// CHECK: Name: 'globalVar_addressor'
+// CHECK: end running test 1 of 1 on global_addressor_basic: variable_name_inference with: @trace[0]
+sil [ossa] @global_addressor_basic : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference @trace[0]"
+  %0 = function_ref @globalVar_addressor : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*Klass
+  %3 = begin_access [read] [dynamic] %2 : $*Klass
+  %4 = load [copy] %3 : $*Klass
+  end_access %3 : $*Klass
+  debug_value [trace] %4 : $Klass
+  destroy_value %4 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// Composition: load a field from a struct accessed through a lazy global.
+// Chain: addressor -> ptr_to_addr -> load(ContainsKlass) -> ref_element_addr(.klass) -> load
+//
+// CHECK-LABEL: begin running test 1 of 1 on global_addressor_field: variable_name_inference with: @trace[0]
+// CHECK: Name: 'globalContainsKlass_addressor.klass'
+// CHECK: end running test 1 of 1 on global_addressor_field: variable_name_inference with: @trace[0]
+sil @globalContainsKlass_addressor : $@convention(thin) () -> Builtin.RawPointer
+sil [ossa] @global_addressor_field : $@convention(thin) () -> () {
+bb0:
+  specify_test "variable_name_inference @trace[0]"
+  %0 = function_ref @globalContainsKlass_addressor : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 to [strict] $*ContainsKlass
+  %3 = begin_access [read] [dynamic] %2 : $*ContainsKlass
+  %4 = load [copy] %3 : $*ContainsKlass
+  end_access %3 : $*ContainsKlass
+  %4b = begin_borrow %4 : $ContainsKlass
+  %5 = ref_element_addr %4b : $ContainsKlass, #ContainsKlass.klass
+  %6 = load [copy] %5 : $*Klass
+  debug_value [trace] %6 : $Klass
+  destroy_value %6 : $Klass
+  end_borrow %4b : $ContainsKlass
+  destroy_value %4 : $ContainsKlass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
