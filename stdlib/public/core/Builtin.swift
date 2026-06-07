@@ -403,16 +403,19 @@ internal func _usesNativeSwiftReferenceCounting(_ theClass: AnyClass) -> Bool {
 
 @usableFromInline
 @_silgen_name("_swift_getSwiftClassInstanceExtents")
+@_unavailableInEmbedded
 internal func getSwiftClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @usableFromInline
 @_silgen_name("_swift_getObjCClassInstanceExtents")
+@_unavailableInEmbedded
 internal func getObjCClassInstanceExtents(_ theClass: AnyClass)
   -> (negative: UInt, positive: UInt)
 
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 internal func _class_getInstancePositiveExtentSize(_ theClass: AnyClass) -> Int {
 #if _runtime(_ObjC)
   return Int(getObjCClassInstanceExtents(theClass).positive)
