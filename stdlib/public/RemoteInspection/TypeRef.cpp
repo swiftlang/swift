@@ -1074,7 +1074,7 @@ public:
 
   Demangle::NodePointer
   visitExistentialMetatypeTypeRef(const ExistentialMetatypeTypeRef *EM) {
-    auto node = Dem.createNode(Node::Kind::Metatype);
+    auto node = Dem.createNode(Node::Kind::ExistentialMetatype);
     node->addChild(visit(EM->getInstanceType()), Dem);
     return node;
   }
