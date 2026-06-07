@@ -104,7 +104,8 @@ def main():
 
     new_args += [
       '-Xllvm', '-print-no-uuids',
-      '-Xllvm', '-sil-print-pass-md5']
+      '-Xllvm', '-sil-print-pass-md5',
+      '-Xfrontend', '-disable-safe-interop-wrappers']
 
     if EMIT_IR:
       new_args += [
