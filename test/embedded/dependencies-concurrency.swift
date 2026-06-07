@@ -10,12 +10,12 @@
 // RUN: test ! -s %t/extra.txt
 
 //--- allowed-dependencies.txt
-__ZNSt3__16chrono12steady_clock3nowEv
 ___assert_rtn
 ___error
 ___stack_chk_fail
 ___stack_chk_guard
 _abort
+_clock_gettime
 _exit
 _free
 _malloc
