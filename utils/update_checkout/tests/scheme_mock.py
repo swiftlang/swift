@@ -17,6 +17,7 @@ import copy
 import json
 import os
 import subprocess
+import tempfile
 import unittest
 import urllib.parse
 
@@ -198,7 +199,8 @@ def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path
         json.dump(MOCK_ADDITIONAL_SCHEME, f)
 
 
-BASEDIR_ENV_VAR = "UPDATECHECKOUT_TEST_WORKSPACE_DIR"
+TEST_SUITE_ARENA_ENV_VAR = "UPDATE_CHECKOUT_TEST_SUITE_ARENA"
+TEST_SUITE_ARENA_DIR = os.getenv(TEST_SUITE_ARENA_ENV_VAR)
 CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPDATE_CHECKOUT_EXECUTABLE = (
     "update-checkout.cmd" if os.name == "nt" else "update-checkout"
@@ -222,12 +224,17 @@ class SchemeMockTestCase(unittest.TestCase):
         # not affect subsequent tests.
         self.config = copy.deepcopy(MOCK_CONFIG)
 
-        self.workspace = os.getenv(BASEDIR_ENV_VAR)
-        if self.workspace is None:
+        if TEST_SUITE_ARENA_DIR is None:
             raise RuntimeError(
                 "Misconfigured test suite! Environment "
-                "variable %s must be set!" % BASEDIR_ENV_VAR
+                "variable %s must be set!" % TEST_SUITE_ARENA_ENV_VAR
             )
+
+        # Each individual test gets a temporary directory in the arena. This is
+        # important even though the tests are run serially, because an exception
+        # will interrupt execution of a test and prevent teardown, but will not
+        # prevent subsequent tests from running.
+        self.workspace = tempfile.mkdtemp(dir=TEST_SUITE_ARENA_DIR)
         self.config_path = get_config_path(self.workspace)
         self.additional_config_path = get_additional_config_path(self.workspace)
         self.update_checkout_path = UPDATE_CHECKOUT_PATH
