@@ -129,9 +129,6 @@ public:
   ///                • macro introduces non-observing accessor
   ///                • macro does not introduce `init` accessor
   ///            `false` otherwise
-  ///
-  /// - note: This check is not performed if more than one
-  ///         accessor macro is present.
   bool maybeLazilySubsumed(VarDecl *var) const;
 
   /// If this initializes a single @lazy variable, lazily create a self
