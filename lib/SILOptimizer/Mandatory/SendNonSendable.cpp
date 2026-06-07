@@ -996,6 +996,24 @@ public:
   SILFunction *getFunction() const { return sendingOp->getFunction(); }
 
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
+    // If the apply that performed the send is preconcurrency on either side
+    // of its isolation crossing, downgrade to a warning. This mirrors the
+    // AST-level ActorIsolatedCall policy in TypeCheckConcurrency.cpp (search
+    // for `actor_isolated_call`): both diagnostics observe the same
+    // isolation crossing on the same ApplyExpr, so they should observe the
+    // same severity policy. Read the crossing from the AST ApplyExpr —
+    // SILGen does not propagate it onto the SIL apply for synchronous
+    // direct calls, so `ApplySite::getIsolationCrossing()` is typically
+    // empty here.
+    if (auto *applyExpr =
+            sendingOp->getUser()->getLoc().getAsASTNode<ApplyExpr>()) {
+      if (auto crossing = applyExpr->getIsolationCrossing()) {
+        if (crossing->getCallerIsolation().preconcurrency() ||
+            crossing->getCalleeIsolation().preconcurrency())
+          return DiagnosticBehavior::Warning;
+      }
+    }
+
     return sendingOp->get()->getType().getConcurrencyDiagnosticBehavior(
         getFunction());
   }
@@ -1808,6 +1826,33 @@ public:
     return neverSent.dyn_cast<SILInstruction *>();
   }
 
+  /// Return Warning iff the consuming apply's `ApplyExpr` isolation
+  /// crossing is preconcurrency on either side.
+  ///
+  /// Mirrors the AST-level ActorIsolatedCall policy in
+  /// TypeCheckConcurrency.cpp (search for `actor_isolated_call`): when
+  /// the SIL pass and the AST diagnostic observe the same crossing,
+  /// their severity decisions must agree.
+  ///
+  /// Read the crossing from the AST `ApplyExpr` rather than the SIL
+  /// apply — SILGen does not propagate it onto SIL apply instructions
+  /// for synchronous direct calls, so
+  /// `ApplySite::getIsolationCrossing()` is typically empty here.
+  std::optional<DiagnosticBehavior>
+  getApplyPreconcurrencyBehaviorLimit() const {
+    auto *applyExpr =
+        sendingOperand->getUser()->getLoc().getAsASTNode<ApplyExpr>();
+    if (!applyExpr)
+      return {};
+    auto crossing = applyExpr->getIsolationCrossing();
+    if (!crossing)
+      return {};
+    if (crossing->getCallerIsolation().preconcurrency() ||
+        crossing->getCalleeIsolation().preconcurrency())
+      return DiagnosticBehavior::Warning;
+    return {};
+  }
+
   std::optional<DiagnosticBehavior> getBehaviorLimit() const {
     // If the failure is due to an isolated conformance, downgrade the error
     // to a warning prior to Swift 7.
@@ -1818,6 +1863,9 @@ public:
              ->getASTContext()
              .isLanguageModeAtLeast(LanguageMode::future))
       return DiagnosticBehavior::Warning;
+
+    if (auto limit = getApplyPreconcurrencyBehaviorLimit())
+      return limit;
 
     return sendingOperand->get()->getType().getConcurrencyDiagnosticBehavior(
         getOperand()->getFunction());
