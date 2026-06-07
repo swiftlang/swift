@@ -728,6 +728,7 @@ internal func _swift_class_getSuperclass(_ t: AnyClass) -> AnyClass?
 
 /// Returns the superclass of `t`, if any.  The result is `nil` if `t` is
 /// a root class or class protocol.
+@_unavailableInEmbedded
 public func _getSuperclass(_ t: AnyClass) -> AnyClass? {
   return _swift_class_getSuperclass(t)
 }
@@ -736,6 +737,7 @@ public func _getSuperclass(_ t: AnyClass) -> AnyClass? {
 /// not a class, is a root class, or is a class protocol.
 @inlinable
 @inline(__always)
+@_unavailableInEmbedded
 public // @testable
 func _getSuperclass(_ t: Any.Type) -> AnyClass? {
   return (t as? AnyClass).flatMap { _getSuperclass($0) }

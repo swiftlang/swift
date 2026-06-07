@@ -8,20 +8,6 @@
 // REQUIRES: swift_feature_Embedded
 // REQUIRES: swift_feature_Extern
 
-@_extern(c, "getline")
-func getline(
-  _ linePointer: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
-  _ linecapp: UnsafeMutablePointer<UInt>?,
-  _ stream: UnsafeRawPointer?
-) -> Int
-
-@c
-func swift_stdlib_readLine_stdin(_ linePointer: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?) -> Int {
-  return getline(linePointer, nil, nil)
-}
-
-
-
 @main
 struct Main {
   static func main() {
@@ -35,10 +21,6 @@ struct Main {
     print(b1 ?? false)
     print(b2 ?? false)
     print(b3 ?? false)
-
-    if let value = readLine(), let b4 = Bool(value) {
-      print(b4)
-    }
 
     let bi: StaticBigInt = 17
     print(bi.debugDescription)
