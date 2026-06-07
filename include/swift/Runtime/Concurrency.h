@@ -1134,6 +1134,10 @@ void swift_get_clock_res(long long *seconds,
                          long long *nanoseconds,
                          swift_clock_id clock_id);
 
+/// Sleep the current thread for the given duration.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_sleep(long long seconds, long long nanoseconds);
+
 #ifdef __APPLE__
 /// A magic symbol whose address is the mask to apply to a frame pointer to
 /// signal that it is an async frame. Do not try to read the actual value of

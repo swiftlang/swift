@@ -21,11 +21,11 @@
 #include <realtimeapiset.h>
 #endif
 
-#if __has_include(<chrono>)
+#if __has_include(<chrono>) && __STDC_HOSTED__
 #define WE_HAVE_STD_CHRONO 1
 #include <chrono>
 
-#if __has_include(<thread>)
+#if __has_include(<thread>) && __STDC_HOSTED__
 #define WE_HAVE_STD_THIS_THREAD 1
 #include <thread>
 #endif
