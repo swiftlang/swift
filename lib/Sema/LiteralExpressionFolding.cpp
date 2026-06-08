@@ -351,18 +351,26 @@ private:
 
     FoldingErrorOr<ConstantValuePtr> foldDeclRefExpr(const DeclRefExpr *expr) {
       if (const VarDecl *varDecl = dyn_cast<VarDecl>(expr->getDecl())) {
-        // Swift source `let` bindings whose access level is broader than
-        // internal participate in the ABI surface of their module and may
-        // not appear in a literal expression. Emit the diagnostic inline so
-        // we can carry the access level, and return `UpstreamError` so no
-        // further generic "not a literal expression" message is added.
-        // A `var` that reaches here falls through to the existing
-        // opaque-decl-ref path, which is the correct diagnostic for it.
+        // Reject `let` bindings that are part of the module's ABI surface:
+        // package/public/open by access, and `internal` bindings marked
+        // `@usableFromInline` (or `@inlinable`), whose value an inlinable
+        // function could fold into client binaries. Return `UpstreamError` to
+        // suppress the generic "not a literal expression" follow-up. A `var`
+        // falls through to the opaque-decl-ref path, its correct diagnostic.
         if (!varDecl->hasClangNode() && varDecl->isLet()) {
           auto access = varDecl->getFormalAccess();
           if (access >= AccessLevel::Package) {
             Ctx.Diags.diagnose(expr->getLoc(), diag::const_public_let_ref,
                                access);
+            return FoldingError(IllegalConstError::UpstreamError,
+                                expr->getLoc());
+          }
+
+          // Safe here: the package/public/open cases returned above, so the
+          // formal access is below public as `isUsableFromInline()` asserts.
+          if (varDecl->isUsableFromInline()) {
+            Ctx.Diags.diagnose(expr->getLoc(),
+                               diag::const_usable_from_inline_let_ref);
             return FoldingError(IllegalConstError::UpstreamError,
                                 expr->getLoc());
           }
