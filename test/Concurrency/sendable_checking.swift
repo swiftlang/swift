@@ -480,7 +480,7 @@ struct DowngradeForPreconcurrency {
   func createStream() -> AsyncStream<NonSendable> {
     AsyncStream<NonSendable> {
       self.x // expected-tns-warning {{assignment could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
-      // expected-tns-note @-1 {{'self.x.some' is exposed to main actor-isolated code}}
+      // expected-tns-note @-1 {{'self.x' is exposed to main actor-isolated code}}
       // expected-warning @-2 {{main actor-isolated property 'x' cannot be accessed from outside of the actor; this is an error in the Swift 6 language mode}} {{7-7=await }}
       // expected-warning @-3 {{non-Sendable type 'NonSendable' of property 'x' cannot exit main actor-isolated context; this is an error in the Swift 6 language mode}}
     }
