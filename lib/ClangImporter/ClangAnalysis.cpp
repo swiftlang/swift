@@ -102,12 +102,12 @@ class ForeignReferenceTypeChecker {
   }
 
   /// Extract the retain and release operation annotations from \p decl.
-  static std::pair<std::optional<StringRef>, std::optional<StringRef>>
+  static std::pair<StringRef, StringRef>
   getRetainReleaseOps(const clang::RecordDecl *decl) {
     if (!decl->hasAttrs())
-      return {std::nullopt, std::nullopt};
+      return {StringRef(), StringRef()};
 
-    std::optional<StringRef> retain = std::nullopt, release = std::nullopt;
+    StringRef retain{}, release{};
     for (auto attr : decl->getAttrs()) {
       auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
       if (!swiftAttr)
@@ -124,8 +124,8 @@ class ForeignReferenceTypeChecker {
   }
 
   /// Whether \p x is non-nullopt and matches \p y.
-  static bool opsMatch(std::optional<StringRef> x, std::optional<StringRef> y) {
-    return x && x == y;
+  static bool opsMatch(StringRef x, StringRef y) {
+    return !x.empty() && x == y;
   }
 
 public:
