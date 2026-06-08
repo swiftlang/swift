@@ -39,6 +39,26 @@ let lshift2: InlineArray<(1 << 5), Int> = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 let rshift1: InlineArray<(16 >> 2), Int> = [1, 2, 3, 4]
 let rshift2: InlineArray<(32 >> 3), Int> = [1, 2, 3, 4]
 
+// Signed right shift folds arithmetically. Without arithmetic shift, the size
+// would either be negative or an enormous logical-shift result, both of which
+// would fail to type-check as an InlineArray size.
+let rshiftSigned: InlineArray<(0 - (-8 >> 1)), Int> = [1, 2, 3, 4]
+
+// =============================================================================
+// Overflow arithmetic operators
+// =============================================================================
+
+let overflowAdd: InlineArray<(2 &+ 3), Int> = [1, 2, 3, 4, 5]
+let overflowSub: InlineArray<(7 &- 2), Int> = [1, 2, 3, 4, 5]
+let overflowMul: InlineArray<(2 &* 3), Int> = [1, 2, 3, 4, 5, 6]
+
+// =============================================================================
+// Masking shift operators
+// =============================================================================
+
+let maskingLShift: InlineArray<(1 &<< 3), UInt8> = [0, 0, 0, 0, 0, 0, 0, 0]
+let maskingRShift: InlineArray<(16 &>> 2), UInt8> = [0, 0, 0, 0]
+
 // =============================================================================
 // Operator Precedence
 // =============================================================================

@@ -822,6 +822,10 @@ ERROR(const_unsupported_keypath,none,
       "keypaths not supported in a literal expression", ())
 ERROR(const_opaque_decl_ref,none,
       "unable to resolve variable reference in a literal expression", ())
+ERROR(const_public_let_ref,none,
+      "reference to a %select{%error|%error|%error|package|public|open}0 "
+      "'let' binding is not permitted in a literal expression",
+      (AccessLevel))
 ERROR(const_opaque_func_decl_ref,none,
       "unable to resolve function reference in a literal expression", ())
 ERROR(const_non_convention_c_conversion,none,
@@ -834,6 +838,12 @@ ERROR(const_integer_overflow,none,
       "operation results in integer overflow", ())
 ERROR(const_divide_by_zero,none,
       "division by zero", ())
+ERROR(const_shift_negative,none,
+      "negative shift amount is not permitted in a literal expression", ())
+ERROR(const_shift_out_of_range,none,
+      "shift amount %0 is greater than or equal to the %1-bit width of "
+      "the operand in a literal expression",
+      (unsigned, unsigned))
 ERROR(const_unknown_default,none,
       "not supported in a literal expression", ())
 NOTE(const_failed_fold_declref_init,none,
