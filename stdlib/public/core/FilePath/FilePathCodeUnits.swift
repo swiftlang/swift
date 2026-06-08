@@ -1,10 +1,11 @@
 /*
- This source file is part of the SE-0529 reference implementation
+ This source file is part of the Swift.org open source project
 
- Copyright (c) 2020 - 2026 Apple Inc. and the Swift System project authors
+ Copyright (c) 2020 - 2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
+ See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 */
 
 // MARK: - CodeUnit typealias
@@ -108,8 +109,10 @@ extension FilePath {
     }
     chars.append(._null)
     let str = _SystemString(nullTerminated: chars)
-    self.init(normalizing: str)
+    self.init(_normalizing: str)
   }
+
+  // TODO: Add the init
 
   // NOTE: The proposal specifies an OutputSpan-based initializer:
   //
@@ -138,21 +141,8 @@ extension FilePath.Component {
   @available(SwiftStdlib 9999, *)
   public init?(codeUnits: Span<FilePath.CodeUnit>) {
     guard !codeUnits.isEmpty else { return nil }
-    var chars = [FilePath.CodeUnit]()
-    chars.reserveCapacity(codeUnits.count)
-    for i in codeUnits.indices {
-      let c = codeUnits[i]
-      guard c != ._null else { return nil }
-      chars.append(c)
-    }
-    let str = _SystemString(chars)
-    let path = FilePath(normalizing: str)
-    guard path.anchor == nil else { return nil }
-    let comps = path.components
-    guard comps.count == 1 else { return nil }
-    self = comps.first!
-
-    // TODO: what about checking for trailing slash? do we have tests for that?
+    guard let path = FilePath(codeUnits: codeUnits) else { return nil }
+    self.init(_validating: path)
   }
 }
 
@@ -172,18 +162,10 @@ extension FilePath.ComponentView {
   /// components portion of the path.
   @available(SwiftStdlib 9999, *)
   public var codeUnits: Span<FilePath.CodeUnit> {
-    // The component view spans [_relStart, _relEnd) in the path's storage.
-    // Strip a trailing separator (it is suffix, not part of components) —
-    // same boundary logic as the former buffer-based stand-in.
-    var end = _relEnd
-    if end > _relStart
-       && isSeparator(_path._storage[_path._storage.index(before: end)]) {
-      let (_, relBegin) = _path._storage._parseRoot()
-      let sepIdx = _path._storage.index(before: end)
-      if sepIdx >= relBegin {
-        end = sepIdx
-      }
-    }
-    return _path._storage._nullTerminatedSpan.extracting(_relStart..<end)
+    // The component view spans `[_relStart, _relEnd)`. By construction
+    // `_relEnd` excludes any structural suffix (trailing separator on the
+    // relative region, or a Darwin resource-fork suffix), so this range
+    // is exactly the components-region bytes.
+    _path._storage._nullTerminatedSpan.extracting(_relStart..<_relEnd)
   }
 }

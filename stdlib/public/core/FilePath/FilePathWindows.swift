@@ -1,10 +1,11 @@
 /*
- This source file is part of the SE-0529 reference implementation
+ This source file is part of the Swift.org open source project
 
- Copyright (c) 2020 - 2026 Apple Inc. and the Swift System project authors
+ Copyright (c) 2020 - 2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
+ See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 */
 
 // MARK: - Parsed Windows root
@@ -91,7 +92,7 @@ struct _Lexer {
   // — which tests `\` only — is exactly the right predicate here.
   mutating func eatDrive() -> FilePath.CodeUnit? {
     let copy = slice
-    if let d = slice._eat(if: { !isSeparator($0) }),
+    if let d = slice._eat(if: { !_isSeparator($0) }),
        slice._eat(._colon) != nil {
       return d
     }
@@ -143,6 +144,11 @@ struct _Lexer {
 
 @available(SwiftStdlib 9999, *)
 extension _SystemString {
+  // ASCII bytes "UNC", stored once for the \\?\UNC\ verbatim sub-form
+  // rather than rebuilt on every call.
+  private static let _uncToken: [FilePath.CodeUnit] =
+    "UNC".unicodeScalars.map { FilePath.CodeUnit(_ascii: $0) }
+
   // Check if this string starts with the exact verbatim prefix \\?\
   // (four backslashes — no forward slashes). Returns the index past
   // the prefix, or nil.
@@ -170,30 +176,23 @@ extension _SystemString {
 
     func skipToSep(from start: Index) -> Index {
       var i = start
-      while i < endIndex && !isSeparator(self[i]) {
+      while i < endIndex && !_isSeparator(self[i]) {
         formIndex(after: &i)
       }
       return i
     }
 
     func skipPastSep(from idx: Index) -> Index {
-      if idx < endIndex && isSeparator(self[idx]) {
+      if idx < endIndex && _isSeparator(self[idx]) {
         return index(after: idx)
       }
       return idx
     }
 
-    // TODO: a better way to do this than making an eager array
-
     // \\?\UNC\server\share[\]
-    let uncChars: [FilePath.CodeUnit] = [
-      FilePath.CodeUnit(_ascii: "U"),
-      FilePath.CodeUnit(_ascii: "N"),
-      FilePath.CodeUnit(_ascii: "C")
-    ]
-    if self[afterPrefix...].starts(with: uncChars) {
-      let afterUNC = index(afterPrefix, offsetBy: 3)
-      if afterUNC < endIndex && isSeparator(self[afterUNC]) {
+    if self[afterPrefix...].starts(with: Self._uncToken) {
+      let afterUNC = index(afterPrefix, offsetBy: Self._uncToken.count)
+      if afterUNC < endIndex && _isSeparator(self[afterUNC]) {
         let serverStart = index(after: afterUNC)
         let serverEnd = skipToSep(from: serverStart)
         let shareStart = skipPastSep(from: serverEnd)
@@ -210,7 +209,7 @@ extension _SystemString {
     if afterPrefix < endIndex {
       let afterFirst = index(after: afterPrefix)
       if afterFirst < endIndex
-         && !isSeparator(self[afterPrefix])
+         && !_isSeparator(self[afterPrefix])
          && self[afterFirst] == ._colon {
         let afterColon = index(after: afterFirst)
         return skipPastSep(from: afterColon)
@@ -305,7 +304,7 @@ extension _SystemString {
     if deviceSlice.count >= 2 {
       let first = deviceSlice[deviceSlice.startIndex]
       let second = deviceSlice[deviceSlice.index(after: deviceSlice.startIndex)]
-      if !isSeparator(first) && second == ._colon {
+      if !_isSeparator(first) && second == ._colon {
         if deviceSlice.count == 2 {
           drive = first
           // Check for trailing backslash after C:
@@ -398,7 +397,7 @@ extension _SystemString {
       if deviceSlice.count == 2 {
         let first = deviceSlice[deviceSlice.startIndex]
         let second = deviceSlice[deviceSlice.index(after: deviceSlice.startIndex)]
-        if !isSeparator(first) && second == ._colon {
+        if !_isSeparator(first) && second == ._colon {
           // Device drive letter - eat the trailing backslash if present
           if lexer.eatBackslash() {
             return lexer.current

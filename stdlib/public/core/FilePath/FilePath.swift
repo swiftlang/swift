@@ -1,10 +1,11 @@
 /*
- This source file is part of the SE-0529 reference implementation
+ This source file is part of the Swift.org open source project
 
- Copyright (c) 2020 - 2026 Apple Inc. and the Swift System project authors
+ Copyright (c) 2020 - 2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
+ See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 */
 
 /// A file path is a null-terminated sequence of bytes that represents
@@ -28,7 +29,7 @@ public struct FilePath: Sendable {
   // All three platforms coalesce separators first, then parse. Darwin
   // additionally canonicalizes the anchor and excludes the resource-fork
   // suffix from dot-normalization (see _normalizeDarwin).
-  internal init(normalizing str: _SystemString) {
+  internal init(_normalizing str: _SystemString) {
     if _isDarwin {
       self = Self._normalizeDarwin(str)
     } else if _isWindows {
@@ -39,19 +40,23 @@ public struct FilePath: Sendable {
   }
 
   private static func _normalizeLinux(_ str: _SystemString) -> FilePath {
+    _internalInvariant(_isLinux)
     var s = str
     s._normalizeSeparators()
-    let (rootEnd, _) = s._parseRoot()
+    let (rootEnd, relBegin) = s._parseRoot()
     let isRooted = rootEnd != s.startIndex
-    s._normalizeDots(isVerbatimComponent: false, isRooted: isRooted)
-    return FilePath(_storage: s)
+    var result = _SystemString()
+    result.append(contentsOf: s[s.startIndex..<relBegin])  // anchor + gap
+    _ = s._normalizeDots(
+      over: relBegin..<s.endIndex, isRooted: isRooted, into: &result)
+    return FilePath(_storage: result)
   }
 
   private static func _normalizeWindows(_ str: _SystemString) -> FilePath {
     var s = str
     s._normalizeSeparators()
     let isVerbatim = _isVerbatimComponentPath(s)
-    let (rootEnd, _) = s._parseRoot()
+    let (rootEnd, relBegin) = s._parseRoot()
     let hasRoot = rootEnd != s.startIndex
     let isRooted: Bool
     if hasRoot {
@@ -66,25 +71,30 @@ public struct FilePath: Sendable {
     } else {
       isRooted = false
     }
-    s._normalizeDots(isVerbatimComponent: isVerbatim, isRooted: isRooted)
-    return FilePath(_storage: s)
+    var result = _SystemString()
+    result.append(contentsOf: s[s.startIndex..<relBegin])  // anchor + gap
+    if isVerbatim {
+      // Verbatim paths: `.` and `..` are regular component names.
+      result.append(contentsOf: s[relBegin..<s.endIndex])
+    } else {
+      _ = s._normalizeDots(
+        over: relBegin..<s.endIndex, isRooted: isRooted, into: &result)
+    }
+    return FilePath(_storage: result)
   }
 
   private static func _normalizeDarwin(_ str: _SystemString) -> FilePath {
-    // TODO: the below comment isn't quite right. We are canonicalizing separators
-    // first, then we are parsing and canonicalizing the way XNU does second. XNU
-    // doesn't canonicalize separators, but we're doing a modulo-separator-canonicalization
-    // semantics here.
-
-    // Darwin follows the coalescing POSIX kernel parse: coalesce the
-    // whole string first, then canonicalize the anchor, then parse the
-    // anchor and resource-fork suffix boundaries on those same
-    // coalesced+canonicalized bytes. This makes semantically-identical
-    // spellings store identically — e.g. /.resolve//1/foo and
-    // /.resolve/1/foo both canonicalize to /.nofollow/foo. (The earlier
-    // approach canonicalized raw bytes that still contained the double
-    // slash, so canonicalization never fired and a non-canonical anchor
-    // such as /.resolve/1/ could persist.)
+    // Coalesce separators across the whole string first, then canonicalize
+    // the anchor and parse the anchor / resource-fork suffix boundaries on
+    // those coalesced bytes the way XNU classifies them.
+    //
+    // This is deliberately *not* what XNU does byte-for-byte: the kernel
+    // does not coalesce separators before recognizing the
+    // .vol/.resolve/.nofollow anchors. Because we coalesce first, our
+    // canonicalization is XNU's modulo separator-coalescing — spellings
+    // that differ only in runs of separators store identically. e.g.
+    // /.resolve//1/foo and /.resolve/1/foo both coalesce and canonicalize
+    // to /.nofollow/foo.
     var s = str
     s._normalizeSeparators()
     s._canonicalizeDarwinAnchor()
@@ -99,39 +109,42 @@ public struct FilePath: Sendable {
       suffixStart = s.endIndex
     }
 
-    // TODO: Do the below without making a bunch of arrays and allocations
+    // TODO(post-PR): Single pass instead of both `s` and `result` copies.
 
-    // Slice into anchor + gap separator + relative + suffix.
-    let anchorSlice = Array(s[s.startIndex..<rootEnd])
-    let gapSlice = Array(s[rootEnd..<relBegin])
-    let relativeChars = Array(s[relBegin..<suffixStart])
-    let suffixSlice = Array(s[suffixStart..<s.endIndex])
-
-    // Dot-normalize the relative portion only. Separators are already
-    // coalesced and the suffix is excluded from this step.
-    var relative = _SystemString(relativeChars)
-    relative._normalizeDots(isVerbatimComponent: false, isRooted: hasAnchor)
-
-    // Strip a trailing separator from the relative portion when a suffix
-    // follows it.
-    if !suffixSlice.isEmpty && !relative.isEmpty
-       && isSeparator(relative.last!) {
-      relative.removeLast()
-    }
-
-    // Reassemble: anchor + gap + relative + suffix.
+    // Reassemble: anchor + gap + dot-normalized relative + suffix —
+    // appending the relative portion into `result`
     var result = _SystemString()
-    result.append(contentsOf: anchorSlice)
-    result.append(contentsOf: gapSlice)
-    if !relative.isEmpty && gapSlice.isEmpty && hasAnchor {
-      // Insert a separator between anchor and relative, but only if the
-      // anchor doesn't already end with one.
-      if let last = anchorSlice.last, last != ._slash {
-        result.append(._slash)
-      }
+    result.append(contentsOf: s[..<relBegin])
+ 
+    // If the anchor doesn't already end in `/` and there is no gap
+    // separator, we may need to insert one between anchor and relative.
+    // Insert speculatively; roll back if the relative dot-normalizes to
+    // empty.
+    let needsAnchorSep =
+      hasAnchor && rootEnd == relBegin
+      && s[s.index(before: rootEnd)] != ._slash
+    if needsAnchorSep {
+      result.append(._slash)
     }
-    result.append(contentsOf: relative)
-    result.append(contentsOf: suffixSlice)
+
+    let didEmitRelative = s._normalizeDots(
+      over: relBegin..<suffixStart, isRooted: hasAnchor, into: &result)
+
+    if needsAnchorSep && !didEmitRelative {
+      _internalInvariant(result.last == ._slash)
+      result.removeLast()
+    }
+
+    // Strip a trailing separator on the relative portion when a suffix
+    // follows it.
+    let hasSuffix = suffixStart < s.endIndex
+    if hasSuffix && didEmitRelative
+       && _isSeparator(result[result.index(before: result.endIndex)]) {
+      _internalInvariant(_isSeparator(result.last!))
+      result.removeLast()
+    }
+
+    result.append(contentsOf: s[suffixStart..<s.endIndex])
 
     return FilePath(_storage: result)
   }
@@ -142,7 +155,7 @@ public struct FilePath: Sendable {
   /// On Windows, it is the code unit for `\`.
   @available(SwiftStdlib 9999, *)
   public static var separator: FilePath.CodeUnit {
-    platformSeparator
+    _platformSeparator
   }
 
   /// Whether this path is empty.

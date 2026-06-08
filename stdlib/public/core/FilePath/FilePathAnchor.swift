@@ -1,10 +1,11 @@
 /*
- This source file is part of the SE-0529 reference implementation
+ This source file is part of the Swift.org open source project
 
- Copyright (c) 2020 - 2026 Apple Inc. and the Swift System project authors
+ Copyright (c) 2020 - 2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
+ See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 */
 
 @available(SwiftStdlib 9999, *)
@@ -16,9 +17,9 @@ extension FilePath {
     internal var _path: FilePath
     internal var _end: _SystemString.Index
 
-    internal init(_ path: FilePath, end: _SystemString.Index) {
-      self._path = path
-      self._end = end
+    internal init(_path: FilePath, _end: _SystemString.Index) {
+      self._path = _path
+      self._end = _end
     }
 
     internal var _slice: _SystemString.SubSequence {
@@ -29,57 +30,49 @@ extension FilePath {
     /// Whether this anchor is rooted.
     @available(SwiftStdlib 9999, *)
     public var isRooted: Bool {
-      // TODO: all through this file, we have this pattern. Change to guard when it improves clarity
-      if !_isWindows { return true }
+      guard _isWindows else { return true }
 
       // On Windows, the only non-rooted anchor is drive-relative `C:`
       // (relative to the CWD on that drive). Everything else — `\`,
       // `C:\`, `\\server\share`, `\\?\...` — is rooted.
       return !_isDriveRelativeAnchor(_slice)
     }
-
-    // TODO: Gate the below and others by platform as the proposal now does
-
-    /// The drive letter of this anchor, if any.
-    ///
-    /// Returns the single code unit preceding the colon for drive-style
-    /// anchors (`C:\`, `C:`, `\\?\C:\`, `\\.\C:\`), and `nil` for UNC
-    /// anchors, non-drive device anchors, and the current-drive root `\`.
-    ///
-    /// The value is presented as written, without case normalization.
-    /// If the drive letter is an unpaired surrogate, `U+FFFD` is returned.
-    ///
-    /// NOTE: The proposal gates this under `#if os(Windows)`; it is kept
-    /// cross-platform here so the `REVIEW_ONLY` platform simulation can
-    /// exercise it. On non-Windows platforms it returns `nil`.
-    @available(SwiftStdlib 9999, *)
-    public var driveLetter: Unicode.Scalar? {
-      if !_isWindows { return nil }
-
-      if let parsed = _parseWindowsAnchor() {
-        if let d = parsed.drive {
-          return d._driveLetterScalar
-        }
-      }
-      return nil
-    }
-
-    /// Whether this anchor uses the Windows verbatim-component form.
-    @available(SwiftStdlib 9999, *)
-    public var isVerbatimComponent: Bool {
-      // TODO: this can be a guard along with a guard let, probably in one guard statement
-      if !_isWindows { return false }
-      if let parsed = _parseWindowsAnchor() {
-        return parsed.isVerbatimComponent
-      }
-      return false
-    }
-
-    private func _parseWindowsAnchor() -> _ParsedWindowsRoot? {
-      _path._storage._parseWindowsRootInternal()
-    }
   }
 }
+
+#if os(Windows)
+@available(SwiftStdlib 9999, *)
+extension FilePath.Anchor {
+  /// The drive letter of this anchor, if any.
+  ///
+  /// Returns the single code unit preceding the colon for drive-style
+  /// anchors (`C:\`, `C:`, `\\?\C:\`, `\\.\C:\`), and `nil` for UNC
+  /// anchors, non-drive device anchors, and the current-drive root `\`.
+  ///
+  /// The value is presented as written, without case normalization.
+  /// If the drive letter is an unpaired surrogate, `U+FFFD` is returned.
+  @available(SwiftStdlib 9999, *)
+  public var driveLetter: Unicode.Scalar? {
+    if let parsed = _parseWindowsAnchor() {
+      if let d = parsed.drive {
+        return d._driveLetterScalar
+      }
+    }
+    return nil
+  }
+
+  /// Whether this anchor uses the Windows verbatim-component form.
+  @available(SwiftStdlib 9999, *)
+  public var isVerbatimComponent: Bool {
+    guard let parsed = _parseWindowsAnchor() else { return false }
+    return parsed.isVerbatimComponent
+  }
+
+  private func _parseWindowsAnchor() -> _ParsedWindowsRoot? {
+    _path._storage._parseWindowsRootInternal()
+  }
+}
+#endif
 
 // MARK: - Anchor Hashable, Comparable, descriptions
 
@@ -163,8 +156,6 @@ extension FilePath.Anchor: ExpressibleByStringLiteral {
   }
 }
 
-// TODO: consider de-genericizing the below, basing it on slice. that would help debug builds.
-
 /// Returns `true` when `anchorBytes` is a Windows UNC/device/verbatim
 /// anchor form that is missing its name: incomplete UNC (`\\`, `\\server`),
 /// empty device (`\\.\`), or empty verbatim (`\\?\`).
@@ -180,9 +171,9 @@ extension FilePath.Anchor: ExpressibleByStringLiteral {
 /// (`\`, `C:`, `C:\`) carry no separate name and are never rejected here.
 @available(SwiftStdlib 9999, *)
 private func _isIncompleteWindowsNamedAnchor(
-  _ anchorBytes: some Collection<FilePath.CodeUnit>
+  _ anchorBytes: Slice<_SystemString>
 ) -> Bool {
-  let bytes = Array(anchorBytes)
+  let bytes = anchorBytes
   // A named form begins with the two-backslash UNC/device/verbatim prefix.
   // One leading `\` is the bare current-drive root, and `C:` / `C:\` carry a
   // drive; none of those are a name-bearing form with the name missing.

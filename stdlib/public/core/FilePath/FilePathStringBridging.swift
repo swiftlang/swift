@@ -1,10 +1,11 @@
 /*
- This source file is part of the SE-0529 reference implementation
+ This source file is part of the Swift.org open source project
 
- Copyright (c) 2020 - 2026 Apple Inc. and the Swift System project authors
+ Copyright (c) 2020 - 2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
+ See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 */
 
 // MARK: - FilePath String bridging
@@ -69,7 +70,7 @@ extension FilePath: ExpressibleByStringLiteral {
   @available(SwiftStdlib 9999, *)
   public init?(_ string: String) {
     guard !string.utf8.contains(0) else { return nil }
-    self.init(normalizing: _SystemString(string))
+    self.init(_normalizing: _SystemString(string))
   }
 }
 

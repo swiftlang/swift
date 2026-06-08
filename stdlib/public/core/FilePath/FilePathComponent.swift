@@ -1,10 +1,11 @@
 /*
- This source file is part of the SE-0529 reference implementation
+ This source file is part of the Swift.org open source project
 
- Copyright (c) 2020 - 2026 Apple Inc. and the Swift System project authors
+ Copyright (c) 2020 - 2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
+ See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 */
 
 @available(SwiftStdlib 9999, *)
@@ -16,10 +17,10 @@ extension FilePath {
     internal var _range: Range<_SystemString.Index>
     internal var _verbatimContext: Bool
 
-    internal init(_ path: FilePath, _ range: Range<_SystemString.Index>, verbatimContext: Bool = false) {
-      self._path = path
-      self._range = range
-      self._verbatimContext = verbatimContext
+    internal init(_path: FilePath, _range: Range<_SystemString.Index>, _verbatimContext: Bool) {
+      self._path = _path
+      self._range = _range
+      self._verbatimContext = _verbatimContext
     }
 
     internal var _slice: _SystemString.SubSequence {
@@ -112,18 +113,25 @@ extension FilePath.Component: ExpressibleByStringLiteral {
   @available(SwiftStdlib 9999, *)
   public init?(_ string: String) {
     guard !string.isEmpty else { return nil }
-    guard !string.utf8.contains(0) else { return nil }
-    for scalar in string.unicodeScalars {
-      if scalar == "/" { return nil }
-      if _isWindows && scalar == "\\" { return nil }
-    }
     guard let path = FilePath(string) else { return nil }
-    guard path.anchor == nil else { return nil }
+    self.init(_validating: path)
+  }
+}
+
+@available(SwiftStdlib 9999, *)
+extension FilePath.Component {
+  /// Shared validation behind `init?(_:)` and `init?(codeUnits:)`.
+  ///
+  /// Succeeds only when `path` is exactly one component with no anchor and
+  /// no trailing separator — i.e. a bare component with no embedded *or*
+  /// trailing directory separator, matching the contract that a component
+  /// contains no separators. So `a/b` (interior) and `a/` (trailing) are
+  /// both rejected, as is any anchored input. NUL-rejection has already
+  /// happened in `FilePath.init?`; callers funnel through one of those.
+  internal init?(_validating path: FilePath) {
+    guard path.anchor == nil, !path.hasTrailingSeparator else { return nil }
     let comps = path.components
     guard comps.count == 1 else { return nil }
     self = comps.first!
-
-    // TODO: lots of duplication and bug potential from that with the span based init.
-    // We should probably defer to the span init.
   }
 }

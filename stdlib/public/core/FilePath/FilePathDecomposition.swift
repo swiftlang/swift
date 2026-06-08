@@ -1,10 +1,11 @@
 /*
- This source file is part of the SE-0529 reference implementation
+ This source file is part of the Swift.org open source project
 
- Copyright (c) 2020 - 2026 Apple Inc. and the Swift System project authors
+ Copyright (c) 2020 - 2026 Apple Inc. and the Swift project authors
  Licensed under Apache License v2.0 with Runtime Library Exception
 
  See https://swift.org/LICENSE.txt for license information
+ See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 */
 
 // MARK: - Anchor property
@@ -18,7 +19,7 @@ extension FilePath {
       let (rootEnd, _) = _storage._parseRoot()
       guard rootEnd != _storage.startIndex else { return nil }
       _internalInvariant(rootEnd <= _storage.endIndex)
-      return Anchor(self, end: rootEnd)
+      return Anchor(_path: self, _end: rootEnd)
     }
     set {
       let (rootEnd, relBegin) = _storage._parseRoot()
@@ -37,7 +38,7 @@ extension FilePath {
         if needsSep {
           let after = _storage.index(
             _storage.startIndex, offsetBy: newAnchor._slice.count)
-          _storage.insert(platformSeparator, at: after)
+          _storage.insert(_platformSeparator, at: after)
         }
       } else {
         _storage.removeSubrange(_storage.startIndex..<relBegin)
@@ -69,7 +70,7 @@ extension FilePath {
   /// its own `_path`, then `set` splices that result back into self.
   @available(SwiftStdlib 9999, *)
   public var components: ComponentView {
-    get { ComponentView(self) }
+    get { ComponentView(_path: self) }
     set {
       let (selfRootEnd, _) = _storage._parseRoot()
       let cvBytes = newValue._path._storage[
@@ -80,9 +81,9 @@ extension FilePath {
       // — every byte in `cvBytes` is copied exactly once.
       let needsSep = !cvBytes.isEmpty
         && _anchorNeedsGapSeparator(_storage[..<selfRootEnd])
-        && !isSeparator(cvBytes.first!)
+        && !_isSeparator(cvBytes.first!)
       _storage.removeSubrange(selfRootEnd..<_storage.endIndex)
-      if needsSep { _storage.append(platformSeparator) }
+      if needsSep { _storage.append(_platformSeparator) }
       _storage.append(contentsOf: cvBytes)
     }
   }
@@ -125,14 +126,14 @@ extension FilePath {
       _internalInvariant(relBegin >= rootEnd)
       if relBegin < _storage.endIndex {
         // Has relative content; trailing sep is the last byte
-        return isSeparator(_storage[_storage.index(before: _storage.endIndex)])
+        return _isSeparator(_storage[_storage.index(before: _storage.endIndex)])
       } else if relBegin > rootEnd {
         // No relative content, but a gap separator exists between
         // the anchor and the end of the string (e.g. `\\server\share\`
         // or `/.vol/1234/5678/`). That gap separator IS the trailing
         // separator.
         _internalInvariant(relBegin == _storage.endIndex)
-        _internalInvariant(isSeparator(_storage[rootEnd]))
+        _internalInvariant(_isSeparator(_storage[rootEnd]))
         return true
       }
       // Anchor-only or empty root, no trailing separator
@@ -149,14 +150,15 @@ extension FilePath {
             _storage.removeSubrange(rsrcStart..<_storage.endIndex)
           }
         }
-        if !isSeparator(_storage.last!) {
-          _storage.append(platformSeparator)
+        if !_isSeparator(_storage.last!) {
+          _storage.append(_platformSeparator)
         }
       } else {
         // Remove trailing separator
-        if !isEmpty && isSeparator(_storage.last!) {
+        if !isEmpty && _isSeparator(_storage.last!) {
           let (_, relBegin) = _storage._parseRoot()
           if _storage.index(before: _storage.endIndex) >= relBegin {
+            _internalInvariant(_isSeparator(_storage.last!))
             _storage.removeLast()
           }
         }
@@ -181,7 +183,11 @@ extension FilePath {
   }
 }
 
-// MARK: - Resource fork (Darwin-only, simulated for all platforms in review)
+// MARK: - Resource fork (Darwin)
+//
+// Implemented only on Darwin builds; the getter returns `false` on other
+// platforms and the setter is a no-op (the helpers in FilePathDarwin.swift
+// guard on `_isDarwin`, which folds to `false` at compile time elsewhere).
 
 @available(SwiftStdlib 9999, *)
 extension FilePath {
@@ -198,8 +204,9 @@ extension FilePath {
         }
         var suffix = _SystemString._resourceForkSuffix
         // Avoid double separator when path already ends with one
-        if !_storage.isEmpty && isSeparator(_storage.last!)
-           && !suffix.isEmpty && isSeparator(suffix.first!) {
+        if !_storage.isEmpty && _isSeparator(_storage.last!)
+           && !suffix.isEmpty && _isSeparator(suffix.first!) {
+          _internalInvariant(_isSeparator(suffix.first!))
           suffix.removeFirst()
         }
         _storage.append(contentsOf: suffix)
@@ -253,27 +260,27 @@ extension FilePath {
         // Insert a separator between anchor and first component if the
         // anchor's shape needs one.
         if let anchor = anchor, _anchorNeedsGapSeparator(anchor._slice) {
-          str.append(platformSeparator)
+          str.append(_platformSeparator)
         }
       } else {
-        str.append(platformSeparator)
+        str.append(_platformSeparator)
       }
       str.append(contentsOf: comp._slice)
     }
 
     if hasTrailingSeparator {
       if !comps.isEmpty {
-        str.append(platformSeparator)
+        str.append(_platformSeparator)
       } else if anchor != nil {
         // Trailing sep on anchor-only path (e.g., \\server\share\)
         // Add separator if anchor doesn't already end with one
-        if let last = anchor?._slice.last, !isSeparator(last) {
-          str.append(platformSeparator)
+        if let last = anchor?._slice.last, !_isSeparator(last) {
+          str.append(_platformSeparator)
         }
       }
     }
 
-    self.init(normalizing: str)
+    self.init(_normalizing: str)
   }
 
   /// Creates a file path from a decomposed form with a resource fork suffix.
