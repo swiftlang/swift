@@ -43,16 +43,16 @@ actor ProtectsNonSendable {
   nonisolated func testParameter(_ nsArg: NonSendableKlass) async {
     self.assumeIsolated { isolatedSelf in
       isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
-      // expected-concurrent-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
-      // expected-ni-note @-2 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-concurrent-note @-1 {{'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against code in the current isolation context}}
+      // expected-ni-note @-2 {{'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against code in the current isolation context}}
     }
   }
 
   nonisolated func testParameterOutOfLine2(_ nsArg: NonSendableKlass) async {
     let closure: (isolated ProtectsNonSendable) -> () = { isolatedSelf in
       isolatedSelf.ns = nsArg // expected-warning {{sending 'nsArg' risks causing data races}}
-      // expected-concurrent-note @-1 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
-      // expected-ni-note @-2 {{task-isolated 'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-concurrent-note @-1 {{'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against code in the current isolation context}}
+      // expected-ni-note @-2 {{'nsArg' is captured by a actor-isolated closure. actor-isolated uses in closure may race against code in the current isolation context}}
     }
     self.assumeIsolated(closure)
     self.assumeIsolated(closure)
@@ -63,8 +63,8 @@ actor ProtectsNonSendable {
     doSomething(l, nsArg)
     self.assumeIsolated { isolatedSelf in
       isolatedSelf.ns = l // expected-warning {{sending 'l' risks causing data races}}
-      // expected-concurrent-note @-1 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
-      // expected-ni-note @-2 {{task-isolated 'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against later nonisolated uses}}
+      // expected-concurrent-note @-1 {{'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against code in the current isolation context}}
+      // expected-ni-note @-2 {{'l' is captured by a actor-isolated closure. actor-isolated uses in closure may race against code in the current isolation context}}
     }
   }
 

@@ -144,7 +144,7 @@ actor A {
 func callActorFuncsFromNonisolated(a : A, ns : NonSendable) async {
   await a.actorTakesNS(ns)
   // expected-error @-1 {{sending 'ns' risks causing data races}}
-  // expected-note @-2 {{sending task-isolated 'ns' to actor-isolated instance method 'actorTakesNS' risks causing data races between actor-isolated and task-isolated uses}}
+  // expected-note @-2 {{sending 'ns' to actor-isolated instance method 'actorTakesNS' risks causing data races between actor-isolated code and code in the current isolation context}}
 
   _ = await a.actorRetsNS()
   // expected-error @-1 {{non-Sendable 'NonSendable'-typed result can not be returned from actor-isolated instance method 'actorRetsNS()' to nonisolated context}}
