@@ -33,6 +33,7 @@
 #include "swift/ABI/TaskOptions.h"
 #include "swift/Basic/Casting.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/ObjectCache.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
 #include "swift/Runtime/Heap.h"
@@ -225,12 +226,15 @@ InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTas
     return executorRef;
 }
 
+static ShardedObjectCache<NullaryContinuationJob> nullaryJobCache;
+static ShardedObjectCache<ScheduledContinuationJob> scheduledJobCache;
+
 void NullaryContinuationJob::process(Job *_job) {
   auto *job = cast<NullaryContinuationJob>(_job);
 
   auto *continuation = job->Continuation;
 
-  swift_cxx_deleteObject(job);
+  nullaryJobCache.put_back(job);
 
   auto *context =
     static_cast<ContinuationAsyncContext*>(continuation->ResumeContext);
@@ -244,7 +248,7 @@ void ScheduledContinuationJob::process(Job *_job) {
 
   auto *continuation = job->Continuation;
 
-  swift_cxx_deleteObject(job);
+  scheduledJobCache.put_back(job);
 
   auto *context =
       static_cast<ContinuationAsyncContext *>(continuation->ResumeContext);
@@ -1926,7 +1930,7 @@ static NullaryContinuationJob*
 swift_task_createNullaryContinuationJobImpl(
     size_t priority,
     AsyncTask *continuation) {
-  auto *job = swift_cxx_newObject<NullaryContinuationJob>(swift_task_getCurrent(),
+  auto *job = nullaryJobCache.allocate(swift_task_getCurrent(),
         static_cast<JobPriority>(priority), continuation);
 
   return job;
@@ -1936,7 +1940,7 @@ SWIFT_CC(swift)
 static ScheduledContinuationJob *
 swift_task_createScheduledContinuationJobImpl(size_t priority,
                                               AsyncTask *continuation) {
-  auto *job = swift_cxx_newObject<ScheduledContinuationJob>(
+  auto *job = scheduledJobCache.allocate(
       static_cast<JobPriority>(priority), continuation);
 
   return job;
