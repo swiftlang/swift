@@ -12,6 +12,9 @@
 
 import ArgumentParser
 import SwiftRemoteMirror
+#if canImport(Glibc)
+import Glibc
+#endif
 #if canImport(string_h)
 import string_h
 #endif

@@ -102,12 +102,12 @@ dump-generic-metadata &lt;name-or-pid&gt; [--backtrace] [--backtrace-long]
 dump-raw-metadata &lt;name-or-pid&gt; [--backtrace] [--backtrace-long]
 : Print metadata allocations.
 
+dump-concurrency &lt;name-or-pid&gt;
+: Print information about tasks, actors, and threads under Concurrency.
+  On Linux this needs `CAP_SYS_PTRACE` (run as root, via sudo, or grant
+  the binary `cap_sys_ptrace+ep` with setcap).
+
 #### Darwin and Windows Only
 
 dump-arrays &lt;name-or-pid&gt;
 : Print information about array objects in the target
-
-##### Darwin Only
-
-dump-concurrency &lt;name-or-pid&gt;
-: Print information about tasks, actors, and threads under Concurrency.

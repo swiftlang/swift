@@ -27,6 +27,24 @@
     let memoryMap: SwiftInspectLinux.MemoryMap
     let symbolCache: SwiftInspectLinux.SymbolCache
 
+    /// A symbol resolved (lazily) against the target process's symbol cache.
+    /// `addr` is `nil` when the symbol isn't found.
+    struct RemoteSymbol {
+      let addr: UInt64?
+      let name: String
+      init(_ name: String, _ symbolCache: SwiftInspectLinux.SymbolCache) {
+        self.name = name
+        if let symbolRange = symbolCache.address(of: name) {
+          self.addr = symbolRange.start
+        } else {
+          self.addr = nil
+        }
+      }
+    }
+
+    lazy var swiftTaskGetCurrentSymbol: RemoteSymbol =
+      RemoteSymbol("swift_task_getCurrent", self.symbolCache)
+
     static var QueryDataLayout: QueryDataLayoutFunction {
       return { (context, type, _, output) in
         guard let output = output else { return 0 }
@@ -127,17 +145,21 @@
     func symbolicate(_ address: swift_addr_t) -> (module: String?, symbol: String?, offset: Int?) {
       let moduleName: String?
       let symbolName: String?
+      let symbolOffset: Int?
       if let symbol = self.symbolCache.symbol(for: address) {
         moduleName = symbol.module
         symbolName = symbol.name
+        symbolOffset = Int(address &- symbol.start)
       } else if let mapEntry = memoryMap.findEntry(containing: address) {
         // found no name for the symbol, but there is a memory region containing
         // the address so use its name as the module name
         moduleName = mapEntry.pathname
         symbolName = nil
+        symbolOffset = Int(address &- mapEntry.startAddr)
       } else {
         moduleName = nil
         symbolName = nil
+        symbolOffset = nil
       }
 
       // return only the basename of the module path to keep callstacks brief
@@ -148,19 +170,138 @@
         moduleBaseName = moduleName
       }
 
-      return (moduleBaseName, symbolName, nil)
+      return (moduleBaseName, symbolName, symbolOffset)
     }
 
     internal func iterateHeap(_ body: (swift_addr_t, UInt64) -> Void) {
-      fatalError("heap iteration is not supported on Linux")
+      // Conservative, pointer-aligned scan of every anonymous, readable +
+      // writable, private mapping in the target's address space. 
+      // 
+      // There is no glibc API equivalent to Darwin's `task_enumerate_malloc_blocks`
+      // or Android's `malloc_iterate`, so we cannot ask the allocator for
+      // the live-allocation list like those platforms do.
+      //
+      // Instead, we scan the entire heap where Swift heap objects might possibly be located.
+      //
+      // Cheap pre-filter: read each region locally in 1 MiB chunks, and
+      // only pass through those where the first word looks like a userspace
+      // pointer (>= 0x1000 - all metadata pointers live well above).
+      // This drops body() calls for words holding 0, small ints, or other
+      // non-pointer payloads.
+      let pointerSize = MemoryLayout<UInt>.size
+      let chunkBytes: UInt64 = 1 << 20  // 1 MiB
+      let leastValid: UInt = 0x1000
+
+      for entry in memoryMap.entries where entry.isLikelyHeapRegion() {
+        var addr = entry.startAddr
+        while addr < entry.endAddr {
+          let toRead = min(chunkBytes, entry.endAddr - addr)
+          guard
+            let words: [UInt] = try? process.readArray(
+              address: addr, upToCount: UInt(toRead) / UInt(pointerSize)),
+            !words.isEmpty
+          else {
+            // The mapping vanished or contains a hole we can't read, move on.
+            break
+          }
+          for (i, firstWord) in words.enumerated() {
+            // The word *value* is what its metadata pointer would be.
+            guard firstWord >= leastValid else {
+              // The word definitely won't contain a metadata pointer
+              continue
+            }
+
+            // There's chance this contains a metadata pointer.
+            let candidateObject = addr + UInt64(i * pointerSize)
+            body(swift_addr_t(candidateObject), 0)
+          }
+          addr += UInt64(words.count * pointerSize)
+        }
+      }
     }
 
     internal func iteratePotentialMetadataPages(_ body: (swift_addr_t, UInt64) -> Void) {
-      fatalError("metadata page iteration is not supported on Linux")
+      func readWord(_ name: String) -> UInt? {
+        guard let (addr, _) = symbolCache.address(of: name),
+              let bytes: [UInt] = try? process.readArray(address: addr, upToCount: 1)
+        else { return nil }
+        return bytes.first
+      }
+      guard let initialPoolPointer = readWord("_swift_debug_allocationPoolPointer"),
+            let initialPoolSize = readWord("_swift_debug_allocationPoolSize")
+      else { return }
+      body(swift_addr_t(initialPoolPointer), UInt64(initialPoolSize))
     }
 
     var currentTasks: [(threadID: UInt64, currentTask: swift_addr_t)] {
-      fatalError("thread task pointer lookup is not supported on Linux")
+      guard let getCurrentAddr = swiftTaskGetCurrentSymbol.addr else {
+        return []
+      }
+
+      // Each kernel thread of the target has its own directory under
+      // /proc/<pid>/task/<tid>. Linux ptrace operates per-thread, and a tid
+      // can be passed everywhere a `pid_t` is accepted.
+      let taskDir = "/proc/\(self.processIdentifier)/task"
+      guard let entries = try? FileManager.default.contentsOfDirectory(atPath: taskDir) else {
+        return []
+      }
+      let tids = entries.compactMap { pid_t($0) }
+
+      var result: [(threadID: UInt64, currentTask: swift_addr_t)] = []
+      for tid in tids {
+        do {
+          try withPTracedProcess(pid: tid) { ptrace in
+            // swift_task_getCurrent is `SWIFT_CC(swift)` and takes no args;
+            // for a no-arg, single-pointer-return function the Swift
+            // calling convention is ABI-compatible with C on x86_64/aarch64,
+            // which is what RegisterSet.setupCall implements.
+            let value = try ptrace.jump(to: getCurrentAddr)
+            result.append((threadID: UInt64(tid), currentTask: swift_addr_t(value)))
+          }
+        } catch {
+          // Best-effort: a thread may be exiting, may already be ptraced
+          // (e.g. by a debugger), or may be in an uninterruptible state.
+          // Skip it rather than fail the whole dump.
+          continue
+        }
+      }
+      return result
+    }
+  }
+
+  extension SwiftInspectLinux.MemoryMap.Entry {
+    /// Heuristic for "this region might contain Swift heap objects".
+    ///
+    /// We require `r` and `w` permissions and `p` (private). Heap pages are
+    /// never executable on modern Linux, but we don't filter `x` away here —
+    /// some allocators (jemalloc with sampling, etc.) may legitimately
+    /// mmap rwx pages, and in the conservative-scan model an extra region
+    /// just adds cost, not incorrect results.
+    public func isLikelyHeapRegion() -> Bool {
+      // Permissions string is "rwxp" / "rw-p" / etc.
+      guard permissions.count >= 4 else {
+        return false
+      }
+
+      let i = permissions.startIndex
+      guard permissions[i] == "r",
+            permissions[permissions.index(after: i)] == "w",
+            permissions[permissions.index(i, offsetBy: 3)] == "p"
+      else { return false }
+
+      switch pathname {
+      case nil:
+        // Pure anonymous mapping - likely allocator-backed.
+        return true
+      case "[heap]"?:
+        return true
+      case let p? where p.hasPrefix("[anon:"):
+        // glibc-named anonymous arenas, e.g. jemalloc.
+        return true
+      default:
+        // Ignore other kinds, Swift heap objects won't be in them.
+        return false
+      }
     }
   }
 #endif  // os(Linux)
