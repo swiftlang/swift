@@ -2576,8 +2576,8 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
   }
 
   // Dig out some of the fields from the conformance.
-  Type T = conformance->getType();
   DeclContext *DC = conformance->getDeclContext();
+  Type T = DC->getDeclaredInterfaceType();
   auto Proto = conformance->getProtocol();
   auto ProtoType = Proto->getDeclaredInterfaceType();
   SourceLoc ComplainLoc = conformance->getLoc();
@@ -5701,8 +5701,8 @@ static void ensureRequirementsAreSatisfied(ASTContext &ctx,
     // Make sure any associated type witnesses don't make reference to a
     // type we can't emit metadata for, or we're going to have trouble at
     // runtime.
-    checkTypeMetadataAvailability(type, typeDecl->getLoc(),
-                                  where.getDeclContext());
+    SourceLoc diagLoc = getLocForDiagnosingWitness(conformance, typeDecl);
+    checkTypeMetadataAvailability(type, diagLoc, where.getDeclContext());
 
     return false;
   });
