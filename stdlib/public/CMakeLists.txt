@@ -219,10 +219,6 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
     )
   endif()
 
-  # Non-Wasm freestanding / bare-ELF triples are only added when no Wasm
-  # SDK sysroot is configured, matching the pre-existing convention that
-  # a Wasm-hosted cross-compile tree does not also produce Darwin/Linux
-  # embedded artefacts.
   if(NOT SWIFT_WASI_SYSROOT_PATH AND NOT SWIFT_EMSCRIPTEN_SYSROOT_PATH)
     if("ARM" IN_LIST LLVM_TARGETS_TO_BUILD)
       list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
