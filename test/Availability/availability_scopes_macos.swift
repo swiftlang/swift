@@ -330,6 +330,7 @@ struct SomeStruct {
 // CHECK-NEXT: {{^}}  (decl version=51 decl=SomeEnum
 // CHECK-NEXT: {{^}}    (decl version=52 decl=a
 // CHECK-NEXT: {{^}}    (decl version=53 decl=b
+// CHECK-NEXT: {{^}}    (decl version=51 unavailable=macOS decl=d
 
 @available(OSX 51, *)
 enum SomeEnum {
@@ -338,6 +339,56 @@ enum SomeEnum {
 
   @available(OSX 53, *)
   case b, c
+
+  @available(OSX, unavailable)
+  case d
+
+  case e
+}
+
+// CHECK-NEXT: {{^}}  (decl version=51 decl=switchStatementRefinement(e:)
+// CHECK-NEXT: {{^}}    (switch_stmt version=51
+// CHECK-NEXT: {{^}}      (switch_case_body version=52
+// CHECK-NEXT: {{^}}        (condition_following_availability version=53
+// CHECK-NEXT: {{^}}        (if_then version=53
+// CHECK-NEXT: {{^}}          (decl version=54 decl=funcInIfThen()
+// CHECK-NEXT: {{^}}      (switch_case_body version=53
+// CHECK-NEXT: {{^}}      (switch_case_body version=53
+// CHECK-NEXT: {{^}}      (switch_case_body version=51 unavailable=macOS
+
+@available(OSX 51, *)
+func switchStatementRefinement(e: SomeEnum) {
+  switch e {
+  case .a:
+    if #available(OSX 53, *) {
+      @available(OSX 54, *)
+      func funcInIfThen() { }
+    }
+    someFunction()
+  case .b:
+    someFunction()
+  case .c:
+    someFunction()
+  case .d:
+    someFunction()
+  case .e:
+    someFunction()
+  }
+}
+
+// Refinement also applies inside `switch` expressions.
+
+// CHECK-NEXT: {{^}}  (decl version=51 decl=switchExpressionRefinement(e:)
+// CHECK-NEXT: {{^}}    (switch_stmt version=51
+// CHECK-NEXT: {{^}}      (switch_case_body version=52
+@available(OSX 51, *)
+func switchExpressionRefinement(e: SomeEnum) -> Int {
+  return switch e {
+  case .a:
+    1
+  default:
+    0
+  }
 }
 
 // CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=someComputedGlobalVar
