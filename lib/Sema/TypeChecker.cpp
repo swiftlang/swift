@@ -413,6 +413,7 @@ void swift::performWholeModuleTypeChecking(SourceFile &SF) {
   case SourceFileKind::Library:
   case SourceFileKind::Main:
   case SourceFileKind::MacroExpansion:
+  case SourceFileKind::SyntheticMacro:
     diagnoseObjCMethodConflicts(SF);
     diagnoseObjCCategoryConflicts(SF);
     diagnoseObjCUnsatisfiedOptReqConflicts(SF);
@@ -439,7 +440,8 @@ void swift::loadDerivativeConfigurations(SourceFile &SF) {
   case SourceFileKind::DefaultArgument:
   case SourceFileKind::Library:
   case SourceFileKind::MacroExpansion:
-  case SourceFileKind::Main: {
+  case SourceFileKind::Main:
+  case SourceFileKind::SyntheticMacro: {
     CustomDerivativesRequest request(&SF);
     evaluateOrDefault(SF.getASTContext().evaluator, request, {});
     return;

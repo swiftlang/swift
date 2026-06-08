@@ -974,6 +974,7 @@ static LocationInfo getDeclLocationInfo(const ValueDecl *VD) {
         return Location;
       case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::PrettyPrinted:
+      case GeneratedSourceInfo::SyntheticMacro:
         setLocationInfoForRange(SM, VDRange, VDBufID, Location);
         return Location;
       }
