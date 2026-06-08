@@ -624,8 +624,13 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
     // them and add the case to the variableNamePath.
     if (auto *e = dyn_cast<EnumInst>(searchValue)) {
       if (e->hasOperand()) {
-        pushPathComponent(getNameFromDecl(e->getElement()),
-                          e->getLoc().getSourceLoc());
+        // Do not push a path component for Optional.some wrapping — the
+        // programmer never writes 'x.some' in source, so adding '.some' to the
+        // inferred name produces confusing diagnostics like
+        // "'negotiator.some' cannot be returned".
+        if (!e->getType().getOptionalObjectType())
+          pushPathComponent(getNameFromDecl(e->getElement()),
+                            e->getLoc().getSourceLoc());
         searchValue = e->getOperand();
         continue;
       }
@@ -763,7 +768,16 @@ SILValue VariableNameInferrer::findDebugInfoProvidingValueHelper(
         isa<CopyableToMoveOnlyWrapperValueInst>(searchValue) ||
         isa<EndInitLetRefInst>(searchValue) ||
         isa<ConvertEscapeToNoEscapeInst>(searchValue) ||
-        isa<ConvertFunctionInst>(searchValue)) {
+        isa<ConvertFunctionInst>(searchValue) ||
+        // Look through existential type-erasure wrappers so that name inference
+        // can reach the concrete value underneath. For example, when a named
+        // variable of a concrete class type is wrapped in `any Protocol` before
+        // being stored into an indirect return slot, init_existential_ref sits
+        // between the concrete copy_value and the enum wrapping. Without
+        // looking through it the inferrer gives up and the diagnostic falls back
+        // to the generic "unknown pattern" catch-all.
+        isa<InitExistentialRefInst>(searchValue) ||
+        isa<InitExistentialAddrInst>(searchValue)) {
       searchValue = cast<SingleValueInstruction>(searchValue)->getOperand(0);
       continue;
     }
