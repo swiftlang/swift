@@ -1379,11 +1379,11 @@ function Invoke-Program() {
 }
 
 function Get-DotNetRuntime() {
-  if (-not $DotNetRuntime.Runtimes.ContainsKey($HostArchName)) {
-    throw "Unsupported .NET runtime host architecture '$HostArchName'"
+  if (-not $DotNetRuntime.Runtimes.ContainsKey($BuildArchName)) {
+    throw "Unsupported .NET runtime host architecture '$BuildArchName'"
   }
 
-  return $DotNetRuntime.Runtimes[$HostArchName]
+  return $DotNetRuntime.Runtimes[$BuildArchName]
 }
 
 function Get-DotNetRuntimeRoot() {
