@@ -236,7 +236,7 @@ extension Task where Success == Never, Failure == Never {
   ///
   @available(SwiftStdlib 5.7, *)
   @_alwaysEmitIntoClient
-  public static func sleep<C: Clock>(
+  public static nonisolated(nonsending) func sleep<C: Clock>(
     for duration: C.Instant.Duration,
     tolerance: C.Instant.Duration? = nil,
     clock: C = .continuous

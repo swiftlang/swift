@@ -117,7 +117,7 @@ extension Clock {
   /// access to an absolute instant.
   @available(StdlibDeploymentTarget 5.7, *)
   @_alwaysEmitIntoClient
-  public func sleep(
+  public nonisolated(nonsending) func sleep(
     for duration: Instant.Duration,
     tolerance: Instant.Duration? = nil
   ) async throws {
