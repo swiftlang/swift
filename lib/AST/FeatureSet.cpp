@@ -503,6 +503,7 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 UNINTERESTING_FEATURE(GeneralizedIsSameMetaTypeBuiltin)
 UNINTERESTING_FEATURE(CustomAvailability)
 UNINTERESTING_FEATURE(BuiltinMarkDependence)
+UNINTERESTING_FEATURE(BuiltinGepProjection)
 
 static bool usesFeatureAsyncExecutionBehaviorAttributes(Decl *decl) {
   // Explicit `@concurrent` attribute on the declaration.
