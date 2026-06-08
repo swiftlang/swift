@@ -52,7 +52,7 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 // The effect of .dependenceSource on reachability is like a load of this local. The dependent value depends on any
 // value in this local that reaches this point.
 //
-// A .dependenceDest access is the point where another value becomes dependent on this local:
+// A .dependenceDest access is the point where this local becomes dependent on another value:
 //
 //     %local = alloc_stack // this local
 //     %md = mark_dependence %local on %val
