@@ -99,16 +99,32 @@ extension SuspendingClock: Clock {
   /// This function doesn't block the underlying thread.
   @available(StdlibDeploymentTarget 5.7, *)
   @diagnose(UselessAvailabilityCheck, as: ignored)
-  public func sleep(
+  @_alwaysEmitIntoClient
+  @abi(
+    nonisolated(nonsending) func sleepNonisolatedNonsending(
+      until deadline: Instant, tolerance: Swift.Duration?
+    ) async throws
+  )
+  public nonisolated(nonsending) func sleep(
     until deadline: Instant, tolerance: Swift.Duration? = nil
   ) async throws {
-    if #available(StdlibDeploymentTarget 6.3, *) {
-      try await Task._sleep(until: deadline,
-                            tolerance: tolerance,
-                            clock: self)
-    } else {
-      fatalError("we shouldn't get here; if we have, availability is broken")
-    }
+    try await Task._sleep(until: deadline,
+                          tolerance: tolerance,
+                          clock: self)
+  }
+
+  @abi(
+    func sleep(
+      until deadline: Instant, tolerance: Swift.Duration?
+    ) async throws
+  )
+  @usableFromInline
+  internal func __abi_sleep(
+    until deadline: Instant, tolerance: Swift.Duration? = nil
+  ) async throws {
+    try await Task._sleep(until: deadline,
+                          tolerance: tolerance,
+                          clock: self)
   }
 #else
   @available(StdlibDeploymentTarget 5.7, *)
