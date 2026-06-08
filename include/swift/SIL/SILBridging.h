@@ -1318,6 +1318,8 @@ struct BridgedBuilder{
                                                                         BridgedValue index,
                                                                         bool needsStackProtection,
                                                                         bool isProjection) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIndexRawPointer(BridgedValue base,
+                                                                              BridgedValue index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedRefCast(BridgedValue op,
                                                                                BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedAddrCast(BridgedValue op,

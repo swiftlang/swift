@@ -302,6 +302,11 @@ public struct Builder {
     return notifyNew(dr.getAs(IndexAddrInst.self))
   }
 
+  public func createIndexRawPointer(base: Value, index: Value) -> IndexRawPointerInst {
+    let dr = bridged.createIndexRawPointer(base.bridged, index.bridged)
+    return notifyNew(dr.getAs(IndexRawPointerInst.self))
+  }
+
   public func createUncheckedRefCast(from value: Value, to type: Type) -> UncheckedRefCastInst {
     let cast = bridged.createUncheckedRefCast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UncheckedRefCastInst.self))

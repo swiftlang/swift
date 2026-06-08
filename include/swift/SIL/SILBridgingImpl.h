@@ -2601,6 +2601,11 @@ BridgedInstruction BridgedBuilder::createIndexAddr(BridgedValue base, BridgedVal
                                       needsStackProtection, isProjection)};
 }
 
+BridgedInstruction BridgedBuilder::createIndexRawPointer(BridgedValue base,
+                                                          BridgedValue index) const {
+  return {unbridged().createIndexRawPointer(regularLoc(), base.getSILValue(), index.getSILValue())};
+}
+
 BridgedInstruction BridgedBuilder::createUncheckedRefCast(BridgedValue op, BridgedType type) const {
   return {unbridged().createUncheckedRefCast(regularLoc(), op.getSILValue(),
                                              type.unbridged())};
