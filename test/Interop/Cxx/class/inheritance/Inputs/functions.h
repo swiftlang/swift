@@ -163,3 +163,9 @@ class CopyTrackedDerivedDerivedClass: public NonEmptyBase, public CopyTrackedDer
 public:
     CopyTrackedDerivedDerivedClass(int x) : CopyTrackedDerivedClass(x) {}
 };
+
+inline int freeFuncRenamedToInit() __attribute__((swift_name("init()"))) {
+  return 42;
+}
+// expected-warning@-3 {{ignoring swift_name attribute 'init()'; 'freeFuncRenamedToInit' cannot be imported as an initializer}}
+// expected-note@-4 {{use backticks (e.g. 'swift_name("`init`(...)")')}}
