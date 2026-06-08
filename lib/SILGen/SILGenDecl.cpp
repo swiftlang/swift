@@ -37,6 +37,7 @@
 #include "swift/SIL/SILSymbolVisitor.h"
 #include "swift/SIL/SILType.h"
 #include "swift/SIL/TypeLowering.h"
+#include "clang/AST/DeclarationName.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <iterator>
@@ -2567,8 +2568,12 @@ SILGenFunction::getVariableAddressableBuffer(VarDecl *decl,
                           cleanupPoint.state);
     cleanupPoint.inst->eraseFromParent();
   }
-  
-  return storeBorrow;
+
+  SILValue result = storeBorrow;
+  if (result->getType().isMoveOnly()) {
+    result = B.createMarkUnresolvedNonCopyableValueInst(result.getLoc(), result, MarkUnresolvedNonCopyableValueInst::CheckKind::NoConsumeOrAssign);
+  }
+  return result;
 }
 
 void BlackHoleInitialization::performPackExpansionInitialization(
