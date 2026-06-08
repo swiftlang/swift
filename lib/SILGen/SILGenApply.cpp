@@ -1436,8 +1436,24 @@ public:
     } else if (auto *declRef = dyn_cast<DeclRefExpr>(fn)) {
       assert(isa<FuncDecl>(declRef->getDecl()) && "non-function super call?!");
       // FIXME(backDeploy): Handle calls to back deployed methods on super?
-      constant = SILDeclRef(declRef->getDecl())
-        .asForeign(requiresForeignEntryPoint(declRef->getDecl()));
+      auto funcDecl = cast<FuncDecl>(declRef->getDecl());
+
+      // A call to a virtual method of a foreign reference type in Swift
+      // resolves to a synthesized thunk that performs dynamic dispatch.
+      // However, a `super` call should statically dispatch to the base class
+      // implementation. Substitute it so the direct call below references that
+      // symbol instead of the thunk.
+      if (auto classDecl = funcDecl->getDeclContext()->getSelfClassDecl()) {
+        if (classDecl->isForeignReferenceType()) {
+          auto clangImporter = SGF.getASTContext().getClangModuleLoader();
+          if (auto original =
+                  clangImporter->getOriginalForVirtualThunk(funcDecl))
+            funcDecl = original;
+        }
+      }
+
+      constant =
+          SILDeclRef(funcDecl).asForeign(requiresForeignEntryPoint(funcDecl));
 
       if (declRef->getDeclRef().isSpecialized())
         substitutions = declRef->getDeclRef().getSubstitutions();

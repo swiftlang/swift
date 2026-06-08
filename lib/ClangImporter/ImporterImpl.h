@@ -688,6 +688,10 @@ public:
 
   llvm::SmallPtrSet<const clang::Decl *, 1> synthesizedAndAlwaysVisibleDecls;
 
+  /// For virtual methods of foreign reference types, whenever a virtual thunk
+  /// is generated, keep track of the original C++ method.
+  llvm::DenseMap<const FuncDecl *, FuncDecl *> virtualThunkToOriginal;
+
 private:
   // Keep track of the decls that were already cloned for this specific class.
   llvm::DenseMap<std::pair<ValueDecl *, DeclContext *>, ValueDecl *>
@@ -785,6 +789,8 @@ public:
                                   ClangInheritanceInfo inheritance);
 
   ValueDecl *getOriginalForClonedMember(const ValueDecl *decl);
+  FuncDecl *getOriginalForVirtualThunk(const FuncDecl *decl);
+
   bool isMemberSynthesizedPerType(const ValueDecl *decl);
   void markMemberSynthesizedPerType(const ValueDecl *decl);
 
