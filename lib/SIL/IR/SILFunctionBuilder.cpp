@@ -391,9 +391,17 @@ SILFunction *SILFunctionBuilder::getOrCreateFunction(
       F->setAvailabilityForLinkage(*availability);
 
     F->setIsAlwaysWeakImported(decl->isAlwaysWeakImported());
+
     auto cgModel = decl->getExplicitCodeGenerationModel();
     if (!cgModel && mod.getOptions().EmbeddedSwift)
       cgModel = decl->getEffectiveCodeGenerationModel();
+
+    // Default-argument generators are always @export(implementation).
+    // FIXME: Should we sink all of this logic into SILDeclRef itself?
+    if (cgModel == CodeGenerationModel::Interface &&
+        constant.isDefaultArgGenerator())
+      cgModel = CodeGenerationModel::Implementation;
+
     if (cgModel) {
       switch (*cgModel) {
       case CodeGenerationModel::Interface:
