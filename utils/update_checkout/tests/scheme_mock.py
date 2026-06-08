@@ -129,8 +129,7 @@ def call_quietly(*args, **kwargs):
 
 
 def create_dir(d):
-    if not os.path.isdir(d):
-        os.makedirs(d)
+    os.makedirs(d)
 
 
 def teardown_mock_remote(base_dir):
