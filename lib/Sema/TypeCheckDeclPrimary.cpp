@@ -1731,6 +1731,7 @@ static void maybeDiagnoseClassWithoutInitializers(ClassDecl *classDecl) {
     case SourceFileKind::Library:
     case SourceFileKind::Main:
     case SourceFileKind::MacroExpansion:
+    case SourceFileKind::SyntheticMacro:
       break;
     }
   }
@@ -2777,6 +2778,7 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             var->diagnose(diag::opaque_type_var_no_init);
             break;
           }
@@ -2802,6 +2804,7 @@ public:
           case SourceFileKind::Main:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             break;
           }
 
@@ -2824,6 +2827,7 @@ public:
           case SourceFileKind::DefaultArgument:
           case SourceFileKind::Library:
           case SourceFileKind::MacroExpansion:
+          case SourceFileKind::SyntheticMacro:
             break;
           }
 

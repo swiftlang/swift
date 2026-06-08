@@ -968,6 +968,7 @@ public:
       case GeneratedSourceInfo::ReplacedFunctionBody:
       case GeneratedSourceInfo::PrettyPrinted:
       case GeneratedSourceInfo::AttributeFromClang:
+      case GeneratedSourceInfo::SyntheticMacro:
         break;
       }
     }
