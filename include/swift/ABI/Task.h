@@ -545,6 +545,33 @@ public:
 
   void cancellationShieldPop();
 
+  // ==== Task Fragment Offsets -----------------------------------------------------
+
+  size_t nameFragmentOffset() const {
+    return sizeof(AsyncTask);
+  }
+
+  size_t childFragmentOffset() const {
+    size_t offset = nameFragmentOffset();
+    if (hasTaskName())
+      offset += sizeof(NameFragment);
+    return offset;
+  }
+
+  size_t groupChildFragmentOffset() const {
+    size_t offset = childFragmentOffset();
+    if (hasChildFragment())
+      offset += sizeof(ChildFragment);
+    return offset;
+  }
+
+  size_t futureFragmentOffset() const {
+    size_t offset = groupChildFragmentOffset();
+    if (hasGroupChildFragment())
+      offset += sizeof(GroupChildFragment);
+    return offset;
+  }
+
   // ==== Task Name Fragment --------------------------------------------------------
 
   /// A fragment of an async task that holds the task's name.
@@ -572,20 +599,16 @@ public:
     }
   };
 
-  /// Returns the `NameFragment` of this task.
-  ///
-  /// WARNING: Only valid when `hasTaskName()` is true.
   NameFragment *nameFragment() {
     assert(hasTaskName());
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
+    auto *offset = reinterpret_cast<char *>(this) + nameFragmentOffset();
 #if !SWIFT_CONCURRENCY_EMBEDDED
-    assert(static_cast<size_t>(offset - reinterpret_cast<char*>(this)) ==
-           _swift_concurrency_debug_asyncTaskNameOffset &&
-       "AsyncTask::nameFragment offset must match "
-       "_swift_concurrency_debug_asyncTaskNameOffset");
+    assert(static_cast<size_t>(offset - reinterpret_cast<char *>(this)) ==
+               _swift_concurrency_debug_asyncTaskNameOffset &&
+           "AsyncTask::nameFragment offset must match "
+           "_swift_concurrency_debug_asyncTaskNameOffset");
 #endif
-    return reinterpret_cast<NameFragment*>(offset);
+    return reinterpret_cast<NameFragment *>(offset);
   }
 
   // ==== Child Fragment -------------------------------------------------------
@@ -645,13 +668,8 @@ public:
 
   ChildFragment *childFragment() {
     assert(hasChildFragment());
-
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-    if (hasTaskName())
-      offset += sizeof(NameFragment);
-
-    return reinterpret_cast<ChildFragment*>(offset);
+    return reinterpret_cast<ChildFragment *>(
+        reinterpret_cast<char *>(this) + childFragmentOffset());
   }
 
   // ==== TaskGroup Child ------------------------------------------------------
@@ -686,15 +704,8 @@ public:
 
   GroupChildFragment *groupChildFragment() {
     assert(hasGroupChildFragment());
-
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-    if (hasTaskName())
-      offset += sizeof(NameFragment);
-    if (hasChildFragment())
-      offset += sizeof(ChildFragment);
-
-    return reinterpret_cast<GroupChildFragment *>(offset);
+    return reinterpret_cast<GroupChildFragment *>(
+        reinterpret_cast<char *>(this) + groupChildFragmentOffset());
   }
 
   // ==== Task Executor Preference --------------------------------------------
@@ -832,16 +843,8 @@ public:
 
   FutureFragment *futureFragment() {
     assert(isFuture());
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-    if (hasTaskName())
-      offset += sizeof(NameFragment);
-    if (hasChildFragment())
-      offset += sizeof(ChildFragment);
-    if (hasGroupChildFragment())
-      offset += sizeof(GroupChildFragment);
-
-    return reinterpret_cast<FutureFragment *>(offset);
+    return reinterpret_cast<FutureFragment *>(
+        reinterpret_cast<char *>(this) + futureFragmentOffset());
   }
 
   /// Wait for this future to complete.

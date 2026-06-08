@@ -2101,57 +2101,61 @@ private:
     return {false, 0};
   }
 
-  // ==== Task fragment offsets ===============================================
-  //
-  // An `AsyncTask` has a fixed-size header followed by optional tail-allocated
-  // fragments, in the following order:
-  //
-  //   1. `NameFragment`        — present iff `JobFlags::task_hasInitialTaskName`
-  //   2. `ChildFragment`       — present iff `JobFlags::task_isChildTask`
-  //   3. `GroupChildFragment`  — present iff `JobFlags::task_isGroupChildTask`
-  //   4. `FutureFragment`      — present iff `JobFlags::task_isFuture`
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t nameFragmentOffset() const {
+    return asyncTaskSize;
+  }
+
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t childFragmentOffset(swift::JobFlags flags) const {
+    size_t offset = nameFragmentOffset();
+    if (flags.task_hasInitialTaskName())
+      offset += sizeof(NameFragment<Runtime>);
+    return offset;
+  }
+
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t groupChildFragmentOffset(swift::JobFlags flags) const {
+    size_t offset = childFragmentOffset(flags);
+    if (flags.task_isChildTask())
+      offset += sizeof(ChildFragment<Runtime>);
+    return offset;
+  }
+
+  /// Warning: Does not validate if the fragment is actually present.
+  size_t futureFragmentOffset(swift::JobFlags flags) const {
+    size_t offset = groupChildFragmentOffset(flags);
+    if (flags.task_isGroupChildTask())
+      offset += sizeof(GroupChildFragment<Runtime>);
+    return offset;
+  }
 
   /// Address of `NameFragment` for `task`.
   RemoteAddress nameFragmentAddr(RemoteAddress task,
                                  swift::JobFlags flags) const {
     assert(asyncTaskSize != 0 && flags.task_hasInitialTaskName());
-    return task + asyncTaskSize;
+    return task + nameFragmentOffset();
   }
 
   /// Address of `ChildFragment` for `task`.
   RemoteAddress childFragmentAddr(RemoteAddress task,
                                   swift::JobFlags flags) const {
     assert(asyncTaskSize != 0 && flags.task_isChildTask());
-    RemoteAddress addr = task + asyncTaskSize;
-    if (flags.task_hasInitialTaskName())
-      addr = addr + sizeof(NameFragment<Runtime>);
-    return addr;
+    return task + childFragmentOffset(flags);
   }
 
   /// Address of `GroupChildFragment` for `task`.
   RemoteAddress groupChildFragmentAddr(RemoteAddress task,
                                        swift::JobFlags flags) const {
     assert(asyncTaskSize != 0 && flags.task_isGroupChildTask());
-    RemoteAddress addr = task + asyncTaskSize;
-    if (flags.task_hasInitialTaskName())
-      addr = addr + sizeof(NameFragment<Runtime>);
-    if (flags.task_isChildTask())
-      addr = addr + sizeof(ChildFragment<Runtime>);
-    return addr;
+    return task + groupChildFragmentOffset(flags);
   }
 
   /// Address of `FutureFragment` for `task`.
   RemoteAddress futureFragmentAddr(RemoteAddress task,
                                    swift::JobFlags flags) const {
     assert(asyncTaskSize != 0 && flags.task_isFuture());
-    RemoteAddress addr = task + asyncTaskSize;
-    if (flags.task_hasInitialTaskName())
-      addr = addr + sizeof(NameFragment<Runtime>);
-    if (flags.task_isChildTask())
-      addr = addr + sizeof(ChildFragment<Runtime>);
-    if (flags.task_isGroupChildTask())
-      addr = addr + sizeof(GroupChildFragment<Runtime>);
-    return addr;
+    return task + futureFragmentOffset(flags);
   }
 
   template <typename AsyncTaskType>
