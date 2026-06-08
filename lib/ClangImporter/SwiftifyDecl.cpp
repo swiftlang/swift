@@ -124,7 +124,7 @@ struct SwiftCountExprEmitter
     bool isSigned = IL->getType()->isSignedIntegerType();
     llvm::SmallString<20> valueStr;
     IL->getValue().toString(valueStr, /*Radix=*/10, isSigned);
-    std::optional<StringRef> swiftName = swiftBuiltinTypeName(bt);
+    std::optional<StringRef> swiftName = getBuiltinTypeSwiftName(bt);
     if (!swiftName) {
       DLOG("Unsupported integer literal type\n");
       return false;
@@ -224,7 +224,7 @@ private:
     case CK::CK_IntegralToFloating:
     case CK::CK_FloatingToIntegral:
     case CK::CK_FloatingCast: {
-      std::optional<StringRef> swiftName = swiftBuiltinTypeName(c->getType());
+      std::optional<StringRef> swiftName = getBuiltinTypeSwiftName(c->getType());
       if (!swiftName) {
         DLOG("Unsupported cast destination type\n");
         return false;
@@ -243,29 +243,6 @@ private:
     default:
       DLOG("Unsupported cast kind\n");
       return false;
-    }
-  }
-
-  std::optional<StringRef> swiftBuiltinTypeName(clang::QualType ty) {
-    const auto *bt = ty->getAs<clang::BuiltinType>();
-    if (!bt)
-      return std::nullopt;
-    return swiftBuiltinTypeName(bt);
-  }
-
-  std::optional<StringRef>
-  swiftBuiltinTypeName(const clang::BuiltinType *bt) {
-    switch (bt->getKind()) {
-#define MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)                               \
-  case clang::BuiltinType::CLANG_KIND:                                         \
-    return StringRef(#SWIFT_NAME);
-#define MAP_BUILTIN_CCHAR_TYPE(CLANG_KIND, SWIFT_NAME)                         \
-  MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)
-#define MAP_BUILTIN_INTEGER_TYPE(CLANG_KIND, SWIFT_NAME)                       \
-  MAP_BUILTIN_TYPE(CLANG_KIND, SWIFT_NAME)
-#include "swift/ClangImporter/BuiltinMappedTypes.def"
-    default:
-      return std::nullopt;
     }
   }
 };
