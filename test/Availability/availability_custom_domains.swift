@@ -610,3 +610,97 @@ func testP() { // expected-note 2{{add '@available' attribute to enclosing globa
   acceptP(MyType3.self)  // expected-error{{conformance of 'MyType3' to 'P' is only available in DisabledDomain}}
   // expected-note@-1{{add 'if #available' version check}}
 }
+
+enum E {
+  case unrestricted
+
+  @available(DynamicDomain)
+  case onlyInDynamic
+
+  @available(DynamicDomain)
+  case alsoInDynamic
+
+  @available(DisabledDomain, unavailable)
+  case unavailableInDisabled
+}
+
+func testSwitch(e: E) { // expected-note 5 {{add '@available' attribute to enclosing global function}}
+  switch e {
+  case .unrestricted:
+    availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
+      // expected-note@-1 {{add 'if #available' version check}}
+    unavailableInDisabledDomain() // expected-error {{'unavailableInDisabledDomain()' is unavailable}}
+  case .onlyInDynamic:
+    availableInDynamicDomain()
+  case .alsoInDynamic:
+    availableInDynamicDomain()
+  case .unavailableInDisabled:
+    unavailableInDisabledDomain()
+  }
+
+  // Matching elements that share the same availability allows refinement.
+  switch e {
+  case .onlyInDynamic, .alsoInDynamic:
+    availableInDynamicDomain()
+  default:
+    break
+  }
+
+  // Matching elements with differing availability suppresses refinement.
+  switch e {
+  case .unrestricted, .onlyInDynamic:
+    availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
+      // expected-note@-1 {{add 'if #available' version check}}
+  default:
+    break
+  }
+
+  let x = 1
+  switch (e, x) {
+  case (.onlyInDynamic, 1):
+    availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
+      // expected-note@-1 {{add 'if #available' version check}}
+  default:
+    break
+  }
+
+  // Fall-through statements suppress refinement.
+  switch e {
+  case .unrestricted:
+    fallthrough
+  case .onlyInDynamic:
+    availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
+      // expected-note@-1 {{add 'if #available' version check}}
+  default:
+    break
+  }
+
+  // FIXME: [availability] Refinement could be supported here.
+  switch e {
+  case .onlyInDynamic:
+    fallthrough
+  case .alsoInDynamic:
+    availableInDynamicDomain() // expected-error {{'availableInDynamicDomain()' is only available in DynamicDomain}}
+      // expected-note@-1 {{add 'if #available' version check}}
+  default:
+    break
+  }
+}
+
+// Refinement also applies inside `switch` expressions.
+@available(DynamicDomain)
+func getDynamicDomainValue() -> Int { 0 }
+
+func testSwitchExpr(e: E) -> Int { // expected-note 2 {{add '@available' attribute to enclosing global function}}
+  return switch e {
+  case .unrestricted:
+    getDynamicDomainValue() // expected-error {{'getDynamicDomainValue()' is only available in DynamicDomain}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  case .onlyInDynamic, .alsoInDynamic:
+    // FIXME: https://github.com/swiftlang/swift/issues/89721
+    getDynamicDomainValue() // expected-error {{'getDynamicDomainValue()' is only available in DynamicDomain}}
+    // expected-note@-1 {{add 'if #available' version check}}
+  default:
+    0
+  }
+}
