@@ -7,7 +7,7 @@
 // CHECK-ONONE:    [[ACC:%.*]] = begin_access [read] [static] %0
 // CHECK-ONONE:    [[S:%.*]] = struct_element_addr [[ACC]], #InlineArray._storage
 // CHECK:          [[BA:%.*]] = vector_base_addr [[S]]
-// CHECK:          [[EA:%.*]] = index_addr [stack_protection] [[BA]],
+// CHECK:          [[EA:%.*]] = index_addr [stack_protection] [projection] [[BA]],
 // CHECK-OPT:      [[E:%.*]] = load [[EA]]
 // CHECK-ONONE:    [[ACC2:%.*]] = begin_access [read] [unsafe] [[EA]]
 // CHECK-ONONE:    [[E:%.*]] = load [[ACC2]]
@@ -35,7 +35,7 @@ public final class C {
   // CHECK:          [[CA:%.*]] = ref_element_addr [immutable] %1, #C.a
   // CHECK:          [[S:%.*]] = struct_element_addr [[CA]], #InlineArray._storage
   // CHECK:          [[BA:%.*]] = vector_base_addr [[S]]
-  // CHECK:          [[EA:%.*]] = index_addr [stack_protection] [[BA]],
+  // CHECK:          [[EA:%.*]] = index_addr [stack_protection] [projection] [[BA]],
   // CHECK-OPT:      [[E:%.*]] = load [[EA]]
   // CHECK-ONONE:    [[ACC2:%.*]] = begin_access [read] [unsafe] [[EA]]
   // CHECK-ONONE:    [[E:%.*]] = load [[ACC2]]
@@ -53,7 +53,7 @@ public struct S {
   // CHECK:          [[A:%.*]] = struct_element_addr %1, #S.a
   // CHECK:          [[S:%.*]] = struct_element_addr [[A]], #InlineArray._storage
   // CHECK:          [[BA:%.*]] = vector_base_addr [[S]]
-  // CHECK:          [[EA:%.*]] = index_addr [stack_protection] [[BA]],
+  // CHECK:          [[EA:%.*]] = index_addr [stack_protection] [projection] [[BA]],
   // CHECK-OPT:      [[E:%.*]] = load [[EA]]
   // CHECK-ONONE:    [[ACC2:%.*]] = begin_access [read] [unsafe] [[EA]]
   // CHECK-ONONE:    [[E:%.*]] = load [[ACC2]]

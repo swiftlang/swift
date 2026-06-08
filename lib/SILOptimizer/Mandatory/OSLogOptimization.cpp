@@ -557,15 +557,10 @@ static SILValue emitCodeForConstantArray(ArrayRef<SILValue> elements,
   unsigned elementIndex = 0;
   for (SILValue elementSIL : elements) {
     // Compute the address where the element must be stored.
-    SILValue currentStorageAddr;
-    if (elementIndex != 0) {
-      SILValue indexSIL = builder.createIntegerLiteral(
-          loc, SILType::getBuiltinWordType(astContext), elementIndex);
-      currentStorageAddr = builder.createIndexAddr(loc, storageAddr, indexSIL,
-                              /*needsStackProtection=*/ false);
-    } else {
-      currentStorageAddr = storageAddr;
-    }
+    SILValue indexSIL = builder.createIntegerLiteral(
+        loc, SILType::getBuiltinWordType(astContext), elementIndex);
+    SILValue currentStorageAddr = builder.createIndexAddr(loc, storageAddr, indexSIL,
+                            /*needsStackProtection=*/ false, /*isProjection=*/ true);
     // Store the generated element into the currentStorageAddr. This is an
     // initializing store and therefore there is no need to free any existing
     // element.

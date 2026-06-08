@@ -529,7 +529,8 @@ SILInstruction *SILCombiner::visitIndexAddrInst(IndexAddrInst *IA) {
   auto *newIndex = Builder.createIntegerLiteral(IA->getLoc(),
                                     IA->getIndex()->getType(), index + index2);
   return Builder.createIndexAddr(IA->getLoc(), base2, newIndex,
-    IA->needsStackProtection() || cast<IndexAddrInst>(base)->needsStackProtection());
+    IA->needsStackProtection() || cast<IndexAddrInst>(base)->needsStackProtection(),
+    /*isProjection=*/ false);
 }
 
 /// Whether there exists a unique value to which \p addr is always initialized

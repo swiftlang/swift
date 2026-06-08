@@ -1984,7 +1984,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       const IndexAddrInst *IAI = cast<IndexAddrInst>(&SI);
       operand = IAI->getBase();
       operand2 = IAI->getIndex();
-      Attr = (IAI->needsStackProtection() ? 1 : 0);
+      Attr = (IAI->needsStackProtection() ? 1 : 0) | (IAI->isProjection() ? 2 : 0);
     }
     SILTwoOperandsLayout::emitRecord(Out, ScratchRecord,
         SILAbbrCodes[SILTwoOperandsLayout::Code],

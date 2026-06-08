@@ -592,7 +592,8 @@ static ManagedValue emitBuiltinGep(SILGenFunction &SGF,
                                                /*strict*/ true,
                                                /*invariant*/ false);
   addr = SGF.B.createIndexAddr(loc, addr, args[1].getUnmanagedValue(),
-                               /*needsStackProtection=*/ true);
+                               /*needsStackProtection=*/ true,
+                               /*isProjection=*/ false);
   addr = SGF.B.createAddressToPointer(loc, addr, RawPtrType,
                                       /*needsStackProtection=*/ true);
 

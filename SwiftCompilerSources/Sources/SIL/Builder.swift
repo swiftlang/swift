@@ -296,8 +296,9 @@ public struct Builder {
     return notifyNew(dr.getAs(PointerToAddressInst.self))
   }
 
-  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool) -> IndexAddrInst {
-    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection)
+  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool,
+                              isProjection: Bool) -> IndexAddrInst {
+    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection, isProjection)
     return notifyNew(dr.getAs(IndexAddrInst.self))
   }
 
