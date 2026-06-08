@@ -26,6 +26,7 @@ class UpdateArguments(RunnerArguments):
     cross_repos_pr: Dict[str, str]
     skip_history: bool
     partial_clone: bool
+    update_remote_url: Optional[str] = None
 
 
 @dataclass
