@@ -200,7 +200,7 @@ final class TaskAssignTest {
   func makeStream() -> AsyncStream<NonSendableKlass> {
     AsyncStream<NonSendableKlass> {
       self.stored // expected-warning {{assignment could allow for references between values exposed to code in the current isolation context and main actor-isolated code risking data races}}
-      // expected-named-note @-1 {{'self.stored.some' is exposed to main actor-isolated code}}
+      // expected-named-note @-1 {{'self.stored' is exposed to main actor-isolated code}}
       // expected-bare-note @-2 {{value is exposed to main actor-isolated code}}
       // expected-warning @-3 {{main actor-isolated property 'stored' cannot be accessed from outside of the actor; this is an error in the Swift 6 language mode}}
       // expected-warning @-4 {{non-Sendable type 'NonSendableKlass' of property 'stored' cannot exit main actor-isolated context; this is an error in the Swift 6 language mode}}
