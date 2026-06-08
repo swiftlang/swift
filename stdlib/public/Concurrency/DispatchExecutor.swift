@@ -72,6 +72,11 @@ class DispatchMainExecutor: RunLoopExecutor, SchedulingExecutor,
       }
     }
   }
+
+  @available(StdlibDeploymentTarget 9999, *)
+  internal var asSchedulingExecutor: (any SchedulingExecutor)? {
+    return self
+  }
 }
 
 @available(StdlibDeploymentTarget 9999, *)
@@ -126,6 +131,11 @@ class DispatchGlobalTaskExecutor: TaskExecutor, SchedulingExecutor,
           enqueue(job)
       }
     }
+  }
+
+  @available(StdlibDeploymentTarget 9999, *)
+  internal var asSchedulingExecutor: (any SchedulingExecutor)? {
+    return self
   }
 }
 

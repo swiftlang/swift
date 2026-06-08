@@ -335,6 +335,9 @@ extension CooperativeExecutor: SchedulingExecutor {
     }
   }
 
+  internal var asSchedulingExecutor: (any SchedulingExecutor)? {
+    return self
+  }
 }
 #endif
 

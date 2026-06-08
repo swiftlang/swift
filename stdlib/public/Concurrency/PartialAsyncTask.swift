@@ -353,7 +353,7 @@ public struct ExecutorJob: Sendable, ~Copyable {
   @_spi(ExperimentalCustomExecutors)
   @available(StdlibDeploymentTarget 6.3, *)
   @frozen
-  public struct Kind: Sendable, RawRepresentable {
+  public struct Kind: Sendable, RawRepresentable, Equatable {
     public typealias RawValue = UInt8
 
     /// The raw job kind value.
@@ -369,6 +369,13 @@ public struct ExecutorJob: Sendable, ~Copyable {
 
     // Job kinds >= 192 are private to the implementation.
     public static let firstReserved = Kind(rawValue: RawValue(192))!
+
+    static let defaultActorInline    = Kind(rawValue: RawValue(192))!
+    static let defaultActorSeparate  = Kind(rawValue: RawValue(193))!
+    static let defaultActorOverride  = Kind(rawValue: RawValue(194))!
+    static let nullaryContinuation   = Kind(rawValue: RawValue(195))!
+    static let isolatedDeinit        = Kind(rawValue: RawValue(196))!
+    static let scheduledContinuation = Kind(rawValue: RawValue(197))!
   }
 
   /// What kind of job this is.
@@ -547,11 +554,12 @@ extension ExecutorJob {
   ///
   /// If the job does not support allocation, this property will be `nil`.
   public var allocator: LocalAllocator? {
-    guard self.kind == .task else {
-      return nil
+    switch self.kind {
+      case .task, .nullaryContinuation, .scheduledContinuation:
+        return LocalAllocator(context: self.context)
+      default:
+        return nil
     }
-
-    return LocalAllocator(context: self.context)
   }
 
   /// A job-local stack-disciplined allocator.
