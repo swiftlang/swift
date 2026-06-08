@@ -618,6 +618,11 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
       Builder.getTypeExpansionContext());
   auto GenCalleeType = NewF->getLoweredFunctionType();
   auto SubstCalleeSILType = LoweredType;
+  auto FunctionTy = LoweredType.castTo<SILFunctionType>();
+  SILType errorType;
+  if (FunctionTy->hasErrorResult()) {
+    errorType = NewF->getConventions().getSILErrorType(Builder.getTypeExpansionContext());
+  }
   SubstitutionMap Subs;
   // Handle generic functions.
   if (GenCalleeType->isPolymorphic()) {
@@ -629,8 +634,10 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     SubstCalleeSILType = SILType::getPrimitiveObjectType(SubstCalleeType);
     SILFunctionConventions Conv(SubstCalleeType, M);
     ResultType = Conv.getSILResultType(Builder.getTypeExpansionContext());
+    if (FunctionTy->hasErrorResult()) {
+      errorType = Conv.getSILErrorType(Builder.getTypeExpansionContext());
+    }
   }
-  auto FunctionTy = LoweredType.castTo<SILFunctionType>();
   if (FunctionTy->hasErrorResult()) {
     // We need a try_apply to call a function with an error result.
     SILFunction *Thunk = ThunkBody->getParent();
@@ -638,9 +645,7 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
     ReturnValue =
         NormalBlock->createPhiArgument(ResultType, OwnershipKind::Owned);
     SILBasicBlock *ErrorBlock = Thunk->createBasicBlock();
-    SILType Error =
-        SILType::getPrimitiveObjectType(FunctionTy->getErrorResult().getInterfaceType());
-    auto *ErrorArg = ErrorBlock->createPhiArgument(Error, OwnershipKind::Owned);
+    auto *ErrorArg = ErrorBlock->createPhiArgument(errorType, OwnershipKind::Owned);
     Builder.createTryApply(Loc, FRI, Subs, ThunkArgs, NormalBlock, ErrorBlock);
 
     Builder.setInsertionPoint(ErrorBlock);
