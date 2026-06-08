@@ -44,3 +44,4 @@ struct ModulePass {
     runFunction(context)
   }
 }
+let topologicalOSSAElision = FunctionPass(name: "topological-ossa-elision") { function, context in TopologicalOSSAElision().run(on: function, context: context) }

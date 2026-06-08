@@ -9,5 +9,4 @@ target_sources(swiftSILOptimizer PRIVATE
   GlobalLoopARCSequenceDataflow.cpp
   RCStateTransition.cpp
   RCStateTransitionVisitors.cpp
-  RefCountState.cpp
-  TopologicalARCElision.cpp)
+  RefCountState.cpp)
