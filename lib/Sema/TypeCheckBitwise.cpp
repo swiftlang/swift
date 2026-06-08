@@ -349,6 +349,7 @@ bool DeriveImplicitBitwiseCopyableConformance::allowedForFile() {
     case SourceFileKind::DefaultArgument:
     case SourceFileKind::Main:
     case SourceFileKind::SIL:
+    case SourceFileKind::SyntheticMacro:
       return true;
     }
     llvm_unreachable("covered switch");

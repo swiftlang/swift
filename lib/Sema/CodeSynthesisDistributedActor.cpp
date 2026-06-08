@@ -654,6 +654,7 @@ addDistributedActorCodableConformance(
         case SourceFileKind::MacroExpansion:
         case SourceFileKind::SIL:
         case SourceFileKind::DefaultArgument:
+        case SourceFileKind::SyntheticMacro:
           break;
         }
       }

@@ -688,6 +688,8 @@ UNINTERESTING_FEATURE(BorrowingSequence)
 UNINTERESTING_FEATURE(AbstractStoredPropertyLayout)
 UNINTERESTING_FEATURE(FlowIsolationGlobalActor)
 
+UNINTERESTING_FEATURE(DeriveConformancesViaMacros)
+
 static bool usesFeatureBorrowInout(Decl *decl) {
   auto &ctx = decl->getASTContext();
 

@@ -621,6 +621,9 @@ EXPERIMENTAL_FEATURE(StrictAccessControl, true)
 /// non-resilient modules. Layout will be encoded in the .swiftmodule.
 EXPERIMENTAL_FEATURE(AbstractStoredPropertyLayout, false)
 
+/// Allow use of macros to derive various conformances
+EXPERIMENTAL_FEATURE(DeriveConformancesViaMacros, false)
+  
 /// Defer checking of global-actor-isolated initializers (and the
 /// global-actor-isolated stored properties they access) from Sema to the
 /// SIL-level flow-isolation pass, allowing more programs to be accepted.
