@@ -50,6 +50,7 @@
 #include "swift/Parse/ParseDeclName.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/IDETypeChecking.h"
+#include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclObjC.h"
 #include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -147,6 +148,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       if (auto *KPE = dyn_cast<KeyPathExpr>(E))
         checkForInvalidKeyPath(KPE);
+
+      // Verify that a 'super' call does not target a pure virtual C++ method.
+      if (auto selfApply = dyn_cast<SelfApplyExpr>(E))
+        checkSuperCallToPureVirtualCXXMethod(selfApply);
 
       // Check function calls, looking through implicit conversions on the
       // function and inspecting the arguments directly.
@@ -341,6 +346,34 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
       return Action::Continue(E);
+    }
+
+    /// A `super` call statically dispatches to the base class implementation.
+    /// A pure virtual C++ method of a foreign reference type has none.
+    void checkSuperCallToPureVirtualCXXMethod(SelfApplyExpr *selfApply) {
+      if (!selfApply->getBase()->isSuperExpr())
+        return;
+
+      auto func = dyn_cast_or_null<FuncDecl>(
+          selfApply->getCalledValue(/*skipFunctionConversions=*/true));
+      if (!func)
+        return;
+
+      auto classDecl = func->getDeclContext()->getSelfClassDecl();
+      if (!classDecl || !classDecl->isForeignReferenceType())
+        return;
+
+      auto clangImporter = Ctx.getClangModuleLoader();
+      auto original = clangImporter->getOriginalForVirtualThunk(func);
+      if (!original)
+        return;
+
+      if (auto methodDecl = dyn_cast_or_null<clang::CXXMethodDecl>(
+              original->getClangDecl())) {
+        if (methodDecl->isPureVirtual())
+          Ctx.Diags.diagnose(selfApply->getFn()->getLoc(),
+                             diag::cxx_super_pure_virtual_call, func);
+      }
     }
 
     /// Visit each component of the keypath and emit a diagnostic if they

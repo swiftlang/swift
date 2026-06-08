@@ -8019,6 +8019,14 @@ ValueDecl *ClangImporter::Implementation::getOriginalForClonedMember(
   return nullptr;
 }
 
+FuncDecl *ClangImporter::Implementation::getOriginalForVirtualThunk(
+    const FuncDecl *decl) {
+  auto result = virtualThunkToOriginal.find(decl);
+  if (result != virtualThunkToOriginal.end())
+    return result->getSecond();
+  return nullptr;
+}
+
 bool ClangImporter::Implementation::isMemberSynthesizedPerType(
     const ValueDecl *decl) {
   return membersSynthesizedPerType.contains(decl);
@@ -8037,6 +8045,11 @@ ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
 
 ValueDecl *ClangImporter::getOriginalForClonedMember(const ValueDecl *decl) {
   return Impl.getOriginalForClonedMember(decl);
+}
+
+FuncDecl *
+ClangImporter::getOriginalForVirtualThunk(const FuncDecl *decl) {
+  return Impl.getOriginalForVirtualThunk(decl);
 }
 
 ValueDecl *ClangImporter::getCalledBaseCxxMethod(const ValueDecl *decl) {

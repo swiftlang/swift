@@ -4776,15 +4776,26 @@ namespace {
             // side is mapped from `T*` on the C++ side, an invocation of a
             // virtual method `t->method()` should get dispatched dynamically.
             // Create a thunk that will perform dynamic dispatch.
-            // TODO: we don't have to import the actual `method` in this case,
-            // we can just synthesize a thunk and import that instead.
 
             llvm::SmallString<64> swiftName;
             funcDecl->getName().getString(swiftName);
             FuncDecl *result =
                 synthesizer.makeVirtualMethod(decl, swiftName.str());
 
+            // A `super.virtualMethod()` call should instead statically dispatch
+            // to the base class implementation. Store the original method, so
+            // SILGen can substitute it for super calls.
             if (result) {
+              SmallString<64> staticCallName("__staticCall_");
+              staticCallName += swiftName;
+
+              // Rename the original method to make sure it gets a distinct
+              // mangled name from the thunk.
+              funcDecl->setName(
+                  DeclName(Impl.SwiftContext,
+                           Impl.SwiftContext.getIdentifier(staticCallName),
+                           funcDecl->getName().getArgumentNames()));
+              Impl.virtualThunkToOriginal[result] = funcDecl;
               return result;
             }
             Impl.markUnavailable(funcDecl,

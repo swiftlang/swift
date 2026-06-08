@@ -124,6 +124,12 @@ module SuperStaticDispatch {
   export *
 }
 
+module SuperVirtualDispatch {
+  header "super-virtual-dispatch.h"
+  requires cplusplus
+  export *
+}
+
 module ImmortalFRTHashable {
   header "immortal-frt-hashable.h"
   requires cplusplus
