@@ -434,7 +434,8 @@ extension MutableSpan where Element: ~Copyable {
     @_transparent
     @_unsafeSelfDependentResult
     borrow {
-      Builtin.borrowAt(unsafe _unsafeAddressOfElement(unchecked: position))
+      unsafe UnsafePointer<Element>(
+        _unsafeAddressOfElement(unchecked: position)).pointee
     }
     @_transparent
     @_unsafeSelfDependentResult
