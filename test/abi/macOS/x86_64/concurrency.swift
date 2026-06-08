@@ -462,3 +462,7 @@ Added: _$sSct8_rawTasks06_AsyncB0VvpMV
 
 /// Expose async task name offset in debug header.
 Added: __swift_concurrency_debug_asyncTaskNameOffset
+
+/// Task::_sleep is now @usableFromInline
+Added: _$sScTss5NeverORszABRs_rlE6_sleep5until9tolerance5clocky7InstantQyd___8DurationQyd__Sgqd__tYaKs5ClockRd__lFZ
+Added: _$sScTss5NeverORszABRs_rlE6_sleep5until9tolerance5clocky7InstantQyd___8DurationQyd__Sgqd__tYaKs5ClockRd__lFZTu

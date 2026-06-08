@@ -77,7 +77,8 @@ fileprivate func durationComponents<C: Clock>(for duration: C.Duration, clock: C
 @_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
   @available(StdlibDeploymentTarget 5.7, *)
-  internal static func _sleep<C: Clock>(
+  @usableFromInline
+  internal static nonisolated(nonsending) func _sleep<C: Clock>(
     until instant: C.Instant,
     tolerance: C.Duration?,
     clock: C
