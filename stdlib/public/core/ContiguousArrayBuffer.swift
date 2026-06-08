@@ -537,7 +537,7 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     _internalInvariant(i >= 0 && i < count, "Array index out of range")
     let addr = unsafe UnsafePointer<Element>(
       Builtin.projectTailElems(immutableStorage, Element.self))
-    return unsafe addr[i]
+    return unsafe addr.project(i).pointee
   }
 
   /// The storage of an immutable buffer.
@@ -629,8 +629,9 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       // firstElementAddress[i] = newValue
       var nv = newValue
       let tmp = nv
-      nv = unsafe firstElementAddress[i]
-      unsafe firstElementAddress[i] = tmp
+      let elemAddr = unsafe firstElementAddress.project(i)
+      nv = unsafe elemAddr.pointee
+      unsafe elemAddr.pointee = tmp
     }
   }
 
