@@ -194,8 +194,8 @@ extension MainActorIsolatedEnum {
     case .second(let ns):
       return ns
     }
-  } // expected-warning {{sending 'ns.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+  } // expected-warning {{sending 'ns' risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{main actor-isolated 'ns' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   func testSwitchReturnNoTransfer() -> NonSendableKlass? {
     switch self {
@@ -211,8 +211,8 @@ extension MainActorIsolatedEnum {
       return ns // TODO: The error below should be here.
     }
     return nil
-  } // expected-warning {{sending 'ns.some' risks causing data races}}
-  // expected-note @-1 {{main actor-isolated 'ns.some' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
+  } // expected-warning {{sending 'ns' risks causing data races; this is an error in the Swift 6 language mode}}
+  // expected-note @-1 {{main actor-isolated 'ns' cannot be a 'sending' result. main actor-isolated uses may race with caller uses}}
 
   func testIfLetReturnNoTransfer() -> NonSendableKlass? {
     if case .second(let ns) = self {

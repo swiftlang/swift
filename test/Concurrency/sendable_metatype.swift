@@ -138,8 +138,8 @@ func acceptSendingAnyObjectR(_ s: sending AnyObject & R) { }
   acceptSendingP(t) // expected-warning{{sending 't' risks causing data races}}
   // expected-note@-1{{main actor-isolated 't' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
   // expected-note@-2{{isolated conformance to protocol 'P' can be introduced he}}
-  acceptSendingAnyObjectP(u) // expected-warning{{sending value of non-Sendable type 'U' risks causing data races}}
-  // expected-note@-1{{Passing main actor-isolated value of non-Sendable type 'U' as a 'sending' parameter to global function 'acceptSendingAnyObjectP' risks causing races inbetween main actor-isolated uses and uses reachable from 'acceptSendingAnyObjectP'}}
+  acceptSendingAnyObjectP(u) // expected-warning{{sending 'u' risks causing data races}}
+  // expected-note@-1{{main actor-isolated 'u' is passed as a 'sending' parameter; Uses in callee may race with later main actor-isolated uses}}
   // expected-note@-2{{isolated conformance to protocol 'P' can be introduced here}}
   // All of these are okay, because there are no isolated conformances to R.
   acceptSendingR(S())
