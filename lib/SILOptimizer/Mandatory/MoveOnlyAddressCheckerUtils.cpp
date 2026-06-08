@@ -1052,6 +1052,11 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     }
   }
 
+  // A stored borrow is always initialized.
+  if (isa<StoreBorrowInst>(operand)) {
+    return true;
+  }
+
   // A read or write access always begins on an initialized value.
   if (auto access = dyn_cast<BeginAccessInst>(operand)) {
     switch (access->getAccessKind()) {
