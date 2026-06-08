@@ -427,7 +427,7 @@ public nonisolated(nonsending) func withCheckedThrowingContinuation<T>( // nonse
 }
 
 /// Source-compatibility overload; replaced by
-/// ``withCheckedThrowingContinuation(function:_:)``.
+/// ``withCheckedThrowingContinuation(function:_:)-(_,(CheckedContinuation<T,E>)->Void)``.
 @inlinable
 @available(SwiftStdlib 5.1, *)
 @backDeployed(before: SwiftStdlib 6.0)
