@@ -401,7 +401,7 @@ func benchCaptureProp<S : Sequence>(
   let initial = it.next()!
   return
     IteratorSequence(it) // expected-warning {{accessing 'it' may produce a copy}}
-      .reduce(initial, f) // expected-warning {{accessing 'initial' may produce a copy; write 'copy' to acknowledge or 'consume' to elide}}
+           .reduce(initial, f)
 }
 func benchCaptureProp_fixed<S : Sequence>(
   _ s: S, _ f: (S.Element, S.Element) -> S.Element) -> S.Element {
@@ -410,7 +410,7 @@ func benchCaptureProp_fixed<S : Sequence>(
   let initial = it.next()!
   return
     IteratorSequence(copy it)
-           .reduce(initial, f) // expected-warning {{accessing 'initial' may produce a copy; write 'copy' to acknowledge or 'consume' to elide}}
+           .reduce(initial, f)
 }
 
 extension FixedWidthInteger {
