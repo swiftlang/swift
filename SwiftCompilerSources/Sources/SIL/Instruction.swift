@@ -950,6 +950,15 @@ public protocol IndexingInstruction: SingleValueInstruction {
 extension IndexingInstruction {
   public var base: Value { operands[0].value }
   public var index: Value { operands[1].value }
+
+  public var constantIndex: Int? {
+    if let literal = index as? IntegerLiteralInst,
+       let indexValue = literal.value
+    {
+      return indexValue
+    }
+    return nil
+  }
 }
 
 final public

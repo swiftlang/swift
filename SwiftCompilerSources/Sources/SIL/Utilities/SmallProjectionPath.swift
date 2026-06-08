@@ -216,23 +216,6 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
   /// For example, pushing `s0` to `c3.e1` returns `s0.c3.e1`.
   public func push(_ kind: FieldKind, index: Int = 0) -> SmallProjectionPath {
     assert(kind != .anything || bytes == 0, "'anything' only allowed in last path component")
-    if (kind.isIndexedElement) {
-      let (k, i, numBits) = top
-      if kind == .indexedElement {
-        if index == 0 {
-          // Ignore zero indices
-          return self
-        }
-        if k == .indexedElement && index &+ i >= 0 {
-          // "Merge" two constant successive indexed elements
-          return pop(numBits: numBits).push(.indexedElement, index: index + i)
-        }
-      }
-      // "Merge" two successive indexed elements which doesn't have a constant result
-      if (k.isIndexedElement) {
-        return pop(numBits: numBits).push(.anyIndexedElement)
-      }
-    }
     var idx = index
     var b = bytes
     if (b >> 56) != 0 {
@@ -254,10 +237,6 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
   /// Returns the index of the component and the new path or - if not matching - returns nil.
   public func pop(kind: FieldKind) -> (index: Int, path: SmallProjectionPath)? {
     let (k, idx, newPath) = pop()
-    if k == .anyIndexedElement {
-      // Skip a non-constant index, because the index could be 0.
-      return newPath.pop(kind: kind)
-    }
     if k != kind { return nil }
     return (idx, newPath)
   }
@@ -291,9 +270,9 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
         return nil
       case .anyIndexedElement:
         if kind.isIndexedElement {
-          return self
+          return pop(numBits: numBits)
         }
-        return pop(numBits: numBits).popIfMatches(kind, index: index)
+        return nil
       case kind:
         if let i = index {
           if i != idx { return nil }
@@ -414,7 +393,11 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
         if !kind.isClassField { return false }
         return subPath.matches(pattern: subPattern)
       case .anyIndexedElement:
-        return popIndexedElements().matches(pattern: subPattern)
+        let (kind, _, subPath) = pop()
+        if !kind.isIndexedElement {
+          return false
+        }
+        return subPath.matches(pattern: subPattern)
       case .structField, .tupleField, .enumCase, .classField, .tailElements, .indexedElement, .existential, .vectorBase:
         let (kind, index, subPath) = pop()
         if kind != patternKind || index != patternIdx { return false }
@@ -444,13 +427,8 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
       }
       return subPath.push(lhsKind, index: lhsIdx)
     }
-    if lhsKind.isIndexedElement || rhsKind.isIndexedElement {
-      let subPath = popIndexedElements().merge(with: rhs.popIndexedElements())
-      let subPathTopKind = subPath.top.kind
-      assert(!subPathTopKind.isIndexedElement)
-      if subPathTopKind == .anything || subPathTopKind == .anyValueFields {
-        return subPath
-      }
+    if lhsKind.isIndexedElement && rhsKind.isIndexedElement {
+      let subPath = pop(numBits: lhsBits).merge(with: rhs.pop(numBits: rhsBits))
       return subPath.push(.anyIndexedElement)
     }
     if lhsKind.isValueField || rhsKind.isValueField {
@@ -487,26 +465,16 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
     if lhsKind == .anything || rhsKind == .anything {
       return true
     }
-    if lhsKind == .anyIndexedElement || rhsKind == .anyIndexedElement {
-      return popIndexedElements().mayOverlap(with: rhs.popIndexedElements())
-    }
     if lhsKind == .anyValueFields || rhsKind == .anyValueFields {
       return popAllValueFields().mayOverlap(with: rhs.popAllValueFields())
     }
     if (lhsKind == rhsKind && lhsIdx == rhsIdx) ||
        (lhsKind == .anyClassField && rhsKind.isClassField) ||
-       (lhsKind.isClassField && rhsKind == .anyClassField)
+       (lhsKind.isClassField && rhsKind == .anyClassField) ||
+       (lhsKind == .anyIndexedElement && rhsKind.isIndexedElement) ||
+       (lhsKind.isIndexedElement && rhsKind == .anyIndexedElement)
     {
-      let poppedPath = pop(numBits: lhsBits)
-      let rhsPoppedPath = rhs.pop(numBits: rhsBits)
-      // Check for the case of overlapping the first element of a vector with another element.
-      // Note that the index of `.indexedElement` cannot be 0.
-      if (poppedPath.isEmpty && rhsPoppedPath.pop().kind == .indexedElement) ||
-         (rhsPoppedPath.isEmpty && poppedPath.pop().kind == .indexedElement)
-      {
-        return false
-      }
-      return poppedPath.mayOverlap(with: rhsPoppedPath)
+      return pop(numBits: lhsBits).mayOverlap(with: rhs.pop(numBits: rhsBits))
     }
     return false
   }
@@ -720,20 +688,19 @@ let smallProjectionPathTest = Test("small_projection_path") {
     assert(p5.pop().path.isEmpty)
     let p6 = SmallProjectionPath(.indexedElement, index: 1).push(.indexedElement, index: 2)
     let (k6, i6, p7) = p6.pop()
-    assert(k6 == .indexedElement && i6 == 3 && p7.isEmpty)
+    assert(k6 == .indexedElement && i6 == 2 && p7 == SmallProjectionPath(.indexedElement, index: 1))
     let p8 = SmallProjectionPath(.indexedElement, index: 0)
-    assert(p8.isEmpty)
+    assert(p8.pop() == (.indexedElement, 0, SmallProjectionPath()))
     let p9 = SmallProjectionPath(.indexedElement, index: 1).push(.anyIndexedElement)
     let (k9, i9, p10) = p9.pop()
-    assert(k9 == .anyIndexedElement && i9 == 0 && p10.isEmpty)
+    assert(k9 == .anyIndexedElement && i9 == 0 && p10 == SmallProjectionPath(.indexedElement, index: 1))
     let p11 = SmallProjectionPath(.anyIndexedElement).push(.indexedElement, index: 1)
     let (k11, i11, p12) = p11.pop()
-    assert(k11 == .anyIndexedElement && i11 == 0 && p12.isEmpty)
+    assert(k11 == .indexedElement && i11 == 1 && p12 == SmallProjectionPath(.anyIndexedElement))
 
     let p13 = SmallProjectionPath(.structField, index: 1).push(.anyIndexedElement)
-    let (i13, p14) = p13.pop(kind: .structField)!
-    assert(i13 == 1 && p14.isEmpty)
-    assert(p13.pop(kind: .indexedElement) == nil)
+    let (k13, i13, p14) = p13.pop()
+    assert(k13 == .anyIndexedElement && i13 == 0 && p14 == SmallProjectionPath(.structField, index: 1))
   }
 
   func parsing() {
@@ -785,7 +752,7 @@ let smallProjectionPathTest = Test("small_projection_path") {
     testMerge("ct",       "c2",     expect: "c*")
     testMerge("i1",       "i2",     expect: "i*")
     testMerge("i*",       "i2",     expect: "i*")
-    testMerge("s0.i*.e3", "s0.e3",  expect: "s0.i*.e3")
+    testMerge("s0.i*.e3", "s0.e3",  expect: "s0.v**")
     testMerge("i*",       "v**",    expect: "v**")
     testMerge("s0.b.i1",  "s0.b.i0", expect: "s0.b.i*")
     testMerge("s0.b",     "s0.1",   expect: "s0.v**")
@@ -862,8 +829,8 @@ let smallProjectionPathTest = Test("small_projection_path") {
     testMatch("s0.v**", "s0.**",    expect: true)
     testMatch("s1.v**", "s0.**",    expect: false)
     testMatch("s0.**", "s0.v**",    expect: false)
-    testMatch("s0.s1", "s0.i*.s1",  expect: true)
-    testMatch("s0.b.s1", "s0.b.i*.s1",  expect: true)
+    testMatch("s0.s1", "s0.i*.s1",  expect: false)
+    testMatch("s0.b.s1", "s0.b.i*.s1",  expect: false)
   }
 
   func testMatch(_ lhsStr: String, _ rhsStr: String, expect: Bool) {
@@ -897,13 +864,13 @@ let smallProjectionPathTest = Test("small_projection_path") {
 
     testOverlap("i1", "i*",                 expect: true)
     testOverlap("i1", "v**",                expect: true)
-    testOverlap("s0.i*.s1", "s0.s1",        expect: true)
-    testOverlap("s0.b.s1", "s0.b.i*.s1",    expect: true)
+    testOverlap("s0.i*.s1", "s0.s1",        expect: false)
+    testOverlap("s0.b.s1", "s0.b.i*.s1",    expect: false)
     testOverlap("s0.b.i0.s1", "s0.b.i1.s1", expect: false)
     testOverlap("s0.b.i2.s1", "s0.b.i1.s1", expect: false)
-    testOverlap("s0.b.s1", "s0.b.i0.s1",    expect: true)
-    testOverlap("s0.b", "s0.b.i1",          expect: false)
-    testOverlap("s0.b.i1", "s0.b",          expect: false)
+    testOverlap("s0.b.s1", "s0.b.i0.s1",    expect: false)
+    testOverlap("s0.b", "s0.b.i1",          expect: true)
+    testOverlap("s0.b.i1", "s0.b",          expect: true)
     testOverlap("s0.b.i1", "s0",            expect: true)
   }
 
@@ -966,9 +933,9 @@ let smallProjectionPathTest = Test("small_projection_path") {
     testPath2Path("**",     { $0.popIfMatches(.anyClassField) }, expect: "**")
     testPath2Path("c*.e3",  { $0.popIfMatches(.anyClassField) }, expect: "e3")
 
-    testPath2Path("i*.e3.s0", { $0.popIfMatches(.enumCase, index: 3) }, expect: "s0")
+    testPath2Path("i*.e3.s0", { $0.popIfMatches(.enumCase, index: 3) }, expect: nil)
     testPath2Path("i1.e3.s0", { $0.popIfMatches(.enumCase, index: 3) }, expect: nil)
-    testPath2Path("i*.e3.s0", { $0.popIfMatches(.indexedElement, index: 0) }, expect: "i*.e3.s0")
+    testPath2Path("i*.e3.s0", { $0.popIfMatches(.indexedElement, index: 0) }, expect: "e3.s0")
   }
 
   func testPath2Path(_ pathStr: String, _ transform: (SmallProjectionPath) -> SmallProjectionPath?, expect: String?) {
@@ -999,6 +966,6 @@ let smallProjectionPathTest = Test("small_projection_path") {
 
     let p4 = p3.push(.indexedElement, index: Int.max)
     let (k4, _, s4) = p4.pop()
-    assert(k4 == .anyIndexedElement && s4.isEmpty)
+    assert(k4 == .anything && s4.isEmpty)
   }
 }
