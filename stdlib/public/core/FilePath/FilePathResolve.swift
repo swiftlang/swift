@@ -16,6 +16,11 @@ import Darwin
 #elseif os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)
 import Glibc
 #endif
+#else
+// Stdlib build: SwiftShims supplies `_swift_stdlib_FilePath_resolve` (the
+// platform-specific resolve syscall, in stubs/FilePathStubs.cpp),
+// `_swift_stdlib_free`, and `__swift_size_t`.
+import SwiftShims
 #endif
 
 // MARK: - Internal error type
@@ -51,25 +56,48 @@ extension FilePath {
     return try _resolveLinux()
 #endif
 #else
-    // Stdlib port stub: reaching the real syscalls from swiftCore needs a
-    // shim that is not wired yet. Throw rather than trap so the public
-    // API is shippable in the port branch.
-    throw _FilePathResolveError(code: -1)
+    // Stdlib port: dispatch to the runtime stub, which is the only place in
+    // the stdlib build that imports platform headers. See
+    // `swift/stdlib/public/SwiftShims/swift/shims/FilePath.h` and
+    // `swift/stdlib/public/stubs/FilePathStubs.cpp`.
+    return try _resolveViaStdlibStub()
 #endif
   }
 }
 
-#if FILEPATH_PACKAGE
+#if !FILEPATH_PACKAGE
 
 @available(SwiftStdlib 9999, *)
 extension FilePath {
-  // Build a FilePath from `count` platform code units starting at `ptr`.
-  // The bytes must already be a valid path (no embedded NUL); the result
-  // is fed through `_normalizing`, which canonicalizes whatever
-  // per-platform anchor / suffix the bytes happen to express. One
-  // allocation (the `_SystemString` storage) plus one bulk copy — the
-  // backing `Array` is sized exactly and filled in place rather than via
-  // per-element `append`.
+  fileprivate func _resolveViaStdlibStub() throws -> FilePath {
+    var outBuf: UnsafeMutablePointer<FilePath.CodeUnit>? = nil
+    var outCount: __swift_size_t = 0
+    let err: CInt = unsafe self.withCodeUnits { ptr, count in
+      unsafe _swift_stdlib_FilePath_resolve(
+        ptr, __swift_size_t(count), &outBuf, &outCount)
+    }
+    guard err == 0, let resultBuf = unsafe outBuf else {
+      throw _FilePathResolveError(code: err)
+    }
+    defer { unsafe _swift_stdlib_free(resultBuf) }
+    return unsafe FilePath(
+      _normalizingRawCodeUnits: UnsafeRawPointer(resultBuf),
+      count: Int(outCount))
+  }
+}
+
+#endif // !FILEPATH_PACKAGE
+
+// Build a FilePath from `count` platform code units starting at `ptr`.
+// The bytes must already be a valid path (no embedded NUL); the result
+// is fed through `_normalizing`, which canonicalizes whatever
+// per-platform anchor / suffix the bytes happen to express. One
+// allocation (the `_SystemString` storage) plus one bulk copy — the
+// backing `Array` is sized exactly and filled in place rather than via
+// per-element `append`. Used by both the package-side per-platform
+// `_resolve*` impls and the stdlib-side `_resolveViaStdlibStub`.
+@available(SwiftStdlib 9999, *)
+extension FilePath {
   fileprivate init(
     _normalizingRawCodeUnits ptr: UnsafeRawPointer,
     count: Int
@@ -89,6 +117,8 @@ extension FilePath {
     self.init(_normalizing: _SystemString(nullTerminated: chars))
   }
 }
+
+#if FILEPATH_PACKAGE
 
 // MARK: - Per-platform implementation
 //

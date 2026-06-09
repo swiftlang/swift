@@ -21,22 +21,25 @@ extension FilePath {
       self._path = _path
       self._end = _end
     }
+  }
+}
 
-    internal var _slice: _SystemString.SubSequence {
-      _internalInvariant(_end >= _path._storage.startIndex && _end <= _path._storage.endIndex)
-      return _path._storage[_path._storage.startIndex..<_end]
-    }
+@available(SwiftStdlib 9999, *)
+extension FilePath.Anchor {
+  internal var _slice: _SystemString.SubSequence {
+    _internalInvariant(_end >= _path._storage.startIndex && _end <= _path._storage.endIndex)
+    return _path._storage[_path._storage.startIndex..<_end]
+  }
 
-    /// Whether this anchor is rooted.
-    @available(SwiftStdlib 9999, *)
-    public var isRooted: Bool {
-      guard _isWindows else { return true }
+  /// Whether this anchor is rooted.
+  @available(SwiftStdlib 9999, *)
+  public var isRooted: Bool {
+    guard _isWindows else { return true }
 
-      // On Windows, the only non-rooted anchor is drive-relative `C:`
-      // (relative to the CWD on that drive). Everything else — `\`,
-      // `C:\`, `\\server\share`, `\\?\...` — is rooted.
-      return !_isDriveRelativeAnchor(_slice)
-    }
+    // On Windows, the only non-rooted anchor is drive-relative `C:`
+    // (relative to the CWD on that drive). Everything else — `\`,
+    // `C:\`, `\\server\share`, `\\?\...` — is rooted.
+    return !_isDriveRelativeAnchor(_slice)
   }
 }
 
@@ -164,6 +167,7 @@ extension FilePath.Anchor: ExpressibleByStringLiteral {
 /// non-empty share; device (`\\.\`) needs a non-empty device name; verbatim
 /// (`\\?\`) needs a non-empty component after the prefix. Traditional roots
 /// (`\`, `C:`, `C:\`) carry no separate name and are never rejected here.
+@available(SwiftStdlib 9999, *)
 private func _isIncompleteWindowsNamedAnchor(
   _ anchorBytes: Slice<_SystemString>
 ) -> Bool {

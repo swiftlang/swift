@@ -71,6 +71,7 @@ extension MutableCollection where Element: Equatable {
 
 // MARK: - ASCII byte conversion
 
+@available(SwiftStdlib 9999, *)
 extension String {
   /// A view over the string's bytes as `FilePath.CodeUnit`s, lazily mapped.
   ///

@@ -25,6 +25,7 @@ public struct FilePath: Sendable {
   }
 }
 
+@available(SwiftStdlib 9999, *)
 extension FilePath {
   // Normalizing init: the funnel for all path construction.
   //
@@ -57,6 +58,7 @@ extension FilePath {
 
 // MARK: - Per-platform normalization
 
+@available(SwiftStdlib 9999, *)
 private func _normalizeLinux(_ str: _SystemString) -> FilePath {
   _internalInvariant(_isLinux)
   var s = str
@@ -70,6 +72,7 @@ private func _normalizeLinux(_ str: _SystemString) -> FilePath {
   return FilePath(_storage: result)
 }
 
+@available(SwiftStdlib 9999, *)
 private func _normalizeWindows(_ str: _SystemString) -> FilePath {
   var s = str
   s._normalizeSeparators()
@@ -92,6 +95,7 @@ private func _normalizeWindows(_ str: _SystemString) -> FilePath {
   return FilePath(_storage: result)
 }
 
+@available(SwiftStdlib 9999, *)
 private func _normalizeDarwin(_ str: _SystemString) -> FilePath {
   // Coalesce separators across the whole string first, then canonicalize
   // the anchor and parse the anchor / resource-fork suffix boundaries on
