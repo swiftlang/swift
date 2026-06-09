@@ -3238,10 +3238,14 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
       });
 
   // If the struct is always noncopyable, we must honor that.
-  if (layout.flags.isCopyable() &&
-      structType->getDescription()->isUnconditionallySuppressing(
-          InvertibleProtocolKind::Copyable))
+  if (structType->getDescription()->isUnconditionallySuppressing(
+          InvertibleProtocolKind::Copyable)) {
     layout.flags = layout.flags.withCopyable(false);
+    // Unconditionally ~Copyable types may have a user-defined deinit.
+    // Mark as non-POD to avoid optimizations which may skip calling that
+    // deinit.
+    layout.flags = layout.flags.withPOD(false);
+  }
 
   // We have extra inhabitants if any element does. Use the field with the most.
   unsigned extraInhabitantCount = 0;
