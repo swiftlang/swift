@@ -59,32 +59,31 @@ let pathTestCases: [PathTestCase] = [
             printed: #"\"#, isAbsolute: false, isRooted: true)
     ),
 
-    // Unix: "//" coalesces to "/". Redundant root separator, NOT a trailing sep.
-    // Windows: degenerate UNC (two backslashes, no server). Behavior TBD.
-    //
-    // PathTestCase(
-    //     input: "//",
-    //     unix: Expected(
-    //         anchor: "/", components: [],
-    //         printed: "/", isAbsolute: true),
-    //     windows: Expected(
-    //         // TODO: Degenerate UNC. Does this parse as \ with no server?
-    //         // As \ (rooted) + trailing sep? As something else entirely?
-    //         ...)
-    // ),
+    // Multiple slashes coalesce on Unix; Windows lowers them through `/`→`\`
+    // conversion and then incomplete-UNC handling.
 
-    // Unix: "///" coalesces to "/". Same as "//".
-    // Windows: three backslashes. Behavior TBD (related to degenerate UNC).
-    //
-    // PathTestCase(
-    //     input: "///",
-    //     unix: Expected(
-    //         anchor: "/", components: [],
-    //         printed: "/", isAbsolute: true),
-    //     windows: Expected(
-    //         // TODO: Degenerate. \\\  -> \ + trailing? Just \?
-    //         ...)
-    // ),
+    PathTestCase(
+        input: "//",
+        unix: Expected(
+            anchor: "/", components: [],
+            printed: "/", isAbsolute: true),
+        windows: Expected(
+            // `//` -> `\\` -> incomplete UNC, padded to `\\\` (degraded root).
+            anchor: #"\\\"#, components: [],
+            printed: #"\\\"#, isAbsolute: true)
+    ),
+
+    PathTestCase(
+        input: "///",
+        unix: Expected(
+            anchor: "/", components: [],
+            printed: "/", isAbsolute: true),
+        windows: Expected(
+            // `///` -> `\\\`: 3+ leading backslashes are NOT a UNC/device
+            // path; reduce to a single current-drive root.
+            anchor: #"\"#, components: [],
+            printed: #"\"#, isAbsolute: false, isRooted: true)
+    ),
 
     // MARK: - Basic absolute Unix paths
 
@@ -2312,57 +2311,54 @@ let pathTestCases: [PathTestCase] = [
             printed: #"C:\foo\bar\"#, isAbsolute: true, driveLetter: "C")
     ),
 
-    // MARK: - Degenerate Windows paths (TBD)
+    // MARK: - Degenerate Windows UNC / device paths
     //
-    // These paths start with "\\" (UNC/device prefix) but are incomplete.
-    // Commented out until we settle the behavior.
-    //
-    // PathTestCase(
-    //     input: #"\\server"#,
-    //     // UNC with server but no share. Anchor? Fallback to \ + "server"?
-    //     unix: .singleComponent(#"\\server"#),
-    //     windows: Expected(/* TODO: TBD */ ...)
-    // ),
-    //
-    // PathTestCase(
-    //     input: #"\\server\"#,
-    //     // Server + trailing sep but no share name.
-    //     unix: .singleComponent(#"\\server\"#),
-    //     windows: Expected(/* TODO: TBD */ ...)
-    // ),
-    //
-    // PathTestCase(
-    //     input: #"\\"#,
-    //     // Bare double backslash. Same question as "//" on Unix.
-    //     unix: .singleComponent(#"\\"#),
-    //     windows: Expected(/* TODO: TBD */ ...)
-    // ),
-    //
-    // PathTestCase(
-    //     input: #"\\."#,
-    //     // Incomplete device prefix.
-    //     unix: .singleComponent(#"\\."#),
-    //     windows: Expected(/* TODO: TBD */ ...)
-    // ),
-    //
-    // PathTestCase(
-    //     input: #"\\?"#,
-    //     // Incomplete verbatim prefix.
-    //     unix: .singleComponent(#"\\?"#),
-    //     windows: Expected(/* TODO: TBD */ ...)
-    // ),
-    //
-    // PathTestCase(
-    //     input: #"\\server\share\\foo"#,
-    //     // Double sep between share and first component.
-    //     unix: .singleComponent(#"\\server\share\\foo"#),
-    //     windows: Expected(/* TODO: probably \\server\share + ["foo"] coalesced */ ...)
-    // ),
-    //
-    // PathTestCase(
-    //     input: #"\\srv\\share\foo"#,
-    //     // Double sep between server and share.
-    //     unix: .singleComponent(#"\\srv\\share\foo"#),
-    //     windows: Expected(/* TODO: TBD */ ...)
-    // ),
+    // These start with `\\` but are incomplete or have doubled separators.
+    // Each is well-defined: the parser pads incomplete UNC forms with a
+    // synthesized backslash and coalesces interior doubled separators.
+
+    PathTestCase(
+        input: #"\\server"#,
+        // Incomplete UNC: server with no share. Padded to `\\server\`.
+        unix: .singleComponent(#"\\server"#),
+        windows: Expected(
+            anchor: #"\\server\"#, components: [],
+            printed: #"\\server\"#, isAbsolute: true)
+    ),
+
+    PathTestCase(
+        input: #"\\server\"#,
+        // Server with empty share — same final form as `\\server`.
+        unix: .singleComponent(#"\\server\"#),
+        windows: Expected(
+            anchor: #"\\server\"#, components: [],
+            printed: #"\\server\"#, isAbsolute: true)
+    ),
+
+    PathTestCase(
+        input: #"\\"#,
+        // Bare double backslash: padded to a degraded `\\\` root.
+        unix: .singleComponent(#"\\"#),
+        windows: Expected(
+            anchor: #"\\\"#, components: [],
+            printed: #"\\\"#, isAbsolute: true)
+    ),
+
+    PathTestCase(
+        input: #"\\server\share\\foo"#,
+        // Doubled separator between share and first component coalesces.
+        unix: .singleComponent(#"\\server\share\\foo"#),
+        windows: Expected(
+            anchor: #"\\server\share"#, components: ["foo"],
+            printed: #"\\server\share\foo"#, isAbsolute: true)
+    ),
+
+    PathTestCase(
+        input: #"\\srv\\share\foo"#,
+        // Doubled separator between server and share coalesces.
+        unix: .singleComponent(#"\\srv\\share\foo"#),
+        windows: Expected(
+            anchor: #"\\srv\share"#, components: ["foo"],
+            printed: #"\\srv\share\foo"#, isAbsolute: true)
+    ),
 ]
