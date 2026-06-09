@@ -27,6 +27,20 @@ extension BridgedASTContext {
   }
 }
 
+/// Distinguishes the canonical, parser-driven evaluation of `#if canImport`
+/// from the side-effect-free queries performed by later analyses.
+enum CanImportMode {
+  /// Run the live module-loader query, emit any
+  /// `cannot_find_module_version` diagnostics, and record the result in
+  /// `ASTContext::CanImportModuleVersions`.
+  case driving
+
+  /// Side-effect-free queries: answer from the module loaders without
+  /// emitting diagnostics or mutating the version cache. Use for any analysis
+  /// that re-derives `#if` activity after the canonical drive has run.
+  case analyzing
+}
+
 /// A build configuration that uses the compiler's ASTContext to answer
 /// queries.
 struct CompilerBuildConfiguration: BuildConfiguration {
@@ -34,10 +48,22 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   let staticBuildConfiguration: StaticBuildConfiguration
   let sourceBuffer: UnsafeBufferPointer<UInt8>
 
-  init(ctx: BridgedASTContext, sourceBuffer: UnsafeBufferPointer<UInt8>) {
+  /// Selects whether `canImport(...)` performs the canonical, diagnostic-
+  /// emitting query or a side-effect-free query. Defaults to
+  /// `.analyzing` so that only the explicitly-marked effectful drive sites
+  /// emit `canImport` diagnostics; every other walk re-derives `#if` activity
+  /// without duplicating them.
+  let canImportMode: CanImportMode
+
+  init(
+    ctx: BridgedASTContext,
+    sourceBuffer: UnsafeBufferPointer<UInt8>,
+    canImportMode: CanImportMode = .analyzing
+  ) {
     self.ctx = ctx
     self.staticBuildConfiguration = ctx.staticBuildConfiguration
     self.sourceBuffer = sourceBuffer
+    self.canImportMode = canImportMode
   }
 
   func isCustomConditionSet(name: String) -> Bool {
@@ -76,16 +102,26 @@ struct CompilerBuildConfiguration: BuildConfiguration {
 
     return importPathStr.withBridgedString { bridgedImportPathStr in
       versionComponents.withUnsafeBufferPointer { versionComponentsBuf in
-        ctx.canImport(
-          importPath: bridgedImportPathStr,
-          location: SourceLoc(
-            at: importPath.first!.0.position,
-            in: sourceBuffer
-          ),
-          versionKind: cVersionKind,
-          versionComponents: versionComponentsBuf.baseAddress,
-          numVersionComponents: versionComponentsBuf.count
-        )
+        switch canImportMode {
+        case .analyzing:
+          return ctx.testCanImport(
+            importPath: bridgedImportPathStr,
+            versionKind: cVersionKind,
+            versionComponents: versionComponentsBuf.baseAddress,
+            numVersionComponents: versionComponentsBuf.count
+          )
+        case .driving:
+          return ctx.canImport(
+            importPath: bridgedImportPathStr,
+            location: SourceLoc(
+              at: importPath.first!.0.position,
+              in: sourceBuffer
+            ),
+            versionKind: cVersionKind,
+            versionComponents: versionComponentsBuf.baseAddress,
+            numVersionComponents: versionComponentsBuf.count
+          )
+        }
       }
     }
   }
@@ -159,15 +195,47 @@ extension ExportedSourceFile {
       return _configuredRegions
     }
 
+    // Compute the regions in `.analyzing` mode: the parser's primary
+    // `EvaluateIfConditionRequest` path is the canonical `canImport` drive
+    // that emits diagnostics and populates `CanImportModuleVersions`, so this
+    // secondary walk must not duplicate those effects.
     let configuration = CompilerBuildConfiguration(
       ctx: astContext,
-      sourceBuffer: buffer
+      sourceBuffer: buffer,
+      canImportMode: .analyzing
     )
 
     let regions = syntax.configuredRegions(in: configuration)
     _configuredRegions = regions
     return regions
   }
+
+  /// Perform the canonical evaluation of this file's `#if` directives for
+  /// ASTGen mode, where the C++ parser's `EvaluateIfConditionRequest`
+  /// never runs and would otherwise be the site that emits `canImport`
+  /// diagnostics and populates `CanImportModuleVersions`.
+  mutating func evaluateConfiguredRegionsForDiagnostics(astContext: BridgedASTContext) {
+    guard _configuredRegions == nil else {
+      return
+    }
+
+    _configuredRegions = syntax.configuredRegions(
+      in: CompilerBuildConfiguration(
+        ctx: astContext, sourceBuffer: buffer, canImportMode: .driving))
+  }
+}
+
+/// In ASTGen-only mode, perform the canonical `#if` evaluation for this source
+/// file, emitting `canImport` diagnostics and populating the version cache
+/// exactly once, before any analysis path consumes the configured-regions
+/// cache.
+@_cdecl("swift_ASTGen_evaluateConfiguredRegionsForDiagnostics")
+public func evaluateConfiguredRegionsForDiagnostics(
+  astContext: BridgedASTContext,
+  sourceFilePtr: UnsafeMutableRawPointer
+) {
+  let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
+  sourceFilePtr.pointee.evaluateConfiguredRegionsForDiagnostics(astContext: astContext)
 }
 
 /// Extract the #if clause range information for the given source file.
@@ -387,10 +455,13 @@ public func inactiveCodeContainsReference(
     let searchRangeBuffer = UnsafeBufferPointer<UInt8>(start: searchRange.data, count: searchRange.count)
     syntax = Parser.parse(source: searchRangeBuffer)
 
-    // Compute the configured regions within the search range.
+    // Compute the configured regions within the search range. This runs during
+    // diagnostics, after the canonical `canImport` drive, so use `.analyzing`
+    // to re-derive `#if` activity without re-emitting `canImport` diagnostics.
     let configuration = CompilerBuildConfiguration(
       ctx: astContext,
-      sourceBuffer: searchRangeBuffer
+      sourceBuffer: searchRangeBuffer,
+      canImportMode: .analyzing
     )
     configuredRegions = syntax.configuredRegions(in: configuration)
 
@@ -416,10 +487,13 @@ public func inactiveCodeContainsTryOrThrow(
   let searchRangeBuffer = UnsafeBufferPointer<UInt8>(start: searchRange.data, count: searchRange.count)
   let syntax = Parser.parse(source: searchRangeBuffer)
 
-  // Compute the configured regions within the search range.
+  // Compute the configured regions within the search range. This runs during
+  // diagnostics, after the canonical `canImport` drive, so use `.analyzing`
+  // to re-derive `#if` activity without re-emitting `canImport` diagnostics.
   let configuration = CompilerBuildConfiguration(
     ctx: astContext,
-    sourceBuffer: searchRangeBuffer
+    sourceBuffer: searchRangeBuffer,
+    canImportMode: .analyzing
   )
   let configuredRegions = syntax.configuredRegions(in: configuration)
 
@@ -457,10 +531,13 @@ public func evaluatePoundIfCondition(
   let syntaxErrorsAllowed: Bool
   let diagnostics: [Diagnostic]
   if shouldEvaluate {
-    // Evaluate the condition against the compiler's build configuration.
+    // Evaluate the condition against the compiler's build configuration. This
+    // is the C++ parser's canonical per-`#if` evaluation, so it drives the
+    // `canImport` query: emitting diagnostics and populating the version cache.
     let configuration = CompilerBuildConfiguration(
       ctx: astContext,
-      sourceBuffer: textBuffer
+      sourceBuffer: textBuffer,
+      canImportMode: .driving
     )
 
     let state: IfConfigRegionState

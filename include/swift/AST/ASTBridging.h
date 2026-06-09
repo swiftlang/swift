@@ -287,6 +287,18 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
                                  const SwiftInt *_Nullable versionComponents,
                                  SwiftInt numVersionComponents);
 
+/// Like `canImport`, but does not emit any diagnostics or update the
+/// `CanImportModuleVersions` cache. Use this from analysis paths that
+/// re-evaluate `#if canImport(...)` after the compiler's primary
+/// `EvaluateIfConditionRequest` has already done so, to avoid duplicate
+/// diagnostics.
+SWIFT_NAME("BridgedASTContext.testCanImport(self:importPath:versionKind:versionComponents:numVersionComponents:)")
+bool BridgedASTContext_testCanImport(BridgedASTContext cContext,
+                                     BridgedStringRef importPath,
+                                     BridgedCanImportVersion versionKind,
+                                     const SwiftInt *_Nullable versionComponents,
+                                     SwiftInt numVersionComponents);
+
 SWIFT_NAME("getter:BridgedASTContext.staticBuildConfigurationPtr(self:)")
 void * _Nonnull BridgedASTContext_staticBuildConfiguration(BridgedASTContext cContext);
 
