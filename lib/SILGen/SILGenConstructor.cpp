@@ -1571,6 +1571,9 @@ void SILGenFunction::emitMemberInitializationViaInitAccessor(
   if (!init)
     return;
 
+  // Force the pattern's type to be resolved.
+  (void)member->getCheckedPatternBindingEntry(0);
+
   auto *varPattern = member->getPattern(0);
 
   // Cleanup after this initialization.
@@ -1610,6 +1613,9 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
   assert(!field->isStatic());
 
   for (auto i : range(field->getNumPatternEntries())) {
+    if (auto *var = field->getAnchoringVarDecl(i))
+      (void)var->getImplInfo(); // trigger expansion of attached accessor macros
+
     auto init = field->getExecutableInit(i);
     if (!init)
       continue;
@@ -1650,6 +1656,9 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
       }
     }
     }
+
+    // Force the pattern's type to be resolved.
+    (void)field->getCheckedPatternBindingEntry(i);
 
     auto *varPattern = field->getPattern(i);
 
