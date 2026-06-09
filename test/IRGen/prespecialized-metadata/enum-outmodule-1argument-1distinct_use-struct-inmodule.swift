@@ -6,6 +6,7 @@
 // UNSUPPORTED: CPU=i386 && OS=ios
 // UNSUPPORTED: CPU=armv7 && OS=ios
 // UNSUPPORTED: CPU=armv7s && OS=ios
+// UNSUPPORTED: CPU=armv7k && OS=watchos
 
 //      CHECK: @"$s8Argument03OneA0Oy4main03TheA0VGMN" = linkonce_odr hidden constant <{
 // CHECK-SAME:   ptr,

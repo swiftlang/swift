@@ -2,6 +2,7 @@
 
 // REQUIRES: swift_feature_LayoutStringValueWitnesses
 // REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
+// UNSUPPORTED: CPU=armv7k && OS=watchos
 
 // CHECK: define internal ptr @"$s13rdar1275352744TestVMi"
 // CHECK:  [[METADATA:%.*]] = call ptr @swift_cvw_allocateGenericValueMetadataWithLayoutString
