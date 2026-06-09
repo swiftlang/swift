@@ -337,8 +337,7 @@ public:
   /// A shared reference type using the retain/release functions from \a decl.
   static ForeignReferenceTypeInfo
   Shared(const clang::RecordDecl *decl,
-         const clang::CXXRecordDecl *primarySuperclass = nullptr,
-         bool isValid = true) {
+         const clang::CXXRecordDecl *primarySuperclass, bool isValid = true) {
     ASSERT(decl && "shared reference must have a non-null base decl");
     return {decl, primarySuperclass, isValid, /*isRef=*/true};
   }

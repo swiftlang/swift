@@ -4,3 +4,4 @@ import RefCountingMethods
 
 let _ = StaticRetainRelease(123)
 let _ = DerivedStaticRetainRelease(123, 456)
+let _ = SharedAB(123)
