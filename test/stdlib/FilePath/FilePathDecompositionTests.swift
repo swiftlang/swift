@@ -19,125 +19,120 @@
 import StdlibUnittest
 
 // Drive the per-platform `Expected` decomposition for `tc` through `expect*`
-// assertions, then reconstruct via the decomposition initializer and check the
-// result equals the original. Inert on builds whose platform doesn't match
-// `platform` (see `withPlatform`).
+// assertions, then reconstruct via the decomposition initializer and check
+// the result equals the original. Picks the host platform's column from
+// the `PathTestCase` table at compile time.
 @available(SwiftStdlib 9999, *)
-func runCase(_ tc: PathTestCase, platform: REVIEW_ONLY_Platform) {
-  withPlatform(platform) {
-    let expected: Expected
-    switch platform {
-    case .linux: expected = tc.linux
-    case .darwin: expected = tc.darwin
-    case .windows: expected = tc.windows
-    }
+func runCase(_ tc: PathTestCase) {
+#if canImport(Darwin)
+  let expected = tc.darwin
+#elseif os(Windows)
+  let expected = tc.windows
+#else
+  let expected = tc.linux
+#endif
 
-    let path = FilePath(tc.input)!
+  let path = FilePath(tc.input)!
 
-    // anchor
-    let anchorDesc = path.anchor?.description
-    expectEqual(anchorDesc, expected.anchor,
-      "[\(platform)] input=\(tc.input.debugDescription) anchor: got \(anchorDesc.debugDescription), expected \(expected.anchor.debugDescription)")
+  // anchor
+  let anchorDesc = path.anchor?.description
+  expectEqual(anchorDesc, expected.anchor,
+    "input=\(tc.input.debugDescription) anchor: got \(anchorDesc.debugDescription), expected \(expected.anchor.debugDescription)")
 
-    // components
-    let compDescs = path.components.map(\.description)
-    expectEqual(compDescs, expected.components,
-      "[\(platform)] input=\(tc.input.debugDescription) components: got \(compDescs), expected \(expected.components)")
+  // components
+  let compDescs = path.components.map(\.description)
+  expectEqual(compDescs, expected.components,
+    "input=\(tc.input.debugDescription) components: got \(compDescs), expected \(expected.components)")
 
-    // hasTrailingSeparator
-    expectEqual(path.hasTrailingSeparator, expected.hasTrailingSeparator,
-      "[\(platform)] input=\(tc.input.debugDescription) hasTrailingSep: got \(path.hasTrailingSeparator), expected \(expected.hasTrailingSeparator)")
+  // hasTrailingSeparator
+  expectEqual(path.hasTrailingSeparator, expected.hasTrailingSeparator,
+    "input=\(tc.input.debugDescription) hasTrailingSep: got \(path.hasTrailingSeparator), expected \(expected.hasTrailingSeparator)")
 
-    // isResourceFork (Darwin)
-    if platform == .darwin {
-      expectEqual(path.isResourceFork, expected.isResourceFork,
-        "[\(platform)] input=\(tc.input.debugDescription) isResourceFork: got \(path.isResourceFork), expected \(expected.isResourceFork)")
-    }
+  // isResourceFork (Darwin)
+#if canImport(Darwin)
+  expectEqual(path.isResourceFork, expected.isResourceFork,
+    "input=\(tc.input.debugDescription) isResourceFork: got \(path.isResourceFork), expected \(expected.isResourceFork)")
+#endif
 
-    // printed
-    expectEqual(path.description, expected.printed,
-      "[\(platform)] input=\(tc.input.debugDescription) printed: got \(path.description.debugDescription), expected \(expected.printed.debugDescription)")
+  // printed
+  expectEqual(path.description, expected.printed,
+    "input=\(tc.input.debugDescription) printed: got \(path.description.debugDescription), expected \(expected.printed.debugDescription)")
 
-    // isAbsolute
-    expectEqual(path.isAbsolute, expected.isAbsolute,
-      "[\(platform)] input=\(tc.input.debugDescription) isAbsolute: got \(path.isAbsolute), expected \(expected.isAbsolute)")
+  // isAbsolute
+  expectEqual(path.isAbsolute, expected.isAbsolute,
+    "input=\(tc.input.debugDescription) isAbsolute: got \(path.isAbsolute), expected \(expected.isAbsolute)")
 
-    // isRooted
-    let expectedRooted = expected.isRooted ?? expected.isAbsolute
-    let actualRooted = path.anchor?.isRooted ?? false
-    expectEqual(actualRooted, expectedRooted,
-      "[\(platform)] input=\(tc.input.debugDescription) isRooted: got \(actualRooted), expected \(expectedRooted)")
+  // isRooted
+  let expectedRooted = expected.isRooted ?? expected.isAbsolute
+  let actualRooted = path.anchor?.isRooted ?? false
+  expectEqual(actualRooted, expectedRooted,
+    "input=\(tc.input.debugDescription) isRooted: got \(actualRooted), expected \(expectedRooted)")
 
-    // driveLetter
-    if let expectedDrive = expected.driveLetter {
-      expectTrue(path.anchor?._driveLetter == expectedDrive,
-        "[\(platform)] input=\(tc.input.debugDescription) driveLetter: got \(path.anchor?._driveLetter.debugDescription ?? "nil"), expected \(expectedDrive)")
-    }
-
-    // kinds
-    let actualKinds = path.components.map(\.kind)
-    if let expectedKinds = expected.kinds {
-      expectEqual(actualKinds, expectedKinds,
-        "[\(platform)] input=\(tc.input.debugDescription) kinds: got \(actualKinds), expected \(expectedKinds)")
-    } else {
-      let allRegular = actualKinds.allSatisfy { $0 == .regular }
-      expectTrue(allRegular,
-        "[\(platform)] input=\(tc.input.debugDescription) kinds: expected all .regular, got \(actualKinds)")
-    }
-
-    // Round-trip: reconstruct from decomposition
-    let roundTrip: FilePath
-    if expected.isResourceFork {
-      roundTrip = FilePath(
-        anchor: path.anchor,
-        path.components,
-        resourceFork: true)
-    } else {
-      roundTrip = FilePath(
-        anchor: path.anchor,
-        path.components,
-        hasTrailingSeparator: path.hasTrailingSeparator)
-    }
-    expectEqual(roundTrip, path,
-      "[\(platform)] input=\(tc.input.debugDescription) round-trip failed: got \(roundTrip.description.debugDescription), expected \(path.description.debugDescription)")
+  // driveLetter
+  if let expectedDrive = expected.driveLetter {
+    expectTrue(path.anchor?._driveLetter == expectedDrive,
+      "input=\(tc.input.debugDescription) driveLetter: got \(path.anchor?._driveLetter.debugDescription ?? "nil"), expected \(expectedDrive)")
   }
+
+  // kinds
+  let actualKinds = path.components.map(\.kind)
+  if let expectedKinds = expected.kinds {
+    expectEqual(actualKinds, expectedKinds,
+      "input=\(tc.input.debugDescription) kinds: got \(actualKinds), expected \(expectedKinds)")
+  } else {
+    let allRegular = actualKinds.allSatisfy { $0 == .regular }
+    expectTrue(allRegular,
+      "input=\(tc.input.debugDescription) kinds: expected all .regular, got \(actualKinds)")
+  }
+
+  // Round-trip: reconstruct from decomposition
+  let roundTrip: FilePath
+  if expected.isResourceFork {
+    roundTrip = FilePath(
+      anchor: path.anchor,
+      path.components,
+      resourceFork: true)
+  } else {
+    roundTrip = FilePath(
+      anchor: path.anchor,
+      path.components,
+      hasTrailingSeparator: path.hasTrailingSeparator)
+  }
+  expectEqual(roundTrip, path,
+    "input=\(tc.input.debugDescription) round-trip failed: got \(roundTrip.description.debugDescription), expected \(path.description.debugDescription)")
 }
 
 // Pin the four primary decomposition fields (anchor, components,
-// hasTrailingSeparator, printed) for `input` on `platform`. Used by the
-// edge-case probe tests below. The `file` / `line` defaults forward the
-// caller's source location so a failure points at the probe row rather than
-// this helper. Inert on builds whose platform doesn't match.
+// hasTrailingSeparator, printed) for `input`. Used by the edge-case probe
+// tests below. The `file` / `line` defaults forward the caller's source
+// location so a failure points at the probe row rather than this helper.
 @available(SwiftStdlib 9999, *)
 func probe(
   _ input: String,
-  platform: REVIEW_ONLY_Platform,
   anchor: String?,
   components: [String],
   trailingSeparator: Bool = false,
   printed: String,
   file: String = #file, line: UInt = #line
 ) {
-  withPlatform(platform) {
-    guard let path = FilePath(input) else {
-      expectTrue(false,
-        "[\(platform)] \(input.debugDescription) FilePath init returned nil",
-        file: file, line: line)
-      return
-    }
-    expectEqual(path.anchor?.description, anchor,
-      "[\(platform)] \(input.debugDescription) anchor: got \(path.anchor?.description.debugDescription ?? "nil")",
+  guard let path = FilePath(input) else {
+    expectTrue(false,
+      "\(input.debugDescription) FilePath init returned nil",
       file: file, line: line)
-    expectEqual(path.components.map(\.description), components,
-      "[\(platform)] \(input.debugDescription) components: got \(path.components.map(\.description))",
-      file: file, line: line)
-    expectEqual(path.hasTrailingSeparator, trailingSeparator,
-      "[\(platform)] \(input.debugDescription) trailingSeparator: got \(path.hasTrailingSeparator)",
-      file: file, line: line)
-    expectEqual(path.description, printed,
-      "[\(platform)] \(input.debugDescription) printed: got \(path.description.debugDescription)",
-      file: file, line: line)
+    return
   }
+  expectEqual(path.anchor?.description, anchor,
+    "\(input.debugDescription) anchor: got \(path.anchor?.description.debugDescription ?? "nil")",
+    file: file, line: line)
+  expectEqual(path.components.map(\.description), components,
+    "\(input.debugDescription) components: got \(path.components.map(\.description))",
+    file: file, line: line)
+  expectEqual(path.hasTrailingSeparator, trailingSeparator,
+    "\(input.debugDescription) trailingSeparator: got \(path.hasTrailingSeparator)",
+    file: file, line: line)
+  expectEqual(path.description, printed,
+    "\(input.debugDescription) printed: got \(path.description.debugDescription)",
+    file: file, line: line)
 }
 
 @main
@@ -145,154 +140,157 @@ struct FilePathDecompositionTests {
   static func main() {
     let suite = TestSuite("FilePath.Decomposition")
 
-    // MARK: - Full-table runs (one per platform)
+    // MARK: - Full-table run
     //
-    // On any single build only the matching platform's body does work; the
-    // other two run inert via withPlatform and pass vacuously.
+    // The shared `pathTestCases` table carries expectations for all three
+    // platforms; `runCase` consumes the host platform's column.
 
-    suite.test("allCasesLinux")
+    suite.test("allCases")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
-      for tc in pathTestCases { runCase(tc, platform: .linux) } }
-
-    suite.test("allCasesDarwin")
-    .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
-                  reason: "Requires SwiftStdlib 9999"))
-    .code { guard #available(SwiftStdlib 9999, *) else { return }
-      for tc in pathTestCases { runCase(tc, platform: .darwin) } }
-
-    suite.test("allCasesWindows")
-    .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
-                  reason: "Requires SwiftStdlib 9999"))
-    .code { guard #available(SwiftStdlib 9999, *) else { return }
-      for tc in pathTestCases { runCase(tc, platform: .windows) } }
+      for tc in pathTestCases { runCase(tc) } }
 
     // MARK: - Edge-case probes
     //
     // Each probe pins the decomposition of a degenerate / boundary input that
     // the table-driven `pathTestCases` doesn't cover. Inputs are grouped by
-    // the structural pattern they exercise.
+    // the structural pattern they exercise; each probe test body is gated to
+    // the platform whose parser the probe characterizes.
 
     suite.test("probeDarwinRelativeReparse")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
+#if canImport(Darwin)
       // .vol token as a relative component under a volfs anchor.
-      probe("/.vol/1234/5678/.vol/x", platform: .darwin,
+      probe("/.vol/1234/5678/.vol/x",
         anchor: "/.vol/1234/5678", components: [".vol", "x"],
         printed: "/.vol/1234/5678/.vol/x")
       // .nofollow token as a relative component under a volfs anchor.
-      probe("/.vol/1234/5678/.nofollow/x", platform: .darwin,
+      probe("/.vol/1234/5678/.nofollow/x",
         anchor: "/.vol/1234/5678", components: [".nofollow", "x"],
         printed: "/.vol/1234/5678/.nofollow/x")
       // .resolve/3 tokens as relative components under a volfs anchor.
-      probe("/.vol/1234/5678/.resolve/3/x", platform: .darwin,
+      probe("/.vol/1234/5678/.resolve/3/x",
         anchor: "/.vol/1234/5678", components: [".resolve", "3", "x"],
         printed: "/.vol/1234/5678/.resolve/3/x")
       // .vol AFTER .nofollow forms a combined anchor.
-      probe("/.nofollow/.vol/1234/5678", platform: .darwin,
+      probe("/.nofollow/.vol/1234/5678",
         anchor: "/.nofollow/.vol/1234/5678", components: [],
         printed: "/.nofollow/.vol/1234/5678")
       // .nofollow token as a relative component under a .nofollow anchor.
-      probe("/.nofollow/.nofollow/x", platform: .darwin,
+      probe("/.nofollow/.nofollow/x",
         anchor: "/.nofollow/", components: [".nofollow", "x"],
         printed: "/.nofollow/.nofollow/x")
       // Inner `.resolve/1` is NOT canonicalized: canonicalization is anchor-only.
-      probe("/.resolve/3/.resolve/1/x", platform: .darwin,
+      probe("/.resolve/3/.resolve/1/x",
         anchor: "/.resolve/3/", components: [".resolve", "1", "x"],
-        printed: "/.resolve/3/.resolve/1/x") }
+        printed: "/.resolve/3/.resolve/1/x")
+#endif
+    }
 
     suite.test("probeBareResolveVolAnchors")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
+#if canImport(Darwin)
       // Bare `/.resolve/1` is NOT a resolve anchor — `_parseResolve` requires
       // the trailing slash, so this falls through to a plain `/` root.
-      probe("/.resolve/1", platform: .darwin,
+      probe("/.resolve/1",
         anchor: "/", components: [".resolve", "1"],
         printed: "/.resolve/1")
       // `/.resolve/1/` canonicalizes to `/.nofollow/`.
-      probe("/.resolve/1/", platform: .darwin,
+      probe("/.resolve/1/",
         anchor: "/.nofollow/", components: [],
         printed: "/.nofollow/")
       // Bare `/.resolve/3` (non-canonicalizing flag) — same fall-through.
-      probe("/.resolve/3", platform: .darwin,
+      probe("/.resolve/3",
         anchor: "/", components: [".resolve", "3"],
         printed: "/.resolve/3")
       // `/.vol/1234/2/` — `2`->`@` canonicalization fires; the trailing slash
       // is a separator (the volfs anchor itself is not slash-terminated).
-      probe("/.vol/1234/2/", platform: .darwin,
+      probe("/.vol/1234/2/",
         anchor: "/.vol/1234/@", components: [], trailingSeparator: true,
         printed: "/.vol/1234/@/")
+#elseif !os(Windows)
       // Linux contrast: no Darwin anchor magic at all.
-      probe("/.resolve/1", platform: .linux,
+      probe("/.resolve/1",
         anchor: "/", components: [".resolve", "1"],
-        printed: "/.resolve/1") }
+        printed: "/.resolve/1")
+#endif
+    }
 
     suite.test("probeWindowsThreePlusBackslashes")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
-      probe(#"\\\server\share"#, platform: .windows,
+#if os(Windows)
+      probe(#"\\\server\share"#,
         anchor: #"\"#, components: ["server", "share"],
         printed: #"\server\share"#)
-      probe(#"\\\\server"#, platform: .windows,
+      probe(#"\\\\server"#,
         anchor: #"\"#, components: ["server"],
         printed: #"\server"#)
-      probe(#"\\\"#, platform: .windows,
+      probe(#"\\\"#,
         anchor: #"\"#, components: [],
-        printed: #"\"#) }
+        printed: #"\"#)
+#endif
+    }
 
     suite.test("probeWindowsDegenerateDeviceSigil")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
-      probe(#"\\."#, platform: .windows,
+#if os(Windows)
+      probe(#"\\."#,
         anchor: #"\\.\"#, components: [],
         printed: #"\\.\"#)
-      probe(#"\\?"#, platform: .windows,
+      probe(#"\\?"#,
         anchor: #"\\?\"#, components: [],
         printed: #"\\?\"#)
 
       // Same inputs, additional structural assertions.
-      withPlatform(.windows) {
-        let dotInput: String = #"\\."#
-        let dot = FilePath(dotInput)!
-        expectTrue(dot.isAbsolute, #"\\. is absolute"#)
-        expectFalse(dot.anchor?._isVerbatimComponent ?? true,
-          #"\\. is device-namespace, not verbatim"#)
+      let dotInput: String = #"\\."#
+      let dot = FilePath(dotInput)!
+      expectTrue(dot.isAbsolute, #"\\. is absolute"#)
+      expectFalse(dot.anchor?._isVerbatimComponent ?? true,
+        #"\\. is device-namespace, not verbatim"#)
 
-        let qInput: String = #"\\?"#
-        let q = FilePath(qInput)!
-        expectTrue(q.isAbsolute, #"\\? is absolute"#)
-        expectTrue(q.anchor?._isVerbatimComponent ?? false,
-          #"\\? is verbatim-component"#)
-      } }
+      let qInput: String = #"\\?"#
+      let q = FilePath(qInput)!
+      expectTrue(q.isAbsolute, #"\\? is absolute"#)
+      expectTrue(q.anchor?._isVerbatimComponent ?? false,
+        #"\\? is verbatim-component"#)
+#endif
+    }
 
     suite.test("probeMatchesPrefixNearMisses")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
-      probe("/.nofollowing/bar", platform: .darwin,
+#if canImport(Darwin)
+      probe("/.nofollowing/bar",
         anchor: "/", components: [".nofollowing", "bar"],
         printed: "/.nofollowing/bar")
-      probe("/.resolved/x", platform: .darwin,
+      probe("/.resolved/x",
         anchor: "/", components: [".resolved", "x"],
         printed: "/.resolved/x")
-      probe("/.volume/x", platform: .darwin,
+      probe("/.volume/x",
         anchor: "/", components: [".volume", "x"],
         printed: "/.volume/x")
-      probe("/.resolvex/1/y", platform: .darwin,
+      probe("/.resolvex/1/y",
         anchor: "/", components: [".resolvex", "1", "y"],
         printed: "/.resolvex/1/y")
       // Keyword present but missing the structural slashes.
-      probe("/.vol", platform: .darwin,
+      probe("/.vol",
         anchor: "/", components: [".vol"],
         printed: "/.vol")
-      probe("/.vol/1234", platform: .darwin,
+      probe("/.vol/1234",
         anchor: "/", components: [".vol", "1234"],
-        printed: "/.vol/1234") }
+        printed: "/.vol/1234")
+#endif
+    }
 
     runAllTests()
   }

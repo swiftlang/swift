@@ -23,18 +23,16 @@ struct FilePathSmoke {
   static func main() {
     let suite = TestSuite("FilePath.Smoke")
 
-    suite.test("seam and public API")
+    suite.test("public API")
     .skip(.custom(
       { if #available(SwiftStdlib 9999, *) { false } else { true } },
       reason: "Requires SwiftStdlib 9999"))
     .code {
       guard #available(SwiftStdlib 9999, *) else { return }
-      withPlatform(.darwin) {
-        let p = FilePath("/usr/local/bin")!
-        expectEqual(p.components.map(\.description), ["usr", "local", "bin"])
-        expectEqual(p.description, universal("/usr/local/bin"))
-        expectNotNil(p.anchor)
-      }
+      let p = FilePath("/usr/local/bin")!
+      expectEqual(p.components.map(\.description), ["usr", "local", "bin"])
+      expectEqual(p.description, universal("/usr/local/bin"))
+      expectNotNil(p.anchor)
     }
 
     runAllTests()
