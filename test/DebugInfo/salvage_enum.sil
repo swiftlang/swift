@@ -50,3 +50,29 @@ bb0:
   %2 = integer_literal $Builtin.Int64, 0
   return %2
 }
+
+// Salvaging a move-only enum should not preserve `forwarding: @owned` in the
+// debug reconstruction block.
+
+struct FileDescriptor: ~Copyable {
+  var fd: Builtin.Int64
+}
+
+// CHECK-LABEL: sil [ossa] @test_salvage_enum_ossa
+// CHECK:       bb0([[VAL:%[0-9]+]] : @owned $FileDescriptor):
+// CHECK:         debug_value [[VAL]] : $FileDescriptor, let, name "self", transform {
+// CHECK:           bb0([[ARG:%[0-9]+]] : $FileDescriptor):
+// CHECK-NOT:         forwarding
+// CHECK:             [[ENUM:%[0-9]+]] = enum $Optional<FileDescriptor>, #Optional.some!enumelt, [[ARG]] : $FileDescriptor
+// CHECK-NOT:         forwarding
+// CHECK:             return [[ENUM]] : $Optional<FileDescriptor>
+// CHECK:         }
+// CHECK-LABEL: } // end sil function 'test_salvage_enum_ossa'
+sil_scope 3 { loc "test.swift":3:1 parent @test_salvage_enum_ossa : $@convention(thin) (@owned FileDescriptor) -> @owned FileDescriptor }
+sil [ossa] @test_salvage_enum_ossa : $@convention(thin) (@owned FileDescriptor) -> @owned FileDescriptor {
+bb0(%0 : @owned $FileDescriptor):
+  %1 = enum $Optional<FileDescriptor>, #Optional.some!enumelt, %0 : $FileDescriptor, forwarding: @owned
+  debug_value %1 : $Optional<FileDescriptor>, let, name "self", loc "test.swift":3:1, scope 3
+  %3 = unchecked_enum_data %1 : $Optional<FileDescriptor>, #Optional.some!enumelt
+  return %3 : $FileDescriptor
+}

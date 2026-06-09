@@ -152,6 +152,62 @@ bb0:
   return %r : $()
 }
 
+// Salvaging a move-only struct should not preserve `forwarding: @owned` in the
+// debug reconstruction block.
+
+struct NCPair: ~Copyable {
+  @_hasStorage var x: Int64 { get set }
+  @_hasStorage var y: Int64 { get set }
+  init(x: Int64, y: Int64)
+}
+
+// CHECK-LABEL: sil @salvage_noncopyable_struct_with_debug_bb
+// CHECK: debug_value {{.*}} %0 : $Int64, let, name "field_x", type $Int64, transform {
+// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK-NOT:   forwarding
+// CHECK:     %[[S:[0-9]+]] = struct $NCPair (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK-NOT:   forwarding
+// CHECK:     %[[E:[0-9]+]] = struct_extract %[[S]] : $NCPair, #NCPair.x
+// CHECK:     return %[[E]] : $Int64
+// CHECK:   }
+// CHECK: return %0
+sil @salvage_noncopyable_struct_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %s = struct $NCPair (%0 : $Int64, %1 : $Int64)
+  debug_value %s : $NCPair, let, name "field_x", type $Int64, transform {
+  bb0(%0 : $NCPair):
+    %1 = struct_extract %0 : $NCPair, #NCPair.x
+    return %1 : $Int64
+  }
+  %e = struct_extract %s : $NCPair, #NCPair.x
+  return %e : $Int64
+}
+
+// Salvaging a move-only tuple should not preserve `forwarding: @owned` in the
+// debug reconstruction block.
+
+// CHECK-LABEL: sil @salvage_noncopyable_tuple_with_debug_bb
+// CHECK: debug_value %0 : $Int64, let, name "x", type $Int64, transform {
+// CHECK:   bb0(%[[ARG:[0-9]+]] : $Int64):
+// CHECK-NOT:   forwarding
+// CHECK:     %[[T:[0-9]+]] = tuple (%[[ARG]] : $Int64, undef : $Int64)
+// CHECK-NOT:   forwarding
+// CHECK:     %[[E:[0-9]+]] = tuple_extract %[[T]] : $(Int64, Int64), 0
+// CHECK:     return %[[E]] : $Int64
+// CHECK:   }
+// CHECK: return %0
+sil @salvage_noncopyable_tuple_with_debug_bb : $@convention(thin) (Int64, Int64) -> Int64 {
+bb0(%0 : $Int64, %1 : $Int64):
+  %t = tuple (%0 : $Int64, %1 : $Int64)
+  debug_value %t : $(Int64, Int64), let, name "x", type $Int64, transform {
+  bb0(%0 : $(Int64, Int64)):
+    %1 = tuple_extract %0 : $(Int64, Int64), 0
+    return %1 : $Int64
+  }
+  %e = tuple_extract %t : $(Int64, Int64), 0
+  return %e : $Int64
+}
+
 // This test verifies that splitAggregateLoad in CanonicalizeInstruction.cpp
 // salvages debug info attached to the loaded aggregate in optimized builds.
 //
