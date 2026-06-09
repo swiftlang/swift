@@ -1394,39 +1394,6 @@ void TypeChecker::addImplicitConstructors(NominalTypeDecl *decl) {
   (void)decl->getDefaultInitializer();
 }
 
-/// Checks whether the target conforms to the given protocol. If the
-/// conformance is incomplete, force the conformance.
-///
-/// Returns whether the target conforms to the protocol.
-static bool evaluateTargetConformanceTo(Evaluator &evaluator,
-                                        NominalTypeDecl *target,
-                                        ProtocolDecl *protocol) {
-  if (!protocol)
-    return false;
-
-  auto targetType = target->getDeclaredInterfaceType();
-  auto ref = lookupConformance(targetType, protocol);
-  if (ref.isInvalid()) {
-    return false;
-  }
-
-  if (auto *conformance = dyn_cast<NormalProtocolConformance>(
-          ref.getConcrete()->getRootConformance())) {
-    // Complete evaluate the conformance.
-    evaluateOrDefault(evaluator,
-                      ResolveTypeWitnessesRequest{conformance},
-                      evaluator::SideEffect());
-
-    // FIXME: This should be more fine-grained to avoid having to check
-    // for a cycle here.
-    if (!evaluator.hasActiveRequest(ResolveValueWitnessesRequest{conformance})) {
-      conformance->resolveValueWitnesses();
-    }
-  }
-
-  return true;
-}
-
 evaluator::SideEffect
 ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *target,
@@ -1435,6 +1402,37 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
 
   // FIXME: This entire request is a layering violation made of smaller,
   // finickier layering violations. See rdar://56844567
+
+  // Checks whether the target conforms to the given protocol. If the
+  // conformance is incomplete, force the conformance.
+  //
+  // Returns whether the target conforms to the protocol.
+  auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
+    if (!protocol)
+      return false;
+
+    auto targetType = target->getDeclaredInterfaceType();
+    auto ref = lookupConformance(targetType, protocol);
+    if (ref.isInvalid()) {
+      return false;
+    }
+
+    if (auto *conformance = dyn_cast<NormalProtocolConformance>(
+            ref.getConcrete()->getRootConformance())) {
+      // Complete evaluate the conformance.
+      evaluateOrDefault(evaluator,
+                        ResolveTypeWitnessesRequest{conformance},
+                        evaluator::SideEffect());
+
+      // FIXME: This should be more fine-grained to avoid having to check
+      // for a cycle here.
+      if (!evaluator.hasActiveRequest(ResolveValueWitnessesRequest{conformance})) {
+        conformance->resolveValueWitnesses();
+      }
+    }
+
+    return true;
+  };
 
   auto &Context = target->getASTContext();
   switch (action) {
@@ -1447,7 +1445,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     // If the target should conform to the Encodable protocol, check the
     // conformance here to attempt synthesis.
     auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-    (void)evaluateTargetConformanceTo(evaluator, target, encodableProto);
+    (void)evaluateTargetConformanceTo(encodableProto);
   }
     break;
   case ImplicitMemberAction::ResolveDecodable: {
@@ -1457,7 +1455,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
     // conformance here to attempt synthesis.
     TypeChecker::addImplicitConstructors(target);
     auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
-    (void)evaluateTargetConformanceTo(evaluator, target, decodableProto);
+    (void)evaluateTargetConformanceTo(decodableProto);
     break;
   }
   }
@@ -1479,12 +1477,38 @@ SynthesizeCodingKeysRequest::evaluate(Evaluator &evaluator,
   if (!target->lookupDirect(DeclName(Context.Id_CodingKeys)).empty())
     return std::make_tuple<>();
 
-  // CodingKeys is synthesized as a side effect of Codable conformance
-  // derivation. Try Decodable first; fall back to Encodable.
+  // Checks whether the target conforms to the given protocol and, if the
+  // conformance is incomplete, forces it. CodingKeys is synthesized as a
+  // side effect of Codable conformance derivation.
+  auto evaluateTargetConformanceTo = [&](ProtocolDecl *protocol) {
+    if (!protocol)
+      return false;
+
+    auto targetType = target->getDeclaredInterfaceType();
+    auto ref = lookupConformance(targetType, protocol);
+    if (ref.isInvalid()) {
+      return false;
+    }
+
+    if (auto *conformance = dyn_cast<NormalProtocolConformance>(
+            ref.getConcrete()->getRootConformance())) {
+      evaluateOrDefault(evaluator,
+                        ResolveTypeWitnessesRequest{conformance},
+                        evaluator::SideEffect());
+
+      if (!evaluator.hasActiveRequest(ResolveValueWitnessesRequest{conformance})) {
+        conformance->resolveValueWitnesses();
+      }
+    }
+
+    return true;
+  };
+
+  // Try Decodable first; fall back to Encodable.
   auto *decodableProto = Context.getProtocol(KnownProtocolKind::Decodable);
   auto *encodableProto = Context.getProtocol(KnownProtocolKind::Encodable);
-  if (!evaluateTargetConformanceTo(evaluator, target, decodableProto)) {
-    (void)evaluateTargetConformanceTo(evaluator, target, encodableProto);
+  if (!evaluateTargetConformanceTo(decodableProto)) {
+    (void)evaluateTargetConformanceTo(encodableProto);
   }
   return std::make_tuple<>();
 }

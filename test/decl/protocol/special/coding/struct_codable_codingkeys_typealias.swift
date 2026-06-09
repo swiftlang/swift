@@ -34,3 +34,23 @@ struct StructWithUndeclaredCodingKeys : Codable { // expected-error {{type 'Stru
   // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey}}
   // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey}}
 }
+
+// A typealias that resolves to a non-nominal type (tuple, function type) used
+// to crash lookupEvaluatedCodingKeysEnum because getAnyNominal() returns null
+// and the subsequent dyn_cast<EnumDecl> asserted on the null pointer. The
+// compiler should diagnose the conformance failure rather than crash.
+struct StructWithTupleCodingKeys : Codable { // expected-error {{type 'StructWithTupleCodingKeys' does not conform to protocol 'Decodable'}}
+  // expected-error@-1 {{type 'StructWithTupleCodingKeys' does not conform to protocol 'Encodable'}}
+  var x: Int = 1
+  private typealias CodingKeys = (Int, Int)
+  // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey}}
+  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey}}
+}
+
+struct StructWithFunctionTypeCodingKeys : Codable { // expected-error {{type 'StructWithFunctionTypeCodingKeys' does not conform to protocol 'Decodable'}}
+  // expected-error@-1 {{type 'StructWithFunctionTypeCodingKeys' does not conform to protocol 'Encodable'}}
+  var x: Int = 1
+  private typealias CodingKeys = () -> Void
+  // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey}}
+  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey}}
+}
