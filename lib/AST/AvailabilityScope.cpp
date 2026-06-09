@@ -180,7 +180,13 @@ AvailabilityScope *AvailabilityScope::createForSwitchStmt(
   // scope's source range. The subject is type-checked before the case label
   // items, so excluding it avoids triggering this scope's lazy expansion
   // before the patterns are ready.
+  //
+  // Widen the source range to the end of its last token so it contains
+  // child availability scopes that extend their ranges similarly (such as
+  // implicit decl scopes).
   SourceRange range(S->getLBraceLoc(), S->getRBraceLoc());
+  if (range.End.isValid())
+    range.End = Lexer::getLocForEndOfToken(Ctx.SourceMgr, range.End);
   return new (Ctx)
       AvailabilityScope(Ctx, IntroNode(S, DC), Parent, range, Info);
 }
