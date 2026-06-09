@@ -54,3 +54,17 @@ struct StructWithFunctionTypeCodingKeys : Codable { // expected-error {{type 'St
   // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey}}
   // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey}}
 }
+
+// An immutable 'let' with an initial value combined with a non-nominal
+// CodingKeys typealias. The CheckCodableStoredPropertiesRequest diagnostic
+// walks the CodingKeys enum; here lookupEvaluatedCodingKeysEnum returns null
+// (the tuple has no nominal), so the request must bail out without crashing
+// and without emitting a spurious "will not be decoded" warning for 'x'. Only
+// the conformance failure should be diagnosed.
+struct StructWithImmutableLetAndTupleCodingKeys : Codable { // expected-error {{type 'StructWithImmutableLetAndTupleCodingKeys' does not conform to protocol 'Decodable'}}
+  // expected-error@-1 {{type 'StructWithImmutableLetAndTupleCodingKeys' does not conform to protocol 'Encodable'}}
+  let x: Int = 1
+  private typealias CodingKeys = (Int, Int)
+  // expected-note@-1 {{cannot automatically synthesize 'Decodable' because 'CodingKeys' does not conform to CodingKey}}
+  // expected-note@-2 {{cannot automatically synthesize 'Encodable' because 'CodingKeys' does not conform to CodingKey}}
+}
