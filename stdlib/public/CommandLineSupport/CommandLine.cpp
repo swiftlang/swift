@@ -503,6 +503,56 @@ static char **swift::getUnsafeArgvArgc(int *outArgLen) {
 
 template <typename F>
 static void swift::enumerateUnsafeArgv(const F& body) { }
+#elif defined(__EMSCRIPTEN__)
+#include <emscripten.h>
+#include <stdlib.h>
+
+// EM_JS functions become wasm imports resolved by emcc's JS output.
+// Module['arguments'] and thisProgram are set in Emscripten's preamble
+// before any wasm code executes, so these work during static initialization.
+
+// EM_JS macro expansion produces an extra semicolon after extern "C" block.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wc++98-compat-extra-semi"
+
+EM_JS(int, _swift_emscripten_getArgCount, (), {
+  return (Module['arguments'] || []).length + 1;
+});
+
+EM_JS(int, _swift_emscripten_getArgLen, (int index), {
+  var args = [thisProgram].concat(Module['arguments'] || []);
+  if (index >= args.length) return -1;
+  return lengthBytesUTF8(args[index]);
+});
+
+EM_JS(void, _swift_emscripten_getArg, (int index, char *buf, int bufLen), {
+  var args = [thisProgram].concat(Module['arguments'] || []);
+  if (index < args.length) {
+    stringToUTF8(args[index], buf, bufLen);
+  }
+});
+
+#pragma clang diagnostic pop
+
+static char **swift::getUnsafeArgvArgc(int *outArgLen) {
+  return nullptr;
+}
+
+template <typename F>
+static void swift::enumerateUnsafeArgv(const F& body) {
+  int argc = _swift_emscripten_getArgCount();
+  for (int i = 0; i < argc; i++) {
+    int len = _swift_emscripten_getArgLen(i);
+    if (len >= 0) {
+      char *buf = static_cast<char *>(malloc(len + 1));
+      if (buf) {
+        _swift_emscripten_getArg(i, buf, len + 1);
+        body(argc, buf);
+        free(buf);
+      }
+    }
+  }
+}
 #elif defined(__OpenBSD__)
 #include <sys/types.h>
 #include <sys/sysctl.h>

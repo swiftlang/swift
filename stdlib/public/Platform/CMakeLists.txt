@@ -64,6 +64,23 @@ add_swift_target_library(swiftWASILibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SD
     INSTALL_IN_COMPONENT sdk-overlay
     DEPENDS wasilibc_modulemap)
 
+add_swift_target_library(swiftEmscriptenLibc ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
+    ${swift_platform_sources}
+    POSIXError.swift
+
+    GYB_SOURCES
+      ${swift_platform_gyb_sources}
+      EmscriptenLibc.swift.gyb
+
+    SWIFT_COMPILE_FLAGS
+      ${SWIFT_RUNTIME_SWIFT_COMPILE_FLAGS}
+      ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
+      ${swift_platform_compile_flags}
+    LINK_FLAGS "${SWIFT_RUNTIME_SWIFT_LINK_FLAGS}"
+    TARGET_SDKS EMSCRIPTEN
+    INSTALL_IN_COMPONENT sdk-overlay
+    DEPENDS emscriptenlibc_modulemap)
+
 add_swift_target_library(swiftCRT ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_SDK_OVERLAY
     ucrt.swift
     ${swift_platform_sources}
@@ -466,6 +483,90 @@ add_custom_target(wasilibc_modulemap DEPENDS ${wasilibc_modulemap_target_list})
 set_property(TARGET wasilibc_modulemap PROPERTY FOLDER "Miscellaneous")
 add_dependencies(sdk-overlay wasilibc_modulemap)
 
+set(emscriptenlibc_modulemap_target_list)
+if("EMSCRIPTEN" IN_LIST SWIFT_SDKS)
+  set(emscriptenlibc_modulemap_source "emscripten-libc.modulemap")
+  foreach(arch ${SWIFT_SDK_EMSCRIPTEN_ARCHITECTURES})
+    set(arch_subdir "${SWIFT_SDK_EMSCRIPTEN_LIB_SUBDIR}/${arch}")
+    set(module_dir "${SWIFTLIB_DIR}/${arch_subdir}")
+    set(module_dir_static "${SWIFTSTATICLIB_DIR}/${arch_subdir}")
+    set(module_dir_embedded "${SWIFTLIB_DIR}/embedded/${arch}")
+
+    add_custom_command_target(
+      copy_emscriptenlibc_modulemap_resource
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_static}
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${emscriptenlibc_modulemap_source}" ${module_dir}
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${emscriptenlibc_modulemap_source}" ${module_dir_static}
+      OUTPUT ${module_dir}/${emscriptenlibc_modulemap_source} ${module_dir_static}/${emscriptenlibc_modulemap_source}
+      COMMENT "Copying EmscriptenLibc modulemap to resource directories")
+    add_dependencies(sdk-overlay ${copy_emscriptenlibc_modulemap_resource})
+    list(APPEND emscriptenlibc_modulemap_target_list ${copy_emscriptenlibc_modulemap_resource})
+
+    swift_install_in_component(FILES "${emscriptenlibc_modulemap_source}"
+                               DESTINATION "lib/swift/${arch_subdir}"
+                               COMPONENT sdk-overlay)
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${emscriptenlibc_modulemap_source}"
+                                 DESTINATION "lib/swift_static/${arch_subdir}"
+                                 COMPONENT sdk-overlay)
+    endif()
+
+    if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
+      add_custom_command_target(
+        copy_emscriptenlibc_modulemap_embedded_resource
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "make_directory" ${module_dir} ${module_dir_embedded}
+        COMMAND
+          "${CMAKE_COMMAND}" "-E" "copy_if_different"
+            "${CMAKE_CURRENT_SOURCE_DIR}/${emscriptenlibc_modulemap_source}" ${module_dir_embedded}
+        OUTPUT "${module_dir_embedded}/${emscriptenlibc_modulemap_source}"
+        COMMENT "Copying EmscriptenLibc modulemap to resource directories")
+      add_dependencies(sdk-overlay ${copy_emscriptenlibc_modulemap_embedded_resource})
+      list(APPEND emscriptenlibc_modulemap_target_list ${copy_emscriptenlibc_modulemap_embedded_resource})
+
+      swift_install_in_component(FILES "${emscriptenlibc_modulemap_source}"
+                                 DESTINATION "lib/swift/embedded/${arch}"
+                                 COMPONENT sdk-overlay)
+    endif()
+
+    set(emscriptenlibc_apinotes_source "SwiftEmscriptenLibc.apinotes")
+    add_custom_command_target(
+      copy_emscriptenlibc_apinotes_resource
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" ${SWIFTLIB_DIR}/apinotes ${SWIFTSTATICLIB_DIR}/apinotes
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${emscriptenlibc_apinotes_source}" ${SWIFTLIB_DIR}/apinotes
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${emscriptenlibc_apinotes_source}" ${SWIFTSTATICLIB_DIR}/apinotes
+      OUTPUT
+        ${SWIFTLIB_DIR}/apinotes/${emscriptenlibc_apinotes_source}
+        ${SWIFTSTATICLIB_DIR}/apinotes/${emscriptenlibc_apinotes_source}
+      COMMENT "Copying EmscriptenLibc API notes to resource directories")
+
+    list(APPEND emscriptenlibc_modulemap_target_list ${copy_emscriptenlibc_apinotes_resource})
+    add_dependencies(sdk-overlay ${copy_emscriptenlibc_apinotes_resource})
+    swift_install_in_component(FILES "${emscriptenlibc_apinotes_source}"
+                               DESTINATION "lib/swift/apinotes"
+                               COMPONENT sdk-overlay)
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${emscriptenlibc_apinotes_source}"
+                                 DESTINATION "lib/swift_static/apinotes"
+                                 COMPONENT sdk-overlay)
+    endif()
+
+  endforeach()
+endif()
+add_custom_target(emscriptenlibc_modulemap DEPENDS ${emscriptenlibc_modulemap_target_list})
+set_property(TARGET emscriptenlibc_modulemap PROPERTY FOLDER "Miscellaneous")
+add_dependencies(sdk-overlay emscriptenlibc_modulemap)
+
 if(WINDOWS IN_LIST SWIFT_SDKS)
   swift_install_in_component(FILES
       ucrt.modulemap
@@ -509,6 +610,39 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
       ARCHITECTURE "${arch}"
       ARCHITECTURE_SUBDIR_NAME "${triple}"
       DEPENDS embedded-stdlib-${triple} wasilibc_modulemap
+      INSTALL_IN_COMPONENT sdk-overlay
+    )
+    add_dependencies(embedded-stdlib-platform embedded-stdlib-platform-${triple})
+  endif()
+
+  if(SWIFT_EMSCRIPTEN_SYSROOT_PATH)
+    set(arch "wasm32")
+    set(triple "wasm32-unknown-emscripten")
+
+    set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${triple}")
+    set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
+    set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
+    add_swift_target_library_single(
+      embedded-stdlib-platform-${triple}
+      swiftEmscriptenLibc
+      ONLY_SWIFTMODULE
+      IS_STDLIB IS_FRAGILE
+        ${swift_platform_sources}
+        POSIXError.swift
+
+      GYB_SOURCES
+        ${swift_platform_gyb_sources}
+        EmscriptenLibc.swift.gyb
+
+      SWIFT_COMPILE_FLAGS
+        -enable-experimental-feature Embedded
+        -Xfrontend -emit-empty-object-file
+
+      MODULE_DIR "${CMAKE_BINARY_DIR}/lib/swift/embedded"
+      SDK "embedded"
+      ARCHITECTURE "${arch}"
+      ARCHITECTURE_SUBDIR_NAME "${triple}"
+      DEPENDS embedded-stdlib-${triple} emscriptenlibc_modulemap
       INSTALL_IN_COMPONENT sdk-overlay
     )
     add_dependencies(embedded-stdlib-platform embedded-stdlib-platform-${triple})
