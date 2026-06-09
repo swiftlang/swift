@@ -210,7 +210,7 @@ def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path
                 ],
                 cwd=local_repo_path
             )
-            call_quietly(["git", "push", "origin", "main"], cwd=local_repo_path)
+        call_quietly(["git", "push", "origin", "main"], cwd=local_repo_path)
 
     https_clone_pattern = os.path.join(f"file://{remotes_path}", "%s")
     base_config["https-clone-pattern"] = https_clone_pattern
