@@ -4485,6 +4485,9 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
         parameterizedType->getRequirements(type1, reqs);
         for (const auto &req : reqs) {
           assert(req.getKind() == RequirementKind::SameType);
+          if (req.hasError())
+            continue;
+
           auto result = matchTypes(req.getFirstType(), req.getSecondType(),
                                    ConstraintKind::Bind,
                                    subflags, locator);
