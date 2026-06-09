@@ -88,19 +88,19 @@ split_embedded_sources(
   EMBEDDED ErrorType.swift
   EMBEDDED Exclusivity.swift
   EMBEDDED ExistentialCollection.swift
-  EMBEDDED FilePath/FilePath.swift
-  EMBEDDED FilePath/FilePathAnchor.swift
-  EMBEDDED FilePath/FilePathCodeUnits.swift
-  EMBEDDED FilePath/FilePathComponent.swift
-  EMBEDDED FilePath/FilePathComponentView.swift
-  EMBEDDED FilePath/FilePathDarwin.swift
-  EMBEDDED FilePath/FilePathDecomposition.swift
-  EMBEDDED FilePath/FilePathInternals.swift
-  EMBEDDED FilePath/FilePathParsing.swift
-  EMBEDDED FilePath/FilePathResolve.swift
-  EMBEDDED FilePath/FilePathStringBridging.swift
-  EMBEDDED FilePath/FilePathSystemString.swift
-  EMBEDDED FilePath/FilePathWindows.swift
+    NORMAL FilePath/FilePath.swift
+    NORMAL FilePath/FilePathAnchor.swift
+    NORMAL FilePath/FilePathCodeUnits.swift
+    NORMAL FilePath/FilePathComponent.swift
+    NORMAL FilePath/FilePathComponentView.swift
+    NORMAL FilePath/FilePathDarwin.swift
+    NORMAL FilePath/FilePathDecomposition.swift
+    NORMAL FilePath/FilePathInternals.swift
+    NORMAL FilePath/FilePathParsing.swift
+    NORMAL FilePath/FilePathResolve.swift
+    NORMAL FilePath/FilePathStringBridging.swift
+    NORMAL FilePath/FilePathSystemString.swift
+    NORMAL FilePath/FilePathWindows.swift
   EMBEDDED Filter.swift
   EMBEDDED FlatMap.swift
   EMBEDDED Flatten.swift
