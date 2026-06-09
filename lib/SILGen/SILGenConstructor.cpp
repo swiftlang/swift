@@ -1571,10 +1571,7 @@ void SILGenFunction::emitMemberInitializationViaInitAccessor(
   if (!init)
     return;
 
-  // Force the pattern's type to be resolved.
-  (void)member->getCheckedPatternBindingEntry(0);
-
-  auto *varPattern = member->getPattern(0);
+  auto *varPattern = member->getCheckedPattern(0);
 
   // Cleanup after this initialization.
   FullExpr scope(Cleanups, varPattern);
@@ -1657,10 +1654,7 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     }
     }
 
-    // Force the pattern's type to be resolved.
-    (void)field->getCheckedPatternBindingEntry(i);
-
-    auto *varPattern = field->getPattern(i);
+    auto *varPattern = field->getCheckedPattern(i);
 
     // Cleanup after this initialization.
     FullExpr scope(Cleanups, varPattern);
