@@ -333,6 +333,30 @@ if(NOT BOOTSTRAPPING_MODE STREQUAL "OFF" AND NOT SWIFT_FREESTANDING_FLAVOR AND N
   list(APPEND SWIFTLIB_SOURCES ObjectIdentifier+DebugDescription.swift)
 endif()
 
+# FilePath models only Darwin, Linux, and Windows path syntax (see the
+# platform #if chain in FilePath/FilePathParsing.swift, which #errors on
+# anything else). Keep its sources out of the regular stdlib on every other
+# SDK so they are never compiled there. Folding in additional POSIX
+# platforms (Android, the BSDs, WASI) is deferred; see that file's TODO.
+if(NOT (SWIFT_PRIMARY_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS
+        OR SWIFT_PRIMARY_VARIANT_SDK STREQUAL "LINUX"
+        OR SWIFT_PRIMARY_VARIANT_SDK STREQUAL "WINDOWS"))
+  list(REMOVE_ITEM SWIFTLIB_SOURCES
+    FilePath/FilePath.swift
+    FilePath/FilePathAnchor.swift
+    FilePath/FilePathCodeUnits.swift
+    FilePath/FilePathComponent.swift
+    FilePath/FilePathComponentView.swift
+    FilePath/FilePathDarwin.swift
+    FilePath/FilePathDecomposition.swift
+    FilePath/FilePathInternals.swift
+    FilePath/FilePathParsing.swift
+    FilePath/FilePathResolve.swift
+    FilePath/FilePathStringBridging.swift
+    FilePath/FilePathSystemString.swift
+    FilePath/FilePathWindows.swift)
+endif()
+
 list(APPEND SWIFTLIB_EMBEDDED_SOURCES
   EmbeddedCasting.swift
   EmbeddedRuntime.swift
