@@ -11,7 +11,11 @@
 //===----------------------------------------------------------------------===//
 
 #if os(Linux) || os(Android)
+  #if canImport(FoundationEssentials)
+  import FoundationEssentials
+  #else
   import Foundation
+  #endif
   import SwiftInspectLinux
   import SwiftRemoteMirror
 
@@ -133,8 +137,7 @@
         if case SwiftInspectLinux.Process.ProcessError.processVmReadFailure = error {
           Self.warnAboutMissingPtraceCapabilityOnce()
         }
-        FileHandle.standardError.write(Data(
-          "swift-inspect: failed to attach to process \(processId): \(error)\n".utf8))
+        warn("failed to attach to process \(processId): \(error)")
         return nil
       }
 
@@ -315,8 +318,8 @@
     private static let _warnAboutMissingPtraceCapabilityOnce: Void = {
       let cap = hasPtraceCapability ? "yes" : "no"
       let yama = yamaPtraceScope.map { String($0) } ?? "?"
-      let msg = """
-        swift-inspect: cannot inspect target - insufficient ptrace permission.
+      warn("""
+        cannot inspect target - insufficient ptrace permission.
           CAP_SYS_PTRACE: \(cap)
           kernel.yama.ptrace_scope: \(yama)  (0=any same-UID, 1=ancestors only, 2=CAP_SYS_PTRACE only)
 
@@ -330,9 +333,7 @@
         and run as root inside the container, OR grant file caps with
         setcap. (Docker's --cap-add only adds to the bounding/permitted
         sets; effective caps for non-root container UIDs need file caps.)
-
-        """
-      FileHandle.standardError.write(Data(msg.utf8))
+        """)
     }()
 
     private static func warnAboutMissingPtraceCapabilityOnce() {

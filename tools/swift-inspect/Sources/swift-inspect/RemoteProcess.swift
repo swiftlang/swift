@@ -10,6 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#if canImport(FoundationEssentials)
+import FoundationEssentials
+#else
+import Foundation
+#endif
 import SwiftRemoteMirror
 
 internal protocol RemoteProcess: AnyObject {
@@ -60,4 +65,8 @@ extension RemoteProcess {
   internal func release() {
     Unmanaged.passUnretained(self).release()
   }
+}
+
+internal func warn(_ message: String) {
+  FileHandle.standardError.write(Data("swift-inspect: \(message)\n".utf8))
 }
