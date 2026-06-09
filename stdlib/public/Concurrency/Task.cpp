@@ -89,7 +89,10 @@ const void *const swift::_swift_concurrency_debug_asyncTaskSlabMetadata =
 bool swift::_swift_concurrency_debug_supportsPriorityEscalation =
     SWIFT_CONCURRENCY_ENABLE_PRIORITY_ESCALATION;
 
-uint32_t swift::_swift_concurrency_debug_internal_layout_version = 1;
+// ************************* PLEASE UPDATE DEBUG.H DOCS ***************************************
+// * When changing this version number you MUST document the change in `Concurrency/Debug.h`. *
+// ********************************************************************************************
+uint32_t swift::_swift_concurrency_debug_internal_layout_version = 2;
 
 void FutureFragment::destroy() {
   auto queueHead = waitQueue.load(std::memory_order_acquire);
@@ -327,11 +330,15 @@ AsyncTask::~AsyncTask() {
     futureFragment()->destroy();
   }
 
-  // The initial task name record is special in that we allow it to stay until
-  // task destruction, since it is possible to read a name off a task handle,
-  // even after it completed; so drop it here:
-  if (hasInitialTaskNameRecord()) {
-    dropInitialTaskNameRecord();
+  // The task name characters live in the task's slab as the FIRST slab
+  // allocation. Free them last (i.e. here) so that the LIFO discipline
+  // holds — `task.name` is allowed to be read off a completed task right
+  // up until destruction.
+  if (hasTaskName()) {
+    if (const char *name = nameFragment()->getName()) {
+      _swift_task_dealloc_specific(this, const_cast<char*>(name));
+      nameFragment()->setName(nullptr, 0);
+    }
 
     #ifndef NDEBUG
     auto oldStatus = _private()._status().load(std::memory_order_relaxed);
@@ -459,6 +466,9 @@ const void *const swift::_swift_concurrency_debug_asyncTaskMetadata =
     static_cast<Metadata *>(&taskHeapMetadata);
 
 const size_t swift::_swift_concurrency_debug_asyncTaskSize = sizeof(AsyncTask);
+
+const size_t swift::_swift_concurrency_debug_asyncTaskNameOffset =
+    sizeof(AsyncTask);
 
 const HeapMetadata *swift::jobHeapMetadataPtr =
     static_cast<HeapMetadata *>(&jobHeapMetadata);
@@ -692,9 +702,16 @@ static inline bool taskIsDetached(TaskCreateFlags createFlags, JobFlags jobFlags
 
 static std::pair<size_t, size_t> amountToAllocateForHeaderAndTask(
     const AsyncTask *parent, const TaskGroup *group,
-    ResultTypeInfo futureResultType, size_t initialContextSize) {
+    ResultTypeInfo futureResultType, size_t initialContextSize,
+    bool hasTaskName) {
   // Figure out the size of the header.
   size_t headerSize = sizeof(AsyncTask);
+  if (hasTaskName) {
+    // The NameFragment must be the FIRST tail-allocated fragment so that
+    // its slot lives at the constant offset `sizeof(AsyncTask)` (exported
+    // as `_swift_concurrency_debug_asyncTaskNameOffset`).
+    headerSize += sizeof(AsyncTask::NameFragment);
+  }
   if (parent) {
     headerSize += sizeof(AsyncTask::ChildFragment);
   }
@@ -923,7 +940,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
   size_t headerSize, amountToAllocate;
   std::tie(headerSize, amountToAllocate) = amountToAllocateForHeaderAndTask(
-      parent, group, futureResultType, initialContextSize);
+      parent, group, futureResultType, initialContextSize,
+      /*hasTaskName=*/jobFlags.task_hasInitialTaskName());
 
   unsigned initialSlabSize = 512;
 
@@ -1114,14 +1132,10 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     task->Private.initialize(basePriority);
   }
 
-  // Task name
-  // This record MUST be the FIRST allocation on the task allocator stack.
-  //
-  // The task name is the only initial record we keep alive after the task completes,
-  // until it is destroyed, because `task.name` can be read off a completed task.
-  // All other records are released early, during task completion.
+  // First, initialize the NameFragment, if any.
   if (jobFlags.task_hasInitialTaskName()) {
-    task->pushInitialTaskName(taskName);
+    ::new (task->nameFragment()) AsyncTask::NameFragment();
+    task->initializeTaskName(taskName);
   }
 
   // Perform additional linking between parent and child task.
@@ -1259,7 +1273,8 @@ void swift::swift_task_run_inline(OpaqueValue *result, void *closureAFP,
   size_t candidateAllocationBytes = SWIFT_TASK_RUN_INLINE_INITIAL_CONTEXT_BYTES;
   size_t minimumAllocationSize =
       amountToAllocateForHeaderAndTask(/*parent=*/nullptr, /*group=*/nullptr,
-                                       futureResultType, closureContextSize)
+                                       futureResultType, closureContextSize,
+                                       /*hasTaskName=*/false)
           .second;
   void *allocation = nullptr;
   size_t allocationBytes = 0;
