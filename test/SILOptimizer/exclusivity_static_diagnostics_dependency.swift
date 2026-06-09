@@ -20,20 +20,40 @@ struct InoutPair: ~Escapable, ~Copyable {
   }
 }
 
-func take(_ inoutPair: consuming InoutPair) {}
+func takeFunction(_ inoutPair: consuming InoutPair) {}
 
 struct Pair {
   var x: Int
   var y: Int
 
-  mutating func run() {
+  mutating func testDistinctSubobjects() {
     var inoutPair = InoutPair()
     inoutPair.insertX(&x)
     inoutPair.insertY(&y)
 
-    take(inoutPair) // OK: no overlapping access.
+    takeFunction(inoutPair) // OK: no overlapping access.
     // The access of both &x and &y are extended up to the last use of 'inoutPair'.
     // Exclusivity diagnostics determines that &x and &y are distinct sub-objects
     // so their simultaneous access does not overlap.
   }
+
+  func takeMethod(_ pair: consuming InoutPair) {}
+
+  // A 'modify' access of 'self' extends over the lifetime of 'inoutPair'. But, since the call to 'self.takeMethod()'
+  // simply copies 'self' before calling 'takeMethod()', it is an immutable read scope which does not conflict with the
+  // overlapping 'modify'.
+  mutating func testInoutOverlapsWithMethod() {
+    var inoutPair = InoutPair()
+    inoutPair.insertX(&x)
+    inoutPair.insertY(&y)
+
+    self.takeMethod(inoutPair) // OK: treated like a nested read.
+  }
+}
+
+// Verify that reading the array count does not interfere with a mutable span.
+func testMutableSpan(array: inout [Int]) {
+  var ms = array.mutableSpan
+  _ = array.count // OK
+  ms[0] = 3
 }

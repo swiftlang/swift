@@ -1623,3 +1623,30 @@ bb0(%0 : $*Int):
   %10 = tuple ()
   return %10 : $()
 }
+
+// -----------------------------------------------------------------------------
+// Test an immutable read scope that overlaps with a modify scope. This is fine as long as no actual mutation occurs
+// within the read scope.
+
+sil hidden [ossa] @testImmutableReadTrivial : $@convention(thin) (@inout Int) -> () {
+bb0(%0 : $*Int):
+  %1 = begin_access [modify] [static] %0
+  %2 = begin_access [read] [static] %0
+  %3 = load [trivial] %2
+  end_access %2
+  end_access %1
+  %r = tuple ()
+  return %r
+}
+
+sil hidden [ossa] @testImmutableReadNonTrivial : $@convention(thin) (@inout AnyObject) -> () {
+bb0(%0 : $*AnyObject):
+  %1 = begin_access [modify] [static] %0
+  %2 = begin_access [read] [static] %0
+  %3 = load [copy] %2
+  end_access %2
+  end_access %1
+  destroy_value %3
+  %r = tuple ()
+  return %r
+}
