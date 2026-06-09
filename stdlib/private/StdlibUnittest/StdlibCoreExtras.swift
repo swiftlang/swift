@@ -22,6 +22,8 @@ internal import Musl
 internal import Android
 #elseif os(WASI)
 internal import WASILibc
+#elseif os(Emscripten)
+internal import EmscriptenLibc
 #elseif os(Windows)
 internal import CRT
 #endif
