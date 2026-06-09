@@ -4060,10 +4060,23 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
       ? CastConsumptionKind::BorrowAlways
       : CastConsumptionKind::CopyOnSuccess;
 
+  // ManagedValue::borrow pushes an EndBorrow cleanup for owned object-typed
+  // values, but the returned ManagedValue does not carry the cleanup handle.
+  // Detect the new cleanup by sampling the depth before/after, so the failure
+  // path below can sequence the end_borrow before consuming `exn`.
+  std::optional<CleanupHandle> endBorrowExn;
+  ManagedValue borrowedExn;
+  {
+    auto before = Cleanups.getCleanupsDepth();
+    borrowedExn = exn.borrow(*this, S);
+    if (before != Cleanups.getCleanupsDepth())
+      endBorrowExn = Cleanups.getTopCleanup();
+  }
+
   // Our model is that sub-cases get the exception at +0 and the throw (if we
   // need to rethrow the exception) gets the exception at +1 since we need to
   // trampoline it's ownership to our caller.
-  ConsumableManagedValue subject = {exn.borrow(*this, S), consumptionKind};
+  ConsumableManagedValue subject = {borrowedExn, consumptionKind};
 
   auto failure = [&](SILLocation location) {
     // If we fail to match anything, just rethrow the exception.
@@ -4076,11 +4089,20 @@ void SILGenFunction::emitCatchDispatch(DoCatchStmt *S, ManagedValue exn,
       return;
     }
 
+    // emitThrow may consume `exn` (e.g., by storing it into an existential
+    // box during erasure) before the surrounding scope's cleanups fire,
+    // which could put an EndBorrow after the consume. Emit the end_borrow
+    // eagerly here and put the EndBorrow cleanup into a Dormant state.
+    CleanupStateRestorationScope scope(Cleanups);
+    if (endBorrowExn) {
+      B.createEndBorrow(location, borrowedExn.getValue());
+      scope.pushCleanupState(*endBorrowExn, CleanupState::Dormant);
+    }
+
     // Since we borrowed exn before sending it to our subcases, we know that it
     // must be at +1 at this point. That being said, SILGenPattern will
     // potentially invoke this for each of the catch statements, so we need to
     // copy before we pass it into the throw.
-    CleanupStateRestorationScope scope(Cleanups);
     if (exn.hasCleanup()) {
       scope.pushCleanupState(exn.getCleanup(),
                              CleanupState::PersistentlyActive);

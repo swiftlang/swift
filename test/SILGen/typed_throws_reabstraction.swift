@@ -1,4 +1,6 @@
 // RUN: %target-swift-emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-emit-sil %s -sil-verify-all > /dev/null
+
 func test2() throws { // Not OK
   // The literal closure below is in a generic error context, even though
   // it statically throws `any Error`, leading it to be emitted with an
@@ -15,7 +17,7 @@ func test2() throws { // Not OK
     // CHECK: bb{{[0-9]+}}:
     // CHECK: bb{{[0-9]+}}:
     // CHECK:      end_borrow [[ERROR_BORROW]]
-    // CHECK-NEXT: store [[ERROR]] to [init]
+    // CHECK:      store [[ERROR]] to [init]
     // CHECK-NEXT: throw_addr
 
     catch is E1 { /* ignore */ }
@@ -61,3 +63,72 @@ func test3<E: Error>(e: E) {
     throw e
   }
 }
+
+// rdar://170997361
+// Need to stop borrowing the error value earlier, if the error value is not matched by the catch's pattern.
+// In the analogy of a 'switch', it's like a 'default' case where we are throwing the original error.
+// Previously we were emitting the end_borrow after doing the consuming store into an existential box.
+enum DonutError: Error {
+    case invalidItemType
+    case validError(any Error)
+    case unknown((any Error)?)
+}
+
+func testDonutError() throws {
+    let handler: () throws(DonutError) -> String = { () throws(DonutError) in
+        throw DonutError.invalidItemType
+    }
+
+    do {
+        _ = try handler()
+    } catch DonutError.invalidItemType {
+    } catch DonutError.validError {
+      try testDonutError()
+    }
+}
+// CHECK-LABEL: sil{{.*}} @{{.*}}testDonutErroryyKF :
+// CHECK: bb{{.*}}([[ERROR:%.*]] : @owned $DonutError):
+// CHECK:   [[ERROR_BORROW:%.*]] = begin_borrow [[ERROR]]
+// CHECK:   switch_enum [[ERROR_BORROW]]
+// CHECK: bb{{.*}}({{%.*}} : @guaranteed $Optional<any Error>):
+// CHECK:   end_borrow [[ERROR_BORROW]]
+// CHECK:   store [[ERROR]]
+
+class Box {}
+enum BoxError: Error {
+  case a(Box)
+  case b(Box)
+  case c(Box)
+}
+func mightBoxThrow() throws {}
+func testRethrowFromIsAndSwitch() throws {
+  do {
+    try mightBoxThrow()
+  } catch BoxError.a {
+  }
+}
+// CHECK-LABEL: sil{{.*}} @{{.*}}testRethrowFromIsAndSwitchyyKF :
+// CHECK: bb{{.*}}([[ERROR:%.*]] : @owned $any Error):
+// CHECK:   [[ERROR_BORROW:%.*]] = begin_borrow [[ERROR]]
+// CHECK:   checked_cast_addr_br copy_on_success {{.*}}, [[CAST_SUCCESS_BB:bb[0-9]+]], [[CAST_FAIL_BB:bb[0-9]+]]
+// CHECK: [[CAST_SUCCESS_BB]]:
+// CHECK:   switch_enum {{.*}}, case #BoxError.a!enumelt: [[SWITCH_SUCCESS_BB:bb[0-9]+]], default [[SWITCH_DEFAULT_BB:bb[0-9]+]]
+
+// match success for pattern `BoxError.a`: end the borrow before the destroy
+// CHECK: [[SWITCH_SUCCESS_BB]](
+// CHECK:   end_borrow [[ERROR_BORROW]]
+// CHECK:   destroy_value [[ERROR]]
+
+// switch_enum-default block: end the borrow before re-throwing.
+// CHECK: [[SWITCH_DEFAULT_BB]](
+// CHECK:   end_borrow [[ERROR_BORROW]]
+// CHECK:   br [[RETHROW_BLOCK:bb[0-9]+]]([[ERROR]])
+
+// `is`-cast-fail block: end the borrow before re-throwing.
+// CHECK: [[CAST_FAIL_BB]]:
+// CHECK:   end_borrow [[ERROR_BORROW]]
+// CHECK:   br [[RETHROW_BLOCK]]([[ERROR]])
+
+// CHECK: [[RETHROW_BLOCK]]({{.*}} @owned $any Error):
+// CHECK-NEXT:  throw
+// CHECK: } // end sil function '$s26typed_throws_reabstraction26testRethrowFromIsAndSwitchyyKF'

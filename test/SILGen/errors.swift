@@ -185,8 +185,8 @@ func all_together_now(_ flag: Bool) -> Cat {
 // CHECK:   switch_enum [[SUBERROR]] : $HomeworkError, case #HomeworkError.TooHard!enumelt: {{bb[0-9]+}}, default [[SWITCH_MATCH_FAIL_BB:bb[0-9]+]],
 //
 // CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
-// CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $any Error)
 //
 // CHECK: [[CAST_NO_BB]]:
@@ -222,8 +222,8 @@ func all_together_now_two(_ flag: Bool) throws -> Cat? {
 // CHECK:   switch_enum [[SUBERROR]] : $HomeworkError, case #HomeworkError.TooHard!enumelt: {{bb[0-9]+}}, case #HomeworkError.TooMuch!enumelt: {{bb[0-9]+}}, default [[SWITCH_MATCH_FAIL_BB:bb[0-9]+]],
 //
 // CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
-// CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $any Error)
 //
 // CHECK: [[CAST_NO_BB]]:
@@ -272,8 +272,8 @@ func all_together_now_three(_ flag: Bool) throws -> Cat? {
 // CHECK:   br bb2([[RETVAL]] : $Optional<Cat>)
 //
 // CHECK: [[SWITCH_MATCH_FAIL_BB]]([[SUBERROR:%.*]] : @owned $HomeworkError):
-// CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   end_borrow [[BORROWED_ERROR]]
+// CHECK:   destroy_value [[SUBERROR]]
 // CHECK:   br [[RETHROW_BB:bb[0-9]+]]([[ERROR]] : $any Error)
 //
 // CHECK: [[CAST_NO_BB]]:
@@ -346,19 +346,19 @@ func all_together_now_four(_ flag: Bool) throws -> Cat? {
 
 //   Catch other HomeworkErrors.
 // CHECK:    [[NO_MATCH]]([[CATCHALL_ERROR:%.*]] : @owned $HomeworkError):
+// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
 // CHECK-NEXT: destroy_value [[CATCHALL_ERROR]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
-// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
 // CHECK-NEXT: br [[RETHROW:bb[0-9]+]]
 
 //   Catch other types.
 // CHECK:    [[NOT_HWE]]:
+// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
 // CHECK-NEXT: dealloc_stack [[DEST_TEMP]]
 // CHECK-NEXT: destroy_addr [[SRC_TEMP]]
 // CHECK-NEXT: dealloc_stack [[SRC_TEMP]]
-// CHECK-NEXT: end_borrow [[BORROWED_ERROR]]
 // CHECK-NEXT: br [[RETHROW]]
 
 // Rethrow
