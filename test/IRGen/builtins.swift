@@ -1003,4 +1003,11 @@ nonisolated(nonsending) func testTaskCancellationShieldPop() async {
   Builtin.taskCancellationShieldPop()
 }  
 
+// CHECK-LABEL: define hidden {{.*}}ptr @"$s8builtins20test_dereferenceableyBpBp_BwtF"(ptr %0, i64 %1)
+func test_dereferenceable(_ ptr: Builtin.RawPointer, _ size: Builtin.Word) -> Builtin.RawPointer {
+  // CHECK: call void @llvm.assume(i1 true) [ "dereferenceable"(ptr %0, i64 %1) ]
+  // CHECK: ret ptr %0
+  return Builtin.dereferenceable(ptr, size)
+}
+
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

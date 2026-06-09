@@ -1040,3 +1040,11 @@ func markDependenceGuaranteed(_ p: AnyObject, _ o: AnyObject) -> AnyObject {
   return Builtin.markDependence(p, o)
 }
 
+// CHECK-LABEL: sil hidden [ossa] @$s8builtins20test_dereferenceableyBpBp_BwtF : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+// CHECK: bb0([[PTR:%.*]] : $Builtin.RawPointer, [[SIZE:%.*]] : $Builtin.Word):
+// CHECK:   [[RESULT:%.*]] = builtin "dereferenceable"([[PTR]] : $Builtin.RawPointer, [[SIZE]] : $Builtin.Word) : $Builtin.RawPointer
+// CHECK:   return [[RESULT]] : $Builtin.RawPointer
+// CHECK: } // end sil function '$s8builtins20test_dereferenceableyBpBp_BwtF'
+func test_dereferenceable(_ ptr: Builtin.RawPointer, _ size: Builtin.Word) -> Builtin.RawPointer {
+  return Builtin.dereferenceable(ptr, size)
+}
