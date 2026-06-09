@@ -92,6 +92,10 @@ def find_rev_by_timestamp(
         raise RuntimeError("No rev in %s before timestamp %s" % (repo_name, timestamp))
 
 
+def output_prefix(repo_name: str):
+    return f"[{repo_name}] ".ljust(40)
+
+
 def get_branch_for_repo(
     repo_path: Path,
     config: Dict[str, Any],
@@ -120,30 +124,55 @@ def get_branch_for_repo(
     repo_branch = scheme_name
     if scheme_map:
         scheme_branch = scheme_map[repo_name]
-        repo_branch = scheme_branch
         remote_repo_id = config["repos"][repo_name]["remote"]["id"]
         if remote_repo_id in cross_repos_pr:
+            prefix = output_prefix(repo_name)
             cross_repo = True
             pr_id = cross_repos_pr[remote_repo_id]
             repo_branch = "ci_pr_{0}".format(pr_id)
-            Git.run(repo_path, ["checkout", scheme_branch], echo=True)
-            Git.run(
-                repo_path,
-                ["branch", "-D", repo_branch],
-                echo=True,
-                allow_non_zero_exit=True,
-                fatal=True,
-            )
+
+            # Fetch the PR merge branch into repo_branch, and also fetch the
+            # scheme branch, which ought to match the PR base branch.
             Git.run(
                 repo_path,
                 [
                     "fetch",
                     "origin",
-                    "pull/{0}/merge:{1}".format(pr_id, repo_branch),
+                    # If repo_branch exists, overwrite it.
+                    "--force",
+                    # If repo_branch exists and is checked out, this will
+                    # prevent Git from refusing the fetch.
+                    "--update-head-ok",
                     "--tags",
+                    f"pull/{pr_id}/merge:{repo_branch}",
+                    scheme_branch,
                 ],
                 echo=True,
+                prefix=prefix,
             )
+            # Check out repo_branch and merge the base branch into it.
+            # GitHub cannot be trusted to keep PR merge branches up-to-date.
+            Git.run(repo_path, ["checkout", repo_branch], echo=True, prefix=prefix)
+            try:
+                Git.run(
+                    repo_path,
+                    ["merge", f"origin/{scheme_branch}", "--no-edit"],
+                    echo=True,
+                    prefix=prefix,
+                )
+            except Exception as e:
+                # If the merge fails, odds are there's a conflict. Either way
+                # we do not want to proceed. Abort the merge to leave a clean
+                # working directory behind, ignoring errors, and fail with the
+                # merge error.
+                try:
+                    Git.run(repo_path, ["merge", "--abort"], echo=True, prefix=prefix)
+                except:
+                    pass
+                raise e
+        else:
+            repo_branch = scheme_branch
+
     return repo_branch, cross_repo
 
 
@@ -156,7 +185,7 @@ def update_single_repository(pool_args: UpdateArguments):
         return
 
     try:
-        prefix = f"[{repo_path.name}] ".ljust(40)
+        prefix = output_prefix(repo_name)
         if verbose:
             print(f"{prefix}Updating '{repo_path}'")
 
@@ -1025,7 +1054,7 @@ def main() -> int:
                     swift_repo_path,
                     ["checkout", branch_name],
                     echo=True,
-                    prefix="[swift] ",
+                    prefix=output_prefix("swift"),
                 )
 
                 # Re-read the config after checkout.
