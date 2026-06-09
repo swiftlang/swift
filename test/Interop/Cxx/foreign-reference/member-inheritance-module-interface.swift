@@ -112,14 +112,14 @@
 // CHECK:  final func swiftParamsRename(a2 i: Int32) -> Int32
 // CHECK: }
 
-// CHECK: struct D3 {
+// CHECK: class D3 {
 // CHECK:  final func virtualMethod() -> Int32
 // CHECK:  final func swiftFooRename() -> Int32
 // CHECK:  final func swiftBarRename() -> Int32
 // CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
 // CHECK: }
 
-// CHECK: struct D4 {
+// CHECK: class D4 {
 // CHECK:  final func swiftFooRename() -> Int32
 // CHECK:  final func swiftBarRename() -> Int32
 // CHECK:  final func swiftParamsRename(a1 i: Int32) -> Int32
