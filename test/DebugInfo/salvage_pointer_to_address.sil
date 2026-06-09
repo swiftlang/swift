@@ -1,0 +1,26 @@
+// RUN: %target-sil-opt -sil-verify-all -sil-combine %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// When a pointer_to_address is dead (only used by debug_value), SILCombine
+// should salvage the debug info into a reconstruction block.
+//
+// CHECK-LABEL: sil @salvage_pointer_to_address
+// CHECK: bb0(%0 : $Builtin.RawPointer):
+// CHECK:   debug_value %0, let, name "addr", transform {
+// CHECK:   bb0(%[[ARG:[0-9]+]] : $Builtin.RawPointer):
+// CHECK:     %[[PTA:[0-9]+]] = pointer_to_address %[[ARG]] to [strict] $*Int
+// CHECK:     %[[LOAD:[0-9]+]] = load %[[PTA]]
+// CHECK:     return %[[LOAD]]
+// CHECK:   }
+// CHECK:   return
+sil @salvage_pointer_to_address : $@convention(thin) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  %1 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Int
+  debug_value %1 : $*Int, let, name "addr", expr op_deref
+  %r = tuple ()
+  return %r : $()
+}
