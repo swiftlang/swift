@@ -31,32 +31,11 @@ extension _SystemString {
     let afterSlash = index(after: startIndex)
     guard afterSlash < endIndex, self[afterSlash] == ._dot else { return nil }
 
-    // Per the proposal, an anchor may include resolve flags AND/OR a
-    // volume identifier; resolve always precedes vol. So a leading
-    // /.nofollow/ or /.resolve/N/ may extend with .vol/FSID/FILEID into
-    // a single combined anchor.
-    if let leading = _parseNofollow(from: afterSlash) {
-      return _maybeChainVol(after: leading)
-    }
-    if let leading = _parseResolve(from: afterSlash) {
-      return _maybeChainVol(after: leading)
-    }
-    return _parseVol(from: afterSlash)
-  }
-
-  // If `.vol/FSID/FILEID` follows the leading flag's relativeBegin,
-  // extend the anchor to include it. Otherwise return the leading
-  // anchor unchanged.
-  private func _maybeChainVol(
-    after leading: _ParsedDarwinAnchor
-  ) -> _ParsedDarwinAnchor {
-    guard let chained = _parseVol(from: leading.relativeBegin) else {
-      return leading
-    }
-    // Chaining must strictly extend the leading anchor.
-    _internalInvariant(chained.anchorEnd >= leading.relativeBegin)
-    _internalInvariant(chained.relativeBegin >= chained.anchorEnd)
-    return chained
+    // Anchor grammar: /(flag)?(vol)? — flag is .nofollow/ or .resolve/N/,
+    // vol is .vol/FSID/FILEID(/)?, at least one of the two must be present.
+    let flag = _parseNofollow(from: afterSlash) ?? _parseResolve(from: afterSlash)
+    let volStart = flag?.relativeBegin ?? afterSlash
+    return _parseVol(from: volStart) ?? flag
   }
 
   // MARK: - /.nofollow/
@@ -89,8 +68,8 @@ extension _SystemString {
   }
 
   // Shared parser for the `.vol/FSID/FILEID[/]` body. Returns the
-  // FILEID range (used by canonicalize to test for `2`) and the
-  // relative-portion start (which is past the trailing `/` if any).
+  // FILEID range and the relative-portion start (past the trailing
+  // `/` if any).
   private func _parseVolBody(
     from dotIdx: Index
   ) -> (fileidRange: Range<Index>, relativeBegin: Index)? {

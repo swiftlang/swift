@@ -97,8 +97,7 @@ extension String {
   public init?(validating anchor: FilePath.Anchor) {
     // Mirror the FilePath overload: decode, re-encode, and compare (via
     // String(validating: _SystemString)), so ill-formed content yields nil
-    // instead of a lossy U+FFFD decode. Not directly reachable by a test —
-    // Anchor has no public codeUnits init to inject ill-formed bytes.
+    // instead of a lossy U+FFFD decode.
     guard let str = String(validating: _SystemString(anchor._slice)) else {
       return nil
     }

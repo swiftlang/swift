@@ -20,8 +20,6 @@ internal var _isLinux:   Bool { false }
 internal var _isWindows: Bool { false }
 internal var _isDarwin:  Bool { true }
 internal var _isLinux:   Bool { false }
-// TODO(post-merge): what all can we fold in here? basically any generic POSIX platform that folds `//` into `/`
-// ... #elseif os(Linux) || os(Android) || os(FreeBSD) || os(OpenBSD) || os(WASI)
 #elseif os(Linux)
 internal var _isWindows: Bool { false }
 internal var _isDarwin:  Bool { false }
@@ -49,28 +47,25 @@ internal func _isSeparator(_ c: FilePath.CodeUnit) -> Bool {
 /// Returns `true` if the given anchor bytes are the Windows
 /// drive-relative form `<letter>:` (e.g. `C:`).
 ///
-/// Drive-relative is the *only* 2-byte anchor across all platforms:
-/// Linux `/` is 1 byte; Darwin magic anchors (`/.nofollow/`,
-/// `/.resolve/N/`, `/.vol/FSID/FILEID`) are all longer; UNC
-/// (`\\server\share`) and verbatim variants are all longer. So the
-/// "2-byte anchor ending in `:`" shape uniquely identifies
-/// drive-relative — and traps if we're not on Windows.
+/// **Precondition: caller is on Windows.** Drive-relative is a
+/// Windows-specific concept; this function asserts `_isWindows` and
+/// must not be called from cross-platform code without a `_isWindows`
+/// gate. (See `_anchorNeedsGapSeparator` for the canonical example.)
 ///
 /// The `:` IS the boundary in this anchor: `C:foo` is valid
 /// (drive-relative with one component); `C:\foo` is a different
-/// anchor (drive-absolute). Other anchor shapes that happen to end
-/// in `:` — UNC with a colon-ending share name (`\\server\C:`),
-/// Darwin volfs with a colon-ending FILEID — are NOT 2 bytes and
-/// don't match.
+/// anchor (drive-absolute). Drive-relative is the *only* 2-byte
+/// anchor on Windows: UNC (`\\server\share`) and verbatim variants
+/// are all longer; other anchor shapes that happen to end in `:` —
+/// UNC with a colon-ending share name (`\\server\C:`), or volfs-style
+/// FILEIDs on hypothetical cross-platform code — are NOT 2 bytes
+/// and don't match.
 @available(SwiftStdlib 9999, *)
 internal func _isDriveRelativeAnchor(
   _ anchorBytes: some BidirectionalCollection<FilePath.CodeUnit>
 ) -> Bool {
-  guard anchorBytes.count == 2, anchorBytes.last == ._colon else {
-    return false
-  }
-  _internalInvariant(_isWindows, "2-byte colon anchor only exists on Windows")
-  return true
+  _internalInvariant(_isWindows, "drive-relative anchor is Windows-specific")
+  return anchorBytes.count == 2 && anchorBytes.last == ._colon
 }
 
 /// Returns `true` if a separator must be inserted between the given
@@ -95,7 +90,7 @@ internal func _anchorNeedsGapSeparator(
 ) -> Bool {
   guard let last = anchorBytes.last else { return false }
   if _isSeparator(last) { return false }
-  if _isDriveRelativeAnchor(anchorBytes) { return false }
+  if _isWindows && _isDriveRelativeAnchor(anchorBytes) { return false }
   return true
 }
 
@@ -183,8 +178,7 @@ extension _SystemString {
 
 @available(SwiftStdlib 9999, *)
 extension _SystemString {
-  // Append the dot-normalized form of `self[range]` to `result`, per the
-  // proposal rules:
+  // Append the dot-normalized form of `self[range]` to `result`. Rules:
   // - `.` is dropped unless it is the leading component of an unrooted path
   // - Trailing `.` becomes a trailing separator (foo/. -> foo/)
   // - `..` is always preserved

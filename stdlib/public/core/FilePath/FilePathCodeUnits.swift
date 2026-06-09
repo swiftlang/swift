@@ -57,26 +57,6 @@ extension FilePath {
 
 // MARK: - Code unit access (Span)
 
-// The proposal specifies two SEPARATE forms of byte access, both present:
-//
-//   1. `withCodeUnits(_:)` above — closure-based, hands back a
-//      null-terminated `UnsafePointer` plus the code-unit count, for C
-//      interop (tracks `String.withCString`). FilePath only.
-//   2. `var codeUnits: Span<CodeUnit>` on FilePath, Component, Anchor, and
-//      ComponentView, plus `var nullTerminatedCodeUnits` on FilePath — safe,
-//      borrowed, direct byte access.
-//
-// These are NOT subsumed by one another: the Span getters are the proposal's
-// Span surface and coexist with the C-interop `withCodeUnits(_:)`.
-//
-// The Span getters borrow `_SystemString.nullTerminatedStorage` via its
-// `.span` (see `_span` / `_nullTerminatedSpan` in FilePathSystemString.swift),
-// sub-extracted to each type's byte range. They are computed getters on
-// Escapable types, so per SE-0456 the borrow on `self` is inferred and no
-// `@_lifetime` annotation is required. Enabled by
-// `.enableExperimentalFeature("Lifetimes")` in Package.swift. Span access is
-// safe, so the bodies carry no `unsafe` expressions under StrictMemorySafety.
-
 @available(SwiftStdlib 9999, *)
 extension FilePath {
   /// A span of the platform code units comprising this path, not

@@ -52,22 +52,6 @@ extension FilePath {
 @available(SwiftStdlib 9999, *)
 extension FilePath {
   /// View the relative path components that make up this path.
-  ///
-  /// The anchor of the result follows from whatever the path string is
-  /// after mutation: re-decomposition of the resulting bytes is what the
-  /// kernel sees, and is what we report.
-  ///
-  /// `set` splices the new view's contributed bytes
-  /// (`[_originalStart, _suffixEnd)`) into self's post-anchor region —
-  /// self's anchor bytes are physically untouched, so the anchor is
-  /// preserved by construction. Mutation that produces bytes parsing
-  /// as a different anchor (e.g. inserting `.nofollow` at the front of
-  /// an absolute Darwin path) lets the new anchor stand, because the
-  /// absorbed bytes are inside the spliced region.
-  ///
-  /// In-place mutation (`path.components.append(x)`) lowers to
-  /// get-mutate-set: the temporary view's mutating method splices into
-  /// its own `_path`, then `set` splices that result back into self.
   @available(SwiftStdlib 9999, *)
   public var components: ComponentView {
     get { ComponentView(_path: self) }

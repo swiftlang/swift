@@ -182,10 +182,10 @@ extension _SystemString {
     }
 
     // \\?\<drive>:[\] — a drive letter is any single non-separator code
-    // unit before the colon (matching eatDrive and the proposal). In
-    // verbatim paths separators are not normalized and `/` is a legal
-    // component byte, so `!isSeparator` accepts it: `\\?\/:` parses with
-    // drive `/`, taking the bytes as written.
+    // unit before the colon (matching eatDrive). In verbatim paths
+    // separators are not normalized and `/` is a legal component byte,
+    // so `!isSeparator` accepts it: `\\?\/:` parses with drive `/`,
+    // taking the bytes as written.
     s = self[afterPrefix...]
     if s._eat(if: { !_isSeparator($0) }) != nil,
        s._eat(._colon) != nil {
@@ -272,8 +272,8 @@ extension _SystemString {
     let rootEnd = lexer.current
 
     // A drive letter is any single non-separator code unit before the
-    // colon (matching `eatDrive` and the proposal). In verbatim paths
-    // `/` is a non-separator and legal, so `\\?\/:` parses with drive `/`.
+    // colon (matching `eatDrive`). In verbatim paths `/` is a non-separator
+    // and legal, so `\\?\/:` parses with drive `/`.
     let drive = _driveLetter(of: self[deviceRange])
     if drive != nil, lexer.eatBackslash() {
       // \\?\C:\  or \\.\C:\

@@ -34,15 +34,6 @@ extension FilePath {
       let (rootEnd, relBegin) = _path._storage._parseRoot()
       self._originalStart = rootEnd
       self._relStart = relBegin
-      // `_relEnd` excludes any structural suffix beyond the iterable
-      // component region: a Darwin resource-fork suffix (`/file/..namedfork/rsrc`
-      // → `_relEnd` at the leading `/` of the suffix), OR a trailing separator
-      // on the relative region (`/foo/bar/` → `_relEnd` at the trailing `/`).
-      // Both kinds live in `[_relEnd, _suffixEnd)` and are absorbed by splice
-      // operations that touch the end. The trailing-sep case requires the
-      // `relBegin` guard: for `/`, `\\server\share\`, `C:\`, etc., the trailing
-      // byte of storage IS a separator but it belongs to the anchor/gap, not
-      // to the relative region.
       self._relEnd = _path._storage._componentViewRelEnd(relBegin: relBegin)
       self._suffixEnd = _path._storage.endIndex
 
@@ -108,6 +99,16 @@ extension _SystemString {
 
 @available(SwiftStdlib 9999, *)
 extension FilePath.ComponentView {
+  // Re-derive _relStart/_relEnd/_suffixEnd from current _path._storage.
+  // _originalStart is intentionally NOT touched — it's set at view
+  // creation and stays put even when re-decomposition shifts the anchor.
+  internal mutating func _recomputeIndices() {
+    let (_, relBegin) = _path._storage._parseRoot()
+    _relStart = relBegin
+    _relEnd = _path._storage._componentViewRelEnd(relBegin: relBegin)
+    _suffixEnd = _path._storage.endIndex
+  }
+
   internal func _componentEnd(at pos: _SystemString.Index) -> _SystemString.Index {
     var i = pos
     while i < _relEnd && !_isSeparator(_path._storage[i]) {
@@ -217,9 +218,7 @@ extension FilePath.ComponentView: RangeReplaceableCollection {
     let byteLower = subrange.lowerBound._storage
     let byteUpper = touchesEnd ? _suffixEnd : subrange.upperBound._storage
 
-    let newArray = Array(newElements)
-
-    if newArray.isEmpty {
+    if newElements.isEmpty {
       // Indices point to component starts. The range [byteLower, byteUpper)
       // covers the removed component(s) plus the joining separator that
       // follows them. The exception is `touchesEnd`: there is no following
@@ -254,7 +253,7 @@ extension FilePath.ComponentView: RangeReplaceableCollection {
         // up to and including any existing suffix bytes).
         _path._storage.removeSubrange(byteLower..<byteUpper)
         if needLeadingSep { _path._storage.append(_platformSeparator) }
-        for (i, comp) in newArray.enumerated() {
+        for (i, comp) in newElements.enumerated() {
           if i > 0 { _path._storage.append(_platformSeparator) }
           _path._storage.append(contentsOf: comp._slice)
         }
@@ -267,7 +266,7 @@ extension FilePath.ComponentView: RangeReplaceableCollection {
 
         var bytes = _SystemString()
         if needLeadingSep { bytes.append(_platformSeparator) }
-        for (i, comp) in newArray.enumerated() {
+        for (i, comp) in newElements.enumerated() {
           if i > 0 { bytes.append(_platformSeparator) }
           bytes.append(contentsOf: comp._slice)
         }
@@ -280,10 +279,7 @@ extension FilePath.ComponentView: RangeReplaceableCollection {
     // Recompute the mutable trio. _originalStart does NOT move — it
     // marks where this view's contribution starts in storage, regardless
     // of how the post-mutation bytes re-decompose.
-    let (_, newRelBegin) = _path._storage._parseRoot()
-    _relStart = newRelBegin
-    _relEnd = _path._storage._componentViewRelEnd(relBegin: newRelBegin)
-    _suffixEnd = _path._storage.endIndex
+    _recomputeIndices()
   }
 }
 

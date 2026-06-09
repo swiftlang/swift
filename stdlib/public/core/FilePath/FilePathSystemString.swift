@@ -173,18 +173,13 @@ extension _SystemString {
 
 @available(SwiftStdlib 9999, *)
 extension _SystemString {
-  // A borrowed span over the whole backing array, INCLUDING the trailing
-  // null terminator as its final element. Backs FilePath's
-  // `nullTerminatedCodeUnits`. Computed getter, so the borrow on `self` is
-  // inferred (SE-0456) — no `@_lifetime` needed. Span access is safe, so no
-  // `unsafe` expression is required under StrictMemorySafety.
+  // The backing array INCLUDING the trailing null terminator. Per-subtype
+  // spans extract their slice range from this base.
   internal var _nullTerminatedSpan: Span<FilePath.CodeUnit> {
     nullTerminatedStorage.span
   }
 
-  // A borrowed span over the code units EXCLUDING the trailing null
-  // terminator. Backs FilePath's `codeUnits`; the per-subtype spans extract
-  // their slice range from `_nullTerminatedSpan`.
+  // The backing array EXCLUDING the trailing null terminator.
   internal var _span: Span<FilePath.CodeUnit> {
     nullTerminatedStorage.span.extracting(0..<length)
   }

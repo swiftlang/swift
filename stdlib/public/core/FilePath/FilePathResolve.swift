@@ -27,8 +27,7 @@ import SwiftShims
 //
 // Carries a platform error code (`errno` on POSIX, `GetLastError()` on
 // Windows) so callers can introspect via `as? _FilePathResolveError` while
-// `resolve()`'s public surface stays untyped (`throws`). The public
-// error-type design is deferred to review.
+// `resolve()`'s public surface stays untyped (`throws`).
 
 @available(SwiftStdlib 9999, *)
 internal struct _FilePathResolveError: Error {
@@ -94,8 +93,7 @@ extension FilePath {
 // per-platform anchor / suffix the bytes happen to express. One
 // allocation (the `_SystemString` storage) plus one bulk copy — the
 // backing `Array` is sized exactly and filled in place rather than via
-// per-element `append`. Used by both the package-side per-platform
-// `_resolve*` impls and the stdlib-side `_resolveViaStdlibStub`.
+// per-element `append`.
 @available(SwiftStdlib 9999, *)
 extension FilePath {
   fileprivate init(
@@ -121,18 +119,10 @@ extension FilePath {
 #if FILEPATH_PACKAGE
 
 // MARK: - Per-platform implementation
-//
-// Branch order matches the dispatch in `resolve()` and the centralized
-// `_isWindows` / `_isDarwin` predicates in FilePathParsing.swift, so the
-// `os(Windows)` and `canImport(Darwin)` checks don't need to disambiguate
-// each other.
 
 #if os(Windows)
 
 // MARK: Windows
-//
-// Best-effort. Not exercised by the local test target on this build (Darwin)
-// — to be validated on a Windows host.
 
 @available(SwiftStdlib 9999, *)
 extension FilePath {
@@ -279,8 +269,7 @@ extension FilePath {
 // MARK: Linux (and other POSIX)
 //
 // Linux has neither firmlinks nor Darwin-style anchor prefixes, so the
-// portable POSIX call is correct. Best-effort; not exercised by the local
-// test target on this build (Darwin).
+// portable POSIX call is correct.
 
 @available(SwiftStdlib 9999, *)
 extension FilePath {
