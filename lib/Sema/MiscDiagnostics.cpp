@@ -1475,14 +1475,23 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       Expr *subExpr = nullptr;
       if (calleeName == "??" &&
           (subExpr = isImplicitPromotionToOptional(lhs))) {
-
-        Ctx.Diags
-            .diagnose(DRE->getLoc(), diag::use_of_qq_on_non_optional_value,
-                      subExpr->getType())
-            .highlight(lhs->getSourceRange())
-            .fixItRemoveChars(
-                Lexer::getLocForEndOfToken(Ctx.SourceMgr, lhs->getEndLoc()),
-                Lexer::getLocForEndOfToken(Ctx.SourceMgr, rhs->getEndLoc()));
+        if (subExpr->getType()->getOptionalObjectType()) {
+          // The LHS is already optional and is being promoted to an additional
+          // level of optional (e.g. Int? -> Int??), making it always non-nil.
+          Ctx.Diags
+              .diagnose(DRE->getLoc(),
+                        diag::use_of_qq_with_optional_lhs_promotion,
+                        subExpr->getType())
+              .highlight(lhs->getSourceRange());
+        } else {
+          Ctx.Diags
+              .diagnose(DRE->getLoc(), diag::use_of_qq_on_non_optional_value,
+                        subExpr->getType())
+              .highlight(lhs->getSourceRange())
+              .fixItRemoveChars(
+                  Lexer::getLocForEndOfToken(Ctx.SourceMgr, lhs->getEndLoc()),
+                  Lexer::getLocForEndOfToken(Ctx.SourceMgr, rhs->getEndLoc()));
+        }
         return;
       }
       
