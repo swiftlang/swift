@@ -696,6 +696,16 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.build_wasistdlib)
         builder.add_product(products.WASISwiftSDK,
                             is_enabled=self.args.build_wasistdlib)
+
+        builder.add_product(products.EmscriptenSysroot,
+                            is_enabled=self.args.build_emscriptenstdlib)
+        builder.add_product(products.EmscriptenLLVMRuntimeLibs,
+                            is_enabled=self.args.build_emscriptenstdlib)
+        builder.add_product(products.EmscriptenStdlib,
+                            is_enabled=self.args.build_emscriptenstdlib)
+        builder.add_product(products.EmscriptenSwiftSDK,
+                            is_enabled=self.args.build_emscriptenstdlib)
+
         builder.add_product(products.SwiftFoundationTests,
                             is_enabled=self.args.build_foundation)
         builder.add_product(products.FoundationTests,
