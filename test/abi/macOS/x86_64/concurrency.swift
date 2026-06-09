@@ -459,3 +459,6 @@ Added: _$ss10_AsyncTaskVyABBpcfC
 // (raw pointer wrapper) under the new `_rawTask` field.
 Added: _$sSct8_rawTasks06_AsyncB0Vvg
 Added: _$sSct8_rawTasks06_AsyncB0VvpMV
+
+/// Expose async task name offset in debug header.
+Added: __swift_concurrency_debug_asyncTaskNameOffset

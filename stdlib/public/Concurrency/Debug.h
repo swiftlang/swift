@@ -38,6 +38,13 @@ const void *const _swift_concurrency_debug_asyncTaskMetadata;
 SWIFT_EXPORT_FROM(swift_Concurrency)
 const size_t _swift_concurrency_debug_asyncTaskSize;
 
+/// Offset from the start of an `AsyncTask` to its `NameFragment`
+/// (a single `const char *` pointing to the task's null-terminated name).
+///
+/// The fragment is ONLY present when `JobFlags::task_hasInitialTaskName()` is true.
+SWIFT_EXPORT_FROM(swift_Concurrency)
+const size_t _swift_concurrency_debug_asyncTaskNameOffset;
+
 /// A fake metadata pointer placed at the start of async task slab allocations.
 SWIFT_EXPORT_FROM(swift_Concurrency)
 const void *const _swift_concurrency_debug_asyncTaskSlabMetadata;
@@ -58,6 +65,8 @@ bool _swift_concurrency_debug_supportsPriorityEscalation;
 /// The current version of internal data structures that lldb may decode.
 /// The version numbers used so far are:
 /// 1 - The initial version number when this variable was added, in swift 6.1.
+/// 2 - Task names moved from a record to a dedicated fragment,
+///     tail allocated just after the AsyncTask itself.
 SWIFT_EXPORT_FROM(swift_Concurrency)
 uint32_t _swift_concurrency_debug_internal_layout_version;
 

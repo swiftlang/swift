@@ -668,17 +668,21 @@ static size_t swift_strlen(const char *text) {
 }
 #endif
 
-void AsyncTask::pushInitialTaskName(const char* _taskName) {
+void AsyncTask::initializeTaskName(const char *_taskName) {
   assert(_taskName && "Task name must not be null!");
-  assert(hasInitialTaskNameRecord() && "Attempted pushing name but task has no initial task name flag!");
+  assert(hasTaskName() &&
+         "Attempted to initialize the task name fragment but the task has no "
+         "initial task name flag!");
 
-  void *allocation = _swift_task_alloc_specific(
-      this, sizeof(class TaskNameStatusRecord));
-
-  // TODO: Copy the string maybe into the same allocation at an offset or retain the swift string?
+  // The name fragment is tail-allocated on the task, but the actual name string
+  // we allocate on the task local allocator;
+  //
+  // The task name string therefore must respect stack discipline and must be
+  // the first allocation made on the task-local allocator, as it will be the
+  // last thing we destroy.
   auto taskNameLen = swift_strlen(_taskName);
-  char* taskNameCopy = reinterpret_cast<char*>(
-      _swift_task_alloc_specific(this, taskNameLen + 1/*null terminator*/));
+  char *taskNameCopy = reinterpret_cast<char *>(
+      _swift_task_alloc_specific(this, taskNameLen + 1 /*null terminator*/));
 #if SWIFT_CONCURRENCY_EMBEDDED
   swift_strcpy(taskNameCopy, _taskName);
 #elif defined(_WIN32)
@@ -689,58 +693,19 @@ void AsyncTask::pushInitialTaskName(const char* _taskName) {
   taskNameCopy[taskNameLen] = '\0'; // make sure we null-terminate
 #endif
 
-  auto record =
-      ::new (allocation) TaskNameStatusRecord(taskNameCopy);
-  SWIFT_TASK_DEBUG_LOG("[TaskName] Create initial task name record %p "
-                       "for task:%p, name:%s", record, this, taskNameCopy);
-
-  addStatusRecord(this, record,
-                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
-                    return true; // always add the record
-                  });
-}
-
-void AsyncTask::dropInitialTaskNameRecord() {
-  if (!hasInitialTaskNameRecord()) {
-    return;
-  }
-
-  SWIFT_TASK_DEBUG_LOG("[TaskName] Drop initial task name record for task:%p", this);
-  TaskNameStatusRecord *record =
-      popStatusRecordOfType<TaskNameStatusRecord>(this);
-  assert(record &&
-         "hasInitialTaskNameRecord is true but we did not find a name record");
-  // Since we first allocated the record, and then the string copy, deallocate
-  // in LIFO order.
-  char *name = const_cast<char *>(record->getName());
-  _swift_task_dealloc_specific(this, name);
-  _swift_task_dealloc_specific(this, record);
+  nameFragment()->setName(taskNameCopy, taskNameLen);
+  SWIFT_TASK_DEBUG_LOG("[TaskName] Initialize name slot for task:%p, name:%s",
+                       this, taskNameCopy);
 }
 
 const char*
 AsyncTask::getTaskName() {
-  // We first check the executor preference status flag, in order to avoid
-  // having to scan through the records of the task checking if there was
-  // such record.
-  //
-  // This is an optimization in order to make the enqueue/run
-  // path of a task avoid excessive work if a task had many records.
-  if (!hasInitialTaskNameRecord()) {
+  if (!hasTaskName())
     return nullptr;
-  }
 
-  const char *data = nullptr;
-  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
-    for (auto record : status.records()) {
-      if (record->getKind() == TaskStatusRecordKind::TaskName) {
-        auto nameRecord = cast<TaskNameStatusRecord>(record);
-        data = nameRecord->getName();
-        return;
-      }
-    }
-  });
-
-  return data;
+  // Reads are trivial, no locking or record walks are involved;
+  // Just get the name fragment and pointed at name string.
+  return nameFragment()->getName();
 }
 
 /**************************************************************************/
@@ -761,18 +726,13 @@ void swift::updateNewChildWithParentAndGroupState(AsyncTask *child,
                                                   TaskGroup *group) {
   // We can take the fast path of just modifying the ActiveTaskStatus in the
   // child task since we know it cannot be accessed by anyone else yet -- it
-  // hasn't been linked in. The only record that may already be present is the
-  // initial task name (pushed first during task creation so it can outlive
-  // `complete()`); that's harmless here because we only mutate status flags,
-  // not the records list.
+  // hasn't been linked in. There should be no status records yet: the task
+  // name now lives in a tail-allocated `NameFragment`, not on the chain.
   // Avoids the extra logic in `swift_task_cancel` and `swift_task_escalate`
   auto oldChildTaskStatus =
       child->_private()._status().load(std::memory_order_relaxed);
-  assert((oldChildTaskStatus.getInnermostRecord() == NULL ||
-          (oldChildTaskStatus.getInnermostRecord()->getKind() ==
-               TaskStatusRecordKind::TaskName &&
-           oldChildTaskStatus.getInnermostRecord()->getParent() == NULL)) &&
-         "child task should have no records, or only the initial task name");
+  assert(oldChildTaskStatus.getInnermostRecord() == NULL &&
+         "child task should have no records yet");
 
   auto newChildTaskStatus = oldChildTaskStatus;
 
@@ -906,10 +866,6 @@ static void performCancellationAction(ActiveTaskStatus status, TaskStatusRecord 
   case TaskStatusRecordKind::TaskExecutorPreference:
     break;
 
-  // Cancellation has no impact on task names.
-  case TaskStatusRecordKind::TaskName:
-    break;
-
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:
     break;
@@ -1009,9 +965,6 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
   /// Executor preference we can ignore.
   case TaskStatusRecordKind::TaskExecutorPreference:
-    return;
-  /// Task names don't matter to priority escalation.
-  case TaskStatusRecordKind::TaskName:
     return;
   // This should never be found, but the compiler complains if we don't check.
   case TaskStatusRecordKind::First_Reserved:

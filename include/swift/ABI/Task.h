@@ -60,11 +60,19 @@ class TaskOptionRecord;
 class TaskGroup;
 class ContinuationAsyncContext;
 
+// Forward-declared from `stdlib/public/Concurrency/Debug.h` so we can assert
+// against it.
+#if !SWIFT_CONCURRENCY_EMBEDDED
+extern "C" const size_t _swift_concurrency_debug_asyncTaskNameOffset;
+#endif
+
 // lldb knows about some of these internals. If you change things that lldb
 // knows about (or might know about in the future, as a future lldb might be
 // inspecting a process running an older Swift runtime), increment
 // _swift_concurrency_debug_internal_layout_version and add a comment describing
 // the new version.
+//
+// See `Concurrency/Debug.h` for details about each version.
 
 extern const HeapMetadata *jobHeapMetadataPtr;
 extern const HeapMetadata *taskHeapMetadataPtr;
@@ -283,6 +291,7 @@ struct ResultTypeInfo {
 /// An AsyncTask may have the following fragments:
 ///
 ///    +--------------------------+
+///    | nameFragment?            |
 ///    | childFragment?           |
 ///    | groupChildFragment?      |
 ///    | futureFragment?          |*
@@ -473,25 +482,18 @@ public:
   ///        Cancellation shields prevent the observation of the isCancelled flag while active.
   bool isCancelled(bool ignoreShield) const;
 
-  // ==== INITIAL TASK RECORDS =================================================
-  // A task may have a number of "initial" records set, they MUST be set in the
-  // following order to make the task-local allocation/deallocation's stack
-  // discipline easy to work out at the tasks destruction:
-  //
-  // - Initial TaskName
-  // - Initial ExecutorPreference
-
   // ==== Task Naming ----------------------------------------------------------
 
-  /// At task creation a task may be assigned a name.
-  void pushInitialTaskName(const char* taskName);
-  void dropInitialTaskNameRecord();
-
   /// Get the initial task name that was given to this task during creation,
-  /// or nullptr if the task has no name
+  /// or nullptr if the task has no name.
   const char* getTaskName();
 
-  bool hasInitialTaskNameRecord() const {
+  /// Copy `taskName` into the the task local allocated memory, and store a pointer
+  /// to it in `NameFragment`.
+  void initializeTaskName(const char *taskName);
+
+  /// True only if this task has a `NameFragment`.
+  bool hasTaskName() const {
     return Flags.task_hasInitialTaskName();
   }
 
@@ -542,6 +544,72 @@ public:
   bool cancellationShieldPush();
 
   void cancellationShieldPop();
+
+  // ==== Task Fragment Offsets -----------------------------------------------------
+
+  size_t nameFragmentOffset() const {
+    return sizeof(AsyncTask);
+  }
+
+  size_t childFragmentOffset() const {
+    size_t offset = nameFragmentOffset();
+    if (hasTaskName())
+      offset += sizeof(NameFragment);
+    return offset;
+  }
+
+  size_t groupChildFragmentOffset() const {
+    size_t offset = childFragmentOffset();
+    if (hasChildFragment())
+      offset += sizeof(ChildFragment);
+    return offset;
+  }
+
+  size_t futureFragmentOffset() const {
+    size_t offset = groupChildFragmentOffset();
+    if (hasGroupChildFragment())
+      offset += sizeof(GroupChildFragment);
+    return offset;
+  }
+
+  // ==== Task Name Fragment --------------------------------------------------------
+
+  /// A fragment of an async task that holds the task's name.
+  ///
+  /// This fragment MUST be allocated immediately after the AsyncTask itself,
+  /// as external tools rely on the location of this record to read the task name,
+  /// see `Concurrency/Debug.h`.
+  class NameFragment {
+    /// Pointer to a null-terminated UTF-8 string.
+    /// The string is allocated no the task-local allocator as the first thing
+    /// allocated on it, and must be the last thing we free on it.
+    const char *Name;
+    /// The length of the string stored in Name (not counting the trailing \0).
+    /// Used by tools so they can preallocate a buffer of the right size.
+    size_t NameLength;
+
+  public:
+    NameFragment() : Name(nullptr), NameLength(0) {}
+
+    const char *getName() const { return Name; }
+    size_t getNameLength() const { return NameLength; }
+    void setName(const char *name, size_t length) {
+      Name = name;
+      NameLength = length;
+    }
+  };
+
+  NameFragment *nameFragment() {
+    assert(hasTaskName());
+    auto *offset = reinterpret_cast<char *>(this) + nameFragmentOffset();
+#if !SWIFT_CONCURRENCY_EMBEDDED
+    assert(static_cast<size_t>(offset - reinterpret_cast<char *>(this)) ==
+               _swift_concurrency_debug_asyncTaskNameOffset &&
+           "AsyncTask::nameFragment offset must match "
+           "_swift_concurrency_debug_asyncTaskNameOffset");
+#endif
+    return reinterpret_cast<NameFragment *>(offset);
+  }
 
   // ==== Child Fragment -------------------------------------------------------
 
@@ -600,11 +668,8 @@ public:
 
   ChildFragment *childFragment() {
     assert(hasChildFragment());
-
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-
-    return reinterpret_cast<ChildFragment*>(offset);
+    return reinterpret_cast<ChildFragment *>(
+        reinterpret_cast<char *>(this) + childFragmentOffset());
   }
 
   // ==== TaskGroup Child ------------------------------------------------------
@@ -639,13 +704,8 @@ public:
 
   GroupChildFragment *groupChildFragment() {
     assert(hasGroupChildFragment());
-
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-    if (hasChildFragment())
-      offset += sizeof(ChildFragment);
-
-    return reinterpret_cast<GroupChildFragment *>(offset);
+    return reinterpret_cast<GroupChildFragment *>(
+        reinterpret_cast<char *>(this) + groupChildFragmentOffset());
   }
 
   // ==== Task Executor Preference --------------------------------------------
@@ -783,14 +843,8 @@ public:
 
   FutureFragment *futureFragment() {
     assert(isFuture());
-    auto offset = reinterpret_cast<char*>(this);
-    offset += sizeof(AsyncTask);
-    if (hasChildFragment())
-      offset += sizeof(ChildFragment);
-    if (hasGroupChildFragment())
-      offset += sizeof(GroupChildFragment);
-
-    return reinterpret_cast<FutureFragment *>(offset);
+    return reinterpret_cast<FutureFragment *>(
+        reinterpret_cast<char *>(this) + futureFragmentOffset());
   }
 
   /// Wait for this future to complete.
