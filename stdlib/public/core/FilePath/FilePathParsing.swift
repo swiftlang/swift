@@ -143,12 +143,10 @@ extension _SystemString {
 
     if _isWindows {
       // Detect exact \\?\ prefix on raw input before any conversion.
-      // Only exact backslashes trigger verbatim mode.
-      let verbatimAnchorEnd = _findVerbatimAnchorEnd()
-      if verbatimAnchorEnd != startIndex {
-        // Verbatim: no slash conversion in component region.
-        // Anchor region is already all-backslash (required by prefix).
-      } else {
+      // Only exact backslashes trigger verbatim mode. Inside a verbatim
+      // anchor `/` is a legal component byte and we leave it alone; the
+      // anchor region itself is already all-backslash by definition.
+      if _findVerbatimAnchorEnd() == startIndex {
         self._replaceAll(_genericSeparator, with: _platformSeparator)
         // //?/ normalizes to \\?\ after conversion, but it's
         // device-namespace, not verbatim. Demote ? → . sigil.

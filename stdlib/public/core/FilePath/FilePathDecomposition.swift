@@ -99,14 +99,9 @@ extension FilePath {
   public var isAbsolute: Bool {
     guard let anchor = anchor else { return false }
     if !_isWindows { return true }
-
-    // On Windows, only fully qualified paths are absolute
-    let slice = anchor._slice
-    guard slice.count >= 3 else {
-      // `\` (1 char) or `C:` (2 chars) are relative
-      return false
-    }
-    return true
+    // On Windows, only fully qualified paths are absolute. The relative
+    // anchors are `\` (1 byte) and `C:` (2 bytes); 3+ bytes is absolute.
+    return anchor._slice.count >= 3
   }
 
 }
@@ -141,27 +136,24 @@ extension FilePath {
     }
     set {
       if newValue == hasTrailingSeparator { return }
-      if newValue {
-        // Add trailing separator
-        if isEmpty { return }
-        if _storage._hasResourceForkSuffix() {
-          // Replace resource fork with trailing sep
-          if let rsrcStart = _storage._resourceForkSuffixStart {
-            _storage.removeSubrange(rsrcStart..<_storage.endIndex)
-          }
+      if !newValue {
+        // Remove the trailing separator. The getter returned true, so the
+        // last byte is a separator; drop it unless it's the structural gap
+        // separator (when relBegin > rootEnd, e.g. `\\server\share\`),
+        // which belongs to the anchor.
+        let (_, relBegin) = _storage._parseRoot()
+        if _storage.index(before: _storage.endIndex) >= relBegin {
+          _storage.removeLast()
         }
-        if !_isSeparator(_storage.last!) {
-          _storage.append(_platformSeparator)
-        }
-      } else {
-        // Remove trailing separator
-        if !isEmpty && _isSeparator(_storage.last!) {
-          let (_, relBegin) = _storage._parseRoot()
-          if _storage.index(before: _storage.endIndex) >= relBegin {
-            _internalInvariant(_isSeparator(_storage.last!))
-            _storage.removeLast()
-          }
-        }
+        return
+      }
+      // Add a trailing separator.
+      if isEmpty { return }
+      if let rsrcStart = _storage._resourceForkSuffixStart {
+        _storage.removeSubrange(rsrcStart..<_storage.endIndex)
+      }
+      if !_isSeparator(_storage.last!) {
+        _storage.append(_platformSeparator)
       }
     }
   }
@@ -197,24 +189,24 @@ extension FilePath {
     get { _storage._hasResourceForkSuffix() }
     set {
       if newValue == isResourceFork { return }
-      if newValue {
-        // Add resource fork suffix
-        if hasTrailingSeparator {
-          hasTrailingSeparator = false
-        }
-        var suffix = _SystemString._resourceForkSuffix
-        // Avoid double separator when path already ends with one
-        if !_storage.isEmpty && _isSeparator(_storage.last!)
-           && !suffix.isEmpty && _isSeparator(suffix.first!) {
-          _internalInvariant(_isSeparator(suffix.first!))
-          suffix.removeFirst()
-        }
-        _storage.append(contentsOf: suffix)
-      } else {
-        // Remove resource fork suffix
+      if !newValue {
+        // Remove the resource fork suffix.
         if let rsrcStart = _storage._resourceForkSuffixStart {
           _storage.removeSubrange(rsrcStart..<_storage.endIndex)
         }
+        return
+      }
+      // Add the resource fork suffix. The literal starts with `/`, so
+      // when storage already ends in a separator we drop the leading `/`
+      // to avoid storing two in a row.
+      if hasTrailingSeparator {
+        hasTrailingSeparator = false
+      }
+      let suffix = _SystemString._resourceForkSuffix._asciiBytes
+      if !_storage.isEmpty && _isSeparator(_storage.last!) {
+        _storage.append(contentsOf: suffix.dropFirst())
+      } else {
+        _storage.append(contentsOf: suffix)
       }
     }
   }
@@ -252,31 +244,31 @@ extension FilePath {
     if let anchor = anchor {
       str.append(contentsOf: anchor._slice)
     }
+    // Whether a separator is needed between the anchor and the first
+    // component, when one or more components follow.
+    let anchorNeedsSep = anchor.map {
+      _anchorNeedsGapSeparator($0._slice)
+    } ?? false
 
-    let comps = Array(components)
-
-    for (i, comp) in comps.enumerated() {
-      if i == 0 {
-        // Insert a separator between anchor and first component if the
-        // anchor's shape needs one.
-        if let anchor = anchor, _anchorNeedsGapSeparator(anchor._slice) {
-          str.append(_platformSeparator)
-        }
-      } else {
+    var hasComponents = false
+    for comp in components {
+      // First component: separator iff the anchor's shape needs one.
+      // Subsequent components: always a separator.
+      if hasComponents || anchorNeedsSep {
         str.append(_platformSeparator)
       }
       str.append(contentsOf: comp._slice)
+      hasComponents = true
     }
 
     if hasTrailingSeparator {
-      if !comps.isEmpty {
+      if hasComponents {
         str.append(_platformSeparator)
-      } else if anchor != nil {
-        // Trailing sep on anchor-only path (e.g., \\server\share\)
-        // Add separator if anchor doesn't already end with one
-        if let last = anchor?._slice.last, !_isSeparator(last) {
-          str.append(_platformSeparator)
-        }
+      } else if let anchor = anchor, let last = anchor._slice.last,
+                !_isSeparator(last) {
+        // Trailing sep on an anchor-only path (e.g., `\\server\share\`):
+        // add a separator only if the anchor doesn't already end with one.
+        str.append(_platformSeparator)
       }
     }
 

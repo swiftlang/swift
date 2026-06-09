@@ -68,3 +68,17 @@ extension MutableCollection where Element: Equatable {
     }
   }
 }
+
+// MARK: - ASCII byte conversion
+
+extension String {
+  /// A view over the string's bytes as `FilePath.CodeUnit`s, lazily mapped.
+  ///
+  /// Intended for ASCII string literals used as match/replace tokens — no
+  /// allocation, materialized only when iterated. Non-ASCII scalars trap.
+  internal var _asciiBytes: LazyMapCollection<
+    String.UnicodeScalarView, FilePath.CodeUnit
+  > {
+    self.unicodeScalars.lazy.map { FilePath.CodeUnit(_ascii: $0) }
+  }
+}

@@ -10,6 +10,60 @@
 //
 //===----------------------------------------------------------------------===//
 
+// FilePathTestSupport — the indirection seam between test bodies and (a) the
+// test framework and (b) compile-time platform selection. In the package this
+// lives at Tests/FilePathTests/TestSupport.swift; here the assertion seam
+// uses StdlibUnittest's `expect*` natives directly so this file only has to
+// vend the platform-runner seam plus the `universal()` helper and the two
+// Anchor shims for Windows-only API.
+
+// MARK: - Platform-runner seam
+//
+// Compile-time platform selection: the build target IS the platform, no
+// runtime dispatch. `withPlatform(p)` runs `body` only when `p` matches the
+// built platform — other-platform calls are inert (the test still runs and
+// passes; it just makes no assertions). This mirrors the package seam
+// shape one-for-one so test bodies port unchanged.
+
+/// Platform tag for gating tests. Internal so test files can name the
+/// platforms (`.linux` / `.darwin` / `.windows`); the library itself uses
+/// compile-time predicates and doesn't carry a type.
+enum _Platform: Sendable { case linux, darwin, windows }
+
+/// The single platform this target was built for, selected at compile time.
+let _builtPlatform: _Platform = {
+  #if os(Windows)
+  .windows
+  #elseif canImport(Darwin)
+  .darwin
+  #else
+  .linux
+  #endif
+}()
+
+/// Runs `body` only when `p` is the built platform. Other-platform calls are
+/// inert — the test still runs and passes, it just makes no assertions.
+func withPlatform(
+  _ p: _Platform,
+  _ body: () throws -> Void
+) rethrows {
+  guard p == _builtPlatform else { return }
+  try body()
+}
+
+/// Runs `body` when the built platform is one of `ps`. Canonical case:
+/// `withPlatforms(.linux, .darwin)` for "any unix". Tests valid on every
+/// platform should carry no gate at all.
+func withPlatforms(
+  _ ps: _Platform...,
+  body: () throws -> Void
+) rethrows {
+  guard ps.contains(_builtPlatform) else { return }
+  try body()
+}
+
+// MARK: - Universal path literals
+
 private var universalRootDescription: String {
 #if os(Windows)
   "\\"
@@ -53,11 +107,13 @@ func universal(_ canonicalSlashForm: String) -> String {
 #endif
 }
 
-// `driveLetter` and `isVerbatimComponent` on `FilePath.Anchor` are
-// gated under `#if os(Windows)` in the FilePath sources. Test bodies
-// referring to those properties must still type-check on non-Windows
-// builds (where the body is `#if`-gated to never run); these shims
-// give them a benign default everywhere.
+// MARK: - Windows-only API shims
+//
+// `driveLetter` and `isVerbatimComponent` on `FilePath.Anchor` are gated
+// under `#if os(Windows)` in the FilePath sources. Test bodies referring to
+// those properties must still type-check on non-Windows builds (where the
+// body is `#if`-gated to never run); these shims give them a benign default
+// everywhere.
 @available(SwiftStdlib 9999, *)
 extension FilePath.Anchor {
   var _driveLetter: Unicode.Scalar? {

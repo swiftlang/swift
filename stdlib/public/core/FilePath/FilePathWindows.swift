@@ -113,9 +113,7 @@ struct _Lexer {
   }
 
   mutating func eatUNC() -> Bool {
-    slice._eatSequence(
-      "UNC".unicodeScalars.lazy.map { FilePath.CodeUnit(_ascii: $0) }
-    ) != nil
+    slice._eatSequence("UNC"._asciiBytes) != nil
   }
 
   mutating func eatComponent() -> Range<_SystemString.Index> {
@@ -144,26 +142,13 @@ struct _Lexer {
 
 @available(SwiftStdlib 9999, *)
 extension _SystemString {
-  // ASCII bytes "UNC", stored once for the \\?\UNC\ verbatim sub-form
-  // rather than rebuilt on every call.
-  private static let _uncToken: [FilePath.CodeUnit] =
-    "UNC".unicodeScalars.map { FilePath.CodeUnit(_ascii: $0) }
-
   // Check if this string starts with the exact verbatim prefix \\?\
   // (four backslashes — no forward slashes). Returns the index past
   // the prefix, or nil.
   internal func _startsWithVerbatimPrefix() -> Index? {
-    guard count >= 4 else { return nil }
-    let i0 = startIndex
-    let i1 = index(after: i0)
-    let i2 = index(after: i1)
-    let i3 = index(after: i2)
-    guard self[i0] == ._backslash,
-          self[i1] == ._backslash,
-          self[i2] == ._question,
-          self[i3] == ._backslash
-    else { return nil }
-    return index(after: i3)
+    var s = self[...]
+    guard s._eatSequence(#"\\?\"#._asciiBytes) != nil else { return nil }
+    return s.startIndex
   }
 
   // For a verbatim path (exact \\?\ prefix), find where the anchor
@@ -183,22 +168,17 @@ extension _SystemString {
     }
 
     func skipPastSep(from idx: Index) -> Index {
-      if idx < endIndex && _isSeparator(self[idx]) {
-        return index(after: idx)
-      }
-      return idx
+      idx < endIndex && _isSeparator(self[idx]) ? index(after: idx) : idx
     }
 
     // \\?\UNC\server\share[\]
-    if self[afterPrefix...].starts(with: Self._uncToken) {
-      let afterUNC = index(afterPrefix, offsetBy: Self._uncToken.count)
-      if afterUNC < endIndex && _isSeparator(self[afterUNC]) {
-        let serverStart = index(after: afterUNC)
-        let serverEnd = skipToSep(from: serverStart)
-        let shareStart = skipPastSep(from: serverEnd)
-        let shareEnd = skipToSep(from: shareStart)
-        return skipPastSep(from: shareEnd)
-      }
+    var s = self[afterPrefix...]
+    if s._eatSequence("UNC"._asciiBytes) != nil,
+       s._eat(._backslash) != nil {
+      let serverEnd = skipToSep(from: s.startIndex)
+      let shareStart = skipPastSep(from: serverEnd)
+      let shareEnd = skipToSep(from: shareStart)
+      return skipPastSep(from: shareEnd)
     }
 
     // \\?\<drive>:[\] — a drive letter is any single non-separator code
@@ -206,14 +186,10 @@ extension _SystemString {
     // verbatim paths separators are not normalized and `/` is a legal
     // component byte, so `!isSeparator` accepts it: `\\?\/:` parses with
     // drive `/`, taking the bytes as written.
-    if afterPrefix < endIndex {
-      let afterFirst = index(after: afterPrefix)
-      if afterFirst < endIndex
-         && !_isSeparator(self[afterPrefix])
-         && self[afterFirst] == ._colon {
-        let afterColon = index(after: afterFirst)
-        return skipPastSep(from: afterColon)
-      }
+    s = self[afterPrefix...]
+    if s._eat(if: { !_isSeparator($0) }) != nil,
+       s._eat(._colon) != nil {
+      return skipPastSep(from: s.startIndex)
     }
 
     // \\?\device[\]
@@ -295,30 +271,18 @@ extension _SystemString {
     let deviceRange = lexer.eatComponent()
     let rootEnd = lexer.current
 
-    // Check if device is a drive letter (e.g., C: or C:\). A drive
-    // letter is any single non-separator code unit before the colon
-    // (matching eatDrive); in verbatim paths `/` is a non-separator and
-    // legal, so `\\?\/:` parses with drive `/`.
-    var drive: FilePath.CodeUnit? = nil
-    let deviceSlice = self[deviceRange]
-    if deviceSlice.count >= 2 {
-      let first = deviceSlice[deviceSlice.startIndex]
-      let second = deviceSlice[deviceSlice.index(after: deviceSlice.startIndex)]
-      if !_isSeparator(first) && second == ._colon {
-        if deviceSlice.count == 2 {
-          drive = first
-          // Check for trailing backslash after C:
-          if lexer.eatBackslash() {
-            // \\?\C:\  or \\.\C:\
-            let newEnd = lexer.current
-            return .device(
-              deviceSigil: sigil,
-              drive: drive,
-              endingAt: newEnd,
-              relativeBegin: newEnd)
-          }
-        }
-      }
+    // A drive letter is any single non-separator code unit before the
+    // colon (matching `eatDrive` and the proposal). In verbatim paths
+    // `/` is a non-separator and legal, so `\\?\/:` parses with drive `/`.
+    let drive = _driveLetter(of: self[deviceRange])
+    if drive != nil, lexer.eatBackslash() {
+      // \\?\C:\  or \\.\C:\
+      let newEnd = lexer.current
+      return .device(
+        deviceSigil: sigil,
+        drive: drive,
+        endingAt: newEnd,
+        relativeBegin: newEnd)
     }
 
     _ = lexer.eatBackslash()
@@ -338,6 +302,21 @@ extension _SystemString {
     }
     return (parsed.rootEnd, parsed.relativeBegin)
   }
+}
+
+// Returns the drive letter if `slice` is exactly the 2-byte drive form
+// `<non-separator><colon>`, else nil. Intended for testing already-
+// extracted device slices; for parsing-from-stream, see `_Lexer.eatDrive`.
+@available(SwiftStdlib 9999, *)
+private func _driveLetter(
+  of slice: Slice<_SystemString>
+) -> FilePath.CodeUnit? {
+  var s = slice
+  guard let first = s._eat(if: { !_isSeparator($0) }),
+        s._eat(._colon) != nil,
+        s.isEmpty
+  else { return nil }
+  return first
 }
 
 // MARK: - Windows root prenormalization
@@ -393,17 +372,11 @@ extension _SystemString {
       // Check for drive letter device: \\.\C:\ or \\?\C:\. A drive
       // letter is any single non-separator code unit before the colon.
       let deviceRange = lexer.eatComponent()
-      let deviceSlice = self[deviceRange]
-      if deviceSlice.count == 2 {
-        let first = deviceSlice[deviceSlice.startIndex]
-        let second = deviceSlice[deviceSlice.index(after: deviceSlice.startIndex)]
-        if !_isSeparator(first) && second == ._colon {
-          // Device drive letter - eat the trailing backslash if present
-          if lexer.eatBackslash() {
-            return lexer.current
-          }
-          return lexer.current
-        }
+      if _driveLetter(of: self[deviceRange]) != nil {
+        // Eat the trailing backslash if present (both branches return
+        // `lexer.current`).
+        _ = lexer.eatBackslash()
+        return lexer.current
       }
       // Only expect trailing backslash if there's more content
       if !deviceRange.isEmpty && !lexer.isEmpty {

@@ -53,12 +53,7 @@ extension FilePath.Anchor {
   /// If the drive letter is an unpaired surrogate, `U+FFFD` is returned.
   @available(SwiftStdlib 9999, *)
   public var driveLetter: Unicode.Scalar? {
-    if let parsed = _parseWindowsAnchor() {
-      if let d = parsed.drive {
-        return d._driveLetterScalar
-      }
-    }
-    return nil
+    _parseWindowsAnchor()?.drive?._driveLetterScalar
   }
 
   /// Whether this anchor uses the Windows verbatim-component form.
@@ -169,33 +164,25 @@ extension FilePath.Anchor: ExpressibleByStringLiteral {
 /// non-empty share; device (`\\.\`) needs a non-empty device name; verbatim
 /// (`\\?\`) needs a non-empty component after the prefix. Traditional roots
 /// (`\`, `C:`, `C:\`) carry no separate name and are never rejected here.
-@available(SwiftStdlib 9999, *)
 private func _isIncompleteWindowsNamedAnchor(
   _ anchorBytes: Slice<_SystemString>
 ) -> Bool {
-  let bytes = anchorBytes
   // A named form begins with the two-backslash UNC/device/verbatim prefix.
   // One leading `\` is the bare current-drive root, and `C:` / `C:\` carry a
   // drive; none of those are a name-bearing form with the name missing.
-  guard bytes.count >= 2,
-        bytes[0] == ._backslash, bytes[1] == ._backslash else {
+  var s = anchorBytes
+  guard s._eat(._backslash) != nil, s._eat(._backslash) != nil else {
     return false
   }
-  var i = 2
-  if i < bytes.count, bytes[i] == ._dot || bytes[i] == ._question {
-    // Device (`\\.\<device>`) or verbatim (`\\?\<component>`). Separator
-    // coalescing always stores the prefix backslash (`\\.\` / `\\?\`), so
-    // whatever follows it is the name. An empty name => incomplete.
-    i += 1
-    guard i < bytes.count, bytes[i] == ._backslash else { return true }
-    i += 1
-    return i >= bytes.count
+  // Device (`\\.\<device>`) or verbatim (`\\?\<component>`). Separator
+  // coalescing always stores the prefix backslash (`\\.\` / `\\?\`), so
+  // whatever follows it is the name; an empty name means incomplete.
+  if s._eat(if: { $0 == ._dot || $0 == ._question }) != nil {
+    guard s._eat(._backslash) != nil else { return true }
+    return s.isEmpty
   }
   // UNC (`\\server\share`): require a non-empty server AND a non-empty share.
-  let serverStart = i
-  while i < bytes.count, bytes[i] != ._backslash { i += 1 }
-  if i == serverStart { return true }         // empty server
-  guard i < bytes.count else { return true }  // server but no share at all
-  i += 1                                       // skip server/share separator
-  return i >= bytes.count                      // empty share
+  guard s._eatWhile({ $0 != ._backslash }) != nil else { return true }
+  guard s._eat(._backslash) != nil else { return true }
+  return s.isEmpty
 }

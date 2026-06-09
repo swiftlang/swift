@@ -215,12 +215,7 @@ extension FilePath.ComponentView: RangeReplaceableCollection {
     // separator OR a resource fork; `append` replaces the suffix bytes
     // with the new component.
     let byteLower = subrange.lowerBound._storage
-    let byteUpper: _SystemString.Index
-    if touchesEnd {
-      byteUpper = _suffixEnd
-    } else {
-      byteUpper = subrange.upperBound._storage
-    }
+    let byteUpper = touchesEnd ? _suffixEnd : subrange.upperBound._storage
 
     let newArray = Array(newElements)
 
@@ -232,15 +227,11 @@ extension FilePath.ComponentView: RangeReplaceableCollection {
       // PRECEDING separator to keep the result well-formed (no dangling
       // sep after the last surviving component).
       var adjLower = byteLower
-      let adjUpper = byteUpper
-
-      if touchesEnd {
-        if adjLower > _relStart
-           && _isSeparator(_path._storage[_path._storage.index(before: adjLower)]) {
-          _path._storage.formIndex(before: &adjLower)
-        }
+      if touchesEnd && adjLower > _relStart
+         && _isSeparator(_path._storage[_path._storage.index(before: adjLower)]) {
+        _path._storage.formIndex(before: &adjLower)
       }
-      _path._storage.removeSubrange(adjLower..<adjUpper)
+      _path._storage.removeSubrange(adjLower..<byteUpper)
     } else {
       // Boundary separators
       let needLeadingSep: Bool
