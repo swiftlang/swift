@@ -872,6 +872,17 @@ BUILTIN_MISC_OPERATION(ResumeThrowingContinuationThrowing,
 /// (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
 BUILTIN_MISC_OPERATION(AssumeAlignment, "assumeAlignment", "n", Special)
 
+/// Allows the compiler to assume that the pointer is dereferenceable for at
+/// least the specified number of bytes. This enables LLVM optimizations that
+/// rely on knowing that a pointer can be safely dereferenced.
+///
+///   %derefPtr = builtin "dereferenceable" (%ptr : $Builtin.RawPointer,
+///                                          %size : $Builtin.Word)
+///                                        : $Builtin.RawPointer
+///
+/// (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer
+BUILTIN_MISC_OPERATION(Dereferenceable, "dereferenceable", "n", Special)
+
 // BUILTIN_MISC_OPERATION_WITH_SILGEN - Miscellaneous operations that are
 // specially emitted during SIL generation.
 //

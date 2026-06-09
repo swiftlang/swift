@@ -163,6 +163,7 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::StackDealloc:
     case BuiltinValueKind::AllocVector:
     case BuiltinValueKind::AssumeAlignment:
+    case BuiltinValueKind::Dereferenceable:
     case BuiltinValueKind::GetEnumTag:
     case BuiltinValueKind::InjectEnumTag:
     case BuiltinValueKind::ExtractFunctionIsolation:
