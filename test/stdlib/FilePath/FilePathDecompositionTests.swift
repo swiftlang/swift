@@ -18,11 +18,10 @@
 
 import StdlibUnittest
 
-// Ported from the SE-0529 reference suite's `DecompositionTests.swift`. Free
-// function (no wrapping struct), prefixed `@available(SwiftStdlib 9999, *)`,
-// otherwise verbatim — the package's `expect*` seam helpers map onto
-// StdlibUnittest's free `expect*` functions of the same name with the same
-// (value, value, message) shape.
+// Drive the per-platform `Expected` decomposition for `tc` through `expect*`
+// assertions, then reconstruct via the decomposition initializer and check the
+// result equals the original. Inert on builds whose platform doesn't match
+// `platform` (see `withPlatform`).
 @available(SwiftStdlib 9999, *)
 func runCase(_ tc: PathTestCase, platform: REVIEW_ONLY_Platform) {
   withPlatform(platform) {
@@ -104,11 +103,11 @@ func runCase(_ tc: PathTestCase, platform: REVIEW_ONLY_Platform) {
   }
 }
 
-// Ported from the SE-0529 reference suite's `ProbeTests.swift`. Free function,
-// prefixed `@available(SwiftStdlib 9999, *)`. Source-location forwarding uses
-// StdlibUnittest's `file: String = #file, line: UInt = #line` convention. The
-// "force a failure" expectNotNil(Optional<Int>.none, ...) idiom from the
-// package becomes `expectTrue(false, ...)` here.
+// Pin the four primary decomposition fields (anchor, components,
+// hasTrailingSeparator, printed) for `input` on `platform`. Used by the
+// edge-case probe tests below. The `file` / `line` defaults forward the
+// caller's source location so a failure points at the probe row rather than
+// this helper. Inert on builds whose platform doesn't match.
 @available(SwiftStdlib 9999, *)
 func probe(
   _ input: String,
@@ -169,7 +168,11 @@ struct FilePathDecompositionTests {
     .code { guard #available(SwiftStdlib 9999, *) else { return }
       for tc in pathTestCases { runCase(tc, platform: .windows) } }
 
-    // MARK: - Probes (verbatim sequences from package ProbeTests.swift)
+    // MARK: - Edge-case probes
+    //
+    // Each probe pins the decomposition of a degenerate / boundary input that
+    // the table-driven `pathTestCases` doesn't cover. Inputs are grouped by
+    // the structural pattern they exercise.
 
     suite.test("probeDarwinRelativeReparse")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
@@ -204,19 +207,21 @@ struct FilePathDecompositionTests {
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
-      // GAP: bare `/.resolve/1` is NOT a resolve anchor.
+      // Bare `/.resolve/1` is NOT a resolve anchor — `_parseResolve` requires
+      // the trailing slash, so this falls through to a plain `/` root.
       probe("/.resolve/1", platform: .darwin,
         anchor: "/", components: [".resolve", "1"],
         printed: "/.resolve/1")
-      // SPECIFIED: `/.resolve/1/` canonicalizes to `/.nofollow/`.
+      // `/.resolve/1/` canonicalizes to `/.nofollow/`.
       probe("/.resolve/1/", platform: .darwin,
         anchor: "/.nofollow/", components: [],
         printed: "/.nofollow/")
-      // GAP: bare `/.resolve/3` (non-canonicalizing flag).
+      // Bare `/.resolve/3` (non-canonicalizing flag) — same fall-through.
       probe("/.resolve/3", platform: .darwin,
         anchor: "/", components: [".resolve", "3"],
         printed: "/.resolve/3")
-      // GAP-adjacent: `/.vol/1234/2/` — `2`->`@` fires; trailing slash is sep.
+      // `/.vol/1234/2/` — `2`->`@` canonicalization fires; the trailing slash
+      // is a separator (the volfs anchor itself is not slash-terminated).
       probe("/.vol/1234/2/", platform: .darwin,
         anchor: "/.vol/1234/@", components: [], trailingSeparator: true,
         printed: "/.vol/1234/@/")
@@ -250,19 +255,19 @@ struct FilePathDecompositionTests {
         anchor: #"\\?\"#, components: [],
         printed: #"\\?\"#)
 
-      // Extra observed properties for the same inputs.
+      // Same inputs, additional structural assertions.
       withPlatform(.windows) {
         let dotInput: String = #"\\."#
         let dot = FilePath(dotInput)!
-        expectTrue(dot.isAbsolute, #"\\. should be absolute (observed)"#)
+        expectTrue(dot.isAbsolute, #"\\. is absolute"#)
         expectFalse(dot.anchor?._isVerbatimComponent ?? true,
-          #"\\. is device-namespace, not verbatim (observed)"#)
+          #"\\. is device-namespace, not verbatim"#)
 
         let qInput: String = #"\\?"#
         let q = FilePath(qInput)!
-        expectTrue(q.isAbsolute, #"\\? should be absolute (observed)"#)
+        expectTrue(q.isAbsolute, #"\\? is absolute"#)
         expectTrue(q.anchor?._isVerbatimComponent ?? false,
-          #"\\? becomes verbatim-component (observed)"#)
+          #"\\? is verbatim-component"#)
       } }
 
     suite.test("probeMatchesPrefixNearMisses")
