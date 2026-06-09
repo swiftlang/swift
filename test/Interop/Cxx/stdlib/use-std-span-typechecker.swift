@@ -1,5 +1,6 @@
-// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++20 2>&1 -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -enable-experimental-cxx-interop -Xcc -std=c++20 2>&1 -disable-availability-checking -enable-experimental-feature BorrowingSequence
 // REQUIRES: std_span
+// REQUIRES: swift_feature_BorrowingSequence
 
 import StdSpan
 
