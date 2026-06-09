@@ -953,9 +953,7 @@ std::string ASTMangler::mangleObjCRuntimeName(const NominalTypeDecl *Nominal) {
   Node *NewGlobal = Dem.createNode(Node::Kind::Global);
   NewGlobal->addChild(TyMangling, Dem);
   auto mangling = mangleNodeOld(NewGlobal);
-  if (!mangling.isSuccess()) {
-    llvm_unreachable("unexpected mangling failure");
-  }
+  ASSERT(mangling.isSuccess());
   return mangling.result();
 #endif
 }
