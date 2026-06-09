@@ -683,6 +683,66 @@ findConflictingArgumentAccess(const AccessSummaryAnalysis::ArgumentSummary &AS,
                            *BestArgAccess);
 }
 
+// Return true if this instruction is immutable with respect to formally
+// accessed storage. Ref-count updates are not considered a mutation.
+static bool isImmutable(SILInstruction *inst) {
+  if (!inst->mayWriteToMemory())
+    return true;
+
+  if (isa<LoadInst>(inst))
+    return true;
+
+  if (onlyAffectsRefCount(inst))
+    return true;
+
+  // TODO: consider updating mayWriteToMemory so that
+  // "begin_access [read] [static]" is not generally considered a write.
+  if (auto *bai = dyn_cast<BeginAccessInst>(inst)) {
+    return bai->getAccessKind() == SILAccessKind::Read
+      && bai->getEnforcement() == SILAccessEnforcement::Static;
+  }
+  return false;
+}
+
+// Return true if no mutation occurs within this read scope. If so, then the
+// read can safely be considered to be a nested access within an overlapping
+// modify access.
+//
+// This is common with access extension across ~Escapable values:
+//
+// %a1 = begin_access [modify] %base
+// %dependent = mark_dependence ... on %base
+//
+// # modification via the dependent value
+// apply (%dependent) // may modify base
+//
+// # Copy the original value within the lifetime of the dependent value...
+// # handle this as if it was a read of %a1 rather than %base.
+// %a2 = begin_access [read] %base
+// %copy = load [copy] %a2
+// end_access %a2
+//
+// # modification via the dependent value
+// apply (%dependent) // may modify base
+// end_access %a1
+static bool isImmutableRead(BeginAccessInst *bai) {
+  auto endAccesses = bai->getEndAccesses();
+  if (endAccesses.empty()
+      || std::next(endAccesses.begin()) != endAccesses.end()) {
+    return false;
+  }
+  auto *eai = endAccesses.front();
+  if (eai->getParent() != bai->getParent())
+    return false;
+
+  for (SILInstruction *inst = bai; inst != eai;
+       inst = inst->getNextInstruction()) {
+    if (!isImmutable(inst))
+      return false;
+  }
+  return true;
+}
+
 // =============================================================================
 // The data flow algorithm that drives diagnostics.
 
@@ -876,8 +936,10 @@ static void checkForViolationsAtInstruction(SILInstruction &I,
     AccessInfo &Info = (*State.Accesses)[Storage];
     const IndexTrieNode *SubPath = State.ASA->findSubPathAccessed(BAI);
     if (auto Conflict = shouldReportAccess(Info, Kind, SubPath)) {
-      State.recordConflictingAccess(Storage, *Conflict,
-                                    RecordedAccess(BAI, SubPath));
+      if (!isImmutableRead(BAI)) {
+        State.recordConflictingAccess(Storage, *Conflict,
+                                      RecordedAccess(BAI, SubPath));
+      }
     }
 
     Info.beginAccess(BAI, SubPath);
