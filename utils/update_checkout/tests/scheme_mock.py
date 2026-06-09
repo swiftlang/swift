@@ -24,23 +24,6 @@ import urllib.parse
 
 from typing import Any, Dict
 
-# For now we only use a config with a single scheme. We should add support for
-# handling multiple schemes.
-MOCK_REMOTE = {
-    "repo1": [
-        # This is a series of changes to repo1. (File, NewContents)
-        ("A.txt", "A"),
-        ("B.txt", "B"),
-        ("A.txt", "a"),
-    ],
-    "repo2": [
-        # This is a series of changes to repo2. (File, NewContents)
-        ("X.txt", "X"),
-        ("Y.txt", "Y"),
-        ("X.txt", "z"),
-    ],
-}
-
 MOCK_CONFIG = {
     # This is here just b/c we expect it. We should consider consolidating
     # clone-patterns into a dictionary where we map protocols (i.e. ['ssh,
@@ -166,9 +149,7 @@ def get_path_from_url(url: str) -> str:
 
 # TODO: Move this to SchemeMockTestCase.
 def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path):
-    assert base_config["repos"].keys() == MOCK_REMOTE.keys()
-
-    for local_repo_name, changes in MOCK_REMOTE.items():
+    for local_repo_name in base_config["repos"].keys():
         local_repo_path = os.path.join(local_path, local_repo_name)
         remote_repo_path = test_case._compute_remote_path(repo_name=local_repo_name)
 
@@ -192,24 +173,21 @@ def setup_mock_remote(test_case, base_dir, base_config, remotes_path, local_path
         call_quietly(
             ["git", "symbolic-ref", "HEAD", "refs/heads/main"], cwd=local_repo_path
         )
-        for filename, contents in changes:
-            filename_path = os.path.join(local_repo_path, filename)
-            with open(filename_path, "w") as f:
-                f.write(contents)
-            call_quietly(["git", "add", filename], cwd=local_repo_path)
-            call_quietly(
-                [
-                  "git",
-                  "commit",
-                  "-m",
-                  # Equal commits created in different repositories at these
-                  # short time intervals tend to get the same SHA, which can
-                  # compromise tests. Supplying a random commit message makes
-                  # these SHA collisions far less likely.
-                  str(random.random()),
-                ],
-                cwd=local_repo_path
-            )
+
+        call_quietly(
+            [
+                "git",
+                "commit",
+                "--allow-empty",
+                "-m",
+                # Equal commits created in different repositories at these
+                # short time intervals tend to get the same SHA, which can
+                # compromise tests. Supplying a random commit message makes
+                # these SHA collisions far less likely.
+                str(random.random()),
+            ],
+            cwd=local_repo_path,
+        )
         call_quietly(["git", "push", "origin", "main"], cwd=local_repo_path)
 
     https_clone_pattern = os.path.join(f"file://{remotes_path}", "%s")
