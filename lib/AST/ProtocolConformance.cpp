@@ -1555,7 +1555,6 @@ createProtocolToProtocolConformances(ProtocolDecl *protocol) {
 
   for (auto &[newBase, ext, index] : protocol->getReparentingProtocols()) {
     // We say that 'Self' is what conforms to the @reparented entry.
-    auto conformingType = protocol->getDeclaredInterfaceType();
     auto const &entry = ext->getInherited().getEntry(index);
     assert(entry.isReparented());
 
@@ -1564,7 +1563,7 @@ createProtocolToProtocolConformances(ProtocolDecl *protocol) {
       loc = ext->getLoc();
 
     conformances.push_back(ctx.getNormalConformance(
-        conformingType, newBase, loc, entry.getTypeRepr(), /*dc=*/ext,
+        ctx.TheSelfType, newBase, loc, entry.getTypeRepr(), /*dc=*/ext,
         ProtocolConformanceState::Incomplete,
         ProtocolConformanceFlags::Reparented));
   }
