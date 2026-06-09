@@ -2079,8 +2079,7 @@ getBuiltinTypeSwiftName(const clang::BuiltinType *bt);
 
 /// Return the Swift type name if `ty` is a `clang::BuiltinType` with a Swift
 /// counterpart.
-[[nodiscard]] std::optional<StringRef> static inline
-getBuiltinTypeSwiftName(
+[[nodiscard]] std::optional<StringRef> static inline getBuiltinTypeSwiftName(
     clang::QualType ty) {
   if (const auto *bt = ty->getAs<clang::BuiltinType>())
     return getBuiltinTypeSwiftName(bt);

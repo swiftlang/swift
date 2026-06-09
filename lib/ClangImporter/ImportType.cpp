@@ -163,33 +163,33 @@ importer::getBuiltinTypeSwiftName(const clang::BuiltinType *type) {
 #include "clang/Basic/OpenCLExtensionTypes.def"
     return std::nullopt;
 
-  // ARM SVE builtin types that don't have Swift equivalents.
+    // ARM SVE builtin types that don't have Swift equivalents.
 #define SVE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/AArch64ACLETypes.def"
     return std::nullopt;
 
-  // PPC SVE builtin types that don't have Swift equivalents.
+    // PPC SVE builtin types that don't have Swift equivalents.
 #define PPC_VECTOR_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/PPCTypes.def"
     return std::nullopt;
 
-  // RISC-V V builtin types that don't have Swift equivalents.
+    // RISC-V V builtin types that don't have Swift equivalents.
 #define RVV_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/RISCVVTypes.def"
     return std::nullopt;
 
-  // WASM builtin types that don't have Swift equivalents.
+    // WASM builtin types that don't have Swift equivalents.
 #define WASM_TYPE(Name, Id, Size) case clang::BuiltinType::Id:
 #include "clang/Basic/WebAssemblyReferenceTypes.def"
     return std::nullopt;
 
-  // AMDGPU builtin types that don't have Swift equivalents.
+    // AMDGPU builtin types that don't have Swift equivalents.
 #define AMDGPU_TYPE(Name, Id, SingletonId, Width, Align)                       \
   case clang::BuiltinType::Id:
 #include "clang/Basic/AMDGPUTypes.def"
     return std::nullopt;
 
-  // HLSL intangible builtin types that don't have Swift equivalents.
+    // HLSL intangible builtin types that don't have Swift equivalents.
 #define HLSL_INTANGIBLE_TYPE(Name, Id, ...) case clang::BuiltinType::Id:
 #include "clang/Basic/HLSLIntangibleTypes.def"
     return std::nullopt;
@@ -390,9 +390,9 @@ namespace {
       default:
         return false;
 #define MAP_BUILTIN_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)
-      /* Intentionally empty; fallback to default label. */
+        /* Intentionally empty; fallback to default label. */
 #define MAP_BUILTIN_CCHAR_TYPE(CLANG_BUILTIN_KIND, SWIFT_TYPE_NAME)          \
-      case clang::BuiltinType::CLANG_BUILTIN_KIND:
+    case clang::BuiltinType::CLANG_BUILTIN_KIND:
 #include "swift/ClangImporter/BuiltinMappedTypes.def"
         return true;
       }

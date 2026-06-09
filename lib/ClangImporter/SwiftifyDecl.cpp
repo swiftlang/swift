@@ -152,9 +152,9 @@ struct SwiftCountExprEmitter
   bool VisitUnaryOperator(const clang::UnaryOperator *unop) {
     char op;
     switch (unop->getOpcode()) {
-#define UNOP(variant, c)                                                  \
+#define UNOP(variant, c)                                                       \
   case clang::variant:                                                         \
-    op = c;                                                               \
+    op = c;                                                                    \
     break
       UNOP(UO_Plus, '+');
       UNOP(UO_Minus, '-');
@@ -224,7 +224,8 @@ private:
     case CK::CK_IntegralToFloating:
     case CK::CK_FloatingToIntegral:
     case CK::CK_FloatingCast: {
-      std::optional<StringRef> swiftName = getBuiltinTypeSwiftName(c->getType());
+      std::optional<StringRef> swiftName =
+          getBuiltinTypeSwiftName(c->getType());
       if (!swiftName) {
         DLOG("Unsupported cast destination type\n");
         return false;
