@@ -12,7 +12,7 @@
 // UNSUPPORTED: back_deploy_concurrency
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: freestanding
-// UNSUPPORTED: OS=wasip1
+// UNSUPPORTED: OS=wasip1 || OS=emscripten
 
 import StdlibUnittest
 

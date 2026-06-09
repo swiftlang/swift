@@ -10,6 +10,7 @@
 // rdar://78109470
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: freestanding
+// XFAIL: OS=emscripten
 
 import _Concurrency
 import StdlibUnittest
