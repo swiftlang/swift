@@ -103,11 +103,11 @@ func runCase(_ tc: PathTestCase) {
 }
 
 // Pin the four primary decomposition fields (anchor, components,
-// hasTrailingSeparator, printed) for `input`. Used by the edge-case probe
-// tests below. The `file` / `line` defaults forward the caller's source
-// location so a failure points at the probe row rather than this helper.
+// hasTrailingSeparator, printed) for `input`. Used by the edge-case tests
+// below. The `file` / `line` defaults forward the caller's source location
+// so a failure points at the assertion row rather than this helper.
 @available(SwiftStdlib 9999, *)
-func probe(
+func expectDecomposition(
   _ input: String,
   anchor: String?,
   components: [String],
@@ -151,102 +151,102 @@ struct FilePathDecompositionTests {
     .code { guard #available(SwiftStdlib 9999, *) else { return }
       for tc in pathTestCases { runCase(tc) } }
 
-    // MARK: - Edge-case probes
+    // MARK: - Edge cases
     //
-    // Each probe pins the decomposition of a degenerate / boundary input that
+    // Each test pins the decomposition of a degenerate / boundary input that
     // the table-driven `pathTestCases` doesn't cover. Inputs are grouped by
-    // the structural pattern they exercise; each probe test body is gated to
-    // the platform whose parser the probe characterizes.
+    // the structural pattern they exercise; each test body is gated to the
+    // platform whose parser the case characterizes.
 
-    suite.test("probeDarwinRelativeReparse")
+    suite.test("darwinRelativeReparse")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
 #if canImport(Darwin)
       // .vol token as a relative component under a volfs anchor.
-      probe("/.vol/1234/5678/.vol/x",
+      expectDecomposition("/.vol/1234/5678/.vol/x",
         anchor: "/.vol/1234/5678", components: [".vol", "x"],
         printed: "/.vol/1234/5678/.vol/x")
       // .nofollow token as a relative component under a volfs anchor.
-      probe("/.vol/1234/5678/.nofollow/x",
+      expectDecomposition("/.vol/1234/5678/.nofollow/x",
         anchor: "/.vol/1234/5678", components: [".nofollow", "x"],
         printed: "/.vol/1234/5678/.nofollow/x")
       // .resolve/3 tokens as relative components under a volfs anchor.
-      probe("/.vol/1234/5678/.resolve/3/x",
+      expectDecomposition("/.vol/1234/5678/.resolve/3/x",
         anchor: "/.vol/1234/5678", components: [".resolve", "3", "x"],
         printed: "/.vol/1234/5678/.resolve/3/x")
       // .vol AFTER .nofollow forms a combined anchor.
-      probe("/.nofollow/.vol/1234/5678",
+      expectDecomposition("/.nofollow/.vol/1234/5678",
         anchor: "/.nofollow/.vol/1234/5678", components: [],
         printed: "/.nofollow/.vol/1234/5678")
       // .nofollow token as a relative component under a .nofollow anchor.
-      probe("/.nofollow/.nofollow/x",
+      expectDecomposition("/.nofollow/.nofollow/x",
         anchor: "/.nofollow/", components: [".nofollow", "x"],
         printed: "/.nofollow/.nofollow/x")
       // Inner `.resolve/1` is NOT canonicalized: canonicalization is anchor-only.
-      probe("/.resolve/3/.resolve/1/x",
+      expectDecomposition("/.resolve/3/.resolve/1/x",
         anchor: "/.resolve/3/", components: [".resolve", "1", "x"],
         printed: "/.resolve/3/.resolve/1/x")
 #endif
     }
 
-    suite.test("probeBareResolveVolAnchors")
+    suite.test("bareResolveVolAnchors")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
 #if canImport(Darwin)
       // Bare `/.resolve/1` is NOT a resolve anchor — `_parseResolve` requires
       // the trailing slash, so this falls through to a plain `/` root.
-      probe("/.resolve/1",
+      expectDecomposition("/.resolve/1",
         anchor: "/", components: [".resolve", "1"],
         printed: "/.resolve/1")
       // `/.resolve/1/` canonicalizes to `/.nofollow/`.
-      probe("/.resolve/1/",
+      expectDecomposition("/.resolve/1/",
         anchor: "/.nofollow/", components: [],
         printed: "/.nofollow/")
       // Bare `/.resolve/3` (non-canonicalizing flag) — same fall-through.
-      probe("/.resolve/3",
+      expectDecomposition("/.resolve/3",
         anchor: "/", components: [".resolve", "3"],
         printed: "/.resolve/3")
       // `/.vol/1234/2/` — `2`->`@` canonicalization fires; the trailing slash
       // is a separator (the volfs anchor itself is not slash-terminated).
-      probe("/.vol/1234/2/",
+      expectDecomposition("/.vol/1234/2/",
         anchor: "/.vol/1234/@", components: [], trailingSeparator: true,
         printed: "/.vol/1234/@/")
 #elseif !os(Windows)
       // Linux contrast: no Darwin anchor magic at all.
-      probe("/.resolve/1",
+      expectDecomposition("/.resolve/1",
         anchor: "/", components: [".resolve", "1"],
         printed: "/.resolve/1")
 #endif
     }
 
-    suite.test("probeWindowsThreePlusBackslashes")
+    suite.test("windowsThreePlusBackslashes")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
 #if os(Windows)
-      probe(#"\\\server\share"#,
+      expectDecomposition(#"\\\server\share"#,
         anchor: #"\"#, components: ["server", "share"],
         printed: #"\server\share"#)
-      probe(#"\\\\server"#,
+      expectDecomposition(#"\\\\server"#,
         anchor: #"\"#, components: ["server"],
         printed: #"\server"#)
-      probe(#"\\\"#,
+      expectDecomposition(#"\\\"#,
         anchor: #"\"#, components: [],
         printed: #"\"#)
 #endif
     }
 
-    suite.test("probeWindowsDegenerateDeviceSigil")
+    suite.test("windowsDegenerateDeviceSigil")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
 #if os(Windows)
-      probe(#"\\."#,
+      expectDecomposition(#"\\."#,
         anchor: #"\\.\"#, components: [],
         printed: #"\\.\"#)
-      probe(#"\\?"#,
+      expectDecomposition(#"\\?"#,
         anchor: #"\\?\"#, components: [],
         printed: #"\\?\"#)
 
@@ -265,28 +265,28 @@ struct FilePathDecompositionTests {
 #endif
     }
 
-    suite.test("probeMatchesPrefixNearMisses")
+    suite.test("matchesPrefixNearMisses")
     .skip(.custom({ if #available(SwiftStdlib 9999, *) { false } else { true } },
                   reason: "Requires SwiftStdlib 9999"))
     .code { guard #available(SwiftStdlib 9999, *) else { return }
 #if canImport(Darwin)
-      probe("/.nofollowing/bar",
+      expectDecomposition("/.nofollowing/bar",
         anchor: "/", components: [".nofollowing", "bar"],
         printed: "/.nofollowing/bar")
-      probe("/.resolved/x",
+      expectDecomposition("/.resolved/x",
         anchor: "/", components: [".resolved", "x"],
         printed: "/.resolved/x")
-      probe("/.volume/x",
+      expectDecomposition("/.volume/x",
         anchor: "/", components: [".volume", "x"],
         printed: "/.volume/x")
-      probe("/.resolvex/1/y",
+      expectDecomposition("/.resolvex/1/y",
         anchor: "/", components: [".resolvex", "1", "y"],
         printed: "/.resolvex/1/y")
       // Keyword present but missing the structural slashes.
-      probe("/.vol",
+      expectDecomposition("/.vol",
         anchor: "/", components: [".vol"],
         printed: "/.vol")
-      probe("/.vol/1234",
+      expectDecomposition("/.vol/1234",
         anchor: "/", components: [".vol", "1234"],
         printed: "/.vol/1234")
 #endif
