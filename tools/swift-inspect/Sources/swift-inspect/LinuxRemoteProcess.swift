@@ -130,7 +130,11 @@
         self.symbolCache = try SwiftInspectLinux.SymbolCache(for: process)
         self.memoryMap = try SwiftInspectLinux.MemoryMap(for: processId)
       } catch {
-        fatalError("failed initialization for process \(processId): \(error)")
+        if case SwiftInspectLinux.Process.ProcessError.processVmReadFailure = error {
+          Self.warnAboutMissingPtraceCapabilityOnce()
+        }
+        FileHandle.standardError.write(Data(
+          "swift-inspect: failed to attach to process \(processId): \(error)\n".utf8))
         return nil
       }
 
@@ -238,6 +242,14 @@
         return []
       }
 
+      // ptrace.jump which we're about to use needs PTRACE_ATTACH.
+      // That requires either CAP_SYS_PTRACE, OR ptrace_scope=0 (which
+      // makes same-UID enough) -- if we don't have either, bail out.
+      guard Self.hasPtraceCapability || Self.yamaPtraceScope == 0 else {
+        Self.warnAboutMissingPtraceCapabilityOnce()
+        return []
+      }
+
       // Each kernel thread of the target has its own directory under
       // /proc/<pid>/task/<tid>. Linux ptrace operates per-thread, and a tid
       // can be passed everywhere a `pid_t` is accepted.
@@ -250,11 +262,9 @@
       var result: [(threadID: UInt64, currentTask: swift_addr_t)] = []
       for tid in tids {
         do {
+          // We ptrace the thread and invoke `swift_task_getCurrent`
+          // to easily get the "current" task executing on it.
           try withPTracedProcess(pid: tid) { ptrace in
-            // swift_task_getCurrent is `SWIFT_CC(swift)` and takes no args;
-            // for a no-arg, single-pointer-return function the Swift
-            // calling convention is ABI-compatible with C on x86_64/aarch64,
-            // which is what RegisterSet.setupCall implements.
             let value = try ptrace.jump(to: getCurrentAddr)
             result.append((threadID: UInt64(tid), currentTask: swift_addr_t(value)))
           }
@@ -267,13 +277,74 @@
       }
       return result
     }
+
+    /// True iff this swift-inspect process has CAP_SYS_PTRACE capability.
+    static let hasPtraceCapability: Bool = {
+      guard let status = try? String(
+        contentsOfFile: "/proc/self/status", encoding: .utf8)
+      else { return false }
+      for line in status.split(whereSeparator: { $0.isNewline }) {
+        let CapEff = "CapEff:"
+        guard line.hasPrefix(CapEff) else { continue }
+
+        let hex = line.dropFirst(CapEff.count)
+          .trimmingCharacters(in: .whitespaces)
+        guard let mask = UInt64(hex, radix: 16) else { return false }
+
+        // CAP_SYS_PTRACE is 19.
+        return (mask & (UInt64(1) << 19)) != 0
+      }
+      return false
+    }()
+
+    /// `kernel.yama.ptrace_scope`:
+    ///   - 0 = anyone same-UID,
+    ///   - 1 = ancestors only,
+    ///   - 2 = CAP_SYS_PTRACE only,
+    ///   - 3 = ptrace disabled.
+    /// Defaults to 1 on most distributions.
+    static let yamaPtraceScope: Int? = {
+      guard let raw = try? String(
+        contentsOfFile: "/proc/sys/kernel/yama/ptrace_scope", encoding: .utf8)
+      else { return nil }
+      return Int(raw.trimmingCharacters(in: .whitespacesAndNewlines))
+    }()
+
+    /// Access this property to print the missing-capability warning exactly once.
+    /// Any use of process_vm_readv or ptrace needs these permissions.
+    private static let _warnAboutMissingPtraceCapabilityOnce: Void = {
+      let cap = hasPtraceCapability ? "yes" : "no"
+      let yama = yamaPtraceScope.map { String($0) } ?? "?"
+      let msg = """
+        swift-inspect: cannot inspect target - insufficient ptrace permission.
+          CAP_SYS_PTRACE: \(cap)
+          kernel.yama.ptrace_scope: \(yama)  (0=any same-UID, 1=ancestors only, 2=CAP_SYS_PTRACE only)
+
+        To grant necessary permissions, you can:
+          * run swift-inspect as root, or via sudo
+          * sudo setcap cap_sys_ptrace+ep <path-to-swift-inspect>
+          * sudo sysctl -w kernel.yama.ptrace_scope=0 (not recommended, system-wide)
+
+        When using containers, you may need to pass:
+          --cap-add=SYS_PTRACE --security-opt seccomp=unconfined
+        and run as root inside the container, OR grant file caps with
+        setcap. (Docker's --cap-add only adds to the bounding/permitted
+        sets; effective caps for non-root container UIDs need file caps.)
+
+        """
+      FileHandle.standardError.write(Data(msg.utf8))
+    }()
+
+    private static func warnAboutMissingPtraceCapabilityOnce() {
+      _ = _warnAboutMissingPtraceCapabilityOnce
+    }
   }
 
   extension SwiftInspectLinux.MemoryMap.Entry {
     /// Heuristic for "this region might contain Swift heap objects".
     ///
     /// We require `r` and `w` permissions and `p` (private). Heap pages are
-    /// never executable on modern Linux, but we don't filter `x` away here —
+    /// never executable on modern Linux, but we don't filter `x` away here -
     /// some allocators (jemalloc with sampling, etc.) may legitimately
     /// mmap rwx pages, and in the conservative-scan model an extra region
     /// just adds cost, not incorrect results.
