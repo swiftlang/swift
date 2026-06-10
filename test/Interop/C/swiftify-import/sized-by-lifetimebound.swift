@@ -75,10 +75,10 @@ const void * __sized_by(len) shared(int len, const void * p __sized_by(len) __li
 //   expected-experimental-remark@9{{macro content: |    }|}}
 //   expected-experimental-remark@10{{macro content: |    let _resultValue: UnsafeRawPointer? = unsafe complexExpr(len, offset, len2, _pPtr.baseAddress)|}}
 //   expected-experimental-remark@11{{macro content: |    if unsafe _resultValue == nil {|}}
-//   expected-experimental-remark@12{{macro content: |      precondition(len - offset == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
+//   expected-experimental-remark@12{{macro content: |      precondition((len - offset) == 0, "sized_by may only be null if size is 0 (unlike sized_by_or_null)")|}}
 //   expected-experimental-remark@13{{macro content: |      return RawSpan()|}}
 //   expected-experimental-remark@14{{macro content: |    }|}}
-//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: _resultValue!, byteCount: Int(len - offset)), copying: ())|}}
+//   expected-experimental-remark@15{{macro content: |    return unsafe _swiftifyOverrideLifetime(RawSpan(_unsafeStart: _resultValue!, byteCount: Int((len - offset))), copying: ())|}}
 //   expected-experimental-remark@16{{macro content: |}|}}
 // }}
 const void * __sized_by(len - offset) complexExpr(int len, int offset, int len2, const void * p __sized_by(len2) __lifetimebound);

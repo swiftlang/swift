@@ -76,8 +76,8 @@ void shared(int len, const void * __sized_by(len) __noescape p1, const void * __
 // expected-expansion@+15:89{{
 //   expected-remark@1{{macro content: |/// This is an auto-generated wrapper for safer interop|}}
 //   expected-remark@2{{macro content: |@_alwaysEmitIntoClient @available(visionOS 1.0, tvOS 12.2, watchOS 5.2, iOS 12.2, macOS 10.14.4, *) @_disfavoredOverload public func complexExpr(_ len: Int32, _ offset: Int32, _ p: RawSpan) {|}}
-//   expected-remark@3{{macro content: |    if p.byteCount != len - offset {|}}
-//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\(len - offset) but got \\(p.byteCount)")|}}
+//   expected-remark@3{{macro content: |    if p.byteCount != (len - offset) {|}}
+//   expected-remark@4{{macro content: |      fatalError("bounds check failure in complexExpr: expected \\((len - offset)) but got \\(p.byteCount)")|}}
 //   expected-remark@5{{macro content: |    }|}}
 //   expected-remark@6{{macro content: |    let _pPtr = p.withUnsafeBytes {|}}
 //   expected-remark@7{{macro content: |        unsafe $0|}}
