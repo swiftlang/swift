@@ -381,13 +381,57 @@ extension PublicGenericStruct {
   func testPermanentlyUnavailableInUnavailableExtension() { }
 }
 
-func testUnnecessaryIfAvailableStmt() {
+func testUnnecessaryIfAvailableStmt(_ x: Int?) {
   // expected-warning@+3 {{availability domain 'Aral' is deprecated}}
   // expected-warning@+2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
   // expected-warning@+1 {{'if' condition is always true}}{{3-+2:4=_ = 0}}
   if #available(Aral) {
     _ = 0
   }
+
+  // expected-warning@+3 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
+  // expected-warning@+1 {{'if' condition is always true}}{{3-+4:4=_ = 0}}
+  if #available(Aral) {
+    _ = 0
+  } else {
+    _ = 1
+  }
+
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be true}}{{15-33=}}
+  if let _ = x, #available(Aral) {
+    _ = 0
+  }
+
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be true}}{{26-44=}}
+  if #available(Colorado), #available(Aral) {
+    _ = 0
+  }
+
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be true}}{{6-24=}}
+  if #available(Aral), #available(Colorado) {
+    _ = 0
+  }
+
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be true}}{{28-46=}}
+  if #available(Colorado), #available(Aral), #available(Baltic) {
+    _ = 0
+  }
+
+  // expected-warning@+6 2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+5 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
+  // expected-warning@+4 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
+  // expected-warning@+3 {{unnecessary check for 'Aral'; enclosing scope ensures guard will always be true}}{{none}}
+  // expected-note@+2 {{enclosing scope here}}
+  // expected-warning@+1 {{'if' condition is always true}}{{3-+2:4=_ = 0}}
+  if #available(Aral), #available(Aral) {
+    _ = 0
+  }
+
 }
 
 func testUnnecessaryIfAvailableExpr() {
@@ -397,24 +441,22 @@ func testUnnecessaryIfAvailableExpr() {
   // https://github.com/swiftlang/swift/issues/84453
 }
 
-func testUnnecessaryIfAvailableCompoundStmt() {
-  if #available(Colorado), #available(Aral) {
-    // expected-warning@-1 {{availability domain 'Aral' is deprecated}}
-    // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
-  }
-}
-
 func testUnnecessaryIfUnavailableStmt() {
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be false}}{{none}}
   if #unavailable(Aral) {
-    // expected-warning@-1 {{availability domain 'Aral' is deprecated}}
-    // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be false}}{{none}}
+    _ = 0
   }
-}
 
-func testUnnecessaryIfUnavailableCompoundStmt() {
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be false}}{{none}}
   if #unavailable(Colorado), #unavailable(Aral) {
-    // expected-warning@-1 {{availability domain 'Aral' is deprecated}}
-    // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be false}}{{none}}
+    _ = 0
+  }
+
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be false}}{{none}}
+  if #unavailable(Aral), #unavailable(Colorado) {
   }
 }
 
@@ -427,30 +469,31 @@ func testUnnecessaryGuardAvailableStmt() {
   }
 }
 
+func testUnnecessaryGuardAvailableStmtCondition() {
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be true}}{{29-47=}}
+  guard #available(Colorado), #available(Aral) else { return }
+}
+
 func testUnnecessaryGuardUnavailableStmt() {
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be false}}{{none}}
   guard #unavailable(Aral) else {
-    // expected-warning@-1 {{availability domain 'Aral' is deprecated}}
-    // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be false}}{{none}}
     return
   }
 }
 
 func testUnnecessaryWhileAvailableStmt() {
-  while #available(Aral) {
-    // expected-warning@-1 {{availability domain 'Aral' is deprecated}}
-    // expected-warning@-2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
-    // expected-warning@-3 {{'while' condition is always true}}{{none}}
-    break
-  }
-}
-
-func testUnnecessaryIfAvailableStmtWithElse() {
   // expected-warning@+3 {{availability domain 'Aral' is deprecated}}
   // expected-warning@+2 {{unnecessary check for 'Aral'; this condition will always be true}}{{none}}
-  // expected-warning@+1 {{'if' condition is always true}}{{3-+4:4=_ = 0}}
-  if #available(Aral) {
-    _ = 0
-  } else {
-    _ = 1
+  // expected-warning@+1 {{'while' condition is always true}}{{none}}
+  while #available(Aral) {
+    break
+  }
+
+  // expected-warning@+2 {{availability domain 'Aral' is deprecated}}
+  // expected-warning@+1 {{unnecessary check for 'Aral'; this condition will always be true}}{{29-47=}}
+  while #available(Colorado), #available(Aral) {
+    break
   }
 }
