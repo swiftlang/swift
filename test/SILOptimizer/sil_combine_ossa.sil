@@ -2084,7 +2084,7 @@ bb0:
 // CHECK: } // end sil function 'sub_pointers'
 sil [ossa] @sub_pointers : $@convention(thin) (Builtin.RawPointer) -> Builtin.Word {
 bb0(%0 : $Builtin.RawPointer):
-  %1 = integer_literal $Builtin.Word, 0
+  %1 = integer_literal $Builtin.Word, 1
   %23 = index_raw_pointer %0 : $Builtin.RawPointer, %1 : $Builtin.Word
   %26 = builtin "ptrtoint_Word"(%23 : $Builtin.RawPointer) : $Builtin.Word
   %27 = builtin "ptrtoint_Word"(%0 : $Builtin.RawPointer) : $Builtin.Word

@@ -454,7 +454,8 @@ static SILValue createIndexAddrFrom(IndexRawPointerInst *I,
                              TruncOrBitCast->getType(), {}, Distance);
 
   auto *NewIAI = Builder.createIndexAddr(I->getLoc(), NewPTAI, DistanceAsWord,
-                                         /*needsStackProtection=*/ false);
+                                         /*needsStackProtection=*/ false,
+                                         /*isProjection=*/ false);
   auto *NewATPI =
     Builder.createAddressToPointer(I->getLoc(), NewIAI, RawPointerTy,
                                    /*needsStackProtection=*/ false);

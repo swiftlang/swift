@@ -532,13 +532,13 @@ extension InlineArray where Element: ~Copyable {
     @_transparent
     @_unsafeSelfDependentResult
     borrow {
-      unsafe (_protectedAddress + i).pointee
+      unsafe _protectedAddress.project(i).pointee
     }
 
     @_transparent
     @_unsafeSelfDependentResult
     mutate {
-      unsafe &(_protectedMutableAddress + i).pointee
+      unsafe &_protectedMutableAddress.project(i).pointee
     }
   }
 }

@@ -328,7 +328,7 @@ bb0(%0 : $*S1):
 // CHECK:         [[CMP:%.*]] = builtin "cmp_slt_Word"([[IV]] : $Builtin.Word, %1 : $Builtin.Word)
 // CHECK:         cond_br [[CMP]], bb2, bb3
 // CHECK:       bb2:
-// CHECK:         [[ADDR:%.*]] = index_addr [[PTA]] :  $*S1, [[IV]]
+// CHECK:         [[ADDR:%.*]] = index_addr [projection] [[PTA]] :  $*S1, [[IV]]
 // CHECK:         [[DEINIT:%.*]] = function_ref @s1_deinit :
 // CHECK:         [[ELEMENT:%.*]] = load [take] [[ADDR]]
 // CHECK:         apply [[DEINIT]]([[ELEMENT]])
@@ -359,7 +359,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK:         [[CMP:%.*]] = builtin "cmp_slt_Word"([[IV]] : $Builtin.Word, [[COUNT]] : $Builtin.Word)
 // CHECK:         cond_br [[CMP]], bb2, bb3
 // CHECK:       bb2:
-// CHECK:         [[ADDR:%.*]] = index_addr [[VB]] :  $*S1, [[IV]]
+// CHECK:         [[ADDR:%.*]] = index_addr [projection] [[VB]] :  $*S1, [[IV]]
 // CHECK:         [[DEINIT:%.*]] = function_ref @s1_deinit :
 // CHECK:         [[ELEMENT:%.*]] = load [take] [[ADDR]]
 // CHECK:         apply [[DEINIT]]([[ELEMENT]])
@@ -388,7 +388,7 @@ bb0(%0 : @owned $InlineArray<20, S1>):
 // CHECK:         [[CMP:%.*]] = builtin "cmp_slt_Word"([[IV]] : $Builtin.Word, [[COUNT]] : $Builtin.Word)
 // CHECK:         cond_br [[CMP]], bb2, bb3
 // CHECK:       bb2:
-// CHECK:         [[ADDR:%.*]] = index_addr [[VB]] :  $*S1, [[IV]]
+// CHECK:         [[ADDR:%.*]] = index_addr [projection] [[VB]] :  $*S1, [[IV]]
 // CHECK:         [[DEINIT:%.*]] = function_ref @s1_deinit :
 // CHECK:         [[ELEMENT:%.*]] = load [take] [[ADDR]]
 // CHECK:         apply [[DEINIT]]([[ELEMENT]])

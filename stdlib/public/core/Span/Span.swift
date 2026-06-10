@@ -484,8 +484,12 @@ extension Span where Element: ~Copyable {
   internal func _unsafeAddressOfElement(
     unchecked position: Index
   ) -> Builtin.RawPointer {
+#if $BuiltinGepProjection
+    unsafe Builtin.gepProjection_Word(_start()._rawValue, position._builtinWordValue, Element.self)
+#else
     let elementOffset = position &* MemoryLayout<Element>.stride
     return unsafe _start().advanced(by: elementOffset)._rawValue
+#endif
   }
 }
 

@@ -2596,7 +2596,8 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                       getSILType(Ty, (SILValueCategory)TyCategory, Fn)),
         getLocalValue(Builder.maybeGetFunction(), ValID2,
                       getSILType(Ty2, (SILValueCategory)TyCategory2, Fn)),
-        /*needsStackProtection=*/Attr != 0);
+        /*needsStackProtection=*/(Attr & 1) != 0,
+        /*isProjection=*/(Attr & 2) != 0);
     break;
   }
   case SILInstructionKind::TailAddrInst: {

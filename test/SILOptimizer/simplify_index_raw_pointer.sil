@@ -1,0 +1,118 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=index_raw_pointer | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// ============================================================
+// tryRemoveZeroIndex
+// ============================================================
+
+// Zero index is removed; uses of the index_raw_pointer are replaced with base.
+// CHECK-LABEL: sil @remove_zero_index :
+// CHECK-NOT:     index_raw_pointer
+// CHECK:       } // end sil function 'remove_zero_index'
+sil @remove_zero_index : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%base : $Builtin.RawPointer):
+  %idx    = integer_literal $Builtin.Word, 0
+  %result = index_raw_pointer %base, %idx
+  return %result
+}
+
+// Non-zero constant index is not removed.
+// CHECK-LABEL: sil @no_remove_nonzero_index :
+// CHECK:         index_raw_pointer
+// CHECK:       } // end sil function 'no_remove_nonzero_index'
+sil @no_remove_nonzero_index : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%base : $Builtin.RawPointer):
+  %idx    = integer_literal $Builtin.Word, 1
+  %result = index_raw_pointer %base, %idx
+  return %result
+}
+
+// Non-literal (dynamic) index is not removed.
+// CHECK-LABEL: sil @no_remove_nonconstant_index :
+// CHECK:         index_raw_pointer
+// CHECK:       } // end sil function 'no_remove_nonconstant_index'
+sil @no_remove_nonconstant_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%base : $Builtin.RawPointer, %idx : $Builtin.Word):
+  %result = index_raw_pointer %base, %idx
+  return %result
+}
+
+// ============================================================
+// tryFoldNestedIndexRawPointers
+// ============================================================
+
+// Constant indices are summed into a single index_raw_pointer.
+// CHECK-LABEL: sil @fold_nested :
+// CHECK:         [[IDX:%.*]] = integer_literal $Builtin.Word, 7
+// CHECK:         index_raw_pointer {{.*}}, [[IDX]]
+// CHECK-NOT:     index_raw_pointer
+// CHECK:       } // end sil function 'fold_nested'
+sil @fold_nested : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%base : $Builtin.RawPointer):
+  %idx1  = integer_literal $Builtin.Word, 3
+  %outer = index_raw_pointer %base, %idx1
+  %idx2  = integer_literal $Builtin.Word, 4
+  %inner = index_raw_pointer %outer, %idx2
+  return %inner
+}
+
+// Non-literal inner index blocks the fold.
+// CHECK-LABEL: sil @no_fold_nonconstant_inner_index :
+// CHECK:         index_raw_pointer
+// CHECK:         index_raw_pointer
+// CHECK:       } // end sil function 'no_fold_nonconstant_inner_index'
+sil @no_fold_nonconstant_inner_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%base : $Builtin.RawPointer, %dyn : $Builtin.Word):
+  %idx1  = integer_literal $Builtin.Word, 3
+  %outer = index_raw_pointer %base, %idx1
+  %inner = index_raw_pointer %outer, %dyn
+  return %inner
+}
+
+// Non-literal outer index blocks the fold.
+// CHECK-LABEL: sil @no_fold_nonconstant_outer_index :
+// CHECK:         index_raw_pointer
+// CHECK:         index_raw_pointer
+// CHECK:       } // end sil function 'no_fold_nonconstant_outer_index'
+sil @no_fold_nonconstant_outer_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%base : $Builtin.RawPointer, %dyn : $Builtin.Word):
+  %outer = index_raw_pointer %base, %dyn
+  %idx2  = integer_literal $Builtin.Word, 4
+  %inner = index_raw_pointer %outer, %idx2
+  return %inner
+}
+
+// Base is not an index_raw_pointer, so there is nothing to fold.
+// CHECK-LABEL: sil @no_fold_non_irp_base :
+// CHECK:         index_raw_pointer
+// CHECK-NOT:     index_raw_pointer
+// CHECK:       } // end sil function 'no_fold_non_irp_base'
+sil @no_fold_non_irp_base : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%base : $Builtin.RawPointer):
+  %idx    = integer_literal $Builtin.Word, 4
+  %result = index_raw_pointer %base, %idx
+  return %result
+}
+
+// Adding the two constant indices would overflow Int, so the fold is suppressed.
+// On 64-bit: Int.max + 1 overflows. On 32-bit: Int.max = 2147483647, so
+// 9223372036854775807 doesn't fit in Int and constantIndex returns nil —
+// a different bail-out path, but the fold still doesn't happen.
+// CHECK-LABEL: sil @no_fold_overflow :
+// CHECK:         index_raw_pointer
+// CHECK:         index_raw_pointer
+// CHECK:       } // end sil function 'no_fold_overflow'
+sil @no_fold_overflow : $@convention(thin) (Builtin.RawPointer) -> Builtin.RawPointer {
+bb0(%base : $Builtin.RawPointer):
+  %idx1  = integer_literal $Builtin.Word, 9223372036854775807
+  %outer = index_raw_pointer %base, %idx1
+  %idx2  = integer_literal $Builtin.Word, 1
+  %inner = index_raw_pointer %outer, %idx2
+  return %inner
+}

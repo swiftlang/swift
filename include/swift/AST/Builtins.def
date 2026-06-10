@@ -366,6 +366,13 @@ BUILTIN_SIL_OPERATION(GepRaw, "gepRaw", Integer)
 /// Like the GepRaw-builtin, but multiplies the index by stride-of type 'T'.
 BUILTIN_SIL_OPERATION(Gep, "gep", Integer)
 
+/// GepProjection (Builtin.RawPointer, Builtin.Word, T.Type) -> Builtin.RawPointer
+///
+/// Like Gep, but marks the resulting index_addr as a projection, meaning the
+/// result can only reach the single element at the given index and cannot be
+/// used for general pointer arithmetic by chaining index_addr instructions.
+BUILTIN_SIL_OPERATION(GepProjection, "gepProjection", Integer)
+
 /// getTailAddr(Builtin.RawPointer,
 ///             Builtin.Word, T.Type, E.Type) -> Builtin.RawPointer
 ///
