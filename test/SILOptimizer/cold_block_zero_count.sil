@@ -1,8 +1,13 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline -debug-only=cold-block-info 2> %t/conservative.txt | %FileCheck %s --check-prefix=CHECK-CONSERVATIVE
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline \
+// RUN:   -debug-only=cold-block-info 2> %t/conservative.txt \
+// RUN:   | %FileCheck %s --check-prefix=CHECK-CONSERVATIVE
 // RUN: %FileCheck %s --input-file=%t/conservative.txt --check-prefix=CHECK-CONSERVATIVE-DEBUG
 
-// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline -sil-zero-count-strategy=optimistic -debug-only=cold-block-info 2> %t/optimistic.txt | %FileCheck %s --check-prefix=CHECK-OPTIMISTIC
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline \
+// RUN:   -sil-zero-count-strategy=optimistic -debug-only=cold-block-info \
+// RUN:   2> %t/optimistic.txt \
+// RUN:   | %FileCheck %s --check-prefix=CHECK-OPTIMISTIC
 // RUN: %FileCheck %s --input-file=%t/optimistic.txt --check-prefix=CHECK-OPTIMISTIC-DEBUG
 
 // REQUIRES: asserts
