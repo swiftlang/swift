@@ -1,0 +1,32 @@
+//===----------------------------------------------------------------------===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2026 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+
+@available(SwiftStdlib 6.4, *)
+extension _RigidArray where Element: ~Copyable {
+  @_alwaysEmitIntoClient
+  internal func isTriviallyIdentical(to other: borrowing Self) -> Bool {
+    unsafe _count == other._count &&
+    _storage.isTriviallyIdentical(to: other._storage)
+  }
+}
+
+@available(SwiftStdlib 6.4, *)
+extension _RigidArray: Equatable where Element: Equatable & ~Copyable {
+  @available(SwiftStdlib 6.4, *)
+  @_alwaysEmitIntoClient
+  internal static func ==(
+    left: borrowing Self,
+    right: borrowing Self
+  ) -> Bool {
+    left.span._elementsEqual(to: right.span)
+  }
+}

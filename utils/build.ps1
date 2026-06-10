@@ -4235,6 +4235,7 @@ function Build-SDK([Hashtable] $Platform, [Hashtable] $Context) {
         -SwiftSDK $null `
         -Defines ($SDKInstallDefines + @{
           BUILD_SHARED_LIBS = $BUILD_SHARED_LIBS;
+          CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
 
           dispatch_DIR = (Get-ProjectCMakeModules $Platform ([Project]"${Variant}CDispatch"));
