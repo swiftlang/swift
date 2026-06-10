@@ -151,8 +151,8 @@ class WASISwiftSDK(product.Product):
             # Append this triple's Swift SDK to the shared wasm
             # `.artifactbundle`. The bundle is reused across wasi /
             # emscripten via `--incremental` + `--bundle-name
-            # canonical_bundle_name()`. wasip1-threads is skipped — see
-            # the TODO above the loop.
+            # canonical_bundle_name(swift_version)`. wasip1-threads is skipped
+            # — see the TODO above the loop.
             if build_sdk:
                 helpers.generate_swift_sdk(
                     swift_run=swift_run,
@@ -161,7 +161,7 @@ class WASISwiftSDK(product.Product):
                     triple=swift_host_triple,
                     sysroot=sysroot,
                     package_path=dest_dir,
-                    bundle_name=helpers.canonical_bundle_name(),
+                    bundle_name=helpers.canonical_bundle_name(swift_version),
                     swift_version=swift_version,
                 )
 

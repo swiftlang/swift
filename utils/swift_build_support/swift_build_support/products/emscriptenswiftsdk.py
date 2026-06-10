@@ -162,7 +162,7 @@ class EmscriptenSwiftSDK(product.Product):
         # Append the Emscripten Swift SDK to the shared wasm
         # `.artifactbundle`. The bundle is reused across wasi /
         # wasi-threads / emscripten via `--incremental` +
-        # `--bundle-name canonical_bundle_name()`.
+        # `--bundle-name canonical_bundle_name(swift_version)`.
         helpers.generate_swift_sdk(
             swift_run=swift_run,
             source_dir=self.source_dir,
@@ -170,7 +170,7 @@ class EmscriptenSwiftSDK(product.Product):
             triple=swift_host_triple,
             sysroot=sysroot,
             package_path=dest_dir,
-            bundle_name=helpers.canonical_bundle_name(),
+            bundle_name=helpers.canonical_bundle_name(swift_version),
             swift_version=swift_version,
         )
 
