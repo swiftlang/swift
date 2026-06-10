@@ -160,8 +160,8 @@ extension UniqueArray where Element: ~Copyable {
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  public mutating func reallocate(capacity: Int) {
-    _storage.reallocate(capacity: capacity)
+  public mutating func setCapacity(_ newCapacity: Int) {
+    _storage.setCapacity(newCapacity)
   }
 
   /// Ensure that the array has capacity to store the specified number of
@@ -196,7 +196,7 @@ extension UniqueArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal mutating func _ensureFreeCapacitySlow(_ freeCapacity: Int) {
     let newCapacity = _grow(freeCapacity: freeCapacity)
-    reallocate(capacity: newCapacity)
+    setCapacity(newCapacity)
   }
 }
 

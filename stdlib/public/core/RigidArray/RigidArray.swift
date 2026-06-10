@@ -245,13 +245,12 @@ extension _RigidArray where Element: ~Copyable {
   /// - Complexity: O(`count`)
   @available(SwiftStdlib 6.4, *)
   @_alwaysEmitIntoClient
-  internal mutating func reallocate(capacity newCapacity: Int) {
-    _precondition(newCapacity >= count, "RigidArray capacity overflow")
+  internal mutating func setCapacity(_ newCapacity: Int) {
     guard newCapacity != capacity else { return }
     let newStorage: UnsafeMutableBufferPointer<Element> = .allocate(
-      capacity: newCapacity)
-    let i = unsafe newStorage.moveInitialize(fromContentsOf: self._items)
-    assert(i == count)
+      capacity: Swift.max(newCapacity, count))
+    let i = unsafe newStorage.moveInitialize(fromContentsOf: _items)
+    _internalInvariant(i == count)
     unsafe _storage.deallocate()
     unsafe _storage = newStorage
   }
@@ -268,7 +267,7 @@ extension _RigidArray where Element: ~Copyable {
   @_alwaysEmitIntoClient
   internal mutating func reserveCapacity(_ n: Int) {
     guard capacity < n else { return }
-    reallocate(capacity: n)
+    setCapacity(n)
   }
 }
 
