@@ -39,7 +39,7 @@ if __name__ == "__main__":
     suite = unittest.TestSuite()
     suite.addTests(module_tests)
 
-    runner = unittest.TextTestRunner()
+    runner = unittest.TextTestRunner(verbosity=2)
     try:
         result = runner.run(suite)
     finally:
