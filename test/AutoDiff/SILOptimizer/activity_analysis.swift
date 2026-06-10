@@ -252,7 +252,7 @@ func testArrayUninitializedIntrinsic(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [VARIED]   %9 = begin_borrow %7
 // CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
 // CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Float, [[I]] : $Builtin.Word
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [projection] [[T]] : $*Float, [[I]] : $Builtin.Word
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
 // CHECK: [ACTIVE]   [[A:%.*]] = apply %{{[0-9]+}}<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
@@ -272,7 +272,7 @@ func testArrayUninitializedIntrinsicGeneric<T>(_ x: T, _ y: T) -> [T] {
 // CHECK: [VARIED]   %9 = begin_borrow %7
 // CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
 // CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*T, [[I]] : $Builtin.Word
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [projection] [[T]] : $*T, [[I]] : $Builtin.Word
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
 // CHECK: [ACTIVE]   [[A:%.*]] = apply %{{[0-9]+}}<T>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 
@@ -301,7 +301,7 @@ func testArrayUninitializedIntrinsicAddress(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
 // CHECK: [ACTIVE]   [[BA:%.*]] = begin_access [read] [static] %4 : $*Float
 // CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Float, [[I]] : $Builtin.Word
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [projection] [[T]] : $*Float, [[I]] : $Builtin.Word
 // CHECK: [ACTIVE]   [[BA2:%.*]] = begin_access [read] [static] %4 : $*Float
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
 // CHECK: [ACTIVE]   [[A:%.*]] = apply %{{[0-9]+}}<Float>(%18) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
@@ -324,7 +324,7 @@ func testArrayUninitializedIntrinsicFunctionResult(_ x: Float, _ y: Float) -> [F
 // CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
 // CHECK: [ACTIVE]   [[A:%.*]] = apply %{{[0-9]+}}(%0, %1, [[MT]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
 // CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Float, [[I]] : $Builtin.Word
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [projection] [[T]] : $*Float, [[I]] : $Builtin.Word
 // CHECK: [USEFUL]   [[MT2:%.*]] = metatype $@thin Float.Type
 // CHECK: [NONE]   // function_ref static Float.* infix(_:_:)
 // CHECK: [ACTIVE]   [[A2:%.*]] = apply %{{[0-9]+}}(%0, %1, [[MT2]]) : $@convention(method) (Float, Float, @thin Float.Type) -> Float
@@ -348,7 +348,7 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [VARIED]   %9 = begin_borrow %7
 // CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
 // CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Float, [[I]] : $Builtin.Word
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [projection] [[T]] : $*Float, [[I]] : $Builtin.Word
 // CHECK: [NONE]   // function_ref _finalizeUninitializedArray<A>(_:)
 // CHECK:            [[FR:%.*]] = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
 // CHECK: [ACTIVE]   [[A:%.*]] = apply [[FR]]<Float>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0>
@@ -361,14 +361,16 @@ func testArrayUninitializedIntrinsicNested(_ x: Float, _ y: Float) -> [Float] {
 // CHECK: [VARIED] ([[ARR2]], **%{{[0-9]+}}**) = destructure_tuple [[A2]] : $(Array<Float>, Builtin.RawPointer)
 // CHECK: [VARIED]   [[BB:%.*]] = begin_borrow [[ARR2]]
 // CHECK: [ACTIVE]   [[T2:%.*]] = ref_tail_addr
+// CHECK: [VARIED]   [[I0T2:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [ACTIVE]   [[IA0T2:%.*]] = index_addr [projection] [[T2]] : $*Float, [[I0T2]] : $Builtin.Word
 // CHECK: [USEFUL]   [[I3:%.*]] = integer_literal $Builtin.IntLiteral, 0
 // CHECK: [USEFUL]   [[MT:%.*]] = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
 // CHECK: [USEFUL]   [[A3:%.*]] = apply %{{[0-9]+}}([[I3]], [[MT]]) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
 // CHECK: [NONE]   // function_ref Array.subscript.getter
-// CHECK: [NONE]     [[A4:%.*]] = apply %{{[0-9]+}}<Float>([[T2]], [[A3]], [[MV]]) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
+// CHECK: [NONE]     [[A4:%.*]] = apply %{{[0-9]+}}<Float>([[IA0T2]], [[A3]], [[MV]]) : $@convention(method) <τ_0_0> (Int, @guaranteed Array<τ_0_0>) -> @out τ_0_0
 // CHECK: [VARIED]   [[I4:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   [[IA2:%.*]] = index_addr [[T2]] : $*Float, [[I4]] : $Builtin.Word
+// CHECK: [ACTIVE]   [[IA2:%.*]] = index_addr [projection] [[T2]] : $*Float, [[I4]] : $Builtin.Word
 // CHECK: [USEFUL]   [[I5:%.*]] = integer_literal $Builtin.IntLiteral, 1
 // CHECK: [USEFUL]   [[MT2:%.*]] = metatype $@thin Int.Type
 // CHECK: [NONE]   // function_ref Int.init(_builtinIntegerLiteral:)
@@ -396,12 +398,14 @@ func testArrayUninitializedIntrinsicApplyIndirectResult<T>(_ x: T, _ y: T) -> [W
 // CHECK: [VARIED] (%7, **%8**) = destructure_tuple %6 : $(Array<Wrapper<T>>, Builtin.RawPointer)
 // CHECK: [VARIED]   %9 = begin_borrow %7
 // CHECK: [ACTIVE]   [[T:%.*]] = ref_tail_addr
+// CHECK: [VARIED]   [[I0:%.*]] = integer_literal $Builtin.Word, 0
+// CHECK: [ACTIVE]   [[IA0:%.*]] = index_addr [projection] [[T]] : $*Wrapper<T>, [[I0]] : $Builtin.Word
 // CHECK: [USEFUL]   [[MT:%.*]] = metatype $@thin Wrapper<T>.Type
 // CHECK: [ACTIVE]   [[AS:%.*]] = alloc_stack $T
 // CHECK: [NONE]   // function_ref Wrapper.init(value:)
-// CHECK: [NONE]     [[A:%.*]] = apply %{{[0-9]+}}<T>([[T]], [[AS]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
+// CHECK: [NONE]     [[A:%.*]] = apply %{{[0-9]+}}<T>([[IA0]], [[AS]], [[MT]]) : $@convention(method) <τ_0_0 where τ_0_0 : Differentiable> (@in τ_0_0, @thin Wrapper<τ_0_0>.Type) -> @out Wrapper<τ_0_0>
 // CHECK: [VARIED]   [[I:%.*]] = integer_literal $Builtin.Word, 1
-// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [[T]] : $*Wrapper<T>, [[I]] : $Builtin.Word
+// CHECK: [ACTIVE]   [[IA:%.*]] = index_addr [projection] [[T]] : $*Wrapper<T>, [[I]] : $Builtin.Word
 // CHECK: [USEFUL]   [[MT2:%.*]] = metatype $@thin Wrapper<T>.Type
 // CHECK: [ACTIVE]   [[AS2:%.*]] = alloc_stack $T
 // CHECK: [NONE]   // function_ref Wrapper.init(value:)

@@ -388,12 +388,12 @@ bb0(%0 : $Builtin.RawPointer):
   %6 = struct $Int32 (%5)
   store %6 to [trivial] %4
   %8 = integer_literal $Builtin.Word, 1
-  %9 = index_addr %4, %8
+  %9 = index_addr [projection] %4, %8
   %10 = integer_literal $Builtin.Int32, 2
   %11 = struct $Int32 (%10)
   store %11 to [trivial] %9
   %13 = integer_literal $Builtin.Word, 2
-  %14 = index_addr %4, %13
+  %14 = index_addr [projection] %4, %13
   %15 = integer_literal $Builtin.Int32, 3
   %16 = struct $Int32 (%15)
   store %16 to [trivial] %14
@@ -424,7 +424,7 @@ bb0(%0 : $Builtin.RawPointer):
   %11 = struct $Int32 (%10)
   store %11 to [trivial] %6
   %13 = integer_literal $Builtin.Word, 1
-  %14 = index_addr %4, %13
+  %14 = index_addr [projection] %4, %13
   %15 = tuple_element_addr %14, 0
   %16 = tuple_element_addr %14, 1
   %17 = integer_literal $Builtin.Int32, 30
@@ -434,7 +434,7 @@ bb0(%0 : $Builtin.RawPointer):
   %21 = struct $Int32 (%20)
   store %21 to [trivial] %16
   %23 = integer_literal $Builtin.Word, 2
-  %24 = index_addr %4, %23
+  %24 = index_addr [projection] %4, %23
   %25 = tuple_element_addr %24, 0
   %26 = tuple_element_addr %24, 1
   %27 = integer_literal $Builtin.Int32, 50
@@ -466,7 +466,7 @@ bb0(%0 : $Builtin.RawPointer):
   %6 = struct $Int32 (%5)
   store %6 to [trivial] %4
   %8 = integer_literal $Builtin.Word, 1
-  %9 = index_addr %4, %8
+  %9 = index_addr [projection] %4, %8
   %10 = integer_literal $Builtin.Int32, 2
   %11 = struct $Int32 (%10)
   store %11 to [trivial] %9
@@ -494,7 +494,7 @@ bb0(%0 : $Builtin.RawPointer):
   %6 = struct $Int32 (%5)
   store %6 to [trivial] %4
   %8 = integer_literal $Builtin.Word, 1
-  %9 = index_addr %4, %8
+  %9 = index_addr [projection] %4, %8
   %10 = load [trivial] %4
   store %10 to [trivial] %9
   %18 = load [trivial] %3
@@ -519,7 +519,7 @@ bb0(%0 : $Builtin.RawPointer):
   %6 = struct $Int32 (%5)
   store %6 to [trivial] %4
   %8 = integer_literal $Builtin.Word, 1
-  %9 = index_addr %4, %8
+  %9 = index_addr [projection] %4, %8
   %10 = integer_literal $Builtin.Int32, 2
   %11 = struct $Int32 (%10)
   store %11 to [trivial] %9
@@ -560,7 +560,7 @@ bb0(%0 : $Builtin.RawPointer):
   %3 = alloc_stack $Builtin.FixedArray<3, ()>
   %4 = vector_base_addr %3
   %13 = integer_literal $Builtin.Word, 2
-  %14 = index_addr %4, %13
+  %14 = index_addr [projection] %4, %13
   %15 = tuple ()
   store %15 to [trivial] %14
   %18 = load [trivial] %3

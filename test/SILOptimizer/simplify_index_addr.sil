@@ -1,0 +1,200 @@
+// RUN: %target-sil-opt %s -simplification -simplify-instruction=index_addr | %FileCheck %s
+
+// REQUIRES: swift_in_compiler
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+// ============================================================
+// tryRemoveZeroIndex
+// ============================================================
+
+// Zero index is removed; uses of the index_addr are replaced with base.
+// CHECK-LABEL: sil @remove_zero_index :
+// CHECK:         [[BASE:%.*]] = pointer_to_address
+// CHECK:         load [[BASE]]
+// CHECK-NOT:     index_addr
+// CHECK:       } // end sil function 'remove_zero_index'
+sil @remove_zero_index : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer):
+  %base = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx  = integer_literal $Builtin.Word, 0
+  %addr = index_addr %base, %idx
+  %val  = load %addr
+  return %val
+}
+
+// [projection] index_addr must not be removed, even with a zero index.
+// CHECK-LABEL: sil @no_remove_zero_index_projection :
+// CHECK:         index_addr [projection]
+// CHECK:       } // end sil function 'no_remove_zero_index_projection'
+sil @no_remove_zero_index_projection : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer):
+  %base = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx  = integer_literal $Builtin.Word, 0
+  %addr = index_addr [projection] %base, %idx
+  %val  = load %addr
+  return %val
+}
+
+// Non-zero constant index is not removed.
+// CHECK-LABEL: sil @no_remove_nonzero_index :
+// CHECK:         index_addr
+// CHECK:       } // end sil function 'no_remove_nonzero_index'
+sil @no_remove_nonzero_index : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer):
+  %base = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx  = integer_literal $Builtin.Word, 1
+  %addr = index_addr %base, %idx
+  %val  = load %addr
+  return %val
+}
+
+// Non-literal (dynamic) index is not removed.
+// CHECK-LABEL: sil @no_remove_nonconstant_index :
+// CHECK:         index_addr
+// CHECK:       } // end sil function 'no_remove_nonconstant_index'
+sil @no_remove_nonconstant_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer, %idx : $Builtin.Word):
+  %base = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %addr = index_addr %base, %idx
+  %val  = load %addr
+  return %val
+}
+
+// ============================================================
+// tryFoldNestedIndexAddrs
+// ============================================================
+
+// Constant indices are summed into a single index_addr.
+// CHECK-LABEL: sil @fold_nested_index_addrs :
+// CHECK:         [[IDX:%.*]] = integer_literal $Builtin.Word, 7
+// CHECK:         index_addr {{.*}}, [[IDX]]
+// CHECK-NOT:     index_addr
+// CHECK:       } // end sil function 'fold_nested_index_addrs'
+sil @fold_nested_index_addrs : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer):
+  %base  = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx1  = integer_literal $Builtin.Word, 3
+  %outer = index_addr %base, %idx1
+  %idx2  = integer_literal $Builtin.Word, 4
+  %inner = index_addr %outer, %idx2
+  %val   = load %inner
+  return %val
+}
+
+// [stack_protection] on the outer is propagated to the folded result.
+// CHECK-LABEL: sil @fold_nested_outer_stack_protection :
+// CHECK:         [[IDX:%.*]] = integer_literal $Builtin.Word, 7
+// CHECK:         index_addr [stack_protection] {{.*}}, [[IDX]]
+// CHECK-NOT:     index_addr
+// CHECK:       } // end sil function 'fold_nested_outer_stack_protection'
+sil @fold_nested_outer_stack_protection : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer):
+  %base  = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx1  = integer_literal $Builtin.Word, 3
+  %outer = index_addr [stack_protection] %base, %idx1
+  %idx2  = integer_literal $Builtin.Word, 4
+  %inner = index_addr %outer, %idx2
+  %val   = load %inner
+  return %val
+}
+
+// [stack_protection] on the inner is propagated to the folded result.
+// CHECK-LABEL: sil @fold_nested_inner_stack_protection :
+// CHECK:         [[IDX:%.*]] = integer_literal $Builtin.Word, 7
+// CHECK:         index_addr [stack_protection] {{.*}}, [[IDX]]
+// CHECK-NOT:     index_addr
+// CHECK:       } // end sil function 'fold_nested_inner_stack_protection'
+sil @fold_nested_inner_stack_protection : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer):
+  %base  = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx1  = integer_literal $Builtin.Word, 3
+  %outer = index_addr %base, %idx1
+  %idx2  = integer_literal $Builtin.Word, 4
+  %inner = index_addr [stack_protection] %outer, %idx2
+  %val   = load %inner
+  return %val
+}
+
+// [projection] flag of the inner is preserved on the folded result.
+// CHECK-LABEL: sil @fold_nested_preserves_projection :
+// CHECK:         [[IDX:%.*]] = integer_literal $Builtin.Word, 7
+// CHECK:         index_addr [projection] {{.*}}, [[IDX]]
+// CHECK-NOT:     index_addr
+// CHECK:       } // end sil function 'fold_nested_preserves_projection'
+sil @fold_nested_preserves_projection : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer):
+  %base  = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx1  = integer_literal $Builtin.Word, 3
+  %outer = index_addr %base, %idx1
+  %idx2  = integer_literal $Builtin.Word, 4
+  %inner = index_addr [projection] %outer, %idx2
+  %val   = load %inner
+  return %val
+}
+
+// Non-literal inner index blocks the fold.
+// CHECK-LABEL: sil @no_fold_nonconstant_inner_index :
+// CHECK:         index_addr
+// CHECK:         index_addr
+// CHECK:       } // end sil function 'no_fold_nonconstant_inner_index'
+sil @no_fold_nonconstant_inner_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer, %dyn : $Builtin.Word):
+  %base  = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx1  = integer_literal $Builtin.Word, 3
+  %outer = index_addr %base, %idx1
+  %inner = index_addr %outer, %dyn
+  %val   = load %inner
+  return %val
+}
+
+// Non-literal outer index blocks the fold.
+// CHECK-LABEL: sil @no_fold_nonconstant_outer_index :
+// CHECK:         index_addr
+// CHECK:         index_addr
+// CHECK:       } // end sil function 'no_fold_nonconstant_outer_index'
+sil @no_fold_nonconstant_outer_index : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer, %dyn : $Builtin.Word):
+  %base  = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %outer = index_addr %base, %dyn
+  %idx2  = integer_literal $Builtin.Word, 4
+  %inner = index_addr %outer, %idx2
+  %val   = load %inner
+  return %val
+}
+
+// Base is not an index_addr, so there is nothing to fold.
+// CHECK-LABEL: sil @no_fold_non_index_addr_base :
+// CHECK:         index_addr
+// CHECK-NOT:     index_addr
+// CHECK:       } // end sil function 'no_fold_non_index_addr_base'
+sil @no_fold_non_index_addr_base : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer):
+  %base = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx  = integer_literal $Builtin.Word, 4
+  %addr = index_addr %base, %idx
+  %val  = load %addr
+  return %val
+}
+
+// Adding the two constant indices would overflow Int, so the fold is suppressed.
+// On 64-bit: Int.max + 1 overflows. On 32-bit: Int.max = 2147483647, so
+// 9223372036854775807 doesn't fit in Int and constantIndex returns nil —
+// a different bail-out path, but the fold still doesn't happen.
+// CHECK-LABEL: sil @no_fold_overflow :
+// CHECK:         index_addr
+// CHECK:         index_addr
+// CHECK:       } // end sil function 'no_fold_overflow'
+sil @no_fold_overflow : $@convention(thin) (Builtin.RawPointer) -> Builtin.Int64 {
+bb0(%ptr : $Builtin.RawPointer):
+  %base  = pointer_to_address %ptr : $Builtin.RawPointer to $*Builtin.Int64
+  %idx1  = integer_literal $Builtin.Word, 9223372036854775807
+  %outer = index_addr %base, %idx1
+  %idx2  = integer_literal $Builtin.Word, 1
+  %inner = index_addr %outer, %idx2
+  %val   = load %inner
+  return %val
+}

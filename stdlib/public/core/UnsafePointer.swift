@@ -898,7 +898,7 @@ extension UnsafeMutablePointer {
     // Must not use `initializeFrom` with a `Collection` as that will introduce
     // a cycle.
     for offset in 0..<count {
-      unsafe Builtin.initialize(repeatedValue, (self + offset)._rawValue)
+      unsafe Builtin.initialize(repeatedValue, self.project(offset)._rawValue)
     }
   }
 }

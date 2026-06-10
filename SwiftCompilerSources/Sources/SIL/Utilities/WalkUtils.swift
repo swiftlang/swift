@@ -533,15 +533,17 @@ extension AddressDefUseWalker {
       } else {
         return unmatchedPath(address: operand, path: path)
       }
-    case let ia as IndexAddrInst:
-      if let (pathIdx, subPath) = path.pop(kind: .indexedElement) {
-        if let idx = ia.constantIndex,
-           idx == pathIdx {
+    case let ia as IndexAddrInst where ia.isProjection:
+      if let idx = ia.constantIndex {
+        if let subPath = path.popIfMatches(.indexedElement, index: idx) {
           return walkDownUses(ofAddress: ia, path: subPath)
         }
-        return walkDownUses(ofAddress: ia, path: subPath.push(.anyIndexedElement, index: 0))
+      } else {
+        if let subPath = path.popIfMatches(.indexedElement, index: nil) {
+          return walkDownUses(ofAddress: ia, path: subPath)
+        }
       }
-      return walkDownUses(ofAddress: ia, path: path)
+      return unmatchedPath(address: operand, path: path)
     case is MarkUninitializedInst,
          is MoveOnlyWrapperToCopyableAddrInst,
          is CopyableToMoveOnlyWrapperAddrInst,
@@ -837,7 +839,7 @@ extension AddressUseDefWalker {
       return walkUp(address: uteda.enum, path: path.push(.enumCase, index: uteda.caseIndex))
     case is InitExistentialAddrInst, is OpenExistentialAddrInst:
       return walkUp(address: (def as! Instruction).operands[0].value, path: path.push(.existential, index: 0))
-    case let ia as IndexAddrInst:
+    case let ia as IndexAddrInst where ia.isProjection:
       if let idx = ia.constantIndex {
         return walkUp(address: ia.base, path: path.push(.indexedElement, index: idx))
       } else {
@@ -859,15 +861,3 @@ extension AddressUseDefWalker {
     }
   }
 }
-
-private extension IndexAddrInst {
-  var constantIndex: Int? {
-    if let literal = index as? IntegerLiteralInst,
-       let indexValue = literal.value
-    {
-      return indexValue
-    }
-    return nil
-  }
-}
-

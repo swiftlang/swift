@@ -296,9 +296,15 @@ public struct Builder {
     return notifyNew(dr.getAs(PointerToAddressInst.self))
   }
 
-  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool) -> IndexAddrInst {
-    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection)
+  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool,
+                              isProjection: Bool) -> IndexAddrInst {
+    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection, isProjection)
     return notifyNew(dr.getAs(IndexAddrInst.self))
+  }
+
+  public func createIndexRawPointer(base: Value, index: Value) -> IndexRawPointerInst {
+    let dr = bridged.createIndexRawPointer(base.bridged, index.bridged)
+    return notifyNew(dr.getAs(IndexRawPointerInst.self))
   }
 
   public func createUncheckedRefCast(from value: Value, to type: Type) -> UncheckedRefCastInst {

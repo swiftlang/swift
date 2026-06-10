@@ -3674,7 +3674,8 @@ SILCloner<ImplClass>::visitIndexAddrInst(IndexAddrInst *Inst) {
       Inst, getBuilder().createIndexAddr(getOpLocation(Inst->getLoc()),
                                          getOpValue(Inst->getBase()),
                                          getOpValue(Inst->getIndex()),
-                                         Inst->needsStackProtection()));
+                                         Inst->needsStackProtection(),
+                                         Inst->isProjection()));
 }
 
 template<typename ImplClass>

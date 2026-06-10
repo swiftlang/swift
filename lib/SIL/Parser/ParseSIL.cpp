@@ -6051,12 +6051,27 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     case SILInstructionKind::IndexAddrInst: {
       SILValue IndexVal;
       bool needsStackProtection = false;
-      if (parseSILOptional(needsStackProtection, *this, "stack_protection") ||
-          parseTypedValueRef(Val, B) ||
+      bool isProjection = false;
+      StringRef AttrName;
+      SourceLoc AttrLoc;
+      while (parseSILOptional(AttrName, AttrLoc, *this)) {
+        if (AttrName == "stack_protection") {
+          needsStackProtection = true;
+        } else if (AttrName == "projection") {
+          isProjection = true;
+        } else {
+          P.diagnose(InstLoc.getSourceLoc(),
+                     diag::sil_invalid_attribute_for_instruction, AttrName,
+                     "index_addr");
+          return true;
+        }
+      }
+      if (parseTypedValueRef(Val, B) ||
           P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ",") ||
           parseTypedValueRef(IndexVal, B) || parseSILDebugLocation(InstLoc, B))
         return true;
-      ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal, needsStackProtection);
+      ResultVal = B.createIndexAddr(InstLoc, Val, IndexVal, needsStackProtection,
+                                    isProjection);
       break;
     }
     case SILInstructionKind::VectorBaseAddrInst: {

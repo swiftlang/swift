@@ -445,15 +445,6 @@ public struct AccessPath : CustomStringConvertible, Hashable {
   }
 }
 
-private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
-  switch value {
-  case is IndexAddrInst, is RefTailAddrInst, is PointerToAddressInst, is VectorBaseAddrInst:
-    return true
-  default:
-    return false
-  }
-}
-
 /// Tries to identify from which address the pointer operand originates from.
 /// This is useful to identify patterns like
 /// ```
@@ -509,22 +500,6 @@ public extension PointerToAddressInst {
        let global = callee.globalOfGlobalInitFunction
     {
       return global
-    }
-    return nil
-  }
-
-  // If this address is the result of a call to unsafe[Mutable]Address, return the 'self' operand of the apply. This
-  // represents the base value into which this address projects.
-  func isResultOfUnsafeAddressor() -> Operand? {
-    if isStrict,
-       let extract = pointer as? StructExtractInst,
-       extract.`struct`.type.isAnyUnsafePointer,
-       let addressorApply = extract.`struct` as? ApplyInst,
-       let addressorFunc = addressorApply.referencedFunction,
-       addressorFunc.isAddressor
-    {
-      let selfArgIdx = addressorFunc.selfArgumentIndex!
-      return addressorApply.argumentOperands[selfArgIdx]
     }
     return nil
   }
@@ -705,70 +680,58 @@ private struct AccessPathWalker : AddressUseDefWalker {
   }
 
   mutating func walk(startAt address: Value, initialPath: SmallProjectionPath = SmallProjectionPath()) {
-    if walkUp(address: address, path: Path(projectionPath: initialPath)) == .abortWalk {
+    if walkUp(address: address, path: initialPath) == .abortWalk {
       assert(result.base == .unidentified,
              "shouldn't have set an access base in an aborted walk")
     }
   }
 
-  struct Path : SmallProjectionWalkingPath {
-    let projectionPath: SmallProjectionPath
-
-    // Tracks whether an `index_addr` instruction was crossed.
-    // It should be (FIXME: check if it's enforced) that operands
-    // of `index_addr` must be `tail_addr` or other `index_addr` results.
-    let indexAddr: Bool
-
-    init(projectionPath: SmallProjectionPath = SmallProjectionPath(), indexAddr: Bool = false) {
-      self.projectionPath = projectionPath
-      self.indexAddr = indexAddr
-    }
-
-    func with(projectionPath: SmallProjectionPath) -> Self {
-      return Self(projectionPath: projectionPath, indexAddr: indexAddr)
-    }
-
-    func with(indexAddr: Bool) -> Self {
-      return Self(projectionPath: projectionPath, indexAddr: indexAddr)
-    }
-
-    func merge(with other: Self) -> Self {
-      return Self(
-        projectionPath: projectionPath.merge(with: other.projectionPath),
-        indexAddr: indexAddr || other.indexAddr
-      )
-    }
-  }
-
-  mutating func rootDef(address: Value, path: Path) -> WalkResult {
+  mutating func rootDef(address: Value, path: SmallProjectionPath) -> WalkResult {
     assert(result.base == .unidentified, "rootDef should only called once")
     // Try identifying the address a pointer originates from
     if let p2ai = address as? PointerToAddressInst, let originatingAddr = p2ai.originatingAddress {
       return walkUp(address: originatingAddr, path: path)
     }
     let base = AccessBase(baseAddress: address)
-    self.result = AccessPath(base: base, projectionPath: path.projectionPath)
+    self.result = AccessPath(base: base, projectionPath: path)
     return .continueWalk
   }
 
-  mutating func walkUp(address: Value, path: Path) -> WalkResult {
-    if let indexAddr = address as? IndexAddrInst {
-      if !(indexAddr.index is IntegerLiteralInst) && enforceConstantProjectionPath {
-        self.result = AccessPath(base: .index(indexAddr), projectionPath: path.projectionPath)
+  mutating func walkUp(address: Value, path: SmallProjectionPath) -> WalkResult {
+    switch address {
+    case let indexAddr as IndexAddrInst:
+      if indexAddr.constantIndex == nil && enforceConstantProjectionPath {
+        self.result = AccessPath(base: .index(indexAddr), projectionPath: path)
         return .continueWalk
       }
-      // Track that we crossed an `index_addr` during the walk-up
-      return walkUpDefault(address: indexAddr, path: path.with(indexAddr: true))
-    } else if path.indexAddr && !canBeOperandOfIndexAddr(address) {
-      // An `index_addr` instruction cannot be derived from an address
-      // projection. Bail out
-      return .abortWalk
-    } else if let ba = address as? BeginAccessInst {
+      // Handle `pointer_to_address` - `index_addr` (without the `[projection]` flag).
+      // This is a special case which the address-walkers cannot handle. But for access paths this
+      // is okay because the `pointer_to_address` is the access base. And we can ignore the use-def
+      // chain above the access base - even if it contains another chained `index_addr`.
+      if !indexAddr.isProjection,
+         let ptr2addr = indexAddr.base as? PointerToAddressInst,
+         !path.pop().kind.isIndexedElement
+      {
+        let finalPath: SmallProjectionPath
+        if let idx = indexAddr.constantIndex {
+          finalPath = path.push(.indexedElement, index: idx)
+        } else {
+          finalPath = path.push(.anyIndexedElement, index: 0)
+        }
+        let base = AccessBase(baseAddress: ptr2addr)
+        self.result = AccessPath(base: base, projectionPath: finalPath)
+        return .continueWalk
+      }
+      return walkUpDefault(address: indexAddr, path: path)
+    case let ba as BeginAccessInst:
       foundEnclosingScopes.push(.access(ba))
-    } else if let md = address as? MarkDependenceInst {
+      return walkUpDefault(address: address, path: path)
+    case let md as MarkDependenceInst:
       foundEnclosingScopes.push(.dependence(md))
+      return walkUpDefault(address: address, path: path)
+    default:
+      return walkUpDefault(address: address, path: path)
     }
-    return walkUpDefault(address: address, path: path.with(indexAddr: false))
   }
 }
 

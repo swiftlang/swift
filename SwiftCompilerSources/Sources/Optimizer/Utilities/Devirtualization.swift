@@ -393,7 +393,7 @@ private func createArrayDestroyLoop(baseAddress: Value,
 
   let bodyBuilder = Builder(atEndOf: bodyBlock, location: insertionPoint.location, context)
   let elementAddr = bodyBuilder.createIndexAddr(base: baseAddress, index: inductionVariable,
-                                                needStackProtection: false)
+                                                needStackProtection: false, isProjection: true)
   let destroy = bodyBuilder.createDestroyAddr(address: elementAddr)
   let resultType = context.getTupleType(elements: [indexType, boolType]).loweredType(in: insertionPoint.parentFunction)
   let increment = bodyBuilder.createBuiltinBinaryFunction(name: "sadd_with_overflow", operandType: indexType,
