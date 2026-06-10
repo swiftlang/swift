@@ -2677,6 +2677,13 @@ public:
   /// Returns the typechecked binding entry at the given index.
   const PatternBindingEntry *getCheckedPatternBindingEntry(unsigned i) const;
 
+  /// Returns the typechecked pattern at the given index, if any.
+  Pattern *getCheckedPattern(unsigned i) const {
+    if (auto *entry = getCheckedPatternBindingEntry(i))
+      return entry->getPattern();
+    return nullptr;
+  }
+
   /// Clean up walking the initializers for the pattern
   class InitIterator {
 
