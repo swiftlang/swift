@@ -125,6 +125,30 @@ func castNeitherC<T>(_: T.Type) where T: Style, T.Primary: ~Copyable {
   }
 }
 
+// Additional test where conformed-to protocol itself has a Copyable associated type.
+protocol HasACopyableAssoc {
+  associatedtype Inner
+  func describe()
+}
+
+struct G<T: Style> where T.Primary: ~Copyable {}
+
+extension G: HasACopyableAssoc where T.Primary: Copyable {
+  typealias Inner = T.Primary
+  func describe() { print("G<\(T.self)<\(Inner.self), _>> : HasACopyableAssoc") }
+}
+
+@inline(never)
+func castHasA<T>(_: T.Type) where T: Style, T.Primary: ~Copyable {
+  let value = G<T>()
+  if let x = value as? any HasACopyableAssoc {
+    x.describe()
+  } else {
+    print("G<\(T.self)<\(T.Primary.self), _>> is not a HasACopyableAssoc")
+  }
+}
+
+
 func main() {
     // EXEC: going to test
     print("going to test")
@@ -164,6 +188,15 @@ func main() {
     castPrimaryC(NCBoth.self)
     castSecondC(NCBoth.self)
     castNeitherC(NCBoth.self)
+
+    // EXEC-NEXT: G<AllCopyable<Int, _>> : HasACopyableAssoc
+    // EXEC-NEXT: G<NCPrimary<NC, _>> is not a HasACopyableAssoc
+    // EXEC-NEXT: G<NCSecondary<Int, _>> : HasACopyableAssoc
+    // EXEC-NEXT: G<NCBoth<NC, _>> is not a HasACopyableAssoc
+    castHasA(AllCopyable.self)
+    castHasA(NCPrimary.self)
+    castHasA(NCSecondary.self)
+    castHasA(NCBoth.self)
 
     // EXEC-NEXT: done testing
     print("done testing")
