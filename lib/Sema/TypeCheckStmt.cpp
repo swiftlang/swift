@@ -977,20 +977,16 @@ static bool typeCheckAvailableStmtConditionElement(StmtConditionElement &elt,
     return false;
   }
 
-  auto &diags = dc->getASTContext().Diags;
+  // Determine whether this element's `#available`/`#unavailable` query has a
+  // statically known result, but don't diagnose here — the per-element
+  // useless-availability warning is emitted by a second pass in
+  // `typeCheckConditionForStatement` so it can attach a fix-it that depends
+  // on the rest of the condition.
   bool isConditionAlwaysTrue = false;
-
   if (auto query = info->getAvailabilityQuery()) {
     auto domain = query->getDomain();
-    if (query->isConstant() && domain.isPermanentlyAlwaysEnabled()) {
+    if (query->isConstant() && domain.isPermanentlyAlwaysEnabled())
       isConditionAlwaysTrue = *query->getConstantResult();
-
-      diags
-        .diagnose(elt.getStartLoc(),
-                  diag::availability_query_useless_always_true, domain,
-                  isConditionAlwaysTrue)
-        .highlight(elt.getSourceRange());
-    }
   }
 
   if (!isConditionAlwaysTrue)
@@ -1091,6 +1087,80 @@ bool TypeChecker::typeCheckStmtConditionElement(StmtConditionElement &elt,
   }
 }
 
+/// If \p elt is a `#available` or `#unavailable` condition element whose
+/// query result is statically known because the queried domain is
+/// permanently always-enabled, emit the standard useless-check warning. When
+/// the element evaluates to a constant true, additionally attach a fix-it
+/// that removes just this element from the surrounding condition list,
+/// provided removing it preserves semantics: the surrounding statement must
+/// not itself be diagnosed as always-true (the whole-stmt fix-it would
+/// otherwise subsume the per-element one), and the condition must contain
+/// more than one element so removal leaves a non-empty list.
+static void diagnoseUselessAvailabilityCondition(StmtCondition cond,
+                                                 unsigned eltIndex,
+                                                 bool stmtAlwaysTrue,
+                                                 ASTContext &ctx) {
+  auto elt = cond[eltIndex];
+  auto *info = elt.getAvailability();
+  if (info->isInvalid())
+    return;
+  auto query = info->getAvailabilityQuery();
+  if (!query || !query->isConstant())
+    return;
+  auto domain = query->getDomain();
+  if (!domain.isPermanentlyAlwaysEnabled())
+    return;
+
+  bool isAlwaysTrue = *query->getConstantResult();
+  auto inflight = ctx.Diags.diagnose(
+      elt.getStartLoc(), diag::availability_query_useless_always_true, domain,
+      isAlwaysTrue);
+  inflight.highlight(elt.getSourceRange());
+
+  if (!isAlwaysTrue || stmtAlwaysTrue || cond.size() < 2)
+    return;
+
+  auto &SM = ctx.SourceMgr;
+  SourceLoc removeStart, removeEnd;
+  if (eltIndex + 1 < cond.size()) {
+    // Not the last element: remove from the start of this element up to
+    // the start of the next element, taking the trailing comma and
+    // whitespace with it.
+    removeStart = elt.getStartLoc();
+    removeEnd = cond[eltIndex + 1].getStartLoc();
+  } else {
+    // Last element: remove from one past the end of the previous element
+    // up to one past the end of this element, taking the leading comma and
+    // whitespace with it.
+    removeStart =
+        Lexer::getLocForEndOfToken(SM, cond[eltIndex - 1].getEndLoc());
+    removeEnd = Lexer::getLocForEndOfToken(SM, elt.getEndLoc());
+  }
+  if (removeStart.isInvalid() || removeEnd.isInvalid())
+    return;
+
+  inflight.fixItRemoveChars(removeStart, removeEnd);
+}
+
+/// Emits diagnostics for irrefutable condition elements.
+static void diagnoseIrrefutableConditionElement(StmtCondition cond,
+                                                unsigned eltIndex,
+                                                bool stmtAlwaysTrue,
+                                                ASTContext &ctx) {
+  switch (cond[eltIndex].getKind()) {
+  case StmtConditionElement::CK_Availability:
+    diagnoseUselessAvailabilityCondition(cond, eltIndex, stmtAlwaysTrue, ctx);
+    return;
+
+  case StmtConditionElement::CK_PatternBinding:
+  case StmtConditionElement::CK_Boolean:
+  case StmtConditionElement::CK_HasSymbol:
+    // FIXME: Diagnose other irrefutable conditions here (e.g.
+    //   `if case _ = x { ... }`).
+    return;
+  }
+}
+
 /// Type check the given 'if', 'while', or 'guard' statement condition.
 ///
 /// \param stmt The conditional statement to type-check, which will be modified
@@ -1105,16 +1175,27 @@ static bool typeCheckConditionForStatement(LabeledConditionalStmt *stmt,
   bool hadError = false;
   bool hadAnyFalsable = false;
   auto cond = stmt->getCond();
+
+  // Type-check each element, keeping track of the statement's refutability.
   for (auto &elt : cond) {
     hadError |=
         TypeChecker::typeCheckStmtConditionElement(elt, hadAnyFalsable, dc);
   }
 
+  auto &ctx = dc->getASTContext();
+  auto &diags = ctx.Diags;
+
+  bool diagnoseStmtAsAlwaysTrue =
+      !stmt->isImplicit() && !hadAnyFalsable && !hadError;
+
+  // Visit each element again to diagnose irrefutable elements.
+  for (auto i : indices(cond)) {
+    diagnoseIrrefutableConditionElement(cond, i, diagnoseStmtAsAlwaysTrue, ctx);
+  }
+
   // If none of the statement's conditions can be false, diagnose.
   // FIXME: Also diagnose if none of the statements conditions can be true.
-  if (!stmt->isImplicit() && !hadAnyFalsable && !hadError) {
-    auto &ctx = dc->getASTContext();
-    auto &diags = ctx.Diags;
+  if (diagnoseStmtAsAlwaysTrue) {
     Diag<> msg = diag::invalid_diagnostic;
     switch (stmt->getKind()) {
     case StmtKind::If:
