@@ -240,8 +240,12 @@ OPERAND_OWNERSHIP(InstantaneousUse, MergeIsolationRegion)
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
 
+// A debug_value use does not require liveness for ownership verification.
+// Uses can appear out of lifetime after instruction salvaging in optimizations.
+// OwnershipModelEliminator will kill debug uses after a destroy_value.
+OPERAND_OWNERSHIP(DebugUse, DebugValue)
+
 // Unowned uses ignore the value's ownership
-OPERAND_OWNERSHIP(UnownedInstantaneousUse, DebugValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyBlock)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, CopyValue)
 OPERAND_OWNERSHIP(UnownedInstantaneousUse, ExplicitCopyValue)

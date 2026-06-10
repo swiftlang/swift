@@ -381,6 +381,7 @@ bool OwnershipUseVisitor<Impl>::visitOwnedUse(Operand *use) {
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::DebugUse:
   case OperandOwnership::BitwiseEscape:
     return handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding);
 
@@ -416,6 +417,7 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
   case OperandOwnership::InstantaneousUse:
   case OperandOwnership::ForwardingUnowned:
   case OperandOwnership::UnownedInstantaneousUse:
+  case OperandOwnership::DebugUse:
   case OperandOwnership::BitwiseEscape:
     return handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding);
   case OperandOwnership::EndBorrow:

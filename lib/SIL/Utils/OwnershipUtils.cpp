@@ -237,6 +237,7 @@ bool swift::findInnerTransitiveGuaranteedUses(
 
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::DebugUse:
     case OperandOwnership::BitwiseEscape:
     // Reborrow only happens when this is called on a value that creates a
     // borrow scope.
@@ -377,6 +378,7 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
 
     case OperandOwnership::InstantaneousUse:
     case OperandOwnership::UnownedInstantaneousUse:
+    case OperandOwnership::DebugUse:
     case OperandOwnership::BitwiseEscape:
     // EndBorrow either happens when this is called on a value that creates a
     // borrow scope, or when it is pushed as a use when processing a nested
