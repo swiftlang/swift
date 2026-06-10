@@ -24,16 +24,10 @@ from ..products.cmake_product import CMakeProduct
 from .. import shell
 
 
-# Single bundle name shared by every wasm Swift SDK product (WASI +
-# Emscripten). Picked once here so the products don't drift apart and
-# accidentally write into separate `.artifactbundle` directories.
-_CANONICAL_BUNDLE_NAME = "swift-wasm-sdk"
-
-
-def canonical_bundle_name():
-    """Return the on-disk ``.artifactbundle`` directory name (without the
-    ``.artifactbundle`` suffix) shared by every wasm Swift SDK product."""
-    return _CANONICAL_BUNDLE_NAME
+def canonical_bundle_name(swift_version):
+    """Shared ``.artifactbundle`` directory name (without the extension) for
+    the wasm Swift SDK products."""
+    return "{}_wasm".format(swift_version)
 
 
 def target_package_path(build_dir, swift_host_triple):
@@ -263,7 +257,7 @@ def generate_swift_sdk(swift_run, source_dir, build_dir, triple, sysroot,
             (the ``Toolchains/<triple>/`` directory previously
             populated by ``install_stdlib_and_resources``).
         bundle_name: ``.artifactbundle`` directory name (without the
-            ``.artifactbundle`` suffix). Pass
+            extension). Pass
             :func:`canonical_bundle_name` to land in the shared bundle.
         swift_version: passed through to swift-sdk-generator's
             ``--swift-version`` (recorded in the SDK metadata).
