@@ -4656,27 +4656,21 @@ namespace {
       // Post-VisitFunctionDecl(), perform special handling that is specific
       // to importing CXXMethodDecls...
 
-      // For regular methods (not operators, constructors, etc.), if the return
-      // type is an uninstantiated templated class, instantiate it now and
-      // update the imported name if it changed. The safety detection logic
-      // (IsSafeUseOfCxxDecl) relies on the returned class being instantiated,
-      // and may affect the imported name (e.g., adding a "__*Unsafe" prefix).
-      // We defer this instantiation to after importing the method so that we
-      // don't eagerly instantiate templates for methods we may not even end up
-      // importing. The "__*Unsafe" lookup fallback in ClangRecordMemberLookup
-      // will also find methods whose imported name changes due to safety after
-      // instantiation.
+      // For regular methods (not operators, ctors, dtors, conversions),
+      // instantiate the return-type template (if needed) and apply the
+      // __Unsafe-method rename here. This is done post-import so we don't
+      // eagerly instantiate templates for methods we may not import.
       //
-      // This post-import behavior is gated on ImportCxxMembersLazily, because
-      // without that feature, IsSafeUseOfCxxDecl relies on ClangImporter
-      // (over-)eagerly instantiating typedef members.
-      if (Impl.SwiftContext.LangOpts.hasFeature(
-              Feature::ImportCxxMembersLazily)) {
-        if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
-                 clang::CXXConversionDecl>(decl) &&
-            decl->getOverloadedOperator() ==
-                clang::OverloadedOperatorKind::OO_None) {
+      // Instantiation is gated on ImportCxxMembersLazily; without that
+      // feature ClangImporter eagerly instantiates typedef members, so the
+      // return type is usually already instantiated by the time we get here.
+      if (!isa<clang::CXXConstructorDecl, clang::CXXDestructorDecl,
+               clang::CXXConversionDecl>(decl) &&
+          decl->getOverloadedOperator() ==
+              clang::OverloadedOperatorKind::OO_None) {
 
+        if (Impl.SwiftContext.LangOpts.hasFeature(
+                Feature::ImportCxxMembersLazily)) {
           using ClassTmplSpec = clang::ClassTemplateSpecializationDecl;
 
           auto retTy = desugarIfElaborated(decl->getReturnType());
@@ -4691,16 +4685,22 @@ namespace {
                 clang::TemplateSpecializationKind::TSK_ImplicitInstantiation,
                 /*Complain*/ false, /*PrimaryStrictPackMatch*/ false);
           }
-          // Re-import the name now that the return type template is (or was
-          // already) instantiated; safety may have changed, affecting the
-          // base name. Clear the cached name first so importFullName
-          // recomputes it.
-          Impl.getNameImporter().clearCachedName(decl, Impl.CurrentVersion);
-          if (auto updatedName =
-                  Impl.importFullName(decl, Impl.CurrentVersion)) {
-            if (method->getName() != updatedName.getDeclName())
-              method->setName(updatedName.getDeclName());
-          }
+        }
+
+        auto importedName = Impl.importFullName(decl, Impl.CurrentVersion);
+        if (importedName && !importedName.hasCustomName() &&
+            !evaluateOrDefault(Impl.SwiftContext.evaluator,
+                               IsSafeUseOfCxxDecl({decl, Impl.SwiftContext}),
+                               {})) {
+          DeclName currentName = method->getName();
+          Identifier unsafeId = Impl.SwiftContext.getIdentifier(
+              ("__" + currentName.getBaseIdentifier().str() + "Unsafe").str());
+          DeclName unsafeName = currentName.isCompoundName()
+                                    ? DeclName(Impl.SwiftContext, unsafeId,
+                                               currentName.getArgumentNames())
+                                    : DeclName(unsafeId);
+          if (currentName != unsafeName)
+            method->setName(unsafeName);
         }
       }
 

@@ -1594,17 +1594,6 @@ addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
     argumentNames.emplace_back();
 }
 
-static StringRef renameUnsafeMethod(ASTContext &ctx,
-                                    const clang::NamedDecl *decl,
-                                    StringRef name) {
-  if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(ctx.evaluator, IsSafeUseOfCxxDecl({decl, ctx}), {})) {
-    return ctx.getIdentifier(("__" + name + "Unsafe").str()).str();
-  }
-
-  return name;
-}
-
 std::optional<StringRef>
 NameImporter::findCustomName(const clang::Decl *decl,
                              ImportNameVersion version) {
@@ -2575,8 +2564,6 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
       baseName = swiftPrivateScratch;
     }
   }
-
-  baseName = renameUnsafeMethod(swiftCtx, D, baseName);
 
   result.declName =
       formDeclName(swiftCtx, baseName, argumentNames, isFunction,
