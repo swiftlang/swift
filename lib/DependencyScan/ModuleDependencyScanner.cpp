@@ -560,18 +560,18 @@ ModuleDependencyScanner::create(SwiftDependencyScanningService &service,
               .getFrontendOptions()
               .EmitDependencyScannerRemarks));
 
-  if (scanner->ShareClangCompilerInstance) {
-    auto initError = scanner->initializeWorkerClangScanningTool();
+  // if (scanner->ShareClangCompilerInstance) {
+  //   auto initError = scanner->initializeWorkerClangScanningTool();
 
-    if (initError) {
-      llvm::handleAllErrors(
-          std::move(initError), [&](const llvm::StringError &E) {
-            instance->getDiags().diagnose(
-                SourceLoc(), diag::clang_dependency_scan_error, E.getMessage());
-          });
-      return std::make_error_code(std::errc::invalid_argument);
-    }
-  }
+  //   if (initError) {
+  //     llvm::handleAllErrors(
+  //         std::move(initError), [&](const llvm::StringError &E) {
+  //           instance->getDiags().diagnose(
+  //               SourceLoc(), diag::clang_dependency_scan_error, E.getMessage());
+  //         });
+  //     return std::make_error_code(std::errc::invalid_argument);
+  //   }
+  // }
 
   return scanner;
 }
@@ -596,8 +596,8 @@ ModuleDependencyScanner::ModuleDependencyScanner(
                      : 1),
       ScanningThreadPool(llvm::hardware_concurrency(NumThreads)),
       CAS(ScanningService.ClangScanningService->getCAS()),
-      ActionCache(ScanningService.ClangScanningService->getActionCache()),
-      ShareClangCompilerInstance(ShareClangCompilerInstance) {
+      ActionCache(ScanningService.ClangScanningService->getActionCache())/*,
+      ShareClangCompilerInstance(ShareClangCompilerInstance)*/ {
   // Setup prefix mapping.
   auto &ScannerPrefixMapper =
       ScanCompilerInvocation.getSearchPathOptions().ScannerPrefixMapper;
@@ -626,10 +626,10 @@ ModuleDependencyScanner::ModuleDependencyScanner(
 }
 
 ModuleDependencyScanner::~ModuleDependencyScanner() {
-  if (ShareClangCompilerInstance) {
-    auto finError = finalizeWorkerClangScanningTool();
-    assert(!finError && "ClangScanningTool finalization must succeed.");
-  }
+  // if (ShareClangCompilerInstance) {
+  //   auto finError = finalizeWorkerClangScanningTool();
+  //   assert(!finError && "ClangScanningTool finalization must succeed.");
+  // }
 }
 
 llvm::Error ModuleDependencyScanner::initializeWorkerClangScanningTool() {
@@ -1230,50 +1230,128 @@ void ModuleDependencyScanner::reQueryMissedModulesFromCache(
   }
 }
 
+class ConcurrentIdentifierQueue {
+  std::vector<Identifier> Names;
+  std::atomic<size_t> Next = 0;
+
+public:
+  explicit ConcurrentIdentifierQueue(std::vector<Identifier> N)
+      : Names(std::move(N)) {}
+
+  std::optional<Identifier> tryPop() {
+    size_t I = Next.fetch_add(1, std::memory_order_relaxed);
+    if (I >= Names.size())
+      return std::nullopt;
+    return Names[I];
+  }
+};
+
 void ModuleDependencyScanner::performClangModuleLookup(
     const ImportStatementInfoMap &unresolvedImportsMap,
     const ImportStatementInfoMap &unresolvedOptionalImportsMap,
     BatchClangModuleLookupResult &result) {
   auto seenClangModules = DependencyCache.getAlreadySeenClangModules();
   std::mutex resultAccessLock;
-  auto scanForClangModuleDependency = [this, &result, &resultAccessLock,
-                                       &seenClangModules](
-                                          Identifier moduleIdentifier) {
-    auto scanResult = withDependencyScanningWorker(
-        [&](ModuleDependencyScanningWorker *ScanningWorker) {
-          auto lookupModuleOutput = [this](const auto &cd, auto mok) -> auto {
-            return clangModuleOutputPathLookup(cd, mok);
-          };
-          return ScanningWorker->scanFilesystemForClangModuleDependency(
-              moduleIdentifier, lookupModuleOutput, seenClangModules);
-        });
-    {
+  // auto scanForClangModuleDependency = [this, &result, &resultAccessLock,
+  //                                      &seenClangModules](
+  //                                         Identifier moduleIdentifier) {
+  //   auto scanResult = withDependencyScanningWorker(
+  //       [&](ModuleDependencyScanningWorker *ScanningWorker) {
+  //         auto lookupModuleOutput = [this](const auto &cd, auto mok) -> auto {
+  //           return clangModuleOutputPathLookup(cd, mok);
+  //         };
+  //         return ScanningWorker->scanFilesystemForClangModuleDependency(
+  //             moduleIdentifier, lookupModuleOutput, seenClangModules);
+  //       });
+  //   {
+  //     std::lock_guard<std::mutex> guard(resultAccessLock);
+  //     if (scanResult) {
+  //       llvm::for_each(scanResult->ModuleGraph, [&result](const auto &dep) {
+  //         result.discoveredDependencyInfos.try_emplace(dep.ID.ModuleName, dep);
+  //       });
+  //       result.visibleModules.insert_or_assign(moduleIdentifier.str(),
+  //                                              scanResult->VisibleModules);
+  //     }
+  //   }
+  // };
+
+  // Insert and dedupe identifiers.
+  llvm::StringSet<> namesToQuery;
+  std::vector<Identifier> idsToQuery;
+  for (const auto &unresolvedImports : unresolvedImportsMap)
+    for (const auto &unresolvedImportInfo : unresolvedImports.second)
+      if (namesToQuery.insert(unresolvedImportInfo.importIdentifier).second)
+        idsToQuery.push_back(
+            getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
+
+  for (const auto &unresolvedImports : unresolvedOptionalImportsMap)
+    for (const auto &unresolvedImportInfo : unresolvedImports.second)
+      if (namesToQuery.insert(unresolvedImportInfo.importIdentifier).second)
+        idsToQuery.push_back(
+            getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
+
+
+  ConcurrentIdentifierQueue IdQueue(idsToQuery);
+  auto drainClangModules = [&](ModuleDependencyScanningWorker *W){
+    if (auto err = W->initializeClangScanningTool()) {
+      llvm::handleAllErrors(std::move(err), [&](const llvm::StringError &E) {
+        /* prototype, do not handle init error atm. */ });
+      return true;
+    }
+    auto lookupModuleOutput = [this](const auto &cd, auto mok) -> auto {
+      return clangModuleOutputPathLookup(cd, mok);
+    };
+
+    auto deliverResult = [&](Identifier id, auto scanResult) {
       std::lock_guard<std::mutex> guard(resultAccessLock);
       if (scanResult) {
         llvm::for_each(scanResult->ModuleGraph, [&result](const auto &dep) {
           result.discoveredDependencyInfos.try_emplace(dep.ID.ModuleName, dep);
         });
-        result.visibleModules.insert_or_assign(moduleIdentifier.str(),
+        result.visibleModules.insert_or_assign(id.str(),
                                                scanResult->VisibleModules);
       }
+    };
+
+    // Since withDependencyScanningWorker already incremented the counter, we
+    // decrement it once to avoid a wrong count. Keeps NumLookups increment by 1
+    // per name.
+    NumLookups--;
+    while (auto next = IdQueue.tryPop()) {
+      NumLookups++;
+      auto Deps = W->scanFilesystemForClangModuleDependency(
+          *next, lookupModuleOutput, seenClangModules);
+      deliverResult(*next, Deps);
     }
+
+    llvm::consumeError(W->finalizeClangScanningTool());
+    return true;
   };
 
-  // Enque asynchronous lookup tasks
-  llvm::StringSet<> queriedIdentifiers;
-  for (const auto &unresolvedImports : unresolvedImportsMap)
-    for (const auto &unresolvedImportInfo : unresolvedImports.second)
-      if (queriedIdentifiers.insert(unresolvedImportInfo.importIdentifier).second)
-        ScanningThreadPool.async(
-            scanForClangModuleDependency,
-            getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
+  auto numIds = idsToQuery.size();
+  if (!numIds) return;
 
-  for (const auto &unresolvedImports : unresolvedOptionalImportsMap)
-    for (const auto &unresolvedImportInfo : unresolvedImports.second)
-      if (queriedIdentifiers.insert(unresolvedImportInfo.importIdentifier).second)
-        ScanningThreadPool.async(
-            scanForClangModuleDependency,
-            getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
+  unsigned NumDrainers = std::min<unsigned>(NumThreads, numIds);
+  for (unsigned i = 0; i < NumDrainers; ++i) {
+    ScanningThreadPool.async(
+        [&]() { withDependencyScanningWorker(drainClangModules); });
+  }
+
+  // Enque asynchronous lookup tasks
+  // llvm::StringSet<> queriedIdentifiers;
+  // for (const auto &unresolvedImports : unresolvedImportsMap)
+  //   for (const auto &unresolvedImportInfo : unresolvedImports.second)
+  //     if (queriedIdentifiers.insert(unresolvedImportInfo.importIdentifier).second)
+  //       ScanningThreadPool.async(
+  //           scanForClangModuleDependency,
+  //           getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
+
+  // for (const auto &unresolvedImports : unresolvedOptionalImportsMap)
+  //   for (const auto &unresolvedImportInfo : unresolvedImports.second)
+  //     if (queriedIdentifiers.insert(unresolvedImportInfo.importIdentifier).second)
+  //       ScanningThreadPool.async(
+  //           scanForClangModuleDependency,
+  //           getModuleImportIdentifier(unresolvedImportInfo.importIdentifier));
 
   ScanningThreadPool.wait();
 }

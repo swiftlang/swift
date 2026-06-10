@@ -482,7 +482,7 @@ private:
   /// Flag to use a single clang compiler instance to do all
   /// dependency queries during the life time of each worker this
   /// scanner owns.
-  bool ShareClangCompilerInstance = true;
+  //bool ShareClangCompilerInstance = true;
 };
 
 /// Check if a module path is under one of the known SDK private framework
