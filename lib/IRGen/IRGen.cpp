@@ -499,7 +499,7 @@ void swift::performLLVMOptimizations(
                                            llvm::ThinOrFullLTOPhase) {
       std::vector<std::string> allowlistFiles;
       std::vector<std::string> ignorelistFiles;
-      MPM.addPass(SanitizerCoveragePass(Opts.SanitizeCoverage,
+      MPM.addPass(SanitizerCoveragePass(Opts.SanitizeCoverage, /*VFS=*/FS,
                                         allowlistFiles, ignorelistFiles));
     });
   }

@@ -1730,6 +1730,7 @@ void SignatureExpansion::expandExternalSignatureTypes() {
       break;
     }
     case clang::CodeGen::ABIArgInfo::IndirectAliased:
+    case clang::CodeGen::ABIArgInfo::TargetSpecific:
       llvm_unreachable("not implemented");
     case clang::CodeGen::ABIArgInfo::Indirect: {
       // When `i` is 0, if the clang offset is 1, that means we mapped the last
@@ -4663,6 +4664,7 @@ void CallEmission::externalizeArguments(IRGenFunction &IGF, const Callee &callee
       break;
     }
     case clang::CodeGen::ABIArgInfo::IndirectAliased:
+    case clang::CodeGen::ABIArgInfo::TargetSpecific:
       llvm_unreachable("not implemented");
     case clang::CodeGen::ABIArgInfo::Indirect: {
       auto &ti = cast<LoadableTypeInfo>(IGF.getTypeInfo(paramType));
@@ -4988,7 +4990,8 @@ void irgen::emitForeignParameter(IRGenFunction &IGF, Explosion &params,
                                paramTI);
     return;
   case clang::CodeGen::ABIArgInfo::IndirectAliased:
-      llvm_unreachable("not implemented");
+  case clang::CodeGen::ABIArgInfo::TargetSpecific:
+    llvm_unreachable("not implemented");
   case clang::CodeGen::ABIArgInfo::Indirect: {
     Address address = paramTI.getAddressForPointer(params.claimNext());
     paramTI.loadAsTake(IGF, address, paramExplosion);
