@@ -79,6 +79,7 @@ private func registerSwiftPasses() {
   registerPass(highLevelCSE, { highLevelCSE.run($0) })
   registerPass(embeddedWitnessCallSpecialization, { embeddedWitnessCallSpecialization.run($0) })
   registerPass(letPropertyLowering, { letPropertyLowering.run($0) })
+  registerPass(mergeBorrowScopes, { mergeBorrowScopes.run($0) })
   registerPass(mergeCondFailsPass, { mergeCondFailsPass.run($0) })
   registerPass(constantCapturePropagation, { constantCapturePropagation.run($0) })
   registerPass(computeEscapeEffects, { computeEscapeEffects.run($0) })
