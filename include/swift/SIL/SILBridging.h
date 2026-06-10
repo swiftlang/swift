@@ -815,6 +815,7 @@ struct BridgedInstruction {
   BRIDGED_INLINE void PointerToAddressInst_setAlignment(uint64_t alignment) const;
   BRIDGED_INLINE bool AddressToPointerInst_needsStackProtection() const;
   BRIDGED_INLINE bool IndexAddrInst_needsStackProtection() const;
+  BRIDGED_INLINE bool IndexAddrInst_isProjection() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialRefInst_getConformances() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType InitExistentialRefInst_getFormalConcreteType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformanceArray InitExistentialAddrInst_getConformances() const;
@@ -1315,7 +1316,10 @@ struct BridgedBuilder{
                                                                                uint64_t alignment) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIndexAddr(BridgedValue base,
                                                                         BridgedValue index,
-                                                                        bool needsStackProtection) const;
+                                                                        bool needsStackProtection,
+                                                                        bool isProjection) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createIndexRawPointer(BridgedValue base,
+                                                                              BridgedValue index) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedRefCast(BridgedValue op,
                                                                                BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedAddrCast(BridgedValue op,

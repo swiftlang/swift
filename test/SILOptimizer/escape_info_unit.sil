@@ -1587,10 +1587,10 @@ bb0:
   %1 = alloc_ref $X
   %2 = vector_base_addr %0
   %3 = integer_literal $Builtin.Int64, 1
-  %4 = index_addr %2, %3
+  %4 = index_addr [projection] %2, %3
   store %1 to %4
   %6 = vector_base_addr %0
-  %7 = index_addr %6, %3
+  %7 = index_addr [projection] %6, %3
   %8 = load %4
   dealloc_stack %0
   return %8
@@ -1608,11 +1608,11 @@ bb0(%0 : $Builtin.Word):
   %3 = begin_borrow %2
   %4 = ref_tail_addr %3, $OneF
   %5 = integer_literal $Builtin.Word, 1
-  %6 = index_addr %4, %5
+  %6 = index_addr [projection] %4, %5
   %7 = alloc_ref $F
   %10 = struct $OneF (%7)
   store %10 to [init] %6
-  %30 = index_addr [stack_protection] %4, %0
+  %30 = index_addr [stack_protection] [projection] %4, %0
   %31 = load [copy] %30
   %32 = destructure_struct %31
   end_borrow %3

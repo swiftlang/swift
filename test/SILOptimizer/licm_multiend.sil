@@ -82,7 +82,7 @@ bb4(%27 : $Builtin.Int64):
   %37 = builtin "or_Int1"(%32 : $Builtin.Int1, %36 : $Builtin.Int1) : $Builtin.Int1
   cond_fail %37 : $Builtin.Int1
   %39 = builtin "truncOrBitCast_Int64_Word"(%29 : $Builtin.Int64) : $Builtin.Word
-  %40 = index_addr %23 : $*Int, %39 : $Builtin.Word
+  %40 = index_addr [projection] %23 : $*Int, %39 : $Builtin.Word
   %41 = struct_element_addr %40 : $*Int, #Int._value
   %42 = load %41 : $*Builtin.Int64
   %43 = struct $Int (%42 : $Builtin.Int64)
@@ -169,7 +169,7 @@ bb4(%27 : $Builtin.Int64):
   %37 = builtin "or_Int1"(%32 : $Builtin.Int1, %36 : $Builtin.Int1) : $Builtin.Int1
   cond_fail %37 : $Builtin.Int1
   %39 = builtin "truncOrBitCast_Int64_Word"(%29 : $Builtin.Int64) : $Builtin.Word
-  %40 = index_addr %23 : $*Int, %39 : $Builtin.Word
+  %40 = index_addr [projection] %23 : $*Int, %39 : $Builtin.Word
   %41 = struct_element_addr %40 : $*Int, #Int._value
   %42 = load %41 : $*Builtin.Int64
   %43 = struct $Int (%42 : $Builtin.Int64)

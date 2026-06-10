@@ -2659,9 +2659,11 @@ public:
   //===--------------------------------------------------------------------===//
 
   IndexAddrInst *createIndexAddr(SILLocation Loc, SILValue Operand,
-                                 SILValue Index, bool needsStackProtection) {
+                                 SILValue Index, bool needsStackProtection,
+                                 bool isProjection) {
     return insert(new (getModule()) IndexAddrInst(getSILDebugLocation(Loc),
-                                    Operand, Index, needsStackProtection));
+                                    Operand, Index, needsStackProtection,
+                                    isProjection));
   }
 
   TailAddrInst *createTailAddr(SILLocation Loc, SILValue Operand,

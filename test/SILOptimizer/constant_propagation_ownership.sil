@@ -796,15 +796,11 @@ bb0:
   return %12 : $(Builtin.Int1, Builtin.Int32, Builtin.Int64)
 }
 
-// CHECK-LABEL: sil [ossa] @constant_fold_indexing_inst_of_0 : $@convention(thin) (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
-// CHECK: bb0
-// CHECK-NEXT: pointer_to_address
-// CHECK-NEXT: pointer_to_address
-// CHECK-NEXT: load
-// CHECK-NEXT: load
-// CHECK-NEXT: tuple
-// CHECK-NEXT: return
-sil [ossa] @constant_fold_indexing_inst_of_0 : $@convention(thin) (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
+// CHECK-LABEL: sil [ossa] @dont_constant_fold_indexing_inst_of_0 : $@convention(thin) (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
+// CHECK:         index_addr
+// CHECK:         index_raw_pointer
+// CHECK:       } // end sil function 'dont_constant_fold_indexing_inst_of_0'
+sil [ossa] @dont_constant_fold_indexing_inst_of_0 : $@convention(thin) (Builtin.RawPointer) -> (Builtin.Int8, Builtin.Int8) {
 bb0(%0 : $Builtin.RawPointer):
   %1 = integer_literal $Builtin.Word, 0
   %2 = pointer_to_address %0 : $Builtin.RawPointer to [strict] $*Builtin.Int8

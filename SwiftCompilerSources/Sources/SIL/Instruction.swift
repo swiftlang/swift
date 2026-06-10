@@ -950,12 +950,29 @@ public protocol IndexingInstruction: SingleValueInstruction {
 extension IndexingInstruction {
   public var base: Value { operands[0].value }
   public var index: Value { operands[1].value }
+
+  public var constantIndex: Int? {
+    if let literal = index as? IntegerLiteralInst,
+       let indexValue = literal.value
+    {
+      return indexValue
+    }
+    return nil
+  }
 }
 
 final public
 class IndexAddrInst : SingleValueInstruction, IndexingInstruction {
   public var needsStackProtection: Bool {
     bridged.IndexAddrInst_needsStackProtection()
+  }
+  /// True if this instruction projects a single array element address from an
+  /// array base, as opposed to being used for general pointer arithmetic.
+  /// When set, the result cannot be used to reach other array elements (e.g.
+  /// by chaining `index_addr` instructions); without this flag such chaining
+  /// is permitted.
+  public var isProjection: Bool {
+    bridged.IndexAddrInst_isProjection()
   }
 }
 

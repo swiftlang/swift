@@ -3095,6 +3095,10 @@ ValueDecl *swift::getBuiltinValueDecl(ASTContext &Context, Identifier Id) {
     if (Types.size() != 1) return nullptr;
     return getGepOperation(Context, Id, Types[0]);
 
+  case BuiltinValueKind::GepProjection:
+    if (Types.size() != 1) return nullptr;
+    return getGepOperation(Context, Id, Types[0]);
+
   case BuiltinValueKind::GetTailAddr:
     if (Types.size() != 1) return nullptr;
     return getGetTailAddrOperation(Context, Id, Types[0]);
