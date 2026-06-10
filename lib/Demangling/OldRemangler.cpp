@@ -2953,10 +2953,22 @@ ManglingError Remangler::mangleOpaqueReturnTypeParent(Node *node, unsigned depth
 ManglingError Remangler::mangleOpaqueReturnTypeOf(Node *node,
                                                   EntityContext &ctx,
                                                   unsigned depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+  DEMANGLER_ASSERT(node->getNumChildren() >= 1, node);
+  Buffer << "QO";
+  return mangleEntityContext(node->getChild(0), ctx, depth + 1);
 }
 ManglingError Remangler::mangleOpaqueType(Node *node, unsigned depth) {
-  return MANGLING_ERROR(ManglingError::UnsupportedNodeKind, node);
+  DEMANGLER_ASSERT(node->getNumChildren() >= 2, node);
+  Buffer << "Qo";
+  mangleIndex(node->getChild(1)->getIndex());
+  RETURN_IF_ERROR(mangle(node->getChild(0), depth + 1));
+  if (node->getNumChildren() >= 3) {
+    Node *boundGenerics = node->getChild(2);
+    for (unsigned i = 0, e = boundGenerics->getNumChildren(); i < e; ++i)
+      RETURN_IF_ERROR(mangleChildNodes(boundGenerics->getChild(i), depth + 1));
+  }
+  Buffer << '_';
+  return ManglingError::Success;
 }
 ManglingError Remangler::mangleOpaqueTypeDescriptor(Node *node,
                                                     unsigned depth) {
