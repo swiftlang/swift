@@ -2536,6 +2536,39 @@ synthesizeAccessorBody(AbstractFunctionDecl *fn, void *) {
   llvm_unreachable("bad synthesized function kind");
 }
 
+/// If the accessor is one of the given kinds, and there is a @section on a
+/// parsed accessor of one of the given kinds, transfer it to the accessor.
+///
+/// Returns true if anything was transferred.
+static bool tryTransferAccessorSection(
+    AccessorDecl *accessor, ArrayRef<AccessorKind> kinds) {
+  // Is our accessor one of the expected kinds?
+  if (std::find(kinds.begin(), kinds.end(), accessor->getAccessorKind()) ==
+        kinds.end())
+    return false;
+
+  // If the accessor has a @section attribute already, we're done.
+  if (accessor->getAttrs().hasAttribute<SectionAttr>())
+    return true;
+
+  // Look for a parsed accessor from which we can pull the section name.
+  auto storage = accessor->getStorage();
+  for (auto kind : kinds) {
+    auto parsed = storage->getParsedAccessor(kind);
+    if (!parsed)
+      continue;
+
+    if (auto section = parsed->getAttrs().getAttribute<SectionAttr>()) {
+      // Clone the attribute.
+      ASTContext &ctx = storage->getASTContext();
+      accessor->getAttrs().add(section->clone(ctx));
+      return true;
+    }
+  }
+
+  return false;
+}
+
 static void finishImplicitAccessor(AccessorDecl *accessor,
                                    ASTContext &ctx) {
   accessor->setImplicit();
@@ -2545,6 +2578,28 @@ static void finishImplicitAccessor(AccessorDecl *accessor,
 
   if (accessor->doesAccessorHaveBody())
     accessor->setBodySynthesizer(&synthesizeAccessorBody);
+
+  // Look for a @section attribute to transfer.
+  AccessorKind readAccessors[] = {
+    AccessorKind::Get,
+    AccessorKind::DistributedGet,
+    AccessorKind::Read,
+    AccessorKind::YieldingBorrow,
+    AccessorKind::Borrow,
+    AccessorKind::Address
+  };
+  AccessorKind writeAccessors[] = {
+    AccessorKind::Set,
+    AccessorKind::Modify,
+    AccessorKind::YieldingMutate,
+    AccessorKind::Mutate,
+    AccessorKind::MutableAddress,
+    AccessorKind::Init,
+    AccessorKind::WillSet,
+    AccessorKind::DidSet
+  };
+  if (!tryTransferAccessorSection(accessor, writeAccessors))
+    tryTransferAccessorSection(accessor, readAccessors);
 }
 
 static AccessorDecl *createGetterPrototype(AbstractStorageDecl *storage,
