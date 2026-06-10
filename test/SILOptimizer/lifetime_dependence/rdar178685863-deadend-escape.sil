@@ -1,0 +1,91 @@
+// RUN: %target-sil-opt %s \
+// RUN:   --lifetime-dependence-diagnostics \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -enable-experimental-feature Lifetimes \
+// RUN:   -enable-experimental-feature AddressableTypes \
+// RUN:   -o /dev/null
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Lifetimes
+// REQUIRES: swift_feature_AddressableTypes
+
+// Verify that diagnostics does not report an escape. Requires LifetimeDependence.Scope.computeInitializedRange extends
+// the range to dead-end blocks.
+
+sil_stage raw
+
+import Builtin
+import Swift
+import SwiftShims
+
+public protocol IterableIteratorProtocol<Element, Failure> : ~Copyable, ~Escapable {
+  associatedtype Element : ~Copyable
+  associatedtype Failure : Error = Never
+}
+
+struct Iterator<T> : ~Copyable, ~Escapable, IterableIteratorProtocol {
+  typealias Element = T
+  @_hasStorage let t: T { get }
+
+  @_lifetime(borrow t)
+  init(t: borrowing T)
+
+  typealias Failure = Never
+}
+
+struct List<T> : ~Escapable {
+  @_hasStorage let t: T { get }
+
+  @_lifetime(borrow t)
+  init(t: borrowing T)
+}
+
+sil @iteratorNextSpan : $@convention(method) <τ_0_0 where τ_0_0 : IterableIteratorProtocol, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_0.Element : ~Copyable> (@lifetime(copy 0) @inout τ_0_0) -> (@lifetime(borrow address_for_deps 0) @owned Span<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
+sil @makeList : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @out List<τ_0_0>
+sil @makeListIterator : $@convention(method) <τ_0_0> (@in_guaranteed List<τ_0_0>) -> @lifetime(borrow address_for_deps 0) @out Iterator<τ_0_0>
+sil @spanCount : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Int
+  
+sil hidden [ossa] @test : $@convention(thin) <T> (@in_guaranteed T) -> () {
+bb0(%0 : $*T):
+  %2 = alloc_stack [lexical] [var_decl] $List<T>, let, name "list"
+
+  %3 = function_ref @makeList : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @out List<τ_0_0>
+  %4 = apply %3<T>(%2, %0) : $@convention(thin) <τ_0_0> (@in_guaranteed τ_0_0) -> @lifetime(borrow address_for_deps 0) @out List<τ_0_0>
+  // NOTE: the dependency is valid as long as the lifetime of %2 extends through the dead-end block.
+  mark_dependence_addr [unresolved] %2 on %0
+  %6 = alloc_stack [lexical] [var_decl] $Iterator<T>, var, name "iterator", type $Iterator<T>
+
+  %7 = function_ref @makeListIterator : $@convention(method) <τ_0_0> (@in_guaranteed List<τ_0_0>) -> @lifetime(borrow address_for_deps 0) @out Iterator<τ_0_0>
+  %8 = apply %7<T>(%6, %2) : $@convention(method) <τ_0_0> (@in_guaranteed List<τ_0_0>) -> @lifetime(borrow address_for_deps 0) @out Iterator<τ_0_0>
+  mark_dependence_addr [unresolved] %6 on %2
+  %10 = begin_access [modify] [static] %6
+
+  %11 = function_ref @iteratorNextSpan : $@convention(method) <τ_0_0 where τ_0_0 : IterableIteratorProtocol, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_0.Element : ~Copyable> (@lifetime(copy 0) @inout τ_0_0) -> (@lifetime(borrow address_for_deps 0) @owned Span<τ_0_0.Element>, @error_indirect τ_0_0.Failure)
+  %12 = alloc_stack $Never
+  try_apply %11<Iterator<T>>(%12, %10) : $@convention(method) <τ_0_0 where τ_0_0 : IterableIteratorProtocol, τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_0.Element : ~Copyable> (@lifetime(copy 0) @inout τ_0_0) -> (@lifetime(borrow address_for_deps 0) @owned Span<τ_0_0.Element>, @error_indirect τ_0_0.Failure), normal bb1, error bb2
+
+bb1(%14 : @owned $Span<T>):
+  mark_dependence_addr [unresolved] %12 on %10
+  %16 = mark_dependence [unresolved] %14 on %10
+  dealloc_stack %12
+  %18 = move_value [var_decl] %16
+
+  %20 = function_ref @spanCount : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Int
+  %21 = apply %20<T>(%18) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (@guaranteed Span<τ_0_0>) -> Int
+  destroy_value %18
+  end_access %10
+  destroy_addr %6
+  dealloc_stack %6
+  destroy_addr %2
+  dealloc_stack %2
+  %29 = tuple ()
+  return %29
+
+bb2:
+  mark_dependence_addr [unresolved] %12 on %10
+  destroy_addr %6
+  end_access %10
+  // NOTE: destroy_addr %2 is missing, so we don't naturally see the full range of %2 = alloc_stack.
+  unreachable
+}
