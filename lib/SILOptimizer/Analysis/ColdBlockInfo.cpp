@@ -243,7 +243,7 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
 
   // First pass: collect all counters and check for evidence of profiling.
   // ProfileCounter has native missing data support via hasValue().
-  bool hasAnyNonZeroCount = false;
+  bool hasAnyExplicitCount = false;
   bool hasAnyMissingData = false;
   SmallVector<ProfileCounter, 2> counters;
 
@@ -253,8 +253,8 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
 
     if (!counter.hasValue()) {
       hasAnyMissingData = true;
-    } else if (counter.getValue() > 0) {
-      hasAnyNonZeroCount = true;
+    } else {
+      hasAnyExplicitCount = true;
     }
   }
 
@@ -262,17 +262,19 @@ bool ColdBlockInfo::inferFromEdgeProfile(SILBasicBlock *BB) {
   if (hasAnyMissingData) {
     if (ZeroCountHandling == ZeroCountStrategy::Optimistic) {
       // Optimistic strategy: treat missing data as zero only when we have
-      // evidence of profiling (at least one non-zero count).
+      // evidence of profiling (at least one explicit count).
       // This enables optimizations when profile data is partial.
-      if (!hasAnyNonZeroCount) {
+      if (!hasAnyExplicitCount) {
         // No evidence of profiling - bail out conservatively
-        LLVM_DEBUG(llvm::dbgs() << "ColdBlockInfo: no evidence of profiling for "
-                                << toString(BB) << " (optimistic mode, but no non-zero counts)\n");
+        LLVM_DEBUG(llvm::dbgs()
+                   << "ColdBlockInfo: no evidence of profiling for "
+                   << toString(BB)
+                   << " (optimistic mode, but no explicit counts)\n");
         return false;
       }
       // Continue to build count vector, treating missing as zero
       LLVM_DEBUG(llvm::dbgs() << "ColdBlockInfo: applying optimistic strategy for "
-                              << toString(BB) << " (found non-zero counts)\n");
+                              << toString(BB) << " (found explicit counts)\n");
     } else {
       // Conservative strategy: bail out when any missing data exists.
       // This prevents marking unprofiled code as cold.

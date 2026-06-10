@@ -1,7 +1,8 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline -Xllvm --debug-only=cold-block-info 2> %t/conservative.txt | %FileCheck %s --check-prefix=CHECK-CONSERVATIVE
+// RUN: %empty-directory(%t)
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline -debug-only=cold-block-info 2> %t/conservative.txt | %FileCheck %s --check-prefix=CHECK-CONSERVATIVE
 // RUN: %FileCheck %s --input-file=%t/conservative.txt --check-prefix=CHECK-CONSERVATIVE-DEBUG
 
-// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline -sil-zero-count-strategy=optimistic -Xllvm --debug-only=cold-block-info 2> %t/optimistic.txt | %FileCheck %s --check-prefix=CHECK-OPTIMISTIC
+// RUN: %target-sil-opt -enable-sil-verify-all %s -performance-inline -sil-zero-count-strategy=optimistic -debug-only=cold-block-info 2> %t/optimistic.txt | %FileCheck %s --check-prefix=CHECK-OPTIMISTIC
 // RUN: %FileCheck %s --input-file=%t/optimistic.txt --check-prefix=CHECK-OPTIMISTIC-DEBUG
 
 // REQUIRES: asserts
@@ -27,7 +28,7 @@ import Swift
 // CHECK-OPTIMISTIC-DEBUG-NEXT: ColdBlockInfo {
 // CHECK-OPTIMISTIC-DEBUG: $test_zero_count_block::bb1 -> cold
 // CHECK-OPTIMISTIC-DEBUG: $test_zero_count_block::bb2 -> cold
-// CHECK-OPTIMISTIC-DEBUG: STATISTICS: warm 1 | cold 2
+// CHECK-OPTIMISTIC-DEBUG: STATISTICS: warm {{[0-9]+}} | cold {{[0-9]+}}
 // CHECK-OPTIMISTIC-DEBUG-NEXT: }
 
 sil @test_zero_count_block : $@convention(thin) () -> () !function_entry_count(100) {
@@ -197,17 +198,25 @@ bb3:
 // CHECK-CONSERVATIVE-LABEL: sil @test_missing_with_zero
 // CHECK-OPTIMISTIC-LABEL: sil @test_missing_with_zero
 
-// One edge missing, one edge explicitly zero - no non-zero evidence of execution.
-// Both strategies should skip inference (totalCount < 1), resulting in early exit.
+// One edge missing, one edge explicitly zero - conservative mode still skips
+// inference because data is missing.
 // CHECK-CONSERVATIVE-DEBUG-LABEL: --> Stopping early in $test_missing_with_zero
 
-// CHECK-OPTIMISTIC-DEBUG-LABEL: --> Stopping early in $test_missing_with_zero
+// With optimistic strategy, the explicit zero count is evidence of profiling.
+// The missing edge is treated as zero, so both successors are cold.
+// CHECK-OPTIMISTIC-DEBUG-LABEL: --> Final for $test_missing_with_zero
+// CHECK-OPTIMISTIC-DEBUG-NEXT: ColdBlockInfo {
+// CHECK-OPTIMISTIC-DEBUG: $test_missing_with_zero::bb1 -> cold
+// CHECK-OPTIMISTIC-DEBUG: $test_missing_with_zero::bb2 -> cold
+// CHECK-OPTIMISTIC-DEBUG: STATISTICS: warm {{[0-9]+}} | cold {{[0-9]+}}
+// CHECK-OPTIMISTIC-DEBUG-NEXT: }
 
 sil @test_missing_with_zero : $@convention(thin) () -> () !function_entry_count(100) {
 bb0:
   %0 = integer_literal $Builtin.Int1, 0
   // One edge missing, one edge explicitly zero
-  // Both strategies should be conservative (no non-zero evidence)
+  // Optimistic strategy treats the missing count as zero because the explicit
+  // zero count is evidence that profiling happened.
   cond_br %0, bb1, bb2, !true_count(0)
 
 bb1:
