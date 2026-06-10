@@ -1,9 +1,8 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift %S/Inputs/Inlining.swift -Xfrontend -disable-availability-checking -parse-as-library -g -o %t/Inlining
 // RUN: %target-build-swift %s -parse-as-library -g -o %t/DwarfReader
-// RUN: %target-run %t/DwarfReader %t/Inlining | %FileCheck %s
+// RUN: %target-run %t/DwarfReader %S/Inputs/Inlining | %FileCheck %s
 
-// REQUIRES: OS=linux-gnu
+// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: backtracing
 
 @_spi(DwarfTest) import Runtime
